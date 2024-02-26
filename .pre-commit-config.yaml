@@ -1,0 +1,25 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.6
+    hooks:
+      - id: ruff
+        args: [ --fix ]
+      - id: ruff-format
+        exclude: ^.*(?:generative_regressor|actor).*$
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: end-of-file-fixer
+        types: [file, python]
+      - id: trailing-whitespace
+        types: [file, python]
+  - repo: local
+    hooks:
+      - id: pytest
+        name: pytest
+        entry: pytest tests
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-push]

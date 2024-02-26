@@ -22,3 +22,15 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# Virtual env
+pyvenv.cfg
+bin/
+share/
+
+# Models
+ag_ckpt_vocab/
+
+# IDEs
+
+.vscode/

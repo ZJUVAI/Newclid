@@ -1,0 +1,85 @@
+[build-system]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
+
+[project]
+name = "ddar"
+authors = [
+    {name = "Mathis Federico", email = "mathfederico@gmail.com"}
+]
+dynamic = ["version", "readme", "dependencies"]
+description = "DDAR geometric symbolic solver standalone package."
+requires-python = ">=3.6"
+classifiers=[
+    'Intended Audience :: Science/Research',
+    'Intended Audience :: Developers',
+    'Topic :: Software Development',
+    'Topic :: Scientific/Engineering',
+    'Operating System :: Microsoft :: Windows',
+    'Operating System :: POSIX',
+    'Operating System :: Unix',
+    'Operating System :: MacOS',
+]
+
+[project.urls]
+Homepage = "https://github.com/ramp-kits/rl_simulator"
+
+[project.optional-dependencies]
+dev = ['black', 'ruff', 'pytest', 'pytest-cov', 'pytest-check', 'pytest-mock', 'pre-commit']
+sb3 = ['torch<2,>=1.13', 'stable-baselines3==1.4.0']
+
+[tool.setuptools]
+license-files = ['LICEN[CS]E*', 'COPYING*', 'NOTICE*', 'AUTHORS*']
+
+[project.scripts]
+
+
+[tool.setuptools.dynamic]
+readme = { file = ["README.md"] }
+dependencies = { file = ["requirements.txt"] }
+
+[tool.setuptools_scm]
+
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    'ignore:distutils Version classes are deprecated:DeprecationWarning',
+    'ignore:`np.bool8` is a deprecated alias for `np.bool_`:DeprecationWarning',
+    'ignore:Training and eval env are not of the same type:UserWarning',
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "legacy: old tests that should be updated or removed"
+]
+
+[tool.coverage.run]
+source = ['src']
+
+[tool.coverage.report]
+exclude_also = [
+    # Don't complain about missing debug-only code:
+    "def __repr__",
+    "if self\\.debug",
+
+    # Don't complain if tests don't hit defensive assertion code:
+    "raise AssertionError",
+    "raise NotImplementedError",
+
+    # Don't complain if non-runnable code isn't run:
+    "if 0:",
+    "if __name__ == .__main__.:",
+
+    # Don't complain about abstract methods, they aren't run:
+    "@(abc\\.)?abstractmethod",
+
+    # Don't complain about typing imports, they aren't run:
+    "if TYPE_CHECKING:",
+
+    # Don't complain about optional imports, they don't matter for now:
+    "except ImportError:"
+]
+omit = [
+    # Don't cover optional_imports because it makes no sense to test it:
+    "optional_imports.py",
+    # Don't cover deprecated model envs:
+    "**/mbrltools/model_envs/legacy/**"
+]
