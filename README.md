@@ -1,5 +1,5 @@
 
-# DDAR Geometric Symbolic solver
+# Symbolic solver for Geometric problems
 
 A standalone package of the geometric solver used for 
 introduced in the [Nature 2024](https://www.nature.com/articles/s41586-023-06747-5) paper:.
