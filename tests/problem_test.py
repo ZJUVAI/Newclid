@@ -16,7 +16,7 @@
 """Unit tests for problem.py."""
 
 import pytest
-import ddar.problem as pr
+import geosolver.problem as pr
 
 
 class TestProblem:

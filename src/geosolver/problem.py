@@ -20,8 +20,8 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any
 
-import ddar.geometry as gm
-import ddar.pretty as pt
+import geosolver.geometry as gm
+import geosolver.pretty as pt
 
 
 def reshape(list_to_reshape: list[Any], n: int = 1) -> list[list[Any]]:

@@ -34,3 +34,6 @@ ag_ckpt_vocab/
 # IDEs
 
 .vscode/
+
+# Coverage data
+.coverage

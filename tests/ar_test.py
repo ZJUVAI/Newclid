@@ -17,9 +17,9 @@
 
 import pytest
 import pytest_check as check
-import ddar.ar as ar
-import ddar.graph as gh
-import ddar.problem as pr
+import geosolver.ar as ar
+import geosolver.graph as gh
+import geosolver.problem as pr
 
 
 class TestAR:

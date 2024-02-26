@@ -19,10 +19,10 @@
 import pytest
 import pytest_check as check
 
-from ddar.ddar import solve
-import ddar.graph as gh
-import ddar.problem as pr
-import ddar.trace_back as tb
+from geosolver.ddar import solve
+import geosolver.graph as gh
+import geosolver.problem as pr
+import geosolver.trace_back as tb
 
 
 class TestTraceback:

@@ -16,7 +16,7 @@
 """Unit tests for graph_utils.py."""
 import unittest
 
-import ddar.graph_utils as gu
+import geosolver.graph_utils as gu
 
 
 class TestGraphUtils(unittest.TestCase):

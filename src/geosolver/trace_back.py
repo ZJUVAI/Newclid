@@ -17,9 +17,9 @@
 
 from typing import Any
 
-import ddar.geometry as gm
-import ddar.pretty as pt
-import ddar.problem as problem
+import geosolver.geometry as gm
+import geosolver.pretty as pt
+import geosolver.problem as problem
 
 
 pretty = pt.pretty

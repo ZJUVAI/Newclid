@@ -17,9 +17,9 @@
 import pytest
 import pytest_check as check
 
-import ddar.graph as gh
-import ddar.numericals as nm
-import ddar.problem as pr
+import geosolver.graph as gh
+import geosolver.numericals as nm
+import geosolver.problem as pr
 
 
 MAX_LEVEL = 10

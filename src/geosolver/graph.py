@@ -22,15 +22,15 @@ from collections import defaultdict
 from typing import Callable, Generator, Optional, Type, Union
 import logging
 
-import ddar.ar as ar
-import ddar.geometry as gm
-from ddar.geometry import Angle, Direction, Length, Ratio
-from ddar.geometry import Circle, Line, Point, Segment
-from ddar.geometry import Measure, Value
-import ddar.graph_utils as utils
-import ddar.numericals as nm
-import ddar.problem as problem
-from ddar.problem import Dependency, EmptyDependency
+import geosolver.ar as ar
+import geosolver.geometry as gm
+from geosolver.geometry import Angle, Direction, Length, Ratio
+from geosolver.geometry import Circle, Line, Point, Segment
+from geosolver.geometry import Measure, Value
+import geosolver.graph_utils as utils
+import geosolver.numericals as nm
+import geosolver.problem as problem
+from geosolver.problem import Dependency, EmptyDependency
 
 
 np = nm.np

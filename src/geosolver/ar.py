@@ -19,9 +19,9 @@ from collections import defaultdict
 from fractions import Fraction as frac
 from typing import Any, Generator
 
-import ddar.geometry as gm
+import geosolver.geometry as gm
 import numpy as np
-import ddar.problem as pr
+import geosolver.problem as pr
 from scipy import optimize
 
 

@@ -17,7 +17,7 @@
 
 import pytest_check as check
 
-import ddar.numericals as nm
+import geosolver.numericals as nm
 
 np = nm.np
 

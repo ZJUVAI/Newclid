@@ -23,12 +23,12 @@ from collections import defaultdict
 import time
 
 
-import ddar.geometry as gm
-import ddar.graph as gh
-import ddar.graph_utils as utils
-import ddar.numericals as nm
-import ddar.problem as pr
-from ddar.problem import Dependency, EmptyDependency
+import geosolver.geometry as gm
+import geosolver.graph as gh
+import geosolver.graph_utils as utils
+import geosolver.numericals as nm
+import geosolver.problem as pr
+from geosolver.problem import Dependency, EmptyDependency
 
 
 def intersect1(set1: set[Any], set2: set[Any]) -> Any:

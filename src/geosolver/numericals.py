@@ -27,7 +27,7 @@ import numpy as np
 from numpy.random import uniform as unif
 
 
-import ddar.geometry as gm
+import geosolver.geometry as gm
 
 ATOM = 1e-12
 

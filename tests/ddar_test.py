@@ -13,13 +13,13 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Unit tests for ddar.py."""
+"""Unit tests for geosolver.py."""
 import pytest
 import pytest_check as check
 
-import ddar.ddar as ddar
-import ddar.graph as gh
-import ddar.problem as pr
+from geosolver.ddar import solve
+import geosolver.graph as gh
+import geosolver.problem as pr
 
 
 class TestDDAR:
@@ -33,7 +33,7 @@ class TestDDAR:
         p = pr.Problem.from_txt(txt)
         g, _ = gh.Graph.build_problem(p, self.defs)
 
-        ddar.solve(g, self.rules, p, max_level=1000)
+        solve(g, self.rules, p, max_level=1000)
         goal_args = g.names2nodes(p.goal.args)
         check.is_false(g.check(p.goal.name, goal_args))
 
@@ -42,7 +42,7 @@ class TestDDAR:
         p = pr.Problem.from_txt(txt)
         g, _ = gh.Graph.build_problem(p, self.defs)
 
-        ddar.solve(g, self.rules, p, max_level=1000)
+        solve(g, self.rules, p, max_level=1000)
         goal_args = g.names2nodes(p.goal.args)
         check.is_true(g.check(p.goal.name, goal_args))
 
@@ -54,6 +54,6 @@ class TestDDAR:
         )
         g, _ = gh.Graph.build_problem(p, self.defs)
 
-        ddar.solve(g, self.rules, p, max_level=1000)
+        solve(g, self.rules, p, max_level=1000)
         goal_args = g.names2nodes(p.goal.args)
         check.is_true(g.check(p.goal.name, goal_args))

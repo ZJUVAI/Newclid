@@ -17,9 +17,9 @@
 import pytest
 import pytest_check as check
 
-from ddar.dd import bfs_one_level
-import ddar.graph as gh
-import ddar.problem as pr
+from geosolver.dd import bfs_one_level
+import geosolver.graph as gh
+import geosolver.problem as pr
 
 
 MAX_LEVEL = 10

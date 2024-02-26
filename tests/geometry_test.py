@@ -16,7 +16,7 @@
 """Unit tests for geometry.py."""
 import pytest_check as check
 
-import ddar.geometry as gm
+import geosolver.geometry as gm
 
 
 class TestGeometry:
