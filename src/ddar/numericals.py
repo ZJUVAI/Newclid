@@ -29,9 +29,6 @@ from numpy.random import uniform as unif
 
 import ddar.geometry as gm
 
-matplotlib.use("TkAgg")
-
-
 ATOM = 1e-12
 
 
