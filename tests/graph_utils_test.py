@@ -16,7 +16,6 @@
 """Unit tests for graph_utils.py."""
 import unittest
 
-from absl.testing import absltest
 import ddar.graph_utils as gu
 
 
@@ -138,7 +137,3 @@ class TestGraphUtils(unittest.TestCase):
                 (4, 3, 2, 1),
             ],
         )
-
-
-if __name__ == "__main__":
-    absltest.main()
