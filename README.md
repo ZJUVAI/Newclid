@@ -66,11 +66,11 @@ pytest tests
 
 ## Source code description
 
-Files in this repository include python modules/scripts to run the solvers and
+Modules of the geosolver package implements everything needed to run the solvers and
 resource files necessary for the script to execute. We listed below
 each of them and their description.
 
-| File name              | Description                                                                        |
+| Module name            | Description                                                                        |
 |------------------------|------------------------------------------------------------------------------------|
 | `geometry.py`          | Implements nodes (Point, Line, Circle, etc) in the proof state graph.              |
 | `numericals.py`        | Implements the numerical engine in the dynamic geometry environment.               |
@@ -84,14 +84,7 @@ each of them and their description.
 | `beam_search.py`       | Implements beam decoding of a language model in JAX.                               |
 | `models.py`            | Implements the transformer model.                                                  |
 | `transformer_layer.py` | Implements the transformer layer.                                                  |
-| `decoder_stack.py`     | Implements the transformer decoder stack.                                          |
-| `lm_inference.py`      | Implements an interface to a trained LM to perform decoding.                       |
-| `alphageometry.py`                | Main script that loads problems, calls DD+AR or AlphaGeometry solver, and prints solutions.   |
 | `pretty.py`            | Pretty formating the solutions output by solvers.                                  |
-| `*_test.py`            | Tests for the corresponding module.                                                |
-| `download.sh`          | Script to download model checkpoints and LM                                        |
-| `run.sh`               | Script to execute instructions in README.                                          |
-| `run_tests.sh`         | Script to execute the test suite.                                                  |
 
 
 Resource files:
