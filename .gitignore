@@ -27,6 +27,7 @@ MANIFEST
 pyvenv.cfg
 bin/
 share/
+venv/
 
 # Models
 ag_ckpt_vocab/
