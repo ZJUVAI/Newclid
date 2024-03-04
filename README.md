@@ -16,14 +16,7 @@ introduced in the [Nature 2024](https://www.nature.com/articles/s41586-023-06747
 
 ## Installation
 
-1. (Optional) Create a virtual environment, for example with venv:
-
-```
-python -m venv venv
-source ./bin/activate
-```
-
-2. Install last release using pip
+Using pip
 
 ```
 pip install git+https://rnd-gitlab-eu.huawei.com/Noahs-Ark/libraries/ddar
