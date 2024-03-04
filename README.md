@@ -42,7 +42,12 @@ cd path/to/repo
 
 ```
 python -m venv venv
+
+# On UNIX
 source ./bin/activate
+
+# On Windows
+.\venv\Scripts\activate
 ```
 
 3. Install as an editable package with dev requirements
