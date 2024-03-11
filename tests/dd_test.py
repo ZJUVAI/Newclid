@@ -43,7 +43,7 @@ class TestDD:
         goal_args = g.names2nodes(p.goal.args)
 
         success = False
-        for level in range(MAX_LEVEL):
+        for level in range(1, MAX_LEVEL):
             added, _, _, _ = bfs_one_level(g, self.rules, level, p)
             if g.check(p.goal.name, goal_args):
                 success = True
@@ -62,7 +62,7 @@ class TestDD:
         goal_args = g.names2nodes(p.goal.args)
 
         success = False
-        for level in range(MAX_LEVEL):
+        for level in range(1, MAX_LEVEL):
             added, _, _, _ = bfs_one_level(g, self.rules, level, p)
             if g.check(p.goal.name, goal_args):
                 success = True
