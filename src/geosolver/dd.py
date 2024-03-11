@@ -17,18 +17,20 @@
 
 
 from __future__ import annotations
-from typing import Any, Callable, Generator
+from typing import TYPE_CHECKING, Any, Callable, Generator
 
 from collections import defaultdict
 import time
 
 
 import geosolver.geometry as gm
-import geosolver.graph as gh
 import geosolver.graph_utils as utils
 import geosolver.numericals as nm
 import geosolver.problem as pr
 from geosolver.problem import Dependency, EmptyDependency
+
+if TYPE_CHECKING:
+    from geosolver.graph import Graph
 
 
 def intersect1(set1: set[Any], set2: set[Any]) -> Any:
@@ -46,7 +48,7 @@ def diff_point(line: gm.Line, a: gm.Point) -> gm.Point:
 
 
 def match_eqratio_eqratio_eqratio(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -93,7 +95,7 @@ def match_eqratio_eqratio_eqratio(
 
 
 def match_eqangle_eqangle_eqangle(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -140,7 +142,7 @@ def match_eqangle_eqangle_eqangle(
 
 
 def match_perp_perp_npara_eqangle(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -167,7 +169,7 @@ def match_perp_perp_npara_eqangle(
 
 
 def match_circle_coll_eqangle_midp(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -209,7 +211,7 @@ def match_circle_coll_eqangle_midp(
 
 
 def match_midp_perp_cong(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -224,7 +226,7 @@ def match_midp_perp_cong(
 
 
 def match_cyclic_eqangle_cong(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -239,7 +241,7 @@ def match_cyclic_eqangle_cong(
 
 
 def match_circle_eqangle_perp(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -280,7 +282,7 @@ def match_circle_eqangle_perp(
 
 
 def match_circle_perp_eqangle(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -299,7 +301,7 @@ def match_circle_perp_eqangle(
 
 
 def match_perp_perp_ncoll_para(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -324,7 +326,7 @@ def match_perp_perp_ncoll_para(
 
 
 def match_eqangle6_ncoll_cong(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -339,7 +341,7 @@ def match_eqangle6_ncoll_cong(
 
 
 def match_eqangle_perp_perp(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -366,7 +368,7 @@ def match_eqangle_perp_perp(
 
 
 def match_eqangle_ncoll_cyclic(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -402,7 +404,7 @@ def match_eqangle_ncoll_cyclic(
 
 
 def match_eqangle_para(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -426,7 +428,7 @@ def match_eqangle_para(
 
 
 def match_cyclic_eqangle(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -459,7 +461,7 @@ def rotate_simtri(
 
 
 def match_cong_cong_cong_cyclic(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -478,7 +480,7 @@ def match_cong_cong_cong_cyclic(
 
 
 def match_cong_cong_cong_ncoll_contri(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -497,7 +499,7 @@ def match_cong_cong_cong_ncoll_contri(
 
 
 def match_cong_cong_eqangle6_ncoll_contri(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -540,7 +542,7 @@ def match_cong_cong_eqangle6_ncoll_contri(
 
 
 def match_eqratio6_eqangle6_ncoll_simtri(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -566,7 +568,7 @@ def match_eqratio6_eqangle6_ncoll_simtri(
 
 
 def match_eqangle6_eqangle6_ncoll_simtri(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -590,7 +592,7 @@ def match_eqangle6_eqangle6_ncoll_simtri(
 
 
 def match_eqratio6_eqratio6_ncoll_simtri(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -614,7 +616,7 @@ def match_eqratio6_eqratio6_ncoll_simtri(
 
 
 def match_eqangle6_eqangle6_ncoll_simtri2(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -645,7 +647,7 @@ def rotate_contri(
 
 
 def match_eqangle6_eqangle6_ncoll_cong_contri(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -672,7 +674,7 @@ def match_eqangle6_eqangle6_ncoll_cong_contri(
 
 
 def match_eqratio6_eqratio6_ncoll_cong_contri(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -699,7 +701,7 @@ def match_eqratio6_eqratio6_ncoll_cong_contri(
 
 
 def match_eqangle6_eqangle6_ncoll_cong_contri2(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -725,7 +727,7 @@ def match_eqangle6_eqangle6_ncoll_cong_contri2(
 
 
 def match_eqratio6_coll_ncoll_eqangle6(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -744,7 +746,7 @@ def match_eqratio6_coll_ncoll_eqangle6(
 
 
 def match_eqangle6_coll_ncoll_eqratio6(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -763,7 +765,7 @@ def match_eqangle6_coll_ncoll_eqratio6(
 
 
 def match_eqangle6_ncoll_cyclic(
-    g: gh.Graph,
+    g: "Graph",
     g_matcher: Callable[[str], list[tuple[gm.Point, ...]]],
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
@@ -775,7 +777,7 @@ def match_eqangle6_ncoll_cyclic(
             yield dict(zip("ABPQ", [b, c, a, x]))
 
 
-def match_all(name: str, g: gh.Graph) -> Generator[tuple[gm.Point, ...], None, None]:
+def match_all(name: str, g: "Graph") -> Generator[tuple[gm.Point, ...], None, None]:
     """Match all instances of a certain relation."""
     if name in ["ncoll", "npara", "nperp"]:
         return []
@@ -805,7 +807,7 @@ def match_all(name: str, g: gh.Graph) -> Generator[tuple[gm.Point, ...], None, N
 
 
 def cache_match(
-    graph: gh.Graph,
+    graph: "Graph",
 ) -> Callable[[str], list[tuple[gm.Point, ...]]]:
     """Cache throughout one single BFS level."""
     cache = {}
@@ -850,7 +852,7 @@ def try_to_map(
 
 
 def match_generic(
-    g: gh.Graph, cache: Callable[[str], list[tuple[gm.Point, ...]]], theorem: pr.Theorem
+    g: "Graph", cache: Callable[[str], list[tuple[gm.Point, ...]]], theorem: pr.Theorem
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match any generic rule that is not one of the above match_*() rules."""
     clause2enum = {}
@@ -927,28 +929,15 @@ BUILT_IN_FNS = {
 }
 
 
-SKIP_THEOREMS = set()
-
-
-def set_skip_theorems(theorems: set[str]) -> None:
-    SKIP_THEOREMS.update(theorems)
-
-
 MAX_BRANCH = 50_000
 
 
 def match_one_theorem(
-    g: gh.Graph, cache: Callable[[str], list[tuple[gm.Point, ...]]], theorem: pr.Theorem
+    g: "Graph", cache: Callable[[str], list[tuple[gm.Point, ...]]], theorem: pr.Theorem
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match all instances of a single theorem (rule)."""
     if cache is None:
         cache = cache_match(g)
-
-    if theorem.name in SKIP_THEOREMS:
-        return []
-
-    if theorem.name.split("_")[-1] in SKIP_THEOREMS:
-        return []
 
     if theorem.name in BUILT_IN_FNS:
         mps = BUILT_IN_FNS[theorem.name](g, cache, theorem)
@@ -965,7 +954,7 @@ def match_one_theorem(
 
 
 def match_all_theorems(
-    g: gh.Graph, theorems: list[pr.Theorem], goal: pr.Clause
+    g: "Graph", theorems: list[pr.Theorem], goal: pr.Clause
 ) -> dict[pr.Theorem, dict[pr.Theorem, dict[str, gm.Point]]]:
     """Match all instances of all theorems (rules)."""
     cache = cache_match(g)
@@ -989,13 +978,13 @@ def match_all_theorems(
                 continue
 
         mappings = match_one_theorem(g, cache, theorem)
-        if len(mappings):
+        if mappings:
             theorem2mappings[theorem] = list(mappings)
     return theorem2mappings
 
 
 def bfs_one_level(
-    g: gh.Graph,
+    g: "Graph",
     theorems: list[pr.Theorem],
     level: int,
     controller: pr.Problem,
@@ -1110,7 +1099,7 @@ def bfs_one_level(
     return added, derives, eq4s, branching
 
 
-def create_consts_str(g: gh.Graph, s: str) -> gm.Angle | gm.Ratio:
+def create_consts_str(g: "Graph", s: str) -> gm.Angle | gm.Ratio:
     if "pi/" in s:
         n, d = s.split("pi/")
         n, d = int(n), int(d)
@@ -1122,7 +1111,7 @@ def create_consts_str(g: gh.Graph, s: str) -> gm.Angle | gm.Ratio:
     return p0
 
 
-def do_algebra(g: gh.Graph, added: list[pr.Dependency], verbose: bool = False) -> None:
+def do_algebra(g: "Graph", added: list[pr.Dependency], verbose: bool = False) -> None:
     for add in added:
         g.add_algebra(add, None)
     derives, eq4s = g.derive_algebra(level=None, verbose=verbose)
@@ -1131,7 +1120,7 @@ def do_algebra(g: gh.Graph, added: list[pr.Dependency], verbose: bool = False) -
 
 
 def apply_derivations(
-    g: gh.Graph, derives: dict[str, list[tuple[gm.Point, ...]]]
+    g: "Graph", derives: dict[str, list[tuple[gm.Point, ...]]]
 ) -> list[pr.Dependency]:
     applied = []
     all_derives = list(derives.items())

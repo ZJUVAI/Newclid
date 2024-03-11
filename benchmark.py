@@ -39,6 +39,7 @@ def main():
         logging.info(f"Starting problem {problem_name} with ddar only.")
         graph, _ = gh.Graph.build_problem(problem, DEFINITIONS)
         run_ddar(graph, problem, out_folder_path / problem_name)
+        graph.dependency_graph.show_html(RULES)
         return
 
 

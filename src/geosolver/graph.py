@@ -31,6 +31,7 @@ import geosolver.graph_utils as utils
 import geosolver.numericals as nm
 import geosolver.problem as problem
 from geosolver.problem import Dependency, EmptyDependency
+from geosolver.dependency_graph import DependencyGraph
 
 
 np = nm.np
@@ -117,6 +118,9 @@ class Graph:
 
         # to quick access deps.
         self.cache = {}
+
+        # to display the deps graph.
+        self.dependency_graph = DependencyGraph()
 
         self._pair2line = {}
         self._triplet2circle = {}
@@ -390,7 +394,9 @@ class Graph:
 
         for x in self.rtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
-            dep = EmptyDependency(level=level, rule_name="a01")
+            dep = EmptyDependency(
+                level=level, rule_name=ar.AlgebraicRules.Ratio_Chase.value
+            )
             dep.why = why
 
             if len(x) == 2:
@@ -415,7 +421,9 @@ class Graph:
 
         for x in self.atable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
-            dep = EmptyDependency(level=level, rule_name="a02")
+            dep = EmptyDependency(
+                level=level, rule_name=ar.AlgebraicRules.Angle_Chase.value
+            )
             dep.why = why
 
             if len(x) == 2:
@@ -451,7 +459,9 @@ class Graph:
         added = {"inci": [], "cong": [], "rconst": []}
         for x in self.dtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
-            dep = EmptyDependency(level=level, rule_name="a00")
+            dep = EmptyDependency(
+                level=level, rule_name=ar.AlgebraicRules.Distance_Chase.value
+            )
             dep.why = why
 
             if len(x) == 2:
@@ -676,26 +686,26 @@ class Graph:
     ) -> list[Dependency]:
         """Add a new predicate."""
         if name in ["coll", "collx"]:
-            return self.add_coll(args, deps)
+            new_deps = self.add_coll(args, deps)
         elif name == "para":
-            return self.add_para(args, deps)
+            new_deps = self.add_para(args, deps)
         elif name == "perp":
-            return self.add_perp(args, deps)
+            new_deps = self.add_perp(args, deps)
         elif name == "midp":
-            return self.add_midp(args, deps)
+            new_deps = self.add_midp(args, deps)
         elif name == "cong":
-            return self.add_cong(args, deps)
+            new_deps = self.add_cong(args, deps)
         elif name == "circle":
-            return self.add_circle(args, deps)
+            new_deps = self.add_circle(args, deps)
         elif name == "cyclic":
-            return self.add_cyclic(args, deps)
+            new_deps = self.add_cyclic(args, deps)
         elif name in ["eqangle", "eqangle6"]:
-            return self.add_eqangle(args, deps)
+            new_deps = self.add_eqangle(args, deps)
         elif name in ["eqratio", "eqratio6"]:
-            return self.add_eqratio(args, deps)
+            new_deps = self.add_eqratio(args, deps)
         # numerical!
         elif name == "s_angle":
-            return self.add_s_angle(args, deps)
+            new_deps = self.add_s_angle(args, deps)
         elif name == "aconst":
             a, b, c, d, ang = args
 
@@ -706,7 +716,7 @@ class Graph:
 
             num, den = name.split("pi/")
             num, den = int(num), int(den)
-            return self.add_aconst([a, b, c, d, num, den], deps)
+            new_deps = self.add_aconst([a, b, c, d, num, den], deps)
         elif name == "s_angle":
             b, x, a, b, ang = args
 
@@ -717,7 +727,7 @@ class Graph:
 
             n, d = name.split("pi/")
             ang = int(n) * 180 / int(d)
-            return self.add_s_angle([a, b, x, ang], deps)
+            new_deps = self.add_s_angle([a, b, x, ang], deps)
         elif name == "rconst":
             a, b, c, d, rat = args
 
@@ -728,38 +738,50 @@ class Graph:
 
             num, den = name.split("/")
             num, den = int(num), int(den)
-            return self.add_eqrat_const([a, b, c, d, num, den], deps)
+            new_deps = self.add_eqrat_const([a, b, c, d, num, den], deps)
 
         # composite pieces:
         elif name == "cong2":
-            return self.add_cong2(args, deps)
+            new_deps = self.add_cong2(args, deps)
         elif name == "eqratio3":
-            return self.add_eqratio3(args, deps)
+            new_deps = self.add_eqratio3(args, deps)
         elif name == "eqratio4":
-            return self.add_eqratio4(args, deps)
+            new_deps = self.add_eqratio4(args, deps)
         elif name == "simtri":
-            return self.add_simtri(args, deps)
+            new_deps = self.add_simtri(args, deps)
         elif name == "contri":
-            return self.add_contri(args, deps)
+            new_deps = self.add_contri(args, deps)
         elif name == "simtri2":
-            return self.add_simtri2(args, deps)
+            new_deps = self.add_simtri2(args, deps)
         elif name == "contri2":
-            return self.add_contri2(args, deps)
+            new_deps = self.add_contri2(args, deps)
         elif name == "simtri*":
-            return self.add_simtri_check(args, deps)
+            new_deps = self.add_simtri_check(args, deps)
         elif name == "contri*":
-            return self.add_contri_check(args, deps)
+            new_deps = self.add_contri_check(args, deps)
         elif name in ["acompute", "rcompute"]:
             dep = deps.populate(name, args)
             self.cache_dep(name, args, dep)
-            return [dep]
+            new_deps = [dep]
         elif name in ["fixl", "fixc", "fixb", "fixt", "fixp"]:
             dep = deps.populate(name, args)
             self.cache_dep(name, args, dep)
-            return [dep]
+            new_deps = [dep]
         elif name in ["ind"]:
-            return []
-        raise ValueError(f"Not recognize {name}")
+            new_deps = []
+        else:
+            raise ValueError(f"Not recognize {name}")
+
+        for added_dependency in new_deps:
+            self.dependency_graph.add_dependency(added_dependency)
+            for why_added in added_dependency.why:
+                self.dependency_graph.add_edge(
+                    why_added,
+                    added_dependency,
+                    rule_name=added_dependency.rule_name,
+                )
+
+        return new_deps
 
     def check(self, name: str, args: list[Point]) -> bool:
         """Symbolically check if a predicate is True."""
@@ -2528,11 +2550,11 @@ class Graph:
                     raise DepCheckFailError(
                         d.name + " " + " ".join([x.name for x in args])
                     )
-                deps.why += [
-                    Dependency(
-                        d.name, args, rule_name=problem.CONSTRUCTION_RULE, level=0
-                    )
-                ]
+                construction = Dependency(
+                    d.name, args, rule_name=problem.CONSTRUCTION_RULE, level=0
+                )
+                self.dependency_graph.add_dependency(construction)
+                deps.why += [construction]
 
             new_points_dep += [deps]
 
