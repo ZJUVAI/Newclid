@@ -16,6 +16,7 @@
 """Implementing Algebraic Reasoning (AR)."""
 
 from collections import defaultdict
+from enum import Enum
 from fractions import Fraction as frac
 from typing import Any, Generator
 
@@ -45,6 +46,12 @@ MAX_DENOMINATOR = 1000000
 
 # tolerance for fraction approximation
 TOL = 1e-15
+
+
+class AlgebraicRules(Enum):
+    Distance_Chase = "a00"
+    Ratio_Chase = "a01"
+    Angle_Chase = "a02"
 
 
 def get_quotient(v: float) -> tuple[int, int]:
