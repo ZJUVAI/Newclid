@@ -1,4 +1,5 @@
-from typing import Dict
+from pathlib import Path
+from typing import Dict, List
 from networkx import MultiDiGraph
 from pyvis.network import Network
 
@@ -13,7 +14,11 @@ class DependencyGraph:
 
     def add_dependency(self, dependency: Dependency):
         node = dependency_node_name(dependency)
-        self.nx_graph.add_node(node, level=dependency.level)
+
+        dep_args_names = [arg.name for arg in dependency.args]
+        self.nx_graph.add_node(
+            node, name=dependency.name, level=dependency.level, args=dep_args_names
+        )
 
     def add_edge(self, u_for_edge: Dependency, v_for_edge: Dependency, rule_name: str):
         pred = dependency_node_name(u_for_edge)
@@ -26,14 +31,18 @@ class DependencyGraph:
             key=rule_name,
         )
 
-    def show_html(self, rules: Dict[str, Theorem]):
+    def show_html(self, html_path: Path, rules: Dict[str, Theorem]):
         nt = Network("1080px", directed=True)
         # populates the nodes and edges data structures
         vis_graph: MultiDiGraph = self.nx_graph.copy()
         for node, data in vis_graph.nodes(data=True):
-            level = data.get("level", -1)
+            name: str = data.get("name", "Unknown")
+            level: int = data.get("level", -1)
+            args: List[str] = data.get("args", [])
             vis_graph.nodes[node]["group"] = level
-            vis_graph.nodes[node]["title"] = f"Level {level}"
+            vis_graph.nodes[node]["title"] = (
+                f"{name.capitalize()}" f"\nArgs:{args}" f"\nLevel {level}"
+            )
         for u, v, k, data in vis_graph.edges(data=True, keys=True):
             theorem = rules.get(k)
             if theorem:
@@ -47,7 +56,7 @@ class DependencyGraph:
             vis_graph.edges[u, v, k]["title"] = edge_name
             vis_graph.edges[u, v, k]["label"] = k if k else "NAN"
         nt.from_nx(vis_graph)
-        nt.show("orthocenter_aux.dependency_graph.html", notebook=False)
+        nt.show(str(html_path), notebook=False)
 
 
 def dependency_node_name(dependency: Dependency):

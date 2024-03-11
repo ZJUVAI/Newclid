@@ -2,7 +2,6 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-import os
 
 import geosolver.graph as gh
 import geosolver.problem as pr
@@ -31,15 +30,17 @@ def main():
     out_folder_path = Path("./ddar_results/")
     out_folder_path.mkdir(exist_ok=True)
     for problem_name, problem in problems.items():
-        if problem_name != "orthocenter_aux":
-            continue
-        if problem_name in os.listdir(out_folder_path):
-            logging.info(f"Skipping already solved problem {problem_name}.")
+        if problem_name != "incenter_excenter":
             continue
         logging.info(f"Starting problem {problem_name} with ddar only.")
         graph, _ = gh.Graph.build_problem(problem, DEFINITIONS)
-        run_ddar(graph, problem, out_folder_path / problem_name)
-        graph.dependency_graph.show_html(RULES)
+
+        problem_output_path = out_folder_path / problem_name
+        run_ddar(graph, problem, problem_output_path)
+        graph.dependency_graph.show_html(
+            problem_output_path / f"{problem_name}.dependency_graph.html",
+            RULES,
+        )
         return
 
 
