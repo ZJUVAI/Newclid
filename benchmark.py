@@ -34,7 +34,7 @@ def main():
         if problem_name != "orthocenter_aux":
             continue
         if problem_name in os.listdir(out_folder_path):
-            logging.info(f"Skipping aleady solved problem {problem_name}.")
+            logging.info(f"Skipping already solved problem {problem_name}.")
             continue
         logging.info(f"Starting problem {problem_name} with ddar only.")
         graph, _ = gh.Graph.build_problem(problem, DEFINITIONS)
@@ -115,12 +115,12 @@ def write_solution(g: gh.Graph, p: pr.Problem, out_file: Optional[Path]) -> None
     r2name = {
         "r32": "(SSS)",
         "r33": "(SAS)",
-        "r34": "(Similar Triangles)",
-        "r35": "(Similar Triangles)",
+        "r34": "(Similar Triangles 34)",
+        "r35": "(Similar Triangles 35)",
         "r36": "(ASA)",
         "r37": "(ASA)",
-        "r38": "(Similar Triangles)",
-        "r39": "(Similar Triangles)",
+        "r38": "(Similar Triangles 38)",
+        "r39": "(Similar Triangles 39)",
         "r40": "(Congruent Triangles)",
         "a00": "(Distance chase)",
         "a01": "(Ratio chase)",
@@ -131,7 +131,7 @@ def write_solution(g: gh.Graph, p: pr.Problem, out_file: Optional[Path]) -> None
     for i, step in enumerate(proof_steps):
         _, [con] = step
         nl = proof_step_string(step, refs, last_step=i == len(proof_steps) - 1)
-        rule_name = r2name.get(con.rule_name, "")
+        rule_name = r2name.get(con.rule_name, f"({con.rule_name})")
         nl = nl.replace("\u21d2", f"{rule_name}\u21d2 ")
         solution += "{:03}. ".format(i + 1) + nl + "\n"
 
@@ -189,7 +189,7 @@ def proof_step_string(
     if not last_step:
         conclusion_nl += " [{:02}]".format(refs[conclusion.hashed()])
 
-    return f"{premises_nl} \u21D2 {conclusion_nl}"
+    return f"{premises_nl} \u21d2 {conclusion_nl}"
 
 
 if __name__ == "__main__":

@@ -6,3 +6,15 @@ incenter_excenter
 a b c = triangle a b c; d1 d2 d3 d = incenter2 a b c; e1 e2 e3 e = excenter2 a b c ? perp d c c e
 euler
 a b c = triangle a b c; h = orthocenter a b c; h1 = foot a b c; h2 = foot b c a; h3 = foot c a b; g1 g2 g3 g = centroid g1 g2 g3 g a b c; o = circle a b c ? coll h g o
+pappus
+a b = segment a b; p q = segment p q; c = on_line c a b; r = on_line r p q; x = on_line x a q, on_line x p b; y = on_line y a r, on_line y p c; z = on_line z b r, on_line z c q ? coll x y z
+desargues
+a p = segment a p; b q = segment b q; o = on_line o a p, on_line o b q; o c = segment o c; r = on_line r o c; x = on_line x b c, on_line x q r; y = on_line y a c, on_line y p r; z = on_line z a b, on_line z p q ? coll x y z
+orthocenter_consequence
+a b c = triangle; h = on_tline b a c, on_tline c a b; f = on_tline f c c b ? para a h f c
+orthocenter_consequence_aux
+a b c = triangle; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d; f = on_tline f c b c ? para a d f c
+imo_2004_p1
+a b c = triangle a b c; o = midpoint o b c; m = on_circle m o b, on_line m a b; n = on_circle n o b, on_line n a c; r = angle_bisector r b a c, angle_bisector r m o n; o1 = circle o1 b m r; o2 = circle o2 c n r; p = on_circle p o1 r, on_circle p o2 r; k = on_bline k m n; l = eqdistance l k k a, eqdistance l o o a ? coll p b c
+testing_problem
+a b c = triangle; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d; f = on_tline f c b c ? para a d f c
