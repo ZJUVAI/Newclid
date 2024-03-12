@@ -571,15 +571,6 @@ class ProofGraph:
         else:
             raise ValueError(f"Not recognize {name}")
 
-        for added_dependency in new_deps:
-            self.dependency_graph.add_dependency(added_dependency)
-            for why_added in added_dependency.why:
-                self.dependency_graph.add_edge(
-                    why_added,
-                    added_dependency,
-                    rule_name=added_dependency.rule_name,
-                )
-
         return new_deps
 
     def check(self, name: str, args: list[Point]) -> bool:
@@ -2495,6 +2486,7 @@ class ProofGraph:
                     args = list(map(lambda x: self.get(x, lambda: int(x)), args))
 
                     adds = self.add_piece(name=b.name, args=args, deps=deps)
+                    self.dependency_graph.add_construction_edges(adds)
                     basics.append((b.name, args, deps))
                     if adds:
                         added += adds
