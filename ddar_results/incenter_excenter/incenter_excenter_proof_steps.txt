@@ -1,0 +1,41 @@
+
+==========================
+ * From theorem premises:
+A B C D E : Points
+∠ACD = ∠DCB [00]
+∠ECA = ∠BCE [01]
+
+ * Auxiliary Constructions:
+D1 D2 E1 E2 : Points
+C,D_1,B are collinear [02]
+DD_1 ⟂ BC [03]
+C,A,D_2 are collinear [04]
+DD_2 ⟂ AC [05]
+C,E_1,B are collinear [06]
+BC ⟂ EE_1 [07]
+C,A,E_2 are collinear [08]
+CA ⟂ EE_2 [09]
+
+ * Proof steps:
+001. C,D_1,B are collinear [02] & C,A,D_2 are collinear [04] & DD_2 ⟂ AC [05] & DD_1 ⟂ BC [03] ()⇒  ∠DD_1C = ∠CD_2D [10]
+002. C,D_1,B are collinear [02] & C,A,D_2 are collinear [04] & ∠DCB = ∠ACD [00] ()⇒  ∠DCD_1 = ∠D_2CD [11]
+003. ∠DD_1C = ∠CD_2D [10] & ∠DCD_1 = ∠D_2CD [11] (Similar Triangles 35)⇒  DD_1 = DD_2 [12]
+004. ∠DD_1C = ∠CD_2D [10] & ∠DCD_1 = ∠D_2CD [11] (Similar Triangles 35)⇒  CD_1 = CD_2 [13]
+005. DD_1 = DD_2 [12] & CD_1 = CD_2 [13] (r23)⇒  D_1D_2 ⟂ CD [14]
+006. C,A,E_2 are collinear [08] & C,E_1,B are collinear [06] & DD_2 ⟂ AC [05] & DD_1 ⟂ BC [03] & CA ⟂ EE_2 [09] & BC ⟂ EE_1 [07] ()⇒  ∠EE_2C = ∠CE_1E [15]
+007. C,A,E_2 are collinear [08] & C,E_1,B are collinear [06] & ∠ECA = ∠BCE [01] ()⇒  ∠ECE_2 = ∠E_1CE [16]
+008. ∠EE_2C = ∠CE_1E [15] & ∠ECE_2 = ∠E_1CE [16] (Similar Triangles 35)⇒  EE_2 = EE_1 [17]
+009. ∠EE_2C = ∠CE_1E [15] & ∠ECE_2 = ∠E_1CE [16] (Similar Triangles 35)⇒  CE_1 = CE_2 [18]
+010. CD_2 = CD_1 [13] & EE_2 = EE_1 [17] ()⇒  CD_2:CD_1 = EE_2:EE_1 [19]
+011. C,D_1,B are collinear [02] & DD_1 ⟂ BC [03] ()⇒  D_1D ⟂ CD_1 [20]
+012. EE_2 ⟂ CA [09] & D_1D ⟂ CD_1 [20] (r08)⇒  ∠(EE_2-D_1D) = ∠ACD_1 [21]
+013. C,A,D_2 are collinear [04] & C,D_1,B are collinear [02] & ∠(EE_2-D_1D) = ∠ACD_1 [21] & CA ⟂ EE_2 [09] & DD_2 ⟂ AC [05] & BC ⟂ EE_1 [07] & DD_1 ⟂ BC [03] ()⇒  ∠D_2CD_1 = ∠E_2EE_1 [22]
+014. CD_2:CD_1 = EE_2:EE_1 [19] & ∠D_2CD_1 = ∠E_2EE_1 [22] (Similar Triangles 39)⇒  ∠D_2D_1C = ∠E_2E_1E [23]
+015. DD_1 = DD_2 [12] & CE_1 = CE_2 [18] ()⇒  DD_1:DD_2 = CE_1:CE_2 [24]
+016. C,E_1,B are collinear [06] & C,A,E_2 are collinear [08] & ∠(EE_2-D_1D) = ∠ACD_1 [21] & C,D_1,B are collinear [02] & CA ⟂ EE_2 [09] & DD_2 ⟂ AC [05] ()⇒  ∠D_1DD_2 = ∠E_1CE_2 [25]
+017. DD_1:DD_2 = CE_1:CE_2 [24] & ∠D_1DD_2 = ∠E_1CE_2 [25] (Similar Triangles 39)⇒  ∠DD_1D_2 = ∠CE_1E_2 [26]
+018. ∠D_2D_1C = ∠E_2E_1E [23] & C,D_1,B are collinear [02] & BC ⟂ EE_1 [07] & DD_1 ⟂ BC [03] & ∠DD_1D_2 = ∠CE_1E_2 [26] & C,E_1,B are collinear [06] ()⇒  E_1E_2 ⟂ D_1D_2 [27]
+019. EE_2 = EE_1 [17] & CE_2 = CE_1 [18] (r23)⇒  E_1E_2 ⟂ CE [28]
+020. E_1E_2 ⟂ D_1D_2 [27] & E_1E_2 ⟂ CE [28] (r00)⇒  D_1D_2 ∥ EC [29]
+021. D_1D_2 ⟂ CD [14] & D_1D_2 ∥ CE [29] ()⇒  DC ⟂ CE
+==========================

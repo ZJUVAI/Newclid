@@ -1,0 +1,48 @@
+
+==========================
+ * From theorem premises:
+A B C H G1 G2 G O : Points
+AH ⟂ BC [00]
+BH ⟂ AC [01]
+B,C,G_1 are collinear [02]
+G_1B = G_1C [03]
+C,A,G_2 are collinear [04]
+G_2C = G_2A [05]
+G,G_1,A are collinear [06]
+B,G,G_2 are collinear [07]
+OB = OC [08]
+OA = OB [09]
+
+ * Auxiliary Constructions:
+H1 G3 : Points
+BC ⟂ H_1A [10]
+B,C,H_1 are collinear [11]
+B,G_3,A are collinear [12]
+G_3A = G_3B [13]
+
+ * Proof steps:
+001. B,C,G_1 are collinear [02] & G_1B = G_1C [03] ⇒  G_1 is midpoint of BC [14]
+002. C,A,G_2 are collinear [04] & G_2C = G_2A [05] ⇒  G_2 is midpoint of CA [15]
+003. G_1 is midpoint of BC [14] & G_2 is midpoint of CA [15] ⇒  G_1G_2 ∥ BA [16]
+004. G_1G_2 ∥ AB [16] & G,G_1,A are collinear [06] & B,G,G_2 are collinear [07] ⇒  G_1G_2:GG_1 = BA:GA [17]
+005. B,G_3,A are collinear [12] & G_3A = G_3B [13] ⇒  G_3 is midpoint of BA [18]
+006. G_2 is midpoint of CA [15] & G_3 is midpoint of BA [18] ⇒  G_2G_3 ∥ CB [19]
+007. B,G_1,C are collinear [02] & B,G_3,A are collinear [12] & AB ∥ G_1G_2 [16] & BC ∥ G_2G_3 [19] ⇒  ∠BG_1G_2 = ∠G_2G_3B [20]
+008. B,G,G_2 are collinear [07] & B,G_3,A are collinear [12] & G_1G_2 ∥ AB [16] ⇒  ∠BG_2G_1 = ∠G_2BG_3 [21]
+009. ∠BG_1G_2 = ∠G_2G_3B [20] & ∠BG_2G_1 = ∠G_2BG_3 [21] (Similar Triangles)⇒  G_2G_1 = BG_3 [22]
+010. BC ⟂ H_1A [10] & AH ⟂ BC [00] & B,C,H_1 are collinear [11] ⇒  AH_1 ⟂ H_1B [23]
+011. AH_1 ⟂ H_1B [23] & G_3 is midpoint of BA [18] ⇒  AG_3 = H_1G_3 [24]
+012. G_1G_2:GG_1 = BA:GA [17] & G_2G_1 = BG_3 [22] & G_3A = G_3B [13] & AG_3 = H_1G_3 [24] ⇒  G_3H_1:GG_1 = BA:GA [25]
+013. G_1B = G_1C [03] & OB = OC [08] ⇒  BC ⟂ G_1O [26]
+014. BC ⟂ G_1O [26] & AH ⟂ BC [00] & AB ∥ G_1G_2 [16] ⇒  ∠HAB = ∠OG_1G_2 [27]
+015. OA = OB [09] & OB = OC [08] ⇒  OC = OA [28]
+016. G_2C = G_2A [05] & OC = OA [28] ⇒  CA ⟂ G_2O [29]
+017. CA ⟂ G_2O [29] & BH ⟂ AC [01] & AB ∥ G_1G_2 [16] ⇒  ∠HBA = ∠OG_2G_1 [30]
+018. ∠HAB = ∠OG_1G_2 [27] & ∠HBA = ∠OG_2G_1 [30] (Similar Triangles)⇒  HA:BA = G_1O:G_1G_2 [31]
+019. G_1O:G_1G_2 = HA:BA [31] & G_2G_1 = BG_3 [22] & G_3A = G_3B [13] & AG_3 = H_1G_3 [24] ⇒  G_1O:G_3H_1 = HA:BA [32]
+020. G_3H_1:GG_1 = BA:GA [25] & G_1O:G_3H_1 = HA:BA [32] ⇒  GA:HA = GG_1:G_1O [33]
+021. G,G_1,A are collinear [06] & BC ⟂ G_1O [26] & AH ⟂ BC [00] ⇒  ∠GG_1O = ∠GAH [34]
+022. GA:HA = GG_1:G_1O [33] & ∠GG_1O = ∠GAH [34] (Similar Triangles)⇒  ∠G_1GO = ∠AGH [35]
+023. ∠G_1GO = ∠AGH [35] & G,G_1,A are collinear [06] ⇒  GO ∥ GH [36]
+024. GO ∥ GH [36] ⇒  G,H,O are collinear
+==========================

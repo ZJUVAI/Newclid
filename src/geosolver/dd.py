@@ -15,7 +15,6 @@
 
 """Implements Deductive Database (DD)."""
 
-
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable, Generator
 
@@ -447,7 +446,7 @@ def match_cyclic_eqangle(
 def rotate_simtri(
     a: gm.Point, b: gm.Point, c: gm.Point, x: gm.Point, y: gm.Point, z: gm.Point
 ) -> Generator[tuple[gm.Point, ...], None, None]:
-    """Rotate points around for similar triangle predicates."""
+    """Rotate points around for similar triangle predicates. Generates all permutations but the standard one, with the correspondence of vertices a->x, b->y, c->z."""
     yield (z, y, x, c, b, a)
     for p in [
         (b, c, a, y, z, x),
@@ -457,7 +456,7 @@ def rotate_simtri(
         (z, x, y, c, a, b),
     ]:
         yield p
-        yield p[::-1]
+        yield p[::-1]  # Reverses order
 
 
 def match_cong_cong_cong_cyclic(

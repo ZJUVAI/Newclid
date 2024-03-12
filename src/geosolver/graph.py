@@ -15,7 +15,6 @@
 
 """Implements the graph representation of the proof state."""
 
-
 from __future__ import annotations
 
 from collections import defaultdict
@@ -264,7 +263,9 @@ class Graph:
         ab_cd, cd_ab, why = self._get_or_create_ratio(ab, cd, deps=None)
         if why:
             dep0 = deps.populate("rconst", [a, b, c, d, nd])
-            deps = EmptyDependency(level=deps.level, rule_name=None)
+            deps = EmptyDependency(
+                level=deps.level, rule_name=f"Constant ratio: {num}/{den}"
+            )
             deps.why = [dep0] + why
 
         lab, lcd = ab_cd._l
@@ -977,7 +978,9 @@ class Graph:
             abcd_deps = deps
             if whys + why0:
                 dep0 = deps.populate("coll", og_points)
-                abcd_deps = EmptyDependency(level=deps.level, rule_name=None)
+                abcd_deps = EmptyDependency(
+                    level=deps.level, rule_name="Found in line (D3)"
+                )  # CHECKING!1
                 abcd_deps.why = [dep0] + whys
 
             is_coll = self.check_coll(args)
@@ -1091,7 +1094,9 @@ class Graph:
         (a, b), (c, d) = ab.points, cd.points
 
         dep0 = deps.populate("para", points)
-        deps = EmptyDependency(level=deps.level, rule_name=None)
+        deps = EmptyDependency(
+            level=deps.level, rule_name="Found parallel"
+        )  # CHECKING!2
 
         deps = deps.populate("para", [a, b, c, d])
         deps.why = [dep0] + why1 + why2
@@ -1248,9 +1253,9 @@ class Graph:
 
     def add_perp(self, points: list[Point], deps: EmptyDependency) -> list[Dependency]:
         """Add a new perpendicular predicate from 4 points (2 lines)."""
-        add = self.maybe_make_para_from_perp(points, deps)
-        if add is not None:
-            return add
+        # add = self.maybe_make_para_from_perp(points, deps)
+        # if add is not None:
+        #     return add
 
         a, b, c, d = points
         ab, why1 = self.get_line_thru_pair_why(a, b)
@@ -1260,7 +1265,9 @@ class Graph:
 
         if why1 + why2:
             dep0 = deps.populate("perp", points)
-            deps = EmptyDependency(level=deps.level, rule_name=None)
+            deps = EmptyDependency(
+                level=deps.level, rule_name="Found perpendicular"
+            )  # CHECKING3
             deps.why = [dep0] + why1 + why2
 
         self.connect_val(ab, deps=None)

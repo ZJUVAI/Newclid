@@ -1,0 +1,25 @@
+
+==========================
+ * From theorem premises:
+A B C D F : Points
+BD ⟂ AC [00]
+CD ⟂ AB [01]
+CF ⟂ BC [02]
+
+ * Auxiliary Constructions:
+E : Points
+D,E,B are collinear [03]
+C,A,E are collinear [04]
+
+ * Proof steps:
+001. D,E,B are collinear [03] & C,A,E are collinear [04] & BD ⟂ AC [00] ⇒  ∠DEC = ∠AEB [05]
+002. D,E,B are collinear [03] & C,A,E are collinear [04] & BD ⟂ AC [00] ⇒  ∠CEB = ∠DEA [06]
+003. D,E,B are collinear [03] & BD ⟂ AC [00] ⇒  DE ⟂ CA [07]
+004. DE ⟂ CA [07] & CD ⟂ AB [01] ⇒  ∠(DE-AB) = ∠ACD [08]
+005. C,A,E are collinear [04] & D,E,B are collinear [03] & ∠(DE-AB) = ∠ACD [08] ⇒  ∠DCE = ∠ABE [09]
+006. ∠DEC = ∠AEB [05] & ∠DCE = ∠ABE [09] (Similar Triangles)⇒  DE:AE = CE:EB [10]
+007. DE:AE = CE:EB [10] & ∠CEB = ∠DEA [06] (Similar Triangles)⇒  ∠CBE = ∠DAE [11]
+008. DE:AE = CE:EB [10] & ∠CEB = ∠DEA [06] (Similar Triangles)⇒  ∠ECB = ∠EDA [12]
+009. ∠CBE = ∠DAE [11] & D,E,B are collinear [03] & C,A,E are collinear [04] & ∠ECB = ∠EDA [12] ⇒  CB ⟂ DA [13]
+010. CF ⟂ BC [02] & CB ⟂ DA [13] ⇒  CF ∥ DA
+==========================

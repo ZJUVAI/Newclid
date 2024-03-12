@@ -1,0 +1,19 @@
+
+==========================
+ * From theorem premises:
+A B D C B1 D1 B2 D2 : Points
+B_1B = AB [00]
+D_1D = CD [01]
+B_2B_1 = AB [02]
+D_2D_1 = CD [03]
+
+ * Auxiliary Constructions:
+: Points
+
+
+ * Proof steps:
+001. B_1B = AB [00] & B_2B_1 = AB [02] (Distance chase)⇒  BA:AB_2 = 1_/3 [04]
+002. D_1D = CD [01] & D_2D_1 = CD [03] (Distance chase)⇒  D_1D:D_2C = 1_/3 [05]
+003. D_1D:D_2C = 1_/3 [05] & D_1D = CD [01] (Ratio: 1/3)⇒  CD:D_2C = 1_/3 [06]
+004. BA:AB_2 = 1_/3 [04] & CD:D_2C = 1_/3 [06] & D_2D_1 = CD [03] & B_1B_2 = BA [02] ()⇒  D_2D_1:CD_2 = B_2B_1:AB_2
+==========================

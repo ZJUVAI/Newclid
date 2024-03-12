@@ -1,0 +1,15 @@
+
+==========================
+ * From theorem premises:
+A B C X : Points
+AB = AC [00]
+∠BAX = ∠XAC [01]
+
+ * Auxiliary Constructions:
+: Points
+
+
+ * Proof steps:
+001. AB = AC [00] & ∠BAX = ∠XAC [01] (SAS)⇒  XB = XC [02]
+002. AB = AC [00] & XB = XC [02] (r23)⇒  BC ⟂ AX
+==========================
