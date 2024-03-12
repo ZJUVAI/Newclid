@@ -13,7 +13,7 @@ from geosolver.problem import Dependency, EmptyDependency
 from geosolver.deductive.match_theorems import match_all_theorems
 
 if TYPE_CHECKING:
-    from geosolver.graph import ProofGraph
+    from geosolver.proof_graph import ProofGraph
 
 
 def dd_bfs_one_level(

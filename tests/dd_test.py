@@ -3,7 +3,7 @@ import pytest
 import pytest_check as check
 
 from geosolver.deductive import dd_bfs_one_level
-from geosolver.graph import ProofGraph
+from geosolver.proof_graph import ProofGraph
 from geosolver.problem import Definition, Problem, Theorem
 
 

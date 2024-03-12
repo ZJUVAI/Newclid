@@ -17,7 +17,7 @@
 import pytest
 import pytest_check as check
 
-from geosolver.graph import ProofGraph
+from geosolver.proof_graph import ProofGraph
 from geosolver.numericals import (
     check_circle,
     check_coll,
@@ -35,7 +35,7 @@ from geosolver.problem import Definition, Problem, Theorem
 MAX_LEVEL = 10
 
 
-class TestGraph:
+class TestProofGraph:
     @pytest.fixture(autouse=True)
     def setUpClass(self):
         self.defs = Definition.from_txt_file("defs.txt", to_dict=True)

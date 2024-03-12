@@ -10,7 +10,7 @@ from geosolver.deductive import dd_bfs_one_level
 from geosolver.problem import Problem, Theorem, Dependency
 
 if TYPE_CHECKING:
-    from geosolver.graph import ProofGraph
+    from geosolver.proof_graph import ProofGraph
 
 
 def solve(

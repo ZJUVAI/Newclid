@@ -5,7 +5,7 @@ from typing import Optional
 
 from geosolver.ddar import solve
 from geosolver.geometry import Circle, Line, Point, Segment
-from geosolver.graph import ProofGraph
+from geosolver.proof_graph import ProofGraph
 from geosolver.numericals import draw
 from geosolver.problem import Definition, Problem, Theorem
 from geosolver.proof_writing import write_solution

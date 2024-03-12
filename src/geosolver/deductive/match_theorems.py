@@ -3,7 +3,7 @@
 from collections import defaultdict
 
 import geosolver.geometry as gm
-import geosolver.graph_utils as utils
+import geosolver.combinations_permutations as utils
 import geosolver.numericals as nm
 import geosolver.problem as pr
 
@@ -18,7 +18,7 @@ from geosolver.deductive.points_manipulation import (
 from typing import TYPE_CHECKING, Callable, Generator
 
 if TYPE_CHECKING:
-    from geosolver.graph import ProofGraph
+    from geosolver.proof_graph import ProofGraph
 
 MAX_BRANCH = 50_000
 

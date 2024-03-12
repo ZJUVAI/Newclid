@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from geosolver.graph import ProofGraph
+    from geosolver.proof_graph import ProofGraph
     from geosolver.geometry import Point
     from geosolver.problem import Dependency
 

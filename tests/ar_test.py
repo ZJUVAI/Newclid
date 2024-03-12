@@ -18,7 +18,7 @@
 import pytest
 import pytest_check as check
 import geosolver.algebraic.geometric_tables as geometric_tables
-from geosolver.graph import ProofGraph
+from geosolver.proof_graph import ProofGraph
 from geosolver.problem import Definition, EmptyDependency, Problem, Theorem
 
 

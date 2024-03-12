@@ -39,7 +39,7 @@ from geosolver.geometry import (
 )
 from geosolver.geometry import Circle, Line, Point, Segment
 from geosolver.geometry import Measure, Value
-import geosolver.graph_utils as utils
+import geosolver.combinations_permutations as utils
 import geosolver.numericals as nm
 import geosolver.problem as problem
 from geosolver.problem import Dependency, EmptyDependency

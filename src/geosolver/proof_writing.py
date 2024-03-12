@@ -9,7 +9,7 @@ import geosolver.trace_back as trace_back
 from geosolver.problem import Clause, Dependency, Problem
 
 if TYPE_CHECKING:
-    from geosolver.graph import ProofGraph
+    from geosolver.proof_graph import ProofGraph
 
 
 def get_proof_steps(

@@ -10,7 +10,7 @@ from geosolver.problem import Dependency, EmptyDependency
 import geosolver.ratios
 
 if TYPE_CHECKING:
-    from geosolver.graph import ProofGraph
+    from geosolver.proof_graph import ProofGraph
 
 
 class AlgebraicManipulator:

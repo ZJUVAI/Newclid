@@ -20,7 +20,7 @@ import pytest
 import pytest_check as check
 
 from geosolver.ddar import solve
-from geosolver.graph import ProofGraph
+from geosolver.proof_graph import ProofGraph
 from geosolver.problem import Definition, Dependency, Problem, Theorem
 from geosolver.trace_back import get_logs
 
