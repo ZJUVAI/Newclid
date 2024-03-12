@@ -2,11 +2,14 @@
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 import geosolver.pretty as pt
 import geosolver.trace_back as trace_back
-from geosolver.graph import ProofGraph
+
 from geosolver.problem import Clause, Dependency, Problem
+
+if TYPE_CHECKING:
+    from geosolver.graph import ProofGraph
 
 
 def get_proof_steps(
@@ -83,7 +86,7 @@ def proof_step_string(
     return f"{premises_nl} \u21d2 {conclusion_nl}"
 
 
-def write_solution(g: ProofGraph, p: Problem, out_file: Optional[Path]) -> None:
+def write_solution(g: "ProofGraph", p: Problem, out_file: Optional[Path]) -> None:
     """Output the solution to out_file.
 
     Args:
