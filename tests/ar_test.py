@@ -128,8 +128,8 @@ class TestAR:
 
         # Add two eqangles facts because ieq_triangle only add congruent sides
         a, b, c = g.names2nodes("abc")
-        g.add_eqangle([a, b, b, c, b, c, c, a], EmptyDependency(0, None))
-        g.add_eqangle([b, c, c, a, c, a, a, b], EmptyDependency(0, None))
+        g._add_eqangle([a, b, b, c, b, c, c, a], EmptyDependency(0, None))
+        g._add_eqangle([b, c, c, a, c, a, a, b], EmptyDependency(0, None))
 
         # Create an external angle table:
         tb = geometric_tables.AngleTable("pi")

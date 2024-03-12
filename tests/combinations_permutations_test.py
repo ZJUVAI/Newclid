@@ -15,12 +15,18 @@
 
 """Unit tests for graph_utils.py."""
 
-from numpy import cross
 
 import pytest_check as check
 
-from geosolver.algebraic.geometric_tables import comb2, perm2
-from geosolver.combinations_permutations import comb3, comb4, perm3, perm4
+from geosolver.combinations_permutations import (
+    cross,
+    comb2,
+    comb3,
+    comb4,
+    perm2,
+    perm3,
+    perm4,
+)
 
 
 class TestCombinationsPermutations:

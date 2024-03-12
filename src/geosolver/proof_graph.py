@@ -147,66 +147,6 @@ class ProofGraph:
         g.build_clauses = list(getattr(self, "build_clauses", []))
         return g
 
-    def add_eqrat_const(
-        self, args: list[Point], deps: EmptyDependency
-    ) -> list[Dependency]:
-        """Add new algebraic predicates of type eqratio-constant."""
-        a, b, c, d, num, den = args
-        nd, dn = self.alegbraic.get_or_create_const_rat(self, num, den)
-
-        if num == den:
-            return self.add_cong([a, b, c, d], deps)
-
-        ab = self._get_or_create_segment(a, b, deps=None)
-        cd = self._get_or_create_segment(c, d, deps=None)
-
-        self.connect_val(ab, deps=None)
-        self.connect_val(cd, deps=None)
-
-        if ab.val == cd.val:
-            raise ValueError(f"{ab.name} and {cd.name} cannot be equal")
-
-        args = [a, b, c, d, nd]
-        i = 0
-        for x, y, xy in [(a, b, ab), (c, d, cd)]:
-            i += 1
-            x_, y_ = list(xy._val._obj.points)
-            if {x, y} == {x_, y_}:
-                continue
-            if deps:
-                deps = deps.extend(self, "rconst", list(args), "cong", [x, y, x_, y_])
-            args[2 * i - 2] = x_
-            args[2 * i - 1] = y_
-
-        ab_cd, cd_ab, why = self._get_or_create_ratio(ab, cd, deps=None)
-        if why:
-            dep0 = deps.populate("rconst", [a, b, c, d, nd])
-            deps = EmptyDependency(level=deps.level, rule_name=None)
-            deps.why = [dep0] + why
-
-        lab, lcd = ab_cd._l
-        a, b = list(lab._obj.points)
-        c, d = list(lcd._obj.points)
-
-        add = []
-        if not self.is_equal(ab_cd, nd):
-            args = [a, b, c, d, nd]
-            dep1 = deps.populate("rconst", args)
-            dep1.algebra = ab._val, cd._val, num, den
-            self.make_equal(nd, ab_cd, deps=dep1)
-            self.cache_dep("rconst", [a, b, c, d, nd], dep1)
-            add += [dep1]
-
-        if not self.is_equal(cd_ab, dn):
-            args = [c, d, a, b, dn]
-            dep2 = deps.populate("rconst", args)
-            dep2.algebra = cd._val, ab._val, num, den
-            self.make_equal(dn, cd_ab, deps=dep2)
-            self.cache_dep("rconst", [c, d, a, b, dn], dep2)
-            add += [dep2]
-
-        return add
-
     def do_algebra(self, name: str, args: list[Point]) -> list[Dependency]:
         """Derive (but not add) new algebraic predicates."""
         if name == "para":
@@ -214,7 +154,7 @@ class ProofGraph:
             if is_equiv(a, b):
                 return []
             (x, y), (m, n) = a._obj.points, b._obj.points
-            return self.add_para([x, y, m, n], dep)
+            return self._add_para([x, y, m, n], dep)
 
         if name == "aconst":
             a, b, n, d, dep = args
@@ -234,7 +174,7 @@ class ProofGraph:
             added = []
             if not self.is_equal(ab, nd):
                 if nd == self.halfpi:
-                    added += self.add_perp([x, y, m, n], dep)
+                    added += self._add_perp([x, y, m, n], dep)
                 # else:
                 name = "aconst"
                 args = [x, y, m, n, nd]
@@ -245,7 +185,7 @@ class ProofGraph:
 
             if not self.is_equal(ba, dn):
                 if dn == self.halfpi:
-                    added += self.add_perp([m, n, x, y], dep)
+                    added += self._add_perp([m, n, x, y], dep)
                 name = "aconst"
                 args = [m, n, x, y, dn]
                 dep2 = dep.populate(name, args)
@@ -256,7 +196,7 @@ class ProofGraph:
 
         if name == "rconst":
             a, b, c, d, num, den, dep = args
-            return self.add_eqrat_const([a, b, c, d, num, den], dep)
+            return self._add_eqrat_const([a, b, c, d, num, den], dep)
 
         if name == "eqangle":
             d1, d2, d3, d4, dep = args
@@ -265,7 +205,7 @@ class ProofGraph:
             e, f = d3._obj.points
             g, h = d4._obj.points
 
-            return self.add_eqangle([a, b, c, d, e, f, g, h], dep)
+            return self._add_eqangle([a, b, c, d, e, f, g, h], dep)
 
         if name == "eqratio":
             d1, d2, d3, d4, dep = args
@@ -274,13 +214,13 @@ class ProofGraph:
             e, f = d3._obj.points
             g, h = d4._obj.points
 
-            return self.add_eqratio([a, b, c, d, e, f, g, h], dep)
+            return self._add_eqratio([a, b, c, d, e, f, g, h], dep)
 
         if name in ["cong", "cong2"]:
             a, b, c, d, dep = args
             if not (a != b and c != d and (a != c or b != d)):
                 return []
-            return self.add_cong([a, b, c, d], dep)
+            return self._add_cong([a, b, c, d], dep)
 
         return []
 
@@ -404,58 +344,6 @@ class ProofGraph:
 
         return node
 
-    def merge(self, nodes: list[Node], deps: Dependency) -> Node:
-        """Merge all nodes."""
-        if len(nodes) < 2:
-            return
-
-        node0, *nodes1 = nodes
-        all_nodes = self.type2nodes[type(node0)]
-
-        # find node0 that exists in all_nodes to be the rep
-        # and merge all other nodes into node0
-        for node in nodes:
-            if node in all_nodes:
-                node0 = node
-                nodes1 = [n for n in nodes if n != node0]
-                break
-        return self.merge_into(node0, nodes1, deps)
-
-    def merge_into(self, node0: Node, nodes1: list[Node], deps: Dependency) -> Node:
-        """Merge nodes1 into a single node0."""
-        node0.merge(nodes1, deps)
-        for n in nodes1:
-            if n.rep() != n:
-                self.remove([n])
-
-        nodes = [node0] + nodes1
-        if any([node._val for node in nodes]):
-            for node in nodes:
-                self.connect_val(node, deps=None)
-
-            vals1 = [n._val for n in nodes1]
-            node0._val.merge(vals1, deps)
-
-            for v in vals1:
-                if v.rep() != v:
-                    self.remove([v])
-
-        return node0
-
-    def remove(self, nodes: list[Node]) -> None:
-        """Remove nodes out of self because they are merged."""
-        if not nodes:
-            return
-
-        for node in nodes:
-            all_nodes = self.type2nodes[type(nodes[0])]
-
-            if node in all_nodes:
-                all_nodes.remove(node)
-
-            if node.name in self._name2node.values():
-                self._name2node.pop(node.name)
-
     def connect(self, a: Node, b: Node, deps: Dependency) -> None:
         a.connect_to(b, deps)
         b.connect_to(a, deps)
@@ -477,34 +365,146 @@ class ProofGraph:
         self.connect(node, v, deps=deps)
         return v
 
+    def _merge(self, nodes: list[Node], deps: Dependency) -> Node:
+        """Merge all nodes."""
+        if len(nodes) < 2:
+            return
+
+        node0, *nodes1 = nodes
+        all_nodes = self.type2nodes[type(node0)]
+
+        # find node0 that exists in all_nodes to be the rep
+        # and merge all other nodes into node0
+        for node in nodes:
+            if node in all_nodes:
+                node0 = node
+                nodes1 = [n for n in nodes if n != node0]
+                break
+        return self._merge_into(node0, nodes1, deps)
+
+    def _merge_into(self, node0: Node, nodes1: list[Node], deps: Dependency) -> Node:
+        """Merge nodes1 into a single node0."""
+        node0.merge(nodes1, deps)
+        for n in nodes1:
+            if n.rep() != n:
+                self._remove([n])
+
+        nodes = [node0] + nodes1
+        if any([node._val for node in nodes]):
+            for node in nodes:
+                self.connect_val(node, deps=None)
+
+            vals1 = [n._val for n in nodes1]
+            node0._val.merge(vals1, deps)
+
+            for v in vals1:
+                if v.rep() != v:
+                    self._remove([v])
+
+        return node0
+
+    def _remove(self, nodes: list[Node]) -> None:
+        """Remove nodes out of self because they are merged."""
+        if not nodes:
+            return
+
+        for node in nodes:
+            all_nodes = self.type2nodes[type(nodes[0])]
+
+            if node in all_nodes:
+                all_nodes.remove(node)
+
+            if node.name in self._name2node.values():
+                self._name2node.pop(node.name)
+
     def is_equal(self, x: Node, y: Node, level: int = None) -> bool:
         return is_equal(x, y, level)
+
+    def _add_eqrat_const(
+        self, args: list[Point], deps: EmptyDependency
+    ) -> list[Dependency]:
+        """Add new algebraic predicates of type eqratio-constant."""
+        a, b, c, d, num, den = args
+        nd, dn = self.alegbraic.get_or_create_const_rat(self, num, den)
+
+        if num == den:
+            return self._add_cong([a, b, c, d], deps)
+
+        ab = self._get_or_create_segment(a, b, deps=None)
+        cd = self._get_or_create_segment(c, d, deps=None)
+
+        self.connect_val(ab, deps=None)
+        self.connect_val(cd, deps=None)
+
+        if ab.val == cd.val:
+            raise ValueError(f"{ab.name} and {cd.name} cannot be equal")
+
+        args = [a, b, c, d, nd]
+        i = 0
+        for x, y, xy in [(a, b, ab), (c, d, cd)]:
+            i += 1
+            x_, y_ = list(xy._val._obj.points)
+            if {x, y} == {x_, y_}:
+                continue
+            if deps:
+                deps = deps.extend(self, "rconst", list(args), "cong", [x, y, x_, y_])
+            args[2 * i - 2] = x_
+            args[2 * i - 1] = y_
+
+        ab_cd, cd_ab, why = self._get_or_create_ratio(ab, cd, deps=None)
+        if why:
+            dep0 = deps.populate("rconst", [a, b, c, d, nd])
+            deps = EmptyDependency(level=deps.level, rule_name=None)
+            deps.why = [dep0] + why
+
+        lab, lcd = ab_cd._l
+        a, b = list(lab._obj.points)
+        c, d = list(lcd._obj.points)
+
+        add = []
+        if not self.is_equal(ab_cd, nd):
+            args = [a, b, c, d, nd]
+            dep1 = deps.populate("rconst", args)
+            dep1.algebra = ab._val, cd._val, num, den
+            self.make_equal(nd, ab_cd, deps=dep1)
+            self.cache_dep("rconst", [a, b, c, d, nd], dep1)
+            add += [dep1]
+
+        if not self.is_equal(cd_ab, dn):
+            args = [c, d, a, b, dn]
+            dep2 = deps.populate("rconst", args)
+            dep2.algebra = cd._val, ab._val, num, den
+            self.make_equal(dn, cd_ab, deps=dep2)
+            self.cache_dep("rconst", [c, d, a, b, dn], dep2)
+            add += [dep2]
+
+        return add
 
     def add_piece(
         self, name: str, args: list[Point], deps: EmptyDependency
     ) -> list[Dependency]:
         """Add a new predicate."""
         if name in ["coll", "collx"]:
-            new_deps = self.add_coll(args, deps)
+            new_deps = self._add_coll(args, deps)
         elif name == "para":
-            new_deps = self.add_para(args, deps)
+            new_deps = self._add_para(args, deps)
         elif name == "perp":
-            new_deps = self.add_perp(args, deps)
+            new_deps = self._add_perp(args, deps)
         elif name == "midp":
-            new_deps = self.add_midp(args, deps)
+            new_deps = self._add_midp(args, deps)
         elif name == "cong":
-            new_deps = self.add_cong(args, deps)
+            new_deps = self._add_cong(args, deps)
         elif name == "circle":
-            new_deps = self.add_circle(args, deps)
+            new_deps = self._add_circle(args, deps)
         elif name == "cyclic":
-            new_deps = self.add_cyclic(args, deps)
+            new_deps = self._add_cyclic(args, deps)
         elif name in ["eqangle", "eqangle6"]:
-            new_deps = self.add_eqangle(args, deps)
+            new_deps = self._add_eqangle(args, deps)
         elif name in ["eqratio", "eqratio6"]:
-            new_deps = self.add_eqratio(args, deps)
+            new_deps = self._add_eqratio(args, deps)
         # numerical!
         elif name == "s_angle":
-            new_deps = self.add_s_angle(args, deps)
+            new_deps = self._add_s_angle(args, deps)
         elif name == "aconst":
             a, b, c, d, ang = args
 
@@ -515,7 +515,7 @@ class ProofGraph:
 
             num, den = name.split("pi/")
             num, den = int(num), int(den)
-            new_deps = self.add_aconst([a, b, c, d, num, den], deps)
+            new_deps = self._add_aconst([a, b, c, d, num, den], deps)
         elif name == "s_angle":
             b, x, a, b, ang = args
 
@@ -526,7 +526,7 @@ class ProofGraph:
 
             n, d = name.split("pi/")
             ang = int(n) * 180 / int(d)
-            new_deps = self.add_s_angle([a, b, x, ang], deps)
+            new_deps = self._add_s_angle([a, b, x, ang], deps)
         elif name == "rconst":
             a, b, c, d, rat = args
 
@@ -537,27 +537,27 @@ class ProofGraph:
 
             num, den = name.split("/")
             num, den = int(num), int(den)
-            new_deps = self.add_eqrat_const([a, b, c, d, num, den], deps)
+            new_deps = self._add_eqrat_const([a, b, c, d, num, den], deps)
 
         # composite pieces:
         elif name == "cong2":
-            new_deps = self.add_cong2(args, deps)
+            new_deps = self._add_cong2(args, deps)
         elif name == "eqratio3":
-            new_deps = self.add_eqratio3(args, deps)
+            new_deps = self._add_eqratio3(args, deps)
         elif name == "eqratio4":
-            new_deps = self.add_eqratio4(args, deps)
+            new_deps = self._add_eqratio4(args, deps)
         elif name == "simtri":
-            new_deps = self.add_simtri(args, deps)
+            new_deps = self._add_simtri(args, deps)
         elif name == "contri":
-            new_deps = self.add_contri(args, deps)
+            new_deps = self._add_contri(args, deps)
         elif name == "simtri2":
-            new_deps = self.add_simtri2(args, deps)
+            new_deps = self._add_simtri2(args, deps)
         elif name == "contri2":
-            new_deps = self.add_contri2(args, deps)
+            new_deps = self._add_contri2(args, deps)
         elif name == "simtri*":
-            new_deps = self.add_simtri_check(args, deps)
+            new_deps = self._add_simtri_check(args, deps)
         elif name == "contri*":
-            new_deps = self.add_contri_check(args, deps)
+            new_deps = self._add_contri_check(args, deps)
         elif name in ["acompute", "rcompute"]:
             dep = deps.populate(name, args)
             self.cache_dep(name, args, dep)
@@ -727,7 +727,7 @@ class ProofGraph:
                 dep = Dependency("coll", [p1, p2, p], None, None)
                 return dep.why_me_or_cache(self, None)
 
-    def add_coll(self, points: list[Point], deps: EmptyDependency) -> list[Dependency]:
+    def _add_coll(self, points: list[Point], deps: EmptyDependency) -> list[Dependency]:
         """Add a predicate that `points` are collinear."""
         points = list(set(points))
         og_points = list(points)
@@ -782,7 +782,7 @@ class ProofGraph:
             is_coll = self.check_coll(args)
             dep = abcd_deps.populate("coll", args)
             self.cache_dep("coll", args, dep)
-            self.merge_into(line0, [line], dep)
+            self._merge_into(line0, [line], dep)
 
             if not is_coll:
                 add += [dep]
@@ -835,13 +835,13 @@ class ProofGraph:
         ):
             merges = [self.vhalfpi, vx, vy]
 
-        self.merge(merges, deps)
+        self._merge(merges, deps)
 
     def merge_vals(self, vx: Node, vy: Node, deps: Dependency) -> None:
         if vx == vy:
             return
         merges = [vx, vy]
-        self.merge(merges, deps)
+        self._merge(merges, deps)
 
     def why_equal(self, x: Node, y: Node, level: int) -> list[Dependency]:
         return why_equal(x, y, level)
@@ -879,7 +879,7 @@ class ProofGraph:
         why8 += self._why_coll4(m, n, mn, p, q, pq, level)
         return why8
 
-    def add_para(self, points: list[Point], deps: EmptyDependency) -> list[Dependency]:
+    def _add_para(self, points: list[Point], deps: EmptyDependency) -> list[Dependency]:
         """Add a new predicate that 4 points (2 lines) are parallel."""
         a, b, c, d = points
         ab, why1 = self.get_line_thru_pair_why(a, b)
@@ -1014,12 +1014,12 @@ class ProofGraph:
             extends.append(("coll", [d, m, n]))
         else:
             deps = deps.extend_many(self, "perp", [a, b, c, d], extends)
-            return self.add_para([c, d, m, n], deps)
+            return self._add_para([c, d, m, n], deps)
 
         deps = deps.extend_many(self, "perp", [a, b, c, d], extends)
-        return self.add_coll(list(set([c, d, m, n])), deps)
+        return self._add_coll(list(set([c, d, m, n])), deps)
 
-    def maybe_make_para_from_perp(
+    def _maybe_make_para_from_perp(
         self, points: list[Point], deps: EmptyDependency
     ) -> Optional[list[Dependency]]:
         """Maybe add a new parallel predicate from perp predicate."""
@@ -1045,9 +1045,9 @@ class ProofGraph:
 
         return None
 
-    def add_perp(self, points: list[Point], deps: EmptyDependency) -> list[Dependency]:
+    def _add_perp(self, points: list[Point], deps: EmptyDependency) -> list[Dependency]:
         """Add a new perpendicular predicate from 4 points (2 lines)."""
-        add = self.maybe_make_para_from_perp(points, deps)
+        add = self._maybe_make_para_from_perp(points, deps)
         if add is not None:
             return add
 
@@ -1153,7 +1153,7 @@ class ProofGraph:
         s.points = {p1, p2}
         return s
 
-    def add_cong(self, points: list[Point], deps: EmptyDependency) -> list[Dependency]:
+    def _add_cong(self, points: list[Point], deps: EmptyDependency) -> list[Dependency]:
         """Add that two segments (4 points) are congruent."""
         a, b, c, d = points
         ab = self._get_or_create_segment(a, b, deps=None)
@@ -1217,7 +1217,7 @@ class ProofGraph:
         deps = EmptyDependency(cong_ab_ac.level, "")
         deps.why = why
 
-        return self.add_cyclic([b, c, x, y], deps)
+        return self._add_cyclic([b, c, x, y], deps)
 
     def check_cong(self, points: list[Point]) -> bool:
         a, b, c, d = points
@@ -1234,10 +1234,10 @@ class ProofGraph:
         ab, cd = args
         return self.why_equal(ab, cd, None)
 
-    def add_midp(self, points: list[Point], deps: EmptyDependency) -> list[Dependency]:
+    def _add_midp(self, points: list[Point], deps: EmptyDependency) -> list[Dependency]:
         m, a, b = points
-        add = self.add_coll(points, deps=deps)
-        add += self.add_cong([m, a, m, b], deps)
+        add = self._add_coll(points, deps=deps)
+        add += self._add_cong([m, a, m, b], deps)
         return add
 
     def why_midp(
@@ -1252,12 +1252,12 @@ class ProofGraph:
         m, a, b = points
         return self.check_cong([m, a, m, b])
 
-    def add_circle(
+    def _add_circle(
         self, points: list[Point], deps: EmptyDependency
     ) -> list[Dependency]:
         o, a, b, c = points
-        add = self.add_cong([o, a, o, b], deps=deps)
-        add += self.add_cong([o, a, o, c], deps=deps)
+        add = self._add_cong([o, a, o, b], deps=deps)
+        add += self._add_cong([o, a, o, c], deps=deps)
         return add
 
     def why_circle(self, args: tuple[Segment, Segment, Segment]) -> list[Dependency]:
@@ -1289,7 +1289,7 @@ class ProofGraph:
                 dep = Dependency("cyclic", [p1, p2, p3, p], None, None)
                 return dep.why_me_or_cache(self, None)
 
-    def add_cyclic(
+    def _add_cyclic(
         self, points: list[Point], deps: EmptyDependency
     ) -> list[Dependency]:
         """Add a new cyclic predicate that 4 points are concyclic."""
@@ -1345,7 +1345,7 @@ class ProofGraph:
 
             dep = abcdef_deps.populate("cyclic", args)
             self.cache_dep("cyclic", args, dep)
-            self.merge_into(circle0, [circle], dep)
+            self._merge_into(circle0, [circle], dep)
             if not is_cyclic:
                 add += [dep]
 
@@ -1409,7 +1409,7 @@ class ProofGraph:
             return []
         return [deps]
 
-    def maybe_make_equal_pairs(
+    def _maybe_make_equal_pairs(
         self,
         a: Point,
         b: Point,
@@ -1480,7 +1480,7 @@ class ProofGraph:
         else:
             return None
 
-    def _add_eqangle(
+    def _add_eqangle8(
         self,
         a: Point,
         b: Point,
@@ -1553,7 +1553,7 @@ class ProofGraph:
 
         return add
 
-    def add_eqangle(
+    def _add_eqangle(
         self, points: list[Point], deps: EmptyDependency
     ) -> list[Dependency]:
         """Add eqangle made by 8 points in `points`."""
@@ -1575,7 +1575,7 @@ class ProofGraph:
             deps = EmptyDependency(level=deps.level, rule_name=None)
             deps.why = [dep0] + why1 + why2 + why3 + why4
 
-        add = self.maybe_make_equal_pairs(a, b, c, d, m, n, p, q, ab, cd, mn, pq, deps)
+        add = self._maybe_make_equal_pairs(a, b, c, d, m, n, p, q, ab, cd, mn, pq, deps)
 
         if add is not None:
             return add
@@ -1591,14 +1591,14 @@ class ProofGraph:
             and mn.val != pq.val
             and (ab.val != mn.val or cd.val != pq.val)
         ):
-            add += self._add_eqangle(a, b, c, d, m, n, p, q, ab, cd, mn, pq, deps)
+            add += self._add_eqangle8(a, b, c, d, m, n, p, q, ab, cd, mn, pq, deps)
 
         if (
             ab.val != mn.val
             and cd.val != pq.val
             and (ab.val != cd.val or mn.val != pq.val)
         ):
-            add += self._add_eqangle(
+            add += self._add_eqangle8(
                 a,
                 b,
                 m,
@@ -1616,7 +1616,7 @@ class ProofGraph:
 
         return add
 
-    def add_aconst(
+    def _add_aconst(
         self, points: list[Point], deps: EmptyDependency
     ) -> list[Dependency]:
         """Add that an angle is equal to some constant."""
@@ -1624,7 +1624,7 @@ class ProofGraph:
         nd, dn = self.alegbraic.get_or_create_const_ang(self, num, den)
 
         if nd == self.halfpi:
-            return self.add_perp([a, b, c, d], deps)
+            return self._add_perp([a, b, c, d], deps)
 
         ab, why1 = self.get_line_thru_pair_why(a, b)
         cd, why2 = self.get_line_thru_pair_why(c, d)
@@ -1681,7 +1681,7 @@ class ProofGraph:
             add += [deps2]
         return add
 
-    def add_s_angle(
+    def _add_s_angle(
         self, points: list[Point], deps: EmptyDependency
     ) -> list[Dependency]:
         """Add that an angle abx is equal to constant y."""
@@ -1691,7 +1691,7 @@ class ProofGraph:
         nd, dn = self.alegbraic.get_or_create_const_ang(self, n, d)
 
         if nd == self.halfpi:
-            return self.add_perp([a, b, b, x], deps)
+            return self._add_perp([a, b, b, x], deps)
 
         ab, why1 = self.get_line_thru_pair_why(a, b)
         bx, why2 = self.get_line_thru_pair_why(b, x)
@@ -1870,14 +1870,16 @@ class ProofGraph:
         r21.opposite = r12
         return r12, r21, why1 + why2
 
-    def add_cong2(self, points: list[Point], deps: EmptyDependency) -> list[Dependency]:
+    def _add_cong2(
+        self, points: list[Point], deps: EmptyDependency
+    ) -> list[Dependency]:
         m, n, a, b = points
         add = []
-        add += self.add_cong([m, a, n, a], deps)
-        add += self.add_cong([m, b, n, b], deps)
+        add += self._add_cong([m, a, n, a], deps)
+        add += self._add_cong([m, b, n, b], deps)
         return add
 
-    def add_eqratio3(
+    def _add_eqratio3(
         self, points: list[Point], deps: EmptyDependency
     ) -> list[Dependency]:
         """Add three eqratios through a list of 6 points (due to parallel lines)."""
@@ -1886,25 +1888,25 @@ class ProofGraph:
         #  m  --  n
         # c   --   d
         add = []
-        add += self.add_eqratio([m, a, m, c, n, b, n, d], deps)
-        add += self.add_eqratio([a, m, a, c, b, n, b, d], deps)
-        add += self.add_eqratio([c, m, c, a, d, n, d, b], deps)
+        add += self._add_eqratio([m, a, m, c, n, b, n, d], deps)
+        add += self._add_eqratio([a, m, a, c, b, n, b, d], deps)
+        add += self._add_eqratio([c, m, c, a, d, n, d, b], deps)
         if m == n:
-            add += self.add_eqratio([m, a, m, c, a, b, c, d], deps)
+            add += self._add_eqratio([m, a, m, c, a, b, c, d], deps)
         return add
 
-    def add_eqratio4(
+    def _add_eqratio4(
         self, points: list[Point], deps: EmptyDependency
     ) -> list[Dependency]:
         o, a, b, c, d = points
         #   o
         #  a b
         # c   d
-        add = self.add_eqratio3([a, b, c, d, o, o], deps)
-        add += self.add_eqratio([o, a, o, c, a, b, c, d], deps)
+        add = self._add_eqratio3([a, b, c, d, o, o], deps)
+        add += self._add_eqratio([o, a, o, c, a, b, c, d], deps)
         return add
 
-    def _add_eqratio(
+    def _add_eqratio8(
         self,
         a: Point,
         b: Point,
@@ -1974,7 +1976,7 @@ class ProofGraph:
         self.make_equal(cd_ab, pq_mn, deps=deps2)
         return add
 
-    def add_eqratio(
+    def _add_eqratio(
         self, points: list[Point], deps: EmptyDependency
     ) -> list[Dependency]:
         """Add a new eqratio from 8 points."""
@@ -1986,7 +1988,7 @@ class ProofGraph:
         mn = self._get_or_create_segment(m, n, deps=None)
         pq = self._get_or_create_segment(p, q, deps=None)
 
-        add = self.maybe_make_equal_pairs(a, b, c, d, m, n, p, q, ab, cd, mn, pq, deps)
+        add = self._maybe_make_equal_pairs(a, b, c, d, m, n, p, q, ab, cd, mn, pq, deps)
 
         if add is not None:
             return add
@@ -2002,14 +2004,14 @@ class ProofGraph:
             and mn.val != pq.val
             and (ab.val != mn.val or cd.val != pq.val)
         ):
-            add += self._add_eqratio(a, b, c, d, m, n, p, q, ab, cd, mn, pq, deps)
+            add += self._add_eqratio8(a, b, c, d, m, n, p, q, ab, cd, mn, pq, deps)
 
         if (
             ab.val != mn.val
             and cd.val != pq.val
             and (ab.val != cd.val or mn.val != pq.val)
         ):
-            add += self._add_eqratio(
+            add += self._add_eqratio8(
                 a,
                 b,
                 m,
@@ -2116,19 +2118,19 @@ class ProofGraph:
                     return True
         return False
 
-    def add_simtri_check(
+    def _add_simtri_check(
         self, points: list[Point], deps: EmptyDependency
     ) -> list[Dependency]:
         if nm.same_clock(*[p.num for p in points]):
-            return self.add_simtri(points, deps)
-        return self.add_simtri2(points, deps)
+            return self._add_simtri(points, deps)
+        return self._add_simtri2(points, deps)
 
-    def add_contri_check(
+    def _add_contri_check(
         self, points: list[Point], deps: EmptyDependency
     ) -> list[Dependency]:
         if nm.same_clock(*[p.num for p in points]):
-            return self.add_contri(points, deps)
-        return self.add_contri2(points, deps)
+            return self._add_contri(points, deps)
+        return self._add_contri2(points, deps)
 
     def enum_sides(self, points: list[Point]) -> Generator[list[Point], None, None]:
         a, b, c, x, y, z = points
@@ -2148,7 +2150,7 @@ class ProofGraph:
         yield [b, a, b, c, y, z, y, x]
         yield [c, a, c, b, z, y, z, x]
 
-    def add_simtri(
+    def _add_simtri(
         self, points: list[Point], deps: EmptyDependency
     ) -> list[Dependency]:
         """Add two similar triangles."""
@@ -2158,12 +2160,12 @@ class ProofGraph:
         for args in self.enum_triangle(points):
             if problem.hashed("eqangle6", args) in hashs:
                 continue
-            add += self.add_eqangle(args, deps=deps)
+            add += self._add_eqangle(args, deps=deps)
 
         for args in self.enum_triangle(points):
             if problem.hashed("eqratio6", args) in hashs:
                 continue
-            add += self.add_eqratio(args, deps=deps)
+            add += self._add_eqratio(args, deps=deps)
 
         return add
 
@@ -2173,7 +2175,7 @@ class ProofGraph:
             [b, a, b, c, y, x, y, z]
         )
 
-    def add_simtri2(
+    def _add_simtri2(
         self, points: list[Point], deps: EmptyDependency
     ) -> list[Dependency]:
         """Add two similar reflected triangles."""
@@ -2182,16 +2184,16 @@ class ProofGraph:
         for args in self.enum_triangle2(points):
             if problem.hashed("eqangle6", args) in hashs:
                 continue
-            add += self.add_eqangle(args, deps=deps)
+            add += self._add_eqangle(args, deps=deps)
 
         for args in self.enum_triangle(points):
             if problem.hashed("eqratio6", args) in hashs:
                 continue
-            add += self.add_eqratio(args, deps=deps)
+            add += self._add_eqratio(args, deps=deps)
 
         return add
 
-    def add_contri(
+    def _add_contri(
         self, points: list[Point], deps: EmptyDependency
     ) -> list[Dependency]:
         """Add two congruent triangles."""
@@ -2200,12 +2202,12 @@ class ProofGraph:
         for args in self.enum_triangle(points):
             if problem.hashed("eqangle6", args) in hashs:
                 continue
-            add += self.add_eqangle(args, deps=deps)
+            add += self._add_eqangle(args, deps=deps)
 
         for args in self.enum_sides(points):
             if problem.hashed("cong", args) in hashs:
                 continue
-            add += self.add_cong(args, deps=deps)
+            add += self._add_cong(args, deps=deps)
         return add
 
     def check_contri(self, points: list[Point]) -> bool:
@@ -2216,7 +2218,7 @@ class ProofGraph:
             and self.check_cong([c, a, z, x])
         )
 
-    def add_contri2(
+    def _add_contri2(
         self, points: list[Point], deps: EmptyDependency
     ) -> list[Dependency]:
         """Add two congruent reflected triangles."""
@@ -2225,12 +2227,12 @@ class ProofGraph:
         for args in self.enum_triangle2(points):
             if problem.hashed("eqangle6", args) in hashs:
                 continue
-            add += self.add_eqangle(args, deps=deps)
+            add += self._add_eqangle(args, deps=deps)
 
         for args in self.enum_sides(points):
             if problem.hashed("cong", args) in hashs:
                 continue
-            add += self.add_cong(args, deps=deps)
+            add += self._add_cong(args, deps=deps)
 
         return add
 
