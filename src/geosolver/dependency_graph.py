@@ -4,7 +4,7 @@ from networkx import MultiDiGraph
 from pyvis.network import Network
 
 
-from geosolver.ar import AlgebraicRules
+from geosolver.algebraic import AlgebraicRules
 from geosolver.problem import CONSTRUCTION_RULE, Dependency, Theorem
 
 

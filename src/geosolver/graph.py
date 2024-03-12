@@ -22,9 +22,21 @@ from collections import defaultdict
 from typing import Callable, Generator, Optional, Type, Union
 import logging
 
-import geosolver.ar as ar
-import geosolver.geometry as gm
-from geosolver.geometry import Angle, Direction, Length, Ratio
+from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
+from geosolver.geometry import (
+    Angle,
+    Direction,
+    Length,
+    Node,
+    Ratio,
+    all_angles,
+    all_ratios,
+    is_equal,
+    is_equiv,
+    line_of_and_why,
+    val_type,
+    why_equal,
+)
 from geosolver.geometry import Circle, Line, Point, Segment
 from geosolver.geometry import Measure, Value
 import geosolver.graph_utils as utils
@@ -32,6 +44,7 @@ import geosolver.numericals as nm
 import geosolver.problem as problem
 from geosolver.problem import Dependency, EmptyDependency
 from geosolver.dependency_graph import DependencyGraph
+from geosolver.ratios import simplify
 
 
 np = nm.np
@@ -87,10 +100,10 @@ class PointTooFarError(Exception):
     pass
 
 
-class Graph:
+class ProofGraph:
     """Graph data structure representing proof state."""
 
-    def __init__(self):
+    def __init__(self, alegbraic: AlgebraicManipulator):
         self.type2nodes = {
             Point: [],
             Line: [],
@@ -106,15 +119,9 @@ class Graph:
         self._name2point = {}
         self._name2node = {}
 
-        self.rconst = {}  # contains all constant ratios
-        self.aconst = {}  # contains all constant angles.
-
-        self.halfpi, _ = self.get_or_create_const_ang(1, 2)
+        self.alegbraic = alegbraic
+        self.halfpi, _ = self.alegbraic.get_or_create_const_ang(self, 1, 2)
         self.vhalfpi = self.halfpi.val
-
-        self.atable = ar.AngleTable()
-        self.dtable = ar.DistanceTable()
-        self.rtable = ar.RatioTable()
 
         # to quick access deps.
         self.cache = {}
@@ -125,7 +132,7 @@ class Graph:
         self._pair2line = {}
         self._triplet2circle = {}
 
-    def copy(self) -> Graph:
+    def copy(self) -> ProofGraph:
         """Make a copy of self."""
         p, definitions = self.build_def
 
@@ -135,107 +142,17 @@ class Graph:
             for pname in clause.points:
                 clause.nums.append(self._name2node[pname].num)
 
-        g, _ = Graph.build_problem(p, definitions, verbose=False, init_copy=False)
+        g, _ = ProofGraph.build_problem(p, definitions, verbose=False, init_copy=False)
 
         g.build_clauses = list(getattr(self, "build_clauses", []))
         return g
-
-    def _create_const_ang(self, n: int, d: int) -> None:
-        n, d = ar.simplify(n, d)
-        ang = self.aconst[(n, d)] = self.new_node(Angle, f"{n}pi/{d}")
-        ang.set_directions(None, None)
-        self.connect_val(ang, deps=None)
-
-    def _create_const_rat(self, n: int, d: int) -> None:
-        n, d = ar.simplify(n, d)
-        rat = self.rconst[(n, d)] = self.new_node(Ratio, f"{n}/{d}")
-        rat.set_lengths(None, None)
-        self.connect_val(rat, deps=None)
-
-    def get_or_create_const_ang(self, n: int, d: int) -> None:
-        n, d = ar.simplify(n, d)
-        if (n, d) not in self.aconst:
-            self._create_const_ang(n, d)
-        ang1 = self.aconst[(n, d)]
-
-        n, d = ar.simplify(d - n, d)
-        if (n, d) not in self.aconst:
-            self._create_const_ang(n, d)
-        ang2 = self.aconst[(n, d)]
-        return ang1, ang2
-
-    def get_or_create_const_rat(self, n: int, d: int) -> None:
-        n, d = ar.simplify(n, d)
-        if (n, d) not in self.rconst:
-            self._create_const_rat(n, d)
-        rat1 = self.rconst[(n, d)]
-
-        if (d, n) not in self.rconst:
-            self._create_const_rat(d, n)
-        rat2 = self.rconst[(d, n)]
-        return rat1, rat2
-
-    def add_algebra(self, dep: Dependency, level: int) -> None:
-        """Add new algebraic predicates."""
-        _ = level
-        if dep.name not in [
-            "para",
-            "perp",
-            "eqangle",
-            "eqratio",
-            "aconst",
-            "rconst",
-            "cong",
-        ]:
-            return
-
-        name, args = dep.name, dep.args
-
-        if name == "para":
-            ab, cd = dep.algebra
-            self.atable.add_para(ab, cd, dep)
-
-        if name == "perp":
-            ab, cd = dep.algebra
-            self.atable.add_const_angle(ab, cd, 90, dep)
-
-        if name == "eqangle":
-            ab, cd, mn, pq = dep.algebra
-            if (ab, cd) == (pq, mn):
-                self.atable.add_const_angle(ab, cd, 90, dep)
-            else:
-                self.atable.add_eqangle(ab, cd, mn, pq, dep)
-
-        if name == "eqratio":
-            ab, cd, mn, pq = dep.algebra
-            if (ab, cd) == (pq, mn):
-                self.rtable.add_eq(ab, cd, dep)
-            else:
-                self.rtable.add_eqratio(ab, cd, mn, pq, dep)
-
-        if name == "aconst":
-            bx, ab, y = dep.algebra
-            self.atable.add_const_angle(bx, ab, y, dep)
-
-        if name == "rconst":
-            l1, l2, m, n = dep.algebra
-            self.rtable.add_const_ratio(l1, l2, m, n, dep)
-
-        if name == "cong":
-            a, b, c, d = args
-            ab, _ = self.get_line_thru_pair_why(a, b)
-            cd, _ = self.get_line_thru_pair_why(c, d)
-            self.dtable.add_cong(ab, cd, a, b, c, d, dep)
-
-            ab, cd = dep.algebra
-            self.rtable.add_eq(ab, cd, dep)
 
     def add_eqrat_const(
         self, args: list[Point], deps: EmptyDependency
     ) -> list[Dependency]:
         """Add new algebraic predicates of type eqratio-constant."""
         a, b, c, d, num, den = args
-        nd, dn = self.get_or_create_const_rat(num, den)
+        nd, dn = self.alegbraic.get_or_create_const_rat(self, num, den)
 
         if num == den:
             return self.add_cong([a, b, c, d], deps)
@@ -294,7 +211,7 @@ class Graph:
         """Derive (but not add) new algebraic predicates."""
         if name == "para":
             a, b, dep = args
-            if gm.is_equiv(a, b):
+            if is_equiv(a, b):
                 return []
             (x, y), (m, n) = a._obj.points, b._obj.points
             return self.add_para([x, y, m, n], dep)
@@ -302,7 +219,7 @@ class Graph:
         if name == "aconst":
             a, b, n, d, dep = args
             ab, ba, why = self.get_or_create_angle_d(a, b, deps=None)
-            nd, dn = self.get_or_create_const_ang(n, d)
+            nd, dn = self.alegbraic.get_or_create_const_ang(self, n, d)
 
             (x, y), (m, n) = a._obj.points, b._obj.points
 
@@ -367,124 +284,8 @@ class Graph:
 
         return []
 
-    def derive_algebra(
-        self, level: int, verbose: bool = False
-    ) -> tuple[dict[str, list[tuple[Point, ...]]], dict[str, list[tuple[Point, ...]]]]:
-        """Derive new algebraic predicates."""
-        derives = {}
-        ang_derives = self.derive_angle_algebra(level, verbose=verbose)
-        dist_derives = self.derive_distance_algebra(level, verbose=verbose)
-        rat_derives = self.derive_ratio_algebra(level, verbose=verbose)
-
-        derives.update(ang_derives)
-        derives.update(dist_derives)
-        derives.update(rat_derives)
-
-        # Separate eqangle and eqratio derivations
-        # As they are too numerous => slow down DD+AR.
-        # & reserve them only for last effort.
-        eqs = {"eqangle": derives.pop("eqangle"), "eqratio": derives.pop("eqratio")}
-        return derives, eqs
-
-    def derive_ratio_algebra(
-        self, level: int, verbose: bool = False
-    ) -> dict[str, list[tuple[Point, ...]]]:
-        """Derive new eqratio predicates."""
-        added = {"cong2": [], "eqratio": []}
-
-        for x in self.rtable.get_all_eqs_and_why():
-            x, why = x[:-1], x[-1]
-            dep = EmptyDependency(
-                level=level, rule_name=ar.AlgebraicRules.Ratio_Chase.value
-            )
-            dep.why = why
-
-            if len(x) == 2:
-                a, b = x
-                if gm.is_equiv(a, b):
-                    continue
-
-                (m, n), (p, q) = a._obj.points, b._obj.points
-                added["cong2"].append((m, n, p, q, dep))
-
-            if len(x) == 4:
-                a, b, c, d = x
-                added["eqratio"].append((a, b, c, d, dep))
-
-        return added
-
-    def derive_angle_algebra(
-        self, level: int, verbose: bool = False
-    ) -> dict[str, list[tuple[Point, ...]]]:
-        """Derive new eqangles predicates."""
-        added = {"eqangle": [], "aconst": [], "para": []}
-
-        for x in self.atable.get_all_eqs_and_why():
-            x, why = x[:-1], x[-1]
-            dep = EmptyDependency(
-                level=level, rule_name=ar.AlgebraicRules.Angle_Chase.value
-            )
-            dep.why = why
-
-            if len(x) == 2:
-                a, b = x
-                if gm.is_equiv(a, b):
-                    continue
-
-                (e, f), (p, q) = a._obj.points, b._obj.points
-                if not nm.check("para", [e, f, p, q]):
-                    continue
-
-                added["para"].append((a, b, dep))
-
-            if len(x) == 3:
-                a, b, (n, d) = x
-
-                (e, f), (p, q) = a._obj.points, b._obj.points
-                if not nm.check("aconst", [e, f, p, q, n, d]):
-                    continue
-
-                added["aconst"].append((a, b, n, d, dep))
-
-            if len(x) == 4:
-                a, b, c, d = x
-                added["eqangle"].append((a, b, c, d, dep))
-
-        return added
-
-    def derive_distance_algebra(
-        self, level: int, verbose: bool = False
-    ) -> dict[str, list[tuple[Point, ...]]]:
-        """Derive new cong predicates."""
-        added = {"inci": [], "cong": [], "rconst": []}
-        for x in self.dtable.get_all_eqs_and_why():
-            x, why = x[:-1], x[-1]
-            dep = EmptyDependency(
-                level=level, rule_name=ar.AlgebraicRules.Distance_Chase.value
-            )
-            dep.why = why
-
-            if len(x) == 2:
-                a, b = x
-                if a == b:
-                    continue
-
-                dep.name = f"inci {a.name} {b.name}"
-                added["inci"].append((x, dep))
-
-            if len(x) == 4:
-                a, b, c, d = x
-                if not (a != b and c != d and (a != c or b != d)):
-                    continue
-                added["cong"].append((a, b, c, d, dep))
-
-            if len(x) == 6:
-                a, b, c, d, num, den = x
-                if not (a != b and c != d and (a != c or b != d)):
-                    continue
-                added["rconst"].append((a, b, c, d, num, den, dep))
-
-        return added
+    def add_algebra(self, dep: Dependency, level: int) -> None:
+        self.alegbraic.add_algebra(self, dep, level)
 
     @classmethod
     def build_problem(
@@ -493,7 +294,7 @@ class Graph:
         definitions: dict[str, problem.Definition],
         verbose: bool = True,
         init_copy: bool = True,
-    ) -> tuple[Graph, list[Dependency]]:
+    ) -> tuple[ProofGraph, list[Dependency]]:
         """Build a problem into a gr.Graph object."""
         check = False
         g = None
@@ -503,7 +304,7 @@ class Graph:
             logging.info(pr.txt())
         while not check:
             try:
-                g = Graph()
+                g = ProofGraph(alegbraic=AlgebraicManipulator())
                 added = []
                 plevel = 0
                 for clause in pr.clauses:
@@ -537,7 +338,7 @@ class Graph:
         """Return all nodes of type Point."""
         return list(self.type2nodes[Point])
 
-    def all_nodes(self) -> list[gm.Node]:
+    def all_nodes(self) -> list[Node]:
         """Return all nodes."""
         return list(self._name2node.values())
 
@@ -547,7 +348,7 @@ class Graph:
         self._name2point.update(zip(pnames, result))
         return result
 
-    def names2nodes(self, pnames: list[str]) -> list[gm.Node]:
+    def names2nodes(self, pnames: list[str]) -> list[Node]:
         return [self._name2node[name] for name in pnames]
 
     def names2points(
@@ -574,11 +375,11 @@ class Graph:
                 result += [int(name)]
             elif "pi/" in name:
                 n, d = name.split("pi/")
-                ang, _ = self.get_or_create_const_ang(int(n), int(d))
+                ang, _ = self.alegbraic.get_or_create_const_ang(self, int(n), int(d))
                 result += [ang]
             elif "/" in name:
                 n, d = name.split("/")
-                rat, _ = self.get_or_create_const_rat(int(n), int(d))
+                rat, _ = self.alegbraic.get_or_create_const_rat(self, int(n), int(d))
                 result += [rat]
             else:
                 result += [self._name2point[name]]
@@ -592,7 +393,7 @@ class Graph:
             return self._name2node[pointname]
         return default_fn()
 
-    def new_node(self, oftype: Type[gm.Node], name: str = "") -> gm.Node:
+    def new_node(self, oftype: Type[Node], name: str = "") -> Node:
         node = oftype(name, self)
 
         self.type2nodes[oftype].append(node)
@@ -603,7 +404,7 @@ class Graph:
 
         return node
 
-    def merge(self, nodes: list[gm.Node], deps: Dependency) -> gm.Node:
+    def merge(self, nodes: list[Node], deps: Dependency) -> Node:
         """Merge all nodes."""
         if len(nodes) < 2:
             return
@@ -620,9 +421,7 @@ class Graph:
                 break
         return self.merge_into(node0, nodes1, deps)
 
-    def merge_into(
-        self, node0: gm.Node, nodes1: list[gm.Node], deps: Dependency
-    ) -> gm.Node:
+    def merge_into(self, node0: Node, nodes1: list[Node], deps: Dependency) -> Node:
         """Merge nodes1 into a single node0."""
         node0.merge(nodes1, deps)
         for n in nodes1:
@@ -643,7 +442,7 @@ class Graph:
 
         return node0
 
-    def remove(self, nodes: list[gm.Node]) -> None:
+    def remove(self, nodes: list[Node]) -> None:
         """Remove nodes out of self because they are merged."""
         if not nodes:
             return
@@ -657,11 +456,11 @@ class Graph:
             if node.name in self._name2node.values():
                 self._name2node.pop(node.name)
 
-    def connect(self, a: gm.Node, b: gm.Node, deps: Dependency) -> None:
+    def connect(self, a: Node, b: Node, deps: Dependency) -> None:
         a.connect_to(b, deps)
         b.connect_to(a, deps)
 
-    def connect_val(self, node: gm.Node, deps: Dependency) -> gm.Node:
+    def connect_val(self, node: Node, deps: Dependency) -> Node:
         """Connect a node into its value (equality) node."""
         if node._val:
             return node._val
@@ -674,12 +473,12 @@ class Graph:
             name = "l(" + node.name + ")"
         if isinstance(node, Ratio):
             name = "r(" + node.name + ")"
-        v = self.new_node(gm.val_type(node), name)
+        v = self.new_node(val_type(node), name)
         self.connect(node, v, deps=deps)
         return v
 
-    def is_equal(self, x: gm.Node, y: gm.Node, level: int = None) -> bool:
-        return gm.is_equal(x, y, level)
+    def is_equal(self, x: Node, y: Node, level: int = None) -> bool:
+        return is_equal(x, y, level)
 
     def add_piece(
         self, name: str, args: list[Point], deps: EmptyDependency
@@ -836,7 +635,7 @@ class Graph:
             return True
         raise ValueError(f"Not recognize {name}")
 
-    def get_lines_thru_all(self, *points: list[gm.Point]) -> list[Line]:
+    def get_lines_thru_all(self, *points: list[Point]) -> list[Line]:
         line2count = defaultdict(lambda: 0)
         points = set(points)
         for p in points:
@@ -915,7 +714,7 @@ class Graph:
         if (p1, p2) in self._pair2line:
             return self._pair2line[(p1, p2)].rep_and_why()
 
-        line, why = gm.line_of_and_why([p1, p2])
+        line, why = line_of_and_why([p1, p2])
         if line is None:
             line = self.get_new_line_thru_pair(p1, p2)
             why = []
@@ -1012,7 +811,7 @@ class Graph:
     def check_sameside(self, points: list[Point]) -> bool:
         return nm.check_sameside([p.num for p in points])
 
-    def make_equal(self, x: gm.Node, y: gm.Node, deps: Dependency) -> None:
+    def make_equal(self, x: Node, y: Node, deps: Dependency) -> None:
         """Make that two nodes x and y are equal, i.e. merge their value node."""
         if x.val is None:
             x, y = y, x
@@ -1029,8 +828,8 @@ class Graph:
 
         if (
             isinstance(x, Angle)
-            and x not in self.aconst.values()
-            and y not in self.aconst.values()
+            and x not in self.alegbraic.aconst.values()
+            and y not in self.alegbraic.aconst.values()
             and x.directions == y.directions[::-1]
             and x.directions[0] != x.directions[1]
         ):
@@ -1038,14 +837,14 @@ class Graph:
 
         self.merge(merges, deps)
 
-    def merge_vals(self, vx: gm.Node, vy: gm.Node, deps: Dependency) -> None:
+    def merge_vals(self, vx: Node, vy: Node, deps: Dependency) -> None:
         if vx == vy:
             return
         merges = [vx, vy]
         self.merge(merges, deps)
 
-    def why_equal(self, x: gm.Node, y: gm.Node, level: int) -> list[Dependency]:
-        return gm.why_equal(x, y, level)
+    def why_equal(self, x: Node, y: Node, level: int) -> list[Dependency]:
+        return why_equal(x, y, level)
 
     def _why_coll4(
         self,
@@ -1225,7 +1024,7 @@ class Graph:
     ) -> Optional[list[Dependency]]:
         """Maybe add a new parallel predicate from perp predicate."""
         a, b, c, d = points
-        halfpi = self.aconst[(1, 2)]
+        halfpi = self.alegbraic.aconst[(1, 2)]
         for ang in halfpi.val.neighbors(Angle):
             if ang == halfpi:
                 continue
@@ -1822,7 +1621,7 @@ class Graph:
     ) -> list[Dependency]:
         """Add that an angle is equal to some constant."""
         a, b, c, d, num, den = points
-        nd, dn = self.get_or_create_const_ang(num, den)
+        nd, dn = self.alegbraic.get_or_create_const_ang(self, num, den)
 
         if nd == self.halfpi:
             return self.add_perp([a, b, c, d], deps)
@@ -1888,8 +1687,8 @@ class Graph:
         """Add that an angle abx is equal to constant y."""
         a, b, x, y = points
 
-        n, d = ar.simplify(y % 180, 180)
-        nd, dn = self.get_or_create_const_ang(n, d)
+        n, d = simplify(y % 180, 180)
+        nd, dn = self.alegbraic.get_or_create_const_ang(self, n, d)
 
         if nd == self.halfpi:
             return self.add_perp([a, b, b, x], deps)
@@ -1949,7 +1748,7 @@ class Graph:
         else:
             name = nd.name
         num, den = name.split("pi/")
-        ang, _ = self.get_or_create_const_ang(int(num), int(den))
+        ang, _ = self.alegbraic.get_or_create_const_ang(self, int(num), int(den))
 
         ab = self._get_line(a, b)
         cd = self._get_line(c, d)
@@ -1959,7 +1758,7 @@ class Graph:
         if not (ab.val and cd.val):
             return False
 
-        for ang1, _, _ in gm.all_angles(ab._val, cd._val):
+        for ang1, _, _ in all_angles(ab._val, cd._val):
             if self.is_equal(ang1, ang):
                 return True
         return False
@@ -1975,7 +1774,7 @@ class Graph:
         if not (ab.val and cd.val):
             return False
 
-        for ang0 in self.aconst.values():
+        for ang0 in self.alegbraic.aconst.values():
             for ang in ang0.val.neighbors(Angle):
                 d1, d2 = ang.directions
                 if ab.val == d1 and cd.val == d2:
@@ -2024,8 +1823,8 @@ class Graph:
         ):
             return True
 
-        for ang1, _, _ in gm.all_angles(ab._val, cd._val):
-            for ang2, _, _ in gm.all_angles(mn._val, pq._val):
+        for ang1, _, _ in all_angles(ab._val, cd._val):
+            for ang2, _, _ in all_angles(mn._val, pq._val):
                 if self.is_equal(ang1, ang2):
                     return True
 
@@ -2236,7 +2035,7 @@ class Graph:
         else:
             name = nd.name
         num, den = name.split("/")
-        rat, _ = self.get_or_create_const_rat(int(num), int(den))
+        rat, _ = self.alegbraic.get_or_create_const_rat(self, int(num), int(den))
 
         ab = self._get_segment(a, b)
         cd = self._get_segment(c, d)
@@ -2247,7 +2046,7 @@ class Graph:
         if not (ab.val and cd.val):
             return False
 
-        for rat1, _, _ in gm.all_ratios(ab._val, cd._val):
+        for rat1, _, _ in all_ratios(ab._val, cd._val):
             if self.is_equal(rat1, rat):
                 return True
         return False
@@ -2264,7 +2063,7 @@ class Graph:
         if not (ab.val and cd.val):
             return False
 
-        for rat0 in self.rconst.values():
+        for rat0 in self.alegbraic.rconst.values():
             for rat in rat0.val.neighbors(Ratio):
                 l1, l2 = rat.lengths
                 if ab.val == l1 and cd.val == l2:
@@ -2311,8 +2110,8 @@ class Graph:
         ):
             return True
 
-        for rat1, _, _ in gm.all_ratios(ab._val, cd._val):
-            for rat2, _, _ in gm.all_ratios(mn._val, pq._val):
+        for rat1, _, _ in all_ratios(ab._val, cd._val):
+            for rat2, _, _ in all_ratios(mn._val, pq._val):
                 if self.is_equal(rat1, rat2):
                     return True
         return False
@@ -2688,7 +2487,7 @@ class Graph:
                         args = [mapping[a] for a in b.args]
                     else:
                         num, den = map(int, b.args[-2:])
-                        rat, _ = self.get_or_create_const_rat(num, den)
+                        rat, _ = self.alegbraic.get_or_create_const_rat(self, num, den)
                         args = [mapping[a] for a in b.args[:-2]] + [rat.name]
 
                     args = list(map(lambda x: self.get(x, lambda: int(x)), args))
@@ -3012,27 +2811,3 @@ class Graph:
         s = lenght.neighbors(Segment)[0]
         p1, p2 = s.points
         return p1, p2
-
-
-def create_consts_str(g: Graph, s: str) -> Union[Ratio, Angle]:
-    if "pi/" in s:
-        n, d = s.split("pi/")
-        n, d = int(n), int(d)
-        p0, _ = g.get_or_create_const_ang(n, d)
-    else:
-        n, d = s.split("/")
-        n, d = int(n), int(d)
-        p0, _ = g.get_or_create_const_rat(n, d)
-    return p0
-
-
-def create_consts(g: Graph, p: gm.Node) -> Union[Ratio, Angle]:
-    if isinstance(p, Angle):
-        n, d = p.name.split("pi/")
-        n, d = int(n), int(d)
-        p0, _ = g.get_or_create_const_ang(n, d)
-    if isinstance(p, Ratio):
-        n, d = p.name.split("/")
-        n, d = int(n), int(d)
-        p0, _ = g.get_or_create_const_rat(n, d)
-    return p0
