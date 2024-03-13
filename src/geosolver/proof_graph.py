@@ -19,7 +19,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Callable, Generator, Optional, Type, Union
+from typing import Callable, Dict, Generator, List, Optional, Type, Union
 import logging
 
 from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
@@ -104,7 +104,7 @@ class ProofGraph:
     """Graph data structure representing proof state."""
 
     def __init__(self, alegbraic: AlgebraicManipulator):
-        self.type2nodes = {
+        self.type2nodes: Dict[Type[Node], List[Node]] = {
             Point: [],
             Line: [],
             Segment: [],

@@ -2,6 +2,8 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+from networkx import Graph
+from pyvis.network import Network
 
 from geosolver.ddar import solve
 from geosolver.geometry import Circle, Line, Point, Segment
@@ -32,13 +34,18 @@ def main():
     out_folder_path = Path("./ddar_results/")
     out_folder_path.mkdir(exist_ok=True)
     for problem_name, problem in problems.items():
-        if problem_name != "incenter_excenter":
+        if problem_name != "orthocenter_consequence_aux":
             continue
         logging.info(f"Starting problem {problem_name} with ddar only.")
         graph, _ = ProofGraph.build_problem(problem, DEFINITIONS)
 
         problem_output_path = out_folder_path / problem_name
         run_ddar(graph, problem, problem_output_path)
+
+        draw_elements_graph(
+            graph, problem_output_path / f"{problem_name}.elements_graph.html"
+        )
+
         graph.dependency_graph.show_html(
             problem_output_path / f"{problem_name}.dependency_graph.html",
             RULES,
@@ -80,6 +87,28 @@ def run_ddar(graph: ProofGraph, problem: Problem, out_folder: Optional[Path]) ->
         block=False,
     )
     return True
+
+
+def draw_elements_graph(graph: ProofGraph, html_path: Path):
+    nt = Network("1080px")
+    # populates the nodes and edges data structures
+    nx_graph = Graph()
+    for node_type, nodes in graph.type2nodes.items():
+        type_name = node_type.__name__
+        for node in nodes:
+            nx_graph.add_node(node.name, title=type_name, group=type_name)
+            for neighbor_type in graph.type2nodes.keys():
+                neighbor_type_name = neighbor_type.__name__
+                for neighbor in node.neighbors(neighbor_type):
+                    nx_graph.add_node(
+                        neighbor.name,
+                        title=neighbor_type_name,
+                        group=neighbor_type_name,
+                    )
+                    nx_graph.add_edge(neighbor.name, node.name)
+
+    nt.from_nx(nx_graph)
+    nt.show(str(html_path), notebook=False)
 
 
 if __name__ == "__main__":

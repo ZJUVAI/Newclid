@@ -26,8 +26,9 @@ class DependencyGraph:
     def add_edge(self, u_for_edge: Dependency, v_for_edge: Dependency, rule_name: str):
         pred = dependency_node_name(u_for_edge)
         succ = dependency_node_name(v_for_edge)
-        # assert u in self.nx_graph.nodes
-        # assert v in self.nx_graph.nodes
+        if pred not in self.nx_graph.nodes:
+            self.add_dependency(u_for_edge)
+        assert succ in self.nx_graph.nodes
         self.nx_graph.add_edge(
             pred,
             succ,
