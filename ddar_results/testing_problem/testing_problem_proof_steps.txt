@@ -1,15 +1,25 @@
 
 ==========================
  * From theorem premises:
-A B C X : Points
-AB = AC [00]
-∠BAX = ∠XAC [01]
+A B C D F : Points
+BD ⟂ AC [00]
+CD ⟂ AB [01]
+CF ⟂ BC [02]
 
  * Auxiliary Constructions:
-: Points
-
+E : Points
+E,C,A are collinear [03]
+B,D,E are collinear [04]
 
  * Proof steps:
-001. AB = AC [00] & ∠BAX = ∠XAC [01] (SAS)⇒  XB = XC [02]
-002. AB = AC [00] & XB = XC [02] (r23)⇒  BC ⟂ AX
+001. E,C,A are collinear [03] & E,D,B are collinear [04] & BD ⟂ AC [00] ()⇒  ∠CED = ∠BEA [05]
+002. E,C,A are collinear [03] & E,D,B are collinear [04] & BD ⟂ AC [00] ()⇒  ∠CEB = ∠DEA [06]
+003. E,C,A are collinear [03] & BD ⟂ AC [00] ()⇒  BD ⟂ EC [07]
+004. BD ⟂ EC [07] & CD ⟂ AB [01] (r08)⇒  ∠BDC = ∠(EC-BA) [08]
+005. E,D,B are collinear [04] & E,C,A are collinear [03] & ∠BDC = ∠(EC-BA) [08] ()⇒  ∠CDE = ∠BAE [09]
+006. ∠CED = ∠BEA [05] & ∠CDE = ∠BAE [09] (Similar Triangles 34)⇒  EC:BE = ED:EA [10]
+007. EC:BE = ED:EA [10] & ∠CEB = ∠DEA [06] (Similar Triangles 39)⇒  ∠CBE = ∠DAE [11]
+008. EC:BE = ED:EA [10] & ∠CEB = ∠DEA [06] (Similar Triangles 39)⇒  ∠ECB = ∠EDA [12]
+009. ∠CBE = ∠DAE [11] & B,D,E are collinear [04] & E,C,A are collinear [03] & ∠ECB = ∠EDA [12] ()⇒  DA ⟂ BC [13]
+010. DA ⟂ BC [13] & CF ⟂ BC [02] (r00)⇒  DA ∥ FC
 ==========================

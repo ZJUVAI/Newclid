@@ -1053,7 +1053,9 @@ class ProofGraph:
 
         if why1 + why2:
             dep0 = deps.populate("perp", points)
-            deps = EmptyDependency(level=deps.level, rule_name=None)
+            deps = EmptyDependency(
+                level=deps.level, rule_name="Found perpendicular"
+            )  # NAMING4
             deps.why = [dep0] + why1 + why2
 
         self.connect_val(ab, deps=None)

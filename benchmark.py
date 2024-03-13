@@ -32,7 +32,7 @@ def main():
     out_folder_path = Path("./ddar_results/")
     out_folder_path.mkdir(exist_ok=True)
     for problem_name, problem in problems.items():
-        if problem_name != "testing_problem":
+        if problem_name != "testing_problem_2":
             continue
         logging.info(f"Starting problem {problem_name} with ddar only.")
         graph, _ = ProofGraph.build_problem(problem, DEFINITIONS)

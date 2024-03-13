@@ -8,18 +8,18 @@ CF ⟂ BC [02]
 
  * Auxiliary Constructions:
 E : Points
-D,E,B are collinear [03]
-C,A,E are collinear [04]
+C,A,E are collinear [03]
+D,E,B are collinear [04]
 
  * Proof steps:
-001. D,E,B are collinear [03] & C,A,E are collinear [04] & BD ⟂ AC [00] ⇒  ∠DEC = ∠AEB [05]
-002. D,E,B are collinear [03] & C,A,E are collinear [04] & BD ⟂ AC [00] ⇒  ∠CEB = ∠DEA [06]
-003. D,E,B are collinear [03] & BD ⟂ AC [00] ⇒  DE ⟂ CA [07]
-004. DE ⟂ CA [07] & CD ⟂ AB [01] ⇒  ∠(DE-AB) = ∠ACD [08]
-005. C,A,E are collinear [04] & D,E,B are collinear [03] & ∠(DE-AB) = ∠ACD [08] ⇒  ∠DCE = ∠ABE [09]
-006. ∠DEC = ∠AEB [05] & ∠DCE = ∠ABE [09] (Similar Triangles)⇒  DE:AE = CE:EB [10]
-007. DE:AE = CE:EB [10] & ∠CEB = ∠DEA [06] (Similar Triangles)⇒  ∠CBE = ∠DAE [11]
-008. DE:AE = CE:EB [10] & ∠CEB = ∠DEA [06] (Similar Triangles)⇒  ∠ECB = ∠EDA [12]
-009. ∠CBE = ∠DAE [11] & D,E,B are collinear [03] & C,A,E are collinear [04] & ∠ECB = ∠EDA [12] ⇒  CB ⟂ DA [13]
-010. CF ⟂ BC [02] & CB ⟂ DA [13] ⇒  CF ∥ DA
+001. C,A,E are collinear [03] & D,E,B are collinear [04] & BD ⟂ AC [00] ()⇒  ∠CED = ∠BEA [05]
+002. C,A,E are collinear [03] & D,E,B are collinear [04] & BD ⟂ AC [00] ()⇒  ∠DEA = ∠CEB [06]
+003. D,E,B are collinear [04] & BD ⟂ AC [00] ()⇒  DE ⟂ CA [07]
+004. DE ⟂ CA [07] & CD ⟂ AB [01] (r08)⇒  ∠EDC = ∠CAB [08]
+005. D,E,B are collinear [04] & C,A,E are collinear [03] & ∠EDC = ∠CAB [08] ()⇒  ∠CDE = ∠BAE [09]
+006. ∠CED = ∠BEA [05] & ∠CDE = ∠BAE [09] (Similar Triangles 34)⇒  CE:EB = DE:AE [10]
+007. CE:EB = DE:AE [10] & ∠DEA = ∠CEB [06] (Similar Triangles 39)⇒  ∠DAE = ∠CBE [11]
+008. CE:EB = DE:AE [10] & ∠DEA = ∠CEB [06] (Similar Triangles 39)⇒  ∠EDA = ∠ECB [12]
+009. ∠DAE = ∠CBE [11] & C,A,E are collinear [03] & D,E,B are collinear [04] & ∠EDA = ∠ECB [12] ()⇒  CB ⟂ DA [13]
+010. CF ⟂ BC [02] & CB ⟂ DA [13] (r00)⇒  FC ∥ DA
 ==========================
