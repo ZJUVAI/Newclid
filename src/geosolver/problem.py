@@ -18,11 +18,15 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import geosolver.geometry as gm
 import geosolver.pretty as pt
+
 from geosolver.ratios import simplify
+
+if TYPE_CHECKING:
+    from geosolver.proof_graph import ProofGraph
 
 
 def reshape(list_to_reshape: list[Any], n: int = 1) -> list[list[Any]]:
@@ -687,7 +691,7 @@ class Dependency(Construction):
         dep.why = list(self.why)
         return dep
 
-    def why_me_or_cache(self, g: Any, level: int) -> Dependency:
+    def why_me_or_cache(self, g: "ProofGraph", level: int) -> Dependency:
         if self.hashed() in g.cache:
             return g.cache[self.hashed()]
         self.why_me(g, level)
@@ -699,7 +703,7 @@ class Dependency(Construction):
         dep.why = list(self.why)
         return dep
 
-    def why_me(self, g: Any, level: int) -> None:
+    def why_me(self, g: "ProofGraph", level: int) -> None:
         """Figure out the dependencies predicates of self."""
         name, args = self.name, self.args
 
