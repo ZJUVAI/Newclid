@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 
 from pathlib import Path
 from typing import Dict, List
@@ -37,15 +38,17 @@ class DependencyGraph:
         for added_dependency in dependencies:
             self.add_dependency(added_dependency)
             for why_added in added_dependency.why:
-                rule_name = added_dependency.rule_name
-                if rule_name:
-                    assert rule_name == theorem.rule_name
-                else:
-                    rule_name = theorem.rule_name
+                dep_rule_name = added_dependency.rule_name
+                if dep_rule_name and dep_rule_name != theorem.rule_name:
+                    logging.warning(
+                        "Dependency rule was different from the theorem. %s != %s",
+                        dep_rule_name,
+                        theorem.rule_name,
+                    )
                 self.add_edge(
                     why_added,
                     added_dependency,
-                    rule_name=rule_name,
+                    rule_name=theorem.rule_name,
                 )
 
     def add_construction_edges(self, dependencies: list[Dependency]):
@@ -53,15 +56,18 @@ class DependencyGraph:
             self.add_dependency(added_dependency)
             for why_added in added_dependency.why:
                 self.add_dependency(why_added)
-                rule_name = added_dependency.rule_name
-                if rule_name:
-                    assert rule_name == CONSTRUCTION_RULE
-                else:
-                    rule_name = CONSTRUCTION_RULE
+                dep_rule_name = added_dependency.rule_name
+                if dep_rule_name and dep_rule_name != CONSTRUCTION_RULE:
+                    logging.warning(
+                        "Dependency rule was different"
+                        "from the construction rule. %s != %s",
+                        dep_rule_name,
+                        CONSTRUCTION_RULE,
+                    )
                 self.add_edge(
                     why_added,
                     added_dependency,
-                    rule_name=rule_name,
+                    rule_name=CONSTRUCTION_RULE,
                 )
 
     def show_html(self, html_path: Path, rules: Dict[str, Theorem]):
