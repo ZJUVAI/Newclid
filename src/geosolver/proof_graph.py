@@ -453,7 +453,9 @@ class ProofGraph:
         ab_cd, cd_ab, why = self._get_or_create_ratio(ab, cd, deps=None)
         if why:
             dep0 = deps.populate("rconst", [a, b, c, d, nd])
-            deps = EmptyDependency(level=deps.level, rule_name=None)
+            deps = EmptyDependency(
+                level=deps.level, rule_name=f"Constant ratio: {num}/{den}"
+            )  # NAMED1
             deps.why = [dep0] + why
 
         lab, lcd = ab_cd._l
@@ -766,7 +768,9 @@ class ProofGraph:
             abcd_deps = deps
             if whys + why0:
                 dep0 = deps.populate("coll", og_points)
-                abcd_deps = EmptyDependency(level=deps.level, rule_name=None)
+                abcd_deps = EmptyDependency(
+                    level=deps.level, rule_name="Found in line (D3)"
+                )  # NAMED2 -- NOT VERIFIED
                 abcd_deps.why = [dep0] + whys
 
             is_coll = self.check_coll(args)
@@ -880,7 +884,7 @@ class ProofGraph:
         (a, b), (c, d) = ab.points, cd.points
 
         dep0 = deps.populate("para", points)
-        deps = EmptyDependency(level=deps.level, rule_name=None)
+        deps = EmptyDependency(level=deps.level, rule_name="Found parallel")  # NAMED3
 
         deps = deps.populate("para", [a, b, c, d])
         deps.why = [dep0] + why1 + why2
