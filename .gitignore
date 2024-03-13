@@ -38,3 +38,12 @@ ag_ckpt_vocab/
 
 # Coverage data
 .coverage
+
+# Profiling data
+*.prof
+
+# Experiment data
+ddar_results/
+
+# TODO
+TODO.md

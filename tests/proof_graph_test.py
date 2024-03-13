@@ -17,24 +17,34 @@
 import pytest
 import pytest_check as check
 
-import geosolver.graph as gh
-import geosolver.numericals as nm
-import geosolver.problem as pr
+from geosolver.proof_graph import ProofGraph
+from geosolver.numericals import (
+    check_circle,
+    check_coll,
+    check_cong,
+    check_cyclic,
+    check_eqangle,
+    check_eqratio,
+    check_midp,
+    check_para,
+    check_perp,
+)
+from geosolver.problem import Definition, Problem, Theorem
 
 
 MAX_LEVEL = 10
 
 
-class TestGraph:
+class TestProofGraph:
     @pytest.fixture(autouse=True)
     def setUpClass(self):
-        self.defs = pr.Definition.from_txt_file("defs.txt", to_dict=True)
-        self.rules = pr.Theorem.from_txt_file("rules.txt", to_dict=True)
+        self.defs = Definition.from_txt_file("defs.txt", to_dict=True)
+        self.rules = Theorem.from_txt_file("rules.txt", to_dict=True)
 
         # load a complex setup:
         txt = "a b c = triangle a b c; h = orthocenter a b c; h1 = foot a b c; h2 = foot b c a; h3 = foot c a b; g1 g2 g3 g = centroid g1 g2 g3 g a b c; o = circle a b c ? coll h g o"
-        p = pr.Problem.from_txt(txt, translate=False)
-        self.graph, _ = gh.Graph.build_problem(p, self.defs)
+        p = Problem.from_txt(txt, translate=False)
+        self.graph, _ = ProofGraph.build_problem(p, self.defs)
 
     def test_build_graph_points(self):
         g = self.graph
@@ -89,28 +99,28 @@ class TestGraph:
 
         for a, b, c in g.all_colls():
             check.is_true(g.check_coll([a, b, c]))
-            check.is_true(nm.check_coll([a.num, b.num, c.num]))
+            check.is_true(check_coll([a.num, b.num, c.num]))
 
     def test_enumerate_paras(self):
         g = self.graph
 
         for a, b, c, d in g.all_paras():
             check.is_true(g.check_para([a, b, c, d]))
-            check.is_true(nm.check_para([a.num, b.num, c.num, d.num]))
+            check.is_true(check_para([a.num, b.num, c.num, d.num]))
 
     def test_enumerate_perps(self):
         g = self.graph
 
         for a, b, c, d in g.all_perps():
             check.is_true(g.check_perp([a, b, c, d]))
-            check.is_true(nm.check_perp([a.num, b.num, c.num, d.num]))
+            check.is_true(check_perp([a.num, b.num, c.num, d.num]))
 
     def test_enumerate_congs(self):
         g = self.graph
 
         for a, b, c, d in g.all_congs():
             check.is_true(g.check_cong([a, b, c, d]))
-            check.is_true(nm.check_cong([a.num, b.num, c.num, d.num]))
+            check.is_true(check_cong([a.num, b.num, c.num, d.num]))
 
     def test_enumerate_eqangles(self):
         g = self.graph
@@ -118,9 +128,7 @@ class TestGraph:
         for a, b, c, d, x, y, z, t in g.all_eqangles_8points():
             check.is_true(g.check_eqangle([a, b, c, d, x, y, z, t]))
             check.is_true(
-                nm.check_eqangle(
-                    [a.num, b.num, c.num, d.num, x.num, y.num, z.num, t.num]
-                )
+                check_eqangle([a.num, b.num, c.num, d.num, x.num, y.num, z.num, t.num])
             )
 
     def test_enumerate_eqratios(self):
@@ -129,9 +137,7 @@ class TestGraph:
         for a, b, c, d, x, y, z, t in g.all_eqratios_8points():
             check.is_true(g.check_eqratio([a, b, c, d, x, y, z, t]))
             check.is_true(
-                nm.check_eqratio(
-                    [a.num, b.num, c.num, d.num, x.num, y.num, z.num, t.num]
-                )
+                check_eqratio([a.num, b.num, c.num, d.num, x.num, y.num, z.num, t.num])
             )
 
     def test_enumerate_cyclics(self):
@@ -139,18 +145,18 @@ class TestGraph:
 
         for a, b, c, d, x, y, z, t in g.all_cyclics():
             check.is_true(g.check_cyclic([a, b, c, d, x, y, z, t]))
-            check.is_true(nm.check_cyclic([a.num, b.num, c.num, d.num]))
+            check.is_true(check_cyclic([a.num, b.num, c.num, d.num]))
 
     def test_enumerate_midps(self):
         g = self.graph
 
         for a, b, c in g.all_midps():
             check.is_true(g.check_midp([a, b, c]))
-            check.is_true(nm.check_midp([a.num, b.num, c.num]))
+            check.is_true(check_midp([a.num, b.num, c.num]))
 
     def test_enumerate_circles(self):
         g = self.graph
 
         for a, b, c, d in g.all_circles():
             check.is_true(g.check_circle([a, b, c, d]))
-            check.is_true(nm.check_circle([a.num, b.num, c.num, d.num]))
+            check.is_true(check_circle([a.num, b.num, c.num, d.num]))

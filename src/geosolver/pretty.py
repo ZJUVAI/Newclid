@@ -48,17 +48,6 @@ def map_symbol_inv(c: str) -> str:
     return {v: k for k, v in MAP_SYMBOL.items()}[c]
 
 
-def _gcd(x: int, y: int) -> int:
-    while y:
-        x, y = y, x % y
-    return x
-
-
-def simplify(n: int, d: int) -> tuple[int, int]:
-    g = _gcd(n, d)
-    return (n // g, d // g)
-
-
 def pretty2r(a: str, b: str, c: str, d: str) -> str:
     if b in (c, d):
         a, b = b, a

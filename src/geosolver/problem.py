@@ -22,6 +22,7 @@ from typing import Any
 
 import geosolver.geometry as gm
 import geosolver.pretty as pt
+from geosolver.ratios import simplify
 
 
 def reshape(list_to_reshape: list[Any], n: int = 1) -> list[list[Any]]:
@@ -110,17 +111,6 @@ class Clause:
             + " = "
             + ", ".join(c.txt() for c in self.constructions)
         )
-
-
-def _gcd(x: int, y: int) -> int:
-    while y:
-        x, y = y, x % y
-    return x
-
-
-def simplify(n: int, d: int) -> tuple[int, int]:
-    g = _gcd(n, d)
-    return (n // g, d // g)
 
 
 def compare_fn(dep: Dependency) -> tuple[Dependency, str]:

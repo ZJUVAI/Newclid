@@ -17,23 +17,23 @@
 
 import pytest
 import pytest_check as check
-import geosolver.ar as ar
-import geosolver.graph as gh
-import geosolver.problem as pr
+import geosolver.algebraic.geometric_tables as geometric_tables
+from geosolver.proof_graph import ProofGraph
+from geosolver.problem import Definition, EmptyDependency, Problem, Theorem
 
 
 class TestAR:
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.defs = pr.Definition.from_txt_file("defs.txt", to_dict=True)
-        self.rules = pr.Theorem.from_txt_file("rules.txt", to_dict=True)
+        self.defs = Definition.from_txt_file("defs.txt", to_dict=True)
+        self.rules = Theorem.from_txt_file("rules.txt", to_dict=True)
 
     def test_update_groups(self):
         """Test for update_groups."""
         groups1 = [{1, 2}, {3, 4, 5}, {6, 7}]
         groups2 = [{2, 3, 8}, {9, 10, 11}]
 
-        _, links, history = ar.update_groups(groups1, groups2)
+        _, links, history = geometric_tables.update_groups(groups1, groups2)
         check.equal(
             history,
             [
@@ -46,7 +46,7 @@ class TestAR:
         groups1 = [{1, 2}, {3, 4}, {5, 6}, {7, 8}]
         groups2 = [{2, 3, 8, 9, 10}, {3, 6, 11}]
 
-        _, links, history = ar.update_groups(groups1, groups2)
+        _, links, history = geometric_tables.update_groups(groups1, groups2)
         check.equal(
             history,
             [
@@ -59,7 +59,7 @@ class TestAR:
         groups1 = []
         groups2 = [{1, 2}, {3, 4}, {5, 6}, {2, 3}]
 
-        _, links, history = ar.update_groups(groups1, groups2)
+        _, links, history = geometric_tables.update_groups(groups1, groups2)
         check.equal(
             history,
             [
@@ -72,7 +72,7 @@ class TestAR:
         check.equal(links, [(1, 2), (3, 4), (5, 6), (2, 3)])
 
     def test_generic_table_simple(self):
-        tb = ar.Table()
+        tb = geometric_tables.Table()
 
         # If a-b = b-c & d-a = c-d
         tb.add_eq4("a", "b", "b", "c", "fact1")
@@ -87,14 +87,14 @@ class TestAR:
         """Test that AR can figure out bisector & ex-bisector are perpendicular."""
         # Load the scenario that we have cd is bisector of acb and
         # ce is the ex-bisector of acb.
-        p = pr.Problem.from_txt(
+        p = Problem.from_txt(
             "a b c = triangle a b c; d = incenter d a b c; e = excenter e a b c ?"
             " perp d c c e"
         )
-        g, _ = gh.Graph.build_problem(p, self.defs)
+        g, _ = ProofGraph.build_problem(p, self.defs)
 
         # Create an external angle table:
-        tb = ar.AngleTable("pi")
+        tb = geometric_tables.AngleTable("pi")
 
         # Add bisector & ex-bisector facts into the table:
         ca, cd, cb, ce = g.names2nodes(["d(ac)", "d(cd)", "d(bc)", "d(ce)"])
@@ -123,16 +123,16 @@ class TestAR:
     def test_angle_table_equilateral_triangle(self):
         """Test that AR can figure out triangles with 3 equal angles => each is pi/3."""
         # Load an equaliteral scenario
-        p = pr.Problem.from_txt("a b c = ieq_triangle ? cong a b a c")
-        g, _ = gh.Graph.build_problem(p, self.defs)
+        p = Problem.from_txt("a b c = ieq_triangle ? cong a b a c")
+        g, _ = ProofGraph.build_problem(p, self.defs)
 
         # Add two eqangles facts because ieq_triangle only add congruent sides
         a, b, c = g.names2nodes("abc")
-        g.add_eqangle([a, b, b, c, b, c, c, a], pr.EmptyDependency(0, None))
-        g.add_eqangle([b, c, c, a, c, a, a, b], pr.EmptyDependency(0, None))
+        g._add_eqangle([a, b, b, c, b, c, c, a], EmptyDependency(0, None))
+        g._add_eqangle([b, c, c, a, c, a, a, b], EmptyDependency(0, None))
 
         # Create an external angle table:
-        tb = ar.AngleTable("pi")
+        tb = geometric_tables.AngleTable("pi")
 
         # Add the fact that there are three equal angles
         ab, bc, ca = g.names2nodes(["d(ab)", "d(bc)", "d(ac)"])
@@ -163,19 +163,19 @@ class TestAR:
     def test_incenter_excenter_touchpoints(self):
         """Test that AR can figure out incenter/excenter touchpoints are equidistant to midpoint."""
 
-        p = pr.Problem.from_txt(
+        p = Problem.from_txt(
             "a b c = triangle a b c; d1 d2 d3 d = incenter2 a b c; e1 e2 e3 e ="
             " excenter2 a b c ? perp d c c e",
             translate=False,
         )
-        g, _ = gh.Graph.build_problem(p, self.defs)
+        g, _ = ProofGraph.build_problem(p, self.defs)
 
         a, b, c, ab, bc, ca, d1, d2, d3, e1, e2, e3 = g.names2nodes(
             ["a", "b", "c", "ab", "bc", "ac", "d1", "d2", "d3", "e1", "e2", "e3"]
         )
 
         # Create an external distance table:
-        tb = ar.DistanceTable()
+        tb = geometric_tables.DistanceTable()
 
         # DD can figure out the following facts,
         # we manually add them to AR.
@@ -195,4 +195,4 @@ class TestAR:
         d1 = tb.v2e["bc:d1"]
         e1 = tb.v2e["bc:e1"]
 
-        check.equal(ar.minus(d1, b), ar.minus(c, e1))
+        check.equal(geometric_tables.minus(d1, b), geometric_tables.minus(c, e1))

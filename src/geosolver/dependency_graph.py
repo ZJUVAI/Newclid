@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 from pathlib import Path
 from typing import Dict, List
 from networkx import MultiDiGraph
 from pyvis.network import Network
 
 
-from geosolver.ar import AlgebraicRules
+from geosolver.algebraic import AlgebraicRules
 from geosolver.problem import CONSTRUCTION_RULE, Dependency, Theorem
 
 
@@ -30,6 +32,37 @@ class DependencyGraph:
             succ,
             key=rule_name,
         )
+
+    def add_theorem_edges(self, dependencies: list[Dependency], theorem: Theorem):
+        for added_dependency in dependencies:
+            self.add_dependency(added_dependency)
+            for why_added in added_dependency.why:
+                rule_name = added_dependency.rule_name
+                if rule_name:
+                    assert rule_name == theorem.rule_name
+                else:
+                    rule_name = theorem.rule_name
+                self.add_edge(
+                    why_added,
+                    added_dependency,
+                    rule_name=rule_name,
+                )
+
+    def add_construction_edges(self, dependencies: list[Dependency]):
+        for added_dependency in dependencies:
+            self.add_dependency(added_dependency)
+            for why_added in added_dependency.why:
+                self.add_dependency(why_added)
+                rule_name = added_dependency.rule_name
+                if rule_name:
+                    assert rule_name == CONSTRUCTION_RULE
+                else:
+                    rule_name = CONSTRUCTION_RULE
+                self.add_edge(
+                    why_added,
+                    added_dependency,
+                    rule_name=rule_name,
+                )
 
     def show_html(self, html_path: Path, rules: Dict[str, Theorem]):
         nt = Network("1080px", directed=True)

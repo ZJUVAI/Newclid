@@ -14,67 +14,73 @@
 # ==============================================================================
 
 """Unit tests for graph_utils.py."""
-import unittest
-
-import geosolver.graph_utils as gu
 
 
-class TestGraphUtils(unittest.TestCase):
+import pytest_check as check
+
+from geosolver.combinations_permutations import (
+    cross,
+    comb2,
+    comb3,
+    comb4,
+    perm2,
+    perm3,
+    perm4,
+)
+
+
+class TestCombinationsPermutations:
     def test_cross(self):
-        self.assertEqual(gu.cross([], [1]), [])
-        self.assertEqual(gu.cross([1], []), [])
-        self.assertEqual(gu.cross([1], [2]), [(1, 2)])
-        self.assertEqual(gu.cross([1], [2, 3]), [(1, 2), (1, 3)])
+        check.equal(cross([], [1]), [])
+        check.equal(cross([1], []), [])
+        check.equal(cross([1], [2]), [(1, 2)])
+        check.equal(cross([1], [2, 3]), [(1, 2), (1, 3)])
 
         e1 = [1, 2, 3]
         e2 = [4, 5]
         target = [(1, 4), (1, 5), (2, 4), (2, 5), (3, 4), (3, 5)]
-        self.assertEqual(gu.cross(e1, e2), target)
+        check.equal(cross(e1, e2), target)
 
     def test_comb2(self):
-        self.assertEqual(gu.comb2([]), [])
-        self.assertEqual(gu.comb2([1]), [])
-        self.assertEqual(gu.comb2([1, 2]), [(1, 2)])
-        self.assertEqual(gu.comb2([1, 2, 3]), [(1, 2), (1, 3), (2, 3)])
+        check.equal(comb2([]), [])
+        check.equal(comb2([1]), [])
+        check.equal(comb2([1, 2]), [(1, 2)])
+        check.equal(comb2([1, 2, 3]), [(1, 2), (1, 3), (2, 3)])
 
     def test_comb3(self):
-        self.assertEqual(gu.comb3([]), [])
-        self.assertEqual(gu.comb3([1]), [])
-        self.assertEqual(gu.comb3([1, 2]), [])
-        self.assertEqual(gu.comb3([1, 2, 3]), [(1, 2, 3)])
-        self.assertEqual(
-            gu.comb3([1, 2, 3, 4]), [(1, 2, 3), (1, 2, 4), (1, 3, 4), (2, 3, 4)]
-        )
+        check.equal(comb3([]), [])
+        check.equal(comb3([1]), [])
+        check.equal(comb3([1, 2]), [])
+        check.equal(comb3([1, 2, 3]), [(1, 2, 3)])
+        check.equal(comb3([1, 2, 3, 4]), [(1, 2, 3), (1, 2, 4), (1, 3, 4), (2, 3, 4)])
 
     def test_comb4(self):
-        self.assertEqual(gu.comb4([]), [])
-        self.assertEqual(gu.comb4([1]), [])
-        self.assertEqual(gu.comb4([1, 2]), [])
-        self.assertEqual(gu.comb4([1, 2, 3]), [])
-        self.assertEqual(gu.comb4([1, 2, 3, 4]), [(1, 2, 3, 4)])
-        self.assertEqual(
-            gu.comb4([1, 2, 3, 4, 5]),
+        check.equal(comb4([]), [])
+        check.equal(comb4([1]), [])
+        check.equal(comb4([1, 2]), [])
+        check.equal(comb4([1, 2, 3]), [])
+        check.equal(comb4([1, 2, 3, 4]), [(1, 2, 3, 4)])
+        check.equal(
+            comb4([1, 2, 3, 4, 5]),
             [(1, 2, 3, 4), (1, 2, 3, 5), (1, 2, 4, 5), (1, 3, 4, 5), (2, 3, 4, 5)],
         )
 
     def test_perm2(self):
-        self.assertEqual(gu.perm2([]), [])
-        self.assertEqual(gu.perm2([1]), [])
-        self.assertEqual(gu.perm2([1, 2]), [(1, 2), (2, 1)])
-        self.assertEqual(
-            gu.perm2([1, 2, 3]), [(1, 2), (2, 1), (1, 3), (3, 1), (2, 3), (3, 2)]
-        )
+        check.equal(perm2([]), [])
+        check.equal(perm2([1]), [])
+        check.equal(perm2([1, 2]), [(1, 2), (2, 1)])
+        check.equal(perm2([1, 2, 3]), [(1, 2), (2, 1), (1, 3), (3, 1), (2, 3), (3, 2)])
 
     def test_perm3(self):
-        self.assertEqual(gu.perm3([]), [])
-        self.assertEqual(gu.perm3([1]), [])
-        self.assertEqual(gu.perm3([1, 2]), [])
-        self.assertEqual(
-            gu.perm3([1, 2, 3]),
+        check.equal(perm3([]), [])
+        check.equal(perm3([1]), [])
+        check.equal(perm3([1, 2]), [])
+        check.equal(
+            perm3([1, 2, 3]),
             [(1, 2, 3), (1, 3, 2), (2, 1, 3), (2, 3, 1), (3, 1, 2), (3, 2, 1)],
         )
-        self.assertEqual(
-            gu.perm3([1, 2, 3, 4]),
+        check.equal(
+            perm3([1, 2, 3, 4]),
             [
                 (1, 2, 3),
                 (1, 2, 4),
@@ -104,12 +110,12 @@ class TestGraphUtils(unittest.TestCase):
         )
 
     def test_perm4(self):
-        self.assertEqual(gu.perm3([]), [])
-        self.assertEqual(gu.perm3([1]), [])
-        self.assertEqual(gu.perm3([1, 2]), [])
-        self.assertEqual(gu.perm4([1, 2, 3]), [])
-        self.assertEqual(
-            gu.perm4([1, 2, 3, 4]),
+        check.equal(perm3([]), [])
+        check.equal(perm3([1]), [])
+        check.equal(perm3([1, 2]), [])
+        check.equal(perm4([1, 2, 3]), [])
+        check.equal(
+            perm4([1, 2, 3, 4]),
             [
                 (1, 2, 3, 4),
                 (1, 2, 4, 3),

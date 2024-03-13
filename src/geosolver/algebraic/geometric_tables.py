@@ -16,29 +16,20 @@
 """Implementing Algebraic Reasoning (AR)."""
 
 from collections import defaultdict
-from enum import Enum
 from fractions import Fraction as frac
 from typing import Any, Generator
 
-import geosolver.geometry as gm
+
 import numpy as np
-import geosolver.problem as pr
 from scipy import optimize
+from geosolver.geometry import Direction, Length, Line, Point
+from geosolver.problem import Dependency
+
+from geosolver.ratios import simplify
 
 
 class InfQuotientError(Exception):
     pass
-
-
-def _gcd(x: int, y: int) -> int:
-    while y:
-        x, y = y, x % y
-    return x
-
-
-def simplify(n: int, d: int) -> tuple[int, int]:
-    g = _gcd(n, d)
-    return (n // g, d // g)
 
 
 # maximum denominator for a fraction.
@@ -46,12 +37,6 @@ MAX_DENOMINATOR = 1000000
 
 # tolerance for fraction approximation
 TOL = 1e-15
-
-
-class AlgebraicRules(Enum):
-    Distance_Chase = "a00"
-    Ratio_Chase = "a01"
-    Angle_Chase = "a02"
 
 
 def get_quotient(v: float) -> tuple[int, int]:
@@ -183,6 +168,251 @@ def chain2(elems: list[Any]) -> Generator[tuple[Any, Any], None, None]:
         yield e1, elems[i + 1]
 
 
+class Table:
+    """The coefficient matrix."""
+
+    def __init__(self, const: str = "1"):
+        self.const = const
+        self.v2e = {}
+        self.add_free(const)  # the table {var: expression}
+
+        # to cache what is already derived/inputted
+        self.eqs = set()
+        self.groups = []  # groups of equal pairs.
+
+        # for why (linprog)
+        self.c = []
+        self.v2i = {}  # v -> index of row in A.
+        self.deps = []  # equal number of columns.
+        self.A = np.zeros([0, 0])
+        self.do_why = True
+
+    def add_free(self, v: str) -> None:
+        self.v2e[v] = {v: frac(1)}
+
+    def replace(self, v0: str, e0: dict[str, float]) -> None:
+        for v, e in list(self.v2e.items()):
+            self.v2e[v] = replace(e, v0, e0)
+
+    def add_expr(self, vc: list[tuple[str, float]]) -> bool:
+        """Add a new equality, represented by the list of tuples vc=[(v, c), ..]."""
+        result = {}
+        free = []
+
+        for v, c in vc:
+            c = frac(c)
+            if v in self.v2e:
+                result = plus(result, mult(self.v2e[v], c))
+            else:
+                free += [(v, c)]
+
+        if free == []:
+            if is_zero(self.modulo(result)):
+                return False
+            result = recon(result, self.const)
+            if result is None:
+                return False
+            v, e = result
+            self.replace(v, e)
+
+        elif len(free) == 1:
+            v, m = free[0]
+            self.v2e[v] = mult(result, frac(-1, m))
+
+        else:
+            dependent_v = None
+            for v, m in free:
+                if dependent_v is None and v != self.const:
+                    dependent_v = (v, m)
+                    continue
+
+                self.add_free(v)
+                result = plus(result, {v: m})
+
+            v, m = dependent_v
+            self.v2e[v] = mult(result, frac(-1, m))
+
+        return True
+
+    def register(self, vc: list[tuple[str, float]], dep: Dependency) -> None:
+        """Register a new equality vc=[(v, c), ..] with traceback dependency dep."""
+        result = plus_all(*[{v: c} for v, c in vc])
+        if is_zero(result):
+            return
+
+        vs, _ = zip(*vc)
+        for v in vs:
+            if v not in self.v2i:
+                self.v2i[v] = len(self.v2i)
+
+        (m, n), lenght = self.A.shape, len(self.v2i)
+        if lenght > m:
+            self.A = np.concatenate([self.A, np.zeros([lenght - m, n])], 0)
+
+        new_column = np.zeros([len(self.v2i), 2])  # N, 2
+        for v, c in vc:
+            new_column[self.v2i[v], 0] += float(c)
+            new_column[self.v2i[v], 1] -= float(c)
+
+        self.A = np.concatenate([self.A, new_column], 1)
+        self.c += [1.0, -1.0]
+        self.deps += [dep]
+
+    def register2(self, a: str, b: str, m: float, n: float, dep: Dependency) -> None:
+        self.register([(a, m), (b, -n)], dep)
+
+    def register3(self, a: str, b: str, f: float, dep: Dependency) -> None:
+        self.register([(a, 1), (b, -1), (self.const, -f)], dep)
+
+    def register4(self, a: str, b: str, c: str, d: str, dep: Dependency) -> None:
+        self.register([(a, 1), (b, -1), (c, -1), (d, 1)], dep)
+
+    def why(self, e: dict[str, float]) -> list[Any]:
+        """AR traceback == MILP."""
+        if not self.do_why:
+            return []
+        # why expr == 0?
+        # Solve min(c^Tx) s.t. A_eq * x = b_eq, x >= 0
+        e = strip(e)
+        if not e:
+            return []
+
+        b_eq = [0] * len(self.v2i)
+        for v, c in e.items():
+            b_eq[self.v2i[v]] += float(c)
+
+        try:
+            x = optimize.linprog(c=self.c, A_eq=self.A, b_eq=b_eq, method="highs")["x"]
+        except ValueError:
+            x = optimize.linprog(
+                c=self.c,
+                A_eq=self.A,
+                b_eq=b_eq,
+            )["x"]
+
+        deps = []
+        for i, dep in enumerate(self.deps):
+            if x[2 * i] > 1e-12 or x[2 * i + 1] > 1e-12:
+                if dep not in deps:
+                    deps.append(dep)
+        return deps
+
+    def record_eq(self, v1: str, v2: str, v3: str, v4: str) -> None:
+        self.eqs.add((v1, v2, v3, v4))
+        self.eqs.add((v2, v1, v4, v3))
+        self.eqs.add((v3, v4, v1, v2))
+        self.eqs.add((v4, v3, v2, v1))
+
+    def check_record_eq(self, v1: str, v2: str, v3: str, v4: str) -> bool:
+        if (v1, v2, v3, v4) in self.eqs:
+            return True
+        if (v2, v1, v4, v3) in self.eqs:
+            return True
+        if (v3, v4, v1, v2) in self.eqs:
+            return True
+        if (v4, v3, v2, v1) in self.eqs:
+            return True
+        return False
+
+    def add_eq2(self, a: str, b: str, m: float, n: float, dep: Dependency) -> None:
+        # a/b = m/n
+        if not self.add_expr([(a, m), (b, -n)]):
+            return []
+        self.register2(a, b, m, n, dep)
+
+    def add_eq3(self, a: str, b: str, f: float, dep: Dependency) -> None:
+        # a - b = f * constant
+        self.eqs.add((a, b, frac(f)))
+        self.eqs.add((b, a, frac(1 - f)))
+
+        if not self.add_expr([(a, 1), (b, -1), (self.const, -f)]):
+            return []
+
+        self.register3(a, b, f, dep)
+
+    def add_eq4(self, a: str, b: str, c: str, d: str, dep: Dependency) -> None:
+        # a - b = c - d
+        self.record_eq(a, b, c, d)
+        self.record_eq(a, c, b, d)
+
+        expr = list(minus({a: 1, b: -1}, {c: 1, d: -1}).items())
+
+        if not self.add_expr(expr):
+            return []
+
+        self.register4(a, b, c, d, dep)
+        self.groups, _, _ = update_groups(
+            self.groups, [{(a, b), (c, d)}, {(b, a), (d, c)}]
+        )
+
+    def pairs(self) -> Generator[list[tuple[str, str]], None, None]:
+        for v1, v2 in perm2(list(self.v2e.keys())):
+            if v1 == self.const or v2 == self.const:
+                continue
+            yield v1, v2
+
+    def modulo(self, e: dict[str, float]) -> dict[str, float]:
+        return strip(e)
+
+    def get_all_eqs(
+        self,
+    ) -> dict[tuple[tuple[str, float], ...], list[tuple[str, str]]]:
+        h2pairs = defaultdict(list)
+        for v1, v2 in self.pairs():
+            e1, e2 = self.v2e[v1], self.v2e[v2]
+            e12 = minus(e1, e2)
+            h12 = hashed(self.modulo(e12))
+            h2pairs[h12].append((v1, v2))
+        return h2pairs
+
+    def get_all_eqs_and_why(
+        self, return_quads: bool = True
+    ) -> Generator[Any, None, None]:
+        """Check all 4/3/2-permutations for new equalities."""
+        groups = []
+
+        for h, vv in self.get_all_eqs().items():
+            if h == ():
+                for v1, v2 in vv:
+                    if (v1, v2) in self.eqs or (v2, v1) in self.eqs:
+                        continue
+                    self.eqs.add((v1, v2))
+                    # why v1 - v2 = e12 ?  (note modulo(e12) == 0)
+                    why_dict = minus({v1: 1, v2: -1}, minus(self.v2e[v1], self.v2e[v2]))
+                    yield v1, v2, self.why(why_dict)
+                continue
+
+            if len(h) == 1 and h[0][0] == self.const:
+                for v1, v2 in vv:
+                    frac = h[0][1]
+                    if (v1, v2, frac) in self.eqs:
+                        continue
+                    self.eqs.add((v1, v2, frac))
+                    # why v1 - v2 = e12 ?  (note modulo(e12) == 0)
+                    why_dict = minus({v1: 1, v2: -1}, minus(self.v2e[v1], self.v2e[v2]))
+                    value = simplify(frac.numerator, frac.denominator)
+                    yield v1, v2, value, self.why(why_dict)
+                continue
+
+            groups.append(vv)
+
+        if not return_quads:
+            return
+
+        self.groups, links, _ = update_groups(self.groups, groups)
+        for (v1, v2), (v3, v4) in links:
+            if self.check_record_eq(v1, v2, v3, v4):
+                continue
+            e12 = minus(self.v2e[v1], self.v2e[v2])
+            e34 = minus(self.v2e[v3], self.v2e[v4])
+
+            why_dict = minus(  # why (v1-v2)-(v3-v4)=e12-e34?
+                minus({v1: 1, v2: -1}, {v3: 1, v4: -1}), minus(e12, e34)
+            )
+            self.record_eq(v1, v2, v3, v4)
+            yield v1, v2, v3, v4, self.why(why_dict)
+
+
 def update_groups(
     groups1: list[Any], groups2: list[Any]
 ) -> tuple[list[Any], list[tuple[Any, Any]], list[list[Any]]]:
@@ -275,251 +505,6 @@ def update_groups(
     return groups1, links, history
 
 
-class Table:
-    """The coefficient matrix."""
-
-    def __init__(self, const: str = "1"):
-        self.const = const
-        self.v2e = {}
-        self.add_free(const)  # the table {var: expression}
-
-        # to cache what is already derived/inputted
-        self.eqs = set()
-        self.groups = []  # groups of equal pairs.
-
-        # for why (linprog)
-        self.c = []
-        self.v2i = {}  # v -> index of row in A.
-        self.deps = []  # equal number of columns.
-        self.A = np.zeros([0, 0])
-        self.do_why = True
-
-    def add_free(self, v: str) -> None:
-        self.v2e[v] = {v: frac(1)}
-
-    def replace(self, v0: str, e0: dict[str, float]) -> None:
-        for v, e in list(self.v2e.items()):
-            self.v2e[v] = replace(e, v0, e0)
-
-    def add_expr(self, vc: list[tuple[str, float]]) -> bool:
-        """Add a new equality, represented by the list of tuples vc=[(v, c), ..]."""
-        result = {}
-        free = []
-
-        for v, c in vc:
-            c = frac(c)
-            if v in self.v2e:
-                result = plus(result, mult(self.v2e[v], c))
-            else:
-                free += [(v, c)]
-
-        if free == []:
-            if is_zero(self.modulo(result)):
-                return False
-            result = recon(result, self.const)
-            if result is None:
-                return False
-            v, e = result
-            self.replace(v, e)
-
-        elif len(free) == 1:
-            v, m = free[0]
-            self.v2e[v] = mult(result, frac(-1, m))
-
-        else:
-            dependent_v = None
-            for v, m in free:
-                if dependent_v is None and v != self.const:
-                    dependent_v = (v, m)
-                    continue
-
-                self.add_free(v)
-                result = plus(result, {v: m})
-
-            v, m = dependent_v
-            self.v2e[v] = mult(result, frac(-1, m))
-
-        return True
-
-    def register(self, vc: list[tuple[str, float]], dep: pr.Dependency) -> None:
-        """Register a new equality vc=[(v, c), ..] with traceback dependency dep."""
-        result = plus_all(*[{v: c} for v, c in vc])
-        if is_zero(result):
-            return
-
-        vs, _ = zip(*vc)
-        for v in vs:
-            if v not in self.v2i:
-                self.v2i[v] = len(self.v2i)
-
-        (m, n), lenght = self.A.shape, len(self.v2i)
-        if lenght > m:
-            self.A = np.concatenate([self.A, np.zeros([lenght - m, n])], 0)
-
-        new_column = np.zeros([len(self.v2i), 2])  # N, 2
-        for v, c in vc:
-            new_column[self.v2i[v], 0] += float(c)
-            new_column[self.v2i[v], 1] -= float(c)
-
-        self.A = np.concatenate([self.A, new_column], 1)
-        self.c += [1.0, -1.0]
-        self.deps += [dep]
-
-    def register2(self, a: str, b: str, m: float, n: float, dep: pr.Dependency) -> None:
-        self.register([(a, m), (b, -n)], dep)
-
-    def register3(self, a: str, b: str, f: float, dep: pr.Dependency) -> None:
-        self.register([(a, 1), (b, -1), (self.const, -f)], dep)
-
-    def register4(self, a: str, b: str, c: str, d: str, dep: pr.Dependency) -> None:
-        self.register([(a, 1), (b, -1), (c, -1), (d, 1)], dep)
-
-    def why(self, e: dict[str, float]) -> list[Any]:
-        """AR traceback == MILP."""
-        if not self.do_why:
-            return []
-        # why expr == 0?
-        # Solve min(c^Tx) s.t. A_eq * x = b_eq, x >= 0
-        e = strip(e)
-        if not e:
-            return []
-
-        b_eq = [0] * len(self.v2i)
-        for v, c in e.items():
-            b_eq[self.v2i[v]] += float(c)
-
-        try:
-            x = optimize.linprog(c=self.c, A_eq=self.A, b_eq=b_eq, method="highs")["x"]
-        except ValueError:
-            x = optimize.linprog(
-                c=self.c,
-                A_eq=self.A,
-                b_eq=b_eq,
-            )["x"]
-
-        deps = []
-        for i, dep in enumerate(self.deps):
-            if x[2 * i] > 1e-12 or x[2 * i + 1] > 1e-12:
-                if dep not in deps:
-                    deps.append(dep)
-        return deps
-
-    def record_eq(self, v1: str, v2: str, v3: str, v4: str) -> None:
-        self.eqs.add((v1, v2, v3, v4))
-        self.eqs.add((v2, v1, v4, v3))
-        self.eqs.add((v3, v4, v1, v2))
-        self.eqs.add((v4, v3, v2, v1))
-
-    def check_record_eq(self, v1: str, v2: str, v3: str, v4: str) -> bool:
-        if (v1, v2, v3, v4) in self.eqs:
-            return True
-        if (v2, v1, v4, v3) in self.eqs:
-            return True
-        if (v3, v4, v1, v2) in self.eqs:
-            return True
-        if (v4, v3, v2, v1) in self.eqs:
-            return True
-        return False
-
-    def add_eq2(self, a: str, b: str, m: float, n: float, dep: pr.Dependency) -> None:
-        # a/b = m/n
-        if not self.add_expr([(a, m), (b, -n)]):
-            return []
-        self.register2(a, b, m, n, dep)
-
-    def add_eq3(self, a: str, b: str, f: float, dep: pr.Dependency) -> None:
-        # a - b = f * constant
-        self.eqs.add((a, b, frac(f)))
-        self.eqs.add((b, a, frac(1 - f)))
-
-        if not self.add_expr([(a, 1), (b, -1), (self.const, -f)]):
-            return []
-
-        self.register3(a, b, f, dep)
-
-    def add_eq4(self, a: str, b: str, c: str, d: str, dep: pr.Dependency) -> None:
-        # a - b = c - d
-        self.record_eq(a, b, c, d)
-        self.record_eq(a, c, b, d)
-
-        expr = list(minus({a: 1, b: -1}, {c: 1, d: -1}).items())
-
-        if not self.add_expr(expr):
-            return []
-
-        self.register4(a, b, c, d, dep)
-        self.groups, _, _ = update_groups(
-            self.groups, [{(a, b), (c, d)}, {(b, a), (d, c)}]
-        )
-
-    def pairs(self) -> Generator[list[tuple[str, str]], None, None]:
-        for v1, v2 in perm2(list(self.v2e.keys())):
-            if v1 == self.const or v2 == self.const:
-                continue
-            yield v1, v2
-
-    def modulo(self, e: dict[str, float]) -> dict[str, float]:
-        return strip(e)
-
-    def get_all_eqs(
-        self,
-    ) -> dict[tuple[tuple[str, float], ...], list[tuple[str, str]]]:
-        h2pairs = defaultdict(list)
-        for v1, v2 in self.pairs():
-            e1, e2 = self.v2e[v1], self.v2e[v2]
-            e12 = minus(e1, e2)
-            h12 = hashed(self.modulo(e12))
-            h2pairs[h12].append((v1, v2))
-        return h2pairs
-
-    def get_all_eqs_and_why(
-        self, return_quads: bool = True
-    ) -> Generator[Any, None, None]:
-        """Check all 4/3/2-permutations for new equalities."""
-        groups = []
-
-        for h, vv in self.get_all_eqs().items():
-            if h == ():
-                for v1, v2 in vv:
-                    if (v1, v2) in self.eqs or (v2, v1) in self.eqs:
-                        continue
-                    self.eqs.add((v1, v2))
-                    # why v1 - v2 = e12 ?  (note modulo(e12) == 0)
-                    why_dict = minus({v1: 1, v2: -1}, minus(self.v2e[v1], self.v2e[v2]))
-                    yield v1, v2, self.why(why_dict)
-                continue
-
-            if len(h) == 1 and h[0][0] == self.const:
-                for v1, v2 in vv:
-                    frac = h[0][1]
-                    if (v1, v2, frac) in self.eqs:
-                        continue
-                    self.eqs.add((v1, v2, frac))
-                    # why v1 - v2 = e12 ?  (note modulo(e12) == 0)
-                    why_dict = minus({v1: 1, v2: -1}, minus(self.v2e[v1], self.v2e[v2]))
-                    value = simplify(frac.numerator, frac.denominator)
-                    yield v1, v2, value, self.why(why_dict)
-                continue
-
-            groups.append(vv)
-
-        if not return_quads:
-            return
-
-        self.groups, links, _ = update_groups(self.groups, groups)
-        for (v1, v2), (v3, v4) in links:
-            if self.check_record_eq(v1, v2, v3, v4):
-                continue
-            e12 = minus(self.v2e[v1], self.v2e[v2])
-            e34 = minus(self.v2e[v3], self.v2e[v4])
-
-            why_dict = minus(  # why (v1-v2)-(v3-v4)=e12-e34?
-                minus({v1: 1, v2: -1}, {v3: 1, v4: -1}), minus(e12, e34)
-            )
-            self.record_eq(v1, v2, v3, v4)
-            yield v1, v2, v3, v4, self.why(why_dict)
-
-
 class GeometricTable(Table):
     """Abstract class representing the coefficient matrix (table) A."""
 
@@ -558,23 +543,23 @@ class RatioTable(GeometricTable):
         super().__init__(name)
         self.one = self.const
 
-    def add_eq(self, l1: gm.Length, l2: gm.Length, dep: pr.Dependency) -> None:
+    def add_eq(self, l1: Length, l2: Length, dep: Dependency) -> None:
         l1, l2 = self.get_name([l1, l2])
         return super().add_eq3(l1, l2, 0.0, dep)
 
     def add_const_ratio(
-        self, l1: gm.Length, l2: gm.Length, m: float, n: float, dep: pr.Dependency
+        self, l1: Length, l2: Length, m: float, n: float, dep: Dependency
     ) -> None:
         l1, l2 = self.get_name([l1, l2])
         return super().add_eq2(l1, l2, m, n, dep)
 
     def add_eqratio(
         self,
-        l1: gm.Length,
-        l2: gm.Length,
-        l3: gm.Length,
-        l4: gm.Length,
-        dep: pr.Dependency,
+        l1: Length,
+        l2: Length,
+        l3: Length,
+        l4: Length,
+        dep: Dependency,
     ) -> None:
         l1, l2, l3, l4 = self.get_name([l1, l2, l3, l4])
         return self.add_eq4(l1, l2, l3, l4, dep)
@@ -599,11 +584,11 @@ class AngleTable(GeometricTable):
         e[self.pi] = e[self.pi] % 1
         return strip(e)
 
-    def add_para(self, d1: gm.Direction, d2: gm.Direction, dep: pr.Dependency) -> None:
+    def add_para(self, d1: Direction, d2: Direction, dep: Dependency) -> None:
         return self.add_const_angle(d1, d2, 0, dep)
 
     def add_const_angle(
-        self, d1: gm.Direction, d2: gm.Direction, ang: float, dep: pr.Dependency
+        self, d1: Direction, d2: Direction, ang: float, dep: Dependency
     ) -> None:
         if ang and d2._obj.num > d1._obj.num:
             d1, d2 = d2, d1
@@ -617,11 +602,11 @@ class AngleTable(GeometricTable):
 
     def add_eqangle(
         self,
-        d1: gm.Direction,
-        d2: gm.Direction,
-        d3: gm.Direction,
-        d4: gm.Direction,
-        dep: pr.Dependency,
+        d1: Direction,
+        d2: Direction,
+        d3: Direction,
+        d4: Direction,
+        dep: Dependency,
     ) -> None:
         """Add the inequality d1-d2=d3-d4."""
         # Use string as variables.
@@ -670,23 +655,23 @@ class DistanceTable(GeometricTable):
             for p1, p2 in perm2(ps):
                 yield line + ":" + p1, line + ":" + p2
 
-    def name(self, line: gm.Line, p: gm.Point) -> str:
+    def name(self, line: Line, p: Point) -> str:
         v = line.name + ":" + p.name
         self.v2obj[v] = (line, p)
         return v
 
-    def map2obj(self, names: list[str]) -> list[gm.Point]:
+    def map2obj(self, names: list[str]) -> list[Point]:
         return [self.v2obj[n][1] for n in names]
 
     def add_cong(
         self,
-        l12: gm.Line,
-        l34: gm.Line,
-        p1: gm.Point,
-        p2: gm.Point,
-        p3: gm.Point,
-        p4: gm.Point,
-        dep: pr.Dependency,
+        l12: Line,
+        l34: Line,
+        p1: Point,
+        p2: Point,
+        p3: Point,
+        p4: Point,
+        dep: Dependency,
     ) -> None:
         """Add that distance between p1 and p2 (on l12) == p3 and p4 (on l34)."""
         if p2.num > p1.num:

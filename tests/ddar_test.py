@@ -18,20 +18,20 @@ import pytest
 import pytest_check as check
 
 from geosolver.ddar import solve
-import geosolver.graph as gh
-import geosolver.problem as pr
+from geosolver.proof_graph import ProofGraph
+from geosolver.problem import Definition, Problem, Theorem
 
 
 class TestDDAR:
     @pytest.fixture(autouse=True)
     def setUpClass(self):
-        self.defs = pr.Definition.from_txt_file("defs.txt", to_dict=True)
-        self.rules = pr.Theorem.from_txt_file("rules.txt", to_dict=True)
+        self.defs = Definition.from_txt_file("defs.txt", to_dict=True)
+        self.rules = Theorem.from_txt_file("rules.txt", to_dict=True)
 
     def test_orthocenter_should_fail(self):
         txt = "a b c = triangle a b c; d = on_tline d b a c, on_tline d c a b ? perp a d b c"
-        p = pr.Problem.from_txt(txt)
-        g, _ = gh.Graph.build_problem(p, self.defs)
+        p = Problem.from_txt(txt)
+        g, _ = ProofGraph.build_problem(p, self.defs)
 
         solve(g, self.rules, p, max_level=1000)
         goal_args = g.names2nodes(p.goal.args)
@@ -39,8 +39,8 @@ class TestDDAR:
 
     def test_orthocenter_aux_should_succeed(self):
         txt = "a b c = triangle a b c; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d ? perp a d b c"
-        p = pr.Problem.from_txt(txt)
-        g, _ = gh.Graph.build_problem(p, self.defs)
+        p = Problem.from_txt(txt)
+        g, _ = ProofGraph.build_problem(p, self.defs)
 
         solve(g, self.rules, p, max_level=1000)
         goal_args = g.names2nodes(p.goal.args)
@@ -48,11 +48,11 @@ class TestDDAR:
 
     def test_incenter_excenter_should_succeed(self):
         # Note that this same problem should fail in dd_test.py
-        p = pr.Problem.from_txt(
+        p = Problem.from_txt(
             "a b c = triangle a b c; d = incenter d a b c; e = excenter e a b c ?"
             " perp d c c e"
         )
-        g, _ = gh.Graph.build_problem(p, self.defs)
+        g, _ = ProofGraph.build_problem(p, self.defs)
 
         solve(g, self.rules, p, max_level=1000)
         goal_args = g.names2nodes(p.goal.args)
