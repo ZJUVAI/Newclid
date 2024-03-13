@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 from geosolver.algebraic import AlgebraicRules
 from geosolver.algebraic.geometric_tables import AngleTable, DistanceTable, RatioTable
 from geosolver.geometry import Angle, Point, Ratio, is_equiv
-from geosolver.numericals import check
+from geosolver.numerical.check import check_numerical
 
 from geosolver.problem import Dependency, EmptyDependency
 import geosolver.ratios
@@ -144,7 +144,7 @@ class AlgebraicManipulator:
                     continue
 
                 (e, f), (p, q) = a._obj.points, b._obj.points
-                if not check("para", [e, f, p, q]):
+                if not check_numerical("para", [e, f, p, q]):
                     continue
 
                 added["para"].append((a, b, dep))
@@ -153,7 +153,7 @@ class AlgebraicManipulator:
                 a, b, (n, d) = x
 
                 (e, f), (p, q) = a._obj.points, b._obj.points
-                if not check("aconst", [e, f, p, q, n, d]):
+                if not check_numerical("aconst", [e, f, p, q, n, d]):
                     continue
 
                 added["aconst"].append((a, b, n, d, dep))

@@ -4,7 +4,7 @@ from collections import defaultdict
 
 import geosolver.geometry as gm
 import geosolver.combinations_permutations as utils
-import geosolver.numericals as nm
+import geosolver.numerical.check
 import geosolver.problem as pr
 
 
@@ -297,7 +297,7 @@ def match_perp_perp_ncoll_para(
         for y1, y2 in utils.comb2(ys):
             a, b = g.two_points_on_direction(y1)
             e, f = g.two_points_on_direction(y2)
-            if nm.check_ncoll([a.num, b.num, e.num]):
+            if geosolver.numerical.check.check_ncoll_numerical([a.num, b.num, e.num]):
                 yield dict(zip("ABCDEF", [a, b, c, d, e, f]))
 
 
@@ -491,7 +491,9 @@ def match_cong_cong_eqangle6_ncoll_contri(
                 if not g.check_ncoll([a, b, c]):
                     continue
 
-                if nm.same_clock(a.num, b.num, c.num, p.num, q.num, r.num):
+                if geosolver.numerical.check.same_clock(
+                    a.num, b.num, c.num, p.num, q.num, r.num
+                ):
                     if g.check_eqangle([b, a, b, c, q, p, q, r]):
                         record.add((a, b, c, p, q, r))
                         yield dict(zip("ABCPQR", [a, b, c, p, q, r]))
@@ -518,7 +520,9 @@ def match_eqratio6_eqangle6_ncoll_simtri(
         if not g.check_ncoll([a, b, c]):
             continue
 
-        if nm.same_clock(a.num, b.num, c.num, p.num, q.num, r.num):
+        if geosolver.numerical.check.same_clock(
+            a.num, b.num, c.num, p.num, q.num, r.num
+        ):
             if g.check_eqangle([b, a, b, c, q, p, q, r]):
                 record.add((a, b, c, p, q, r))
                 yield dict(zip("ABCPQR", [a, b, c, p, q, r]))
@@ -726,7 +730,9 @@ def match_eqangle6_ncoll_cyclic(
     for a, b, a, c, x, y, x, z in g_matcher("eqangle6"):
         if (b, c) != (y, z) or a == x:
             continue
-        if nm.check_ncoll([x.num for x in [a, b, c, x]]):
+        if geosolver.numerical.check.check_ncoll_numerical(
+            [x.num for x in [a, b, c, x]]
+        ):
             yield dict(zip("ABPQ", [b, c, a, x]))
 
 

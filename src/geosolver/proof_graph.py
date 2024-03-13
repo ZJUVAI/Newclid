@@ -40,14 +40,34 @@ from geosolver.geometry import (
 from geosolver.geometry import Circle, Line, Point, Segment
 from geosolver.geometry import Measure, Value
 import geosolver.combinations_permutations as utils
-import geosolver.numericals as nm
-import geosolver.problem as problem
-from geosolver.problem import Dependency, EmptyDependency
+import geosolver.numerical.geometries as num_geo
+
+from geosolver.numerical.check import (
+    check_coll_numerical,
+    check_numerical,
+    check_para_numerical,
+    check_perp_numerical,
+    check_sameside_numerical,
+)
+from geosolver.numerical.distances import (
+    check_too_far_numerical,
+    check_too_close_numerical,
+)
+import geosolver.numerical.check as nm
+from geosolver.numerical.sketch import sketch
+
+
+from geosolver.problem import (
+    CONSTRUCTION_RULE,
+    Clause,
+    Definition,
+    Dependency,
+    EmptyDependency,
+    Problem,
+    hashed,
+)
 from geosolver.dependency_graph import DependencyGraph
 from geosolver.ratios import simplify
-
-
-np = nm.np
 
 
 FREE = [
@@ -230,8 +250,8 @@ class ProofGraph:
     @classmethod
     def build_problem(
         cls,
-        pr: problem.Problem,
-        definitions: dict[str, problem.Definition],
+        pr: Problem,
+        definitions: dict[str, Definition],
         verbose: bool = True,
         init_copy: bool = True,
     ) -> tuple[ProofGraph, list[Dependency]]:
@@ -254,7 +274,7 @@ class ProofGraph:
                     added += adds
                 g.plevel = plevel
 
-            except (nm.InvalidLineIntersectError, nm.InvalidQuadSolveError):
+            except (num_geo.InvalidLineIntersectError, num_geo.InvalidQuadSolveError):
                 continue
             except DepCheckFailError:
                 continue
@@ -265,7 +285,7 @@ class ProofGraph:
                 break
 
             args = list(map(lambda x: g.get(x, lambda: int(x)), pr.goal.args))
-            check = nm.check(pr.goal.name, args)
+            check = check_numerical(pr.goal.name, args)
 
         g.url = pr.url
         g.build_def = (pr, definitions)
@@ -667,7 +687,7 @@ class ProofGraph:
         p1, p2, p3 = sorted([p1, p2, p3], key=lambda x: x.name)
         name = p1.name.lower() + p2.name.lower() + p3.name.lower()
         circle = self.new_node(Circle, f"({name})")
-        circle.num = nm.Circle(p1=p1.num, p2=p2.num, p3=p3.num)
+        circle.num = num_geo.Circle(p1=p1.num, p2=p2.num, p3=p3.num)
         circle.points = p1, p2, p3
 
         self.connect(p1, circle, deps=None)
@@ -688,7 +708,7 @@ class ProofGraph:
             p1, p2 = p2, p1
         name = p1.name.lower() + p2.name.lower()
         line = self.new_node(Line, name)
-        line.num = nm.Line(p1.num, p2.num)
+        line.num = num_geo.Line(p1.num, p2.num)
         line.points = p1, p2
 
         self.connect(p1, line, deps=None)
@@ -797,10 +817,10 @@ class ProofGraph:
     def check_ncoll(self, points: list[Point]) -> bool:
         if self.check_coll(points):
             return False
-        return not nm.check_coll([p.num for p in points])
+        return not check_coll_numerical([p.num for p in points])
 
     def check_sameside(self, points: list[Point]) -> bool:
-        return nm.check_sameside([p.num for p in points])
+        return check_sameside_numerical([p.num for p in points])
 
     def make_equal(self, x: Node, y: Node, deps: Dependency) -> None:
         """Make that two nodes x and y are equal, i.e. merge their value node."""
@@ -915,7 +935,7 @@ class ProofGraph:
     def check_npara(self, points: list[Point]) -> bool:
         if self.check_para(points):
             return False
-        return not nm.check_para([p.num for p in points])
+        return not check_para_numerical([p.num for p in points])
 
     def _get_angle(self, d1: Direction, d2: Direction) -> tuple[Angle, Optional[Angle]]:
         for a in self.type2nodes[Angle]:
@@ -1119,7 +1139,7 @@ class ProofGraph:
     def check_nperp(self, points: list[Point]) -> bool:
         if self.check_perp(points):
             return False
-        return not nm.check_perp([p.num for p in points])
+        return not check_perp_numerical([p.num for p in points])
 
     def _get_segment(self, p1: Point, p2: Point) -> Optional[Segment]:
         for s in self.type2nodes[Segment]:
@@ -2149,12 +2169,12 @@ class ProofGraph:
         hashs = [d.hashed() for d in deps.why]
 
         for args in self.enum_triangle(points):
-            if problem.hashed("eqangle6", args) in hashs:
+            if hashed("eqangle6", args) in hashs:
                 continue
             add += self._add_eqangle(args, deps=deps)
 
         for args in self.enum_triangle(points):
-            if problem.hashed("eqratio6", args) in hashs:
+            if hashed("eqratio6", args) in hashs:
                 continue
             add += self._add_eqratio(args, deps=deps)
 
@@ -2173,12 +2193,12 @@ class ProofGraph:
         add = []
         hashs = [d.hashed() for d in deps.why]
         for args in self.enum_triangle2(points):
-            if problem.hashed("eqangle6", args) in hashs:
+            if hashed("eqangle6", args) in hashs:
                 continue
             add += self._add_eqangle(args, deps=deps)
 
         for args in self.enum_triangle(points):
-            if problem.hashed("eqratio6", args) in hashs:
+            if hashed("eqratio6", args) in hashs:
                 continue
             add += self._add_eqratio(args, deps=deps)
 
@@ -2191,12 +2211,12 @@ class ProofGraph:
         add = []
         hashs = [d.hashed() for d in deps.why]
         for args in self.enum_triangle(points):
-            if problem.hashed("eqangle6", args) in hashs:
+            if hashed("eqangle6", args) in hashs:
                 continue
             add += self._add_eqangle(args, deps=deps)
 
         for args in self.enum_sides(points):
-            if problem.hashed("cong", args) in hashs:
+            if hashed("cong", args) in hashs:
                 continue
             add += self._add_cong(args, deps=deps)
         return add
@@ -2216,27 +2236,27 @@ class ProofGraph:
         add = []
         hashs = [d.hashed() for d in deps.why]
         for args in self.enum_triangle2(points):
-            if problem.hashed("eqangle6", args) in hashs:
+            if hashed("eqangle6", args) in hashs:
                 continue
             add += self._add_eqangle(args, deps=deps)
 
         for args in self.enum_sides(points):
-            if problem.hashed("cong", args) in hashs:
+            if hashed("cong", args) in hashs:
                 continue
             add += self._add_cong(args, deps=deps)
 
         return add
 
     def in_cache(self, name: str, args: list[Point]) -> bool:
-        return problem.hashed(name, args) in self.cache
+        return hashed(name, args) in self.cache
 
     def cache_dep(
         self, name: str, args: list[Point], premises: list[Dependency]
     ) -> None:
-        hashed = problem.hashed(name, args)
-        if hashed in self.cache:
+        _hashed = hashed(name, args)
+        if _hashed in self.cache:
             return
-        self.cache[hashed] = premises
+        self.cache[_hashed] = premises
 
     def all_same_line(
         self, a: Point, b: Point
@@ -2261,31 +2281,31 @@ class ProofGraph:
         if name in ["circle"]:
             center, point = args[:2]
             circle = self.new_node(Circle, f"({center.name},{point.name})")
-            circle.num = nm.Circle(center.num, p1=point.num)
+            circle.num = num_geo.Circle(center.num, p1=point.num)
             circle.points = center, point
 
         if name in ["on_circle", "tangent"]:
             center, point = args[-2:]
             circle = self.new_node(Circle, f"({center.name},{point.name})")
-            circle.num = nm.Circle(center.num, p1=point.num)
+            circle.num = num_geo.Circle(center.num, p1=point.num)
             circle.points = center, point
 
         if name in ["incenter", "excenter", "incenter2", "excenter2"]:
             d, a, b, c = [x for x in args[-4:]]
             a, b, c = sorted([a, b, c], key=lambda x: x.name.lower())
             circle = self.new_node(Circle, f"({d.name},h.{a.name}{b.name})")
-            p = d.num.foot(nm.Line(a.num, b.num))
-            circle.num = nm.Circle(d.num, p1=p)
+            p = d.num.foot(num_geo.Line(a.num, b.num))
+            circle.num = num_geo.Circle(d.num, p1=p)
             circle.points = d, a, b, c
 
         if name in ["cc_tangent"]:
             o, a, w, b = args[-4:]
             c1 = self.new_node(Circle, f"({o.name},{a.name})")
-            c1.num = nm.Circle(o.num, p1=a.num)
+            c1.num = num_geo.Circle(o.num, p1=a.num)
             c1.points = o, a
 
             c2 = self.new_node(Circle, f"({w.name},{b.name})")
-            c2.num = nm.Circle(w.num, p1=b.num)
+            c2.num = num_geo.Circle(w.num, p1=b.num)
             c2.points = w, b
 
         if name in ["ninepoints"]:
@@ -2295,21 +2315,21 @@ class ProofGraph:
             p1 = (b.num + c.num) * 0.5
             p2 = (c.num + a.num) * 0.5
             p3 = (a.num + b.num) * 0.5
-            circle.num = nm.Circle(p1=p1, p2=p2, p3=p3)
+            circle.num = num_geo.Circle(p1=p1, p2=p2, p3=p3)
             circle.points = (None, None, a, b, c)
 
         if name in ["2l1c"]:
             a, b, c, o = args[:4]
             a, b, c = sorted([a, b, c], key=lambda x: x.name.lower())
             circle = self.new_node(Circle, f"({o.name},{a.name}{b.name}{c.name})")
-            circle.num = nm.Circle(p1=a.num, p2=b.num, p3=c.num)
+            circle.num = num_geo.Circle(p1=a.num, p2=b.num, p3=c.num)
             circle.points = (a, b, c)
 
     def add_clause(
         self,
-        clause: problem.Clause,
+        clause: Clause,
         plevel: int,
-        definitions: dict[str, problem.Definition],
+        definitions: dict[str, Definition],
         verbose: int = False,
     ) -> tuple[list[Dependency], int]:
         """Add a new clause of construction, e.g. a new excenter."""
@@ -2332,7 +2352,7 @@ class ProofGraph:
 
             mapping = dict(zip(cdef.construction.args, c.args))
             c_name = "midp" if c.name == "midpoint" else c.name
-            deps = EmptyDependency(level=0, rule_name=problem.CONSTRUCTION_RULE)
+            deps = EmptyDependency(level=0, rule_name=CONSTRUCTION_RULE)
             deps.construction = Dependency(c_name, c.args, rule_name=None, level=0)
 
             for d in cdef.deps.constructions:
@@ -2343,7 +2363,7 @@ class ProofGraph:
                         d.name + " " + " ".join([x.name for x in args])
                     )
                 construction = Dependency(
-                    d.name, args, rule_name=problem.CONSTRUCTION_RULE, level=0
+                    d.name, args, rule_name=CONSTRUCTION_RULE, level=0
                 )
                 self.dependency_graph.add_dependency(construction)
                 deps.why += [construction]
@@ -2352,7 +2372,15 @@ class ProofGraph:
 
         # Step 2: draw.
         def range_fn() -> (
-            list[Union[nm.Point, nm.Line, nm.Circle, nm.HalfLine, nm.HoleCircle]]
+            list[
+                Union[
+                    num_geo.Point,
+                    num_geo.Line,
+                    num_geo.Circle,
+                    num_geo.HalfLine,
+                    num_geo.HoleCircle,
+                ]
+            ]
         ):
             to_be_intersected = []
             for c in clause.constructions:
@@ -2361,7 +2389,7 @@ class ProofGraph:
                 for n in cdef.numerics:
                     args = [mapping[a] for a in n.args]
                     args = list(map(lambda x: self.get(x, lambda: int(x)), args))
-                    to_be_intersected += nm.sketch(n.name, args)
+                    to_be_intersected += sketch(n.name, args)
 
             return to_be_intersected
 
@@ -2374,9 +2402,9 @@ class ProofGraph:
 
         existing_points = [p.num for p in existing_points]
 
-        def draw_fn() -> list[nm.Point]:
+        def draw_fn() -> list[num_geo.Point]:
             to_be_intersected = range_fn()
-            return nm.reduce(to_be_intersected, existing_points)
+            return num_geo.reduce(to_be_intersected, existing_points)
 
         rely_on = set()
         for c in clause.constructions:
@@ -2393,18 +2421,18 @@ class ProofGraph:
         nums = draw_fn()
         for p, num, num0 in zip(new_points, nums, clause.nums):
             p.co_change = new_points
-            if isinstance(num0, nm.Point):
+            if isinstance(num0, num_geo.Point):
                 num = num0
             elif isinstance(num0, (tuple, list)):
                 x, y = num0
-                num = nm.Point(x, y)
+                num = num_geo.Point(x, y)
 
             p.num = num
 
         # check two things.
-        if nm.check_too_close(nums, existing_points):
+        if check_too_close_numerical(nums, existing_points):
             raise PointTooCloseError()
-        if nm.check_too_far(nums, existing_points):
+        if check_too_far_numerical(nums, existing_points):
             raise PointTooFarError()
 
         # Commit: now that all conditions are passed.

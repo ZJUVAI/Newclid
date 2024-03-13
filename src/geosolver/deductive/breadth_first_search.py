@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Union
 
 import time
 from geosolver.geometry import Angle, Point, Ratio
-from geosolver.numericals import same_clock
+from geosolver.numerical.check import same_clock
 
 from geosolver.problem import Dependency, EmptyDependency, Problem, Theorem, hashed
 from geosolver.deductive.match_theorems import match_all_theorems
