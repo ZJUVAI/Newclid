@@ -5,6 +5,7 @@ from networkx import Graph
 from pyvis.network import Network
 
 import geosolver.numerical.geometries as num_geo
+from geosolver.numerical.draw_figure import draw_figure as draw_numerical_figure
 from geosolver.geometry import (
     Angle,
     Circle,
@@ -351,3 +352,13 @@ class SymbolsGraph:
 
         nt.from_nx(nx_graph)
         nt.show(str(html_path), notebook=False)
+
+    def draw_figure(self, save_path: Path):
+        draw_numerical_figure(
+            self.type2nodes[Point],
+            self.type2nodes[Line],
+            self.type2nodes[Circle],
+            self.type2nodes[Segment],
+            save_to=str(save_path),
+            block=False,
+        )
