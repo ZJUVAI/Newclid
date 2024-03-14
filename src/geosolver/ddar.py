@@ -24,7 +24,7 @@ def solve(
     status = "saturated"
     level_times = []
 
-    dervs, eq4 = g.alegbraic.derive_algebra(level=0, verbose=False)
+    dervs, eq4 = g.alegbraic_manipulator.derive_algebra(level=0, verbose=False)
     derives = [dervs]
     eq4s = [eq4]
     branches = []

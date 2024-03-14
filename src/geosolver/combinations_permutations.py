@@ -18,6 +18,7 @@
 Mainly for listing combinations and permutations of elements.
 """
 
+from typing import Generator
 from geosolver.geometry import Point
 
 
@@ -130,3 +131,24 @@ def _perm4(elems):
 
 def perm4(elems):
     return list(_perm4(elems))
+
+
+def enum_sides(points: list[Point]) -> Generator[list[Point], None, None]:
+    a, b, c, x, y, z = points
+    yield [a, b, x, y]
+    yield [b, c, y, z]
+    yield [c, a, z, x]
+
+
+def enum_triangle(points: list[Point]) -> Generator[list[Point], None, None]:
+    a, b, c, x, y, z = points
+    yield [a, b, a, c, x, y, x, z]
+    yield [b, a, b, c, y, x, y, z]
+    yield [c, a, c, b, z, x, z, y]
+
+
+def enum_triangle2(points: list[Point]) -> Generator[list[Point], None, None]:
+    a, b, c, x, y, z = points
+    yield [a, b, a, c, x, z, x, y]
+    yield [b, a, b, c, y, z, y, x]
+    yield [c, a, c, b, z, y, z, x]

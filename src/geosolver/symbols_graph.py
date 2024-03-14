@@ -1,3 +1,4 @@
+from collections import defaultdict
 from pathlib import Path
 
 from networkx import Graph
@@ -167,6 +168,113 @@ class SymbolsGraph:
 
             if node.name in self._name2node.values():
                 self._name2node.pop(node.name)
+
+    def get_line(self, a: Point, b: Point) -> Optional[Line]:
+        linesa = a.neighbors(Line)
+        for line in b.neighbors(Line):
+            if line in linesa:
+                return line
+        return None
+
+    def get_segment(self, p1: Point, p2: Point) -> Optional[Segment]:
+        for s in self.type2nodes[Segment]:
+            if s.points == {p1, p2}:
+                return s
+        return None
+
+    def get_angle(self, d1: Direction, d2: Direction) -> tuple[Angle, Optional[Angle]]:
+        for a in self.type2nodes[Angle]:
+            if a.directions == (d1, d2):
+                return a, a.opposite
+        return None, None
+
+    def get_ratio(self, l1: Length, l2: Length) -> tuple[Ratio, Ratio]:
+        for r in self.type2nodes[Ratio]:
+            if r.lengths == (l1, l2):
+                return r, r.opposite
+        return None, None
+
+    def get_circles(self, *points: list[Point]) -> list[Circle]:
+        circle2count = defaultdict(lambda: 0)
+        for p in points:
+            for c in p.neighbors(Circle):
+                circle2count[c] += 1
+        return [c for c, count in circle2count.items() if count >= 3]
+
+    def get_or_create_segment(self, p1: Point, p2: Point, deps: Dependency) -> Segment:
+        """Get or create a Segment object between two Points p1 and p2."""
+        if p1 == p2:
+            raise ValueError(f"Creating same 0-length segment {p1.name}")
+
+        for s in self.type2nodes[Segment]:
+            if s.points == {p1, p2}:
+                return s
+
+        if p1.name > p2.name:
+            p1, p2 = p2, p1
+        s = self.new_node(Segment, name=f"{p1.name.upper()}{p2.name.upper()}")
+        self.connect(p1, s, deps=deps)
+        self.connect(p2, s, deps=deps)
+        s.points = {p1, p2}
+        return s
+
+    def get_or_create_angle_from_lines(
+        self, l1: Line, l2: Line, deps: Dependency
+    ) -> tuple[Angle, Angle, list[Dependency]]:
+        return self.get_or_create_angle_from_directions(l1._val, l2._val, deps)
+
+    def get_or_create_angle_from_directions(
+        self, d1: Direction, d2: Direction, deps: Dependency
+    ) -> tuple[Angle, Angle, list[Dependency]]:
+        """Get or create an angle between two Direction d1 and d2."""
+        for a in self.type2nodes[Angle]:
+            if a.directions == (d1.rep(), d2.rep()):  # directions = _d.rep()
+                d1_, d2_ = a._d
+                why1 = d1.why_equal([d1_], None) + d1_.why_rep()
+                why2 = d2.why_equal([d2_], None) + d2_.why_rep()
+                return a, a.opposite, why1 + why2
+
+        d1, why1 = d1.rep_and_why()
+        d2, why2 = d2.rep_and_why()
+        a12 = self.new_node(Angle, f"{d1.name}-{d2.name}")
+        a21 = self.new_node(Angle, f"{d2.name}-{d1.name}")
+        self.connect(d1, a12, deps)
+        self.connect(d2, a21, deps)
+        self.connect(a12, a21, deps)
+        a12.set_directions(d1, d2)
+        a21.set_directions(d2, d1)
+        a12.opposite = a21
+        a21.opposite = a12
+        return a12, a21, why1 + why2
+
+    def get_or_create_ratio_from_segments(
+        self, s1: Segment, s2: Segment, deps: Dependency
+    ) -> tuple[Ratio, Ratio, list[Dependency]]:
+        return self.get_or_create_ratio_from_lenghts(s1._val, s2._val, deps)
+
+    def get_or_create_ratio_from_lenghts(
+        self, l1: Length, l2: Length, deps: Dependency
+    ) -> tuple[Ratio, Ratio, list[Dependency]]:
+        """Get or create a new Ratio from two Lenghts l1 and l2."""
+        for r in self.type2nodes[Ratio]:
+            if r.lengths == (l1.rep(), l2.rep()):
+                l1_, l2_ = r._l
+                why1 = l1.why_equal([l1_], None) + l1_.why_rep()
+                why2 = l2.why_equal([l2_], None) + l2_.why_rep()
+                return r, r.opposite, why1 + why2
+
+        l1, why1 = l1.rep_and_why()
+        l2, why2 = l2.rep_and_why()
+        r12 = self.new_node(Ratio, f"{l1.name}/{l2.name}")
+        r21 = self.new_node(Ratio, f"{l2.name}/{l1.name}")
+        self.connect(l1, r12, deps)
+        self.connect(l2, r21, deps)
+        self.connect(r12, r21, deps)
+        r12.set_lengths(l1, l2)
+        r21.set_lengths(l2, l1)
+        r12.opposite = r21
+        r21.opposite = r12
+        return r12, r21, why1 + why2
 
     def get_new_line_thru_pair(self, p1: Point, p2: Point) -> Line:
         if p1.name.lower() > p2.name.lower():

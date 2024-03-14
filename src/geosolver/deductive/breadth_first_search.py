@@ -122,7 +122,7 @@ def dd_bfs_one_level(
     # Run AR, but do NOT apply to the proof state (yet).
     for dep in added:
         g.add_algebra(dep, level)
-    derives, eq4s = g.alegbraic.derive_algebra(level, verbose=False)
+    derives, eq4s = g.alegbraic_manipulator.derive_algebra(level, verbose=False)
 
     branching += sum([len(x) for x in derives.values()])
     branching += sum([len(x) for x in eq4s.values()])
@@ -134,13 +134,13 @@ def create_consts_str(proof_graph: "ProofGraph", s: str) -> Union[Ratio, Angle]:
     if "pi/" in s:
         n, d = s.split("pi/")
         n, d = int(n), int(d)
-        p0, _ = proof_graph.alegbraic.get_or_create_const_ang(
+        p0, _ = proof_graph.alegbraic_manipulator.get_or_create_const_ang(
             proof_graph.symbols_graph, n, d
         )
     else:
         n, d = s.split("/")
         n, d = int(n), int(d)
-        p0, _ = proof_graph.alegbraic.get_or_create_const_rat(
+        p0, _ = proof_graph.alegbraic_manipulator.get_or_create_const_rat(
             proof_graph.symbols_graph, n, d
         )
     return p0

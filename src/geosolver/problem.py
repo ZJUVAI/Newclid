@@ -720,8 +720,8 @@ class Dependency(Construction):
                 self.why = []
                 return
 
-            ab = g._get_line(a, b)
-            cd = g._get_line(c, d)
+            ab = g.symbols_graph.get_line(a, b)
+            cd = g.symbols_graph.get_line(c, d)
             if ab == cd:
                 if {a, b} == {c, d}:
                     self.why = []
@@ -743,15 +743,15 @@ class Dependency(Construction):
 
         elif self.name == "midp":
             m, a, b = self.args
-            ma = g._get_segment(m, a)
-            mb = g._get_segment(m, b)
+            ma = g.symbols_graph.get_segment(m, a)
+            mb = g.symbols_graph.get_segment(m, b)
             dep = Dependency("coll", [m, a, b], None, None).why_me_or_cache(g, None)
             self.why = [dep] + g.why_equal(ma, mb, level)
 
         elif self.name == "perp":
             a, b, c, d = self.args
-            ab = g._get_line(a, b)
-            cd = g._get_line(c, d)
+            ab = g.symbols_graph.get_line(a, b)
+            cd = g.symbols_graph.get_line(c, d)
             for (x, y), xy in zip([(a, b), (c, d)], [ab, cd]):
                 x_, y_ = xy.points
                 if {x, y} == {x_, y_}:
@@ -772,8 +772,8 @@ class Dependency(Construction):
 
         elif self.name == "cong":
             a, b, c, d = self.args
-            ab = g._get_segment(a, b)
-            cd = g._get_segment(c, d)
+            ab = g.symbols_graph.get_segment(a, b)
+            cd = g.symbols_graph.get_segment(c, d)
 
             self.why = g.why_equal(ab, cd, level)
 
@@ -801,9 +801,9 @@ class Dependency(Construction):
 
         elif self.name == "circle":
             o, a, b, c = self.args
-            oa = g._get_segment(o, a)
-            ob = g._get_segment(o, b)
-            oc = g._get_segment(o, c)
+            oa = g.symbols_graph.get_segment(o, a)
+            ob = g.symbols_graph.get_segment(o, b)
+            oc = g.symbols_graph.get_segment(o, c)
             self.why = g.why_equal(oa, ob, level) + g.why_equal(oa, oc, level)
 
         elif self.name in ["eqangle", "eqangle6"]:
@@ -895,10 +895,10 @@ class Dependency(Construction):
 
         elif self.name in ["eqratio", "eqratio6"]:
             a, b, c, d, m, n, p, q = self.args
-            ab = g._get_segment(a, b)
-            cd = g._get_segment(c, d)
-            mn = g._get_segment(m, n)
-            pq = g._get_segment(p, q)
+            ab = g.symbols_graph.get_segment(a, b)
+            cd = g.symbols_graph.get_segment(c, d)
+            mn = g.symbols_graph.get_segment(m, n)
+            pq = g.symbols_graph.get_segment(p, q)
 
             if ab is None or cd is None or mn is None or pq is None:
                 if {a, b} == {m, n}:

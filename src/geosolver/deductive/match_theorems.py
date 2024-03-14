@@ -151,28 +151,28 @@ def match_circle_coll_eqangle_midp(
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match circle O A B C, coll M B C, eqangle A B A C O B O M => midp M B C."""
     for p, a, b, c in g.all_circles():
-        ab = g._get_line(a, b)
+        ab = g.symbols_graph.get_line(a, b)
         if ab is None:
             continue
         if ab.val is None:
             continue
-        ac = g._get_line(a, c)
+        ac = g.symbols_graph.get_line(a, c)
         if ac is None:
             continue
         if ac.val is None:
             continue
-        pb = g._get_line(p, b)
+        pb = g.symbols_graph.get_line(p, b)
         if pb is None:
             continue
         if pb.val is None:
             continue
 
-        bc = g._get_line(b, c)
+        bc = g.symbols_graph.get_line(b, c)
         if bc is None:
             continue
         bc_points = bc.neighbors(gm.Point, return_set=True)
 
-        anga, _ = g._get_angle(ab.val, ac.val)
+        anga, _ = g.symbols_graph.get_angle(ab.val, ac.val)
 
         for angp in pb.val.neighbors(gm.Angle):
             if not g.is_equal(anga, angp):
@@ -193,7 +193,7 @@ def match_midp_perp_cong(
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match midp M A B, perp O M A B => cong O A O B."""
     for m, a, b in g.all_midps():
-        ab = g._get_line(a, b)
+        ab = g.symbols_graph.get_line(a, b)
         for line_neighbor in m.neighbors(gm.Line):
             if g.check_perpl(line_neighbor, ab):
                 for o in line_neighbor.neighbors(gm.Point):
@@ -223,13 +223,13 @@ def match_circle_eqangle_perp(
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match circle O A B C, eqangle A X A B C A C B => perp O A A X."""
     for p, a, b, c in g.all_circles():
-        ca = g._get_line(c, a)
+        ca = g.symbols_graph.get_line(c, a)
         if ca is None:
             continue
-        cb = g._get_line(c, b)
+        cb = g.symbols_graph.get_line(c, b)
         if cb is None:
             continue
-        ab = g._get_line(a, b)
+        ab = g.symbols_graph.get_line(a, b)
         if ab is None:
             continue
 
@@ -240,7 +240,7 @@ def match_circle_eqangle_perp(
         if ab.val is None:
             continue
 
-        c_ang, _ = g._get_angle(cb.val, ca.val)
+        c_ang, _ = g.symbols_graph.get_angle(cb.val, ca.val)
         if c_ang is None:
             continue
 
@@ -264,7 +264,7 @@ def match_circle_perp_eqangle(
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match circle O A B C, perp O A A X => eqangle A X A B C A C B."""
     for p, a, b, c in g.all_circles():
-        pa = g._get_line(p, a)
+        pa = g.symbols_graph.get_line(p, a)
         if pa is None:
             continue
         if pa.val is None:
@@ -331,8 +331,8 @@ def match_eqangle_perp_perp(
             if d1 == d3 or d2 == d4:
                 continue
             # if d1 - d3 = d2 - d4 => d3 perp d4
-            a13, a31 = g._get_angle(d1, d3)
-            a24, a42 = g._get_angle(d2, d4)
+            a13, a31 = g.symbols_graph.get_angle(d1, d3)
+            a24, a42 = g.symbols_graph.get_angle(d2, d4)
             if a13 is None or a31 is None or a24 is None or a42 is None:
                 continue
             if g.is_equal(a13, a24) and g.is_equal(a31, a42):
