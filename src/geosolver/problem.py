@@ -721,9 +721,13 @@ class Dependency(Construction):
             if ab == cd:
                 if {a, b} == {c, d}:
                     self.why = []
-                    self.rule_name = ""
+                    self.rule_name = "Both are the same line - r28"  # NAMING10
                     return
-                dep = Dependency("coll", list({a, b, c, d}), "t??", None)
+
+                # NAMING9
+                rule_name = "Both are the same line - r28"
+                dep = Dependency("coll", list({a, b, c, d}), rule_name, None)
+
                 self.why = [dep.why_me_or_cache(g, level)]
                 return
 
@@ -731,7 +735,10 @@ class Dependency(Construction):
                 x_, y_ = xy.points
                 if {x, y} == {x_, y_}:
                     continue
-                d = Dependency("collx", [x, y, x_, y_], None, level)
+
+                # NAMING12
+                d = Dependency("collx", [x, y, x_, y_], "Found pair in line", level)
+
                 self.why += [d.why_me_or_cache(g, level)]
 
             whypara = g.why_equal(ab, cd, None)
@@ -784,7 +791,9 @@ class Dependency(Construction):
                 if hashed_me in g.cache:
                     dep = g.cache[hashed_me]
                     self.why = [dep]
-                    self.rule_name = ""
+
+                    # NAMING12
+                    self.rule_name = "Numerically checked for collinearity"
                     return
                 _, self.why = gm.line_of_and_why(args, level)
             else:

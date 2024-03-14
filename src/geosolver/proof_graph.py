@@ -768,9 +768,12 @@ class ProofGraph:
             abcd_deps = deps
             if whys + why0:
                 dep0 = deps.populate("coll", og_points)
+
+                # NAMED2
                 abcd_deps = EmptyDependency(
                     level=deps.level, rule_name="Found in line (D3)"
-                )  # NAMED2 -- NOT VERIFIED
+                )
+
                 abcd_deps.why = [dep0] + whys
 
             is_coll = self.check_coll(args)
@@ -1080,7 +1083,10 @@ class ProofGraph:
 
         if why:
             dep0 = deps.populate("perp", [a, b, c, d])
-            deps = EmptyDependency(level=deps.level, rule_name=None)
+
+            # NAMING5
+            deps = EmptyDependency(level=deps.level, rule_name="Found perpendicular")
+
             deps.why = [dep0] + why
 
         dab, dcd = a12._d
@@ -1210,7 +1216,9 @@ class ProofGraph:
         why = ab._val.why_equal([ax._val, ay._val], level=None)
         why += [cong_ab_ac]
 
-        deps = EmptyDependency(cong_ab_ac.level, "")
+        # NAMING7
+        deps = EmptyDependency(cong_ab_ac.level, "r01")
+
         deps.why = why
 
         return self._add_cyclic([b, c, x, y], deps)
@@ -1334,7 +1342,9 @@ class ProofGraph:
             abcdef_deps = deps
             if whys + why0:
                 dep0 = deps.populate("cyclic", og_points)
-                abcdef_deps = EmptyDependency(level=deps.level, rule_name=None)
+                abcdef_deps = EmptyDependency(
+                    level=deps.level, rule_name="Found circle"
+                )  # NAMING6
                 abcdef_deps.why = [dep0] + whys
 
             is_cyclic = self.check_cyclic(args)
@@ -1390,9 +1400,13 @@ class ProofGraph:
             colls = [a, b, c, d]
             if len(set(colls)) > 2:
                 dep0 = deps.populate(depname, [a, b, c, d, m, n, p, q])
-                deps = EmptyDependency(level=deps.level, rule_name=None)
 
-                dep = Dependency("collx", colls, None, deps.level)
+                # NAMING14
+                deps = EmptyDependency(level=deps.level, rule_name="Found pair in line")
+
+                # NAMING13
+                dep = Dependency("collx", colls, "Found pair in line", deps.level)
+
                 deps.why = [dep0, dep.why_me_or_cache(self, None)]
 
         deps = deps.populate(eqname, [m, n, p, q])
@@ -1516,7 +1530,10 @@ class ProofGraph:
         why = why1 + why2
         if why:
             dep0 = deps.populate("eqangle", args)
-            deps = EmptyDependency(level=deps.level, rule_name=None)
+
+            # NAMING15
+            deps = EmptyDependency(level=deps.level, rule_name="Found congruent angles")
+
             deps.why = [dep0] + why
 
         dab, dcd = ab_cd._d
@@ -1568,7 +1585,10 @@ class ProofGraph:
 
         if deps and why1 + why2 + why3 + why4:
             dep0 = deps.populate("eqangle", points)
-            deps = EmptyDependency(level=deps.level, rule_name=None)
+
+            # NAMING8
+            deps = EmptyDependency(level=deps.level, rule_name="Found congruent angles")
+
             deps.why = [dep0] + why1 + why2 + why3 + why4
 
         add = self._maybe_make_equal_pairs(a, b, c, d, m, n, p, q, ab, cd, mn, pq, deps)
@@ -1940,7 +1960,12 @@ class ProofGraph:
         why = why1 + why2
         if why:
             dep0 = deps.populate("eqratio", args)
-            deps = EmptyDependency(level=deps.level, rule_name=None)
+
+            # NAMING8
+            deps = EmptyDependency(
+                level=deps.level, rule_name="Found proportional segments"
+            )
+
             deps.why = [dep0] + why
 
         lab, lcd = ab_cd._l
