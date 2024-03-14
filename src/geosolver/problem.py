@@ -809,10 +809,10 @@ class Dependency(Construction):
         elif self.name in ["eqangle", "eqangle6"]:
             a, b, c, d, m, n, p, q = self.args
 
-            ab, why1 = g.get_line_thru_pair_why(a, b)
-            cd, why2 = g.get_line_thru_pair_why(c, d)
-            mn, why3 = g.get_line_thru_pair_why(m, n)
-            pq, why4 = g.get_line_thru_pair_why(p, q)
+            ab, why1 = g.symbols_graph.get_line_thru_pair_why(a, b)
+            cd, why2 = g.symbols_graph.get_line_thru_pair_why(c, d)
+            mn, why3 = g.symbols_graph.get_line_thru_pair_why(m, n)
+            pq, why4 = g.symbols_graph.get_line_thru_pair_why(p, q)
 
             if ab is None or cd is None or mn is None or pq is None:
                 if {a, b} == {m, n}:

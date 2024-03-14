@@ -29,8 +29,8 @@ def match_eqratio_eqratio_eqratio(
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match eqratio a b c d m n p q, eqratio c d e f p q r u => eqratio a b e f m n r u."""
-    for m1 in g.type2nodes[gm.Value]:
-        for m2 in g.type2nodes[gm.Value]:
+    for m1 in g.symbols_graph.type2nodes[gm.Value]:
+        for m2 in g.symbols_graph.type2nodes[gm.Value]:
             rats1 = []
             for rat in m1.neighbors(gm.Ratio):
                 l1, l2 = rat.lengths
@@ -76,8 +76,8 @@ def match_eqangle_eqangle_eqangle(
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match eqangle a b c d m n p q, eqangle c d e f p q r u => eqangle a b e f m n r u."""
-    for m1 in g.type2nodes[gm.Measure]:
-        for m2 in g.type2nodes[gm.Measure]:
+    for m1 in g.symbols_graph.type2nodes[gm.Measure]:
+        for m2 in g.symbols_graph.type2nodes[gm.Measure]:
             angs1 = []
             for ang in m1.neighbors(gm.Angle):
                 d1, d2 = ang.directions
@@ -207,7 +207,7 @@ def match_cyclic_eqangle_cong(
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match cyclic A B C P Q R, eqangle C A C B R P R Q => cong A B P Q."""
-    for c in g.type2nodes[gm.Circle]:
+    for c in g.symbols_graph.type2nodes[gm.Circle]:
         ps = c.neighbors(gm.Point)
         for (a, b, c), (x, y, z) in utils.comb2(list(utils.perm3(ps))):
             if {a, b, c} == {x, y, z}:
@@ -307,8 +307,8 @@ def match_eqangle6_ncoll_cong(
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match eqangle6 A O A B B A B O, ncoll O A B => cong O A O B."""
-    for a in g.type2nodes[gm.Point]:
-        for b, c in utils.comb2(g.type2nodes[gm.Point]):
+    for a in g.symbols_graph.type2nodes[gm.Point]:
+        for b, c in utils.comb2(g.symbols_graph.type2nodes[gm.Point]):
             if a == b or a == c:
                 continue
             if g.check_eqangle([b, a, b, c, c, b, c, a]):
@@ -327,7 +327,7 @@ def match_eqangle_perp_perp(
         d1, d2 = ang.directions
         if d1 is None or d2 is None:
             continue
-        for d3, d4 in utils.comb2(g.type2nodes[gm.Direction]):
+        for d3, d4 in utils.comb2(g.symbols_graph.type2nodes[gm.Direction]):
             if d1 == d3 or d2 == d4:
                 continue
             # if d1 - d3 = d2 - d4 => d3 perp d4
@@ -385,7 +385,7 @@ def match_eqangle_para(
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match eqangle A B P Q C D P Q => para A B C D."""
-    for measure in g.type2nodes[gm.Measure]:
+    for measure in g.symbols_graph.type2nodes[gm.Measure]:
         angs = measure.neighbors(gm.Angle)
         d12, d21 = defaultdict(list), defaultdict(list)
         for ang in angs:
@@ -426,7 +426,7 @@ def match_cong_cong_cong_cyclic(
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match cong O A O B, cong O B O C, cong O C O D => cyclic A B C D."""
-    for lenght in g.type2nodes[gm.Length]:
+    for lenght in g.symbols_graph.type2nodes[gm.Length]:
         p2p = defaultdict(list)
         for s in lenght.neighbors(gm.Segment):
             a, b = s.points
@@ -447,8 +447,8 @@ def match_cong_cong_cong_ncoll_contri(
     """Match cong A B P Q, cong B C Q R, cong C A R P, ncoll A B C => contri* A B C P Q R."""
     record = set()
     for a, b, p, q in g_matcher("cong"):
-        for c in g.type2nodes[gm.Point]:
-            for r in g.type2nodes[gm.Point]:
+        for c in g.symbols_graph.type2nodes[gm.Point]:
+            for r in g.symbols_graph.type2nodes[gm.Point]:
                 if any([x in record for x in rotate_simtri(a, b, c, p, q, r)]):
                     continue
                 if not g.check_ncoll([a, b, c]):
@@ -466,10 +466,10 @@ def match_cong_cong_eqangle6_ncoll_contri(
     """Match cong A B P Q, cong B C Q R, eqangle6 B A B C Q P Q R, ncoll A B C => contri* A B C P Q R."""
     record = set()
     for a, b, p, q in g_matcher("cong"):
-        for c in g.type2nodes[gm.Point]:
+        for c in g.symbols_graph.type2nodes[gm.Point]:
             if c in (a, b):
                 continue
-            for r in g.type2nodes[gm.Point]:
+            for r in g.symbols_graph.type2nodes[gm.Point]:
                 if r in (p, q):
                     continue
 
@@ -691,7 +691,7 @@ def match_eqratio6_coll_ncoll_eqangle6(
     """Match eqratio6 d b d c a b a c, coll d b c, ncoll a b c => eqangle6 a b a d a d a c."""
     records = set()
     for b, d, c in g_matcher("coll"):
-        for a in g.all_points():
+        for a in g.symbols_graph.all_points():
             if g.check_coll([a, b, c]):
                 continue
             if (a, b, d, c) in records or (a, c, d, b) in records:
@@ -710,7 +710,7 @@ def match_eqangle6_coll_ncoll_eqratio6(
     """Match eqangle6 a b a d a d a c, coll d b c, ncoll a b c => eqratio6 d b d c a b a c."""
     records = set()
     for b, d, c in g_matcher("coll"):
-        for a in g.all_points():
+        for a in g.symbols_graph.all_points():
             if g.check_coll([a, b, c]):
                 continue
             if (a, b, d, c) in records or (a, c, d, b) in records:

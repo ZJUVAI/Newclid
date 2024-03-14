@@ -21,7 +21,7 @@ def get_proof_steps(
     dict[tuple[str, ...], int],
 ]:
     """Extract proof steps from the built DAG."""
-    goal_args = g.names2nodes(goal.args)
+    goal_args = g.symbols_graph.names2nodes(goal.args)
     query = Dependency(goal.name, goal_args, None, None)
 
     setup, aux, log, setup_points = trace_back.get_logs(

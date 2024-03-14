@@ -38,7 +38,7 @@ class TestTraceback:
 
         solve(graph, self.rules, p)
 
-        goal_args = graph.names2nodes(p.goal.args)
+        goal_args = graph.symbols_graph.names2nodes(p.goal.args)
         query = Dependency(p.goal.name, goal_args, None, None)
 
         setup, aux, _, _ = get_logs(query, graph, merge_trivials=False)

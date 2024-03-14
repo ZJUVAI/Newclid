@@ -42,7 +42,7 @@ def solve(
 
         # Now, it is either goal or saturated
         if controller.goal is not None:
-            goal_args = g.names2points(controller.goal.args)
+            goal_args = g.symbols_graph.names2points(controller.goal.args)
             if g.check(controller.goal.name, goal_args):  # found goal
                 status = "solved"
                 break
@@ -105,7 +105,9 @@ def saturate_or_goal(
         level_times.append(level_time)
 
         if p.goal is not None:
-            goal_args = list(map(lambda x: g.get(x, lambda: int(x)), p.goal.args))
+            goal_args = list(
+                map(lambda x: g.symbols_graph.get_point(x, lambda: int(x)), p.goal.args)
+            )
             if g.check(p.goal.name, goal_args):  # found goal
                 break
 

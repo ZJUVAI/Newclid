@@ -2,8 +2,6 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from networkx import Graph
-from pyvis.network import Network
 
 from geosolver.ddar import solve
 from geosolver.geometry import Circle, Line, Point, Segment
@@ -43,16 +41,16 @@ def main():
         run_ddar(graph, problem, problem_output_path)
 
         draw_figure(
-            graph.type2nodes[Point],
-            graph.type2nodes[Line],
-            graph.type2nodes[Circle],
-            graph.type2nodes[Segment],
+            graph.symbols_graph.type2nodes[Point],
+            graph.symbols_graph.type2nodes[Line],
+            graph.symbols_graph.type2nodes[Circle],
+            graph.symbols_graph.type2nodes[Segment],
             save_to=str(problem_output_path / f"{problem.url}_proof_figure.png"),
             block=False,
         )
 
-        draw_elements_graph(
-            graph, problem_output_path / f"{problem_name}.elements_graph.html"
+        graph.symbols_graph.draw_html(
+            problem_output_path / f"{problem_name}.symbols_graph.html"
         )
 
         graph.dependency_graph.show_html(
@@ -75,7 +73,7 @@ def run_ddar(graph: ProofGraph, problem: Problem, out_folder: Optional[Path]) ->
     """
     solve(graph, RULES, problem, max_level=1000)
 
-    goal_args = graph.names2nodes(problem.goal.args)
+    goal_args = graph.symbols_graph.names2nodes(problem.goal.args)
     if not graph.check(problem.goal.name, goal_args):
         logging.info(f"DD+AR failed to solve the problem {problem.url}.")
         return False
@@ -88,28 +86,6 @@ def run_ddar(graph: ProofGraph, problem: Problem, out_folder: Optional[Path]) ->
     write_solution(graph, problem, outfile)
 
     return True
-
-
-def draw_elements_graph(graph: ProofGraph, html_path: Path):
-    nt = Network("1080px")
-    # populates the nodes and edges data structures
-    nx_graph = Graph()
-    for node_type, nodes in graph.type2nodes.items():
-        type_name = node_type.__name__
-        for node in nodes:
-            nx_graph.add_node(node.name, title=type_name, group=type_name)
-            for neighbor_type in graph.type2nodes.keys():
-                neighbor_type_name = neighbor_type.__name__
-                for neighbor in node.neighbors(neighbor_type):
-                    nx_graph.add_node(
-                        neighbor.name,
-                        title=neighbor_type_name,
-                        group=neighbor_type_name,
-                    )
-                    nx_graph.add_edge(neighbor.name, node.name)
-
-    nt.from_nx(nx_graph)
-    nt.show(str(html_path), notebook=False)
 
 
 if __name__ == "__main__":

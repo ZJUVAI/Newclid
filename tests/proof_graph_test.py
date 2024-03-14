@@ -51,7 +51,7 @@ class TestProofGraph:
     def test_build_graph_points(self):
         g = self.graph
 
-        all_points = g.all_points()
+        all_points = g.symbols_graph.all_points()
         check.equal(
             {p.name for p in all_points},
             {"a", "b", "c", "g", "h", "o", "g1", "g2", "g3", "h1", "h2", "h3"},
@@ -60,7 +60,7 @@ class TestProofGraph:
     def test_build_graph_predicates(self):
         gr = self.graph
 
-        a, b, c, g, h, o, g1, g2, g3, h1, h2, h3 = gr.names2points(
+        a, b, c, g, h, o, g1, g2, g3, h1, h2, h3 = gr.symbols_graph.names2points(
             ["a", "b", "c", "g", "h", "o", "g1", "g2", "g3", "h1", "h2", "h3"]
         )
 

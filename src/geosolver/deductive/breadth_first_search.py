@@ -108,8 +108,8 @@ def dd_bfs_one_level(
         args = []
 
         for a in controller.goal.args:
-            if a in g._name2node:
-                a = g._name2node[a]
+            if a in g.symbols_graph._name2node:
+                a = g.symbols_graph._name2node[a]
             elif "/" in a:
                 a = create_consts_str(g, a)
             elif a.isdigit():
@@ -130,13 +130,17 @@ def dd_bfs_one_level(
     return added, derives, eq4s, branching
 
 
-def create_consts_str(g: "ProofGraph", s: str) -> Union[Ratio, Angle]:
+def create_consts_str(proof_graph: "ProofGraph", s: str) -> Union[Ratio, Angle]:
     if "pi/" in s:
         n, d = s.split("pi/")
         n, d = int(n), int(d)
-        p0, _ = g.alegbraic.get_or_create_const_ang(n, d)
+        p0, _ = proof_graph.alegbraic.get_or_create_const_ang(
+            proof_graph.symbols_graph, n, d
+        )
     else:
         n, d = s.split("/")
         n, d = int(n), int(d)
-        p0, _ = g.alegbraic.get_or_create_const_rat(n, d)
+        p0, _ = proof_graph.alegbraic.get_or_create_const_rat(
+            proof_graph.symbols_graph, n, d
+        )
     return p0

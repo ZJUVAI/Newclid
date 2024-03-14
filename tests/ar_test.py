@@ -97,12 +97,14 @@ class TestAR:
         tb = geometric_tables.AngleTable("pi")
 
         # Add bisector & ex-bisector facts into the table:
-        ca, cd, cb, ce = g.names2nodes(["d(ac)", "d(cd)", "d(bc)", "d(ce)"])
+        ca, cd, cb, ce = g.symbols_graph.names2nodes(
+            ["d(ac)", "d(cd)", "d(bc)", "d(ce)"]
+        )
         tb.add_eqangle(ca, cd, cd, cb, "fact1")
         tb.add_eqangle(ce, ca, cb, ce, "fact2")
 
         # Add a distractor fact to make sure traceback does not include this fact
-        ab = g.names2nodes(["d(ab)"])[0]
+        ab = g.symbols_graph.names2nodes(["d(ab)"])[0]
         tb.add_eqangle(ab, cb, cb, ca, "fact3")
 
         # Check for all new equalities
@@ -127,7 +129,7 @@ class TestAR:
         g, _ = ProofGraph.build_problem(p, self.defs)
 
         # Add two eqangles facts because ieq_triangle only add congruent sides
-        a, b, c = g.names2nodes("abc")
+        a, b, c = g.symbols_graph.names2nodes("abc")
         g._add_eqangle([a, b, b, c, b, c, c, a], EmptyDependency(0, None))
         g._add_eqangle([b, c, c, a, c, a, a, b], EmptyDependency(0, None))
 
@@ -135,7 +137,7 @@ class TestAR:
         tb = geometric_tables.AngleTable("pi")
 
         # Add the fact that there are three equal angles
-        ab, bc, ca = g.names2nodes(["d(ab)", "d(bc)", "d(ac)"])
+        ab, bc, ca = g.symbols_graph.names2nodes(["d(ab)", "d(bc)", "d(ac)"])
         tb.add_eqangle(ab, bc, bc, ca, "fact1")
         tb.add_eqangle(bc, ca, ca, ab, "fact2")
 
@@ -170,7 +172,7 @@ class TestAR:
         )
         g, _ = ProofGraph.build_problem(p, self.defs)
 
-        a, b, c, ab, bc, ca, d1, d2, d3, e1, e2, e3 = g.names2nodes(
+        a, b, c, ab, bc, ca, d1, d2, d3, e1, e2, e3 = g.symbols_graph.names2nodes(
             ["a", "b", "c", "ab", "bc", "ac", "d1", "d2", "d3", "e1", "e2", "e3"]
         )
 

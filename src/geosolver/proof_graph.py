@@ -19,9 +19,10 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Callable, Dict, Generator, List, Optional, Type, Union
+from typing import Generator, Optional, Union
 import logging
 
+from geosolver.symbols_graph import SymbolsGraph
 from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 from geosolver.geometry import (
     Angle,
@@ -33,8 +34,6 @@ from geosolver.geometry import (
     all_ratios,
     is_equal,
     is_equiv,
-    line_of_and_why,
-    val_type,
     why_equal,
 )
 from geosolver.geometry import Circle, Line, Point, Segment
@@ -123,34 +122,18 @@ class PointTooFarError(Exception):
 class ProofGraph:
     """Graph data structure representing proof state."""
 
-    def __init__(self, alegbraic: AlgebraicManipulator):
-        self.type2nodes: Dict[Type[Node], List[Node]] = {
-            Point: [],
-            Line: [],
-            Segment: [],
-            Circle: [],
-            Direction: [],
-            Length: [],
-            Angle: [],
-            Ratio: [],
-            Measure: [],
-            Value: [],
-        }
-        self._name2point = {}
-        self._name2node = {}
-
-        self.alegbraic = alegbraic
-        self.halfpi, _ = self.alegbraic.get_or_create_const_ang(self, 1, 2)
-        self.vhalfpi = self.halfpi.val
-
-        # to quick access deps.
+    def __init__(self, alegbraic: AlgebraicManipulator, symbols_graph: SymbolsGraph):
         self.cache = {}
 
-        # to display the deps graph.
-        self.dependency_graph = DependencyGraph()
+        self.symbols_graph = symbols_graph
+        self.alegbraic = alegbraic
 
-        self._pair2line = {}
-        self._triplet2circle = {}
+        self._halfpi, _ = self.alegbraic.get_or_create_const_ang(
+            self.symbols_graph, 1, 2
+        )
+        self.vhalfpi = self._halfpi.val
+
+        self.dependency_graph = DependencyGraph()
 
     def copy(self) -> ProofGraph:
         """Make a copy of self."""
@@ -160,7 +143,7 @@ class ProofGraph:
         for clause in p.clauses:
             clause.nums = []
             for pname in clause.points:
-                clause.nums.append(self._name2node[pname].num)
+                clause.nums.append(self.symbols_graph._name2node[pname].num)
 
         g, _ = ProofGraph.build_problem(p, definitions, verbose=False, init_copy=False)
 
@@ -179,7 +162,7 @@ class ProofGraph:
         if name == "aconst":
             a, b, n, d, dep = args
             ab, ba, why = self.get_or_create_angle_d(a, b, deps=None)
-            nd, dn = self.alegbraic.get_or_create_const_ang(self, n, d)
+            nd, dn = self.alegbraic.get_or_create_const_ang(self.symbols_graph, n, d)
 
             (x, y), (m, n) = a._obj.points, b._obj.points
 
@@ -193,7 +176,7 @@ class ProofGraph:
 
             added = []
             if not self.is_equal(ab, nd):
-                if nd == self.halfpi:
+                if nd == self._halfpi:
                     added += self._add_perp([x, y, m, n], dep)
                 # else:
                 name = "aconst"
@@ -204,7 +187,7 @@ class ProofGraph:
                 added += [dep1]
 
             if not self.is_equal(ba, dn):
-                if dn == self.halfpi:
+                if dn == self._halfpi:
                     added += self._add_perp([m, n, x, y], dep)
                 name = "aconst"
                 args = [m, n, x, y, dn]
@@ -245,7 +228,7 @@ class ProofGraph:
         return []
 
     def add_algebra(self, dep: Dependency, level: int) -> None:
-        self.alegbraic.add_algebra(self, dep, level)
+        self.alegbraic.add_algebra(self.symbols_graph, dep, level)
 
     @classmethod
     def build_problem(
@@ -264,7 +247,10 @@ class ProofGraph:
             logging.info(pr.txt())
         while not check:
             try:
-                g = ProofGraph(alegbraic=AlgebraicManipulator())
+                g = ProofGraph(
+                    alegbraic=AlgebraicManipulator(),
+                    symbols_graph=SymbolsGraph(),
+                )
                 added = []
                 plevel = 0
                 for clause in pr.clauses:
@@ -284,7 +270,11 @@ class ProofGraph:
             if not pr.goal:
                 break
 
-            args = list(map(lambda x: g.get(x, lambda: int(x)), pr.goal.args))
+            args = list(
+                map(
+                    lambda x: g.symbols_graph.get_point(x, lambda: int(x)), pr.goal.args
+                )
+            )
             check = check_numerical(pr.goal.name, args)
 
         g.url = pr.url
@@ -294,149 +284,6 @@ class ProofGraph:
 
         return g, added
 
-    def all_points(self) -> list[Point]:
-        """Return all nodes of type Point."""
-        return list(self.type2nodes[Point])
-
-    def all_nodes(self) -> list[Node]:
-        """Return all nodes."""
-        return list(self._name2node.values())
-
-    def add_points(self, pnames: list[str]) -> list[Point]:
-        """Add new points with given names in list pnames."""
-        result = [self.new_node(Point, name) for name in pnames]
-        self._name2point.update(zip(pnames, result))
-        return result
-
-    def names2nodes(self, pnames: list[str]) -> list[Node]:
-        return [self._name2node[name] for name in pnames]
-
-    def names2points(
-        self, pnames: list[str], create_new_point: bool = False
-    ) -> list[Point]:
-        """Return Point objects given names."""
-        result = []
-        for name in pnames:
-            if name not in self._name2node and not create_new_point:
-                raise ValueError(f"Cannot find point {name} in graph")
-            elif name in self._name2node:
-                obj = self._name2node[name]
-            else:
-                obj = self.new_node(Point, name)
-            result.append(obj)
-
-        return result
-
-    def names2points_or_int(self, pnames: list[str]) -> list[Point]:
-        """Return Point objects given names."""
-        result = []
-        for name in pnames:
-            if name.isdigit():
-                result += [int(name)]
-            elif "pi/" in name:
-                n, d = name.split("pi/")
-                ang, _ = self.alegbraic.get_or_create_const_ang(self, int(n), int(d))
-                result += [ang]
-            elif "/" in name:
-                n, d = name.split("/")
-                rat, _ = self.alegbraic.get_or_create_const_rat(self, int(n), int(d))
-                result += [rat]
-            else:
-                result += [self._name2point[name]]
-
-        return result
-
-    def get(self, pointname: str, default_fn: Callable[[str], Point]) -> Point:
-        if pointname in self._name2point:
-            return self._name2point[pointname]
-        if pointname in self._name2node:
-            return self._name2node[pointname]
-        return default_fn()
-
-    def new_node(self, oftype: Type[Node], name: str = "") -> Node:
-        node = oftype(name, self)
-
-        self.type2nodes[oftype].append(node)
-        self._name2node[name] = node
-
-        if isinstance(node, Point):
-            self._name2point[name] = node
-
-        return node
-
-    def connect(self, a: Node, b: Node, deps: Dependency) -> None:
-        a.connect_to(b, deps)
-        b.connect_to(a, deps)
-
-    def connect_val(self, node: Node, deps: Dependency) -> Node:
-        """Connect a node into its value (equality) node."""
-        if node._val:
-            return node._val
-        name = None
-        if isinstance(node, Line):
-            name = "d(" + node.name + ")"
-        if isinstance(node, Angle):
-            name = "m(" + node.name + ")"
-        if isinstance(node, Segment):
-            name = "l(" + node.name + ")"
-        if isinstance(node, Ratio):
-            name = "r(" + node.name + ")"
-        v = self.new_node(val_type(node), name)
-        self.connect(node, v, deps=deps)
-        return v
-
-    def _merge(self, nodes: list[Node], deps: Dependency) -> Node:
-        """Merge all nodes."""
-        if len(nodes) < 2:
-            return
-
-        node0, *nodes1 = nodes
-        all_nodes = self.type2nodes[type(node0)]
-
-        # find node0 that exists in all_nodes to be the rep
-        # and merge all other nodes into node0
-        for node in nodes:
-            if node in all_nodes:
-                node0 = node
-                nodes1 = [n for n in nodes if n != node0]
-                break
-        return self._merge_into(node0, nodes1, deps)
-
-    def _merge_into(self, node0: Node, nodes1: list[Node], deps: Dependency) -> Node:
-        """Merge nodes1 into a single node0."""
-        node0.merge(nodes1, deps)
-        for n in nodes1:
-            if n.rep() != n:
-                self._remove([n])
-
-        nodes = [node0] + nodes1
-        if any([node._val for node in nodes]):
-            for node in nodes:
-                self.connect_val(node, deps=None)
-
-            vals1 = [n._val for n in nodes1]
-            node0._val.merge(vals1, deps)
-
-            for v in vals1:
-                if v.rep() != v:
-                    self._remove([v])
-
-        return node0
-
-    def _remove(self, nodes: list[Node]) -> None:
-        """Remove nodes out of self because they are merged."""
-        if not nodes:
-            return
-
-        for node in nodes:
-            all_nodes = self.type2nodes[type(nodes[0])]
-
-            if node in all_nodes:
-                all_nodes.remove(node)
-
-            if node.name in self._name2node.values():
-                self._name2node.pop(node.name)
-
     def is_equal(self, x: Node, y: Node, level: int = None) -> bool:
         return is_equal(x, y, level)
 
@@ -445,7 +292,7 @@ class ProofGraph:
     ) -> list[Dependency]:
         """Add new algebraic predicates of type eqratio-constant."""
         a, b, c, d, num, den = args
-        nd, dn = self.alegbraic.get_or_create_const_rat(self, num, den)
+        nd, dn = self.alegbraic.get_or_create_const_rat(self.symbols_graph, num, den)
 
         if num == den:
             return self._add_cong([a, b, c, d], deps)
@@ -453,8 +300,8 @@ class ProofGraph:
         ab = self._get_or_create_segment(a, b, deps=None)
         cd = self._get_or_create_segment(c, d, deps=None)
 
-        self.connect_val(ab, deps=None)
-        self.connect_val(cd, deps=None)
+        self.symbols_graph.get_node_val(ab, deps=None)
+        self.symbols_graph.get_node_val(cd, deps=None)
 
         if ab.val == cd.val:
             raise ValueError(f"{ab.name} and {cd.name} cannot be equal")
@@ -676,61 +523,6 @@ class ProofGraph:
                 line2count[line_neighbor] += 1
         return [line for line, count in line2count.items() if count >= 2]
 
-    def get_circle_thru_triplet(self, p1: Point, p2: Point, p3: Point) -> Circle:
-        p1, p2, p3 = sorted([p1, p2, p3], key=lambda x: x.name)
-        if (p1, p2, p3) in self._triplet2circle:
-            return self._triplet2circle[(p1, p2, p3)]
-        return self.get_new_circle_thru_triplet(p1, p2, p3)
-
-    def get_new_circle_thru_triplet(self, p1: Point, p2: Point, p3: Point) -> Circle:
-        """Get a new Circle that goes thru three given Points."""
-        p1, p2, p3 = sorted([p1, p2, p3], key=lambda x: x.name)
-        name = p1.name.lower() + p2.name.lower() + p3.name.lower()
-        circle = self.new_node(Circle, f"({name})")
-        circle.num = num_geo.Circle(p1=p1.num, p2=p2.num, p3=p3.num)
-        circle.points = p1, p2, p3
-
-        self.connect(p1, circle, deps=None)
-        self.connect(p2, circle, deps=None)
-        self.connect(p3, circle, deps=None)
-        self._triplet2circle[(p1, p2, p3)] = circle
-        return circle
-
-    def get_line_thru_pair(self, p1: Point, p2: Point) -> Line:
-        if (p1, p2) in self._pair2line:
-            return self._pair2line[(p1, p2)]
-        if (p2, p1) in self._pair2line:
-            return self._pair2line[(p2, p1)]
-        return self.get_new_line_thru_pair(p1, p2)
-
-    def get_new_line_thru_pair(self, p1: Point, p2: Point) -> Line:
-        if p1.name.lower() > p2.name.lower():
-            p1, p2 = p2, p1
-        name = p1.name.lower() + p2.name.lower()
-        line = self.new_node(Line, name)
-        line.num = num_geo.Line(p1.num, p2.num)
-        line.points = p1, p2
-
-        self.connect(p1, line, deps=None)
-        self.connect(p2, line, deps=None)
-        self._pair2line[(p1, p2)] = line
-        return line
-
-    def get_line_thru_pair_why(
-        self, p1: Point, p2: Point
-    ) -> tuple[Line, list[Dependency]]:
-        """Get one line thru two given points and the corresponding dependency list."""
-        if p1.name.lower() > p2.name.lower():
-            p1, p2 = p2, p1
-        if (p1, p2) in self._pair2line:
-            return self._pair2line[(p1, p2)].rep_and_why()
-
-        line, why = line_of_and_why([p1, p2])
-        if line is None:
-            line = self.get_new_line_thru_pair(p1, p2)
-            why = []
-        return line, why
-
     def coll_dep(self, points: list[Point], p: Point) -> list[Dependency]:
         """Return the dep(.why) explaining why p is coll with points."""
         for p1, p2 in utils.comb2(points):
@@ -745,7 +537,7 @@ class ProofGraph:
 
         all_lines = []
         for p1, p2 in utils.comb2(points):
-            all_lines.append(self.get_line_thru_pair(p1, p2))
+            all_lines.append(self.symbols_graph.get_line_thru_pair(p1, p2))
         points = sum([line.neighbors(Point) for line in all_lines], [])
         points = list(set(points))
 
@@ -754,11 +546,11 @@ class ProofGraph:
         for p1, p2 in utils.comb2(points):
             if p1.name > p2.name:
                 p1, p2 = p2, p1
-            if (p1, p2) in self._pair2line:
-                line = self._pair2line[(p1, p2)]
+            if (p1, p2) in self.symbols_graph._pair2line:
+                line = self.symbols_graph._pair2line[(p1, p2)]
                 existed.add(line)
             else:
-                line = self.get_new_line_thru_pair(p1, p2)
+                line = self.symbols_graph.get_new_line_thru_pair(p1, p2)
                 new.add(line)
 
         existed = sorted(existed, key=lambda node: node.name)
@@ -793,7 +585,7 @@ class ProofGraph:
             is_coll = self.check_coll(args)
             dep = abcd_deps.populate("coll", args)
             self.cache_dep("coll", args, dep)
-            self._merge_into(line0, [line], dep)
+            self.symbols_graph.merge_into(line0, [line], dep)
 
             if not is_coll:
                 add += [dep]
@@ -827,8 +619,8 @@ class ProofGraph:
         if x.val is None:
             x, y = y, x
 
-        self.connect_val(x, deps=None)
-        self.connect_val(y, deps=None)
+        self.symbols_graph.get_node_val(x, deps=None)
+        self.symbols_graph.get_node_val(y, deps=None)
         vx = x._val
         vy = y._val
 
@@ -846,13 +638,13 @@ class ProofGraph:
         ):
             merges = [self.vhalfpi, vx, vy]
 
-        self._merge(merges, deps)
+        self.symbols_graph.merge(merges, deps)
 
     def merge_vals(self, vx: Node, vy: Node, deps: Dependency) -> None:
         if vx == vy:
             return
         merges = [vx, vy]
-        self._merge(merges, deps)
+        self.symbols_graph.merge(merges, deps)
 
     def why_equal(self, x: Node, y: Node, level: int) -> list[Dependency]:
         return why_equal(x, y, level)
@@ -893,8 +685,8 @@ class ProofGraph:
     def _add_para(self, points: list[Point], deps: EmptyDependency) -> list[Dependency]:
         """Add a new predicate that 4 points (2 lines) are parallel."""
         a, b, c, d = points
-        ab, why1 = self.get_line_thru_pair_why(a, b)
-        cd, why2 = self.get_line_thru_pair_why(c, d)
+        ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
+        cd, why2 = self.symbols_graph.get_line_thru_pair_why(c, d)
 
         is_equal = self.is_equal(ab, cd)
 
@@ -938,7 +730,7 @@ class ProofGraph:
         return not check_para_numerical([p.num for p in points])
 
     def _get_angle(self, d1: Direction, d2: Direction) -> tuple[Angle, Optional[Angle]]:
-        for a in self.type2nodes[Angle]:
+        for a in self.symbols_graph.type2nodes[Angle]:
             if a.directions == (d1, d2):
                 return a, a.opposite
         return None, None
@@ -970,7 +762,7 @@ class ProofGraph:
         self, d1: Direction, d2: Direction, deps: Dependency
     ) -> tuple[Angle, Angle, list[Dependency]]:
         """Get or create an angle between two Direction d1 and d2."""
-        for a in self.type2nodes[Angle]:
+        for a in self.symbols_graph.type2nodes[Angle]:
             if a.directions == (d1.rep(), d2.rep()):  # directions = _d.rep()
                 d1_, d2_ = a._d
                 why1 = d1.why_equal([d1_], None) + d1_.why_rep()
@@ -979,11 +771,11 @@ class ProofGraph:
 
         d1, why1 = d1.rep_and_why()
         d2, why2 = d2.rep_and_why()
-        a12 = self.new_node(Angle, f"{d1.name}-{d2.name}")
-        a21 = self.new_node(Angle, f"{d2.name}-{d1.name}")
-        self.connect(d1, a12, deps)
-        self.connect(d2, a21, deps)
-        self.connect(a12, a21, deps)
+        a12 = self.symbols_graph.new_node(Angle, f"{d1.name}-{d2.name}")
+        a21 = self.symbols_graph.new_node(Angle, f"{d2.name}-{d1.name}")
+        self.symbols_graph.connect(d1, a12, deps)
+        self.symbols_graph.connect(d2, a21, deps)
+        self.symbols_graph.connect(a12, a21, deps)
         a12.set_directions(d1, d2)
         a21.set_directions(d2, d1)
         a12.opposite = a21
@@ -1063,8 +855,8 @@ class ProofGraph:
             return add
 
         a, b, c, d = points
-        ab, why1 = self.get_line_thru_pair_why(a, b)
-        cd, why2 = self.get_line_thru_pair_why(c, d)
+        ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
+        cd, why2 = self.symbols_graph.get_line_thru_pair_why(c, d)
 
         (a, b), (c, d) = ab.points, cd.points
 
@@ -1073,8 +865,8 @@ class ProofGraph:
             deps = EmptyDependency(level=deps.level, rule_name=None)
             deps.why = [dep0] + why1 + why2
 
-        self.connect_val(ab, deps=None)
-        self.connect_val(cd, deps=None)
+        self.symbols_graph.get_node_val(ab, deps=None)
+        self.symbols_graph.get_node_val(cd, deps=None)
 
         if ab.val == cd.val:
             raise ValueError(f"{ab.name} and {cd.name} Cannot be perp.")
@@ -1142,7 +934,7 @@ class ProofGraph:
         return not check_perp_numerical([p.num for p in points])
 
     def _get_segment(self, p1: Point, p2: Point) -> Optional[Segment]:
-        for s in self.type2nodes[Segment]:
+        for s in self.symbols_graph.type2nodes[Segment]:
             if s.points == {p1, p2}:
                 return s
         return None
@@ -1152,15 +944,17 @@ class ProofGraph:
         if p1 == p2:
             raise ValueError(f"Creating same 0-length segment {p1.name}")
 
-        for s in self.type2nodes[Segment]:
+        for s in self.symbols_graph.type2nodes[Segment]:
             if s.points == {p1, p2}:
                 return s
 
         if p1.name > p2.name:
             p1, p2 = p2, p1
-        s = self.new_node(Segment, name=f"{p1.name.upper()}{p2.name.upper()}")
-        self.connect(p1, s, deps=deps)
-        self.connect(p2, s, deps=deps)
+        s = self.symbols_graph.new_node(
+            Segment, name=f"{p1.name.upper()}{p2.name.upper()}"
+        )
+        self.symbols_graph.connect(p1, s, deps=deps)
+        self.symbols_graph.connect(p2, s, deps=deps)
         s.points = {p1, p2}
         return s
 
@@ -1309,7 +1103,7 @@ class ProofGraph:
 
         all_circles = []
         for p1, p2, p3 in utils.comb3(points):
-            all_circles.append(self.get_circle_thru_triplet(p1, p2, p3))
+            all_circles.append(self.symbols_graph.get_circle_thru_triplet(p1, p2, p3))
         points = sum([c.neighbors(Point) for c in all_circles], [])
         points = list(set(points))
 
@@ -1318,11 +1112,11 @@ class ProofGraph:
         for p1, p2, p3 in utils.comb3(points):
             p1, p2, p3 = sorted([p1, p2, p3], key=lambda x: x.name)
 
-            if (p1, p2, p3) in self._triplet2circle:
-                circle = self._triplet2circle[(p1, p2, p3)]
+            if (p1, p2, p3) in self.symbols_graph._triplet2circle:
+                circle = self.symbols_graph._triplet2circle[(p1, p2, p3)]
                 existed.add(circle)
             else:
-                circle = self.get_new_circle_thru_triplet(p1, p2, p3)
+                circle = self.symbols_graph.get_new_circle_thru_triplet(p1, p2, p3)
                 new.add(circle)
 
         existed = sorted(existed, key=lambda node: node.name)
@@ -1356,7 +1150,7 @@ class ProofGraph:
 
             dep = abcdef_deps.populate("cyclic", args)
             self.cache_dep("cyclic", args, dep)
-            self._merge_into(circle0, [circle], dep)
+            self.symbols_graph.merge_into(circle0, [circle], dep)
             if not is_cyclic:
                 add += [dep]
 
@@ -1571,10 +1365,10 @@ class ProofGraph:
         if deps:
             deps = deps.copy()
         a, b, c, d, m, n, p, q = points
-        ab, why1 = self.get_line_thru_pair_why(a, b)
-        cd, why2 = self.get_line_thru_pair_why(c, d)
-        mn, why3 = self.get_line_thru_pair_why(m, n)
-        pq, why4 = self.get_line_thru_pair_why(p, q)
+        ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
+        cd, why2 = self.symbols_graph.get_line_thru_pair_why(c, d)
+        mn, why3 = self.symbols_graph.get_line_thru_pair_why(m, n)
+        pq, why4 = self.symbols_graph.get_line_thru_pair_why(p, q)
 
         a, b = ab.points
         c, d = cd.points
@@ -1591,10 +1385,10 @@ class ProofGraph:
         if add is not None:
             return add
 
-        self.connect_val(ab, deps=None)
-        self.connect_val(cd, deps=None)
-        self.connect_val(mn, deps=None)
-        self.connect_val(pq, deps=None)
+        self.symbols_graph.get_node_val(ab, deps=None)
+        self.symbols_graph.get_node_val(cd, deps=None)
+        self.symbols_graph.get_node_val(mn, deps=None)
+        self.symbols_graph.get_node_val(pq, deps=None)
 
         add = []
         if (
@@ -1632,13 +1426,13 @@ class ProofGraph:
     ) -> list[Dependency]:
         """Add that an angle is equal to some constant."""
         a, b, c, d, num, den = points
-        nd, dn = self.alegbraic.get_or_create_const_ang(self, num, den)
+        nd, dn = self.alegbraic.get_or_create_const_ang(self.symbols_graph, num, den)
 
-        if nd == self.halfpi:
+        if nd == self._halfpi:
             return self._add_perp([a, b, c, d], deps)
 
-        ab, why1 = self.get_line_thru_pair_why(a, b)
-        cd, why2 = self.get_line_thru_pair_why(c, d)
+        ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
+        cd, why2 = self.symbols_graph.get_line_thru_pair_why(c, d)
 
         (a, b), (c, d) = ab.points, cd.points
         if why1 + why2:
@@ -1647,8 +1441,8 @@ class ProofGraph:
             deps = EmptyDependency(level=deps.level, rule_name=None)
             deps.why = [dep0] + why1 + why2
 
-        self.connect_val(ab, deps=None)
-        self.connect_val(cd, deps=None)
+        self.symbols_graph.get_node_val(ab, deps=None)
+        self.symbols_graph.get_node_val(cd, deps=None)
 
         if ab.val == cd.val:
             raise ValueError(f"{ab.name} - {cd.name} cannot be {nd.name}")
@@ -1699,16 +1493,16 @@ class ProofGraph:
         a, b, x, y = points
 
         n, d = simplify(y % 180, 180)
-        nd, dn = self.alegbraic.get_or_create_const_ang(self, n, d)
+        nd, dn = self.alegbraic.get_or_create_const_ang(self.symbols_graph, n, d)
 
-        if nd == self.halfpi:
+        if nd == self._halfpi:
             return self._add_perp([a, b, b, x], deps)
 
-        ab, why1 = self.get_line_thru_pair_why(a, b)
-        bx, why2 = self.get_line_thru_pair_why(b, x)
+        ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
+        bx, why2 = self.symbols_graph.get_line_thru_pair_why(b, x)
 
-        self.connect_val(ab, deps=None)
-        self.connect_val(bx, deps=None)
+        self.symbols_graph.get_node_val(ab, deps=None)
+        self.symbols_graph.get_node_val(bx, deps=None)
         add = []
 
         if ab.val == bx.val:
@@ -1759,7 +1553,9 @@ class ProofGraph:
         else:
             name = nd.name
         num, den = name.split("pi/")
-        ang, _ = self.alegbraic.get_or_create_const_ang(self, int(num), int(den))
+        ang, _ = self.alegbraic.get_or_create_const_ang(
+            self.symbols_graph, int(num), int(den)
+        )
 
         ab = self._get_line(a, b)
         cd = self._get_line(c, d)
@@ -1847,7 +1643,7 @@ class ProofGraph:
         return False
 
     def _get_ratio(self, l1: Length, l2: Length) -> tuple[Ratio, Ratio]:
-        for r in self.type2nodes[Ratio]:
+        for r in self.symbols_graph.type2nodes[Ratio]:
             if r.lengths == (l1, l2):
                 return r, r.opposite
         return None, None
@@ -1861,7 +1657,7 @@ class ProofGraph:
         self, l1: Length, l2: Length, deps: Dependency
     ) -> tuple[Ratio, Ratio, list[Dependency]]:
         """Get or create a new Ratio from two Lenghts l1 and l2."""
-        for r in self.type2nodes[Ratio]:
+        for r in self.symbols_graph.type2nodes[Ratio]:
             if r.lengths == (l1.rep(), l2.rep()):
                 l1_, l2_ = r._l
                 why1 = l1.why_equal([l1_], None) + l1_.why_rep()
@@ -1870,11 +1666,11 @@ class ProofGraph:
 
         l1, why1 = l1.rep_and_why()
         l2, why2 = l2.rep_and_why()
-        r12 = self.new_node(Ratio, f"{l1.name}/{l2.name}")
-        r21 = self.new_node(Ratio, f"{l2.name}/{l1.name}")
-        self.connect(l1, r12, deps)
-        self.connect(l2, r21, deps)
-        self.connect(r12, r21, deps)
+        r12 = self.symbols_graph.new_node(Ratio, f"{l1.name}/{l2.name}")
+        r21 = self.symbols_graph.new_node(Ratio, f"{l2.name}/{l1.name}")
+        self.symbols_graph.connect(l1, r12, deps)
+        self.symbols_graph.connect(l2, r21, deps)
+        self.symbols_graph.connect(r12, r21, deps)
         r12.set_lengths(l1, l2)
         r21.set_lengths(l2, l1)
         r12.opposite = r21
@@ -2004,10 +1800,10 @@ class ProofGraph:
         if add is not None:
             return add
 
-        self.connect_val(ab, deps=None)
-        self.connect_val(cd, deps=None)
-        self.connect_val(mn, deps=None)
-        self.connect_val(pq, deps=None)
+        self.symbols_graph.get_node_val(ab, deps=None)
+        self.symbols_graph.get_node_val(cd, deps=None)
+        self.symbols_graph.get_node_val(mn, deps=None)
+        self.symbols_graph.get_node_val(pq, deps=None)
 
         add = []
         if (
@@ -2048,7 +1844,9 @@ class ProofGraph:
         else:
             name = nd.name
         num, den = name.split("/")
-        rat, _ = self.alegbraic.get_or_create_const_rat(self, int(num), int(den))
+        rat, _ = self.alegbraic.get_or_create_const_rat(
+            self.symbols_graph, int(num), int(den)
+        )
 
         ab = self._get_segment(a, b)
         cd = self._get_segment(c, d)
@@ -2280,38 +2078,46 @@ class ProofGraph:
 
         if name in ["circle"]:
             center, point = args[:2]
-            circle = self.new_node(Circle, f"({center.name},{point.name})")
+            circle = self.symbols_graph.new_node(
+                Circle, f"({center.name},{point.name})"
+            )
             circle.num = num_geo.Circle(center.num, p1=point.num)
             circle.points = center, point
 
         if name in ["on_circle", "tangent"]:
             center, point = args[-2:]
-            circle = self.new_node(Circle, f"({center.name},{point.name})")
+            circle = self.symbols_graph.new_node(
+                Circle, f"({center.name},{point.name})"
+            )
             circle.num = num_geo.Circle(center.num, p1=point.num)
             circle.points = center, point
 
         if name in ["incenter", "excenter", "incenter2", "excenter2"]:
             d, a, b, c = [x for x in args[-4:]]
             a, b, c = sorted([a, b, c], key=lambda x: x.name.lower())
-            circle = self.new_node(Circle, f"({d.name},h.{a.name}{b.name})")
+            circle = self.symbols_graph.new_node(
+                Circle, f"({d.name},h.{a.name}{b.name})"
+            )
             p = d.num.foot(num_geo.Line(a.num, b.num))
             circle.num = num_geo.Circle(d.num, p1=p)
             circle.points = d, a, b, c
 
         if name in ["cc_tangent"]:
             o, a, w, b = args[-4:]
-            c1 = self.new_node(Circle, f"({o.name},{a.name})")
+            c1 = self.symbols_graph.new_node(Circle, f"({o.name},{a.name})")
             c1.num = num_geo.Circle(o.num, p1=a.num)
             c1.points = o, a
 
-            c2 = self.new_node(Circle, f"({w.name},{b.name})")
+            c2 = self.symbols_graph.new_node(Circle, f"({w.name},{b.name})")
             c2.num = num_geo.Circle(w.num, p1=b.num)
             c2.points = w, b
 
         if name in ["ninepoints"]:
             a, b, c = args[-3:]
             a, b, c = sorted([a, b, c], key=lambda x: x.name.lower())
-            circle = self.new_node(Circle, f"(,m.{a.name}{b.name}{c.name})")
+            circle = self.symbols_graph.new_node(
+                Circle, f"(,m.{a.name}{b.name}{c.name})"
+            )
             p1 = (b.num + c.num) * 0.5
             p2 = (c.num + a.num) * 0.5
             p3 = (a.num + b.num) * 0.5
@@ -2321,7 +2127,9 @@ class ProofGraph:
         if name in ["2l1c"]:
             a, b, c, o = args[:4]
             a, b, c = sorted([a, b, c], key=lambda x: x.name.lower())
-            circle = self.new_node(Circle, f"({o.name},{a.name}{b.name}{c.name})")
+            circle = self.symbols_graph.new_node(
+                Circle, f"({o.name},{a.name}{b.name}{c.name})"
+            )
             circle.num = num_geo.Circle(p1=a.num, p2=b.num, p3=c.num)
             circle.points = (a, b, c)
 
@@ -2333,7 +2141,7 @@ class ProofGraph:
         verbose: int = False,
     ) -> tuple[list[Dependency], int]:
         """Add a new clause of construction, e.g. a new excenter."""
-        existing_points = self.all_points()
+        existing_points = self.symbols_graph.all_points()
         new_points = [Point(name) for name in clause.points]
 
         new_points_dep_points = set()
@@ -2356,7 +2164,7 @@ class ProofGraph:
             deps.construction = Dependency(c_name, c.args, rule_name=None, level=0)
 
             for d in cdef.deps.constructions:
-                args = self.names2points([mapping[a] for a in d.args])
+                args = self.symbols_graph.names2points([mapping[a] for a in d.args])
                 new_points_dep_points.update(args)
                 if not self.check(d.name, args):
                     raise DepCheckFailError(
@@ -2388,7 +2196,12 @@ class ProofGraph:
                 mapping = dict(zip(cdef.construction.args, c.args))
                 for n in cdef.numerics:
                     args = [mapping[a] for a in n.args]
-                    args = list(map(lambda x: self.get(x, lambda: int(x)), args))
+                    args = list(
+                        map(
+                            lambda x: self.symbols_graph.get_point(x, lambda: int(x)),
+                            args,
+                        )
+                    )
                     to_be_intersected += sketch(n.name, args)
 
             return to_be_intersected
@@ -2412,7 +2225,9 @@ class ProofGraph:
             mapping = dict(zip(cdef.construction.args, c.args))
             for n in cdef.numerics:
                 args = [mapping[a] for a in n.args]
-                args = list(map(lambda x: self.get(x, lambda: int(x)), args))
+                args = list(
+                    map(lambda x: self.symbols_graph.get_point(x, lambda: int(x)), args)
+                )
                 rely_on.update([a for a in args if isinstance(a, Point)])
 
         for p in rely_on:
@@ -2438,9 +2253,7 @@ class ProofGraph:
         # Commit: now that all conditions are passed.
         # add these points to current graph.
         for p in new_points:
-            self._name2point[p.name] = p
-            self._name2node[p.name] = p
-            self.type2nodes[Point].append(p)
+            self.symbols_graph.add_node(p)
 
         for p in new_points:
             p.why = sum([d.why for d in new_points_dep], [])  # to generate txt logs.
@@ -2466,8 +2279,8 @@ class ProofGraph:
             if len(pss) > 1:
                 ps = [x for x in ps if x != p]
 
-            p = self._name2point[p]
-            ps = self.names2nodes(ps)
+            p = self.symbols_graph._name2point[p]
+            ps = self.symbols_graph.names2nodes(ps)
             rely_dict[p] = ps
 
         for p in new_points:
@@ -2489,12 +2302,16 @@ class ProofGraph:
             mapping = dict(zip(cdef.construction.args, c.args))
 
             # not necessary for proofing, but for visualization.
-            c_args = list(map(lambda x: self.get(x, lambda: int(x)), c.args))
+            c_args = list(
+                map(lambda x: self.symbols_graph.get_point(x, lambda: int(x)), c.args)
+            )
             self.additionally_draw(c.name, c_args)
 
             for points, bs in cdef.basics:
                 if points:
-                    points = self.names2nodes([mapping[p] for p in points])
+                    points = self.symbols_graph.names2nodes(
+                        [mapping[p] for p in points]
+                    )
                     points = [p for p in points if p not in plevel_done]
                     for p in points:
                         p.plevel = plevel
@@ -2508,10 +2325,17 @@ class ProofGraph:
                         args = [mapping[a] for a in b.args]
                     else:
                         num, den = map(int, b.args[-2:])
-                        rat, _ = self.alegbraic.get_or_create_const_rat(self, num, den)
+                        rat, _ = self.alegbraic.get_or_create_const_rat(
+                            self.symbols_graph, num, den
+                        )
                         args = [mapping[a] for a in b.args[:-2]] + [rat.name]
 
-                    args = list(map(lambda x: self.get(x, lambda: int(x)), args))
+                    args = list(
+                        map(
+                            lambda x: self.symbols_graph.get_point(x, lambda: int(x)),
+                            args,
+                        )
+                    )
 
                     adds = self.add_piece(name=b.name, args=args, deps=deps)
                     self.dependency_graph.add_construction_edges(adds)
@@ -2528,7 +2352,7 @@ class ProofGraph:
         return added, plevel
 
     def all_eqangle_same_lines(self) -> Generator[tuple[Point, ...], None, None]:
-        for l1, l2 in utils.perm2(self.type2nodes[Line]):
+        for l1, l2 in utils.perm2(self.symbols_graph.type2nodes[Line]):
             for a, b, c, d, e, f, g, h in utils.all_8points(l1, l2, l1, l2):
                 if (a, b, c, d) != (e, f, g, h):
                     yield a, b, c, d, e, f, g, h
@@ -2538,7 +2362,7 @@ class ProofGraph:
     ) -> Generator[tuple[Line, ...], None, None]:
         """No eqangles betcause para-para, or para-corresponding, or same."""
 
-        for measure in self.type2nodes[Measure]:
+        for measure in self.symbols_graph.type2nodes[Measure]:
             angs = measure.neighbors(Angle)
             line_pairss = []
             for ang in angs:
@@ -2560,12 +2384,14 @@ class ProofGraph:
         """List all sets of 8 points that make two equal angles."""
         # Case 1: (l1-l2) = (l3-l4), including because l1//l3, l2//l4 (para-para)
         angss = []
-        for measure in self.type2nodes[Measure]:
+        for measure in self.symbols_graph.type2nodes[Measure]:
             angs = measure.neighbors(Angle)
             angss.append(angs)
 
         # include the angs that do not have any measure.
-        angss.extend([[ang] for ang in self.type2nodes[Angle] if ang.val is None])
+        angss.extend(
+            [[ang] for ang in self.symbols_graph.type2nodes[Angle] if ang.val is None]
+        )
 
         line_pairss = []
         for angs in angss:
@@ -2580,10 +2406,14 @@ class ProofGraph:
             line_pairss.append(line_pairs)
 
         # include (d1, d2) in which d1 does not have any angles.
-        noang_ds = [d for d in self.type2nodes[Direction] if not d.neighbors(Angle)]
+        noang_ds = [
+            d
+            for d in self.symbols_graph.type2nodes[Direction]
+            if not d.neighbors(Angle)
+        ]
 
         for d1 in noang_ds:
-            for d2 in self.type2nodes[Direction]:
+            for d2 in self.symbols_graph.type2nodes[Direction]:
                 if d1 == d2:
                     continue
                 l1s = d1.neighbors(Line)
@@ -2595,10 +2425,12 @@ class ProofGraph:
 
         # Case 2: d1 // d2 => (d1-d3) = (d2-d3)
         # include lines that does not have any direction.
-        nodir_ls = [line for line in self.type2nodes[Line] if line.val is None]
+        nodir_ls = [
+            line for line in self.symbols_graph.type2nodes[Line] if line.val is None
+        ]
 
         for line in nodir_ls:
-            for d in self.type2nodes[Direction]:
+            for d in self.symbols_graph.type2nodes[Direction]:
                 l1s = d.neighbors(Line)
                 if len(l1s) < 2:
                     continue
@@ -2649,7 +2481,7 @@ class ProofGraph:
             yield a, b, c, d, e, f, g, h  # where a==c, e==g
 
     def all_paras(self) -> Generator[tuple[Point, ...], None, None]:
-        for d in self.type2nodes[Direction]:
+        for d in self.symbols_graph.type2nodes[Direction]:
             for l1, l2 in utils.perm2(d.neighbors(Line)):
                 for a, b, c, d in utils.all_4points(l1, l2):
                     yield a, b, c, d
@@ -2666,7 +2498,7 @@ class ProofGraph:
                     yield a, b, c, d
 
     def all_congs(self) -> Generator[tuple[Point, ...], None, None]:
-        for lenght in self.type2nodes[Length]:
+        for lenght in self.symbols_graph.type2nodes[Length]:
             for s1, s2 in utils.perm2(lenght.neighbors(Segment)):
                 (a, b), (c, d) = s1.points, s2.points
                 for x, y in [(a, b), (b, a)]:
@@ -2676,12 +2508,14 @@ class ProofGraph:
     def all_eqratios_8points(self) -> Generator[tuple[Point, ...], None, None]:
         """List all sets of 8 points that make two equal ratios."""
         ratss = []
-        for value in self.type2nodes[Value]:
+        for value in self.symbols_graph.type2nodes[Value]:
             rats = value.neighbors(Ratio)
             ratss.append(rats)
 
         # include the rats that do not have any val.
-        ratss.extend([[rat] for rat in self.type2nodes[Ratio] if rat.val is None])
+        ratss.extend(
+            [[rat] for rat in self.symbols_graph.type2nodes[Ratio] if rat.val is None]
+        )
 
         seg_pairss = []
         for rats in ratss:
@@ -2697,11 +2531,13 @@ class ProofGraph:
 
         # include (l1, l2) in which l1 does not have any ratio.
         norat_ls = [
-            lenght for lenght in self.type2nodes[Length] if not lenght.neighbors(Ratio)
+            lenght
+            for lenght in self.symbols_graph.type2nodes[Length]
+            if not lenght.neighbors(Ratio)
         ]
 
         for l1 in norat_ls:
-            for l2 in self.type2nodes[Length]:
+            for l2 in self.symbols_graph.type2nodes[Length]:
                 if l1 == l2:
                     continue
                 s1s = l1.neighbors(Segment)
@@ -2712,10 +2548,10 @@ class ProofGraph:
                 seg_pairss.append(set(utils.cross(s2s, s1s)))
 
         # include Seg that does not have any Length.
-        nolen_ss = [s for s in self.type2nodes[Segment] if s.val is None]
+        nolen_ss = [s for s in self.symbols_graph.type2nodes[Segment] if s.val is None]
 
         for seg in nolen_ss:
-            for lenght in self.type2nodes[Length]:
+            for lenght in self.symbols_graph.type2nodes[Length]:
                 s1s = lenght.neighbors(Segment)
                 if len(s1s) == 1:
                     continue
@@ -2747,7 +2583,7 @@ class ProofGraph:
 
         segss = []
         # finally the list of ratios that is equal to 1.0
-        for length in self.type2nodes[Length]:
+        for length in self.symbols_graph.type2nodes[Length]:
             segs = length.neighbors(Segment)
             segss.append(segs)
 
@@ -2797,23 +2633,23 @@ class ProofGraph:
             yield a, b, c, d, e, f, g, h  # now a==c, e==g
 
     def all_cyclics(self) -> Generator[tuple[Point, ...], None, None]:
-        for c in self.type2nodes[Circle]:
+        for c in self.symbols_graph.type2nodes[Circle]:
             for x, y, z, t in utils.perm4(c.neighbors(Point)):
                 yield x, y, z, t
 
     def all_colls(self) -> Generator[tuple[Point, ...], None, None]:
-        for line in self.type2nodes[Line]:
+        for line in self.symbols_graph.type2nodes[Line]:
             for x, y, z in utils.perm3(line.neighbors(Point)):
                 yield x, y, z
 
     def all_midps(self) -> Generator[tuple[Point, ...], None, None]:
-        for line in self.type2nodes[Line]:
+        for line in self.symbols_graph.type2nodes[Line]:
             for a, b, c in utils.perm3(line.neighbors(Point)):
                 if self.check_cong([a, b, a, c]):
                     yield a, b, c
 
     def all_circles(self) -> Generator[tuple[Point, ...], None, None]:
-        for lenght in self.type2nodes[Length]:
+        for lenght in self.symbols_graph.type2nodes[Length]:
             p2p = defaultdict(list)
             for s in lenght.neighbors(Segment):
                 a, b = s.points
