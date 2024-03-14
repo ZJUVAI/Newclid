@@ -25,18 +25,35 @@ class DependencyGraph:
 
     def add_edge(self, u_for_edge: Dependency, v_for_edge: Dependency, rule_name: str):
         pred = dependency_node_name(u_for_edge)
+
+        if pred not in self.nx_graph.nodes:
+            self.add_dependency(u_for_edge)
+            for why_u in u_for_edge.why:
+                self.add_edge(why_u, u_for_edge, rule_name=u_for_edge.rule_name)
+
         succ = dependency_node_name(v_for_edge)
-        # assert u in self.nx_graph.nodes
-        # assert v in self.nx_graph.nodes
+        assert succ in self.nx_graph.nodes
         self.nx_graph.add_edge(
             pred,
             succ,
             key=rule_name,
         )
 
-    def add_theorem_edges(self, dependencies: list[Dependency], theorem: Theorem):
+    def add_theorem_edges(
+        self,
+        dependencies: list[Dependency],
+        theorem: Theorem,
+    ):
         for added_dependency in dependencies:
             self.add_dependency(added_dependency)
+
+            # Check for identical mapping A.B.D.C == A.B.C.D
+            while (
+                len(added_dependency.why) == 1
+                and added_dependency.why[0].hashed() == added_dependency.hashed()
+            ):
+                added_dependency = added_dependency.why[0]
+
             for why_added in added_dependency.why:
                 dep_rule_name = added_dependency.rule_name
                 if dep_rule_name and dep_rule_name != theorem.rule_name:
@@ -54,6 +71,7 @@ class DependencyGraph:
     def add_construction_edges(self, dependencies: list[Dependency]):
         for added_dependency in dependencies:
             self.add_dependency(added_dependency)
+
             for why_added in added_dependency.why:
                 self.add_dependency(why_added)
                 dep_rule_name = added_dependency.rule_name

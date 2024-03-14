@@ -3,8 +3,8 @@
 from collections import defaultdict
 
 import geosolver.geometry as gm
-import geosolver.combinations_permutations as utils
-import geosolver.numericals as nm
+import geosolver.combinatorics as comb
+import geosolver.numerical.check
 import geosolver.problem as pr
 
 
@@ -29,8 +29,8 @@ def match_eqratio_eqratio_eqratio(
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match eqratio a b c d m n p q, eqratio c d e f p q r u => eqratio a b e f m n r u."""
-    for m1 in g.type2nodes[gm.Value]:
-        for m2 in g.type2nodes[gm.Value]:
+    for m1 in g.symbols_graph.type2nodes[gm.Value]:
+        for m2 in g.symbols_graph.type2nodes[gm.Value]:
             rats1 = []
             for rat in m1.neighbors(gm.Ratio):
                 l1, l2 = rat.lengths
@@ -46,11 +46,11 @@ def match_eqratio_eqratio_eqratio(
                 rats2.append((l1, l2))
 
             pairs = []
-            for (l1, l2), (l3, l4) in utils.cross(rats1, rats2):
+            for (l1, l2), (l3, l4) in comb.cross(rats1, rats2):
                 if l2 == l3:
                     pairs.append((l1, l2, l4))
 
-            for (l1, l12, l2), (l3, l34, l4) in utils.comb2(pairs):
+            for (l1, l12, l2), (l3, l34, l4) in comb.comb2(pairs):
                 if (l1, l12, l2) == (l3, l34, l4):
                     continue
                 if l1 == l2 or l3 == l4:
@@ -76,8 +76,8 @@ def match_eqangle_eqangle_eqangle(
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match eqangle a b c d m n p q, eqangle c d e f p q r u => eqangle a b e f m n r u."""
-    for m1 in g.type2nodes[gm.Measure]:
-        for m2 in g.type2nodes[gm.Measure]:
+    for m1 in g.symbols_graph.type2nodes[gm.Measure]:
+        for m2 in g.symbols_graph.type2nodes[gm.Measure]:
             angs1 = []
             for ang in m1.neighbors(gm.Angle):
                 d1, d2 = ang.directions
@@ -93,11 +93,11 @@ def match_eqangle_eqangle_eqangle(
                 angs2.append((d1, d2))
 
             pairs = []
-            for (d1, d2), (d3, d4) in utils.cross(angs1, angs2):
+            for (d1, d2), (d3, d4) in comb.cross(angs1, angs2):
                 if d2 == d3:
                     pairs.append((d1, d2, d4))
 
-            for (d1, d12, d2), (d3, d34, d4) in utils.comb2(pairs):
+            for (d1, d12, d2), (d3, d34, d4) in comb.comb2(pairs):
                 if (d1, d12, d2) == (d3, d34, d4):
                     continue
                 if d1 == d2 or d3 == d4:
@@ -130,7 +130,7 @@ def match_perp_perp_npara_eqangle(
             continue
         dpairs.append((d1, d2))
 
-    for (d1, d2), (d3, d4) in utils.comb2(dpairs):
+    for (d1, d2), (d3, d4) in comb.comb2(dpairs):
         a, b = g.two_points_on_direction(d1)
         c, d = g.two_points_on_direction(d2)
         m, n = g.two_points_on_direction(d3)
@@ -151,28 +151,28 @@ def match_circle_coll_eqangle_midp(
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match circle O A B C, coll M B C, eqangle A B A C O B O M => midp M B C."""
     for p, a, b, c in g.all_circles():
-        ab = g._get_line(a, b)
+        ab = g.symbols_graph.get_line(a, b)
         if ab is None:
             continue
         if ab.val is None:
             continue
-        ac = g._get_line(a, c)
+        ac = g.symbols_graph.get_line(a, c)
         if ac is None:
             continue
         if ac.val is None:
             continue
-        pb = g._get_line(p, b)
+        pb = g.symbols_graph.get_line(p, b)
         if pb is None:
             continue
         if pb.val is None:
             continue
 
-        bc = g._get_line(b, c)
+        bc = g.symbols_graph.get_line(b, c)
         if bc is None:
             continue
         bc_points = bc.neighbors(gm.Point, return_set=True)
 
-        anga, _ = g._get_angle(ab.val, ac.val)
+        anga, _ = g.symbols_graph.get_angle(ab.val, ac.val)
 
         for angp in pb.val.neighbors(gm.Angle):
             if not g.is_equal(anga, angp):
@@ -193,7 +193,7 @@ def match_midp_perp_cong(
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match midp M A B, perp O M A B => cong O A O B."""
     for m, a, b in g.all_midps():
-        ab = g._get_line(a, b)
+        ab = g.symbols_graph.get_line(a, b)
         for line_neighbor in m.neighbors(gm.Line):
             if g.check_perpl(line_neighbor, ab):
                 for o in line_neighbor.neighbors(gm.Point):
@@ -207,9 +207,9 @@ def match_cyclic_eqangle_cong(
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match cyclic A B C P Q R, eqangle C A C B R P R Q => cong A B P Q."""
-    for c in g.type2nodes[gm.Circle]:
+    for c in g.symbols_graph.type2nodes[gm.Circle]:
         ps = c.neighbors(gm.Point)
-        for (a, b, c), (x, y, z) in utils.comb2(list(utils.perm3(ps))):
+        for (a, b, c), (x, y, z) in comb.comb2(list(comb.perm3(ps))):
             if {a, b, c} == {x, y, z}:
                 continue
             if g.check_eqangle([c, a, c, b, z, x, z, y]):
@@ -223,13 +223,13 @@ def match_circle_eqangle_perp(
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match circle O A B C, eqangle A X A B C A C B => perp O A A X."""
     for p, a, b, c in g.all_circles():
-        ca = g._get_line(c, a)
+        ca = g.symbols_graph.get_line(c, a)
         if ca is None:
             continue
-        cb = g._get_line(c, b)
+        cb = g.symbols_graph.get_line(c, b)
         if cb is None:
             continue
-        ab = g._get_line(a, b)
+        ab = g.symbols_graph.get_line(a, b)
         if ab is None:
             continue
 
@@ -240,7 +240,7 @@ def match_circle_eqangle_perp(
         if ab.val is None:
             continue
 
-        c_ang, _ = g._get_angle(cb.val, ca.val)
+        c_ang, _ = g.symbols_graph.get_angle(cb.val, ca.val)
         if c_ang is None:
             continue
 
@@ -264,7 +264,7 @@ def match_circle_perp_eqangle(
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match circle O A B C, perp O A A X => eqangle A X A B C A C B."""
     for p, a, b, c in g.all_circles():
-        pa = g._get_line(p, a)
+        pa = g.symbols_graph.get_line(p, a)
         if pa is None:
             continue
         if pa.val is None:
@@ -294,10 +294,10 @@ def match_perp_perp_ncoll_para(
         if len(ys) < 2:
             continue
         c, d = g.two_points_on_direction(x)
-        for y1, y2 in utils.comb2(ys):
+        for y1, y2 in comb.comb2(ys):
             a, b = g.two_points_on_direction(y1)
             e, f = g.two_points_on_direction(y2)
-            if nm.check_ncoll([a.num, b.num, e.num]):
+            if geosolver.numerical.check.check_ncoll_numerical([a.num, b.num, e.num]):
                 yield dict(zip("ABCDEF", [a, b, c, d, e, f]))
 
 
@@ -307,8 +307,8 @@ def match_eqangle6_ncoll_cong(
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match eqangle6 A O A B B A B O, ncoll O A B => cong O A O B."""
-    for a in g.type2nodes[gm.Point]:
-        for b, c in utils.comb2(g.type2nodes[gm.Point]):
+    for a in g.symbols_graph.type2nodes[gm.Point]:
+        for b, c in comb.comb2(g.symbols_graph.type2nodes[gm.Point]):
             if a == b or a == c:
                 continue
             if g.check_eqangle([b, a, b, c, c, b, c, a]):
@@ -327,12 +327,12 @@ def match_eqangle_perp_perp(
         d1, d2 = ang.directions
         if d1 is None or d2 is None:
             continue
-        for d3, d4 in utils.comb2(g.type2nodes[gm.Direction]):
+        for d3, d4 in comb.comb2(g.symbols_graph.type2nodes[gm.Direction]):
             if d1 == d3 or d2 == d4:
                 continue
             # if d1 - d3 = d2 - d4 => d3 perp d4
-            a13, a31 = g._get_angle(d1, d3)
-            a24, a42 = g._get_angle(d2, d4)
+            a13, a31 = g.symbols_graph.get_angle(d1, d3)
+            a24, a42 = g.symbols_graph.get_angle(d2, d4)
             if a13 is None or a31 is None or a24 is None or a42 is None:
                 continue
             if g.is_equal(a13, a24) and g.is_equal(a31, a42):
@@ -385,7 +385,7 @@ def match_eqangle_para(
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match eqangle A B P Q C D P Q => para A B C D."""
-    for measure in g.type2nodes[gm.Measure]:
+    for measure in g.symbols_graph.type2nodes[gm.Measure]:
         angs = measure.neighbors(gm.Angle)
         d12, d21 = defaultdict(list), defaultdict(list)
         for ang in angs:
@@ -397,7 +397,7 @@ def match_eqangle_para(
 
         for d1, d2s in d12.items():
             a, b = g.two_points_on_direction(d1)
-            for d2, d3 in utils.comb2(d2s):
+            for d2, d3 in comb.comb2(d2s):
                 c, d = g.two_points_on_direction(d2)
                 e, f = g.two_points_on_direction(d3)
                 yield dict(zip("ABCDPQ", [c, d, e, f, a, b]))
@@ -426,7 +426,7 @@ def match_cong_cong_cong_cyclic(
     theorem: pr.Theorem,
 ) -> Generator[dict[str, gm.Point], None, None]:
     """Match cong O A O B, cong O B O C, cong O C O D => cyclic A B C D."""
-    for lenght in g.type2nodes[gm.Length]:
+    for lenght in g.symbols_graph.type2nodes[gm.Length]:
         p2p = defaultdict(list)
         for s in lenght.neighbors(gm.Segment):
             a, b = s.points
@@ -435,7 +435,7 @@ def match_cong_cong_cong_cyclic(
 
         for p, ps in p2p.items():
             if len(ps) >= 4:
-                for a, b, c, d in utils.comb4(ps):
+                for a, b, c, d in comb.comb4(ps):
                     yield dict(zip("OABCD", [p, a, b, c, d]))
 
 
@@ -447,8 +447,8 @@ def match_cong_cong_cong_ncoll_contri(
     """Match cong A B P Q, cong B C Q R, cong C A R P, ncoll A B C => contri* A B C P Q R."""
     record = set()
     for a, b, p, q in g_matcher("cong"):
-        for c in g.type2nodes[gm.Point]:
-            for r in g.type2nodes[gm.Point]:
+        for c in g.symbols_graph.type2nodes[gm.Point]:
+            for r in g.symbols_graph.type2nodes[gm.Point]:
                 if any([x in record for x in rotate_simtri(a, b, c, p, q, r)]):
                     continue
                 if not g.check_ncoll([a, b, c]):
@@ -466,10 +466,10 @@ def match_cong_cong_eqangle6_ncoll_contri(
     """Match cong A B P Q, cong B C Q R, eqangle6 B A B C Q P Q R, ncoll A B C => contri* A B C P Q R."""
     record = set()
     for a, b, p, q in g_matcher("cong"):
-        for c in g.type2nodes[gm.Point]:
+        for c in g.symbols_graph.type2nodes[gm.Point]:
             if c in (a, b):
                 continue
-            for r in g.type2nodes[gm.Point]:
+            for r in g.symbols_graph.type2nodes[gm.Point]:
                 if r in (p, q):
                     continue
 
@@ -491,7 +491,9 @@ def match_cong_cong_eqangle6_ncoll_contri(
                 if not g.check_ncoll([a, b, c]):
                     continue
 
-                if nm.same_clock(a.num, b.num, c.num, p.num, q.num, r.num):
+                if geosolver.numerical.check.same_clock(
+                    a.num, b.num, c.num, p.num, q.num, r.num
+                ):
                     if g.check_eqangle([b, a, b, c, q, p, q, r]):
                         record.add((a, b, c, p, q, r))
                         yield dict(zip("ABCPQR", [a, b, c, p, q, r]))
@@ -518,7 +520,9 @@ def match_eqratio6_eqangle6_ncoll_simtri(
         if not g.check_ncoll([a, b, c]):
             continue
 
-        if nm.same_clock(a.num, b.num, c.num, p.num, q.num, r.num):
+        if geosolver.numerical.check.same_clock(
+            a.num, b.num, c.num, p.num, q.num, r.num
+        ):
             if g.check_eqangle([b, a, b, c, q, p, q, r]):
                 record.add((a, b, c, p, q, r))
                 yield dict(zip("ABCPQR", [a, b, c, p, q, r]))
@@ -687,7 +691,7 @@ def match_eqratio6_coll_ncoll_eqangle6(
     """Match eqratio6 d b d c a b a c, coll d b c, ncoll a b c => eqangle6 a b a d a d a c."""
     records = set()
     for b, d, c in g_matcher("coll"):
-        for a in g.all_points():
+        for a in g.symbols_graph.all_points():
             if g.check_coll([a, b, c]):
                 continue
             if (a, b, d, c) in records or (a, c, d, b) in records:
@@ -706,7 +710,7 @@ def match_eqangle6_coll_ncoll_eqratio6(
     """Match eqangle6 a b a d a d a c, coll d b c, ncoll a b c => eqratio6 d b d c a b a c."""
     records = set()
     for b, d, c in g_matcher("coll"):
-        for a in g.all_points():
+        for a in g.symbols_graph.all_points():
             if g.check_coll([a, b, c]):
                 continue
             if (a, b, d, c) in records or (a, c, d, b) in records:
@@ -726,7 +730,9 @@ def match_eqangle6_ncoll_cyclic(
     for a, b, a, c, x, y, x, z in g_matcher("eqangle6"):
         if (b, c) != (y, z) or a == x:
             continue
-        if nm.check_ncoll([x.num for x in [a, b, c, x]]):
+        if geosolver.numerical.check.check_ncoll_numerical(
+            [x.num for x in [a, b, c, x]]
+        ):
             yield dict(zip("ABPQ", [b, c, a, x]))
 
 

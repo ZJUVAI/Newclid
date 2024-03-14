@@ -18,11 +18,15 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import geosolver.geometry as gm
 import geosolver.pretty as pt
+
 from geosolver.ratios import simplify
+
+if TYPE_CHECKING:
+    from geosolver.proof_graph import ProofGraph
 
 
 def reshape(list_to_reshape: list[Any], n: int = 1) -> list[list[Any]]:
@@ -687,7 +691,7 @@ class Dependency(Construction):
         dep.why = list(self.why)
         return dep
 
-    def why_me_or_cache(self, g: Any, level: int) -> Dependency:
+    def why_me_or_cache(self, g: "ProofGraph", level: int) -> Dependency:
         if self.hashed() in g.cache:
             return g.cache[self.hashed()]
         self.why_me(g, level)
@@ -699,7 +703,7 @@ class Dependency(Construction):
         dep.why = list(self.why)
         return dep
 
-    def why_me(self, g: Any, level: int) -> None:
+    def why_me(self, g: "ProofGraph", level: int) -> None:
         """Figure out the dependencies predicates of self."""
         name, args = self.name, self.args
 
@@ -716,8 +720,8 @@ class Dependency(Construction):
                 self.why = []
                 return
 
-            ab = g._get_line(a, b)
-            cd = g._get_line(c, d)
+            ab = g.symbols_graph.get_line(a, b)
+            cd = g.symbols_graph.get_line(c, d)
             if ab == cd:
                 if {a, b} == {c, d}:
                     self.why = []
@@ -746,15 +750,15 @@ class Dependency(Construction):
 
         elif self.name == "midp":
             m, a, b = self.args
-            ma = g._get_segment(m, a)
-            mb = g._get_segment(m, b)
+            ma = g.symbols_graph.get_segment(m, a)
+            mb = g.symbols_graph.get_segment(m, b)
             dep = Dependency("coll", [m, a, b], None, None).why_me_or_cache(g, None)
             self.why = [dep] + g.why_equal(ma, mb, level)
 
         elif self.name == "perp":
             a, b, c, d = self.args
-            ab = g._get_line(a, b)
-            cd = g._get_line(c, d)
+            ab = g.symbols_graph.get_line(a, b)
+            cd = g.symbols_graph.get_line(c, d)
             for (x, y), xy in zip([(a, b), (c, d)], [ab, cd]):
                 x_, y_ = xy.points
                 if {x, y} == {x_, y_}:
@@ -775,8 +779,8 @@ class Dependency(Construction):
 
         elif self.name == "cong":
             a, b, c, d = self.args
-            ab = g._get_segment(a, b)
-            cd = g._get_segment(c, d)
+            ab = g.symbols_graph.get_segment(a, b)
+            cd = g.symbols_graph.get_segment(c, d)
 
             self.why = g.why_equal(ab, cd, level)
 
@@ -806,18 +810,18 @@ class Dependency(Construction):
 
         elif self.name == "circle":
             o, a, b, c = self.args
-            oa = g._get_segment(o, a)
-            ob = g._get_segment(o, b)
-            oc = g._get_segment(o, c)
+            oa = g.symbols_graph.get_segment(o, a)
+            ob = g.symbols_graph.get_segment(o, b)
+            oc = g.symbols_graph.get_segment(o, c)
             self.why = g.why_equal(oa, ob, level) + g.why_equal(oa, oc, level)
 
         elif self.name in ["eqangle", "eqangle6"]:
             a, b, c, d, m, n, p, q = self.args
 
-            ab, why1 = g.get_line_thru_pair_why(a, b)
-            cd, why2 = g.get_line_thru_pair_why(c, d)
-            mn, why3 = g.get_line_thru_pair_why(m, n)
-            pq, why4 = g.get_line_thru_pair_why(p, q)
+            ab, why1 = g.symbols_graph.get_line_thru_pair_why(a, b)
+            cd, why2 = g.symbols_graph.get_line_thru_pair_why(c, d)
+            mn, why3 = g.symbols_graph.get_line_thru_pair_why(m, n)
+            pq, why4 = g.symbols_graph.get_line_thru_pair_why(p, q)
 
             if ab is None or cd is None or mn is None or pq is None:
                 if {a, b} == {m, n}:
@@ -900,10 +904,10 @@ class Dependency(Construction):
 
         elif self.name in ["eqratio", "eqratio6"]:
             a, b, c, d, m, n, p, q = self.args
-            ab = g._get_segment(a, b)
-            cd = g._get_segment(c, d)
-            mn = g._get_segment(m, n)
-            pq = g._get_segment(p, q)
+            ab = g.symbols_graph.get_segment(a, b)
+            cd = g.symbols_graph.get_segment(c, d)
+            mn = g.symbols_graph.get_segment(m, n)
+            pq = g.symbols_graph.get_segment(p, q)
 
             if ab is None or cd is None or mn is None or pq is None:
                 if {a, b} == {m, n}:

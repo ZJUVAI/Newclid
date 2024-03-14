@@ -34,7 +34,7 @@ class TestDDAR:
         g, _ = ProofGraph.build_problem(p, self.defs)
 
         solve(g, self.rules, p, max_level=1000)
-        goal_args = g.names2nodes(p.goal.args)
+        goal_args = g.symbols_graph.names2nodes(p.goal.args)
         check.is_false(g.check(p.goal.name, goal_args))
 
     def test_orthocenter_aux_should_succeed(self):
@@ -43,7 +43,7 @@ class TestDDAR:
         g, _ = ProofGraph.build_problem(p, self.defs)
 
         solve(g, self.rules, p, max_level=1000)
-        goal_args = g.names2nodes(p.goal.args)
+        goal_args = g.symbols_graph.names2nodes(p.goal.args)
         check.is_true(g.check(p.goal.name, goal_args))
 
     def test_incenter_excenter_should_succeed(self):
@@ -55,5 +55,5 @@ class TestDDAR:
         g, _ = ProofGraph.build_problem(p, self.defs)
 
         solve(g, self.rules, p, max_level=1000)
-        goal_args = g.names2nodes(p.goal.args)
+        goal_args = g.symbols_graph.names2nodes(p.goal.args)
         check.is_true(g.check(p.goal.name, goal_args))

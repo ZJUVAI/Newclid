@@ -17,27 +17,23 @@
 
 from typing import Any
 
-import geosolver.geometry as gm
-import geosolver.pretty as pt
-import geosolver.problem as problem
-
-
-pretty = pt.pretty
+from geosolver.geometry import Point
+from geosolver.problem import CONSTRUCTION_RULE, Dependency
 
 
 def point_levels(
-    setup: list[problem.Dependency], existing_points: list[gm.Point]
-) -> list[tuple[set[gm.Point], list[problem.Dependency]]]:
+    setup: list[Dependency], existing_points: list[Point]
+) -> list[tuple[set[Point], list[Dependency]]]:
     """Reformat setup into levels of point constructions."""
     levels = []
     for con in setup:
-        plevel = max([p.plevel for p in con.args if isinstance(p, gm.Point)])
+        plevel = max([p.plevel for p in con.args if isinstance(p, Point)])
 
         while len(levels) - 1 < plevel:
             levels.append((set(), []))
 
         for p in con.args:
-            if not isinstance(p, gm.Point):
+            if not isinstance(p, Point):
                 continue
             if existing_points and p in existing_points:
                 continue
@@ -51,10 +47,10 @@ def point_levels(
 
 
 def point_log(
-    setup: list[problem.Dependency],
+    setup: list[Dependency],
     ref_id: dict[tuple[str, ...], int],
-    existing_points=list[gm.Point],
-) -> list[tuple[list[gm.Point], list[problem.Dependency]]]:
+    existing_points=list[Point],
+) -> list[tuple[list[Point], list[Dependency]]]:
     """Reformat setup into groups of point constructions."""
     log = []
 
@@ -71,12 +67,12 @@ def point_log(
 
 
 def setup_to_levels(
-    setup: list[problem.Dependency],
-) -> list[list[problem.Dependency]]:
+    setup: list[Dependency],
+) -> list[list[Dependency]]:
     """Reformat setup into levels of point constructions."""
     levels = []
     for d in setup:
-        plevel = max([p.plevel for p in d.args if isinstance(p, gm.Point)])
+        plevel = max([p.plevel for p in d.args if isinstance(p, Point)])
         while len(levels) - 1 < plevel:
             levels.append([])
 
@@ -87,14 +83,14 @@ def setup_to_levels(
 
 
 def separate_dependency_difference(
-    query: problem.Dependency,
-    log: list[tuple[list[problem.Dependency], list[problem.Dependency]]],
+    query: Dependency,
+    log: list[tuple[list[Dependency], list[Dependency]]],
 ) -> tuple[
-    list[tuple[list[problem.Dependency], list[problem.Dependency]]],
-    list[problem.Dependency],
-    list[problem.Dependency],
-    set[gm.Point],
-    set[gm.Point],
+    list[tuple[list[Dependency], list[Dependency]]],
+    list[Dependency],
+    list[Dependency],
+    set[Point],
+    set[Point],
 ]:
     """Identify and separate the dependency difference."""
     setup = []
@@ -105,7 +101,7 @@ def separate_dependency_difference(
             continue
         cons_ = []
         for con in cons:
-            if con.rule_name == "c0":
+            if con.rule_name == CONSTRUCTION_RULE:
                 setup.append(con)
             else:
                 cons_.append(con)
@@ -121,7 +117,7 @@ def separate_dependency_difference(
     while i < len(queue):
         q = queue[i]
         i += 1
-        if not isinstance(q, gm.Point):
+        if not isinstance(q, Point):
             continue
         for p in q.rely_on:
             if p not in points:
@@ -132,10 +128,10 @@ def separate_dependency_difference(
     for con in setup_:
         if con.name == "ind":
             continue
-        elif any([p not in points for p in con.args if isinstance(p, gm.Point)]):
+        elif any([p not in points for p in con.args if isinstance(p, Point)]):
             aux_setup.append(con)
             aux_points.update(
-                [p for p in con.args if isinstance(p, gm.Point) and p not in points]
+                [p for p in con.args if isinstance(p, Point) and p not in points]
             )
         else:
             setup.append(con)
@@ -144,14 +140,14 @@ def separate_dependency_difference(
 
 
 def recursive_traceback(
-    query: problem.Dependency,
-) -> list[tuple[list[problem.Dependency], list[problem.Dependency]]]:
+    query: Dependency,
+) -> list[tuple[list[Dependency], list[Dependency]]]:
     """Recursively traceback from the query, i.e. the conclusion."""
     visited = set()
     log = []
     stack = []
 
-    def read(q: problem.Dependency) -> None:
+    def read(q: Dependency) -> None:
         q = q.remove_loop()
         hashed = q.hashed()
         if hashed in visited:
@@ -165,7 +161,7 @@ def recursive_traceback(
         stack.append(hashed)
         prems = []
 
-        if q.rule_name != problem.CONSTRUCTION_RULE:
+        if q.rule_name != CONSTRUCTION_RULE:
             all_deps = []
             dep_names = set()
             for d in q.why:
@@ -206,8 +202,8 @@ def recursive_traceback(
 
 
 def collx_to_coll_setup(
-    setup: list[problem.Dependency],
-) -> list[problem.Dependency]:
+    setup: list[Dependency],
+) -> list[Dependency]:
     """Convert collx to coll in setups."""
     result = []
     for level in setup_to_levels(setup):
@@ -226,13 +222,13 @@ def collx_to_coll_setup(
 
 
 def collx_to_coll(
-    setup: list[problem.Dependency],
-    aux_setup: list[problem.Dependency],
-    log: list[tuple[list[problem.Dependency], list[problem.Dependency]]],
+    setup: list[Dependency],
+    aux_setup: list[Dependency],
+    log: list[tuple[list[Dependency], list[Dependency]]],
 ) -> tuple[
-    list[problem.Dependency],
-    list[problem.Dependency],
-    list[tuple[list[problem.Dependency], list[problem.Dependency]]],
+    list[Dependency],
+    list[Dependency],
+    list[tuple[list[Dependency], list[Dependency]]],
 ]:
     """Convert collx to coll and dedup."""
     setup = collx_to_coll_setup(setup)
@@ -271,12 +267,12 @@ def collx_to_coll(
 
 
 def get_logs(
-    query: problem.Dependency, g: Any, merge_trivials: bool = False
+    query: Dependency, g: Any, merge_trivials: bool = False
 ) -> tuple[
-    list[problem.Dependency],
-    list[problem.Dependency],
-    list[tuple[list[problem.Dependency], list[problem.Dependency]]],
-    set[gm.Point],
+    list[Dependency],
+    list[Dependency],
+    list[tuple[list[Dependency], list[Dependency]]],
+    set[Point],
 ]:
     """Given a DAG and conclusion N, return the premise, aux, proof."""
     query = query.why_me_or_cache(g, query.level)
@@ -291,14 +287,14 @@ def get_logs(
 
 
 def shorten_and_shave(
-    setup: list[problem.Dependency],
-    aux_setup: list[problem.Dependency],
-    log: list[tuple[list[problem.Dependency], list[problem.Dependency]]],
+    setup: list[Dependency],
+    aux_setup: list[Dependency],
+    log: list[tuple[list[Dependency], list[Dependency]]],
     merge_trivials: bool = False,
 ) -> tuple[
-    list[problem.Dependency],
-    list[problem.Dependency],
-    list[tuple[list[problem.Dependency], list[problem.Dependency]]],
+    list[Dependency],
+    list[Dependency],
+    list[tuple[list[Dependency], list[Dependency]]],
 ]:
     """Shorten the proof by removing unused predicates."""
     log, _ = shorten_proof(log, merge_trivials=merge_trivials)
@@ -311,10 +307,10 @@ def shorten_and_shave(
 
 
 def join_prems(
-    con: problem.Dependency,
-    con2prems: dict[tuple[str, ...], list[problem.Dependency]],
+    con: Dependency,
+    con2prems: dict[tuple[str, ...], list[Dependency]],
     expanded: set[tuple[str, ...]],
-) -> list[problem.Dependency]:
+) -> list[Dependency]:
     """Join proof steps with the same premises."""
     h = con.hashed()
     if h in expanded or h not in con2prems:
@@ -327,11 +323,11 @@ def join_prems(
 
 
 def shorten_proof(
-    log: list[tuple[list[problem.Dependency], list[problem.Dependency]]],
+    log: list[tuple[list[Dependency], list[Dependency]]],
     merge_trivials: bool = False,
 ) -> tuple[
-    list[tuple[list[problem.Dependency], list[problem.Dependency]]],
-    dict[tuple[str, ...], list[problem.Dependency]],
+    list[tuple[list[Dependency], list[Dependency]]],
+    dict[tuple[str, ...], list[Dependency]],
 ]:
     """Join multiple trivials proof steps into one."""
     pops = set()

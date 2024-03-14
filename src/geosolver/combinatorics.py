@@ -1,23 +1,9 @@
-# Copyright 2023 DeepMind Technologies Limited
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-
 """Utilizations for graph representation.
 
 Mainly for listing combinations and permutations of elements.
 """
 
+from typing import Generator
 from geosolver.geometry import Point
 
 
@@ -130,3 +116,24 @@ def _perm4(elems):
 
 def perm4(elems):
     return list(_perm4(elems))
+
+
+def enum_sides(points: list[Point]) -> Generator[list[Point], None, None]:
+    a, b, c, x, y, z = points
+    yield [a, b, x, y]
+    yield [b, c, y, z]
+    yield [c, a, z, x]
+
+
+def enum_triangle(points: list[Point]) -> Generator[list[Point], None, None]:
+    a, b, c, x, y, z = points
+    yield [a, b, a, c, x, y, x, z]
+    yield [b, a, b, c, y, x, y, z]
+    yield [c, a, c, b, z, x, z, y]
+
+
+def enum_triangle2(points: list[Point]) -> Generator[list[Point], None, None]:
+    a, b, c, x, y, z = points
+    yield [a, b, a, c, x, z, x, y]
+    yield [b, a, b, c, y, z, y, x]
+    yield [c, a, c, b, z, y, z, x]

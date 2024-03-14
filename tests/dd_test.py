@@ -25,7 +25,7 @@ class TestDD:
             " n, on_line p c d; q = on_line q b n, on_line q c d ? cong e p e q"
         )
         g, _ = ProofGraph.build_problem(p, self.defs)
-        goal_args = g.names2nodes(p.goal.args)
+        goal_args = g.symbols_graph.names2nodes(p.goal.args)
 
         success = False
         for level in range(1, MAX_LEVEL):
@@ -44,7 +44,7 @@ class TestDD:
             " perp d c c e"
         )
         g, _ = ProofGraph.build_problem(p, self.defs)
-        goal_args = g.names2nodes(p.goal.args)
+        goal_args = g.symbols_graph.names2nodes(p.goal.args)
 
         success = False
         for level in range(1, MAX_LEVEL):

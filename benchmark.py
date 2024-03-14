@@ -6,7 +6,7 @@ from typing import Optional
 from geosolver.ddar import solve
 from geosolver.geometry import Circle, Line, Point, Segment
 from geosolver.proof_graph import ProofGraph
-from geosolver.numericals import draw
+from geosolver.numerical.draw_figure import draw_figure
 from geosolver.problem import Definition, Problem, Theorem
 from geosolver.proof_writing import write_solution
 
@@ -39,6 +39,20 @@ def main():
 
         problem_output_path = out_folder_path / problem_name
         run_ddar(graph, problem, problem_output_path)
+
+        draw_figure(
+            graph.symbols_graph.type2nodes[Point],
+            graph.symbols_graph.type2nodes[Line],
+            graph.symbols_graph.type2nodes[Circle],
+            graph.symbols_graph.type2nodes[Segment],
+            save_to=str(problem_output_path / f"{problem.url}_proof_figure.png"),
+            block=False,
+        )
+
+        graph.symbols_graph.draw_html(
+            problem_output_path / f"{problem_name}.symbols_graph.html"
+        )
+
         graph.dependency_graph.show_html(
             problem_output_path / f"{problem_name}.dependency_graph.html",
             RULES,
@@ -59,7 +73,7 @@ def run_ddar(graph: ProofGraph, problem: Problem, out_folder: Optional[Path]) ->
     """
     solve(graph, RULES, problem, max_level=1000)
 
-    goal_args = graph.names2nodes(problem.goal.args)
+    goal_args = graph.symbols_graph.names2nodes(problem.goal.args)
     if not graph.check(problem.goal.name, goal_args):
         logging.info(f"DD+AR failed to solve the problem {problem.url}.")
         return False
@@ -71,14 +85,6 @@ def run_ddar(graph: ProofGraph, problem: Problem, out_folder: Optional[Path]) ->
     )
     write_solution(graph, problem, outfile)
 
-    draw(
-        graph.type2nodes[Point],
-        graph.type2nodes[Line],
-        graph.type2nodes[Circle],
-        graph.type2nodes[Segment],
-        save_to=str(out_folder / f"{problem.url}_proof_figure.png"),
-        block=False,
-    )
     return True
 
 
