@@ -38,7 +38,7 @@ from geosolver.geometry import (
 )
 from geosolver.geometry import Circle, Line, Point, Segment
 from geosolver.geometry import Measure, Value
-import geosolver.combinations_permutations as utils
+import geosolver.combinatorics as comb
 import geosolver.numerical.geometries as num_geo
 
 from geosolver.numerical.check import (
@@ -440,7 +440,7 @@ class ProofGraph:
 
     def coll_dep(self, points: list[Point], p: Point) -> list[Dependency]:
         """Return the dep(.why) explaining why p is coll with points."""
-        for p1, p2 in utils.comb2(points):
+        for p1, p2 in comb.comb2(points):
             if self.check_coll([p1, p2, p]):
                 dep = Dependency("coll", [p1, p2, p], None, None)
                 return dep.why_me_or_cache(self, None)
@@ -451,14 +451,14 @@ class ProofGraph:
         og_points = list(points)
 
         all_lines = []
-        for p1, p2 in utils.comb2(points):
+        for p1, p2 in comb.comb2(points):
             all_lines.append(self.symbols_graph.get_line_thru_pair(p1, p2))
         points = sum([line.neighbors(Point) for line in all_lines], [])
         points = list(set(points))
 
         existed = set()
         new = set()
-        for p1, p2 in utils.comb2(points):
+        for p1, p2 in comb.comb2(points):
             if p1.name > p2.name:
                 p1, p2 = p2, p1
             if (p1, p2) in self.symbols_graph._pair2line:
@@ -980,7 +980,7 @@ class ProofGraph:
         return self.check_cong([o, a, o, b]) and self.check_cong([o, a, o, c])
 
     def cyclic_dep(self, points: list[Point], p: Point) -> list[Dependency]:
-        for p1, p2, p3 in utils.comb3(points):
+        for p1, p2, p3 in comb.comb3(points):
             if self.check_cyclic([p1, p2, p3, p]):
                 dep = Dependency("cyclic", [p1, p2, p3, p], None, None)
                 return dep.why_me_or_cache(self, None)
@@ -993,14 +993,14 @@ class ProofGraph:
         og_points = list(points)
 
         all_circles = []
-        for p1, p2, p3 in utils.comb3(points):
+        for p1, p2, p3 in comb.comb3(points):
             all_circles.append(self.symbols_graph.get_circle_thru_triplet(p1, p2, p3))
         points = sum([c.neighbors(Point) for c in all_circles], [])
         points = list(set(points))
 
         existed = set()
         new = set()
-        for p1, p2, p3 in utils.comb3(points):
+        for p1, p2, p3 in comb.comb3(points):
             p1, p2, p3 = sorted([p1, p2, p3], key=lambda x: x.name)
 
             if (p1, p2, p3) in self.symbols_graph._triplet2circle:
@@ -1820,12 +1820,12 @@ class ProofGraph:
         add = []
         hashs = [d.hashed() for d in deps.why]
 
-        for args in utils.enum_triangle(points):
+        for args in comb.enum_triangle(points):
             if hashed("eqangle6", args) in hashs:
                 continue
             add += self._add_eqangle(args, deps=deps)
 
-        for args in utils.enum_triangle(points):
+        for args in comb.enum_triangle(points):
             if hashed("eqratio6", args) in hashs:
                 continue
             add += self._add_eqratio(args, deps=deps)
@@ -1844,12 +1844,12 @@ class ProofGraph:
         """Add two similar reflected triangles."""
         add = []
         hashs = [d.hashed() for d in deps.why]
-        for args in utils.enum_triangle2(points):
+        for args in comb.enum_triangle2(points):
             if hashed("eqangle6", args) in hashs:
                 continue
             add += self._add_eqangle(args, deps=deps)
 
-        for args in utils.enum_triangle(points):
+        for args in comb.enum_triangle(points):
             if hashed("eqratio6", args) in hashs:
                 continue
             add += self._add_eqratio(args, deps=deps)
@@ -1862,12 +1862,12 @@ class ProofGraph:
         """Add two congruent triangles."""
         add = []
         hashs = [d.hashed() for d in deps.why]
-        for args in utils.enum_triangle(points):
+        for args in comb.enum_triangle(points):
             if hashed("eqangle6", args) in hashs:
                 continue
             add += self._add_eqangle(args, deps=deps)
 
-        for args in utils.enum_sides(points):
+        for args in comb.enum_sides(points):
             if hashed("cong", args) in hashs:
                 continue
             add += self._add_cong(args, deps=deps)
@@ -1887,12 +1887,12 @@ class ProofGraph:
         """Add two congruent reflected triangles."""
         add = []
         hashs = [d.hashed() for d in deps.why]
-        for args in utils.enum_triangle2(points):
+        for args in comb.enum_triangle2(points):
             if hashed("eqangle6", args) in hashs:
                 continue
             add += self._add_eqangle(args, deps=deps)
 
-        for args in utils.enum_sides(points):
+        for args in comb.enum_sides(points):
             if hashed("cong", args) in hashs:
                 continue
             add += self._add_cong(args, deps=deps)
@@ -1916,7 +1916,7 @@ class ProofGraph:
         ab = self.symbols_graph.get_line(a, b)
         if ab is None:
             return
-        for p1, p2 in utils.comb2(ab.neighbors(Point)):
+        for p1, p2 in comb.comb2(ab.neighbors(Point)):
             if {p1, p2} != {a, b}:
                 yield p1, p2
 
@@ -2206,8 +2206,8 @@ class ProofGraph:
         return added, plevel
 
     def all_eqangle_same_lines(self) -> Generator[tuple[Point, ...], None, None]:
-        for l1, l2 in utils.perm2(self.symbols_graph.type2nodes[Line]):
-            for a, b, c, d, e, f, g, h in utils.all_8points(l1, l2, l1, l2):
+        for l1, l2 in comb.perm2(self.symbols_graph.type2nodes[Line]):
+            for a, b, c, d, e, f, g, h in comb.all_8points(l1, l2, l1, l2):
                 if (a, b, c, d) != (e, f, g, h):
                     yield a, b, c, d, e, f, g, h
 
@@ -2226,11 +2226,11 @@ class ProofGraph:
                 l1s = d1.neighbors(Line)
                 l2s = d2.neighbors(Line)
                 # Any pair in this is para-para.
-                para_para = list(utils.cross(l1s, l2s))
+                para_para = list(comb.cross(l1s, l2s))
                 line_pairss.append(para_para)
 
-            for pairs1, pairs2 in utils.comb2(line_pairss):
-                for pair1, pair2 in utils.cross(pairs1, pairs2):
+            for pairs1, pairs2 in comb.comb2(line_pairss):
+                for pair1, pair2 in comb.cross(pairs1, pairs2):
                     (l1, l2), (l3, l4) = pair1, pair2
                     yield l1, l2, l3, l4
 
@@ -2256,7 +2256,7 @@ class ProofGraph:
                     continue
                 l1s = d1.neighbors(Line)
                 l2s = d2.neighbors(Line)
-                line_pairs.update(set(utils.cross(l1s, l2s)))
+                line_pairs.update(set(comb.cross(l1s, l2s)))
             line_pairss.append(line_pairs)
 
         # include (d1, d2) in which d1 does not have any angles.
@@ -2274,8 +2274,8 @@ class ProofGraph:
                 l2s = d2.neighbors(Line)
                 if len(l1s) < 2 and len(l2s) < 2:
                     continue
-                line_pairss.append(set(utils.cross(l1s, l2s)))
-                line_pairss.append(set(utils.cross(l2s, l1s)))
+                line_pairss.append(set(comb.cross(l1s, l2s)))
+                line_pairss.append(set(comb.cross(l2s, l1s)))
 
         # Case 2: d1 // d2 => (d1-d3) = (d2-d3)
         # include lines that does not have any direction.
@@ -2289,12 +2289,12 @@ class ProofGraph:
                 if len(l1s) < 2:
                     continue
                 l2s = [line]
-                line_pairss.append(set(utils.cross(l1s, l2s)))
-                line_pairss.append(set(utils.cross(l2s, l1s)))
+                line_pairss.append(set(comb.cross(l1s, l2s)))
+                line_pairss.append(set(comb.cross(l2s, l1s)))
 
         record = set()
         for line_pairs in line_pairss:
-            for pair1, pair2 in utils.perm2(list(line_pairs)):
+            for pair1, pair2 in comb.perm2(list(line_pairs)):
                 (l1, l2), (l3, l4) = pair1, pair2
                 if l1 == l2 or l3 == l4:
                     continue
@@ -2303,7 +2303,7 @@ class ProofGraph:
                 if (l1, l2, l3, l4) in record:
                     continue
                 record.add((l1, l2, l3, l4))
-                for a, b, c, d, e, f, g, h in utils.all_8points(l1, l2, l3, l4):
+                for a, b, c, d, e, f, g, h in comb.all_8points(l1, l2, l3, l4):
                     yield (a, b, c, d, e, f, g, h)
 
         for a, b, c, d, e, f, g, h in self.all_eqangle_same_lines():
@@ -2336,8 +2336,8 @@ class ProofGraph:
 
     def all_paras(self) -> Generator[tuple[Point, ...], None, None]:
         for d in self.symbols_graph.type2nodes[Direction]:
-            for l1, l2 in utils.perm2(d.neighbors(Line)):
-                for a, b, c, d in utils.all_4points(l1, l2):
+            for l1, l2 in comb.perm2(d.neighbors(Line)):
+                for a, b, c, d in comb.all_4points(l1, l2):
                     yield a, b, c, d
 
     def all_perps(self) -> Generator[tuple[Point, ...], None, None]:
@@ -2347,13 +2347,13 @@ class ProofGraph:
                 continue
             if d1 == d2:
                 continue
-            for l1, l2 in utils.cross(d1.neighbors(Line), d2.neighbors(Line)):
-                for a, b, c, d in utils.all_4points(l1, l2):
+            for l1, l2 in comb.cross(d1.neighbors(Line), d2.neighbors(Line)):
+                for a, b, c, d in comb.all_4points(l1, l2):
                     yield a, b, c, d
 
     def all_congs(self) -> Generator[tuple[Point, ...], None, None]:
         for lenght in self.symbols_graph.type2nodes[Length]:
-            for s1, s2 in utils.perm2(lenght.neighbors(Segment)):
+            for s1, s2 in comb.perm2(lenght.neighbors(Segment)):
                 (a, b), (c, d) = s1.points, s2.points
                 for x, y in [(a, b), (b, a)]:
                     for m, n in [(c, d), (d, c)]:
@@ -2380,7 +2380,7 @@ class ProofGraph:
                     continue
                 s1s = l1.neighbors(Segment)
                 s2s = l2.neighbors(Segment)
-                seg_pairs.update(utils.cross(s1s, s2s))
+                seg_pairs.update(comb.cross(s1s, s2s))
             seg_pairss.append(seg_pairs)
 
         # include (l1, l2) in which l1 does not have any ratio.
@@ -2398,8 +2398,8 @@ class ProofGraph:
                 s2s = l2.neighbors(Segment)
                 if len(s1s) < 2 and len(s2s) < 2:
                     continue
-                seg_pairss.append(set(utils.cross(s1s, s2s)))
-                seg_pairss.append(set(utils.cross(s2s, s1s)))
+                seg_pairss.append(set(comb.cross(s1s, s2s)))
+                seg_pairss.append(set(comb.cross(s2s, s1s)))
 
         # include Seg that does not have any Length.
         nolen_ss = [s for s in self.symbols_graph.type2nodes[Segment] if s.val is None]
@@ -2410,12 +2410,12 @@ class ProofGraph:
                 if len(s1s) == 1:
                     continue
                 s2s = [seg]
-                seg_pairss.append(set(utils.cross(s1s, s2s)))
-                seg_pairss.append(set(utils.cross(s2s, s1s)))
+                seg_pairss.append(set(comb.cross(s1s, s2s)))
+                seg_pairss.append(set(comb.cross(s2s, s1s)))
 
         record = set()
         for seg_pairs in seg_pairss:
-            for pair1, pair2 in utils.perm2(list(seg_pairs)):
+            for pair1, pair2 in comb.perm2(list(seg_pairs)):
                 (s1, s2), (s3, s4) = pair1, pair2
                 if s1 == s2 or s3 == s4:
                     continue
@@ -2441,11 +2441,11 @@ class ProofGraph:
             segs = length.neighbors(Segment)
             segss.append(segs)
 
-        segs_pair = list(utils.perm2(list(segss)))
+        segs_pair = list(comb.perm2(list(segss)))
         segs_pair += list(zip(segss, segss))
         for segs1, segs2 in segs_pair:
-            for s1, s2 in utils.perm2(list(segs1)):
-                for s3, s4 in utils.perm2(list(segs2)):
+            for s1, s2 in comb.perm2(list(segs1)):
+                for s3, s4 in comb.perm2(list(segs2)):
                     if (s1, s2) == (s3, s4) or (s1, s3) == (s2, s4):
                         continue
                     if (s1, s2, s3, s4) in record:
@@ -2488,17 +2488,17 @@ class ProofGraph:
 
     def all_cyclics(self) -> Generator[tuple[Point, ...], None, None]:
         for c in self.symbols_graph.type2nodes[Circle]:
-            for x, y, z, t in utils.perm4(c.neighbors(Point)):
+            for x, y, z, t in comb.perm4(c.neighbors(Point)):
                 yield x, y, z, t
 
     def all_colls(self) -> Generator[tuple[Point, ...], None, None]:
         for line in self.symbols_graph.type2nodes[Line]:
-            for x, y, z in utils.perm3(line.neighbors(Point)):
+            for x, y, z in comb.perm3(line.neighbors(Point)):
                 yield x, y, z
 
     def all_midps(self) -> Generator[tuple[Point, ...], None, None]:
         for line in self.symbols_graph.type2nodes[Line]:
-            for a, b, c in utils.perm3(line.neighbors(Point)):
+            for a, b, c in comb.perm3(line.neighbors(Point)):
                 if self.check_cong([a, b, a, c]):
                     yield a, b, c
 
@@ -2511,7 +2511,7 @@ class ProofGraph:
                 p2p[b].append(a)
             for p, ps in p2p.items():
                 if len(ps) >= 3:
-                    for a, b, c in utils.perm3(ps):
+                    for a, b, c in comb.perm3(ps):
                         yield p, a, b, c
 
     def two_points_on_direction(self, d: Direction) -> tuple[Point, Point]:

@@ -18,7 +18,7 @@
 
 import pytest_check as check
 
-from geosolver.combinations_permutations import (
+from geosolver.combinatorics import (
     cross,
     comb2,
     comb3,
