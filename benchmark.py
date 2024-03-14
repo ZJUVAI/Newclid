@@ -4,9 +4,7 @@ from typing import Optional
 
 
 from geosolver.ddar import solve
-from geosolver.geometry import Circle, Line, Point, Segment
 from geosolver.proof_graph import ProofGraph
-from geosolver.numerical.draw_figure import draw_figure
 from geosolver.problem import Definition, Problem, Theorem
 from geosolver.proof_writing import write_solution
 
@@ -40,13 +38,8 @@ def main():
         problem_output_path = out_folder_path / problem_name
         run_ddar(graph, problem, problem_output_path)
 
-        draw_figure(
-            graph.symbols_graph.type2nodes[Point],
-            graph.symbols_graph.type2nodes[Line],
-            graph.symbols_graph.type2nodes[Circle],
-            graph.symbols_graph.type2nodes[Segment],
-            save_to=str(problem_output_path / f"{problem.url}_proof_figure.png"),
-            block=False,
+        graph.symbols_graph.draw_figure(
+            problem_output_path / f"{problem.url}_proof_figure.png",
         )
 
         graph.symbols_graph.draw_html(
