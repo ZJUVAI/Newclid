@@ -1,4 +1,5 @@
 from __future__ import annotations
+from enum import Enum
 import logging
 
 from pathlib import Path
@@ -8,19 +9,47 @@ from pyvis.network import Network
 
 
 from geosolver.algebraic import AlgebraicRules
+from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE, Dependency, Theorem
+
+
+class DependencyType(Enum):
+    GOAL = "goal"
+    PREMISE = "premise"
+    STATEMENT = "statement"
+
+
+DEPTYPE_TO_SHAPE = {
+    DependencyType.GOAL.value: "star",
+    DependencyType.PREMISE.value: "hexagon",
+    DependencyType.STATEMENT.value: "dot",
+}
 
 
 class DependencyGraph:
     def __init__(self) -> None:
         self.nx_graph = MultiDiGraph()
+        self._goal_node = None
 
-    def add_dependency(self, dependency: Dependency):
+    def add_dependency(
+        self,
+        dependency: Dependency,
+        dependency_type: DependencyType = DependencyType.STATEMENT,
+    ):
         node = dependency_node_name(dependency)
+
+        dep_type = dependency_type.value
+        if node in self.nx_graph.nodes:
+            # So goal stay as such
+            dep_type = self.nx_graph.nodes[node]["type"]
 
         dep_args_names = [arg.name for arg in dependency.args]
         self.nx_graph.add_node(
-            node, name=dependency.name, level=dependency.level, args=dep_args_names
+            node,
+            name=dependency.name,
+            level=dependency.level,
+            args=dep_args_names,
+            type=dep_type,
         )
 
     def add_edge(self, u_for_edge: Dependency, v_for_edge: Dependency, rule_name: str):
@@ -70,7 +99,7 @@ class DependencyGraph:
 
     def add_construction_edges(self, dependencies: list[Dependency]):
         for added_dependency in dependencies:
-            self.add_dependency(added_dependency)
+            self.add_dependency(added_dependency, DependencyType.PREMISE)
 
             for why_added in added_dependency.why:
                 self.add_dependency(why_added)
@@ -88,18 +117,31 @@ class DependencyGraph:
                     rule_name=CONSTRUCTION_RULE,
                 )
 
+    def add_goal(self, goal_name: str, goal_args: List[Point]):
+        goal_dep = Dependency(goal_name, goal_args, None, -1)
+        self.add_dependency(goal_dep, DependencyType.GOAL)
+
     def show_html(self, html_path: Path, rules: Dict[str, Theorem]):
         nt = Network("1080px", directed=True)
         # populates the nodes and edges data structures
         vis_graph: MultiDiGraph = self.nx_graph.copy()
         for node, data in vis_graph.nodes(data=True):
             name: str = data.get("name", "Unknown")
+            dep_type: str = data.get("type", "Unknown")
             level: int = data.get("level", -1)
             args: List[str] = data.get("args", [])
             vis_graph.nodes[node]["group"] = level
             vis_graph.nodes[node]["title"] = (
-                f"{name.capitalize()}" f"\nArgs:{args}" f"\nLevel {level}"
+                f"{name.capitalize()}"
+                f"\n {dep_type.capitalize()}"
+                f"\nArgs:{args}"
+                f"\nLevel {level}"
             )
+            vis_graph.nodes[node]["shape"] = DEPTYPE_TO_SHAPE.get(dep_type, "dot")
+            if dep_type == DependencyType.PREMISE.value:
+                vis_graph.nodes[node]["size"] = 20
+            if dep_type == DependencyType.GOAL.value:
+                vis_graph.nodes[node]["size"] = 40
         for u, v, k, data in vis_graph.edges(data=True, keys=True):
             theorem = rules.get(k)
             if theorem:

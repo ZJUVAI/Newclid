@@ -283,6 +283,7 @@ class ProofGraph:
                     lambda x: g.symbols_graph.get_point(x, lambda: int(x)), pr.goal.args
                 )
             )
+            g.dependency_graph.add_goal(pr.goal.name, args)
             check = check_numerical(pr.goal.name, args)
 
         g.url = pr.url
