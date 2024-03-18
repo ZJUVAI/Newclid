@@ -16,5 +16,7 @@ orthocenter_consequence_aux
 a b c = triangle; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d; f = on_tline f c b c ? para a d f c
 imo_2004_p1
 a b c = triangle a b c; o = midpoint o b c; m = on_circle m o b, on_line m a b; n = on_circle n o b, on_line n a c; r = angle_bisector r b a c, angle_bisector r m o n; o1 = circle o1 b m r; o2 = circle o2 c n r; p = on_circle p o1 r, on_circle p o2 r; k = on_bline k m n; l = eqdistance l k k a, eqdistance l o o a ? coll p b c
+r29_only
+a b = segment a b; m = midpoint m a b; m1 = midpoint m1 m a ? eqratio m a a b m1 m m a
 testing_problem
 a b c = triangle; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d; f = on_tline f c b c ? para a d f c
