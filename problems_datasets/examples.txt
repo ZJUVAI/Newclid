@@ -20,6 +20,8 @@ imo_2004_p1_generalized
 a b c = triangle a b c; o = free o; m = on_circle m o b, on_line m a b; n = on_circle n o b, on_line n a c; r = angle_bisector r b a c, angle_bisector r m o n; o1 = circle o1 b m r; o2 = circle o2 c n r; p = on_circle p o1 r, on_circle p o2 r; k = on_bline k m n; l = eqdistance l k k a, eqdistance l o o a ? coll p b c
 not_always_good
 a b c = triangle a b c; o = free o; m = on_circle m o b, on_line m a b; n = on_circle n o b, on_line n a c; r = angle_bisector r b a c, angle_bisector r m o n ? perp n m o r
+r29_only
+a b = segment a b; m = midpoint m a b; m1 = midpoint m1 m a ? eqratio m a a b m1 m m a
 testing_problem
 p q = segment p q; a b = segment a b; o = on_line a b, on_line p q; d = on_aline d p q b o q ? para p d a b
 rule_r29_not_found_disguise

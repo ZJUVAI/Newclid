@@ -98,7 +98,7 @@ def dd_bfs_one_level(
                 continue
 
             add = g.add_piece(name, args, deps=deps)
-            g.dependency_graph.add_theorem_edges(add, theorem)
+            g.dependency_graph.add_theorem_edges(add, theorem, args)
             added += add
 
     branching = len(added)
