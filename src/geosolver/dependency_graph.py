@@ -3,9 +3,11 @@ from enum import Enum
 import logging
 
 from pathlib import Path
+import random
 from typing import TYPE_CHECKING, Dict, List, Union
 from networkx import MultiDiGraph
 from pyvis.network import Network
+import seaborn as sns
 
 
 from geosolver.algebraic import AlgebraicRules
@@ -170,6 +172,9 @@ class DependencyGraph:
                 vis_graph.nodes[node]["size"] = 20
             if dep_type == DependencyType.GOAL.value:
                 vis_graph.nodes[node]["size"] = 40
+
+        edges_colors = build_edges_colors()
+        edges_keys_indexes = []
         for u, v, k, data in vis_graph.edges(data=True, keys=True):
             name = k.split(".")[0]
             theorem = rules.get(name)
@@ -185,7 +190,25 @@ class DependencyGraph:
             vis_graph.edges[u, v, k]["label"] = k if name else "NAN" + k
             vis_graph.edges[u, v, k]["font"] = {"size": 8}
 
+            if k in edges_keys_indexes:
+                edge_index = edges_keys_indexes.index(k)
+            else:
+                edge_index = len(edges_keys_indexes)
+                edges_keys_indexes.append(k)
+
+            edge_color_index = edge_index % len(edges_colors)
+            base_edge_color = edges_colors[edge_color_index]
+
+            idle_edge_color = rgba_to_hex(*base_edge_color, a=0.6)
+            edge_color = rgba_to_hex(*base_edge_color, a=1.0)
+            vis_graph.edges[u, v, k]["color"] = {
+                "color": idle_edge_color,
+                "highlight": edge_color,
+                "hover": edge_color,
+            }
+
         nt.from_nx(vis_graph)
+        nt.options.interaction.hover = True
         nt.show_buttons(filter_=["physics"])
         nt.show(str(html_path), notebook=False)
 
@@ -202,3 +225,19 @@ def _str_arguments(args: List[Union[str, int, "Node"]]) -> List[str]:
         else:
             args_str.append(arg.name)
     return args_str
+
+
+def rgba_to_hex(r, g, b, a=0.5):
+    hexes = "%02x%02x%02x%02x" % (
+        int(r * 255),
+        int(g * 255),
+        int(b * 255),
+        int(a * 255),
+    )
+    return f"#{hexes.upper()}"
+
+
+def build_edges_colors() -> List[str]:
+    edge_colors = sns.color_palette("colorblind")
+    random.shuffle(edge_colors)
+    return edge_colors
