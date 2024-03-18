@@ -156,14 +156,17 @@ class ProofGraph:
 
     def do_algebra(self, name: str, args: list[Point]) -> list[Dependency]:
         """Derive (but not add) new algebraic predicates."""
+        new_deps = []
+
         if name == "para":
             a, b, dep = args
             if is_equiv(a, b):
                 return []
-            (x, y), (m, n) = a._obj.points, b._obj.points
-            return self._add_para([x, y, m, n], dep)
+            else:
+                (x, y), (m, n) = a._obj.points, b._obj.points
+                new_deps = self._add_para([x, y, m, n], dep)
 
-        if name == "aconst":
+        elif name == "aconst":
             a, b, n, d, dep = args
             ab, ba, why = self.symbols_graph.get_or_create_angle_from_directions(
                 a, b, deps=None
@@ -203,37 +206,39 @@ class ProofGraph:
                 self.cache_dep(name, args, dep2)
                 self.make_equal(dn, ba, deps=dep2)
                 added += [dep2]
-            return added
+            new_deps = added
 
-        if name == "rconst":
+        elif name == "rconst":
             a, b, c, d, num, den, dep = args
-            return self._add_eqrat_const([a, b, c, d, num, den], dep)
+            new_deps = self._add_eqrat_const([a, b, c, d, num, den], dep)
 
-        if name == "eqangle":
+        elif name == "eqangle":
             d1, d2, d3, d4, dep = args
             a, b = d1._obj.points
             c, d = d2._obj.points
             e, f = d3._obj.points
             g, h = d4._obj.points
 
-            return self._add_eqangle([a, b, c, d, e, f, g, h], dep)
+            new_deps = self._add_eqangle([a, b, c, d, e, f, g, h], dep)
 
-        if name == "eqratio":
+        elif name == "eqratio":
             d1, d2, d3, d4, dep = args
             a, b = d1._obj.points
             c, d = d2._obj.points
             e, f = d3._obj.points
             g, h = d4._obj.points
 
-            return self._add_eqratio([a, b, c, d, e, f, g, h], dep)
+            new_deps = self._add_eqratio([a, b, c, d, e, f, g, h], dep)
 
-        if name in ["cong", "cong2"]:
+        elif name in ["cong", "cong2"]:
             a, b, c, d, dep = args
             if not (a != b and c != d and (a != c or b != d)):
-                return []
-            return self._add_cong([a, b, c, d], dep)
+                new_deps = []
+            else:
+                new_deps = self._add_cong([a, b, c, d], dep)
 
-        return []
+        self.dependency_graph.add_algebra_edges(new_deps, args[:-1])
+        return new_deps
 
     def add_algebra(self, dep: Dependency, level: int) -> None:
         self.alegbraic_manipulator.add_algebra(self.symbols_graph, dep, level)
@@ -2193,7 +2198,7 @@ class ProofGraph:
                     )
 
                     adds = self.add_piece(name=b.name, args=args, deps=deps)
-                    self.dependency_graph.add_construction_edges(adds)
+                    self.dependency_graph.add_construction_edges(adds, args)
                     basics.append((b.name, args, deps))
                     if adds:
                         added += adds

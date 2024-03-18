@@ -3,14 +3,16 @@ from enum import Enum
 import logging
 
 from pathlib import Path
-from typing import Dict, List
+from typing import TYPE_CHECKING, Dict, List, Union
 from networkx import MultiDiGraph
 from pyvis.network import Network
 
 
 from geosolver.algebraic import AlgebraicRules
-from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE, Dependency, Theorem
+
+if TYPE_CHECKING:
+    from geosolver.geometry import Point, Node
 
 
 class DependencyType(Enum):
@@ -52,26 +54,32 @@ class DependencyGraph:
             type=dep_type,
         )
 
-    def add_edge(self, u_for_edge: Dependency, v_for_edge: Dependency, rule_name: str):
+    def add_edge(
+        self,
+        u_for_edge: Dependency,
+        v_for_edge: Dependency,
+        rule_name: str,
+        rule_arguments: List[Union[str, "Node"]],
+    ):
         pred = dependency_node_name(u_for_edge)
 
         if pred not in self.nx_graph.nodes:
             self.add_dependency(u_for_edge)
             for why_u in u_for_edge.why:
-                self.add_edge(why_u, u_for_edge, rule_name=u_for_edge.rule_name)
+                self.add_edge(
+                    why_u,
+                    u_for_edge,
+                    rule_name=u_for_edge.rule_name,
+                    rule_arguments=u_for_edge.args,
+                )
 
         succ = dependency_node_name(v_for_edge)
         assert succ in self.nx_graph.nodes
-        self.nx_graph.add_edge(
-            pred,
-            succ,
-            key=rule_name,
-        )
+        edge_key = f"{rule_name}." + ".".join(_str_arguments(rule_arguments))
+        self.nx_graph.add_edge(pred, succ, key=edge_key)
 
     def add_theorem_edges(
-        self,
-        dependencies: list[Dependency],
-        theorem: Theorem,
+        self, dependencies: list[Dependency], theorem: Theorem, args: List["Point"]
     ):
         for added_dependency in dependencies:
             self.add_dependency(added_dependency)
@@ -85,7 +93,7 @@ class DependencyGraph:
 
             for why_added in added_dependency.why:
                 dep_rule_name = added_dependency.rule_name
-                if dep_rule_name and dep_rule_name != theorem.rule_name:
+                if dep_rule_name != theorem.rule_name:
                     logging.warning(
                         "Dependency rule was different from the theorem. %s != %s",
                         dep_rule_name,
@@ -94,17 +102,36 @@ class DependencyGraph:
                 self.add_edge(
                     why_added,
                     added_dependency,
-                    rule_name=theorem.rule_name,
+                    rule_name=dep_rule_name,
+                    rule_arguments=args,
                 )
 
-    def add_construction_edges(self, dependencies: list[Dependency]):
+    def add_algebra_edges(
+        self, dependencies: list[Dependency], args: List[Union["Point", int]]
+    ):
+        for added_dependency in dependencies:
+            self.add_dependency(added_dependency)
+            for why_added in added_dependency.why:
+                dep_rule_name = added_dependency.rule_name
+                if dep_rule_name not in [ar.value for ar in AlgebraicRules]:
+                    logging.warning("Dependency rule was unknown: '%s'", dep_rule_name)
+                self.add_edge(
+                    why_added,
+                    added_dependency,
+                    rule_name=dep_rule_name,
+                    rule_arguments=args,
+                )
+
+    def add_construction_edges(
+        self, dependencies: list[Dependency], args: List["Point"]
+    ):
         for added_dependency in dependencies:
             self.add_dependency(added_dependency, DependencyType.PREMISE)
 
             for why_added in added_dependency.why:
                 self.add_dependency(why_added)
                 dep_rule_name = added_dependency.rule_name
-                if dep_rule_name and dep_rule_name != CONSTRUCTION_RULE:
+                if dep_rule_name != CONSTRUCTION_RULE:
                     logging.warning(
                         "Dependency rule was different"
                         "from the construction rule. %s != %s",
@@ -114,10 +141,11 @@ class DependencyGraph:
                 self.add_edge(
                     why_added,
                     added_dependency,
-                    rule_name=CONSTRUCTION_RULE,
+                    rule_name=dep_rule_name,
+                    rule_arguments=args,
                 )
 
-    def add_goal(self, goal_name: str, goal_args: List[Point]):
+    def add_goal(self, goal_name: str, goal_args: List["Point"]):
         goal_dep = Dependency(goal_name, goal_args, None, -1)
         self.add_dependency(goal_dep, DependencyType.GOAL)
 
@@ -143,20 +171,34 @@ class DependencyGraph:
             if dep_type == DependencyType.GOAL.value:
                 vis_graph.nodes[node]["size"] = 40
         for u, v, k, data in vis_graph.edges(data=True, keys=True):
-            theorem = rules.get(k)
+            name = k.split(".")[0]
+            theorem = rules.get(name)
             if theorem:
                 edge_name = theorem.name
-            elif k == CONSTRUCTION_RULE:
+            elif name == CONSTRUCTION_RULE:
                 edge_name = "Construction"
-            elif k in [ar.value for ar in AlgebraicRules]:
-                edge_name = AlgebraicRules(k).name.replace("_", " ")
+            elif name in [ar.value for ar in AlgebraicRules]:
+                edge_name = AlgebraicRules(name).name.replace("_", " ")
             else:
                 edge_name = "NOT FOUND"
             vis_graph.edges[u, v, k]["title"] = edge_name
-            vis_graph.edges[u, v, k]["label"] = k if k else "NAN"
+            vis_graph.edges[u, v, k]["label"] = k if name else "NAN" + k
+            vis_graph.edges[u, v, k]["font"] = {"size": 8}
+
         nt.from_nx(vis_graph)
+        nt.show_buttons(filter_=["physics"])
         nt.show(str(html_path), notebook=False)
 
 
 def dependency_node_name(dependency: Dependency):
     return ".".join(dependency.hashed())
+
+
+def _str_arguments(args: List[Union[str, int, "Node"]]) -> List[str]:
+    args_str = []
+    for arg in args:
+        if isinstance(arg, (int, str, float)):
+            args_str.append(str(arg))
+        else:
+            args_str.append(arg.name)
+    return args_str
