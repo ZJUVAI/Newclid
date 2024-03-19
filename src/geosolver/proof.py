@@ -22,6 +22,8 @@ from collections import defaultdict
 from typing import Generator, Optional, Union
 import logging
 
+from networkx import ancestors
+
 from geosolver.symbols_graph import SymbolsGraph
 from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 from geosolver.geometry import (
@@ -138,6 +140,16 @@ class Proof:
         self.vhalfpi = self._halfpi.val
 
         self.dependency_graph = DependencyGraph()
+
+    @property
+    def proof_subgraph(self) -> DependencyGraph:
+        proof_graph = DependencyGraph()
+        proof_graph.nx_graph = self.dependency_graph.nx_graph.copy()
+        proof_graph.nx_graph = proof_graph.nx_graph.subgraph(
+            ancestors(proof_graph.nx_graph, self.dependency_graph.goal)
+            | {self.dependency_graph.goal}
+        )
+        return proof_graph
 
     def copy(self) -> Proof:
         """Make a copy of self."""

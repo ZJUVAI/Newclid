@@ -35,6 +35,7 @@ DEPTYPE_TO_SHAPE = {
 class DependencyGraph:
     def __init__(self) -> None:
         self.nx_graph = MultiDiGraph()
+        self.goal = None
 
     def add_dependency(
         self,
@@ -155,6 +156,7 @@ class DependencyGraph:
 
     def add_goal(self, goal_name: str, goal_args: List["Point"]):
         goal_dep = Dependency(goal_name, goal_args, None, -1)
+        self.goal = dependency_node_name(goal_dep)
         self.add_dependency(goal_dep, DependencyType.GOAL)
 
     def show_html(self, html_path: Path, rules: Dict[str, Theorem]):

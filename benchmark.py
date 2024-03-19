@@ -33,21 +33,26 @@ def main():
         if problem_name != "orthocenter_consequence_aux":
             continue
         logging.info(f"Starting problem {problem_name} with ddar only.")
-        graph, _ = Proof.build_problem(problem, DEFINITIONS)
+        proof, _ = Proof.build_problem(problem, DEFINITIONS)
 
         problem_output_path = out_folder_path / problem_name
-        run_ddar(graph, problem, problem_output_path)
+        run_ddar(proof, problem, problem_output_path)
 
-        graph.symbols_graph.draw_figure(
+        proof.symbols_graph.draw_figure(
             problem_output_path / f"{problem.url}_proof_figure.png",
         )
 
-        graph.symbols_graph.draw_html(
+        proof.symbols_graph.draw_html(
             problem_output_path / f"{problem_name}.symbols_graph.html"
         )
 
-        graph.dependency_graph.show_html(
+        proof.dependency_graph.show_html(
             problem_output_path / f"{problem_name}.dependency_graph.html",
+            RULES,
+        )
+
+        proof.proof_subgraph.show_html(
+            problem_output_path / f"{problem_name}.proof_subgraph.html",
             RULES,
         )
 
