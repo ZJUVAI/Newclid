@@ -21,12 +21,14 @@ class DependencyType(Enum):
     GOAL = "goal"
     PREMISE = "premise"
     STATEMENT = "statement"
+    NUMERICAL_CHECK = "numerical_check"
 
 
 DEPTYPE_TO_SHAPE = {
     DependencyType.GOAL.value: "star",
     DependencyType.PREMISE.value: "hexagon",
     DependencyType.STATEMENT.value: "dot",
+    DependencyType.NUMERICAL_CHECK.value: "square",
 }
 
 
@@ -66,7 +68,10 @@ class DependencyGraph:
         pred = dependency_node_name(u_for_edge)
 
         if pred not in self.nx_graph.nodes:
-            self.add_dependency(u_for_edge)
+            dependency_type = DependencyType.STATEMENT
+            if not u_for_edge.why:
+                dependency_type = DependencyType.NUMERICAL_CHECK
+            self.add_dependency(u_for_edge, dependency_type)
             for why_u in u_for_edge.why:
                 self.add_edge(
                     why_u,
