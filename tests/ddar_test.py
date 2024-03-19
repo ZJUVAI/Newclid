@@ -18,7 +18,7 @@ import pytest
 import pytest_check as check
 
 from geosolver.ddar import solve
-from geosolver.proof_graph import ProofGraph
+from geosolver.proof import Proof
 from geosolver.problem import Definition, Problem, Theorem
 
 
@@ -30,30 +30,30 @@ class TestDDAR:
 
     def test_orthocenter_should_fail(self):
         txt = "a b c = triangle a b c; d = on_tline d b a c, on_tline d c a b ? perp a d b c"
-        p = Problem.from_txt(txt)
-        g, _ = ProofGraph.build_problem(p, self.defs)
+        problem = Problem.from_txt(txt)
+        proof, _ = Proof.build_problem(problem, self.defs)
 
-        solve(g, self.rules, p, max_level=1000)
-        goal_args = g.symbols_graph.names2nodes(p.goal.args)
-        check.is_false(g.check(p.goal.name, goal_args))
+        solve(proof, self.rules, problem, max_level=1000)
+        goal_args = proof.symbols_graph.names2nodes(problem.goal.args)
+        check.is_false(proof.check(problem.goal.name, goal_args))
 
     def test_orthocenter_aux_should_succeed(self):
         txt = "a b c = triangle a b c; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d ? perp a d b c"
-        p = Problem.from_txt(txt)
-        g, _ = ProofGraph.build_problem(p, self.defs)
+        problem = Problem.from_txt(txt)
+        proof, _ = Proof.build_problem(problem, self.defs)
 
-        solve(g, self.rules, p, max_level=1000)
-        goal_args = g.symbols_graph.names2nodes(p.goal.args)
-        check.is_true(g.check(p.goal.name, goal_args))
+        solve(proof, self.rules, problem, max_level=1000)
+        goal_args = proof.symbols_graph.names2nodes(problem.goal.args)
+        check.is_true(proof.check(problem.goal.name, goal_args))
 
     def test_incenter_excenter_should_succeed(self):
         # Note that this same problem should fail in dd_test.py
-        p = Problem.from_txt(
+        problem = Problem.from_txt(
             "a b c = triangle a b c; d = incenter d a b c; e = excenter e a b c ?"
             " perp d c c e"
         )
-        g, _ = ProofGraph.build_problem(p, self.defs)
+        proof, _ = Proof.build_problem(problem, self.defs)
 
-        solve(g, self.rules, p, max_level=1000)
-        goal_args = g.symbols_graph.names2nodes(p.goal.args)
-        check.is_true(g.check(p.goal.name, goal_args))
+        solve(proof, self.rules, problem, max_level=1000)
+        goal_args = proof.symbols_graph.names2nodes(problem.goal.args)
+        check.is_true(proof.check(problem.goal.name, goal_args))

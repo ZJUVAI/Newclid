@@ -9,11 +9,11 @@ import geosolver.trace_back as trace_back
 from geosolver.problem import Clause, Dependency, Problem
 
 if TYPE_CHECKING:
-    from geosolver.proof_graph import ProofGraph
+    from geosolver.proof import Proof
 
 
 def get_proof_steps(
-    g: "ProofGraph", goal: Clause, merge_trivials: bool = False
+    proof: "Proof", goal: Clause, merge_trivials: bool = False
 ) -> tuple[
     list[Dependency],
     list[Dependency],
@@ -21,11 +21,11 @@ def get_proof_steps(
     dict[tuple[str, ...], int],
 ]:
     """Extract proof steps from the built DAG."""
-    goal_args = g.symbols_graph.names2nodes(goal.args)
+    goal_args = proof.symbols_graph.names2nodes(goal.args)
     query = Dependency(goal.name, goal_args, None, None)
 
     setup, aux, log, setup_points = trace_back.get_logs(
-        query, g, merge_trivials=merge_trivials
+        query, proof, merge_trivials=merge_trivials
     )
 
     refs = {}
@@ -86,15 +86,17 @@ def proof_step_string(
     return f"{premises_nl} \u21d2 {conclusion_nl}"
 
 
-def write_solution(g: "ProofGraph", p: Problem, out_file: Optional[Path]) -> None:
+def write_solution(proof: "Proof", problem: Problem, out_file: Optional[Path]) -> None:
     """Output the solution to out_file.
 
     Args:
-      g: gh.Graph object, containing the proof state.
-      p: pr.Problem object, containing the theorem.
+      proof: Proof state.
+      problem: Containing the problem definition and theorems.
       out_file: file to write to, empty string to skip writing to file.
     """
-    setup, aux, proof_steps, refs = get_proof_steps(g, p.goal, merge_trivials=False)
+    setup, aux, proof_steps, refs = get_proof_steps(
+        proof, problem.goal, merge_trivials=False
+    )
 
     solution = "\n=========================="
     solution += "\n * From theorem premises:\n"

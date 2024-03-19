@@ -15,10 +15,13 @@
 
 """Implements DAG-level traceback."""
 
-from typing import Any
+from typing import TYPE_CHECKING
 
 from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE, Dependency
+
+if TYPE_CHECKING:
+    from geosolver.proof import Proof
 
 
 def point_levels(
@@ -267,7 +270,7 @@ def collx_to_coll(
 
 
 def get_logs(
-    query: Dependency, g: Any, merge_trivials: bool = False
+    query: Dependency, proof: "Proof", merge_trivials: bool = False
 ) -> tuple[
     list[Dependency],
     list[Dependency],
@@ -275,7 +278,7 @@ def get_logs(
     set[Point],
 ]:
     """Given a DAG and conclusion N, return the premise, aux, proof."""
-    query = query.why_me_or_cache(g, query.level)
+    query = query.why_me_or_cache(proof, query.level)
     log = recursive_traceback(query)
     log, setup, aux_setup, setup_points, _ = separate_dependency_difference(query, log)
 

@@ -12,11 +12,11 @@ from geosolver.problem import Dependency, EmptyDependency, Problem, Theorem, has
 from geosolver.deductive.match_theorems import match_all_theorems
 
 if TYPE_CHECKING:
-    from geosolver.proof_graph import ProofGraph
+    from geosolver.proof import Proof
 
 
 def dd_bfs_one_level(
-    g: "ProofGraph",
+    proof: "Proof",
     theorems: list[Theorem],
     level: int,
     controller: Problem,
@@ -32,7 +32,7 @@ def dd_bfs_one_level(
     """Forward deduce one breadth-first level."""
 
     # Step 1: match all theorems:
-    theorem2mappings = match_all_theorems(g, theorems, controller.goal)
+    theorem2mappings = match_all_theorems(proof, theorems, controller.goal)
 
     # Step 2: traceback for each deduce:
     theorem2deps: dict[Theorem, list[Dependency]] = {}
@@ -68,7 +68,7 @@ def dd_bfs_one_level(
 
                 dep = Dependency(p.name, p_args, rule_name="", level=level)
                 try:
-                    dep = dep.why_me_or_cache(g, level)
+                    dep = dep.why_me_or_cache(proof, level)
                 except Exception:
                     fail = True
                     break
@@ -76,7 +76,7 @@ def dd_bfs_one_level(
                 if dep.why is None:
                     fail = True
                     break
-                g.cache_dep(p.name, p_args, dep)
+                proof.cache_dep(p.name, p_args, dep)
                 deps.why.append(dep)
 
             if fail:
@@ -94,11 +94,11 @@ def dd_bfs_one_level(
                 break
             name, args = theorem.conclusion_name_args(mp)
             hash_conclusion = hashed(name, args)
-            if hash_conclusion in g.cache:
+            if hash_conclusion in proof.cache:
                 continue
 
-            add = g.add_piece(name, args, deps=deps)
-            g.dependency_graph.add_theorem_edges(add, theorem, args)
+            add = proof.add_piece(name, args, deps=deps)
+            proof.dependency_graph.add_theorem_edges(add, theorem, args)
             added += add
 
     branching = len(added)
@@ -108,21 +108,21 @@ def dd_bfs_one_level(
         args = []
 
         for a in controller.goal.args:
-            if a in g.symbols_graph._name2node:
-                a = g.symbols_graph._name2node[a]
+            if a in proof.symbols_graph._name2node:
+                a = proof.symbols_graph._name2node[a]
             elif "/" in a:
-                a = create_consts_str(g, a)
+                a = create_consts_str(proof, a)
             elif a.isdigit():
                 a = int(a)
             args.append(a)
 
-        if g.check(controller.goal.name, args):
+        if proof.check(controller.goal.name, args):
             return added, {}, {}, branching
 
     # Run AR, but do NOT apply to the proof state (yet).
     for dep in added:
-        g.add_algebra(dep, level)
-    derives, eq4s = g.alegbraic_manipulator.derive_algebra(level, verbose=False)
+        proof.add_algebra(dep, level)
+    derives, eq4s = proof.alegbraic_manipulator.derive_algebra(level, verbose=False)
 
     branching += sum([len(x) for x in derives.values()])
     branching += sum([len(x) for x in eq4s.values()])
@@ -130,7 +130,7 @@ def dd_bfs_one_level(
     return added, derives, eq4s, branching
 
 
-def create_consts_str(proof_graph: "ProofGraph", s: str) -> Union[Ratio, Angle]:
+def create_consts_str(proof_graph: "Proof", s: str) -> Union[Ratio, Angle]:
     if "pi/" in s:
         n, d = s.split("pi/")
         n, d = int(n), int(d)

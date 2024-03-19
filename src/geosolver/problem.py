@@ -26,7 +26,7 @@ import geosolver.pretty as pt
 from geosolver.ratios import simplify
 
 if TYPE_CHECKING:
-    from geosolver.proof_graph import ProofGraph
+    from geosolver.proof import Proof
 
 
 def reshape(list_to_reshape: list[Any], n: int = 1) -> list[list[Any]]:
@@ -596,7 +596,7 @@ class EmptyDependency:
 
     def extend(
         self,
-        g: Any,
+        proof: "Proof",
         name0: str,
         args0: list[gm.Point],
         name: str,
@@ -606,12 +606,12 @@ class EmptyDependency:
         dep0 = self.populate(name0, args0)
         deps = EmptyDependency(level=self.level, rule_name=None)
         dep = Dependency(name, args, None, deps.level)
-        deps.why = [dep0, dep.why_me_or_cache(g, None)]
+        deps.why = [dep0, dep.why_me_or_cache(proof, None)]
         return deps
 
     def extend_many(
         self,
-        g: Any,
+        proof: "Proof",
         name0: str,
         args0: list[gm.Point],
         name_args: list[tuple[str, list[gm.Point]]],
@@ -624,7 +624,7 @@ class EmptyDependency:
         deps.why = [dep0]
         for name, args in name_args:
             dep = Dependency(name, args, None, deps.level)
-            deps.why += [dep.why_me_or_cache(g, None)]
+            deps.why += [dep.why_me_or_cache(proof, None)]
         return deps
 
 
@@ -639,7 +639,7 @@ def maybe_make_equal_pairs(
     q: gm.Point,
     ab: gm.Line,
     mn: gm.Line,
-    g: Any,
+    proof: "Proof",
     level: int,
 ) -> list[Dependency]:
     """Make a-b:c-d==m-n:p-q in case a-b==m-n or c-d==p-q."""
@@ -650,11 +650,11 @@ def maybe_make_equal_pairs(
     colls = [a, b, m, n]
     if len(set(colls)) > 2 and eqname == "para":
         dep = Dependency("collx", colls, None, level)
-        dep.why_me(g, level)
+        dep.why_me(proof, level)
         why += [dep]
 
     dep = Dependency(eqname, [c, d, p, q], None, level)
-    dep.why_me(g, level)
+    dep.why_me(proof, level)
     why += [dep]
     return why
 
@@ -691,10 +691,10 @@ class Dependency(Construction):
         dep.why = list(self.why)
         return dep
 
-    def why_me_or_cache(self, g: "ProofGraph", level: int) -> Dependency:
-        if self.hashed() in g.cache:
-            return g.cache[self.hashed()]
-        self.why_me(g, level)
+    def why_me_or_cache(self, proof: "Proof", level: int) -> Dependency:
+        if self.hashed() in proof.cache:
+            return proof.cache[self.hashed()]
+        self.why_me(proof, level)
         return self
 
     def populate(self, name: str, args: list[gm.Point]) -> Dependency:
@@ -703,13 +703,13 @@ class Dependency(Construction):
         dep.why = list(self.why)
         return dep
 
-    def why_me(self, g: "ProofGraph", level: int) -> None:
+    def why_me(self, proof: "Proof", level: int) -> None:
         """Figure out the dependencies predicates of self."""
         name, args = self.name, self.args
 
         hashed_me = hashed(name, args)
-        if hashed_me in g.cache:
-            dep = g.cache[hashed_me]
+        if hashed_me in proof.cache:
+            dep = proof.cache[hashed_me]
             self.why = dep.why
             self.rule_name = dep.rule_name
             return
@@ -720,15 +720,15 @@ class Dependency(Construction):
                 self.why = []
                 return
 
-            ab = g.symbols_graph.get_line(a, b)
-            cd = g.symbols_graph.get_line(c, d)
+            ab = proof.symbols_graph.get_line(a, b)
+            cd = proof.symbols_graph.get_line(c, d)
             if ab == cd:
                 if {a, b} == {c, d}:
                     self.why = []
                     self.rule_name = ""
                     return
                 dep = Dependency("coll", list({a, b, c, d}), "t??", None)
-                self.why = [dep.why_me_or_cache(g, level)]
+                self.why = [dep.why_me_or_cache(proof, level)]
                 return
 
             for (x, y), xy in zip([(a, b), (c, d)], [ab, cd]):
@@ -736,28 +736,28 @@ class Dependency(Construction):
                 if {x, y} == {x_, y_}:
                     continue
                 d = Dependency("collx", [x, y, x_, y_], None, level)
-                self.why += [d.why_me_or_cache(g, level)]
+                self.why += [d.why_me_or_cache(proof, level)]
 
-            whypara = g.why_equal(ab, cd, None)
+            whypara = proof.why_equal(ab, cd, None)
             self.why += whypara
 
         elif self.name == "midp":
             m, a, b = self.args
-            ma = g.symbols_graph.get_segment(m, a)
-            mb = g.symbols_graph.get_segment(m, b)
-            dep = Dependency("coll", [m, a, b], None, None).why_me_or_cache(g, None)
-            self.why = [dep] + g.why_equal(ma, mb, level)
+            ma = proof.symbols_graph.get_segment(m, a)
+            mb = proof.symbols_graph.get_segment(m, b)
+            dep = Dependency("coll", [m, a, b], None, None).why_me_or_cache(proof, None)
+            self.why = [dep] + proof.why_equal(ma, mb, level)
 
         elif self.name == "perp":
             a, b, c, d = self.args
-            ab = g.symbols_graph.get_line(a, b)
-            cd = g.symbols_graph.get_line(c, d)
+            ab = proof.symbols_graph.get_line(a, b)
+            cd = proof.symbols_graph.get_line(c, d)
             for (x, y), xy in zip([(a, b), (c, d)], [ab, cd]):
                 x_, y_ = xy.points
                 if {x, y} == {x_, y_}:
                     continue
                 d = Dependency("collx", [x, y, x_, y_], None, level)
-                self.why += [d.why_me_or_cache(g, level)]
+                self.why += [d.why_me_or_cache(proof, level)]
 
             _, why = why_eqangle(ab._val, cd._val, cd._val, ab._val, level)
             a, b = ab.points
@@ -772,28 +772,28 @@ class Dependency(Construction):
 
         elif self.name == "cong":
             a, b, c, d = self.args
-            ab = g.symbols_graph.get_segment(a, b)
-            cd = g.symbols_graph.get_segment(c, d)
+            ab = proof.symbols_graph.get_segment(a, b)
+            cd = proof.symbols_graph.get_segment(c, d)
 
-            self.why = g.why_equal(ab, cd, level)
+            self.why = proof.why_equal(ab, cd, level)
 
         elif self.name == "coll":
             _, why = gm.line_of_and_why(self.args, level)
             self.why = why
 
         elif self.name == "collx":
-            if g.check_coll(self.args):
+            if proof.check_coll(self.args):
                 args = list(set(self.args))
                 hashed_me = hashed("coll", args)
-                if hashed_me in g.cache:
-                    dep = g.cache[hashed_me]
+                if hashed_me in proof.cache:
+                    dep = proof.cache[hashed_me]
                     self.why = [dep]
                     self.rule_name = ""
                     return
                 _, self.why = gm.line_of_and_why(args, level)
             else:
                 self.name = "para"
-                self.why_me(g, level)
+                self.why_me(proof, level)
 
         elif self.name == "cyclic":
             _, why = gm.circle_of_and_why(self.args, level)
@@ -801,32 +801,32 @@ class Dependency(Construction):
 
         elif self.name == "circle":
             o, a, b, c = self.args
-            oa = g.symbols_graph.get_segment(o, a)
-            ob = g.symbols_graph.get_segment(o, b)
-            oc = g.symbols_graph.get_segment(o, c)
-            self.why = g.why_equal(oa, ob, level) + g.why_equal(oa, oc, level)
+            oa = proof.symbols_graph.get_segment(o, a)
+            ob = proof.symbols_graph.get_segment(o, b)
+            oc = proof.symbols_graph.get_segment(o, c)
+            self.why = proof.why_equal(oa, ob, level) + proof.why_equal(oa, oc, level)
 
         elif self.name in ["eqangle", "eqangle6"]:
             a, b, c, d, m, n, p, q = self.args
 
-            ab, why1 = g.symbols_graph.get_line_thru_pair_why(a, b)
-            cd, why2 = g.symbols_graph.get_line_thru_pair_why(c, d)
-            mn, why3 = g.symbols_graph.get_line_thru_pair_why(m, n)
-            pq, why4 = g.symbols_graph.get_line_thru_pair_why(p, q)
+            ab, why1 = proof.symbols_graph.get_line_thru_pair_why(a, b)
+            cd, why2 = proof.symbols_graph.get_line_thru_pair_why(c, d)
+            mn, why3 = proof.symbols_graph.get_line_thru_pair_why(m, n)
+            pq, why4 = proof.symbols_graph.get_line_thru_pair_why(p, q)
 
             if ab is None or cd is None or mn is None or pq is None:
                 if {a, b} == {m, n}:
                     d = Dependency("para", [c, d, p, q], None, level)
-                    self.why = [d.why_me_or_cache(g, level)]
+                    self.why = [d.why_me_or_cache(proof, level)]
                 if {a, b} == {c, d}:
                     d = Dependency("para", [p, q, m, n], None, level)
-                    self.why = [d.why_me_or_cache(g, level)]
+                    self.why = [d.why_me_or_cache(proof, level)]
                 if {c, d} == {p, q}:
                     d = Dependency("para", [a, b, m, n], None, level)
-                    self.why = [d.why_me_or_cache(g, level)]
+                    self.why = [d.why_me_or_cache(proof, level)]
                 if {p, q} == {m, n}:
                     d = Dependency("para", [a, b, c, d], None, level)
-                    self.why = [d.why_me_or_cache(g, level)]
+                    self.why = [d.why_me_or_cache(proof, level)]
                 return
 
             for (x, y), xy, whyxy in zip(
@@ -864,55 +864,55 @@ class Dependency(Construction):
                     self.why += []
                 elif ab == mn:
                     self.why += maybe_make_equal_pairs(
-                        a, b, c, d, m, n, p, q, ab, mn, g, level
+                        a, b, c, d, m, n, p, q, ab, mn, proof, level
                     )
                 elif cd == pq:
                     self.why += maybe_make_equal_pairs(
-                        c, d, a, b, p, q, m, n, cd, pq, g, level
+                        c, d, a, b, p, q, m, n, cd, pq, proof, level
                     )
                 elif ab == cd:
                     self.why += maybe_make_equal_pairs(
-                        a, b, m, n, c, d, p, q, ab, cd, g, level
+                        a, b, m, n, c, d, p, q, ab, cd, proof, level
                     )
                 elif mn == pq:
                     self.why += maybe_make_equal_pairs(
-                        m, n, a, b, p, q, c, d, mn, pq, g, level
+                        m, n, a, b, p, q, c, d, mn, pq, proof, level
                     )
-                elif g.is_equal(ab, mn) or g.is_equal(cd, pq):
+                elif proof.is_equal(ab, mn) or proof.is_equal(cd, pq):
                     dep1 = Dependency("para", [a, b, m, n], None, level)
-                    dep1.why_me(g, level)
+                    dep1.why_me(proof, level)
                     dep2 = Dependency("para", [c, d, p, q], None, level)
-                    dep2.why_me(g, level)
+                    dep2.why_me(proof, level)
                     self.why += [dep1, dep2]
-                elif g.is_equal(ab, cd) or g.is_equal(mn, pq):
+                elif proof.is_equal(ab, cd) or proof.is_equal(mn, pq):
                     dep1 = Dependency("para", [a, b, c, d], None, level)
-                    dep1.why_me(g, level)
+                    dep1.why_me(proof, level)
                     dep2 = Dependency("para", [m, n, p, q], None, level)
-                    dep2.why_me(g, level)
+                    dep2.why_me(proof, level)
                     self.why += [dep1, dep2]
                 elif ab._val and cd._val and mn._val and pq._val:
                     self.why = why_eqangle(ab._val, cd._val, mn._val, pq._val, level)
 
         elif self.name in ["eqratio", "eqratio6"]:
             a, b, c, d, m, n, p, q = self.args
-            ab = g.symbols_graph.get_segment(a, b)
-            cd = g.symbols_graph.get_segment(c, d)
-            mn = g.symbols_graph.get_segment(m, n)
-            pq = g.symbols_graph.get_segment(p, q)
+            ab = proof.symbols_graph.get_segment(a, b)
+            cd = proof.symbols_graph.get_segment(c, d)
+            mn = proof.symbols_graph.get_segment(m, n)
+            pq = proof.symbols_graph.get_segment(p, q)
 
             if ab is None or cd is None or mn is None or pq is None:
                 if {a, b} == {m, n}:
                     d = Dependency("cong", [c, d, p, q], None, level)
-                    self.why = [d.why_me_or_cache(g, level)]
+                    self.why = [d.why_me_or_cache(proof, level)]
                 if {a, b} == {c, d}:
                     d = Dependency("cong", [p, q, m, n], None, level)
-                    self.why = [d.why_me_or_cache(g, level)]
+                    self.why = [d.why_me_or_cache(proof, level)]
                 if {c, d} == {p, q}:
                     d = Dependency("cong", [a, b, m, n], None, level)
-                    self.why = [d.why_me_or_cache(g, level)]
+                    self.why = [d.why_me_or_cache(proof, level)]
                 if {p, q} == {m, n}:
                     d = Dependency("cong", [a, b, c, d], None, level)
-                    self.why = [d.why_me_or_cache(g, level)]
+                    self.why = [d.why_me_or_cache(proof, level)]
                 return
 
             if ab._val and cd._val and mn._val and pq._val:
@@ -924,31 +924,31 @@ class Dependency(Construction):
                     self.why = []
                 elif ab == mn:
                     self.why += maybe_make_equal_pairs(
-                        a, b, c, d, m, n, p, q, ab, mn, g, level
+                        a, b, c, d, m, n, p, q, ab, mn, proof, level
                     )
                 elif cd == pq:
                     self.why += maybe_make_equal_pairs(
-                        c, d, a, b, p, q, m, n, cd, pq, g, level
+                        c, d, a, b, p, q, m, n, cd, pq, proof, level
                     )
                 elif ab == cd:
                     self.why += maybe_make_equal_pairs(
-                        a, b, m, n, c, d, p, q, ab, cd, g, level
+                        a, b, m, n, c, d, p, q, ab, cd, proof, level
                     )
                 elif mn == pq:
                     self.why += maybe_make_equal_pairs(
-                        m, n, a, b, p, q, c, d, mn, pq, g, level
+                        m, n, a, b, p, q, c, d, mn, pq, proof, level
                     )
-                elif g.is_equal(ab, mn) or g.is_equal(cd, pq):
+                elif proof.is_equal(ab, mn) or proof.is_equal(cd, pq):
                     dep1 = Dependency("cong", [a, b, m, n], None, level)
-                    dep1.why_me(g, level)
+                    dep1.why_me(proof, level)
                     dep2 = Dependency("cong", [c, d, p, q], None, level)
-                    dep2.why_me(g, level)
+                    dep2.why_me(proof, level)
                     self.why += [dep1, dep2]
-                elif g.is_equal(ab, cd) or g.is_equal(mn, pq):
+                elif proof.is_equal(ab, cd) or proof.is_equal(mn, pq):
                     dep1 = Dependency("cong", [a, b, c, d], None, level)
-                    dep1.why_me(g, level)
+                    dep1.why_me(proof, level)
                     dep2 = Dependency("cong", [m, n, p, q], None, level)
-                    dep2.why_me(g, level)
+                    dep2.why_me(proof, level)
                     self.why += [dep1, dep2]
                 elif ab._val and cd._val and mn._val and pq._val:
                     self.why = why_eqangle(ab._val, cd._val, mn._val, pq._val, level)
@@ -959,20 +959,20 @@ class Dependency(Construction):
         elif self.name == "simtri":
             a, b, c, x, y, z = self.args
             dep1 = Dependency("eqangle", [a, b, a, c, x, y, x, z], "", level)
-            dep1.why_me(g, level)
+            dep1.why_me(proof, level)
             dep2 = Dependency("eqangle", [b, a, b, c, y, x, y, z], "", level)
-            dep2.why_me(g, level)
+            dep2.why_me(proof, level)
             self.rule_name = "r34"
             self.why = [dep1, dep2]
 
         elif self.name == "contri":
             a, b, c, x, y, z = self.args
             dep1 = Dependency("cong", [a, b, x, y], "", level)
-            dep1.why_me(g, level)
+            dep1.why_me(proof, level)
             dep2 = Dependency("cong", [b, c, y, z], "", level)
-            dep2.why_me(g, level)
+            dep2.why_me(proof, level)
             dep3 = Dependency("cong", [c, a, z, x], "", level)
-            dep3.why_me(g, level)
+            dep3.why_me(proof, level)
             self.rule_name = "r32"
             self.why = [dep1, dep2, dep3]
 
@@ -991,20 +991,20 @@ class Dependency(Construction):
                 l1, l2 = d1._obj, d2._obj
                 (a1, b1), (c1, d1) = l1.points, l2.points
 
-                if not g.check_para_or_coll([a, b, a1, b1]) or not g.check_para_or_coll(
-                    [c, d, c1, d1]
-                ):
+                if not proof.check_para_or_coll(
+                    [a, b, a1, b1]
+                ) or not proof.check_para_or_coll([c, d, c1, d1]):
                     continue
 
                 self.why = []
                 for args in [(a, b, a1, b1), (c, d, c1, d1)]:
-                    if g.check_coll(args):
+                    if proof.check_coll(args):
                         if len(set(args)) > 2:
                             dep = Dependency("coll", args, None, None)
-                            self.why.append(dep.why_me_or_cache(g, level))
+                            self.why.append(dep.why_me_or_cache(proof, level))
                     else:
                         dep = Dependency("para", args, None, None)
-                        self.why.append(dep.why_me_or_cache(g, level))
+                        self.why.append(dep.why_me_or_cache(proof, level))
 
                 self.why += gm.why_equal(ang, ang0)
                 break
@@ -1021,14 +1021,16 @@ class Dependency(Construction):
                 s1, s2 = l1._obj, l2._obj
                 (a1, b1), (c1, d1) = list(s1.points), list(s2.points)
 
-                if not g.check_cong([a, b, a1, b1]) or not g.check_cong([c, d, c1, d1]):
+                if not proof.check_cong([a, b, a1, b1]) or not proof.check_cong(
+                    [c, d, c1, d1]
+                ):
                     continue
 
                 self.why = []
                 for args in [(a, b, a1, b1), (c, d, c1, d1)]:
                     if len(set(args)) > 2:
                         dep = Dependency("cong", args, None, None)
-                        self.why.append(dep.why_me_or_cache(g, level))
+                        self.why.append(dep.why_me_or_cache(proof, level))
 
                 self.why += gm.why_equal(rat, rat0)
                 break

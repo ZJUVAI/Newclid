@@ -119,8 +119,8 @@ class PointTooFarError(Exception):
     pass
 
 
-class ProofGraph:
-    """Graph data structure representing proof state."""
+class Proof:
+    """Object representing the proof state."""
 
     def __init__(
         self,
@@ -139,7 +139,7 @@ class ProofGraph:
 
         self.dependency_graph = DependencyGraph()
 
-    def copy(self) -> ProofGraph:
+    def copy(self) -> Proof:
         """Make a copy of self."""
         p, definitions = self.build_def
 
@@ -149,10 +149,10 @@ class ProofGraph:
             for pname in clause.points:
                 clause.nums.append(self.symbols_graph._name2node[pname].num)
 
-        g, _ = ProofGraph.build_problem(p, definitions, verbose=False, init_copy=False)
+        proof, _ = Proof.build_problem(p, definitions, verbose=False, init_copy=False)
 
-        g.build_clauses = list(getattr(self, "build_clauses", []))
-        return g
+        proof.build_clauses = list(getattr(self, "build_clauses", []))
+        return proof
 
     def do_algebra(self, name: str, args: list[Point]) -> list[Dependency]:
         """Derive (but not add) new algebraic predicates."""
@@ -250,28 +250,31 @@ class ProofGraph:
         definitions: dict[str, Definition],
         verbose: bool = True,
         init_copy: bool = True,
-    ) -> tuple[ProofGraph, list[Dependency]]:
+    ) -> tuple[Proof, list[Dependency]]:
         """Build a problem into a gr.Graph object."""
         check = False
-        g = None
+        proof = None
         added = None
         if verbose:
             logging.info(pr.url)
             logging.info(pr.txt())
         while not check:
+            # While loop to search for coordinates
+            # that checks premises conditions numerically
+            # will result in infinite loop if problem is impossible numerically.
             try:
-                g = ProofGraph(
+                proof = Proof(
                     alegbraic_manipulator=AlgebraicManipulator(),
                     symbols_graph=SymbolsGraph(),
                 )
                 added = []
                 plevel = 0
                 for clause in pr.clauses:
-                    adds, plevel = g.add_clause(
+                    adds, plevel = proof.add_clause(
                         clause, plevel, definitions, verbose=verbose
                     )
                     added += adds
-                g.plevel = plevel
+                proof.plevel = plevel
 
             except (num_geo.InvalidLineIntersectError, num_geo.InvalidQuadSolveError):
                 continue
@@ -285,18 +288,19 @@ class ProofGraph:
 
             args = list(
                 map(
-                    lambda x: g.symbols_graph.get_point(x, lambda: int(x)), pr.goal.args
+                    lambda x: proof.symbols_graph.get_point(x, lambda: int(x)),
+                    pr.goal.args,
                 )
             )
-            g.dependency_graph.add_goal(pr.goal.name, args)
+            proof.dependency_graph.add_goal(pr.goal.name, args)
             check = check_numerical(pr.goal.name, args)
 
-        g.url = pr.url
-        g.build_def = (pr, definitions)
+        proof.url = pr.url
+        proof.build_def = (pr, definitions)
         for add in added:
-            g.add_algebra(add, level=0)
+            proof.add_algebra(add, level=0)
 
-        return g, added
+        return proof, added
 
     def add_piece(
         self, name: str, args: list[Point], deps: EmptyDependency
