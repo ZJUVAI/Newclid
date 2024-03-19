@@ -8,7 +8,7 @@ import time
 from geosolver.geometry import Angle, Point, Ratio
 from geosolver.numerical.check import same_clock
 
-from geosolver.problem import Dependency, EmptyDependency, Problem, Theorem, hashed
+from geosolver.problem import Dependency, EmptyDependency, Problem, Theorem
 from geosolver.deductive.match_theorems import match_all_theorems
 
 if TYPE_CHECKING:
@@ -92,12 +92,11 @@ def dd_bfs_one_level(
         for mp, deps in mp_deps:
             if time.time() - t0 > timeout:
                 break
-            name, args = theorem.conclusion_name_args(mp)
-            hash_conclusion = hashed(name, args)
-            if hash_conclusion in proof.cache:
+            conclusion_name, args = theorem.conclusion_name_args(mp)
+            if proof.in_cache(conclusion_name, args):
                 continue
 
-            add = proof.add_piece(name, args, deps=deps)
+            add = proof.add_piece(conclusion_name, args, deps=deps)
             proof.dependency_graph.add_theorem_edges(add, theorem, args)
             added += add
 

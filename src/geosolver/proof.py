@@ -1913,7 +1913,10 @@ class Proof:
         return hashed(name, args) in self.cache
 
     def cache_dep(
-        self, name: str, args: list[Point], premises: list[Dependency]
+        self,
+        name: str,
+        args: list[Point],
+        premises: Union[Dependency, list[Dependency]],
     ) -> None:
         _hashed = hashed(name, args)
         if _hashed in self.cache:

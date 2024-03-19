@@ -4,7 +4,7 @@ import logging
 
 from pathlib import Path
 import random
-from typing import TYPE_CHECKING, Dict, List, Union
+from typing import TYPE_CHECKING, Dict, List, Tuple, Union
 from networkx import MultiDiGraph
 from pyvis.network import Network
 import seaborn as sns
@@ -35,7 +35,6 @@ DEPTYPE_TO_SHAPE = {
 class DependencyGraph:
     def __init__(self) -> None:
         self.nx_graph = MultiDiGraph()
-        self._goal_node = None
 
     def add_dependency(
         self,
@@ -61,12 +60,13 @@ class DependencyGraph:
     def add_edge(
         self,
         u_for_edge: Dependency,
-        v_for_edge: Dependency,
-        rule_name: str,
-        rule_arguments: List[Union[str, "Node"]],
+        v_for_edge: Union[Dependency, str],
+        edge_arguments: List[Union[str, "Node"]],
+        edge_name: str = "",
     ):
-        pred = dependency_node_name(u_for_edge)
+        edge_name = edge_name if edge_name else "NAN"
 
+        pred = dependency_node_name(u_for_edge)
         if pred not in self.nx_graph.nodes:
             dependency_type = DependencyType.STATEMENT
             if not u_for_edge.why:
@@ -76,14 +76,15 @@ class DependencyGraph:
                 self.add_edge(
                     why_u,
                     u_for_edge,
-                    rule_name=u_for_edge.rule_name,
-                    rule_arguments=u_for_edge.args,
+                    edge_name=u_for_edge.rule_name,
+                    edge_arguments=u_for_edge.args,
                 )
 
-        succ = dependency_node_name(v_for_edge)
-        assert succ in self.nx_graph.nodes
-        edge_key = f"{rule_name}." + ".".join(_str_arguments(rule_arguments))
-        self.nx_graph.add_edge(pred, succ, key=edge_key)
+        if isinstance(v_for_edge, Dependency):
+            v_for_edge = dependency_node_name(v_for_edge)
+        assert v_for_edge in self.nx_graph.nodes
+        edge_key = f"{edge_name}." + ".".join(_str_arguments(edge_arguments))
+        self.nx_graph.add_edge(pred, v_for_edge, key=edge_key)
 
     def add_theorem_edges(
         self, dependencies: list[Dependency], theorem: Theorem, args: List["Point"]
@@ -109,8 +110,8 @@ class DependencyGraph:
                 self.add_edge(
                     why_added,
                     added_dependency,
-                    rule_name=dep_rule_name,
-                    rule_arguments=args,
+                    edge_name=dep_rule_name,
+                    edge_arguments=args,
                 )
 
     def add_algebra_edges(
@@ -125,8 +126,8 @@ class DependencyGraph:
                 self.add_edge(
                     why_added,
                     added_dependency,
-                    rule_name=dep_rule_name,
-                    rule_arguments=args,
+                    edge_name=dep_rule_name,
+                    edge_arguments=args,
                 )
 
     def add_construction_edges(
@@ -148,8 +149,8 @@ class DependencyGraph:
                 self.add_edge(
                     why_added,
                     added_dependency,
-                    rule_name=dep_rule_name,
-                    rule_arguments=args,
+                    edge_name=dep_rule_name,
+                    edge_arguments=args,
                 )
 
     def add_goal(self, goal_name: str, goal_args: List["Point"]):
@@ -192,7 +193,7 @@ class DependencyGraph:
             else:
                 edge_name = "NOT FOUND"
             vis_graph.edges[u, v, k]["title"] = edge_name
-            vis_graph.edges[u, v, k]["label"] = k if name else "NAN" + k
+            vis_graph.edges[u, v, k]["label"] = k
             vis_graph.edges[u, v, k]["font"] = {"size": 8}
 
             if k in edges_keys_indexes:
@@ -219,7 +220,11 @@ class DependencyGraph:
 
 
 def dependency_node_name(dependency: Dependency):
-    return ".".join(dependency.hashed())
+    return node_name_from_hash(dependency.hashed())
+
+
+def node_name_from_hash(hash_tuple: Tuple[str]):
+    return ".".join(hash_tuple)
 
 
 def _str_arguments(args: List[Union[str, int, "Node"]]) -> List[str]:
