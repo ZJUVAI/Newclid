@@ -20,3 +20,7 @@ r29_only
 a b = segment a b; m = midpoint m a b; m1 = midpoint m1 m a ? eqratio m a a b m1 m m a
 testing_problem
 a b c = triangle; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d; f = on_tline f c b c ? para a d f c
+two_ways
+a b c = triangle a b c; p q = segment p q; s = on_aline s p q c a b; t = on_aline t q p c b a ? eqangle c a c b s p t q
+false_equlity
+a b e = triangle12 a b e; c = midpoint c a e ? cong a c a b
