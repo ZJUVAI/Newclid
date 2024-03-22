@@ -36,7 +36,6 @@ from geosolver.geometry import (
     Ratio,
     is_equal,
     is_equiv,
-    why_equal,
 )
 from geosolver.geometry import Circle, Line, Point, Segment
 from geosolver.geometry import Measure, Value
@@ -475,10 +474,6 @@ class Proof:
 
         return add
 
-    def why_coll(self, args: tuple[Line, list[Point]]) -> list[Dependency]:
-        line, points = args
-        return line.why_coll(points)
-
     def _add_eqrat_const(
         self, args: list[Point], deps: EmptyDependency
     ) -> list[Dependency]:
@@ -573,9 +568,6 @@ class Proof:
         merges = [vx, vy]
         self.symbols_graph.merge(merges, deps)
 
-    def why_equal(self, x: Node, y: Node, level: int) -> list[Dependency]:
-        return why_equal(x, y, level)
-
     def _add_para(self, points: list[Point], deps: EmptyDependency) -> list[Dependency]:
         """Add a new predicate that 4 points (2 lines) are parallel."""
         a, b, c, d = points
@@ -597,10 +589,6 @@ class Proof:
         if not is_equal(ab, cd):
             return [deps]
         return []
-
-    def why_para(self, args: list[Point]) -> list[Dependency]:
-        ab, cd, lvl = args
-        return self.why_equal(ab, cd, lvl)
 
     def check_para_or_coll(self, points: list[Point]) -> bool:
         return self.statements_checker.check_para(
@@ -732,10 +720,6 @@ class Proof:
             return [dep]
         return []
 
-    def why_perp(self, args: list[Union[Point, list[Dependency]]]) -> list[Dependency]:
-        a, b, deps = args
-        return deps + self.why_equal(a, b, None)
-
     def _add_cong(self, points: list[Point], deps: EmptyDependency) -> list[Dependency]:
         """Add that two segments (4 points) are congruent."""
         a, b, c, d = points
@@ -800,21 +784,11 @@ class Proof:
 
         return self._add_cyclic([b, c, x, y], deps)
 
-    def why_cong(self, args: tuple[Segment, Segment]) -> list[Dependency]:
-        ab, cd = args
-        return self.why_equal(ab, cd, None)
-
     def _add_midp(self, points: list[Point], deps: EmptyDependency) -> list[Dependency]:
         m, a, b = points
         add = self._add_coll(points, deps=deps)
         add += self._add_cong([m, a, m, b], deps)
         return add
-
-    def why_midp(
-        self, args: tuple[Line, list[Point], Segment, Segment]
-    ) -> list[Dependency]:
-        line, points, ma, mb = args
-        return self.why_coll([line, points]) + self.why_cong([ma, mb])
 
     def _add_circle(
         self, points: list[Point], deps: EmptyDependency
@@ -823,10 +797,6 @@ class Proof:
         add = self._add_cong([o, a, o, b], deps=deps)
         add += self._add_cong([o, a, o, c], deps=deps)
         return add
-
-    def why_circle(self, args: tuple[Segment, Segment, Segment]) -> list[Dependency]:
-        oa, ob, oc = args
-        return self.why_equal(oa, ob, None) and self.why_equal(oa, oc, None)
 
     def cyclic_dep(self, points: list[Point], p: Point) -> list[Dependency]:
         for p1, p2, p3 in comb.comb3(points):
@@ -963,53 +933,11 @@ class Proof:
         if is_equal(ab, cd, level):
             return self.make_equal_pairs(a, b, c, d, m, n, p, q, ab, cd, mn, pq, deps)
         elif is_equal(mn, pq, level):
-            return self.make_equal_pairs(
-                m,
-                n,
-                p,
-                q,
-                a,
-                b,
-                c,
-                d,
-                mn,
-                pq,
-                ab,
-                cd,
-                deps,
-            )
+            return self.make_equal_pairs(m, n, p, q, a, b, c, d, mn, pq, ab, cd, deps)
         elif is_equal(ab, mn, level):
-            return self.make_equal_pairs(
-                a,
-                b,
-                m,
-                n,
-                c,
-                d,
-                p,
-                q,
-                ab,
-                mn,
-                cd,
-                pq,
-                deps,
-            )
+            return self.make_equal_pairs(a, b, m, n, c, d, p, q, ab, mn, cd, pq, deps)
         elif is_equal(cd, pq, level):
-            return self.make_equal_pairs(
-                c,
-                d,
-                p,
-                q,
-                a,
-                b,
-                m,
-                n,
-                cd,
-                pq,
-                ab,
-                mn,
-                deps,
-            )
+            return self.make_equal_pairs(c, d, p, q, a, b, m, n, cd, pq, ab, mn, deps)
         else:
             return None
 

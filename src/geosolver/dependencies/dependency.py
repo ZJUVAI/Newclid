@@ -107,7 +107,7 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
             d = Dependency("collx", [x, y, x_, y_], None, level)
             dep.why += [d.why_me_or_cache(proof, level)]
 
-        whypara = proof.why_equal(ab, cd, None)
+        whypara = why_equal(ab, cd)
         dep.why += whypara
 
     elif dep.name == "midp":
@@ -115,7 +115,7 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
         ma = proof.symbols_graph.get_segment(m, a)
         mb = proof.symbols_graph.get_segment(m, b)
         dep = Dependency("coll", [m, a, b], None, None).why_me_or_cache(proof, None)
-        dep.why = [dep] + proof.why_equal(ma, mb, level)
+        dep.why = [dep] + why_equal(ma, mb, level)
 
     elif dep.name == "perp":
         a, b, c, d = dep.args
@@ -144,7 +144,7 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
         ab = proof.symbols_graph.get_segment(a, b)
         cd = proof.symbols_graph.get_segment(c, d)
 
-        dep.why = proof.why_equal(ab, cd, level)
+        dep.why = why_equal(ab, cd, level)
 
     elif dep.name == "coll":
         _, why = line_of_and_why(dep.args, level)
@@ -172,7 +172,7 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
         oa = proof.symbols_graph.get_segment(o, a)
         ob = proof.symbols_graph.get_segment(o, b)
         oc = proof.symbols_graph.get_segment(o, c)
-        dep.why = proof.why_equal(oa, ob, level) + proof.why_equal(oa, oc, level)
+        dep.why = why_equal(oa, ob, level) + why_equal(oa, oc, level)
 
     elif dep.name in ["eqangle", "eqangle6"]:
         a, b, c, d, m, n, p, q = dep.args
