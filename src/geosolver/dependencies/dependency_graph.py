@@ -11,7 +11,8 @@ import seaborn as sns
 
 
 from geosolver.algebraic import AlgebraicRules
-from geosolver.problem import CONSTRUCTION_RULE, Dependency, Theorem
+from geosolver.dependencies.dependency import Dependency
+from geosolver.problem import CONSTRUCTION_RULE, Theorem
 
 if TYPE_CHECKING:
     from geosolver.geometry import Point, Node

@@ -20,8 +20,9 @@ import pytest
 import pytest_check as check
 
 from geosolver.ddar import solve
+from geosolver.dependencies.dependency import Dependency
 from geosolver.proof import Proof
-from geosolver.problem import Definition, Dependency, Problem, Theorem
+from geosolver.problem import Definition, Problem, Theorem
 from geosolver.trace_back import get_logs
 
 

@@ -3,23 +3,24 @@ from __future__ import annotations
 import time
 import logging
 from typing import TYPE_CHECKING
-from geosolver.algebraic.derivations import apply_derivations
 
+from geosolver.algebraic.derivations import apply_derivations
 from geosolver.deductive import dd_bfs_one_level
 
-from geosolver.problem import Problem, Theorem, Dependency
 
 if TYPE_CHECKING:
+    from geosolver.dependencies.dependency import Dependency
     from geosolver.proof import Proof
+    from geosolver.problem import Problem, Theorem
 
 
 def solve(
     proof: "Proof",
-    theorems: list[Problem],
-    controller: Problem,
+    theorems: list["Problem"],
+    controller: "Problem",
     max_level: int = 1000,
     timeout: int = 600,
-) -> tuple["Proof", list[float], str, list[int], list[Dependency]]:
+) -> tuple["Proof", list[float], str, list[int], list["Dependency"]]:
     """Alternate between DD and AR until goal is found."""
     status = "saturated"
     level_times = []

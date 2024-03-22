@@ -18,8 +18,9 @@
 import pytest
 import pytest_check as check
 import geosolver.algebraic.geometric_tables as geometric_tables
+from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.proof import Proof
-from geosolver.problem import Definition, EmptyDependency, Problem, Theorem
+from geosolver.problem import Definition, Problem, Theorem
 
 
 class TestAR:
