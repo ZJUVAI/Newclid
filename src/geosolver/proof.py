@@ -1935,23 +1935,6 @@ class Proof:
             return
         self.cache[_hashed] = premises
 
-    def all_same_line(
-        self, a: Point, b: Point
-    ) -> Generator[tuple[Point, Point], None, None]:
-        ab = self.symbols_graph.get_line(a, b)
-        if ab is None:
-            return
-        for p1, p2 in comb.comb2(ab.neighbors(Point)):
-            if {p1, p2} != {a, b}:
-                yield p1, p2
-
-    def all_same_angle(
-        self, a: Point, b: Point, c: Point, d: Point
-    ) -> Generator[tuple[Point, Point, Point, Point], None, None]:
-        for x, y in self.all_same_line(a, b):
-            for m, n in self.all_same_line(c, d):
-                yield x, y, m, n
-
     def additionally_draw(self, name: str, args: list[Point]) -> None:
         """Draw some extra line/circles for illustration purpose."""
 
