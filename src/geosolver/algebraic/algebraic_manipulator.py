@@ -3,14 +3,16 @@ from typing import TYPE_CHECKING
 
 from geosolver.algebraic import AlgebraicRules
 from geosolver.algebraic.geometric_tables import AngleTable, DistanceTable, RatioTable
+from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.geometry import Angle, Point, Ratio, is_equiv
 from geosolver.numerical.check import check_numerical
 
-from geosolver.problem import Dependency, EmptyDependency
+
 import geosolver.ratios
 
 if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
+    from geosolver.dependencies.dependency import Dependency
 
 
 class AlgebraicManipulator:
@@ -23,7 +25,7 @@ class AlgebraicManipulator:
         self.aconst = {}  # contains all constant angles.
 
     def add_algebra(
-        self, symbols_graph: "SymbolsGraph", dep: Dependency, level: int
+        self, symbols_graph: "SymbolsGraph", dep: "Dependency", level: int
     ) -> None:
         """Add new algebraic predicates."""
         _ = level

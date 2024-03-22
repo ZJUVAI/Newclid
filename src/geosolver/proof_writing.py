@@ -3,17 +3,20 @@
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
+
+
 import geosolver.pretty as pt
 import geosolver.trace_back as trace_back
 
-from geosolver.problem import Clause, Dependency, Problem
+from geosolver.dependencies.dependency import Dependency
 
 if TYPE_CHECKING:
+    from geosolver.problem import Clause, Problem
     from geosolver.proof import Proof
 
 
 def get_proof_steps(
-    proof: "Proof", goal: Clause, merge_trivials: bool = False
+    proof: "Proof", goal: "Clause", merge_trivials: bool = False
 ) -> tuple[
     list[Dependency],
     list[Dependency],
@@ -86,7 +89,9 @@ def proof_step_string(
     return f"{premises_nl} \u21d2 {conclusion_nl}"
 
 
-def write_solution(proof: "Proof", problem: Problem, out_file: Optional[Path]) -> None:
+def write_solution(
+    proof: "Proof", problem: "Problem", out_file: Optional[Path]
+) -> None:
     """Output the solution to out_file.
 
     Args:

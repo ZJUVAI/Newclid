@@ -17,15 +17,17 @@
 
 from collections import defaultdict
 from fractions import Fraction as frac
-from typing import Any, Generator
+from typing import TYPE_CHECKING, Any, Generator
 
 
 import numpy as np
 from scipy import optimize
-from geosolver.geometry import Direction, Length, Line, Point
-from geosolver.problem import Dependency
 
+from geosolver.geometry import Direction, Length, Line, Point
 from geosolver.ratios import simplify
+
+if TYPE_CHECKING:
+    from geosolver.dependencies.dependency import Dependency
 
 
 class InfQuotientError(Exception):
@@ -234,7 +236,7 @@ class Table:
 
         return True
 
-    def register(self, vc: list[tuple[str, float]], dep: Dependency) -> None:
+    def register(self, vc: list[tuple[str, float]], dep: "Dependency") -> None:
         """Register a new equality vc=[(v, c), ..] with traceback dependency dep."""
         result = plus_all(*[{v: c} for v, c in vc])
         if is_zero(result):
@@ -258,13 +260,13 @@ class Table:
         self.c += [1.0, -1.0]
         self.deps += [dep]
 
-    def register2(self, a: str, b: str, m: float, n: float, dep: Dependency) -> None:
+    def register2(self, a: str, b: str, m: float, n: float, dep: "Dependency") -> None:
         self.register([(a, m), (b, -n)], dep)
 
-    def register3(self, a: str, b: str, f: float, dep: Dependency) -> None:
+    def register3(self, a: str, b: str, f: float, dep: "Dependency") -> None:
         self.register([(a, 1), (b, -1), (self.const, -f)], dep)
 
-    def register4(self, a: str, b: str, c: str, d: str, dep: Dependency) -> None:
+    def register4(self, a: str, b: str, c: str, d: str, dep: "Dependency") -> None:
         self.register([(a, 1), (b, -1), (c, -1), (d, 1)], dep)
 
     def why(self, e: dict[str, float]) -> list[Any]:
@@ -314,13 +316,13 @@ class Table:
             return True
         return False
 
-    def add_eq2(self, a: str, b: str, m: float, n: float, dep: Dependency) -> None:
+    def add_eq2(self, a: str, b: str, m: float, n: float, dep: "Dependency") -> None:
         # a/b = m/n
         if not self.add_expr([(a, m), (b, -n)]):
             return []
         self.register2(a, b, m, n, dep)
 
-    def add_eq3(self, a: str, b: str, f: float, dep: Dependency) -> None:
+    def add_eq3(self, a: str, b: str, f: float, dep: "Dependency") -> None:
         # a - b = f * constant
         self.eqs.add((a, b, frac(f)))
         self.eqs.add((b, a, frac(1 - f)))
@@ -330,7 +332,7 @@ class Table:
 
         self.register3(a, b, f, dep)
 
-    def add_eq4(self, a: str, b: str, c: str, d: str, dep: Dependency) -> None:
+    def add_eq4(self, a: str, b: str, c: str, d: str, dep: "Dependency") -> None:
         # a - b = c - d
         self.record_eq(a, b, c, d)
         self.record_eq(a, c, b, d)
@@ -543,12 +545,12 @@ class RatioTable(GeometricTable):
         super().__init__(name)
         self.one = self.const
 
-    def add_eq(self, l1: Length, l2: Length, dep: Dependency) -> None:
+    def add_eq(self, l1: Length, l2: Length, dep: "Dependency") -> None:
         l1, l2 = self.get_name([l1, l2])
         return super().add_eq3(l1, l2, 0.0, dep)
 
     def add_const_ratio(
-        self, l1: Length, l2: Length, m: float, n: float, dep: Dependency
+        self, l1: Length, l2: Length, m: float, n: float, dep: "Dependency"
     ) -> None:
         l1, l2 = self.get_name([l1, l2])
         return super().add_eq2(l1, l2, m, n, dep)
@@ -559,7 +561,7 @@ class RatioTable(GeometricTable):
         l2: Length,
         l3: Length,
         l4: Length,
-        dep: Dependency,
+        dep: "Dependency",
     ) -> None:
         l1, l2, l3, l4 = self.get_name([l1, l2, l3, l4])
         return self.add_eq4(l1, l2, l3, l4, dep)
@@ -584,11 +586,11 @@ class AngleTable(GeometricTable):
         e[self.pi] = e[self.pi] % 1
         return strip(e)
 
-    def add_para(self, d1: Direction, d2: Direction, dep: Dependency) -> None:
+    def add_para(self, d1: Direction, d2: Direction, dep: "Dependency") -> None:
         return self.add_const_angle(d1, d2, 0, dep)
 
     def add_const_angle(
-        self, d1: Direction, d2: Direction, ang: float, dep: Dependency
+        self, d1: Direction, d2: Direction, ang: float, dep: "Dependency"
     ) -> None:
         if ang and d2._obj.num > d1._obj.num:
             d1, d2 = d2, d1
@@ -606,7 +608,7 @@ class AngleTable(GeometricTable):
         d2: Direction,
         d3: Direction,
         d4: Direction,
-        dep: Dependency,
+        dep: "Dependency",
     ) -> None:
         """Add the inequality d1-d2=d3-d4."""
         # Use string as variables.
@@ -671,7 +673,7 @@ class DistanceTable(GeometricTable):
         p2: Point,
         p3: Point,
         p4: Point,
-        dep: Dependency,
+        dep: "Dependency",
     ) -> None:
         """Add that distance between p1 and p2 (on l12) == p3 and p4 (on l34)."""
         if p2.num > p1.num:

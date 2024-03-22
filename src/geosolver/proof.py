@@ -24,6 +24,7 @@ import logging
 
 from networkx import ancestors
 
+
 from geosolver.symbols_graph import SymbolsGraph
 from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 from geosolver.geometry import (
@@ -58,16 +59,13 @@ import geosolver.numerical.check as nm
 from geosolver.numerical.sketch import sketch
 
 
-from geosolver.problem import (
-    CONSTRUCTION_RULE,
-    Clause,
-    Definition,
-    Dependency,
-    EmptyDependency,
-    Problem,
-    hashed,
-)
-from geosolver.dependency_graph import DependencyGraph
+from geosolver.problem import CONSTRUCTION_RULE, Clause, Definition, Problem
+
+from geosolver.dependencies.empty_dependency import EmptyDependency
+from geosolver.dependencies.caching import DependencyCache, hashed
+from geosolver.dependencies.dependency import Dependency
+from geosolver.dependencies.dependency_graph import DependencyGraph
+
 from geosolver.ratios import simplify
 
 
@@ -126,11 +124,11 @@ class Proof:
 
     def __init__(
         self,
+        dependency_cache: DependencyCache,
         alegbraic_manipulator: AlgebraicManipulator,
         symbols_graph: SymbolsGraph,
     ):
-        self.cache = {}
-
+        self.dependency_cache = dependency_cache
         self.symbols_graph = symbols_graph
         self.alegbraic_manipulator = alegbraic_manipulator
 
@@ -162,8 +160,6 @@ class Proof:
                 clause.nums.append(self.symbols_graph._name2node[pname].num)
 
         proof, _ = Proof.build_problem(p, definitions, verbose=False, init_copy=False)
-
-        proof.build_clauses = list(getattr(self, "build_clauses", []))
         return proof
 
     def do_algebra(self, name: str, args: list[Point]) -> list[Dependency]:
@@ -205,7 +201,7 @@ class Proof:
                 name = "aconst"
                 args = [x, y, m, n, nd]
                 dep1 = dep.populate(name, args)
-                self.cache_dep(name, args, dep1)
+                self.dependency_cache.add_dependency(name, args, dep1)
                 self.make_equal(nd, ab, deps=dep1)
                 added += [dep1]
 
@@ -215,7 +211,7 @@ class Proof:
                 name = "aconst"
                 args = [m, n, x, y, dn]
                 dep2 = dep.populate(name, args)
-                self.cache_dep(name, args, dep2)
+                self.dependency_cache.add_dependency(name, args, dep2)
                 self.make_equal(dn, ba, deps=dep2)
                 added += [dep2]
             new_deps = added
@@ -276,6 +272,7 @@ class Proof:
             # will result in infinite loop if problem is impossible numerically.
             try:
                 proof = Proof(
+                    dependency_cache=DependencyCache(),
                     alegbraic_manipulator=AlgebraicManipulator(),
                     symbols_graph=SymbolsGraph(),
                 )
@@ -394,11 +391,11 @@ class Proof:
             new_deps = self._add_contri_check(args, deps)
         elif name in ["acompute", "rcompute"]:
             dep = deps.populate(name, args)
-            self.cache_dep(name, args, dep)
+            self.dependency_cache.add_dependency(name, args, dep)
             new_deps = [dep]
         elif name in ["fixl", "fixc", "fixb", "fixt", "fixp"]:
             dep = deps.populate(name, args)
-            self.cache_dep(name, args, dep)
+            self.dependency_cache.add_dependency(name, args, dep)
             new_deps = [dep]
         elif name in ["ind"]:
             new_deps = []
@@ -455,7 +452,7 @@ class Proof:
             a, b = args
             return not a.num.close(b.num)
         if name in ["fixl", "fixc", "fixb", "fixt", "fixp"]:
-            return self.in_cache(name, args)
+            return self.dependency_cache.contains(name, args)
         if name in ["ind"]:
             return True
         raise ValueError(f"Not recognize {name}")
@@ -521,7 +518,7 @@ class Proof:
 
             is_coll = self.check_coll(args)
             dep = abcd_deps.populate("coll", args)
-            self.cache_dep("coll", args, dep)
+            self.dependency_cache.add_dependency("coll", args, dep)
             self.symbols_graph.merge_into(line0, [line], dep)
 
             if not is_coll:
@@ -597,7 +594,7 @@ class Proof:
             dep1 = deps.populate("rconst", args)
             dep1.algebra = ab._val, cd._val, num, den
             self.make_equal(nd, ab_cd, deps=dep1)
-            self.cache_dep("rconst", [a, b, c, d, nd], dep1)
+            self.dependency_cache.add_dependency("rconst", [a, b, c, d, nd], dep1)
             add += [dep1]
 
         if not self.is_equal(cd_ab, dn):
@@ -605,7 +602,7 @@ class Proof:
             dep2 = deps.populate("rconst", args)
             dep2.algebra = cd._val, ab._val, num, den
             self.make_equal(dn, cd_ab, deps=dep2)
-            self.cache_dep("rconst", [c, d, a, b, dn], dep2)
+            self.dependency_cache.add_dependency("rconst", [c, d, a, b, dn], dep2)
             add += [dep2]
 
         return add
@@ -705,7 +702,7 @@ class Proof:
         self.make_equal(ab, cd, deps)
         deps.algebra = ab._val, cd._val
 
-        self.cache_dep("para", [a, b, c, d], deps)
+        self.dependency_cache.add_dependency("para", [a, b, c, d], deps)
         if not is_equal:
             return [deps]
         return []
@@ -848,15 +845,15 @@ class Proof:
         c, d = dcd._obj.points
 
         is_equal = self.is_equal(a12, a21)
-        deps = deps.populate("perp", [a, b, c, d])
-        deps.algebra = [dab, dcd]
-        self.make_equal(a12, a21, deps=deps)
+        dep = deps.populate("perp", [a, b, c, d])
+        dep.algebra = [dab, dcd]
+        self.make_equal(a12, a21, deps=dep)
 
-        self.cache_dep("perp", [a, b, c, d], deps)
-        self.cache_dep("eqangle", [a, b, c, d, c, d, a, b], deps)
+        self.dependency_cache.add_dependency("perp", [a, b, c, d], dep)
+        self.dependency_cache.add_dependency("eqangle", [a, b, c, d, c, d, a, b], dep)
 
         if not is_equal:
-            return [deps]
+            return [dep]
         return []
 
     def why_perp(self, args: list[Union[Point, list[Dependency]]]) -> list[Dependency]:
@@ -898,7 +895,7 @@ class Proof:
         self.make_equal(ab, cd, deps=dep)
         dep.algebra = ab._val, cd._val
 
-        self.cache_dep("cong", [a, b, c, d], dep)
+        self.dependency_cache.add_dependency("cong", [a, b, c, d], dep)
 
         result = []
 
@@ -1062,7 +1059,7 @@ class Proof:
             is_cyclic = self.check_cyclic(args)
 
             dep = abcdef_deps.populate("cyclic", args)
-            self.cache_dep("cyclic", args, dep)
+            self.dependency_cache.add_dependency("cyclic", args, dep)
             self.symbols_graph.merge_into(circle0, [circle], dep)
             if not is_cyclic:
                 add += [dep]
@@ -1121,7 +1118,7 @@ class Proof:
         self.make_equal(mn, pq, deps=deps)
 
         deps.algebra = mn._val, pq._val
-        self.cache_dep(eqname, [m, n, p, q], deps)
+        self.dependency_cache.add_dependency(eqname, [m, n, p, q], deps)
 
         if is_equal:
             return []
@@ -1260,7 +1257,7 @@ class Proof:
             deps1.algebra = [dab, dcd, dmn, dpq]
         if not is_eq1:
             add += [deps1]
-        self.cache_dep("eqangle", [a, b, c, d, m, n, p, q], deps1)
+        self.dependency_cache.add_dependency("eqangle", [a, b, c, d, m, n, p, q], deps1)
         self.make_equal(ab_cd, mn_pq, deps=deps1)
 
         is_eq2 = self.is_equal(cd_ab, pq_mn)
@@ -1270,7 +1267,7 @@ class Proof:
             deps2.algebra = [dcd, dab, dpq, dmn]
         if not is_eq2:
             add += [deps2]
-        self.cache_dep("eqangle", [c, d, a, b, p, q, m, n], deps2)
+        self.dependency_cache.add_dependency("eqangle", [c, d, a, b, p, q, m, n], deps2)
         self.make_equal(cd_ab, pq_mn, deps=deps2)
 
         return add
@@ -1396,14 +1393,14 @@ class Proof:
             deps1 = deps.populate("aconst", [a, b, c, d, nd])
             deps1.algebra = dab, dcd, ang % 180
             self.make_equal(ab_cd, nd, deps=deps1)
-            self.cache_dep("aconst", [a, b, c, d, nd], deps1)
+            self.dependency_cache.add_dependency("aconst", [a, b, c, d, nd], deps1)
             add += [deps1]
 
         if not self.is_equal(cd_ab, dn):
             deps2 = deps.populate("aconst", [c, d, a, b, dn])
             deps2.algebra = dcd, dab, 180 - ang % 180
             self.make_equal(cd_ab, dn, deps=deps2)
-            self.cache_dep("aconst", [c, d, a, b, dn], deps2)
+            self.dependency_cache.add_dependency("aconst", [c, d, a, b, dn], deps2)
             add += [deps2]
         return add
 
@@ -1457,7 +1454,7 @@ class Proof:
             deps1.algebra = dbx, dab, y % 180
 
             self.make_equal(xba, nd, deps=deps1)
-            self.cache_dep("aconst", [c, x, a, b, nd], deps1)
+            self.dependency_cache.add_dependency("aconst", [c, x, a, b, nd], deps1)
             add += [deps1]
 
         if not self.is_equal(abx, dn):
@@ -1465,7 +1462,7 @@ class Proof:
             deps2.algebra = dab, dbx, 180 - (y % 180)
 
             self.make_equal(abx, dn, deps=deps2)
-            self.cache_dep("s_angle", [a, b, c, x, dn], deps2)
+            self.dependency_cache.add_dependency("s_angle", [a, b, c, x, dn], deps2)
             add += [deps2]
         return add
 
@@ -1663,7 +1660,7 @@ class Proof:
             deps1.algebra = [ab._val, cd._val, mn._val, pq._val]
         if not is_eq1:
             add += [deps1]
-        self.cache_dep("eqratio", [a, b, c, d, m, n, p, q], deps1)
+        self.dependency_cache.add_dependency("eqratio", [a, b, c, d, m, n, p, q], deps1)
         self.make_equal(ab_cd, mn_pq, deps=deps1)
 
         is_eq2 = self.is_equal(cd_ab, pq_mn)
@@ -1673,7 +1670,7 @@ class Proof:
             deps2.algebra = [cd._val, ab._val, pq._val, mn._val]
         if not is_eq2:
             add += [deps2]
-        self.cache_dep("eqratio", [c, d, a, b, p, q, m, n], deps2)
+        self.dependency_cache.add_dependency("eqratio", [c, d, a, b, p, q, m, n], deps2)
         self.make_equal(cd_ab, pq_mn, deps=deps2)
         return add
 
@@ -1920,20 +1917,6 @@ class Proof:
             add += self._add_cong(args, deps=deps)
 
         return add
-
-    def in_cache(self, name: str, args: list[Point]) -> bool:
-        return hashed(name, args) in self.cache
-
-    def cache_dep(
-        self,
-        name: str,
-        args: list[Point],
-        premises: Union[Dependency, list[Dependency]],
-    ) -> None:
-        _hashed = hashed(name, args)
-        if _hashed in self.cache:
-            return
-        self.cache[_hashed] = premises
 
     def additionally_draw(self, name: str, args: list[Point]) -> None:
         """Draw some extra line/circles for illustration purpose."""
@@ -2205,7 +2188,9 @@ class Proof:
                     if adds:
                         added += adds
                         for add in adds:
-                            self.cache_dep(add.name, add.args, add)
+                            self.dependency_cache.add_dependency(
+                                add.name, add.args, add
+                            )
 
         assert len(plevel_done) == len(new_points)
         for p in new_points:

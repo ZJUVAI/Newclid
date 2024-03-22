@@ -18,15 +18,16 @@
 from typing import TYPE_CHECKING
 
 from geosolver.geometry import Point
-from geosolver.problem import CONSTRUCTION_RULE, Dependency
+from geosolver.problem import CONSTRUCTION_RULE
 
 if TYPE_CHECKING:
     from geosolver.proof import Proof
+    from geosolver.dependencies.dependency import Dependency
 
 
 def point_levels(
-    setup: list[Dependency], existing_points: list[Point]
-) -> list[tuple[set[Point], list[Dependency]]]:
+    setup: list["Dependency"], existing_points: list[Point]
+) -> list[tuple[set[Point], list["Dependency"]]]:
     """Reformat setup into levels of point constructions."""
     levels = []
     for con in setup:
@@ -50,10 +51,10 @@ def point_levels(
 
 
 def point_log(
-    setup: list[Dependency],
+    setup: list["Dependency"],
     ref_id: dict[tuple[str, ...], int],
     existing_points=list[Point],
-) -> list[tuple[list[Point], list[Dependency]]]:
+) -> list[tuple[list[Point], list["Dependency"]]]:
     """Reformat setup into groups of point constructions."""
     log = []
 
@@ -70,8 +71,8 @@ def point_log(
 
 
 def setup_to_levels(
-    setup: list[Dependency],
-) -> list[list[Dependency]]:
+    setup: list["Dependency"],
+) -> list[list["Dependency"]]:
     """Reformat setup into levels of point constructions."""
     levels = []
     for d in setup:
@@ -86,12 +87,12 @@ def setup_to_levels(
 
 
 def separate_dependency_difference(
-    query: Dependency,
-    log: list[tuple[list[Dependency], list[Dependency]]],
+    query: "Dependency",
+    log: list[tuple[list["Dependency"], list["Dependency"]]],
 ) -> tuple[
-    list[tuple[list[Dependency], list[Dependency]]],
-    list[Dependency],
-    list[Dependency],
+    list[tuple[list["Dependency"], list["Dependency"]]],
+    list["Dependency"],
+    list["Dependency"],
     set[Point],
     set[Point],
 ]:
@@ -143,14 +144,14 @@ def separate_dependency_difference(
 
 
 def recursive_traceback(
-    query: Dependency,
-) -> list[tuple[list[Dependency], list[Dependency]]]:
+    query: "Dependency",
+) -> list[tuple[list["Dependency"], list["Dependency"]]]:
     """Recursively traceback from the query, i.e. the conclusion."""
     visited = set()
     log = []
     stack = []
 
-    def read(q: Dependency) -> None:
+    def read(q: "Dependency") -> None:
         q = q.remove_loop()
         hashed = q.hashed()
         if hashed in visited:
@@ -205,8 +206,8 @@ def recursive_traceback(
 
 
 def collx_to_coll_setup(
-    setup: list[Dependency],
-) -> list[Dependency]:
+    setup: list["Dependency"],
+) -> list["Dependency"]:
     """Convert collx to coll in setups."""
     result = []
     for level in setup_to_levels(setup):
@@ -225,13 +226,13 @@ def collx_to_coll_setup(
 
 
 def collx_to_coll(
-    setup: list[Dependency],
-    aux_setup: list[Dependency],
-    log: list[tuple[list[Dependency], list[Dependency]]],
+    setup: list["Dependency"],
+    aux_setup: list["Dependency"],
+    log: list[tuple[list["Dependency"], list["Dependency"]]],
 ) -> tuple[
-    list[Dependency],
-    list[Dependency],
-    list[tuple[list[Dependency], list[Dependency]]],
+    list["Dependency"],
+    list["Dependency"],
+    list[tuple[list["Dependency"], list["Dependency"]]],
 ]:
     """Convert collx to coll and dedup."""
     setup = collx_to_coll_setup(setup)
@@ -270,11 +271,11 @@ def collx_to_coll(
 
 
 def get_logs(
-    query: Dependency, proof: "Proof", merge_trivials: bool = False
+    query: "Dependency", proof: "Proof", merge_trivials: bool = False
 ) -> tuple[
-    list[Dependency],
-    list[Dependency],
-    list[tuple[list[Dependency], list[Dependency]]],
+    list["Dependency"],
+    list["Dependency"],
+    list[tuple[list["Dependency"], list["Dependency"]]],
     set[Point],
 ]:
     """Given a DAG and conclusion N, return the premise, aux, proof."""
@@ -290,14 +291,14 @@ def get_logs(
 
 
 def shorten_and_shave(
-    setup: list[Dependency],
-    aux_setup: list[Dependency],
-    log: list[tuple[list[Dependency], list[Dependency]]],
+    setup: list["Dependency"],
+    aux_setup: list["Dependency"],
+    log: list[tuple[list["Dependency"], list["Dependency"]]],
     merge_trivials: bool = False,
 ) -> tuple[
-    list[Dependency],
-    list[Dependency],
-    list[tuple[list[Dependency], list[Dependency]]],
+    list["Dependency"],
+    list["Dependency"],
+    list[tuple[list["Dependency"], list["Dependency"]]],
 ]:
     """Shorten the proof by removing unused predicates."""
     log, _ = shorten_proof(log, merge_trivials=merge_trivials)
@@ -310,10 +311,10 @@ def shorten_and_shave(
 
 
 def join_prems(
-    con: Dependency,
-    con2prems: dict[tuple[str, ...], list[Dependency]],
+    con: "Dependency",
+    con2prems: dict[tuple[str, ...], list["Dependency"]],
     expanded: set[tuple[str, ...]],
-) -> list[Dependency]:
+) -> list["Dependency"]:
     """Join proof steps with the same premises."""
     h = con.hashed()
     if h in expanded or h not in con2prems:
@@ -326,11 +327,11 @@ def join_prems(
 
 
 def shorten_proof(
-    log: list[tuple[list[Dependency], list[Dependency]]],
+    log: list[tuple[list["Dependency"], list["Dependency"]]],
     merge_trivials: bool = False,
 ) -> tuple[
-    list[tuple[list[Dependency], list[Dependency]]],
-    dict[tuple[str, ...], list[Dependency]],
+    list[tuple[list["Dependency"], list["Dependency"]]],
+    dict[tuple[str, ...], list["Dependency"]],
 ]:
     """Join multiple trivials proof steps into one."""
     pops = set()

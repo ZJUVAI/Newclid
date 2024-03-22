@@ -1,5 +1,6 @@
 from collections import defaultdict
 from pathlib import Path
+from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Type
 
 from networkx import Graph
 from pyvis.network import Network
@@ -20,10 +21,11 @@ from geosolver.geometry import (
     Value,
     line_of_and_why,
 )
-from geosolver.problem import Dependency
 
 
-from typing import Callable, Dict, List, Optional, Type
+if TYPE_CHECKING:
+    from geosolver.dependencies.dependency import Dependency
+
 
 NODES_VALUES: Dict[Type[Node], Type[Node]] = {
     Line: Direction,
@@ -59,7 +61,7 @@ class SymbolsGraph:
         self._pair2line = {}
         self._triplet2circle = {}
 
-    def connect(self, a: Node, b: Node, deps: Dependency) -> None:
+    def connect(self, a: Node, b: Node, deps: "Dependency") -> None:
         a.connect_to(b, deps)
         b.connect_to(a, deps)
 
@@ -98,7 +100,7 @@ class SymbolsGraph:
         self.add_node(node)
         return node
 
-    def get_node_val(self, node: Node, deps: Optional[Dependency]) -> Node:
+    def get_node_val(self, node: Node, deps: Optional["Dependency"]) -> Node:
         """Get a node value (equality) node, creating it if necessary."""
         if node._val:
             return node._val
@@ -118,7 +120,7 @@ class SymbolsGraph:
             return self._name2node[pointname]
         return default_fn()
 
-    def merge(self, nodes: list[Node], deps: Dependency) -> Node:
+    def merge(self, nodes: list[Node], deps: "Dependency") -> Node:
         """Merge all nodes."""
         if len(nodes) < 2:
             return
@@ -135,7 +137,7 @@ class SymbolsGraph:
                 break
         return self.merge_into(node0, nodes1, deps)
 
-    def merge_into(self, node0: Node, nodes1: list[Node], deps: Dependency) -> Node:
+    def merge_into(self, node0: Node, nodes1: list[Node], deps: "Dependency") -> Node:
         """Merge nodes1 into a single node0."""
         node0.merge(nodes1, deps)
         for n in nodes1:
@@ -202,7 +204,9 @@ class SymbolsGraph:
                 circle2count[c] += 1
         return [c for c, count in circle2count.items() if count >= 3]
 
-    def get_or_create_segment(self, p1: Point, p2: Point, deps: Dependency) -> Segment:
+    def get_or_create_segment(
+        self, p1: Point, p2: Point, deps: "Dependency"
+    ) -> Segment:
         """Get or create a Segment object between two Points p1 and p2."""
         if p1 == p2:
             raise ValueError(f"Creating same 0-length segment {p1.name}")
@@ -220,13 +224,13 @@ class SymbolsGraph:
         return s
 
     def get_or_create_angle_from_lines(
-        self, l1: Line, l2: Line, deps: Dependency
-    ) -> tuple[Angle, Angle, list[Dependency]]:
+        self, l1: Line, l2: Line, deps: "Dependency"
+    ) -> tuple[Angle, Angle, list["Dependency"]]:
         return self.get_or_create_angle_from_directions(l1._val, l2._val, deps)
 
     def get_or_create_angle_from_directions(
-        self, d1: Direction, d2: Direction, deps: Dependency
-    ) -> tuple[Angle, Angle, list[Dependency]]:
+        self, d1: Direction, d2: Direction, deps: "Dependency"
+    ) -> tuple[Angle, Angle, list["Dependency"]]:
         """Get or create an angle between two Direction d1 and d2."""
         for a in self.type2nodes[Angle]:
             if a.directions == (d1.rep(), d2.rep()):  # directions = _d.rep()
@@ -249,13 +253,13 @@ class SymbolsGraph:
         return a12, a21, why1 + why2
 
     def get_or_create_ratio_from_segments(
-        self, s1: Segment, s2: Segment, deps: Dependency
-    ) -> tuple[Ratio, Ratio, list[Dependency]]:
+        self, s1: Segment, s2: Segment, deps: "Dependency"
+    ) -> tuple[Ratio, Ratio, list["Dependency"]]:
         return self.get_or_create_ratio_from_lenghts(s1._val, s2._val, deps)
 
     def get_or_create_ratio_from_lenghts(
-        self, l1: Length, l2: Length, deps: Dependency
-    ) -> tuple[Ratio, Ratio, list[Dependency]]:
+        self, l1: Length, l2: Length, deps: "Dependency"
+    ) -> tuple[Ratio, Ratio, list["Dependency"]]:
         """Get or create a new Ratio from two Lenghts l1 and l2."""
         for r in self.type2nodes[Ratio]:
             if r.lengths == (l1.rep(), l2.rep()):
@@ -299,7 +303,7 @@ class SymbolsGraph:
 
     def get_line_thru_pair_why(
         self, p1: Point, p2: Point
-    ) -> tuple[Line, list[Dependency]]:
+    ) -> tuple[Line, list["Dependency"]]:
         """Get one line thru two given points and the corresponding dependency list."""
         if p1.name.lower() > p2.name.lower():
             p1, p2 = p2, p1
