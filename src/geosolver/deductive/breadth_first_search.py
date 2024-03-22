@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Union
 
 import time
 
+
 from geosolver.dependencies.dependency import Dependency
 from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.geometry import Angle, Point, Ratio
@@ -15,6 +16,7 @@ from geosolver.deductive.match_theorems import match_all_theorems
 if TYPE_CHECKING:
     from geosolver.problem import Problem, Theorem
     from geosolver.proof import Proof
+    from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 
 
 def dd_bfs_one_level(
@@ -113,7 +115,7 @@ def dd_bfs_one_level(
             if a in proof.symbols_graph._name2node:
                 a = proof.symbols_graph._name2node[a]
             elif "/" in a:
-                a = create_consts_str(proof, a)
+                a = create_consts_str(proof.alegbraic_manipulator, a)
             elif a.isdigit():
                 a = int(a)
             args.append(a)
@@ -132,17 +134,15 @@ def dd_bfs_one_level(
     return added, derives, eq4s, branching
 
 
-def create_consts_str(proof_graph: "Proof", s: str) -> Union[Ratio, Angle]:
+def create_consts_str(
+    alegbraic_manipulator: "AlgebraicManipulator", s: str
+) -> Union[Ratio, Angle]:
     if "pi/" in s:
         n, d = s.split("pi/")
         n, d = int(n), int(d)
-        p0, _ = proof_graph.alegbraic_manipulator.get_or_create_const_ang(
-            proof_graph.symbols_graph, n, d
-        )
+        p0, _ = alegbraic_manipulator.get_or_create_const_ang(n, d)
     else:
         n, d = s.split("/")
         n, d = int(n), int(d)
-        p0, _ = proof_graph.alegbraic_manipulator.get_or_create_const_rat(
-            proof_graph.symbols_graph, n, d
-        )
+        p0, _ = alegbraic_manipulator.get_or_create_const_rat(n, d)
     return p0

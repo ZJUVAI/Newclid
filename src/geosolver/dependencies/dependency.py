@@ -13,6 +13,7 @@ from geosolver.geometry import (
     all_ratios,
     bfs_backtrack,
     circle_of_and_why,
+    is_equal,
     line_of_and_why,
     why_equal,
 )
@@ -150,7 +151,7 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
         dep.why = why
 
     elif dep.name == "collx":
-        if proof.check_coll(dep.args):
+        if proof.statements_checker.check_coll(dep.args):
             args = list(set(dep.args))
             cached_dep = proof.dependency_cache.get("coll", args)
             if cached_dep is not None:
@@ -245,13 +246,13 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
                 dep.why += maybe_make_equal_pairs(
                     m, n, a, b, p, q, c, d, mn, pq, proof, level
                 )
-            elif proof.is_equal(ab, mn) or proof.is_equal(cd, pq):
+            elif is_equal(ab, mn) or is_equal(cd, pq):
                 dep1 = Dependency("para", [a, b, m, n], None, level)
                 dep1.why_me(proof, level)
                 dep2 = Dependency("para", [c, d, p, q], None, level)
                 dep2.why_me(proof, level)
                 dep.why += [dep1, dep2]
-            elif proof.is_equal(ab, cd) or proof.is_equal(mn, pq):
+            elif is_equal(ab, cd) or is_equal(mn, pq):
                 dep1 = Dependency("para", [a, b, c, d], None, level)
                 dep1.why_me(proof, level)
                 dep2 = Dependency("para", [m, n, p, q], None, level)
@@ -305,13 +306,13 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
                 dep.why += maybe_make_equal_pairs(
                     m, n, a, b, p, q, c, d, mn, pq, proof, level
                 )
-            elif proof.is_equal(ab, mn) or proof.is_equal(cd, pq):
+            elif is_equal(ab, mn) or is_equal(cd, pq):
                 dep1 = Dependency("cong", [a, b, m, n], None, level)
                 dep1.why_me(proof, level)
                 dep2 = Dependency("cong", [c, d, p, q], None, level)
                 dep2.why_me(proof, level)
                 dep.why += [dep1, dep2]
-            elif proof.is_equal(ab, cd) or proof.is_equal(mn, pq):
+            elif is_equal(ab, cd) or is_equal(mn, pq):
                 dep1 = Dependency("cong", [a, b, c, d], None, level)
                 dep1.why_me(proof, level)
                 dep2 = Dependency("cong", [m, n, p, q], None, level)
@@ -365,7 +366,7 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
 
             dep.why = []
             for args in [(a, b, a1, b1), (c, d, c1, d1)]:
-                if proof.check_coll(args):
+                if proof.statements_checker.check_coll(args):
                     if len(set(args)) > 2:
                         dep = Dependency("coll", args, None, None)
                         dep.why.append(dep.why_me_or_cache(proof, level))
@@ -388,9 +389,9 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
             s1, s2 = l1._obj, l2._obj
             (a1, b1), (c1, d1) = list(s1.points), list(s2.points)
 
-            if not proof.check_cong([a, b, a1, b1]) or not proof.check_cong(
-                [c, d, c1, d1]
-            ):
+            if not proof.statements_checker.check_cong(
+                [a, b, a1, b1]
+            ) or not proof.statements_checker.check_cong([c, d, c1, d1]):
                 continue
 
             dep.why = []

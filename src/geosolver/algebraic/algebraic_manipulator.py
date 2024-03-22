@@ -16,7 +16,9 @@ if TYPE_CHECKING:
 
 
 class AlgebraicManipulator:
-    def __init__(self) -> None:
+    def __init__(self, symbols_graph: "SymbolsGraph") -> None:
+        self.symbols_graph = symbols_graph
+
         self.atable = AngleTable()
         self.dtable = DistanceTable()
         self.rtable = RatioTable()
@@ -24,9 +26,11 @@ class AlgebraicManipulator:
         self.rconst = {}  # contains all constant ratios
         self.aconst = {}  # contains all constant angles.
 
-    def add_algebra(
-        self, symbols_graph: "SymbolsGraph", dep: "Dependency", level: int
-    ) -> None:
+        # Half pi constant is always added by default.
+        self.halfpi, _ = self.get_or_create_const_ang(1, 2)
+        self.vhalfpi = self.halfpi.val
+
+    def add_algebra(self, dep: "Dependency", level: int) -> None:
         """Add new algebraic predicates."""
         _ = level
         if dep.name not in [
@@ -74,8 +78,8 @@ class AlgebraicManipulator:
 
         if name == "cong":
             a, b, c, d = args
-            ab, _ = symbols_graph.get_line_thru_pair_why(a, b)
-            cd, _ = symbols_graph.get_line_thru_pair_why(c, d)
+            ab, _ = self.symbols_graph.get_line_thru_pair_why(a, b)
+            cd, _ = self.symbols_graph.get_line_thru_pair_why(c, d)
             self.dtable.add_cong(ab, cd, a, b, c, d, dep)
 
             ab, cd = dep.algebra
@@ -203,41 +207,37 @@ class AlgebraicManipulator:
 
         return added
 
-    def _create_const_ang(self, symbols_graph: "SymbolsGraph", n: int, d: int) -> None:
+    def _create_const_ang(self, n: int, d: int) -> None:
         n, d = geosolver.ratios.simplify(n, d)
-        ang = self.aconst[(n, d)] = symbols_graph.new_node(Angle, f"{n}pi/{d}")
+        ang = self.aconst[(n, d)] = self.symbols_graph.new_node(Angle, f"{n}pi/{d}")
         ang.set_directions(None, None)
-        symbols_graph.get_node_val(ang, deps=None)
+        self.symbols_graph.get_node_val(ang, deps=None)
 
-    def _create_const_rat(self, symbols_graph: "SymbolsGraph", n: int, d: int) -> None:
+    def _create_const_rat(self, n: int, d: int) -> None:
         n, d = geosolver.ratios.simplify(n, d)
-        rat = self.rconst[(n, d)] = symbols_graph.new_node(Ratio, f"{n}/{d}")
+        rat = self.rconst[(n, d)] = self.symbols_graph.new_node(Ratio, f"{n}/{d}")
         rat.set_lengths(None, None)
-        symbols_graph.get_node_val(rat, deps=None)
+        self.symbols_graph.get_node_val(rat, deps=None)
 
-    def get_or_create_const_ang(
-        self, symbols_graph: "SymbolsGraph", n: int, d: int
-    ) -> None:
+    def get_or_create_const_ang(self, n: int, d: int) -> None:
         n, d = geosolver.ratios.simplify(n, d)
         if (n, d) not in self.aconst:
-            self._create_const_ang(symbols_graph, n, d)
+            self._create_const_ang(n, d)
         ang1 = self.aconst[(n, d)]
 
         n, d = geosolver.ratios.simplify(d - n, d)
         if (n, d) not in self.aconst:
-            self._create_const_ang(symbols_graph, n, d)
+            self._create_const_ang(n, d)
         ang2 = self.aconst[(n, d)]
         return ang1, ang2
 
-    def get_or_create_const_rat(
-        self, symbols_graph: "SymbolsGraph", n: int, d: int
-    ) -> None:
+    def get_or_create_const_rat(self, n: int, d: int) -> None:
         n, d = geosolver.ratios.simplify(n, d)
         if (n, d) not in self.rconst:
-            self._create_const_rat(symbols_graph, n, d)
+            self._create_const_rat(n, d)
         rat1 = self.rconst[(n, d)]
 
         if (d, n) not in self.rconst:
-            self._create_const_rat(symbols_graph, d, n)
+            self._create_const_rat(d, n)
         rat2 = self.rconst[(d, n)]
         return rat1, rat2

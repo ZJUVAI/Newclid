@@ -336,6 +336,18 @@ class SymbolsGraph:
         self._triplet2circle[(p1, p2, p3)] = circle
         return circle
 
+    @staticmethod
+    def two_points_of_length(lenght: Length) -> tuple[Point, Point]:
+        s = lenght.neighbors(Segment)[0]
+        p1, p2 = s.points
+        return p1, p2
+
+    @staticmethod
+    def two_points_on_direction(d: Direction) -> tuple[Point, Point]:
+        line_neighbor = d.neighbors(Line)[0]
+        p1, p2 = line_neighbor.neighbors(Point)[:2]
+        return p1, p2
+
     def draw_html(self, html_path: Path):
         nt = Network("1080px")
         # populates the nodes and edges data structures
