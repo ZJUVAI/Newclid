@@ -132,7 +132,7 @@ def enum_triangle(points: list[Point]) -> Generator[list[Point], None, None]:
     yield [c, a, c, b, z, x, z, y]
 
 
-def enum_triangle2(points: list[Point]) -> Generator[list[Point], None, None]:
+def enum_triangle_reflect(points: list[Point]) -> Generator[list[Point], None, None]:
     a, b, c, x, y, z = points
     yield [a, b, a, c, x, z, x, y]
     yield [b, a, b, c, y, z, y, x]

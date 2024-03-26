@@ -279,7 +279,12 @@ def get_logs(
     set[Point],
 ]:
     """Given a DAG and conclusion N, return the premise, aux, proof."""
-    query = query.why_me_or_cache(proof, query.level)
+    query = query.why_me_or_cache(
+        proof.symbols_graph,
+        proof.statements_checker,
+        proof.dependency_cache,
+        query.level,
+    )
     log = recursive_traceback(query)
     log, setup, aux_setup, setup_points, _ = separate_dependency_difference(query, log)
 

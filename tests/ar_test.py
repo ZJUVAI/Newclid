@@ -131,8 +131,12 @@ class TestAR:
 
         # Add two eqangles facts because ieq_triangle only add congruent sides
         a, b, c = proof.symbols_graph.names2nodes("abc")
-        proof._add_eqangle([a, b, b, c, b, c, c, a], EmptyDependency(0, None))
-        proof._add_eqangle([b, c, c, a, c, a, a, b], EmptyDependency(0, None))
+        proof.statements_adder._add_eqangle(
+            [a, b, b, c, b, c, c, a], EmptyDependency(0, None)
+        )
+        proof.statements_adder._add_eqangle(
+            [b, c, c, a, c, a, a, b], EmptyDependency(0, None)
+        )
 
         # Create an external angle table:
         tb = geometric_tables.AngleTable("pi")

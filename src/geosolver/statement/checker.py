@@ -30,14 +30,11 @@ class StatementChecker:
         self.symbols_graph = symbols_graph
         self.alegbraic_manipulator = alegbraic_manipulator
         self.NAME_TO_CHECK = {
-            "ncoll": self.check_ncoll,
-            "npara": self.check_npara,
-            "nperp": self.check_nperp,
+            "coll": self.check_coll,
+            "para": self.check_para,
             "midp": self.check_midp,
             "cong": self.check_cong,
             "perp": self.check_perp,
-            "para": self.check_para,
-            "coll": self.check_coll,
             "cyclic": self.check_cyclic,
             "circle": self.check_circle,
             "aconst": self.check_aconst,
@@ -56,6 +53,9 @@ class StatementChecker:
             "contri*": self.check_contri,
             "sameside": self.check_sameside,
             "diff": self.check_diff,
+            "ncoll": self.check_ncoll,
+            "npara": self.check_npara,
+            "nperp": self.check_nperp,
         }
 
     def check(self, name: str, args: list[Point]) -> bool:
@@ -94,6 +94,9 @@ class StatementChecker:
             return False
 
         return is_equal(ab, cd)
+
+    def check_para_or_coll(self, points: list[Point]) -> bool:
+        return self.check_para(points) or self.check_coll(points)
 
     def check_perpl(self, ab: Line, cd: Line) -> bool:
         if ab.val is None or cd.val is None:

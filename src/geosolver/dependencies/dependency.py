@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 
-from geosolver.dependencies.caching import hashed
+from geosolver.dependencies.caching import DependencyCache, hashed
 from geosolver.geometry import (
     Angle,
     Direction,
@@ -19,8 +19,10 @@ from geosolver.geometry import (
 )
 from geosolver.problem import CONSTRUCTION_RULE, Construction
 
+
 if TYPE_CHECKING:
-    from geosolver.proof import Proof
+    from geosolver.symbols_graph import SymbolsGraph
+    from geosolver.statement.checker import StatementChecker
 
 
 class Dependency(Construction):
@@ -61,23 +63,41 @@ class Dependency(Construction):
         dep.why = list(self.why)
         return dep
 
-    def why_me(self, proof: "Proof", level: int) -> None:
+    def why_me(
+        self,
+        symbols_graph: "SymbolsGraph",
+        statements_checker: "StatementChecker",
+        dependency_cache: "DependencyCache",
+        level: int,
+    ) -> None:
         """Figure out the dependencies predicates of self."""
-        why_dependency(self, proof, level)
+        why_dependency(self, symbols_graph, statements_checker, dependency_cache, level)
 
-    def why_me_or_cache(self, proof: "Proof", level: int) -> "Dependency":
-        cached_dep = proof.dependency_cache.get_cached(self)
+    def why_me_or_cache(
+        self,
+        symbols_graph: "SymbolsGraph",
+        statements_checker: "StatementChecker",
+        dependency_cache: "DependencyCache",
+        level: int,
+    ) -> "Dependency":
+        cached_dep = dependency_cache.get_cached(self)
         if cached_dep is not None:
             return cached_dep
-        self.why_me(proof, level)
+        self.why_me(symbols_graph, statements_checker, dependency_cache, level)
         return self
 
     def hashed(self, rename: bool = False) -> tuple[str, ...]:
         return hashed(self.name, self.args, rename=rename)
 
 
-def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
-    cached_me = proof.dependency_cache.get(dep.name, dep.args)
+def why_dependency(
+    dep: "Dependency",
+    symbols_graph: "SymbolsGraph",
+    statements_checker: "StatementChecker",
+    dependency_cache: "DependencyCache",
+    level: int,
+) -> None:
+    cached_me = dependency_cache.get(dep.name, dep.args)
     if cached_me is not None:
         dep.why = cached_me.why
         dep.rule_name = cached_me.rule_name
@@ -89,15 +109,19 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
             dep.why = []
             return
 
-        ab = proof.symbols_graph.get_line(a, b)
-        cd = proof.symbols_graph.get_line(c, d)
+        ab = symbols_graph.get_line(a, b)
+        cd = symbols_graph.get_line(c, d)
         if ab == cd:
             if {a, b} == {c, d}:
                 dep.why = []
                 dep.rule_name = ""
                 return
             dep = Dependency("coll", list({a, b, c, d}), "t??", None)
-            dep.why = [dep.why_me_or_cache(proof, level)]
+            dep.why = [
+                dep.why_me_or_cache(
+                    symbols_graph, statements_checker, dependency_cache, level
+                )
+            ]
             return
 
         for (x, y), xy in zip([(a, b), (c, d)], [ab, cd]):
@@ -105,28 +129,38 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
             if {x, y} == {x_, y_}:
                 continue
             d = Dependency("collx", [x, y, x_, y_], None, level)
-            dep.why += [d.why_me_or_cache(proof, level)]
+            dep.why += [
+                d.why_me_or_cache(
+                    symbols_graph, statements_checker, dependency_cache, level
+                )
+            ]
 
         whypara = why_equal(ab, cd)
         dep.why += whypara
 
     elif dep.name == "midp":
         m, a, b = dep.args
-        ma = proof.symbols_graph.get_segment(m, a)
-        mb = proof.symbols_graph.get_segment(m, b)
-        dep = Dependency("coll", [m, a, b], None, None).why_me_or_cache(proof, None)
+        ma = symbols_graph.get_segment(m, a)
+        mb = symbols_graph.get_segment(m, b)
+        dep = Dependency("coll", [m, a, b], None, None).why_me_or_cache(
+            symbols_graph, statements_checker, dependency_cache, None
+        )
         dep.why = [dep] + why_equal(ma, mb, level)
 
     elif dep.name == "perp":
         a, b, c, d = dep.args
-        ab = proof.symbols_graph.get_line(a, b)
-        cd = proof.symbols_graph.get_line(c, d)
+        ab = symbols_graph.get_line(a, b)
+        cd = symbols_graph.get_line(c, d)
         for (x, y), xy in zip([(a, b), (c, d)], [ab, cd]):
             x_, y_ = xy.points
             if {x, y} == {x_, y_}:
                 continue
             d = Dependency("collx", [x, y, x_, y_], None, level)
-            dep.why += [d.why_me_or_cache(proof, level)]
+            dep.why += [
+                d.why_me_or_cache(
+                    symbols_graph, statements_checker, dependency_cache, level
+                )
+            ]
 
         _, why = why_eqangle(ab._val, cd._val, cd._val, ab._val, level)
         a, b = ab.points
@@ -141,8 +175,8 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
 
     elif dep.name == "cong":
         a, b, c, d = dep.args
-        ab = proof.symbols_graph.get_segment(a, b)
-        cd = proof.symbols_graph.get_segment(c, d)
+        ab = symbols_graph.get_segment(a, b)
+        cd = symbols_graph.get_segment(c, d)
 
         dep.why = why_equal(ab, cd, level)
 
@@ -151,9 +185,9 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
         dep.why = why
 
     elif dep.name == "collx":
-        if proof.statements_checker.check_coll(dep.args):
+        if statements_checker.check_coll(dep.args):
             args = list(set(dep.args))
-            cached_dep = proof.dependency_cache.get("coll", args)
+            cached_dep = dependency_cache.get("coll", args)
             if cached_dep is not None:
                 dep.why = [cached_dep]
                 dep.rule_name = ""
@@ -161,7 +195,7 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
             _, dep.why = line_of_and_why(args, level)
         else:
             dep.name = "para"
-            dep.why_me(proof, level)
+            dep.why_me(symbols_graph, statements_checker, dependency_cache, level)
 
     elif dep.name == "cyclic":
         _, why = circle_of_and_why(dep.args, level)
@@ -169,32 +203,48 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
 
     elif dep.name == "circle":
         o, a, b, c = dep.args
-        oa = proof.symbols_graph.get_segment(o, a)
-        ob = proof.symbols_graph.get_segment(o, b)
-        oc = proof.symbols_graph.get_segment(o, c)
+        oa = symbols_graph.get_segment(o, a)
+        ob = symbols_graph.get_segment(o, b)
+        oc = symbols_graph.get_segment(o, c)
         dep.why = why_equal(oa, ob, level) + why_equal(oa, oc, level)
 
     elif dep.name in ["eqangle", "eqangle6"]:
         a, b, c, d, m, n, p, q = dep.args
 
-        ab, why1 = proof.symbols_graph.get_line_thru_pair_why(a, b)
-        cd, why2 = proof.symbols_graph.get_line_thru_pair_why(c, d)
-        mn, why3 = proof.symbols_graph.get_line_thru_pair_why(m, n)
-        pq, why4 = proof.symbols_graph.get_line_thru_pair_why(p, q)
+        ab, why1 = symbols_graph.get_line_thru_pair_why(a, b)
+        cd, why2 = symbols_graph.get_line_thru_pair_why(c, d)
+        mn, why3 = symbols_graph.get_line_thru_pair_why(m, n)
+        pq, why4 = symbols_graph.get_line_thru_pair_why(p, q)
 
         if ab is None or cd is None or mn is None or pq is None:
             if {a, b} == {m, n}:
                 d = Dependency("para", [c, d, p, q], None, level)
-                dep.why = [d.why_me_or_cache(proof, level)]
+                dep.why = [
+                    d.why_me_or_cache(
+                        symbols_graph, statements_checker, dependency_cache, level
+                    )
+                ]
             if {a, b} == {c, d}:
                 d = Dependency("para", [p, q, m, n], None, level)
-                dep.why = [d.why_me_or_cache(proof, level)]
+                dep.why = [
+                    d.why_me_or_cache(
+                        symbols_graph, statements_checker, dependency_cache, level
+                    )
+                ]
             if {c, d} == {p, q}:
                 d = Dependency("para", [a, b, m, n], None, level)
-                dep.why = [d.why_me_or_cache(proof, level)]
+                dep.why = [
+                    d.why_me_or_cache(
+                        symbols_graph, statements_checker, dependency_cache, level
+                    )
+                ]
             if {p, q} == {m, n}:
                 d = Dependency("para", [a, b, c, d], None, level)
-                dep.why = [d.why_me_or_cache(proof, level)]
+                dep.why = [
+                    d.why_me_or_cache(
+                        symbols_graph, statements_checker, dependency_cache, level
+                    )
+                ]
             return
 
         for (x, y), xy, whyxy in zip(
@@ -232,55 +282,123 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
                 dep.why += []
             elif ab == mn:
                 dep.why += maybe_make_equal_pairs(
-                    a, b, c, d, m, n, p, q, ab, mn, proof, level
+                    a,
+                    b,
+                    c,
+                    d,
+                    m,
+                    n,
+                    p,
+                    q,
+                    ab,
+                    mn,
+                    symbols_graph,
+                    statements_checker,
+                    dependency_cache,
+                    level,
                 )
             elif cd == pq:
                 dep.why += maybe_make_equal_pairs(
-                    c, d, a, b, p, q, m, n, cd, pq, proof, level
+                    c,
+                    d,
+                    a,
+                    b,
+                    p,
+                    q,
+                    m,
+                    n,
+                    cd,
+                    pq,
+                    symbols_graph,
+                    statements_checker,
+                    dependency_cache,
+                    level,
                 )
             elif ab == cd:
                 dep.why += maybe_make_equal_pairs(
-                    a, b, m, n, c, d, p, q, ab, cd, proof, level
+                    a,
+                    b,
+                    m,
+                    n,
+                    c,
+                    d,
+                    p,
+                    q,
+                    ab,
+                    cd,
+                    symbols_graph,
+                    statements_checker,
+                    dependency_cache,
+                    level,
                 )
             elif mn == pq:
                 dep.why += maybe_make_equal_pairs(
-                    m, n, a, b, p, q, c, d, mn, pq, proof, level
+                    m,
+                    n,
+                    a,
+                    b,
+                    p,
+                    q,
+                    c,
+                    d,
+                    mn,
+                    pq,
+                    symbols_graph,
+                    statements_checker,
+                    dependency_cache,
+                    level,
                 )
             elif is_equal(ab, mn) or is_equal(cd, pq):
                 dep1 = Dependency("para", [a, b, m, n], None, level)
-                dep1.why_me(proof, level)
+                dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
                 dep2 = Dependency("para", [c, d, p, q], None, level)
-                dep2.why_me(proof, level)
+                dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
                 dep.why += [dep1, dep2]
             elif is_equal(ab, cd) or is_equal(mn, pq):
                 dep1 = Dependency("para", [a, b, c, d], None, level)
-                dep1.why_me(proof, level)
+                dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
                 dep2 = Dependency("para", [m, n, p, q], None, level)
-                dep2.why_me(proof, level)
+                dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
                 dep.why += [dep1, dep2]
             elif ab._val and cd._val and mn._val and pq._val:
                 dep.why = why_eqangle(ab._val, cd._val, mn._val, pq._val, level)
 
     elif dep.name in ["eqratio", "eqratio6"]:
         a, b, c, d, m, n, p, q = dep.args
-        ab = proof.symbols_graph.get_segment(a, b)
-        cd = proof.symbols_graph.get_segment(c, d)
-        mn = proof.symbols_graph.get_segment(m, n)
-        pq = proof.symbols_graph.get_segment(p, q)
+        ab = symbols_graph.get_segment(a, b)
+        cd = symbols_graph.get_segment(c, d)
+        mn = symbols_graph.get_segment(m, n)
+        pq = symbols_graph.get_segment(p, q)
 
         if ab is None or cd is None or mn is None or pq is None:
             if {a, b} == {m, n}:
                 d = Dependency("cong", [c, d, p, q], None, level)
-                dep.why = [d.why_me_or_cache(proof, level)]
+                dep.why = [
+                    d.why_me_or_cache(
+                        symbols_graph, statements_checker, dependency_cache, level
+                    )
+                ]
             if {a, b} == {c, d}:
                 d = Dependency("cong", [p, q, m, n], None, level)
-                dep.why = [d.why_me_or_cache(proof, level)]
+                dep.why = [
+                    d.why_me_or_cache(
+                        symbols_graph, statements_checker, dependency_cache, level
+                    )
+                ]
             if {c, d} == {p, q}:
                 d = Dependency("cong", [a, b, m, n], None, level)
-                dep.why = [d.why_me_or_cache(proof, level)]
+                dep.why = [
+                    d.why_me_or_cache(
+                        symbols_graph, statements_checker, dependency_cache, level
+                    )
+                ]
             if {p, q} == {m, n}:
                 d = Dependency("cong", [a, b, c, d], None, level)
-                dep.why = [d.why_me_or_cache(proof, level)]
+                dep.why = [
+                    d.why_me_or_cache(
+                        symbols_graph, statements_checker, dependency_cache, level
+                    )
+                ]
             return
 
         if ab._val and cd._val and mn._val and pq._val:
@@ -292,31 +410,83 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
                 dep.why = []
             elif ab == mn:
                 dep.why += maybe_make_equal_pairs(
-                    a, b, c, d, m, n, p, q, ab, mn, proof, level
+                    a,
+                    b,
+                    c,
+                    d,
+                    m,
+                    n,
+                    p,
+                    q,
+                    ab,
+                    mn,
+                    symbols_graph,
+                    statements_checker,
+                    dependency_cache,
+                    level,
                 )
             elif cd == pq:
                 dep.why += maybe_make_equal_pairs(
-                    c, d, a, b, p, q, m, n, cd, pq, proof, level
+                    c,
+                    d,
+                    a,
+                    b,
+                    p,
+                    q,
+                    m,
+                    n,
+                    cd,
+                    pq,
+                    symbols_graph,
+                    statements_checker,
+                    dependency_cache,
+                    level,
                 )
             elif ab == cd:
                 dep.why += maybe_make_equal_pairs(
-                    a, b, m, n, c, d, p, q, ab, cd, proof, level
+                    a,
+                    b,
+                    m,
+                    n,
+                    c,
+                    d,
+                    p,
+                    q,
+                    ab,
+                    cd,
+                    symbols_graph,
+                    statements_checker,
+                    dependency_cache,
+                    level,
                 )
             elif mn == pq:
                 dep.why += maybe_make_equal_pairs(
-                    m, n, a, b, p, q, c, d, mn, pq, proof, level
+                    m,
+                    n,
+                    a,
+                    b,
+                    p,
+                    q,
+                    c,
+                    d,
+                    mn,
+                    pq,
+                    symbols_graph,
+                    statements_checker,
+                    dependency_cache,
+                    level,
                 )
             elif is_equal(ab, mn) or is_equal(cd, pq):
                 dep1 = Dependency("cong", [a, b, m, n], None, level)
-                dep1.why_me(proof, level)
+                dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
                 dep2 = Dependency("cong", [c, d, p, q], None, level)
-                dep2.why_me(proof, level)
+                dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
                 dep.why += [dep1, dep2]
             elif is_equal(ab, cd) or is_equal(mn, pq):
                 dep1 = Dependency("cong", [a, b, c, d], None, level)
-                dep1.why_me(proof, level)
+                dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
                 dep2 = Dependency("cong", [m, n, p, q], None, level)
-                dep2.why_me(proof, level)
+                dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
                 dep.why += [dep1, dep2]
             elif ab._val and cd._val and mn._val and pq._val:
                 dep.why = why_eqangle(ab._val, cd._val, mn._val, pq._val, level)
@@ -327,20 +497,20 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
     elif dep.name == "simtri":
         a, b, c, x, y, z = dep.args
         dep1 = Dependency("eqangle", [a, b, a, c, x, y, x, z], "", level)
-        dep1.why_me(proof, level)
+        dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
         dep2 = Dependency("eqangle", [b, a, b, c, y, x, y, z], "", level)
-        dep2.why_me(proof, level)
+        dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
         dep.rule_name = "r34"
         dep.why = [dep1, dep2]
 
     elif dep.name == "contri":
         a, b, c, x, y, z = dep.args
         dep1 = Dependency("cong", [a, b, x, y], "", level)
-        dep1.why_me(proof, level)
+        dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
         dep2 = Dependency("cong", [b, c, y, z], "", level)
-        dep2.why_me(proof, level)
+        dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
         dep3 = Dependency("cong", [c, a, z, x], "", level)
-        dep3.why_me(proof, level)
+        dep3.why_me(symbols_graph, statements_checker, dependency_cache, level)
         dep.rule_name = "r32"
         dep.why = [dep1, dep2, dep3]
 
@@ -359,20 +529,31 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
             l1, l2 = d1._obj, d2._obj
             (a1, b1), (c1, d1) = l1.points, l2.points
 
-            if not proof.check_para_or_coll(
+            if not statements_checker.check_para_or_coll(
                 [a, b, a1, b1]
-            ) or not proof.check_para_or_coll([c, d, c1, d1]):
+            ) or not statements_checker.check_para_or_coll([c, d, c1, d1]):
                 continue
 
             dep.why = []
             for args in [(a, b, a1, b1), (c, d, c1, d1)]:
-                if proof.statements_checker.check_coll(args):
+                if statements_checker.check_coll(args):
                     if len(set(args)) > 2:
                         dep = Dependency("coll", args, None, None)
-                        dep.why.append(dep.why_me_or_cache(proof, level))
+                        dep.why.append(
+                            dep.why_me_or_cache(
+                                symbols_graph,
+                                statements_checker,
+                                dependency_cache,
+                                level,
+                            )
+                        )
                 else:
                     dep = Dependency("para", args, None, None)
-                    dep.why.append(dep.why_me_or_cache(proof, level))
+                    dep.why.append(
+                        dep.why_me_or_cache(
+                            symbols_graph, statements_checker, dependency_cache, level
+                        )
+                    )
 
             dep.why += why_equal(ang, ang0)
             break
@@ -389,16 +570,20 @@ def why_dependency(dep: "Dependency", proof: "Proof", level: int) -> None:
             s1, s2 = l1._obj, l2._obj
             (a1, b1), (c1, d1) = list(s1.points), list(s2.points)
 
-            if not proof.statements_checker.check_cong(
+            if not statements_checker.check_cong(
                 [a, b, a1, b1]
-            ) or not proof.statements_checker.check_cong([c, d, c1, d1]):
+            ) or not statements_checker.check_cong([c, d, c1, d1]):
                 continue
 
             dep.why = []
             for args in [(a, b, a1, b1), (c, d, c1, d1)]:
                 if len(set(args)) > 2:
                     dep = Dependency("cong", args, None, None)
-                    dep.why.append(dep.why_me_or_cache(proof, level))
+                    dep.why.append(
+                        dep.why_me_or_cache(
+                            symbols_graph, statements_checker, dependency_cache, level
+                        )
+                    )
 
             dep.why += why_equal(rat, rat0)
             break
@@ -547,7 +732,9 @@ def maybe_make_equal_pairs(
     q: Point,
     ab: Line,
     mn: Line,
-    proof: "Proof",
+    symbols_graph: "SymbolsGraph",
+    statements_checker: "StatementChecker",
+    dependency_cache: "DependencyCache",
     level: int,
 ) -> list["Dependency"]:
     """Make a-b:c-d==m-n:p-q in case a-b==m-n or c-d==p-q."""
@@ -558,10 +745,10 @@ def maybe_make_equal_pairs(
     colls = [a, b, m, n]
     if len(set(colls)) > 2 and eqname == "para":
         dep = Dependency("collx", colls, None, level)
-        dep.why_me(proof, level)
+        dep.why_me(symbols_graph, statements_checker, dependency_cache, level)
         why += [dep]
 
     dep = Dependency(eqname, [c, d, p, q], None, level)
-    dep.why_me(proof, level)
+    dep.why_me(symbols_graph, statements_checker, dependency_cache, level)
     why += [dep]
     return why

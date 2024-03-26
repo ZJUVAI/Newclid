@@ -72,7 +72,12 @@ def dd_bfs_one_level(
 
                 dep = Dependency(p.name, p_args, rule_name="", level=level)
                 try:
-                    dep = dep.why_me_or_cache(proof, level)
+                    dep = dep.why_me_or_cache(
+                        proof.symbols_graph,
+                        proof.statements_checker,
+                        proof.dependency_cache,
+                        level,
+                    )
                 except Exception:
                     fail = True
                     break

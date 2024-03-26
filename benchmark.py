@@ -51,7 +51,7 @@ def main():
             RULES,
         )
 
-        proof.proof_subgraph.show_html(
+        proof.dependency_graph.proof_subgraph.show_html(
             problem_output_path / f"{problem_name}.proof_subgraph.html",
             RULES,
         )

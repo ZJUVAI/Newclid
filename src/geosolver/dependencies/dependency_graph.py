@@ -5,7 +5,7 @@ import logging
 from pathlib import Path
 import random
 from typing import TYPE_CHECKING, Dict, List, Tuple, Union
-from networkx import MultiDiGraph
+from networkx import MultiDiGraph, ancestors
 from pyvis.network import Network
 import seaborn as sns
 
@@ -37,6 +37,17 @@ class DependencyGraph:
     def __init__(self) -> None:
         self.nx_graph = MultiDiGraph()
         self.goal = None
+
+    @property
+    def proof_subgraph(self) -> DependencyGraph:
+        if self.goal is None:
+            raise ValueError("Cannot extract proof subgraph without goal.")
+        proof_graph = DependencyGraph()
+        proof_graph.nx_graph = self.nx_graph.copy()
+        proof_graph.nx_graph = proof_graph.nx_graph.subgraph(
+            ancestors(proof_graph.nx_graph, self.goal) | {self.goal}
+        )
+        return proof_graph
 
     def add_dependency(
         self,

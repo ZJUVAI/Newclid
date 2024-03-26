@@ -39,7 +39,15 @@ class EmptyDependency:
         dep0 = self.populate(name0, args0)
         deps = EmptyDependency(level=self.level, rule_name=None)
         dep = Dependency(name, args, None, deps.level)
-        deps.why = [dep0, dep.why_me_or_cache(proof, None)]
+        deps.why = [
+            dep0,
+            dep.why_me_or_cache(
+                proof.symbols_graph,
+                proof.statements_checker,
+                proof.dependency_cache,
+                None,
+            ),
+        ]
         return deps
 
     def extend_many(
@@ -57,5 +65,12 @@ class EmptyDependency:
         deps.why = [dep0]
         for name, args in name_args:
             dep = Dependency(name, args, None, deps.level)
-            deps.why += [dep.why_me_or_cache(proof, None)]
+            deps.why += [
+                dep.why_me_or_cache(
+                    proof.symbols_graph,
+                    proof.statements_checker,
+                    proof.dependency_cache,
+                    None,
+                )
+            ]
         return deps
