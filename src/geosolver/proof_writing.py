@@ -121,15 +121,15 @@ def write_solution(g: "ProofGraph", p: Problem, out_file: Optional[Path]) -> Non
 
     # some special case where the deduction rule has a well known name.
     r2name = {
-        "r32": "(SSS)",
-        "r33": "(SAS)",
+        "r32": "(SSS 32)",
+        "r33": "(SAS 33)",
         "r34": "(Similar Triangles 34)",
         "r35": "(Similar Triangles 35)",
-        "r36": "(ASA)",
-        "r37": "(ASA)",
+        "r36": "(ASA 36)",
+        "r37": "(ASA 37)",
         "r38": "(Similar Triangles 38)",
         "r39": "(Similar Triangles 39)",
-        "r40": "(Congruent Triangles)",
+        "r40": "(Congruent Triangles 40)",
         "a00": "(Distance chase)",
         "a01": "(Ratio chase)",
         "a02": "(Angle chase)",
