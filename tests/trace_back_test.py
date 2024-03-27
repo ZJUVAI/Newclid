@@ -19,6 +19,7 @@
 import pytest
 import pytest_check as check
 
+from geosolver.concepts import ConceptName
 from geosolver.ddar import solve
 from geosolver.dependencies.dependency import Dependency
 from geosolver.proof import Proof
@@ -49,7 +50,17 @@ class TestTraceback:
         aux = [p.hashed() for p in aux]
 
         check.equal(
-            set(setup), {("perp", "a", "c", "b", "d"), ("perp", "a", "b", "c", "d")}
+            set(setup),
+            {
+                (ConceptName.PERPENDICULAR.value, "a", "c", "b", "d"),
+                ("perp", "a", "b", "c", "d"),
+            },
         )
 
-        check.equal(set(aux), {("coll", "a", "c", "e"), ("coll", "b", "d", "e")})
+        check.equal(
+            set(aux),
+            {
+                (ConceptName.COLLINEAR.value, "a", "c", "e"),
+                (ConceptName.COLLINEAR.value, "b", "d", "e"),
+            },
+        )

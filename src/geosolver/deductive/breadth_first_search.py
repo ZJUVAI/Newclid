@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Union
 import time
 
 
+from geosolver.concepts import ConceptName
 from geosolver.dependencies.dependency import Dependency
 from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.geometry import Angle, Point, Ratio
@@ -52,11 +53,11 @@ def dd_bfs_one_level(
             for p in theorem.premise:
                 p_args = [mp[a] for a in p.args]
                 # Trivial deps.
-                if p.name == "cong":
+                if p.name == ConceptName.CONGRUENT.value:
                     a, b, c, d = p_args
                     if {a, b} == {c, d}:
                         continue
-                if p.name == "para":
+                if p.name == ConceptName.PARALLEL.value:
                     a, b, c, d = p_args
                     if {a, b} == {c, d}:
                         continue
@@ -65,7 +66,10 @@ def dd_bfs_one_level(
                     "cong_cong_eqangle6_ncoll_contri*",
                     "eqratio6_eqangle6_ncoll_simtri*",
                 ]:
-                    if p.name in ["eqangle", "eqangle6"]:  # SAS or RAR
+                    if p.name in [
+                        ConceptName.EQANGLE.value,
+                        ConceptName.EQANGLE6.value,
+                    ]:  # SAS or RAR
                         b, a, b, c, y, x, y, z = p_args
                         if not same_clock(a.num, b.num, c.num, x.num, y.num, z.num):
                             p_args = b, a, b, c, y, z, y, x
@@ -130,7 +134,7 @@ def dd_bfs_one_level(
 
     # Run AR, but do NOT apply to the proof state (yet).
     for dep in added:
-        proof.add_algebra(dep, level)
+        proof.add_algebra(dep)
     derives, eq4s = proof.alegbraic_manipulator.derive_algebra(level, verbose=False)
 
     branching += sum([len(x) for x in derives.values()])

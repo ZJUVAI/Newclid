@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Callable, Generator
 
 import geosolver.combinatorics as comb
 
+from geosolver.concepts import ConceptName
 from geosolver.deductive.points_manipulation import (
     diff_point,
     intersect1,
@@ -421,7 +422,7 @@ def match_cyclic_eqangle(
 ) -> Generator[dict[str, Point], None, None]:
     """Match cyclic A B P Q => eqangle P A P B Q A Q B."""
     record = set()
-    for a, b, c, d in g_matcher("cyclic"):
+    for a, b, c, d in g_matcher(ConceptName.CYCLIC.value):
         if (a, b, c, d) in record:
             continue
         record.add((a, b, c, d))
@@ -457,7 +458,7 @@ def match_cong_cong_cong_ncoll_contri(
 ) -> Generator[dict[str, Point], None, None]:
     """Match cong A B P Q, cong B C Q R, cong C A R P, ncoll A B C => contri* A B C P Q R."""
     record = set()
-    for a, b, p, q in g_matcher("cong"):
+    for a, b, p, q in g_matcher(ConceptName.CONGRUENT.value):
         for c in proof.symbols_graph.type2nodes[Point]:
             for r in proof.symbols_graph.type2nodes[Point]:
                 if any([x in record for x in rotate_simtri(a, b, c, p, q, r)]):
@@ -478,7 +479,7 @@ def match_cong_cong_eqangle6_ncoll_contri(
 ) -> Generator[dict[str, Point], None, None]:
     """Match cong A B P Q, cong B C Q R, eqangle6 B A B C Q P Q R, ncoll A B C => contri* A B C P Q R."""
     record = set()
-    for a, b, p, q in g_matcher("cong"):
+    for a, b, p, q in g_matcher(ConceptName.CONGRUENT.value):
         for c in proof.symbols_graph.type2nodes[Point]:
             if c in (a, b):
                 continue
@@ -520,7 +521,7 @@ def match_eqratio6_eqangle6_ncoll_simtri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R."""
-    enums = g_matcher("eqratio6")
+    enums = g_matcher(ConceptName.EQRATIO6.value)
 
     record = set()
     for b, a, b, c, q, p, q, r in enums:
@@ -546,7 +547,7 @@ def match_eqangle6_eqangle6_ncoll_simtri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 B A B C Q P Q R, eqangle6 C A C B R P R Q, ncoll A B C => simtri A B C P Q R."""
-    enums = g_matcher("eqangle6")
+    enums = g_matcher(ConceptName.EQANGLE6.value)
 
     record = set()
     for b, a, b, c, q, p, q, r in enums:
@@ -570,7 +571,7 @@ def match_eqratio6_eqratio6_ncoll_simtri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R."""
-    enums = g_matcher("eqratio6")
+    enums = g_matcher(ConceptName.EQRATIO6.value)
 
     record = set()
     for b, a, b, c, q, p, q, r in enums:
@@ -594,7 +595,7 @@ def match_eqangle6_eqangle6_ncoll_simtri2(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C => simtri2 A B C P Q R."""
-    enums = g_matcher("eqangle6")
+    enums = g_matcher(ConceptName.EQANGLE6.value)
 
     record = set()
     for b, a, b, c, q, r, q, p in enums:
@@ -618,7 +619,7 @@ def match_eqangle6_eqangle6_ncoll_cong_contri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 B A B C Q P Q R, eqangle6 C A C B R P R Q, ncoll A B C, cong A B P Q => contri A B C P Q R."""
-    enums = g_matcher("eqangle6")
+    enums = g_matcher(ConceptName.EQANGLE6.value)
 
     record = set()
     for b, a, b, c, q, p, q, r in enums:
@@ -645,7 +646,7 @@ def match_eqratio6_eqratio6_ncoll_cong_contri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C, cong A B P Q => contri* A B C P Q R."""
-    enums = g_matcher("eqratio6")
+    enums = g_matcher(ConceptName.EQRATIO6.value)
 
     record = set()
     for b, a, b, c, q, p, q, r in enums:
@@ -672,7 +673,7 @@ def match_eqangle6_eqangle6_ncoll_cong_contri2(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C, cong A B P Q => contri2 A B C P Q R."""
-    enums = g_matcher("eqangle6")
+    enums = g_matcher(ConceptName.EQANGLE6.value)
 
     record = set()
     for b, a, b, c, q, r, q, p in enums:
@@ -699,7 +700,7 @@ def match_eqratio6_coll_ncoll_eqangle6(
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqratio6 d b d c a b a c, coll d b c, ncoll a b c => eqangle6 a b a d a d a c."""
     records = set()
-    for b, d, c in g_matcher("coll"):
+    for b, d, c in g_matcher(ConceptName.COLLINEAR.value):
         for a in proof.symbols_graph.all_points():
             if proof.statements_checker.check_coll([a, b, c]):
                 continue
@@ -718,7 +719,7 @@ def match_eqangle6_coll_ncoll_eqratio6(
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 a b a d a d a c, coll d b c, ncoll a b c => eqratio6 d b d c a b a c."""
     records = set()
-    for b, d, c in g_matcher("coll"):
+    for b, d, c in g_matcher(ConceptName.COLLINEAR.value):
         for a in proof.symbols_graph.all_points():
             if proof.statements_checker.check_coll([a, b, c]):
                 continue
@@ -736,7 +737,7 @@ def match_eqangle6_ncoll_cyclic(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 P A P B Q A Q B, ncoll P Q A B => cyclic A B P Q."""
-    for a, b, a, c, x, y, x, z in g_matcher("eqangle6"):
+    for a, b, a, c, x, y, x, z in g_matcher(ConceptName.EQANGLE6.value):
         if (b, c) != (y, z) or a == x:
             continue
         if check_ncoll_numerical([x.num for x in [a, b, c, x]]):
@@ -745,29 +746,33 @@ def match_eqangle6_ncoll_cyclic(
 
 def match_all(name: str, proof: "Proof") -> Generator[tuple[Point, ...], None, None]:
     """Match all instances of a certain relation."""
-    if name in ["ncoll", "npara", "nperp"]:
+    if name in [
+        ConceptName.NON_COLLINEAR.value,
+        ConceptName.NON_PARALLEL.value,
+        ConceptName.NON_PERPENDICULAR.value,
+    ]:
         return []
-    if name == "coll":
+    if name == ConceptName.COLLINEAR.value:
         return proof.all_colls()
-    if name == "para":
+    if name == ConceptName.PARALLEL.value:
         return proof.all_paras()
-    if name == "perp":
+    if name == ConceptName.PERPENDICULAR.value:
         return proof.all_perps()
-    if name == "cong":
+    if name == ConceptName.CONGRUENT.value:
         return proof.all_congs()
-    if name == "eqangle":
+    if name == ConceptName.EQANGLE.value:
         return proof.all_eqangles_8points()
-    if name == "eqangle6":
+    if name == ConceptName.EQANGLE6.value:
         return proof.all_eqangles_6points()
-    if name == "eqratio":
+    if name == ConceptName.EQRATIO.value:
         return proof.all_eqratios_8points()
-    if name == "eqratio6":
+    if name == ConceptName.EQRATIO6.value:
         return proof.all_eqratios_6points()
-    if name == "cyclic":
+    if name == ConceptName.CYCLIC.value:
         return proof.all_cyclics()
-    if name == "midp":
+    if name == ConceptName.MIDPOINT.value:
         return proof.all_midps()
-    if name == "circle":
+    if name == ConceptName.CIRCLE.value:
         return proof.all_circles()
     raise ValueError(f"Unrecognize {name}")
 
@@ -828,7 +833,12 @@ def match_generic(
     clauses = []
     numerical_checks = []
     for clause in theorem.premise:
-        if clause.name in ["ncoll", "npara", "nperp", "sameside"]:
+        if clause.name in [
+            ConceptName.NON_COLLINEAR.value,
+            ConceptName.NON_PARALLEL.value,
+            ConceptName.NON_PERPENDICULAR.value,
+            ConceptName.SAMESIDE.value,
+        ]:
             numerical_checks.append(clause)
             continue
 
@@ -849,13 +859,13 @@ def match_generic(
         checks_ok = True
         for check in numerical_checks:
             args = [mapping[a] for a in check.args]
-            if check.name == "ncoll":
+            if check.name == ConceptName.NON_COLLINEAR.value:
                 checks_ok = proof.statements_checker.check_ncoll(args)
-            elif check.name == "npara":
+            elif check.name == ConceptName.NON_PARALLEL.value:
                 checks_ok = proof.statements_checker.check_npara(args)
-            elif check.name == "nperp":
+            elif check.name == ConceptName.NON_PERPENDICULAR.value:
                 checks_ok = proof.statements_checker.check_nperp(args)
-            elif check.name == "sameside":
+            elif check.name == ConceptName.SAMESIDE.value:
                 checks_ok = proof.statements_checker.check_sameside(args)
             if not checks_ok:
                 break
@@ -933,13 +943,13 @@ def match_all_theorems(
     for _, theorem in theorems.items():
         name = theorem.name
         if name.split("_")[-1] in [
-            "acompute",
-            "rcompute",
-            "fixl",
-            "fixc",
-            "fixb",
-            "fixt",
-            "fixp",
+            ConceptName.COMPUTE_ANGLE.value,
+            ConceptName.COMPUTE_RATIO.value,
+            ConceptName.FIX_L.value,
+            ConceptName.FIX_C.value,
+            ConceptName.FIX_B.value,
+            ConceptName.FIX_T.value,
+            ConceptName.FIX_P.value,
         ]:
             if goal and goal.name != name:
                 continue

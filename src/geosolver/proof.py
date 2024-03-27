@@ -23,6 +23,7 @@ from typing import Generator, Union
 import logging
 
 
+from geosolver.concepts import ConceptName
 from geosolver.statement.adder import StatementAdder, ToCache
 from geosolver.statement.checker import StatementChecker
 from geosolver.symbols_graph import SymbolsGraph
@@ -188,7 +189,7 @@ class Proof:
         proof.url = problem.url
         proof.build_def = (problem, definitions)
         for add in added:
-            proof.add_algebra(add, level=0)
+            proof.add_algebra(add)
 
         return proof, added
 
@@ -199,8 +200,8 @@ class Proof:
         self.cache_deps(deps_to_cache)
         return new_deps
 
-    def add_algebra(self, dep: Dependency, level: int) -> None:
-        self.alegbraic_manipulator.add_algebra(dep, level)
+    def add_algebra(self, dep: Dependency) -> None:
+        self.alegbraic_manipulator.add_algebra(dep)
 
     def do_algebra(self, name: str, args: list[Point]) -> list[Dependency]:
         """Derive (but not add) new algebraic predicates."""
@@ -215,16 +216,22 @@ class Proof:
 
     def check(self, name: str, args: list[Point]) -> bool:
         """Symbolically check if a predicate is True."""
-        if name in ["fixl", "fixc", "fixb", "fixt", "fixp"]:
+        if name in [
+            ConceptName.FIX_L.value,
+            ConceptName.FIX_C.value,
+            ConceptName.FIX_B.value,
+            ConceptName.FIX_T.value,
+            ConceptName.FIX_P.value,
+        ]:
             return self.dependency_cache.contains(name, args)
-        if name in ["ind"]:
+        if name in [ConceptName.IND.value]:
             return True
         return self.statements_checker.check(name, args)
 
     def additionally_draw(self, name: str, args: list[Point]) -> None:
         """Draw some extra line/circles for illustration purpose."""
 
-        if name in ["circle"]:
+        if name in [ConceptName.CIRCLE.value]:
             center, point = args[:2]
             circle = self.symbols_graph.new_node(
                 Circle, f"({center.name},{point.name})"
@@ -307,7 +314,7 @@ class Proof:
                     raise ValueError("Argument mismatch. " + correct_form)
 
             mapping = dict(zip(cdef.construction.args, c.args))
-            c_name = "midp" if c.name == "midpoint" else c.name
+            c_name = ConceptName.MIDPOINT.value if c.name == "midpoint" else c.name
             deps = EmptyDependency(level=0, rule_name=CONSTRUCTION_RULE)
             deps.construction = Dependency(c_name, c.args, rule_name=None, level=0)
 
@@ -469,7 +476,7 @@ class Proof:
                     continue
 
                 for b in bs:
-                    if b.name != "rconst":
+                    if b.name != ConceptName.CONSTANT_RATIO.value:
                         args = [mapping[a] for a in b.args]
                     else:
                         num, den = map(int, b.args[-2:])

@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 from geosolver.algebraic import AlgebraicRules
 from geosolver.algebraic.geometric_tables import AngleTable, DistanceTable, RatioTable
+from geosolver.concepts import ConceptName
 from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.geometry import Angle, Point, Ratio, is_equiv
 from geosolver.numerical.check import check_numerical
@@ -30,60 +31,21 @@ class AlgebraicManipulator:
         self.halfpi, _ = self.get_or_create_const_ang(1, 2)
         self.vhalfpi = self.halfpi.val
 
-    def add_algebra(self, dep: "Dependency", level: int) -> None:
+        self.NAME_TO_ADDER = {
+            ConceptName.PARALLEL.value: self._add_para,
+            ConceptName.PERPENDICULAR.value: self._add_perp,
+            ConceptName.EQANGLE.value: self._add_eqangle,
+            ConceptName.EQRATIO.value: self._add_eqratio,
+            ConceptName.CONSTANT_ANGLE.value: self._add_aconst,
+            ConceptName.CONSTANT_RATIO.value: self._add_rconst,
+            ConceptName.CONGRUENT.value: self._add_cong,
+        }
+
+    def add_algebra(self, dep: "Dependency") -> None:
         """Add new algebraic predicates."""
-        _ = level
-        if dep.name not in [
-            "para",
-            "perp",
-            "eqangle",
-            "eqratio",
-            "aconst",
-            "rconst",
-            "cong",
-        ]:
-            return
-
-        name, args = dep.name, dep.args
-
-        if name == "para":
-            ab, cd = dep.algebra
-            self.atable.add_para(ab, cd, dep)
-
-        if name == "perp":
-            ab, cd = dep.algebra
-            self.atable.add_const_angle(ab, cd, 90, dep)
-
-        if name == "eqangle":
-            ab, cd, mn, pq = dep.algebra
-            if (ab, cd) == (pq, mn):
-                self.atable.add_const_angle(ab, cd, 90, dep)
-            else:
-                self.atable.add_eqangle(ab, cd, mn, pq, dep)
-
-        if name == "eqratio":
-            ab, cd, mn, pq = dep.algebra
-            if (ab, cd) == (pq, mn):
-                self.rtable.add_eq(ab, cd, dep)
-            else:
-                self.rtable.add_eqratio(ab, cd, mn, pq, dep)
-
-        if name == "aconst":
-            bx, ab, y = dep.algebra
-            self.atable.add_const_angle(bx, ab, y, dep)
-
-        if name == "rconst":
-            l1, l2, m, n = dep.algebra
-            self.rtable.add_const_ratio(l1, l2, m, n, dep)
-
-        if name == "cong":
-            a, b, c, d = args
-            ab, _ = self.symbols_graph.get_line_thru_pair_why(a, b)
-            cd, _ = self.symbols_graph.get_line_thru_pair_why(c, d)
-            self.dtable.add_cong(ab, cd, a, b, c, d, dep)
-
-            ab, cd = dep.algebra
-            self.rtable.add_eq(ab, cd, dep)
+        adder = self.NAME_TO_ADDER.get(dep.name)
+        if adder is not None:
+            adder(dep)
 
     def derive_algebra(
         self, level: int, verbose: bool = False
@@ -101,14 +63,17 @@ class AlgebraicManipulator:
         # Separate eqangle and eqratio derivations
         # As they are too numerous => slow down DD+AR.
         # & reserve them only for last effort.
-        eqs = {"eqangle": derives.pop("eqangle"), "eqratio": derives.pop("eqratio")}
+        eqs = {
+            ConceptName.EQANGLE.value: derives.pop(ConceptName.EQANGLE.value),
+            ConceptName.EQRATIO.value: derives.pop(ConceptName.EQRATIO.value),
+        }
         return derives, eqs
 
     def derive_ratio_algebra(
         self, level: int, verbose: bool = False
     ) -> dict[str, list[tuple[Point, ...]]]:
         """Derive new eqratio predicates."""
-        added = {"cong2": [], "eqratio": []}
+        added = {ConceptName.CONGRUENT_2.value: [], ConceptName.EQRATIO.value: []}
 
         for x in self.rtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
@@ -124,11 +89,11 @@ class AlgebraicManipulator:
                     continue
 
                 (m, n), (p, q) = a._obj.points, b._obj.points
-                added["cong2"].append((m, n, p, q, dep))
+                added[ConceptName.CONGRUENT_2.value].append((m, n, p, q, dep))
 
             if len(x) == 4:
                 a, b, c, d = x
-                added["eqratio"].append((a, b, c, d, dep))
+                added[ConceptName.EQRATIO.value].append((a, b, c, d, dep))
 
         return added
 
@@ -136,7 +101,11 @@ class AlgebraicManipulator:
         self, level: int, verbose: bool = False
     ) -> dict[str, list[tuple[Point, ...]]]:
         """Derive new eqangles predicates."""
-        added = {"eqangle": [], "aconst": [], "para": []}
+        added = {
+            ConceptName.EQANGLE.value: [],
+            ConceptName.CONSTANT_ANGLE.value: [],
+            ConceptName.PARALLEL.value: [],
+        }
 
         for x in self.atable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
@@ -152,23 +121,25 @@ class AlgebraicManipulator:
                     continue
 
                 (e, f), (p, q) = a._obj.points, b._obj.points
-                if not check_numerical("para", [e, f, p, q]):
+                if not check_numerical(ConceptName.PARALLEL.value, [e, f, p, q]):
                     continue
 
-                added["para"].append((a, b, dep))
+                added[ConceptName.PARALLEL.value].append((a, b, dep))
 
             if len(x) == 3:
                 a, b, (n, d) = x
 
                 (e, f), (p, q) = a._obj.points, b._obj.points
-                if not check_numerical("aconst", [e, f, p, q, n, d]):
+                if not check_numerical(
+                    ConceptName.CONSTANT_ANGLE.value, [e, f, p, q, n, d]
+                ):
                     continue
 
-                added["aconst"].append((a, b, n, d, dep))
+                added[ConceptName.CONSTANT_ANGLE.value].append((a, b, n, d, dep))
 
             if len(x) == 4:
                 a, b, c, d = x
-                added["eqangle"].append((a, b, c, d, dep))
+                added[ConceptName.EQANGLE.value].append((a, b, c, d, dep))
 
         return added
 
@@ -176,7 +147,11 @@ class AlgebraicManipulator:
         self, level: int, verbose: bool = False
     ) -> dict[str, list[tuple[Point, ...]]]:
         """Derive new cong predicates."""
-        added = {"inci": [], "cong": [], "rconst": []}
+        added = {
+            ConceptName.INCI.value: [],
+            ConceptName.CONGRUENT.value: [],
+            ConceptName.CONSTANT_RATIO.value: [],
+        }
         for x in self.dtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
             dep = EmptyDependency(
@@ -191,21 +166,62 @@ class AlgebraicManipulator:
                     continue
 
                 dep.name = f"inci {a.name} {b.name}"
-                added["inci"].append((x, dep))
+                added[ConceptName.INCI.value].append((x, dep))
 
             if len(x) == 4:
                 a, b, c, d = x
                 if not (a != b and c != d and (a != c or b != d)):
                     continue
-                added["cong"].append((a, b, c, d, dep))
+                added[ConceptName.CONGRUENT.value].append((a, b, c, d, dep))
 
             if len(x) == 6:
                 a, b, c, d, num, den = x
                 if not (a != b and c != d and (a != c or b != d)):
                     continue
-                added["rconst"].append((a, b, c, d, num, den, dep))
+                added[ConceptName.CONSTANT_RATIO.value].append(
+                    (a, b, c, d, num, den, dep)
+                )
 
         return added
+
+    def _add_para(self, dep: "Dependency"):
+        ab, cd = dep.algebra
+        self.atable.add_para(ab, cd, dep)
+
+    def _add_perp(self, dep: "Dependency"):
+        ab, cd = dep.algebra
+        self.atable.add_const_angle(ab, cd, 90, dep)
+
+    def _add_eqangle(self, dep: "Dependency"):
+        ab, cd, mn, pq = dep.algebra
+        if (ab, cd) == (pq, mn):
+            self.atable.add_const_angle(ab, cd, 90, dep)
+        else:
+            self.atable.add_eqangle(ab, cd, mn, pq, dep)
+
+    def _add_eqratio(self, dep: "Dependency"):
+        ab, cd, mn, pq = dep.algebra
+        if (ab, cd) == (pq, mn):
+            self.rtable.add_eq(ab, cd, dep)
+        else:
+            self.rtable.add_eqratio(ab, cd, mn, pq, dep)
+
+    def _add_aconst(self, dep: "Dependency"):
+        bx, ab, y = dep.algebra
+        self.atable.add_const_angle(bx, ab, y, dep)
+
+    def _add_rconst(self, dep: "Dependency"):
+        l1, l2, m, n = dep.algebra
+        self.rtable.add_const_ratio(l1, l2, m, n, dep)
+
+    def _add_cong(self, dep: "Dependency"):
+        a, b, c, d = dep.args
+        ab, _ = self.symbols_graph.get_line_thru_pair_why(a, b)
+        cd, _ = self.symbols_graph.get_line_thru_pair_why(c, d)
+        self.dtable.add_cong(ab, cd, a, b, c, d, dep)
+
+        ab, cd = dep.algebra
+        self.rtable.add_eq(ab, cd, dep)
 
     def _create_const_ang(self, n: int, d: int) -> None:
         n, d = geosolver.ratios.simplify(n, d)

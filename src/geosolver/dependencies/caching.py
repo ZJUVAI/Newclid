@@ -1,5 +1,7 @@
 from typing import TYPE_CHECKING, Optional
 
+from geosolver.concepts import ConceptName
+
 
 if TYPE_CHECKING:
     from geosolver.geometry import Point
@@ -40,13 +42,23 @@ class DependencyCache:
 def hashed_txt(name: str, args: list[str]) -> tuple[str, ...]:
     """Return a tuple unique to name and args upto arg permutation equivariant."""
 
-    if name in ["const", "aconst", "rconst"]:
+    if name in [
+        ConceptName.CONSTANT_ANGLE.value,
+        ConceptName.CONSTANT_RATIO.value,
+    ]:
         a, b, c, d, y = args
         a, b = sorted([a, b])
         c, d = sorted([c, d])
         return name, a, b, c, d, y
 
-    if name in ["npara", "nperp", "para", "cong", "perp", "collx"]:
+    if name in [
+        ConceptName.NON_PARALLEL.value,
+        ConceptName.NON_PERPENDICULAR.value,
+        ConceptName.PARALLEL.value,
+        ConceptName.CONGRUENT.value,
+        ConceptName.PERPENDICULAR.value,
+        ConceptName.COLLINEAR_X.value,
+    ]:
         a, b, c, d = args
 
         a, b = sorted([a, b])
@@ -55,19 +67,30 @@ def hashed_txt(name: str, args: list[str]) -> tuple[str, ...]:
 
         return (name, a, b, c, d)
 
-    if name in ["midp", "midpoint"]:
+    if name in [ConceptName.MIDPOINT.value, "midpoint"]:
         a, b, c = args
         b, c = sorted([b, c])
         return (name, a, b, c)
 
-    if name in ["coll", "cyclic", "ncoll", "diff", "triangle"]:
+    if name in [
+        ConceptName.COLLINEAR.value,
+        ConceptName.CYCLIC.value,
+        ConceptName.NON_COLLINEAR.value,
+        ConceptName.DIFFERENT.value,
+        "triangle",
+    ]:
         return (name,) + tuple(sorted(list(set(args))))
 
-    if name == "circle":
+    if name == ConceptName.CIRCLE.value:
         x, a, b, c = args
         return (name, x) + tuple(sorted([a, b, c]))
 
-    if name in ["eqangle", "eqratio", "eqangle6", "eqratio6"]:
+    if name in [
+        ConceptName.EQANGLE.value,
+        ConceptName.EQRATIO.value,
+        ConceptName.EQANGLE6.value,
+        ConceptName.EQRATIO6.value,
+    ]:
         a, b, c, d, e, f, g, h = args
         a, b = sorted([a, b])
         c, d = sorted([c, d])
@@ -78,32 +101,39 @@ def hashed_txt(name: str, args: list[str]) -> tuple[str, ...]:
         if (a, b, c, d) > (e, f, g, h):
             a, b, c, d, e, f, g, h = e, f, g, h, a, b, c, d
 
-        if name == "eqangle6":
-            name = "eqangle"
-        if name == "eqratio6":
-            name = "eqratio"
+        if name == ConceptName.EQANGLE6.value:
+            name = ConceptName.EQANGLE.value
+        if name == ConceptName.EQRATIO6.value:
+            name = ConceptName.EQRATIO.value
         return (name,) + (a, b, c, d, e, f, g, h)
 
-    if name in ["contri", "simtri", "simtri2", "contri2", "contri*", "simtri*"]:
+    if name in [
+        ConceptName.CONTRI_TRIANGLE.value,
+        ConceptName.SIMILAR_TRIANGLE.value,
+        ConceptName.SIMILAR_TRIANGLE_REFLECTED.value,
+        ConceptName.CONTRI_TRIANGLE_REFLECTED.value,
+        ConceptName.CONTRI_TRIANGLE_BOTH.value,
+        ConceptName.SIMILAR_TRIANGLE_BOTH.value,
+    ]:
         a, b, c, x, y, z = args
         (a, x), (b, y), (c, z) = sorted([(a, x), (b, y), (c, z)], key=sorted)
         (a, b, c), (x, y, z) = sorted([(a, b, c), (x, y, z)], key=sorted)
         return (name, a, b, c, x, y, z)
 
-    if name in ["eqratio3"]:
+    if name in [ConceptName.EQRATIO3.value]:
         a, b, c, d, o, o = args
         (a, c), (b, d) = sorted([(a, c), (b, d)], key=sorted)
         (a, b), (c, d) = sorted([(a, b), (c, d)], key=sorted)
         return (name, a, b, c, d, o, o)
 
-    if name in ["sameside", "s_angle"]:
+    if name in [ConceptName.SAMESIDE.value, ConceptName.S_ANGLE.value]:
         return (name,) + tuple(args)
 
     raise ValueError(f"Not recognize {name} to hash.")
 
 
 def hashed(name: str, args: list["Point"], rename: bool = False) -> tuple[str, ...]:
-    if name == "s_angle":
+    if name == ConceptName.S_ANGLE.value:
         args = [p.name if not rename else p.new_name for p in args[:-1]] + [
             str(args[-1])
         ]

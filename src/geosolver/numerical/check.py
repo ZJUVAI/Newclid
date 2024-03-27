@@ -1,5 +1,6 @@
 from typing import Union
 import numpy as np
+from geosolver.concepts import ConceptName
 import geosolver.geometry as gm
 
 from geosolver.numerical import ATOM, close_enough
@@ -185,42 +186,54 @@ def check_ratio_numerical(points: list[Point]) -> bool:
 
 
 NUMERICAL_CHECK_FUNCTIONS = {
-    "eqangle": check_eqangle_numerical,
-    "eqratio": check_eqratio_numerical,
-    "simtri": check_simtri_numerical,
-    "contri": check_contri_numerical,
+    ConceptName.EQANGLE.value: check_eqangle_numerical,
+    ConceptName.EQRATIO.value: check_eqratio_numerical,
+    ConceptName.SIMILAR_TRIANGLE.value: check_simtri_numerical,
+    ConceptName.CONTRI_TRIANGLE.value: check_contri_numerical,
     "para_or_coll": check_para_or_coll_numerical,
-    "cyclic": check_cyclic_numerical,
+    ConceptName.CYCLIC.value: check_cyclic_numerical,
     "ratio": check_ratio_numerical,
-    "coll": check_coll_numerical,
-    "ncoll": check_ncoll_numerical,
-    "perp": check_perp_numerical,
-    "cong": check_cong_numerical,
-    "aconst": check_aconst_numerical,
-    "circle": check_circle_numerical,
+    ConceptName.COLLINEAR.value: check_coll_numerical,
+    ConceptName.NON_COLLINEAR.value: check_ncoll_numerical,
+    ConceptName.PERPENDICULAR.value: check_perp_numerical,
+    ConceptName.CONGRUENT.value: check_cong_numerical,
+    ConceptName.CONSTANT_ANGLE.value: check_aconst_numerical,
+    ConceptName.CIRCLE.value: check_circle_numerical,
     "const_angle": check_const_angle_numerical,
-    "midp": check_midp_numerical,
-    "sameside": check_sameside_numerical,
+    ConceptName.MIDPOINT.value: check_midp_numerical,
+    ConceptName.SAMESIDE.value: check_sameside_numerical,
 }
 
 
 def check_numerical(name: str, args: list[Union[gm.Point, Point]]) -> bool:
     """Numerical check."""
-    if name == "eqangle6":
-        name = "eqangle"
-    elif name == "eqratio6":
-        name = "eqratio"
-    elif name in ["simtri2", "simtri*"]:
-        name = "simtri"
-    elif name in ["contri2", "contri*"]:
-        name = "contri"
-    elif name == "para":
+    if name == ConceptName.EQANGLE6.value:
+        name = ConceptName.EQANGLE.value
+    elif name == ConceptName.EQRATIO6.value:
+        name = ConceptName.EQRATIO.value
+    elif name in [
+        ConceptName.SIMILAR_TRIANGLE_REFLECTED.value,
+        ConceptName.SIMILAR_TRIANGLE_BOTH.value,
+    ]:
+        name = ConceptName.SIMILAR_TRIANGLE.value
+    elif name in [
+        ConceptName.CONTRI_TRIANGLE_REFLECTED.value,
+        ConceptName.CONTRI_TRIANGLE_BOTH.value,
+    ]:
+        name = ConceptName.CONTRI_TRIANGLE.value
+    elif name == ConceptName.PARALLEL.value:
         name = "para_or_coll"
     elif name == "on_line":
-        name = "coll"
-    elif name in ["rcompute", "acompute"]:
+        name = ConceptName.COLLINEAR.value
+    elif name in [ConceptName.COMPUTE_RATIO.value, ConceptName.COMPUTE_ANGLE.value]:
         return True
-    elif name in ["fixl", "fixc", "fixb", "fixt", "fixp"]:
+    elif name in [
+        ConceptName.FIX_L.value,
+        ConceptName.FIX_C.value,
+        ConceptName.FIX_B.value,
+        ConceptName.FIX_T.value,
+        ConceptName.FIX_P.value,
+    ]:
         return True
 
     args = [p.num if isinstance(p, gm.Point) else p for p in args]
