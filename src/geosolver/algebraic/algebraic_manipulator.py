@@ -34,11 +34,11 @@ class AlgebraicManipulator:
         self.NAME_TO_ADDER = {
             ConceptName.PARALLEL.value: self._add_para,
             ConceptName.PERPENDICULAR.value: self._add_perp,
+            ConceptName.CONGRUENT.value: self._add_cong,
             ConceptName.EQANGLE.value: self._add_eqangle,
             ConceptName.EQRATIO.value: self._add_eqratio,
             ConceptName.CONSTANT_ANGLE.value: self._add_aconst,
             ConceptName.CONSTANT_RATIO.value: self._add_rconst,
-            ConceptName.CONGRUENT.value: self._add_cong,
         }
 
     def add_algebra(self, dep: "Dependency") -> None:

@@ -53,11 +53,7 @@ def dd_bfs_one_level(
             for p in theorem.premise:
                 p_args = [mp[a] for a in p.args]
                 # Trivial deps.
-                if p.name == ConceptName.CONGRUENT.value:
-                    a, b, c, d = p_args
-                    if {a, b} == {c, d}:
-                        continue
-                if p.name == ConceptName.PARALLEL.value:
+                if p.name in [ConceptName.PARALLEL.value, ConceptName.CONGRUENT.value]:
                     a, b, c, d = p_args
                     if {a, b} == {c, d}:
                         continue

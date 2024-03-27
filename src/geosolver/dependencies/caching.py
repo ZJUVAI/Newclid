@@ -108,12 +108,12 @@ def hashed_txt(name: str, args: list[str]) -> tuple[str, ...]:
         return (name,) + (a, b, c, d, e, f, g, h)
 
     if name in [
-        ConceptName.CONTRI_TRIANGLE.value,
         ConceptName.SIMILAR_TRIANGLE.value,
         ConceptName.SIMILAR_TRIANGLE_REFLECTED.value,
+        ConceptName.SIMILAR_TRIANGLE_BOTH.value,
+        ConceptName.CONTRI_TRIANGLE.value,
         ConceptName.CONTRI_TRIANGLE_REFLECTED.value,
         ConceptName.CONTRI_TRIANGLE_BOTH.value,
-        ConceptName.SIMILAR_TRIANGLE_BOTH.value,
     ]:
         a, b, c, x, y, z = args
         (a, x), (b, y), (c, z) = sorted([(a, x), (b, y), (c, z)], key=sorted)

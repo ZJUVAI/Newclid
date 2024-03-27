@@ -758,8 +758,14 @@ def match_all(name: str, proof: "Proof") -> Generator[tuple[Point, ...], None, N
         return proof.all_paras()
     if name == ConceptName.PERPENDICULAR.value:
         return proof.all_perps()
+    if name == ConceptName.MIDPOINT.value:
+        return proof.all_midps()
     if name == ConceptName.CONGRUENT.value:
         return proof.all_congs()
+    if name == ConceptName.CIRCLE.value:
+        return proof.all_circles()
+    if name == ConceptName.CYCLIC.value:
+        return proof.all_cyclics()
     if name == ConceptName.EQANGLE.value:
         return proof.all_eqangles_8points()
     if name == ConceptName.EQANGLE6.value:
@@ -768,12 +774,7 @@ def match_all(name: str, proof: "Proof") -> Generator[tuple[Point, ...], None, N
         return proof.all_eqratios_8points()
     if name == ConceptName.EQRATIO6.value:
         return proof.all_eqratios_6points()
-    if name == ConceptName.CYCLIC.value:
-        return proof.all_cyclics()
-    if name == ConceptName.MIDPOINT.value:
-        return proof.all_midps()
-    if name == ConceptName.CIRCLE.value:
-        return proof.all_circles()
+
     raise ValueError(f"Unrecognize {name}")
 
 

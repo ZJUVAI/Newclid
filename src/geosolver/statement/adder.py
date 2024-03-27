@@ -37,12 +37,12 @@ class StatementAdder:
             ConceptName.PERPENDICULAR.value: self._add_perp,
             ConceptName.MIDPOINT.value: self._add_midp,
             ConceptName.CONGRUENT.value: self._add_cong,
+            ConceptName.CONGRUENT_2.value: self._add_cong2,
             ConceptName.CIRCLE.value: self._add_circle,
             ConceptName.CYCLIC.value: self._add_cyclic,
             ConceptName.EQANGLE.value: self._add_eqangle,
             ConceptName.EQANGLE6.value: self._add_eqangle,
             ConceptName.S_ANGLE.value: self._add_s_angle,
-            ConceptName.CONGRUENT_2.value: self._add_cong2,
             ConceptName.EQRATIO.value: self._add_eqratio,
             ConceptName.EQRATIO6.value: self._add_eqratio,
             ConceptName.EQRATIO3.value: self._add_eqratio3,
@@ -127,11 +127,9 @@ class StatementAdder:
 
         deps_to_cache = []
         # Cached or compute piece
-        if name in [ConceptName.COMPUTE_ANGLE.value, ConceptName.COMPUTE_RATIO.value]:
-            dep = deps.populate(name, args)
-            deps_to_cache.append((name, args, dep))
-            new_deps = [dep]
-        elif name in [
+        if name in [
+            ConceptName.COMPUTE_ANGLE.value,
+            ConceptName.COMPUTE_RATIO.value,
             ConceptName.FIX_L.value,
             ConceptName.FIX_C.value,
             ConceptName.FIX_B.value,

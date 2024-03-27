@@ -57,10 +57,6 @@ def check_para_numerical(points: list[Point]) -> bool:
     return ab.is_parallel(cd)
 
 
-def check_para_or_coll_numerical(points: list[Point]) -> bool:
-    return check_para_numerical(points) or check_coll_numerical(points)
-
-
 def check_perp_numerical(points: list[Point]) -> bool:
     a, b, c, d = points
     ab = Line(a, b)
@@ -186,44 +182,34 @@ def check_ratio_numerical(points: list[Point]) -> bool:
 
 
 NUMERICAL_CHECK_FUNCTIONS = {
-    ConceptName.EQANGLE.value: check_eqangle_numerical,
-    ConceptName.EQRATIO.value: check_eqratio_numerical,
-    ConceptName.SIMILAR_TRIANGLE.value: check_simtri_numerical,
-    ConceptName.CONTRI_TRIANGLE.value: check_contri_numerical,
-    "para_or_coll": check_para_or_coll_numerical,
-    ConceptName.CYCLIC.value: check_cyclic_numerical,
-    "ratio": check_ratio_numerical,
     ConceptName.COLLINEAR.value: check_coll_numerical,
-    ConceptName.NON_COLLINEAR.value: check_ncoll_numerical,
+    ConceptName.PARALLEL.value: check_para_numerical,
     ConceptName.PERPENDICULAR.value: check_perp_numerical,
-    ConceptName.CONGRUENT.value: check_cong_numerical,
-    ConceptName.CONSTANT_ANGLE.value: check_aconst_numerical,
-    ConceptName.CIRCLE.value: check_circle_numerical,
-    "const_angle": check_const_angle_numerical,
     ConceptName.MIDPOINT.value: check_midp_numerical,
+    ConceptName.CONGRUENT.value: check_cong_numerical,
+    ConceptName.CIRCLE.value: check_circle_numerical,
+    ConceptName.CYCLIC.value: check_cyclic_numerical,
+    ConceptName.EQANGLE.value: check_eqangle_numerical,
+    ConceptName.EQANGLE6.value: check_eqangle_numerical,
+    ConceptName.EQRATIO.value: check_eqratio_numerical,
+    ConceptName.EQRATIO6.value: check_eqratio_numerical,
+    ConceptName.SIMILAR_TRIANGLE.value: check_simtri_numerical,
+    ConceptName.SIMILAR_TRIANGLE_REFLECTED.value: check_simtri_numerical,
+    ConceptName.SIMILAR_TRIANGLE_BOTH.value: check_simtri_numerical,
+    ConceptName.CONTRI_TRIANGLE.value: check_contri_numerical,
+    ConceptName.CONTRI_TRIANGLE_REFLECTED.value: check_contri_numerical,
+    ConceptName.CONTRI_TRIANGLE_BOTH.value: check_contri_numerical,
+    ConceptName.CONSTANT_ANGLE.value: check_aconst_numerical,
     ConceptName.SAMESIDE.value: check_sameside_numerical,
+    ConceptName.NON_COLLINEAR.value: check_ncoll_numerical,
+    "ratio": check_ratio_numerical,
+    "const_angle": check_const_angle_numerical,
 }
 
 
 def check_numerical(name: str, args: list[Union[gm.Point, Point]]) -> bool:
     """Numerical check."""
-    if name == ConceptName.EQANGLE6.value:
-        name = ConceptName.EQANGLE.value
-    elif name == ConceptName.EQRATIO6.value:
-        name = ConceptName.EQRATIO.value
-    elif name in [
-        ConceptName.SIMILAR_TRIANGLE_REFLECTED.value,
-        ConceptName.SIMILAR_TRIANGLE_BOTH.value,
-    ]:
-        name = ConceptName.SIMILAR_TRIANGLE.value
-    elif name in [
-        ConceptName.CONTRI_TRIANGLE_REFLECTED.value,
-        ConceptName.CONTRI_TRIANGLE_BOTH.value,
-    ]:
-        name = ConceptName.CONTRI_TRIANGLE.value
-    elif name == ConceptName.PARALLEL.value:
-        name = "para_or_coll"
-    elif name == "on_line":
+    if name == "on_line":
         name = ConceptName.COLLINEAR.value
     elif name in [ConceptName.COMPUTE_RATIO.value, ConceptName.COMPUTE_ANGLE.value]:
         return True
