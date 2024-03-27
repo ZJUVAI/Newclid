@@ -7,7 +7,7 @@ from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 from geosolver.dependencies.caching import DependencyCache, hashed
 from geosolver.dependencies.dependency import Dependency
 from geosolver.dependencies.empty_dependency import EmptyDependency
-from geosolver.geometry import Angle, Line, Node, Point, Segment, is_equal
+from geosolver.geometry import Angle, Line, Node, Point, Segment, is_equal, is_equiv
 from geosolver.ratios import simplify
 from geosolver.statement.checker import StatementChecker
 from geosolver.symbols_graph import SymbolsGraph
@@ -140,6 +140,93 @@ class StatementAdder:
             raise ValueError(f"Not recognize {name}")
 
         return new_deps, deps_to_cache
+
+    def add_algebra(
+        self, name: str, args: list[Point], deps: EmptyDependency
+    ) -> Tuple[list[Dependency], list[ToCache]]:
+        new_deps, to_cache = [], []
+        if name == "para":
+            a, b, dep = args
+            if is_equiv(a, b):
+                return []
+            else:
+                (x, y), (m, n) = a._obj.points, b._obj.points
+                new_deps, to_cache = self._add_para([x, y, m, n], dep)
+
+        elif name == "aconst":
+            a, b, n, d, dep = args
+            ab, ba, why = self.symbols_graph.get_or_create_angle_from_directions(
+                a, b, deps=None
+            )
+            nd, dn = self.alegbraic_manipulator.get_or_create_const_ang(n, d)
+
+            (x, y), (m, n) = a._obj.points, b._obj.points
+
+            if why:
+                dep0 = dep.populate("aconst", [x, y, m, n, nd])
+                dep = EmptyDependency(level=dep.level, rule_name=None)
+                dep.why = [dep0] + why
+
+            a, b = ab._d
+            (x, y), (m, n) = a._obj.points, b._obj.points
+
+            added = []
+            to_cache = []
+            if not is_equal(ab, nd):
+                if nd == self.alegbraic_manipulator.halfpi:
+                    _add, _to_cache = self._add_perp([x, y, m, n], dep)
+                    added += _add
+                    to_cache += _to_cache
+                name = "aconst"
+                args = [x, y, m, n, nd]
+                dep1 = dep.populate(name, args)
+                self.dependency_cache.add_dependency(name, args, dep1)
+                self.make_equal(nd, ab, deps=dep1)
+                added += [dep1]
+
+            if not is_equal(ba, dn):
+                if dn == self.alegbraic_manipulator.halfpi:
+                    _add, _to_cache = self._add_perp([m, n, x, y], dep)
+                    added += _add
+                    to_cache += _to_cache
+                name = "aconst"
+                args = [m, n, x, y, dn]
+                dep2 = dep.populate(name, args)
+                self.dependency_cache.add_dependency(name, args, dep2)
+                self.make_equal(dn, ba, deps=dep2)
+                added += [dep2]
+            new_deps = added
+
+        elif name == "rconst":
+            a, b, c, d, num, den, dep = args
+            new_deps, to_cache = self._add_eqrat_const([a, b, c, d, num, den], dep)
+
+        elif name == "eqangle":
+            d1, d2, d3, d4, dep = args
+            a, b = d1._obj.points
+            c, d = d2._obj.points
+            e, f = d3._obj.points
+            g, h = d4._obj.points
+
+            new_deps, to_cache = self._add_eqangle([a, b, c, d, e, f, g, h], dep)
+
+        elif name == "eqratio":
+            d1, d2, d3, d4, dep = args
+            a, b = d1._obj.points
+            c, d = d2._obj.points
+            e, f = d3._obj.points
+            g, h = d4._obj.points
+
+            new_deps, to_cache = self._add_eqratio([a, b, c, d, e, f, g, h], dep)
+
+        elif name in ["cong", "cong2"]:
+            a, b, c, d, dep = args
+            if not (a != b and c != d and (a != c or b != d)):
+                new_deps = []
+            else:
+                new_deps, to_cache = self._add_cong([a, b, c, d], dep)
+
+        return new_deps, to_cache
 
     def _add_coll(
         self, points: list[Point], deps: EmptyDependency
