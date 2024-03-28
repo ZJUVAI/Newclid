@@ -38,3 +38,5 @@ ratio_chase_incorrect_on_step_one
 a b e = triangle12 a b e; c = midpoint c a e ? cong a c a b
 forcing_ratio
 a b c = triangle12 a b c; m = midpoint m a c ? cong a m a b
+check_r00
+c d = segment c d; b = on_tline b c c d; f = on_tline f d c d ? para b c f d
