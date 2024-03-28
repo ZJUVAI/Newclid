@@ -374,7 +374,7 @@ class Proof:
             to_be_intersected = range_fn()
             return num_geo.reduce(to_be_intersected, existing_points)
 
-        rely_on = set()
+        rely_on: set[Point] = set()
         for c in clause.constructions:
             cdef = definitions[c.name]
             mapping = dict(zip(cdef.construction.args, c.args))
@@ -509,7 +509,7 @@ class Proof:
         return added, plevel
 
     def all_eqangle_same_lines(self) -> Generator[tuple[Point, ...], None, None]:
-        for l1, l2 in comb.perm2(self.symbols_graph.type2nodes[Line]):
+        for l1, l2 in comb.permutations_pairs(self.symbols_graph.type2nodes[Line]):
             for a, b, c, d, e, f, g, h in comb.all_8points(l1, l2, l1, l2):
                 if (a, b, c, d) != (e, f, g, h):
                     yield a, b, c, d, e, f, g, h
@@ -529,11 +529,11 @@ class Proof:
                 l1s = d1.neighbors(Line)
                 l2s = d2.neighbors(Line)
                 # Any pair in this is para-para.
-                para_para = list(comb.cross(l1s, l2s))
+                para_para = list(comb.cross_product(l1s, l2s))
                 line_pairss.append(para_para)
 
-            for pairs1, pairs2 in comb.comb2(line_pairss):
-                for pair1, pair2 in comb.cross(pairs1, pairs2):
+            for pairs1, pairs2 in comb.arrangement_pairs(line_pairss):
+                for pair1, pair2 in comb.cross_product(pairs1, pairs2):
                     (l1, l2), (l3, l4) = pair1, pair2
                     yield l1, l2, l3, l4
 
@@ -559,7 +559,7 @@ class Proof:
                     continue
                 l1s = d1.neighbors(Line)
                 l2s = d2.neighbors(Line)
-                line_pairs.update(set(comb.cross(l1s, l2s)))
+                line_pairs.update(set(comb.cross_product(l1s, l2s)))
             line_pairss.append(line_pairs)
 
         # include (d1, d2) in which d1 does not have any angles.
@@ -577,8 +577,8 @@ class Proof:
                 l2s = d2.neighbors(Line)
                 if len(l1s) < 2 and len(l2s) < 2:
                     continue
-                line_pairss.append(set(comb.cross(l1s, l2s)))
-                line_pairss.append(set(comb.cross(l2s, l1s)))
+                line_pairss.append(set(comb.cross_product(l1s, l2s)))
+                line_pairss.append(set(comb.cross_product(l2s, l1s)))
 
         # Case 2: d1 // d2 => (d1-d3) = (d2-d3)
         # include lines that does not have any direction.
@@ -592,12 +592,12 @@ class Proof:
                 if len(l1s) < 2:
                     continue
                 l2s = [line]
-                line_pairss.append(set(comb.cross(l1s, l2s)))
-                line_pairss.append(set(comb.cross(l2s, l1s)))
+                line_pairss.append(set(comb.cross_product(l1s, l2s)))
+                line_pairss.append(set(comb.cross_product(l2s, l1s)))
 
         record = set()
         for line_pairs in line_pairss:
-            for pair1, pair2 in comb.perm2(list(line_pairs)):
+            for pair1, pair2 in comb.permutations_pairs(list(line_pairs)):
                 (l1, l2), (l3, l4) = pair1, pair2
                 if l1 == l2 or l3 == l4:
                     continue
@@ -639,7 +639,7 @@ class Proof:
 
     def all_paras(self) -> Generator[tuple[Point, ...], None, None]:
         for d in self.symbols_graph.type2nodes[Direction]:
-            for l1, l2 in comb.perm2(d.neighbors(Line)):
+            for l1, l2 in comb.permutations_pairs(d.neighbors(Line)):
                 for a, b, c, d in comb.all_4points(l1, l2):
                     yield a, b, c, d
 
@@ -650,13 +650,13 @@ class Proof:
                 continue
             if d1 == d2:
                 continue
-            for l1, l2 in comb.cross(d1.neighbors(Line), d2.neighbors(Line)):
+            for l1, l2 in comb.cross_product(d1.neighbors(Line), d2.neighbors(Line)):
                 for a, b, c, d in comb.all_4points(l1, l2):
                     yield a, b, c, d
 
     def all_congs(self) -> Generator[tuple[Point, ...], None, None]:
         for lenght in self.symbols_graph.type2nodes[Length]:
-            for s1, s2 in comb.perm2(lenght.neighbors(Segment)):
+            for s1, s2 in comb.permutations_pairs(lenght.neighbors(Segment)):
                 (a, b), (c, d) = s1.points, s2.points
                 for x, y in [(a, b), (b, a)]:
                     for m, n in [(c, d), (d, c)]:
@@ -683,7 +683,7 @@ class Proof:
                     continue
                 s1s = l1.neighbors(Segment)
                 s2s = l2.neighbors(Segment)
-                seg_pairs.update(comb.cross(s1s, s2s))
+                seg_pairs.update(comb.cross_product(s1s, s2s))
             seg_pairss.append(seg_pairs)
 
         # include (l1, l2) in which l1 does not have any ratio.
@@ -701,8 +701,8 @@ class Proof:
                 s2s = l2.neighbors(Segment)
                 if len(s1s) < 2 and len(s2s) < 2:
                     continue
-                seg_pairss.append(set(comb.cross(s1s, s2s)))
-                seg_pairss.append(set(comb.cross(s2s, s1s)))
+                seg_pairss.append(set(comb.cross_product(s1s, s2s)))
+                seg_pairss.append(set(comb.cross_product(s2s, s1s)))
 
         # include Seg that does not have any Length.
         nolen_ss = [s for s in self.symbols_graph.type2nodes[Segment] if s.val is None]
@@ -713,12 +713,12 @@ class Proof:
                 if len(s1s) == 1:
                     continue
                 s2s = [seg]
-                seg_pairss.append(set(comb.cross(s1s, s2s)))
-                seg_pairss.append(set(comb.cross(s2s, s1s)))
+                seg_pairss.append(set(comb.cross_product(s1s, s2s)))
+                seg_pairss.append(set(comb.cross_product(s2s, s1s)))
 
         record = set()
         for seg_pairs in seg_pairss:
-            for pair1, pair2 in comb.perm2(list(seg_pairs)):
+            for pair1, pair2 in comb.permutations_pairs(list(seg_pairs)):
                 (s1, s2), (s3, s4) = pair1, pair2
                 if s1 == s2 or s3 == s4:
                     continue
@@ -744,11 +744,11 @@ class Proof:
             segs = length.neighbors(Segment)
             segss.append(segs)
 
-        segs_pair = list(comb.perm2(list(segss)))
+        segs_pair = list(comb.permutations_pairs(list(segss)))
         segs_pair += list(zip(segss, segss))
         for segs1, segs2 in segs_pair:
-            for s1, s2 in comb.perm2(list(segs1)):
-                for s3, s4 in comb.perm2(list(segs2)):
+            for s1, s2 in comb.permutations_pairs(list(segs1)):
+                for s3, s4 in comb.permutations_pairs(list(segs2)):
                     if (s1, s2) == (s3, s4) or (s1, s3) == (s2, s4):
                         continue
                     if (s1, s2, s3, s4) in record:
@@ -791,17 +791,17 @@ class Proof:
 
     def all_cyclics(self) -> Generator[tuple[Point, ...], None, None]:
         for c in self.symbols_graph.type2nodes[Circle]:
-            for x, y, z, t in comb.perm4(c.neighbors(Point)):
+            for x, y, z, t in comb.permutations_quadruplets(c.neighbors(Point)):
                 yield x, y, z, t
 
     def all_colls(self) -> Generator[tuple[Point, ...], None, None]:
         for line in self.symbols_graph.type2nodes[Line]:
-            for x, y, z in comb.perm3(line.neighbors(Point)):
+            for x, y, z in comb.permutations_triplets(line.neighbors(Point)):
                 yield x, y, z
 
     def all_midps(self) -> Generator[tuple[Point, ...], None, None]:
         for line in self.symbols_graph.type2nodes[Line]:
-            for a, b, c in comb.perm3(line.neighbors(Point)):
+            for a, b, c in comb.permutations_triplets(line.neighbors(Point)):
                 if self.statements_checker.check_cong([a, b, a, c]):
                     yield a, b, c
 
@@ -814,5 +814,5 @@ class Proof:
                 p2p[b].append(a)
             for p, ps in p2p.items():
                 if len(ps) >= 3:
-                    for a, b, c in comb.perm3(ps):
+                    for a, b, c in comb.permutations_triplets(ps):
                         yield p, a, b, c

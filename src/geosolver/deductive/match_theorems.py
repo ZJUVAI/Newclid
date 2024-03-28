@@ -58,11 +58,11 @@ def match_eqratio_eqratio_eqratio(
                 rats2.append((l1, l2))
 
             pairs = []
-            for (l1, l2), (l3, l4) in comb.cross(rats1, rats2):
+            for (l1, l2), (l3, l4) in comb.cross_product(rats1, rats2):
                 if l2 == l3:
                     pairs.append((l1, l2, l4))
 
-            for (l1, l12, l2), (l3, l34, l4) in comb.comb2(pairs):
+            for (l1, l12, l2), (l3, l34, l4) in comb.arrangement_pairs(pairs):
                 if (l1, l12, l2) == (l3, l34, l4):
                     continue
                 if l1 == l2 or l3 == l4:
@@ -105,11 +105,11 @@ def match_eqangle_eqangle_eqangle(
                 angs2.append((d1, d2))
 
             pairs = []
-            for (d1, d2), (d3, d4) in comb.cross(angs1, angs2):
+            for (d1, d2), (d3, d4) in comb.cross_product(angs1, angs2):
                 if d2 == d3:
                     pairs.append((d1, d2, d4))
 
-            for (d1, d12, d2), (d3, d34, d4) in comb.comb2(pairs):
+            for (d1, d12, d2), (d3, d34, d4) in comb.arrangement_pairs(pairs):
                 if (d1, d12, d2) == (d3, d34, d4):
                     continue
                 if d1 == d2 or d3 == d4:
@@ -142,7 +142,7 @@ def match_perp_perp_npara_eqangle(
             continue
         dpairs.append((d1, d2))
 
-    for (d1, d2), (d3, d4) in comb.comb2(dpairs):
+    for (d1, d2), (d3, d4) in comb.arrangement_pairs(dpairs):
         a, b = proof.symbols_graph.two_points_on_direction(d1)
         c, d = proof.symbols_graph.two_points_on_direction(d2)
         m, n = proof.symbols_graph.two_points_on_direction(d3)
@@ -221,7 +221,9 @@ def match_cyclic_eqangle_cong(
     """Match cyclic A B C P Q R, eqangle C A C B R P R Q => cong A B P Q."""
     for c in proof.symbols_graph.type2nodes[Circle]:
         ps = c.neighbors(Point)
-        for (a, b, c), (x, y, z) in comb.comb2(list(comb.perm3(ps))):
+        for (a, b, c), (x, y, z) in comb.arrangement_pairs(
+            list(comb.permutations_triplets(ps))
+        ):
             if {a, b, c} == {x, y, z}:
                 continue
             if proof.statements_checker.check_eqangle([c, a, c, b, z, x, z, y]):
@@ -306,7 +308,7 @@ def match_perp_perp_ncoll_para(
         if len(ys) < 2:
             continue
         c, d = proof.symbols_graph.two_points_on_direction(x)
-        for y1, y2 in comb.comb2(ys):
+        for y1, y2 in comb.arrangement_pairs(ys):
             a, b = proof.symbols_graph.two_points_on_direction(y1)
             e, f = proof.symbols_graph.two_points_on_direction(y2)
             if check_ncoll_numerical([a.num, b.num, e.num]):
@@ -320,7 +322,7 @@ def match_eqangle6_ncoll_cong(
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 A O A B B A B O, ncoll O A B => cong O A O B."""
     for a in proof.symbols_graph.type2nodes[Point]:
-        for b, c in comb.comb2(proof.symbols_graph.type2nodes[Point]):
+        for b, c in comb.arrangement_pairs(proof.symbols_graph.type2nodes[Point]):
             if a == b or a == c:
                 continue
             if proof.statements_checker.check_eqangle([b, a, b, c, c, b, c, a]):
@@ -339,7 +341,7 @@ def match_eqangle_perp_perp(
         d1, d2 = ang.directions
         if d1 is None or d2 is None:
             continue
-        for d3, d4 in comb.comb2(proof.symbols_graph.type2nodes[Direction]):
+        for d3, d4 in comb.arrangement_pairs(proof.symbols_graph.type2nodes[Direction]):
             if d1 == d3 or d2 == d4:
                 continue
             # if d1 - d3 = d2 - d4 => d3 perp d4
@@ -409,7 +411,7 @@ def match_eqangle_para(
 
         for d1, d2s in d12.items():
             a, b = proof.symbols_graph.two_points_on_direction(d1)
-            for d2, d3 in comb.comb2(d2s):
+            for d2, d3 in comb.arrangement_pairs(d2s):
                 c, d = proof.symbols_graph.two_points_on_direction(d2)
                 e, f = proof.symbols_graph.two_points_on_direction(d3)
                 yield dict(zip("ABCDPQ", [c, d, e, f, a, b]))
@@ -447,7 +449,7 @@ def match_cong_cong_cong_cyclic(
 
         for p, ps in p2p.items():
             if len(ps) >= 4:
-                for a, b, c, d in comb.comb4(ps):
+                for a, b, c, d in comb.arrangement_quadruplets(ps):
                     yield dict(zip("OABCD", [p, a, b, c, d]))
 
 

@@ -70,6 +70,7 @@ class StatementAdder:
 
         merges = [vx, vy]
 
+        # If eqangle on the same directions switched then they are perpendicular
         if (
             isinstance(x, Angle)
             and x not in self.alegbraic_manipulator.aconst.values()
@@ -241,14 +242,14 @@ class StatementAdder:
         og_points = list(points)
 
         all_lines: list[Line] = []
-        for p1, p2 in comb.comb2(points):
+        for p1, p2 in comb.arrangement_pairs(points):
             all_lines.append(self.symbols_graph.get_line_thru_pair(p1, p2))
         points = sum([line.neighbors(Point) for line in all_lines], [])
         points = list(set(points))
 
         existed: set[Line] = set()
         new: set[Line] = set()
-        for p1, p2 in comb.comb2(points):
+        for p1, p2 in comb.arrangement_pairs(points):
             if p1.name > p2.name:
                 p1, p2 = p2, p1
             if (p1, p2) in self.symbols_graph._pair2line:
@@ -298,7 +299,7 @@ class StatementAdder:
 
     def _coll_dep(self, points: list[Point], p: Point) -> list[Dependency]:
         """Return the dep(.why) explaining why p is coll with points."""
-        for p1, p2 in comb.comb2(points):
+        for p1, p2 in comb.arrangement_pairs(points):
             if self.statements_checker.check_coll([p1, p2, p]):
                 dep = Dependency(ConceptName.COLLINEAR.value, [p1, p2, p], None, None)
                 return dep.why_me_or_cache(
@@ -534,14 +535,14 @@ class StatementAdder:
         og_points = list(points)
 
         all_circles = []
-        for p1, p2, p3 in comb.comb3(points):
+        for p1, p2, p3 in comb.arrangement_triplets(points):
             all_circles.append(self.symbols_graph.get_circle_thru_triplet(p1, p2, p3))
         points = sum([c.neighbors(Point) for c in all_circles], [])
         points = list(set(points))
 
         existed = set()
         new = set()
-        for p1, p2, p3 in comb.comb3(points):
+        for p1, p2, p3 in comb.arrangement_triplets(points):
             p1, p2, p3 = sorted([p1, p2, p3], key=lambda x: x.name)
 
             if (p1, p2, p3) in self.symbols_graph._triplet2circle:
@@ -590,7 +591,7 @@ class StatementAdder:
         return add, to_cache
 
     def cyclic_dep(self, points: list[Point], p: Point) -> list[Dependency]:
-        for p1, p2, p3 in comb.comb3(points):
+        for p1, p2, p3 in comb.arrangement_triplets(points):
             if self.statements_checker.check_cyclic([p1, p2, p3, p]):
                 dep = Dependency(ConceptName.CYCLIC.value, [p1, p2, p3, p], None, None)
                 return dep.why_me_or_cache(

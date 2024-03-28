@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, Tuple
 
 
 from geosolver.algebraic import AlgebraicRules
@@ -24,8 +24,8 @@ class AlgebraicManipulator:
         self.dtable = DistanceTable()
         self.rtable = RatioTable()
 
-        self.rconst = {}  # contains all constant ratios
-        self.aconst = {}  # contains all constant angles.
+        self.rconst: Dict[Tuple[int, int], Ratio] = {}  # contains all constant ratios
+        self.aconst: Dict[Tuple[int, int], Angle] = {}  # contains all constant angles.
 
         # Half pi constant is always added by default.
         self.halfpi, _ = self.get_or_create_const_ang(1, 2)
