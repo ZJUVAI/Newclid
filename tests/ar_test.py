@@ -18,8 +18,9 @@
 import pytest
 import pytest_check as check
 import geosolver.algebraic.geometric_tables as geometric_tables
-from geosolver.proof_graph import ProofGraph
-from geosolver.problem import Definition, EmptyDependency, Problem, Theorem
+from geosolver.dependencies.empty_dependency import EmptyDependency
+from geosolver.proof import Proof
+from geosolver.problem import Definition, Problem, Theorem
 
 
 class TestAR:
@@ -87,24 +88,24 @@ class TestAR:
         """Test that AR can figure out bisector & ex-bisector are perpendicular."""
         # Load the scenario that we have cd is bisector of acb and
         # ce is the ex-bisector of acb.
-        p = Problem.from_txt(
+        problem = Problem.from_txt(
             "a b c = triangle a b c; d = incenter d a b c; e = excenter e a b c ?"
             " perp d c c e"
         )
-        g, _ = ProofGraph.build_problem(p, self.defs)
+        proof, _ = Proof.build_problem(problem, self.defs)
 
         # Create an external angle table:
         tb = geometric_tables.AngleTable("pi")
 
         # Add bisector & ex-bisector facts into the table:
-        ca, cd, cb, ce = g.symbols_graph.names2nodes(
+        ca, cd, cb, ce = proof.symbols_graph.names2nodes(
             ["d(ac)", "d(cd)", "d(bc)", "d(ce)"]
         )
         tb.add_eqangle(ca, cd, cd, cb, "fact1")
         tb.add_eqangle(ce, ca, cb, ce, "fact2")
 
         # Add a distractor fact to make sure traceback does not include this fact
-        ab = g.symbols_graph.names2nodes(["d(ab)"])[0]
+        ab = proof.symbols_graph.names2nodes(["d(ab)"])[0]
         tb.add_eqangle(ab, cb, cb, ca, "fact3")
 
         # Check for all new equalities
@@ -125,19 +126,23 @@ class TestAR:
     def test_angle_table_equilateral_triangle(self):
         """Test that AR can figure out triangles with 3 equal angles => each is pi/3."""
         # Load an equaliteral scenario
-        p = Problem.from_txt("a b c = ieq_triangle ? cong a b a c")
-        g, _ = ProofGraph.build_problem(p, self.defs)
+        problem = Problem.from_txt("a b c = ieq_triangle ? cong a b a c")
+        proof, _ = Proof.build_problem(problem, self.defs)
 
         # Add two eqangles facts because ieq_triangle only add congruent sides
-        a, b, c = g.symbols_graph.names2nodes("abc")
-        g._add_eqangle([a, b, b, c, b, c, c, a], EmptyDependency(0, None))
-        g._add_eqangle([b, c, c, a, c, a, a, b], EmptyDependency(0, None))
+        a, b, c = proof.symbols_graph.names2nodes("abc")
+        proof.statements_adder._add_eqangle(
+            [a, b, b, c, b, c, c, a], EmptyDependency(0, None)
+        )
+        proof.statements_adder._add_eqangle(
+            [b, c, c, a, c, a, a, b], EmptyDependency(0, None)
+        )
 
         # Create an external angle table:
         tb = geometric_tables.AngleTable("pi")
 
         # Add the fact that there are three equal angles
-        ab, bc, ca = g.symbols_graph.names2nodes(["d(ab)", "d(bc)", "d(ac)"])
+        ab, bc, ca = proof.symbols_graph.names2nodes(["d(ab)", "d(bc)", "d(ac)"])
         tb.add_eqangle(ab, bc, bc, ca, "fact1")
         tb.add_eqangle(bc, ca, ca, ab, "fact2")
 
@@ -165,14 +170,14 @@ class TestAR:
     def test_incenter_excenter_touchpoints(self):
         """Test that AR can figure out incenter/excenter touchpoints are equidistant to midpoint."""
 
-        p = Problem.from_txt(
+        problem = Problem.from_txt(
             "a b c = triangle a b c; d1 d2 d3 d = incenter2 a b c; e1 e2 e3 e ="
             " excenter2 a b c ? perp d c c e",
             translate=False,
         )
-        g, _ = ProofGraph.build_problem(p, self.defs)
+        proof, _ = Proof.build_problem(problem, self.defs)
 
-        a, b, c, ab, bc, ca, d1, d2, d3, e1, e2, e3 = g.symbols_graph.names2nodes(
+        a, b, c, ab, bc, ca, d1, d2, d3, e1, e2, e3 = proof.symbols_graph.names2nodes(
             ["a", "b", "c", "ab", "bc", "ac", "d1", "d2", "d3", "e1", "e2", "e3"]
         )
 

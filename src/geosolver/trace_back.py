@@ -15,15 +15,20 @@
 
 """Implements DAG-level traceback."""
 
-from typing import Any
+from typing import TYPE_CHECKING
 
+from geosolver.concepts import ConceptName
 from geosolver.geometry import Point
-from geosolver.problem import CONSTRUCTION_RULE, Dependency
+from geosolver.problem import CONSTRUCTION_RULE
+
+if TYPE_CHECKING:
+    from geosolver.proof import Proof
+    from geosolver.dependencies.dependency import Dependency
 
 
 def point_levels(
-    setup: list[Dependency], existing_points: list[Point]
-) -> list[tuple[set[Point], list[Dependency]]]:
+    setup: list["Dependency"], existing_points: list[Point]
+) -> list[tuple[set[Point], list["Dependency"]]]:
     """Reformat setup into levels of point constructions."""
     levels = []
     for con in setup:
@@ -47,10 +52,10 @@ def point_levels(
 
 
 def point_log(
-    setup: list[Dependency],
+    setup: list["Dependency"],
     ref_id: dict[tuple[str, ...], int],
     existing_points=list[Point],
-) -> list[tuple[list[Point], list[Dependency]]]:
+) -> list[tuple[list[Point], list["Dependency"]]]:
     """Reformat setup into groups of point constructions."""
     log = []
 
@@ -67,8 +72,8 @@ def point_log(
 
 
 def setup_to_levels(
-    setup: list[Dependency],
-) -> list[list[Dependency]]:
+    setup: list["Dependency"],
+) -> list[list["Dependency"]]:
     """Reformat setup into levels of point constructions."""
     levels = []
     for d in setup:
@@ -83,12 +88,12 @@ def setup_to_levels(
 
 
 def separate_dependency_difference(
-    query: Dependency,
-    log: list[tuple[list[Dependency], list[Dependency]]],
+    query: "Dependency",
+    log: list[tuple[list["Dependency"], list["Dependency"]]],
 ) -> tuple[
-    list[tuple[list[Dependency], list[Dependency]]],
-    list[Dependency],
-    list[Dependency],
+    list[tuple[list["Dependency"], list["Dependency"]]],
+    list["Dependency"],
+    list["Dependency"],
     set[Point],
     set[Point],
 ]:
@@ -108,7 +113,7 @@ def separate_dependency_difference(
         if not cons_:
             continue
 
-        prems = [p for p in prems if p.name != "ind"]
+        prems = [p for p in prems if p.name != ConceptName.IND.value]
         log.append((prems, cons_))
 
     points = set(query.args)
@@ -126,7 +131,7 @@ def separate_dependency_difference(
 
     setup_, setup, aux_setup, aux_points = setup, [], [], set()
     for con in setup_:
-        if con.name == "ind":
+        if con.name == ConceptName.IND.value:
             continue
         elif any([p not in points for p in con.args if isinstance(p, Point)]):
             aux_setup.append(con)
@@ -140,20 +145,26 @@ def separate_dependency_difference(
 
 
 def recursive_traceback(
-    query: Dependency,
-) -> list[tuple[list[Dependency], list[Dependency]]]:
+    query: "Dependency",
+) -> list[tuple[list["Dependency"], list["Dependency"]]]:
     """Recursively traceback from the query, i.e. the conclusion."""
     visited = set()
     log = []
     stack = []
 
-    def read(q: Dependency) -> None:
+    def read(q: "Dependency") -> None:
         q = q.remove_loop()
         hashed = q.hashed()
         if hashed in visited:
             return
 
-        if hashed[0] in ["ncoll", "npara", "nperp", "diff", "sameside"]:
+        if hashed[0] in [
+            ConceptName.NON_COLLINEAR.value,
+            ConceptName.NON_PARALLEL.value,
+            ConceptName.NON_PERPENDICULAR.value,
+            ConceptName.DIFFERENT.value,
+            ConceptName.SAMESIDE.value,
+        ]:
             return
 
         nonlocal stack
@@ -202,15 +213,15 @@ def recursive_traceback(
 
 
 def collx_to_coll_setup(
-    setup: list[Dependency],
-) -> list[Dependency]:
+    setup: list["Dependency"],
+) -> list["Dependency"]:
     """Convert collx to coll in setups."""
     result = []
     for level in setup_to_levels(setup):
         hashs = set()
         for dep in level:
-            if dep.name == "collx":
-                dep.name = "coll"
+            if dep.name == ConceptName.COLLINEAR_X.value:
+                dep.name = ConceptName.COLLINEAR.value
                 dep.args = list(set(dep.args))
 
             if dep.hashed() in hashs:
@@ -222,13 +233,13 @@ def collx_to_coll_setup(
 
 
 def collx_to_coll(
-    setup: list[Dependency],
-    aux_setup: list[Dependency],
-    log: list[tuple[list[Dependency], list[Dependency]]],
+    setup: list["Dependency"],
+    aux_setup: list["Dependency"],
+    log: list[tuple[list["Dependency"], list["Dependency"]]],
 ) -> tuple[
-    list[Dependency],
-    list[Dependency],
-    list[tuple[list[Dependency], list[Dependency]]],
+    list["Dependency"],
+    list["Dependency"],
+    list[tuple[list["Dependency"], list["Dependency"]]],
 ]:
     """Convert collx to coll and dedup."""
     setup = collx_to_coll_setup(setup)
@@ -240,8 +251,8 @@ def collx_to_coll(
         prem_set = set()
         prems_, prems = prems, []
         for p in prems_:
-            if p.name == "collx":
-                p.name = "coll"
+            if p.name == ConceptName.COLLINEAR_X.value:
+                p.name = ConceptName.COLLINEAR.value
                 p.args = list(set(p.args))
             if p.hashed() in prem_set:
                 continue
@@ -250,8 +261,8 @@ def collx_to_coll(
 
         cons_, cons = cons, []
         for c in cons_:
-            if c.name == "collx":
-                c.name = "coll"
+            if c.name == ConceptName.COLLINEAR_X.value:
+                c.name = ConceptName.COLLINEAR.value
                 c.args = list(set(c.args))
             if c.hashed() in con_set:
                 continue
@@ -267,15 +278,20 @@ def collx_to_coll(
 
 
 def get_logs(
-    query: Dependency, g: Any, merge_trivials: bool = False
+    query: "Dependency", proof: "Proof", merge_trivials: bool = False
 ) -> tuple[
-    list[Dependency],
-    list[Dependency],
-    list[tuple[list[Dependency], list[Dependency]]],
+    list["Dependency"],
+    list["Dependency"],
+    list[tuple[list["Dependency"], list["Dependency"]]],
     set[Point],
 ]:
     """Given a DAG and conclusion N, return the premise, aux, proof."""
-    query = query.why_me_or_cache(g, query.level)
+    query = query.why_me_or_cache(
+        proof.symbols_graph,
+        proof.statements_checker,
+        proof.dependency_cache,
+        query.level,
+    )
     log = recursive_traceback(query)
     log, setup, aux_setup, setup_points, _ = separate_dependency_difference(query, log)
 
@@ -287,14 +303,14 @@ def get_logs(
 
 
 def shorten_and_shave(
-    setup: list[Dependency],
-    aux_setup: list[Dependency],
-    log: list[tuple[list[Dependency], list[Dependency]]],
+    setup: list["Dependency"],
+    aux_setup: list["Dependency"],
+    log: list[tuple[list["Dependency"], list["Dependency"]]],
     merge_trivials: bool = False,
 ) -> tuple[
-    list[Dependency],
-    list[Dependency],
-    list[tuple[list[Dependency], list[Dependency]]],
+    list["Dependency"],
+    list["Dependency"],
+    list[tuple[list["Dependency"], list["Dependency"]]],
 ]:
     """Shorten the proof by removing unused predicates."""
     log, _ = shorten_proof(log, merge_trivials=merge_trivials)
@@ -307,10 +323,10 @@ def shorten_and_shave(
 
 
 def join_prems(
-    con: Dependency,
-    con2prems: dict[tuple[str, ...], list[Dependency]],
+    con: "Dependency",
+    con2prems: dict[tuple[str, ...], list["Dependency"]],
     expanded: set[tuple[str, ...]],
-) -> list[Dependency]:
+) -> list["Dependency"]:
     """Join proof steps with the same premises."""
     h = con.hashed()
     if h in expanded or h not in con2prems:
@@ -323,11 +339,11 @@ def join_prems(
 
 
 def shorten_proof(
-    log: list[tuple[list[Dependency], list[Dependency]]],
+    log: list[tuple[list["Dependency"], list["Dependency"]]],
     merge_trivials: bool = False,
 ) -> tuple[
-    list[tuple[list[Dependency], list[Dependency]]],
-    dict[tuple[str, ...], list[Dependency]],
+    list[tuple[list["Dependency"], list["Dependency"]]],
+    dict[tuple[str, ...], list["Dependency"]],
 ]:
     """Join multiple trivials proof steps into one."""
     pops = set()

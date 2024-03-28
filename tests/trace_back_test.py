@@ -19,9 +19,11 @@
 import pytest
 import pytest_check as check
 
+from geosolver.concepts import ConceptName
 from geosolver.ddar import solve
-from geosolver.proof_graph import ProofGraph
-from geosolver.problem import Definition, Dependency, Problem, Theorem
+from geosolver.dependencies.dependency import Dependency
+from geosolver.proof import Proof
+from geosolver.problem import Definition, Problem, Theorem
 from geosolver.trace_back import get_logs
 
 
@@ -34,7 +36,7 @@ class TestTraceback:
     def test_orthocenter_dependency_difference(self):
         txt = "a b c = triangle a b c; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d ? perp a d b c"
         p = Problem.from_txt(txt)
-        graph, _ = ProofGraph.build_problem(p, self.defs)
+        graph, _ = Proof.build_problem(p, self.defs)
 
         solve(graph, self.rules, p)
 
@@ -48,7 +50,17 @@ class TestTraceback:
         aux = [p.hashed() for p in aux]
 
         check.equal(
-            set(setup), {("perp", "a", "c", "b", "d"), ("perp", "a", "b", "c", "d")}
+            set(setup),
+            {
+                (ConceptName.PERPENDICULAR.value, "a", "c", "b", "d"),
+                ("perp", "a", "b", "c", "d"),
+            },
         )
 
-        check.equal(set(aux), {("coll", "a", "c", "e"), ("coll", "b", "d", "e")})
+        check.equal(
+            set(aux),
+            {
+                (ConceptName.COLLINEAR.value, "a", "c", "e"),
+                (ConceptName.COLLINEAR.value, "b", "d", "e"),
+            },
+        )

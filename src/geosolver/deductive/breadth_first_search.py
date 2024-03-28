@@ -5,21 +5,26 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Union
 
 import time
+
+
+from geosolver.concepts import ConceptName
+from geosolver.dependencies.dependency import Dependency
+from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.geometry import Angle, Point, Ratio
 from geosolver.numerical.check import same_clock
-
-from geosolver.problem import Dependency, EmptyDependency, Problem, Theorem, hashed
 from geosolver.deductive.match_theorems import match_all_theorems
 
 if TYPE_CHECKING:
-    from geosolver.proof_graph import ProofGraph
+    from geosolver.problem import Problem, Theorem
+    from geosolver.proof import Proof
+    from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 
 
 def dd_bfs_one_level(
-    g: "ProofGraph",
-    theorems: list[Theorem],
+    proof: "Proof",
+    theorems: list["Theorem"],
     level: int,
-    controller: Problem,
+    controller: "Problem",
     verbose: bool = False,
     nm_check: bool = False,
     timeout: int = 600,
@@ -32,10 +37,10 @@ def dd_bfs_one_level(
     """Forward deduce one breadth-first level."""
 
     # Step 1: match all theorems:
-    theorem2mappings = match_all_theorems(g, theorems, controller.goal)
+    theorem2mappings = match_all_theorems(proof, theorems, controller.goal)
 
     # Step 2: traceback for each deduce:
-    theorem2deps: dict[Theorem, list[Dependency]] = {}
+    theorem2deps: dict["Theorem", list[Dependency]] = {}
     t0 = time.time()
     for theorem, mappings in theorem2mappings.items():
         if time.time() - t0 > timeout:
@@ -48,11 +53,7 @@ def dd_bfs_one_level(
             for p in theorem.premise:
                 p_args = [mp[a] for a in p.args]
                 # Trivial deps.
-                if p.name == "cong":
-                    a, b, c, d = p_args
-                    if {a, b} == {c, d}:
-                        continue
-                if p.name == "para":
+                if p.name in [ConceptName.PARALLEL.value, ConceptName.CONGRUENT.value]:
                     a, b, c, d = p_args
                     if {a, b} == {c, d}:
                         continue
@@ -61,14 +62,22 @@ def dd_bfs_one_level(
                     "cong_cong_eqangle6_ncoll_contri*",
                     "eqratio6_eqangle6_ncoll_simtri*",
                 ]:
-                    if p.name in ["eqangle", "eqangle6"]:  # SAS or RAR
+                    if p.name in [
+                        ConceptName.EQANGLE.value,
+                        ConceptName.EQANGLE6.value,
+                    ]:  # SAS or RAR
                         b, a, b, c, y, x, y, z = p_args
                         if not same_clock(a.num, b.num, c.num, x.num, y.num, z.num):
                             p_args = b, a, b, c, y, z, y, x
 
                 dep = Dependency(p.name, p_args, rule_name="", level=level)
                 try:
-                    dep = dep.why_me_or_cache(g, level)
+                    dep = dep.why_me_or_cache(
+                        proof.symbols_graph,
+                        proof.statements_checker,
+                        proof.dependency_cache,
+                        level,
+                    )
                 except Exception:
                     fail = True
                     break
@@ -76,7 +85,7 @@ def dd_bfs_one_level(
                 if dep.why is None:
                     fail = True
                     break
-                g.cache_dep(p.name, p_args, dep)
+                proof.dependency_cache.add_dependency(p.name, p_args, dep)
                 deps.why.append(dep)
 
             if fail:
@@ -92,13 +101,13 @@ def dd_bfs_one_level(
         for mp, deps in mp_deps:
             if time.time() - t0 > timeout:
                 break
-            name, args = theorem.conclusion_name_args(mp)
-            hash_conclusion = hashed(name, args)
-            if hash_conclusion in g.cache:
+            conclusion_name, args = theorem.conclusion_name_args(mp)
+            cached_conclusion = proof.dependency_cache.get(conclusion_name, args)
+            if cached_conclusion is not None:
                 continue
 
-            add = g.add_piece(name, args, deps=deps)
-            g.dependency_graph.add_theorem_edges(add, theorem, args)
+            add = proof.add_piece(conclusion_name, args, deps=deps)
+            proof.dependency_graph.add_theorem_edges(add, theorem, args)
             added += add
 
     branching = len(added)
@@ -108,21 +117,21 @@ def dd_bfs_one_level(
         args = []
 
         for a in controller.goal.args:
-            if a in g.symbols_graph._name2node:
-                a = g.symbols_graph._name2node[a]
+            if a in proof.symbols_graph._name2node:
+                a = proof.symbols_graph._name2node[a]
             elif "/" in a:
-                a = create_consts_str(g, a)
+                a = create_consts_str(proof.alegbraic_manipulator, a)
             elif a.isdigit():
                 a = int(a)
             args.append(a)
 
-        if g.check(controller.goal.name, args):
+        if proof.check(controller.goal.name, args):
             return added, {}, {}, branching
 
     # Run AR, but do NOT apply to the proof state (yet).
     for dep in added:
-        g.add_algebra(dep, level)
-    derives, eq4s = g.alegbraic_manipulator.derive_algebra(level, verbose=False)
+        proof.add_algebra(dep)
+    derives, eq4s = proof.alegbraic_manipulator.derive_algebra(level, verbose=False)
 
     branching += sum([len(x) for x in derives.values()])
     branching += sum([len(x) for x in eq4s.values()])
@@ -130,17 +139,15 @@ def dd_bfs_one_level(
     return added, derives, eq4s, branching
 
 
-def create_consts_str(proof_graph: "ProofGraph", s: str) -> Union[Ratio, Angle]:
+def create_consts_str(
+    alegbraic_manipulator: "AlgebraicManipulator", s: str
+) -> Union[Ratio, Angle]:
     if "pi/" in s:
         n, d = s.split("pi/")
         n, d = int(n), int(d)
-        p0, _ = proof_graph.alegbraic_manipulator.get_or_create_const_ang(
-            proof_graph.symbols_graph, n, d
-        )
+        p0, _ = alegbraic_manipulator.get_or_create_const_ang(n, d)
     else:
         n, d = s.split("/")
         n, d = int(n), int(d)
-        p0, _ = proof_graph.alegbraic_manipulator.get_or_create_const_rat(
-            proof_graph.symbols_graph, n, d
-        )
+        p0, _ = alegbraic_manipulator.get_or_create_const_rat(n, d)
     return p0

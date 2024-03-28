@@ -3,7 +3,7 @@ import pytest
 import pytest_check as check
 
 from geosolver.deductive import dd_bfs_one_level
-from geosolver.proof_graph import ProofGraph
+from geosolver.proof import Proof
 from geosolver.problem import Definition, Problem, Theorem
 
 
@@ -24,13 +24,13 @@ class TestDD:
             " on_circle d g2 b; e = on_line e a c, on_line e b d; p = on_line p a"
             " n, on_line p c d; q = on_line q b n, on_line q c d ? cong e p e q"
         )
-        g, _ = ProofGraph.build_problem(p, self.defs)
-        goal_args = g.symbols_graph.names2nodes(p.goal.args)
+        proof, _ = Proof.build_problem(p, self.defs)
+        goal_args = proof.symbols_graph.names2nodes(p.goal.args)
 
         success = False
         for level in range(1, MAX_LEVEL):
-            added, _, _, _ = dd_bfs_one_level(g, self.rules, level, p)
-            if g.check(p.goal.name, goal_args):
+            added, _, _, _ = dd_bfs_one_level(proof, self.rules, level, p)
+            if proof.check(p.goal.name, goal_args):
                 success = True
                 break
             if not added:  # saturated
@@ -43,13 +43,13 @@ class TestDD:
             "a b c = triangle a b c; d = incenter d a b c; e = excenter e a b c ?"
             " perp d c c e"
         )
-        g, _ = ProofGraph.build_problem(p, self.defs)
-        goal_args = g.symbols_graph.names2nodes(p.goal.args)
+        proof, _ = Proof.build_problem(p, self.defs)
+        goal_args = proof.symbols_graph.names2nodes(p.goal.args)
 
         success = False
         for level in range(1, MAX_LEVEL):
-            added, _, _, _ = dd_bfs_one_level(g, self.rules, level, p)
-            if g.check(p.goal.name, goal_args):
+            added, _, _, _ = dd_bfs_one_level(proof, self.rules, level, p)
+            if proof.check(p.goal.name, goal_args):
                 success = True
                 break
             if not added:  # saturated

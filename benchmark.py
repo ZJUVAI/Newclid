@@ -4,7 +4,7 @@ from typing import Optional
 
 
 from geosolver.ddar import solve
-from geosolver.proof_graph import ProofGraph
+from geosolver.proof import Proof
 from geosolver.problem import Definition, Problem, Theorem
 from geosolver.proof_writing import write_solution
 
@@ -33,41 +33,47 @@ def main():
         if problem_name != "orthocenter_aux":
             continue
         logging.info(f"Starting problem {problem_name} with ddar only.")
-        graph, _ = ProofGraph.build_problem(problem, DEFINITIONS)
+        proof, _ = Proof.build_problem(problem, DEFINITIONS)
 
         problem_output_path = out_folder_path / problem_name
-        run_ddar(graph, problem, problem_output_path)
+        run_ddar(proof, problem, problem_output_path)
 
-        graph.symbols_graph.draw_figure(
+        proof.symbols_graph.draw_figure(
             problem_output_path / f"{problem.url}_proof_figure.png",
         )
 
-        graph.symbols_graph.draw_html(
+        proof.symbols_graph.draw_html(
             problem_output_path / f"{problem_name}.symbols_graph.html"
         )
 
-        graph.dependency_graph.show_html(
+        proof.dependency_graph.show_html(
             problem_output_path / f"{problem_name}.dependency_graph.html",
             RULES,
         )
+
+        proof.dependency_graph.proof_subgraph.show_html(
+            problem_output_path / f"{problem_name}.proof_subgraph.html",
+            RULES,
+        )
+
         return
 
 
-def run_ddar(graph: ProofGraph, problem: Problem, out_folder: Optional[Path]) -> bool:
+def run_ddar(proof: Proof, problem: Problem, out_folder: Optional[Path]) -> bool:
     """Run DD+AR.
 
     Args:
-      g: Graph object, containing the proof state.
-      p: Problem object, containing the problem statement.
+      proof: Proof state.
+      p: Problem statement.
       out_file: path to output file if solution is found.
 
     Returns:
       Boolean, whether DD+AR finishes successfully.
     """
-    solve(graph, RULES, problem, max_level=1000)
+    solve(proof, RULES, problem, max_level=1000)
 
-    goal_args = graph.symbols_graph.names2nodes(problem.goal.args)
-    if not graph.check(problem.goal.name, goal_args):
+    goal_args = proof.symbols_graph.names2nodes(problem.goal.args)
+    if not proof.check(problem.goal.name, goal_args):
         logging.info(f"DD+AR failed to solve the problem {problem.url}.")
         return False
 
@@ -76,7 +82,7 @@ def run_ddar(graph: ProofGraph, problem: Problem, out_folder: Optional[Path]) ->
         if out_folder is not None
         else None
     )
-    write_solution(graph, problem, outfile)
+    write_solution(proof, problem, outfile)
 
     return True
 

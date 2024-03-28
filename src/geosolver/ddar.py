@@ -3,28 +3,29 @@ from __future__ import annotations
 import time
 import logging
 from typing import TYPE_CHECKING
-from geosolver.algebraic.derivations import apply_derivations
 
+from geosolver.algebraic.derivations import apply_derivations
 from geosolver.deductive import dd_bfs_one_level
 
-from geosolver.problem import Problem, Theorem, Dependency
 
 if TYPE_CHECKING:
-    from geosolver.proof_graph import ProofGraph
+    from geosolver.dependencies.dependency import Dependency
+    from geosolver.proof import Proof
+    from geosolver.problem import Problem, Theorem
 
 
 def solve(
-    g: "ProofGraph",
-    theorems: list[Problem],
-    controller: Problem,
+    proof: "Proof",
+    theorems: list["Problem"],
+    controller: "Problem",
     max_level: int = 1000,
     timeout: int = 600,
-) -> tuple["ProofGraph", list[float], str, list[int], list[Dependency]]:
+) -> tuple["Proof", list[float], str, list[int], list["Dependency"]]:
     """Alternate between DD and AR until goal is found."""
     status = "saturated"
     level_times = []
 
-    dervs, eq4 = g.alegbraic_manipulator.derive_algebra(level=0, verbose=False)
+    dervs, eq4 = proof.alegbraic_manipulator.derive_algebra(level=0, verbose=False)
     derives = [dervs]
     eq4s = [eq4]
     branches = []
@@ -32,7 +33,7 @@ def solve(
 
     while len(level_times) < max_level:
         dervs, eq4, next_branches, added = saturate_or_goal(
-            g, theorems, level_times, controller, max_level, timeout=timeout
+            proof, theorems, level_times, controller, max_level, timeout=timeout
         )
         all_added += added
 
@@ -42,8 +43,8 @@ def solve(
 
         # Now, it is either goal or saturated
         if controller.goal is not None:
-            goal_args = g.symbols_graph.names2points(controller.goal.args)
-            if g.check(controller.goal.name, goal_args):  # found goal
+            goal_args = proof.symbols_graph.names2points(controller.goal.args)
+            if proof.check(controller.goal.name, goal_args):  # found goal
                 status = "solved"
                 break
 
@@ -53,28 +54,28 @@ def solve(
         # Now we resort to algebra derivations.
         added = []
         while derives and not added:
-            added += apply_derivations(g, derives.pop(0))
+            added += apply_derivations(proof, derives.pop(0))
 
         if added:
             continue
 
         # Final help from AR.
         while eq4s and not added:
-            added += apply_derivations(g, eq4s.pop(0))
+            added += apply_derivations(proof, eq4s.pop(0))
 
         all_added += added
 
         if not added:  # Nothing left. saturated.
             break
 
-    return g, level_times, status, branches, all_added
+    return proof, level_times, status, branches, all_added
 
 
 def saturate_or_goal(
-    g: "ProofGraph",
+    proof: "Proof",
     theorems: list["Theorem"],
     level_times: list[float],
-    p: "Problem",
+    problem: "Problem",
     max_level: int = 100,
     timeout: int = 600,
 ) -> tuple[
@@ -92,7 +93,13 @@ def saturate_or_goal(
 
         t = time.time()
         added, derv, eq4, n_branching = dd_bfs_one_level(
-            g, theorems, level, p, verbose=False, nm_check=True, timeout=timeout
+            proof,
+            theorems,
+            level,
+            problem,
+            verbose=False,
+            nm_check=True,
+            timeout=timeout,
         )
         all_added += added
         branching.append(n_branching)
@@ -104,11 +111,14 @@ def saturate_or_goal(
         logging.info(f"Depth {level}/{max_level} time = {level_time}")
         level_times.append(level_time)
 
-        if p.goal is not None:
+        if problem.goal is not None:
             goal_args = list(
-                map(lambda x: g.symbols_graph.get_point(x, lambda: int(x)), p.goal.args)
+                map(
+                    lambda x: proof.symbols_graph.get_point(x, lambda: int(x)),
+                    problem.goal.args,
+                )
             )
-            if g.check(p.goal.name, goal_args):  # found goal
+            if proof.check(problem.goal.name, goal_args):  # found goal
                 break
 
         if not added:  # saturated

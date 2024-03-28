@@ -3,13 +3,16 @@ from enum import Enum
 import logging
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Dict, List, Union
-from networkx import MultiDiGraph
+import random
+from typing import TYPE_CHECKING, Dict, List, Tuple, Union
+from networkx import MultiDiGraph, ancestors
 from pyvis.network import Network
+import seaborn as sns
 
 
 from geosolver.algebraic import AlgebraicRules
-from geosolver.problem import CONSTRUCTION_RULE, Dependency, Theorem
+from geosolver.dependencies.dependency import Dependency
+from geosolver.problem import CONSTRUCTION_RULE, Theorem
 
 if TYPE_CHECKING:
     from geosolver.geometry import Point, Node
@@ -19,19 +22,32 @@ class DependencyType(Enum):
     GOAL = "goal"
     PREMISE = "premise"
     STATEMENT = "statement"
+    NUMERICAL_CHECK = "numerical_check"
 
 
 DEPTYPE_TO_SHAPE = {
     DependencyType.GOAL.value: "star",
     DependencyType.PREMISE.value: "hexagon",
     DependencyType.STATEMENT.value: "dot",
+    DependencyType.NUMERICAL_CHECK.value: "square",
 }
 
 
 class DependencyGraph:
     def __init__(self) -> None:
         self.nx_graph = MultiDiGraph()
-        self._goal_node = None
+        self.goal = None
+
+    @property
+    def proof_subgraph(self) -> DependencyGraph:
+        if self.goal is None:
+            raise ValueError("Cannot extract proof subgraph without goal.")
+        proof_graph = DependencyGraph()
+        proof_graph.nx_graph = self.nx_graph.copy()
+        proof_graph.nx_graph = proof_graph.nx_graph.subgraph(
+            ancestors(proof_graph.nx_graph, self.goal) | {self.goal}
+        )
+        return proof_graph
 
     def add_dependency(
         self,
@@ -57,26 +73,31 @@ class DependencyGraph:
     def add_edge(
         self,
         u_for_edge: Dependency,
-        v_for_edge: Dependency,
-        rule_name: str,
-        rule_arguments: List[Union[str, "Node"]],
+        v_for_edge: Union[Dependency, str],
+        edge_arguments: List[Union[str, "Node"]],
+        edge_name: str = "",
     ):
-        pred = dependency_node_name(u_for_edge)
+        edge_name = edge_name if edge_name else "NAN"
 
+        pred = dependency_node_name(u_for_edge)
         if pred not in self.nx_graph.nodes:
-            self.add_dependency(u_for_edge)
+            dependency_type = DependencyType.STATEMENT
+            if not u_for_edge.why:
+                dependency_type = DependencyType.NUMERICAL_CHECK
+            self.add_dependency(u_for_edge, dependency_type)
             for why_u in u_for_edge.why:
                 self.add_edge(
                     why_u,
                     u_for_edge,
-                    rule_name=u_for_edge.rule_name,
-                    rule_arguments=u_for_edge.args,
+                    edge_name=u_for_edge.rule_name,
+                    edge_arguments=u_for_edge.args,
                 )
 
-        succ = dependency_node_name(v_for_edge)
-        assert succ in self.nx_graph.nodes
-        edge_key = f"{rule_name}." + ".".join(_str_arguments(rule_arguments))
-        self.nx_graph.add_edge(pred, succ, key=edge_key)
+        if isinstance(v_for_edge, Dependency):
+            v_for_edge = dependency_node_name(v_for_edge)
+        assert v_for_edge in self.nx_graph.nodes
+        edge_key = f"{edge_name}." + ".".join(_str_arguments(edge_arguments))
+        self.nx_graph.add_edge(pred, v_for_edge, key=edge_key)
 
     def add_theorem_edges(
         self, dependencies: list[Dependency], theorem: Theorem, args: List["Point"]
@@ -102,8 +123,8 @@ class DependencyGraph:
                 self.add_edge(
                     why_added,
                     added_dependency,
-                    rule_name=dep_rule_name,
-                    rule_arguments=args,
+                    edge_name=dep_rule_name,
+                    edge_arguments=args,
                 )
 
     def add_algebra_edges(
@@ -118,8 +139,8 @@ class DependencyGraph:
                 self.add_edge(
                     why_added,
                     added_dependency,
-                    rule_name=dep_rule_name,
-                    rule_arguments=args,
+                    edge_name=dep_rule_name,
+                    edge_arguments=args,
                 )
 
     def add_construction_edges(
@@ -141,12 +162,13 @@ class DependencyGraph:
                 self.add_edge(
                     why_added,
                     added_dependency,
-                    rule_name=dep_rule_name,
-                    rule_arguments=args,
+                    edge_name=dep_rule_name,
+                    edge_arguments=args,
                 )
 
     def add_goal(self, goal_name: str, goal_args: List["Point"]):
         goal_dep = Dependency(goal_name, goal_args, None, -1)
+        self.goal = dependency_node_name(goal_dep)
         self.add_dependency(goal_dep, DependencyType.GOAL)
 
     def show_html(self, html_path: Path, rules: Dict[str, Theorem]):
@@ -170,6 +192,9 @@ class DependencyGraph:
                 vis_graph.nodes[node]["size"] = 20
             if dep_type == DependencyType.GOAL.value:
                 vis_graph.nodes[node]["size"] = 40
+
+        edges_colors = build_edges_colors()
+        edges_keys_indexes = []
         for u, v, k, data in vis_graph.edges(data=True, keys=True):
             name = k.split(".")[0]
             theorem = rules.get(name)
@@ -182,16 +207,38 @@ class DependencyGraph:
             else:
                 edge_name = "NOT FOUND"
             vis_graph.edges[u, v, k]["title"] = edge_name
-            vis_graph.edges[u, v, k]["label"] = k if name else "NAN" + k
+            vis_graph.edges[u, v, k]["label"] = k
             vis_graph.edges[u, v, k]["font"] = {"size": 8}
 
+            if k in edges_keys_indexes:
+                edge_index = edges_keys_indexes.index(k)
+            else:
+                edge_index = len(edges_keys_indexes)
+                edges_keys_indexes.append(k)
+
+            edge_color_index = edge_index % len(edges_colors)
+            base_edge_color = edges_colors[edge_color_index]
+
+            idle_edge_color = rgba_to_hex(*base_edge_color, a=0.6)
+            edge_color = rgba_to_hex(*base_edge_color, a=1.0)
+            vis_graph.edges[u, v, k]["color"] = {
+                "color": idle_edge_color,
+                "highlight": edge_color,
+                "hover": edge_color,
+            }
+
         nt.from_nx(vis_graph)
+        nt.options.interaction.hover = True
         nt.show_buttons(filter_=["physics"])
         nt.show(str(html_path), notebook=False)
 
 
 def dependency_node_name(dependency: Dependency):
-    return ".".join(dependency.hashed())
+    return node_name_from_hash(dependency.hashed())
+
+
+def node_name_from_hash(hash_tuple: Tuple[str]):
+    return ".".join(hash_tuple)
 
 
 def _str_arguments(args: List[Union[str, int, "Node"]]) -> List[str]:
@@ -202,3 +249,19 @@ def _str_arguments(args: List[Union[str, int, "Node"]]) -> List[str]:
         else:
             args_str.append(arg.name)
     return args_str
+
+
+def rgba_to_hex(r, g, b, a=0.5):
+    hexes = "%02x%02x%02x%02x" % (
+        int(r * 255),
+        int(g * 255),
+        int(b * 255),
+        int(a * 255),
+    )
+    return f"#{hexes.upper()}"
+
+
+def build_edges_colors() -> List[str]:
+    edge_colors = sns.color_palette("colorblind")
+    random.shuffle(edge_colors)
+    return edge_colors
