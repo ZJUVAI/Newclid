@@ -838,7 +838,6 @@ class StatementAdder:
         pq = self.symbols_graph.get_or_create_segment(p, q, deps=None)
 
         add = self._maybe_make_equal_pairs(a, b, c, d, m, n, p, q, ab, cd, mn, pq, deps)
-
         if add is not None:
             return add
 
@@ -1142,15 +1141,15 @@ class StatementAdder:
                     ),
                 ]
 
-        deps = deps.populate(eqname, [m, n, p, q])
-        self.make_equal(mn, pq, deps=deps)
+        dep = deps.populate(eqname, [m, n, p, q])
+        self.make_equal(mn, pq, deps=dep)
 
-        deps.algebra = mn._val, pq._val
-        to_cache = [(eqname, [m, n, p, q], deps)]
+        dep.algebra = mn._val, pq._val
+        to_cache = [(eqname, [m, n, p, q], dep)]
 
         if is_equal(mn, pq):
             return [], to_cache
-        return [deps], to_cache
+        return [dep], to_cache
 
     def _add_aconst(
         self, points: list[Point], deps: EmptyDependency
