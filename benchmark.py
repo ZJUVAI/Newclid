@@ -8,6 +8,7 @@ from geosolver.ddar import solve
 from geosolver.proof import Proof
 from geosolver.problem import Definition, Problem, Theorem
 from geosolver.proof_writing import write_solution
+from geosolver.statement.adder import IntrisicRules
 
 DEFINITIONS = None  # contains definitions of construction actions
 RULES = None  # contains rules of deductions
@@ -34,7 +35,16 @@ def main():
         if problem_name != "orthocenter_consequence_aux":
             continue
         logging.info(f"Starting problem {problem_name} with ddar only.")
-        proof, _ = Proof.build_problem(problem, DEFINITIONS)
+        proof, _ = Proof.build_problem(
+            problem,
+            DEFINITIONS,
+            disabled_intrinsic_rules=[
+                IntrisicRules.PARA_FROM_PERP,
+                IntrisicRules.CYCLIC_FROM_CONG,
+                IntrisicRules.CONG_FROM_EQRATIO,
+                IntrisicRules.PARA_FROM_EQANGLE,
+            ],
+        )
         problem_output_path = out_folder_path / problem_name
         cProfile.runctx(
             "run_ddar(proof, problem, problem_output_path)",
