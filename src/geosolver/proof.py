@@ -209,8 +209,8 @@ class Proof:
     def do_algebra(self, name: str, args: list[Point]) -> list[Dependency]:
         """Derive (but not add) new algebraic predicates."""
         new_deps, to_cache = self.statements_adder.add_algebra(name, args)
-        self.cache_deps(to_cache)
         self.dependency_graph.add_algebra_edges(new_deps, args[:-1])
+        self.cache_deps(to_cache)
         return new_deps
 
     def cache_deps(self, deps_to_cache: list[ToCache]):

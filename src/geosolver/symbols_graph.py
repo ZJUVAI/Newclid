@@ -356,6 +356,11 @@ class SymbolsGraph:
             type_name = node_type.__name__
             for node in nodes:
                 nx_graph.add_node(node.name, title=type_name, group=type_name)
+                rep = node.rep()
+                if rep != node:
+                    rep_type = rep.__class__.__name__
+                    nx_graph.add_node(rep.name, title=rep_type, group=rep_type)
+                    nx_graph.add_edge(rep.name, node.name, dashes=True)
                 for neighbor_type in self.type2nodes.keys():
                     neighbor_type_name = neighbor_type.__name__
                     for neighbor in node.neighbors(neighbor_type):
@@ -364,7 +369,7 @@ class SymbolsGraph:
                             title=neighbor_type_name,
                             group=neighbor_type_name,
                         )
-                        nx_graph.add_edge(neighbor.name, node.name)
+                        nx_graph.add_edge(neighbor.name, rep.name)
 
         nt.from_nx(nx_graph)
         nt.show(str(html_path), notebook=False)
