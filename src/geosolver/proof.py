@@ -19,7 +19,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Generator, Optional, Union
+from typing import Generator, Optional, Tuple, Union
 import logging
 
 
@@ -198,12 +198,10 @@ class Proof:
 
         return proof, added
 
-    def add_piece(
+    def resolve_dependencies(
         self, name: str, args: list[Point], deps: EmptyDependency
-    ) -> list[Dependency]:
-        new_deps, deps_to_cache = self.statements_adder.add_piece(name, args, deps)
-        self.cache_deps(deps_to_cache)
-        return new_deps
+    ) -> Tuple[list[Dependency], list[ToCache]]:
+        return self.statements_adder.add_piece(name, args, deps)
 
     def add_algebra(self, dep: Dependency) -> None:
         self.alegbraic_manipulator.add_algebra(dep)
@@ -497,7 +495,10 @@ class Proof:
                         )
                     )
 
-                    adds = self.add_piece(name=b.name, args=args, deps=deps)
+                    adds, to_cache = self.resolve_dependencies(
+                        name=b.name, args=args, deps=deps
+                    )
+                    self.cache_deps(to_cache)
                     self.dependency_graph.add_construction_edges(adds, args)
                     basics.append((b.name, args, deps))
                     if adds:
