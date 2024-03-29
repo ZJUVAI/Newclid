@@ -154,7 +154,7 @@ class StatementAdder:
         if name == ConceptName.PARALLEL.value:
             a, b, dep = args
             if is_equiv(a, b):
-                return []
+                return [], []
             else:
                 (x, y), (m, n) = a._obj.points, b._obj.points
                 new_deps, to_cache = self._add_para([x, y, m, n], dep)
@@ -176,32 +176,29 @@ class StatementAdder:
             a, b = ab._d
             (x, y), (m, n) = a._obj.points, b._obj.points
 
-            added = []
-            to_cache = []
             if not is_equal(ab, nd):
                 if nd == self.alegbraic_manipulator.halfpi:
                     _add, _to_cache = self._add_perp([x, y, m, n], dep)
-                    added += _add
+                    new_deps += _add
                     to_cache += _to_cache
                 name = ConceptName.CONSTANT_ANGLE.value
                 args = [x, y, m, n, nd]
                 dep1 = dep.populate(name, args)
-                self.dependency_cache.add_dependency(name, args, dep1)
+                to_cache.append((name, args, dep1))
                 self.make_equal(nd, ab, deps=dep1)
-                added += [dep1]
+                new_deps.append(dep1)
 
             if not is_equal(ba, dn):
                 if dn == self.alegbraic_manipulator.halfpi:
                     _add, _to_cache = self._add_perp([m, n, x, y], dep)
-                    added += _add
+                    new_deps += _add
                     to_cache += _to_cache
                 name = ConceptName.CONSTANT_ANGLE.value
                 args = [m, n, x, y, dn]
                 dep2 = dep.populate(name, args)
-                self.dependency_cache.add_dependency(name, args, dep2)
+                to_cache.append((name, args, dep2))
                 self.make_equal(dn, ba, deps=dep2)
-                added += [dep2]
-            new_deps = added
+                new_deps.append(dep2)
 
         elif name == ConceptName.CONSTANT_RATIO.value:
             a, b, c, d, num, den, dep = args
@@ -228,7 +225,7 @@ class StatementAdder:
         elif name in [ConceptName.CONGRUENT.value, ConceptName.CONGRUENT_2.value]:
             a, b, c, d, dep = args
             if not (a != b and c != d and (a != c or b != d)):
-                new_deps = []
+                return [], []
             else:
                 new_deps, to_cache = self._add_cong([a, b, c, d], dep)
 

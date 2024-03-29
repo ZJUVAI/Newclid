@@ -57,6 +57,10 @@ def check_para_numerical(points: list[Point]) -> bool:
     return ab.is_parallel(cd)
 
 
+def check_para_or_coll_numerical(points: list[Point]) -> bool:
+    return check_para_numerical(points) or check_coll_numerical(points)
+
+
 def check_perp_numerical(points: list[Point]) -> bool:
     a, b, c, d = points
     ab = Line(a, b)
@@ -183,7 +187,6 @@ def check_ratio_numerical(points: list[Point]) -> bool:
 
 NUMERICAL_CHECK_FUNCTIONS = {
     ConceptName.COLLINEAR.value: check_coll_numerical,
-    ConceptName.PARALLEL.value: check_para_numerical,
     ConceptName.PERPENDICULAR.value: check_perp_numerical,
     ConceptName.MIDPOINT.value: check_midp_numerical,
     ConceptName.CONGRUENT.value: check_cong_numerical,
@@ -202,6 +205,7 @@ NUMERICAL_CHECK_FUNCTIONS = {
     ConceptName.CONSTANT_ANGLE.value: check_aconst_numerical,
     ConceptName.SAMESIDE.value: check_sameside_numerical,
     ConceptName.NON_COLLINEAR.value: check_ncoll_numerical,
+    "para_or_coll": check_para_or_coll_numerical,
     "ratio": check_ratio_numerical,
     "const_angle": check_const_angle_numerical,
 }
@@ -211,9 +215,11 @@ def check_numerical(name: str, args: list[Union[gm.Point, Point]]) -> bool:
     """Numerical check."""
     if name == "on_line":
         name = ConceptName.COLLINEAR.value
-    elif name in [ConceptName.COMPUTE_RATIO.value, ConceptName.COMPUTE_ANGLE.value]:
-        return True
+    elif name == ConceptName.PARALLEL.value:
+        name = "para_or_coll"
     elif name in [
+        ConceptName.COMPUTE_RATIO.value,
+        ConceptName.COMPUTE_ANGLE.value,
         ConceptName.FIX_L.value,
         ConceptName.FIX_C.value,
         ConceptName.FIX_B.value,
