@@ -406,8 +406,20 @@ a b c = ncoll a b c
 x : cyclic a b c x
 cyclic a b c
 
-double x a b
-x : a b
-a b = diff a b
-x : coll x a b, cong x b a b
-line a b
+on_pline0 x a b c
+x : x a b c
+a b c = diff b c
+x : para x a b c
+pline a b c
+
+iso_triangle0 a b c
+c : a b c
+ =
+a : ; b : ; c : cong a b a c
+isos
+
+iso_triangle_vertex x b c
+x : b c
+b c = diff b c
+x : cong x b x c
+isosvertex b c
