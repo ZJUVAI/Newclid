@@ -638,3 +638,15 @@ def sketch_3peq(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     x = line_line_intersection(ca_parallel_line, ab)
     y = z * 2 - x
     return x, y, z
+
+
+###### NEW FUNCTIONS FOR NEW DEFINITIONS ---- V. S.
+
+
+def sketch_isosvertex(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
+    b, c = args
+    side = unif(0.5, 2)
+
+    a, _ = circle_circle_intersection(Circle(b, side), Circle(c, side))
+
+    return a
