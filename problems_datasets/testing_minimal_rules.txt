@@ -2,14 +2,14 @@ r00
 a = free a; b = free b; c = free c; d = on_tline d c a b; e = free e; f = on_tline f e c d ? para a b e f
 r01
 o = free o; a = free a; b = eqdistance b o o a; c = eqdistance c o o b; d = eqdistance d o o c ? cyclic a b c d
-r02
-
+r02_p=a_q=c_s=relabel-line
+p = free p; q = free q; s = on_line s p q; d = free d; b = on_aline b p q d q s ? para p b q d
 r03
 a = free a; b = free b; p = free p; q = on_circum q a b p ? eqangle p a p b q a q b
 r04
-
+a = free a ? coll a a a
 r05
-
+a = free a ? coll a a a
 r06
 a = free a; b = free b; c = free c; e = midpoint e a b; f = midpoint f a c ? para e f b c
 r07
@@ -17,25 +17,25 @@ a = free a; b = free b; c = free c; d = on_pline d c a b; o = on_line o a c, on_
 r08
 a = free a; b = free b; c = free c; d = on_tline d c a b; e = free e; f = free f; g = free g; h = on_tline h g e f ? eqangle a b e f c d g h
 r09
-
+a = free a ? coll a a a
 r10
-
+a = free a ? coll a a a
 r11
-
+a = free a ? coll a a a
 r12
-
+a = free a ? coll a a a
 r13
-o = free o; a = free a; b = eqdistance b o o a; eqangle o a a b a b o b
+o = free o; a = free a; b = eqdistance b o o a ? eqangle o a a b a b o b
 r14
-
+a = free a ? coll a a a
 r15
 o = free o; a = free a; b = on_circle b o a; c = on_circle c o a; x = on_tline x a a o ? eqangle a x a b c a c b
 r16
-
+a = free a ? coll a a a
 r17
 o = free o; a = free a; b = on_circle b o a; c = on_circle c o a; m = midpoint m b c ? eqangle a b a c o b o m
 r18
-
+a = free a ? coll a a a
 r19
 a = free a; b = free b; c = on_tline c b b a; m = midpoint m a c ? cong a m b m
 r20
@@ -47,40 +47,40 @@ a = free a; b = free b; m = midpoint m a b; o = on_tline o m a b ? cong o a o b
 r23
 a = free a; p = free p; q = free q; b = eqdistance b p a p, eqdistance b q a q ? perp a b p q
 r24
-
+a = free a; b = free b; p = iso_triangle_vertex p a b; q = iso_triangle_vertex q a b, on_circum q a b p ? perp p a a q
 r25
-
+a = free a ? coll a a a
 r26
 a = free a; b = free b; c = free c; d = on_pline d b a c, on_pline d a b c; m = midpoint m a b ? midp m c d
 r27
-
+a = free a ? coll a a a
 r28
-
+a = free a; b = free b; c = on_pline0 c a b a ? coll a b c
 r29
 a = free a; b = free b; c = free c; d = free d; m = midpoint m a b; n = midpoint n c d ? eqratio m a a b n c c d
 r30
-
+a = free a ? coll a a a
 r31
-
+a = free a ? coll a a a
 r32
 a b c = triangle a b c; p = free p; q = eqdistance q p a b; r = eqdistance r p a c, eqdistance r q c b ? contri* a b c p q r
 r33
-
+a = free a ? coll a a a
 r34
-
+a = free a ? coll a a a
 r35
-
+a = free a ? coll a a a
 r36
-
+a = free a ? coll a a a
 r37
-
+a = free a ? coll a a a
 r38
-
+a = free a ? coll a a a
 r39
-
+a = free a ? coll a a a
 r40
-
+a = free a ? coll a a a
 r41
-
+a = free a ? coll a a a
 r42
 a = free a; b = free b; c = free c; d = on_pline d c a b; m = on_line m a d; n = on_line n b c, on_pline n m a b ? eqratio6 m a m d n b n c
