@@ -1,10 +1,11 @@
+import cProfile
 import logging
 from pathlib import Path
 from typing import Optional
 
 
 from geosolver.ddar import solve
-from geosolver.proof_graph import ProofGraph
+from geosolver.proof import Proof
 from geosolver.problem import Definition, Problem, Theorem
 from geosolver.proof_writing import write_solution
 
@@ -30,54 +31,76 @@ def main():
     out_folder_path = Path("./ddar_results/")
     out_folder_path.mkdir(exist_ok=True)
     for problem_name, problem in problems.items():
-        # if problem_name != "orthocenter_aux":
+        # if problem_name != "orthocenter":
         #     continue
-        logging.info(f"Checking rule {problem_name} with ddar only.")
-        graph, _ = ProofGraph.build_problem(problem, DEFINITIONS)
+        logging.info(f"Trying to prove rule {problem_name} with ddar only.")
+        proof, _ = Proof.build_problem(
+            problem,
+            DEFINITIONS,
+            disabled_intrinsic_rules=[
+                # IntrisicRules.PARA_FROM_PERP,
+                # IntrisicRules.CYCLIC_FROM_CONG,
+                # IntrisicRules.CONG_FROM_EQRATIO,
+                # IntrisicRules.PARA_FROM_EQANGLE,
+            ],
+        )
 
         problem_output_path = out_folder_path / problem_name
-        run_ddar(graph, problem, problem_output_path)
 
-        graph.symbols_graph.draw_figure(
+        proof.symbols_graph.draw_figure(
+            problem_output_path / f"{problem.url}_construction_figure.png",
+        )
+
+        cProfile.runctx(
+            "run_ddar(proof, problem, problem_output_path)",
+            globals=globals(),
+            locals=locals(),
+            filename=str(problem_output_path / f"{problem.url}.proof"),
+        )
+
+        write_solution(
+            proof,
+            problem,
+            problem_output_path / f"{problem.url}_proof_steps.txt",
+        )
+
+        proof.symbols_graph.draw_figure(
             problem_output_path / f"{problem.url}_proof_figure.png",
         )
 
-        graph.symbols_graph.draw_html(
-            problem_output_path / f"{problem_name}.symbols_graph.html"
+        proof.symbols_graph.draw_html(
+            problem_output_path / f"{problem.url}.symbols_graph.html"
         )
 
-        graph.dependency_graph.show_html(
-            problem_output_path / f"{problem_name}.dependency_graph.html",
+        proof.dependency_graph.show_html(
+            problem_output_path / f"{problem.url}.dependency_graph.html",
             RULES,
         )
-        return
+
+        proof.dependency_graph.proof_subgraph.show_html(
+            problem_output_path / f"{problem.url}.proof_subgraph.html",
+            RULES,
+        )
+
+    return
 
 
-def run_ddar(graph: ProofGraph, problem: Problem, out_folder: Optional[Path]) -> bool:
+def run_ddar(proof: Proof, problem: Problem, out_folder: Optional[Path]) -> bool:
     """Run DD+AR.
 
     Args:
-      g: Graph object, containing the proof state.
-      p: Problem object, containing the problem statement.
+      proof: Proof state.
+      p: Problem statement.
       out_file: path to output file if solution is found.
 
     Returns:
       Boolean, whether DD+AR finishes successfully.
     """
-    solve(graph, RULES, problem, max_level=1000)
-
-    goal_args = graph.symbols_graph.names2nodes(problem.goal.args)
-    if not graph.check(problem.goal.name, goal_args):
-        logging.info(f"DD+AR can't find rule {problem.url}.")
+    solve(proof, RULES, problem, max_level=1000)
+    goal_args = proof.symbols_graph.names2nodes(problem.goal.args)
+    if not proof.check(problem.goal.name, goal_args):
+        logging.info(f"DD+AR failed to solve the problem {problem.url}.")
         return False
-
-    outfile = (
-        out_folder / f"{problem.url}_proof_steps.txt"
-        if out_folder is not None
-        else None
-    )
-    write_solution(graph, problem, outfile)
-
     return True
 
 
