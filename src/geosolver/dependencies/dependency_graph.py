@@ -13,6 +13,7 @@ import seaborn as sns
 from geosolver.algebraic import AlgebraicRules
 from geosolver.dependencies.dependency import Dependency
 from geosolver.problem import CONSTRUCTION_RULE, Theorem
+from geosolver.statement.adder import ToCache
 
 if TYPE_CHECKING:
     from geosolver.geometry import Point, Node
@@ -57,15 +58,20 @@ class DependencyGraph:
         node = dependency_node_name(dependency)
 
         dep_type = dependency_type.value
+        dep_level = dependency.level
         if node in self.nx_graph.nodes:
             # So goal stay as such
             dep_type = self.nx_graph.nodes[node]["type"]
+            # First level counts
+            dep_level = self.nx_graph.nodes[node].get("level")
+            if dep_level is None:
+                dep_level = dependency.level
 
         dep_args_names = [arg.name for arg in dependency.args]
         self.nx_graph.add_node(
             node,
             name=dependency.name,
-            level=dependency.level,
+            level=dep_level,
             args=dep_args_names,
             type=dep_type,
         )
@@ -100,9 +106,9 @@ class DependencyGraph:
         self.nx_graph.add_edge(pred, v_for_edge, key=edge_key)
 
     def add_theorem_edges(
-        self, dependencies: list[Dependency], theorem: Theorem, args: List["Point"]
+        self, to_cache: list[ToCache], theorem: Theorem, args: List["Point"]
     ):
-        for added_dependency in dependencies:
+        for cache_name, cache_args, added_dependency in to_cache:
             self.add_dependency(added_dependency)
 
             # Check for identical mapping A.B.D.C == A.B.C.D
@@ -112,30 +118,70 @@ class DependencyGraph:
             ):
                 added_dependency = added_dependency.why[0]
 
+            same_name = added_dependency.name == cache_name
+            same_args = added_dependency.args == cache_args
+
+            if not same_name or not same_args:
+                dep_args_str = ".".join(_str_arguments(added_dependency.args))
+                cache_args_str = ".".join(arg.name for arg in cache_args)
+                logging.warning(
+                    f"Dependency {added_dependency.name}.{dep_args_str}"
+                    f" differs from cache {cache_name}.{cache_args_str}"
+                )
+
+            same_rule = added_dependency.rule_name == theorem.rule_name
+            if not same_rule:
+                args_str = ".".join(arg.name for arg in args)
+                logging.warning(
+                    f"Dependency {added_dependency.name}"
+                    f" has rule_name '{added_dependency.rule_name}'"
+                    f" different from the theorem {theorem.name}"
+                    f" with rule_name {theorem.rule_name} and arguments {args_str}",
+                )
+
             for why_added in added_dependency.why:
-                dep_rule_name = added_dependency.rule_name
-                if dep_rule_name != theorem.rule_name:
-                    logging.warning(
-                        "Dependency rule was different from the theorem. %s != %s",
-                        dep_rule_name,
-                        theorem.rule_name,
-                    )
                 self.add_edge(
                     why_added,
                     added_dependency,
-                    edge_name=dep_rule_name,
+                    edge_name=added_dependency.rule_name,
                     edge_arguments=args,
                 )
 
     def add_algebra_edges(
-        self, dependencies: list[Dependency], args: List[Union["Point", int]]
+        self, to_cache: list[ToCache], args: List[Union["Point", int]]
     ):
-        for added_dependency in dependencies:
+        for cache_name, cache_args, added_dependency in to_cache:
             self.add_dependency(added_dependency)
+
+            # Check for identical mapping A.B.D.C == A.B.C.D
+            while (
+                len(added_dependency.why) == 1
+                and added_dependency.why[0].hashed() == added_dependency.hashed()
+            ):
+                added_dependency = added_dependency.why[0]
+
+            same_name = added_dependency.name == cache_name
+            same_args = added_dependency.args == cache_args
+
+            if not same_name or not same_args:
+                dep_args_str = ".".join(_str_arguments(added_dependency.args))
+                cache_args_str = ".".join(arg.name for arg in cache_args)
+                logging.warning(
+                    f"Dependency {added_dependency.name}.{dep_args_str}"
+                    f" differs from cache {cache_name}.{cache_args_str}"
+                )
+
+            dep_rule_name = added_dependency.rule_name
+            ar_rules = [ar.value for ar in AlgebraicRules]
+            if dep_rule_name not in ar_rules:
+                args_str = ".".join(arg.name for arg in args)
+                logging.warning(
+                    f"Dependency {added_dependency} has rule_name {dep_rule_name}"
+                    f" not present in algebraic rules {ar_rules}"
+                    f" with arguments {args_str}",
+                )
+
             for why_added in added_dependency.why:
-                dep_rule_name = added_dependency.rule_name
-                if dep_rule_name not in [ar.value for ar in AlgebraicRules]:
-                    logging.warning("Dependency rule was unknown: '%s'", dep_rule_name)
                 self.add_edge(
                     why_added,
                     added_dependency,
@@ -143,22 +189,39 @@ class DependencyGraph:
                     edge_arguments=args,
                 )
 
-    def add_construction_edges(
-        self, dependencies: list[Dependency], args: List["Point"]
-    ):
-        for added_dependency in dependencies:
+    def add_construction_edges(self, to_cache: list[ToCache], args: List["Point"]):
+        for cache_name, cache_args, added_dependency in to_cache:
             self.add_dependency(added_dependency, DependencyType.PREMISE)
+
+            # Check for identical mapping A.B.D.C == A.B.C.D
+            while (
+                len(added_dependency.why) == 1
+                and added_dependency.why[0].hashed() == added_dependency.hashed()
+            ):
+                added_dependency = added_dependency.why[0]
+
+            same_name = added_dependency.name == cache_name
+            same_args = added_dependency.args == cache_args
+
+            if not same_name or not same_args:
+                dep_args_str = ".".join(_str_arguments(added_dependency.args))
+                cache_args_str = ".".join(arg.name for arg in cache_args)
+                logging.warning(
+                    f"Dependency {added_dependency.name}.{dep_args_str}"
+                    f" differs from cache {cache_name}.{cache_args_str}"
+                )
+
+            dep_rule_name = added_dependency.rule_name
+            if dep_rule_name != CONSTRUCTION_RULE:
+                logging.warning(
+                    "Dependency rule was different"
+                    "from the construction rule. %s != %s",
+                    dep_rule_name,
+                    CONSTRUCTION_RULE,
+                )
 
             for why_added in added_dependency.why:
                 self.add_dependency(why_added)
-                dep_rule_name = added_dependency.rule_name
-                if dep_rule_name != CONSTRUCTION_RULE:
-                    logging.warning(
-                        "Dependency rule was different"
-                        "from the construction rule. %s != %s",
-                        dep_rule_name,
-                        CONSTRUCTION_RULE,
-                    )
                 self.add_edge(
                     why_added,
                     added_dependency,
@@ -167,7 +230,7 @@ class DependencyGraph:
                 )
 
     def add_goal(self, goal_name: str, goal_args: List["Point"]):
-        goal_dep = Dependency(goal_name, goal_args, None, -1)
+        goal_dep = Dependency(goal_name, goal_args, None, None)
         self.goal = dependency_node_name(goal_dep)
         self.add_dependency(goal_dep, DependencyType.GOAL)
 
@@ -229,6 +292,17 @@ class DependencyGraph:
 
         nt.from_nx(vis_graph)
         nt.options.interaction.hover = True
+        nt.options.physics.solver = "barnesHut"
+        nt.options.physics.use_barnes_hut(
+            {
+                "gravity": -20000,
+                "central_gravity": 0.3,
+                "spring_length": 100,
+                "spring_strength": 0.05,
+                "damping": 0.09,
+                "overlap": 0.01,
+            }
+        )
         nt.show_buttons(filter_=["physics"])
         nt.show(str(html_path), notebook=False)
 
