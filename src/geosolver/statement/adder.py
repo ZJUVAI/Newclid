@@ -1,3 +1,5 @@
+from __future__ import annotations
+from enum import Enum
 from typing import Optional, Tuple
 
 
@@ -16,6 +18,13 @@ from geosolver.symbols_graph import SymbolsGraph
 ToCache = Tuple[str, list[Point], Dependency]
 
 
+class IntrisicRules(Enum):
+    PARA_FROM_PERP = "i00"
+    CYCLIC_FROM_CONG = "i01"
+    CONG_FROM_EQRATIO = "i02"
+    PARA_FROM_EQANGLE = "i03"
+
+
 class StatementAdder:
     def __init__(
         self,
@@ -23,12 +32,19 @@ class StatementAdder:
         alegbraic_manipulator: AlgebraicManipulator,
         statements_checker: StatementChecker,
         dependency_cache: DependencyCache,
+        disabled_intrinsic_rules: Optional[list[IntrisicRules | str]] = None,
     ) -> None:
         self.symbols_graph = symbols_graph
         self.alegbraic_manipulator = alegbraic_manipulator
 
         self.statements_checker = statements_checker
         self.dependency_cache = dependency_cache
+
+        if disabled_intrinsic_rules is None:
+            disabled_intrinsic_rules = []
+        self.DISABLED_INTRINSIC_RULES = [
+            IntrisicRules(r) for r in disabled_intrinsic_rules
+        ]
 
         self.NAME_TO_ADDER = {
             ConceptName.COLLINEAR.value: self._add_coll,
@@ -154,7 +170,7 @@ class StatementAdder:
         if name == ConceptName.PARALLEL.value:
             a, b, dep = args
             if is_equiv(a, b):
-                return []
+                return [], []
             else:
                 (x, y), (m, n) = a._obj.points, b._obj.points
                 new_deps, to_cache = self._add_para([x, y, m, n], dep)
@@ -176,32 +192,29 @@ class StatementAdder:
             a, b = ab._d
             (x, y), (m, n) = a._obj.points, b._obj.points
 
-            added = []
-            to_cache = []
             if not is_equal(ab, nd):
                 if nd == self.alegbraic_manipulator.halfpi:
                     _add, _to_cache = self._add_perp([x, y, m, n], dep)
-                    added += _add
+                    new_deps += _add
                     to_cache += _to_cache
                 name = ConceptName.CONSTANT_ANGLE.value
                 args = [x, y, m, n, nd]
                 dep1 = dep.populate(name, args)
-                self.dependency_cache.add_dependency(name, args, dep1)
+                to_cache.append((name, args, dep1))
                 self.make_equal(nd, ab, deps=dep1)
-                added += [dep1]
+                new_deps.append(dep1)
 
             if not is_equal(ba, dn):
                 if dn == self.alegbraic_manipulator.halfpi:
                     _add, _to_cache = self._add_perp([m, n, x, y], dep)
-                    added += _add
+                    new_deps += _add
                     to_cache += _to_cache
                 name = ConceptName.CONSTANT_ANGLE.value
                 args = [m, n, x, y, dn]
                 dep2 = dep.populate(name, args)
-                self.dependency_cache.add_dependency(name, args, dep2)
+                to_cache.append((name, args, dep2))
                 self.make_equal(dn, ba, deps=dep2)
-                added += [dep2]
-            new_deps = added
+                new_deps.append(dep2)
 
         elif name == ConceptName.CONSTANT_RATIO.value:
             a, b, c, d, num, den, dep = args
@@ -228,7 +241,7 @@ class StatementAdder:
         elif name in [ConceptName.CONGRUENT.value, ConceptName.CONGRUENT_2.value]:
             a, b, c, d, dep = args
             if not (a != b and c != d and (a != c or b != d)):
-                new_deps = []
+                return [], []
             else:
                 new_deps, to_cache = self._add_cong([a, b, c, d], dep)
 
@@ -407,9 +420,11 @@ class StatementAdder:
         self, points: list[Point], deps: EmptyDependency
     ) -> Tuple[list[Dependency], list[ToCache]]:
         """Add a new perpendicular predicate from 4 points (2 lines)."""
-        para_from_perp = self._maybe_make_para_from_perp(points, deps)
-        if para_from_perp is not None:
-            return para_from_perp
+
+        if IntrisicRules.PARA_FROM_PERP not in self.DISABLED_INTRINSIC_RULES:
+            para_from_perp = self._maybe_make_para_from_perp(points, deps)
+            if para_from_perp is not None:
+                return para_from_perp
 
         a, b, c, d = points
         ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
@@ -490,7 +505,9 @@ class StatementAdder:
         if not is_equal(ab, cd):
             deps += [dep]
 
-        if a not in [c, d] and b not in [c, d]:
+        if IntrisicRules.CYCLIC_FROM_CONG in self.DISABLED_INTRINSIC_RULES or (
+            a not in [c, d] and b not in [c, d]
+        ):
             return deps, to_cache
 
         if b in [c, d]:
@@ -659,12 +676,12 @@ class StatementAdder:
             deps = EmptyDependency(level=deps.level, rule_name=None)
             deps.why = [dep0] + why1 + why2 + why3 + why4
 
-        maybe_pairs = self._maybe_make_equal_pairs(
-            a, b, c, d, m, n, p, q, ab, cd, mn, pq, deps
-        )
-
-        if maybe_pairs is not None:
-            return maybe_pairs
+        if IntrisicRules.PARA_FROM_EQANGLE not in self.DISABLED_INTRINSIC_RULES:
+            maybe_pairs = self._maybe_make_equal_pairs(
+                a, b, c, d, m, n, p, q, ab, cd, mn, pq, deps
+            )
+            if maybe_pairs is not None:
+                return maybe_pairs
 
         self.symbols_graph.get_node_val(ab, deps=None)
         self.symbols_graph.get_node_val(cd, deps=None)
@@ -837,10 +854,12 @@ class StatementAdder:
         mn = self.symbols_graph.get_or_create_segment(m, n, deps=None)
         pq = self.symbols_graph.get_or_create_segment(p, q, deps=None)
 
-        add = self._maybe_make_equal_pairs(a, b, c, d, m, n, p, q, ab, cd, mn, pq, deps)
-
-        if add is not None:
-            return add
+        if IntrisicRules.CONG_FROM_EQRATIO not in self.DISABLED_INTRINSIC_RULES:
+            add = self._maybe_make_equal_pairs(
+                a, b, c, d, m, n, p, q, ab, cd, mn, pq, deps
+            )
+            if add is not None:
+                return add
 
         self.symbols_graph.get_node_val(ab, deps=None)
         self.symbols_graph.get_node_val(cd, deps=None)
@@ -1142,15 +1161,15 @@ class StatementAdder:
                     ),
                 ]
 
-        deps = deps.populate(eqname, [m, n, p, q])
-        self.make_equal(mn, pq, deps=deps)
+        dep = deps.populate(eqname, [m, n, p, q])
+        self.make_equal(mn, pq, deps=dep)
 
-        deps.algebra = mn._val, pq._val
-        to_cache = [(eqname, [m, n, p, q], deps)]
+        dep.algebra = mn._val, pq._val
+        to_cache = [(eqname, [m, n, p, q], dep)]
 
         if is_equal(mn, pq):
             return [], to_cache
-        return [deps], to_cache
+        return [dep], to_cache
 
     def _add_aconst(
         self, points: list[Point], deps: EmptyDependency

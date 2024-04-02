@@ -103,11 +103,12 @@ def dd_bfs_one_level(
                 break
             conclusion_name, args = theorem.conclusion_name_args(mp)
             cached_conclusion = proof.dependency_cache.get(conclusion_name, args)
+            add, to_cache = proof.resolve_dependencies(conclusion_name, args, deps=deps)
+            proof.dependency_graph.add_theorem_edges(add, theorem, args)
             if cached_conclusion is not None:
                 continue
 
-            add = proof.add_piece(conclusion_name, args, deps=deps)
-            proof.dependency_graph.add_theorem_edges(add, theorem, args)
+            proof.cache_deps(to_cache)
             added += add
 
     branching = len(added)

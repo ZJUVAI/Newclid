@@ -16,6 +16,7 @@ class TestDD:
         self.defs = Definition.from_txt_file("defs.txt", to_dict=True)
         self.rules = Theorem.from_txt_file("rules.txt", to_dict=True)
 
+    @pytest.mark.slow
     def test_imo_2022_p4_should_succeed(self):
         p = Problem.from_txt(
             "a b = segment a b; g1 = on_tline g1 a a b; g2 = on_tline g2 b b a; m ="

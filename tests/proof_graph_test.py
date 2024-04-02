@@ -116,6 +116,7 @@ class TestProofGraph:
             check.is_true(self.statements_checker.check_cong([a, b, c, d]))
             check.is_true(check_cong_numerical([a.num, b.num, c.num, d.num]))
 
+    @pytest.mark.slow
     def test_enumerate_eqangles(self):
         for a, b, c, d, x, y, z, t in self.proof.all_eqangles_8points():
             check.is_true(
@@ -127,6 +128,7 @@ class TestProofGraph:
                 )
             )
 
+    @pytest.mark.slow
     def test_enumerate_eqratios(self):
         for a, b, c, d, x, y, z, t in self.proof.all_eqratios_8points():
             check.is_true(

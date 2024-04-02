@@ -19,7 +19,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Generator, Union
+from typing import Generator, Optional, Tuple, Union
 import logging
 
 
@@ -124,7 +124,7 @@ class Proof:
         problem: Problem,
         definitions: dict[str, Definition],
         verbose: bool = True,
-        init_copy: bool = True,
+        disabled_intrinsic_rules: Optional[list[str]] = None,
     ) -> tuple[Proof, list[Dependency]]:
         """Build a problem into a gr.Graph object."""
         check = False
@@ -133,6 +133,10 @@ class Proof:
         if verbose:
             logging.info(problem.url)
             logging.info(problem.txt())
+
+        if disabled_intrinsic_rules is None:
+            disabled_intrinsic_rules = []
+
         while not check:
             # While loop to search for coordinates
             # that checks premises conditions numerically
@@ -150,6 +154,7 @@ class Proof:
                     alegbraic_manipulator,
                     statements_checker,
                     dependency_cache,
+                    disabled_intrinsic_rules=disabled_intrinsic_rules,
                 )
                 proof = Proof(
                     dependency_cache=dependency_cache,
@@ -193,12 +198,10 @@ class Proof:
 
         return proof, added
 
-    def add_piece(
+    def resolve_dependencies(
         self, name: str, args: list[Point], deps: EmptyDependency
-    ) -> list[Dependency]:
-        new_deps, deps_to_cache = self.statements_adder.add_piece(name, args, deps)
-        self.cache_deps(deps_to_cache)
-        return new_deps
+    ) -> Tuple[list[Dependency], list[ToCache]]:
+        return self.statements_adder.add_piece(name, args, deps)
 
     def add_algebra(self, dep: Dependency) -> None:
         self.alegbraic_manipulator.add_algebra(dep)
@@ -206,8 +209,8 @@ class Proof:
     def do_algebra(self, name: str, args: list[Point]) -> list[Dependency]:
         """Derive (but not add) new algebraic predicates."""
         new_deps, to_cache = self.statements_adder.add_algebra(name, args)
-        self.cache_deps(to_cache)
         self.dependency_graph.add_algebra_edges(new_deps, args[:-1])
+        self.cache_deps(to_cache)
         return new_deps
 
     def cache_deps(self, deps_to_cache: list[ToCache]):
@@ -492,7 +495,10 @@ class Proof:
                         )
                     )
 
-                    adds = self.add_piece(name=b.name, args=args, deps=deps)
+                    adds, to_cache = self.resolve_dependencies(
+                        name=b.name, args=args, deps=deps
+                    )
+                    self.cache_deps(to_cache)
                     self.dependency_graph.add_construction_edges(adds, args)
                     basics.append((b.name, args, deps))
                     if adds:
