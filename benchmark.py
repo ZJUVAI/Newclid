@@ -46,6 +46,12 @@ def main():
             ],
         )
         problem_output_path = out_folder_path / problem_name
+        problem_output_path.mkdir(exist_ok=True)
+
+        proof.symbols_graph.draw_figure(
+            problem_output_path / f"{problem.url}_construction_figure.png",
+        )
+
         cProfile.runctx(
             "run_ddar(proof, problem, problem_output_path)",
             globals=globals(),
