@@ -15,7 +15,7 @@ a = free a; b = free b; c = free c; e = midpoint e a b; f = midpoint f a c ? par
 r07
 a = free a; b = free b; c = free c; d = on_pline d c a b; o = on_line o a c, on_line o b d ? eqratio3 a b c d o o
 r08
-
+a = free a; b = free b; c = free c; d = on_tline d c a b; e = free e; f = free f; g = free g; h = on_tline h g e f ? eqangle a b e f c d g h
 r09
 
 r10
@@ -60,10 +60,10 @@ r29
 a = free a; b = free b; c = free c; d = free d; m = midpoint m a b; n = midpoint n c d ? eqratio m a a b n c c d
 r30
 
-r13
+r31
 
 r32
-
+a b c = triangle a b c; p = free p; q = eqdistance q p a b; r = eqdistance r p a c, eqdistance r q c b ? contri* a b c p q r
 r33
 
 r34
