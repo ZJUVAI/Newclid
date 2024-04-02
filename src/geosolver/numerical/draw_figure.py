@@ -66,6 +66,7 @@ def draw_figure(
         fig.savefig(save_to)
 
     plt.show(block=block)
+    plt.close(fig)
 
 
 def _draw(
