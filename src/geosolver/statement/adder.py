@@ -1248,7 +1248,7 @@ class StatementAdder:
 
     def _add_s_angle(
         self, points: list[Point], deps: EmptyDependency
-    ) -> list[Dependency]:
+    ) -> Tuple[list[Dependency], list[ToCache]]:
         """Add that an angle abx is equal to constant y."""
         a, b, x, y = points
 
@@ -1263,10 +1263,11 @@ class StatementAdder:
 
         self.symbols_graph.get_node_val(ab, deps=None)
         self.symbols_graph.get_node_val(bx, deps=None)
-        add = []
+
+        add, to_cache = [], []
 
         if ab.val == bx.val:
-            return add
+            return add, to_cache
 
         deps.why += why1 + why2
 
@@ -1298,7 +1299,6 @@ class StatementAdder:
         a, b = dab._obj.points
         c, x = dbx._obj.points
 
-        to_cache = []
         if not is_equal(xba, nd):
             deps1 = deps.populate(ConceptName.CONSTANT_ANGLE.value, [c, x, a, b, nd])
             deps1.algebra = dbx, dab, y % 180
@@ -1314,7 +1314,7 @@ class StatementAdder:
             self.make_equal(abx, dn, deps=deps2)
             to_cache.append((ConceptName.S_ANGLE.value, [a, b, c, x, dn], deps2))
             add += [deps2]
-        return add
+        return add, to_cache
 
     def _add_eqrat_const(
         self, args: list[Point], deps: EmptyDependency
