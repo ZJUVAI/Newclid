@@ -33,10 +33,20 @@ a b c = triangle a b c; p q = segment p q; s = on_aline s p q c a b; t = on_alin
 b23_may_need_BUILT_IN_FNS
 a x = segment a x; m = midpoint m a x; p q r = triangle12 p q r; n = midpoint n m a; u = midpoint u p q ? eqratio a x a n p r p u
 testing_problem
-a b c = triangle a b c; p q = segment p q; s = on_aline s p q c a b; t = on_aline t q p c b a; r = on_line r p s, on_line r q t ? simtri a b c p q r
+b c = segment b c; a = iso_triangle_vertex a b c ? eqangle a b b c b c a c
 ratio_chase_incorrect_on_step_one
 a b e = triangle12 a b e; c = midpoint c a e ? cong a c a b
 forcing_ratio
 a b c = triangle12 a b c; m = midpoint m a c ? cong a m a b
 check_r00
 c d = segment c d; b = on_tline b c c d; f = on_tline f d c d ? para b c f d
+angles_in_triangle
+a b = segment a b; x = s_angle a b x 63; y = s_angle b a y 153 ? perp b x a y
+
+
+R_not_always_good
+a b c = triangle a b c; o = free o; m = on_circle m o b, on_line m a b; n = on_circle n o b, on_line n a c; r = angle_bisector r b a c, angle_bisector r m o n ? perp n m o r
+R_two_paths_problem
+a b c = triangle a b c; p q = segment p q; s = on_aline s p q c a b; t = on_aline t q p c b a ? eqangle c a c b s p t q
+R_two_paths_problem_aux
+a b c = triangle a b c; p q = segment p q; s = on_aline s p q c a b; t = on_aline t q p c b a; r = on_line r p s, on_line r q t ? eqangle c a c b s p t q
