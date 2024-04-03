@@ -9,7 +9,7 @@ a b c = triangle a b c; h = orthocenter a b c; h1 = foot a b c; h2 = foot b c a;
 pappus
 a b = segment a b; p q = segment p q; c = on_line c a b; r = on_line r p q; x = on_line x a q, on_line x p b; y = on_line y a r, on_line y p c; z = on_line z b r, on_line z c q ? coll x y z
 orthocenter_consequence
-a b c = triangle; h = on_tline b a c, on_tline c a b; f = on_tline f c c b ? para a h f c
+a b c = triangle a b c; h = on_tline b a c, on_tline c a b; f = on_tline f c c b ? para a h f c
 orthocenter_consequence_aux
 a b c = triangle; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d; f = on_tline f c b c ? para a d f c
 imo_2004_p1
