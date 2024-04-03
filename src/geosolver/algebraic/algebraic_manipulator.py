@@ -53,11 +53,11 @@ class AlgebraicManipulator:
         """Derive new algebraic predicates."""
         derives = {}
         ang_derives = self.derive_angle_algebra(level, verbose=verbose)
-        dist_derives = self.derive_distance_algebra(level, verbose=verbose)
+        cong_derives = self.derive_cong_algebra(level, verbose=verbose)
         rat_derives = self.derive_ratio_algebra(level, verbose=verbose)
 
         derives.update(ang_derives)
-        derives.update(dist_derives)
+        derives.update(cong_derives)
         derives.update(rat_derives)
 
         # Separate eqangle and eqratio derivations
@@ -143,7 +143,7 @@ class AlgebraicManipulator:
 
         return added
 
-    def derive_distance_algebra(
+    def derive_cong_algebra(
         self, level: int, verbose: bool = False
     ) -> dict[str, list[tuple[Point, ...]]]:
         """Derive new cong predicates."""
