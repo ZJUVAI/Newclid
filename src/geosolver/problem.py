@@ -412,6 +412,7 @@ class Theorem:
         if len(conclusion) != 1:
             raise ValueError("Cannot have more than one conclusion")
         self.name = "_".join([p.name for p in premise + conclusion])
+        self.rule_name = None
         self.premise = premise
         self.conclusion = conclusion
         self.is_arg_reduce = False
