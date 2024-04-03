@@ -645,7 +645,7 @@ def sketch_3peq(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
 
 def sketch_isosvertex(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     b, c = args
-    side = unif(0.5, 2)
+    side = unif(0.6, 2.5) * b.distance(c)
 
     a, _ = circle_circle_intersection(Circle(b, side), Circle(c, side))
 
