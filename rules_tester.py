@@ -8,6 +8,7 @@ from geosolver.ddar import solve
 from geosolver.proof import Proof
 from geosolver.problem import Definition, Problem, Theorem
 from geosolver.proof_writing import write_solution
+# from geosolver.statement.adder import IntrisicRules
 
 DEFINITIONS = None  # contains definitions of construction actions
 RULES = None  # contains rules of deductions
@@ -31,7 +32,7 @@ def main():
     out_folder_path = Path("./ddar_results/")
     out_folder_path.mkdir(exist_ok=True)
     for problem_name, problem in problems.items():
-        # if problem_name != "orthocenter":
+        # if problem_name != "r24":
         #     continue
         logging.info(f"Trying to prove rule {problem_name} with ddar only.")
         proof, _ = Proof.build_problem(
@@ -46,6 +47,7 @@ def main():
         )
 
         problem_output_path = out_folder_path / problem_name
+        problem_output_path.mkdir(exist_ok=True)
 
         proof.symbols_graph.draw_figure(
             problem_output_path / f"{problem.url}_construction_figure.png",
