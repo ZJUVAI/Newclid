@@ -239,7 +239,9 @@ class DependencyGraph:
         # populates the nodes and edges data structures
         vis_graph: MultiDiGraph = self.nx_graph.copy()
 
-        max_level = max(level for _, level in self.nx_graph.nodes(data="level"))
+        max_level = max(
+            level for _, level in self.nx_graph.nodes(data="level") if level
+        )
         nodes_colors = build_nodes_colors(max_level + 1)
         for node, data in vis_graph.nodes(data=True):
             name: str = data.get("name", "Unknown")
