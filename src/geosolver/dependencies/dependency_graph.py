@@ -238,12 +238,15 @@ class DependencyGraph:
         nt = Network("1080px", directed=True)
         # populates the nodes and edges data structures
         vis_graph: MultiDiGraph = self.nx_graph.copy()
+
+        max_level = max(level for _, level in self.nx_graph.nodes(data="level"))
+        nodes_colors = build_nodes_colors(max_level + 1)
         for node, data in vis_graph.nodes(data=True):
             name: str = data.get("name", "Unknown")
             dep_type: str = data.get("type", "Unknown")
             level: int = data.get("level", -1)
             args: List[str] = data.get("args", [])
-            vis_graph.nodes[node]["group"] = level
+            vis_graph.nodes[node]["color"] = rgba_to_hex(*nodes_colors[level], a=1.0)
             vis_graph.nodes[node]["title"] = (
                 f"{name.capitalize()}"
                 f"\n {dep_type.capitalize()}"
@@ -295,7 +298,7 @@ class DependencyGraph:
         nt.options.physics.solver = "barnesHut"
         nt.options.physics.use_barnes_hut(
             {
-                "gravity": -20000,
+                "gravity": -15000,
                 "central_gravity": 0.3,
                 "spring_length": 100,
                 "spring_strength": 0.05,
@@ -339,3 +342,22 @@ def build_edges_colors() -> List[str]:
     edge_colors = sns.color_palette("colorblind")
     random.shuffle(edge_colors)
     return edge_colors
+
+
+def build_nodes_colors(n_colors: int):
+    """Build a nodes colors palette according to levels.
+
+    Color from this SO post:
+    https://stackoverflow.com/questions/7251872/is-there-a-better-color-scale-than-the-rainbow-colormap
+    """
+    return sns.blend_palette(
+        colors=[
+            (0.847, 0.057, 0.057),
+            (0.527, 0.527, 0),
+            (0, 0.592, 0),
+            (0, 0.559, 0.559),
+            (0.316, 0.316, 0.991),
+            (0.718, 0, 0.718),
+        ],
+        n_colors=n_colors,
+    )
