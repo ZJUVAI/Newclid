@@ -3,7 +3,6 @@ from enum import Enum
 import logging
 
 from pathlib import Path
-import random
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 from networkx import MultiDiGraph, ancestors
 from pyvis.network import Network
@@ -245,13 +244,15 @@ class DependencyGraph:
         vis_graph: MultiDiGraph = self.nx_graph.copy()
 
         max_level = max(
-            level for _, level in self.nx_graph.nodes(data="level") if level
+            lvl for _, lvl in self.nx_graph.nodes(data="level") if lvl is not None
         )
         nodes_colors = build_nodes_colors(max_level + 1)
         for node, data in vis_graph.nodes(data=True):
             name: str = data.get("name", "Unknown")
             dep_type: str = data.get("type", "Unknown")
-            level: int = data.get("level", -1)
+            level: Optional[int] = data.get("level")
+            if level is None:
+                level = -1
             args: List[str] = data.get("args", [])
             vis_graph.nodes[node]["color"] = rgba_to_hex(*nodes_colors[level], a=1.0)
             vis_graph.nodes[node]["title"] = (
@@ -267,7 +268,6 @@ class DependencyGraph:
                 vis_graph.nodes[node]["size"] = 40
 
         edges_colors = build_edges_colors()
-        edges_keys_indexes = []
         for u, v, k, data in vis_graph.edges(data=True, keys=True):
             name = k.split(".")[0]
             theorem = rules.get(name)
@@ -280,15 +280,19 @@ class DependencyGraph:
             else:
                 edge_name = "NOT FOUND"
             vis_graph.edges[u, v, k]["title"] = edge_name
+            vis_graph.edges[u, v, k]["arrows"] = {
+                "middle": {"enabled": True},
+                "to": {"enabled": True},
+            }
             vis_graph.edges[u, v, k]["label"] = k
             vis_graph.edges[u, v, k]["font"] = {"size": 8}
 
-            if k in edges_keys_indexes:
-                edge_index = edges_keys_indexes.index(k)
-            else:
-                edge_index = len(edges_keys_indexes)
-                edges_keys_indexes.append(k)
-
+            node_edges_keys = sorted(
+                key
+                for _, _, key in list(vis_graph.in_edges(v, keys=True))
+                + list(vis_graph.out_edges(u, keys=True))
+            )
+            edge_index = node_edges_keys.index(k)
             edge_color_index = edge_index % len(edges_colors)
             base_edge_color = edges_colors[edge_color_index]
 
@@ -374,9 +378,7 @@ def rgba_to_hex(r, g, b, a=0.5):
 
 
 def build_edges_colors() -> List[str]:
-    edge_colors = sns.color_palette("colorblind")
-    random.shuffle(edge_colors)
-    return edge_colors
+    return sns.color_palette("colorblind", n_colors=20)
 
 
 def build_nodes_colors(n_colors: int):
