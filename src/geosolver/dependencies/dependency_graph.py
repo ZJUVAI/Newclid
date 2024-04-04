@@ -4,7 +4,7 @@ import logging
 
 from pathlib import Path
 import random
-from typing import TYPE_CHECKING, Dict, List, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 from networkx import MultiDiGraph, ancestors
 from pyvis.network import Network
 import seaborn as sns
@@ -41,14 +41,19 @@ class DependencyGraph:
 
     @property
     def proof_subgraph(self) -> DependencyGraph:
-        if self.goal is None:
-            raise ValueError("Cannot extract proof subgraph without goal.")
         proof_graph = DependencyGraph()
-        proof_graph.nx_graph = self.nx_graph.copy()
-        proof_graph.nx_graph = proof_graph.nx_graph.subgraph(
-            ancestors(proof_graph.nx_graph, self.goal) | {self.goal}
+        proof_graph.nx_graph = extract_sub_graph(
+            self.nx_graph, self.premises, self.goal
         )
         return proof_graph
+
+    @property
+    def premises(self) -> List[str]:
+        return [
+            node
+            for node, node_type in self.nx_graph.nodes(data="type")
+            if DependencyType(node_type) is DependencyType.PREMISE
+        ]
 
     def add_dependency(
         self,
@@ -310,6 +315,34 @@ class DependencyGraph:
         )
         nt.show_buttons(filter_=["physics"])
         nt.show(str(html_path), notebook=False)
+
+
+def extract_sub_graph(
+    graph: MultiDiGraph, roots: List[str], goal: Optional[str]
+) -> MultiDiGraph:
+    if goal is None:
+        raise ValueError("Cannot extract proof subgraph without goal.")
+
+    subgraph: MultiDiGraph = graph.copy()
+    subgraph.remove_nodes_from(
+        [n for n in subgraph if n not in ancestors(subgraph, goal) | {goal}]
+    )
+
+    subgraph.remove_edges_from([e for e in subgraph.out_edges(goal)])
+    for root in roots:
+        subgraph.remove_edges_from([e for e in subgraph.in_edges(root)])
+
+    down_edges = []
+    for u, v, k in subgraph.edges(keys=True):
+        in_level = subgraph.nodes[u].get("level")
+        out_level = subgraph.nodes[v].get("level")
+        if in_level is not None and out_level is not None and in_level > out_level:
+            down_edges.append((u, v, k))
+
+    subgraph.remove_edges_from(down_edges)
+
+    subgraph.remove_nodes_from([n for n in subgraph if subgraph.degree(n) == 0])
+    return subgraph
 
 
 def dependency_node_name(dependency: Dependency):
