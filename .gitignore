@@ -33,7 +33,7 @@ venv/
 ag_ckpt_vocab/
 
 # IDEs
-
+.idea/
 .vscode/
 
 # Coverage data
