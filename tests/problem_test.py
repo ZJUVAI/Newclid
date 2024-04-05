@@ -52,3 +52,11 @@ class TestProblem:
             setup_str
             == "{S} a : ; b : ; c : ; d : T a b c d 00 T a c b d 01 ? T a d b c"
         )
+
+    def test_goal_free_txt(self):
+        # Reading goal-free problems from txt should be invertible
+        txt = "a b c = triangle a b c; h = on_tline h b a c, on_tline h c a b"
+
+        p = pr.Problem.from_txt(txt, translate=False)
+
+        assert p.txt() == txt
