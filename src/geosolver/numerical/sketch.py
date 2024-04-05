@@ -650,3 +650,24 @@ def sketch_isosvertex(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     a, _ = circle_circle_intersection(Circle(b, side), Circle(c, side))
 
     return a
+
+
+def sketch_aline0(args: tuple[gm.Point, ...]) -> HalfLine:
+    """Sketch the construction aline."""
+    A, B, C, D, E, F, G = args
+    ab = A - B
+    cd = C - D
+    ef = E - F
+
+    dab = A.distance(B)
+    ang_ab = np.arctan2(ab.y / dab, ab.x / dab)
+
+    dcd = C.distance(D)
+    ang_cd = np.arctan2(cd.y / dcd, cd.x / dcd)
+
+    d_ef = E.distance(F)
+    ang_ef = np.arctan2(ef.y / d_ef, ef.x / d_ef)
+
+    ang_gx = ang_ef + ang_cd - ang_ab
+    X = G + Point(np.cos(ang_gx), np.sin(ang_gx))
+    return HalfLine(G, X)
