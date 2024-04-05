@@ -419,7 +419,19 @@ a : ; b : ; c : cong a b a c
 isos
 
 iso_triangle_vertex x b c
-x : b c
+x : x b c
 b c = diff b c
 x : cong x b x c
 isosvertex b c
+
+iso_triangle_vertex_angle x b c
+x : x b c
+b c = diff b c
+x : eqangle x b b c b c x c
+isosvertex b c
+
+on_aline0 x a b c d e f g
+x : x a b c d e f g
+a b c d e f g = ncoll a b c
+x : eqangle a b c d e f g x
+aline0 a b c d e f g
