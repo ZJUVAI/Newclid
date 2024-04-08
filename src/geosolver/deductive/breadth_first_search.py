@@ -24,9 +24,7 @@ def dd_bfs_one_level(
     proof: "Proof",
     theorems: list["Theorem"],
     level: int,
-    controller: "Problem",
-    verbose: bool = False,
-    nm_check: bool = False,
+    problem: "Problem",
     timeout: int = 600,
 ) -> tuple[
     list[Dependency],
@@ -37,7 +35,7 @@ def dd_bfs_one_level(
     """Forward deduce one breadth-first level."""
 
     # Step 1: match all theorems:
-    theorem2mappings = match_all_theorems(proof, theorems, controller.goal)
+    theorem2mappings = match_all_theorems(proof, theorems, problem.goal)
 
     # Step 2: traceback for each deduce:
     theorem2deps: dict["Theorem", list[Dependency]] = {}
@@ -114,10 +112,10 @@ def dd_bfs_one_level(
     branching = len(added)
 
     # Check if goal is found
-    if controller.goal:
+    if problem.goal:
         args = []
 
-        for a in controller.goal.args:
+        for a in problem.goal.args:
             if a in proof.symbols_graph._name2node:
                 a = proof.symbols_graph._name2node[a]
             elif "/" in a:
@@ -126,13 +124,13 @@ def dd_bfs_one_level(
                 a = int(a)
             args.append(a)
 
-        if proof.check(controller.goal.name, args):
+        if proof.check(problem.goal.name, args):
             return added, {}, {}, branching
 
     # Run AR, but do NOT apply to the proof state (yet).
     for dep in added:
         proof.add_algebra(dep)
-    derives, eq4s = proof.alegbraic_manipulator.derive_algebra(level, verbose=False)
+    derives, eq4s = proof.alegbraic_manipulator.derive_algebra(level)
 
     branching += sum([len(x) for x in derives.values()])
     branching += sum([len(x) for x in eq4s.values()])
