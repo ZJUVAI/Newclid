@@ -184,12 +184,6 @@ a b c d e = ncoll c d e
 x : eqangle a x a b d c d e
 aline e d c b a
 
-on_aline2 x a b c d e
-x : x a b c d e
-a b c d e = ncoll c d e
-x : eqangle x a x b d c d e
-aline2 e d c b a
-
 on_bline x a b
 x : x a b
 a b = diff a b
