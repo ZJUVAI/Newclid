@@ -32,8 +32,6 @@ if TYPE_CHECKING:
     from geosolver.proof import Proof
     from geosolver.problem import Theorem, Clause
 
-MAX_BRANCH = 50_000
-
 
 def match_eqratio_eqratio_eqratio(
     proof: "Proof",
@@ -914,6 +912,7 @@ def match_one_theorem(
     proof: "Proof",
     cache: Callable[[str], list[tuple[Point, ...]]],
     theorem: "Theorem",
+    max_mappings: int = 50_000,
 ) -> Generator[dict[str, Point], None, None]:
     """Match all instances of a single theorem (rule)."""
     if cache is None:
@@ -927,7 +926,7 @@ def match_one_theorem(
     mappings = []
     for mp in mps:
         mappings.append(mp)
-        if len(mappings) > MAX_BRANCH:  # cap branching at this number.
+        if len(mappings) > max_mappings:  # cap branching at this number.
             break
 
     return mappings
