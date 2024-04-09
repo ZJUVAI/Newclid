@@ -2,30 +2,134 @@
 
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Union
+from enum import Enum, auto
+import logging
+from typing import TYPE_CHECKING, Optional, Union
+
+from abc import abstractmethod
 
 import time
 
 
-from geosolver.concepts import ConceptName
 from geosolver.dependencies.dependency import Dependency
-from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.geometry import Angle, Point, Ratio
-from geosolver.numerical.check import same_clock
 from geosolver.deductive.match_theorems import match_all_theorems
 
+
 if TYPE_CHECKING:
+    from geosolver.statement.adder import ToCache
     from geosolver.problem import Problem, Theorem
     from geosolver.proof import Proof
     from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 
 
-def dd_bfs_one_level(
+class DeductiveAgent:
+    def __init__(self, problem: "Problem") -> None:
+        self.problem = problem
+        self.level = None
+
+    @abstractmethod
+    def choose_one_theorem(
+        self, proof: "Proof", theorems: list["Theorem"]
+    ) -> tuple[list[Dependency], list["ToCache"]]:
+        """Deduce new statements in the given proof state using ONE theorem on ONE mapping."""
+
+
+Mapping = dict[str, Point]
+
+
+class BFSDeductor(DeductiveAgent):
+    class State(Enum):
+        EXAUSTED = auto()
+        DEDUCTING_ON_LEVEL = auto()
+        AR_DEDUCTION = auto()
+
+    def __init__(self, problem: "Problem") -> None:
+        super().__init__(problem)
+        self.theorem_mappings: list[tuple["Theorem", list[Mapping]]] = {}
+        self.actions_taken: set[tuple["Theorem", Mapping]] = set()
+        self.current_mappings: tuple[Optional["Theorem"], list[Mapping]] = (None, [])
+        self.level = 0
+        self._level_start_time = time.time()
+        self._state = self.State.EXAUSTED
+
+    def choose_one_theorem(
+        self, proof: "Proof", theorems: list["Theorem"]
+    ) -> tuple[list[Dependency], list["ToCache"]]:
+        """Deduce new statements by applying
+        breath-first search over all theorems one by one."""
+        add = []
+        while not add:
+            theorem, mapping = self._next_theorem_mapping(proof, theorems)
+            if theorem is None:
+                # Exausted all theorems
+                return [], []
+
+            add, to_cache, success = proof.apply_theorem(theorem, mapping, self.level)
+            if success:
+                self.actions_taken.add(_action_str(theorem, mapping))
+
+            conclusion_name, args = theorem.conclusion_name_args(mapping)
+            cached_conclusion = proof.dependency_cache.get(conclusion_name, args)
+            if cached_conclusion is not None:
+                # Skip theorem if already have the conclusion
+                add, to_cache = [], []
+                continue
+
+        return add, to_cache
+
+    def _next_theorem_mapping(
+        self, proof: "Proof", theorems: list["Theorem"]
+    ) -> tuple["Theorem", Mapping]:
+        if not self.theorem_mappings:
+            any_new_mapping = self._match_new_level(proof, theorems)
+            if not any_new_mapping:
+                return None, None
+
+        theorem, mappings = self.current_mappings
+        if not mappings:
+            self.current_mappings = self.theorem_mappings.pop(0)
+
+        theorem, mappings = self.current_mappings
+        mapping = mappings.pop(0)
+        return theorem, mapping
+
+    def _match_new_level(self, proof: "Proof", theorems: list["Theorem"]) -> bool:
+        self._update_level()
+        theorem2mappings = match_all_theorems(proof, theorems, self.problem.goal)
+        self.theorem_mappings = []
+
+        any_new = False
+        for theorem, mappings in theorem2mappings.items():
+            new_mappings = [
+                mapping
+                for mapping in mappings
+                if _action_str(theorem, mapping) not in self.actions_taken
+            ]
+            if new_mappings:
+                any_new = True
+                self.theorem_mappings.append((theorem, new_mappings))
+
+        return any_new
+
+    def _update_level(self):
+        if self.level == 0:
+            self.level = 1
+            self._level_start_time = time.time()
+            return
+
+        logging.info(
+            f"Level {self.level} exausted"
+            f" | Time={ time.time() - self._level_start_time:.1f}s"
+        )
+        self._level_start_time = time.time()
+        self.level += 1
+
+
+def do_deduction(
+    deductive_agent: DeductiveAgent,
     proof: "Proof",
     theorems: list["Theorem"],
-    level: int,
-    problem: "Problem",
-    timeout: int = 600,
 ) -> tuple[
     list[Dependency],
     dict[str, list[tuple[Point, ...]]],
@@ -34,103 +138,15 @@ def dd_bfs_one_level(
 ]:
     """Forward deduce one breadth-first level."""
 
-    # Step 1: match all theorems:
-    theorem2mappings = match_all_theorems(proof, theorems, problem.goal)
-
-    # Step 2: traceback for each deduce:
-    theorem2deps: dict["Theorem", list[Dependency]] = {}
-    t0 = time.time()
-    for theorem, mappings in theorem2mappings.items():
-        if time.time() - t0 > timeout:
-            break
-        mp_deps = []
-        for mp in mappings:
-            deps = EmptyDependency(level=level, rule_name=theorem.rule_name)
-            fail = False  # finding why deps might fail.
-
-            for p in theorem.premise:
-                p_args = [mp[a] for a in p.args]
-                # Trivial deps.
-                if p.name in [ConceptName.PARALLEL.value, ConceptName.CONGRUENT.value]:
-                    a, b, c, d = p_args
-                    if {a, b} == {c, d}:
-                        continue
-
-                if theorem.name in [
-                    "cong_cong_eqangle6_ncoll_contri*",
-                    "eqratio6_eqangle6_ncoll_simtri*",
-                ]:
-                    if p.name in [
-                        ConceptName.EQANGLE.value,
-                        ConceptName.EQANGLE6.value,
-                    ]:  # SAS or RAR
-                        b, a, b, c, y, x, y, z = p_args
-                        if not same_clock(a.num, b.num, c.num, x.num, y.num, z.num):
-                            p_args = b, a, b, c, y, z, y, x
-
-                dep = Dependency(p.name, p_args, rule_name="", level=level)
-                try:
-                    dep = dep.why_me_or_cache(
-                        proof.symbols_graph,
-                        proof.statements_checker,
-                        proof.dependency_cache,
-                        level,
-                    )
-                except Exception:
-                    fail = True
-                    break
-
-                if dep.why is None:
-                    fail = True
-                    break
-                proof.dependency_cache.add_dependency(p.name, p_args, dep)
-                deps.why.append(dep)
-
-            if fail:
-                continue
-
-            mp_deps.append((mp, deps))
-        theorem2deps[theorem] = mp_deps
-
-    # Step 3: add conclusions to graph.
-    # Note that we do NOT mix step 2 and 3, strictly going for BFS.
-    added = []
-    for theorem, mp_deps in theorem2deps.items():
-        for mp, deps in mp_deps:
-            if time.time() - t0 > timeout:
-                break
-            conclusion_name, args = theorem.conclusion_name_args(mp)
-            cached_conclusion = proof.dependency_cache.get(conclusion_name, args)
-            add, to_cache = proof.resolve_dependencies(conclusion_name, args, deps=deps)
-            proof.dependency_graph.add_theorem_edges(to_cache, theorem, args)
-            if cached_conclusion is not None:
-                continue
-
-            proof.cache_deps(to_cache)
-            added += add
+    added, to_cache = deductive_agent.choose_one_theorem(proof, theorems)
+    proof.cache_deps(to_cache)
 
     branching = len(added)
 
-    # Check if goal is found
-    if problem.goal:
-        args = []
-
-        for a in problem.goal.args:
-            if a in proof.symbols_graph._name2node:
-                a = proof.symbols_graph._name2node[a]
-            elif "/" in a:
-                a = create_consts_str(proof.alegbraic_manipulator, a)
-            elif a.isdigit():
-                a = int(a)
-            args.append(a)
-
-        if proof.check(problem.goal.name, args):
-            return added, {}, {}, branching
-
     # Run AR, but do NOT apply to the proof state (yet).
     for dep in added:
-        proof.add_algebra(dep)
-    derives, eq4s = proof.alegbraic_manipulator.derive_algebra(level)
+        proof.alegbraic_manipulator.add_algebra(dep)
+    derives, eq4s = proof.alegbraic_manipulator.derive_algebra(deductive_agent.level)
 
     branching += sum([len(x) for x in derives.values()])
     branching += sum([len(x) for x in eq4s.values()])
@@ -150,3 +166,8 @@ def create_consts_str(
         n, d = int(n), int(d)
         p0, _ = alegbraic_manipulator.get_or_create_const_rat(n, d)
     return p0
+
+
+def _action_str(theorem: "Theorem", mapping: Mapping) -> str:
+    arg_names = [point.name for arg, point in mapping.items() if isinstance(arg, str)]
+    return ".".join([theorem.name] + arg_names)

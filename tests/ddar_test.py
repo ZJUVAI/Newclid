@@ -17,7 +17,8 @@
 import pytest
 import pytest_check as check
 
-from geosolver.ddar import solve
+from geosolver.ddar import ddar_solve
+from geosolver.deductive.breadth_first_search import BFSDeductor
 from geosolver.proof import Proof
 from geosolver.problem import Definition, Problem, Theorem
 
@@ -29,31 +30,49 @@ class TestDDAR:
         self.rules = Theorem.from_txt_file("rules.txt", to_dict=True)
 
     def test_orthocenter_should_fail(self):
-        txt = "a b c = triangle a b c; d = on_tline d b a c, on_tline d c a b ? perp a d b c"
-        problem = Problem.from_txt(txt)
+        problem = Problem.from_txt(
+            "a b c = triangle a b c; "
+            "d = on_tline d b a c, "
+            "on_tline d c a b "
+            "? perp a d b c"
+        )
+        deductive_agent = BFSDeductor(problem)
+
         proof, _ = Proof.build_problem(problem, self.defs)
 
-        solve(proof, self.rules, problem, max_level=1000)
+        ddar_solve(deductive_agent, proof, self.rules, problem, max_steps=1000)
         goal_args = proof.symbols_graph.names2nodes(problem.goal.args)
         check.is_false(proof.check(problem.goal.name, goal_args))
 
     def test_orthocenter_aux_should_succeed(self):
-        txt = "a b c = triangle a b c; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d ? perp a d b c"
-        problem = Problem.from_txt(txt)
+        problem = Problem.from_txt(
+            "a b c = triangle a b c; "
+            "d = on_tline d b a c, "
+            "on_tline d c a b; "
+            "e = on_line e a c, "
+            "on_line e b d "
+            "? perp a d b c"
+        )
+        deductive_agent = BFSDeductor(problem)
+
         proof, _ = Proof.build_problem(problem, self.defs)
 
-        solve(proof, self.rules, problem, max_level=1000)
+        ddar_solve(deductive_agent, proof, self.rules, problem, max_steps=1000)
         goal_args = proof.symbols_graph.names2nodes(problem.goal.args)
         check.is_true(proof.check(problem.goal.name, goal_args))
 
     def test_incenter_excenter_should_succeed(self):
         # Note that this same problem should fail in dd_test.py
         problem = Problem.from_txt(
-            "a b c = triangle a b c; d = incenter d a b c; e = excenter e a b c ?"
-            " perp d c c e"
+            "a b c = triangle a b c; "
+            "d = incenter d a b c; "
+            "e = excenter e a b c "
+            "? perp d c c e"
         )
+        deductive_agent = BFSDeductor(problem)
+
         proof, _ = Proof.build_problem(problem, self.defs)
 
-        solve(proof, self.rules, problem, max_level=1000)
+        ddar_solve(deductive_agent, proof, self.rules, problem, max_steps=1000)
         goal_args = proof.symbols_graph.names2nodes(problem.goal.args)
         check.is_true(proof.check(problem.goal.name, goal_args))

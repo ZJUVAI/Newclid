@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Optional
 
 
-from geosolver.ddar import solve
+from geosolver.ddar import ddar_solve
+from geosolver.deductive.breadth_first_search import BFSDeductor
 from geosolver.proof import Proof
 from geosolver.problem import Definition, Problem, Theorem
 from geosolver.proof_writing import write_solution
@@ -97,7 +98,8 @@ def run_ddar(proof: Proof, problem: Problem, out_folder: Optional[Path]) -> bool
     Returns:
       Boolean, whether DD+AR finishes successfully.
     """
-    solve(proof, RULES, problem, max_level=1000)
+    deductive_agent = BFSDeductor(problem)
+    ddar_solve(deductive_agent, proof, RULES, problem)
     goal_args = proof.symbols_graph.names2nodes(problem.goal.args)
     if not proof.check(problem.goal.name, goal_args):
         logging.info(f"DD+AR failed to solve the problem {problem.url}.")
