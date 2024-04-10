@@ -20,9 +20,9 @@ def main():
     global RULES
 
     # definitions of terms used in our domain-specific language.
-    DEFINITIONS = Definition.from_txt_file("defs.txt", to_dict=True)
+    DEFINITIONS = Definition.to_dict(Definition.from_txt_file("defs.txt"))
     # load inference rules used in DD.
-    RULES = Theorem.from_txt_file("rules.txt", to_dict=True)
+    RULES = Theorem.to_dict(Theorem.from_txt_file("rules.txt"))
 
     logging.basicConfig(level=logging.INFO)
 

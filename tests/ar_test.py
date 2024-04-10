@@ -20,14 +20,13 @@ import pytest_check as check
 import geosolver.algebraic.geometric_tables as geometric_tables
 from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.proof import Proof
-from geosolver.problem import Definition, Problem, Theorem
+from geosolver.problem import Definition, Problem
 
 
 class TestAR:
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.defs = Definition.from_txt_file("defs.txt", to_dict=True)
-        self.rules = Theorem.from_txt_file("rules.txt", to_dict=True)
+        self.defs = Definition.to_dict(Definition.from_txt_file("defs.txt"))
 
     def test_update_groups(self):
         """Test for update_groups."""

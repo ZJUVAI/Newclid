@@ -14,8 +14,8 @@ MAX_STEPS = 10000
 class TestDD:
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.defs = Definition.from_txt_file("defs.txt", to_dict=True)
-        self.rules = Theorem.from_txt_file("rules.txt", to_dict=True)
+        self.defs = Definition.to_dict(Definition.from_txt_file("defs.txt"))
+        self.rules = Theorem.from_txt_file("rules.txt")
 
     @pytest.mark.slow
     def test_imo_2022_p4_should_succeed(self):

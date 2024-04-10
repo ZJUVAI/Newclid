@@ -31,8 +31,8 @@ from geosolver.trace_back import get_logs
 class TestTraceback:
     @pytest.fixture(autouse=True)
     def setUpClass(self):
-        self.defs = Definition.from_txt_file("defs.txt", to_dict=True)
-        self.rules = Theorem.from_txt_file("rules.txt", to_dict=True)
+        self.defs = Definition.to_dict(Definition.from_txt_file("defs.txt"))
+        self.rules = Theorem.from_txt_file("rules.txt")
 
     def test_orthocenter_dependency_difference(self):
         problem = Problem.from_txt(

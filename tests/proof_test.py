@@ -40,8 +40,8 @@ MAX_LEVEL = 10
 class TestProof:
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.defs = Definition.from_txt_file("defs.txt", to_dict=True)
-        self.rules = Theorem.from_txt_file("rules.txt", to_dict=True)
+        self.defs = Definition.to_dict(Definition.from_txt_file("defs.txt"))
+        self.rules = Theorem.from_txt_file("rules.txt")
 
         # load a complex setup:
         txt = "a b c = triangle a b c; h = orthocenter a b c; h1 = foot a b c; h2 = foot b c a; h3 = foot c a b; g1 g2 g3 g = centroid g1 g2 g3 g a b c; o = circle a b c ? coll h g o"
