@@ -28,11 +28,11 @@ d : a b c d
 a : ; b : ; c : ; d : cong d a b c
 eq_quadrangle
 
-eq_trapezoid a b c d
+iso_trapezoid a b c d
 d : a b c
  =
 a : ; b : ; c : ; d : para d c a b, cong d a b c
-eq_trapezoid
+iso_trapezoid
 
 eq_triangle x b c
 x : b c
@@ -183,12 +183,6 @@ x : x a b c d e
 a b c d e = ncoll c d e
 x : eqangle a x a b d c d e
 aline e d c b a
-
-on_aline2 x a b c d e
-x : x a b c d e
-a b c d e = ncoll c d e
-x : eqangle x a x b d c d e
-aline2 e d c b a
 
 on_bline x a b
 x : x a b

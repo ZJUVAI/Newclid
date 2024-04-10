@@ -28,11 +28,11 @@ d : a b c d
 a : ; b : ; c : ; d : cong d a b c
 eq_quadrangle
 
-eq_trapezoid a b c d
+iso_trapezoid a b c d
 d : a b c
  =
 a : ; b : ; c : ; d : para d c a b, cong d a b c
-eq_trapezoid
+iso_trapezoid
 
 eq_triangle x b c
 x : b c
@@ -429,3 +429,9 @@ x : x a b c d e f g
 a b c d e f g = ncoll a b c
 x : eqangle a b c d e f g x
 aline0 a b c d e f g
+
+eqratio_prescription x a b c d e f g
+x : x a b c d e f g
+a b c d e f g = diff a b, diff c d, diff e f
+x : eqratio a b c d e f g x
+eqratioprescription a b c d e f g
