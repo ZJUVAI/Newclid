@@ -650,7 +650,6 @@ def sketch_isosvertex(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     side = unif(0.6, 2.5) * b.distance(c)
 
     a, _ = circle_circle_intersection(Circle(b, side), Circle(c, side))
-
     return a
 
 
@@ -677,3 +676,10 @@ def sketch_aline0(args: tuple[gm.Point, ...]) -> HalfLine:
 
 def sketch_eqratioprescription(args: tuple[gm.Point, ...]) -> Circle:
     A, B, C, D, E, F, G = args
+
+    dab = A.distance(B)
+    dcd = C.distance(D)
+    d_ef = E.distance(F)
+
+    dgx = d_ef * dcd / dab
+    return Circle(center=G, radius=dgx)
