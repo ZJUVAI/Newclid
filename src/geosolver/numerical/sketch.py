@@ -493,6 +493,7 @@ def sketch_triangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     ac = unif(0.5, 2.0)
     ang = unif(0.2, 0.8) * np.pi
     c = head_from(a, ang, ac)
+    a, b, c = random_rfss(a, b, c)
     return a, b, c
 
 
