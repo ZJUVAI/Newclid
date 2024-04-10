@@ -481,7 +481,7 @@ def sketch_trapezoid(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
 
     base = unif(0.5, 2.0)
     height = unif(0.5, 2.0)
-    a = Point(unif(0.2, 0.5), height)
+    a = Point(unif(-0.5, 1.5), height)
     b = Point(a.x + base, height)
     a, b, c, d = random_rfss(a, b, c, d)
     return a, b, c, d
@@ -671,3 +671,7 @@ def sketch_aline0(args: tuple[gm.Point, ...]) -> HalfLine:
     ang_gx = ang_ef + ang_cd - ang_ab
     X = G + Point(np.cos(ang_gx), np.sin(ang_gx))
     return HalfLine(G, X)
+
+
+def sketch_eqratioprescription(args: tuple[gm.Point, ...]) -> Circle:
+    A, B, C, D, E, F, G = args
