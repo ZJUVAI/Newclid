@@ -2,6 +2,8 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Optional
 
+from geosolver.deductive.deductive_agent import StopAction
+
 
 if TYPE_CHECKING:
     from geosolver.deductive.deductive_agent import DeductiveAgent
@@ -18,10 +20,10 @@ def do_deduction_step(
 ) -> tuple[list[Dependency], Derivations, Derivations, int]:
     """Forward deduce the first conclusive step."""
     added = []
-    action = True
-    while not added and action is not None:
+    action = ()
+    while not added and not isinstance(action, StopAction):
         action = deductive_agent.act(proof, theorems)
-        added, to_cache, success = proof.step(action, deductive_agent.level)
+        added, to_cache, success = proof.step(action)
         deductive_agent.remember_effects(action, success, added, to_cache)
 
     derives, eq4s = {}, {}

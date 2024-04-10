@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, NamedTuple, Union
 from abc import abstractmethod
 
 if TYPE_CHECKING:
@@ -10,7 +10,19 @@ if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
 
 Mapping = dict[str, "Point"]
-Action = Optional[tuple["Theorem", Mapping]]
+
+
+class StopAction(NamedTuple):
+    pass
+
+
+class ApplyTheoremAction(NamedTuple):
+    theorem: "Theorem"
+    mapping: Mapping
+    level: int
+
+
+Action = Union[StopAction, ApplyTheoremAction]
 
 
 class DeductiveAgent:

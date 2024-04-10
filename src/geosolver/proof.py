@@ -25,6 +25,7 @@ import logging
 
 from geosolver.concepts import ConceptName
 from geosolver.deductive.breadth_first_search import Action, Mapping
+from geosolver.deductive.deductive_agent import ApplyTheoremAction, StopAction
 from geosolver.statement.adder import StatementAdder, ToCache
 from geosolver.statement.checker import StatementChecker
 from geosolver.symbols_graph import SymbolsGraph
@@ -206,28 +207,29 @@ class Proof:
 
         return proof, added
 
-    def step(
-        self, action: Action, level: int
-    ) -> Tuple[list[Dependency], list[ToCache], bool]:
-        if action is None:
+    def step(self, action: Action) -> Tuple[list[Dependency], list[ToCache], bool]:
+        if isinstance(action, StopAction):
             return [], [], True
-
+        elif isinstance(action, ApplyTheoremAction):
+            added, to_cache, success = self._apply_theorem(
+                action.theorem, action.mapping, action.level
+            )
         else:
-            theorem, mapping = action
-            added, to_cache, success = self.apply_theorem(theorem, mapping, level)
+            raise NotImplementedError()
 
         self.cache_deps(to_cache)
-
         return added, to_cache, success
 
-    def apply_theorem(
+    def _apply_theorem(
         self, theorem: "Theorem", mapping: Mapping, dependency_level: int
     ) -> Tuple[list[Dependency], list[ToCache], bool]:
         deps = self._resolve_mapping_dependency(theorem, mapping, dependency_level)
         if deps is None:
             return [], [], False
         conclusion_name, args = theorem.conclusion_name_args(mapping)
-        add, to_cache = self.resolve_dependencies(conclusion_name, args, deps=deps)
+        add, to_cache = self.resolve_statement_dependencies(
+            conclusion_name, args, deps=deps
+        )
         self.dependency_graph.add_theorem_edges(to_cache, theorem, args)
         return add, to_cache, True
 
@@ -296,7 +298,7 @@ class Proof:
 
         return dep, fail
 
-    def resolve_dependencies(
+    def resolve_statement_dependencies(
         self, name: str, args: list[Point], deps: EmptyDependency
     ) -> Tuple[list[Dependency], list[ToCache]]:
         return self.statements_adder.add_piece(name, args, deps)
@@ -590,7 +592,7 @@ class Proof:
                         )
                     )
 
-                    adds, to_cache = self.resolve_dependencies(
+                    adds, to_cache = self.resolve_statement_dependencies(
                         name=b.name, args=args, deps=deps
                     )
                     self.dependency_graph.add_construction_edges(to_cache, args)

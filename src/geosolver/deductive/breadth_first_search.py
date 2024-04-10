@@ -6,7 +6,13 @@ import logging
 from typing import TYPE_CHECKING, Optional
 import time
 
-from geosolver.deductive.deductive_agent import Action, DeductiveAgent, Mapping
+from geosolver.deductive.deductive_agent import (
+    DeductiveAgent,
+    Action,
+    Mapping,
+    StopAction,
+    ApplyTheoremAction,
+)
 from geosolver.deductive.match_theorems import match_all_theorems
 
 if TYPE_CHECKING:
@@ -32,8 +38,8 @@ class BFSDeductor(DeductiveAgent):
         theorem, mapping = self._next_theorem_mapping(proof, theorems)
         if theorem is None:
             # Exausted all theorems
-            return None
-        return theorem, mapping
+            return StopAction()
+        return ApplyTheoremAction(theorem, mapping, self.level)
 
     def remember_effects(
         self,
@@ -42,11 +48,13 @@ class BFSDeductor(DeductiveAgent):
         added: list[Dependency],
         to_cache: ToCache,
     ):
-        if action is None:
+        if isinstance(action, StopAction):
             return
-        theorem, mapping = action
-        if success:
-            self._actions_taken.add(_action_str(theorem, mapping))
+        elif isinstance(action, ApplyTheoremAction):
+            if success:
+                self._actions_taken.add(_action_str(action.theorem, action.mapping))
+        else:
+            raise NotImplementedError()
 
     def _next_theorem_mapping(
         self, proof: "Proof", theorems: list["Theorem"]
