@@ -245,7 +245,7 @@ def sketch_eq_quadrangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     return a, b, c, d
 
 
-def sketch_eq_trapezoid(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
+def sketch_iso_trapezoid(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     a = Point(0.0, 0.0)
     b = Point(1.0, 0.0)
     lenght = unif(0.5, 2.0)

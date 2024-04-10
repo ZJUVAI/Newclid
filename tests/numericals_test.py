@@ -32,7 +32,7 @@ from geosolver.numerical.sketch import (
     sketch_circle,
     sketch_e5128,
     sketch_eq_quadrangle,
-    sketch_eq_trapezoid,
+    sketch_iso_trapezoid,
     sketch_eqangle2,
     sketch_eqangle3,
     sketch_eqdia_quadrangle,
@@ -182,8 +182,8 @@ class TestNumerical:
         bd = geo_num.Line(b, d)
         assert bd.diff_side(a, c), (bd(a), bd(c))
 
-    def test_sketch_eq_trapezoid(self):
-        a, b, c, d = sketch_eq_trapezoid([])
+    def test_sketch_iso_trapezoid(self):
+        a, b, c, d = sketch_iso_trapezoid([])
         assert geo_num.Line(a, b).is_parallel(geo_num.Line(c, d))
         check.almost_equal(a.distance(d), b.distance(c))
 

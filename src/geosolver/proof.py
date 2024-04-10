@@ -15,7 +15,6 @@
 
 """Implements the graph representation of the proof state."""
 
-
 from __future__ import annotations
 
 from collections import defaultdict
@@ -59,7 +58,7 @@ FREE = [
     "triangle12",
     "ieq_triangle",
     "eq_quadrangle",
-    "eq_trapezoid",
+    "iso_trapezoid",
     "eqdia_quadrangle",
     "quadrangle",
     "r_trapezoid",
