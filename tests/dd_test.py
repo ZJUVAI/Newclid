@@ -2,12 +2,13 @@
 import pytest
 import pytest_check as check
 
-from geosolver.deductive.breadth_first_search import BFSDeductor, do_deduction
+from geosolver.deductive.breadth_first_search import BFSDeductor
+from geosolver.deductive.deduction_step import deduce_to_saturation_or_goal
 from geosolver.proof import Proof
 from geosolver.problem import Definition, Problem, Theorem
 
 
-MAX_LEVEL = 10
+MAX_STEPS = 10000
 
 
 class TestDD:
@@ -16,6 +17,7 @@ class TestDD:
         self.defs = Definition.from_txt_file("defs.txt", to_dict=True)
         self.rules = Theorem.from_txt_file("rules.txt", to_dict=True)
 
+    @pytest.mark.slow
     def test_imo_2022_p4_should_succeed(self):
         problem = Problem.from_txt(
             "a b = segment a b; g1 = on_tline g1 a a b; g2 = on_tline g2 b b a; m ="
@@ -25,21 +27,11 @@ class TestDD:
             " n, on_line p c d; q = on_line q b n, on_line q c d ? cong e p e q"
         )
         proof, _ = Proof.build_problem(problem, self.defs)
-        goal_args = proof.symbols_graph.names2nodes(problem.goal.args)
-
         deductive_agent = BFSDeductor(problem)
 
-        success = False
-        while deductive_agent.level < MAX_LEVEL:
-            added, _derives, _eq4s, _branching = do_deduction(
-                deductive_agent, proof, self.rules
-            )
-            if proof.check(problem.goal.name, goal_args):
-                success = True
-                break
-            if not added:  # saturated
-                break
-
+        _derives, _eq4s, _branching, _all_added, success = deduce_to_saturation_or_goal(
+            deductive_agent, proof, self.rules, problem, timeout=60
+        )
         check.is_true(success)
 
     def test_incenter_excenter_should_fail(self):
@@ -48,19 +40,18 @@ class TestDD:
             " perp d c c e"
         )
         proof, _ = Proof.build_problem(problem, self.defs)
-        goal_args = proof.symbols_graph.names2nodes(problem.goal.args)
-
         deductive_agent = BFSDeductor(problem)
 
-        success = False
-        while deductive_agent.level < MAX_LEVEL:
-            added, _derives, _eq4s, _branching = do_deduction(
-                deductive_agent, proof, self.rules
-            )
-            if proof.check(problem.goal.name, goal_args):
-                success = True
-                break
-            if not added:  # saturated
-                break
+        step_times = []
+        timeout = 1
+        _derives, _eq4s, _branching, _all_added, success = deduce_to_saturation_or_goal(
+            deductive_agent,
+            proof,
+            self.rules,
+            problem,
+            step_times=step_times,
+            timeout=timeout,
+        )
 
         check.is_false(success)
+        check.less(sum(step_times), timeout)

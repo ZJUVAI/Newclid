@@ -24,7 +24,7 @@ import logging
 
 
 from geosolver.concepts import ConceptName
-from geosolver.deductive.breadth_first_search import Mapping
+from geosolver.deductive.breadth_first_search import Action, Mapping
 from geosolver.statement.adder import StatementAdder, ToCache
 from geosolver.statement.checker import StatementChecker
 from geosolver.symbols_graph import SymbolsGraph
@@ -205,6 +205,20 @@ class Proof:
             proof.alegbraic_manipulator.add_algebra(add)
 
         return proof, added
+
+    def step(
+        self, action: Action, level: int
+    ) -> Tuple[list[Dependency], list[ToCache], bool]:
+        if action is None:
+            return [], [], True
+
+        else:
+            theorem, mapping = action
+            added, to_cache, success = self.apply_theorem(theorem, mapping, level)
+
+        self.cache_deps(to_cache)
+
+        return added, to_cache, success
 
     def apply_theorem(
         self, theorem: "Theorem", mapping: Mapping, dependency_level: int
