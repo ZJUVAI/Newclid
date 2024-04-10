@@ -556,6 +556,7 @@ def sketch_ieq_triangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     b = Point(1.0, 0.0)
 
     c, _ = Circle(a, p1=b).intersect(Circle(b, p1=a))
+    a, b, c = random_rfss(a, b, c)
     return a, b, c
 
 
