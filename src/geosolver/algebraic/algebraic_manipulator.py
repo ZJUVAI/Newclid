@@ -15,6 +15,8 @@ if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
     from geosolver.dependencies.dependency import Dependency
 
+Derivations = dict[str, list[tuple[Point, ...]]]
+
 
 class AlgebraicManipulator:
     def __init__(self, symbols_graph: "SymbolsGraph") -> None:
@@ -47,9 +49,7 @@ class AlgebraicManipulator:
         if adder is not None:
             adder(dep)
 
-    def derive_algebra(
-        self, level: int
-    ) -> tuple[dict[str, list[tuple[Point, ...]]], dict[str, list[tuple[Point, ...]]]]:
+    def derive_algebra(self, level: int) -> tuple[Derivations, Derivations]:
         """Derive new algebraic predicates."""
         derives = {}
         ang_derives = self.derive_angle_algebra(level)
@@ -69,7 +69,7 @@ class AlgebraicManipulator:
         }
         return derives, eqs
 
-    def derive_ratio_algebra(self, level: int) -> dict[str, list[tuple[Point, ...]]]:
+    def derive_ratio_algebra(self, level: int) -> Derivations:
         """Derive new eqratio predicates."""
         added = {ConceptName.CONGRUENT_2.value: [], ConceptName.EQRATIO.value: []}
 
@@ -95,7 +95,7 @@ class AlgebraicManipulator:
 
         return added
 
-    def derive_angle_algebra(self, level: int) -> dict[str, list[tuple[Point, ...]]]:
+    def derive_angle_algebra(self, level: int) -> Derivations:
         """Derive new eqangles predicates."""
         added = {
             ConceptName.EQANGLE.value: [],
@@ -139,7 +139,7 @@ class AlgebraicManipulator:
 
         return added
 
-    def derive_cong_algebra(self, level: int) -> dict[str, list[tuple[Point, ...]]]:
+    def derive_cong_algebra(self, level: int) -> Derivations:
         """Derive new cong predicates."""
         added = {
             ConceptName.INCI.value: [],
