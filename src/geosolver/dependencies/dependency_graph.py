@@ -13,7 +13,7 @@ import seaborn as sns
 from geosolver.algebraic import AlgebraicRules
 from geosolver.dependencies.dependency import Dependency
 from geosolver.problem import CONSTRUCTION_RULE, Theorem
-from geosolver.statement.adder import ToCache
+from geosolver.statement.adder import IntrisicRules, ToCache
 
 if TYPE_CHECKING:
     from geosolver.geometry import Point, Node
@@ -267,6 +267,8 @@ class DependencyGraph:
                 edge_name = "Construction"
             elif name in [ar.value for ar in AlgebraicRules]:
                 edge_name = AlgebraicRules(name).name.replace("_", " ")
+            elif name in [ir.value for ir in IntrisicRules]:
+                edge_name = IntrisicRules(name).name.replace("_", " ")
             else:
                 edge_name = "NOT FOUND"
             vis_graph.edges[u, v, k]["title"] = edge_name
