@@ -20,12 +20,8 @@ classifiers=[
     'Operating System :: MacOS',
 ]
 
-[project.urls]
-Homepage = "https://github.com/ramp-kits/rl_simulator"
-
 [project.optional-dependencies]
 dev = ['black', 'ruff', 'pytest', 'pytest-cov', 'pytest-check', 'pytest-mock', 'pre-commit']
-sb3 = ['torch<2,>=1.13', 'stable-baselines3==1.4.0']
 
 [tool.setuptools]
 license-files = ['LICEN[CS]E*', 'COPYING*', 'NOTICE*', 'AUTHORS*']
@@ -48,7 +44,6 @@ filterwarnings = [
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "legacy: old tests that should be updated or removed"
 ]
 
 [tool.coverage.run]
@@ -76,10 +71,4 @@ exclude_also = [
 
     # Don't complain about optional imports, they don't matter for now:
     "except ImportError:"
-]
-omit = [
-    # Don't cover optional_imports because it makes no sense to test it:
-    "optional_imports.py",
-    # Don't cover deprecated model envs:
-    "**/mbrltools/model_envs/legacy/**"
 ]
