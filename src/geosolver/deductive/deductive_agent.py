@@ -1,13 +1,15 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, NamedTuple, Union
+from typing import TYPE_CHECKING, NamedTuple, Optional, Union
 from abc import abstractmethod
+
 
 if TYPE_CHECKING:
     from geosolver.proof import Proof
     from geosolver.geometry import Point
-    from geosolver.problem import Problem, Theorem
+    from geosolver.problem import Problem, Theorem, Construction
     from geosolver.statement.adder import ToCache
     from geosolver.dependencies.dependency import Dependency
+    from geosolver.deductive.match_theorems import MatchCache
 
 Mapping = dict[str, "Point"]
 
@@ -22,7 +24,31 @@ class ApplyTheoremAction(NamedTuple):
     level: int
 
 
-Action = Union[StopAction, ApplyTheoremAction]
+class MatchAction(NamedTuple):
+    theorem: "Theorem"
+    cache: Optional["MatchCache"] = None
+    goal: Optional["Construction"] = None
+
+
+Action = Union[StopAction, ApplyTheoremAction, MatchAction]
+
+
+class StopFeedback(NamedTuple):
+    pass
+
+
+class ApplyTheoremFeedback(NamedTuple):
+    success: bool
+    added: list["Dependency"]
+    to_cache: list["ToCache"]
+
+
+class MatchFeedback(NamedTuple):
+    theorem: "Theorem"
+    mappings: list[Mapping]
+
+
+Feedback = Union[StopFeedback, ApplyTheoremFeedback, MatchFeedback]
 
 
 class DeductiveAgent:
@@ -37,12 +63,6 @@ class DeductiveAgent:
         """Pict the next action to perform to update the proof state."""
 
     @abstractmethod
-    def remember_effects(
-        self,
-        action: Action,
-        success: bool,
-        added: list["Dependency"],
-        to_cache: list[ToCache],
-    ):
+    def remember_effects(self, action: Action, feedback: Feedback):
         """Remember the action effects."""
         pass

@@ -1,11 +1,12 @@
 """Implements theorem matching functions for the Deductive Database (DD)."""
 
 from collections import defaultdict
-from typing import TYPE_CHECKING, Callable, Generator
+from typing import TYPE_CHECKING, Callable, Generator, Optional
 
 import geosolver.combinatorics as comb
 
 from geosolver.concepts import ConceptName
+from geosolver.deductive.deductive_agent import Mapping
 from geosolver.deductive.points_manipulation import (
     diff_point,
     intersect1,
@@ -778,23 +779,6 @@ def match_all(name: str, proof: "Proof") -> Generator[tuple[Point, ...], None, N
     raise ValueError(f"Unrecognize {name}")
 
 
-def cache_match(
-    proof: "Proof",
-) -> Callable[[str], list[tuple[Point, ...]]]:
-    """Cache throughout one single BFS level."""
-    cache = {}
-
-    def match_fn(name: str) -> list[tuple[Point, ...]]:
-        if name in cache:
-            return cache[name]
-
-        result = list(match_all(name, proof))
-        cache[name] = result
-        return result
-
-    return match_fn
-
-
 def try_to_map(
     clause_enum: list[tuple["Clause", list[tuple[Point, ...]]]],
     mapping: dict[str, Point],
@@ -824,9 +808,7 @@ def try_to_map(
 
 
 def match_generic(
-    proof: "Proof",
-    cache: Callable[[str], list[tuple[Point, ...]]],
-    theorem: "Theorem",
+    proof: "Proof", cache: "MatchCache", theorem: "Theorem"
 ) -> Generator[dict[str, Point], None, None]:
     """Match any generic rule that is not one of the above match_*() rules."""
     clause2enum = {}
@@ -908,15 +890,47 @@ BUILT_IN_FNS = {
 }
 
 
+class MatchCache:
+    def __init__(self, proof: "Proof") -> None:
+        self.cache = {}
+        self.proof = proof
+
+    def __call__(self, name: str) -> list[tuple[Point, ...]]:
+        cached = self.cache.get(name)
+        if cached is not None:
+            return cached
+
+        result = list(match_all(name, self.proof))
+        self.cache[name] = result
+        return result
+
+    def reset(self):
+        self.cache = {}
+
+
 def match_one_theorem(
     proof: "Proof",
-    cache: Callable[[str], list[tuple[Point, ...]]],
     theorem: "Theorem",
+    cache: Optional[MatchCache] = None,
+    goal: Optional["Clause"] = None,
     max_mappings: int = 50_000,
-) -> Generator[dict[str, Point], None, None]:
+) -> list[Mapping]:
     """Match all instances of a single theorem (rule)."""
     if cache is None:
-        cache = cache_match(proof)
+        cache = MatchCache(proof)
+
+    name = theorem.name
+    if name.split("_")[-1] in [
+        ConceptName.COMPUTE_ANGLE.value,
+        ConceptName.COMPUTE_RATIO.value,
+        ConceptName.FIX_L.value,
+        ConceptName.FIX_C.value,
+        ConceptName.FIX_B.value,
+        ConceptName.FIX_T.value,
+        ConceptName.FIX_P.value,
+    ]:
+        if goal and goal.name != name:
+            return []
 
     if theorem.name in BUILT_IN_FNS:
         mps = BUILT_IN_FNS[theorem.name](proof, cache, theorem)
@@ -936,27 +950,10 @@ def match_all_theorems(
     proof: "Proof", theorems: list["Theorem"], goal: "Clause"
 ) -> dict["Theorem", dict["Theorem", dict[str, Point]]]:
     """Match all instances of all theorems (rules)."""
-    cache = cache_match(proof)
-    # for BFS, collect all potential matches
-    # and then do it at the same time
+    cache = MatchCache(proof)
     theorem2mappings = {}
-
-    # Step 1: list all matches
-    for _, theorem in theorems.items():
-        name = theorem.name
-        if name.split("_")[-1] in [
-            ConceptName.COMPUTE_ANGLE.value,
-            ConceptName.COMPUTE_RATIO.value,
-            ConceptName.FIX_L.value,
-            ConceptName.FIX_C.value,
-            ConceptName.FIX_B.value,
-            ConceptName.FIX_T.value,
-            ConceptName.FIX_P.value,
-        ]:
-            if goal and goal.name != name:
-                continue
-
-        mappings = match_one_theorem(proof, cache, theorem)
+    for theorem in theorems:
+        mappings = match_one_theorem(proof, cache, theorem, goal=goal)
         if mappings:
-            theorem2mappings[theorem] = list(mappings)
+            theorem2mappings[theorem] = mappings
     return theorem2mappings

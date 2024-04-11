@@ -25,7 +25,16 @@ import logging
 
 from geosolver.concepts import ConceptName
 from geosolver.deductive.breadth_first_search import Action, Mapping
-from geosolver.deductive.deductive_agent import ApplyTheoremAction, StopAction
+from geosolver.deductive.deductive_agent import (
+    ApplyTheoremAction,
+    ApplyTheoremFeedback,
+    Feedback,
+    MatchAction,
+    MatchFeedback,
+    StopAction,
+    StopFeedback,
+)
+from geosolver.deductive.match_theorems import match_one_theorem
 from geosolver.statement.adder import StatementAdder, ToCache
 from geosolver.statement.checker import StatementChecker
 from geosolver.symbols_graph import SymbolsGraph
@@ -207,18 +216,22 @@ class Proof:
 
         return proof, added
 
-    def step(self, action: Action) -> Tuple[list[Dependency], list[ToCache], bool]:
+    def step(self, action: Action) -> Feedback:
         if isinstance(action, StopAction):
-            return [], [], True
+            return StopFeedback()
         elif isinstance(action, ApplyTheoremAction):
             added, to_cache, success = self._apply_theorem(
                 action.theorem, action.mapping, action.level
             )
-        else:
-            raise NotImplementedError()
+            self.cache_deps(to_cache)
+            return ApplyTheoremFeedback(success, added, to_cache)
+        elif isinstance(action, MatchAction):
+            mappings = match_one_theorem(
+                self, action.theorem, cache=action.cache, goal=action.goal
+            )
+            return MatchFeedback(action.theorem, mappings)
 
-        self.cache_deps(to_cache)
-        return added, to_cache, success
+        raise NotImplementedError()
 
     def _apply_theorem(
         self, theorem: "Theorem", mapping: Mapping, dependency_level: int

@@ -7,19 +7,23 @@ from typing import TYPE_CHECKING, Optional
 import time
 
 from geosolver.deductive.deductive_agent import (
+    ApplyTheoremFeedback,
     DeductiveAgent,
     Action,
+    Feedback,
     Mapping,
+    MatchAction,
+    MatchFeedback,
     StopAction,
     ApplyTheoremAction,
+    StopFeedback,
 )
-from geosolver.deductive.match_theorems import match_all_theorems
+from geosolver.deductive.match_theorems import MatchCache
+
 
 if TYPE_CHECKING:
-    from geosolver.statement.adder import ToCache
     from geosolver.problem import Problem, Theorem
     from geosolver.proof import Proof
-    from geosolver.dependencies.dependency import Dependency
 
 
 class BFSDeductor(DeductiveAgent):
@@ -27,68 +31,95 @@ class BFSDeductor(DeductiveAgent):
         super().__init__(problem)
         self.level = 0
 
-        self._theorem_mappings: list[tuple["Theorem", list[Mapping]]] = {}
-        self._actions_taken: set[tuple["Theorem", Mapping]] = set()
-        self._current_mappings: tuple[Optional["Theorem"], list[Mapping]] = (None, [])
-        self._level_start_time = time.time()
+        self._theorem_mappings: list[tuple["Theorem", list[Mapping]]] = []
+        self._actions_taken: set[str] = set()
+        self._actions_failed: set[str] = set()
+
+        self._current_mappings: list[Mapping] = []
+        self._current_theorem: Optional["Theorem"] = None
+        self._level_start_time: float = time.time()
+
+        self._unmatched_theorems: list["Theorem"] = []
+        self._match_cache: Optional[MatchCache] = None
+        self._any_success_or_new_match_per_level: dict[int, bool] = {}
 
     def act(self, proof: "Proof", theorems: list["Theorem"]) -> Action:
         """Deduce new statements by applying
         breath-first search over all theorems one by one."""
-        theorem, mapping = self._next_theorem_mapping(proof, theorems)
-        if theorem is None:
-            # Exausted all theorems
-            return StopAction()
-        return ApplyTheoremAction(theorem, mapping, self.level)
 
-    def remember_effects(
-        self,
-        action: Action,
-        success: bool,
-        added: list[Dependency],
-        to_cache: ToCache,
-    ):
-        if isinstance(action, StopAction):
+        if self._unmatched_theorems:
+            # We first match all unmatch theorems of the level
+            return self._match_next_theorem(proof)
+
+        if self._current_mappings or self._theorem_mappings:
+            # Then we apply all gathered mappings of the level
+            theorem, mapping = self._next_theorem_mapping()
+            return ApplyTheoremAction(theorem, mapping, self.level)
+
+        if self.level > 0 and not self._any_success_or_new_match_per_level[self.level]:
+            # If one full level without new success we have saturated
+            return StopAction()
+
+        # Else we just go to the next level
+        self._next_level(theorems)
+        return self._match_next_theorem(proof)
+
+    def remember_effects(self, action: Action, feedback: Feedback):
+        if isinstance(feedback, StopFeedback):
             return
-        elif isinstance(action, ApplyTheoremAction):
-            if success:
-                self._actions_taken.add(_action_str(action.theorem, action.mapping))
+        elif isinstance(feedback, ApplyTheoremFeedback):
+            assert isinstance(action, ApplyTheoremAction)
+            action_hash = _action_str(action.theorem, action.mapping)
+            if feedback.success:
+                self._any_success_or_new_match_per_level[self.level] = True
+                self._actions_taken.add(action_hash)
+                if action_hash in self._actions_failed:
+                    self._actions_failed.remove(action_hash)
+            else:
+                self._actions_failed.add(action_hash)
+
+        elif isinstance(feedback, MatchFeedback):
+            new_mappings = self._filter_new_mappings(
+                feedback.theorem, feedback.mappings
+            )
+            if len(new_mappings) > 0:
+                self._theorem_mappings.append((feedback.theorem, new_mappings))
+            for mapping in new_mappings:
+                action_hash = _action_str(feedback.theorem, mapping)
+                if action_hash not in self._actions_failed:
+                    self._any_success_or_new_match_per_level[self.level] = True
         else:
             raise NotImplementedError()
 
-    def _next_theorem_mapping(
-        self, proof: "Proof", theorems: list["Theorem"]
-    ) -> tuple[Optional["Theorem"], Optional[Mapping]]:
-        if not self._theorem_mappings:
-            any_new_mapping = self._match_new_level(proof, theorems)
-            if not any_new_mapping:
-                return None, None
+    def _next_theorem_mapping(self) -> tuple[Optional["Theorem"], Optional[Mapping]]:
+        if not self._current_mappings:
+            new_mapping = self._theorem_mappings.pop(0)
+            self._current_theorem, self._current_mappings = new_mapping
+        return self._current_theorem, self._current_mappings.pop(0)
 
-        theorem, mappings = self._current_mappings
-        if not mappings:
-            self._current_mappings = self._theorem_mappings.pop(0)
+    def _filter_new_mappings(self, theorem: "Theorem", mappings: list[Mapping]):
+        return [
+            mapping
+            for mapping in mappings
+            if _action_str(theorem, mapping) not in self._actions_taken
+        ]
 
-        theorem, mappings = self._current_mappings
-        mapping = mappings.pop(0)
-        return theorem, mapping
+    def _match_next_theorem(self, proof: "Proof"):
+        if self._match_cache is None:
+            self._match_cache = MatchCache(proof)
+        next_theorem = self._unmatched_theorems.pop(0)
+        return MatchAction(
+            next_theorem,
+            cache=self._match_cache,
+            goal=self.problem.goal,
+        )
 
-    def _match_new_level(self, proof: "Proof", theorems: list["Theorem"]) -> bool:
+    def _next_level(self, theorems: list["Theorem"]):
         self._update_level()
-        theorem2mappings = match_all_theorems(proof, theorems, self.problem.goal)
-        self._theorem_mappings = []
-
-        any_new = False
-        for theorem, mappings in theorem2mappings.items():
-            new_mappings = [
-                mapping
-                for mapping in mappings
-                if _action_str(theorem, mapping) not in self._actions_taken
-            ]
-            if new_mappings:
-                any_new = True
-                self._theorem_mappings.append((theorem, new_mappings))
-
-        return any_new
+        self._any_success_or_new_match_per_level[self.level] = False
+        if self._match_cache is not None:
+            self._match_cache.reset()
+        self._unmatched_theorems = theorems.copy()
 
     def _update_level(self):
         if self.level == 0:

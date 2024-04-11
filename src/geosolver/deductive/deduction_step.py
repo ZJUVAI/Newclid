@@ -2,7 +2,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Optional
 
-from geosolver.deductive.deductive_agent import StopAction
+from geosolver.deductive.deductive_agent import ApplyTheoremFeedback, StopAction
 
 
 if TYPE_CHECKING:
@@ -17,14 +17,21 @@ def do_deduction_step(
     deductive_agent: "DeductiveAgent",
     proof: "Proof",
     theorems: list["Theorem"],
-) -> tuple[list[Dependency], Derivations, Derivations, int]:
+    timeout: float = 600.0,
+) -> tuple[list[Dependency], Derivations, Derivations, int, bool]:
     """Forward deduce the first conclusive step."""
     added = []
     action = ()
-    while not added and not isinstance(action, StopAction):
+
+    t0 = time.time()
+    while not (added or isinstance(action, StopAction)):
         action = deductive_agent.act(proof, theorems)
-        added, to_cache, success = proof.step(action)
-        deductive_agent.remember_effects(action, success, added, to_cache)
+        feedback = proof.step(action)
+        if isinstance(feedback, ApplyTheoremFeedback):
+            added = feedback.added
+        deductive_agent.remember_effects(action, feedback)
+        if time.time() - t0 > timeout:
+            break
 
     derives, eq4s = {}, {}
     if proof.alegbraic_manipulator and added:
@@ -48,7 +55,7 @@ def deduce_to_saturation_or_goal(
     problem: "Problem",
     step_times: Optional[list[float]] = None,
     max_steps: int = 10000,
-    timeout: float = 600,
+    timeout: float = 600.0,
 ) -> tuple[list[list["Dependency"]], list[int], list, list, bool]:
     """Run DD until saturation or goal found."""
     derives = []
@@ -60,30 +67,22 @@ def deduce_to_saturation_or_goal(
 
     overall_t0 = time.time()
     success = False
+    total_elapsed = time.time() - overall_t0
 
     while len(step_times) < max_steps:
         step_start = time.time()
         added, derv, eq4, n_branching = do_deduction_step(
-            deductive_agent, proof, theorems
+            deductive_agent, proof, theorems, timeout - total_elapsed
         )
         all_added += added
         branching.append(n_branching)
         derives.append(derv)
         eq4s.append(eq4)
         step_times.append(time.time() - step_start)
+        total_elapsed = time.time() - overall_t0
 
-        if problem.goal is not None:
-            goal_args = proof.symbols_graph.names2points(problem.goal.args)
-            if proof.check(problem.goal.name, goal_args):
-                # Found goal
-                success = True
-                break
-
-        if not added:
-            # Saturated
-            break
-
-        if time.time() - overall_t0 > timeout:
+        success = proof.statements_checker.check_goal(problem.goal)
+        if success or not added or total_elapsed > timeout:
             break
 
     return derives, eq4s, branching, all_added, success

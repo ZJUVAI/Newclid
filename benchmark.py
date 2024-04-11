@@ -99,7 +99,7 @@ def run_ddar(proof: Proof, problem: Problem, out_folder: Optional[Path]) -> bool
       Boolean, whether DD+AR finishes successfully.
     """
     deductive_agent = BFSDeductor(problem)
-    ddar_solve(deductive_agent, proof, RULES, problem)
+    ddar_solve(deductive_agent, proof, RULES)
     goal_args = proof.symbols_graph.names2nodes(problem.goal.args)
     if not proof.check(problem.goal.name, goal_args):
         logging.info(f"DD+AR failed to solve the problem {problem.url}.")
