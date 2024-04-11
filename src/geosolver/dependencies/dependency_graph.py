@@ -3,8 +3,7 @@ from enum import Enum
 import logging
 
 from pathlib import Path
-import random
-from typing import TYPE_CHECKING, Dict, List, Tuple, Union
+from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 from networkx import MultiDiGraph, ancestors
 from pyvis.network import Network
 import seaborn as sns
@@ -13,7 +12,7 @@ import seaborn as sns
 from geosolver.algebraic import AlgebraicRules
 from geosolver.dependencies.dependency import Dependency
 from geosolver.problem import CONSTRUCTION_RULE, Theorem
-from geosolver.statement.adder import IntrisicRules, ToCache
+from geosolver.statement.adder import IntrinsicRules, ToCache
 
 if TYPE_CHECKING:
     from geosolver.geometry import Point, Node
@@ -41,14 +40,19 @@ class DependencyGraph:
 
     @property
     def proof_subgraph(self) -> DependencyGraph:
-        if self.goal is None:
-            raise ValueError("Cannot extract proof subgraph without goal.")
         proof_graph = DependencyGraph()
-        proof_graph.nx_graph = self.nx_graph.copy()
-        proof_graph.nx_graph = proof_graph.nx_graph.subgraph(
-            ancestors(proof_graph.nx_graph, self.goal) | {self.goal}
+        proof_graph.nx_graph = extract_sub_graph(
+            self.nx_graph, self.premises, self.goal
         )
         return proof_graph
+
+    @property
+    def premises(self) -> List[str]:
+        return [
+            node
+            for node, node_type in self.nx_graph.nodes(data="type")
+            if DependencyType(node_type) is DependencyType.PREMISE
+        ]
 
     def add_dependency(
         self,
@@ -238,12 +242,19 @@ class DependencyGraph:
         nt = Network("1080px", directed=True)
         # populates the nodes and edges data structures
         vis_graph: MultiDiGraph = self.nx_graph.copy()
+
+        max_level = max(
+            lvl for _, lvl in self.nx_graph.nodes(data="level") if lvl is not None
+        )
+        nodes_colors = build_nodes_colors(max_level + 1)
         for node, data in vis_graph.nodes(data=True):
             name: str = data.get("name", "Unknown")
             dep_type: str = data.get("type", "Unknown")
-            level: int = data.get("level", -1)
+            level: Optional[int] = data.get("level")
+            if level is None:
+                level = -1
             args: List[str] = data.get("args", [])
-            vis_graph.nodes[node]["group"] = level
+            vis_graph.nodes[node]["color"] = rgba_to_hex(*nodes_colors[level], a=1.0)
             vis_graph.nodes[node]["title"] = (
                 f"{name.capitalize()}"
                 f"\n {dep_type.capitalize()}"
@@ -257,7 +268,6 @@ class DependencyGraph:
                 vis_graph.nodes[node]["size"] = 40
 
         edges_colors = build_edges_colors()
-        edges_keys_indexes = []
         for u, v, k, data in vis_graph.edges(data=True, keys=True):
             name = k.split(".")[0]
             theorem = rules.get(name)
@@ -267,20 +277,24 @@ class DependencyGraph:
                 edge_name = "Construction"
             elif name in [ar.value for ar in AlgebraicRules]:
                 edge_name = AlgebraicRules(name).name.replace("_", " ")
-            elif name in [ir.value for ir in IntrisicRules]:
-                edge_name = IntrisicRules(name).name.replace("_", " ")
+            elif name in [ir.value for ir in IntrinsicRules]:
+                edge_name = IntrinsicRules(name).name.replace("_", " ")
             else:
                 edge_name = "NOT FOUND"
             vis_graph.edges[u, v, k]["title"] = edge_name
+            vis_graph.edges[u, v, k]["arrows"] = {
+                "middle": {"enabled": True},
+                "to": {"enabled": True},
+            }
             vis_graph.edges[u, v, k]["label"] = k
             vis_graph.edges[u, v, k]["font"] = {"size": 8}
 
-            if k in edges_keys_indexes:
-                edge_index = edges_keys_indexes.index(k)
-            else:
-                edge_index = len(edges_keys_indexes)
-                edges_keys_indexes.append(k)
-
+            node_edges_keys = sorted(
+                key
+                for _, _, key in list(vis_graph.in_edges(v, keys=True))
+                + list(vis_graph.out_edges(u, keys=True))
+            )
+            edge_index = node_edges_keys.index(k)
             edge_color_index = edge_index % len(edges_colors)
             base_edge_color = edges_colors[edge_color_index]
 
@@ -297,7 +311,7 @@ class DependencyGraph:
         nt.options.physics.solver = "barnesHut"
         nt.options.physics.use_barnes_hut(
             {
-                "gravity": -20000,
+                "gravity": -15000,
                 "central_gravity": 0.3,
                 "spring_length": 100,
                 "spring_strength": 0.05,
@@ -307,6 +321,34 @@ class DependencyGraph:
         )
         nt.show_buttons(filter_=["physics"])
         nt.show(str(html_path), notebook=False)
+
+
+def extract_sub_graph(
+    graph: MultiDiGraph, roots: List[str], goal: Optional[str]
+) -> MultiDiGraph:
+    if goal is None:
+        raise ValueError("Cannot extract proof subgraph without goal.")
+
+    subgraph: MultiDiGraph = graph.copy()
+    subgraph.remove_nodes_from(
+        [n for n in subgraph if n not in ancestors(subgraph, goal) | {goal}]
+    )
+
+    subgraph.remove_edges_from([e for e in subgraph.out_edges(goal)])
+    for root in roots:
+        subgraph.remove_edges_from([e for e in subgraph.in_edges(root)])
+
+    down_edges = []
+    for u, v, k in subgraph.edges(keys=True):
+        in_level = subgraph.nodes[u].get("level")
+        out_level = subgraph.nodes[v].get("level")
+        if in_level is not None and out_level is not None and in_level > out_level:
+            down_edges.append((u, v, k))
+
+    subgraph.remove_edges_from(down_edges)
+
+    subgraph.remove_nodes_from([n for n in subgraph if subgraph.degree(n) == 0])
+    return subgraph
 
 
 def dependency_node_name(dependency: Dependency):
@@ -338,6 +380,23 @@ def rgba_to_hex(r, g, b, a=0.5):
 
 
 def build_edges_colors() -> List[str]:
-    edge_colors = sns.color_palette("colorblind")
-    random.shuffle(edge_colors)
-    return edge_colors
+    return sns.color_palette("colorblind", n_colors=20)
+
+
+def build_nodes_colors(n_colors: int):
+    """Build a nodes colors palette according to levels.
+
+    Color from this SO post:
+    https://stackoverflow.com/questions/7251872/is-there-a-better-color-scale-than-the-rainbow-colormap
+    """
+    return sns.blend_palette(
+        colors=[
+            (0.847, 0.057, 0.057),
+            (0.527, 0.527, 0),
+            (0, 0.592, 0),
+            (0, 0.559, 0.559),
+            (0.316, 0.316, 0.991),
+            (0.718, 0, 0.718),
+        ],
+        n_colors=n_colors,
+    )

@@ -37,9 +37,9 @@ from geosolver.problem import Definition, Problem, Theorem
 MAX_LEVEL = 10
 
 
-class TestProofGraph:
+class TestProof:
     @pytest.fixture(autouse=True)
-    def setUpClass(self):
+    def setup(self):
         self.defs = Definition.from_txt_file("defs.txt", to_dict=True)
         self.rules = Theorem.from_txt_file("rules.txt", to_dict=True)
 
@@ -50,14 +50,14 @@ class TestProofGraph:
         self.symbols_graph = self.proof.symbols_graph
         self.statements_checker = self.proof.statements_checker
 
-    def test_build_graph_points(self):
+    def test_build_points(self):
         all_points = self.symbols_graph.all_points()
         check.equal(
             {p.name for p in all_points},
             {"a", "b", "c", "g", "h", "o", "g1", "g2", "g3", "h1", "h2", "h3"},
         )
 
-    def test_build_graph_predicates(self):
+    def test_build_predicates(self):
         (a, b, c, g, h, o, g1, g2, g3, h1, h2, h3) = self.symbols_graph.names2points(
             ["a", "b", "c", "g", "h", "o", "g1", "g2", "g3", "h1", "h2", "h3"]
         )

@@ -8,7 +8,7 @@ from geosolver.ddar import solve
 from geosolver.proof import Proof
 from geosolver.problem import Definition, Problem, Theorem
 from geosolver.proof_writing import write_solution
-# from geosolver.statement.adder import IntrisicRules
+# from geosolver.statement.adder import IntrinsicRules
 
 DEFINITIONS = None  # contains definitions of construction actions
 RULES = None  # contains rules of deductions
@@ -39,10 +39,10 @@ def main():
             problem,
             DEFINITIONS,
             disabled_intrinsic_rules=[
-                # IntrisicRules.PARA_FROM_PERP,
-                # IntrisicRules.CYCLIC_FROM_CONG,
-                # IntrisicRules.CONG_FROM_EQRATIO,
-                # IntrisicRules.PARA_FROM_EQANGLE,
+                # IntrinsicRules.PARA_FROM_PERP,
+                # IntrinsicRules.CYCLIC_FROM_CONG,
+                # IntrinsicRules.CONG_FROM_EQRATIO,
+                # IntrinsicRules.PARA_FROM_EQANGLE,
             ],
         )
 
