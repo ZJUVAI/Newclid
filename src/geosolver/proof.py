@@ -139,10 +139,7 @@ class Proof:
 
         err = DepCheckFailError(f"Numerical check failed {max_attempts} times")
         for _ in range(max_attempts):
-            # while not check:
-            # While loop to search for coordinates
-            # that checks premises conditions numerically
-            # will result in infinite loop if problem is impossible numerically.
+            # Search for coordinates that checks premises conditions numerically.
             try:
                 symbols_graph = SymbolsGraph()
                 alegbraic_manipulator = AlgebraicManipulator(symbols_graph)
