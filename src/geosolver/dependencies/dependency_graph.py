@@ -92,16 +92,18 @@ class DependencyGraph:
         pred = dependency_node_name(u_for_edge)
         if pred not in self.nx_graph.nodes:
             dependency_type = DependencyType.STATEMENT
-            if not u_for_edge.why:
+            none_why = u_for_edge.why is None
+            if none_why:
                 dependency_type = DependencyType.NUMERICAL_CHECK
             self.add_dependency(u_for_edge, dependency_type)
-            for why_u in u_for_edge.why:
-                self.add_edge(
-                    why_u,
-                    u_for_edge,
-                    edge_name=u_for_edge.rule_name,
-                    edge_arguments=u_for_edge.args,
-                )
+            if not none_why:
+                for why_u in u_for_edge.why:
+                    self.add_edge(
+                        why_u,
+                        u_for_edge,
+                        edge_name=u_for_edge.rule_name,
+                        edge_arguments=u_for_edge.args,
+                    )
 
         if isinstance(v_for_edge, Dependency):
             v_for_edge = dependency_node_name(v_for_edge)

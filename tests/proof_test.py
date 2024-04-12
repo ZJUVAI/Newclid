@@ -16,6 +16,7 @@
 """Unit tests for graph.py."""
 import pytest
 import pytest_check as check
+from geosolver.api import GeometricSolverBuilder
 from geosolver.numerical.check import (
     check_circle_numerical,
     check_coll_numerical,
@@ -25,13 +26,8 @@ from geosolver.numerical.check import (
     check_eqratio_numerical,
     check_para_numerical,
     check_perp_numerical,
-)
-
-from geosolver.proof import Proof
-from geosolver.numerical.check import (
     check_midp_numerical,
 )
-from geosolver.problem import Definition, Problem, Theorem
 
 
 MAX_LEVEL = 10
@@ -40,13 +36,22 @@ MAX_LEVEL = 10
 class TestProof:
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.defs = Definition.from_txt_file("defs.txt", to_dict=True)
-        self.rules = Theorem.from_txt_file("rules.txt", to_dict=True)
-
-        # load a complex setup:
-        txt = "a b c = triangle a b c; h = orthocenter a b c; h1 = foot a b c; h2 = foot b c a; h3 = foot c a b; g1 g2 g3 g = centroid g1 g2 g3 g a b c; o = circle a b c ? coll h g o"
-        p = Problem.from_txt(txt, translate=False)
-        self.proof, _ = Proof.build_problem(p, self.defs)
+        solver = (
+            GeometricSolverBuilder()
+            .load_problem_from_txt(
+                "a b c = triangle a b c; "
+                "h = orthocenter a b c; "
+                "h1 = foot a b c; "
+                "h2 = foot b c a; "
+                "h3 = foot c a b; "
+                "g1 g2 g3 g = centroid g1 g2 g3 g a b c; "
+                "o = circle a b c "
+                "? coll h g o",
+                translate=False,
+            )
+            .build()
+        )
+        self.proof = solver.proof_state
         self.symbols_graph = self.proof.symbols_graph
         self.statements_checker = self.proof.statements_checker
 
