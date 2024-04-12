@@ -17,10 +17,8 @@
 import pytest
 import pytest_check as check
 
-from geosolver.configs import default_defs_path, default_rules_path
-import geosolver.graph as gh
+from geosolver.api import GeometricSolverBuilder
 import geosolver.numericals as nm
-import geosolver.problem as pr
 
 
 MAX_LEVEL = 10
@@ -29,13 +27,22 @@ MAX_LEVEL = 10
 class TestGraph:
     @pytest.fixture(autouse=True)
     def setUpClass(self):
-        self.defs = pr.Definition.from_txt_file(default_defs_path(), to_dict=True)
-        self.rules = pr.Theorem.from_txt_file(default_rules_path(), to_dict=True)
-
-        # load a complex setup:
-        txt = "a b c = triangle a b c; h = orthocenter a b c; h1 = foot a b c; h2 = foot b c a; h3 = foot c a b; g1 g2 g3 g = centroid g1 g2 g3 g a b c; o = circle a b c ? coll h g o"
-        p = pr.Problem.from_txt(txt, translate=False)
-        self.graph, _ = gh.Graph.build_problem(p, self.defs)
+        self.solver = (
+            GeometricSolverBuilder()
+            .load_problem_from_txt(
+                "a b c = triangle a b c; "
+                "h = orthocenter a b c; "
+                "h1 = foot a b c; "
+                "h2 = foot b c a; "
+                "h3 = foot c a b; "
+                "g1 g2 g3 g = centroid g1 g2 g3 g a b c; "
+                "o = circle a b c "
+                "? coll h g o",
+                translate=False,
+            )
+            .build()
+        )
+        self.graph = self.solver.proof_state
 
     def test_build_graph_points(self):
         g = self.graph

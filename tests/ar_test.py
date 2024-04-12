@@ -17,17 +17,15 @@
 
 import pytest
 import pytest_check as check
+from geosolver.api import GeometricSolverBuilder
 import geosolver.ar as ar
-from geosolver.configs import default_defs_path, default_rules_path
-import geosolver.graph as gh
 import geosolver.problem as pr
 
 
 class TestAR:
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.defs = pr.Definition.from_txt_file(default_defs_path(), to_dict=True)
-        self.rules = pr.Theorem.from_txt_file(default_rules_path(), to_dict=True)
+        self.solver_builder = GeometricSolverBuilder()
 
     def test_update_groups(self):
         """Test for update_groups."""
@@ -88,11 +86,14 @@ class TestAR:
         """Test that AR can figure out bisector & ex-bisector are perpendicular."""
         # Load the scenario that we have cd is bisector of acb and
         # ce is the ex-bisector of acb.
-        p = pr.Problem.from_txt(
-            "a b c = triangle a b c; d = incenter d a b c; e = excenter e a b c ?"
-            " perp d c c e"
-        )
-        g, _ = gh.Graph.build_problem(p, self.defs)
+
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b c = triangle a b c; "
+            "d = incenter d a b c; "
+            "e = excenter e a b c "
+            "? perp d c c e"
+        ).build()
+        g = solver.proof_state
 
         # Create an external angle table:
         tb = ar.AngleTable("pi")
@@ -124,8 +125,10 @@ class TestAR:
     def test_angle_table_equilateral_triangle(self):
         """Test that AR can figure out triangles with 3 equal angles => each is pi/3."""
         # Load an equaliteral scenario
-        p = pr.Problem.from_txt("a b c = ieq_triangle ? cong a b a c")
-        g, _ = gh.Graph.build_problem(p, self.defs)
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b c = ieq_triangle " "? cong a b a c"
+        ).build()
+        g = solver.proof_state
 
         # Add two eqangles facts because ieq_triangle only add congruent sides
         a, b, c = g.names2nodes("abc")
@@ -163,13 +166,14 @@ class TestAR:
 
     def test_incenter_excenter_touchpoints(self):
         """Test that AR can figure out incenter/excenter touchpoints are equidistant to midpoint."""
-
-        p = pr.Problem.from_txt(
-            "a b c = triangle a b c; d1 d2 d3 d = incenter2 a b c; e1 e2 e3 e ="
-            " excenter2 a b c ? perp d c c e",
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b c = triangle a b c; "
+            "d1 d2 d3 d = incenter2 a b c; "
+            "e1 e2 e3 e = excenter2 a b c "
+            "? perp d c c e",
             translate=False,
-        )
-        g, _ = gh.Graph.build_problem(p, self.defs)
+        ).build()
+        g = solver.proof_state
 
         a, b, c, ab, bc, ca, d1, d2, d3, e1, e2, e3 = g.names2nodes(
             ["a", "b", "c", "ab", "bc", "ac", "d1", "d2", "d3", "e1", "e2", "e3"]

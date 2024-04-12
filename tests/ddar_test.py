@@ -17,44 +17,40 @@
 import pytest
 import pytest_check as check
 
-from geosolver.configs import default_defs_path, default_rules_path
-from geosolver.ddar import solve
-import geosolver.graph as gh
-import geosolver.problem as pr
+from geosolver.api import GeometricSolverBuilder
 
 
 class TestDDAR:
     @pytest.fixture(autouse=True)
     def setUpClass(self):
-        self.defs = pr.Definition.from_txt_file(default_defs_path(), to_dict=True)
-        self.rules = pr.Theorem.from_txt_file(default_rules_path(), to_dict=True)
+        self.solver_builder = GeometricSolverBuilder()
 
     def test_orthocenter_should_fail(self):
-        txt = "a b c = triangle a b c; d = on_tline d b a c, on_tline d c a b ? perp a d b c"
-        p = pr.Problem.from_txt(txt)
-        g, _ = gh.Graph.build_problem(p, self.defs)
-
-        solve(g, self.rules, p, max_level=1000)
-        goal_args = g.names2nodes(p.goal.args)
-        check.is_false(g.check(p.goal.name, goal_args))
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b c = triangle a b c; "
+            "d = on_tline d b a c, on_tline d c a b "
+            "? perp a d b c"
+        ).build()
+        success = solver.run()
+        check.is_false(success)
 
     def test_orthocenter_aux_should_succeed(self):
-        txt = "a b c = triangle a b c; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d ? perp a d b c"
-        p = pr.Problem.from_txt(txt)
-        g, _ = gh.Graph.build_problem(p, self.defs)
-
-        solve(g, self.rules, p, max_level=1000)
-        goal_args = g.names2nodes(p.goal.args)
-        check.is_true(g.check(p.goal.name, goal_args))
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b c = triangle a b c; "
+            "d = on_tline d b a c, on_tline d c a b; "
+            "e = on_line e a c, on_line e b d "
+            "? perp a d b c"
+        ).build()
+        success = solver.run()
+        check.is_true(success)
 
     def test_incenter_excenter_should_succeed(self):
         # Note that this same problem should fail in dd_test.py
-        p = pr.Problem.from_txt(
-            "a b c = triangle a b c; d = incenter d a b c; e = excenter e a b c ?"
-            " perp d c c e"
-        )
-        g, _ = gh.Graph.build_problem(p, self.defs)
-
-        solve(g, self.rules, p, max_level=1000)
-        goal_args = g.names2nodes(p.goal.args)
-        check.is_true(g.check(p.goal.name, goal_args))
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b c = triangle a b c; "
+            "d = incenter d a b c; "
+            "e = excenter e a b c "
+            "? perp d c c e"
+        ).build()
+        success = solver.run()
+        check.is_true(success)

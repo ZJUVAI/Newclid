@@ -17,10 +17,8 @@
 import pytest
 import pytest_check as check
 
-from geosolver.configs import default_defs_path, default_rules_path
+from geosolver.api import GeometricSolverBuilder
 from geosolver.dd import bfs_one_level
-import geosolver.graph as gh
-import geosolver.problem as pr
 
 
 MAX_LEVEL = 10
@@ -29,24 +27,29 @@ MAX_LEVEL = 10
 class TestDD:
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.defs = pr.Definition.from_txt_file(default_defs_path(), to_dict=True)
-        self.rules = pr.Theorem.from_txt_file(default_rules_path(), to_dict=True)
+        self.solver_builder = GeometricSolverBuilder()
 
     def test_imo_2022_p4_should_succeed(self):
-        p = pr.Problem.from_txt(
-            "a b = segment a b; g1 = on_tline g1 a a b; g2 = on_tline g2 b b a; m ="
-            " on_circle m g1 a, on_circle m g2 b; n = on_circle n g1 a, on_circle n"
-            " g2 b; c = on_pline c m a b, on_circle c g1 a; d = on_pline d m a b,"
-            " on_circle d g2 b; e = on_line e a c, on_line e b d; p = on_line p a"
-            " n, on_line p c d; q = on_line q b n, on_line q c d ? cong e p e q"
-        )
-        g, _ = gh.Graph.build_problem(p, self.defs)
-        goal_args = g.names2nodes(p.goal.args)
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b = segment a b; "
+            "g1 = on_tline g1 a a b; "
+            "g2 = on_tline g2 b b a; "
+            "m = on_circle m g1 a, on_circle m g2 b; "
+            "n = on_circle n g1 a, on_circle n g2 b; "
+            "c = on_pline c m a b, on_circle c g1 a; "
+            "d = on_pline d m a b, on_circle d g2 b; "
+            "e = on_line e a c, on_line e b d; "
+            "p = on_line p a n, on_line p c d; "
+            "q = on_line q b n, on_line q c d "
+            "? cong e p e q"
+        ).build()
+        g = solver.proof_state
+        goal_args = g.names2nodes(solver.goal.args)
 
         success = False
         for level in range(MAX_LEVEL):
-            added, _, _, _ = bfs_one_level(g, self.rules, level, p)
-            if g.check(p.goal.name, goal_args):
+            added, _, _, _ = bfs_one_level(g, solver.rules, level, solver.problem)
+            if g.check(solver.goal.name, goal_args):
                 success = True
                 break
             if not added:  # saturated
@@ -55,17 +58,19 @@ class TestDD:
         check.is_true(success)
 
     def test_incenter_excenter_should_fail(self):
-        p = pr.Problem.from_txt(
-            "a b c = triangle a b c; d = incenter d a b c; e = excenter e a b c ?"
-            " perp d c c e"
-        )
-        g, _ = gh.Graph.build_problem(p, self.defs)
-        goal_args = g.names2nodes(p.goal.args)
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b c = triangle a b c; "
+            "d = incenter d a b c; "
+            "e = excenter e a b c "
+            "? perp d c c e"
+        ).build()
+        g = solver.proof_state
+        goal_args = g.names2nodes(solver.goal.args)
 
         success = False
         for level in range(MAX_LEVEL):
-            added, _, _, _ = bfs_one_level(g, self.rules, level, p)
-            if g.check(p.goal.name, goal_args):
+            added, _, _, _ = bfs_one_level(g, solver.rules, level, solver.problem)
+            if g.check(solver.goal.name, goal_args):
                 success = True
                 break
             if not added:  # saturated
