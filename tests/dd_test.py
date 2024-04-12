@@ -17,6 +17,7 @@
 import pytest
 import pytest_check as check
 
+from geosolver.configs import default_defs_path, default_rules_path
 from geosolver.dd import bfs_one_level
 import geosolver.graph as gh
 import geosolver.problem as pr
@@ -28,8 +29,8 @@ MAX_LEVEL = 10
 class TestDD:
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.defs = pr.Definition.from_txt_file("defs.txt", to_dict=True)
-        self.rules = pr.Theorem.from_txt_file("rules.txt", to_dict=True)
+        self.defs = pr.Definition.from_txt_file(default_defs_path(), to_dict=True)
+        self.rules = pr.Theorem.from_txt_file(default_rules_path(), to_dict=True)
 
     def test_imo_2022_p4_should_succeed(self):
         p = pr.Problem.from_txt(

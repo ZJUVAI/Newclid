@@ -16,13 +16,14 @@
 """Unit tests for problem.py."""
 
 import pytest
+from geosolver.configs import default_defs_path
 import geosolver.problem as pr
 
 
 class TestProblem:
     @pytest.fixture(autouse=True)
     def setUp(self):
-        self.defs = pr.Definition.from_txt_file("defs.txt", to_dict=True)
+        self.defs = pr.Definition.from_txt_file(default_defs_path(), to_dict=True)
 
     def test_orthocenter_no_translate(self):
         txt = "a b c = triangle a b c; h = on_tline h b a c, on_tline h c a b ? perp a h b c"

@@ -38,3 +38,10 @@ ag_ckpt_vocab/
 
 # Coverage data
 .coverage
+
+# Results
+ddar_results/
+
+# Profiling
+*.prof
+

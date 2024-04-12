@@ -18,6 +18,7 @@
 import pytest
 import pytest_check as check
 import geosolver.ar as ar
+from geosolver.configs import default_defs_path, default_rules_path
 import geosolver.graph as gh
 import geosolver.problem as pr
 
@@ -25,8 +26,8 @@ import geosolver.problem as pr
 class TestAR:
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.defs = pr.Definition.from_txt_file("defs.txt", to_dict=True)
-        self.rules = pr.Theorem.from_txt_file("rules.txt", to_dict=True)
+        self.defs = pr.Definition.from_txt_file(default_defs_path(), to_dict=True)
+        self.rules = pr.Theorem.from_txt_file(default_rules_path(), to_dict=True)
 
     def test_update_groups(self):
         """Test for update_groups."""

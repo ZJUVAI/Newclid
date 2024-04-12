@@ -17,6 +17,7 @@
 import pytest
 import pytest_check as check
 
+from geosolver.configs import default_defs_path, default_rules_path
 import geosolver.graph as gh
 import geosolver.numericals as nm
 import geosolver.problem as pr
@@ -28,8 +29,8 @@ MAX_LEVEL = 10
 class TestGraph:
     @pytest.fixture(autouse=True)
     def setUpClass(self):
-        self.defs = pr.Definition.from_txt_file("defs.txt", to_dict=True)
-        self.rules = pr.Theorem.from_txt_file("rules.txt", to_dict=True)
+        self.defs = pr.Definition.from_txt_file(default_defs_path(), to_dict=True)
+        self.rules = pr.Theorem.from_txt_file(default_rules_path(), to_dict=True)
 
         # load a complex setup:
         txt = "a b c = triangle a b c; h = orthocenter a b c; h1 = foot a b c; h2 = foot b c a; h3 = foot c a b; g1 g2 g3 g = centroid g1 g2 g3 g a b c; o = circle a b c ? coll h g o"
