@@ -692,3 +692,9 @@ def sketch_rconstprescription(args: tuple[gm.Point, ...]) -> Circle:
 
     length = dab * n / m
     return Circle(center=C, radius=length)
+
+
+def sketch_radiuscircle(args: tuple[gm.Point, ...]) -> Circle:
+    a, y = args
+
+    return Circle(center=a, radius=y)
