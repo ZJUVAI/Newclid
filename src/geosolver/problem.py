@@ -200,10 +200,8 @@ class Problem:
         return p
 
     def txt(self) -> str:
-        return (
-            "; ".join([c.txt() for c in self.clauses]) + " ? " + self.goal.txt()
-            if self.goal
-            else ""
+        return "; ".join([c.txt() for c in self.clauses]) + (
+            " ? " + self.goal.txt() if self.goal else ""
         )
 
     def setup_str_from_problem(self, definitions: list[Definition]) -> str:

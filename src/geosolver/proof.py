@@ -143,9 +143,9 @@ class Proof:
         definitions: dict[str, Definition],
         verbose: bool = True,
         disabled_intrinsic_rules: Optional[list[str]] = None,
+        max_attempts=100,
     ) -> tuple[Proof, list[Dependency]]:
         """Build a problem into a gr.Graph object."""
-        check = False
         proof = None
         added = None
         if verbose:
@@ -155,10 +155,9 @@ class Proof:
         if disabled_intrinsic_rules is None:
             disabled_intrinsic_rules = []
 
-        while not check:
-            # While loop to search for coordinates
-            # that checks premises conditions numerically
-            # will result in infinite loop if problem is impossible numerically.
+        err = DepCheckFailError(f"Numerical check failed {max_attempts} times")
+        for _ in range(max_attempts):
+            # Search for coordinates that checks premises conditions numerically.
             try:
                 symbols_graph = SymbolsGraph()
                 alegbraic_manipulator = AlgebraicManipulator(symbols_graph)
@@ -190,11 +189,14 @@ class Proof:
                     added += adds
                 proof.plevel = plevel
 
-            except (num_geo.InvalidLineIntersectError, num_geo.InvalidQuadSolveError):
-                continue
-            except DepCheckFailError:
-                continue
-            except (PointTooCloseError, PointTooFarError):
+            except (
+                num_geo.InvalidLineIntersectError,
+                num_geo.InvalidQuadSolveError,
+                DepCheckFailError,
+                PointTooCloseError,
+                PointTooFarError,
+            ) as e:
+                err = e
                 continue
 
             if not problem.goal:
@@ -207,7 +209,10 @@ class Proof:
                 )
             )
             proof.dependency_graph.add_goal(problem.goal.name, args)
-            check = check_numerical(problem.goal.name, args)
+            if check_numerical(problem.goal.name, args):
+                break
+        else:
+            raise err
 
         proof.url = problem.url
         proof.build_def = (problem, definitions)

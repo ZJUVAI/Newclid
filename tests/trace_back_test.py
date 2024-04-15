@@ -20,39 +20,29 @@ import pytest
 import pytest_check as check
 
 from geosolver.concepts import ConceptName
-from geosolver.ddar import ddar_solve
-from geosolver.deductive.breadth_first_search import BFSDeductor
 from geosolver.dependencies.dependency import Dependency
-from geosolver.proof import Proof
-from geosolver.problem import Definition, Problem, Theorem
 from geosolver.trace_back import get_logs
+from geosolver.api import GeometricSolverBuilder
 
 
 class TestTraceback:
     @pytest.fixture(autouse=True)
     def setUpClass(self):
-        self.defs = Definition.to_dict(Definition.from_txt_file("defs.txt"))
-        self.rules = Theorem.from_txt_file("rules.txt")
+        self.solver_builder = GeometricSolverBuilder()
 
     def test_orthocenter_dependency_difference(self):
-        problem = Problem.from_txt(
+        solver = self.solver_builder.load_problem_from_txt(
             "a b c = triangle a b c; "
-            "d = on_tline d b a c, "
-            "on_tline d c a b; "
-            "e = on_line e a c, "
-            "on_line e b d "
+            "d = on_tline d b a c, on_tline d c a b; "
+            "e = on_line e a c, on_line e b d "
             "? perp a d b c"
-        )
-        deductive_agent = BFSDeductor(problem)
+        ).build()
 
-        proof, _ = Proof.build_problem(problem, self.defs)
+        solver.run()
 
-        ddar_solve(deductive_agent, proof, self.rules, problem)
-
-        goal_args = proof.symbols_graph.names2nodes(problem.goal.args)
-        query = Dependency(problem.goal.name, goal_args, None, None)
-
-        setup, aux, _, _ = get_logs(query, proof, merge_trivials=False)
+        goal_args = solver.proof_state.symbols_graph.names2nodes(solver.goal.args)
+        query = Dependency(solver.goal.name, goal_args, None, None)
+        setup, aux, _, _ = get_logs(query, solver.proof_state, merge_trivials=False)
 
         # Convert each predicates to its hash string:
         setup = [p.hashed() for p in setup]

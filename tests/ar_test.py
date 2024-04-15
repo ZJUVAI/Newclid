@@ -19,14 +19,13 @@ import pytest
 import pytest_check as check
 import geosolver.algebraic.geometric_tables as geometric_tables
 from geosolver.dependencies.empty_dependency import EmptyDependency
-from geosolver.proof import Proof
-from geosolver.problem import Definition, Problem
+from geosolver.api import GeometricSolverBuilder
 
 
 class TestAR:
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.defs = Definition.to_dict(Definition.from_txt_file("defs.txt"))
+        self.solver_builder = GeometricSolverBuilder()
 
     def test_update_groups(self):
         """Test for update_groups."""
@@ -87,11 +86,14 @@ class TestAR:
         """Test that AR can figure out bisector & ex-bisector are perpendicular."""
         # Load the scenario that we have cd is bisector of acb and
         # ce is the ex-bisector of acb.
-        problem = Problem.from_txt(
-            "a b c = triangle a b c; d = incenter d a b c; e = excenter e a b c ?"
-            " perp d c c e"
-        )
-        proof, _ = Proof.build_problem(problem, self.defs)
+
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b c = triangle a b c; "
+            "d = incenter d a b c; "
+            "e = excenter e a b c "
+            "? perp d c c e"
+        ).build()
+        proof = solver.proof_state
 
         # Create an external angle table:
         tb = geometric_tables.AngleTable("pi")
@@ -125,8 +127,10 @@ class TestAR:
     def test_angle_table_equilateral_triangle(self):
         """Test that AR can figure out triangles with 3 equal angles => each is pi/3."""
         # Load an equaliteral scenario
-        problem = Problem.from_txt("a b c = ieq_triangle ? cong a b a c")
-        proof, _ = Proof.build_problem(problem, self.defs)
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b c = ieq_triangle " "? cong a b a c"
+        ).build()
+        proof = solver.proof_state
 
         # Add two eqangles facts because ieq_triangle only add congruent sides
         a, b, c = proof.symbols_graph.names2nodes("abc")
@@ -168,13 +172,14 @@ class TestAR:
 
     def test_incenter_excenter_touchpoints(self):
         """Test that AR can figure out incenter/excenter touchpoints are equidistant to midpoint."""
-
-        problem = Problem.from_txt(
-            "a b c = triangle a b c; d1 d2 d3 d = incenter2 a b c; e1 e2 e3 e ="
-            " excenter2 a b c ? perp d c c e",
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b c = triangle a b c; "
+            "d1 d2 d3 d = incenter2 a b c; "
+            "e1 e2 e3 e = excenter2 a b c "
+            "? perp d c c e",
             translate=False,
-        )
-        proof, _ = Proof.build_problem(problem, self.defs)
+        ).build()
+        proof = solver.proof_state
 
         a, b, c, ab, bc, ca, d1, d2, d3, e1, e2, e3 = proof.symbols_graph.names2nodes(
             ["a", "b", "c", "ab", "bc", "ac", "d1", "d2", "d3", "e1", "e2", "e3"]
