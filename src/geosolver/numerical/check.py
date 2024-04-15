@@ -233,11 +233,13 @@ def check_numerical(name: str, args: list[Union[gm.Point, Point]]) -> bool:
 
 
 def same_clock(a: Point, b: Point, c: Point, d: Point, e: Point, f: Point) -> bool:
+    return clock(a, b, c) * clock(d, e, f) > 0
+
+
+def clock(a: Point, b: Point, c: Point):
     ba = b - a
     cb = c - b
-    ed = e - d
-    fe = f - e
-    return (ba.x * cb.y - ba.y * cb.x) * (ed.x * fe.y - ed.y * fe.x) > 0
+    return ba.x * cb.y - ba.y * cb.x
 
 
 def same_sign(a: Point, b: Point, c: Point, d: Point, e: Point, f: Point) -> bool:
