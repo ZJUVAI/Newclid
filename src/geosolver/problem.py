@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
+from fractions import Fraction
 
 
 from geosolver.concepts import ConceptName
@@ -43,12 +44,16 @@ def reshape(list_to_reshape: list[Any], n: int = 1) -> list[list[Any]]:
     return zip(*columns)
 
 
-def isint(x: str) -> bool:
+def is_int_or_frac(x: str) -> bool:
     try:
         int(x)
         return True
     except ValueError:
-        return False
+        try:
+            Fraction(x)
+            return True
+        except ValueError:
+            return False
 
 
 class Construction:
@@ -64,7 +69,7 @@ class Construction:
         self.args = args
 
     def translate(self, mapping: dict[str, str]) -> Construction:
-        args = [a if isint(a) else mapping[a] for a in self.args]
+        args = [a if is_int_or_frac(a) else mapping[a] for a in self.args]
         return Construction(self.name, args)
 
     def txt(self) -> str:

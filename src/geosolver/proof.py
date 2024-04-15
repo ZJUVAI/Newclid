@@ -183,14 +183,9 @@ class Proof:
             if not problem.goal:
                 break
 
-            args = list(
-                map(
-                    lambda x: proof.symbols_graph.get_point(x, lambda: int(x)),
-                    problem.goal.args,
-                )
-            )
-            proof.dependency_graph.add_goal(problem.goal.name, args)
-            if check_numerical(problem.goal.name, args):
+            goal_args = proof.symbols_graph.names2nodes(problem.goal.args)
+            proof.dependency_graph.add_goal(problem.goal.name, goal_args)
+            if check_numerical(problem.goal.name, goal_args):
                 break
         else:
             raise err
@@ -486,11 +481,11 @@ class Proof:
                     if b.name != ConceptName.CONSTANT_RATIO.value:
                         args = [mapping[a] for a in b.args]
                     else:
-                        num, den = map(int, b.args[-2:])
+                        num, den = map(int, b.args[-1].split("/"))
                         rat, _ = self.alegbraic_manipulator.get_or_create_const_rat(
                             num, den
                         )
-                        args = [mapping[a] for a in b.args[:-2]] + [rat.name]
+                        args = [mapping[a] for a in b.args[:-1]] + [rat.name]
 
                     args = list(
                         map(

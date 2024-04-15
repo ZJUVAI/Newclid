@@ -178,8 +178,9 @@ def check_contri_numerical(points: list[Point]) -> bool:
     )
 
 
-def check_ratio_numerical(points: list[Point]) -> bool:
-    a, b, c, d, m, n = points
+def check_ratio_numerical(points: list[Point | gm.Ratio]) -> bool:
+    a, b, c, d, ratio = points
+    m, n = map(int, ratio.name.split("/"))
     ab = a.distance(b)
     cd = c.distance(d)
     return close_enough(ab * n, cd * m)
@@ -205,8 +206,8 @@ NUMERICAL_CHECK_FUNCTIONS = {
     ConceptName.CONSTANT_ANGLE.value: check_aconst_numerical,
     ConceptName.SAMESIDE.value: check_sameside_numerical,
     ConceptName.NON_COLLINEAR.value: check_ncoll_numerical,
+    ConceptName.CONSTANT_RATIO.value: check_ratio_numerical,
     "para_or_coll": check_para_or_coll_numerical,
-    "ratio": check_ratio_numerical,
     "const_angle": check_const_angle_numerical,
 }
 
