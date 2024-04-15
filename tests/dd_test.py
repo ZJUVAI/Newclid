@@ -32,7 +32,7 @@ class TestDD:
         ).build()
 
         deductive_agent = BFSDeductor(solver.problem)
-        _derives, _eq4s, _branching, _all_added, success = deduce_to_saturation_or_goal(
+        _derives, _eq4s, _all_added, success = deduce_to_saturation_or_goal(
             deductive_agent,
             solver.proof_state,
             solver.rules,
@@ -52,7 +52,7 @@ class TestDD:
         timeout = 1
 
         deductive_agent = BFSDeductor(solver.problem)
-        _derives, _eq4s, _branching, _all_added, success = deduce_to_saturation_or_goal(
+        _derives, _eq4s, _all_added, success = deduce_to_saturation_or_goal(
             deductive_agent,
             solver.proof_state,
             solver.rules,

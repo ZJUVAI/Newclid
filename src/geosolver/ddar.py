@@ -28,11 +28,10 @@ def ddar_solve(
     dervs, eq4 = proof.alegbraic_manipulator.derive_algebra(level=0)
     derives = [dervs]
     eq4s = [eq4]
-    branches = []
     all_added = []
 
     while len(step_times) < max_steps:
-        dervs, eq4, next_branches, added, success = deduce_to_saturation_or_goal(
+        dervs, eq4, added, success = deduce_to_saturation_or_goal(
             deductive_agent,
             proof,
             theorems,
@@ -44,7 +43,6 @@ def ddar_solve(
         all_added += added
         derives += dervs
         eq4s += eq4
-        branches += next_branches
 
         if success:
             status = "solved"
@@ -72,4 +70,4 @@ def ddar_solve(
             # Nothing left... completely saturated.
             break
 
-    return proof, step_times, status, branches, all_added
+    return proof, step_times, status, all_added

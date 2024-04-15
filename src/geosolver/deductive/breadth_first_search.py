@@ -6,10 +6,13 @@ import logging
 from typing import TYPE_CHECKING, Optional
 import time
 
+from geosolver.algebraic.algebraic_manipulator import Derivations
 from geosolver.deductive.deductive_agent import (
     ApplyTheoremFeedback,
     DeductiveAgent,
     Action,
+    DeriveAlgebraAction,
+    DeriveFeedback,
     Feedback,
     Mapping,
     MatchAction,
@@ -43,6 +46,9 @@ class BFSDeductor(DeductiveAgent):
         self._match_cache: Optional[MatchCache] = None
         self._any_success_or_new_match_per_level: dict[int, bool] = {}
 
+        self._derivations: Derivations = {}
+        self._eq4s: Derivations = {}
+
     def act(self, proof: "Proof", theorems: list["Theorem"]) -> Action:
         """Deduce new statements by applying
         breath-first search over all theorems one by one."""
@@ -60,9 +66,10 @@ class BFSDeductor(DeductiveAgent):
             # If one full level without new success we have saturated
             return StopAction()
 
-        # Else we just go to the next level
+        # Else we derive the algebra of this level and go to the next level
+        action = DeriveAlgebraAction(self.level)
         self._next_level(theorems)
-        return self._match_next_theorem(proof)
+        return action
 
     def remember_effects(self, action: Action, feedback: Feedback):
         if isinstance(feedback, StopFeedback):
@@ -88,6 +95,9 @@ class BFSDeductor(DeductiveAgent):
                 action_hash = _action_str(feedback.theorem, mapping)
                 if action_hash not in self._actions_failed:
                     self._any_success_or_new_match_per_level[self.level] = True
+        elif isinstance(feedback, DeriveFeedback):
+            concat_derivations(self._derivations, feedback.derives)
+            concat_derivations(self._eq4s, feedback.eq4s)
         else:
             raise NotImplementedError()
 
@@ -138,3 +148,10 @@ class BFSDeductor(DeductiveAgent):
 def _action_str(theorem: "Theorem", mapping: Mapping) -> str:
     arg_names = [point.name for arg, point in mapping.items() if isinstance(arg, str)]
     return ".".join([theorem.name] + arg_names)
+
+
+def concat_derivations(derivations: Derivations, new: Derivations):
+    for new_key, new_vals in new.items():
+        if new_key not in derivations:
+            derivations[new_key] = []
+        derivations[new_key] += new_vals

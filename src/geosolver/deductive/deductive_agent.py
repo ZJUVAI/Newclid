@@ -2,6 +2,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, NamedTuple, Optional, Union
 from abc import abstractmethod
 
+from geosolver.algebraic.algebraic_manipulator import Derivations
+
 
 if TYPE_CHECKING:
     from geosolver.proof import Proof
@@ -30,7 +32,11 @@ class MatchAction(NamedTuple):
     goal: Optional["Construction"] = None
 
 
-Action = Union[StopAction, ApplyTheoremAction, MatchAction]
+class DeriveAlgebraAction(NamedTuple):
+    level: int
+
+
+Action = Union[StopAction, ApplyTheoremAction, MatchAction, DeriveAlgebraAction]
 
 
 class StopFeedback(NamedTuple):
@@ -48,7 +54,12 @@ class MatchFeedback(NamedTuple):
     mappings: list[Mapping]
 
 
-Feedback = Union[StopFeedback, ApplyTheoremFeedback, MatchFeedback]
+class DeriveFeedback(NamedTuple):
+    derives: Derivations
+    eq4s: Derivations
+
+
+Feedback = Union[StopFeedback, ApplyTheoremFeedback, MatchFeedback, DeriveFeedback]
 
 
 class DeductiveAgent:

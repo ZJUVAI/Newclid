@@ -28,6 +28,8 @@ from geosolver.deductive.breadth_first_search import Action, Mapping
 from geosolver.deductive.deductive_agent import (
     ApplyTheoremAction,
     ApplyTheoremFeedback,
+    DeriveAlgebraAction,
+    DeriveFeedback,
     Feedback,
     MatchAction,
     MatchFeedback,
@@ -228,8 +230,15 @@ class Proof:
             added, to_cache, success = self._apply_theorem(
                 action.theorem, action.mapping, action.level
             )
+            if self.alegbraic_manipulator and added:
+                # Add algebra to AR, but do NOT derive nor add to the proof state (yet)
+                for dep in added:
+                    self.alegbraic_manipulator.add_algebra(dep)
             self.cache_deps(to_cache)
             return ApplyTheoremFeedback(success, added, to_cache)
+        elif isinstance(action, DeriveAlgebraAction):
+            derives, eq4s = self.alegbraic_manipulator.derive_algebra(action.level)
+            return DeriveFeedback(derives, eq4s)
         elif isinstance(action, MatchAction):
             mappings = match_one_theorem(
                 self, action.theorem, cache=action.cache, goal=action.goal

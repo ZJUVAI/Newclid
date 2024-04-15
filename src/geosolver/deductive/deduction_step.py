@@ -2,7 +2,11 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Optional
 
-from geosolver.deductive.deductive_agent import ApplyTheoremFeedback, StopAction
+from geosolver.deductive.deductive_agent import (
+    ApplyTheoremFeedback,
+    DeriveFeedback,
+    StopAction,
+)
 
 
 if TYPE_CHECKING:
@@ -24,28 +28,21 @@ def do_deduction_step(
     action = ()
 
     t0 = time.time()
-    while not (added or isinstance(action, StopAction)):
+    while not (added or isinstance(action, (StopAction, DeriveFeedback))):
         action = deductive_agent.act(proof, theorems)
         feedback = proof.step(action)
         if isinstance(feedback, ApplyTheoremFeedback):
             added = feedback.added
+
         deductive_agent.remember_effects(action, feedback)
         if time.time() - t0 > timeout:
             break
 
     derives, eq4s = {}, {}
-    if proof.alegbraic_manipulator and added:
-        # Run AR, but do NOT apply to the proof state (yet)
-        for dep in added:
-            proof.alegbraic_manipulator.add_algebra(dep)
-        derives, eq4s = proof.alegbraic_manipulator.derive_algebra(
-            deductive_agent.level
-        )
+    if isinstance(feedback, DeriveFeedback):
+        derives, eq4s = feedback.derives, feedback.eq4s
 
-    branching = len(added)
-    branching += sum([len(x) for x in derives.values()])
-    branching += sum([len(x) for x in eq4s.values()])
-    return added, derives, eq4s, branching
+    return added, derives, eq4s
 
 
 def deduce_to_saturation_or_goal(
@@ -60,22 +57,20 @@ def deduce_to_saturation_or_goal(
     """Run DD until saturation or goal found."""
     derives = []
     eq4s = []
-    branching = []
     all_added = []
     if step_times is None:
         step_times = []
 
-    overall_t0 = time.time()
     success = False
+    overall_t0 = time.time()
     total_elapsed = time.time() - overall_t0
 
     while len(step_times) < max_steps:
         step_start = time.time()
-        added, derv, eq4, n_branching = do_deduction_step(
+        added, derv, eq4 = do_deduction_step(
             deductive_agent, proof, theorems, timeout - total_elapsed
         )
         all_added += added
-        branching.append(n_branching)
         derives.append(derv)
         eq4s.append(eq4)
         step_times.append(time.time() - step_start)
@@ -85,4 +80,4 @@ def deduce_to_saturation_or_goal(
         if success or not added or total_elapsed > timeout:
             break
 
-    return derives, eq4s, branching, all_added, success
+    return derives, eq4s, all_added, success
