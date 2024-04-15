@@ -683,3 +683,12 @@ def sketch_eqratioprescription(args: tuple[gm.Point, ...]) -> Circle:
 
     dgx = d_ef * dcd / dab
     return Circle(center=G, radius=dgx)
+
+
+def sketch_rconstprescription(args: tuple[gm.Point, ...]) -> Circle:
+    """Sketches point x such that ab/cx=m/n"""
+    A, B, C, m, n = args
+    dab = A.distance(B)
+
+    length = dab * n / m
+    return Circle(center=C, radius=length)
