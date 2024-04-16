@@ -8,7 +8,7 @@ from geosolver.algebraic.algebraic_manipulator import Derivations
 if TYPE_CHECKING:
     from geosolver.proof import Proof
     from geosolver.geometry import Point
-    from geosolver.problem import Problem, Theorem, Construction
+    from geosolver.problem import Theorem
     from geosolver.statement.adder import ToCache
     from geosolver.dependencies.dependency import Dependency
     from geosolver.deductive.match_theorems import MatchCache
@@ -29,14 +29,24 @@ class ApplyTheoremAction(NamedTuple):
 class MatchAction(NamedTuple):
     theorem: "Theorem"
     cache: Optional["MatchCache"] = None
-    goal: Optional["Construction"] = None
 
 
 class DeriveAlgebraAction(NamedTuple):
     level: int
 
 
-Action = Union[StopAction, ApplyTheoremAction, MatchAction, DeriveAlgebraAction]
+class ApplyDerivationAction(NamedTuple):
+    derivation_name: str
+    derivation_arguments: tuple["Point", ...]
+
+
+Action = Union[
+    StopAction,
+    ApplyTheoremAction,
+    MatchAction,
+    DeriveAlgebraAction,
+    ApplyDerivationAction,
+]
 
 
 class StopFeedback(NamedTuple):
@@ -59,14 +69,24 @@ class DeriveFeedback(NamedTuple):
     eq4s: Derivations
 
 
-Feedback = Union[StopFeedback, ApplyTheoremFeedback, MatchFeedback, DeriveFeedback]
+class ApplyDerivationFeedback(NamedTuple):
+    added: list["Dependency"]
+    to_cache: list["ToCache"]
+
+
+Feedback = Union[
+    StopFeedback,
+    ApplyTheoremFeedback,
+    MatchFeedback,
+    DeriveFeedback,
+    ApplyDerivationFeedback,
+]
 
 
 class DeductiveAgent:
     """Common interface for deductive agents"""
 
-    def __init__(self, problem: "Problem") -> None:
-        self.problem = problem
+    def __init__(self) -> None:
         self.level = None
 
     @abstractmethod

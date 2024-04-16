@@ -1,11 +1,8 @@
 import cProfile
 import logging
 from pathlib import Path
-from typing import Optional
 
 
-from geosolver.ddar import ddar_solve
-from geosolver.deductive.breadth_first_search import BFSDeductor
 from geosolver.proof import Proof
 from geosolver.problem import Definition, Problem, Theorem
 from geosolver.proof_writing import write_solution
@@ -85,26 +82,6 @@ def main():
         )
 
         return
-
-
-def run_ddar(proof: Proof, problem: Problem, out_folder: Optional[Path]) -> bool:
-    """Run DD+AR.
-
-    Args:
-      proof: Proof state.
-      p: Problem statement.
-      out_file: path to output file if solution is found.
-
-    Returns:
-      Boolean, whether DD+AR finishes successfully.
-    """
-    deductive_agent = BFSDeductor(problem)
-    ddar_solve(deductive_agent, proof, RULES)
-    goal_args = proof.symbols_graph.names2nodes(problem.goal.args)
-    if not proof.check(problem.goal.name, goal_args):
-        logging.info(f"DD+AR failed to solve the problem {problem.url}.")
-        return False
-    return True
 
 
 if __name__ == "__main__":

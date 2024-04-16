@@ -11,11 +11,13 @@ from typing_extensions import Self
 
 from geosolver.auxiliary_constructions import insert_aux_to_premise
 from geosolver.configs import default_defs_path, default_rules_path
-from geosolver.ddar import ddar_solve
-from geosolver.deductive.breadth_first_search import BFSDeductor
+from geosolver.deductive.breadth_first_search import BFSDDAR
+from geosolver.deductive.deductive_agent import DeductiveAgent
+from geosolver.deductive.deduction_step import run_loop
 from geosolver.problem import Problem, Theorem, Definition, Clause
 from geosolver.proof import Proof
 from geosolver.proof_writing import write_solution
+from geosolver.statement.adder import IntrinsicRules
 
 
 class GeometricSolver:
@@ -25,12 +27,17 @@ class GeometricSolver:
         problem: "Problem",
         defs: dict[str, "Definition"],
         rules: list["Theorem"],
+        deductive_agent: Optional[DeductiveAgent] = None,
     ) -> None:
         self.proof_state = proof_state
         self.problem = problem
         self.defs = defs
         self.rules = rules
         self.problem_string = problem.txt()
+        if deductive_agent is None:
+            deductive_agent = BFSDDAR()
+        self.deductive_agent = deductive_agent
+        self.run_infos = None
 
     @property
     def goal(self):
@@ -54,22 +61,17 @@ class GeometricSolver:
     def get_setup_string(self) -> str:
         return self.problem.setup_str_from_problem(self.defs)
 
-    def run(self, max_steps: int = 1000) -> bool:
-        deductive_agent = BFSDeductor(self.problem)
-        ddar_solve(
-            deductive_agent,
+    def run(self, max_steps: int = 10000, timeout: float = 600.0) -> bool:
+        success, infos = run_loop(
+            self.deductive_agent,
             self.proof_state,
             self.rules,
-            self.problem,
+            self.problem.goal,
             max_steps=max_steps,
+            timeout=timeout,
         )
-        goal = self.problem.goal
-        goal_args_names = self.proof_state.symbols_graph.names2nodes(goal.args)
-        if not self.proof_state.check(goal.name, goal_args_names):
-            logging.info("Solver failed to solve the problem.")
-            return False
-        logging.info("Solved.")
-        return True
+        self.run_infos = infos
+        return success
 
     def write_solution(self, out_file: Path):
         write_solution(self.proof_state, self.problem, out_file)
@@ -105,10 +107,12 @@ class GeometricSolver:
 
 class GeometricSolverBuilder:
     def __init__(self) -> None:
-        self.problem = None
-        self.defs = None
-        self.rules = None
-        self.proof_state = None
+        self.problem: Optional[Problem] = None
+        self.defs: Optional[list[Definition]] = None
+        self.rules: Optional[list[Theorem]] = None
+        self.proof_state: Optional[Proof] = None
+        self.deductive_agent: Optional[DeductiveAgent] = None
+        self.disabled_intrinsic_rules: Optional[list[IntrinsicRules]] = None
 
     def build(self) -> "GeometricSolver":
         if self.problem is None:
@@ -123,9 +127,13 @@ class GeometricSolverBuilder:
             self.rules = Theorem.from_txt_file(default_rules_path())
 
         if self.proof_state is None:
-            self.proof_state, _ = Proof.build_problem(self.problem, self.defs)
+            self.proof_state, _ = Proof.build_problem(
+                self.problem, self.defs, self.disabled_intrinsic_rules
+            )
 
-        return GeometricSolver(self.proof_state, self.problem, self.defs, self.rules)
+        return GeometricSolver(
+            self.proof_state, self.problem, self.defs, self.rules, self.deductive_agent
+        )
 
     def load_problem_from_file(
         self, problems_path: Path, problem_name: str, translate: bool = True
@@ -154,4 +162,14 @@ class GeometricSolverBuilder:
         if defs_path is None:
             defs_path = default_defs_path()
         self.defs = Definition.to_dict(Definition.from_txt_file(defs_path))
+        return self
+
+    def with_deductive_agent(self, deductive_agent: DeductiveAgent):
+        self.deductive_agent = deductive_agent
+        return self
+
+    def with_disabled_intrinsic_rules(
+        self, disabled_intrinsic_rules: list[IntrinsicRules]
+    ):
+        self.disabled_intrinsic_rules = disabled_intrinsic_rules
         return self

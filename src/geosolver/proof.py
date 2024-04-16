@@ -26,6 +26,8 @@ import logging
 from geosolver.concepts import ConceptName
 from geosolver.deductive.breadth_first_search import Action, Mapping
 from geosolver.deductive.deductive_agent import (
+    ApplyDerivationAction,
+    ApplyDerivationFeedback,
     ApplyTheoremAction,
     ApplyTheoremFeedback,
     DeriveAlgebraAction,
@@ -37,7 +39,7 @@ from geosolver.deductive.deductive_agent import (
     StopFeedback,
 )
 from geosolver.deductive.match_theorems import match_one_theorem
-from geosolver.statement.adder import StatementAdder, ToCache
+from geosolver.statement.adder import IntrinsicRules, StatementAdder, ToCache
 from geosolver.statement.checker import StatementChecker
 from geosolver.symbols_graph import SymbolsGraph
 from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
@@ -137,22 +139,20 @@ class Proof:
         self.statements_checker = statements_checker
         self.statements_adder = statements_adder
         self.dependency_graph = DependencyGraph()
+        self._goal = None
 
     @classmethod
     def build_problem(
         cls,
         problem: Problem,
         definitions: dict[str, Definition],
-        verbose: bool = True,
-        disabled_intrinsic_rules: Optional[list[str]] = None,
+        disabled_intrinsic_rules: Optional[list[IntrinsicRules]] = None,
         max_attempts=100,
     ) -> tuple[Proof, list[Dependency]]:
         """Build a problem into a gr.Graph object."""
         proof = None
         added = None
-        if verbose:
-            logging.info(problem.url)
-            logging.info(problem.txt())
+        logging.info(f"Building proof from problem '{problem.url}': {problem.txt()}")
 
         if disabled_intrinsic_rules is None:
             disabled_intrinsic_rules = []
@@ -185,9 +185,7 @@ class Proof:
                 added = []
                 plevel = 0
                 for clause in problem.clauses:
-                    adds, plevel = proof.add_clause(
-                        clause, plevel, definitions, verbose=verbose
-                    )
+                    adds, plevel = proof.add_clause(clause, plevel, definitions)
                     added += adds
                 proof.plevel = plevel
 
@@ -210,14 +208,14 @@ class Proof:
                     problem.goal.args,
                 )
             )
+
             proof.dependency_graph.add_goal(problem.goal.name, args)
             if check_numerical(problem.goal.name, args):
                 break
         else:
             raise err
 
-        proof.url = problem.url
-        proof.build_def = (problem, definitions)
+        proof._goal = problem.goal
         for add in added:
             proof.alegbraic_manipulator.add_algebra(add)
 
@@ -241,9 +239,15 @@ class Proof:
             return DeriveFeedback(derives, eq4s)
         elif isinstance(action, MatchAction):
             mappings = match_one_theorem(
-                self, action.theorem, cache=action.cache, goal=action.goal
+                self, action.theorem, cache=action.cache, goal=self._goal
             )
             return MatchFeedback(action.theorem, mappings)
+        elif isinstance(action, ApplyDerivationAction):
+            added, to_cache = self.do_algebra(
+                action.derivation_name, action.derivation_arguments
+            )
+            self.cache_deps(to_cache)
+            return ApplyDerivationFeedback(added, to_cache)
 
         raise NotImplementedError()
 
@@ -330,12 +334,13 @@ class Proof:
     ) -> Tuple[list[Dependency], list[ToCache]]:
         return self.statements_adder.add_piece(name, args, deps)
 
-    def do_algebra(self, name: str, args: list[Point]) -> list[Dependency]:
+    def do_algebra(
+        self, name: str, args: list[Point]
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Derive (but not add) new algebraic predicates."""
         new_deps, to_cache = self.statements_adder.add_algebra(name, args)
         self.dependency_graph.add_algebra_edges(to_cache, args[:-1])
-        self.cache_deps(to_cache)
-        return new_deps
+        return new_deps, to_cache
 
     def cache_deps(self, deps_to_cache: list[ToCache]):
         for to_cache in deps_to_cache:
@@ -420,7 +425,6 @@ class Proof:
         clause: Clause,
         plevel: int,
         definitions: dict[str, Definition],
-        verbose: int = False,
     ) -> tuple[list[Dependency], int]:
         """Add a new clause of construction, e.g. a new excenter."""
         existing_points = self.symbols_graph.all_points()
