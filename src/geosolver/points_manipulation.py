@@ -3,9 +3,11 @@
 
 from typing import Any, Generator
 
+from geosolver.combinatorics import memoized
 from geosolver.geometry import Line, Point
 
 
+@memoized
 def rotate_simtri(
     a: Point, b: Point, c: Point, x: Point, y: Point, z: Point
 ) -> Generator[tuple[Point, ...], None, None]:
@@ -22,6 +24,7 @@ def rotate_simtri(
         yield p[::-1]
 
 
+@memoized
 def rotate_contri(
     a: Point, b: Point, c: Point, x: Point, y: Point, z: Point
 ) -> Generator[tuple[Point, ...], None, None]:

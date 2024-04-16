@@ -872,7 +872,7 @@ class Proof:
         # finally the list of ratios that is equal to 1.0
         for length in self.symbols_graph.type2nodes[Length]:
             segs = length.neighbors(Segment)
-            segss.append(segs)
+            segss.append(tuple(segs))
 
         segs_pair = list(comb.permutations_pairs(list(segss)))
         segs_pair += list(zip(segss, segss))
