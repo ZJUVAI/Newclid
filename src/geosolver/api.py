@@ -11,9 +11,9 @@ from typing_extensions import Self
 
 from geosolver.auxiliary_constructions import insert_aux_to_premise
 from geosolver.configs import default_defs_path, default_rules_path
-from geosolver.deductive.breadth_first_search import BFSDDAR
-from geosolver.deductive.deductive_agent import DeductiveAgent
-from geosolver.deductive.deduction_step import run_loop
+from geosolver.agent.breadth_first_search import BFSDDAR
+from geosolver.agent.interface import DeductiveAgent
+from geosolver.run_loop import run_loop
 from geosolver.problem import Problem, Theorem, Definition, Clause
 from geosolver.proof import Proof
 from geosolver.proof_writing import write_solution

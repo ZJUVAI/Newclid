@@ -1,1 +1,0 @@
-"""Implements Deductive Database (DD)."""

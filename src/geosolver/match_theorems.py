@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Callable, Generator, Optional
 import geosolver.combinatorics as comb
 
 from geosolver.concepts import ConceptName
-from geosolver.deductive.deductive_agent import Mapping
-from geosolver.deductive.points_manipulation import (
+from geosolver.agent.interface import Mapping
+from geosolver.points_manipulation import (
     diff_point,
     intersect1,
     rotate_contri,

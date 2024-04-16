@@ -1,8 +1,7 @@
+"""Implements Deductive Database (DD)."""
 from __future__ import annotations
 from typing import TYPE_CHECKING, NamedTuple, Optional, Union
 from abc import abstractmethod
-
-from geosolver.algebraic.algebraic_manipulator import Derivations
 
 
 if TYPE_CHECKING:
@@ -11,7 +10,8 @@ if TYPE_CHECKING:
     from geosolver.problem import Theorem
     from geosolver.statement.adder import ToCache
     from geosolver.dependencies.dependency import Dependency
-    from geosolver.deductive.match_theorems import MatchCache
+    from geosolver.match_theorems import MatchCache
+    from geosolver.algebraic.algebraic_manipulator import Derivations
 
 Mapping = dict[str, "Point"]
 
@@ -65,8 +65,8 @@ class MatchFeedback(NamedTuple):
 
 
 class DeriveFeedback(NamedTuple):
-    derives: Derivations
-    eq4s: Derivations
+    derives: "Derivations"
+    eq4s: "Derivations"
 
 
 class ApplyDerivationFeedback(NamedTuple):

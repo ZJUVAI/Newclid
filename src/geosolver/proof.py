@@ -24,8 +24,8 @@ import logging
 
 
 from geosolver.concepts import ConceptName
-from geosolver.deductive.breadth_first_search import Action, Mapping
-from geosolver.deductive.deductive_agent import (
+from geosolver.agent.breadth_first_search import Action, Mapping
+from geosolver.agent.interface import (
     ApplyDerivationAction,
     ApplyDerivationFeedback,
     ApplyTheoremAction,
@@ -38,7 +38,7 @@ from geosolver.deductive.deductive_agent import (
     StopAction,
     StopFeedback,
 )
-from geosolver.deductive.match_theorems import match_one_theorem
+from geosolver.match_theorems import match_one_theorem
 from geosolver.statement.adder import IntrinsicRules, StatementAdder, ToCache
 from geosolver.statement.checker import StatementChecker
 from geosolver.symbols_graph import SymbolsGraph

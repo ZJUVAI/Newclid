@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Optional
 import time
 
 from geosolver.algebraic.algebraic_manipulator import Derivations
-from geosolver.deductive.deductive_agent import (
+from geosolver.agent.interface import (
     ApplyDerivationAction,
     ApplyDerivationFeedback,
     ApplyTheoremFeedback,
@@ -23,7 +23,7 @@ from geosolver.deductive.deductive_agent import (
     ApplyTheoremAction,
     StopFeedback,
 )
-from geosolver.deductive.match_theorems import MatchCache
+from geosolver.match_theorems import MatchCache
 from geosolver.geometry import Point
 
 

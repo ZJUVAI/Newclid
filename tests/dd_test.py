@@ -2,7 +2,7 @@
 import pytest
 import pytest_check as check
 
-from geosolver.deductive.breadth_first_search import BFSDD
+from geosolver.agent.breadth_first_search import BFSDD
 from geosolver.api import GeometricSolverBuilder
 
 
