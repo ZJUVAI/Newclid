@@ -20,7 +20,7 @@ def run_loop(
     max_steps: int = 10000,
     timeout: float = 600.0,
 ) -> tuple[bool, dict]:
-    """Run DD until saturation or goal found."""
+    """Run DeductiveAgent until saturation or goal found."""
     infos = {}
     success = False
     t0 = time.time()
@@ -44,6 +44,7 @@ def run_loop(
         ):
             done = True
 
+    infos["success"] = success
     infos["runtime"] = total_elapsed
     infos["timeout"] = total_elapsed > timeout
     infos["overstep"] = step > max_steps

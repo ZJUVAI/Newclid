@@ -76,6 +76,26 @@ class GeometricSolver:
     def write_solution(self, out_file: Path):
         write_solution(self.proof_state, self.problem, out_file)
 
+    def write_all_outputs(self, output_folder_path: Path):
+        problem_name = self.problem.url
+        self.write_solution(
+            output_folder_path / f"{problem_name}_proof_steps.txt",
+        )
+        self.proof_state.symbols_graph.draw_figure(
+            output_folder_path / f"{problem_name}_proof_figure.png",
+        )
+        self.proof_state.symbols_graph.draw_html(
+            output_folder_path / f"{problem_name}.symbols_graph.html"
+        )
+        self.proof_state.dependency_graph.show_html(
+            output_folder_path / f"{problem_name}.dependency_graph.html",
+            Theorem.to_dict(self.rules),
+        )
+        self.proof_state.dependency_graph.proof_subgraph.show_html(
+            output_folder_path / f"{problem_name}.proof_subgraph.html",
+            Theorem.to_dict(self.rules),
+        )
+
     def draw_figure(self, out_file: Path):
         self.proof_state.symbols_graph.draw_figure(out_file)
 
