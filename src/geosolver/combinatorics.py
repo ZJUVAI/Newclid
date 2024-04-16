@@ -5,10 +5,33 @@ Mainly for listing combinations and permutations of elements.
 
 from typing import Generator, List, Tuple, TypeVar
 from geosolver.geometry import Point
+from itertools import tee
+from types import GeneratorType
+
+
+Tee = tee([], 1)[0].__class__
+
+
+def memoized(f):
+    cache = {}
+
+    def ret(*args):
+        if args not in cache:
+            cache[args] = f(*args)
+        if isinstance(cache[args], (GeneratorType, Tee)):
+            # the original can't be used any more,
+            # so we need to change the cache as well
+            cache[args], r = tee(cache[args])
+            return r
+        return cache[args]
+
+    return ret
+
 
 Element = TypeVar("Element")
 
 
+@memoized
 def _cross_product(elems1: List[Element], elems2: List[Element]):
     for e1 in elems1:
         for e2 in elems2:
@@ -16,9 +39,10 @@ def _cross_product(elems1: List[Element], elems2: List[Element]):
 
 
 def cross_product(elems1: List[Element], elems2: List[Element]) -> List[Tuple[Element]]:
-    return list(_cross_product(elems1, elems2))
+    return list(_cross_product(tuple(elems1), tuple(elems2)))
 
 
+@memoized
 def _arrangement_pairs(elems):
     if len(elems) < 2:
         return
@@ -28,9 +52,10 @@ def _arrangement_pairs(elems):
 
 
 def arrangement_pairs(elems: List[Element]) -> List[Tuple[Element]]:
-    return list(_arrangement_pairs(elems))
+    return list(_arrangement_pairs(tuple(elems)))
 
 
+@memoized
 def _arrangement_triplets(elems):
     if len(elems) < 3:
         return
@@ -41,9 +66,10 @@ def _arrangement_triplets(elems):
 
 
 def arrangement_triplets(elems: List[Element]) -> List[Tuple[Element]]:
-    return list(_arrangement_triplets(elems))
+    return list(_arrangement_triplets(tuple(elems)))
 
 
+@memoized
 def _arrangement_quadruplets(elems):
     if len(elems) < 4:
         return
@@ -54,9 +80,10 @@ def _arrangement_quadruplets(elems):
 
 
 def arrangement_quadruplets(elems: List[Element]) -> List[Tuple[Element]]:
-    return list(_arrangement_quadruplets(elems))
+    return list(_arrangement_quadruplets(tuple(elems)))
 
 
+@memoized
 def _permutation_pairs(elems):
     for e1, e2 in arrangement_pairs(elems):
         yield e1, e2
@@ -64,9 +91,10 @@ def _permutation_pairs(elems):
 
 
 def permutations_pairs(elems):
-    return list(_permutation_pairs(elems))
+    return list(_permutation_pairs(tuple(elems)))
 
 
+@memoized
 def _all_4points(l1, l2):
     p1s = l1.neighbors(Point)
     p2s = l2.neighbors(Point)
@@ -79,6 +107,7 @@ def all_4points(l1, l2):
     return list(_all_4points(l1, l2))
 
 
+@memoized
 def _all_8points(l1, l2, l3, l4):
     for a, b, c, d in all_4points(l1, l2):
         for e, f, g, h in all_4points(l3, l4):
@@ -89,6 +118,7 @@ def all_8points(l1, l2, l3, l4):
     return list(_all_8points(l1, l2, l3, l4))
 
 
+@memoized
 def _perm3(elems):
     for x in elems:
         for y in elems:
@@ -100,9 +130,10 @@ def _perm3(elems):
 
 
 def permutations_triplets(elems):
-    return list(_perm3(elems))
+    return list(_perm3(tuple(elems)))
 
 
+@memoized
 def _perm4(elems):
     for x in elems:
         for y in elems:
@@ -117,7 +148,7 @@ def _perm4(elems):
 
 
 def permutations_quadruplets(elems):
-    return list(_perm4(elems))
+    return list(_perm4(tuple(elems)))
 
 
 def enum_sides(points: list[Point]) -> Generator[list[Point], None, None]:
