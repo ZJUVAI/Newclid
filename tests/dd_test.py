@@ -12,7 +12,7 @@ class TestDD:
         self.solver_builder = GeometricSolverBuilder()
 
     @pytest.mark.slow
-    def test_imo_2022_p4_should_succeed(self):
+    def test_imo_2000_p1_should_succeed(self):
         solver = (
             self.solver_builder.load_problem_from_txt(
                 "a b = segment a b; "
