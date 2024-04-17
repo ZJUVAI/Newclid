@@ -441,3 +441,9 @@ x : a b c x
 a b c = diff a b
 x : rconst a b c x m n
 rconstprescription a b c m n
+
+eqratio_prescription2 x a c e f g h
+x : x a c e f g h
+a c e f g h = diff e f, diff g h
+x : eqratio a x c x e f g h
+eqratioprescription0 a c e f g h
