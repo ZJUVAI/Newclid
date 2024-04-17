@@ -23,11 +23,11 @@ class StopAction(NamedTuple):
 class ApplyTheoremAction(NamedTuple):
     theorem: "Theorem"
     mapping: Mapping
-    level: int
 
 
 class MatchAction(NamedTuple):
     theorem: "Theorem"
+    level: int
     cache: Optional["MatchCache"] = None
 
 

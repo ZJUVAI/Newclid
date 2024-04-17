@@ -140,6 +140,9 @@ class Proof:
         self.statements_adder = statements_adder
         self.dependency_graph = DependencyGraph()
         self._goal = None
+        self._resolved_mapping_deps: dict[
+            tuple["Theorem", "Mapping"], EmptyDependency
+        ] = {}
 
     @classmethod
     def build_problem(
@@ -226,7 +229,7 @@ class Proof:
             return StopFeedback()
         elif isinstance(action, ApplyTheoremAction):
             added, to_cache, success = self._apply_theorem(
-                action.theorem, action.mapping, action.level
+                action.theorem, action.mapping
             )
             if self.alegbraic_manipulator and added:
                 # Add algebra to AR, but do NOT derive nor add to the proof state (yet)
@@ -238,10 +241,19 @@ class Proof:
             derives, eq4s = self.alegbraic_manipulator.derive_algebra(action.level)
             return DeriveFeedback(derives, eq4s)
         elif isinstance(action, MatchAction):
-            mappings = match_one_theorem(
-                self, action.theorem, cache=action.cache, goal=self._goal
+            theorem = action.theorem
+            potential_mappings = match_one_theorem(
+                self, theorem, cache=action.cache, goal=self._goal
             )
-            return MatchFeedback(action.theorem, mappings)
+            mappings = []
+            for mapping in potential_mappings:
+                deps = self._resolve_mapping_dependency(theorem, mapping, action.level)
+                if deps is not None:
+                    mappings.append(mapping)
+                    mapping_str = theorem_mapping_str(theorem, mapping)
+                    self._resolved_mapping_deps[mapping_str] = deps
+
+            return MatchFeedback(theorem, mappings)
         elif isinstance(action, ApplyDerivationAction):
             added, to_cache = self.do_algebra(
                 action.derivation_name, action.derivation_arguments
@@ -252,9 +264,10 @@ class Proof:
         raise NotImplementedError()
 
     def _apply_theorem(
-        self, theorem: "Theorem", mapping: Mapping, dependency_level: int
+        self, theorem: "Theorem", mapping: Mapping
     ) -> Tuple[list[Dependency], list[ToCache], bool]:
-        deps = self._resolve_mapping_dependency(theorem, mapping, dependency_level)
+        mapping_str = theorem_mapping_str(theorem, mapping)
+        deps = self._resolved_mapping_deps.get(mapping_str)
         if deps is None:
             return [], [], False
         conclusion_name, args = theorem.conclusion_name_args(mapping)
@@ -946,3 +959,10 @@ class Proof:
                 if len(ps) >= 3:
                     for a, b, c in comb.permutations_triplets(ps):
                         yield p, a, b, c
+
+
+def theorem_mapping_str(theorem: Theorem, mapping: Mapping) -> str:
+    points_txt = " ".join(
+        [point.name for _name, point in mapping.items() if isinstance(_name, str)]
+    )
+    return f"{theorem.rule_name} {points_txt}"

@@ -60,7 +60,7 @@ class BFSDD(DeductiveAgent):
         if self._current_mappings or self._theorem_mappings:
             # Then we apply all gathered mappings of the level
             theorem, mapping = self._next_theorem_mapping()
-            return ApplyTheoremAction(theorem, mapping, self.level)
+            return ApplyTheoremAction(theorem, mapping)
 
         if self.level > 0 and not self._any_success_or_new_match_per_level[self.level]:
             # If one full level without new success we have saturated
@@ -114,7 +114,7 @@ class BFSDD(DeductiveAgent):
         if self._match_cache is None:
             self._match_cache = MatchCache(proof)
         next_theorem = self._unmatched_theorems.pop(0)
-        return MatchAction(next_theorem, cache=self._match_cache)
+        return MatchAction(next_theorem, cache=self._match_cache, level=self.level)
 
     def _next_level(self, theorems: list["Theorem"]):
         self._update_level()
