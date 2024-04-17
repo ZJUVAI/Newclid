@@ -645,12 +645,11 @@ def sketch_3peq(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
 ###### NEW FUNCTIONS FOR NEW DEFINITIONS ---- V. S.
 
 
-def sketch_isosvertex(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
+def sketch_isosvertex(args: tuple[gm.Point, ...]) -> Line:
     b, c = args
-    side = unif(0.6, 2.5) * b.distance(c)
+    m = (b + c) * 2
 
-    a, _ = circle_circle_intersection(Circle(b, side), Circle(c, side))
-    return a
+    return m.perpendicular_line(Line(b, c))
 
 
 def sketch_aline0(args: tuple[gm.Point, ...]) -> HalfLine:
@@ -692,3 +691,22 @@ def sketch_rconstprescription(args: tuple[gm.Point, ...]) -> Circle:
 
     length = dab * n / m
     return Circle(center=C, radius=length)
+
+
+def sketch_eqratioprescription2(args: tuple[gm.Point, ...]) -> Circle | Line:
+    """Sketches a point x such that ax/cx=ef/gh"""
+    A, C, E, F, G, H = args
+    d_ef = E.distance(F)
+    dgh = G.distance(H)
+
+    if dgh == d_ef:
+        M = (A + C) * 0.5
+        return M.perpendicular_line(Line(A, C))
+
+    else:
+        ratio = d_ef / dgh
+        extremum_1 = (1 / (1 - ratio)) * (A - ratio * C)
+        extremum_2 = (1 / (1 + ratio)) * (ratio * C + A)
+        center = (extremum_1 + extremum_2) * 0.5
+        radius = 0.5 * extremum_1.distance(extremum_2)
+        return Circle(center=center, radius=radius)
