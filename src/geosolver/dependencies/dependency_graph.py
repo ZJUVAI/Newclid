@@ -1,6 +1,5 @@
 from __future__ import annotations
 from enum import Enum
-import logging
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
@@ -124,26 +123,26 @@ class DependencyGraph:
             ):
                 added_dependency = added_dependency.why[0]
 
-            same_name = added_dependency.name == cache_name
-            same_args = added_dependency.args == cache_args
+            # same_name = added_dependency.name == cache_name
+            # same_args = added_dependency.args == cache_args
 
-            if not same_name or not same_args:
-                dep_args_str = ".".join(_str_arguments(added_dependency.args))
-                cache_args_str = ".".join(arg.name for arg in cache_args)
-                logging.warning(
-                    f"Dependency {added_dependency.name}.{dep_args_str}"
-                    f" differs from cache {cache_name}.{cache_args_str}"
-                )
+            # if not same_name or not same_args:
+            #     dep_args_str = ".".join(_str_arguments(added_dependency.args))
+            #     cache_args_str = ".".join(arg.name for arg in cache_args)
+            #     logging.warning(
+            #         f"Dependency {added_dependency.name}.{dep_args_str}"
+            #         f" differs from cache {cache_name}.{cache_args_str}"
+            #     )
 
-            same_rule = added_dependency.rule_name == theorem.rule_name
-            if not same_rule:
-                args_str = ".".join(arg.name for arg in args)
-                logging.warning(
-                    f"Dependency {added_dependency.name}"
-                    f" has rule_name '{added_dependency.rule_name}'"
-                    f" different from the theorem {theorem.name}"
-                    f" with rule_name {theorem.rule_name} and arguments {args_str}",
-                )
+            # same_rule = added_dependency.rule_name == theorem.rule_name
+            # if not same_rule:
+            #     args_str = ".".join(arg.name for arg in args)
+            #     logging.warning(
+            #         f"Dependency {added_dependency.name}"
+            #         f" has rule_name '{added_dependency.rule_name}'"
+            #         f" different from the theorem {theorem.name}"
+            #         f" with rule_name {theorem.rule_name} and arguments {args_str}",
+            #     )
 
             for why_added in added_dependency.why:
                 self.add_edge(
@@ -166,26 +165,26 @@ class DependencyGraph:
             ):
                 added_dependency = added_dependency.why[0]
 
-            same_name = added_dependency.name == cache_name
-            same_args = added_dependency.args == cache_args
+            # same_name = added_dependency.name == cache_name
+            # same_args = added_dependency.args == cache_args
 
-            if not same_name or not same_args:
-                dep_args_str = ".".join(_str_arguments(added_dependency.args))
-                cache_args_str = ".".join(arg.name for arg in cache_args)
-                logging.warning(
-                    f"Dependency {added_dependency.name}.{dep_args_str}"
-                    f" differs from cache {cache_name}.{cache_args_str}"
-                )
+            # if not same_name or not same_args:
+            #     dep_args_str = ".".join(_str_arguments(added_dependency.args))
+            #     cache_args_str = ".".join(arg.name for arg in cache_args)
+            #     logging.warning(
+            #         f"Dependency {added_dependency.name}.{dep_args_str}"
+            #         f" differs from cache {cache_name}.{cache_args_str}"
+            #     )
 
             dep_rule_name = added_dependency.rule_name
-            ar_rules = [ar.value for ar in AlgebraicRules]
-            if dep_rule_name not in ar_rules:
-                args_str = ".".join(arg.name for arg in args)
-                logging.warning(
-                    f"Dependency {added_dependency} has rule_name {dep_rule_name}"
-                    f" not present in algebraic rules {ar_rules}"
-                    f" with arguments {args_str}",
-                )
+            # ar_rules = [ar.value for ar in AlgebraicRules]
+            # if dep_rule_name not in ar_rules:
+            #     args_str = ".".join(arg.name for arg in args)
+            #     logging.warning(
+            #         f"Dependency {added_dependency} has rule_name {dep_rule_name}"
+            #         f" not present in algebraic rules {ar_rules}"
+            #         f" with arguments {args_str}",
+            #     )
 
             for why_added in added_dependency.why:
                 self.add_edge(
@@ -206,25 +205,25 @@ class DependencyGraph:
             ):
                 added_dependency = added_dependency.why[0]
 
-            same_name = added_dependency.name == cache_name
-            same_args = added_dependency.args == cache_args
+            # same_name = added_dependency.name == cache_name
+            # same_args = added_dependency.args == cache_args
 
-            if not same_name or not same_args:
-                dep_args_str = ".".join(_str_arguments(added_dependency.args))
-                cache_args_str = ".".join(arg.name for arg in cache_args)
-                logging.warning(
-                    f"Dependency {added_dependency.name}.{dep_args_str}"
-                    f" differs from cache {cache_name}.{cache_args_str}"
-                )
+            # if not same_name or not same_args:
+            #     dep_args_str = ".".join(_str_arguments(added_dependency.args))
+            #     cache_args_str = ".".join(arg.name for arg in cache_args)
+            #     logging.warning(
+            #         f"Dependency {added_dependency.name}.{dep_args_str}"
+            #         f" differs from cache {cache_name}.{cache_args_str}"
+            #     )
 
             dep_rule_name = added_dependency.rule_name
-            if dep_rule_name != CONSTRUCTION_RULE:
-                logging.warning(
-                    "Dependency rule was different"
-                    "from the construction rule. %s != %s",
-                    dep_rule_name,
-                    CONSTRUCTION_RULE,
-                )
+            # if dep_rule_name != CONSTRUCTION_RULE:
+            #     logging.warning(
+            #         "Dependency rule was different"
+            #         "from the construction rule. %s != %s",
+            #         dep_rule_name,
+            #         CONSTRUCTION_RULE,
+            #     )
 
             for why_added in added_dependency.why:
                 self.add_dependency(why_added)
@@ -245,9 +244,10 @@ class DependencyGraph:
         # populates the nodes and edges data structures
         vis_graph: MultiDiGraph = self.nx_graph.copy()
 
-        max_level = max(
+        levels = [
             lvl for _, lvl in self.nx_graph.nodes(data="level") if lvl is not None
-        )
+        ]
+        max_level = max(levels) if levels else 0
         nodes_colors = build_nodes_colors(max_level + 1)
         for node, data in vis_graph.nodes(data=True):
             name: str = data.get("name", "Unknown")
@@ -312,10 +312,10 @@ class DependencyGraph:
         nt.options.physics.use_barnes_hut(
             {
                 "gravity": -15000,
-                "central_gravity": 0.3,
+                "central_gravity": 2.0,
                 "spring_length": 100,
                 "spring_strength": 0.05,
-                "damping": 0.09,
+                "damping": 0.2,
                 "overlap": 0.01,
             }
         )
