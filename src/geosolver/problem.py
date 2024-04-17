@@ -70,6 +70,9 @@ class Construction:
     def txt(self) -> str:
         return " ".join([self.name] + list(self.args))
 
+    def __str__(self) -> str:
+        return self.txt()
+
 
 class Clause:
     """One construction (>= 1 predicate)."""

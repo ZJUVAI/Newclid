@@ -77,6 +77,7 @@ class GeometricSolver:
         write_solution(self.proof_state, self.problem, out_file)
 
     def write_all_outputs(self, output_folder_path: Path):
+        output_folder_path.mkdir(exist_ok=True, parents=True)
         problem_name = self.problem.url
         self.write_solution(
             output_folder_path / f"{problem_name}_proof_steps.txt",
@@ -95,6 +96,7 @@ class GeometricSolver:
             output_folder_path / f"{problem_name}.proof_subgraph.html",
             Theorem.to_dict(self.rules),
         )
+        logging.info("Written all outputs at %s", output_folder_path)
 
     def draw_figure(self, out_file: Path):
         self.proof_state.symbols_graph.draw_figure(out_file)
