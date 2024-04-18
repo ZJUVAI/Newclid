@@ -19,7 +19,6 @@ from __future__ import annotations
 
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
-from fractions import Fraction
 
 
 from geosolver.concepts import ConceptName
@@ -42,18 +41,6 @@ def reshape(list_to_reshape: list[Any], n: int = 1) -> list[list[Any]]:
     for i, x in enumerate(list_to_reshape):
         columns[i % n].append(x)
     return zip(*columns)
-
-
-def is_int_or_frac(x: str) -> bool:
-    try:
-        int(x)
-        return True
-    except ValueError:
-        try:
-            Fraction(x)
-            return True
-        except ValueError:
-            return False
 
 
 class Construction:
