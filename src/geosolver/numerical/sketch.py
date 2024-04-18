@@ -1,3 +1,4 @@
+from __future__ import annotations
 from fractions import Fraction
 from typing import Optional, Union
 import numpy as np
@@ -723,5 +724,4 @@ def sketch_eqratio6(args: tuple[gm.Point, ...]) -> Circle | Line:
 
 def sketch_radiuscircle(args: tuple[gm.Point, ...]) -> Circle:
     a, y = args
-
     return Circle(center=a, radius=y)
