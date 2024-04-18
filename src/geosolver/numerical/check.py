@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Union
 import numpy as np
 from geosolver.concepts import ConceptName
@@ -29,8 +30,18 @@ def check_ncoll_numerical(points: list[Point]) -> bool:
     return not check_coll_numerical(points)
 
 
-def check_aconst_numerical(args: list[Point]) -> bool:
-    a, b, c, d, num, den = args
+def check_sangle_numerical(args: list[Point | gm.Angle]) -> bool:
+    a, b, c, angle = args
+    num, den = map(int, angle.name.split("pi/"))
+    ang = ang_between(b, c, a)
+    if ang < 0:
+        ang += np.pi
+    return close_enough(ang, num * np.pi / den)
+
+
+def check_aconst_numerical(args: list[Point | gm.Angle]) -> bool:
+    a, b, c, d, angle = args
+    num, den = map(int, angle.name.split("pi/"))
     d = d + a - c
     ang = ang_between(a, b, d)
     if ang < 0:
@@ -204,6 +215,7 @@ NUMERICAL_CHECK_FUNCTIONS = {
     ConceptName.CONTRI_TRIANGLE_REFLECTED.value: check_contri_numerical,
     ConceptName.CONTRI_TRIANGLE_BOTH.value: check_contri_numerical,
     ConceptName.CONSTANT_ANGLE.value: check_aconst_numerical,
+    ConceptName.S_ANGLE.value: check_sangle_numerical,
     ConceptName.SAMESIDE.value: check_sameside_numerical,
     ConceptName.NON_COLLINEAR.value: check_ncoll_numerical,
     ConceptName.CONSTANT_RATIO.value: check_ratio_numerical,

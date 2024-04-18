@@ -274,12 +274,6 @@ c : a b
 a : ; b : ; c : perp a b a c, cong a b a c; eqangle b a b c c b c a
 risos
 
-s_angle a b x y
-x : a b x
-a b = diff a b
-x : s_angle a b x y
-s_angle a b y
-
 segment a b
 
  =
@@ -430,26 +424,32 @@ a b c d e f g = ncoll a b c
 x : eqangle a b c d e f g x
 aline0 a b c d e f g
 
-eqratio_prescription x a b c d e f g
+eqratio x a b c d e f g
 x : x a b c d e f g
 a b c d e f g = diff a b, diff c d, diff e f
 x : eqratio a b c d e f g x
-eqratioprescription a b c d e f g
+eqratio a b c d e f g
 
-rconst_prescription a b c x m n
+rconst a b c x r
 x : a b c x
 a b c = diff a b
-x : rconst a b c x m/n
-rconstprescription a b c m n
+x : rconst a b c x r
+rconst a b c r
 
-lconst_prescription x a y
+aconst a b c x r
+x : x a b c
+a b c = diff a b
+x : aconst a b c x r
+aconst a b c r
+
+s_angle a b x y
+x : a b x
+a b = diff a b
+x : s_angle a b x y
+s_angle a b y
+
+lconst x a y
 a : x a
 a = a
 x : lconst x a y
 radiuscircle a y
-
-prescribe_aconst x a b m n
-x : x a b
-a b = diff a b
-x : aconst a b a x mpi/n
-s_angle a b (m*180/n)

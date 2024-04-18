@@ -35,13 +35,21 @@ import geosolver.numerical.geometries as num_geo
 
 from geosolver.numerical.check import check_numerical
 from geosolver.numerical.distances import (
+    PointTooCloseError,
+    PointTooFarError,
     check_too_far_numerical,
     check_too_close_numerical,
 )
 from geosolver.numerical.sketch import sketch
 
 
-from geosolver.problem import CONSTRUCTION_RULE, Clause, Definition, Problem
+from geosolver.problem import (
+    CONSTRUCTION_RULE,
+    Clause,
+    Construction,
+    Definition,
+    Problem,
+)
 
 from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.dependencies.caching import DependencyCache
@@ -88,14 +96,6 @@ INTERSECT = [
 
 
 class DepCheckFailError(Exception):
-    pass
-
-
-class PointTooCloseError(Exception):
-    pass
-
-
-class PointTooFarError(Exception):
     pass
 
 
@@ -183,7 +183,7 @@ class Proof:
             if not problem.goal:
                 break
 
-            goal_args = proof.symbols_graph.names2nodes(problem.goal.args)
+            goal_args = proof.map_construction_args_to_objects(problem.goal)
             proof.dependency_graph.add_goal(problem.goal.name, goal_args)
             if check_numerical(problem.goal.name, goal_args):
                 break
@@ -352,13 +352,7 @@ class Proof:
                 cdef = definitions[c.name]
                 mapping = dict(zip(cdef.construction.args, c.args))
                 for n in cdef.numerics:
-                    args = [mapping[a] for a in n.args]
-                    args = list(
-                        map(
-                            lambda x: self.symbols_graph.get_point(x, lambda: int(x)),
-                            args,
-                        )
-                    )
+                    args = self.map_construction_args_to_objects(n, mapping)
                     to_be_intersected += sketch(n.name, args)
 
             return to_be_intersected
@@ -370,21 +364,18 @@ class Proof:
             len(clause.constructions) == 1 and clause.constructions[0].name in INTERSECT
         )
 
-        existing_points = [p.num for p in existing_points]
+        existing_numerical_points = [p.num for p in existing_points]
 
         def draw_fn() -> list[num_geo.Point]:
             to_be_intersected = range_fn()
-            return num_geo.reduce(to_be_intersected, existing_points)
+            return num_geo.reduce(to_be_intersected, existing_numerical_points)
 
         rely_on: set[Point] = set()
         for c in clause.constructions:
             cdef = definitions[c.name]
             mapping = dict(zip(cdef.construction.args, c.args))
             for n in cdef.numerics:
-                args = [mapping[a] for a in n.args]
-                args = list(
-                    map(lambda x: self.symbols_graph.get_point(x, lambda: int(x)), args)
-                )
+                args = self.map_construction_args_to_objects(n, mapping)
                 rely_on.update([a for a in args if isinstance(a, Point)])
 
         for p in rely_on:
@@ -401,10 +392,11 @@ class Proof:
 
             p.num = num
 
-        # check two things.
-        if check_too_close_numerical(nums, existing_points):
+        # check two things
+        new_points_nums = [p.num for p in new_points]
+        if check_too_close_numerical(new_points_nums, existing_numerical_points):
             raise PointTooCloseError()
-        if check_too_far_numerical(nums, existing_points):
+        if check_too_far_numerical(new_points_nums, existing_numerical_points):
             raise PointTooFarError()
 
         # Commit: now that all conditions are passed.
@@ -459,9 +451,7 @@ class Proof:
             mapping = dict(zip(cdef.construction.args, c.args))
 
             # not necessary for proofing, but for visualization.
-            c_args = list(
-                map(lambda x: self.symbols_graph.get_point(x, lambda: int(x)), c.args)
-            )
+            c_args = [self.symbols_graph.get_point(a, lambda a: a) for a in c.args]
             self.additionally_draw(c.name, c_args)
 
             for points, bs in cdef.basics:
@@ -478,22 +468,7 @@ class Proof:
                     continue
 
                 for b in bs:
-                    if b.name != ConceptName.CONSTANT_RATIO.value:
-                        args = [mapping[a] for a in b.args]
-                    else:
-                        num, den = map(int, b.args[-1].split("/"))
-                        rat, _ = self.alegbraic_manipulator.get_or_create_const_rat(
-                            num, den
-                        )
-                        args = [mapping[a] for a in b.args[:-1]] + [rat.name]
-
-                    args = list(
-                        map(
-                            lambda x: self.symbols_graph.get_point(x, lambda: int(x)),
-                            args,
-                        )
-                    )
-
+                    args = self.map_construction_args_to_objects(b, mapping)
                     adds, to_cache = self.resolve_dependencies(
                         name=b.name, args=args, deps=deps
                     )
@@ -817,3 +792,19 @@ class Proof:
                 if len(ps) >= 3:
                     for a, b, c in comb.permutations_triplets(ps):
                         yield p, a, b, c
+
+    def map_construction_args_to_objects(
+        self, construction: Construction, mapping: Optional[dict[str, str]] = None
+    ) -> list[Point | Angle | Ratio]:
+        def make_const(x):
+            arg_obj, _ = self.alegbraic_manipulator.get_or_create_const(
+                x, construction.name
+            )
+            return arg_obj
+
+        args_objs = []
+        for arg in construction.args:
+            if mapping and arg in mapping:
+                arg = mapping[arg]
+            args_objs.append(self.symbols_graph.get_point(arg, make_const))
+        return args_objs

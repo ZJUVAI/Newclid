@@ -115,17 +115,7 @@ def dd_bfs_one_level(
 
     # Check if goal is found
     if controller.goal:
-        args = []
-
-        for a in controller.goal.args:
-            if a in proof.symbols_graph._name2node:
-                a = proof.symbols_graph._name2node[a]
-            elif "/" in a:
-                a = create_consts_str(proof.alegbraic_manipulator, a)
-            elif a.isdigit():
-                a = int(a)
-            args.append(a)
-
+        args = proof.map_construction_args_to_objects(controller.goal)
         if proof.check(controller.goal.name, args):
             return added, {}, {}, branching
 

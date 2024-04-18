@@ -118,7 +118,7 @@ class SymbolsGraph:
             return self._name2point[pointname]
         if pointname in self._name2node:
             return self._name2node[pointname]
-        return default_fn()
+        return default_fn(pointname)
 
     def merge(self, nodes: list[Node], deps: "Dependency") -> Node:
         """Merge all nodes."""

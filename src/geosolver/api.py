@@ -56,7 +56,7 @@ class GeometricSolver:
     def run(self, max_steps: int = 1000) -> bool:
         solve(self.proof_state, self.rules, self.problem, max_level=max_steps)
         goal = self.problem.goal
-        goal_args_names = self.proof_state.symbols_graph.names2nodes(goal.args)
+        goal_args_names = self.proof_state.map_construction_args_to_objects(goal)
         if not self.proof_state.check(goal.name, goal_args_names):
             logging.info("Solver failed to solve the problem.")
             return False
@@ -146,4 +146,8 @@ class GeometricSolverBuilder:
         if defs_path is None:
             defs_path = default_defs_path()
         self.defs = Definition.from_txt_file(defs_path, to_dict=True)
+        return self
+
+    def load_defs_from_txt(self, defs_txt: str):
+        self.defs = Definition.to_dict(Definition.from_string(defs_txt))
         return self

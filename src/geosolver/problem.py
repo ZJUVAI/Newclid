@@ -69,7 +69,7 @@ class Construction:
         self.args = args
 
     def translate(self, mapping: dict[str, str]) -> Construction:
-        args = [a if is_int_or_frac(a) else mapping[a] for a in self.args]
+        args = [mapping[a] if a in mapping else a for a in self.args]
         return Construction(self.name, args)
 
     def txt(self) -> str:

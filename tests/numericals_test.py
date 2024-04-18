@@ -17,6 +17,7 @@
 
 import numpy as np
 import pytest_check as check
+from geosolver.geometry import Angle
 from geosolver.numerical.angles import ang_between
 from geosolver.numerical.check import check_coll_numerical, check_eqangle_numerical
 import geosolver.numerical.geometries as geo_num
@@ -57,6 +58,7 @@ from geosolver.numerical.sketch import (
     sketch_trisegment,
 )
 import geosolver.numerical.sketch
+from geosolver.ratios import simplify
 
 
 class TestNumerical:
@@ -268,15 +270,18 @@ class TestNumerical:
 
     def test_sketch_s_angle(self):
         a, b = geosolver.numerical.sketch.random_points(2)
-        y = geo_num.unif(0.0, np.pi)
-        bx = sketch_s_angle([a, b, y / np.pi * 180])
+        num = geo_num.unif(0.0, 180.0)
+        num, den = simplify(int(num), 180)
+        ang = num * np.pi / den
+        y = Angle(f"{num}pi/{den}")
+        bx = sketch_s_angle([a, b, y])
         check.is_instance(bx, geo_num.HalfLine)
         check.equal(bx.tail, b)
         x = bx.head
 
         d = geo_num.Point(1.0, 0.0)
         e = geo_num.Point(0.0, 0.0)
-        f = geo_num.Point(np.cos(y), np.sin(y))
+        f = geo_num.Point(np.cos(ang), np.sin(ang))
         check.almost_equal(ang_between(e, d, f), ang_between(b, a, x))
 
     def test_sketch_shift(self):
