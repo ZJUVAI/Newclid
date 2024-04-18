@@ -1,6 +1,6 @@
 imo_shortlist_2004_g8
 a b d = triangle a b d; c = on_circum c a b d; e = on_line e a d, on_line e b c; f = on_line f a c, on_line f b d; m = midpoint m c d; n = on_circum n a b m, eqratio_prescription2 n a b a m b m ? coll e f n
 imo_shortlist_2006_g2
-a b c d = trapezoid a b c d; k = on_line k a b; l = on_line l c d, eqratio_prescription2 l d c a k b k; p = eqangle3 p a b c b d, on_line p k l; q = eqangle3 q c d b a c, on_line q k l ? cyclic p q b c
-imo_shortlist_2006_g2_modified
-a b c d = trapezoid a b c d; k = on_line k a b; l = on_line l c d, eqratio_prescription2 l d c a k b k; p = eqangle3 p a b c b d, on_line p k l; q = on_circum q p b c, on_line q k l ? eqangle q c q d b a b c
+a b c d = trapezoid a b c d; k = on_line k a b; l = on_line l c d, eqratio_prescription2 l d c a k b k; p = eqangle3 p a b c d b, on_line p k l; q = eqangle3 q c d b c a, on_line q k l ? cyclic p q b c
+thales_reverse
+a b c d = trapezoid a b c d; k = on_line k a b; l = eqratio_prescription2 l d c a k b k, on_line l c d; o = on_line o k l, on_line o a d ? coll o b c
