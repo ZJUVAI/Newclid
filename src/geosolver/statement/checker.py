@@ -1,3 +1,4 @@
+from typing import TYPE_CHECKING, Optional
 from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 from geosolver.concepts import ConceptName
 from geosolver.geometry import (
@@ -16,7 +17,11 @@ from geosolver.numerical.check import (
     check_perp_numerical,
     check_sameside_numerical,
 )
+
 from geosolver.symbols_graph import SymbolsGraph
+
+if TYPE_CHECKING:
+    from geosolver.problem import Construction
 
 
 from collections import defaultdict
@@ -63,6 +68,14 @@ class StatementChecker:
     def check(self, name: str, args: list[Point]) -> bool:
         """Symbolically check if a predicate is True."""
         return self.NAME_TO_CHECK[name](args)
+
+    def check_goal(self, goal: Optional["Construction"]):
+        success = False
+        if goal is not None:
+            goal_args = self.symbols_graph.names2points(goal.args)
+            if self.check(goal.name, goal_args):
+                success = True
+        return success
 
     def check_const_or_eqangle(self, args: list[Point]) -> bool:
         if len(args) == 5:

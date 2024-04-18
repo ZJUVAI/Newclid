@@ -23,7 +23,22 @@ import logging
 
 
 from geosolver.concepts import ConceptName
-from geosolver.statement.adder import StatementAdder, ToCache
+from geosolver.agent.breadth_first_search import Action, Mapping
+from geosolver.agent.interface import (
+    ApplyDerivationAction,
+    ApplyDerivationFeedback,
+    ApplyTheoremAction,
+    ApplyTheoremFeedback,
+    DeriveAlgebraAction,
+    DeriveFeedback,
+    Feedback,
+    MatchAction,
+    MatchFeedback,
+    StopAction,
+    StopFeedback,
+)
+from geosolver.match_theorems import match_one_theorem
+from geosolver.statement.adder import IntrinsicRules, StatementAdder, ToCache
 from geosolver.statement.checker import StatementChecker
 from geosolver.symbols_graph import SymbolsGraph
 from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
@@ -33,7 +48,7 @@ from geosolver.geometry import Measure, Value
 import geosolver.combinatorics as comb
 import geosolver.numerical.geometries as num_geo
 
-from geosolver.numerical.check import check_numerical
+from geosolver.numerical.check import check_numerical, same_clock
 from geosolver.numerical.distances import (
     PointTooCloseError,
     PointTooFarError,
@@ -49,6 +64,7 @@ from geosolver.problem import (
     Construction,
     Definition,
     Problem,
+    Theorem,
 )
 
 from geosolver.dependencies.empty_dependency import EmptyDependency
@@ -116,22 +132,20 @@ class Proof:
         self.statements_checker = statements_checker
         self.statements_adder = statements_adder
         self.dependency_graph = DependencyGraph()
+        self._goal = None
 
     @classmethod
     def build_problem(
         cls,
         problem: Problem,
         definitions: dict[str, Definition],
-        verbose: bool = True,
-        disabled_intrinsic_rules: Optional[list[str]] = None,
+        disabled_intrinsic_rules: Optional[list[IntrinsicRules]] = None,
         max_attempts=100,
     ) -> tuple[Proof, list[Dependency]]:
         """Build a problem into a gr.Graph object."""
         proof = None
         added = None
-        if verbose:
-            logging.info(problem.url)
-            logging.info(problem.txt())
+        logging.info(f"Building proof from problem '{problem.url}': {problem.txt()}")
 
         if disabled_intrinsic_rules is None:
             disabled_intrinsic_rules = []
@@ -164,9 +178,7 @@ class Proof:
                 added = []
                 plevel = 0
                 for clause in problem.clauses:
-                    adds, plevel = proof.add_clause(
-                        clause, plevel, definitions, verbose=verbose
-                    )
+                    adds, plevel = proof.add_clause(clause, plevel, definitions)
                     added += adds
                 proof.plevel = plevel
 
@@ -190,27 +202,132 @@ class Proof:
         else:
             raise err
 
-        proof.url = problem.url
-        proof.build_def = (problem, definitions)
+        proof._goal = problem.goal
         for add in added:
-            proof.add_algebra(add)
+            proof.alegbraic_manipulator.add_algebra(add)
 
         return proof, added
 
-    def resolve_dependencies(
+    def step(self, action: Action) -> Feedback:
+        if isinstance(action, StopAction):
+            return StopFeedback()
+        elif isinstance(action, ApplyTheoremAction):
+            added, to_cache, success = self._apply_theorem(
+                action.theorem, action.mapping, action.level
+            )
+            if self.alegbraic_manipulator and added:
+                # Add algebra to AR, but do NOT derive nor add to the proof state (yet)
+                for dep in added:
+                    self.alegbraic_manipulator.add_algebra(dep)
+            self.cache_deps(to_cache)
+            return ApplyTheoremFeedback(success, added, to_cache)
+        elif isinstance(action, DeriveAlgebraAction):
+            derives, eq4s = self.alegbraic_manipulator.derive_algebra(action.level)
+            return DeriveFeedback(derives, eq4s)
+        elif isinstance(action, MatchAction):
+            mappings = match_one_theorem(
+                self, action.theorem, cache=action.cache, goal=self._goal
+            )
+            return MatchFeedback(action.theorem, mappings)
+        elif isinstance(action, ApplyDerivationAction):
+            added, to_cache = self.do_algebra(
+                action.derivation_name, action.derivation_arguments
+            )
+            self.cache_deps(to_cache)
+            return ApplyDerivationFeedback(added, to_cache)
+
+        raise NotImplementedError()
+
+    def _apply_theorem(
+        self, theorem: "Theorem", mapping: Mapping, dependency_level: int
+    ) -> Tuple[list[Dependency], list[ToCache], bool]:
+        deps = self._resolve_mapping_dependency(theorem, mapping, dependency_level)
+        if deps is None:
+            return [], [], False
+        conclusion_name, args = theorem.conclusion_name_args(mapping)
+        add, to_cache = self.resolve_statement_dependencies(
+            conclusion_name, args, deps=deps
+        )
+        self.dependency_graph.add_theorem_edges(to_cache, theorem, args)
+        return add, to_cache, True
+
+    def _resolve_mapping_dependency(
+        self, theorem: "Theorem", mapping: Mapping, dependency_level: int
+    ) -> Optional[EmptyDependency]:
+        deps = EmptyDependency(level=dependency_level, rule_name=theorem.rule_name)
+        fail = False
+
+        for premise in theorem.premise:
+            p_args = [mapping[a] for a in premise.args]
+            dep, fail = self._resolve_premise_dependency(
+                theorem, premise, p_args, dependency_level
+            )
+            if fail:
+                return None
+            if dep is None:
+                continue
+
+            self.dependency_cache.add_dependency(premise.name, p_args, dep)
+            deps.why.append(dep)
+
+        return deps
+
+    def _resolve_premise_dependency(
+        self,
+        theorem: "Theorem",
+        premise: "Construction",
+        p_args: list["Point"],
+        dependency_level: int,
+    ) -> Tuple[Optional[Dependency], bool]:
+        # Trivial deps.
+        if premise.name in [ConceptName.PARALLEL.value, ConceptName.CONGRUENT.value]:
+            a, b, c, d = p_args
+            if {a, b} == {c, d}:
+                return None, False
+
+        if theorem.name in [
+            "cong_cong_eqangle6_ncoll_contri*",
+            "eqratio6_eqangle6_ncoll_simtri*",
+        ]:
+            if premise.name in [
+                ConceptName.EQANGLE.value,
+                ConceptName.EQANGLE6.value,
+            ]:  # SAS or RAR
+                b, a, b, c, y, x, y, z = p_args
+                if not same_clock(a.num, b.num, c.num, x.num, y.num, z.num):
+                    p_args = b, a, b, c, y, z, y, x
+
+        dep = Dependency(
+            premise.name, p_args, rule_name="Premise", level=dependency_level
+        )
+        try:
+            dep = dep.why_me_or_cache(
+                self.symbols_graph,
+                self.statements_checker,
+                self.dependency_cache,
+                dependency_level,
+            )
+            fail = False
+        except Exception:
+            fail = True
+
+        if dep.why is None:
+            fail = True
+
+        return dep, fail
+
+    def resolve_statement_dependencies(
         self, name: str, args: list[Point], deps: EmptyDependency
     ) -> Tuple[list[Dependency], list[ToCache]]:
         return self.statements_adder.add_piece(name, args, deps)
 
-    def add_algebra(self, dep: Dependency) -> None:
-        self.alegbraic_manipulator.add_algebra(dep)
-
-    def do_algebra(self, name: str, args: list[Point]) -> list[Dependency]:
+    def do_algebra(
+        self, name: str, args: list[Point]
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Derive (but not add) new algebraic predicates."""
         new_deps, to_cache = self.statements_adder.add_algebra(name, args)
         self.dependency_graph.add_algebra_edges(to_cache, args[:-1])
-        self.cache_deps(to_cache)
-        return new_deps
+        return new_deps, to_cache
 
     def cache_deps(self, deps_to_cache: list[ToCache]):
         for to_cache in deps_to_cache:
@@ -295,7 +412,6 @@ class Proof:
         clause: Clause,
         plevel: int,
         definitions: dict[str, Definition],
-        verbose: int = False,
     ) -> tuple[list[Dependency], int]:
         """Add a new clause of construction, e.g. a new excenter."""
         existing_points = self.symbols_graph.all_points()
@@ -469,7 +585,7 @@ class Proof:
 
                 for b in bs:
                     args = self.map_construction_args_to_objects(b, mapping)
-                    adds, to_cache = self.resolve_dependencies(
+                    adds, to_cache = self.resolve_statement_dependencies(
                         name=b.name, args=args, deps=deps
                     )
                     self.dependency_graph.add_construction_edges(to_cache, args)
@@ -718,7 +834,7 @@ class Proof:
         # finally the list of ratios that is equal to 1.0
         for length in self.symbols_graph.type2nodes[Length]:
             segs = length.neighbors(Segment)
-            segss.append(segs)
+            segss.append(tuple(segs))
 
         segs_pair = list(comb.permutations_pairs(list(segss)))
         segs_pair += list(zip(segss, segss))
