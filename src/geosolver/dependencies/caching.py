@@ -1,10 +1,10 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 
 from geosolver.concepts import ConceptName
-
+from geosolver.geometry import Point, Ratio
 
 if TYPE_CHECKING:
-    from geosolver.geometry import Point
     from geosolver.dependencies.dependency import Dependency
 
 
@@ -42,10 +42,7 @@ class DependencyCache:
 def hashed_txt(name: str, args: list[str]) -> tuple[str, ...]:
     """Return a tuple unique to name and args upto arg permutation equivariant."""
 
-    if name in [
-        ConceptName.CONSTANT_ANGLE.value,
-        ConceptName.CONSTANT_RATIO.value,
-    ]:
+    if name in [ConceptName.CONSTANT_ANGLE.value, ConceptName.CONSTANT_RATIO.value]:
         a, b, c, d, y = args
         a, b = sorted([a, b])
         c, d = sorted([c, d])
@@ -132,11 +129,17 @@ def hashed_txt(name: str, args: list[str]) -> tuple[str, ...]:
     raise ValueError(f"Not recognize {name} to hash.")
 
 
-def hashed(name: str, args: list["Point"], rename: bool = False) -> tuple[str, ...]:
-    if name == ConceptName.S_ANGLE.value:
-        args = [p.name if not rename else p.new_name for p in args[:-1]] + [
-            str(args[-1])
-        ]
-    else:
-        args = [p.name if not rename else p.new_name for p in args]
-    return hashed_txt(name, args)
+def hashed(
+    name: str, args: list["Point" | "Ratio" | int], rename: bool = False
+) -> tuple[str, ...]:
+    return hashed_txt(name, [symbol_to_txt(p, rename=rename) for p in args])
+
+
+def symbol_to_txt(symbol: "Point" | "Ratio" | int, rename):
+    if isinstance(symbol, int):
+        return str(symbol)
+
+    if rename and isinstance(symbol, Point):
+        return symbol.new_name
+
+    return symbol.name

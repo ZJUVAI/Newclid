@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
+from fractions import Fraction
 
 
 from geosolver.concepts import ConceptName
@@ -43,12 +44,16 @@ def reshape(list_to_reshape: list[Any], n: int = 1) -> list[list[Any]]:
     return zip(*columns)
 
 
-def isint(x: str) -> bool:
+def is_int_or_frac(x: str) -> bool:
     try:
         int(x)
         return True
     except ValueError:
-        return False
+        try:
+            Fraction(x)
+            return True
+        except ValueError:
+            return False
 
 
 class Construction:
@@ -64,7 +69,7 @@ class Construction:
         self.args = args
 
     def translate(self, mapping: dict[str, str]) -> Construction:
-        args = [a if isint(a) else mapping[a] for a in self.args]
+        args = [mapping[a] if a in mapping else a for a in self.args]
         return Construction(self.name, args)
 
     def txt(self) -> str:
@@ -293,21 +298,19 @@ class Definition:
     """Definitions of construction statements."""
 
     @classmethod
-    def from_txt_file(cls, fname: str, to_dict: bool = False) -> Definition:
+    def from_txt_file(cls, fname: str) -> Definition:
         with open(fname, "r") as f:
             lines = f.read()
-        return cls.from_string(lines, to_dict)
+        return cls.from_string(lines)
 
     @classmethod
-    def from_string(cls, string: str, to_dict: bool = False) -> Definition:
+    def from_string(cls, string: str) -> Definition:
         lines = string.split("\n")
         data = [cls.from_txt("\n".join(group)) for group in reshape(lines, 6)]
-        if to_dict:
-            return cls.to_dict(data)
         return data
 
-    @classmethod
-    def to_dict(cls, data: list[Definition]) -> dict[str, Definition]:
+    @staticmethod
+    def to_dict(data: list[Definition]) -> dict[str, Definition]:
         return {d.construction.name: d for d in data}
 
     @classmethod
@@ -331,7 +334,7 @@ class Definition:
 
         numerics = [] if not numerics else numerics.split(", ")
 
-        return Definition(
+        return cls(
             construction=Construction.from_txt(construction),
             rely=parse_rely(rely),
             deps=Clause.from_txt(deps),
@@ -370,13 +373,13 @@ class Theorem:
     """Deduction rule."""
 
     @classmethod
-    def from_txt_file(cls, fname: str, to_dict: bool = False) -> Theorem:
+    def from_txt_file(cls, fname: str) -> list[Theorem]:
         with open(fname, "r") as f:
             theorems = f.read()
-        return cls.from_string(theorems, to_dict)
+        return cls.from_string(theorems)
 
     @classmethod
-    def from_string(cls, string: str, to_dict: bool = False) -> Theorem:
+    def from_string(cls, string: str) -> list[Theorem]:
         """Load deduction rule from a str object."""
         theorems = string.split("\n")
         theorems = [line for line in theorems if line and not line.startswith("#")]
@@ -385,16 +388,16 @@ class Theorem:
         for i, th in enumerate(theorems):
             th.rule_name = "r{:02}".format(i)
 
-        if to_dict:
-            result = {}
-            for t in theorems:
-                if t.name in result:
-                    t.name += "_"
-                result[t.rule_name] = t
-
-            return result
-
         return theorems
+
+    @staticmethod
+    def to_dict(theorems: list[Theorem]):
+        result = {}
+        for t in theorems:
+            if t.name in result:
+                t.name += "_"
+            result[t.rule_name] = t
+        return result
 
     @classmethod
     def from_txt(cls, data: str) -> Theorem:

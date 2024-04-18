@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING, Dict, Tuple
 
 
@@ -14,6 +15,8 @@ import geosolver.ratios
 if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
     from geosolver.dependencies.dependency import Dependency
+
+Derivations = dict[str, list[tuple[Point, ...]]]
 
 
 class AlgebraicManipulator:
@@ -47,14 +50,12 @@ class AlgebraicManipulator:
         if adder is not None:
             adder(dep)
 
-    def derive_algebra(
-        self, level: int, verbose: bool = False
-    ) -> tuple[dict[str, list[tuple[Point, ...]]], dict[str, list[tuple[Point, ...]]]]:
+    def derive_algebra(self, level: int) -> tuple[Derivations, Derivations]:
         """Derive new algebraic predicates."""
         derives = {}
-        ang_derives = self.derive_angle_algebra(level, verbose=verbose)
-        cong_derives = self.derive_cong_algebra(level, verbose=verbose)
-        rat_derives = self.derive_ratio_algebra(level, verbose=verbose)
+        ang_derives = self.derive_angle_algebra(level)
+        cong_derives = self.derive_cong_algebra(level)
+        rat_derives = self.derive_ratio_algebra(level)
 
         derives.update(ang_derives)
         derives.update(cong_derives)
@@ -69,9 +70,7 @@ class AlgebraicManipulator:
         }
         return derives, eqs
 
-    def derive_ratio_algebra(
-        self, level: int, verbose: bool = False
-    ) -> dict[str, list[tuple[Point, ...]]]:
+    def derive_ratio_algebra(self, level: int) -> Derivations:
         """Derive new eqratio predicates."""
         added = {ConceptName.CONGRUENT_2.value: [], ConceptName.EQRATIO.value: []}
 
@@ -97,9 +96,7 @@ class AlgebraicManipulator:
 
         return added
 
-    def derive_angle_algebra(
-        self, level: int, verbose: bool = False
-    ) -> dict[str, list[tuple[Point, ...]]]:
+    def derive_angle_algebra(self, level: int) -> Derivations:
         """Derive new eqangles predicates."""
         added = {
             ConceptName.EQANGLE.value: [],
@@ -130,8 +127,9 @@ class AlgebraicManipulator:
                 a, b, (n, d) = x
 
                 (e, f), (p, q) = a._obj.points, b._obj.points
+                ang, _ = self.get_or_create_const_ang(n, d)
                 if not check_numerical(
-                    ConceptName.CONSTANT_ANGLE.value, [e, f, p, q, n, d]
+                    ConceptName.CONSTANT_ANGLE.value, [e, f, p, q, ang]
                 ):
                     continue
 
@@ -143,9 +141,7 @@ class AlgebraicManipulator:
 
         return added
 
-    def derive_cong_algebra(
-        self, level: int, verbose: bool = False
-    ) -> dict[str, list[tuple[Point, ...]]]:
+    def derive_cong_algebra(self, level: int) -> Derivations:
         """Derive new cong predicates."""
         added = {
             ConceptName.INCI.value: [],
@@ -235,7 +231,7 @@ class AlgebraicManipulator:
         rat.set_lengths(None, None)
         self.symbols_graph.get_node_val(rat, deps=None)
 
-    def get_or_create_const_ang(self, n: int, d: int) -> None:
+    def get_or_create_const_ang(self, n: int, d: int) -> tuple[Angle, Angle]:
         n, d = geosolver.ratios.simplify(n, d)
         if (n, d) not in self.aconst:
             self._create_const_ang(n, d)
@@ -247,7 +243,7 @@ class AlgebraicManipulator:
         ang2 = self.aconst[(n, d)]
         return ang1, ang2
 
-    def get_or_create_const_rat(self, n: int, d: int) -> None:
+    def get_or_create_const_rat(self, n: int, d: int) -> tuple[Ratio, Ratio]:
         n, d = geosolver.ratios.simplify(n, d)
         if (n, d) not in self.rconst:
             self._create_const_rat(n, d)
@@ -257,3 +253,27 @@ class AlgebraicManipulator:
             self._create_const_rat(d, n)
         rat2 = self.rconst[(d, n)]
         return rat1, rat2
+
+    def get_or_create_const(
+        self, const_str: str, const_concept: ConceptName | str
+    ) -> tuple[Angle, Angle] | tuple[Ratio, Ratio]:
+        const_concept = ConceptName(const_concept)
+        if const_concept in (ConceptName.CONSTANT_ANGLE, ConceptName.S_ANGLE):
+            if "pi/" in const_str:
+                # pi fraction
+                num, den = map(int, const_str.split("pi/"))
+            elif const_str.endswith("o"):
+                # degrees
+                num, den = geosolver.ratios.simplify(int(const_str[:-1]), 180)
+            else:
+                raise ValueError("Could not interpret constant angle: %s", const_str)
+            return self.get_or_create_const_ang(num, den)
+
+        elif const_concept is ConceptName.CONSTANT_RATIO:
+            if "/" in const_str:
+                num, den = map(int, const_str.split("/"))
+                return self.get_or_create_const_rat(num, den)
+
+        raise NotImplementedError(
+            "Unsupported concept for constants: %s", const_concept.value
+        )

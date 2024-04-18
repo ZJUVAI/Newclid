@@ -274,12 +274,6 @@ c : a b
 a : ; b : ; c : perp a b a c, cong a b a c; eqangle b a b c c b c a
 risos
 
-s_angle a b x y
-x : a b x
-a b = diff a b
-x : s_angle a b x y
-s_angle a b y
-
 segment a b
 
  =
@@ -319,7 +313,7 @@ triangle
 triangle12 a b c
 c : a b c
  =
-a : ; b : ; c : rconst a b a c 1 2
+a : ; b : ; c : rconst a b a c 1/2
 triangle12
 
 2l1c x y z i a b c o
@@ -430,20 +424,38 @@ a b c d e f g = ncoll a b c
 x : eqangle a b c d e f g x
 aline0 a b c d e f g
 
-eqratio_prescription x a b c d e f g
+eqratio x a b c d e f g
 x : x a b c d e f g
 a b c d e f g = diff a b, diff c d, diff e f
 x : eqratio a b c d e f g x
-eqratioprescription a b c d e f g
+eqratio a b c d e f g
 
-rconst_prescription a b c x m n
-x : a b c x
-a b c = diff a b
-x : rconst a b c x m n
-rconstprescription a b c m n
-
-eqratio_prescription2 x a c e f g h
+eqratio6 x a c e f g h
 x : x a c e f g h
 a c e f g h = diff e f, diff g h
 x : eqratio a x c x e f g h
-eqratioprescription2 a c e f g h
+eqratio6 a c e f g h
+
+rconst a b c x r
+x : a b c x
+a b c = diff a b
+x : rconst a b c x r
+rconst a b c r
+
+aconst a b c x r
+x : x a b c
+a b c = diff a b
+x : aconst a b c x r
+aconst a b c r
+
+s_angle a b x y
+x : a b x
+a b = diff a b
+x : s_angle a b x y
+s_angle a b y
+
+lconst x a y
+a : x a
+a = a
+x : lconst x a y
+radiuscircle a y

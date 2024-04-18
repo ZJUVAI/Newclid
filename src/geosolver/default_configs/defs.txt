@@ -319,7 +319,7 @@ triangle
 triangle12 a b c
 c : a b c
  =
-a : ; b : ; c : rconst a b a c 1 2
+a : ; b : ; c : rconst a b a c 1/2
 triangle12
 
 2l1c x y z i a b c o

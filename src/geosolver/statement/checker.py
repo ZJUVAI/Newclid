@@ -1,3 +1,4 @@
+from typing import TYPE_CHECKING
 from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 from geosolver.concepts import ConceptName
 from geosolver.geometry import (
@@ -16,7 +17,11 @@ from geosolver.numerical.check import (
     check_perp_numerical,
     check_sameside_numerical,
 )
+
 from geosolver.symbols_graph import SymbolsGraph
+
+if TYPE_CHECKING:
+    pass
 
 
 from collections import defaultdict
@@ -49,6 +54,7 @@ class StatementChecker:
             ConceptName.CONTRI_TRIANGLE_REFLECTED.value: self.check_contri,
             ConceptName.CONTRI_TRIANGLE_BOTH.value: self.check_contri,
             ConceptName.CONSTANT_ANGLE.value: self.check_aconst,
+            ConceptName.S_ANGLE.value: self.check_sangle,
             ConceptName.CONSTANT_RATIO.value: self.check_rconst,
             ConceptName.COMPUTE_ANGLE.value: self.check_acompute,
             ConceptName.COMPUTE_RATIO.value: self.check_rcompute,
@@ -252,6 +258,28 @@ class StatementChecker:
             return False
 
         for ang1, _, _ in all_angles(ab._val, cd._val):
+            if is_equal(ang1, ang):
+                return True
+        return False
+
+    def check_sangle(self, points: list[Point], verbose: bool = False) -> bool:
+        a, b, c, nd = points
+        if isinstance(nd, str):
+            name = nd
+        else:
+            name = nd.name
+        num, den = map(int, name.split("pi/"))
+        ang, _ = self.alegbraic_manipulator.get_or_create_const_ang(num, den)
+
+        ab = self.symbols_graph.get_line(a, b)
+        cb = self.symbols_graph.get_line(c, b)
+        if not ab or not cb:
+            return False
+
+        if not (ab.val and cb.val):
+            return False
+
+        for ang1, _, _ in all_angles(ab._val, cb._val):
             if is_equal(ang1, ang):
                 return True
         return False

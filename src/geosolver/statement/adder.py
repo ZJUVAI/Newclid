@@ -11,7 +11,6 @@ from geosolver.dependencies.caching import DependencyCache, hashed
 from geosolver.dependencies.dependency import Dependency
 from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.geometry import Angle, Line, Node, Point, Segment, is_equal, is_equiv
-from geosolver.ratios import simplify
 from geosolver.statement.checker import StatementChecker
 from geosolver.symbols_graph import SymbolsGraph
 
@@ -1317,7 +1316,8 @@ class StatementAdder:
         """Add that an angle abx is equal to constant y."""
         a, b, x, y = points
 
-        n, d = simplify(y % 180, 180)
+        n, d = map(int, y.name.split("pi/"))
+        ang = int(n * 180 / d) % 180
         nd, dn = self.alegbraic_manipulator.get_or_create_const_ang(n, d)
 
         if nd == self.alegbraic_manipulator.halfpi:
@@ -1371,7 +1371,7 @@ class StatementAdder:
 
         if not is_equal(xba, nd):
             deps1 = deps.populate(ConceptName.CONSTANT_ANGLE.value, [c, x, a, b, nd])
-            deps1.algebra = dbx, dab, y % 180
+            deps1.algebra = dbx, dab, ang
 
             self.make_equal(xba, nd, deps=deps1)
             to_cache.append((ConceptName.CONSTANT_ANGLE.value, [c, x, a, b, nd], deps1))
@@ -1379,7 +1379,7 @@ class StatementAdder:
 
         if not is_equal(abx, dn):
             deps2 = deps.populate(ConceptName.CONSTANT_ANGLE.value, [a, b, c, x, dn])
-            deps2.algebra = dab, dbx, 180 - (y % 180)
+            deps2.algebra = dab, dbx, 180 - ang
 
             self.make_equal(abx, dn, deps=deps2)
             to_cache.append((ConceptName.S_ANGLE.value, [a, b, c, x, dn], deps2))

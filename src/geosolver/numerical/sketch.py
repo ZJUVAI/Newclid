@@ -1,3 +1,4 @@
+from fractions import Fraction
 from typing import Optional, Union
 import numpy as np
 from numpy.random import uniform as unif
@@ -439,9 +440,18 @@ def sketch_rotatep90(args: tuple[gm.Point, ...]) -> Point:
 
 def sketch_s_angle(args: tuple[gm.Point, ...]) -> HalfLine:
     a, b, y = args
-    ang = y / 180 * np.pi
+    num, den = map(int, y.name.split("pi/"))
+    ang = num * np.pi / den
     x = b + (a - b).rotatea(ang)
     return HalfLine(b, x)
+
+
+def sketch_aconst(args: tuple[gm.Point, ...]) -> HalfLine:
+    a, b, c, r = args
+    num, den = map(int, r.name.split("pi/"))
+    ang = num * np.pi / den
+    x = c + (a - b).rotatea(ang)
+    return HalfLine(c, x)
 
 
 def sketch_segment(args: tuple[gm.Point, ...]) -> tuple[Point, Point]:
@@ -673,7 +683,7 @@ def sketch_aline0(args: tuple[gm.Point, ...]) -> HalfLine:
     return HalfLine(G, X)
 
 
-def sketch_eqratioprescription(args: tuple[gm.Point, ...]) -> Circle:
+def sketch_eqratio(args: tuple[gm.Point, ...]) -> Circle:
     A, B, C, D, E, F, G = args
 
     dab = A.distance(B)
@@ -684,16 +694,15 @@ def sketch_eqratioprescription(args: tuple[gm.Point, ...]) -> Circle:
     return Circle(center=G, radius=dgx)
 
 
-def sketch_rconstprescription(args: tuple[gm.Point, ...]) -> Circle:
+def sketch_rconst(args: tuple[gm.Point, ...]) -> Circle:
     """Sketches point x such that ab/cx=m/n"""
-    A, B, C, m, n = args
+    A, B, C, r = args
     dab = A.distance(B)
-
-    length = dab * n / m
+    length = float(dab / Fraction(r.name))
     return Circle(center=C, radius=length)
 
 
-def sketch_eqratioprescription2(args: tuple[gm.Point, ...]) -> Circle | Line:
+def sketch_eqratio6(args: tuple[gm.Point, ...]) -> Circle | Line:
     """Sketches a point x such that ax/cx=ef/gh"""
     A, C, E, F, G, H = args
     d_ef = E.distance(F)
@@ -710,3 +719,9 @@ def sketch_eqratioprescription2(args: tuple[gm.Point, ...]) -> Circle | Line:
         center = (extremum_1 + extremum_2) * 0.5
         radius = 0.5 * extremum_1.distance(extremum_2)
         return Circle(center=center, radius=radius)
+
+
+def sketch_radiuscircle(args: tuple[gm.Point, ...]) -> Circle:
+    a, y = args
+
+    return Circle(center=a, radius=y)
