@@ -347,6 +347,14 @@ class Proof:
             return True
         return self.statements_checker.check(name, args)
 
+    def check_goal(self, goal: Optional["Construction"]):
+        success = False
+        if goal is not None:
+            goal_args = self.map_construction_args_to_objects(goal)
+            if self.check(goal.name, goal_args):
+                success = True
+        return success
+
     def additionally_draw(self, name: str, args: list[Point]) -> None:
         """Draw some extra line/circles for illustration purpose."""
 
