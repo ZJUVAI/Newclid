@@ -11,7 +11,6 @@ from geosolver.dependencies.caching import DependencyCache, hashed
 from geosolver.dependencies.dependency import Dependency
 from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.geometry import Angle, Line, Node, Point, Segment, is_equal, is_equiv
-from geosolver.ratios import simplify
 from geosolver.statement.checker import StatementChecker
 from geosolver.symbols_graph import SymbolsGraph
 
@@ -23,6 +22,20 @@ class IntrinsicRules(Enum):
     CYCLIC_FROM_CONG = "i01"
     CONG_FROM_EQRATIO = "i02"
     PARA_FROM_EQANGLE = "i03"
+
+    POINT_ON_SAME_LINE = "i04"
+    PARA_FROM_LINES = "i05"
+    PERP_FROM_LINES = "i06"
+    PERP_FROM_ANGLE = "i07"
+    EQANGLE_FROM_LINES = "i08"
+    EQANGLE_FROM_CONGRUENT_ANGLE = "i09"
+    EQRATIO_FROM_PROPORTIONAL_SEGMENTS = "i10"
+    CYCLIC_FROM_CIRCLE = "i11"
+
+    ACONST_FROM_LINES = "i12"
+    ACONST_FROM_ANGLE = "i13"
+    SANGLE_FROM_ANGLE = "i14"
+    RCONST_FROM_RATIO = "i15"
 
 
 class StatementAdder:
@@ -295,9 +308,15 @@ class StatementAdder:
                     whys.append(self._coll_dep(og_points, x))
 
             abcd_deps = deps
-            if whys + why0:
+            if (
+                whys + why0
+                and IntrinsicRules.POINT_ON_SAME_LINE
+                not in self.DISABLED_INTRINSIC_RULES
+            ):
                 dep0 = deps.populate(ConceptName.COLLINEAR.value, og_points)
-                abcd_deps = EmptyDependency(level=deps.level, rule_name=None)
+                abcd_deps = EmptyDependency(
+                    level=deps.level, rule_name=IntrinsicRules.POINT_ON_SAME_LINE.value
+                )
                 abcd_deps.why = [dep0] + whys
 
             is_coll = self.statements_checker.check_coll(args)
@@ -332,21 +351,26 @@ class StatementAdder:
 
         (a, b), (c, d) = ab.points, cd.points
 
-        dep0 = deps.populate(ConceptName.PARALLEL.value, points)
-        deps = EmptyDependency(level=deps.level, rule_name=None)
+        if (
+            why1 + why2
+            and IntrinsicRules.PARA_FROM_LINES not in self.DISABLED_INTRINSIC_RULES
+        ):
+            dep0 = deps.populate(ConceptName.PARALLEL.value, points)
+            deps = EmptyDependency(
+                level=deps.level, rule_name=IntrinsicRules.PARA_FROM_LINES.value
+            )
+            deps.why = [dep0] + why1 + why2
 
-        deps = deps.populate(ConceptName.PARALLEL.value, [a, b, c, d])
-        deps.why = [dep0] + why1 + why2
+        dep = deps.populate(ConceptName.PARALLEL.value, [a, b, c, d])
+        self.make_equal(ab, cd, dep)
+        dep.algebra = ab._val, cd._val
 
-        self.make_equal(ab, cd, deps)
-        deps.algebra = ab._val, cd._val
-
-        to_cache = [(ConceptName.PARALLEL.value, [a, b, c, d], deps)]
+        to_cache = [(ConceptName.PARALLEL.value, [a, b, c, d], dep)]
         if not is_equal(ab, cd):
-            return [deps], to_cache
+            return [dep], to_cache
         return [], to_cache
 
-    def _add_para_or_coll(
+    def _add_para_or_coll_from_perp(
         self,
         a: Point,
         b: Point,
@@ -410,7 +434,7 @@ class StatementAdder:
                 (c, d, a, b, m, n, x, y),
             ]:
                 args = args + (deps,)
-                para_or_coll = self._add_para_or_coll(*args)
+                para_or_coll = self._add_para_or_coll_from_perp(*args)
                 if para_or_coll is not None:
                     return para_or_coll
 
@@ -432,9 +456,14 @@ class StatementAdder:
 
         (a, b), (c, d) = ab.points, cd.points
 
-        if why1 + why2:
+        if (
+            why1 + why2
+            and IntrinsicRules.PERP_FROM_LINES not in self.DISABLED_INTRINSIC_RULES
+        ):
             dep0 = deps.populate(ConceptName.PERPENDICULAR.value, points)
-            deps = EmptyDependency(level=deps.level, rule_name=None)
+            deps = EmptyDependency(
+                level=deps.level, rule_name=IntrinsicRules.PERP_FROM_LINES.value
+            )
             deps.why = [dep0] + why1 + why2
 
         self.symbols_graph.get_node_val(ab, deps=None)
@@ -465,9 +494,11 @@ class StatementAdder:
             ab, cd, deps=None
         )
 
-        if why:
+        if why and IntrinsicRules.PERP_FROM_ANGLE not in self.DISABLED_INTRINSIC_RULES:
             dep0 = deps.populate(ConceptName.PERPENDICULAR.value, [a, b, c, d])
-            deps = EmptyDependency(level=deps.level, rule_name=None)
+            deps = EmptyDependency(
+                level=deps.level, rule_name=IntrinsicRules.PERP_FROM_ANGLE.value
+            )
             deps.why = [dep0] + why
 
         dab, dcd = a12._d
@@ -591,10 +622,17 @@ class StatementAdder:
             for x in [a, b, c, d, e, f]:
                 if x not in og_points:
                     whys.append(self.cyclic_dep(og_points, x))
+
             abcdef_deps = deps
-            if whys + why0:
+            if (
+                whys + why0
+                and IntrinsicRules.CYCLIC_FROM_CIRCLE
+                not in self.DISABLED_INTRINSIC_RULES
+            ):
                 dep0 = deps.populate(ConceptName.CYCLIC.value, og_points)
-                abcdef_deps = EmptyDependency(level=deps.level, rule_name=None)
+                abcdef_deps = EmptyDependency(
+                    level=deps.level, rule_name=IntrinsicRules.CYCLIC_FROM_CIRCLE.value
+                )
                 abcdef_deps.why = [dep0] + whys
 
             is_cyclic = self.statements_checker.check_cyclic(args)
@@ -649,7 +687,7 @@ class StatementAdder:
         why = ab._val.why_equal([ax._val, ay._val], level=None)
         why += [cong_ab_ac]
 
-        deps = EmptyDependency(cong_ab_ac.level, "")
+        deps = EmptyDependency(cong_ab_ac.level, IntrinsicRules.CYCLIC_FROM_CONG.value)
         deps.why = why
 
         return self._add_cyclic([b, c, x, y], deps)
@@ -671,9 +709,15 @@ class StatementAdder:
         m, n = mn.points
         p, q = pq.points
 
-        if deps and why1 + why2 + why3 + why4:
+        if (
+            deps
+            and why1 + why2 + why3 + why4
+            and IntrinsicRules.EQANGLE_FROM_LINES not in self.DISABLED_INTRINSIC_RULES
+        ):
             dep0 = deps.populate(ConceptName.EQANGLE.value, points)
-            deps = EmptyDependency(level=deps.level, rule_name=None)
+            deps = EmptyDependency(
+                level=deps.level, rule_name=IntrinsicRules.EQANGLE_FROM_LINES.value
+            )
             deps.why = [dep0] + why1 + why2 + why3 + why4
 
         if IntrinsicRules.PARA_FROM_EQANGLE not in self.DISABLED_INTRINSIC_RULES:
@@ -761,11 +805,17 @@ class StatementAdder:
             mn, pq, deps=None
         )
 
-        why = why1 + why2
-        if why:
+        if (
+            why1 + why2
+            and IntrinsicRules.EQANGLE_FROM_CONGRUENT_ANGLE
+            not in self.DISABLED_INTRINSIC_RULES
+        ):
             dep0 = deps.populate(ConceptName.EQANGLE.value, args)
-            deps = EmptyDependency(level=deps.level, rule_name=None)
-            deps.why = [dep0] + why
+            deps = EmptyDependency(
+                level=deps.level,
+                rule_name=IntrinsicRules.EQANGLE_FROM_CONGRUENT_ANGLE.value,
+            )
+            deps.why = [dep0] + why1 + why2
 
         dab, dcd = ab_cd._d
         dmn, dpq = mn_pq._d
@@ -936,11 +986,17 @@ class StatementAdder:
             mn, pq, deps=None
         )
 
-        why = why1 + why2
-        if why:
+        if (
+            why1 + why2
+            and IntrinsicRules.EQRATIO_FROM_PROPORTIONAL_SEGMENTS
+            not in self.DISABLED_INTRINSIC_RULES
+        ):
             dep0 = deps.populate(ConceptName.EQRATIO.value, args)
-            deps = EmptyDependency(level=deps.level, rule_name=None)
-            deps.why = [dep0] + why
+            deps = EmptyDependency(
+                level=deps.level,
+                rule_name=IntrinsicRules.EQRATIO_FROM_PROPORTIONAL_SEGMENTS.value,
+            )
+            deps.why = [dep0] + why1 + why2
 
         lab, lcd = ab_cd._l
         lmn, lpq = mn_pq._l
@@ -1118,20 +1174,18 @@ class StatementAdder:
         deps: EmptyDependency,
     ) -> Tuple[list[Dependency], list[ToCache]]:
         """Add ab/cd = mn/pq in case either two of (ab,cd,mn,pq) are equal."""
-        depname = (
-            ConceptName.EQRATIO.value
-            if isinstance(ab, Segment)
-            else ConceptName.EQANGLE.value
-        )
-        eqname = (
-            ConceptName.CONGRUENT.value
-            if isinstance(ab, Segment)
-            else ConceptName.PARALLEL.value
-        )
+        if isinstance(ab, Segment):
+            depname = ConceptName.EQRATIO.value
+            eqname = ConceptName.CONGRUENT.value
+            rule = IntrinsicRules.CONG_FROM_EQRATIO
+        else:
+            depname = ConceptName.EQANGLE.value
+            eqname = ConceptName.PARALLEL.value
+            rule = IntrinsicRules.PARA_FROM_EQANGLE
 
         if ab != cd:
             dep0 = deps.populate(depname, [a, b, c, d, m, n, p, q])
-            deps = EmptyDependency(level=deps.level, rule_name=None)
+            deps = EmptyDependency(level=deps.level, rule_name=rule)
 
             dep = Dependency(eqname, [a, b, c, d], None, deps.level)
             deps.why = [
@@ -1148,7 +1202,7 @@ class StatementAdder:
             colls = [a, b, c, d]
             if len(set(colls)) > 2:
                 dep0 = deps.populate(depname, [a, b, c, d, m, n, p, q])
-                deps = EmptyDependency(level=deps.level, rule_name=None)
+                deps = EmptyDependency(level=deps.level, rule_name=rule)
 
                 dep = Dependency(ConceptName.COLLINEAR_X.value, colls, None, deps.level)
                 deps.why = [
@@ -1185,10 +1239,15 @@ class StatementAdder:
         cd, why2 = self.symbols_graph.get_line_thru_pair_why(c, d)
 
         (a, b), (c, d) = ab.points, cd.points
-        if why1 + why2:
+        if (
+            why1 + why2
+            and IntrinsicRules.ACONST_FROM_LINES not in self.DISABLED_INTRINSIC_RULES
+        ):
             args = points[:-2] + [nd]
             dep0 = deps.populate(ConceptName.CONSTANT_ANGLE.value, args)
-            deps = EmptyDependency(level=deps.level, rule_name=None)
+            deps = EmptyDependency(
+                level=deps.level, rule_name=IntrinsicRules.ACONST_FROM_LINES.value
+            )
             deps.why = [dep0] + why1 + why2
 
         self.symbols_graph.get_node_val(ab, deps=None)
@@ -1218,9 +1277,14 @@ class StatementAdder:
         ab_cd, cd_ab, why = self.symbols_graph.get_or_create_angle_from_lines(
             ab, cd, deps=None
         )
-        if why:
+        if (
+            why
+            and IntrinsicRules.ACONST_FROM_ANGLE not in self.DISABLED_INTRINSIC_RULES
+        ):
             dep0 = deps.populate(ConceptName.CONSTANT_ANGLE.value, [a, b, c, d, nd])
-            deps = EmptyDependency(level=deps.level, rule_name=None)
+            deps = EmptyDependency(
+                level=deps.level, rule_name=IntrinsicRules.ACONST_FROM_ANGLE.value
+            )
             deps.why = [dep0] + why
 
         dab, dcd = ab_cd._d
@@ -1248,11 +1312,12 @@ class StatementAdder:
 
     def _add_s_angle(
         self, points: list[Point], deps: EmptyDependency
-    ) -> list[Dependency]:
+    ) -> Tuple[list[Dependency], list[ToCache]]:
         """Add that an angle abx is equal to constant y."""
         a, b, x, y = points
 
-        n, d = simplify(y % 180, 180)
+        n, d = map(int, y.name.split("pi/"))
+        ang = int(n * 180 / d) % 180
         nd, dn = self.alegbraic_manipulator.get_or_create_const_ang(n, d)
 
         if nd == self.alegbraic_manipulator.halfpi:
@@ -1267,7 +1332,7 @@ class StatementAdder:
         add, to_cache = [], []
 
         if ab.val == bx.val:
-            return add
+            return add, to_cache
 
         deps.why += why1 + why2
 
@@ -1290,9 +1355,14 @@ class StatementAdder:
         xba, abx, why = self.symbols_graph.get_or_create_angle_from_lines(
             bx, ab, deps=None
         )
-        if why:
+        if (
+            why
+            and IntrinsicRules.SANGLE_FROM_ANGLE not in self.DISABLED_INTRINSIC_RULES
+        ):
             dep0 = deps.populate(ConceptName.CONSTANT_ANGLE.value, [b, x, a, b, nd])
-            deps = EmptyDependency(level=deps.level, rule_name=None)
+            deps = EmptyDependency(
+                level=deps.level, rule_name=IntrinsicRules.SANGLE_FROM_ANGLE.value
+            )
             deps.why = [dep0] + why
 
         dab, dbx = abx._d
@@ -1301,7 +1371,7 @@ class StatementAdder:
 
         if not is_equal(xba, nd):
             deps1 = deps.populate(ConceptName.CONSTANT_ANGLE.value, [c, x, a, b, nd])
-            deps1.algebra = dbx, dab, y % 180
+            deps1.algebra = dbx, dab, ang
 
             self.make_equal(xba, nd, deps=deps1)
             to_cache.append((ConceptName.CONSTANT_ANGLE.value, [c, x, a, b, nd], deps1))
@@ -1309,7 +1379,7 @@ class StatementAdder:
 
         if not is_equal(abx, dn):
             deps2 = deps.populate(ConceptName.CONSTANT_ANGLE.value, [a, b, c, x, dn])
-            deps2.algebra = dab, dbx, 180 - (y % 180)
+            deps2.algebra = dab, dbx, 180 - ang
 
             self.make_equal(abx, dn, deps=deps2)
             to_cache.append((ConceptName.S_ANGLE.value, [a, b, c, x, dn], deps2))
@@ -1357,9 +1427,14 @@ class StatementAdder:
         ab_cd, cd_ab, why = self.symbols_graph.get_or_create_ratio_from_segments(
             ab, cd, deps=None
         )
-        if why:
+        if (
+            why
+            and IntrinsicRules.RCONST_FROM_RATIO not in self.DISABLED_INTRINSIC_RULES
+        ):
             dep0 = deps.populate(ConceptName.CONSTANT_RATIO.value, [a, b, c, d, nd])
-            deps = EmptyDependency(level=deps.level, rule_name=None)
+            deps = EmptyDependency(
+                level=deps.level, rule_name=IntrinsicRules.RCONST_FROM_RATIO.value
+            )
             deps.why = [dep0] + why
 
         lab, lcd = ab_cd._l

@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import Union
 import numpy as np
 from geosolver.concepts import ConceptName
@@ -29,8 +30,18 @@ def check_ncoll_numerical(points: list[Point]) -> bool:
     return not check_coll_numerical(points)
 
 
-def check_aconst_numerical(args: list[Point]) -> bool:
-    a, b, c, d, num, den = args
+def check_sangle_numerical(args: list[Point | gm.Angle]) -> bool:
+    a, b, c, angle = args
+    num, den = map(int, angle.name.split("pi/"))
+    ang = ang_between(b, c, a)
+    if ang < 0:
+        ang += np.pi
+    return close_enough(ang, num * np.pi / den)
+
+
+def check_aconst_numerical(args: list[Point | gm.Angle]) -> bool:
+    a, b, c, d, angle = args
+    num, den = map(int, angle.name.split("pi/"))
     d = d + a - c
     ang = ang_between(a, b, d)
     if ang < 0:
@@ -178,8 +189,9 @@ def check_contri_numerical(points: list[Point]) -> bool:
     )
 
 
-def check_ratio_numerical(points: list[Point]) -> bool:
-    a, b, c, d, m, n = points
+def check_ratio_numerical(points: list[Point | gm.Ratio]) -> bool:
+    a, b, c, d, ratio = points
+    m, n = map(int, ratio.name.split("/"))
     ab = a.distance(b)
     cd = c.distance(d)
     return close_enough(ab * n, cd * m)
@@ -203,10 +215,11 @@ NUMERICAL_CHECK_FUNCTIONS = {
     ConceptName.CONTRI_TRIANGLE_REFLECTED.value: check_contri_numerical,
     ConceptName.CONTRI_TRIANGLE_BOTH.value: check_contri_numerical,
     ConceptName.CONSTANT_ANGLE.value: check_aconst_numerical,
+    ConceptName.S_ANGLE.value: check_sangle_numerical,
     ConceptName.SAMESIDE.value: check_sameside_numerical,
     ConceptName.NON_COLLINEAR.value: check_ncoll_numerical,
+    ConceptName.CONSTANT_RATIO.value: check_ratio_numerical,
     "para_or_coll": check_para_or_coll_numerical,
-    "ratio": check_ratio_numerical,
     "const_angle": check_const_angle_numerical,
 }
 
@@ -233,11 +246,13 @@ def check_numerical(name: str, args: list[Union[gm.Point, Point]]) -> bool:
 
 
 def same_clock(a: Point, b: Point, c: Point, d: Point, e: Point, f: Point) -> bool:
+    return clock(a, b, c) * clock(d, e, f) > 0
+
+
+def clock(a: Point, b: Point, c: Point):
     ba = b - a
     cb = c - b
-    ed = e - d
-    fe = f - e
-    return (ba.x * cb.y - ba.y * cb.x) * (ed.x * fe.y - ed.y * fe.x) > 0
+    return ba.x * cb.y - ba.y * cb.x
 
 
 def same_sign(a: Point, b: Point, c: Point, d: Point, e: Point, f: Point) -> bool:

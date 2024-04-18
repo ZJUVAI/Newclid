@@ -243,7 +243,7 @@ a b c = triangle a b c; d = foot d a b c; e = foot e b a c; h = on_line h a d, o
 examples/complete2/010/complete_002_6_GDD_FULL_41-60_57.gex
 a b c = triangle a b c; d = foot d a b c; o = midpoint o a d; e = on_line e a b, on_circle e o d; f = on_line f a c, on_circle f o d ? cyclic b c e f
 examples/complete2/010/complete_010_Other_Auxiliary_ye_aux_ppara.gex
-a b c d = eq_trapezoid a b c d; e = on_pline e b a d, on_line e c d ? eqangle a d a b b a b c
+a b c d = iso_trapezoid a b c d; e = on_pline e b a d, on_line e c d ? eqangle a d a b b a b c
 examples/complete2/003/complete_003_6_GDD_FULL_more_E013-3.gex
 a b = segment a b; d = on_tline d b a b; e = on_circle e a b; f = on_line f d e, on_circle f a b; g = midpoint g e f; c = on_circle c a b, on_dia c d a; h = intersection_lc h g a c ? para e f b h
 examples/complete2/003/complete_005_Other_ndgs_01.gex
@@ -449,7 +449,7 @@ a b = segment a b; c = midpoint c b a; d = on_circle d c a; e = on_tline e a a b
 new_unsolved/0.gex
 c d b = triangle c d b; e = midpoint e c d; a = eqdistance a d c b, on_pline a b d c; f = midpoint f b a ? perp a b e f
 new_unsolved/1.gex
-a b c d = eq_trapezoid a b c d ? eqangle a d a b b a b c
+a b c d = iso_trapezoid a b c d ? eqangle a d a b b a b c
 examples/complete2/unsolved1/complete_009_Other_paper_Thebault_t5.gex
 a b c = triangle a b c; d = circle d a b c; e = on_line e b c; f g h i = 2l1c f g h i a b e d; j k l m = 2l1c j k l m a c e d; n = incenter n a b c ? coll m n i
 examples/complete2/unsolved/complete_013_7_Book_00EE_10_E072-11.gex

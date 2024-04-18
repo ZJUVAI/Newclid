@@ -184,6 +184,10 @@ class GeometricSolverBuilder:
         self.defs = Definition.to_dict(Definition.from_txt_file(defs_path))
         return self
 
+    def load_defs_from_txt(self, defs_txt: str) -> Self:
+        self.defs = Definition.to_dict(Definition.from_string(defs_txt))
+        return self
+
     def with_deductive_agent(self, deductive_agent: DeductiveAgent):
         self.deductive_agent = deductive_agent
         return self
