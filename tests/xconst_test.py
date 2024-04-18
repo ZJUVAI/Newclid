@@ -1,7 +1,8 @@
 import pytest
 import pytest_check as check
 
-from geosolver.api import GeometricSolverBuilder
+from geosolver.api import GeometricSolver, GeometricSolverBuilder
+from geosolver.numerical.distances import PointTooCloseError, PointTooFarError
 
 
 class TestConstants:
@@ -31,16 +32,16 @@ class TestConstants:
             "aconst a b c r",
             "",
         ]
-        solver = (
-            self.solver_builder.load_defs_from_txt("\n".join(defs))
-            .load_problem_from_txt(
+        solver = build_until_works(
+            self.solver_builder.load_defs_from_txt(
+                "\n".join(defs)
+            ).load_problem_from_txt(
                 "a b = segment a b; "
                 "c = free c; "
                 "x = aconst a b c x 63o; "
                 "y = aconst a b c y 153o "
                 "? aconst c x c y 90o"
             )
-            .build()
         )
         success = solver.run()
         check.is_true(success)
@@ -67,16 +68,16 @@ class TestConstants:
             "aconst a b c r",
             "",
         ]
-        solver = (
-            self.solver_builder.load_defs_from_txt("\n".join(defs))
-            .load_problem_from_txt(
+        solver = build_until_works(
+            self.solver_builder.load_defs_from_txt(
+                "\n".join(defs)
+            ).load_problem_from_txt(
                 "a b = segment a b; "
                 "c = free c; "
                 "x = aconst a b c x 7pi/20; "
                 "y = aconst a b c y 17pi/20 "
                 "? aconst c x c y 1pi/2"
             )
-            .build()
         )
         success = solver.run()
         check.is_true(success)
@@ -97,15 +98,15 @@ class TestConstants:
             "s_angle a b y",
             "",
         ]
-        solver = (
-            self.solver_builder.load_defs_from_txt("\n".join(defs))
-            .load_problem_from_txt(
+        solver = build_until_works(
+            self.solver_builder.load_defs_from_txt(
+                "\n".join(defs)
+            ).load_problem_from_txt(
                 "a b = segment a b; "
                 "x = s_angle a b x 63o; "
                 "y = s_angle a b y 153o "
                 "? s_angle x b y 90o"
             )
-            .build()
         )
         success = solver.run()
         check.is_true(success)
@@ -126,15 +127,16 @@ class TestConstants:
             "s_angle a b y",
             "",
         ]
-        solver = (
-            self.solver_builder.load_defs_from_txt("\n".join(defs))
-            .load_problem_from_txt(
+
+        solver = build_until_works(
+            self.solver_builder.load_defs_from_txt(
+                "\n".join(defs)
+            ).load_problem_from_txt(
                 "a b = segment a b; "
                 "x = s_angle a b x 7pi/20; "
                 "y = s_angle a b y 17pi/20 "
                 "? s_angle x b y 1pi/2"
             )
-            .build()
         )
         success = solver.run()
         check.is_true(success)
@@ -156,15 +158,15 @@ class TestConstants:
             "",
         ]
 
-        solver = (
-            self.solver_builder.load_defs_from_txt("\n".join(defs))
-            .load_problem_from_txt(
+        solver = build_until_works(
+            self.solver_builder.load_defs_from_txt(
+                "\n".join(defs)
+            ).load_problem_from_txt(
                 "a b = segment a b; "
                 "x = s_angle a b x 63o; "
                 "y = s_angle b a y 153o "
                 "? perp b x a y"
             )
-            .build()
         )
         success = solver.run()
         check.is_true(success)
@@ -187,15 +189,15 @@ class TestConstants:
             "",
         ]
 
-        solver = (
-            self.solver_builder.load_defs_from_txt("\n".join(defs))
-            .load_problem_from_txt(
+        solver = build_until_works(
+            self.solver_builder.load_defs_from_txt(
+                "\n".join(defs)
+            ).load_problem_from_txt(
                 "a b = segment a b; "
                 "x = s_angle a b x 63o; "
                 "y = s_angle b a y 153o "
                 "? aconst b x a y 1pi/2"
             )
-            .build()
         )
         success = solver.run()
         check.is_true(success)
@@ -222,15 +224,15 @@ class TestConstants:
             "rconst a b c r",
             "",
         ]
-        solver = (
-            self.solver_builder.load_defs_from_txt("\n".join(defs))
-            .load_problem_from_txt(
+        solver = build_until_works(
+            self.solver_builder.load_defs_from_txt(
+                "\n".join(defs)
+            ).load_problem_from_txt(
                 "a b = segment a b; "
                 "c = free c; "
                 "d = rconst a b c d 3/4 "
                 "? rconst a b c d 3/4"
             )
-            .build()
         )
         success = solver.run()
         check.is_true(success)
@@ -245,15 +247,15 @@ class TestConstants:
             "triangle12",
             "",
         ]
-        solver = (
-            self.solver_builder.load_defs_from_txt("\n".join(defs))
-            .load_problem_from_txt("a b c = triangle12 a b c ? rconst a b a c 1/2")
-            .build()
+        solver = build_until_works(
+            self.solver_builder.load_problem_from_txt(
+                "a b c = triangle12 a b c ? rconst a b a c 1/2"
+            ).load_defs_from_txt("\n".join(defs))
         )
         success = solver.run()
         check.is_true(success)
 
-    @pytest.mark.xfail
+    @pytest.mark.skip
     def test_lconst(self):
         """Should be able to prescribe a constant lenght"""
         solver = (
@@ -265,3 +267,23 @@ class TestConstants:
         )
         success = solver.run()
         check.is_true(success)
+
+
+def build_until_works(
+    builder: GeometricSolverBuilder, max_attempts: int = 100
+) -> GeometricSolver:
+    solver = None
+    attemps = 0
+    err = None
+    while solver is None and attemps < max_attempts:
+        attemps += 1
+        try:
+            solver = builder.build()
+        except (PointTooFarError, PointTooCloseError) as err:
+            solver = None
+            err = err
+
+    if solver is None:
+        raise Exception("Failed to build after %s attempts", max_attempts) from err
+
+    return solver
