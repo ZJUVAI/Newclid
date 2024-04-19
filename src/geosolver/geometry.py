@@ -406,10 +406,6 @@ def why_equal(x: Node, y: Node, level: int = None) -> list[Any]:
     return x._val.why_equal([y._val], level)
 
 
-class Direction(Node):
-    pass
-
-
 def get_lines_thru_all(*points: Point) -> list[Line]:
     line2count = defaultdict(lambda: 0)
     points = set(points)
@@ -491,14 +487,6 @@ class Angle(Node):
         return d1.rep(), d2.rep()
 
 
-class Measure(Node):
-    pass
-
-
-class Length(Node):
-    pass
-
-
 class Ratio(Node):
     """Node of type Ratio."""
 
@@ -514,6 +502,18 @@ class Ratio(Node):
         if l1 is None or l2 is None:
             return l1, l2
         return l1.rep(), l2.rep()
+
+
+class Direction(Node):
+    pass
+
+
+class Measure(Node):
+    pass
+
+
+class Length(Node):
+    pass
 
 
 class Value(Node):
@@ -556,14 +556,3 @@ RANKING = {
     Measure: 8,
     Value: 9,
 }
-
-
-def val_type(x: Node) -> Type[Node]:
-    if isinstance(x, Line):
-        return Direction
-    if isinstance(x, Segment):
-        return Length
-    if isinstance(x, Angle):
-        return Measure
-    if isinstance(x, Ratio):
-        return Value

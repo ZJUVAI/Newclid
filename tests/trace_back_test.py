@@ -19,9 +19,10 @@
 import pytest
 import pytest_check as check
 
+from geosolver.concepts import ConceptName
+from geosolver.dependencies.dependency import Dependency
+from geosolver.trace_back import get_logs
 from geosolver.api import GeometricSolverBuilder
-import geosolver.problem as pr
-import geosolver.trace_back as tb
 
 
 class TestTraceback:
@@ -39,16 +40,26 @@ class TestTraceback:
 
         solver.run()
 
-        goal_args = solver.proof_state.names2nodes(solver.goal.args)
-        query = pr.Dependency(solver.goal.name, goal_args, None, None)
-        setup, aux, _, _ = tb.get_logs(query, solver.proof_state, merge_trivials=False)
+        goal_args = solver.proof_state.symbols_graph.names2nodes(solver.goal.args)
+        query = Dependency(solver.goal.name, goal_args, None, None)
+        setup, aux, _, _ = get_logs(query, solver.proof_state, merge_trivials=False)
 
         # Convert each predicates to its hash string:
         setup = [p.hashed() for p in setup]
         aux = [p.hashed() for p in aux]
 
         check.equal(
-            set(setup), {("perp", "a", "c", "b", "d"), ("perp", "a", "b", "c", "d")}
+            set(setup),
+            {
+                (ConceptName.PERPENDICULAR.value, "a", "c", "b", "d"),
+                ("perp", "a", "b", "c", "d"),
+            },
         )
 
-        check.equal(set(aux), {("coll", "a", "c", "e"), ("coll", "b", "d", "e")})
+        check.equal(
+            set(aux),
+            {
+                (ConceptName.COLLINEAR.value, "a", "c", "e"),
+                (ConceptName.COLLINEAR.value, "b", "d", "e"),
+            },
+        )

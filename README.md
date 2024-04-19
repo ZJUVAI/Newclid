@@ -16,14 +16,7 @@ introduced in the [Nature 2024](https://www.nature.com/articles/s41586-023-06747
 
 ## Installation
 
-1. (Optional) Create a virtual environment, for example with venv:
-
-```
-python -m venv venv
-source ./bin/activate
-```
-
-2. Install last release using pip
+Using pip
 
 ```
 pip install git+https://rnd-gitlab-eu.huawei.com/Noahs-Ark/libraries/ddar
@@ -42,7 +35,12 @@ cd path/to/repo
 
 ```
 python -m venv venv
+
+# On UNIX
 source ./bin/activate
+
+# On Windows
+.\venv\Scripts\activate
 ```
 
 3. Install as an editable package with dev requirements
@@ -66,11 +64,11 @@ pytest tests
 
 ## Source code description
 
-Files in this repository include python modules/scripts to run the solvers and
+Modules of the geosolver package implements everything needed to run the solvers and
 resource files necessary for the script to execute. We listed below
 each of them and their description.
 
-| File name              | Description                                                                        |
+| Module name            | Description                                                                        |
 |------------------------|------------------------------------------------------------------------------------|
 | `geometry.py`          | Implements nodes (Point, Line, Circle, etc) in the proof state graph.              |
 | `numericals.py`        | Implements the numerical engine in the dynamic geometry environment.               |
@@ -84,14 +82,7 @@ each of them and their description.
 | `beam_search.py`       | Implements beam decoding of a language model in JAX.                               |
 | `models.py`            | Implements the transformer model.                                                  |
 | `transformer_layer.py` | Implements the transformer layer.                                                  |
-| `decoder_stack.py`     | Implements the transformer decoder stack.                                          |
-| `lm_inference.py`      | Implements an interface to a trained LM to perform decoding.                       |
-| `alphageometry.py`                | Main script that loads problems, calls DD+AR or AlphaGeometry solver, and prints solutions.   |
 | `pretty.py`            | Pretty formating the solutions output by solvers.                                  |
-| `*_test.py`            | Tests for the corresponding module.                                                |
-| `download.sh`          | Script to download model checkpoints and LM                                        |
-| `run.sh`               | Script to execute instructions in README.                                          |
-| `run_tests.sh`         | Script to execute the test suite.                                                  |
 
 
 Resource files:

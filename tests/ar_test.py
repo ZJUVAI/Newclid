@@ -17,9 +17,10 @@
 
 import pytest
 import pytest_check as check
+import geosolver.algebraic.geometric_tables as geometric_tables
+from geosolver.dependencies.empty_dependency import EmptyDependency
+from geosolver.numerical.check import clock
 from geosolver.api import GeometricSolverBuilder
-import geosolver.ar as ar
-import geosolver.problem as pr
 
 
 class TestAR:
@@ -32,7 +33,7 @@ class TestAR:
         groups1 = [{1, 2}, {3, 4, 5}, {6, 7}]
         groups2 = [{2, 3, 8}, {9, 10, 11}]
 
-        _, links, history = ar.update_groups(groups1, groups2)
+        _, links, history = geometric_tables.update_groups(groups1, groups2)
         check.equal(
             history,
             [
@@ -45,7 +46,7 @@ class TestAR:
         groups1 = [{1, 2}, {3, 4}, {5, 6}, {7, 8}]
         groups2 = [{2, 3, 8, 9, 10}, {3, 6, 11}]
 
-        _, links, history = ar.update_groups(groups1, groups2)
+        _, links, history = geometric_tables.update_groups(groups1, groups2)
         check.equal(
             history,
             [
@@ -58,7 +59,7 @@ class TestAR:
         groups1 = []
         groups2 = [{1, 2}, {3, 4}, {5, 6}, {2, 3}]
 
-        _, links, history = ar.update_groups(groups1, groups2)
+        _, links, history = geometric_tables.update_groups(groups1, groups2)
         check.equal(
             history,
             [
@@ -71,7 +72,7 @@ class TestAR:
         check.equal(links, [(1, 2), (3, 4), (5, 6), (2, 3)])
 
     def test_generic_table_simple(self):
-        tb = ar.Table()
+        tb = geometric_tables.Table()
 
         # If a-b = b-c & d-a = c-d
         tb.add_eq4("a", "b", "b", "c", "fact1")
@@ -93,18 +94,20 @@ class TestAR:
             "e = excenter e a b c "
             "? perp d c c e"
         ).build()
-        g = solver.proof_state
+        proof = solver.proof_state
 
         # Create an external angle table:
-        tb = ar.AngleTable("pi")
+        tb = geometric_tables.AngleTable("pi")
 
         # Add bisector & ex-bisector facts into the table:
-        ca, cd, cb, ce = g.names2nodes(["d(ac)", "d(cd)", "d(bc)", "d(ce)"])
+        ca, cd, cb, ce = proof.symbols_graph.names2nodes(
+            ["d(ac)", "d(cd)", "d(bc)", "d(ce)"]
+        )
         tb.add_eqangle(ca, cd, cd, cb, "fact1")
         tb.add_eqangle(ce, ca, cb, ce, "fact2")
 
         # Add a distractor fact to make sure traceback does not include this fact
-        ab = g.names2nodes(["d(ab)"])[0]
+        ab = proof.symbols_graph.names2nodes(["d(ab)"])[0]
         tb.add_eqangle(ab, cb, cb, ca, "fact3")
 
         # Check for all new equalities
@@ -128,18 +131,22 @@ class TestAR:
         solver = self.solver_builder.load_problem_from_txt(
             "a b c = ieq_triangle " "? cong a b a c"
         ).build()
-        g = solver.proof_state
+        proof = solver.proof_state
 
         # Add two eqangles facts because ieq_triangle only add congruent sides
-        a, b, c = g.names2nodes("abc")
-        g.add_eqangle([a, b, b, c, b, c, c, a], pr.EmptyDependency(0, None))
-        g.add_eqangle([b, c, c, a, c, a, a, b], pr.EmptyDependency(0, None))
+        a, b, c = proof.symbols_graph.names2nodes("abc")
+        proof.statements_adder._add_eqangle(
+            [a, b, b, c, b, c, c, a], EmptyDependency(0, None)
+        )
+        proof.statements_adder._add_eqangle(
+            [b, c, c, a, c, a, a, b], EmptyDependency(0, None)
+        )
 
         # Create an external angle table:
-        tb = ar.AngleTable("pi")
+        tb = geometric_tables.AngleTable("pi")
 
         # Add the fact that there are three equal angles
-        ab, bc, ca = g.names2nodes(["d(ab)", "d(bc)", "d(ac)"])
+        ab, bc, ca = proof.symbols_graph.names2nodes(["d(ab)", "d(bc)", "d(ac)"])
         tb.add_eqangle(ab, bc, bc, ca, "fact1")
         tb.add_eqangle(bc, ca, ca, ab, "fact2")
 
@@ -151,18 +158,29 @@ class TestAR:
         angle_60 = (1, 3)
         angle_120 = (2, 3)
 
-        # check that angles constants are created and figured out:
-        check.equal(
-            result,
-            [
+        is_clockwise = clock(a.num, b.num, c.num) > 0
+
+        if not is_clockwise:
+            expected = [
                 ("d(bc)", "d(ac)", angle_120, ["fact1", "fact2"]),
                 ("d(ab)", "d(bc)", angle_120, ["fact1", "fact2"]),
                 ("d(ac)", "d(ab)", angle_120, ["fact1", "fact2"]),
                 ("d(ac)", "d(bc)", angle_60, ["fact1", "fact2"]),
                 ("d(bc)", "d(ab)", angle_60, ["fact1", "fact2"]),
                 ("d(ab)", "d(ac)", angle_60, ["fact1", "fact2"]),
-            ],
-        )
+            ]
+        else:
+            expected = [
+                ("d(bc)", "d(ac)", angle_60, ["fact1", "fact2"]),
+                ("d(ab)", "d(bc)", angle_60, ["fact1", "fact2"]),
+                ("d(ac)", "d(ab)", angle_60, ["fact1", "fact2"]),
+                ("d(ac)", "d(bc)", angle_120, ["fact1", "fact2"]),
+                ("d(bc)", "d(ab)", angle_120, ["fact1", "fact2"]),
+                ("d(ab)", "d(ac)", angle_120, ["fact1", "fact2"]),
+            ]
+
+        # check that angles constants are created and figured out:
+        check.equal(result, expected)
 
     def test_incenter_excenter_touchpoints(self):
         """Test that AR can figure out incenter/excenter touchpoints are equidistant to midpoint."""
@@ -173,14 +191,14 @@ class TestAR:
             "? perp d c c e",
             translate=False,
         ).build()
-        g = solver.proof_state
+        proof = solver.proof_state
 
-        a, b, c, ab, bc, ca, d1, d2, d3, e1, e2, e3 = g.names2nodes(
+        a, b, c, ab, bc, ca, d1, d2, d3, e1, e2, e3 = proof.symbols_graph.names2nodes(
             ["a", "b", "c", "ab", "bc", "ac", "d1", "d2", "d3", "e1", "e2", "e3"]
         )
 
         # Create an external distance table:
-        tb = ar.DistanceTable()
+        tb = geometric_tables.DistanceTable()
 
         # DD can figure out the following facts,
         # we manually add them to AR.
@@ -200,4 +218,4 @@ class TestAR:
         d1 = tb.v2e["bc:d1"]
         e1 = tb.v2e["bc:e1"]
 
-        check.equal(ar.minus(d1, b), ar.minus(c, e1))
+        check.equal(geometric_tables.minus(d1, b), geometric_tables.minus(c, e1))

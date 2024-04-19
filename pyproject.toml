@@ -44,7 +44,6 @@ filterwarnings = [
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "legacy: old tests that should be updated or removed"
 ]
 
 [tool.coverage.run]

@@ -16,34 +16,34 @@
 """Unit tests for geometry.py."""
 import pytest_check as check
 
-import geosolver.geometry as gm
+from geosolver.geometry import Length, Segment, why_equal
 
 
 class TestGeometry:
     def _setup_equality_example(self):
         # Create 4 nodes a, b, c, d
         # and their lengths
-        a = gm.Segment("a")
-        la = gm.Length("l(a)")
+        a = Segment("a")
+        la = Length("l(a)")
         a.connect_to(la)
         la.connect_to(a)
 
-        b = gm.Segment("b")
-        lb = gm.Length("l(b)")
+        b = Segment("b")
+        lb = Length("l(b)")
         b.connect_to(lb)
         lb.connect_to(b)
 
-        c = gm.Segment("c")
-        lc = gm.Length("l(c)")
+        c = Segment("c")
+        lc = Length("l(c)")
         c.connect_to(lc)
         lc.connect_to(c)
 
-        d = gm.Segment("d")
-        ld = gm.Length("l(d)")
+        d = Segment("d")
+        ld = Length("l(d)")
         d.connect_to(ld)
         ld.connect_to(d)
 
-        # Now let a=b, b=c, a=c, c=d
+        # Now let la=lb, lb=lc, la=lc, lc=ld
         la.merge([lb], "fact1")
         lb.merge([lc], "fact2")
         la.merge([lc], "fact3")
@@ -71,4 +71,4 @@ class TestGeometry:
         a, _, _, d, _, _, _, _ = self._setup_equality_example()
 
         # check that a==d because fact3 & fact4, not fact1 & fact2
-        check.equal(set(gm.why_equal(a, d)), {"fact3", "fact4"})
+        check.equal(set(why_equal(a, d)), {"fact3", "fact4"})

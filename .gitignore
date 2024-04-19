@@ -33,15 +33,17 @@ venv/
 ag_ckpt_vocab/
 
 # IDEs
-
+.idea/
 .vscode/
 
 # Coverage data
 .coverage
 
-# Results
-ddar_results/
-
-# Profiling
+# Profiling data
 *.prof
 
+# Experiment data
+ddar_results/
+
+# TODO
+TODO.md

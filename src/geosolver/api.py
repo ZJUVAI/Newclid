@@ -10,33 +10,39 @@ from typing_extensions import Self
 
 from geosolver.auxiliary_constructions import insert_aux_to_premise
 from geosolver.configs import default_defs_path, default_rules_path
-from geosolver.graph import Graph
-from geosolver.numericals import draw
-from geosolver.ddar import solve
+from geosolver.agent.breadth_first_search import BFSDDAR
+from geosolver.agent.interface import DeductiveAgent
+from geosolver.run_loop import run_loop
 from geosolver.problem import Problem, Theorem, Definition, Clause
-from geosolver.geometry import Point, Circle, Line, Segment
-from geosolver.write_proof import write_solution
+from geosolver.proof import Proof
+from geosolver.proof_writing import write_solution
+from geosolver.statement.adder import IntrinsicRules
 
 
 class GeometricSolver:
     def __init__(
         self,
-        proof_state: "Graph",
+        proof_state: "Proof",
         problem: "Problem",
         defs: dict[str, "Definition"],
         rules: list["Theorem"],
+        deductive_agent: Optional[DeductiveAgent] = None,
     ) -> None:
         self.proof_state = proof_state
         self.problem = problem
         self.defs = defs
         self.rules = rules
         self.problem_string = problem.txt()
+        if deductive_agent is None:
+            deductive_agent = BFSDDAR()
+        self.deductive_agent = deductive_agent
+        self.run_infos = None
 
     @property
     def goal(self):
         return self.problem.goal
 
-    def load_state(self, proof_state: "Graph"):
+    def load_state(self, proof_state: "Proof"):
         self.proof_state = proof_state
 
     def load_problem_string(self, problem_string: str):
@@ -54,31 +60,46 @@ class GeometricSolver:
     def get_setup_string(self) -> str:
         return self.problem.setup_str_from_problem(self.defs)
 
-    def run(self, max_steps: int = 1000) -> bool:
-        solve(self.proof_state, self.rules, self.problem, max_level=max_steps)
-        goal = self.problem.goal
-        goal_args_names = self.proof_state.names2nodes(goal.args)
-        if not self.proof_state.check(goal.name, goal_args_names):
-            logging.info("Solver failed to solve the problem.")
-            return False
-        logging.info("Solved.")
-        return True
+    def run(self, max_steps: int = 10000, timeout: float = 600.0) -> bool:
+        success, infos = run_loop(
+            self.deductive_agent,
+            self.proof_state,
+            self.rules,
+            self.problem.goal,
+            max_steps=max_steps,
+            timeout=timeout,
+        )
+        self.run_infos = infos
+        return success
 
     def write_solution(self, out_file: Path):
         write_solution(self.proof_state, self.problem, out_file)
 
-    def draw_figure(self, out_file: Path):
-        draw(
-            self.proof_state.type2nodes[Point],
-            self.proof_state.type2nodes[Line],
-            self.proof_state.type2nodes[Circle],
-            self.proof_state.type2nodes[Segment],
-            block=False,
-            save_to=out_file,
+    def write_all_outputs(self, output_folder_path: Path):
+        problem_name = self.problem.url
+        self.write_solution(
+            output_folder_path / f"{problem_name}_proof_steps.txt",
+        )
+        self.proof_state.symbols_graph.draw_figure(
+            output_folder_path / f"{problem_name}_proof_figure.png",
+        )
+        self.proof_state.symbols_graph.draw_html(
+            output_folder_path / f"{problem_name}.symbols_graph.html"
+        )
+        self.proof_state.dependency_graph.show_html(
+            output_folder_path / f"{problem_name}.dependency_graph.html",
+            Theorem.to_dict(self.rules),
+        )
+        self.proof_state.dependency_graph.proof_subgraph.show_html(
+            output_folder_path / f"{problem_name}.proof_subgraph.html",
+            Theorem.to_dict(self.rules),
         )
 
+    def draw_figure(self, out_file: Path):
+        self.proof_state.symbols_graph.draw_figure(out_file)
+
     def get_existing_points(self) -> list[str]:
-        return [p.name for p in self.proof_state.all_points()]
+        return [p.name for p in self.proof_state.symbols_graph.all_points()]
 
     def validate_clause_txt(self, clause_txt: str):
         if clause_txt.startswith("ERROR"):
@@ -97,7 +118,7 @@ class GeometricSolver:
         p_new = Problem.from_txt(candidate_pstring)
         p_new.url = self.problem.url
         # This is the new proof state graph representation:
-        g_new, _ = Graph.build_problem(p_new, self.defs)
+        g_new, _ = Proof.build_problem(p_new, self.defs)
 
         self.problem = p_new
         self.proof_state = g_new
@@ -105,10 +126,12 @@ class GeometricSolver:
 
 class GeometricSolverBuilder:
     def __init__(self) -> None:
-        self.problem = None
-        self.defs = None
-        self.rules = None
-        self.proof_state = None
+        self.problem: Optional[Problem] = None
+        self.defs: Optional[list[Definition]] = None
+        self.rules: Optional[list[Theorem]] = None
+        self.proof_state: Optional[Proof] = None
+        self.deductive_agent: Optional[DeductiveAgent] = None
+        self.disabled_intrinsic_rules: Optional[list[IntrinsicRules]] = None
 
     def build(self) -> "GeometricSolver":
         if self.problem is None:
@@ -120,12 +143,16 @@ class GeometricSolverBuilder:
             )
 
         if self.rules is None:
-            self.rules = Theorem.from_txt_file(default_rules_path(), to_dict=True)
+            self.rules = Theorem.from_txt_file(default_rules_path())
 
         if self.proof_state is None:
-            self.proof_state, _ = Graph.build_problem(self.problem, self.defs)
+            self.proof_state, _ = Proof.build_problem(
+                self.problem, self.defs, self.disabled_intrinsic_rules
+            )
 
-        return GeometricSolver(self.proof_state, self.problem, self.defs, self.rules)
+        return GeometricSolver(
+            self.proof_state, self.problem, self.defs, self.rules, self.deductive_agent
+        )
 
     def load_problem_from_file(
         self, problems_path: Path, problem_name: str, translate: bool = True
@@ -147,11 +174,25 @@ class GeometricSolverBuilder:
     def load_rules_from_file(self, rules_path: Optional[Path] = None) -> Self:
         if rules_path is None:
             rules_path = default_rules_path()
-        self.rules = Theorem.from_txt_file(rules_path, to_dict=True)
+        self.rules = Theorem.from_txt_file(rules_path)
         return self
 
     def load_defs_from_file(self, defs_path: Optional[Path] = None) -> Self:
         if defs_path is None:
             defs_path = default_defs_path()
-        self.defs = Definition.from_txt_file(defs_path, to_dict=True)
+        self.defs = Definition.to_dict(Definition.from_txt_file(defs_path))
+        return self
+
+    def load_defs_from_txt(self, defs_txt: str) -> Self:
+        self.defs = Definition.to_dict(Definition.from_string(defs_txt))
+        return self
+
+    def with_deductive_agent(self, deductive_agent: DeductiveAgent):
+        self.deductive_agent = deductive_agent
+        return self
+
+    def with_disabled_intrinsic_rules(
+        self, disabled_intrinsic_rules: list[IntrinsicRules]
+    ):
+        self.disabled_intrinsic_rules = disabled_intrinsic_rules
         return self
