@@ -1,6 +1,7 @@
+from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Type
+from typing import TYPE_CHECKING, Callable, Optional, Type
 
 from networkx import Graph
 from pyvis.network import Network
@@ -27,14 +28,14 @@ if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
 
 
-NODES_VALUES: Dict[Type[Node], Type[Node]] = {
+NODES_VALUES: dict[Type[Node], Type[Node]] = {
     Line: Direction,
     Segment: Length,
     Angle: Measure,
     Ratio: Value,
 }
 
-NODES_VALUES_MARKERS: Dict[Type[Node], str] = {
+NODES_VALUES_MARKERS: dict[Type[Node], str] = {
     Direction: "d",
     Length: "l",
     Measure: "m",
@@ -44,7 +45,7 @@ NODES_VALUES_MARKERS: Dict[Type[Node], str] = {
 
 class SymbolsGraph:
     def __init__(self) -> None:
-        self.type2nodes: Dict[Type[Node], List[Node]] = {
+        self.type2nodes: dict[Type[Node], list[Node]] = {
             Point: [],
             Line: [],
             Segment: [],
@@ -56,10 +57,10 @@ class SymbolsGraph:
             Measure: [],
             Value: [],
         }
-        self._name2point = {}
-        self._name2node = {}
-        self._pair2line = {}
-        self._triplet2circle = {}
+        self._name2point: dict[str, Point] = {}
+        self._name2node: dict[str, Node] = {}
+        self._pair2line: dict[tuple[Point, Point], Line] = {}
+        self._triplet2circle: dict[tuple[Point, Point, Point], Circle] = {}
 
     def connect(self, a: Node, b: Node, deps: "Dependency") -> None:
         a.connect_to(b, deps)

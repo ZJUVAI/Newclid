@@ -133,6 +133,8 @@ class Proof:
         self.statements_adder = statements_adder
         self.dependency_graph = DependencyGraph()
         self._goal = None
+        self._problem: Optional[Problem] = None
+        self._definitions: Optional[dict[str, Definition]] = None
 
     @classmethod
     def build_problem(
@@ -203,6 +205,8 @@ class Proof:
             raise err
 
         proof._goal = problem.goal
+        proof._problem = problem
+        proof._definitions = definitions
         for add in added:
             proof.alegbraic_manipulator.add_algebra(add)
 
@@ -237,6 +241,26 @@ class Proof:
             return ApplyDerivationFeedback(added, to_cache)
 
         raise NotImplementedError()
+
+    def copy(self):
+        """Make a copy of proof state."""
+        if self._problem is None:
+            raise TypeError("Could not find problem when trying to copy.")
+        if self._definitions is None:
+            raise TypeError("Could not find definitions when trying to copy.")
+
+        problem = self._problem.copy()
+        for clause in problem.clauses:
+            clause.nums = [
+                self.symbols_graph._name2node[pname].num for pname in clause.points
+            ]
+
+        proof, _ = Proof.build_problem(
+            problem,
+            self._definitions,
+            disabled_intrinsic_rules=self.statements_adder.DISABLED_INTRINSIC_RULES,
+        )
+        return proof
 
     def _apply_theorem(
         self, theorem: "Theorem", mapping: Mapping, dependency_level: int

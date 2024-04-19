@@ -2,7 +2,6 @@
 # !!! Do not change the external API except if you know what you are doing !!!
 
 from __future__ import annotations
-from copy import deepcopy
 import logging
 from pathlib import Path
 import traceback
@@ -44,7 +43,7 @@ class GeometricSolver:
         return self.problem.goal
 
     def load_state(self, proof_state: "Proof"):
-        self.proof_state = deepcopy(proof_state)
+        self.proof_state = proof_state
 
     def load_problem_string(self, problem_string: str):
         self.problem_string = problem_string
@@ -53,7 +52,7 @@ class GeometricSolver:
         return self.problem.txt()
 
     def get_proof_state(self) -> str:
-        return deepcopy(self.proof_state)
+        return self.proof_state
 
     def get_defs(self):
         return self.defs
@@ -107,7 +106,7 @@ class GeometricSolver:
             return clause_txt
         clause = Clause.from_txt(clause_txt)
         try:
-            deepcopy(self.proof_state).add_clause(clause, 0, self.defs)
+            self.proof_state.copy().add_clause(clause, 0, self.defs)
         except Exception:
             return "ERROR: " + traceback.format_exc()
         return clause_txt
