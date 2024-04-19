@@ -111,6 +111,36 @@ class TestConstants:
         success = solver.run()
         check.is_true(success)
 
+    @pytest.mark.xfail
+    def test_s_angle_deg_not_perp(self):
+        """Should be able to prescribe and check a constant s_angle in degree"""
+        defs = [
+            "segment a b",
+            "",
+            " =",
+            "a : ; b :",
+            "segment",
+            "",
+            "s_angle a b x y",
+            "x : a b x",
+            "a b = diff a b",
+            "x : s_angle a b x y",
+            "s_angle a b y",
+            "",
+        ]
+        solver = build_until_works(
+            self.solver_builder.load_defs_from_txt(
+                "\n".join(defs)
+            ).load_problem_from_txt(
+                "a b = segment a b; "
+                "x = s_angle a b x 63o; "
+                "y = s_angle a b y 143o "
+                "? s_angle x b y 80o"
+            )
+        )
+        success = solver.run()
+        check.is_true(success)
+
     def test_s_angle_pi_frac(self):
         """Should be able to prescribe and check a constant s_angle as pi fraction"""
         defs = [
