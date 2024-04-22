@@ -217,7 +217,10 @@ class Proof:
 
     def step(self, action: Action) -> Feedback:
         if isinstance(action, StopAction):
-            return StopFeedback()
+            success = False
+            if self._goal is not None:
+                success = self.check_goal(self._goal)
+            return StopFeedback(success=success)
         elif isinstance(action, ApplyTheoremAction):
             added, to_cache, success = self._apply_theorem(
                 action.theorem, action.mapping

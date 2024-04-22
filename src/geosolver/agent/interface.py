@@ -50,7 +50,7 @@ Action = Union[
 
 
 class StopFeedback(NamedTuple):
-    pass
+    success: bool
 
 
 class ApplyTheoremFeedback(NamedTuple):

@@ -13,6 +13,7 @@ from geosolver.agent.interface import (
     MatchAction,
     MatchFeedback,
     StopAction,
+    StopFeedback,
 )
 from geosolver.geometry import Point
 from geosolver.problem import Construction, Theorem
@@ -25,9 +26,9 @@ class HumanAgent(DeductiveAgent):
     INPUT_TO_ACTION_TYPE = {
         "match": MatchAction,
         "apply": ApplyTheoremAction,
-        "stop": StopAction,
         "resolve derivations": DeriveAlgebraAction,
         "derive": ApplyDerivationAction,
+        "stop": StopAction,
     }
     ACTION_TYPE_DESCRIPTION = {
         MatchAction: "Match a theorem to know on which mappings it can be applied.",
@@ -55,15 +56,15 @@ class HumanAgent(DeductiveAgent):
         }
 
         act_method = ACTION_TYPE_ACT[choosen_action_type]
-        action = act_method(proof, theorems)
+        action = act_method(theorems)
         if isinstance(action, (ApplyTheoremAction, ApplyDerivationAction)):
             self.level += 1
         return action
 
-    def _act_stop(self, proof: Proof, theorems: list[Theorem]) -> Action:
+    def _act_stop(self, theorems: list[Theorem]) -> Action:
         return StopAction()
 
-    def _act_match(self, proof: Proof, theorems: list[Theorem]) -> Action:
+    def _act_match(self, theorems: list[Theorem]) -> Action:
         choose_theorem_str = "\nChoose a theorem: \n"
         for th in theorems:
             choose_theorem_str += f" - [{th.rule_name}]: {th.txt()}\n"
@@ -74,7 +75,7 @@ class HumanAgent(DeductiveAgent):
         theorem = self._ask_for_key(theorem_dict, choose_theorem_str)
         return MatchAction(theorem, level=self.level)
 
-    def _act_apply_theorem(self, proof: Proof, theorems: list[Theorem]) -> Action:
+    def _act_apply_theorem(self, theorems: list[Theorem]) -> Action:
         choosen_mapping_str = "\nAvailable theorems mappings: \n"
         for mapping_str in self._mappings.keys():
             choosen_mapping_str += f" - [{mapping_str}]\n"
@@ -82,10 +83,10 @@ class HumanAgent(DeductiveAgent):
         theorem, mapping = self._ask_for_key(self._mappings, choosen_mapping_str)
         return ApplyTheoremAction(theorem, mapping)
 
-    def _act_resolve_derivations(self, proof: Proof, theorems: list[Theorem]) -> Action:
+    def _act_resolve_derivations(self, theorems: list[Theorem]) -> Action:
         return DeriveAlgebraAction(level=self.level)
 
-    def _act_apply_derivation(self, proof: Proof, theorems: list[Theorem]) -> Action:
+    def _act_apply_derivation(self, theorems: list[Theorem]) -> Action:
         choosen_mapping_str = "\nAvailable derivations mappings: \n"
         for mapping_str in self._derivations.keys():
             choosen_mapping_str += f" - [{mapping_str}]\n"
@@ -95,6 +96,7 @@ class HumanAgent(DeductiveAgent):
 
     def remember_effects(self, action: Action, feedback: Feedback):
         feedback_type_to_method = {
+            StopFeedback: self._remember_stop,
             MatchFeedback: self._remember_match,
             ApplyTheoremFeedback: self._remember_apply_theorem,
             DeriveFeedback: self._remember_derivations,
@@ -107,6 +109,11 @@ class HumanAgent(DeductiveAgent):
                 return
 
         raise NotImplementedError(f"Feedback {type(feedback)} is not implemented.")
+
+    def _remember_stop(self, action: StopAction, feedback: StopFeedback) -> str:
+        if feedback.success:
+            return "Congratulations ! You have solved the problem !"
+        return "You did not solve the problem."
 
     def _remember_match(self, action: MatchAction, feedback: MatchFeedback) -> str:
         matched_theorem = feedback.theorem
@@ -189,6 +196,10 @@ class HumanAgent(DeductiveAgent):
     def _choose_action_type(self):
         choose_action_type_str = "\nChoose an action type:\n"
         for action_input, action_type in self.INPUT_TO_ACTION_TYPE.items():
+            if action_type == ApplyTheoremAction and not self._mappings:
+                continue
+            if action_type == ApplyDerivationAction and not self._derivations:
+                continue
             action_description = self.ACTION_TYPE_DESCRIPTION[action_type]
             choose_action_type_str += f" -  [{action_input}]: {action_description}\n"
         choose_action_type_str += "Your choice: "
@@ -203,7 +214,7 @@ class HumanAgent(DeductiveAgent):
         choosen_value = None
         while choosen_value is None:
             choosen_input = self._ask_input(input_txt)
-            choosen = dict_to_ask.get(choosen_input, None)
+            choosen = dict_to_ask.pop(choosen_input, None)
             if choosen is not None:
                 choosen_value = choosen
             else:
