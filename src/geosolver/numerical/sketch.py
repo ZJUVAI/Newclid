@@ -1,3 +1,5 @@
+from __future__ import annotations
+from fractions import Fraction
 from typing import Optional, Union
 import numpy as np
 from numpy.random import uniform as unif
@@ -245,7 +247,7 @@ def sketch_eq_quadrangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     return a, b, c, d
 
 
-def sketch_eq_trapezoid(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
+def sketch_iso_trapezoid(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     a = Point(0.0, 0.0)
     b = Point(1.0, 0.0)
     lenght = unif(0.5, 2.0)
@@ -439,9 +441,18 @@ def sketch_rotatep90(args: tuple[gm.Point, ...]) -> Point:
 
 def sketch_s_angle(args: tuple[gm.Point, ...]) -> HalfLine:
     a, b, y = args
-    ang = y / 180 * np.pi
+    num, den = map(int, y.name.split("pi/"))
+    ang = num * np.pi / den
     x = b + (a - b).rotatea(ang)
     return HalfLine(b, x)
+
+
+def sketch_aconst(args: tuple[gm.Point, ...]) -> HalfLine:
+    a, b, c, r = args
+    num, den = map(int, r.name.split("pi/"))
+    ang = num * np.pi / den
+    x = c + (a - b).rotatea(ang)
+    return HalfLine(c, x)
 
 
 def sketch_segment(args: tuple[gm.Point, ...]) -> tuple[Point, Point]:
@@ -481,7 +492,7 @@ def sketch_trapezoid(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
 
     base = unif(0.5, 2.0)
     height = unif(0.5, 2.0)
-    a = Point(unif(0.2, 0.5), height)
+    a = Point(unif(-0.5, 1.5), height)
     b = Point(a.x + base, height)
     a, b, c, d = random_rfss(a, b, c, d)
     return a, b, c, d
@@ -493,6 +504,7 @@ def sketch_triangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     ac = unif(0.5, 2.0)
     ang = unif(0.2, 0.8) * np.pi
     c = head_from(a, ang, ac)
+    a, b, c = random_rfss(a, b, c)
     return a, b, c
 
 
@@ -555,6 +567,7 @@ def sketch_ieq_triangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     b = Point(1.0, 0.0)
 
     c, _ = Circle(a, p1=b).intersect(Circle(b, p1=a))
+    a, b, c = random_rfss(a, b, c)
     return a, b, c
 
 
@@ -638,3 +651,77 @@ def sketch_3peq(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     x = line_line_intersection(ca_parallel_line, ab)
     y = z * 2 - x
     return x, y, z
+
+
+###### NEW FUNCTIONS FOR NEW DEFINITIONS ---- V. S.
+
+
+def sketch_isosvertex(args: tuple[gm.Point, ...]) -> Line:
+    b, c = args
+    m = (b + c) * 2
+
+    return m.perpendicular_line(Line(b, c))
+
+
+def sketch_aline0(args: tuple[gm.Point, ...]) -> HalfLine:
+    """Sketch the construction aline."""
+    A, B, C, D, E, F, G = args
+    ab = A - B
+    cd = C - D
+    ef = E - F
+
+    dab = A.distance(B)
+    ang_ab = np.arctan2(ab.y / dab, ab.x / dab)
+
+    dcd = C.distance(D)
+    ang_cd = np.arctan2(cd.y / dcd, cd.x / dcd)
+
+    d_ef = E.distance(F)
+    ang_ef = np.arctan2(ef.y / d_ef, ef.x / d_ef)
+
+    ang_gx = ang_ef + ang_cd - ang_ab
+    X = G + Point(np.cos(ang_gx), np.sin(ang_gx))
+    return HalfLine(G, X)
+
+
+def sketch_eqratio(args: tuple[gm.Point, ...]) -> Circle:
+    A, B, C, D, E, F, G = args
+
+    dab = A.distance(B)
+    dcd = C.distance(D)
+    d_ef = E.distance(F)
+
+    dgx = d_ef * dcd / dab
+    return Circle(center=G, radius=dgx)
+
+
+def sketch_rconst(args: tuple[gm.Point, ...]) -> Circle:
+    """Sketches point x such that ab/cx=m/n"""
+    A, B, C, r = args
+    dab = A.distance(B)
+    length = float(dab / Fraction(r.name))
+    return Circle(center=C, radius=length)
+
+
+def sketch_eqratio6(args: tuple[gm.Point, ...]) -> Circle | Line:
+    """Sketches a point x such that ax/cx=ef/gh"""
+    A, C, E, F, G, H = args
+    d_ef = E.distance(F)
+    dgh = G.distance(H)
+
+    if dgh == d_ef:
+        M = (A + C) * 0.5
+        return M.perpendicular_line(Line(A, C))
+
+    else:
+        ratio = d_ef / dgh
+        extremum_1 = (1 / (1 - ratio)) * (A - ratio * C)
+        extremum_2 = (1 / (1 + ratio)) * (ratio * C + A)
+        center = (extremum_1 + extremum_2) * 0.5
+        radius = 0.5 * extremum_1.distance(extremum_2)
+        return Circle(center=center, radius=radius)
+
+
+def sketch_radiuscircle(args: tuple[gm.Point, ...]) -> Circle:
+    a, y = args
+    return Circle(center=a, radius=y)

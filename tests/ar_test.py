@@ -19,6 +19,7 @@ import pytest
 import pytest_check as check
 import geosolver.algebraic.geometric_tables as geometric_tables
 from geosolver.dependencies.empty_dependency import EmptyDependency
+from geosolver.numerical.check import clock
 from geosolver.api import GeometricSolverBuilder
 
 
@@ -157,18 +158,29 @@ class TestAR:
         angle_60 = (1, 3)
         angle_120 = (2, 3)
 
-        # check that angles constants are created and figured out:
-        check.equal(
-            result,
-            [
+        is_clockwise = clock(a.num, b.num, c.num) > 0
+
+        if not is_clockwise:
+            expected = [
                 ("d(bc)", "d(ac)", angle_120, ["fact1", "fact2"]),
                 ("d(ab)", "d(bc)", angle_120, ["fact1", "fact2"]),
                 ("d(ac)", "d(ab)", angle_120, ["fact1", "fact2"]),
                 ("d(ac)", "d(bc)", angle_60, ["fact1", "fact2"]),
                 ("d(bc)", "d(ab)", angle_60, ["fact1", "fact2"]),
                 ("d(ab)", "d(ac)", angle_60, ["fact1", "fact2"]),
-            ],
-        )
+            ]
+        else:
+            expected = [
+                ("d(bc)", "d(ac)", angle_60, ["fact1", "fact2"]),
+                ("d(ab)", "d(bc)", angle_60, ["fact1", "fact2"]),
+                ("d(ac)", "d(ab)", angle_60, ["fact1", "fact2"]),
+                ("d(ac)", "d(bc)", angle_120, ["fact1", "fact2"]),
+                ("d(bc)", "d(ab)", angle_120, ["fact1", "fact2"]),
+                ("d(ab)", "d(ac)", angle_120, ["fact1", "fact2"]),
+            ]
+
+        # check that angles constants are created and figured out:
+        check.equal(result, expected)
 
     def test_incenter_excenter_touchpoints(self):
         """Test that AR can figure out incenter/excenter touchpoints are equidistant to midpoint."""

@@ -11,7 +11,7 @@ import seaborn as sns
 from geosolver.algebraic import AlgebraicRules
 from geosolver.dependencies.dependency import Dependency
 from geosolver.problem import CONSTRUCTION_RULE, Theorem
-from geosolver.statement.adder import ToCache
+from geosolver.statement.adder import IntrinsicRules, ToCache
 
 if TYPE_CHECKING:
     from geosolver.geometry import Point, Node
@@ -123,27 +123,6 @@ class DependencyGraph:
             ):
                 added_dependency = added_dependency.why[0]
 
-            # same_name = added_dependency.name == cache_name
-            # same_args = added_dependency.args == cache_args
-
-            # if not same_name or not same_args:
-            #     dep_args_str = ".".join(_str_arguments(added_dependency.args))
-            #     cache_args_str = ".".join(arg.name for arg in cache_args)
-            #     logging.warning(
-            #         f"Dependency {added_dependency.name}.{dep_args_str}"
-            #         f" differs from cache {cache_name}.{cache_args_str}"
-            #     )
-
-            # same_rule = added_dependency.rule_name == theorem.rule_name
-            # if not same_rule:
-            #     args_str = ".".join(arg.name for arg in args)
-            #     logging.warning(
-            #         f"Dependency {added_dependency.name}"
-            #         f" has rule_name '{added_dependency.rule_name}'"
-            #         f" different from the theorem {theorem.name}"
-            #         f" with rule_name {theorem.rule_name} and arguments {args_str}",
-            #     )
-
             for why_added in added_dependency.why:
                 self.add_edge(
                     why_added,
@@ -165,27 +144,7 @@ class DependencyGraph:
             ):
                 added_dependency = added_dependency.why[0]
 
-            # same_name = added_dependency.name == cache_name
-            # same_args = added_dependency.args == cache_args
-
-            # if not same_name or not same_args:
-            #     dep_args_str = ".".join(_str_arguments(added_dependency.args))
-            #     cache_args_str = ".".join(arg.name for arg in cache_args)
-            #     logging.warning(
-            #         f"Dependency {added_dependency.name}.{dep_args_str}"
-            #         f" differs from cache {cache_name}.{cache_args_str}"
-            #     )
-
             dep_rule_name = added_dependency.rule_name
-            # ar_rules = [ar.value for ar in AlgebraicRules]
-            # if dep_rule_name not in ar_rules:
-            #     args_str = ".".join(arg.name for arg in args)
-            #     logging.warning(
-            #         f"Dependency {added_dependency} has rule_name {dep_rule_name}"
-            #         f" not present in algebraic rules {ar_rules}"
-            #         f" with arguments {args_str}",
-            #     )
-
             for why_added in added_dependency.why:
                 self.add_edge(
                     why_added,
@@ -205,26 +164,7 @@ class DependencyGraph:
             ):
                 added_dependency = added_dependency.why[0]
 
-            # same_name = added_dependency.name == cache_name
-            # same_args = added_dependency.args == cache_args
-
-            # if not same_name or not same_args:
-            #     dep_args_str = ".".join(_str_arguments(added_dependency.args))
-            #     cache_args_str = ".".join(arg.name for arg in cache_args)
-            #     logging.warning(
-            #         f"Dependency {added_dependency.name}.{dep_args_str}"
-            #         f" differs from cache {cache_name}.{cache_args_str}"
-            #     )
-
             dep_rule_name = added_dependency.rule_name
-            # if dep_rule_name != CONSTRUCTION_RULE:
-            #     logging.warning(
-            #         "Dependency rule was different"
-            #         "from the construction rule. %s != %s",
-            #         dep_rule_name,
-            #         CONSTRUCTION_RULE,
-            #     )
-
             for why_added in added_dependency.why:
                 self.add_dependency(why_added)
                 self.add_edge(
@@ -279,6 +219,8 @@ class DependencyGraph:
                 edge_name = "Construction"
             elif name in [ar.value for ar in AlgebraicRules]:
                 edge_name = AlgebraicRules(name).name.replace("_", " ")
+            elif name in [ir.value for ir in IntrinsicRules]:
+                edge_name = IntrinsicRules(name).name.replace("_", " ")
             else:
                 edge_name = "NOT FOUND"
             vis_graph.edges[u, v, k]["title"] = edge_name

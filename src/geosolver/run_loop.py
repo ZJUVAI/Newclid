@@ -35,7 +35,7 @@ def run_loop(
         step += 1
         total_elapsed = time.time() - t0
 
-        success = proof.statements_checker.check_goal(goal)
+        success = proof.check_goal(goal)
         if (
             success
             or total_elapsed > timeout

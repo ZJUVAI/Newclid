@@ -43,14 +43,6 @@ def reshape(list_to_reshape: list[Any], n: int = 1) -> list[list[Any]]:
     return zip(*columns)
 
 
-def isint(x: str) -> bool:
-    try:
-        int(x)
-        return True
-    except ValueError:
-        return False
-
-
 class Construction:
     """One predicate."""
 
@@ -64,7 +56,7 @@ class Construction:
         self.args = args
 
     def translate(self, mapping: dict[str, str]) -> Construction:
-        args = [a if isint(a) else mapping[a] for a in self.args]
+        args = [mapping[a] if a in mapping else a for a in self.args]
         return Construction(self.name, args)
 
     def txt(self) -> str:

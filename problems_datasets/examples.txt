@@ -8,19 +8,41 @@ euler
 a b c = triangle a b c; h = orthocenter a b c; h1 = foot a b c; h2 = foot b c a; h3 = foot c a b; g1 g2 g3 g = centroid g1 g2 g3 g a b c; o = circle a b c ? coll h g o
 pappus
 a b = segment a b; p q = segment p q; c = on_line c a b; r = on_line r p q; x = on_line x a q, on_line x p b; y = on_line y a r, on_line y p c; z = on_line z b r, on_line z c q ? coll x y z
-desargues
-a p = segment a p; b q = segment b q; o = on_line o a p, on_line o b q; o c = segment o c; r = on_line r o c; x = on_line x b c, on_line x q r; y = on_line y a c, on_line y p r; z = on_line z a b, on_line z p q ? coll x y z
 orthocenter_consequence
-a b c = triangle; h = on_tline b a c, on_tline c a b; f = on_tline f c c b ? para a h f c
+a b c = triangle a b c; h = on_tline b a c, on_tline c a b; f = on_tline f c c b ? para a h f c
 orthocenter_consequence_aux
 a b c = triangle; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d; f = on_tline f c b c ? para a d f c
 imo_2004_p1
 a b c = triangle a b c; o = midpoint o b c; m = on_circle m o b, on_line m a b; n = on_circle n o b, on_line n a c; r = angle_bisector r b a c, angle_bisector r m o n; o1 = circle o1 b m r; o2 = circle o2 c n r; p = on_circle p o1 r, on_circle p o2 r; k = on_bline k m n; l = eqdistance l k k a, eqdistance l o o a ? coll p b c
+imo_2004_p1_generalized
+a b c = triangle a b c; o = free o; m = on_circle m o b, on_line m a b; n = on_circle n o b, on_line n a c; r = angle_bisector r b a c, angle_bisector r m o n; o1 = circle o1 b m r; o2 = circle o2 c n r; p = on_circle p o1 r, on_circle p o2 r; k = on_bline k m n; l = eqdistance l k k a, eqdistance l o o a ? coll p b c
+not_always_good
+a b c = triangle a b c; o = free o; m = on_circle m o b, on_line m a b; n = on_circle n o b, on_line n a c; r = angle_bisector r b a c, angle_bisector r m o n ? perp n m o r
 r29_only
 a b = segment a b; m = midpoint m a b; m1 = midpoint m1 m a ? eqratio m a a b m1 m m a
-testing_problem
-a b c = triangle; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d; f = on_tline f c b c ? para a d f c
-two_ways
+rule_r29_not_found_disguise
+a b = segment a b; m = midpoint m a b; m1 = midpoint m1 m a ? eqratio m a a b m1 m m a
+rule_r29_not_found_explicit
+a b = segment a b; m = midpoint m a b; c d = segment c d; n = midpoint n c d ? eqratio m a a b n c c d
+find_r22
+a b = segment a b; m = midpoint m a b; o = on_tline o m a b ? cong o a o b
+two_paths_problem_aux
+a b c = triangle a b c; p q = segment p q; s = on_aline s p q c a b; t = on_aline t q p c b a; r = on_line r p s, on_line r q t ? eqangle c a c b s p t q
+two_paths_problem
 a b c = triangle a b c; p q = segment p q; s = on_aline s p q c a b; t = on_aline t q p c b a ? eqangle c a c b s p t q
-false_equlity
+b23_may_need_BUILT_IN_FNS
+a x = segment a x; m = midpoint m a x; p q r = triangle12 p q r; n = midpoint n m a; u = midpoint u p q ? eqratio a x a n p r p u
+ratio_chase_incorrect_on_step_one
 a b e = triangle12 a b e; c = midpoint c a e ? cong a c a b
+forcing_ratio
+a b c = triangle12 a b c; m = midpoint m a c ? cong a m a b
+check_r00
+c d = segment c d; b = on_tline b c c d; f = on_tline f d c d ? para b c f d
+angles_in_triangle
+a b = segment a b; x = s_angle a b x 63; y = s_angle b a y 153 ? perp b x a y
+testing_aline0
+a = free a; b = free b; c = free c; d = free d; e = free e; f = free f; g = free g; h = on_aline0 h a b c d e f g ? eqangle a b c d e f g h
+testing_iso_triangle_vertex_angle
+b = free b; c = free c; a = iso_triangle_vertex_angle a b c ? cong a b a c
+testing_problem
+p = free p; q = free q; u = free u; v = on_tline v u p q; a = free a; b = free b; c = free c; d = on_aline0 d p q a b u v c ? perp a b c d

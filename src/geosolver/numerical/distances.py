@@ -1,6 +1,14 @@
 from geosolver.numerical.geometries import Point
 
 
+class PointTooCloseError(Exception):
+    pass
+
+
+class PointTooFarError(Exception):
+    pass
+
+
 def check_too_close_numerical(
     newpoints: list[Point], points: list[Point], tol: int = 0.1
 ) -> bool:
