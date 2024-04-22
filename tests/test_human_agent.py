@@ -4,6 +4,7 @@ import pytest
 
 from geosolver.agent.human_agent import HumanAgent
 from geosolver.api import GeometricSolverBuilder
+from tests.fixtures import build_until_works
 
 
 class HumanAgentWithPredefinedInput(HumanAgent):
@@ -57,5 +58,25 @@ class TestHumanAgent:
             "? eqangle b a d a d a d c",
             translate=False,
         ).build()
+        success = solver.run()
+        assert success
+
+    def test_should_resolve_and_apply_derivation(self):
+        self.human_agent.inputs_given = [
+            "resolve derivations",
+            "derive",
+            "aconst d(bx) d(ay) 1 2",
+            "stop",
+        ]
+
+        solver = build_until_works(
+            self.solver_builder.load_problem_from_txt(
+                "a b = segment a b; "
+                "x = s_angle a b x 63o; "
+                "y = s_angle b a y 153o "
+                "? perp b x a y",
+                translate=False,
+            )
+        )
         success = solver.run()
         assert success

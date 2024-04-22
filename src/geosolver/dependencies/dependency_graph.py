@@ -10,7 +10,11 @@ import seaborn as sns
 
 from geosolver.algebraic import AlgebraicRules
 from geosolver.dependencies.dependency import Dependency
-from geosolver.problem import CONSTRUCTION_RULE, Construction, Theorem
+from geosolver.problem import (
+    CONSTRUCTION_RULE,
+    Theorem,
+    name_and_arguments_to_str,
+)
 from geosolver.statement.adder import IntrinsicRules, ToCache
 
 if TYPE_CHECKING:
@@ -107,7 +111,7 @@ class DependencyGraph:
         if isinstance(v_for_edge, Dependency):
             v_for_edge = dependency_node_name(v_for_edge)
         assert v_for_edge in self.nx_graph.nodes
-        edge_key = str(Construction(edge_name, edge_arguments))
+        edge_key = name_and_arguments_to_str(edge_name, edge_arguments, ".")
         self.nx_graph.add_edge(pred, v_for_edge, key=edge_key)
 
     def add_theorem_edges(

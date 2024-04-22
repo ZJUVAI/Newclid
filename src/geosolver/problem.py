@@ -60,7 +60,7 @@ class Construction:
         return Construction(self.name, args)
 
     def txt(self) -> str:
-        return " ".join([self.name] + arguments_to_str(self.args))
+        return name_and_arguments_to_str(self.name, self.args, " ")
 
     def __str__(self) -> str:
         return self.txt()
@@ -124,6 +124,12 @@ def compare_fn(dep: "Dependency") -> tuple["Dependency", str]:
 
 def sort_deps(deps: list["Dependency"]) -> list["Dependency"]:
     return sorted(deps, key=compare_fn)
+
+
+def name_and_arguments_to_str(
+    name: str, args: list[str | int | "gm.Node"], join: str
+) -> list[str]:
+    return join.join([name] + arguments_to_str(args))
 
 
 def arguments_to_str(args: list[str | int | "gm.Node"]) -> list[str]:
