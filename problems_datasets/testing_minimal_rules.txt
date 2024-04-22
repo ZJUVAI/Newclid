@@ -9,7 +9,7 @@ a = free a; b = free b; p = free p; q = on_circum q a b p ? eqangle p a p b q a 
 r04
 a = free a ? coll a a a
 r05
-a = free a ? coll a a a
+a = free a; b = free b; c = free c; p = on_circum p a b c; r = on_circum r a b c; q = on_circum q a b c, eqratio q c a c b r p r ? cong a b p q
 r06
 a = free a; b = free b; c = free c; e = midpoint e a b; f = midpoint f a c ? para e f b c
 r07
@@ -19,7 +19,7 @@ a = free a; b = free b; c = free c; d = on_tline d c a b; e = free e; f = free f
 r09
 c = free c; d = free d; p = free p; q = free q; a = free a; b = free b; m = free m; n = on_aline0 n c d a b p q m; e = free e; f = free f; r = free r; u = on_aline0 u c d e f p q r ? eqangle a b e f m n r u
 r10
-a = free a ? coll a a a
+a = free a; b = free b; c = free c; d = free d; m = free m; n = free n; p = free p; q = eqratio q a b c d m n p; e = free e; f = free f; r = free r; u = eqratio u c d e f p q r ? eqratio a b e f m n r u
 r11
 a = free a ? coll a a a
 r12
@@ -61,7 +61,7 @@ a = free a; b = free b; c = free c; d = free d; m = midpoint m a b; n = midpoint
 r30
 p = free p; q = free q; u = free u; v = on_tline v u p q; a = free a; b = free b; c = free c; d = on_aline0 d p q a b u v c ? perp a b c d
 r31
-a = free a ? coll a a a
+a = free a; b = free b; c = free c; d = free d; p = free p; q = free q; u = free u; v = eqratio v a b p q c d u, eqdistance v u p q ? cong a b c d
 r32
 a b c = triangle a b c; p = free p; q = eqdistance q p a b; r = eqdistance r p a c, eqdistance r q c b ? contri* a b c p q r
 r33
@@ -75,11 +75,11 @@ a = free a ? coll a a a
 r37
 a = free a ? coll a a a
 r38
-a = free a ? coll a a a
+a = free a; b = free b; c = free c; q = free q; r = free r; p = eqratio p b c b a q r q, eqratio p c b c a r q r ? simtri* a b c p q r
 r39
-a = free a ? coll a a a
+a = free a; b = free b; c = free c; p = free p; q = free q; r = eqratio r b a b c q p q, on_aline0 r b a b c q p q ? simtri* a b c p q r
 r40
-a = free a ? coll a a a
+a = free a; b = free b; c = free c; p = free p; q = eqdistance q p a b; r = eqratio r b a b c q p q, eqratio6 r p q c a c b ? contri* a b c p q r
 r41
 a = free a ? coll a a a
 r42
