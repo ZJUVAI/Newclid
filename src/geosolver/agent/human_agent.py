@@ -11,7 +11,7 @@ from geosolver.agent.interface import (
     MatchFeedback,
     StopAction,
 )
-from geosolver.problem import Theorem
+from geosolver.problem import Construction, Theorem
 from geosolver.proof import Proof, theorem_mapping_str
 
 T = TypeVar("T")
@@ -86,12 +86,12 @@ class HumanAgent(DeductiveAgent):
 
             feedback_str = (
                 "Matched theorem "
-                f"[{matched_theorem.rule_name}] ({matched_theorem.txt()}):"
+                f"[{matched_theorem.rule_name}] ({matched_theorem.txt()}):\n"
             )
             for mapping in feedback.mappings:
                 mapping_str = theorem_mapping_str(matched_theorem, mapping)
                 self._mappings[mapping_str] = (matched_theorem, mapping)
-                feedback_str += f"  - {mapping_str}"
+                feedback_str += f"  - [{mapping_str}]\n"
 
         elif isinstance(feedback, ApplyTheoremFeedback):
             theorem = action.theorem
@@ -102,14 +102,18 @@ class HumanAgent(DeductiveAgent):
                 )
                 feedback_str += "    Added statements:\n"
                 for added in feedback.added:
-                    feedback_str += f"     - {str(added)}\n"
+                    feedback_str += f"     - {added}\n"
                 feedback_str += "    Cached statements:\n"
                 for cached in feedback.to_cache:
                     name, args, _deps = cached
-                    args_names = "".join(arg.name for arg in args)
-                    feedback_str += f"     - {name} {args_names}\n"
+                    args_names = " ".join(arg.name for arg in args)
+                    cached_construction = Construction(name, args)
+                    feedback_str += f"     - {name} {args_names}"
+                    if str(cached_construction) != str(_deps):
+                        feedback_str += f" ({cached_construction})"
+                    feedback_str += "\n"
             else:
-                feedback_str = f"Failed to apply theorem [{rname}] ({theorem.txt()})"
+                feedback_str = f"Failed to apply theorem [{rname}] ({theorem.txt()})\n"
 
         if feedback_str:
             self._display_feedback(feedback_str)

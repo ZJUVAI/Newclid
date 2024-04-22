@@ -41,21 +41,20 @@ class TestHumanAgent:
         assert not solver.run_infos["overstep"]
         assert solver.run_infos["step"] == 1
 
-    @pytest.mark.xfail
     def test_should_match_and_apply_theorem(self):
         self.human_agent.inputs_given = [
             "match",
-            "r06",
+            "r21",
             "apply",
-            "r06 m a b n c d",
+            "r21 a d c b",
             "stop",
         ]
         solver = self.solver_builder.load_problem_from_txt(
-            "a b = segment a b; "
-            "e = midpoint e a b; "
-            "c d = segment c d; "
-            "f = midpoint f a c "
-            "? para e f b c",
+            "b = free b; "
+            "c = free c; "
+            "d = free d; "
+            "a = on_circum a b c d, on_pline a d b c "
+            "? eqangle b a d a d a d c",
             translate=False,
         ).build()
         success = solver.run()

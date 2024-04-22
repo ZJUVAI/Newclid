@@ -10,7 +10,7 @@ import seaborn as sns
 
 from geosolver.algebraic import AlgebraicRules
 from geosolver.dependencies.dependency import Dependency
-from geosolver.problem import CONSTRUCTION_RULE, Theorem
+from geosolver.problem import CONSTRUCTION_RULE, Construction, Theorem
 from geosolver.statement.adder import IntrinsicRules, ToCache
 
 if TYPE_CHECKING:
@@ -107,7 +107,7 @@ class DependencyGraph:
         if isinstance(v_for_edge, Dependency):
             v_for_edge = dependency_node_name(v_for_edge)
         assert v_for_edge in self.nx_graph.nodes
-        edge_key = f"{edge_name}." + ".".join(_str_arguments(edge_arguments))
+        edge_key = str(Construction(edge_name, edge_arguments))
         self.nx_graph.add_edge(pred, v_for_edge, key=edge_key)
 
     def add_theorem_edges(
@@ -299,16 +299,6 @@ def dependency_node_name(dependency: Dependency):
 
 def node_name_from_hash(hash_tuple: Tuple[str]):
     return ".".join(hash_tuple)
-
-
-def _str_arguments(args: List[Union[str, int, "Node"]]) -> List[str]:
-    args_str = []
-    for arg in args:
-        if isinstance(arg, (int, str, float)):
-            args_str.append(str(arg))
-        else:
-            args_str.append(arg.name)
-    return args_str
 
 
 def rgba_to_hex(r, g, b, a=0.5):
