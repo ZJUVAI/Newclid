@@ -39,10 +39,46 @@ a b c = triangle12 a b c; m = midpoint m a c ? cong a m a b
 check_r00
 c d = segment c d; b = on_tline b c c d; f = on_tline f d c d ? para b c f d
 angles_in_triangle
-a b = segment a b; x = s_angle a b x 63; y = s_angle b a y 153 ? perp b x a y
+a b = segment a b; x = s_angle a b x 63o; y = s_angle b a y 153o ? perp b x a y
 testing_aline0
 a = free a; b = free b; c = free c; d = free d; e = free e; f = free f; g = free g; h = on_aline0 h a b c d e f g ? eqangle a b c d e f g h
 testing_iso_triangle_vertex_angle
 b = free b; c = free c; a = iso_triangle_vertex_angle a b c ? cong a b a c
 testing_problem
-p = free p; q = free q; u = free u; v = on_tline v u p q; a = free a; b = free b; c = free c; d = on_aline0 d p q a b u v c ? perp a b c d
+a b = segment a b; m = midpoint m a b; x = s_angle b a x 30o; y = s_angle a b y 30o ? aconst b y b a 1pi/6
+angles_eq_triangle
+b c = segment b c; a = eq_triangle a b c ? aconst a b a c 1pi/3
+angles_double_eq_triangle
+b c = segment b c; a = eq_triangle a b c; d = eqdistance d a a b, eqdistance d b b c ? aconst d a a b 2pi/3
+suplementary_angles
+a b = segment a b; c = s_angle a b c 30o ? aconst b a b c 5pi/6
+square_side
+a b = segment a b; c = on_tline c b a b, eqdistance c b a b; d = on_circum d a b c, eqdistance d c a b ? cong a b d a
+square_angle
+a b = segment a b; c = on_tline c b a b, eqdistance c b a b; d = on_circum d a b c, eqdistance d c a b ? aconst d a a b 1pi/2
+regular_pentagon_side
+a b = segment a b; c = s_angle a b c 108o, eqdistance c b a b; d = on_circum d a b c, eqdistance d c b c; e = on_circum e b c d, eqdistance e d c d ? cong e a a b
+regular_pentagon_angle
+a b = segment a b; c = s_angle a b c 108o, eqdistance c b a b; d = on_circum d a b c, eqdistance d c b c; e = on_circum e b c d, eqdistance e d c d ? aconst a b e a 3pi/5
+regular_hexagon_side
+o a = segment o a; b = eqdistance b a o a, eqdistance b o o a; c = on_circle c o a, eqdistance c b a b; d = on_circum d a b c, eqdistance d c b c; e = on_circum e b c d, eqdistance e d c d; f = on_circum f e d c, eqdistance f e e d ? cong a b f a
+regular_hexagon_angle
+o a = segment o a; b = eqdistance b a o a, eqdistance b o o a; c = on_circle c o a, eqdistance c b a b; d = on_circum d a b c, eqdistance d c b c; e = on_circum e b c d, eqdistance e d c d; f = on_circum f e d c, eqdistance f e e d ? aconst f a a b 1pi/3
+regular_triangle_side
+a b = segment a b; c = s_angle a b c 60o, eqdistance c b a b ? cong a c a b
+worlds_hardest_easy_geometry_problem1
+a b = segment a b; o = s_angle b a o 70o, s_angle a b o 120o; c = s_angle o a c 10o, s_angle o b c 160o; d = on_line d o b, on_line d c a; e = on_line e o a, on_line e c b ? aconst a e d e 1pi/9
+worlds_hardest_easy_geometry_problem1_with_construction
+a b = segment a b; o = s_angle b a o 70o, s_angle a b o 120o; c = s_angle o a c 10o, s_angle o b c 160o; d = on_line d o b, on_line d c a; e = on_line e o a, on_line e c b; f = on_pline f d a b, on_line f b c; g = on_line g f a, on_line g d b ? aconst c b c a 1pi/9
+worlds_hardest_easy_geometry_problem2
+a b = segment a b; o = s_angle b a o 60o, s_angle a b o 130o; c = s_angle o a c 20o, s_angle o b c 150o; d = on_line d o b, on_line d c a; e = on_line e o a, on_line e c b ? aconst a e d e 1pi/6
+geometric_ratios
+a b = segment a b; m = midpoint m a b; n = midpoint n m a ? rconst a m b m 1/1
+concatenating_ratios
+a b = segment a b; c = free c; d = rconst a b c d 2/1; e = rconst c d a e 2/1 ? rconst a b a e 4/1
+ar_example_paper_angle_chasing
+a b c = triangle a b c; d = on_circum d a b c; e = on_line e a d, on_line e b c; f = on_line f a b, on_line f c d; x = angle_bisector x a e b, angle_bisector x a f d ? perp e x x f
+ar_example_paper_distance_chasing
+a b c = triangle a b c; f g e d = incenter2 f g e d a b c; j k i h = excenter2 j k i h a b c ? cong c j f b
+ar_example_paper_ratio_chasing
+a b c = triangle a b c; d = midpoint d a c; e = angle_bisector e b a c, on_line e b d; f = on_pline f b e c, on_line f a c ? cong f c a b
