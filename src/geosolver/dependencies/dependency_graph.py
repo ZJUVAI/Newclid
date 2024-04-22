@@ -10,7 +10,11 @@ import seaborn as sns
 
 from geosolver.algebraic import AlgebraicRules
 from geosolver.dependencies.dependency import Dependency
-from geosolver.problem import CONSTRUCTION_RULE, Theorem
+from geosolver.problem import (
+    CONSTRUCTION_RULE,
+    Theorem,
+    name_and_arguments_to_str,
+)
 from geosolver.statement.adder import IntrinsicRules, ToCache
 
 if TYPE_CHECKING:
@@ -107,7 +111,7 @@ class DependencyGraph:
         if isinstance(v_for_edge, Dependency):
             v_for_edge = dependency_node_name(v_for_edge)
         assert v_for_edge in self.nx_graph.nodes
-        edge_key = f"{edge_name}." + ".".join(_str_arguments(edge_arguments))
+        edge_key = name_and_arguments_to_str(edge_name, edge_arguments, ".")
         self.nx_graph.add_edge(pred, v_for_edge, key=edge_key)
 
     def add_theorem_edges(
@@ -184,9 +188,10 @@ class DependencyGraph:
         # populates the nodes and edges data structures
         vis_graph: MultiDiGraph = self.nx_graph.copy()
 
-        max_level = max(
+        levels = [
             lvl for _, lvl in self.nx_graph.nodes(data="level") if lvl is not None
-        )
+        ]
+        max_level = max(levels) if levels else 0
         nodes_colors = build_nodes_colors(max_level + 1)
         for node, data in vis_graph.nodes(data=True):
             name: str = data.get("name", "Unknown")
@@ -253,10 +258,10 @@ class DependencyGraph:
         nt.options.physics.use_barnes_hut(
             {
                 "gravity": -15000,
-                "central_gravity": 0.3,
+                "central_gravity": 2.0,
                 "spring_length": 100,
                 "spring_strength": 0.05,
-                "damping": 0.09,
+                "damping": 0.2,
                 "overlap": 0.01,
             }
         )
@@ -298,16 +303,6 @@ def dependency_node_name(dependency: Dependency):
 
 def node_name_from_hash(hash_tuple: Tuple[str]):
     return ".".join(hash_tuple)
-
-
-def _str_arguments(args: List[Union[str, int, "Node"]]) -> List[str]:
-    args_str = []
-    for arg in args:
-        if isinstance(arg, (int, str, float)):
-            args_str.append(str(arg))
-        else:
-            args_str.append(arg.name)
-    return args_str
 
 
 def rgba_to_hex(r, g, b, a=0.5):

@@ -23,11 +23,11 @@ class StopAction(NamedTuple):
 class ApplyTheoremAction(NamedTuple):
     theorem: "Theorem"
     mapping: Mapping
-    level: int
 
 
 class MatchAction(NamedTuple):
     theorem: "Theorem"
+    level: int
     cache: Optional["MatchCache"] = None
 
 
@@ -50,7 +50,7 @@ Action = Union[
 
 
 class StopFeedback(NamedTuple):
-    pass
+    success: bool
 
 
 class ApplyTheoremFeedback(NamedTuple):

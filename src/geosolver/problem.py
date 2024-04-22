@@ -51,7 +51,7 @@ class Construction:
         data = data.split(" ")
         return Construction(data[0], data[1:])
 
-    def __init__(self, name: str, args: list[str]):
+    def __init__(self, name: str, args: list[str | gm.Point]):
         self.name = name
         self.args = args
 
@@ -60,7 +60,10 @@ class Construction:
         return Construction(self.name, args)
 
     def txt(self) -> str:
-        return " ".join([self.name] + list(self.args))
+        return name_and_arguments_to_str(self.name, self.args, " ")
+
+    def __str__(self) -> str:
+        return self.txt()
 
 
 class Clause:
@@ -121,6 +124,22 @@ def compare_fn(dep: "Dependency") -> tuple["Dependency", str]:
 
 def sort_deps(deps: list["Dependency"]) -> list["Dependency"]:
     return sorted(deps, key=compare_fn)
+
+
+def name_and_arguments_to_str(
+    name: str, args: list[str | int | "gm.Node"], join: str
+) -> list[str]:
+    return join.join([name] + arguments_to_str(args))
+
+
+def arguments_to_str(args: list[str | int | "gm.Node"]) -> list[str]:
+    args_str = []
+    for arg in args:
+        if isinstance(arg, (int, str, float)):
+            args_str.append(str(arg))
+        else:
+            args_str.append(arg.name)
+    return args_str
 
 
 class Problem:

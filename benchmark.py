@@ -1,4 +1,3 @@
-import cProfile
 import logging
 from pathlib import Path
 
@@ -37,24 +36,15 @@ def main():
         problem_output_path / f"{problem_name}_construction_figure.png",
     )
 
-    max_steps = 10000
+    max_steps = 100000
     timeout = 600.0
-    success = False
-    cProfile.runctx(
-        "solver.run(max_steps, timeout)",
-        globals=globals(),
-        locals=locals(),
-        filename=str(problem_output_path / f"{problem_name}.prof"),
-    )
+    success = solver.run(max_steps, timeout)
 
-    if solver.run_infos["success"]:
+    if success:
         logging.info(f"Solved {problem_name}: {solver.run_infos}")
     else:
-        logging.info(f"Failed at {problem_name}: {solver.run_infos}")
-
+        logging.info(f"Failed at problem {problem_name}: {solver.run_infos}")
     solver.write_all_outputs(problem_output_path)
-
-    return
 
 
 if __name__ == "__main__":
