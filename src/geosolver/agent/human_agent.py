@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import TypeVar
 from geosolver.agent.interface import (
     Action,
@@ -48,9 +49,14 @@ class HumanAgent(DeductiveAgent):
     def __init__(self) -> None:
         super().__init__()
         self._mappings: dict[str, tuple[Theorem, Mapping]] = {}
+        self._known_mappings: set[str] = set()
+
         self._derivations: dict[str, tuple[str, Mapping]] = {}
+        self._known_derivations: set[str] = set()
+
         self._all_added: list[Dependency] = []
         self._all_cached: list[Construction] = []
+
         self.level = 0
 
     def act(self, proof: Proof, theorems: list[Theorem]) -> Action:
@@ -147,7 +153,10 @@ class HumanAgent(DeductiveAgent):
         feedback_str = f"Matched theorem {theorem_str}:\n"
         for mapping in feedback.mappings:
             mapping_str = theorem_mapping_str(matched_theorem, mapping)
+            if mapping_str in self._known_mappings:
+                continue
             self._mappings[mapping_str] = (matched_theorem, mapping)
+            self._known_mappings.add(mapping_str)
             feedback_str += f"  - [{mapping_str}]\n"
         return feedback_str, True
 
@@ -185,7 +194,10 @@ class HumanAgent(DeductiveAgent):
         feedback_str = "New derivations:\n"
         for name, mapping in new_mappings:
             derivation_str = str(Construction(name, mapping[:-1]))
+            if derivation_str in self._known_derivations:
+                continue
             self._derivations[derivation_str] = (name, mapping)
+            self._known_derivations.add(derivation_str)
             feedback_str += f"  - [{derivation_str}]\n"
         return feedback_str, True
 
