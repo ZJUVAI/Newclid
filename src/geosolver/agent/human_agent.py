@@ -58,10 +58,14 @@ class HumanAgent(DeductiveAgent):
         self._all_cached: list[Construction] = []
 
         self.level = 0
+        self._started = False
 
     def act(self, proof: Proof, theorems: list[Theorem]) -> Action:
-        choosen_action_type = self._choose_action_type()
+        if not self._started:
+            self._display_feedback("", additional_feedback=True)
+            self._started = True
 
+        choosen_action_type = self._choose_action_type()
         ACTION_TYPE_ACT = {
             StopAction: self._act_stop,
             MatchAction: self._act_match,
