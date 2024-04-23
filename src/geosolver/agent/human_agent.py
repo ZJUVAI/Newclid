@@ -80,7 +80,9 @@ class HumanAgent(DeductiveAgent):
         for mapping_str in self._mappings.keys():
             choosen_mapping_str += f" - [{mapping_str}]\n"
         choosen_mapping_str += "Mapping you want to apply: "
-        theorem, mapping = self._ask_for_key(self._mappings, choosen_mapping_str)
+        theorem, mapping = self._ask_for_key(
+            self._mappings, choosen_mapping_str, pop=True
+        )
         return ApplyTheoremAction(theorem, mapping)
 
     def _act_resolve_derivations(self, theorems: list[Theorem]) -> Action:
@@ -91,7 +93,9 @@ class HumanAgent(DeductiveAgent):
         for mapping_str in self._derivations.keys():
             choosen_mapping_str += f" - [{mapping_str}]\n"
         choosen_mapping_str += "Mapping you want to apply: "
-        derivation, mapping = self._ask_for_key(self._derivations, choosen_mapping_str)
+        derivation, mapping = self._ask_for_key(
+            self._derivations, choosen_mapping_str, pop=True
+        )
         return ApplyDerivationAction(derivation, mapping)
 
     def remember_effects(self, action: Action, feedback: Feedback):
@@ -119,8 +123,7 @@ class HumanAgent(DeductiveAgent):
         matched_theorem = feedback.theorem
         theorem_str = f"[{matched_theorem.rule_name}] ({matched_theorem.txt()})"
         if not feedback.mappings:
-            self._display_feedback(f"No match found for theorem {theorem_str}:\n")
-            return
+            return f"No match found for theorem {theorem_str}:\n"
 
         feedback_str = f"Matched theorem {theorem_str}:\n"
         for mapping in feedback.mappings:
@@ -210,11 +213,15 @@ class HumanAgent(DeductiveAgent):
         dict_to_ask: dict[str, T],
         input_txt: str,
         not_found_txt: str = "Invalid input, try again.",
+        pop: int = False,
     ) -> T:
         choosen_value = None
         while choosen_value is None:
             choosen_input = self._ask_input(input_txt)
-            choosen = dict_to_ask.pop(choosen_input, None)
+            if pop:
+                choosen = dict_to_ask.pop(choosen_input, None)
+            else:
+                choosen = dict_to_ask.get(choosen_input, None)
             if choosen is not None:
                 choosen_value = choosen
             else:
