@@ -21,6 +21,11 @@ from geosolver.problem import Construction, Theorem, name_and_arguments_to_str
 from geosolver.proof import Proof, theorem_mapping_str
 from geosolver.statement.adder import ToCache
 
+from colorama import just_fix_windows_console
+from colorama import Fore, Style
+
+just_fix_windows_console()
+
 T = TypeVar("T")
 
 
@@ -113,36 +118,46 @@ class HumanAgent(DeductiveAgent):
 
         for feedback_type, feedback_process in feedback_type_to_method.items():
             if isinstance(feedback, feedback_type):
-                self._display_feedback(feedback_process(action, feedback))
+                additional_feedback = feedback_type != StopFeedback
+                feedback_txt, success = feedback_process(action, feedback)
+                self._display_feedback(
+                    "\n" + feedback_txt,
+                    additional_feedback=additional_feedback,
+                    color=Fore.GREEN if success else Fore.RED,
+                )
                 return
 
         raise NotImplementedError(f"Feedback {type(feedback)} is not implemented.")
 
-    def _remember_stop(self, action: StopAction, feedback: StopFeedback) -> str:
+    def _remember_stop(
+        self, action: StopAction, feedback: StopFeedback
+    ) -> tuple[str, bool]:
         if feedback.success:
-            return "Congratulations ! You have solved the problem !"
-        return "You did not solve the problem."
+            return "Congratulations ! You have solved the problem !\n", True
+        return "You did not solve the problem.\n", False
 
-    def _remember_match(self, action: MatchAction, feedback: MatchFeedback) -> str:
+    def _remember_match(
+        self, action: MatchAction, feedback: MatchFeedback
+    ) -> tuple[str, bool]:
         matched_theorem = feedback.theorem
         theorem_str = f"[{matched_theorem.rule_name}] ({matched_theorem.txt()})"
         if not feedback.mappings:
-            return f"No match found for theorem {theorem_str}:\n"
+            return f"No match found for theorem {theorem_str}:\n", False
 
         feedback_str = f"Matched theorem {theorem_str}:\n"
         for mapping in feedback.mappings:
             mapping_str = theorem_mapping_str(matched_theorem, mapping)
             self._mappings[mapping_str] = (matched_theorem, mapping)
             feedback_str += f"  - [{mapping_str}]\n"
-        return feedback_str
+        return feedback_str, True
 
     def _remember_apply_theorem(
         self, action: ApplyTheoremAction, feedback: ApplyTheoremFeedback
-    ) -> str:
+    ) -> tuple[str, bool]:
         theorem = action.theorem
         rname = theorem.rule_name
         if not feedback.success:
-            return f"Failed to apply theorem [{rname}] ({theorem.txt()})\n"
+            return f"Failed to apply theorem [{rname}] ({theorem.txt()})\n", False
 
         feedback_str = f"Successfully applied theorem [{rname}] ({theorem.txt()}):\n"
         if feedback.added:
@@ -151,11 +166,11 @@ class HumanAgent(DeductiveAgent):
             feedback_str += self._list_cached_statements(feedback.to_cache)
         if not feedback.added and not feedback.to_cache:
             feedback_str += "But no statements were added nor cached ...\n"
-        return feedback_str
+        return feedback_str, True
 
     def _remember_derivations(
         self, action: DeriveAlgebraAction, feedback: DeriveFeedback
-    ) -> str:
+    ) -> tuple[str, bool]:
         new_mappings: list[tuple[str, tuple[Point, ...]]] = []
         for name, mappings in feedback.derives.items():
             for mapping in mappings:
@@ -165,21 +180,22 @@ class HumanAgent(DeductiveAgent):
                 new_mappings.append((name, mapping))
 
         if not new_mappings:
-            return "No new derviation found.\n"
+            return "No new derviation found.\n", False
 
         feedback_str = "New derivations:\n"
         for name, mapping in new_mappings:
             derivation_str = str(Construction(name, mapping[:-1]))
             self._derivations[derivation_str] = (name, mapping)
             feedback_str += f"  - [{derivation_str}]\n"
-        return feedback_str
+        return feedback_str, True
 
     def _remember_apply_derivation(
         self, action: ApplyDerivationAction, feedback: ApplyDerivationFeedback
-    ) -> str:
+    ) -> tuple[str, bool]:
         derivation_str = name_and_arguments_to_str(
             action.derivation_name, action.derivation_arguments[:-1], " "
         )
+        success = True
         feedback_str = f"Successfully applied derivation [{derivation_str}]:\n"
         if feedback.added:
             feedback_str += self._list_added_statements(feedback.added)
@@ -187,7 +203,8 @@ class HumanAgent(DeductiveAgent):
             feedback_str += self._list_cached_statements(feedback.to_cache)
         if not feedback.added and not feedback.to_cache:
             feedback_str += "But no statements were added nor cached ...\n"
-        return feedback_str
+            success = False
+        return feedback_str, success
 
     def _list_added_statements(self, added: list[Dependency]) -> str:
         feedback_str = "    Added statements:\n"
@@ -237,18 +254,30 @@ class HumanAgent(DeductiveAgent):
             if choosen is not None:
                 choosen_value = choosen
             else:
-                self._display_feedback(not_found_txt)
+                self._display_feedback(not_found_txt, color=Fore.RED)
         return choosen_value
 
-    def _display_feedback(self, feedback: str):
-        print(feedback)
-        if self._all_cached:
-            print(_list_constructions("All cached statements:\n", self._all_cached))
-        if self._all_added:
-            print(_list_constructions("All added statements:\n", self._all_added))
+    def _display_feedback(
+        self,
+        feedback: str,
+        additional_feedback: bool = False,
+        color: int = Fore.WHITE,
+    ):
+        if additional_feedback:
+            if self._all_cached:
+                print(_list_constructions("All cached statements:\n", self._all_cached))
+            if self._all_added:
+                print(_list_constructions("All added statements:\n", self._all_added))
 
-        print("-" * 30)
-        print(f"Current goal:\n{self._problem.goal}")
+        print(color + feedback + Style.RESET_ALL)
+        print("-" * 50)
+
+        if not additional_feedback:
+            return
+
+        problem_initial_txt = self._problem.txt().replace("; ", "\n").split(" ? ")[0]
+        print(Fore.BLUE + f"Problem:\n{problem_initial_txt}\n" + Style.RESET_ALL)
+        print(Fore.YELLOW + f"Current goal:\n{self._problem.goal}" + Style.RESET_ALL)
 
     def _ask_input(self, input_txt: str) -> str:
         return input(input_txt).lower().strip()
