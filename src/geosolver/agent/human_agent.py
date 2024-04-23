@@ -15,9 +15,11 @@ from geosolver.agent.interface import (
     StopAction,
     StopFeedback,
 )
+from geosolver.dependencies.dependency import Dependency
 from geosolver.geometry import Point
-from geosolver.problem import Construction, Theorem
+from geosolver.problem import Construction, Theorem, name_and_arguments_to_str
 from geosolver.proof import Proof, theorem_mapping_str
+from geosolver.statement.adder import ToCache
 
 T = TypeVar("T")
 
@@ -42,6 +44,8 @@ class HumanAgent(DeductiveAgent):
         super().__init__()
         self._mappings: dict[str, tuple[Theorem, Mapping]] = {}
         self._derivations: dict[str, tuple[str, Mapping]] = {}
+        self._all_added: list[Dependency] = []
+        self._all_cached: list[Construction] = []
         self.level = 0
 
     def act(self, proof: Proof, theorems: list[Theorem]) -> Action:
@@ -141,17 +145,12 @@ class HumanAgent(DeductiveAgent):
             return f"Failed to apply theorem [{rname}] ({theorem.txt()})\n"
 
         feedback_str = f"Successfully applied theorem [{rname}] ({theorem.txt()}):\n"
-        feedback_str += "    Added statements:\n"
-        for added in feedback.added:
-            feedback_str += f"    - {added}\n"
-        feedback_str += "    Cached statements:\n"
-        for cached in feedback.to_cache:
-            name, args, _deps = cached
-            cached_construction = Construction(name, args)
-            feedback_str += f"    - {cached_construction}"
-            if str(cached_construction) != str(_deps):
-                feedback_str += f" ({_deps})"
-            feedback_str += "\n"
+        if feedback.added:
+            feedback_str += self._list_added_statements(feedback.added)
+        if feedback.to_cache:
+            feedback_str += self._list_cached_statements(feedback.to_cache)
+        if not feedback.added and not feedback.to_cache:
+            feedback_str += "But no statements were added nor cached ...\n"
         return feedback_str
 
     def _remember_derivations(
@@ -178,18 +177,31 @@ class HumanAgent(DeductiveAgent):
     def _remember_apply_derivation(
         self, action: ApplyDerivationAction, feedback: ApplyDerivationFeedback
     ) -> str:
-        derivation_str = str(
-            Construction(action.derivation_name, action.derivation_arguments[:-1])
+        derivation_str = name_and_arguments_to_str(
+            action.derivation_name, action.derivation_arguments[:-1], " "
         )
-        action.derivation_arguments
         feedback_str = f"Successfully applied derivation [{derivation_str}]:\n"
-        feedback_str += "    Added statements:\n"
-        for added in feedback.added:
+        if feedback.added:
+            feedback_str += self._list_added_statements(feedback.added)
+        if feedback.to_cache:
+            feedback_str += self._list_cached_statements(feedback.to_cache)
+        if not feedback.added and not feedback.to_cache:
+            feedback_str += "But no statements were added nor cached ...\n"
+        return feedback_str
+
+    def _list_added_statements(self, added: list[Dependency]) -> str:
+        feedback_str = "    Added statements:\n"
+        for added in added:
             feedback_str += f"    - {added}\n"
-        feedback_str += "    Cached statements:\n"
-        for cached in feedback.to_cache:
+            self._all_added.append(added)
+        return feedback_str
+
+    def _list_cached_statements(self, to_cache: list[ToCache]) -> str:
+        feedback_str = "    Cached statements:\n"
+        for cached in to_cache:
             name, args, _deps = cached
             cached_construction = Construction(name, args)
+            self._all_cached.append(cached_construction)
             feedback_str += f"    - {cached_construction}"
             if str(cached_construction) != str(_deps):
                 feedback_str += f" ({_deps})"
@@ -212,7 +224,7 @@ class HumanAgent(DeductiveAgent):
         self,
         dict_to_ask: dict[str, T],
         input_txt: str,
-        not_found_txt: str = "Invalid input, try again.",
+        not_found_txt: str = "Invalid input, try again.\n",
         pop: int = False,
     ) -> T:
         choosen_value = None
@@ -230,6 +242,22 @@ class HumanAgent(DeductiveAgent):
 
     def _display_feedback(self, feedback: str):
         print(feedback)
+        if self._all_cached:
+            print(_list_constructions("All cached statements:\n", self._all_cached))
+        if self._all_added:
+            print(_list_constructions("All added statements:\n", self._all_added))
+
+        print("-" * 30)
+        print(f"Current goal:\n{self._problem.goal}")
 
     def _ask_input(self, input_txt: str) -> str:
         return input(input_txt).lower().strip()
+
+
+def _list_constructions(
+    heading: str, constructions: list[Construction], indent: str = ""
+) -> str:
+    feedback_str = heading
+    for construction in constructions:
+        feedback_str += indent + f"- {construction}\n"
+    return feedback_str

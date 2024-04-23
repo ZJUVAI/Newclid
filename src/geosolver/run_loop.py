@@ -3,20 +3,20 @@ import time
 from typing import TYPE_CHECKING
 
 from geosolver.agent.interface import StopAction, StopFeedback
-from geosolver.problem import Construction
 
 
 if TYPE_CHECKING:
     from geosolver.agent.interface import DeductiveAgent
     from geosolver.problem import Theorem
     from geosolver.proof import Proof
+    from geosolver.problem import Problem
 
 
 def run_loop(
     deductive_agent: "DeductiveAgent",
     proof: "Proof",
     theorems: list["Theorem"],
-    goal: "Construction",
+    problem: "Problem",
     max_steps: int = 10000,
     timeout: float = 600.0,
 ) -> tuple[bool, dict]:
@@ -24,6 +24,8 @@ def run_loop(
     infos = {}
     success = False
     t0 = time.time()
+
+    deductive_agent.load_problem(problem)
 
     done = False
     step = 0
@@ -36,7 +38,7 @@ def run_loop(
         total_elapsed = time.time() - t0
 
         # Force StopAction on goal success
-        success = proof.check_goal(goal)
+        success = proof.check_goal(problem.goal)
         if success:
             feedback = proof.step(StopAction())
             deductive_agent.remember_effects(action, feedback)

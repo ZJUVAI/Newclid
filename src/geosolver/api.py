@@ -65,7 +65,7 @@ class GeometricSolver:
             self.deductive_agent,
             self.proof_state,
             self.rules,
-            self.problem.goal,
+            self.problem,
             max_steps=max_steps,
             timeout=timeout,
         )

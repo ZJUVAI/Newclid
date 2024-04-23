@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
     from geosolver.match_theorems import MatchCache
     from geosolver.algebraic.algebraic_manipulator import Derivations
+    from geosolver.problem import Problem
 
 Mapping = dict[str, "Point"]
 
@@ -88,6 +89,10 @@ class DeductiveAgent:
 
     def __init__(self) -> None:
         self.level = None
+        self._problem: Optional["Problem"] = None
+
+    def load_problem(self, problem: "Problem"):
+        self._problem = problem
 
     @abstractmethod
     def act(self, proof: "Proof", theorems: list["Theorem"]) -> Action:
