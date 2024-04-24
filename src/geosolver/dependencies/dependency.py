@@ -402,6 +402,18 @@ def why_dependency(
         dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
         dep.rule_name = "r34"
         dep.why = [dep1, dep2]
+    elif dep.name == ConceptName.SIMILAR_TRIANGLE_BOTH.value:
+        a, b, c, p, q, r = dep.args
+        dep1 = Dependency(
+            ConceptName.EQRATIO.value, [b, a, b, c, q, p, q, r], "", level
+        )
+        dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
+        dep2 = Dependency(
+            ConceptName.EQRATIO.value, [c, a, c, b, r, p, r, q], "", level
+        )
+        dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
+        dep.rule_name = "r38"
+        dep.why = [dep1, dep2]
 
     elif dep.name in [
         ConceptName.CONTRI_TRIANGLE.value,
