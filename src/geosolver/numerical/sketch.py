@@ -658,7 +658,7 @@ def sketch_3peq(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
 
 def sketch_isosvertex(args: tuple[gm.Point, ...]) -> Line:
     b, c = args
-    m = (b + c) * 2
+    m = (b + c) / 2
 
     return m.perpendicular_line(Line(b, c))
 
