@@ -1,6 +1,5 @@
 from __future__ import annotations
 from enum import Enum
-import logging
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
@@ -11,7 +10,11 @@ import seaborn as sns
 
 from geosolver.algebraic import AlgebraicRules
 from geosolver.dependencies.dependency import Dependency
-from geosolver.problem import CONSTRUCTION_RULE, Theorem
+from geosolver.problem import (
+    CONSTRUCTION_RULE,
+    Theorem,
+    name_and_arguments_to_str,
+)
 from geosolver.statement.adder import IntrinsicRules, ToCache
 
 if TYPE_CHECKING:
@@ -108,7 +111,7 @@ class DependencyGraph:
         if isinstance(v_for_edge, Dependency):
             v_for_edge = dependency_node_name(v_for_edge)
         assert v_for_edge in self.nx_graph.nodes
-        edge_key = f"{edge_name}." + ".".join(_str_arguments(edge_arguments))
+        edge_key = name_and_arguments_to_str(edge_name, edge_arguments, ".")
         self.nx_graph.add_edge(pred, v_for_edge, key=edge_key)
 
     def add_theorem_edges(
@@ -123,27 +126,6 @@ class DependencyGraph:
                 and added_dependency.why[0].hashed() == added_dependency.hashed()
             ):
                 added_dependency = added_dependency.why[0]
-
-            same_name = added_dependency.name == cache_name
-            same_args = added_dependency.args == cache_args
-
-            if not same_name or not same_args:
-                dep_args_str = ".".join(_str_arguments(added_dependency.args))
-                cache_args_str = ".".join(arg.name for arg in cache_args)
-                logging.warning(
-                    f"Dependency {added_dependency.name}.{dep_args_str}"
-                    f" differs from cache {cache_name}.{cache_args_str}"
-                )
-
-            same_rule = added_dependency.rule_name == theorem.rule_name
-            if not same_rule:
-                args_str = ".".join(arg.name for arg in args)
-                logging.warning(
-                    f"Dependency {added_dependency.name}"
-                    f" has rule_name '{added_dependency.rule_name}'"
-                    f" different from the theorem {theorem.name}"
-                    f" with rule_name {theorem.rule_name} and arguments {args_str}",
-                )
 
             for why_added in added_dependency.why:
                 self.add_edge(
@@ -166,27 +148,7 @@ class DependencyGraph:
             ):
                 added_dependency = added_dependency.why[0]
 
-            same_name = added_dependency.name == cache_name
-            same_args = added_dependency.args == cache_args
-
-            if not same_name or not same_args:
-                dep_args_str = ".".join(_str_arguments(added_dependency.args))
-                cache_args_str = ".".join(arg.name for arg in cache_args)
-                logging.warning(
-                    f"Dependency {added_dependency.name}.{dep_args_str}"
-                    f" differs from cache {cache_name}.{cache_args_str}"
-                )
-
             dep_rule_name = added_dependency.rule_name
-            ar_rules = [ar.value for ar in AlgebraicRules]
-            if dep_rule_name not in ar_rules:
-                args_str = ".".join(arg.name for arg in args)
-                logging.warning(
-                    f"Dependency {added_dependency} has rule_name {dep_rule_name}"
-                    f" not present in algebraic rules {ar_rules}"
-                    f" with arguments {args_str}",
-                )
-
             for why_added in added_dependency.why:
                 self.add_edge(
                     why_added,
@@ -206,26 +168,7 @@ class DependencyGraph:
             ):
                 added_dependency = added_dependency.why[0]
 
-            same_name = added_dependency.name == cache_name
-            same_args = added_dependency.args == cache_args
-
-            if not same_name or not same_args:
-                dep_args_str = ".".join(_str_arguments(added_dependency.args))
-                cache_args_str = ".".join(arg.name for arg in cache_args)
-                logging.warning(
-                    f"Dependency {added_dependency.name}.{dep_args_str}"
-                    f" differs from cache {cache_name}.{cache_args_str}"
-                )
-
             dep_rule_name = added_dependency.rule_name
-            if dep_rule_name != CONSTRUCTION_RULE:
-                logging.warning(
-                    "Dependency rule was different"
-                    "from the construction rule. %s != %s",
-                    dep_rule_name,
-                    CONSTRUCTION_RULE,
-                )
-
             for why_added in added_dependency.why:
                 self.add_dependency(why_added)
                 self.add_edge(
@@ -245,9 +188,10 @@ class DependencyGraph:
         # populates the nodes and edges data structures
         vis_graph: MultiDiGraph = self.nx_graph.copy()
 
-        max_level = max(
+        levels = [
             lvl for _, lvl in self.nx_graph.nodes(data="level") if lvl is not None
-        )
+        ]
+        max_level = max(levels) if levels else 0
         nodes_colors = build_nodes_colors(max_level + 1)
         for node, data in vis_graph.nodes(data=True):
             name: str = data.get("name", "Unknown")
@@ -314,10 +258,10 @@ class DependencyGraph:
         nt.options.physics.use_barnes_hut(
             {
                 "gravity": -15000,
-                "central_gravity": 0.3,
+                "central_gravity": 2.0,
                 "spring_length": 100,
                 "spring_strength": 0.05,
-                "damping": 0.09,
+                "damping": 0.2,
                 "overlap": 0.01,
             }
         )
@@ -359,16 +303,6 @@ def dependency_node_name(dependency: Dependency):
 
 def node_name_from_hash(hash_tuple: Tuple[str]):
     return ".".join(hash_tuple)
-
-
-def _str_arguments(args: List[Union[str, int, "Node"]]) -> List[str]:
-    args_str = []
-    for arg in args:
-        if isinstance(arg, (int, str, float)):
-            args_str.append(str(arg))
-        else:
-            args_str.append(arg.name)
-    return args_str
 
 
 def rgba_to_hex(r, g, b, a=0.5):

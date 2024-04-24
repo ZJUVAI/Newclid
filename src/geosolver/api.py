@@ -2,7 +2,6 @@
 # !!! Do not change the external API except if you know what you are doing !!!
 
 from __future__ import annotations
-from copy import deepcopy
 import logging
 from pathlib import Path
 import traceback
@@ -44,7 +43,7 @@ class GeometricSolver:
         return self.problem.goal
 
     def load_state(self, proof_state: "Proof"):
-        self.proof_state = deepcopy(proof_state)
+        self.proof_state = proof_state
 
     def load_problem_string(self, problem_string: str):
         self.problem_string = problem_string
@@ -53,7 +52,7 @@ class GeometricSolver:
         return self.problem.txt()
 
     def get_proof_state(self) -> str:
-        return deepcopy(self.proof_state)
+        return self.proof_state
 
     def get_defs(self):
         return self.defs
@@ -66,7 +65,7 @@ class GeometricSolver:
             self.deductive_agent,
             self.proof_state,
             self.rules,
-            self.problem.goal,
+            self.problem,
             max_steps=max_steps,
             timeout=timeout,
         )
@@ -77,6 +76,7 @@ class GeometricSolver:
         write_solution(self.proof_state, self.problem, out_file)
 
     def write_all_outputs(self, output_folder_path: Path):
+        output_folder_path.mkdir(exist_ok=True, parents=True)
         problem_name = self.problem.url
         self.write_solution(
             output_folder_path / f"{problem_name}_proof_steps.txt",
@@ -95,6 +95,7 @@ class GeometricSolver:
             output_folder_path / f"{problem_name}.proof_subgraph.html",
             Theorem.to_dict(self.rules),
         )
+        logging.info("Written all outputs at %s", output_folder_path)
 
     def draw_figure(self, out_file: Path):
         self.proof_state.symbols_graph.draw_figure(out_file)
@@ -107,7 +108,7 @@ class GeometricSolver:
             return clause_txt
         clause = Clause.from_txt(clause_txt)
         try:
-            deepcopy(self.proof_state).add_clause(clause, 0, self.defs)
+            self.proof_state.copy().add_clause(clause, 0, self.defs)
         except Exception:
             return "ERROR: " + traceback.format_exc()
         return clause_txt

@@ -1167,11 +1167,11 @@ class StatementAdder:
         if isinstance(ab, Segment):
             depname = ConceptName.EQRATIO.value
             eqname = ConceptName.CONGRUENT.value
-            rule = IntrinsicRules.CONG_FROM_EQRATIO
+            rule = IntrinsicRules.CONG_FROM_EQRATIO.value
         else:
             depname = ConceptName.EQANGLE.value
             eqname = ConceptName.PARALLEL.value
-            rule = IntrinsicRules.PARA_FROM_EQANGLE
+            rule = IntrinsicRules.PARA_FROM_EQANGLE.value
 
         if ab != cd:
             dep0 = deps.populate(depname, [a, b, c, d, m, n, p, q])

@@ -4,3 +4,4 @@ scipy>=1.10.0
 networkx
 pyvis
 seaborn
+colorama
