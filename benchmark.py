@@ -4,6 +4,7 @@ from pathlib import Path
 
 
 from geosolver.api import GeometricSolverBuilder
+from geosolver.configs import default_configs_path
 from geosolver.statement.adder import IntrinsicRules
 
 
@@ -11,7 +12,7 @@ def main():
     logging.basicConfig(level=logging.INFO)
 
     problem_file = "problems_datasets/examples.txt"
-    problem_name = "orthocenter_consequence_aux"
+    problem_name = "testing_problem"
     solver = (
         GeometricSolverBuilder()
         .load_problem_from_file(problem_file, problem_name, translate=False)
@@ -23,6 +24,7 @@ def main():
                 IntrinsicRules.PARA_FROM_EQANGLE,
             ]
         )
+        .load_defs_from_file(default_configs_path().joinpath("new_defs.txt"))
         .build()
     )
 

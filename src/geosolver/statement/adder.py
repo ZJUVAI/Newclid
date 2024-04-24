@@ -11,6 +11,7 @@ from geosolver.dependencies.caching import DependencyCache, hashed
 from geosolver.dependencies.dependency import Dependency
 from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.geometry import Angle, Line, Node, Point, Segment, is_equal, is_equiv
+from geosolver.statement import list_eqratio3
 from geosolver.statement.checker import StatementChecker
 from geosolver.symbols_graph import SymbolsGraph
 
@@ -857,23 +858,12 @@ class StatementAdder:
         c ------ d
 
         """
-        a, b, c, d, m, n = points
-
         add, to_cache = [], []
-
-        ratios = [
-            [m, a, m, c, n, b, n, d],
-            [a, m, a, c, b, n, b, d],
-            [c, m, c, a, d, n, d, b],
-        ]
-        if m == n:
-            ratios.append([m, a, m, c, a, b, c, d])
-
+        ratios = list_eqratio3(points)
         for ratio_points in ratios:
             _add, _to_cache = self._add_eqratio(ratio_points, deps)
             add += _add
             to_cache += _to_cache
-
         return add, to_cache
 
     def _add_eqratio4(

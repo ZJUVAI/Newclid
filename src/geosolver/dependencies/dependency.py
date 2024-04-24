@@ -369,140 +369,17 @@ def why_dependency(
                 dep.why = why_eqangle(ab._val, cd._val, mn._val, pq._val, level)
 
     elif dep.name in [ConceptName.EQRATIO.value, ConceptName.EQRATIO6.value]:
-        a, b, c, d, m, n, p, q = dep.args
-        ab = symbols_graph.get_segment(a, b)
-        cd = symbols_graph.get_segment(c, d)
-        mn = symbols_graph.get_segment(m, n)
-        pq = symbols_graph.get_segment(p, q)
-
-        if ab is None or cd is None or mn is None or pq is None:
-            if {a, b} == {m, n}:
-                d = Dependency(ConceptName.CONGRUENT.value, [c, d, p, q], None, level)
-                dep.why = [
-                    d.why_me_or_cache(
-                        symbols_graph, statements_checker, dependency_cache, level
-                    )
-                ]
-            if {a, b} == {c, d}:
-                d = Dependency(ConceptName.CONGRUENT.value, [p, q, m, n], None, level)
-                dep.why = [
-                    d.why_me_or_cache(
-                        symbols_graph, statements_checker, dependency_cache, level
-                    )
-                ]
-            if {c, d} == {p, q}:
-                d = Dependency(ConceptName.CONGRUENT.value, [a, b, m, n], None, level)
-                dep.why = [
-                    d.why_me_or_cache(
-                        symbols_graph, statements_checker, dependency_cache, level
-                    )
-                ]
-            if {p, q} == {m, n}:
-                d = Dependency(ConceptName.CONGRUENT.value, [a, b, c, d], None, level)
-                dep.why = [
-                    d.why_me_or_cache(
-                        symbols_graph, statements_checker, dependency_cache, level
-                    )
-                ]
-            return
-
-        if ab._val and cd._val and mn._val and pq._val:
-            dep.why = why_eqratio(ab._val, cd._val, mn._val, pq._val, level)
-
-        if dep.why is None:
-            dep.why = []
-            if (ab == cd and mn == pq) or (ab == mn and cd == pq):
-                dep.why = []
-            elif ab == mn:
-                dep.why += maybe_make_equal_pairs(
-                    a,
-                    b,
-                    c,
-                    d,
-                    m,
-                    n,
-                    p,
-                    q,
-                    ab,
-                    mn,
-                    symbols_graph,
-                    statements_checker,
-                    dependency_cache,
-                    level,
-                )
-            elif cd == pq:
-                dep.why += maybe_make_equal_pairs(
-                    c,
-                    d,
-                    a,
-                    b,
-                    p,
-                    q,
-                    m,
-                    n,
-                    cd,
-                    pq,
-                    symbols_graph,
-                    statements_checker,
-                    dependency_cache,
-                    level,
-                )
-            elif ab == cd:
-                dep.why += maybe_make_equal_pairs(
-                    a,
-                    b,
-                    m,
-                    n,
-                    c,
-                    d,
-                    p,
-                    q,
-                    ab,
-                    cd,
-                    symbols_graph,
-                    statements_checker,
-                    dependency_cache,
-                    level,
-                )
-            elif mn == pq:
-                dep.why += maybe_make_equal_pairs(
-                    m,
-                    n,
-                    a,
-                    b,
-                    p,
-                    q,
-                    c,
-                    d,
-                    mn,
-                    pq,
-                    symbols_graph,
-                    statements_checker,
-                    dependency_cache,
-                    level,
-                )
-            elif is_equal(ab, mn) or is_equal(cd, pq):
-                dep1 = Dependency(
-                    ConceptName.CONGRUENT.value, [a, b, m, n], None, level
-                )
-                dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
-                dep2 = Dependency(
-                    ConceptName.CONGRUENT.value, [c, d, p, q], None, level
-                )
-                dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
-                dep.why += [dep1, dep2]
-            elif is_equal(ab, cd) or is_equal(mn, pq):
-                dep1 = Dependency(
-                    ConceptName.CONGRUENT.value, [a, b, c, d], None, level
-                )
-                dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
-                dep2 = Dependency(
-                    ConceptName.CONGRUENT.value, [m, n, p, q], None, level
-                )
-                dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
-                dep.why += [dep1, dep2]
-            elif ab._val and cd._val and mn._val and pq._val:
-                dep.why = why_eqangle(ab._val, cd._val, mn._val, pq._val, level)
+        why_me_eqratio(dep, symbols_graph, statements_checker, dependency_cache, level)
+    elif dep.name == ConceptName.EQRATIO3.value:
+        a, b, c, d, m, n = dep.args
+        dep1 = Dependency(ConceptName.PARALLEL.value, [a, b, c, d], "", level)
+        dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
+        dep2 = Dependency(ConceptName.COLLINEAR.value, [m, a, c], "", level)
+        dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
+        dep3 = Dependency(ConceptName.COLLINEAR.value, [n, b, d], "", level)
+        dep3.why_me(symbols_graph, statements_checker, dependency_cache, level)
+        dep.rule_name = "r07"
+        dep.why = [dep1, dep2, dep3]
 
     elif dep.name in [
         ConceptName.DIFFERENT.value,
@@ -526,7 +403,11 @@ def why_dependency(
         dep.rule_name = "r34"
         dep.why = [dep1, dep2]
 
-    elif dep.name == ConceptName.CONTRI_TRIANGLE.value:
+    elif dep.name in [
+        ConceptName.CONTRI_TRIANGLE.value,
+        ConceptName.CONTRI_TRIANGLE_REFLECTED.value,
+        ConceptName.CONTRI_TRIANGLE_BOTH.value,
+    ]:
         a, b, c, x, y, z = dep.args
         dep1 = Dependency(ConceptName.CONGRUENT.value, [a, b, x, y], "", level)
         dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
@@ -783,3 +664,114 @@ def maybe_make_equal_pairs(
     dep.why_me(symbols_graph, statements_checker, dependency_cache, level)
     why += [dep]
     return why
+
+
+def why_me_eqratio(
+    dep: "Dependency",
+    symbols_graph: "SymbolsGraph",
+    statements_checker: "StatementChecker",
+    dependency_cache: "DependencyCache",
+    level: int,
+):
+    a, b, c, d, m, n, p, q = dep.args
+    ab = symbols_graph.get_segment(a, b)
+    cd = symbols_graph.get_segment(c, d)
+    mn = symbols_graph.get_segment(m, n)
+    pq = symbols_graph.get_segment(p, q)
+
+    if ab is None or cd is None or mn is None or pq is None:
+        if {a, b} == {m, n}:
+            d = Dependency(ConceptName.CONGRUENT.value, [c, d, p, q], None, level)
+            dep.why = [
+                d.why_me_or_cache(
+                    symbols_graph, statements_checker, dependency_cache, level
+                )
+            ]
+        if {a, b} == {c, d}:
+            d = Dependency(ConceptName.CONGRUENT.value, [p, q, m, n], None, level)
+            dep.why = [
+                d.why_me_or_cache(
+                    symbols_graph, statements_checker, dependency_cache, level
+                )
+            ]
+        if {c, d} == {p, q}:
+            d = Dependency(ConceptName.CONGRUENT.value, [a, b, m, n], None, level)
+            dep.why = [
+                d.why_me_or_cache(
+                    symbols_graph, statements_checker, dependency_cache, level
+                )
+            ]
+        if {p, q} == {m, n}:
+            d = Dependency(ConceptName.CONGRUENT.value, [a, b, c, d], None, level)
+            dep.why = [
+                d.why_me_or_cache(
+                    symbols_graph, statements_checker, dependency_cache, level
+                )
+            ]
+        return
+
+    if ab._val and cd._val and mn._val and pq._val:
+        dep.why = why_eqratio(ab._val, cd._val, mn._val, pq._val, level)
+
+    if dep.why is None:
+        dep.why = []
+        if (ab == cd and mn == pq) or (ab == mn and cd == pq):
+            dep.why = []
+        elif ab == mn:
+            points = [a, b, c, d, m, n, p, q]
+            lines = [ab, mn]
+            dep.why += maybe_make_equal_pairs(
+                *points,
+                *lines,
+                symbols_graph,
+                statements_checker,
+                dependency_cache,
+                level,
+            )
+        elif cd == pq:
+            points = [c, d, a, b, p, q, m, n]
+            lines = [cd, pq]
+            dep.why += maybe_make_equal_pairs(
+                *points,
+                *lines,
+                symbols_graph,
+                statements_checker,
+                dependency_cache,
+                level,
+            )
+        elif ab == cd:
+            points = [a, b, m, n, c, d, p, q]
+            lines = [ab, cd]
+            dep.why += maybe_make_equal_pairs(
+                *points,
+                *lines,
+                symbols_graph,
+                statements_checker,
+                dependency_cache,
+                level,
+            )
+        elif mn == pq:
+            points = [m, n, a, b, p, q, c, d]
+            lines = [mn, pq]
+            dep.why += maybe_make_equal_pairs(
+                *points,
+                *lines,
+                symbols_graph,
+                statements_checker,
+                dependency_cache,
+                level,
+            )
+        elif is_equal(ab, mn) or is_equal(cd, pq):
+            dep1 = Dependency(ConceptName.CONGRUENT.value, [a, b, m, n], None, level)
+            dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
+            dep2 = Dependency(ConceptName.CONGRUENT.value, [c, d, p, q], None, level)
+            dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
+            dep.why += [dep1, dep2]
+        elif is_equal(ab, cd) or is_equal(mn, pq):
+            dep1 = Dependency(ConceptName.CONGRUENT.value, [a, b, c, d], None, level)
+            dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
+            dep2 = Dependency(ConceptName.CONGRUENT.value, [m, n, p, q], None, level)
+            dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
+            dep.why += [dep1, dep2]
+        elif ab._val and cd._val and mn._val and pq._val:
+            dep.why = why_eqangle(ab._val, cd._val, mn._val, pq._val, level)

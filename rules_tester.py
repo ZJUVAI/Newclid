@@ -4,6 +4,7 @@ from pathlib import Path
 
 
 from geosolver.api import GeometricSolverBuilder
+from geosolver.configs import default_configs_path
 from geosolver.statement.adder import IntrinsicRules
 
 
@@ -11,7 +12,7 @@ def main():
     logging.basicConfig(level=logging.INFO)
 
     problem_file = "problems_datasets/testing_minimal_rules.txt"
-    problem_name = "r42"
+    problem_name = "r07"
     solver = (
         GeometricSolverBuilder()
         .load_problem_from_file(problem_file, problem_name, translate=False)
@@ -23,8 +24,8 @@ def main():
                 IntrinsicRules.PARA_FROM_EQANGLE,
             ]
         )
-        .load_defs_from_file("src/geosolver/default_configs/new_defs.txt")
-        .load_rules_from_file("src/geosolver/default_configs/rules.txt")
+        .load_defs_from_file(default_configs_path().joinpath("new_defs.txt"))
+        .load_rules_from_file(default_configs_path().joinpath("rules.txt"))
         .build()
     )
 
@@ -54,7 +55,10 @@ def main():
     else:
         logging.info(f"Failed at {problem_name}: {solver.run_infos}")
 
-    solver.write_all_outputs(problem_output_path)
+    solver.write_solution(problem_output_path / f"{problem_name}_proof_steps.txt")
+    solver.proof_state.symbols_graph.draw_figure(
+        problem_output_path / f"{problem_name}_proof_figure.png",
+    )
 
     return
 

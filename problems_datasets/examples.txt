@@ -44,8 +44,6 @@ testing_aline0
 a = free a; b = free b; c = free c; d = free d; e = free e; f = free f; g = free g; h = on_aline0 h a b c d e f g ? eqangle a b c d e f g h
 testing_iso_triangle_vertex_angle
 b = free b; c = free c; a = iso_triangle_vertex_angle a b c ? cong a b a c
-testing_problem
-a b = segment a b; m = midpoint m a b; x = s_angle b a x 30o; y = s_angle a b y 30o ? aconst b y b a 1pi/6
 angles_eq_triangle
 b c = segment b c; a = eq_triangle a b c ? aconst a b a c 1pi/3
 angles_double_eq_triangle
@@ -82,3 +80,5 @@ ar_example_paper_distance_chasing
 a b c = triangle a b c; f g e d = incenter2 f g e d a b c; j k i h = excenter2 j k i h a b c ? cong c j f b
 ar_example_paper_ratio_chasing
 a b c = triangle a b c; d = midpoint d a c; e = angle_bisector e b a c, on_line e b d; f = on_pline f b e c, on_line f a c ? cong f c a b
+testing_problem
+p = free p; q = free q; u = free u; v = eqdistance v u p q; a = free a; b = free b; c = free c; d = eqratio d p q a b u v c ? cong a b c d
