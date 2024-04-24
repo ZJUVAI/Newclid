@@ -9,7 +9,7 @@ a = free a; b = free b; p = free p; q = on_circum q a b p ? eqangle p a p b q a 
 r04
 a = free a; b = free b; q = free q; p = eqangle3 p a b q a b ? cyclic a b p q
 r05
-a = free a; b = free b; c = free c; p = on_circum p a b c; r = on_circum r a b c; q = on_circum q a b c, eqratio q c a c b r p r ? cong a b p q
+a = free a; b = free b; c = free c; p = on_circum p a b c; r = on_circum r a b c; q = on_circum q a b c, on_aline0 q c a c b r p r ? cong a b p q
 r06
 a = free a; b = free b; c = free c; e = midpoint e a b; f = midpoint f a c ? para e f b c
 r07
@@ -33,13 +33,13 @@ a = free a; b = free b; c = free c; o = circle o a b c; x = on_tline x a a o ? e
 r16
 a = free a; b = free b; c = free c; o = circle o a b c; x = on_aline0 x c b c a a b a ? perp o a a x
 r17
-o = free o; a = free a; b = on_circle b o a; c = on_circle c o a; m = midpoint m b c ? eqangle a b a c o b o m
+a = free a; b = free b; c = free c; o = circle o a b c; m = midpoint m b c ? eqangle a b a c o b o m
 r18
-a = free a; b = free b; c = free c; o = free o; m = on_line m b c, on_aline0 m a b a c o b o ? midp m b c
+a = free a; b = free b; c = free c; o = circle o a b c; m = on_line m b c, on_aline0 m a b a c o b o ? midp m b c
 r19
 a = free a; b = free b; c = on_tline c b b a; m = midpoint m a c ? cong a m b m
 r20
-o = free 0; a = free a; b = on_circle b o a; c = on_circle c o a, on_line c o a ? perp a b b c
+o = free o; a = free a; b = on_circle b o a; c = on_circle c o a, on_line c o a ? perp a b b c
 r21
 a = free a; b = free b; c = free c; d = on_pline d c a b, on_circum d a b c ? eqangle a d c d c d c b
 r22
@@ -61,7 +61,7 @@ a = free a; b = free b; c = free c; d = free d; m = midpoint m a b; n = midpoint
 r30
 p = free p; q = free q; u = free u; v = on_tline v u p q; a = free a; b = free b; c = free c; d = on_aline0 d p q a b u v c ? perp a b c d
 r31
-a = free a; b = free b; c = free c; d = free d; p = free p; q = free q; u = free u; v = eqratio v a b p q c d u, eqdistance v u p q ? cong a b c d
+p = free p; q = free q; u = free u; v = eqdistance v u p q; a = free a; b = free b; c = free c; d = eqratio d p q a b u v c ? cong a b c d
 r32
 a b c = triangle a b c; p = free p; q = eqdistance q p a b; r = eqdistance r p a c, eqdistance r q c b ? contri* a b c p q r
 r33
