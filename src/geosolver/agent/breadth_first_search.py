@@ -19,6 +19,7 @@ from geosolver.agent.interface import (
     Mapping,
     MatchAction,
     MatchFeedback,
+    ResetFeedback,
     StopAction,
     ApplyTheoremAction,
     StopFeedback,
@@ -71,7 +72,7 @@ class BFSDD(DeductiveAgent):
         return self._match_next_theorem(proof)
 
     def remember_effects(self, action: Action, feedback: Feedback):
-        if isinstance(feedback, StopFeedback):
+        if isinstance(feedback, (StopFeedback, ResetFeedback)):
             return
         elif isinstance(feedback, ApplyTheoremFeedback):
             assert isinstance(action, ApplyTheoremAction)

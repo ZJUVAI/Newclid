@@ -17,6 +17,10 @@ if TYPE_CHECKING:
 Mapping = dict[str, "Point"]
 
 
+class ResetAction(NamedTuple):
+    pass
+
+
 class StopAction(NamedTuple):
     pass
 
@@ -42,12 +46,19 @@ class ApplyDerivationAction(NamedTuple):
 
 
 Action = Union[
+    ResetAction,
     StopAction,
     ApplyTheoremAction,
     MatchAction,
     DeriveAlgebraAction,
     ApplyDerivationAction,
 ]
+
+
+class ResetFeedback(NamedTuple):
+    problem: "Problem"
+    added: list["Dependency"]
+    to_cache: list["ToCache"]
 
 
 class StopFeedback(NamedTuple):
@@ -76,6 +87,7 @@ class ApplyDerivationFeedback(NamedTuple):
 
 
 Feedback = Union[
+    ResetFeedback,
     StopFeedback,
     ApplyTheoremFeedback,
     MatchFeedback,
@@ -89,10 +101,6 @@ class DeductiveAgent:
 
     def __init__(self) -> None:
         self.level = None
-        self._problem: Optional["Problem"] = None
-
-    def load_problem(self, problem: "Problem"):
-        self._problem = problem
 
     @abstractmethod
     def act(self, proof: "Proof", theorems: list["Theorem"]) -> Action:

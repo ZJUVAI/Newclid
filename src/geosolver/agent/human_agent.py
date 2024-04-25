@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TypeVar
+from typing import Optional, TypeVar
 from geosolver.agent.interface import (
     Action,
     ApplyDerivationAction,
@@ -13,12 +13,14 @@ from geosolver.agent.interface import (
     Mapping,
     MatchAction,
     MatchFeedback,
+    ResetAction,
+    ResetFeedback,
     StopAction,
     StopFeedback,
 )
 from geosolver.dependencies.dependency import Dependency
 from geosolver.geometry import Point
-from geosolver.problem import Construction, Theorem, name_and_arguments_to_str
+from geosolver.problem import Construction, Problem, Theorem, name_and_arguments_to_str
 from geosolver.proof import Proof, theorem_mapping_str
 from geosolver.statement.adder import ToCache
 
@@ -58,13 +60,9 @@ class HumanAgent(DeductiveAgent):
         self._all_cached: list[Construction] = []
 
         self.level = 0
-        self._started = False
+        self._problem: Optional[Problem] = None
 
     def act(self, proof: Proof, theorems: list[Theorem]) -> Action:
-        if not self._started:
-            self._display_feedback("", additional_feedback=True)
-            self._started = True
-
         choosen_action_type = self._choose_action_type()
         ACTION_TYPE_ACT = {
             StopAction: self._act_stop,
@@ -119,6 +117,7 @@ class HumanAgent(DeductiveAgent):
 
     def remember_effects(self, action: Action, feedback: Feedback):
         feedback_type_to_method = {
+            ResetFeedback: self._remember_reset,
             StopFeedback: self._remember_stop,
             MatchFeedback: self._remember_match,
             ApplyTheoremFeedback: self._remember_apply_theorem,
@@ -138,6 +137,21 @@ class HumanAgent(DeductiveAgent):
                 return
 
         raise NotImplementedError(f"Feedback {type(feedback)} is not implemented.")
+
+    def _remember_reset(
+        self, action: ResetAction, feedback: ResetFeedback
+    ) -> tuple[str, bool]:
+        self._problem = feedback.problem
+        feedback_str = f"\nStarting problem {self._problem.url}:"
+        feedback_str += "\n" + "=" * (len(feedback_str) - 2) + "\n"
+
+        feedback_str += "\n  Initial statements:\n"
+        if feedback.added:
+            feedback_str += self._list_added_statements(feedback.added)
+        if feedback.to_cache:
+            feedback_str += self._list_cached_statements(feedback.to_cache)
+
+        return feedback_str, True
 
     def _remember_stop(
         self, action: StopAction, feedback: StopFeedback
@@ -270,7 +284,9 @@ class HumanAgent(DeductiveAgent):
             if choosen is not None:
                 choosen_value = choosen
             else:
-                self._display_feedback(not_found_txt, color=Fore.RED)
+                self._display_feedback(
+                    not_found_txt, color=Fore.RED, additional_feedback=True
+                )
         return choosen_value
 
     def _display_feedback(
@@ -280,6 +296,7 @@ class HumanAgent(DeductiveAgent):
         color: int = Fore.WHITE,
     ):
         if additional_feedback:
+            print()
             if self._all_cached:
                 print(_list_constructions("All cached statements:\n", self._all_cached))
             if self._all_added:
@@ -288,15 +305,26 @@ class HumanAgent(DeductiveAgent):
         print(color + feedback + Style.RESET_ALL)
         print("-" * 50)
 
-        if not additional_feedback:
+        if not additional_feedback or self._problem is None:
             return
 
-        problem_initial_txt = self._problem.txt().replace("; ", "\n").split(" ? ")[0]
-        print(Fore.BLUE + f"Problem:\n{problem_initial_txt}\n" + Style.RESET_ALL)
-        print(Fore.YELLOW + f"Current goal:\n{self._problem.goal}" + Style.RESET_ALL)
+        print(_pretty_problem(self._problem))
 
     def _ask_input(self, input_txt: str) -> str:
         return input(input_txt).lower().strip()
+
+
+def _pretty_problem(problem: "Problem"):
+    problem_initial_txt = problem.txt().replace("; ", "\n").split(" ? ")[0]
+    return (
+        Fore.BLUE
+        + f"Problem:\n{problem_initial_txt}\n"
+        + Style.RESET_ALL
+        + "\n"
+        + Fore.YELLOW
+        + f"Current goal:\n{problem.goal}"
+        + Style.RESET_ALL
+    )
 
 
 def _list_constructions(

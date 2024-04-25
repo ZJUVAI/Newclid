@@ -19,6 +19,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from typing import Generator, Optional, Tuple, Union
+from typing_extensions import Self
 import logging
 
 
@@ -34,6 +35,7 @@ from geosolver.agent.interface import (
     Feedback,
     MatchAction,
     MatchFeedback,
+    ResetFeedback,
     StopAction,
     StopFeedback,
 )
@@ -132,12 +134,15 @@ class Proof:
         self.statements_checker = statements_checker
         self.statements_adder = statements_adder
         self.dependency_graph = DependencyGraph()
+
         self._goal = None
         self._resolved_mapping_deps: dict[
             tuple["Theorem", "Mapping"], EmptyDependency
         ] = {}
         self._problem: Optional[Problem] = None
         self._definitions: Optional[dict[str, Definition]] = None
+        self._init_added: list[Dependency] = []
+        self._init_to_cache: list[ToCache] = []
 
     @classmethod
     def build_problem(
@@ -146,8 +151,8 @@ class Proof:
         definitions: dict[str, Definition],
         disabled_intrinsic_rules: Optional[list[IntrinsicRules]] = None,
         max_attempts=100,
-    ) -> tuple[Proof, list[Dependency]]:
-        """Build a problem into a gr.Graph object."""
+    ) -> Self:
+        """Build a problem into a Proof state object."""
         proof = None
         added = None
         logging.info(f"Building proof from problem '{problem.url}': {problem.txt()}")
@@ -181,10 +186,14 @@ class Proof:
                     statements_adder=statements_adder,
                 )
                 added = []
+                to_cache = []
                 plevel = 0
                 for clause in problem.clauses:
-                    adds, plevel = proof.add_clause(clause, plevel, definitions)
+                    adds, clause_to_cache, plevel = proof.add_clause(
+                        clause, plevel, definitions
+                    )
                     added += adds
+                    to_cache += clause_to_cache
                 proof.plevel = plevel
 
             except (
@@ -210,10 +219,10 @@ class Proof:
         proof._goal = problem.goal
         proof._problem = problem
         proof._definitions = definitions
-        for add in added:
-            proof.alegbraic_manipulator.add_algebra(add)
+        proof._init_added = added
+        proof._init_to_cache = to_cache
 
-        return proof, added
+        return proof
 
     def step(self, action: Action) -> Feedback:
         if isinstance(action, StopAction):
@@ -257,6 +266,12 @@ class Proof:
 
         raise NotImplementedError()
 
+    def reset(self) -> ResetFeedback:
+        self.cache_deps(self._init_to_cache)
+        for add in self._init_added:
+            self.alegbraic_manipulator.add_algebra(add)
+        return ResetFeedback(self._problem, self._init_added, self._init_to_cache)
+
     def copy(self):
         """Make a copy of proof state."""
         if self._problem is None:
@@ -270,7 +285,7 @@ class Proof:
                 self.symbols_graph._name2node[pname].num for pname in clause.points
             ]
 
-        proof, _ = Proof.build_problem(
+        proof = Proof.build_problem(
             problem,
             self._definitions,
             disabled_intrinsic_rules=self.statements_adder.DISABLED_INTRINSIC_RULES,
@@ -460,7 +475,7 @@ class Proof:
         clause: Clause,
         plevel: int,
         definitions: dict[str, Definition],
-    ) -> tuple[list[Dependency], int]:
+    ) -> tuple[list[Dependency], list[ToCache], int]:
         """Add a new clause of construction, e.g. a new excenter."""
         existing_points = self.symbols_graph.all_points()
         new_points = [Point(name) for name in clause.points]
@@ -608,6 +623,7 @@ class Proof:
 
         plevel_done = set()
         added = []
+        to_cache = []
         basics = []
         # Step 3: build the basics.
         for c, deps in zip(clause.constructions, new_points_dep):
@@ -633,11 +649,12 @@ class Proof:
 
                 for b in bs:
                     args = self.map_construction_args_to_objects(b, mapping)
-                    adds, to_cache = self.resolve_statement_dependencies(
+                    adds, basic_to_cache = self.resolve_statement_dependencies(
                         name=b.name, args=args, deps=deps
                     )
-                    self.dependency_graph.add_construction_edges(to_cache, args)
-                    self.cache_deps(to_cache)
+                    self.dependency_graph.add_construction_edges(basic_to_cache, args)
+                    to_cache += basic_to_cache
+
                     basics.append((b.name, args, deps))
                     if adds:
                         added += adds
@@ -646,7 +663,7 @@ class Proof:
         for p in new_points:
             p.basics = basics
 
-        return added, plevel
+        return added, to_cache, plevel
 
     def all_eqangle_same_lines(self) -> Generator[tuple[Point, ...], None, None]:
         for l1, l2 in comb.permutations_pairs(self.symbols_graph.type2nodes[Line]):

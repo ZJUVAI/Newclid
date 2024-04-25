@@ -119,11 +119,8 @@ class GeometricSolver:
         logging.info('Solving: "%s"', candidate_pstring)
         p_new = Problem.from_txt(candidate_pstring)
         p_new.url = self.problem.url
-        # This is the new proof state graph representation:
-        g_new, _ = Proof.build_problem(p_new, self.defs)
-
         self.problem = p_new
-        self.proof_state = g_new
+        self.proof_state = Proof.build_problem(p_new, self.defs)
 
 
 class GeometricSolverBuilder:
@@ -148,7 +145,7 @@ class GeometricSolverBuilder:
             self.rules = Theorem.from_txt_file(default_rules_path())
 
         if self.proof_state is None:
-            self.proof_state, _ = Proof.build_problem(
+            self.proof_state = Proof.build_problem(
                 self.problem, self.defs, self.disabled_intrinsic_rules
             )
 

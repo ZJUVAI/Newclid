@@ -2,7 +2,7 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-from geosolver.agent.interface import StopAction, StopFeedback
+from geosolver.agent.interface import ResetAction, StopAction, StopFeedback
 
 
 if TYPE_CHECKING:
@@ -25,7 +25,8 @@ def run_loop(
     success = False
     t0 = time.time()
 
-    deductive_agent.load_problem(problem)
+    feedback = proof.reset()
+    deductive_agent.remember_effects(ResetAction(), feedback)
 
     done = False
     step = 0
