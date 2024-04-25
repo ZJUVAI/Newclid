@@ -663,7 +663,7 @@ def sketch_isosvertex(args: tuple[gm.Point, ...]) -> Line:
     return m.perpendicular_line(Line(b, c))
 
 
-def sketch_aline0(args: tuple[gm.Point, ...]) -> HalfLine:
+def sketch_aline0(args: tuple[gm.Point, ...]) -> Line:
     """Sketch the construction aline."""
     A, B, C, D, E, F, G = args
     ab = A - B
@@ -681,7 +681,7 @@ def sketch_aline0(args: tuple[gm.Point, ...]) -> HalfLine:
 
     ang_gx = ang_ef + ang_cd - ang_ab
     X = G + Point(np.cos(ang_gx), np.sin(ang_gx))
-    return HalfLine(G, X)
+    return Line(G, X)
 
 
 def sketch_eqratio(args: tuple[gm.Point, ...]) -> Circle:
