@@ -29,7 +29,7 @@ def main():
                 ]
             )
             .load_defs_from_file(default_configs_path().joinpath("new_defs.txt"))
-            .load_rules_from_file(default_configs_path().joinpath("rules.txt"))
+            .load_rules_from_file("minimal_rules.txt")
             .build()
         )
 

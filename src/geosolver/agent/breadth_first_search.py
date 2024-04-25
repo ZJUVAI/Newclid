@@ -1,6 +1,5 @@
 """Iterative level by level implementation of DD."""
 
-
 from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Optional
@@ -68,7 +67,9 @@ class BFSDD(DeductiveAgent):
 
         # Else we go to the next level
         self._next_level(theorems)
-        return self._match_next_theorem(proof)
+        if self._unmatched_theorems:
+            return self._match_next_theorem(proof)
+        return StopAction()
 
     def remember_effects(self, action: Action, feedback: Feedback):
         if isinstance(feedback, StopFeedback):
