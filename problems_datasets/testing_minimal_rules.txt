@@ -65,7 +65,7 @@ p = free p; q = free q; u = free u; v = eqdistance v u p q; a = free a; b = free
 r32
 a b c = triangle a b c; p = free p; q = eqdistance q p a b; r = eqdistance r p a c, eqdistance r q c b ? contri* a b c p q r
 r33
-a = free a; b = free b; c = free c; p = free p; q = eqdistance q p b a; r = eqdistance r q b c, on_aline0 r b a b c q p q ? contri* a b c p q r
+a = free a; b = free b; c = free c; q = free q; p = eqdistance p q b a; r = eqdistance r q b c, on_aline0 r b a b c q p q ? contri* a b c p q r
 r34
 a = free a; b = free b; c = free c; q = free q; r = free r; p = on_aline0 p b c b a q r q, on_aline0 p c b c a r q r ? simtri a b c p q r
 r35
