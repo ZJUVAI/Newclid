@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Optional, TypeVar
+from typing import NamedTuple, Optional, TypeVar
 
 from geosolver.agent.interface import (
     Action,
@@ -35,8 +35,13 @@ just_fix_windows_console()
 T = TypeVar("T")
 
 
+class ShowAction(NamedTuple):
+    pass
+
+
 class HumanAgent(DeductiveAgent):
     INPUT_TO_ACTION_TYPE = {
+        "show": ShowAction,
         "match": MatchAction,
         "apply": ApplyTheoremAction,
         "resolve derivations": DeriveAlgebraAction,
@@ -51,6 +56,7 @@ class HumanAgent(DeductiveAgent):
         DeriveAlgebraAction: "Resolve available derivation from current proof state.",
         ApplyDerivationAction: "Apply a derivation.",
         AuxAction: "Add an auxiliary construction to the setup.",
+        ShowAction: "Show the geometric figure of the current proof.",
     }
 
     def __init__(self) -> None:
@@ -68,7 +74,6 @@ class HumanAgent(DeductiveAgent):
         self._problem: Optional[Problem] = None
 
     def act(self, proof: Proof, theorems: list[Theorem]) -> Action:
-        choosen_action_type = self._choose_action_type()
         ACTION_TYPE_ACT = {
             StopAction: self._act_stop,
             MatchAction: self._act_match,
@@ -76,13 +81,23 @@ class HumanAgent(DeductiveAgent):
             DeriveAlgebraAction: self._act_resolve_derivations,
             ApplyDerivationAction: self._act_apply_derivation,
             AuxAction: self._act_aux,
+            ShowAction: self._act_show,
         }
 
-        act_method = ACTION_TYPE_ACT[choosen_action_type]
-        action = act_method(theorems)
+        action = None
+        while action is None:
+            choosen_action_type = self._choose_action_type()
+            act_method = ACTION_TYPE_ACT[choosen_action_type]
+            action = act_method(theorems)
+            if isinstance(action, ShowAction):
+                action = self._show_figure(proof)
+
         if isinstance(action, (ApplyTheoremAction, ApplyDerivationAction)):
             self.level += 1
         return action
+
+    def _act_show(self, theorems: list[Theorem]):
+        return ShowAction()
 
     def _act_stop(self, theorems: list[Theorem]) -> StopAction:
         return StopAction()
@@ -345,6 +360,9 @@ class HumanAgent(DeductiveAgent):
 
     def _ask_input(self, input_txt: str) -> str:
         return input(input_txt).lower().strip()
+
+    def _show_figure(self, proof: "Proof"):
+        proof.symbols_graph.draw_figure()
 
 
 def _pretty_problem(problem: "Problem"):

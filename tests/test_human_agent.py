@@ -1,16 +1,31 @@
 from __future__ import annotations
-from typing import Callable, Optional
+from typing import TYPE_CHECKING, Callable, Optional
 import pytest
 
 from geosolver.agent.human_agent import HumanAgent
 from geosolver.api import GeometricSolverBuilder
 from tests.fixtures import build_until_works
 
+if TYPE_CHECKING:
+    from geosolver.proof import Proof
+
 
 class HumanAgentWithPredefinedInput(HumanAgent):
-    def __init__(self, inputs_given: Optional[list[str]] = None) -> None:
+    def __init__(
+        self,
+        inputs_given: Optional[list[str]] = None,
+        show_figure: bool = False,
+    ) -> None:
         super().__init__()
         self.inputs_given = inputs_given if inputs_given is not None else []
+        self._n_figure_shown = 0
+        self.show_figure = show_figure
+
+    def _show_figure(self, proof: "Proof"):
+        self._n_figure_shown += 1
+        print("Showing figure")
+        if self.show_figure:
+            super()._show_figure(proof)
 
     def _ask_input(self, input_txt: str) -> str:
         next_input = self.inputs_given.pop(0)
@@ -162,6 +177,24 @@ class TestHumanAgent:
         ]
         solver = self.solver_builder.load_problem_from_txt(
             "a b c = ieq_triangle a b c; m = midpoint m a b; n = midpoint n m a",
+            translate=False,
+        ).build()
+        success = solver.run()
+        assert not success
+
+    def test_show_figure(self):
+        self.human_agent.show_figure = False
+        self.human_agent.inputs_given = [
+            "show",
+            "aux",
+            "e = on_line e a c, on_line e b d",
+            "show",
+            "stop",
+        ]
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b c = triangle a b c; "
+            "d = on_tline d b a c, on_tline d c a b "
+            "? perp a d b c",
             translate=False,
         ).build()
         success = solver.run()
