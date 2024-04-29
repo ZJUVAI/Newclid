@@ -108,7 +108,9 @@ class GeometricSolver:
             return clause_txt
         clause = Clause.from_txt(clause_txt)
         try:
-            self.proof_state.copy().add_clause(clause, 0, self.defs)
+            self.proof_state.copy().add_clause(
+                clause, self.proof_state._plevel, self.defs
+            )
         except Exception:
             return "ERROR: " + traceback.format_exc()
         return clause_txt

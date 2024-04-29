@@ -20,6 +20,10 @@ class HumanAgentWithPredefinedInput(HumanAgent):
         return next_input
 
 
+def pop_last_mapping(human_agent: HumanAgentWithPredefinedInput):
+    return list(human_agent._mappings.keys())[-1]
+
+
 class TestHumanAgent:
     @pytest.fixture(autouse=True)
     def setup(self):
@@ -83,26 +87,26 @@ class TestHumanAgent:
         success = solver.run()
         assert success
 
-    def test_should_solve_othrocenter_aux(self):
+    def test_should_solve_orthocenter_aux(self):
         self.human_agent.inputs_given = [
             "match",
             "r30",
             "apply",
-            lambda self: list(self._mappings.keys())[-1],
+            pop_last_mapping,
             "match",
             "r08",
             "apply",
-            lambda self: list(self._mappings.keys())[-1],
+            pop_last_mapping,
             "apply",
-            lambda self: list(self._mappings.keys())[-1],
+            pop_last_mapping,
             "match",
             "r34",
             "apply",
-            lambda self: list(self._mappings.keys())[-1],
+            pop_last_mapping,
             "match",
             "r39",
             "apply",
-            lambda self: list(self._mappings.keys())[-1],
+            pop_last_mapping,
             "stop",
         ]
 
@@ -110,6 +114,40 @@ class TestHumanAgent:
             "a b c = triangle a b c; "
             "d = on_tline d b a c, on_tline d c a b; "
             "e = on_line e a c, on_line e b d "
+            "? perp a d b c",
+            translate=False,
+        ).build()
+        success = solver.run()
+        assert success
+
+    def test_should_solve_orthocenter(self):
+        self.human_agent.inputs_given = [
+            "match",
+            "r30",
+            "apply",
+            pop_last_mapping,
+            "aux",
+            "e = on_line e a c, on_line e b d",
+            "match",
+            "r08",
+            "apply",
+            pop_last_mapping,
+            "apply",
+            pop_last_mapping,
+            "match",
+            "r34",
+            "apply",
+            pop_last_mapping,
+            "match",
+            "r39",
+            "apply",
+            pop_last_mapping,
+            "stop",
+        ]
+
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b c = triangle a b c; "
+            "d = on_tline d b a c, on_tline d c a b "
             "? perp a d b c",
             translate=False,
         ).build()

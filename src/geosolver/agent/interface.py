@@ -45,6 +45,10 @@ class ApplyDerivationAction(NamedTuple):
     derivation_arguments: tuple["Point", ...]
 
 
+class AuxAction(NamedTuple):
+    aux_string: str
+
+
 Action = Union[
     ResetAction,
     StopAction,
@@ -52,6 +56,7 @@ Action = Union[
     MatchAction,
     DeriveAlgebraAction,
     ApplyDerivationAction,
+    AuxAction,
 ]
 
 
@@ -86,6 +91,12 @@ class ApplyDerivationFeedback(NamedTuple):
     to_cache: list["ToCache"]
 
 
+class AuxFeedback(NamedTuple):
+    success: bool
+    added: list["Dependency"]
+    to_cache: list["ToCache"]
+
+
 Feedback = Union[
     ResetFeedback,
     StopFeedback,
@@ -93,6 +104,7 @@ Feedback = Union[
     MatchFeedback,
     DeriveFeedback,
     ApplyDerivationFeedback,
+    AuxFeedback,
 ]
 
 

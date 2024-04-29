@@ -1,11 +1,14 @@
 from __future__ import annotations
 from typing import Optional, TypeVar
+
 from geosolver.agent.interface import (
     Action,
     ApplyDerivationAction,
     ApplyDerivationFeedback,
     ApplyTheoremAction,
     ApplyTheoremFeedback,
+    AuxAction,
+    AuxFeedback,
     DeductiveAgent,
     DeriveAlgebraAction,
     DeriveFeedback,
@@ -38,14 +41,16 @@ class HumanAgent(DeductiveAgent):
         "apply": ApplyTheoremAction,
         "resolve derivations": DeriveAlgebraAction,
         "derive": ApplyDerivationAction,
+        "aux": AuxAction,
         "stop": StopAction,
     }
     ACTION_TYPE_DESCRIPTION = {
         MatchAction: "Match a theorem to know on which mappings it can be applied.",
         StopAction: "Stop the proof",
         ApplyTheoremAction: "Apply a theorem on a mapping of points.",
-        DeriveAlgebraAction: "Resolve available derivation from current proof state",
-        ApplyDerivationAction: "Apply a derivation",
+        DeriveAlgebraAction: "Resolve available derivation from current proof state.",
+        ApplyDerivationAction: "Apply a derivation.",
+        AuxAction: "Add an auxiliary construction to the setup.",
     }
 
     def __init__(self) -> None:
@@ -70,6 +75,7 @@ class HumanAgent(DeductiveAgent):
             ApplyTheoremAction: self._act_apply_theorem,
             DeriveAlgebraAction: self._act_resolve_derivations,
             ApplyDerivationAction: self._act_apply_derivation,
+            AuxAction: self._act_aux,
         }
 
         act_method = ACTION_TYPE_ACT[choosen_action_type]
@@ -78,10 +84,10 @@ class HumanAgent(DeductiveAgent):
             self.level += 1
         return action
 
-    def _act_stop(self, theorems: list[Theorem]) -> Action:
+    def _act_stop(self, theorems: list[Theorem]) -> StopAction:
         return StopAction()
 
-    def _act_match(self, theorems: list[Theorem]) -> Action:
+    def _act_match(self, theorems: list[Theorem]) -> MatchAction:
         choose_theorem_str = "\nChoose a theorem: \n"
         for th in theorems:
             choose_theorem_str += f" - [{th.rule_name}]: {th.txt()}\n"
@@ -92,7 +98,7 @@ class HumanAgent(DeductiveAgent):
         theorem = self._ask_for_key(theorem_dict, choose_theorem_str)
         return MatchAction(theorem, level=self.level)
 
-    def _act_apply_theorem(self, theorems: list[Theorem]) -> Action:
+    def _act_apply_theorem(self, theorems: list[Theorem]) -> ApplyTheoremAction:
         choosen_mapping_str = "\nAvailable theorems mappings: \n"
         for mapping_str in self._mappings.keys():
             choosen_mapping_str += f" - [{mapping_str}]\n"
@@ -102,10 +108,10 @@ class HumanAgent(DeductiveAgent):
         )
         return ApplyTheoremAction(theorem, mapping)
 
-    def _act_resolve_derivations(self, theorems: list[Theorem]) -> Action:
+    def _act_resolve_derivations(self, theorems: list[Theorem]) -> DeriveAlgebraAction:
         return DeriveAlgebraAction(level=self.level)
 
-    def _act_apply_derivation(self, theorems: list[Theorem]) -> Action:
+    def _act_apply_derivation(self, theorems: list[Theorem]) -> ApplyDerivationAction:
         choosen_mapping_str = "\nAvailable derivations mappings: \n"
         for mapping_str in self._derivations.keys():
             choosen_mapping_str += f" - [{mapping_str}]\n"
@@ -115,6 +121,10 @@ class HumanAgent(DeductiveAgent):
         )
         return ApplyDerivationAction(derivation, mapping)
 
+    def _act_aux(self, theorems: list[Theorem]) -> AuxAction:
+        aux_string = self._ask_input("Auxiliary string: ")
+        return AuxAction(aux_string)
+
     def remember_effects(self, action: Action, feedback: Feedback):
         feedback_type_to_method = {
             ResetFeedback: self._remember_reset,
@@ -123,6 +133,7 @@ class HumanAgent(DeductiveAgent):
             ApplyTheoremFeedback: self._remember_apply_theorem,
             DeriveFeedback: self._remember_derivations,
             ApplyDerivationFeedback: self._remember_apply_derivation,
+            AuxFeedback: self._remember_aux,
         }
 
         for feedback_type, feedback_process in feedback_type_to_method.items():
@@ -227,6 +238,20 @@ class HumanAgent(DeductiveAgent):
         )
         success = True
         feedback_str = f"Successfully applied derivation [{derivation_str}]:\n"
+        if feedback.added:
+            feedback_str += self._list_added_statements(feedback.added)
+        if feedback.to_cache:
+            feedback_str += self._list_cached_statements(feedback.to_cache)
+        if not feedback.added and not feedback.to_cache:
+            feedback_str += "But no statements were added nor cached ...\n"
+            success = False
+        return feedback_str, success
+
+    def _remember_aux(self, action: AuxAction, feedback: AuxFeedback):
+        success = feedback.success
+        feedback_str = (
+            f"Successfully added auxiliary construction [{action.aux_string}]:\n"
+        )
         if feedback.added:
             feedback_str += self._list_added_statements(feedback.added)
         if feedback.to_cache:

@@ -30,6 +30,8 @@ from geosolver.agent.interface import (
     ApplyDerivationFeedback,
     ApplyTheoremAction,
     ApplyTheoremFeedback,
+    AuxAction,
+    AuxFeedback,
     DeriveAlgebraAction,
     DeriveFeedback,
     Feedback,
@@ -143,6 +145,7 @@ class Proof:
         self._definitions: Optional[dict[str, Definition]] = None
         self._init_added: list[Dependency] = []
         self._init_to_cache: list[ToCache] = []
+        self._plevel: int = 0
 
     @classmethod
     def build_problem(
@@ -194,7 +197,7 @@ class Proof:
                     )
                     added += adds
                     to_cache += clause_to_cache
-                proof.plevel = plevel
+                proof._plevel = plevel
 
             except (
                 num_geo.InvalidLineIntersectError,
@@ -263,6 +266,14 @@ class Proof:
             )
             self.cache_deps(to_cache)
             return ApplyDerivationFeedback(added, to_cache)
+
+        elif isinstance(action, AuxAction):
+            aux_clause = Clause.from_txt(action.aux_string)
+            added, to_cache, plevel = self.add_clause(
+                aux_clause, self._plevel, self._definitions
+            )
+            self._plevel = plevel
+            return AuxFeedback(True, added, to_cache)
 
         raise NotImplementedError()
 
