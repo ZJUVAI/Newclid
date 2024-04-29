@@ -82,5 +82,9 @@ ar_example_paper_ratio_chasing
 a b c = triangle a b c; d = midpoint d a c; e = angle_bisector e b a c, on_line e b d; f = on_pline f b e c, on_line f a c ? cong f c a b
 test_get_two_intersections
 a b = segment a b; c = eqdistance c a a b, eqdistance c b a b; d = eqdistance d a a b, eqdistance d b a b ? perp c d a b
+ar_two_triangles_angle_chasing
+a b = segment a b; c = s_angle a b c 150o, s_angle b a c 30o; d = s_angle c a d 20o, on_line d c b ? aconst b c a d 5pi/9
+ar_three_triangles_angle_chasing
+a b = segment a b; c = s_angle a b c 150o, s_angle b a c 30o; d = s_angle c a d 20o, on_line d c b; e = s_angle d a e 20o, on_line e c b ? aconst b c a e 4pi/9
 testing_problem
 p = free p; q = free q; u = free u; v = eqdistance v u p q; a = free a; b = free b; c = free c; d = eqratio d p q a b u v c ? cong a b c d
