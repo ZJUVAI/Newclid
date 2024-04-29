@@ -249,9 +249,17 @@ class HumanAgent(DeductiveAgent):
 
     def _remember_aux(self, action: AuxAction, feedback: AuxFeedback):
         success = feedback.success
-        feedback_str = (
-            f"Successfully added auxiliary construction [{action.aux_string}]:\n"
-        )
+
+        aux_str = action.aux_string
+        if not success:
+            return (
+                f"Failed to add auxiliary construction  [{aux_str}]\n"
+                "Check that the format is correct "
+                "and that the construction is possible.\n",
+                False,
+            )
+
+        feedback_str = f"Successfully added auxiliary construction [{aux_str}]:\n"
         if feedback.added:
             feedback_str += self._list_added_statements(feedback.added)
         if feedback.to_cache:

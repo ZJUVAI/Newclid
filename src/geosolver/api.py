@@ -8,10 +8,9 @@ import traceback
 from typing import Optional
 from typing_extensions import Self
 
-from geosolver.auxiliary_constructions import insert_aux_to_premise
 from geosolver.configs import default_defs_path, default_rules_path
 from geosolver.agent.breadth_first_search import BFSDDAR
-from geosolver.agent.interface import DeductiveAgent
+from geosolver.agent.interface import AuxAction, DeductiveAgent
 from geosolver.run_loop import run_loop
 from geosolver.problem import Problem, Theorem, Definition, Clause
 from geosolver.proof import Proof
@@ -116,13 +115,10 @@ class GeometricSolver:
         return clause_txt
 
     def add_auxiliary_construction(self, aux_string: str):
-        # Update the constructive statement of the problem with the aux point:
-        candidate_pstring = insert_aux_to_premise(self.problem_string, aux_string)
-        logging.info('Solving: "%s"', candidate_pstring)
-        p_new = Problem.from_txt(candidate_pstring)
-        p_new.url = self.problem.url
-        self.problem = p_new
-        self.proof_state = Proof.build_problem(p_new, self.defs)
+        """Update the constructive statement of the problem with the aux point."""
+        feedback = self.proof_state.step(AuxAction(aux_string))
+        if not feedback.success:
+            raise ValueError(f"Auxiliary construction failed to be added: {aux_string}")
 
 
 class GeometricSolverBuilder:

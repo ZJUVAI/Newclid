@@ -153,3 +153,16 @@ class TestHumanAgent:
         ).build()
         success = solver.run()
         assert success
+
+    def test_impossible_aux_feedback(self):
+        self.human_agent.inputs_given = [
+            "aux",
+            "e = on_circle e n a, on_line e b c",
+            "stop",
+        ]
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b c = ieq_triangle a b c; m = midpoint m a b; n = midpoint n m a",
+            translate=False,
+        ).build()
+        success = solver.run()
+        assert not success

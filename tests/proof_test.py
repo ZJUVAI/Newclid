@@ -55,6 +55,34 @@ class TestProof:
         self.symbols_graph = self.proof.symbols_graph
         self.statements_checker = self.proof.statements_checker
 
+    def test_add_auxiliary_construction(self):
+        solver = (
+            GeometricSolverBuilder()
+            .load_problem_from_txt(
+                "a b c = triangle a b c; "
+                "d = on_tline d b a c, on_tline d c a b "
+                "? perp a d b c",
+                translate=False,
+            )
+            .build()
+        )
+        solver.add_auxiliary_construction("e = on_line e a c, on_line e b d")
+        success = solver.run()
+        assert success
+
+    def test_auxiliary_construction_build_error(self):
+        """Should raise an error when trying an impossible construction though the api."""
+        with pytest.raises(ValueError, match="Auxiliary construction failed"):
+            solver = (
+                GeometricSolverBuilder()
+                .load_problem_from_txt(
+                    "a b c = ieq_triangle a b c; m = midpoint m a b; n = midpoint n m a",
+                    translate=False,
+                )
+                .build()
+            )
+            solver.add_auxiliary_construction("e = on_circle e n a, on_line e b c")
+
     def test_build_points(self):
         all_points = self.symbols_graph.all_points()
         check.equal(

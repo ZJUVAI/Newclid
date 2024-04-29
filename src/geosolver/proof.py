@@ -269,11 +269,17 @@ class Proof:
 
         elif isinstance(action, AuxAction):
             aux_clause = Clause.from_txt(action.aux_string)
-            added, to_cache, plevel = self.add_clause(
-                aux_clause, self._plevel, self._definitions
-            )
-            self._plevel = plevel
-            return AuxFeedback(True, added, to_cache)
+            success = False
+            added, to_cache = [], []
+            try:
+                added, to_cache, plevel = self.add_clause(
+                    aux_clause, self._plevel, self._definitions
+                )
+                self._plevel = plevel
+                success = True
+            except (num_geo.InvalidQuadSolveError, num_geo.InvalidLineIntersectError):
+                pass
+            return AuxFeedback(success, added, to_cache)
 
         raise NotImplementedError()
 
