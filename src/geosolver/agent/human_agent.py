@@ -21,6 +21,8 @@ from geosolver.agent.interface import (
     StopAction,
     StopFeedback,
 )
+from geosolver.dependencies.caching import hashed
+from geosolver.concepts import ConceptName
 from geosolver.dependencies.dependency import Dependency
 from geosolver.geometry import Point
 from geosolver.problem import Construction, Problem, Theorem, name_and_arguments_to_str
@@ -362,7 +364,14 @@ class HumanAgent(DeductiveAgent):
         return input(input_txt).lower().strip()
 
     def _show_figure(self, proof: "Proof"):
-        proof.symbols_graph.draw_figure()
+        equal_angles = {}
+        for eqangle in self._all_cached:
+            if eqangle.name != ConceptName.EQANGLE.value:
+                continue
+            hashed_eqangle = hashed(eqangle.name, eqangle.args)
+            if hashed_eqangle not in equal_angles:
+                equal_angles[hashed_eqangle] = eqangle.args
+        proof.symbols_graph.draw_figure(equal_angles=list(equal_angles.values()))
 
 
 def _pretty_problem(problem: "Problem"):

@@ -136,13 +136,16 @@ class TestHumanAgent:
         assert success
 
     def test_should_solve_orthocenter(self):
+        self.human_agent.show_figure = False
         self.human_agent.inputs_given = [
+            "show",
             "match",
             "r30",
             "apply",
             pop_last_mapping,
             "aux",
             "e = on_line e a c, on_line e b d",
+            "show",
             "match",
             "r08",
             "apply",
@@ -153,10 +156,12 @@ class TestHumanAgent:
             "r34",
             "apply",
             pop_last_mapping,
+            "show",
             "match",
             "r39",
             "apply",
             pop_last_mapping,
+            "show",
             "stop",
         ]
 
@@ -177,24 +182,6 @@ class TestHumanAgent:
         ]
         solver = self.solver_builder.load_problem_from_txt(
             "a b c = ieq_triangle a b c; m = midpoint m a b; n = midpoint n m a",
-            translate=False,
-        ).build()
-        success = solver.run()
-        assert not success
-
-    def test_show_figure(self):
-        self.human_agent.show_figure = False
-        self.human_agent.inputs_given = [
-            "show",
-            "aux",
-            "e = on_line e a c, on_line e b d",
-            "show",
-            "stop",
-        ]
-        solver = self.solver_builder.load_problem_from_txt(
-            "a b c = triangle a b c; "
-            "d = on_tline d b a c, on_tline d c a b "
-            "? perp a d b c",
             translate=False,
         ).build()
         success = solver.run()

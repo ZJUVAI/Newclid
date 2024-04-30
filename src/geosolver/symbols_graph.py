@@ -375,7 +375,7 @@ class SymbolsGraph:
         nt.from_nx(nx_graph)
         nt.show(str(html_path), notebook=False)
 
-    def draw_figure(self, save_path: Optional[Path] = None):
+    def draw_figure(self, save_path: Optional[Path] = None, **kwargs):
         if save_path is not None:
             save_path = str(save_path)
         draw_numerical_figure(
@@ -385,4 +385,5 @@ class SymbolsGraph:
             self.type2nodes[Segment],
             save_to=save_path,
             block=save_path is None,
+            **kwargs,
         )
