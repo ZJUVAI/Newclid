@@ -59,3 +59,19 @@ class TestProblem:
         solver = self.solver_builder.load_problem_from_txt(txt, translate=False).build()
 
         assert solver.get_problem_string() == txt
+
+    def test_multiple_build(self):
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b c = triangle a b c; "
+            "h = on_tline h b a c, on_tline h c a b "
+            "? perp a h b c",
+            translate=True,
+        ).build()
+
+        solver2 = self.solver_builder.load_problem_from_txt(
+            "a b c = triangle a b c",
+            translate=True,
+        ).build()
+
+        # Make sure the proof_state isn't preserved between multiple calls
+        assert solver.proof_state is not solver2.proof_state
