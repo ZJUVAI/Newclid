@@ -70,7 +70,8 @@ def draw_figure(
         fig.savefig(save_to)
 
     plt.show(block=block)
-    plt.close(fig)
+    if block or save_to is not None:
+        plt.close(fig)
 
 
 def _draw(
@@ -214,7 +215,7 @@ def draw_line(ax: plt.Axes, line: Line, color: Any = "white") -> tuple[Point, Po
     points = [p.num for p in points]
     p1, p2 = points[:2]
 
-    ax.axline((p1.x, p1.y), (p2.x, p2.y), color=color, alpha=0.8, lw=0.6)
+    ax.axline((p1.x, p1.y), (p2.x, p2.y), color=color, alpha=0.8, lw=0.2)
 
     pmin, pmax = (p1, 0.0), (p2, (p2 - p1).dot(p2 - p1))
 

@@ -363,7 +363,7 @@ class HumanAgent(DeductiveAgent):
     def _ask_input(self, input_txt: str) -> str:
         return input(input_txt).lower().strip()
 
-    def _show_figure(self, proof: "Proof"):
+    def _show_figure(self, proof: "Proof", block: bool = False):
         equal_angles = {}
         for eqangle in self._all_cached:
             if eqangle.name != ConceptName.EQANGLE.value:
@@ -371,7 +371,9 @@ class HumanAgent(DeductiveAgent):
             hashed_eqangle = hashed(eqangle.name, eqangle.args)
             if hashed_eqangle not in equal_angles:
                 equal_angles[hashed_eqangle] = eqangle.args
-        proof.symbols_graph.draw_figure(equal_angles=list(equal_angles.values()))
+        proof.symbols_graph.draw_figure(
+            equal_angles=list(equal_angles.values()), block=block
+        )
 
 
 def _pretty_problem(problem: "Problem"):

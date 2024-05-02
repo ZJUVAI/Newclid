@@ -25,7 +25,7 @@ class HumanAgentWithPredefinedInput(HumanAgent):
         self._n_figure_shown += 1
         print("Showing figure")
         if self.show_figure:
-            super()._show_figure(proof)
+            super()._show_figure(proof, block=True)
 
     def _ask_input(self, input_txt: str) -> str:
         next_input = self.inputs_given.pop(0)

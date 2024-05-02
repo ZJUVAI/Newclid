@@ -375,15 +375,19 @@ class SymbolsGraph:
         nt.from_nx(nx_graph)
         nt.show(str(html_path), notebook=False)
 
-    def draw_figure(self, save_path: Optional[Path] = None, **kwargs):
+    def draw_figure(
+        self, save_path: Optional[Path] = None, block: Optional[bool] = None, **kwargs
+    ):
         if save_path is not None:
             save_path = str(save_path)
+        if block is None:
+            block = save_path is None
         draw_numerical_figure(
             self.type2nodes[Point],
             self.type2nodes[Line],
             self.type2nodes[Circle],
             self.type2nodes[Segment],
             save_to=save_path,
-            block=save_path is None,
+            block=block,
             **kwargs,
         )
