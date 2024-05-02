@@ -126,7 +126,6 @@ class GeometricSolverBuilder:
         self.problem: Optional[Problem] = None
         self.defs: Optional[list[Definition]] = None
         self.rules: Optional[list[Theorem]] = None
-        self.proof_state: Optional[Proof] = None
         self.deductive_agent: Optional[DeductiveAgent] = None
         self.disabled_intrinsic_rules: Optional[list[IntrinsicRules]] = None
 
@@ -142,13 +141,12 @@ class GeometricSolverBuilder:
         if self.rules is None:
             self.rules = Theorem.from_txt_file(default_rules_path())
 
-        if self.proof_state is None:
-            self.proof_state = Proof.build_problem(
-                self.problem, self.defs, self.disabled_intrinsic_rules
-            )
+        proof_state = Proof.build_problem(
+            self.problem, self.defs, self.disabled_intrinsic_rules
+        )
 
         return GeometricSolver(
-            self.proof_state, self.problem, self.defs, self.rules, self.deductive_agent
+            proof_state, self.problem, self.defs, self.rules, self.deductive_agent
         )
 
     def load_problem_from_file(
