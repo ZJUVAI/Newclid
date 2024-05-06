@@ -8,10 +8,9 @@ import traceback
 from typing import Optional
 from typing_extensions import Self
 
-from geosolver.auxiliary_constructions import insert_aux_to_premise
 from geosolver.configs import default_defs_path, default_rules_path
 from geosolver.agent.breadth_first_search import BFSDDAR
-from geosolver.agent.interface import DeductiveAgent
+from geosolver.agent.interface import AuxAction, DeductiveAgent
 from geosolver.run_loop import run_loop
 from geosolver.problem import Problem, Theorem, Definition, Clause
 from geosolver.proof import Proof
@@ -108,22 +107,18 @@ class GeometricSolver:
             return clause_txt
         clause = Clause.from_txt(clause_txt)
         try:
-            self.proof_state.copy().add_clause(clause, 0, self.defs)
+            self.proof_state.copy().add_clause(
+                clause, self.proof_state._plevel, self.defs
+            )
         except Exception:
             return "ERROR: " + traceback.format_exc()
         return clause_txt
 
     def add_auxiliary_construction(self, aux_string: str):
-        # Update the constructive statement of the problem with the aux point:
-        candidate_pstring = insert_aux_to_premise(self.problem_string, aux_string)
-        logging.info('Solving: "%s"', candidate_pstring)
-        p_new = Problem.from_txt(candidate_pstring)
-        p_new.url = self.problem.url
-        # This is the new proof state graph representation:
-        g_new, _ = Proof.build_problem(p_new, self.defs)
-
-        self.problem = p_new
-        self.proof_state = g_new
+        """Update the constructive statement of the problem with the aux point."""
+        feedback = self.proof_state.step(AuxAction(aux_string))
+        if not feedback.success:
+            raise ValueError(f"Auxiliary construction failed to be added: {aux_string}")
 
 
 class GeometricSolverBuilder:
@@ -131,7 +126,6 @@ class GeometricSolverBuilder:
         self.problem: Optional[Problem] = None
         self.defs: Optional[list[Definition]] = None
         self.rules: Optional[list[Theorem]] = None
-        self.proof_state: Optional[Proof] = None
         self.deductive_agent: Optional[DeductiveAgent] = None
         self.disabled_intrinsic_rules: Optional[list[IntrinsicRules]] = None
 
@@ -147,13 +141,12 @@ class GeometricSolverBuilder:
         if self.rules is None:
             self.rules = Theorem.from_txt_file(default_rules_path())
 
-        if self.proof_state is None:
-            self.proof_state, _ = Proof.build_problem(
-                self.problem, self.defs, self.disabled_intrinsic_rules
-            )
+        proof_state = Proof.build_problem(
+            self.problem, self.defs, self.disabled_intrinsic_rules
+        )
 
         return GeometricSolver(
-            self.proof_state, self.problem, self.defs, self.rules, self.deductive_agent
+            proof_state, self.problem, self.defs, self.rules, self.deductive_agent
         )
 
     def load_problem_from_file(
