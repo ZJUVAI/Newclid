@@ -41,3 +41,16 @@ def test_ar_whatever2():
 
     success = solver.run()
     check.is_true(success)
+
+
+def test_ar_whatever3():
+    solver = build_until_works(
+        GeometricSolverBuilder()
+        .load_problem_from_txt(
+            "a b e = triangle12 a b e; c = midpoint c a e ? cong a c a b"
+        )
+        .with_deductive_agent(BFSDDAR())
+    )
+
+    success = solver.run()
+    check.is_true(success)
