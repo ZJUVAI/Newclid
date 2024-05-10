@@ -56,7 +56,7 @@ docs:
   stage: deploy
   script:
     - pip install -e .[doc]
-    - sphinx-apidoc -M -e -f -o --implicit-namespaces docs/source/ src/geosolver
+    - sphinx-apidoc -M -e -f --implicit-namespaces -o docs/source/ src/geosolver
     - python docs/reformat.py
     - docs/make html
     - mv docs/build/html/ public/
