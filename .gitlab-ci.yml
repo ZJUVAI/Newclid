@@ -55,6 +55,7 @@ pytest-coverage:
 docs:
   stage: deploy
   script:
+    - source venv/bin/activate
     - sphinx-apidoc -M -e -f --implicit-namespaces -o docs/source/ src/geosolver
     - python docs/reformat.py
     - sphinx-build -b html ./docs public
