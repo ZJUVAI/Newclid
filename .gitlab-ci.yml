@@ -34,7 +34,7 @@ build:
     - pip config set global.index-url "http://mirrors.tools.huawei.com/pypi/simple"
     - pip config set global.trusted-host "mirrors.tools.huawei.com rnd-gitlab-eu.huawei.com pypi.org files.pythonhosted.org"
 
-    - pip install --use-feature=in-tree-build -e .[dev] 
+    - pip install --use-feature=in-tree-build -e .[dev,doc] 
 
 pytest-coverage:
     stage: test
@@ -63,6 +63,21 @@ docs:
     paths:
     # The folder that contains the files to be exposed at the Page URL
     - public
+  rules:
+    # This ensures that only pushes to the default branch will trigger
+    # a pages deploy
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
+
+
+pages:
+  script:
+    - sphinx-apidoc -M -e -f --implicit-namespaces -o docs/source/ src/geosolver
+    - python docs/reformat.py
+    - sphinx-build -b html ./docs public
+  artifacts:
+    paths:
+      # The folder that contains the files to be exposed at the Page URL
+      - public
   rules:
     # This ensures that only pushes to the default branch will trigger
     # a pages deploy
