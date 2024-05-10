@@ -34,7 +34,7 @@ build:
     - pip config set global.index-url "http://mirrors.tools.huawei.com/pypi/simple"
     - pip config set global.trusted-host "mirrors.tools.huawei.com rnd-gitlab-eu.huawei.com pypi.org files.pythonhosted.org"
 
-    - pip install --use-feature=in-tree-build -e .[dev,doc] 
+    - pip install --use-feature=in-tree-build -e .[dev] 
 
 pytest-coverage:
     stage: test
@@ -56,6 +56,7 @@ docs:
   stage: deploy
   script:
     - source venv/bin/activate
+    - pip install -e .[doc]
     - sphinx-apidoc -M -e -f --implicit-namespaces -o docs/source/ src/geosolver
     - python docs/reformat.py
     - sphinx-build -b html ./docs public
