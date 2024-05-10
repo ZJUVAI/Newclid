@@ -1,0 +1,7 @@
+Dependency graph
+================
+
+.. automodule:: geosolver.dependencies.dependency_graph
+   :members:
+   :undoc-members:
+   :show-inheritance:
