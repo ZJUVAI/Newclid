@@ -50,3 +50,18 @@ pytest-coverage:
             path: coverage.xml
           junit: report.xml
         expire_in: 2 weeks
+
+
+docs:
+  stage: deploy
+  script:
+    - pip install -e .[doc]
+    - sphinx-apidoc -M -e -f -o --implicit-namespaces docs/source/ src/geosolver
+    - python docs/reformat.py
+    - docs/make html
+    - mv docs/build/html/ public/
+  artifacts:
+    paths:
+    - public
+  only:
+  - main

@@ -22,6 +22,7 @@ classifiers=[
 
 [project.optional-dependencies]
 dev = ['black', 'ruff', 'pytest', 'pytest-cov', 'pytest-check', 'pytest-mock', 'pre-commit']
+doc = ['numpy', 'sphinx-autoapi', 'autoapi', 'sphinx_rtd_theme', 'sphinx-autodoc-typehints']
 
 [tool.setuptools]
 license-files = ['LICEN[CS]E*', 'COPYING*', 'NOTICE*', 'AUTHORS*']
@@ -34,7 +35,6 @@ readme = { file = ["README.md"] }
 dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools_scm]
-
 
 [tool.pytest.ini_options]
 filterwarnings = [
