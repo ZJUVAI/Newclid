@@ -8,7 +8,9 @@ in the Nature 2024 paper:
 <https://www.nature.com/articles/s41586-023-06747-5>`_.
 
 
-.. image:: _static/AlphaGeometryMainPicture.svg
+.. image:: ../docs/_static/AlphaGeometryMainPicture.svg
+  :alt: Where a geometric problem is fed to a solver (DDAR)
+        and helped by an LLM to build auxiliary constructions.
 
 
 
@@ -69,7 +71,7 @@ Contributing
 About AlphaGeometry
 -------------------
 
-See [original repository](https://github.com/google-deepmind/alphageometry).
+See `original repository <https://github.com/google-deepmind/alphageometry>`_.
 
 .. code:: bibtex
 
