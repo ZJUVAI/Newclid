@@ -1,3 +1,4 @@
+.. _dependency-graph:
 Dependency graph
 ================
 
