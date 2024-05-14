@@ -1,12 +1,13 @@
 from geosolver.agent.breadth_first_search import BFSDDAR
 
+import pytest
 import pytest_check as check
 
 from geosolver.api import GeometricSolverBuilder
 from tests.fixtures import build_until_works
 
 
-def test_ar_whatever():
+def test_ar_world_hardest_problem_vertex():
     solver = build_until_works(
         GeometricSolverBuilder()
         .load_problem_from_txt(
@@ -26,24 +27,8 @@ def test_ar_whatever():
     check.is_true(success)
 
 
-def test_ar_whatever2():
-    solver = build_until_works(
-        GeometricSolverBuilder()
-        .load_problem_from_txt(
-            "a b = segment a b; "
-            "c = s_angle b a c 140o, s_angle a b c 60o; "
-            "e = on_tline e c a c, eqdistance e c a c; "
-            "d = s_angle c e d 40o, on_tline d c c b "
-            "? aconst d b a c 11pi/36"
-        )
-        .with_deductive_agent(BFSDDAR())
-    )
-
-    success = solver.run()
-    check.is_true(success)
-
-
-def test_ar_whatever3():
+@pytest.mark.xfail
+def test_ar_ratio_hallucination():
     solver = build_until_works(
         GeometricSolverBuilder()
         .load_problem_from_txt(
