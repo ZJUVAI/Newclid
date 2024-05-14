@@ -50,3 +50,21 @@ pytest-coverage:
             path: coverage.xml
           junit: report.xml
         expire_in: 2 weeks
+
+
+docs:
+  stage: deploy
+  script:
+    - source venv/bin/activate
+    - pip install -e .[doc]
+    - sphinx-apidoc -M -e -f --implicit-namespaces -o docs/source/ src/geosolver
+    - python docs/reformat.py
+    - sphinx-build -b html ./docs public
+  artifacts:
+    paths:
+      # The folder that contains the files to be exposed at the Page URL
+      - public
+  rules:
+    # This ensures that only pushes to the default branch will trigger
+    # a pages deploy
+    - if: $CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH
