@@ -86,5 +86,5 @@ ar_two_triangles_angle_chasing
 a b = segment a b; c = s_angle a b c 150o, s_angle b a c 30o; d = s_angle c a d 20o, on_line d c b ? aconst b c a d 5pi/9
 ar_three_triangles_angle_chasing
 a b = segment a b; c = s_angle a b c 150o, s_angle b a c 30o; d = s_angle c a d 20o, on_line d c b; e = s_angle d a e 20o, on_line e c b ? aconst b c a e 4pi/9
-testing_problem
+cong2_problem
 p = free p; q = free q; u = free u; v = eqdistance v u p q; a = free a; b = free b; c = free c; d = eqratio d p q a b u v c ? cong a b c d
