@@ -7,6 +7,7 @@
    :maxdepth: 2
    :caption: Contents:
 
+   manual/usage
    manual/dependency_graph
    source/geosolver
 
