@@ -420,7 +420,7 @@ isosvertex b c
 
 on_aline0 x a b c d e f g
 x : x a b c d e f g
-a b c d e f g = ncoll a b c
+a b c d e f g = ncoll a b c d
 x : eqangle a b c d e f g x
 aline0 a b c d e f g
 

@@ -7,6 +7,7 @@ import geosolver.geometry as gm
 from geosolver.numerical import ATOM, close_enough
 from geosolver.numerical.angles import ang_between
 from geosolver.numerical.geometries import Circle, Line, Point, bring_together
+from geosolver.statement import list_eqratio3
 
 
 def check_circle_numerical(points: list[Point]) -> bool:
@@ -150,6 +151,13 @@ def check_eqratio_numerical(points: list[Point]) -> bool:
     return close_enough(ab * gh, cd * ef)
 
 
+def check_eqratio3_numerical(points: list[Point]) -> bool:
+    for ratio in list_eqratio3(points):
+        if not check_eqratio_numerical(ratio):
+            return False
+    return True
+
+
 def check_cong_numerical(points: list[Point]) -> bool:
     a, b, c, d = points
     return close_enough(a.distance(b), c.distance(d))
@@ -207,6 +215,7 @@ NUMERICAL_CHECK_FUNCTIONS = {
     ConceptName.EQANGLE.value: check_eqangle_numerical,
     ConceptName.EQANGLE6.value: check_eqangle_numerical,
     ConceptName.EQRATIO.value: check_eqratio_numerical,
+    ConceptName.EQRATIO3.value: check_eqratio3_numerical,
     ConceptName.EQRATIO6.value: check_eqratio_numerical,
     ConceptName.SIMILAR_TRIANGLE.value: check_simtri_numerical,
     ConceptName.SIMILAR_TRIANGLE_REFLECTED.value: check_simtri_numerical,
