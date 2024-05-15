@@ -24,6 +24,12 @@ Using pip
   pip install git+https://rnd-gitlab-eu.huawei.com/Noahs-Ark/libraries/ddar
 
 
+Usage
+-----
+
+See `DOCUMENTATION 
+<https://ddar-noahs-ark-libraries-d1a330533fb77a761c85bd7785b7974dd32b06.rnd-gitlab-eu.huawei.com/>`_.
+
 Contributing
 ------------
 
