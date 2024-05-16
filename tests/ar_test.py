@@ -21,6 +21,7 @@ import geosolver.algebraic.geometric_tables as geometric_tables
 from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.numerical.check import clock
 from geosolver.api import GeometricSolverBuilder
+from tests.fixtures import build_until_works
 
 
 class TestAR:
@@ -219,3 +220,165 @@ class TestAR:
         e1 = tb.v2e["bc:e1"]
 
         check.equal(geometric_tables.minus(d1, b), geometric_tables.minus(c, e1))
+
+    def test_two_triangles(self):
+        """Test that AR can add angles through adjacent triangles."""
+        defs = [
+            "segment a b",
+            "",
+            " =",
+            "a : ; b :",
+            "segment",
+            "",
+            "s_angle a b x y",
+            "x : a b x",
+            "a b = diff a b",
+            "x : s_angle a b x y",
+            "s_angle a b y",
+            "",
+            "on_line x a b",
+            "x : x a b",
+            "a b = diff a b",
+            "x : coll x a b",
+            "line a b",
+            "",
+        ]
+        solver = build_until_works(
+            self.solver_builder.load_defs_from_txt(
+                "\n".join(defs)
+            ).load_problem_from_txt(
+                "a b = segment a b; "
+                "c = s_angle a b c 150o, s_angle b a c 30o; "
+                "d = s_angle c a d 20o, on_line d c b "
+                "? aconst b c a d 5pi/9"
+            )
+        )
+        success = solver.run()
+        check.is_true(success)
+
+    def test_paper_ratio_chasing(self):
+        """Example of ratio chasing given in the original AG paper."""
+        defs = [
+            "triangle a b c",
+            "",
+            " =",
+            "a : ; b : ; c :",
+            "triangle",
+            "",
+            "midpoint x a b",
+            "x : a b",
+            "a b = diff a b",
+            "x : coll x a b, cong x a x b",
+            "midp a b",
+            "",
+            "on_line x a b",
+            "x : x a b",
+            "a b = diff a b",
+            "x : coll x a b",
+            "line a b",
+            "",
+            "angle_bisector x a b c",
+            "x : a b c x",
+            "a b c = ncoll a b c",
+            "x : eqangle b a b x b x b c",
+            "bisect a b c",
+            "",
+            "on_pline x a b c",
+            "x : x a b c",
+            "a b c = diff b c, ncoll a b c",
+            "x : para x a b c",
+            "pline a b c",
+            "",
+        ]
+        solver = build_until_works(
+            self.solver_builder.load_defs_from_txt(
+                "\n".join(defs)
+            ).load_problem_from_txt(
+                "a b c = triangle a b c; "
+                "d = midpoint d a c; "
+                "e = angle_bisector e b a c, on_line e b d; "
+                "f = on_pline f b e c, on_line f a c "
+                "? cong f c a b"
+            )
+        )
+        success = solver.run()
+        check.is_true(success)
+
+    def test_paper_angle_chasing(self):
+        """Example of angle chasing given in the original AG paper."""
+        defs = [
+            "triangle a b c",
+            "",
+            " =",
+            "a : ; b : ; c :",
+            "triangle",
+            "",
+            "angle_bisector x a b c",
+            "x : a b c x",
+            "a b c = ncoll a b c",
+            "x : eqangle b a b x b x b c",
+            "bisect a b c",
+            "",
+            "on_line x a b",
+            "x : x a b",
+            "a b = diff a b",
+            "x : coll x a b",
+            "line a b",
+            "",
+            "on_circum x a b c",
+            "x : a b c",
+            "a b c = ncoll a b c",
+            "x : cyclic a b c x",
+            "cyclic a b c",
+            "",
+        ]
+        solver = build_until_works(
+            self.solver_builder.load_defs_from_txt(
+                "\n".join(defs)
+            ).load_problem_from_txt(
+                "a b c = triangle a b c; "
+                "d = on_circum d a b c; "
+                "e = on_line e a d, on_line e b c; "
+                "f = on_line f a b, on_line f c d; "
+                "x = angle_bisector x a e b, angle_bisector x a f d "
+                "? perp e x x f"
+            )
+        )
+        success = solver.run()
+        check.is_true(success)
+
+    @pytest.mark.xfail
+    def test_paper_distance_chasing(self):
+        """Example of distance chasing given in the original AG paper."""
+        defs = [
+            "triangle a b c",
+            "",
+            " =",
+            "a : ; b : ; c :",
+            "triangle",
+            "",
+            "incenter2 x y z i a b c",
+            "i : a b c, x : i b c, y : i c a, z : i a b",
+            "a b c = ncoll a b c",
+            "i : eqangle a b a i a i a c, eqangle c a c i c i c b; eqangle b c b i b i b a; x : coll x b c, perp i x b c; y : coll y c a, perp i y c a; z : coll z a b, perp i z a b; cong i x i y, cong i y i z",
+            "incenter2 a b c",
+            "",
+            "excenter2 x y z i a b c",
+            "i : a b c, x : i b c, y : i c a, z : i a b",
+            "a b c = ncoll a b c",
+            "i : eqangle a b a i a i a c, eqangle c a c i c i c b; eqangle b c b i b i b a; x : coll x b c, perp i x b c; y : coll y c a, perp i y c a; z : coll z a b, perp i z a b; cong i x i y, cong i y i z",
+            "excenter2 a b c",
+            "",
+        ]
+        solver = build_until_works(
+            self.solver_builder.load_defs_from_txt(
+                "\n".join(defs)
+            ).load_problem_from_txt(
+                "a b c = triangle a b c; "
+                "f g e d = incenter2 f g e d a b c; "
+                "j k i h = excenter2 j k i h a b c "
+                "? cong c j f b"
+            )
+        )
+        success = solver.run()
+        check.is_true(success)

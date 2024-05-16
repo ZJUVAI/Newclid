@@ -52,7 +52,7 @@ pytest-coverage:
         expire_in: 2 weeks
 
 
-docs:
+pages:
   stage: deploy
   script:
     - source venv/bin/activate

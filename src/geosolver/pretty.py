@@ -16,6 +16,7 @@
 """Utilities for string manipulation in the DSL."""
 
 from geosolver.concepts import ConceptName
+from geosolver.statement import list_eqratio3
 
 
 MAP_SYMBOL = {
@@ -106,10 +107,9 @@ def pretty_nl(name: str, args: list[str]) -> str:
         a, b, c, d, e, f, g, h = args
         return f"{pretty_angle(a, b, c, d)} = {pretty_angle(e, f, g, h)}"
     if name in [ConceptName.EQRATIO.value, ConceptName.EQRATIO6.value, "/"]:
-        return "{}{}:{}{} = {}{}:{}{}".format(*args)
+        return _ratio_pretty(args)
     if name == ConceptName.EQRATIO3.value:
-        a, b, c, d, o, o = args
-        return f"S {o} {a} {b} {o} {c} {d}"
+        return " & ".join(_ratio_pretty(ratio) for ratio in list_eqratio3(args))
     if name in [ConceptName.CONGRUENT.value, "D"]:
         a, b, c, d = args
         return f"{a}{b} = {c}{d}"
@@ -145,6 +145,10 @@ def pretty_nl(name: str, args: list[str]) -> str:
     if name == "foot":
         a, b, c, d = args
         return f"{a} is the foot of {b} on {c}{d}"
+
+
+def _ratio_pretty(args: list[str]):
+    return "{}{}:{}{} = {}{}:{}{}".format(*args)
 
 
 def pretty(txt: str) -> str:

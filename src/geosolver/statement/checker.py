@@ -18,6 +18,7 @@ from geosolver.numerical.check import (
     check_sameside_numerical,
 )
 
+from geosolver.statement import list_eqratio3
 from geosolver.symbols_graph import SymbolsGraph
 
 if TYPE_CHECKING:
@@ -46,6 +47,7 @@ class StatementChecker:
             ConceptName.EQANGLE.value: self.check_const_or_eqangle,
             ConceptName.EQANGLE6.value: self.check_const_or_eqangle,
             ConceptName.EQRATIO.value: self.check_const_or_eqratio,
+            ConceptName.EQRATIO3.value: self.check_eqratio3,
             ConceptName.EQRATIO6.value: self.check_const_or_eqratio,
             ConceptName.SIMILAR_TRIANGLE.value: self.check_simtri,
             ConceptName.SIMILAR_TRIANGLE_REFLECTED.value: self.check_simtri,
@@ -235,6 +237,12 @@ class StatementChecker:
                 if is_equal(rat1, rat2):
                     return True
         return False
+
+    def check_eqratio3(self, points: list[Point]) -> bool:
+        for ratio in list_eqratio3(points):
+            if not self.check_eqratio(ratio):
+                return False
+        return True
 
     # Algebraic checks
 
