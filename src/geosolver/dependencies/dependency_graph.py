@@ -3,9 +3,6 @@ from enum import Enum
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
-from networkx import MultiDiGraph, ancestors
-from pyvis.network import Network
-import seaborn as sns
 
 
 from geosolver.algebraic import AlgebraicRules
@@ -16,9 +13,19 @@ from geosolver.problem import (
     name_and_arguments_to_str,
 )
 from geosolver.statement.adder import IntrinsicRules, ToCache
+from geosolver.lazy_loading import lazy_import
 
 if TYPE_CHECKING:
+    import seaborn
+    import pyvis
+    import networkx
+
     from geosolver.geometry import Point, Node
+
+
+sns: "seaborn" = lazy_import("seaborn")
+vis: "pyvis" = lazy_import("pyvis")
+nx: "networkx" = lazy_import("networkx")
 
 
 class DependencyType(Enum):
@@ -38,7 +45,7 @@ DEPTYPE_TO_SHAPE = {
 
 class DependencyGraph:
     def __init__(self) -> None:
-        self.nx_graph = MultiDiGraph()
+        self.nx_graph = nx.MultiDiGraph()
         self.goal = None
 
     @property
@@ -184,9 +191,9 @@ class DependencyGraph:
         self.add_dependency(goal_dep, DependencyType.GOAL)
 
     def show_html(self, html_path: Path, rules: Dict[str, Theorem]):
-        nt = Network("1080px", directed=True)
+        nt = vis.network.Network("1080px", directed=True)
         # populates the nodes and edges data structures
-        vis_graph: MultiDiGraph = self.nx_graph.copy()
+        vis_graph: "networkx.MultiDiGraph" = self.nx_graph.copy()
 
         levels = [
             lvl for _, lvl in self.nx_graph.nodes(data="level") if lvl is not None
@@ -270,14 +277,14 @@ class DependencyGraph:
 
 
 def extract_sub_graph(
-    graph: MultiDiGraph, roots: List[str], goal: Optional[str]
-) -> MultiDiGraph:
+    graph: "networkx.MultiDiGraph", roots: List[str], goal: Optional[str]
+) -> "networkx.MultiDiGraph":
     if goal is None:
         raise ValueError("Cannot extract proof subgraph without goal.")
 
-    subgraph: MultiDiGraph = graph.copy()
+    subgraph: "networkx.MultiDiGraph" = graph.copy()
     subgraph.remove_nodes_from(
-        [n for n in subgraph if n not in ancestors(subgraph, goal) | {goal}]
+        [n for n in subgraph if n not in nx.ancestors(subgraph, goal) | {goal}]
     )
 
     subgraph.remove_edges_from([e for e in subgraph.out_edges(goal)])

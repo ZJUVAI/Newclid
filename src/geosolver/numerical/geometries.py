@@ -6,13 +6,16 @@
 
 
 import math
-from typing import Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 from numpy.random import uniform as unif
+from geosolver.lazy_loading import lazy_import
 from geosolver.numerical import ATOM, close_enough
 
+if TYPE_CHECKING:
+    import numpy
 
-import numpy as np
+np: "numpy" = lazy_import("numpy")
 
 
 class Point:

@@ -8,12 +8,12 @@ import traceback
 from typing import Optional
 from typing_extensions import Self
 
+from geosolver.proof import Proof
 from geosolver.configs import default_defs_path, default_rules_path
 from geosolver.agent.breadth_first_search import BFSDDAR
 from geosolver.agent.interface import AuxAction, DeductiveAgent
 from geosolver.run_loop import run_loop
 from geosolver.problem import Problem, Theorem, Definition, Clause
-from geosolver.proof import Proof
 from geosolver.proof_writing import write_solution
 from geosolver.statement.adder import IntrinsicRules
 

@@ -1,33 +1,22 @@
-# Copyright 2023 DeepMind Technologies Limited
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-
 """Implementing Algebraic Reasoning (AR)."""
 
 from collections import defaultdict
 from fractions import Fraction as frac
 from typing import TYPE_CHECKING, Any, Generator
 
-
-import numpy as np
-from scipy import optimize
-
 from geosolver.geometry import Direction, Length, Line, Point
 from geosolver.ratios import simplify
+from geosolver.lazy_loading import lazy_import
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
+
+    import numpy
+    import scipy.optimize
+
+
+np: "numpy" = lazy_import("numpy")
+opt: "scipy.optimize" = lazy_import("scipy.optimize")
 
 
 class InfQuotientError(Exception):
@@ -284,13 +273,9 @@ class Table:
             b_eq[self.v2i[v]] += float(c)
 
         try:
-            x = optimize.linprog(c=self.c, A_eq=self.A, b_eq=b_eq, method="highs")["x"]
+            x = opt.linprog(c=self.c, A_eq=self.A, b_eq=b_eq, method="highs")["x"]
         except ValueError:
-            x = optimize.linprog(
-                c=self.c,
-                A_eq=self.A,
-                b_eq=b_eq,
-            )["x"]
+            x = opt.linprog(c=self.c, A_eq=self.A, b_eq=b_eq)["x"]
 
         deps = []
         for i, dep in enumerate(self.deps):

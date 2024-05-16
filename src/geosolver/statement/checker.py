@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+
 from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 from geosolver.concepts import ConceptName
 from geosolver.geometry import (

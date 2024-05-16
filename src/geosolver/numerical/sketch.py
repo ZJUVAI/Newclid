@@ -1,9 +1,9 @@
 from __future__ import annotations
 from fractions import Fraction
-from typing import Optional, Union
-import numpy as np
-from numpy.random import uniform as unif
+from typing import TYPE_CHECKING, Optional, Union
+
 import geosolver.geometry as gm
+from geosolver.lazy_loading import lazy_import
 from geosolver.numerical import close_enough
 from geosolver.numerical.angles import ang_between, ang_of
 from geosolver.numerical.distances import (
@@ -20,6 +20,13 @@ from geosolver.numerical.geometries import (
     line_circle_intersection,
     line_line_intersection,
 )
+
+if TYPE_CHECKING:
+    import numpy
+    import numpy.random
+
+np: "numpy" = lazy_import("numpy")
+np_random: "numpy.random" = lazy_import("numpy.random")
 
 
 def sketch(
@@ -212,11 +219,11 @@ def random_rfss(*points: Point) -> list[Point]:
     points = [p - average for p in points]
 
     # rotate
-    ang = unif(0.0, 2 * np.pi)
+    ang = np_random.uniform(0.0, 2 * np.pi)
     sin, cos = np.sin(ang), np.cos(ang)
     # scale and shift
-    scale = unif(0.5, 2.0)
-    shift = Point(unif(-1, 1), unif(-1, 1))
+    scale = np_random.uniform(0.5, 2.0)
+    shift = Point(np_random.uniform(-1, 1), np_random.uniform(-1, 1))
     points = [p.rotate(sin, cos) * scale + shift for p in points]
 
     # randomly flip
@@ -236,12 +243,12 @@ def sketch_eq_quadrangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     a = Point(0.0, 0.0)
     b = Point(1.0, 0.0)
 
-    length = np.random.uniform(0.5, 2.0)
-    ang = np.random.uniform(np.pi / 3, np.pi * 2 / 3)
+    length = np.random.np_random.uniformorm(0.5, 2.0)
+    ang = np.random.np_random.uniformorm(np.pi / 3, np.pi * 2 / 3)
     d = head_from(a, ang, length)
 
     ang = ang_of(b, d)
-    ang = np.random.uniform(ang / 10, ang / 9)
+    ang = np.random.np_random.uniformorm(ang / 10, ang / 9)
     c = head_from(b, ang, length)
     a, b, c, d = random_rfss(a, b, c, d)
     return a, b, c, d
@@ -250,8 +257,8 @@ def sketch_eq_quadrangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
 def sketch_iso_trapezoid(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     a = Point(0.0, 0.0)
     b = Point(1.0, 0.0)
-    lenght = unif(0.5, 2.0)
-    height = unif(0.5, 2.0)
+    lenght = np_random.uniform(0.5, 2.0)
+    height = np_random.uniform(0.5, 2.0)
     c = Point(0.5 + lenght / 2.0, height)
     d = Point(0.5 - lenght / 2.0, height)
 
@@ -267,12 +274,12 @@ def sketch_eqangle2(args: tuple[gm.Point, ...]) -> Point:
     bc = b.distance(c)
     lenght = ba * ba / bc
 
-    if unif(0.0, 1.0) < 0.5:
+    if np_random.uniform(0.0, 1.0) < 0.5:
         be = min(lenght, bc)
-        be = unif(be * 0.1, be * 0.9)
+        be = np_random.uniform(be * 0.1, be * 0.9)
     else:
         be = max(lenght, bc)
-        be = unif(be * 1.1, be * 1.5)
+        be = np_random.uniform(be * 1.1, be * 1.5)
 
     e = b + (c - b) * (be / bc)
     y = b + (a - b) * (be / lenght)
@@ -291,14 +298,14 @@ def sketch_eqangle3(args: tuple[gm.Point, ...]) -> Circle:
 
 def sketch_eqdia_quadrangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     """Sketch quadrangle with two equal diagonals."""
-    m = unif(0.3, 0.7)
-    n = unif(0.3, 0.7)
+    m = np_random.uniform(0.3, 0.7)
+    n = np_random.uniform(0.3, 0.7)
     a = Point(-m, 0.0)
     c = Point(1 - m, 0.0)
     b = Point(0.0, -n)
     d = Point(0.0, 1 - n)
 
-    ang = unif(-0.25 * np.pi, 0.25 * np.pi)
+    ang = np_random.uniform(-0.25 * np.pi, 0.25 * np.pi)
     sin, cos = np.sin(ang), np.cos(ang)
     b = b.rotate(sin, cos)
     d = d.rotate(sin, cos)
@@ -307,7 +314,7 @@ def sketch_eqdia_quadrangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
 
 
 def random_points(n: int = 3) -> list[Point]:
-    return [Point(unif(-1, 1), unif(-1, 1)) for _ in range(n)]
+    return [Point(np_random.uniform(-1, 1), np_random.uniform(-1, 1)) for _ in range(n)]
 
 
 def sketch_free(args: tuple[gm.Point, ...]) -> Point:
@@ -315,8 +322,8 @@ def sketch_free(args: tuple[gm.Point, ...]) -> Point:
 
 
 def sketch_isos(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
-    base = unif(0.5, 1.5)
-    height = unif(0.5, 1.5)
+    base = np_random.uniform(0.5, 1.5)
+    height = np_random.uniform(0.5, 1.5)
 
     b = Point(-base / 2, 0.0)
     c = Point(base / 2, 0.0)
@@ -350,7 +357,7 @@ def sketch_pentagon(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     ang = 0.0
 
     for i in range(4):
-        ang += (2 * np.pi - ang) / (5 - i) * unif(0.5, 1.5)
+        ang += (2 * np.pi - ang) / (5 - i) * np_random.uniform(0.5, 1.5)
         point = Point(np.cos(ang), np.sin(ang))
         points.append(point)
 
@@ -371,14 +378,14 @@ def sketch_pmirror(args: tuple[gm.Point, ...]) -> Point:
 
 def sketch_quadrangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     """Sketch a random quadrangle."""
-    m = unif(0.3, 0.7)
+    m = np_random.uniform(0.3, 0.7)
 
     a = Point(-m, 0.0)
     c = Point(1 - m, 0.0)
-    b = Point(0.0, -unif(0.25, 0.75))
-    d = Point(0.0, unif(0.25, 0.75))
+    b = Point(0.0, -np_random.uniform(0.25, 0.75))
+    d = Point(0.0, np_random.uniform(0.25, 0.75))
 
-    ang = unif(-0.25 * np.pi, 0.25 * np.pi)
+    ang = np_random.uniform(-0.25 * np.pi, 0.25 * np.pi)
     sin, cos = np.sin(ang), np.cos(ang)
     b = b.rotate(sin, cos)
     d = d.rotate(sin, cos)
@@ -389,16 +396,16 @@ def sketch_quadrangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
 def sketch_r_trapezoid(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     a = Point(0.0, 1.0)
     d = Point(0.0, 0.0)
-    b = Point(unif(0.5, 1.5), 1.0)
-    c = Point(unif(0.5, 1.5), 0.0)
+    b = Point(np_random.uniform(0.5, 1.5), 1.0)
+    c = Point(np_random.uniform(0.5, 1.5), 0.0)
     a, b, c, d = random_rfss(a, b, c, d)
     return a, b, c, d
 
 
 def sketch_r_triangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     a = Point(0.0, 0.0)
-    b = Point(0.0, unif(0.5, 2.0))
-    c = Point(unif(0.5, 2.0), 0.0)
+    b = Point(0.0, np_random.uniform(0.5, 2.0))
+    c = Point(np_random.uniform(0.5, 2.0), 0.0)
     a, b, c = random_rfss(a, b, c)
     return a, b, c
 
@@ -406,7 +413,7 @@ def sketch_r_triangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
 def sketch_rectangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     a = Point(0.0, 0.0)
     b = Point(0.0, 1.0)
-    lenght = unif(0.5, 2.0)
+    lenght = np_random.uniform(0.5, 2.0)
     c = Point(lenght, 1.0)
     d = Point(lenght, 0.0)
     a, b, c, d = random_rfss(a, b, c, d)
@@ -490,9 +497,9 @@ def sketch_trapezoid(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     d = Point(0.0, 0.0)
     c = Point(1.0, 0.0)
 
-    base = unif(0.5, 2.0)
-    height = unif(0.5, 2.0)
-    a = Point(unif(-0.5, 1.5), height)
+    base = np_random.uniform(0.5, 2.0)
+    height = np_random.uniform(0.5, 2.0)
+    a = Point(np_random.uniform(-0.5, 1.5), height)
     b = Point(a.x + base, height)
     a, b, c, d = random_rfss(a, b, c, d)
     return a, b, c, d
@@ -501,8 +508,8 @@ def sketch_trapezoid(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
 def sketch_triangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     a = Point(0.0, 0.0)
     b = Point(1.0, 0.0)
-    ac = unif(0.5, 2.0)
-    ang = unif(0.2, 0.8) * np.pi
+    ac = np_random.uniform(0.5, 2.0)
+    ang = np_random.uniform(0.2, 0.8) * np.pi
     c = head_from(a, ang, ac)
     a, b, c = random_rfss(a, b, c)
     return a, b, c
@@ -510,7 +517,7 @@ def sketch_triangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
 
 def sketch_triangle12(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     b = Point(0.0, 0.0)
-    c = Point(unif(1.5, 2.5), 0.0)
+    c = Point(np_random.uniform(1.5, 2.5), 0.0)
     a, _ = circle_circle_intersection(Circle(b, 1.0), Circle(c, 2.0))
     a, b, c = random_rfss(a, b, c)
     return a, b, c
@@ -644,7 +651,7 @@ def sketch_3peq(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     a, b, c = args
     ab, _, ca = Line(a, b), Line(b, c), Line(c, a)
 
-    z = b + (c - b) * np.random.uniform(-0.5, 1.5)
+    z = b + (c - b) * np.random.np_random.uniformorm(-0.5, 1.5)
 
     z_ = z * 2 - c
     ca_parallel_line = z_.parallel_line(ca)
