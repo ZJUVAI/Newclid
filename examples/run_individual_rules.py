@@ -13,8 +13,6 @@ def main():
     logging.basicConfig(level=logging.INFO)
 
     problem_file = "problems_datasets/testing_minimal_rules.txt"
-    # problem_name = "r33"
-
     problems = Problem.to_dict(Problem.from_txt_file(problem_file, translate=False))
     for problem_name in problems.keys():
         solver = (
