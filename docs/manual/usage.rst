@@ -39,7 +39,7 @@ How is a Problem Built
 
 When a problem is given, with a chosen deductive agent (see below), and the program is initialized, the engine will read the files that contain the problem (in its entirety, even if there is more than one problem in the file), the definitions, and the rules to be used. Any formatting mistake anywhere is those files, even if at elements not relevant to the problem being checked, will raise processing errors.
 
-Next, the builder will construct the problem itself. This means compiling the information of the problem in two directions: the numerical diagram and the symbolic statements (proof state, dependency graph, and symbols graph). Symbolically, the builder checks if the symbolic conditions for each definition is satisfied, and adds the predicates assigned to each point to the proof state.
+Next, the builder will construct the problem itself. This means compiling the information of the problem in two directions: the numerical diagram and the symbolic statements (proof state, dependency graph, and symbols graph). Symbolically, the builder checks if the symbolic conditions for each definition is satisfied, and adds the predicates assigned to each point to the proof state (cached and ).
 
 The numerical diagram is built by calling the functions on the sketch.py module (see :ref:`Sketch`). The numerical diagram generated will be used in the construction of the pictures in the problem, but not only. It assigns coordinates to each point, according to the sketch functions. Such coordinates will be used during reasoning to check numerically for some predicates (non-collinearity, non-parallelism, non-perpendicularity, different points). Also, after finishing the constructions, the builder will numerically check if the goal is satisfied in the constructed diagram.
 
@@ -47,16 +47,25 @@ The numerical check of the goal exists for two reasons. First, it is a sanity ch
 
 Deductive Agents
 ----------------
+
+The GeoSolver can use different reasoning agents to try to solve the problem given. They can be chosen when running the problem by specifying the deductive agent in the GeometricSolverBuilder class used to run the problem (see details in ).
+
+.. Add reference to whatever describes the building of the problem, then recover skipped line.
+
+As of now, one can choose to run the problems either using an automatic agent (the BFS-DDAR engine, as in the original AlphaGeometry work, and a BFS-DD engine that does not include algebraic manipulations), or a manually guided helper (the Human Agent deductive agent).
+
+More detailed information on the deductive agents is available at .
+
 .. Also create a separate module
 
 BFS Agent (Traditional Solver)
 ------------------------------
 
-Deductive Agent (DD)
-^^^^^^^^^^^^^^^^^^^^
+The traditional engine of the GeoSolver is AlphaGeometry's DDAR. It corresponds to the BFSDDAR agent. It is composed of two phases: a symbolic reasoner (deductive derivation - DD) that exhaustively runs a list of rules on the facts/predicates known at each time. BFS stands for Breadth-First Search, as in this method the whole list is run, from beginning to end, without considering the possibility of going deep into a result. Such list will run multiple times, until it either solves the problem or ceases to find new statements (fixpoint).
 
-Algebraic Reasoning (AR)
-^^^^^^^^^^^^^^^^^^^^^^^^
+Once the fixpoint is reached, some equations will have been collected throughout the theorem matching into the algebraic reasoning (AR) module, which will solve a linear system of equations and possibly translate the results it gets as new predicates, to restart the DD loop.
+
+This process repeats until a fixpoint is reached both by DD and AR, or until the goal result is found as a fact.
 
 Traceback
 ---------
