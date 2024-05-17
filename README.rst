@@ -13,6 +13,12 @@ in the Nature 2024 paper:
         and helped by an LLM to build auxiliary constructions.
 
 
+AlphaGeometry can be seen as an extension of GeoSolver equipped with a language model 
+that proposes new auxiliary constructions if a problem gets stuck. 
+
+Currently new auxiliary constructions can only be added in Geosolver as human suggested 
+constructions if the HumanAgent is used instead of BFSDDAR (default).
+
 
 Installation
 ------------

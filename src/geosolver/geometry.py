@@ -22,20 +22,20 @@ from typing import Any, Type
 class Node:
     r"""Node in the proof state graph.
 
-  Can be Point, Line, Circle, etc.
+    Can be Point, Line, Circle, etc.
 
-  Each node maintains a merge history to
-  other nodes if they are (found out to be) equivalent
+    Each node maintains a merge history to
+    other nodes if they are (found out to be) equivalent
 
-    a -> b -
-            \
-         c -> d -> e -> f -> g
+        a -> b -
+                \
+            c -> d -> e -> f -> g
 
-  d.merged_to = e
-  d.rep = g
-  d.merged_from = {a, b, c, d}
-  d.equivs = {a, b, c, d, e, f, g}
-  """
+    d.merged_to = e
+    d.rep = g
+    d.merged_from = {a, b, c, d}
+    d.equivs = {a, b, c, d, e, f, g}
+    """
 
     def __init__(self, name: str = "", graph: Any = None):
         self.name = name or str(self)
