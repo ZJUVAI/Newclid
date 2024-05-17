@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 
-from geosolver.concepts import ConceptName
+from geosolver.predicates import Predicate
 from geosolver.dependencies.caching import DependencyCache, hashed
 from geosolver.geometry import (
     Angle,
@@ -104,7 +104,7 @@ def why_dependency(
         dep.rule_name = cached_me.rule_name
         return
 
-    if dep.name == ConceptName.PARALLEL.value:
+    if dep.name == Predicate.PARALLEL.value:
         a, b, c, d = dep.args
         if {a, b} == {c, d}:
             dep.why = []
@@ -117,9 +117,7 @@ def why_dependency(
                 dep.why = []
                 dep.rule_name = ""
                 return
-            dep = Dependency(
-                ConceptName.COLLINEAR.value, list({a, b, c, d}), "t??", None
-            )
+            dep = Dependency(Predicate.COLLINEAR.value, list({a, b, c, d}), "t??", None)
             dep.why = [
                 dep.why_me_or_cache(
                     symbols_graph, statements_checker, dependency_cache, level
@@ -131,7 +129,7 @@ def why_dependency(
             x_, y_ = xy.points
             if {x, y} == {x_, y_}:
                 continue
-            d = Dependency(ConceptName.COLLINEAR_X.value, [x, y, x_, y_], None, level)
+            d = Dependency(Predicate.COLLINEAR_X.value, [x, y, x_, y_], None, level)
             dep.why += [
                 d.why_me_or_cache(
                     symbols_graph, statements_checker, dependency_cache, level
@@ -141,16 +139,16 @@ def why_dependency(
         whypara = why_equal(ab, cd)
         dep.why += whypara
 
-    elif dep.name == ConceptName.MIDPOINT.value:
+    elif dep.name == Predicate.MIDPOINT.value:
         m, a, b = dep.args
         ma = symbols_graph.get_segment(m, a)
         mb = symbols_graph.get_segment(m, b)
         dep = Dependency(
-            ConceptName.COLLINEAR.value, [m, a, b], None, None
+            Predicate.COLLINEAR.value, [m, a, b], None, None
         ).why_me_or_cache(symbols_graph, statements_checker, dependency_cache, None)
         dep.why = [dep] + why_equal(ma, mb, level)
 
-    elif dep.name == ConceptName.PERPENDICULAR.value:
+    elif dep.name == Predicate.PERPENDICULAR.value:
         a, b, c, d = dep.args
         ab = symbols_graph.get_line(a, b)
         cd = symbols_graph.get_line(c, d)
@@ -158,7 +156,7 @@ def why_dependency(
             x_, y_ = xy.points
             if {x, y} == {x_, y_}:
                 continue
-            d = Dependency(ConceptName.COLLINEAR_X.value, [x, y, x_, y_], None, level)
+            d = Dependency(Predicate.COLLINEAR_X.value, [x, y, x_, y_], None, level)
             dep.why += [
                 d.why_me_or_cache(
                     symbols_graph, statements_checker, dependency_cache, level
@@ -176,42 +174,42 @@ def why_dependency(
 
         dep.why += why
 
-    elif dep.name == ConceptName.CONGRUENT.value:
+    elif dep.name == Predicate.CONGRUENT.value:
         a, b, c, d = dep.args
         ab = symbols_graph.get_segment(a, b)
         cd = symbols_graph.get_segment(c, d)
 
         dep.why = why_equal(ab, cd, level)
 
-    elif dep.name == ConceptName.COLLINEAR.value:
+    elif dep.name == Predicate.COLLINEAR.value:
         _, why = line_of_and_why(dep.args, level)
         dep.why = why
 
-    elif dep.name == ConceptName.COLLINEAR_X.value:
+    elif dep.name == Predicate.COLLINEAR_X.value:
         if statements_checker.check_coll(dep.args):
             args = list(set(dep.args))
-            cached_dep = dependency_cache.get(ConceptName.COLLINEAR.value, args)
+            cached_dep = dependency_cache.get(Predicate.COLLINEAR.value, args)
             if cached_dep is not None:
                 dep.why = [cached_dep]
                 dep.rule_name = ""
                 return
             _, dep.why = line_of_and_why(args, level)
         else:
-            dep.name = ConceptName.PARALLEL.value
+            dep.name = Predicate.PARALLEL.value
             dep.why_me(symbols_graph, statements_checker, dependency_cache, level)
 
-    elif dep.name == ConceptName.CYCLIC.value:
+    elif dep.name == Predicate.CYCLIC.value:
         _, why = circle_of_and_why(dep.args, level)
         dep.why = why
 
-    elif dep.name == ConceptName.CIRCLE.value:
+    elif dep.name == Predicate.CIRCLE.value:
         o, a, b, c = dep.args
         oa = symbols_graph.get_segment(o, a)
         ob = symbols_graph.get_segment(o, b)
         oc = symbols_graph.get_segment(o, c)
         dep.why = why_equal(oa, ob, level) + why_equal(oa, oc, level)
 
-    elif dep.name in [ConceptName.EQANGLE.value, ConceptName.EQANGLE6.value]:
+    elif dep.name in [Predicate.EQANGLE.value, Predicate.EQANGLE6.value]:
         a, b, c, d, m, n, p, q = dep.args
 
         ab, why1 = symbols_graph.get_line_thru_pair_why(a, b)
@@ -221,28 +219,28 @@ def why_dependency(
 
         if ab is None or cd is None or mn is None or pq is None:
             if {a, b} == {m, n}:
-                d = Dependency(ConceptName.PARALLEL.value, [c, d, p, q], None, level)
+                d = Dependency(Predicate.PARALLEL.value, [c, d, p, q], None, level)
                 dep.why = [
                     d.why_me_or_cache(
                         symbols_graph, statements_checker, dependency_cache, level
                     )
                 ]
             if {a, b} == {c, d}:
-                d = Dependency(ConceptName.PARALLEL.value, [p, q, m, n], None, level)
+                d = Dependency(Predicate.PARALLEL.value, [p, q, m, n], None, level)
                 dep.why = [
                     d.why_me_or_cache(
                         symbols_graph, statements_checker, dependency_cache, level
                     )
                 ]
             if {c, d} == {p, q}:
-                d = Dependency(ConceptName.PARALLEL.value, [a, b, m, n], None, level)
+                d = Dependency(Predicate.PARALLEL.value, [a, b, m, n], None, level)
                 dep.why = [
                     d.why_me_or_cache(
                         symbols_graph, statements_checker, dependency_cache, level
                     )
                 ]
             if {p, q} == {m, n}:
-                d = Dependency(ConceptName.PARALLEL.value, [a, b, c, d], None, level)
+                d = Dependency(Predicate.PARALLEL.value, [a, b, c, d], None, level)
                 dep.why = [
                     d.why_me_or_cache(
                         symbols_graph, statements_checker, dependency_cache, level
@@ -258,7 +256,7 @@ def why_dependency(
             x_, y_ = xy.points
             if {x, y} == {x_, y_}:
                 continue
-            d = Dependency(ConceptName.COLLINEAR_X.value, [x, y, x_, y_], None, level)
+            d = Dependency(Predicate.COLLINEAR_X.value, [x, y, x_, y_], None, level)
             d.why = whyxy
             dep.why += [d]
 
@@ -276,7 +274,7 @@ def why_dependency(
             (dab, dcd, dmn, dpq), whyeqangle = whyeqangle
             if diff:
                 d = Dependency(
-                    ConceptName.EQANGLE.value, [a, b, c, d, m, n, p, q], None, level
+                    Predicate.EQANGLE.value, [a, b, c, d, m, n, p, q], None, level
                 )
                 d.why = whyeqangle
                 whyeqangle = [d]
@@ -354,86 +352,78 @@ def why_dependency(
                     level,
                 )
             elif is_equal(ab, mn) or is_equal(cd, pq):
-                dep1 = Dependency(ConceptName.PARALLEL.value, [a, b, m, n], None, level)
+                dep1 = Dependency(Predicate.PARALLEL.value, [a, b, m, n], None, level)
                 dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
-                dep2 = Dependency(ConceptName.PARALLEL.value, [c, d, p, q], None, level)
+                dep2 = Dependency(Predicate.PARALLEL.value, [c, d, p, q], None, level)
                 dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
                 dep.why += [dep1, dep2]
             elif is_equal(ab, cd) or is_equal(mn, pq):
-                dep1 = Dependency(ConceptName.PARALLEL.value, [a, b, c, d], None, level)
+                dep1 = Dependency(Predicate.PARALLEL.value, [a, b, c, d], None, level)
                 dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
-                dep2 = Dependency(ConceptName.PARALLEL.value, [m, n, p, q], None, level)
+                dep2 = Dependency(Predicate.PARALLEL.value, [m, n, p, q], None, level)
                 dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
                 dep.why += [dep1, dep2]
             elif ab._val and cd._val and mn._val and pq._val:
                 dep.why = why_eqangle(ab._val, cd._val, mn._val, pq._val, level)
 
-    elif dep.name in [ConceptName.EQRATIO.value, ConceptName.EQRATIO6.value]:
+    elif dep.name in [Predicate.EQRATIO.value, Predicate.EQRATIO6.value]:
         why_me_eqratio(dep, symbols_graph, statements_checker, dependency_cache, level)
-    elif dep.name == ConceptName.EQRATIO3.value:
+    elif dep.name == Predicate.EQRATIO3.value:
         a, b, c, d, m, n = dep.args
-        dep1 = Dependency(ConceptName.PARALLEL.value, [a, b, c, d], "", level)
+        dep1 = Dependency(Predicate.PARALLEL.value, [a, b, c, d], "", level)
         dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
-        dep2 = Dependency(ConceptName.COLLINEAR.value, [m, a, c], "", level)
+        dep2 = Dependency(Predicate.COLLINEAR.value, [m, a, c], "", level)
         dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
-        dep3 = Dependency(ConceptName.COLLINEAR.value, [n, b, d], "", level)
+        dep3 = Dependency(Predicate.COLLINEAR.value, [n, b, d], "", level)
         dep3.why_me(symbols_graph, statements_checker, dependency_cache, level)
         dep.rule_name = "r07"
         dep.why = [dep1, dep2, dep3]
 
     elif dep.name in [
-        ConceptName.DIFFERENT.value,
-        ConceptName.NON_PARALLEL.value,
-        ConceptName.NON_PERPENDICULAR.value,
-        ConceptName.NON_COLLINEAR.value,
-        ConceptName.SAMESIDE.value,
+        Predicate.DIFFERENT.value,
+        Predicate.NON_PARALLEL.value,
+        Predicate.NON_PERPENDICULAR.value,
+        Predicate.NON_COLLINEAR.value,
+        Predicate.SAMESIDE.value,
     ]:
         dep.why = []
 
-    elif dep.name == ConceptName.SIMILAR_TRIANGLE.value:
+    elif dep.name == Predicate.SIMILAR_TRIANGLE.value:
         a, b, c, x, y, z = dep.args
-        dep1 = Dependency(
-            ConceptName.EQANGLE.value, [a, b, a, c, x, y, x, z], "", level
-        )
+        dep1 = Dependency(Predicate.EQANGLE.value, [a, b, a, c, x, y, x, z], "", level)
         dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
-        dep2 = Dependency(
-            ConceptName.EQANGLE.value, [b, a, b, c, y, x, y, z], "", level
-        )
+        dep2 = Dependency(Predicate.EQANGLE.value, [b, a, b, c, y, x, y, z], "", level)
         dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
         dep.rule_name = "r34"
         dep.why = [dep1, dep2]
-    elif dep.name == ConceptName.SIMILAR_TRIANGLE_BOTH.value:
+    elif dep.name == Predicate.SIMILAR_TRIANGLE_BOTH.value:
         a, b, c, p, q, r = dep.args
-        dep1 = Dependency(
-            ConceptName.EQRATIO.value, [b, a, b, c, q, p, q, r], "", level
-        )
+        dep1 = Dependency(Predicate.EQRATIO.value, [b, a, b, c, q, p, q, r], "", level)
         dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
-        dep2 = Dependency(
-            ConceptName.EQRATIO.value, [c, a, c, b, r, p, r, q], "", level
-        )
+        dep2 = Dependency(Predicate.EQRATIO.value, [c, a, c, b, r, p, r, q], "", level)
         dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
         dep.rule_name = "r38"
         dep.why = [dep1, dep2]
 
     elif dep.name in [
-        ConceptName.CONTRI_TRIANGLE.value,
-        ConceptName.CONTRI_TRIANGLE_REFLECTED.value,
-        ConceptName.CONTRI_TRIANGLE_BOTH.value,
+        Predicate.CONTRI_TRIANGLE.value,
+        Predicate.CONTRI_TRIANGLE_REFLECTED.value,
+        Predicate.CONTRI_TRIANGLE_BOTH.value,
     ]:
         a, b, c, x, y, z = dep.args
-        dep1 = Dependency(ConceptName.CONGRUENT.value, [a, b, x, y], "", level)
+        dep1 = Dependency(Predicate.CONGRUENT.value, [a, b, x, y], "", level)
         dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
-        dep2 = Dependency(ConceptName.CONGRUENT.value, [b, c, y, z], "", level)
+        dep2 = Dependency(Predicate.CONGRUENT.value, [b, c, y, z], "", level)
         dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
-        dep3 = Dependency(ConceptName.CONGRUENT.value, [c, a, z, x], "", level)
+        dep3 = Dependency(Predicate.CONGRUENT.value, [c, a, z, x], "", level)
         dep3.why_me(symbols_graph, statements_checker, dependency_cache, level)
         dep.rule_name = "r32"
         dep.why = [dep1, dep2, dep3]
 
-    elif dep.name == ConceptName.IND.value:
+    elif dep.name == Predicate.IND.value:
         pass
 
-    elif dep.name == ConceptName.CONSTANT_ANGLE.value:
+    elif dep.name == Predicate.CONSTANT_ANGLE.value:
         a, b, c, d, ang0 = dep.args
 
         measure = ang0._val
@@ -454,7 +444,7 @@ def why_dependency(
             for args in [(a, b, a1, b1), (c, d, c1, d1)]:
                 if statements_checker.check_coll(args):
                     if len(set(args)) > 2:
-                        dep = Dependency(ConceptName.COLLINEAR.value, args, None, None)
+                        dep = Dependency(Predicate.COLLINEAR.value, args, None, None)
                         dep.why.append(
                             dep.why_me_or_cache(
                                 symbols_graph,
@@ -464,7 +454,7 @@ def why_dependency(
                             )
                         )
                 else:
-                    dep = Dependency(ConceptName.PARALLEL.value, args, None, None)
+                    dep = Dependency(Predicate.PARALLEL.value, args, None, None)
                     dep.why.append(
                         dep.why_me_or_cache(
                             symbols_graph, statements_checker, dependency_cache, level
@@ -474,7 +464,7 @@ def why_dependency(
             dep.why += why_equal(ang, ang0)
             break
 
-    elif dep.name == ConceptName.CONSTANT_RATIO.value:
+    elif dep.name == Predicate.CONSTANT_RATIO.value:
         a, b, c, d, rat0 = dep.args
 
         val = rat0._val
@@ -494,7 +484,7 @@ def why_dependency(
             dep.why = []
             for args in [(a, b, a1, b1), (c, d, c1, d1)]:
                 if len(set(args)) > 2:
-                    dep = Dependency(ConceptName.CONGRUENT.value, args, None, None)
+                    dep = Dependency(Predicate.CONGRUENT.value, args, None, None)
                     dep.why.append(
                         dep.why_me_or_cache(
                             symbols_graph, statements_checker, dependency_cache, level
@@ -550,7 +540,7 @@ def why_eqratio(
     deps = []
     if why0:
         dep = Dependency(
-            ConceptName.EQRATIO.value, [a_, b_, c_, d_, e_, f_, g_, h_], "", level
+            Predicate.EQRATIO.value, [a_, b_, c_, d_, e_, f_, g_, h_], "", level
         )
         dep.why = why0
         deps.append(dep)
@@ -563,7 +553,7 @@ def why_eqratio(
         [(a_, b_), (c_, d_), (e_, f_), (g_, h_)],
     ):
         if why:
-            dep = Dependency(ConceptName.CONGRUENT.value, [x, y, x_, y_], "", level)
+            dep = Dependency(Predicate.CONGRUENT.value, [x, y, x_, y_], "", level)
             dep.why = why
             deps.append(dep)
 
@@ -614,7 +604,7 @@ def why_eqangle(
     deps = []
     if why0:
         dep = Dependency(
-            ConceptName.EQANGLE.value, [a_, b_, c_, d_, e_, f_, g_, h_], "", None
+            Predicate.EQANGLE.value, [a_, b_, c_, d_, e_, f_, g_, h_], "", None
         )
         dep.why = why0
         deps.append(dep)
@@ -631,9 +621,9 @@ def why_eqangle(
         xy, xy_ = d_xy._obj, d_xy_._obj
         if why:
             if xy == xy_:
-                name = ConceptName.COLLINEAR_X.value
+                name = Predicate.COLLINEAR_X.value
             else:
-                name = ConceptName.PARALLEL.value
+                name = Predicate.PARALLEL.value
             dep = Dependency(name, [x_, y_, x, y], "", None)
             dep.why = why
             deps.append(dep)
@@ -662,13 +652,11 @@ def maybe_make_equal_pairs(
         return
     why = []
     eqname = (
-        ConceptName.PARALLEL.value
-        if isinstance(ab, Line)
-        else ConceptName.CONGRUENT.value
+        Predicate.PARALLEL.value if isinstance(ab, Line) else Predicate.CONGRUENT.value
     )
     colls = [a, b, m, n]
-    if len(set(colls)) > 2 and eqname == ConceptName.PARALLEL.value:
-        dep = Dependency(ConceptName.COLLINEAR_X.value, colls, None, level)
+    if len(set(colls)) > 2 and eqname == Predicate.PARALLEL.value:
+        dep = Dependency(Predicate.COLLINEAR_X.value, colls, None, level)
         dep.why_me(symbols_graph, statements_checker, dependency_cache, level)
         why += [dep]
 
@@ -693,28 +681,28 @@ def why_me_eqratio(
 
     if ab is None or cd is None or mn is None or pq is None:
         if {a, b} == {m, n}:
-            d = Dependency(ConceptName.CONGRUENT.value, [c, d, p, q], None, level)
+            d = Dependency(Predicate.CONGRUENT.value, [c, d, p, q], None, level)
             dep.why = [
                 d.why_me_or_cache(
                     symbols_graph, statements_checker, dependency_cache, level
                 )
             ]
         if {a, b} == {c, d}:
-            d = Dependency(ConceptName.CONGRUENT.value, [p, q, m, n], None, level)
+            d = Dependency(Predicate.CONGRUENT.value, [p, q, m, n], None, level)
             dep.why = [
                 d.why_me_or_cache(
                     symbols_graph, statements_checker, dependency_cache, level
                 )
             ]
         if {c, d} == {p, q}:
-            d = Dependency(ConceptName.CONGRUENT.value, [a, b, m, n], None, level)
+            d = Dependency(Predicate.CONGRUENT.value, [a, b, m, n], None, level)
             dep.why = [
                 d.why_me_or_cache(
                     symbols_graph, statements_checker, dependency_cache, level
                 )
             ]
         if {p, q} == {m, n}:
-            d = Dependency(ConceptName.CONGRUENT.value, [a, b, c, d], None, level)
+            d = Dependency(Predicate.CONGRUENT.value, [a, b, c, d], None, level)
             dep.why = [
                 d.why_me_or_cache(
                     symbols_graph, statements_checker, dependency_cache, level
@@ -774,15 +762,15 @@ def why_me_eqratio(
                 level,
             )
         elif is_equal(ab, mn) or is_equal(cd, pq):
-            dep1 = Dependency(ConceptName.CONGRUENT.value, [a, b, m, n], None, level)
+            dep1 = Dependency(Predicate.CONGRUENT.value, [a, b, m, n], None, level)
             dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
-            dep2 = Dependency(ConceptName.CONGRUENT.value, [c, d, p, q], None, level)
+            dep2 = Dependency(Predicate.CONGRUENT.value, [c, d, p, q], None, level)
             dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
             dep.why += [dep1, dep2]
         elif is_equal(ab, cd) or is_equal(mn, pq):
-            dep1 = Dependency(ConceptName.CONGRUENT.value, [a, b, c, d], None, level)
+            dep1 = Dependency(Predicate.CONGRUENT.value, [a, b, c, d], None, level)
             dep1.why_me(symbols_graph, statements_checker, dependency_cache, level)
-            dep2 = Dependency(ConceptName.CONGRUENT.value, [m, n, p, q], None, level)
+            dep2 = Dependency(Predicate.CONGRUENT.value, [m, n, p, q], None, level)
             dep2.why_me(symbols_graph, statements_checker, dependency_cache, level)
             dep.why += [dep1, dep2]
         elif ab._val and cd._val and mn._val and pq._val:

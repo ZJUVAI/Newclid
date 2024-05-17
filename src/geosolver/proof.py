@@ -23,7 +23,7 @@ from typing_extensions import Self
 import logging
 
 
-from geosolver.concepts import ConceptName
+from geosolver.predicates import Predicate
 from geosolver.agent.breadth_first_search import Action, Mapping
 from geosolver.agent.interface import (
     ApplyDerivationAction,
@@ -352,7 +352,7 @@ class Proof:
         dependency_level: int,
     ) -> Tuple[Optional[Dependency], bool]:
         # Trivial deps.
-        if premise.name in [ConceptName.PARALLEL.value, ConceptName.CONGRUENT.value]:
+        if premise.name in [Predicate.PARALLEL.value, Predicate.CONGRUENT.value]:
             a, b, c, d = p_args
             if {a, b} == {c, d}:
                 return None, False
@@ -362,8 +362,8 @@ class Proof:
             "eqratio6_eqangle6_ncoll_simtri*",
         ]:
             if premise.name in [
-                ConceptName.EQANGLE.value,
-                ConceptName.EQANGLE6.value,
+                Predicate.EQANGLE.value,
+                Predicate.EQANGLE6.value,
             ]:  # SAS or RAR
                 b, a, b, c, y, x, y, z = p_args
                 if not same_clock(a.num, b.num, c.num, x.num, y.num, z.num):
@@ -408,14 +408,14 @@ class Proof:
     def check(self, name: str, args: list[Point]) -> bool:
         """Symbolically check if a predicate is True."""
         if name in [
-            ConceptName.FIX_L.value,
-            ConceptName.FIX_C.value,
-            ConceptName.FIX_B.value,
-            ConceptName.FIX_T.value,
-            ConceptName.FIX_P.value,
+            Predicate.FIX_L.value,
+            Predicate.FIX_C.value,
+            Predicate.FIX_B.value,
+            Predicate.FIX_T.value,
+            Predicate.FIX_P.value,
         ]:
             return self.dependency_cache.contains(name, args)
-        if name in [ConceptName.IND.value]:
+        if name in [Predicate.IND.value]:
             return True
         return self.statements_checker.check(name, args)
 
@@ -430,7 +430,7 @@ class Proof:
     def additionally_draw(self, name: str, args: list[Point]) -> None:
         """Draw some extra line/circles for illustration purpose."""
 
-        if name in [ConceptName.CIRCLE.value]:
+        if name in [Predicate.CIRCLE.value]:
             center, point = args[:2]
             circle = self.symbols_graph.new_node(
                 Circle, f"({center.name},{point.name})"
@@ -512,7 +512,7 @@ class Proof:
                     raise ValueError("Argument mismatch. " + correct_form)
 
             mapping = dict(zip(cdef.construction.args, c.args))
-            c_name = ConceptName.MIDPOINT.value if c.name == "midpoint" else c.name
+            c_name = Predicate.MIDPOINT.value if c.name == "midpoint" else c.name
             deps = EmptyDependency(level=0, rule_name=CONSTRUCTION_RULE)
             deps.construction = Dependency(c_name, c.args, rule_name=None, level=0)
 
