@@ -70,6 +70,10 @@ This process repeats until a fixpoint is reached both by DD and AR, or until the
 Traceback
 ---------
 
+Once the goal statement is found by the solver, in general it will have covered a wide graph of statements that do not necessarily contribute to the proof. To have a clean and coherently written proof, the geosolver uses a traceback, that tries to find the shortest straight path from the premises to the goal through the proof graph (for more details see :ref:`Trace back`).
+
+To be able to keep track of the connection between the steps taken on the graph, an important part of the proof construction is the dependency structure, that assigns to each statement a list of reasons for why that statement was added to the graph.
+
 Dependency Structure
 ^^^^^^^^^^^^^^^^^^^^
 
@@ -77,3 +81,7 @@ More info on :ref:`Dependencies`.
 
 Writing the Proof
 -----------------
+
+After the traceback structures the proof, the predicates are translated into (pseudo) natural language (by a script, see :ref:`Proof writing` and :ref:`Pretty`). The written proof constains the hypothesis ("From theorem premises"), which are the points effectively present in the goal, intermediary points ("Auxiliary Constructions") used in the proof, and the proof steps. Constructions given in the statement of the problem but that do not show up in the proof will not be present.
+
+Each proof step lists the premises used for the step, the consequence, and the reason (dependency) that makes it true. As of now, we still have steps being written with empty reason, due to untracked dependencies. All steps are numerated to help follow the proof.
