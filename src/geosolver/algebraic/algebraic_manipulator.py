@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Dict, Tuple
 
 from geosolver.algebraic import AlgebraicRules
 from geosolver.algebraic.geometric_tables import AngleTable, DistanceTable, RatioTable
-from geosolver.concepts import ConceptName
+from geosolver.predicates import Predicate
 from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.geometry import Angle, Point, Ratio, is_equiv
 from geosolver.numerical.check import check_numerical
@@ -35,13 +35,13 @@ class AlgebraicManipulator:
         self.vhalfpi = self.halfpi.val
 
         self.NAME_TO_ADDER = {
-            ConceptName.PARALLEL.value: self._add_para,
-            ConceptName.PERPENDICULAR.value: self._add_perp,
-            ConceptName.CONGRUENT.value: self._add_cong,
-            ConceptName.EQANGLE.value: self._add_eqangle,
-            ConceptName.EQRATIO.value: self._add_eqratio,
-            ConceptName.CONSTANT_ANGLE.value: self._add_aconst,
-            ConceptName.CONSTANT_RATIO.value: self._add_rconst,
+            Predicate.PARALLEL.value: self._add_para,
+            Predicate.PERPENDICULAR.value: self._add_perp,
+            Predicate.CONGRUENT.value: self._add_cong,
+            Predicate.EQANGLE.value: self._add_eqangle,
+            Predicate.EQRATIO.value: self._add_eqratio,
+            Predicate.CONSTANT_ANGLE.value: self._add_aconst,
+            Predicate.CONSTANT_RATIO.value: self._add_rconst,
         }
 
     def add_algebra(self, dep: "Dependency") -> None:
@@ -65,14 +65,14 @@ class AlgebraicManipulator:
         # As they are too numerous => slow down DD+AR.
         # & reserve them only for last effort.
         eqs = {
-            ConceptName.EQANGLE.value: derives.pop(ConceptName.EQANGLE.value),
-            ConceptName.EQRATIO.value: derives.pop(ConceptName.EQRATIO.value),
+            Predicate.EQANGLE.value: derives.pop(Predicate.EQANGLE.value),
+            Predicate.EQRATIO.value: derives.pop(Predicate.EQRATIO.value),
         }
         return derives, eqs
 
     def derive_ratio_algebra(self, level: int) -> Derivations:
         """Derive new eqratio predicates."""
-        added = {ConceptName.CONGRUENT_2.value: [], ConceptName.EQRATIO.value: []}
+        added = {Predicate.CONGRUENT_2.value: [], Predicate.EQRATIO.value: []}
 
         for x in self.rtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
@@ -88,20 +88,20 @@ class AlgebraicManipulator:
                     continue
 
                 (m, n), (p, q) = a._obj.points, b._obj.points
-                added[ConceptName.CONGRUENT_2.value].append((m, n, p, q, dep))
+                added[Predicate.CONGRUENT_2.value].append((m, n, p, q, dep))
 
             if len(x) == 4:
                 a, b, c, d = x
-                added[ConceptName.EQRATIO.value].append((a, b, c, d, dep))
+                added[Predicate.EQRATIO.value].append((a, b, c, d, dep))
 
         return added
 
     def derive_angle_algebra(self, level: int) -> Derivations:
         """Derive new eqangles predicates."""
         added = {
-            ConceptName.EQANGLE.value: [],
-            ConceptName.CONSTANT_ANGLE.value: [],
-            ConceptName.PARALLEL.value: [],
+            Predicate.EQANGLE.value: [],
+            Predicate.CONSTANT_ANGLE.value: [],
+            Predicate.PARALLEL.value: [],
         }
 
         for x in self.atable.get_all_eqs_and_why():
@@ -118,10 +118,10 @@ class AlgebraicManipulator:
                     continue
 
                 (e, f), (p, q) = a._obj.points, b._obj.points
-                if not check_numerical(ConceptName.PARALLEL.value, [e, f, p, q]):
+                if not check_numerical(Predicate.PARALLEL.value, [e, f, p, q]):
                     continue
 
-                added[ConceptName.PARALLEL.value].append((a, b, dep))
+                added[Predicate.PARALLEL.value].append((a, b, dep))
 
             if len(x) == 3:
                 a, b, (n, d) = x
@@ -129,24 +129,24 @@ class AlgebraicManipulator:
                 (e, f), (p, q) = a._obj.points, b._obj.points
                 ang, _ = self.get_or_create_const_ang(n, d)
                 if not check_numerical(
-                    ConceptName.CONSTANT_ANGLE.value, [e, f, p, q, ang]
+                    Predicate.CONSTANT_ANGLE.value, [e, f, p, q, ang]
                 ):
                     continue
 
-                added[ConceptName.CONSTANT_ANGLE.value].append((a, b, n, d, dep))
+                added[Predicate.CONSTANT_ANGLE.value].append((a, b, n, d, dep))
 
             if len(x) == 4:
                 a, b, c, d = x
-                added[ConceptName.EQANGLE.value].append((a, b, c, d, dep))
+                added[Predicate.EQANGLE.value].append((a, b, c, d, dep))
 
         return added
 
     def derive_cong_algebra(self, level: int) -> Derivations:
         """Derive new cong predicates."""
         added = {
-            ConceptName.INCI.value: [],
-            ConceptName.CONGRUENT.value: [],
-            ConceptName.CONSTANT_RATIO.value: [],
+            Predicate.INCI.value: [],
+            Predicate.CONGRUENT.value: [],
+            Predicate.CONSTANT_RATIO.value: [],
         }
         for x in self.dtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
@@ -162,19 +162,19 @@ class AlgebraicManipulator:
                     continue
 
                 dep.name = f"inci {a.name} {b.name}"
-                added[ConceptName.INCI.value].append((x, dep))
+                added[Predicate.INCI.value].append((x, dep))
 
             if len(x) == 4:
                 a, b, c, d = x
                 if not (a != b and c != d and (a != c or b != d)):
                     continue
-                added[ConceptName.CONGRUENT.value].append((a, b, c, d, dep))
+                added[Predicate.CONGRUENT.value].append((a, b, c, d, dep))
 
             if len(x) == 6:
                 a, b, c, d, num, den = x
                 if not (a != b and c != d and (a != c or b != d)):
                     continue
-                added[ConceptName.CONSTANT_RATIO.value].append(
+                added[Predicate.CONSTANT_RATIO.value].append(
                     (a, b, c, d, num, den, dep)
                 )
 
@@ -255,10 +255,10 @@ class AlgebraicManipulator:
         return rat1, rat2
 
     def get_or_create_const(
-        self, const_str: str, const_concept: ConceptName | str
+        self, const_str: str, const_concept: Predicate | str
     ) -> tuple[Angle, Angle] | tuple[Ratio, Ratio]:
-        const_concept = ConceptName(const_concept)
-        if const_concept in (ConceptName.CONSTANT_ANGLE, ConceptName.S_ANGLE):
+        const_concept = Predicate(const_concept)
+        if const_concept in (Predicate.CONSTANT_ANGLE, Predicate.S_ANGLE):
             if "pi/" in const_str:
                 # pi fraction
                 num, den = map(int, const_str.split("pi/"))
@@ -269,7 +269,7 @@ class AlgebraicManipulator:
                 raise ValueError("Could not interpret constant angle: %s", const_str)
             return self.get_or_create_const_ang(num, den)
 
-        elif const_concept is ConceptName.CONSTANT_RATIO:
+        elif const_concept is Predicate.CONSTANT_RATIO:
             if "/" in const_str:
                 num, den = map(int, const_str.split("/"))
                 return self.get_or_create_const_rat(num, den)

@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-class ConceptName(Enum):
+class Predicate(Enum):
     COLLINEAR = "coll"
     COLLINEAR_X = "collx"
     PARALLEL = "para"

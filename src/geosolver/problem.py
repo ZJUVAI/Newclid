@@ -21,7 +21,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
 
-from geosolver.concepts import ConceptName
+from geosolver.predicates import Predicate
 from geosolver.dependencies.caching import hashed_txt
 
 import geosolver.geometry as gm
@@ -242,11 +242,11 @@ class Problem:
                         args = [mapping[a] for a in b.args]
                         name = b.name
                         if b.name in [
-                            ConceptName.S_ANGLE.value,
-                            ConceptName.CONSTANT_ANGLE.value,
+                            Predicate.S_ANGLE.value,
+                            Predicate.CONSTANT_ANGLE.value,
                         ]:
                             x, y, z, v = args
-                            name = ConceptName.CONSTANT_ANGLE.value
+                            name = Predicate.CONSTANT_ANGLE.value
                             v = int(v)
 
                             if v < 0:
@@ -272,7 +272,7 @@ class Problem:
                     ref_str = "{:02}".format(ref)
                     dep_str = pt.pretty(dep)
 
-                    if dep[0] == ConceptName.CONSTANT_ANGLE.value:
+                    if dep[0] == Predicate.CONSTANT_ANGLE.value:
                         m, n = map(int, dep[-1].split("pi/"))
                         mn = f"{m}. pi / {n}."
                         dep_str = " ".join(dep_str.split()[:-1] + [mn])
@@ -428,14 +428,14 @@ class Theorem:
         con = self.conclusion[0]
 
         if con.name in [
-            ConceptName.EQRATIO3.value,
-            ConceptName.MIDPOINT.value,
-            ConceptName.CONTRI_TRIANGLE.value,
-            ConceptName.SIMILAR_TRIANGLE.value,
-            ConceptName.CONTRI_TRIANGLE_REFLECTED.value,
-            ConceptName.SIMILAR_TRIANGLE_REFLECTED.value,
-            ConceptName.SIMILAR_TRIANGLE_BOTH.value,
-            ConceptName.CONTRI_TRIANGLE_BOTH.value,
+            Predicate.EQRATIO3.value,
+            Predicate.MIDPOINT.value,
+            Predicate.CONTRI_TRIANGLE.value,
+            Predicate.SIMILAR_TRIANGLE.value,
+            Predicate.CONTRI_TRIANGLE_REFLECTED.value,
+            Predicate.SIMILAR_TRIANGLE_REFLECTED.value,
+            Predicate.SIMILAR_TRIANGLE_BOTH.value,
+            Predicate.CONTRI_TRIANGLE_BOTH.value,
         ]:
             return
 

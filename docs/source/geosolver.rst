@@ -22,11 +22,11 @@ Geosolver
 
    geosolver.api
    geosolver.combinatorics
-   geosolver.concepts
    geosolver.configs
    geosolver.geometry
    geosolver.match_theorems
    geosolver.points_manipulation
+   geosolver.predicates
    geosolver.pretty
    geosolver.problem
    geosolver.proof

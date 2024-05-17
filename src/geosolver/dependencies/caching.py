@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 
-from geosolver.concepts import ConceptName
+from geosolver.predicates import Predicate
 from geosolver.geometry import Point, Ratio
 
 if TYPE_CHECKING:
@@ -42,19 +42,19 @@ class DependencyCache:
 def hashed_txt(name: str, args: list[str]) -> tuple[str, ...]:
     """Return a tuple unique to name and args upto arg permutation equivariant."""
 
-    if name in [ConceptName.CONSTANT_ANGLE.value, ConceptName.CONSTANT_RATIO.value]:
+    if name in [Predicate.CONSTANT_ANGLE.value, Predicate.CONSTANT_RATIO.value]:
         a, b, c, d, y = args
         a, b = sorted([a, b])
         c, d = sorted([c, d])
         return name, a, b, c, d, y
 
     if name in [
-        ConceptName.NON_PARALLEL.value,
-        ConceptName.NON_PERPENDICULAR.value,
-        ConceptName.PARALLEL.value,
-        ConceptName.CONGRUENT.value,
-        ConceptName.PERPENDICULAR.value,
-        ConceptName.COLLINEAR_X.value,
+        Predicate.NON_PARALLEL.value,
+        Predicate.NON_PERPENDICULAR.value,
+        Predicate.PARALLEL.value,
+        Predicate.CONGRUENT.value,
+        Predicate.PERPENDICULAR.value,
+        Predicate.COLLINEAR_X.value,
     ]:
         a, b, c, d = args
 
@@ -64,29 +64,29 @@ def hashed_txt(name: str, args: list[str]) -> tuple[str, ...]:
 
         return (name, a, b, c, d)
 
-    if name in [ConceptName.MIDPOINT.value, "midpoint"]:
+    if name in [Predicate.MIDPOINT.value, "midpoint"]:
         a, b, c = args
         b, c = sorted([b, c])
         return (name, a, b, c)
 
     if name in [
-        ConceptName.COLLINEAR.value,
-        ConceptName.CYCLIC.value,
-        ConceptName.NON_COLLINEAR.value,
-        ConceptName.DIFFERENT.value,
+        Predicate.COLLINEAR.value,
+        Predicate.CYCLIC.value,
+        Predicate.NON_COLLINEAR.value,
+        Predicate.DIFFERENT.value,
         "triangle",
     ]:
         return (name,) + tuple(sorted(list(set(args))))
 
-    if name == ConceptName.CIRCLE.value:
+    if name == Predicate.CIRCLE.value:
         x, a, b, c = args
         return (name, x) + tuple(sorted([a, b, c]))
 
     if name in [
-        ConceptName.EQANGLE.value,
-        ConceptName.EQRATIO.value,
-        ConceptName.EQANGLE6.value,
-        ConceptName.EQRATIO6.value,
+        Predicate.EQANGLE.value,
+        Predicate.EQRATIO.value,
+        Predicate.EQANGLE6.value,
+        Predicate.EQRATIO6.value,
     ]:
         a, b, c, d, e, f, g, h = args
         a, b = sorted([a, b])
@@ -98,32 +98,32 @@ def hashed_txt(name: str, args: list[str]) -> tuple[str, ...]:
         if (a, b, c, d) > (e, f, g, h):
             a, b, c, d, e, f, g, h = e, f, g, h, a, b, c, d
 
-        if name == ConceptName.EQANGLE6.value:
-            name = ConceptName.EQANGLE.value
-        if name == ConceptName.EQRATIO6.value:
-            name = ConceptName.EQRATIO.value
+        if name == Predicate.EQANGLE6.value:
+            name = Predicate.EQANGLE.value
+        if name == Predicate.EQRATIO6.value:
+            name = Predicate.EQRATIO.value
         return (name,) + (a, b, c, d, e, f, g, h)
 
     if name in [
-        ConceptName.SIMILAR_TRIANGLE.value,
-        ConceptName.SIMILAR_TRIANGLE_REFLECTED.value,
-        ConceptName.SIMILAR_TRIANGLE_BOTH.value,
-        ConceptName.CONTRI_TRIANGLE.value,
-        ConceptName.CONTRI_TRIANGLE_REFLECTED.value,
-        ConceptName.CONTRI_TRIANGLE_BOTH.value,
+        Predicate.SIMILAR_TRIANGLE.value,
+        Predicate.SIMILAR_TRIANGLE_REFLECTED.value,
+        Predicate.SIMILAR_TRIANGLE_BOTH.value,
+        Predicate.CONTRI_TRIANGLE.value,
+        Predicate.CONTRI_TRIANGLE_REFLECTED.value,
+        Predicate.CONTRI_TRIANGLE_BOTH.value,
     ]:
         a, b, c, x, y, z = args
         (a, x), (b, y), (c, z) = sorted([(a, x), (b, y), (c, z)], key=sorted)
         (a, b, c), (x, y, z) = sorted([(a, b, c), (x, y, z)], key=sorted)
         return (name, a, b, c, x, y, z)
 
-    if name in [ConceptName.EQRATIO3.value]:
+    if name in [Predicate.EQRATIO3.value]:
         a, b, c, d, o, o = args
         (a, c), (b, d) = sorted([(a, c), (b, d)], key=sorted)
         (a, b), (c, d) = sorted([(a, b), (c, d)], key=sorted)
         return (name, a, b, c, d, o, o)
 
-    if name in [ConceptName.SAMESIDE.value, ConceptName.S_ANGLE.value]:
+    if name in [Predicate.SAMESIDE.value, Predicate.S_ANGLE.value]:
         return (name,) + tuple(args)
 
     raise ValueError(f"Not recognize {name} to hash.")
