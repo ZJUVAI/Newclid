@@ -227,7 +227,7 @@ def random_rfss(*points: Point) -> list[Point]:
     points = [p.rotate(sin, cos) * scale + shift for p in points]
 
     # randomly flip
-    if np.random.rand() < 0.5:
+    if np_random.rand() < 0.5:
         points = [p.flip() for p in points]
 
     return points
@@ -243,12 +243,12 @@ def sketch_eq_quadrangle(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     a = Point(0.0, 0.0)
     b = Point(1.0, 0.0)
 
-    length = np.random.np_random.uniformorm(0.5, 2.0)
-    ang = np.random.np_random.uniformorm(np.pi / 3, np.pi * 2 / 3)
+    length = np_random.uniform(0.5, 2.0)
+    ang = np_random.uniform(np.pi / 3, np.pi * 2 / 3)
     d = head_from(a, ang, length)
 
     ang = ang_of(b, d)
-    ang = np.random.np_random.uniformorm(ang / 10, ang / 9)
+    ang = np_random.uniform(ang / 10, ang / 9)
     c = head_from(b, ang, length)
     a, b, c, d = random_rfss(a, b, c, d)
     return a, b, c, d
@@ -651,7 +651,7 @@ def sketch_3peq(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     a, b, c = args
     ab, _, ca = Line(a, b), Line(b, c), Line(c, a)
 
-    z = b + (c - b) * np.random.np_random.uniformorm(-0.5, 1.5)
+    z = b + (c - b) * np_random.uniform(-0.5, 1.5)
 
     z_ = z * 2 - c
     ca_parallel_line = z_.parallel_line(ca)
