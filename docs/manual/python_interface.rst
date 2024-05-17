@@ -16,6 +16,8 @@ then uses the built :class:`geosolver.GeometricSolver` to solve it:
 
 .. code:: python
 
+    from geosolver import GeometricSolverBuilder, GeometricSolver
+
     solver_builder = GeometricSolverBuilder()
     solver_builder.load_problem_from_txt(
         "a b c = triangle a b c; "
@@ -24,7 +26,7 @@ then uses the built :class:`geosolver.GeometricSolver` to solve it:
     )
 
     # We now obtain the GeometricSolver with the build method
-    solver = solver_builder.build()
+    solver: GeometricSolver = solver_builder.build()
 
     # And run the GeometricSolver
     success = solver.run()
@@ -36,6 +38,5 @@ then uses the built :class:`geosolver.GeometricSolver` to solve it:
 
     print(f"Run infos {solver.run_infos}")
 
-
-More examples can be found under the `examples` folder of the source repository.
-More examples can also be found in tests.
+More examples can be found under the ``examples`` folder of the source repository.
+More examples can also be found in ``tests``.
