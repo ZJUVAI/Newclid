@@ -24,17 +24,57 @@ Installation
 ------------
 
 Using pip
+^^^^^^^^^
 
 .. code:: bash
 
-  pip install git+https://rnd-gitlab-eu.huawei.com/Noahs-Ark/libraries/ddar
+  pip install git+https://rnd-gitlab-eu.huawei.com/Noahs-Ark/libraries/geosolver
 
 
-Usage
------
+From source
+^^^^^^^^^^^
 
-See `DOCUMENTATION 
-<https://ddar-noahs-ark-libraries-d1a330533fb77a761c85bd7785b7974dd32b06.rnd-gitlab-eu.huawei.com/>`_.
+.. code:: bash
+
+  git clone git+https://rnd-gitlab-eu.huawei.com/Noahs-Ark/libraries/geosolver
+  pip install -e . 
+
+
+Quickstart
+----------
+
+To simply solve a problem using geosolver, use the command line:
+
+.. code:: bash
+
+  geosolver --problem path/to/problem:problem_name
+
+
+For example:
+
+.. code:: bash
+
+  geosolver --problem problems_datasets/examples.txt:orthocenter_consequence_aux
+
+
+See other command line interface options with:
+
+.. code:: bash
+
+  geosolver --help 
+
+For more complex applications, use the `python interface 
+<https://ddar-noahs-ark-libraries-d1a330533fb77a761c85bd7785b7974dd32b06.rnd-gitlab-eu.huawei.com/manual/python_interface.html#/>`_
+, some examples of script using it are displayed in the folder `examples`.
+
+
+Documentation
+-------------
+
+See `the online documentation 
+<https://ddar-noahs-ark-libraries-d1a330533fb77a761c85bd7785b7974dd32b06.rnd-gitlab-eu.huawei.com/>`_
+for more detailed informations about geosolver.
+
 
 Contributing
 ------------

@@ -10,6 +10,7 @@
    manual/overview
    manual/adding_problems
    manual/adding_rules
+   manual/python_interface
    manual/dependency_graph
    source/geosolver
 
