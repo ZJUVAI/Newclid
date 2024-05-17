@@ -1,8 +1,13 @@
 from typing import TYPE_CHECKING
-import numpy as np
+
+from geosolver.lazy_loading import lazy_import
+
 
 if TYPE_CHECKING:
+    import numpy
     from geosolver.numerical.geometries import Point
+
+np: "numpy" = lazy_import("numpy")
 
 
 def ang_of(tail: "Point", head: "Point") -> float:

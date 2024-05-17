@@ -44,6 +44,7 @@ ag_ckpt_vocab/
 
 # Experiment data
 ddar_results/
+run_results/
 
 # TODO
 TODO.md
