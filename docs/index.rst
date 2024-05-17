@@ -8,6 +8,7 @@
    :caption: Contents:
 
    manual/usage
+   manual/python_interface
    manual/dependency_graph
    source/geosolver
 

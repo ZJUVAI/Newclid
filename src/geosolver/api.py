@@ -74,30 +74,30 @@ class GeometricSolver:
     def write_solution(self, out_file: Path):
         write_solution(self.proof_state, self.problem, out_file)
 
-    def write_all_outputs(self, output_folder_path: Path):
-        output_folder_path.mkdir(exist_ok=True, parents=True)
-        problem_name = self.problem.url
-        self.write_solution(
-            output_folder_path / f"{problem_name}_proof_steps.txt",
-        )
-        self.proof_state.symbols_graph.draw_figure(
-            output_folder_path / f"{problem_name}_proof_figure.png",
-        )
-        self.proof_state.symbols_graph.draw_html(
-            output_folder_path / f"{problem_name}.symbols_graph.html"
-        )
-        self.proof_state.dependency_graph.show_html(
-            output_folder_path / f"{problem_name}.dependency_graph.html",
-            Theorem.to_dict(self.rules),
-        )
-        self.proof_state.dependency_graph.proof_subgraph.show_html(
-            output_folder_path / f"{problem_name}.proof_subgraph.html",
-            Theorem.to_dict(self.rules),
-        )
-        logging.info("Written all outputs at %s", output_folder_path)
-
     def draw_figure(self, out_file: Path):
         self.proof_state.symbols_graph.draw_figure(out_file)
+
+    def draw_dependency_graph(self, out_file: Path):
+        self.proof_state.dependency_graph.show_html(
+            out_file, Theorem.to_dict(self.rules)
+        )
+
+    def draw_symbols_graph(self, out_file: Path):
+        self.proof_state.symbols_graph.draw_html(out_file)
+
+    def draw_proof_subgraph(self, out_file: Path):
+        self.proof_state.dependency_graph.proof_subgraph.show_html(
+            out_file, Theorem.to_dict(self.rules)
+        )
+
+    def write_all_outputs(self, output_folder_path: Path):
+        output_folder_path.mkdir(exist_ok=True, parents=True)
+        self.write_solution(output_folder_path / "proof_steps.txt")
+        self.draw_figure(output_folder_path / "proof_figure.png")
+        self.draw_symbols_graph(output_folder_path / "symbols_graph.html")
+        self.draw_dependency_graph(output_folder_path / "dependency_graph.html")
+        self.draw_proof_subgraph(output_folder_path / "proof_subgraph.html")
+        logging.info("Written all outputs at %s", output_folder_path)
 
     def get_existing_points(self) -> list[str]:
         return [p.name for p in self.proof_state.symbols_graph.all_points()]
@@ -156,7 +156,9 @@ class GeometricSolverBuilder:
             Problem.from_txt_file(problems_path, translate=translate)
         )
         if problem_name not in problems:
-            raise ValueError(f"Problem name `{problem_name}` not found in `{problems}`")
+            raise ValueError(
+                f"Problem name `{problem_name}` not found in {list(problems.keys())}"
+            )
         self.problem = problems[problem_name]
         return self
 
