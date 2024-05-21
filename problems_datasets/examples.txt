@@ -90,5 +90,7 @@ cong2_problem
 p = free p; q = free q; u = free u; v = eqdistance v u p q; a = free a; b = free b; c = free c; d = eqratio d p q a b u v c ? cong a b c d
 point_on_circle_eqdistant_from_center
 a b c = triangle a b c; d = on_circum d a b c; o = circle o a b c ? cong o a o d
+minimal_example_2l1c
+a b c = triangle a b c; o = circle o a b c; x y z i = 2l1c x y z i a b c o ? cong c x c y
 testing_problem
 a b = segment a b; x = s_angle a b x 63o; y = s_angle a b y 143o ? aconst y b b x 4pi/9
