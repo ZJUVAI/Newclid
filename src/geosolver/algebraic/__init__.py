@@ -1,6 +1,5 @@
 """Implements Algebraic Derivations and Reasoning (AR)."""
 
-
 from enum import Enum
 
 

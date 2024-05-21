@@ -286,6 +286,7 @@ def get_logs(
     set[Point],
 ]:
     """Given a DAG and conclusion N, return the premise, aux, proof."""
+
     try:
         query = query.why_me_or_cache(
             proof.symbols_graph,
@@ -295,6 +296,7 @@ def get_logs(
         )
     except AttributeError:
         raise Exception("Cannot traceback the proof.")
+
     log = recursive_traceback(query)
     log, setup, aux_setup, setup_points, _ = separate_dependency_difference(query, log)
 

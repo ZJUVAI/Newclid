@@ -14,6 +14,7 @@
 # ==============================================================================
 
 """Implements geometric objects used in the graph representation."""
+
 from __future__ import annotations
 from collections import defaultdict
 from typing import Any, Type
