@@ -37,17 +37,24 @@ class Dependency(Construction):
 
         self._stat = None
         self.trace = None
+        self.hash_mem = None
 
-    def _find(self, dep_hashed: tuple[str, ...]) -> "Dependency":
+    def _find(
+        self, dep_hashed: tuple[str, ...], f_visited: set = set()
+    ) -> "Dependency":
+        f_visited.add(self.hashed())
+        if self.hashed() == dep_hashed:
+            return self, f_visited
+
         for w in self.why:
-            f = w._find(dep_hashed)
-            if f:
-                return f
-            if w.hashed() == dep_hashed:
-                return w
+            if w.hashed() not in f_visited:
+                f, f_visited_w = w._find(dep_hashed, f_visited=f_visited)
+                if f is not None:
+                    return f, f_visited_w
+        return None, None
 
     def remove_loop(self) -> "Dependency":
-        f = self._find(self.hashed())
+        f, _ = self._find(self.hashed(), f_visited=set())
         if f:
             return f
         return self
@@ -82,13 +89,16 @@ class Dependency(Construction):
         level: int,
     ) -> "Dependency":
         cached_dep = dependency_cache.get_cached(self)
+
         if cached_dep is not None:
             return cached_dep
         self.why_me(symbols_graph, statements_checker, dependency_cache, level)
         return self
 
     def hashed(self, rename: bool = False) -> tuple[str, ...]:
-        return hashed(self.name, self.args, rename=rename)
+        if self.hash_mem is None:
+            self.hash_mem = hashed(self.name, self.args, rename=rename)
+        return self.hash_mem
 
 
 def why_dependency(
@@ -99,6 +109,7 @@ def why_dependency(
     level: int,
 ) -> None:
     cached_me = dependency_cache.get(dep.name, dep.args)
+
     if cached_me is not None:
         dep.why = cached_me.why
         dep.rule_name = cached_me.rule_name
