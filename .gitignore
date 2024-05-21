@@ -51,3 +51,6 @@ TODO.md
 
 # builds
 **/_build
+
+# Swap files
+**/*.nfs*c*
