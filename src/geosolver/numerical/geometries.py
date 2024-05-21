@@ -53,7 +53,7 @@ class Point:
     def __str__(self) -> str:
         return "P({},{})".format(self.x, self.y)
 
-    def close(self, point: "Point", tol: float = 1e-12) -> bool:
+    def close(self, point: "Point", tol: float = ATOM) -> bool:
         return abs(self.x - point.x) < tol and abs(self.y - point.y) < tol
 
     def midpoint(self, p: "Point") -> "Point":
@@ -141,7 +141,7 @@ class Line:
         # Make sure a is always positive (or always negative for that matter)
         # With a == 0, Assuming a = +epsilon > 0
         # Then b such that ax + by = 0 with y>0 should be negative.
-        if a < 0.0 or a == 0.0 and b > 0.0:
+        if a < ATOM or np.fabs(a) < ATOM and b > ATOM:
             a, b, c = -a, -b, -c
 
         self.coefficients = a, b, c
@@ -234,23 +234,23 @@ class Line:
             else:
                 return None
         elif x is not None and y is not None:
-            if a * x + b * y + c == 0.0:
+            if np.fabs(a * x + b * y + c) < ATOM:
                 return Point(x, y)
         return None
 
     def diff_side(self, p1: "Point", p2: "Point") -> Optional[bool]:
         d1 = self(p1.x, p1.y)
         d2 = self(p2.x, p2.y)
-        if d1 == 0 or d2 == 0:
+        if np.fabs(d1) < ATOM or np.fabs(d2) < ATOM:
             return None
         return d1 * d2 < 0
 
     def same_side(self, p1: "Point", p2: "Point") -> Optional[bool]:
         d1 = self(p1.x, p1.y)
         d2 = self(p2.x, p2.y)
-        if d1 == 0 or d2 == 0:
+        if np.fabs(d1) < ATOM or np.fabs(d2) < ATOM:
             return None
-        return d1 * d2 > 0
+        return d1 * d2 > ATOM
 
     def sign(self, point: "Point") -> int:
         s = self(point.x, point.y)
@@ -460,7 +460,7 @@ def circle_circle_intersection(c1: Circle, c2: Circle) -> tuple[Point, Point]:
     x1, y1, r1 = c2.a, c2.b, c2.radius
 
     d = math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
-    if d == 0:
+    if np.fabs(d) < ATOM:
         raise InvalidQuadSolveError()
 
     a = (r0**2 - r1**2 + d**2) / (2 * d)
@@ -485,7 +485,7 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
     center = circle.center
     p, q = center.x, center.y
 
-    if b == 0:
+    if np.fabs(b) < ATOM:
         x = -c / a
         x_p = x - p
         x_p2 = x_p * x_p
@@ -495,7 +495,7 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
         y1, y2 = y
         return (Point(x, y1), Point(x, y2))
 
-    if a == 0:
+    if np.fabs(a) < ATOM:
         y = -c / b
         y_q = y - q
         y_q2 = y_q * y_q
@@ -548,7 +548,7 @@ def line_line_intersection(line_1: Line, line_2: Line) -> Point:
     # a1x + b1y + c1 = 0
     # a2x + b2y + c2 = 0
     d = a1 * b2 - a2 * b1
-    if d == 0:
+    if np.fabs(d) < ATOM:
         raise InvalidLineIntersectError
     return Point((c2 * b1 - c1 * b2) / d, (c1 * a2 - c2 * a1) / d)
 
