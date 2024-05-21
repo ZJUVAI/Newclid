@@ -131,6 +131,7 @@ def main():
     outpath = resolve_output_path(args.output_folder, problem_name=solver.problem.url)
 
     if not quiet:
+        outpath.mkdir(parents=True, exist_ok=True)
         solver.draw_figure(outpath / "construction_figure.png")
 
     success = solver.run(max_steps=args.max_steps, timeout=args.timeout)
