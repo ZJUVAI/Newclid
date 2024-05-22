@@ -289,7 +289,7 @@ def get_logs(
     try:
         query = query.why_me_or_cache(
             proof.symbols_graph,
-            proof.statements_checker,
+            proof.statements.checker,
             proof.dependency_cache,
             query.level,
         )

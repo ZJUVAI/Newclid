@@ -1,21 +1,25 @@
 from __future__ import annotations
 from enum import Enum
-from typing import Optional, Tuple
+from typing import TYPE_CHECKING, Optional, Tuple
 
 
 import geosolver.combinatorics as comb
 from geosolver.predicates import Predicate
 import geosolver.numerical.check as nm
-from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
+
 from geosolver.dependencies.caching import DependencyCache, hashed
 from geosolver.dependencies.dependency import Dependency
 from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.geometry import Angle, Line, Node, Point, Segment, is_equal, is_equiv
-from geosolver.statement import list_eqratio3
+from geosolver.listing import list_eqratio3
 from geosolver.statement.checker import StatementChecker
-from geosolver.symbols_graph import SymbolsGraph
+
 
 ToCache = Tuple[str, list[Point], Dependency]
+
+if TYPE_CHECKING:
+    from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
+    from geosolver.symbols_graph import SymbolsGraph
 
 
 class IntrinsicRules(Enum):
@@ -42,8 +46,8 @@ class IntrinsicRules(Enum):
 class StatementAdder:
     def __init__(
         self,
-        symbols_graph: SymbolsGraph,
-        alegbraic_manipulator: AlgebraicManipulator,
+        symbols_graph: "SymbolsGraph",
+        alegbraic_manipulator: "AlgebraicManipulator",
         statements_checker: StatementChecker,
         dependency_cache: DependencyCache,
         disabled_intrinsic_rules: Optional[list[IntrinsicRules | str]] = None,
@@ -406,12 +410,22 @@ class StatementAdder:
             extends.append((Predicate.COLLINEAR.value, [d, m, n]))
         else:
             deps = deps.extend_many(
-                self, Predicate.PERPENDICULAR.value, [a, b, c, d], extends
+                self.symbols_graph,
+                self.statements_checker,
+                self.dependency_cache,
+                Predicate.PERPENDICULAR.value,
+                [a, b, c, d],
+                extends,
             )
             return self._add_para([c, d, m, n], deps)
 
         deps = deps.extend_many(
-            self, Predicate.PERPENDICULAR.value, [a, b, c, d], extends
+            self.symbols_graph,
+            self.statements_checker,
+            self.dependency_cache,
+            Predicate.PERPENDICULAR.value,
+            [a, b, c, d],
+            extends,
         )
         return self._add_coll(list(set([c, d, m, n])), deps)
 
