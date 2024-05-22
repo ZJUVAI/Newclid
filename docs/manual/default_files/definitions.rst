@@ -13,13 +13,13 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **circumcenter x a b c:** Same construction as **circle x a b c**.
 
-- **eq_quadrangle a b c d:**
+- **eq_quadrangle a b c d:** From nothings, adds four points in a quadrilateral abcd with two opposing sides (AD and BC) of same length. Adds the congruence statement that ad=bc.
 
-- **iso_trapezoid a b c d:**
+- **iso_trapezoid a b c d:** From nothing, adds four points on a trapezoid abcd with parallel opposing sides ab and cd and non-parallel opposing sides ad and bc of same length. Adds the congruence statement that ad=bc and the parallel statement that ab//cd.
 
-- **eq_triangle x b c:**
+- **eq_triangle x b c:** From two different points b, c, adds a third point x such that the triangle xbc is equilateral. Adds the two side congruence statements xb=bc and xc=bc, as well as the two angle congruence statements that the angles xbc and xcb are congruent, as well as angles xbc and cxb.
 
-- **eqangle2 x a b c:**
+- **eqangle2 x a b c:** 
 
 - **eqdia_quadrangle a b c d:**
 
