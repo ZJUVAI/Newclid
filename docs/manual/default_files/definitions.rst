@@ -5,9 +5,9 @@ Definitions are the basic building blocks for the statement of problems. Each de
 
 The definitions available in the defs.txt file are the following (definitions in section :ref:`New Definitions` were added by us and are available in new_defs.txt):
 
-- **angle_bisector x a b c:** From non-collinear points a, b, c, creates x in the internal bisector of angle abc, with vertex at b. Adds the statement that angle abx and angle xbc are congruent. Can be subjected to intersections.
+- **angle_bisector x a b c:** From non-collinear points a, b, c, creates x in the internal bisector of angle abc, with vertex at b. Adds the statement that angle abx and angle xbc are congruent. Construction returns a line that can be subjected to intersections.
 
-- **angle_mirror x a b c:**
+- **angle_mirror x a b c:** From non-collinear points a, b, c, creates x on the opposite side of bc with respect to a in a way that angle abx doubles angle abc. Adds the statement that angle abc and angle cbx are congruent. Construction returns a ray that can be subjected to intersections.
 
 - **circle x a b c:** From non-collinear points a, b, c, creates x the center of the circle through a, b, c. Adds the congruence statements that xa=xb and xb=xc.
 
@@ -19,13 +19,13 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **eq_triangle x b c:** From two different points b, c, adds a third point x such that the triangle xbc is equilateral. Adds the two side congruence statements xb=bc and xc=bc, as well as the two angle congruence statements that the angles xbc and xcb are congruent, as well as angles xbc and cxb.
 
-- **eqangle2 x a b c:** From three non-collinear points a, b, c, adds a third point x such that the quadrilateral abcx has two opposed angles that are congruent, bax and bcx. Adds the statement that angles bax and bcx are congruent.
+- **eqangle2 x a b c:** From three non-collinear points a, b, c, adds a third point x such that the quadrilateral abcx has two opposed angles that are congruent, bax and bcx. Adds the statement that angles bax and bcx are congruent. Should be able to be subjected to intersections.
 
-- **eqdia_quadrangle a b c d:**
+- **eqdia_quadrangle a b c d:** From nothing, adds four points on a quadrilateral abcd with the two diagonals of same length. Adds the congruence statement that bd=ac.
 
-- **eqdistance x a b c:**
+- **eqdistance x a b c:** From two different points b, c, and with a base point a (that can be b or c themselves), adds x such that the distance from x to a is equal to the distance from b to c. Adds the congruence statement that ax=bc. Construction returns a circle that can be subjected to intersections.
 
-- **foot x a b c:**
+- **foot x a b c:** 
 
 - **free a:** Adds a point a with random coordinates.
 
