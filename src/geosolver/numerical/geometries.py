@@ -543,14 +543,11 @@ def line_segment_intersection(line: Line, A: Point, B: Point) -> Point:
 
 
 def line_line_intersection(line_1: Line, line_2: Line) -> Point:
-    a1, b1, c1 = line_1.coefficients
-    a2, b2, c2 = line_2.coefficients
-    # a1x + b1y + c1 = 0
-    # a2x + b2y + c2 = 0
+    a1, b1, c1 = line_1.coefficients  # a1x + b1y + c1 = 0
+    a2, b2, c2 = line_2.coefficients  # a2x + b2y + c2 = 0
+
     d = a1 * b2 - a2 * b1
     if np.fabs(d) < ATOM:
-        # import pdb;pdb.set_trace()
-        # print(">>")
         raise InvalidLineIntersectError
     return Point((c2 * b1 - c1 * b2) / d, (c1 * a2 - c2 * a1) / d)
 
