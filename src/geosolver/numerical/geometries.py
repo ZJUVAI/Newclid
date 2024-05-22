@@ -549,6 +549,8 @@ def line_line_intersection(line_1: Line, line_2: Line) -> Point:
     # a2x + b2y + c2 = 0
     d = a1 * b2 - a2 * b1
     if np.fabs(d) < ATOM:
+        # import pdb;pdb.set_trace()
+        # print(">>")
         raise InvalidLineIntersectError
     return Point((c2 * b1 - c1 * b2) / d, (c1 * a2 - c2 * a1) / d)
 

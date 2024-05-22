@@ -28,6 +28,8 @@ if TYPE_CHECKING:
 np: "numpy" = lazy_import("numpy")
 np_random: "numpy.random" = lazy_import("numpy.random")
 
+np_random.seed(42)
+
 
 def sketch(
     name: str, args: list[Union[Point, gm.Point]]
