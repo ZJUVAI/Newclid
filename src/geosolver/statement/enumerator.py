@@ -23,6 +23,7 @@ from geosolver.geometry import (
     Segment,
     Value,
 )
+from geosolver.predicates import Predicate
 
 
 if TYPE_CHECKING:
@@ -41,11 +42,43 @@ class StatementsEnumerator:
         self.statements_checker = statements_checker
         self.alegbraic_manipulator = alegbraic_manipulator
 
-    def all_eqangle_same_lines(self) -> Generator[tuple[Point, ...], None, None]:
-        for l1, l2 in permutations_pairs(self.symbols_graph.type2nodes[Line]):
-            for a, b, c, d, e, f, g, h in all_8points(l1, l2, l1, l2):
-                if (a, b, c, d) != (e, f, g, h):
-                    yield a, b, c, d, e, f, g, h
+    def all(
+        self, predicate_name: str | Predicate
+    ) -> Generator[tuple[Point, ...], None, None]:
+        """Enumerate all instances of a certain predicate."""
+
+        try:
+            predicate = Predicate(predicate_name)
+        except ValueError:
+            raise ValueError(f"Unrecognize predicate: {predicate_name}")
+
+        if predicate in [
+            Predicate.NON_COLLINEAR,
+            Predicate.NON_PARALLEL,
+            Predicate.NON_PERPENDICULAR,
+        ]:
+            return []
+
+        PREDICATE_TO_METHOD = {
+            Predicate.COLLINEAR: self._all_colls,
+            Predicate.PARALLEL: self._all_paras,
+            Predicate.PERPENDICULAR: self._all_perps,
+            Predicate.MIDPOINT: self._all_midps,
+            Predicate.CONGRUENT: self._all_congs,
+            Predicate.CIRCLE: self._all_circles,
+            Predicate.CYCLIC: self._all_cyclics,
+            Predicate.EQANGLE: self._all_eqangles_8points,
+            Predicate.EQANGLE6: self._all_eqangles_6points,
+            Predicate.EQRATIO: self._all_eqratios_8points,
+            Predicate.EQRATIO6: self._all_eqratios_6points,
+        }
+
+        if predicate_name not in PREDICATE_TO_METHOD:
+            raise NotImplementedError(
+                f"Enumerator not implemented for predicate: {predicate_name}"
+            )
+
+        return PREDICATE_TO_METHOD[predicate_name]()
 
     def all_eqangles_distinct_linepairss(
         self,
@@ -70,7 +103,7 @@ class StatementsEnumerator:
                     (l1, l2), (l3, l4) = pair1, pair2
                     yield l1, l2, l3, l4
 
-    def all_eqangles_8points(self) -> Generator[tuple[Point, ...], None, None]:
+    def _all_eqangles_8points(self) -> Generator[tuple[Point, ...], None, None]:
         """List all sets of 8 points that make two equal angles."""
         # Case 1: (l1-l2) = (l3-l4), including because l1//l3, l2//l4 (para-para)
         angss = []
@@ -142,13 +175,13 @@ class StatementsEnumerator:
                 for a, b, c, d, e, f, g, h in all_8points(l1, l2, l3, l4):
                     yield (a, b, c, d, e, f, g, h)
 
-        for a, b, c, d, e, f, g, h in self.all_eqangle_same_lines():
+        for a, b, c, d, e, f, g, h in self._all_eqangle_same_lines():
             yield a, b, c, d, e, f, g, h
 
-    def all_eqangles_6points(self) -> Generator[tuple[Point, ...], None, None]:
+    def _all_eqangles_6points(self) -> Generator[tuple[Point, ...], None, None]:
         """List all sets of 6 points that make two equal angles."""
         record = set()
-        for a, b, c, d, e, f, g, h in self.all_eqangles_8points():
+        for a, b, c, d, e, f, g, h in self._all_eqangles_8points():
             if (
                 a not in (c, d)
                 and b not in (c, d)
@@ -170,13 +203,13 @@ class StatementsEnumerator:
             record.add((a, b, c, d, e, f, g, h))
             yield a, b, c, d, e, f, g, h  # where a==c, e==g
 
-    def all_paras(self) -> Generator[tuple[Point, ...], None, None]:
+    def _all_paras(self) -> Generator[tuple[Point, ...], None, None]:
         for d in self.symbols_graph.type2nodes[Direction]:
             for l1, l2 in permutations_pairs(d.neighbors(Line)):
                 for a, b, c, d in all_4points(l1, l2):
                     yield a, b, c, d
 
-    def all_perps(self) -> Generator[tuple[Point, ...], None, None]:
+    def _all_perps(self) -> Generator[tuple[Point, ...], None, None]:
         for ang in self.alegbraic_manipulator.vhalfpi.neighbors(Angle):
             d1, d2 = ang.directions
             if d1 is None or d2 is None:
@@ -187,7 +220,7 @@ class StatementsEnumerator:
                 for a, b, c, d in all_4points(l1, l2):
                     yield a, b, c, d
 
-    def all_congs(self) -> Generator[tuple[Point, ...], None, None]:
+    def _all_congs(self) -> Generator[tuple[Point, ...], None, None]:
         for lenght in self.symbols_graph.type2nodes[Length]:
             for s1, s2 in permutations_pairs(lenght.neighbors(Segment)):
                 (a, b), (c, d) = s1.points, s2.points
@@ -195,7 +228,7 @@ class StatementsEnumerator:
                     for m, n in [(c, d), (d, c)]:
                         yield x, y, m, n
 
-    def all_eqratios_8points(self) -> Generator[tuple[Point, ...], None, None]:
+    def _all_eqratios_8points(self) -> Generator[tuple[Point, ...], None, None]:
         """List all sets of 8 points that make two equal ratios."""
         ratss = []
         for value in self.symbols_graph.type2nodes[Value]:
@@ -298,10 +331,10 @@ class StatementsEnumerator:
                                 for p, q in [(g, h), (h, g)]:
                                     yield (x, y, z, t, m, n, p, q)
 
-    def all_eqratios_6points(self) -> Generator[tuple[Point, ...], None, None]:
+    def _all_eqratios_6points(self) -> Generator[tuple[Point, ...], None, None]:
         """List all sets of 6 points that make two equal angles."""
         record = set()
-        for a, b, c, d, e, f, g, h in self.all_eqratios_8points():
+        for a, b, c, d, e, f, g, h in self._all_eqratios_8points():
             if (
                 a not in (c, d)
                 and b not in (c, d)
@@ -322,23 +355,23 @@ class StatementsEnumerator:
             record.add((a, b, c, d, e, f, g, h))
             yield a, b, c, d, e, f, g, h  # now a==c, e==g
 
-    def all_cyclics(self) -> Generator[tuple[Point, ...], None, None]:
+    def _all_cyclics(self) -> Generator[tuple[Point, ...], None, None]:
         for c in self.symbols_graph.type2nodes[Circle]:
             for x, y, z, t in permutations_quadruplets(c.neighbors(Point)):
                 yield x, y, z, t
 
-    def all_colls(self) -> Generator[tuple[Point, ...], None, None]:
+    def _all_colls(self) -> Generator[tuple[Point, ...], None, None]:
         for line in self.symbols_graph.type2nodes[Line]:
             for x, y, z in permutations_triplets(line.neighbors(Point)):
                 yield x, y, z
 
-    def all_midps(self) -> Generator[tuple[Point, ...], None, None]:
+    def _all_midps(self) -> Generator[tuple[Point, ...], None, None]:
         for line in self.symbols_graph.type2nodes[Line]:
             for a, b, c in permutations_triplets(line.neighbors(Point)):
                 if self.statements_checker.check_cong([a, b, a, c]):
                     yield a, b, c
 
-    def all_circles(self) -> Generator[tuple[Point, ...], None, None]:
+    def _all_circles(self) -> Generator[tuple[Point, ...], None, None]:
         for lenght in self.symbols_graph.type2nodes[Length]:
             p2p = defaultdict(list)
             for s in lenght.neighbors(Segment):
@@ -349,3 +382,9 @@ class StatementsEnumerator:
                 if len(ps) >= 3:
                     for a, b, c in permutations_triplets(ps):
                         yield p, a, b, c
+
+    def _all_eqangle_same_lines(self) -> Generator[tuple[Point, ...], None, None]:
+        for l1, l2 in permutations_pairs(self.symbols_graph.type2nodes[Line]):
+            for a, b, c, d, e, f, g, h in all_8points(l1, l2, l1, l2):
+                if (a, b, c, d) != (e, f, g, h):
+                    yield a, b, c, d, e, f, g, h

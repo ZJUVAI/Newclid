@@ -43,7 +43,7 @@ class EmptyDependency:
             dep0,
             dep.why_me_or_cache(
                 proof.symbols_graph,
-                proof.statements_checker,
+                proof.statements.checker,
                 proof.dependency_cache,
                 None,
             ),
@@ -68,7 +68,7 @@ class EmptyDependency:
             deps.why += [
                 dep.why_me_or_cache(
                     proof.symbols_graph,
-                    proof.statements_checker,
+                    proof.statements.checker,
                     proof.dependency_cache,
                     None,
                 )

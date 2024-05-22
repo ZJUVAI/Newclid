@@ -27,9 +27,8 @@ from geosolver.agent.interface import (
     StopFeedback,
 )
 from geosolver.match_theorems import match_one_theorem
-from geosolver.statement.adder import IntrinsicRules, StatementAdder, ToCache
-from geosolver.statement.checker import StatementChecker
-from geosolver.statement.enumerator import StatementsEnumerator
+from geosolver.statement.adder import IntrinsicRules, ToCache
+from geosolver.statement import StatementsHandler
 from geosolver.symbols_graph import SymbolsGraph
 from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 from geosolver.geometry import Angle, Ratio
@@ -110,16 +109,12 @@ class Proof:
         dependency_cache: DependencyCache,
         alegbraic_manipulator: AlgebraicManipulator,
         symbols_graph: SymbolsGraph,
-        statements_checker: StatementChecker,
-        statements_adder: StatementAdder,
-        statements_enumerator: StatementsEnumerator,
+        statements_handler: StatementsHandler,
     ):
         self.dependency_cache = dependency_cache
         self.symbols_graph = symbols_graph
         self.alegbraic_manipulator = alegbraic_manipulator
-        self.statements_checker = statements_checker
-        self.statements_adder = statements_adder
-        self.statements_enumerator = statements_enumerator
+        self.statements = statements_handler
         self.dependency_graph = DependencyGraph()
 
         self._goal = None
@@ -154,30 +149,16 @@ class Proof:
             try:
                 symbols_graph = SymbolsGraph()
                 dependency_cache = DependencyCache()
-
                 alegbraic_manipulator = AlgebraicManipulator(symbols_graph)
-
-                statements_checker = StatementChecker(
-                    symbols_graph, alegbraic_manipulator
-                )
-                statements_adder = StatementAdder(
-                    symbols_graph,
-                    alegbraic_manipulator,
-                    statements_checker,
-                    dependency_cache,
-                    disabled_intrinsic_rules=disabled_intrinsic_rules,
-                )
-                statements_enumerator = StatementsEnumerator(
-                    symbols_graph, statements_checker, alegbraic_manipulator
+                statements_handler = StatementsHandler(
+                    symbols_graph, alegbraic_manipulator, dependency_cache
                 )
 
                 proof = Proof(
                     dependency_cache=dependency_cache,
                     alegbraic_manipulator=alegbraic_manipulator,
                     symbols_graph=symbols_graph,
-                    statements_checker=statements_checker,
-                    statements_adder=statements_adder,
-                    statements_enumerator=statements_enumerator,
+                    statements_handler=statements_handler,
                 )
                 added = []
                 to_cache = []
@@ -296,7 +277,7 @@ class Proof:
         proof = Proof.build_problem(
             problem,
             self._definitions,
-            disabled_intrinsic_rules=self.statements_adder.DISABLED_INTRINSIC_RULES,
+            disabled_intrinsic_rules=self.statements.adder.DISABLED_INTRINSIC_RULES,
         )
         return proof
 
@@ -366,7 +347,7 @@ class Proof:
         try:
             dep = dep.why_me_or_cache(
                 self.symbols_graph,
-                self.statements_checker,
+                self.statements.checker,
                 self.dependency_cache,
                 dependency_level,
             )
@@ -382,13 +363,13 @@ class Proof:
     def resolve_statement_dependencies(
         self, name: str, args: list[Point], deps: EmptyDependency
     ) -> Tuple[list[Dependency], list[ToCache]]:
-        return self.statements_adder.add_piece(name, args, deps)
+        return self.statements.adder.add_piece(name, args, deps)
 
     def do_algebra(
         self, name: str, args: list[Point]
     ) -> tuple[list[Dependency], list[ToCache]]:
         """Derive (but not add) new algebraic predicates."""
-        new_deps, to_cache = self.statements_adder.add_algebra(name, args)
+        new_deps, to_cache = self.statements.adder.add_algebra(name, args)
         self.dependency_graph.add_algebra_edges(to_cache, args[:-1])
         return new_deps, to_cache
 
@@ -408,7 +389,7 @@ class Proof:
             return self.dependency_cache.contains(name, args)
         if name in [Predicate.IND.value]:
             return True
-        return self.statements_checker.check(name, args)
+        return self.statements.checker.check(name, args)
 
     def check_goal(self, goal: Optional["Construction"]):
         success = False
