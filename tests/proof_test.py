@@ -130,28 +130,37 @@ class TestProof:
         check.is_true(self.statements_checker.check_coll([b, h, h2]))
 
     def test_enumerate_colls(self):
-        for a, b, c in self.proof.all_colls():
+        for a, b, c in self.proof.statements_enumerator.all_colls():
             check.is_true(self.statements_checker.check_coll([a, b, c]))
             check.is_true(check_coll_numerical([a.num, b.num, c.num]))
 
     def test_enumerate_paras(self):
-        for a, b, c, d in self.proof.all_paras():
+        for a, b, c, d in self.proof.statements_enumerator.all_paras():
             check.is_true(self.statements_checker.check_para([a, b, c, d]))
             check.is_true(check_para_numerical([a.num, b.num, c.num, d.num]))
 
     def test_enumerate_perps(self):
-        for a, b, c, d in self.proof.all_perps():
+        for a, b, c, d in self.proof.statements_enumerator.all_perps():
             check.is_true(self.statements_checker.check_perp([a, b, c, d]))
             check.is_true(check_perp_numerical([a.num, b.num, c.num, d.num]))
 
     def test_enumerate_congs(self):
-        for a, b, c, d in self.proof.all_congs():
+        for a, b, c, d in self.proof.statements_enumerator.all_congs():
             check.is_true(self.statements_checker.check_cong([a, b, c, d]))
             check.is_true(check_cong_numerical([a.num, b.num, c.num, d.num]))
 
     @pytest.mark.slow
     def test_enumerate_eqangles(self):
-        for a, b, c, d, x, y, z, t in self.proof.all_eqangles_8points():
+        for (
+            a,
+            b,
+            c,
+            d,
+            x,
+            y,
+            z,
+            t,
+        ) in self.proof.statements_enumerator.all_eqangles_8points():
             check.is_true(
                 self.statements_checker.check_eqangle([a, b, c, d, x, y, z, t])
             )
@@ -163,7 +172,16 @@ class TestProof:
 
     @pytest.mark.slow
     def test_enumerate_eqratios(self):
-        for a, b, c, d, x, y, z, t in self.proof.all_eqratios_8points():
+        for (
+            a,
+            b,
+            c,
+            d,
+            x,
+            y,
+            z,
+            t,
+        ) in self.proof.statements_enumerator.all_eqratios_8points():
             check.is_true(
                 self.statements_checker.check_eqratio([a, b, c, d, x, y, z, t])
             )
@@ -174,18 +192,18 @@ class TestProof:
             )
 
     def test_enumerate_cyclics(self):
-        for a, b, c, d, x, y, z, t in self.proof.all_cyclics():
+        for a, b, c, d, x, y, z, t in self.proof.statements_enumerator.all_cyclics():
             check.is_true(
                 self.statements_checker.check_cyclic([a, b, c, d, x, y, z, t])
             )
             check.is_true(check_cyclic_numerical([a.num, b.num, c.num, d.num]))
 
     def test_enumerate_midps(self):
-        for a, b, c in self.proof.all_midps():
+        for a, b, c in self.proof.statements_enumerator.all_midps():
             check.is_true(self.statements_checker.check_midp([a, b, c]))
             check.is_true(check_midp_numerical([a.num, b.num, c.num]))
 
     def test_enumerate_circles(self):
-        for a, b, c, d in self.proof.all_circles():
+        for a, b, c, d in self.proof.statements_enumerator.all_circles():
             check.is_true(self.statements_checker.check_circle([a, b, c, d]))
             check.is_true(check_circle_numerical([a.num, b.num, c.num, d.num]))

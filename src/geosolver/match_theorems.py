@@ -161,7 +161,7 @@ def match_circle_coll_eqangle_midp(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match circle O A B C, coll M B C, eqangle A B A C O B O M => midp M B C."""
-    for p, a, b, c in proof.all_circles():
+    for p, a, b, c in proof.statements_enumerator.all_circles():
         ab = proof.symbols_graph.get_line(a, b)
         if ab is None:
             continue
@@ -203,7 +203,7 @@ def match_midp_perp_cong(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match midp M A B, perp O M A B => cong O A O B."""
-    for m, a, b in proof.all_midps():
+    for m, a, b in proof.statements_enumerator.all_midps():
         ab = proof.symbols_graph.get_line(a, b)
         for line_neighbor in m.neighbors(Line):
             if proof.statements_checker.check_perpl(line_neighbor, ab):
@@ -235,7 +235,7 @@ def match_circle_eqangle_perp(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match circle O A B C, eqangle A X A B C A C B => perp O A A X."""
-    for p, a, b, c in proof.all_circles():
+    for p, a, b, c in proof.statements_enumerator.all_circles():
         ca = proof.symbols_graph.get_line(c, a)
         if ca is None:
             continue
@@ -276,7 +276,7 @@ def match_circle_perp_eqangle(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match circle O A B C, perp O A A X => eqangle A X A B C A C B."""
-    for p, a, b, c in proof.all_circles():
+    for p, a, b, c in proof.statements_enumerator.all_circles():
         pa = proof.symbols_graph.get_line(p, a)
         if pa is None:
             continue
@@ -362,7 +362,8 @@ def match_eqangle_ncoll_cyclic(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 P A P B Q A Q B, ncoll P Q A B => cyclic A B P Q."""
-    for l1, l2, l3, l4 in proof.all_eqangles_distinct_linepairss():
+    linepairs = proof.statements_enumerator.all_eqangles_distinct_linepairss()
+    for l1, l2, l3, l4 in linepairs:
         if len(set([l1, l2, l3, l4])) < 4:
             continue  # they all must be distinct.
 
@@ -754,27 +755,27 @@ def match_all(name: str, proof: "Proof") -> Generator[tuple[Point, ...], None, N
     ]:
         return []
     if name == Predicate.COLLINEAR.value:
-        return proof.all_colls()
+        return proof.statements_enumerator.all_colls()
     if name == Predicate.PARALLEL.value:
-        return proof.all_paras()
+        return proof.statements_enumerator.all_paras()
     if name == Predicate.PERPENDICULAR.value:
-        return proof.all_perps()
+        return proof.statements_enumerator.all_perps()
     if name == Predicate.MIDPOINT.value:
-        return proof.all_midps()
+        return proof.statements_enumerator.all_midps()
     if name == Predicate.CONGRUENT.value:
-        return proof.all_congs()
+        return proof.statements_enumerator.all_congs()
     if name == Predicate.CIRCLE.value:
-        return proof.all_circles()
+        return proof.statements_enumerator.all_circles()
     if name == Predicate.CYCLIC.value:
-        return proof.all_cyclics()
+        return proof.statements_enumerator.all_cyclics()
     if name == Predicate.EQANGLE.value:
-        return proof.all_eqangles_8points()
+        return proof.statements_enumerator.all_eqangles_8points()
     if name == Predicate.EQANGLE6.value:
-        return proof.all_eqangles_6points()
+        return proof.statements_enumerator.all_eqangles_6points()
     if name == Predicate.EQRATIO.value:
-        return proof.all_eqratios_8points()
+        return proof.statements_enumerator.all_eqratios_8points()
     if name == Predicate.EQRATIO6.value:
-        return proof.all_eqratios_6points()
+        return proof.statements_enumerator.all_eqratios_6points()
 
     raise ValueError(f"Unrecognize {name}")
 
