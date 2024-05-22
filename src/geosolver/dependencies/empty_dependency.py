@@ -4,6 +4,9 @@ from geosolver.geometry import Point
 
 if TYPE_CHECKING:
     from geosolver.proof import Proof
+    from geosolver.dependencies.caching import DependencyCache
+    from geosolver.symbols_graph import SymbolsGraph
+    from geosolver.statement.checker import StatementChecker
 
 
 class EmptyDependency:
@@ -52,7 +55,9 @@ class EmptyDependency:
 
     def extend_many(
         self,
-        proof: "Proof",
+        symbols_graph: "SymbolsGraph",
+        statements_checker: "StatementChecker",
+        dependency_cache: "DependencyCache",
         name0: str,
         args0: list["Point"],
         name_args: list[tuple[str, list["Point"]]],
@@ -67,9 +72,9 @@ class EmptyDependency:
             dep = Dependency(name, args, None, deps.level)
             deps.why += [
                 dep.why_me_or_cache(
-                    proof.symbols_graph,
-                    proof.statements.checker,
-                    proof.dependency_cache,
+                    symbols_graph,
+                    statements_checker,
+                    dependency_cache,
                     None,
                 )
             ]

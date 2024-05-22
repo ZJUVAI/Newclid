@@ -19,7 +19,7 @@ from geosolver.numerical.check import (
     check_sameside_numerical,
 )
 
-from geosolver.statement import list_eqratio3
+from geosolver.listing import list_eqratio3
 from geosolver.symbols_graph import SymbolsGraph
 
 if TYPE_CHECKING:

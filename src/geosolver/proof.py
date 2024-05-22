@@ -151,7 +151,10 @@ class Proof:
                 dependency_cache = DependencyCache()
                 alegbraic_manipulator = AlgebraicManipulator(symbols_graph)
                 statements_handler = StatementsHandler(
-                    symbols_graph, alegbraic_manipulator, dependency_cache
+                    symbols_graph,
+                    alegbraic_manipulator,
+                    dependency_cache,
+                    disabled_intrinsic_rules,
                 )
 
                 proof = Proof(

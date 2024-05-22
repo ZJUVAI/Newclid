@@ -7,7 +7,7 @@ from geosolver.lazy_loading import lazy_import
 from geosolver.numerical import ATOM, close_enough
 from geosolver.numerical.angles import ang_between
 from geosolver.numerical.geometries import Circle, Line, Point, bring_together
-from geosolver.statement import list_eqratio3
+from geosolver.listing import list_eqratio3
 
 if TYPE_CHECKING:
     import numpy

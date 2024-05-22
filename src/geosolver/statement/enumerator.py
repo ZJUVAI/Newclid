@@ -1,3 +1,4 @@
+from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING, Generator
 
@@ -73,12 +74,12 @@ class StatementsEnumerator:
             Predicate.EQRATIO6: self._all_eqratios_6points,
         }
 
-        if predicate_name not in PREDICATE_TO_METHOD:
+        if predicate not in PREDICATE_TO_METHOD:
             raise NotImplementedError(
                 f"Enumerator not implemented for predicate: {predicate_name}"
             )
 
-        return PREDICATE_TO_METHOD[predicate_name]()
+        return PREDICATE_TO_METHOD[predicate]()
 
     def all_eqangles_distinct_linepairss(
         self,
