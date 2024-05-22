@@ -141,7 +141,7 @@ class Line:
         # Make sure a is always positive (or always negative for that matter)
         # With a == 0, Assuming a = +epsilon > 0
         # Then b such that ax + by = 0 with y>0 should be negative.
-        if a < ATOM or np.fabs(a) < ATOM and b > ATOM:
+        if a < 0.0 or np.fabs(a) < ATOM and b > 0.0:
             a, b, c = -a, -b, -c
 
         self.coefficients = a, b, c
@@ -250,7 +250,7 @@ class Line:
         d2 = self(p2.x, p2.y)
         if np.fabs(d1) < ATOM or np.fabs(d2) < ATOM:
             return None
-        return d1 * d2 > ATOM
+        return d1 * d2 > 0.0
 
     def sign(self, point: "Point") -> int:
         s = self(point.x, point.y)
@@ -549,8 +549,10 @@ def line_line_intersection(line_1: Line, line_2: Line) -> Point:
     # a2x + b2y + c2 = 0
     d = a1 * b2 - a2 * b1
     if np.fabs(d) < ATOM:
-        # import pdb;pdb.set_trace()
-        # print(">>")
+        import pdb
+
+        pdb.set_trace()
+        print(">>")
         raise InvalidLineIntersectError
     return Point((c2 * b1 - c1 * b2) / d, (c1 * a2 - c2 * a1) / d)
 

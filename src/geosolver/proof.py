@@ -304,6 +304,7 @@ class Proof:
         add, to_cache = self.resolve_statement_dependencies(
             conclusion_name, args, deps=deps
         )
+
         self.dependency_graph.add_theorem_edges(to_cache, theorem, args)
         return add, to_cache, True
 
