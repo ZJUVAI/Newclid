@@ -7,9 +7,9 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **angle_bisector x a b c:** From non-collinear points a, b, c, creates x in the internal bisector of angle abc, with vertex at b. Adds the statement that angle abx and angle xbc are congruent. Construction returns a line that can be subjected to intersections.
 
-- **angle_mirror x a b c:** From non-collinear points a, b, c, creates x on the opposite side of bc with respect to a in a way that angle abx doubles angle abc. Adds the statement that angle abc and angle cbx are congruent. Construction returns a ray that can be subjected to intersections.
+- **angle_mirror x a b c:** From non-collinear points a, b, c, creates x on the opposite side of bc with respect to a in a way that angle abx doubles angle abc. Adds the statement that angle abc and angle cbx are congruent. Construction returns a ray that can be subjected to intersections."
 
-- **circle x a b c:** From non-collinear points a, b, c, creates x the center of the circle through a, b, c. Adds the congruence statements that xa=xb and xb=xc.
+- "**circle x a b c:**", "From non-collinear points a, b, c, creates x the center of the circle through a, b, c. Adds the congruence statements that xa=xb and xb=xc."
 
 - **circumcenter x a b c:** Same construction as **circle x a b c**.
 
@@ -25,31 +25,31 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **eqdistance x a b c:** From two different points b, c, and with a base point a (that can be b or c themselves), adds x such that the distance from x to a is equal to the distance from b to c. Adds the congruence statement that ax=bc. Construction returns a circle that can be subjected to intersections.
 
-- **foot x a b c:** 
+- **foot x a b c:** From three non-collinear points a, b, c, adds x that is the perpendicular projection of a onto line bc. Adds the statements that x, b, and c are collinear, and that ax is perpendicular to bc.
 
 - **free a:** Adds a point a with random coordinates.
 
-- **incenter x a b c:**
+- **incenter x a b c:** From three non-collinear points a, b, c, adds x the incenter of the triangle abc. Adds the corresponding three angle congruence statements corresponding to the fact that the incenter is the meeting of the three internal bisctors of the angles of the triangle.
 
-- **incenter2 x y z i a b c:**
+- **incenter2 x y z i a b c:** From three non-collinear points a, b, c, adds i, the incenter of the triangle abc, as well as x, y, and z, the tangent points of the incircle with sides bc, ac, and ab, respectively. Adds the three angle congruence statements corresponding to the fact that the incenter is the meeting of the three internal bisectors of the angles of the triangle, as well as the three collinear statements that place x, y, and z in the corresponding sides of the triangle abc. It also adds the perpendicular statements that ix is perpendicular to bc, that iy is perpendicular to ac, and that iz is perpendicular to ab, given by the tangency of circle and triangle. Finally, it adds the congruence statements ix=iy and iy=iz, given by the fact that x, y, z are in the circle of center i.
 
-- **excenter x a b c:**
+- **excenter x a b c:** From three non-collinear points a, b, c, adds x the excenter of triangle abc in a way that the corresponding excircle is externally tangent to side bc. Symbolically, it works exactly as the incenter construction because the angle constructions in DD do not differentiate the two bisectors of an angle crossing.
 
-- **excenter2 x y z i a b c:**
+- **excenter2 x y z i a b c:** From three non-collinear points a, b, c, adds i, the excenter of the triangle abc in a way that the corresponding excircle is externally tangent to side bc. It also adds x, y, and z, the tangent points of the incircle with the lines containing sides bc, ac, and ab, respectively. Symbolically, it works exactly as the incenter construction because the angle constructions in DD do not differentiate the two bisectors of an angle crossing.
 
-- centroid x y z i a b c
+- **centroid x y z i a b c:** 
 
-- ninepoints x y z i a b c
+- **ninepoints x y z i a b c:** 
 
-- intersection_cc x o w a
+- **intersection_cc x o w a:** From three non-colinear points, o, w, and a, adds x, the other intersection of the circle of center o through a and the circle of center w through a. Adds the two congruence statements oa=ox and wa=wx corresponding to x being in the circle of center o through and in the circle of center w through a, respectively.
 
-- intersection_lc x a o b
+- **intersection_lc x a o b:** From three points, a, o, and b, b different from both a and o, such that bo is not perpendicular to ba (to avoid the situation of a line tangent to a circle at b), adds point x, the second intersection of line ab with the circle of center o going through b. Adds the statements of the colinearity between a, b, and x, and the congruence statement ob=ox, that guarantees that x is in the circle of center o and going through b.
 
-- intersection_ll x a b c d
+- **intersection_ll x a b c d:** 
 
-- intersection_lp x a b c m n
+- **intersection_lp x a b c m n:** 
 
-- intersection_lt x a b c d e
+- **intersection_lt x a b c d e:** 
 
 - intersection_pp x a b c d e f
 
