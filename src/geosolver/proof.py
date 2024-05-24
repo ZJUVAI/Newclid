@@ -783,13 +783,17 @@ class Proof:
             ):
                 continue
 
-            if b in (c, d):
+            # if b in (c, d):
+            if b.num in (c.num, d.num):
                 a, b = b, a  # now a in c, d
-            if f in (g, h):
+            # if f in (g, h):
+            if f.num in (g.num, h.num):
                 e, f = f, e  # now e in g, h
-            if a == d:
+            # if a == d:
+            if a.num == d.num:
                 c, d = d, c  # now a == c
-            if e == h:
+            # if e == h:
+            if e.num == h.num:
                 g, h = h, g  # now e == g
             if (a, b, c, d, e, f, g, h) in record:
                 continue
