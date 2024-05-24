@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     import numpy
 
 np: "numpy" = lazy_import("numpy")
-
+np.random.seed(42)
 
 class Point:
     """Numerical point."""
@@ -141,7 +141,7 @@ class Line:
         # Make sure a is always positive (or always negative for that matter)
         # With a == 0, Assuming a = +epsilon > 0
         # Then b such that ax + by = 0 with y>0 should be negative.
-        if a < 0.0 or np.fabs(a) < ATOM and b > 0.0:
+        if a < -ATOM or np.fabs(a) < ATOM and b > ATOM:
             a, b, c = -a, -b, -c
 
         self.coefficients = a, b, c
@@ -158,7 +158,7 @@ class Line:
         a, b, _ = self.coefficients
         x, y, _ = other.coefficients
         # b/a > y/x
-        return b * x > a * y
+        return b * x - a * y > ATOM
 
     def __gt__(self, other: "Line") -> bool:
         return self.greater_than(other)
@@ -175,13 +175,13 @@ class Line:
         a, b, _ = self.coefficients
         x, y, _ = other.coefficients
         # b/a == y/x
-        return b * x == a * y
+        return close_enough(b * x,a * y)
 
     def less_than(self, other: "Line") -> bool:
         a, b, _ = self.coefficients
         x, y, _ = other.coefficients
         # b/a > y/x
-        return b * x < a * y
+        return -b * x + a * y > ATOM
 
     def intersect(self, obj: Union["Line", "Circle"]) -> tuple[Point, ...]:
         if isinstance(obj, Line):
@@ -224,12 +224,12 @@ class Line:
         a, b, c = self.coefficients
         # ax + by + c = 0
         if x is None and y is not None:
-            if a != 0:
+            if abs(a) > ATOM:
                 return Point((-c - b * y) / a, y)
             else:
                 return None
         elif x is not None and y is None:
-            if b != 0:
+            if ans(b) > ATOM:
                 return Point(x, (-c - a * x) / b)
             else:
                 return None
@@ -241,16 +241,16 @@ class Line:
     def diff_side(self, p1: "Point", p2: "Point") -> Optional[bool]:
         d1 = self(p1.x, p1.y)
         d2 = self(p2.x, p2.y)
-        if np.fabs(d1) < ATOM or np.fabs(d2) < ATOM:
+        if abs(d1) < ATOM or abs(d2) < ATOM:
             return None
-        return d1 * d2 < 0
+        return d1 * d2 < -ATOM
 
     def same_side(self, p1: "Point", p2: "Point") -> Optional[bool]:
         d1 = self(p1.x, p1.y)
         d2 = self(p2.x, p2.y)
-        if np.fabs(d1) < ATOM or np.fabs(d2) < ATOM:
+        if abs(d1) < ATOM or abs(d2) < ATOM:
             return None
-        return d1 * d2 > 0.0
+        return d1 * d2 > ATOM
 
     def sign(self, point: "Point") -> int:
         s = self(point.x, point.y)
@@ -369,9 +369,9 @@ class HalfLine(Line):
         v = self.head - self.tail
         va = a - self.tail
         vb = b - self.tail
-        if v.dot(va) > 0:
+        if v.dot(va) > ATOM:
             return a
-        if v.dot(vb) > 0:
+        if v.dot(vb) > ATOM:
             return b
         raise InvalidLineIntersectError()
 
@@ -382,7 +382,7 @@ class HalfLine(Line):
             center = center.foot(self)
         a, b = line_circle_intersection(self, Circle(center.foot(self), radius))
 
-        if (a - self.tail).dot(self.head - self.tail) > 0:
+        if (a - self.tail).dot(self.head - self.tail) > ATOM:
             a, b = self.tail, a
         else:
             a, b = self.tail, b
@@ -443,13 +443,13 @@ class InvalidQuadSolveError(Exception):
 
 def solve_quad(a: float, b: float, c: float) -> tuple[float, float]:
     """Solve a x^2 + bx + c = 0."""
-    a = 2 * a
+    a = 2.0 * a
     d = b * b - 2 * a * c
-    if d < 0:
+    if d < -ATOM:
         return None  # the caller should expect this result.
 
     y = math.sqrt(d)
-    return (-b - y) / a, (-b + y) / a
+    return (-b - y) / (a + ATOM), (-b + y) / (a + ATOM)
 
 
 def circle_circle_intersection(c1: Circle, c2: Circle) -> tuple[Point, Point]:
@@ -460,14 +460,15 @@ def circle_circle_intersection(c1: Circle, c2: Circle) -> tuple[Point, Point]:
     x1, y1, r1 = c2.a, c2.b, c2.radius
 
     d = math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
-    if np.fabs(d) < ATOM:
+    if abs(d) < ATOM:
         raise InvalidQuadSolveError()
 
     a = (r0**2 - r1**2 + d**2) / (2 * d)
     h = r0**2 - a**2
-    if h < 0:
+    if h < -ATOM:
         raise InvalidQuadSolveError()
     h = np.sqrt(h)
+    d += ATOM
     x2 = x0 + a * (x1 - x0) / d
     y2 = y0 + a * (y1 - y0) / d
     x3 = x2 + h * (y1 - y0) / d
@@ -485,7 +486,7 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
     center = circle.center
     p, q = center.x, center.y
 
-    if np.fabs(b) < ATOM:
+    if abs(b) < ATOM:
         x = -c / a
         x_p = x - p
         x_p2 = x_p * x_p
@@ -495,7 +496,7 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
         y1, y2 = y
         return (Point(x, y1), Point(x, y2))
 
-    if np.fabs(a) < ATOM:
+    if abs(a) < ATOM:
         y = -c / b
         y_q = y - q
         y_q2 = y_q * y_q
@@ -519,7 +520,7 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
 
 def _check_between(a: Point, b: Point, c: Point) -> bool:
     """Whether a is between b & c."""
-    return (a - b).dot(c - b) > 0 and (a - c).dot(b - c) > 0
+    return (a - b).dot(c - b) > ATOM and (a - c).dot(b - c) > ATOM
 
 
 def circle_segment_intersect(circle: Circle, p1: Point, p2: Point) -> list[Point]:
@@ -538,7 +539,7 @@ def line_segment_intersection(line: Line, A: Point, B: Point) -> Point:
     a, b, c = line.coefficients
     x1, y1, x2, y2 = A.x, A.y, B.x, B.y
     dx, dy = x2 - x1, y2 - y1
-    alpha = (-c - a * x1 - b * y1) / (a * dx + b * dy)
+    alpha = (-c - a * x1 - b * y1) / (a * dx + b * dy + ATOM)
     return Point(x1 + alpha * dx, y1 + alpha * dy)
 
 
@@ -547,9 +548,9 @@ def line_line_intersection(line_1: Line, line_2: Line) -> Point:
     a2, b2, c2 = line_2.coefficients  # a2x + b2y + c2 = 0
 
     d = a1 * b2 - a2 * b1
-    if np.fabs(d) < ATOM:
+    if abs(d) < ATOM:
         raise InvalidLineIntersectError
-    return Point((c2 * b1 - c1 * b2) / d, (c1 * a2 - c2 * a1) / d)
+    return Point((c2 * b1 - c1 * b2) / (d + ATOM), (c1 * a2 - c2 * a1) / (d + ATOM))
 
 
 def bring_together(
