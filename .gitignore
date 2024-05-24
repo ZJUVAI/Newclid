@@ -54,3 +54,9 @@ TODO.md
 
 # Swap files
 **/*.nfs*c*
+
+# local env
+.conda/
+
+# local files
+run.log
