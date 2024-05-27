@@ -7,9 +7,9 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **angle_bisector x a b c:** From non-collinear points a, b, c, creates x in the internal bisector of angle abc, with vertex at b. Adds the statement that angle abx and angle xbc are congruent. Construction returns a line that can be subjected to intersections.
 
-- **angle_mirror x a b c:** From non-collinear points a, b, c, creates x on the opposite side of bc with respect to a in a way that angle abx doubles angle abc. Adds the statement that angle abc and angle cbx are congruent. Construction returns a ray that can be subjected to intersections."
+- **angle_mirror x a b c:** From non-collinear points a, b, c, creates x on the opposite side of bc with respect to a in a way that angle abx doubles angle abc. Adds the statement that angle abc and angle cbx are congruent. Construction returns a ray that can be subjected to intersections.
 
-- "**circle x a b c:**", "From non-collinear points a, b, c, creates x the center of the circle through a, b, c. Adds the congruence statements that xa=xb and xb=xc."
+- **circle x a b c:** From non-collinear points a, b, c, creates x the center of the circle through a, b, c. Adds the congruence statements that xa=xb and xb=xc.
 
 - **circumcenter x a b c:** Same construction as **circle x a b c**.
 
