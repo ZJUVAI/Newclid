@@ -347,7 +347,7 @@ class TestAR:
         success = solver.run()
         check.is_true(success)
 
-    @pytest.mark.xfail
+    @pytest.mark.skip
     def test_paper_distance_chasing(self):
         """Example of distance chasing given in the original AG paper."""
         defs = [

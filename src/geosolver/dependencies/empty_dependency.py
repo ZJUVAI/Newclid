@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING
 from geosolver.dependencies.dependency import Dependency
+from geosolver.dependencies.why_predicates import why_dependency
 from geosolver.geometry import Point
 
 if TYPE_CHECKING:
@@ -44,7 +45,8 @@ class EmptyDependency:
         dep = Dependency(name, args, None, deps.level)
         deps.why = [
             dep0,
-            dep.why_me_or_cache(
+            why_dependency(
+                dep,
                 proof.symbols_graph,
                 proof.statements.checker,
                 proof.dependency_cache,
@@ -71,7 +73,8 @@ class EmptyDependency:
         for name, args in name_args:
             dep = Dependency(name, args, None, deps.level)
             deps.why += [
-                dep.why_me_or_cache(
+                why_dependency(
+                    dep,
                     symbols_graph,
                     statements_checker,
                     dependency_cache,

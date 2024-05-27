@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Optional, Tuple
 
 
 import geosolver.combinatorics as comb
+from geosolver.dependencies.why_predicates import why_dependency
 from geosolver.predicates import Predicate
 import geosolver.numerical.check as nm
 
@@ -339,7 +340,8 @@ class StatementAdder:
         for p1, p2 in comb.arrangement_pairs(points):
             if self.statements_checker.check_coll([p1, p2, p]):
                 dep = Dependency(Predicate.COLLINEAR.value, [p1, p2, p], None, None)
-                return dep.why_me_or_cache(
+                return why_dependency(
+                    dep,
                     self.symbols_graph,
                     self.statements_checker,
                     self.dependency_cache,
@@ -664,7 +666,8 @@ class StatementAdder:
         for p1, p2, p3 in comb.arrangement_triplets(points):
             if self.statements_checker.check_cyclic([p1, p2, p3, p]):
                 dep = Dependency(Predicate.CYCLIC.value, [p1, p2, p3, p], None, None)
-                return dep.why_me_or_cache(
+                return why_dependency(
+                    dep,
                     self.symbols_graph,
                     self.statements_checker,
                     self.dependency_cache,
@@ -1194,7 +1197,8 @@ class StatementAdder:
             dep = Dependency(eqname, [a, b, c, d], None, deps.level)
             deps.why = [
                 dep0,
-                dep.why_me_or_cache(
+                why_dependency(
+                    dep,
                     self.symbols_graph,
                     self.statements_checker,
                     self.dependency_cache,
@@ -1211,7 +1215,8 @@ class StatementAdder:
                 dep = Dependency(Predicate.COLLINEAR_X.value, colls, None, deps.level)
                 deps.why = [
                     dep0,
-                    dep.why_me_or_cache(
+                    why_dependency(
+                        dep,
                         self.symbols_graph,
                         self.statements_checker,
                         self.dependency_cache,
@@ -1346,7 +1351,8 @@ class StatementAdder:
                 continue
             dep = Dependency(Predicate.PARALLEL.value, [p, q, p_, q_], None, deps.level)
             deps.why += [
-                dep.why_me_or_cache(
+                why_dependency(
+                    dep,
                     self.symbols_graph,
                     self.statements_checker,
                     self.dependency_cache,

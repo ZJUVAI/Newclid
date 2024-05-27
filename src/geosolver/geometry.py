@@ -326,6 +326,8 @@ class Point(Node):
 class Line(Node):
     """Node of type Line."""
 
+    points: tuple[Point, Point]
+
     def new_val(self) -> Direction:
         return Direction()
 

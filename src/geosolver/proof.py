@@ -8,6 +8,7 @@ from typing_extensions import Self
 import logging
 
 
+from geosolver.dependencies.why_predicates import why_dependency
 from geosolver.predicates import Predicate
 from geosolver.agent.breadth_first_search import Action, Mapping
 from geosolver.agent.interface import (
@@ -351,7 +352,8 @@ class Proof:
             premise.name, p_args, rule_name="Premise", level=dependency_level
         )
         try:
-            dep = dep.why_me_or_cache(
+            dep = why_dependency(
+                dep,
                 self.symbols_graph,
                 self.statements.checker,
                 self.dependency_cache,
