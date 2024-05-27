@@ -2,6 +2,7 @@ import pytest
 import pytest_check as check
 
 from geosolver.api import GeometricSolverBuilder
+from geosolver.problem import Theorem
 from tests.fixtures import build_until_works
 
 
@@ -265,6 +266,14 @@ class TestConstants:
             )
         )
         success = solver.run()
+        check.is_true(success)
+
+    def test_rconst_as_theorem_conclusion(self):
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b = segment a b; m = midpoint m a b ? rconst m a a b 1/2"
+        )
+        solver.rules = [Theorem.from_txt("midp m a b => rconst m a a b 1/2")]
+        success = solver.build().run()
         check.is_true(success)
 
     def test_triangle12_in_rconst_out(self):

@@ -291,9 +291,12 @@ class Proof:
         deps = self._resolved_mapping_deps.get(mapping_str)
         if deps is None:
             return [], [], False
-        conclusion_name, args = theorem.conclusion_name_args(mapping)
+
+        args = self.map_construction_args_to_objects(
+            theorem.conclusion, mapping_to_names(mapping)
+        )
         add, to_cache = self.resolve_statement_dependencies(
-            conclusion_name, args, deps=deps
+            theorem.conclusion.name, args, deps=deps
         )
         self.dependency_graph.add_theorem_edges(to_cache, theorem, args)
         return add, to_cache, True
@@ -672,6 +675,16 @@ class Proof:
                 arg = mapping[arg]
             args_objs.append(self.symbols_graph.get_point(arg, make_const))
         return args_objs
+
+
+def mapping_to_names(mapping: Mapping) -> dict[str, str]:
+    mapping_names = {}
+    for arg, point_or_str in mapping.items():
+        if isinstance(point_or_str, Point):
+            mapping_names[arg] = point_or_str.name
+        else:
+            mapping_names[arg] = point_or_str
+    return mapping_names
 
 
 def theorem_mapping_str(theorem: Theorem, mapping: Mapping) -> str:

@@ -46,7 +46,7 @@ class TestDDAR:
         check.is_true(success)
 
     def test_incenter_excenter_should_succeed(self):
-        # Note that this same problem should fail in dd_test.py
+        # Note that this same problem should fail with DD only
         solver = self.solver_builder.load_problem_from_txt(
             "a b c = triangle a b c; "
             "d = incenter d a b c; "
