@@ -306,16 +306,19 @@ class HumanAgent(DeductiveAgent):
         return feedback_str
 
     def _choose_action_type(self):
-        choose_action_type_str = "\nChoose an action type:\n"
+        availables_action_types = self.INPUT_TO_ACTION_TYPE.copy()
         for action_input, action_type in self.INPUT_TO_ACTION_TYPE.items():
             if action_type == ApplyTheoremAction and not self._mappings:
-                continue
+                availables_action_types.pop(action_input)
             if action_type == ApplyDerivationAction and not self._derivations:
-                continue
+                availables_action_types.pop(action_input)
+
+        choose_action_type_str = "\nChoose an action type:\n"
+        for action_input, action_type in availables_action_types.items():
             action_description = self.ACTION_TYPE_DESCRIPTION[action_type]
             choose_action_type_str += f" -  [{action_input}]: {action_description}\n"
         choose_action_type_str += "Your choice: "
-        return self._ask_for_key(self.INPUT_TO_ACTION_TYPE, choose_action_type_str)
+        return self._ask_for_key(availables_action_types, choose_action_type_str)
 
     def _ask_for_key(
         self,
@@ -326,6 +329,8 @@ class HumanAgent(DeductiveAgent):
     ) -> T:
         choosen_value = None
         while choosen_value is None:
+            if not dict_to_ask:
+                raise ValueError("No value to ask for.")
             choosen_input = self._ask_input(input_txt)
             if pop:
                 choosen = dict_to_ask.pop(choosen_input, None)
