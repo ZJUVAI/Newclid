@@ -15,7 +15,7 @@ even if at elements not relevant to the problem being checked, will raise proces
 Next, the builder will construct the problem itself. 
 This means compiling the information of the problem in two directions: the numerical diagram and the symbolic statements 
 (proof state, dependency graph, and symbols graph). 
-Symbolically, the builder checks if the symbolic conditions for each definition is satisfied, 
+Symbolically, the builder checks if the symbolic conditions for each definition are satisfied, 
 and adds the predicates assigned to each point to the proof state (cached and ).
 
 The numerical diagram is built by calling the functions on the sketch.py module (see :ref:`Sketch`).
@@ -26,7 +26,7 @@ Such coordinates will be used during reasoning to check numerically for some pre
 Also, after finishing the constructions, the builder will numerically check if the goal is satisfied in the constructed diagram.
 
 The numerical check of the goal exists for two reasons.
-First, it is a sanity check to the user, that tells if the problem is well-written or not.
+First, it is a sanity check for the user, that tells if the problem is well-written or not.
 Second, the construction functions have intrinsic degrees of freedom, some of which may not be compatible with the problem (non-degeneracy conditions).
 If one of those is randomly hit by a construction, the goal will not be satisfied and the builder will start building again from scratch.
 This will be attempted a fixed number of times (max_attempts) before the program decides that the goal is not reacheable, 

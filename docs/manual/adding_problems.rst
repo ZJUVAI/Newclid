@@ -66,9 +66,7 @@ with respect to its original statement.
 
 To evaluate if such modifications preserve the nature of the original problem 
 is a matter of considering which facts/predicates are offered to the solver 
-as hypothesis and exercising judgement.
-
-Sometimes there is no clear-cut way to decide if a problem was modified 
+as hypothesis and exercising judgement. Sometimes there is no clear-cut way to decide if a problem was modified 
 or simply translated into the GeoSolver.
 
 When giving a problem to the solver, the problem, definitions to be used, 
