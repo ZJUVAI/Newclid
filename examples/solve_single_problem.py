@@ -47,9 +47,9 @@ def main():
 
     if success:
         logging.info(f"Solved {problem_name}: {solver.run_infos}")
+        solver.write_all_outputs(problem_output_path)
     else:
         logging.info(f"Failed at problem {problem_name}: {solver.run_infos}")
-    solver.write_all_outputs(problem_output_path)
 
 
 if __name__ == "__main__":

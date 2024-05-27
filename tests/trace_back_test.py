@@ -19,7 +19,7 @@
 import pytest
 import pytest_check as check
 
-from geosolver.concepts import ConceptName
+from geosolver.predicates import Predicate
 from geosolver.dependencies.dependency import Dependency
 from geosolver.trace_back import get_logs
 from geosolver.api import GeometricSolverBuilder
@@ -51,7 +51,7 @@ class TestTraceback:
         check.equal(
             set(setup),
             {
-                (ConceptName.PERPENDICULAR.value, "a", "c", "b", "d"),
+                (Predicate.PERPENDICULAR.value, "a", "c", "b", "d"),
                 ("perp", "a", "b", "c", "d"),
             },
         )
@@ -59,7 +59,7 @@ class TestTraceback:
         check.equal(
             set(aux),
             {
-                (ConceptName.COLLINEAR.value, "a", "c", "e"),
-                (ConceptName.COLLINEAR.value, "b", "d", "e"),
+                (Predicate.COLLINEAR.value, "a", "c", "e"),
+                (Predicate.COLLINEAR.value, "b", "d", "e"),
             },
         )

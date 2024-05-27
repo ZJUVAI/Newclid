@@ -1,46 +1,31 @@
-# Copyright 2023 DeepMind Technologies Limited
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-
 """Utilities for string manipulation in the DSL."""
 
-from geosolver.concepts import ConceptName
-from geosolver.statement import list_eqratio3
+from geosolver.predicates import Predicate
+from geosolver.listing import list_eqratio3
 
 
 MAP_SYMBOL = {
-    "C": ConceptName.COLLINEAR.value,
-    "X": ConceptName.COLLINEAR_X.value,
-    "P": ConceptName.PARALLEL.value,
-    "T": ConceptName.PERPENDICULAR.value,
-    "M": ConceptName.MIDPOINT.value,
-    "D": ConceptName.CONGRUENT.value,
-    "I": ConceptName.CIRCLE.value,
-    "O": ConceptName.CYCLIC.value,
-    "^": ConceptName.EQANGLE.value,
-    "/": ConceptName.EQRATIO.value,
-    "%": ConceptName.EQRATIO.value,
-    "S": ConceptName.SIMILAR_TRIANGLE.value,
-    "=": ConceptName.CONTRI_TRIANGLE.value,
-    "A": ConceptName.COMPUTE_ANGLE.value,
-    "R": ConceptName.COMPUTE_RATIO.value,
-    "Q": ConceptName.FIX_C.value,
-    "E": ConceptName.FIX_L.value,
-    "V": ConceptName.FIX_B.value,
-    "H": ConceptName.FIX_T.value,
-    "Z": ConceptName.FIX_P.value,
-    "Y": ConceptName.IND.value,
+    "C": Predicate.COLLINEAR.value,
+    "X": Predicate.COLLINEAR_X.value,
+    "P": Predicate.PARALLEL.value,
+    "T": Predicate.PERPENDICULAR.value,
+    "M": Predicate.MIDPOINT.value,
+    "D": Predicate.CONGRUENT.value,
+    "I": Predicate.CIRCLE.value,
+    "O": Predicate.CYCLIC.value,
+    "^": Predicate.EQANGLE.value,
+    "/": Predicate.EQRATIO.value,
+    "%": Predicate.EQRATIO.value,
+    "S": Predicate.SIMILAR_TRIANGLE.value,
+    "=": Predicate.CONTRI_TRIANGLE.value,
+    "A": Predicate.COMPUTE_ANGLE.value,
+    "R": Predicate.COMPUTE_RATIO.value,
+    "Q": Predicate.FIX_C.value,
+    "E": Predicate.FIX_L.value,
+    "V": Predicate.FIX_B.value,
+    "H": Predicate.FIX_T.value,
+    "Z": Predicate.FIX_P.value,
+    "Y": Predicate.IND.value,
 }
 
 
@@ -85,61 +70,61 @@ def pretty_angle(a: str, b: str, c: str, d: str) -> str:
 
 def pretty_nl(name: str, args: list[str]) -> str:
     """Natural lang formatting a predicate."""
-    if name == ConceptName.CONSTANT_ANGLE.value:
+    if name == Predicate.CONSTANT_ANGLE.value:
         a, b, c, d, y = args
         return f"{pretty_angle(a, b, c, d)} = {y}"
-    if name == ConceptName.CONSTANT_RATIO.value:
+    if name == Predicate.CONSTANT_RATIO.value:
         a, b, c, d, y = args
         return f"{a}{b}:{c}{d} = {y}"
-    if name == ConceptName.COMPUTE_ANGLE.value:
+    if name == Predicate.COMPUTE_ANGLE.value:
         a, b, c, d = args
         return f"{pretty_angle(a, b, c, d)}"
-    if name in [ConceptName.COLLINEAR.value, "C"]:
+    if name in [Predicate.COLLINEAR.value, "C"]:
         return "" + ",".join(args) + " are collinear"
-    if name == ConceptName.COLLINEAR_X.value:
+    if name == Predicate.COLLINEAR_X.value:
         return "" + ",".join(list(set(args))) + " are collinear"
-    if name in [ConceptName.CYCLIC.value, "O"]:
+    if name in [Predicate.CYCLIC.value, "O"]:
         return "" + ",".join(args) + " are concyclic"
-    if name in [ConceptName.MIDPOINT.value, "midpoint", "M"]:
+    if name in [Predicate.MIDPOINT.value, "midpoint", "M"]:
         x, a, b = args
         return f"{x} is midpoint of {a}{b}"
-    if name in [ConceptName.EQANGLE.value, ConceptName.EQANGLE6.value, "^"]:
+    if name in [Predicate.EQANGLE.value, Predicate.EQANGLE6.value, "^"]:
         a, b, c, d, e, f, g, h = args
         return f"{pretty_angle(a, b, c, d)} = {pretty_angle(e, f, g, h)}"
-    if name in [ConceptName.EQRATIO.value, ConceptName.EQRATIO6.value, "/"]:
+    if name in [Predicate.EQRATIO.value, Predicate.EQRATIO6.value, "/"]:
         return _ratio_pretty(args)
-    if name == ConceptName.EQRATIO3.value:
+    if name == Predicate.EQRATIO3.value:
         return " & ".join(_ratio_pretty(ratio) for ratio in list_eqratio3(args))
-    if name in [ConceptName.CONGRUENT.value, "D"]:
+    if name in [Predicate.CONGRUENT.value, "D"]:
         a, b, c, d = args
         return f"{a}{b} = {c}{d}"
-    if name in [ConceptName.PERPENDICULAR.value, "T"]:
+    if name in [Predicate.PERPENDICULAR.value, "T"]:
         if len(args) == 2:  # this is algebraic derivation.
             ab, cd = args  # ab = 'd( ... )'
             return f"{ab} \u27c2 {cd}"
         a, b, c, d = args
         return f"{a}{b} \u27c2 {c}{d}"
-    if name in [ConceptName.PARALLEL.value, "P"]:
+    if name in [Predicate.PARALLEL.value, "P"]:
         if len(args) == 2:  # this is algebraic derivation.
             ab, cd = args  # ab = 'd( ... )'
             return f"{ab} \u2225 {cd}"
         a, b, c, d = args
         return f"{a}{b} \u2225 {c}{d}"
     if name in [
-        ConceptName.SIMILAR_TRIANGLE_REFLECTED.value,
-        ConceptName.SIMILAR_TRIANGLE.value,
-        ConceptName.SIMILAR_TRIANGLE_BOTH.value,
+        Predicate.SIMILAR_TRIANGLE_REFLECTED.value,
+        Predicate.SIMILAR_TRIANGLE.value,
+        Predicate.SIMILAR_TRIANGLE_BOTH.value,
     ]:
         a, b, c, x, y, z = args
         return f"\u0394{a}{b}{c} is similar to \u0394{x}{y}{z}"
     if name in [
-        ConceptName.CONTRI_TRIANGLE_REFLECTED.value,
-        ConceptName.CONTRI_TRIANGLE.value,
-        ConceptName.CONTRI_TRIANGLE_BOTH.value,
+        Predicate.CONTRI_TRIANGLE_REFLECTED.value,
+        Predicate.CONTRI_TRIANGLE.value,
+        Predicate.CONTRI_TRIANGLE_BOTH.value,
     ]:
         a, b, c, x, y, z = args
         return f"\u0394{a}{b}{c} is congruent to \u0394{x}{y}{z}"
-    if name in [ConceptName.CIRCLE.value, "I"]:
+    if name in [Predicate.CIRCLE.value, "I"]:
         o, a, b, c = args
         return f"{o} is the circumcenter of \\Delta {a}{b}{c}"
     if name == "foot":
@@ -156,76 +141,76 @@ def pretty(txt: str) -> str:
     if isinstance(txt, str):
         txt = txt.split(" ")
     name, *args = txt
-    if name == ConceptName.IND.value:
+    if name == Predicate.IND.value:
         return "Y " + " ".join(args)
     if name in [
-        ConceptName.FIX_C.value,
-        ConceptName.FIX_L.value,
-        ConceptName.FIX_B.value,
-        ConceptName.FIX_T.value,
-        ConceptName.FIX_P.value,
+        Predicate.FIX_C.value,
+        Predicate.FIX_L.value,
+        Predicate.FIX_B.value,
+        Predicate.FIX_T.value,
+        Predicate.FIX_P.value,
     ]:
         return map_symbol_inv(name) + " " + " ".join(args)
-    if name == ConceptName.COMPUTE_ANGLE.value:
+    if name == Predicate.COMPUTE_ANGLE.value:
         a, b, c, d = args
         return "A " + " ".join(args)
-    if name == ConceptName.COMPUTE_RATIO.value:
+    if name == Predicate.COMPUTE_RATIO.value:
         a, b, c, d = args
         return "R " + " ".join(args)
-    if name == ConceptName.CONSTANT_ANGLE.value:
+    if name == Predicate.CONSTANT_ANGLE.value:
         a, b, c, d, y = args
         return f"^ {pretty2a(a, b, c, d)} {y}"
-    if name == ConceptName.CONSTANT_RATIO.value:
+    if name == Predicate.CONSTANT_RATIO.value:
         a, b, c, d, y = args
         return f"/ {pretty2r(a, b, c, d)} {y}"
-    if name == ConceptName.COLLINEAR.value:
+    if name == Predicate.COLLINEAR.value:
         return "C " + " ".join(args)
-    if name == ConceptName.COLLINEAR_X.value:
+    if name == Predicate.COLLINEAR_X.value:
         return "X " + " ".join(args)
-    if name == ConceptName.CYCLIC.value:
+    if name == Predicate.CYCLIC.value:
         return "O " + " ".join(args)
-    if name in [ConceptName.MIDPOINT.value, "midpoint"]:
+    if name in [Predicate.MIDPOINT.value, "midpoint"]:
         x, a, b = args
         return f"M {x} {a} {b}"
-    if name == ConceptName.EQANGLE.value:
+    if name == Predicate.EQANGLE.value:
         a, b, c, d, e, f, g, h = args
         return f"^ {pretty2a(a, b, c, d)} {pretty2a(e, f, g, h)}"
-    if name == ConceptName.EQRATIO.value:
+    if name == Predicate.EQRATIO.value:
         a, b, c, d, e, f, g, h = args
         return f"/ {pretty2r(a, b, c, d)} {pretty2r(e, f, g, h)}"
-    if name == ConceptName.EQRATIO3.value:
+    if name == Predicate.EQRATIO3.value:
         a, b, c, d, o, o = args
         return f"S {o} {a} {b} {o} {c} {d}"
-    if name == ConceptName.CONGRUENT.value:
+    if name == Predicate.CONGRUENT.value:
         a, b, c, d = args
         return f"D {a} {b} {c} {d}"
-    if name == ConceptName.PERPENDICULAR.value:
+    if name == Predicate.PERPENDICULAR.value:
         if len(args) == 2:  # this is algebraic derivation.
             ab, cd = args  # ab = 'd( ... )'
             return f"T {ab} {cd}"
         a, b, c, d = args
         return f"T {a} {b} {c} {d}"
-    if name == ConceptName.PARALLEL.value:
+    if name == Predicate.PARALLEL.value:
         if len(args) == 2:  # this is algebraic derivation.
             ab, cd = args  # ab = 'd( ... )'
             return f"P {ab} {cd}"
         a, b, c, d = args
         return f"P {a} {b} {c} {d}"
     if name in [
-        ConceptName.SIMILAR_TRIANGLE_REFLECTED.value,
-        ConceptName.SIMILAR_TRIANGLE.value,
-        ConceptName.SIMILAR_TRIANGLE_BOTH.value,
+        Predicate.SIMILAR_TRIANGLE_REFLECTED.value,
+        Predicate.SIMILAR_TRIANGLE.value,
+        Predicate.SIMILAR_TRIANGLE_BOTH.value,
     ]:
         a, b, c, x, y, z = args
         return f"S {a} {b} {c} {x} {y} {z}"
     if name in [
-        ConceptName.CONTRI_TRIANGLE_REFLECTED.value,
-        ConceptName.CONTRI_TRIANGLE.value,
-        ConceptName.CONTRI_TRIANGLE_BOTH.value,
+        Predicate.CONTRI_TRIANGLE_REFLECTED.value,
+        Predicate.CONTRI_TRIANGLE.value,
+        Predicate.CONTRI_TRIANGLE_BOTH.value,
     ]:
         a, b, c, x, y, z = args
         return f"= {a} {b} {c} {x} {y} {z}"
-    if name == ConceptName.CIRCLE.value:
+    if name == Predicate.CIRCLE.value:
         o, a, b, c = args
         return f"I {o} {a} {b} {c}"
     if name == "foot":

@@ -17,7 +17,7 @@
 
 from typing import TYPE_CHECKING
 
-from geosolver.concepts import ConceptName
+from geosolver.predicates import Predicate
 from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE
 
@@ -113,7 +113,7 @@ def separate_dependency_difference(
         if not cons_:
             continue
 
-        prems = [p for p in prems if p.name != ConceptName.IND.value]
+        prems = [p for p in prems if p.name != Predicate.IND.value]
         log.append((prems, cons_))
 
     points = set(query.args)
@@ -131,7 +131,7 @@ def separate_dependency_difference(
 
     setup_, setup, aux_setup, aux_points = setup, [], [], set()
     for con in setup_:
-        if con.name == ConceptName.IND.value:
+        if con.name == Predicate.IND.value:
             continue
         elif any([p not in points for p in con.args if isinstance(p, Point)]):
             aux_setup.append(con)
@@ -159,11 +159,11 @@ def recursive_traceback(
             return
 
         if hashed[0] in [
-            ConceptName.NON_COLLINEAR.value,
-            ConceptName.NON_PARALLEL.value,
-            ConceptName.NON_PERPENDICULAR.value,
-            ConceptName.DIFFERENT.value,
-            ConceptName.SAMESIDE.value,
+            Predicate.NON_COLLINEAR.value,
+            Predicate.NON_PARALLEL.value,
+            Predicate.NON_PERPENDICULAR.value,
+            Predicate.DIFFERENT.value,
+            Predicate.SAMESIDE.value,
         ]:
             return
 
@@ -220,8 +220,8 @@ def collx_to_coll_setup(
     for level in setup_to_levels(setup):
         hashs = set()
         for dep in level:
-            if dep.name == ConceptName.COLLINEAR_X.value:
-                dep.name = ConceptName.COLLINEAR.value
+            if dep.name == Predicate.COLLINEAR_X.value:
+                dep.name = Predicate.COLLINEAR.value
                 dep.args = list(set(dep.args))
 
             if dep.hashed() in hashs:
@@ -251,8 +251,8 @@ def collx_to_coll(
         prem_set = set()
         prems_, prems = prems, []
         for p in prems_:
-            if p.name == ConceptName.COLLINEAR_X.value:
-                p.name = ConceptName.COLLINEAR.value
+            if p.name == Predicate.COLLINEAR_X.value:
+                p.name = Predicate.COLLINEAR.value
                 p.args = list(set(p.args))
             if p.hashed() in prem_set:
                 continue
@@ -261,8 +261,8 @@ def collx_to_coll(
 
         cons_, cons = cons, []
         for c in cons_:
-            if c.name == ConceptName.COLLINEAR_X.value:
-                c.name = ConceptName.COLLINEAR.value
+            if c.name == Predicate.COLLINEAR_X.value:
+                c.name = Predicate.COLLINEAR.value
                 c.args = list(set(c.args))
             if c.hashed() in con_set:
                 continue
@@ -289,7 +289,7 @@ def get_logs(
     try:
         query = query.why_me_or_cache(
             proof.symbols_graph,
-            proof.statements_checker,
+            proof.statements.checker,
             proof.dependency_cache,
             query.level,
         )

@@ -1,16 +1,7 @@
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
-
-import numpy as np
-
-from matplotlib import pyplot as plt
-import matplotlib.colors as mcolors
-from matplotlib.patches import Arc
-from matplotlib.transforms import Bbox, IdentityTransform, TransformedBbox
-
-
-from geosolver.concepts import ConceptName
 import geosolver.geometry as gm
+from geosolver.predicates import Predicate
 from geosolver.numerical.angles import ang_of
 from geosolver.numerical.check import clock
 from geosolver.numerical.geometries import (
@@ -24,6 +15,23 @@ from geosolver.numerical.geometries import (
     circle_segment_intersect,
     line_line_intersection,
 )
+from geosolver.lazy_loading import lazy_import
+
+
+if TYPE_CHECKING:
+    import numpy
+    import matplotlib
+    import matplotlib.pyplot
+    import matplotlib.colors
+    import matplotlib.patches
+    import matplotlib.transforms
+
+np: "numpy" = lazy_import("numpy")
+matplt: "matplotlib" = lazy_import("matplotlib")
+plt: "matplotlib.pyplot" = lazy_import("matplotlib.pyplot")
+colors: "matplotlib.colors" = lazy_import("matplotlib.colors")
+patches: "matplotlib.patches" = lazy_import("matplotlib.patches")
+transforms: "matplotlib.transforms" = lazy_import("matplotlib.transforms")
 
 
 HCOLORS = None
@@ -75,7 +83,7 @@ def draw_figure(
 
 
 def _draw(
-    ax: plt.Axes,
+    ax: "matplotlib.pyplot.Axes",
     points: list[gm.Point],
     lines: list[gm.Line],
     circles: list[gm.Circle],
@@ -124,7 +132,9 @@ def _draw(
     if highlights:
         global HCOLORS
         if HCOLORS is None:
-            HCOLORS = [k for k in mcolors.TABLEAU_COLORS.keys() if "red" not in k]
+            HCOLORS = [
+                k for k in colors.mcolors.TABLEAU_COLORS.keys() if "red" not in k
+            ]
 
         for i, (name, args) in enumerate(highlights):
             color_i = HCOLORS[i % len(HCOLORS)]
@@ -146,7 +156,7 @@ def set_theme(theme) -> None:
 
 
 def draw_angle(
-    ax: plt.Axes,
+    ax: "matplotlib.pyplot.Axes",
     head: Point,
     p1: Point,
     p2: Point,
@@ -171,7 +181,9 @@ def draw_angle(
     )
 
 
-def draw_circle(ax: plt.Axes, circle: Circle, color: Any = "cyan") -> Circle:
+def draw_circle(
+    ax: "matplotlib.pyplot.Axes", circle: Circle, color: Any = "cyan"
+) -> Circle:
     """Draw a circle."""
     if circle.num is not None:
         circle = circle.num
@@ -187,7 +199,9 @@ def draw_circle(ax: plt.Axes, circle: Circle, color: Any = "cyan") -> Circle:
     return circle
 
 
-def _draw_circle(ax: plt.Axes, c: Circle, color: Any = "cyan", lw: float = 1.2) -> None:
+def _draw_circle(
+    ax: "matplotlib.pyplot.Axes", c: Circle, color: Any = "cyan", lw: float = 1.2
+) -> None:
     ls = "-"
     if color == "--":
         color = "black"
@@ -206,7 +220,9 @@ def _draw_circle(ax: plt.Axes, c: Circle, color: Any = "cyan", lw: float = 1.2) 
     )
 
 
-def draw_line(ax: plt.Axes, line: Line, color: Any = "white") -> tuple[Point, Point]:
+def draw_line(
+    ax: "matplotlib.pyplot.Axes", line: Line, color: Any = "white"
+) -> tuple[Point, Point]:
     """Draw a line."""
     points = line.neighbors(gm.Point)
     if len(points) <= 1:
@@ -232,7 +248,7 @@ def draw_line(ax: plt.Axes, line: Line, color: Any = "white") -> tuple[Point, Po
 
 
 def _draw_line(
-    ax: plt.Axes,
+    ax: "matplotlib.pyplot.Axes",
     p1: Point,
     p2: Point,
     color: Any = "white",
@@ -250,7 +266,7 @@ def _draw_line(
 
 
 def draw_point(
-    ax: plt.Axes,
+    ax: "matplotlib.pyplot.Axes",
     p: Point,
     name: str,
     lines: list[Line],
@@ -273,14 +289,16 @@ def draw_point(
     ax.annotate(name, naming_position(ax, p, lines, circles), color=color, fontsize=15)
 
 
-def mark_segment(ax: plt.Axes, p1: Point, p2: Point, color: Any, alpha: float) -> None:
+def mark_segment(
+    ax: "matplotlib.pyplot.Axes", p1: Point, p2: Point, color: Any, alpha: float
+) -> None:
     _ = alpha
     x, y = (p1.x + p2.x) / 2, (p1.y + p2.y) / 2
     ax.scatter(x, y, color=color, alpha=1.0, marker="o", s=50)
 
 
 def highlight_angle(
-    ax: plt.Axes,
+    ax: "matplotlib.pyplot.Axes",
     a: Point,
     b: Point,
     c: Point,
@@ -297,7 +315,7 @@ def highlight_angle(
 
 
 def highlight(
-    ax: plt.Axes,
+    ax: "matplotlib.pyplot.Axes",
     name: str,
     args: list[gm.Point],
     lcolor: Any,
@@ -307,18 +325,18 @@ def highlight(
     """Draw highlights."""
     args = list(map(lambda x: x.num if isinstance(x, gm.Point) else x, args))
 
-    if name == ConceptName.CYCLIC.value:
+    if name == Predicate.CYCLIC.value:
         a, b, c, d = args
         _draw_circle(ax, Circle(p1=a, p2=b, p3=c), color=color1, lw=2.0)
-    if name == ConceptName.COLLINEAR.value:
+    if name == Predicate.COLLINEAR.value:
         a, b, c = args
         a, b = max(a, b, c), min(a, b, c)
         _draw_line(ax, a, b, color=color1, lw=2.0)
-    if name == ConceptName.PARALLEL.value:
+    if name == Predicate.PARALLEL.value:
         a, b, c, d = args
         _draw_line(ax, a, b, color=color1, lw=2.0)
         _draw_line(ax, c, d, color=color2, lw=2.0)
-    if name == ConceptName.EQANGLE.value:
+    if name == Predicate.EQANGLE.value:
         a, b, c, d, e, f, g, h = args
 
         x = line_line_intersection(Line(a, b), Line(c, d))
@@ -345,7 +363,7 @@ def highlight(
         if color2 == "--":
             color2 = "red"
         draw_angle(ax, e, f, h, color=color2, alpha=0.5)
-    if name == ConceptName.PERPENDICULAR.value:
+    if name == Predicate.PERPENDICULAR.value:
         a, b, c, d = args
         _draw_line(ax, a, b, color=color1, lw=2.0)
         _draw_line(ax, c, d, color=color1, lw=2.0)
@@ -353,15 +371,15 @@ def highlight(
         a, b, c, d, m, n = args
         _draw_line(ax, a, b, color=color1, lw=2.0)
         _draw_line(ax, c, d, color=color2, lw=2.0)
-    if name == ConceptName.CONGRUENT.value:
+    if name == Predicate.CONGRUENT.value:
         a, b, c, d = args
         _draw_line(ax, a, b, color=color1, lw=2.0)
         _draw_line(ax, c, d, color=color2, lw=2.0)
-    if name == ConceptName.MIDPOINT.value:
+    if name == Predicate.MIDPOINT.value:
         m, a, b = args
         _draw_line(ax, a, m, color=color1, lw=2.0, alpha=0.5)
         _draw_line(ax, b, m, color=color2, lw=2.0, alpha=0.5)
-    if name == ConceptName.EQRATIO.value:
+    if name == Predicate.EQRATIO.value:
         a, b, c, d, m, n, p, q = args
         _draw_line(ax, a, b, color=color1, lw=2.0, alpha=0.5)
         _draw_line(ax, c, d, color=color2, lw=2.0, alpha=0.5)
@@ -370,7 +388,7 @@ def highlight(
 
 
 def naming_position(
-    ax: plt.Axes, p: Point, lines: list[Line], circles: list[Circle]
+    ax: "matplotlib.pyplot.Axes", p: Point, lines: list[Line], circles: list[Circle]
 ) -> tuple[float, float]:
     """Figure out a good naming position on the drawing."""
     _ = ax
@@ -404,7 +422,7 @@ def naming_position(
     return x, y
 
 
-class AngleAnnotation(Arc):
+class AngleAnnotation(patches.Arc):
     """
     Draws an arc between two vectors which appears circular in display space.
     """
@@ -479,13 +497,13 @@ class AngleAnnotation(Arc):
             **kwargs,
         )
 
-        self.set_transform(IdentityTransform())
+        self.set_transform(transforms.IdentityTransform())
         self.ax.add_patch(self)
 
         self.kw = dict(
             ha="center",
             va="center",
-            xycoords=IdentityTransform(),
+            xycoords=transforms.IdentityTransform(),
             xytext=(0, 0),
             textcoords="offset points",
             annotation_clip=True,
@@ -498,7 +516,7 @@ class AngleAnnotation(Arc):
         if self.unit == "points":
             factor = self.ax.figure.dpi / 72.0
         elif self.unit[:4] == "axes":
-            b = TransformedBbox(Bbox.unit(), self.ax.transAxes)
+            b = transforms.TransformedBbox(transforms.Bbox.unit(), self.ax.transAxes)
             dic = {
                 "max": max(b.width, b.height),
                 "min": min(b.width, b.height),

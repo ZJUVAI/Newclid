@@ -13,22 +13,96 @@ in the Nature 2024 paper:
         and helped by an LLM to build auxiliary constructions.
 
 
+AlphaGeometry can be seen as an extension of GeoSolver equipped with a language model 
+that proposes new auxiliary constructions if a problem gets stuck. 
+
+Currently new auxiliary constructions can only be added in Geosolver as human suggested 
+constructions if the HumanAgent is used instead of BFSDDAR (default).
+
 
 Installation
 ------------
 
 Using pip
+^^^^^^^^^
 
 .. code:: bash
 
-  pip install git+https://rnd-gitlab-eu.huawei.com/Noahs-Ark/libraries/ddar
+  pip install git+https://rnd-gitlab-eu.huawei.com/Noahs-Ark/libraries/geosolver
 
 
-Usage
------
+From source
+^^^^^^^^^^^
 
-See `DOCUMENTATION 
-<https://ddar-noahs-ark-libraries-d1a330533fb77a761c85bd7785b7974dd32b06.rnd-gitlab-eu.huawei.com/>`_.
+.. code:: bash
+
+  git clone git+https://rnd-gitlab-eu.huawei.com/Noahs-Ark/libraries/geosolver
+  pip install -e . 
+
+
+Quickstart
+----------
+
+To simply solve a problem using geosolver, use the command line:
+
+.. code:: bash
+
+  geosolver --problem path/to/problem:problem_name
+
+
+For example:
+
+.. code:: bash
+
+  geosolver --problem problems_datasets/examples.txt:orthocenter_consequence_aux
+
+
+See other command line interface options with:
+
+.. code:: bash
+
+  geosolver --help 
+
+For more complex applications, use the python interface.
+Below is a minimal example to load a specific problem,
+then uses the built solver to solve it:
+
+.. code:: python
+
+    from geosolver import GeometricSolverBuilder, GeometricSolver
+
+    solver_builder = GeometricSolverBuilder()
+    solver_builder.load_problem_from_txt(
+        "a b c = triangle a b c; "
+        "d = on_tline d b a c, on_tline d c a b "
+        "? perp a d b c"
+    )
+
+    # We now obtain the GeometricSolver with the build method
+    solver: GeometricSolver = solver_builder.build()
+
+    # And run the GeometricSolver
+    success = solver.run()
+
+    if success:
+        print("Successfuly solved the problem!")
+    else:
+        print("Failed to solve the problem...")
+
+    print(f"Run infos {solver.run_infos}")
+
+
+Some more advanced examples of script using the python interface 
+are displayed in the folder ``examples`` or used in ``tests``.
+
+
+Documentation
+-------------
+
+See `the online documentation 
+<https://ddar-noahs-ark-libraries-d1a330533fb77a761c85bd7785b7974dd32b06.rnd-gitlab-eu.huawei.com/>`_
+for more detailed informations about geosolver.
+
 
 Contributing
 ------------

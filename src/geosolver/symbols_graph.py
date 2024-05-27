@@ -3,8 +3,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Optional, Type
 
-from networkx import Graph
-from pyvis.network import Network
 
 import geosolver.numerical.geometries as num_geo
 from geosolver.numerical.draw_figure import draw_figure as draw_numerical_figure
@@ -22,6 +20,14 @@ from geosolver.geometry import (
     Value,
     line_of_and_why,
 )
+from geosolver.lazy_loading import lazy_import
+
+if TYPE_CHECKING:
+    import networkx
+    import pyvis
+
+nx: "networkx" = lazy_import("networkx")
+vis: "pyvis" = lazy_import("pyvis")
 
 
 if TYPE_CHECKING:
@@ -350,9 +356,9 @@ class SymbolsGraph:
         return p1, p2
 
     def draw_html(self, html_path: Path):
-        nt = Network("1080px")
+        nt = vis.network.Network("1080px")
         # populates the nodes and edges data structures
-        nx_graph = Graph()
+        nx_graph = nx.Graph()
         for node_type, nodes in self.type2nodes.items():
             type_name = node_type.__name__
             for node in nodes:

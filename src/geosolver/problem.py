@@ -21,7 +21,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
 
-from geosolver.concepts import ConceptName
+from geosolver.predicates import Predicate
 from geosolver.dependencies.caching import hashed_txt
 
 import geosolver.geometry as gm
@@ -242,11 +242,11 @@ class Problem:
                         args = [mapping[a] for a in b.args]
                         name = b.name
                         if b.name in [
-                            ConceptName.S_ANGLE.value,
-                            ConceptName.CONSTANT_ANGLE.value,
+                            Predicate.S_ANGLE.value,
+                            Predicate.CONSTANT_ANGLE.value,
                         ]:
                             x, y, z, v = args
-                            name = ConceptName.CONSTANT_ANGLE.value
+                            name = Predicate.CONSTANT_ANGLE.value
                             v = int(v)
 
                             if v < 0:
@@ -272,7 +272,7 @@ class Problem:
                     ref_str = "{:02}".format(ref)
                     dep_str = pt.pretty(dep)
 
-                    if dep[0] == ConceptName.CONSTANT_ANGLE.value:
+                    if dep[0] == Predicate.CONSTANT_ANGLE.value:
                         m, n = map(int, dep[-1].split("pi/"))
                         mn = f"{m}. pi / {n}."
                         dep_str = " ".join(dep_str.split()[:-1] + [mn])
@@ -417,42 +417,31 @@ class Theorem:
 
     def __init__(self, premise: list[Construction], conclusion: list[Construction]):
         if len(conclusion) != 1:
-            raise ValueError("Cannot have more than one conclusion")
+            raise ValueError("Cannot have more or less than one conclusion")
         self.name = "_".join([p.name for p in premise + conclusion])
         self.rule_name = None
         self.premise = premise
-        self.conclusion = conclusion
         self.is_arg_reduce = False
+        self.conclusion = conclusion[0]
 
-        assert len(self.conclusion) == 1
-        con = self.conclusion[0]
-
-        if con.name in [
-            ConceptName.EQRATIO3.value,
-            ConceptName.MIDPOINT.value,
-            ConceptName.CONTRI_TRIANGLE.value,
-            ConceptName.SIMILAR_TRIANGLE.value,
-            ConceptName.CONTRI_TRIANGLE_REFLECTED.value,
-            ConceptName.SIMILAR_TRIANGLE_REFLECTED.value,
-            ConceptName.SIMILAR_TRIANGLE_BOTH.value,
-            ConceptName.CONTRI_TRIANGLE_BOTH.value,
+        if self.conclusion.name in [
+            Predicate.EQRATIO3.value,
+            Predicate.MIDPOINT.value,
+            Predicate.CONTRI_TRIANGLE.value,
+            Predicate.SIMILAR_TRIANGLE.value,
+            Predicate.CONTRI_TRIANGLE_REFLECTED.value,
+            Predicate.SIMILAR_TRIANGLE_REFLECTED.value,
+            Predicate.SIMILAR_TRIANGLE_BOTH.value,
+            Predicate.CONTRI_TRIANGLE_BOTH.value,
         ]:
             return
 
         prem_args = set(sum([p.args for p in self.premise], []))
-        con_args = set(con.args)
+        con_args = set(self.conclusion.args)
         if len(prem_args) <= len(con_args):
             self.is_arg_reduce = True
 
     def txt(self) -> str:
         premise_txt = ", ".join([clause.txt() for clause in self.premise])
-        conclusion_txt = ", ".join([clause.txt() for clause in self.conclusion])
+        conclusion_txt = ", ".join([self.conclusion.txt()])
         return f"{premise_txt} => {conclusion_txt}"
-
-    def conclusion_name_args(
-        self, mapping: dict[str, gm.Point]
-    ) -> tuple[str, list[gm.Point]]:
-        mapping = {arg: p for arg, p in mapping.items() if isinstance(arg, str)}
-        c = self.conclusion[0]
-        args = [mapping[a] for a in c.args]
-        return c.name, args

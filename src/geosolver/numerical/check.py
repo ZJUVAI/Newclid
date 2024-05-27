@@ -1,13 +1,18 @@
 from __future__ import annotations
-from typing import Union
-import numpy as np
-from geosolver.concepts import ConceptName
+from typing import TYPE_CHECKING, Union
+from geosolver.predicates import Predicate
 import geosolver.geometry as gm
 
+from geosolver.lazy_loading import lazy_import
 from geosolver.numerical import ATOM, close_enough
 from geosolver.numerical.angles import ang_between
 from geosolver.numerical.geometries import Circle, Line, Point, bring_together
-from geosolver.statement import list_eqratio3
+from geosolver.listing import list_eqratio3
+
+if TYPE_CHECKING:
+    import numpy
+
+np: "numpy" = lazy_import("numpy")
 
 
 def check_circle_numerical(points: list[Point]) -> bool:
@@ -206,28 +211,28 @@ def check_ratio_numerical(points: list[Point | gm.Ratio]) -> bool:
 
 
 NUMERICAL_CHECK_FUNCTIONS = {
-    ConceptName.COLLINEAR.value: check_coll_numerical,
-    ConceptName.PERPENDICULAR.value: check_perp_numerical,
-    ConceptName.MIDPOINT.value: check_midp_numerical,
-    ConceptName.CONGRUENT.value: check_cong_numerical,
-    ConceptName.CIRCLE.value: check_circle_numerical,
-    ConceptName.CYCLIC.value: check_cyclic_numerical,
-    ConceptName.EQANGLE.value: check_eqangle_numerical,
-    ConceptName.EQANGLE6.value: check_eqangle_numerical,
-    ConceptName.EQRATIO.value: check_eqratio_numerical,
-    ConceptName.EQRATIO3.value: check_eqratio3_numerical,
-    ConceptName.EQRATIO6.value: check_eqratio_numerical,
-    ConceptName.SIMILAR_TRIANGLE.value: check_simtri_numerical,
-    ConceptName.SIMILAR_TRIANGLE_REFLECTED.value: check_simtri_numerical,
-    ConceptName.SIMILAR_TRIANGLE_BOTH.value: check_simtri_numerical,
-    ConceptName.CONTRI_TRIANGLE.value: check_contri_numerical,
-    ConceptName.CONTRI_TRIANGLE_REFLECTED.value: check_contri_numerical,
-    ConceptName.CONTRI_TRIANGLE_BOTH.value: check_contri_numerical,
-    ConceptName.CONSTANT_ANGLE.value: check_aconst_numerical,
-    ConceptName.S_ANGLE.value: check_sangle_numerical,
-    ConceptName.SAMESIDE.value: check_sameside_numerical,
-    ConceptName.NON_COLLINEAR.value: check_ncoll_numerical,
-    ConceptName.CONSTANT_RATIO.value: check_ratio_numerical,
+    Predicate.COLLINEAR.value: check_coll_numerical,
+    Predicate.PERPENDICULAR.value: check_perp_numerical,
+    Predicate.MIDPOINT.value: check_midp_numerical,
+    Predicate.CONGRUENT.value: check_cong_numerical,
+    Predicate.CIRCLE.value: check_circle_numerical,
+    Predicate.CYCLIC.value: check_cyclic_numerical,
+    Predicate.EQANGLE.value: check_eqangle_numerical,
+    Predicate.EQANGLE6.value: check_eqangle_numerical,
+    Predicate.EQRATIO.value: check_eqratio_numerical,
+    Predicate.EQRATIO3.value: check_eqratio3_numerical,
+    Predicate.EQRATIO6.value: check_eqratio_numerical,
+    Predicate.SIMILAR_TRIANGLE.value: check_simtri_numerical,
+    Predicate.SIMILAR_TRIANGLE_REFLECTED.value: check_simtri_numerical,
+    Predicate.SIMILAR_TRIANGLE_BOTH.value: check_simtri_numerical,
+    Predicate.CONTRI_TRIANGLE.value: check_contri_numerical,
+    Predicate.CONTRI_TRIANGLE_REFLECTED.value: check_contri_numerical,
+    Predicate.CONTRI_TRIANGLE_BOTH.value: check_contri_numerical,
+    Predicate.CONSTANT_ANGLE.value: check_aconst_numerical,
+    Predicate.S_ANGLE.value: check_sangle_numerical,
+    Predicate.SAMESIDE.value: check_sameside_numerical,
+    Predicate.NON_COLLINEAR.value: check_ncoll_numerical,
+    Predicate.CONSTANT_RATIO.value: check_ratio_numerical,
     "para_or_coll": check_para_or_coll_numerical,
     "const_angle": check_const_angle_numerical,
 }
@@ -236,17 +241,17 @@ NUMERICAL_CHECK_FUNCTIONS = {
 def check_numerical(name: str, args: list[Union[gm.Point, Point]]) -> bool:
     """Numerical check."""
     if name == "on_line":
-        name = ConceptName.COLLINEAR.value
-    elif name == ConceptName.PARALLEL.value:
+        name = Predicate.COLLINEAR.value
+    elif name == Predicate.PARALLEL.value:
         name = "para_or_coll"
     elif name in [
-        ConceptName.COMPUTE_RATIO.value,
-        ConceptName.COMPUTE_ANGLE.value,
-        ConceptName.FIX_L.value,
-        ConceptName.FIX_C.value,
-        ConceptName.FIX_B.value,
-        ConceptName.FIX_T.value,
-        ConceptName.FIX_P.value,
+        Predicate.COMPUTE_RATIO.value,
+        Predicate.COMPUTE_ANGLE.value,
+        Predicate.FIX_L.value,
+        Predicate.FIX_C.value,
+        Predicate.FIX_B.value,
+        Predicate.FIX_T.value,
+        Predicate.FIX_P.value,
     ]:
         return True
 
