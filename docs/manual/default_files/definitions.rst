@@ -27,7 +27,7 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **foot x a b c:** From three non-collinear points a, b, c, adds x that is the perpendicular projection of a onto line bc. Adds the statements that x, b, and c are collinear, and that ax is perpendicular to bc.
 
-- **free a:** Adds a point a with random coordinates.
+- **free a:** From nothing, adds a point a with random coordinates.
 
 - **incenter x a b c:** From three non-collinear points a, b, c, adds x the incenter of the triangle abc. Adds the corresponding three angle congruence statements corresponding to the fact that the incenter is the meeting of the three internal bisctors of the angles of the triangle.
 
@@ -45,119 +45,119 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **intersection_lc x a o b:** From three points, a, o, and b, b different from both a and o, such that bo is not perpendicular to ba (to avoid the situation of a line tangent to a circle at b), adds point x, the second intersection of line ab with the circle of center o going through b. Adds the statements of the colinearity between a, b, and x, and the congruence statement ob=ox, that guarantees that x is in the circle of center o and going through b.
 
-- **intersection_ll x a b c d:** 
+- **intersection_ll x a b c d:** From four points a, b, c, d, such that lines ab and cd are not parallel and such that they do are not all collinear, build point x on the intersection of lines ab and cd. Adds the statements that x, a, and b are collinear and that x, c, and d are collinear.
 
-- **intersection_lp x a b c m n:** 
+- **intersection_lp x a b c m n:** From five points a, b, c, m, and n, such that lines ab and mn are not parallel, and that c is neither on line ab nor on line mn, build x, the intersection of line ab with the line through c that is parallel to mn. Adds the statements that x, a, and b are collinear and that lines cx and mn are parallel.
 
-- **intersection_lt x a b c d e:** 
+- **intersection_lt x a b c d e:** From five points a, b, c, d, and e, such that lines ab and de are not perpendicular and c is not on line ab, build x, the intersection of line ab and the line through c perpendicular to de. Adds the statements that x, a, and b are collinear and that lines cx and de are perpendicular.
 
-- intersection_pp x a b c d e f
+- **intersection_pp x a b c d e f:** From six points, a, b, c, d, e, f, such that a and d are different and that lines bc and ef are not parallel, builds point x in the intersection of the line through a parallel to bc and the line through d parallel to ef. Adds the statements that xa and bc are parallel and that xd and ef are parallel.
 
-- intersection_tt x a b c d e f
+- **intersection_tt x a b c d e f:** From six points, a, b, c, d, e, f, such that a and d are different and lines bc and ef are not parallel, build point x in the intersection of the line through a perpendicular to bc and the line through d perpendicular to ef. Adds the statements that xa and bc are perpendicular and that xd and ef are perpendicular.
 
-- iso_triangle a b c
+- **iso_triangle a b c:** From nothing, creates the three vertices a, b, c of an isosceles triangle with ab=ac. It adds BOTH the congruence statement for ab=ac and for the congruence of angle abc and angle acb. (Compare to iso_triangle0, iso_triangle_vertex, and iso_triangle_vertext_angle below).
 
-- lc_tangent x a o
+- **lc_tangent x a o:**
 
-- midpoint x a b
+- **midpoint x a b:** From a pair of points a, b, that are different, builds m, the midpoint of a and b. Adds the statements that m, a, and b are collinear and that am=bm.
 
-- mirror x a b
+- **mirror x a b:** From two points a, b that are different, builds x, the reflection of point a with respect to point b (so that b is the midpoint of ax). Adds the statements that a, b, and x are collinear and that ba=bx.
 
-- nsquare x a b
+- **nsquare x a b:**
 
-- on_aline x a b c d e
+- **on_aline x a b c d e:**
 
-- on_bline x a b
+- **on_bline x a b:**
 
-- on_circle x o a
+- **on_circle x o a:**
 
-- on_line x a b
+- **on_line x a b:**
 
-- on_pline x a b c
+- **on_pline x a b c:**
 
-- on_tline x a b c
+- **on_tline x a b c:**
 
-- orthocenter x a b c
+- **orthocenter x a b c:**
 
-- parallelogram a b c x
+- **parallelogram a b c x:**
 
-- pentagon a b c d e
+- **pentagon a b c d e:**
 
-- psquare x a b
+- **psquare x a b:**
 
-- quadrangle a b c d
+- **quadrangle a b c d:**
 
-- r_trapezoid a b c d
+- **r_trapezoid a b c d:**
 
-- r_triangle a b c
+- **r_triangle a b c:**
 
-- rectangle a b c d
+- **rectangle a b c d:**
 
-- reflect x a b c
+- **reflect x a b c:**
 
-- risos a b c
+- **risos a b c:**
 
-- segment a b
+- **segment a b:** From nothing, adds two points a, b, with random coordinates.
 
-- shift x b c d
+- **shift x b c d:**
 
-- square a b x y
+- **square a b x y:**
 
-- isquare a b c d
+- **isquare a b c d:**
 
-- trapezoid a b c d
+- **trapezoid a b c d:**
 
-- triangle a b c
+- **triangle a b c:**
 
-- triangle12 a b c
+- **triangle12 a b c:**
 
-- 2l1c x y z i a b c o
+- **2l1c x y z i a b c o:**
 
-- e5128 x y a b c d
+- **e5128 x y a b c d:**
 
-- 3peq x y z a b c
+- **3peq x y z a b c:**
 
-- trisect x y a b c
+- **trisect x y a b c:**
 
-- trisegment x y a b
+- **trisegment x y a b:**
 
-- on_dia x a b
+- **on_dia x a b:**
 
-- ieq_triangle a b c
+- **ieq_triangle a b c:**
 
-- on_opline x a b
+- **on_opline x a b:**
 
-- cc_tangent0 x y o a w b
+- **cc_tangent0 x y o a w b:**
 
-- cc_tangent x y z i o a w b
+- **cc_tangent x y z i o a w b:**
 
-- eqangle3 x a b d e f
+- **eqangle3 x a b d e f:**
 
-- tangent x y a o b
+- **tangent x y a o b:**
 
-- on_circum x a b c
+- **on_circum x a b c:** 
 
 New Definitions
 ---------------
 
-- on_pline0 x a b c
+- **on_pline0 x a b c:**
 
-- iso_triangle0 a b c
+- **iso_triangle0 a b c:**
 
-- iso_triangle_vertex x b c
+- **iso_triangle_vertex x b c:**
 
-- iso_triangle_vertex_angle x b c
+- **iso_triangle_vertex_angle x b c:**
 
-- on_aline0 x a b c d e f g
+- **on_aline0 x a b c d e f g:**
 
-- eqratio x a b c d e f g
+- **eqratio x a b c d e f g:**
 
-- eqratio6 x a c e f g h
+- **eqratio6 x a c e f g h:**
 
-- rconst a b c x r
+- **rconst a b c x r:**
 
-- aconst a b c x r
+- **aconst a b c x r:**
 
-- s_angle a b x y
+- **s_angle a b x y:**
 
-- lconst x a y
+- **lconst x a y:**
