@@ -8,9 +8,10 @@
    :caption: Contents:
 
    manual/overview
+   manual/python_interface
    manual/adding_problems
    manual/adding_rules
-   manual/python_interface
+   manual/default_files/index
    manual/dependency_graph
    source/geosolver
 

@@ -38,5 +38,5 @@ then uses the built :class:`geosolver.GeometricSolver` to solve it:
 
     print(f"Run infos {solver.run_infos}")
 
-More examples can be found under the ``examples`` folder of the source repository.
+More examples of problems to be written can be found under the ``examples`` folder of the source repository.
 More examples can also be found in ``tests``.
