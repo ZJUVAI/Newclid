@@ -29,7 +29,7 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **free a:** From nothing, adds a point a with random coordinates.
 
-- **incenter x a b c:** From three non-collinear points a, b, c, adds x the incenter of the triangle abc. Adds the corresponding three angle congruence statements corresponding to the fact that the incenter is the meeting of the three internal bisctors of the angles of the triangle.
+- **incenter x a b c:** From three non-collinear points a, b, c, adds x the incenter of the triangle abc. Adds the corresponding three angle congruence statements corresponding to the fact that the incenter is the meeting of the three internal bisectors of the angles of the triangle.
 
 - **incenter2 x y z i a b c:** From three non-collinear points a, b, c, adds i, the incenter of the triangle abc, as well as x, y, and z, the tangent points of the incircle with sides bc, ac, and ab, respectively. Adds the three angle congruence statements corresponding to the fact that the incenter is the meeting of the three internal bisectors of the angles of the triangle, as well as the three collinear statements that place x, y, and z in the corresponding sides of the triangle abc. It also adds the perpendicular statements that ix is perpendicular to bc, that iy is perpendicular to ac, and that iz is perpendicular to ab, given by the tangency of circle and triangle. Finally, it adds the congruence statements ix=iy and iy=iz, given by the fact that x, y, z are in the circle of center i.
 
@@ -73,7 +73,7 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **on_line x a b:**
 
-- **on_pline x a b c:**
+- **on_pline x a b c:** From three non-colinear points a, b, c, with b different from c, builds x on the line parallel to bc through a. Adds the parallel statement saying xa is parallel to bc. Construction returns a line, so can be subjected to intersections. (Compare to the simpler on_pline0 below).
 
 - **on_tline x a b c:**
 
@@ -81,11 +81,11 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **parallelogram a b c x:**
 
-- **pentagon a b c d e:**
+- **pentagon a b c d e:** From nothing, creates five points a, b, c, d, e. The coordinates are a random conformal deformation (isometry combined with scaling) of a random inscribed convex pentagon.
 
 - **psquare x a b:**
 
-- **quadrangle a b c d:**
+- **quadrangle a b c d:** From nothing, creates four points, a, b, c, d which are vertices of a random convex quadrilateral.
 
 - **r_trapezoid a b c d:**
 
@@ -93,21 +93,21 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **rectangle a b c d:**
 
-- **reflect x a b c:**
+- **reflect x a b c:** From three non-collinear points a, b, c, in particular with b different from c, builds x the reflection of a by the line bc. Adds the congruence statements for the reflection saying ab=xb and ac=xc, as well as the perpendiculatity statement saying ax is perpendicular to bc.
 
 - **risos a b c:**
 
 - **segment a b:** From nothing, adds two points a, b, with random coordinates.
 
-- **shift x b c d:**
+- **shift x b c d:** From three points b, c, d, with b different from d (presents the building of two points with the same coordinates), build x, the translation of b by the vector from d to c. Adds the (natural) congruence statement bx=cd and the (less natural) condition for the parallelogram xc=bd.
 
 - **square a b x y:**
 
 - **isquare a b c d:**
 
-- **trapezoid a b c d:**
+- **trapezoid a b c d:** From nothing, creates four vertices of a trapezoid abcd, with ab parallel to cd. Adds the parallel statement saying ab=cd.
 
-- **triangle a b c:**
+- **triangle a b c:** From nothing, creates three points a, b, and c, with random coordinates.
 
 - **triangle12 a b c:**
 
@@ -125,7 +125,7 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **ieq_triangle a b c:**
 
-- **on_opline x a b:**
+- **on_opline x a b:** From a pair of different points a, b, builds x, a point on the line ab such that a is NOT between x and b. Adds the statement that a, b, and x are collinear. Construction returns a half-line, so can be subjected to intersections.
 
 - **cc_tangent0 x y o a w b:**
 
@@ -140,7 +140,7 @@ The definitions available in the defs.txt file are the following (definitions in
 New Definitions
 ---------------
 
-- **on_pline0 x a b c:**
+- **on_pline0 x a b c:** From three points a, b, c, with b different from c, builds x on the line parallel to bc through a. Adds the parallel statement saying xa is parallel to bc. Construction returns a line, so can be subjected to intersections. (Compare to on_pline above). This definition was created to allow for the addition of a parallel statement on overlapping lines, by dismissing the restriction of a, b, c being non-collinear, without which r28 would be a rule that could not occur.
 
 - **iso_triangle0 a b c:**
 
@@ -150,9 +150,9 @@ New Definitions
 
 - **on_aline0 x a b c d e f g:**
 
-- **eqratio x a b c d e f g:**
+- **eqratio x a b c d e f g:** From seven points a, b, c, d, e, f, g, builds x, a point such that ab/cd=ef/gx. Adds the ratio equality statement corresponding to ab/cd=ef/gx. Construction returns a circle, that can be subjected to intersection. This definition was created to allow for the explicit prescription of eqratio statements on problems.
 
-- **eqratio6 x a c e f g h:**
+- **eqratio6 x a c e f g h:** From six points a, c, e, f, g, h, builds x,  a point such that ax/cx=ef/gh. Adds the ratio equality statement corresponding to ax/cx=ef/gh. Construction returns a line if ef/gh=1, and a circle otherwise, and can be subjected to intersection in any case. This definition was created to allow a common case for prescription of eqratio statements, when the new point shows up twice in the ratio equality (particularly common when subdividing a segment).
 
 - **rconst a b c x r:**
 
@@ -160,4 +160,4 @@ New Definitions
 
 - **s_angle a b x y:**
 
-- **lconst x a y:**
+- **lconst x a y:** (Still a placeholder, not working). From a point a, builds x with an integer distance y from a to x. Adds the statement that the distance from a to x is y. Construction returns a circle that can be subjected to intersections. This definition was created as an entry point to add the manipulation of lengths to DDAR.
