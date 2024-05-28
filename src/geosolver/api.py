@@ -7,6 +7,7 @@ from pathlib import Path
 import traceback
 from typing import Optional
 from typing_extensions import Self
+import copy as cp
 
 from geosolver.proof import Proof
 from geosolver.configs import default_defs_path, default_rules_path
@@ -42,6 +43,7 @@ class GeometricSolver:
         return self.problem.goal
 
     def load_state(self, proof_state: "Proof"):
+        del self.proof_state
         self.proof_state = proof_state
 
     def load_problem_string(self, problem_string: str):
@@ -51,13 +53,20 @@ class GeometricSolver:
         return self.problem.txt()
 
     def get_proof_state(self) -> str:
-        return self.proof_state
+        return cp.deepcopy(self.proof_state)
 
     def get_defs(self):
         return self.defs
 
     def get_setup_string(self) -> str:
         return self.problem.setup_str_from_problem(self.defs)
+    
+    def reset(self,proof_state: "Proof" = None, problem_string: str = None):
+        self.deductive_agent.reset()
+        proof_state = self.get_proof_state() if proof_state is None else proof_state
+        problem_string = self.get_problem_string() if problem_string is None else problem_string
+        self.load_state(proof_state)
+        self.load_problem_string(problem_string)
 
     def run(self, max_steps: int = 10000, timeout: float = 600.0) -> bool:
         success, infos = run_loop(

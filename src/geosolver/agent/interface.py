@@ -122,3 +122,7 @@ class DeductiveAgent:
     def remember_effects(self, action: Action, feedback: Feedback):
         """Remember the action effects."""
         pass
+
+    @abstractmethod
+    def reset(self):
+        """Resets the agent internal state."""
