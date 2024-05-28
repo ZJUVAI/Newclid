@@ -119,9 +119,7 @@ class Proof:
         self.dependency_graph = DependencyGraph()
 
         self._goal = None
-        self._resolved_mapping_deps: dict[
-            tuple["Theorem", "Mapping"], EmptyDependency
-        ] = {}
+        self._resolved_mapping_deps: dict[str, tuple[EmptyDependency, ToCache]] = {}
         self._problem: Optional[Problem] = None
         self._definitions: Optional[dict[str, Definition]] = None
         self._init_added: list[Dependency] = []
@@ -221,13 +219,81 @@ class Proof:
         )
         mappings = []
         for mapping in potential_mappings:
-            deps = self._resolve_mapping_dependency(theorem, mapping, action.level)
+            deps, to_cache = self._resolve_mapping_dependency(
+                theorem, mapping, action.level
+            )
             if deps is not None:
                 mappings.append(mapping)
                 mapping_str = theorem_mapping_str(theorem, mapping)
-                self._resolved_mapping_deps[mapping_str] = deps
+                self._resolved_mapping_deps[mapping_str] = (deps, to_cache)
 
         return MatchFeedback(theorem, mappings)
+
+    def _resolve_mapping_dependency(
+        self, theorem: "Theorem", mapping: Mapping, dependency_level: int
+    ) -> tuple[Optional[EmptyDependency], Optional[ToCache]]:
+        deps = EmptyDependency(level=dependency_level, rule_name=theorem.rule_name)
+        fail = False
+
+        for premise in theorem.premise:
+            p_args = [mapping[a] for a in premise.args]
+            dep, fail = self._resolve_premise_dependency(
+                theorem, premise, p_args, dependency_level
+            )
+            if fail:
+                return None, None
+            if dep is None:
+                continue
+
+            to_cache = (premise.name, p_args, dep)
+            deps.why.append(dep)
+
+        return deps, to_cache
+
+    def _resolve_premise_dependency(
+        self,
+        theorem: "Theorem",
+        premise: "Construction",
+        p_args: list["Point"],
+        dependency_level: int,
+    ) -> Tuple[Optional[Dependency], bool]:
+        # Trivial deps.
+        if premise.name in [Predicate.PARALLEL.value, Predicate.CONGRUENT.value]:
+            a, b, c, d = p_args
+            if {a, b} == {c, d}:
+                return None, False
+
+        if theorem.name in [
+            "cong_cong_eqangle6_ncoll_contri*",
+            "eqratio6_eqangle6_ncoll_simtri*",
+        ]:
+            if premise.name in [
+                Predicate.EQANGLE.value,
+                Predicate.EQANGLE6.value,
+            ]:  # SAS or RAR
+                b, a, b, c, y, x, y, z = p_args
+                if not same_clock(a.num, b.num, c.num, x.num, y.num, z.num):
+                    p_args = b, a, b, c, y, z, y, x
+
+        dep = Dependency(
+            premise.name, p_args, rule_name="Premise", level=dependency_level
+        )
+        try:
+            dep = why_dependency(
+                dep,
+                self.symbols_graph,
+                self.statements.checker,
+                self.dependency_cache,
+                dependency_level,
+            )
+            fail = False
+        except Exception:
+            fail = True
+
+        if dep.why is None:
+            fail = True
+
+        return dep, fail
 
     def _step_apply_theorem(self, action: ApplyTheoremAction) -> ApplyTheoremFeedback:
         added, to_cache, success = self._apply_theorem(action.theorem, action.mapping)
@@ -237,6 +303,20 @@ class Proof:
                 self.alegbraic_manipulator.add_algebra(dep)
         self.cache_deps(to_cache)
         return ApplyTheoremFeedback(success, added, to_cache)
+
+    def _apply_theorem(
+        self, theorem: "Theorem", mapping: Mapping
+    ) -> Tuple[list[Dependency], list[ToCache], bool]:
+        mapping_str = theorem_mapping_str(theorem, mapping)
+        deps, premise_to_cache = self._resolved_mapping_deps[mapping_str]
+        args = self.map_construction_args_to_objects(
+            theorem.conclusion, mapping_to_names(mapping)
+        )
+        add, to_cache = self.resolve_statement_dependencies(
+            theorem.conclusion.name, args, deps=deps
+        )
+        self.dependency_graph.add_theorem_edges(to_cache, theorem, args)
+        return add, [premise_to_cache] + to_cache, True
 
     def _step_derive_algebra(self, action: DeriveAlgebraAction) -> DeriveFeedback:
         derives, eq4s = self.alegbraic_manipulator.derive_algebra(action.level)
@@ -295,89 +375,6 @@ class Proof:
             disabled_intrinsic_rules=self.statements.adder.DISABLED_INTRINSIC_RULES,
         )
         return proof
-
-    def _apply_theorem(
-        self, theorem: "Theorem", mapping: Mapping
-    ) -> Tuple[list[Dependency], list[ToCache], bool]:
-        mapping_str = theorem_mapping_str(theorem, mapping)
-        deps = self._resolved_mapping_deps.get(mapping_str)
-        if deps is None:
-            return [], [], False
-
-        args = self.map_construction_args_to_objects(
-            theorem.conclusion, mapping_to_names(mapping)
-        )
-        add, to_cache = self.resolve_statement_dependencies(
-            theorem.conclusion.name, args, deps=deps
-        )
-        self.dependency_graph.add_theorem_edges(to_cache, theorem, args)
-        return add, to_cache, True
-
-    def _resolve_mapping_dependency(
-        self, theorem: "Theorem", mapping: Mapping, dependency_level: int
-    ) -> Optional[EmptyDependency]:
-        deps = EmptyDependency(level=dependency_level, rule_name=theorem.rule_name)
-        fail = False
-
-        for premise in theorem.premise:
-            p_args = [mapping[a] for a in premise.args]
-            dep, fail = self._resolve_premise_dependency(
-                theorem, premise, p_args, dependency_level
-            )
-            if fail:
-                return None
-            if dep is None:
-                continue
-
-            self.dependency_cache.add_dependency(premise.name, p_args, dep)
-            deps.why.append(dep)
-
-        return deps
-
-    def _resolve_premise_dependency(
-        self,
-        theorem: "Theorem",
-        premise: "Construction",
-        p_args: list["Point"],
-        dependency_level: int,
-    ) -> Tuple[Optional[Dependency], bool]:
-        # Trivial deps.
-        if premise.name in [Predicate.PARALLEL.value, Predicate.CONGRUENT.value]:
-            a, b, c, d = p_args
-            if {a, b} == {c, d}:
-                return None, False
-
-        if theorem.name in [
-            "cong_cong_eqangle6_ncoll_contri*",
-            "eqratio6_eqangle6_ncoll_simtri*",
-        ]:
-            if premise.name in [
-                Predicate.EQANGLE.value,
-                Predicate.EQANGLE6.value,
-            ]:  # SAS or RAR
-                b, a, b, c, y, x, y, z = p_args
-                if not same_clock(a.num, b.num, c.num, x.num, y.num, z.num):
-                    p_args = b, a, b, c, y, z, y, x
-
-        dep = Dependency(
-            premise.name, p_args, rule_name="Premise", level=dependency_level
-        )
-        try:
-            dep = why_dependency(
-                dep,
-                self.symbols_graph,
-                self.statements.checker,
-                self.dependency_cache,
-                dependency_level,
-            )
-            fail = False
-        except Exception:
-            fail = True
-
-        if dep.why is None:
-            fail = True
-
-        return dep, fail
 
     def resolve_statement_dependencies(
         self, name: str, args: list[Point], deps: EmptyDependency
