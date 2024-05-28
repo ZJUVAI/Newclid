@@ -1,14 +1,9 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
 
 
 from geosolver.dependencies.caching import hashed
 from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE, Construction
-
-
-if TYPE_CHECKING:
-    pass
 
 
 class Dependency(Construction):
