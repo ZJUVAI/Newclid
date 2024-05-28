@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from geosolver.algebraic.algebraic_manipulator import Derivations
     from geosolver.problem import Problem
 
-Mapping = dict[str, "Point"]
+Mapping = dict[str, Union["Point", str]]
 
 
 class ResetAction(NamedTuple):

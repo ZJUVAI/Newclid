@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 
 
+from geosolver.agent.human_agent import HumanAgent
 from geosolver.api import GeometricSolverBuilder
 from geosolver.configs import default_configs_path
 from geosolver.statement.adder import IntrinsicRules
@@ -24,6 +25,8 @@ def main():
             ]
         )
         .load_defs_from_file(default_configs_path().joinpath("new_defs.txt"))
+        .load_rules_from_file(default_configs_path().joinpath("new_rules.txt"))
+        .with_deductive_agent(HumanAgent())
         .build()
     )
 
@@ -39,7 +42,7 @@ def main():
     )
 
     max_steps = 100000
-    timeout = 600.0
+    timeout = 6000000000000000.0
     success = solver.run(max_steps, timeout)
 
     if success:
