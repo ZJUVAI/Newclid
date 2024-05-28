@@ -13,7 +13,7 @@ class Dependency(Construction):
         super().__init__(name, args)
         self.rule_name = rule_name or ""
         self.level = level
-        self.why = []
+        self.why: list[Dependency] = []
 
         self._stat = None
         self.trace = None
