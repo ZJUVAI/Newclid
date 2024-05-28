@@ -127,6 +127,14 @@ class Proof:
         self._init_added: list[Dependency] = []
         self._init_to_cache: list[ToCache] = []
         self._plevel: int = 0
+        self._ACTION_TYPE_TO_STEP = {
+            MatchAction: self._step_match_theorem,
+            ApplyTheoremAction: self._step_apply_theorem,
+            DeriveAlgebraAction: self._step_derive_algebra,
+            ApplyDerivationAction: self._step_apply_derivation,
+            AuxAction: self._step_auxiliary_construction,
+            StopAction: self._step_stop,
+        }
 
     @classmethod
     def build_problem(
@@ -204,60 +212,63 @@ class Proof:
         return proof
 
     def step(self, action: Action) -> Feedback:
-        if isinstance(action, StopAction):
+        return self._ACTION_TYPE_TO_STEP[type(action)](action)
+
+    def _step_match_theorem(self, action: MatchAction) -> MatchFeedback:
+        theorem = action.theorem
+        potential_mappings = match_one_theorem(
+            self, theorem, cache=action.cache, goal=self._goal
+        )
+        mappings = []
+        for mapping in potential_mappings:
+            deps = self._resolve_mapping_dependency(theorem, mapping, action.level)
+            if deps is not None:
+                mappings.append(mapping)
+                mapping_str = theorem_mapping_str(theorem, mapping)
+                self._resolved_mapping_deps[mapping_str] = deps
+
+        return MatchFeedback(theorem, mappings)
+
+    def _step_apply_theorem(self, action: ApplyTheoremAction) -> ApplyTheoremFeedback:
+        added, to_cache, success = self._apply_theorem(action.theorem, action.mapping)
+        if self.alegbraic_manipulator and added:
+            # Add algebra to AR, but do NOT derive nor add to the proof state (yet)
+            for dep in added:
+                self.alegbraic_manipulator.add_algebra(dep)
+        self.cache_deps(to_cache)
+        return ApplyTheoremFeedback(success, added, to_cache)
+
+    def _step_derive_algebra(self, action: DeriveAlgebraAction) -> DeriveFeedback:
+        derives, eq4s = self.alegbraic_manipulator.derive_algebra(action.level)
+        return DeriveFeedback(derives, eq4s)
+
+    def _step_apply_derivation(
+        self, action: ApplyDerivationAction
+    ) -> ApplyDerivationFeedback:
+        added, to_cache = self.do_algebra(
+            action.derivation_name, action.derivation_arguments
+        )
+        self.cache_deps(to_cache)
+        return ApplyDerivationFeedback(added, to_cache)
+
+    def _step_auxiliary_construction(self, action: AuxAction) -> AuxFeedback:
+        aux_clause = Clause.from_txt(action.aux_string)
+        added, to_cache = [], []
+        try:
+            added, to_cache, plevel = self.add_clause(
+                aux_clause, self._plevel, self._definitions
+            )
+            self._plevel = plevel
+            success = True
+        except (num_geo.InvalidQuadSolveError, num_geo.InvalidLineIntersectError):
             success = False
-            if self._goal is not None:
-                success = self.check_goal(self._goal)
-            return StopFeedback(success=success)
-        elif isinstance(action, ApplyTheoremAction):
-            added, to_cache, success = self._apply_theorem(
-                action.theorem, action.mapping
-            )
-            if self.alegbraic_manipulator and added:
-                # Add algebra to AR, but do NOT derive nor add to the proof state (yet)
-                for dep in added:
-                    self.alegbraic_manipulator.add_algebra(dep)
-            self.cache_deps(to_cache)
-            return ApplyTheoremFeedback(success, added, to_cache)
-        elif isinstance(action, DeriveAlgebraAction):
-            derives, eq4s = self.alegbraic_manipulator.derive_algebra(action.level)
-            return DeriveFeedback(derives, eq4s)
-        elif isinstance(action, MatchAction):
-            theorem = action.theorem
-            potential_mappings = match_one_theorem(
-                self, theorem, cache=action.cache, goal=self._goal
-            )
-            mappings = []
-            for mapping in potential_mappings:
-                deps = self._resolve_mapping_dependency(theorem, mapping, action.level)
-                if deps is not None:
-                    mappings.append(mapping)
-                    mapping_str = theorem_mapping_str(theorem, mapping)
-                    self._resolved_mapping_deps[mapping_str] = deps
+        return AuxFeedback(success, added, to_cache)
 
-            return MatchFeedback(theorem, mappings)
-        elif isinstance(action, ApplyDerivationAction):
-            added, to_cache = self.do_algebra(
-                action.derivation_name, action.derivation_arguments
-            )
-            self.cache_deps(to_cache)
-            return ApplyDerivationFeedback(added, to_cache)
-
-        elif isinstance(action, AuxAction):
-            aux_clause = Clause.from_txt(action.aux_string)
-            success = False
-            added, to_cache = [], []
-            try:
-                added, to_cache, plevel = self.add_clause(
-                    aux_clause, self._plevel, self._definitions
-                )
-                self._plevel = plevel
-                success = True
-            except (num_geo.InvalidQuadSolveError, num_geo.InvalidLineIntersectError):
-                pass
-            return AuxFeedback(success, added, to_cache)
-
-        raise NotImplementedError()
+    def _step_stop(self, action: StopAction) -> StopFeedback:
+        success = False
+        if self._goal is not None:
+            success = self.check_goal(self._goal)
+        return StopFeedback(success=success)
 
     def reset(self) -> ResetFeedback:
         self.cache_deps(self._init_to_cache)
@@ -266,7 +277,7 @@ class Proof:
         return ResetFeedback(self._problem, self._init_added, self._init_to_cache)
 
     def copy(self):
-        """Make a copy of proof state."""
+        """Make a blank copy of proof state."""
         if self._problem is None:
             raise TypeError("Could not find problem when trying to copy.")
         if self._definitions is None:
