@@ -183,7 +183,7 @@ class StatementAdder:
         return new_deps, deps_to_cache
 
     def add_algebra(
-        self, name: str, args: list[Point]
+        self, name: str, args: list[Point], dependency: Dependency
     ) -> Tuple[list[Dependency], list[ToCache]]:
         new_deps, to_cache = [], []
         if name == Predicate.PARALLEL.value:
@@ -638,7 +638,7 @@ class StatementAdder:
             whys = []
             for x in [a, b, c, d, e, f]:
                 if x not in og_points:
-                    whys.append(self.cyclic_dep(og_points, x))
+                    whys.append(self._cyclic_dep(og_points, x))
 
             abcdef_deps = deps
             if (
@@ -662,7 +662,7 @@ class StatementAdder:
 
         return add, to_cache
 
-    def cyclic_dep(self, points: list[Point], p: Point) -> list[Dependency]:
+    def _cyclic_dep(self, points: list[Point], p: Point) -> list[Dependency]:
         for p1, p2, p3 in comb.arrangement_triplets(points):
             if self.statements_checker.check_cyclic([p1, p2, p3, p]):
                 dep = Dependency(Predicate.CYCLIC.value, [p1, p2, p3, p], None, None)
