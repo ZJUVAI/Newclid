@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from geosolver.dependencies.caching import hashed
 from geosolver.geometry import Point
-from geosolver.problem import CONSTRUCTION_RULE, Construction
+from geosolver.problem import Construction
 
 
 class Dependency(Construction):
@@ -35,12 +35,6 @@ class Dependency(Construction):
     def copy(self) -> "Dependency":
         dep = Dependency(self.name, self.args, self.rule_name, self.level)
         dep.trace = self.trace
-        dep.why = list(self.why)
-        return dep
-
-    def populate(self, name: str, args: list["Point"]) -> "Dependency":
-        assert self.rule_name == CONSTRUCTION_RULE, self.rule_name
-        dep = Dependency(self.name, self.args, self.rule_name, self.level)
         dep.why = list(self.why)
         return dep
 
