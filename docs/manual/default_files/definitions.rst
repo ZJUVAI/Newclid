@@ -6,18 +6,21 @@ Definitions are the basic building blocks for the statement of problems. Each de
 The definitions available in the defs.txt file are the following (definitions in section :ref:`New Definitions` were added by us and are available in new_defs.txt):
 
 
-.. image:: ../../_static/Images/defs/angle_bisector.png
-    :width: 400
-    :align: center
-
 - **angle_bisector x a b c:** From non-collinear points a, b, c, creates x in the internal bisector of angle abc, with vertex at b. Adds the statement that angle abx and angle xbc are congruent. Construction returns a line that can be subjected to intersections.
 
-
-.. image:: ../../_static/Images/defs/angle_mirror.png
+.. figure:: ../../_static/Images/defs/angle_bisector.png
     :width: 400
     :align: center
 
+    angle_bisector x a b c
+
 - **angle_mirror x a b c:** From non-collinear points a, b, c, creates x on the opposite side of bc with respect to a in a way that angle abx doubles angle abc. Adds the statement that angle abc and angle cbx are congruent. Construction returns a ray that can be subjected to intersections.
+
+.. figure:: ../../_static/Images/defs/angle_mirror.png
+    :width: 400
+    :align: center
+
+    angle_mirror x a b c
 
 - **circle x a b c:** From non-collinear points a, b, c, creates x the center of the circle through a, b, c. Adds the congruence statements that xa=xb and xb=xc.
 
