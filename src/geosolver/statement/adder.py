@@ -183,7 +183,7 @@ class StatementAdder:
         return new_deps, deps_to_cache
 
     def add_algebra(
-        self, name: str, args: list[Point], dependency: Dependency
+        self, name: str, args: list[Point]
     ) -> Tuple[list[Dependency], list[ToCache]]:
         new_deps, to_cache = [], []
         if name == Predicate.PARALLEL.value:
