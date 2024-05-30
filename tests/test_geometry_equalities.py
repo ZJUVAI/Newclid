@@ -1,7 +1,8 @@
 """Unit tests for geometry.py."""
 import pytest_check as check
 
-from geosolver.geometry import Length, Segment, why_equal
+from geosolver.dependencies.why_predicates import _why_equal
+from geosolver.geometry import Length, Segment
 
 
 class TestGeometry:
@@ -56,4 +57,4 @@ class TestGeometry:
         a, _, _, d, _, _, _, _ = self._setup_equality_example()
 
         # check that a==d because fact3 & fact4, not fact1 & fact2
-        check.equal(set(why_equal(a, d)), {"fact3", "fact4"})
+        check.equal(set(_why_equal(a, d)), {"fact3", "fact4"})

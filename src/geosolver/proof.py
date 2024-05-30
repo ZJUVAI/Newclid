@@ -222,10 +222,12 @@ class Proof:
             deps, to_cache = self._resolve_mapping_dependency(
                 theorem, mapping, action.level
             )
-            if deps is not None:
-                mappings.append(mapping)
-                mapping_str = theorem_mapping_str(theorem, mapping)
-                self._resolved_mapping_deps[mapping_str] = (deps, to_cache)
+            if deps is None:
+                continue
+
+            mappings.append(mapping)
+            mapping_str = theorem_mapping_str(theorem, mapping)
+            self._resolved_mapping_deps[mapping_str] = (deps, to_cache)
 
         return MatchFeedback(theorem, mappings)
 
@@ -266,20 +268,19 @@ class Proof:
         if theorem.name in [
             "cong_cong_eqangle6_ncoll_contri*",
             "eqratio6_eqangle6_ncoll_simtri*",
-        ]:
-            if premise.name in [
-                Predicate.EQANGLE.value,
-                Predicate.EQANGLE6.value,
-            ]:  # SAS or RAR
-                b, a, b, c, y, x, y, z = p_args
-                if not same_clock(a.num, b.num, c.num, x.num, y.num, z.num):
-                    p_args = b, a, b, c, y, z, y, x
+        ] and premise.name in [
+            Predicate.EQANGLE.value,
+            Predicate.EQANGLE6.value,
+        ]:  # SAS or RAR
+            b, a, b, c, y, x, y, z = p_args
+            if not same_clock(a.num, b.num, c.num, x.num, y.num, z.num):
+                p_args = b, a, b, c, y, z, y, x
 
         dep = Dependency(
             premise.name, p_args, rule_name="Premise", level=dependency_level
         )
         try:
-            dep = why_dependency(
+            dep.why = why_dependency(
                 dep,
                 self.symbols_graph,
                 self.statements.checker,

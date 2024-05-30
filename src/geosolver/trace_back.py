@@ -273,7 +273,7 @@ def get_logs(
 ]:
     """Given a DAG and conclusion N, return the premise, aux, proof."""
     try:
-        query = why_dependency(
+        query.why = why_dependency(
             query,
             proof.symbols_graph,
             proof.statements.checker,

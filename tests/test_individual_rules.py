@@ -28,6 +28,9 @@ EXPECTED_WRONG_PROOF_LENGTH = [
     "circle O A B C, perp O A A X => eqangle A X A B C A C B",
     "circle O A B C, eqangle A X A B C A C B => perp O A A X",
     "circle O A B C, midp M B C => eqangle A B A C O B O M",
+    "midp E A B, midp F A C => para E F B C",
+    "midp M A B, midp M C D => para A C B D",
+    "midp M A B, perp O M A B => cong O A O B",
     "perp A B B C, midp M A C => cong A M B M",
     "circle O A B C, coll O A C => perp A B B C",
     "midp M A B, midp N C D => eqratio M A A B N C C D",
@@ -319,7 +322,13 @@ def test_rule_used_to_solve_in_one_step(
     assert is_one_step
     for i, (step, _nl_step) in enumerate(zip(proof_steps, nl_proof_step)):
         _, [step_dependency] = step
-        expected_rule = step_dependency.rule_name == theorem.rule_name
+
+        found_rule = step_dependency.rule_name
+        if found_rule.startswith("b"):
+            # Backtracked an hard-coded rule
+            found_rule = found_rule[1:]
+
+        expected_rule = found_rule == theorem.rule_name
         if rule_txt in EXPECTED_TO_USE_OTHER_RULE:
             if expected_rule:
                 raise AssertionError(

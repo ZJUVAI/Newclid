@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Optional, Type
 
 
+from geosolver.dependencies.why_predicates import _line_of_and_why
 import geosolver.numerical.geometries as num_geo
 from geosolver.numerical.draw_figure import draw_figure as draw_numerical_figure
 from geosolver.geometry import (
@@ -18,7 +19,6 @@ from geosolver.geometry import (
     Ratio,
     Segment,
     Value,
-    line_of_and_why,
 )
 from geosolver.lazy_loading import lazy_import
 
@@ -317,7 +317,7 @@ class SymbolsGraph:
         if (p1, p2) in self._pair2line:
             return self._pair2line[(p1, p2)].rep_and_why()
 
-        line, why = line_of_and_why([p1, p2])
+        line, why = _line_of_and_why([p1, p2])
         if line is None:
             line = self.get_new_line_thru_pair(p1, p2)
             why = []

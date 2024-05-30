@@ -340,13 +340,14 @@ class StatementAdder:
         for p1, p2 in comb.arrangement_pairs(points):
             if self.statements_checker.check_coll([p1, p2, p]):
                 dep = Dependency(Predicate.COLLINEAR.value, [p1, p2, p], None, None)
-                return why_dependency(
+                dep.why = why_dependency(
                     dep,
                     self.symbols_graph,
                     self.statements_checker,
                     self.dependency_cache,
                     None,
                 )
+                return dep
 
     def _add_para(
         self, points: list[Point], deps: EmptyDependency
@@ -666,13 +667,14 @@ class StatementAdder:
         for p1, p2, p3 in comb.arrangement_triplets(points):
             if self.statements_checker.check_cyclic([p1, p2, p3, p]):
                 dep = Dependency(Predicate.CYCLIC.value, [p1, p2, p3, p], None, None)
-                return why_dependency(
+                dep.why = why_dependency(
                     dep,
                     self.symbols_graph,
                     self.statements_checker,
                     self.dependency_cache,
                     None,
                 )
+                return dep
 
     def _maybe_add_cyclic_from_cong(
         self, a: Point, b: Point, c: Point, cong_ab_ac: Dependency
@@ -1195,16 +1197,14 @@ class StatementAdder:
             deps = EmptyDependency(level=deps.level, rule_name=rule)
 
             dep = Dependency(eqname, [a, b, c, d], None, deps.level)
-            deps.why = [
-                dep0,
-                why_dependency(
-                    dep,
-                    self.symbols_graph,
-                    self.statements_checker,
-                    self.dependency_cache,
-                    None,
-                ),
-            ]
+            dep.why = why_dependency(
+                dep,
+                self.symbols_graph,
+                self.statements_checker,
+                self.dependency_cache,
+                None,
+            )
+            deps.why = [dep0, dep]
 
         elif eqname == Predicate.PARALLEL.value:  # ab == cd.
             colls = [a, b, c, d]
@@ -1213,16 +1213,14 @@ class StatementAdder:
                 deps = EmptyDependency(level=deps.level, rule_name=rule)
 
                 dep = Dependency(Predicate.COLLINEAR_X.value, colls, None, deps.level)
-                deps.why = [
-                    dep0,
-                    why_dependency(
-                        dep,
-                        self.symbols_graph,
-                        self.statements_checker,
-                        self.dependency_cache,
-                        None,
-                    ),
-                ]
+                dep.why = why_dependency(
+                    dep,
+                    self.symbols_graph,
+                    self.statements_checker,
+                    self.dependency_cache,
+                    None,
+                )
+                deps.why = [dep0, dep]
 
         dep = deps.populate(eqname, [m, n, p, q])
         self.make_equal(mn, pq, deps=dep)
@@ -1350,15 +1348,14 @@ class StatementAdder:
             if {p, q} == {p_, q_}:
                 continue
             dep = Dependency(Predicate.PARALLEL.value, [p, q, p_, q_], None, deps.level)
-            deps.why += [
-                why_dependency(
-                    dep,
-                    self.symbols_graph,
-                    self.statements_checker,
-                    self.dependency_cache,
-                    None,
-                )
-            ]
+            dep.why = why_dependency(
+                dep,
+                self.symbols_graph,
+                self.statements_checker,
+                self.dependency_cache,
+                None,
+            )
+            deps.why += [dep]
 
         xba, abx, why = self.symbols_graph.get_or_create_angle_from_lines(
             bx, ab, deps=None

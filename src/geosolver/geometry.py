@@ -1,6 +1,5 @@
 """Implements geometric objects used in the graph representation."""
 from __future__ import annotations
-from collections import defaultdict
 from typing import Any, Type
 
 
@@ -381,67 +380,6 @@ class Circle(Node):
         if min_deps is None:
             return None
         return [d for d in min_deps if d is not None]
-
-
-def why_equal(x: Node, y: Node, level: int = None) -> list[Any]:
-    if x == y:
-        return []
-    if not x._val or not y._val:
-        return None
-    if x._val == y._val:
-        return []
-    return x._val.why_equal([y._val], level)
-
-
-def get_lines_thru_all(*points: Point) -> list[Line]:
-    line2count = defaultdict(lambda: 0)
-    points = set(points)
-    for p in points:
-        for line_neighbor in p.neighbors(Line):
-            line2count[line_neighbor] += 1
-    return [line for line, count in line2count.items() if count == len(points)]
-
-
-def line_of_and_why(
-    points: list[Point], level: int | None = None
-) -> tuple[Line, list[Any]]:
-    """Why points are collinear."""
-    for l0 in get_lines_thru_all(*points):
-        for line in l0.equivs():
-            if all([p in line.edge_graph for p in points]):
-                x, y = line.points
-                colls = list({x, y} | set(points))
-                # if len(colls) < 3:
-                #   return l, []
-                why = line.why_coll(colls, level)
-                if why is not None:
-                    return line, why
-
-    return None, None
-
-
-def get_circles_thru_all(*points: list[Point]) -> list[Circle]:
-    circle2count = defaultdict(lambda: 0)
-    points = set(points)
-    for p in points:
-        for c in p.neighbors(Circle):
-            circle2count[c] += 1
-    return [c for c, count in circle2count.items() if count == len(points)]
-
-
-def circle_of_and_why(
-    points: list[Point], level: int = None
-) -> tuple[Circle, list[Any]]:
-    """Why points are concyclic."""
-    for c0 in get_circles_thru_all(*points):
-        for c in c0.equivs():
-            if all([p in c.edge_graph for p in points]):
-                cycls = list(set(points))
-                why = c.why_cyclic(cycls, level)
-                if why is not None:
-                    return c, why
-
-    return None, None
 
 
 def name_map(struct: Any) -> Any:

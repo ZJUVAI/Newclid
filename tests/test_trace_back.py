@@ -37,7 +37,7 @@ class TestTraceback:
             set(setup),
             {
                 (Predicate.PERPENDICULAR.value, "a", "c", "b", "d"),
-                ("perp", "a", "b", "c", "d"),
+                (Predicate.PERPENDICULAR.value, "a", "b", "c", "d"),
             },
         )
 
