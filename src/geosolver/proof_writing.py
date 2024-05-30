@@ -5,13 +5,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 
+from geosolver.construction import Clause
 import geosolver.pretty as pt
 import geosolver.trace_back as trace_back
 
 from geosolver.dependencies.dependency import Dependency
 
 if TYPE_CHECKING:
-    from geosolver.problem import Clause, Problem
+    from geosolver.problem import Problem
     from geosolver.proof import Proof
 
 

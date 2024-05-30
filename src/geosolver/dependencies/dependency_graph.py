@@ -5,13 +5,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 
+from geosolver.construction import name_and_arguments_to_str
+from geosolver.theorem import Theorem
 from geosolver.algebraic import AlgebraicRules
 from geosolver.dependencies.dependency import Dependency
-from geosolver.problem import (
-    CONSTRUCTION_RULE,
-    Theorem,
-    name_and_arguments_to_str,
-)
+from geosolver.problem import CONSTRUCTION_RULE
 from geosolver.statement.adder import IntrinsicRules, ToCache
 from geosolver.lazy_loading import lazy_import
 

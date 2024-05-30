@@ -2,7 +2,7 @@ import pytest
 
 from geosolver.api import GeometricSolverBuilder
 from geosolver.configs import default_configs_path
-from geosolver.problem import Theorem
+from geosolver.theorem import Theorem
 from geosolver.proof_writing import get_proof_steps, proof_step_string
 from geosolver.statement.adder import IntrinsicRules
 

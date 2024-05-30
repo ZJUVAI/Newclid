@@ -7,7 +7,7 @@ from geosolver.agent.interface import ResetAction, StopAction, StopFeedback
 
 if TYPE_CHECKING:
     from geosolver.agent.interface import DeductiveAgent
-    from geosolver.problem import Theorem
+    from geosolver.theorem import Theorem
     from geosolver.proof import Proof
     from geosolver.problem import Problem
 

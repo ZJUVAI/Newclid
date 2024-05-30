@@ -7,7 +7,7 @@ from abc import abstractmethod
 if TYPE_CHECKING:
     from geosolver.proof import Proof
     from geosolver.geometry import Point
-    from geosolver.problem import Theorem
+    from geosolver.theorem import Theorem
     from geosolver.statement.adder import ToCache
     from geosolver.dependencies.dependency import Dependency
     from geosolver.match_theorems import MatchCache

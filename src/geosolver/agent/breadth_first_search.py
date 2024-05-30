@@ -28,7 +28,7 @@ from geosolver.geometry import Point
 
 
 if TYPE_CHECKING:
-    from geosolver.problem import Theorem
+    from geosolver.theorem import Theorem
     from geosolver.proof import Proof
 
 

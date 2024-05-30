@@ -1,6 +1,8 @@
 from __future__ import annotations
 from typing import NamedTuple, Optional, TypeVar
 
+from geosolver.construction import Construction, name_and_arguments_to_str
+from geosolver.theorem import Theorem
 from geosolver.agent.interface import (
     Action,
     ApplyDerivationAction,
@@ -25,7 +27,7 @@ from geosolver.dependencies.caching import hashed
 from geosolver.predicates import Predicate
 from geosolver.dependencies.dependency import Dependency
 from geosolver.geometry import Point
-from geosolver.problem import Construction, Problem, Theorem, name_and_arguments_to_str
+from geosolver.problem import Problem
 from geosolver.proof import Proof, theorem_mapping_str
 from geosolver.statement.adder import ToCache
 
@@ -107,7 +109,7 @@ class HumanAgent(DeductiveAgent):
     def _act_match(self, theorems: list[Theorem]) -> MatchAction:
         choose_theorem_str = "\nChoose a theorem: \n"
         for th in theorems:
-            choose_theorem_str += f" - [{th.rule_name}]: {th.txt()}\n"
+            choose_theorem_str += f" - [{th.rule_name}]: {th}\n"
         choose_theorem_str += (
             "Theorem you want to match (type only the name within brackets): "
         )
@@ -192,7 +194,7 @@ class HumanAgent(DeductiveAgent):
         self, action: MatchAction, feedback: MatchFeedback
     ) -> tuple[str, bool]:
         matched_theorem = feedback.theorem
-        theorem_str = f"[{matched_theorem.rule_name}] ({matched_theorem.txt()})"
+        theorem_str = f"[{matched_theorem.rule_name}] ({matched_theorem})"
         if not feedback.mappings:
             return f"No match found for theorem {theorem_str}:\n", False
 
@@ -212,9 +214,9 @@ class HumanAgent(DeductiveAgent):
         theorem = action.theorem
         rname = theorem.rule_name
         if not feedback.success:
-            return f"Failed to apply theorem [{rname}] ({theorem.txt()})\n", False
+            return f"Failed to apply theorem [{rname}] ({theorem})\n", False
 
-        feedback_str = f"Successfully applied theorem [{rname}] ({theorem.txt()}):\n"
+        feedback_str = f"Successfully applied theorem [{rname}] ({theorem}):\n"
         if feedback.added:
             feedback_str += self._list_added_statements(feedback.added)
         if feedback.to_cache:
@@ -382,7 +384,7 @@ class HumanAgent(DeductiveAgent):
 
 
 def _pretty_problem(problem: "Problem"):
-    problem_initial_txt = problem.txt().replace("; ", "\n").split(" ? ")[0]
+    problem_initial_txt = str(problem).replace("; ", "\n").split(" ? ")[0]
     return (
         Fore.BLUE
         + f"Problem:\n{problem_initial_txt}\n"

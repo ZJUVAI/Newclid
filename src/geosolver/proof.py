@@ -8,6 +8,9 @@ from typing_extensions import Self
 import logging
 
 
+from geosolver.construction import Clause, Construction
+from geosolver.definition import Definition
+from geosolver.theorem import Theorem
 from geosolver.dependencies.why_predicates import why_dependency
 from geosolver.predicates import Predicate
 from geosolver.agent.breadth_first_search import Action, Mapping
@@ -47,11 +50,7 @@ from geosolver.numerical.sketch import sketch
 
 from geosolver.problem import (
     CONSTRUCTION_RULE,
-    Clause,
-    Construction,
-    Definition,
     Problem,
-    Theorem,
 )
 
 from geosolver.dependencies.empty_dependency import EmptyDependency
@@ -145,7 +144,7 @@ class Proof:
         """Build a problem into a Proof state object."""
         proof = None
         added = None
-        logging.info(f"Building proof from problem '{problem.url}': {problem.txt()}")
+        logging.info(f"Building proof from problem '{problem.url}': {problem}")
 
         if disabled_intrinsic_rules is None:
             disabled_intrinsic_rules = []

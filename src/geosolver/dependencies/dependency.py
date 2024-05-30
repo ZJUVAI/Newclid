@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 
+from geosolver.construction import Construction
 from geosolver.dependencies.caching import hashed
 from geosolver.geometry import Point
-from geosolver.problem import CONSTRUCTION_RULE, Construction
+from geosolver.problem import CONSTRUCTION_RULE
 
 
 class Dependency(Construction):
