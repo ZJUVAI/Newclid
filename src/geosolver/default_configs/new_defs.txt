@@ -364,12 +364,6 @@ a b = diff a b
 x : coll x a b
 on_opline a b
 
-cc_tangent0 x y o a w b
-x : o a w b y, y : o a w b x
-o a w b = diff o a, diff w b, diff o w
-x y : cong o x o a, cong w y w b, perp x o x y, perp y w y x
-cc_tangent0 o a w b
-
 cc_tangent x y z i o a w b
 x : o a w b y, y : o a w b x, z : o a w b i, i : o a w b z
 o a w b = diff o a, diff w b, diff o w
