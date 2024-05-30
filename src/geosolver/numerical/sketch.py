@@ -3,7 +3,7 @@ from fractions import Fraction
 from typing import TYPE_CHECKING, Optional, Union
 
 import geosolver.geometry as gm
-from geosolver.lazy_loading import lazy_import
+from geosolver._lazy_loading import lazy_import
 from geosolver.numerical import close_enough
 from geosolver.numerical.angles import ang_between, ang_of
 from geosolver.numerical.distances import (

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Union
 from geosolver.predicates import Predicate
 import geosolver.geometry as gm
 
-from geosolver.lazy_loading import lazy_import
+from geosolver._lazy_loading import lazy_import
 from geosolver.numerical import ATOM, close_enough
 from geosolver.numerical.angles import ang_between
 from geosolver.numerical.geometries import Circle, Line, Point, bring_together

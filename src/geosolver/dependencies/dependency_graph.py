@@ -11,7 +11,7 @@ from geosolver.algebraic import AlgebraicRules
 from geosolver.dependencies.dependency import Dependency
 from geosolver.problem import CONSTRUCTION_RULE
 from geosolver.statement.adder import IntrinsicRules, ToCache
-from geosolver.lazy_loading import lazy_import
+from geosolver._lazy_loading import lazy_import
 
 if TYPE_CHECKING:
     import seaborn

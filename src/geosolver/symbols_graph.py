@@ -20,7 +20,7 @@ from geosolver.geometry import (
     Segment,
     Value,
 )
-from geosolver.lazy_loading import lazy_import
+from geosolver._lazy_loading import lazy_import
 
 if TYPE_CHECKING:
     import networkx
