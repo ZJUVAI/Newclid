@@ -494,7 +494,7 @@ class Proof:
 
             if len(cdef.construction.args) != len(c.args):
                 if len(cdef.construction.args) - len(c.args) == len(clause.points):
-                    c.args = clause.points + c.args
+                    c.args = tuple(clause.points) + c.args
                 else:
                     correct_form = " ".join(cdef.points + ["=", c.name] + cdef.args)
                     raise ValueError("Argument mismatch. " + correct_form)

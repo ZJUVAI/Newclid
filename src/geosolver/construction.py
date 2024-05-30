@@ -1,31 +1,31 @@
 from __future__ import annotations
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
+
+from geosolver.predicates import Predicate
 
 if TYPE_CHECKING:
     from geosolver.geometry import Node, Point
 
 
+@dataclass(unsafe_hash=True)
 class Construction:
     """One predicate."""
 
-    def __init__(self, name: str, args: list[str | "Point"]):
-        self.name = name
-        self.args = args
-
-    def translate(self, mapping: dict[str, str]) -> Construction:
-        args = [mapping[a] if a in mapping else a for a in self.args]
-        return Construction(self.name, args)
-
-    def txt(self) -> str:
-        return
+    name: Predicate
+    args: tuple[str | "Point"]
 
     def __str__(self) -> str:
         return name_and_arguments_to_str(self.name, self.args, " ")
 
+    def translate(self, mapping: dict[str, str]) -> Construction:
+        args = [mapping[a] if a in mapping else a for a in self.args]
+        return Construction(self.name, tuple(args))
+
     @classmethod
     def from_txt(cls, data: str) -> Construction:
         data = data.split(" ")
-        return Construction(data[0], data[1:])
+        return Construction(data[0], tuple(data[1:]))
 
 
 def name_and_arguments_to_str(

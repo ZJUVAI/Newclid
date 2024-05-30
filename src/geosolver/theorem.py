@@ -27,7 +27,7 @@ class Theorem:
         ]:
             return
 
-        prem_args = set(sum([p.args for p in self.premise], []))
+        prem_args = set(sum([list(p.args) for p in self.premise], []))
         con_args = set(self.conclusion.args)
         if len(prem_args) <= len(con_args):
             self.is_arg_reduce = True
