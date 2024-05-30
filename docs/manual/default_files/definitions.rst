@@ -94,7 +94,7 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **iso_triangle a b c:** From nothing, creates the three vertices a, b, c of an isosceles triangle with ab=ac. It adds BOTH the congruence statement for ab=ac and for the congruence of angle abc and angle acb. (Compare to iso_triangle0, iso_triangle_vertex, and iso_triangle_vertext_angle below).
 
-- **lc_tangent x a o:**
+- **lc_tangent x a o:** From two different points a, o, builds x, a point on the line perpendicular to ao through a (the line tangent to the circle of center o through a, with tangent point a). Adds the perpendicularity statement saying ax is perpendicular to ao. Construction returns a line, so can be subjected to intersections. It is equivalent to on_tline x a a o (see on_tline below).
 
 - **midpoint x a b:** From a pair of points a, b, that are different, builds m, the midpoint of a and b. Adds the statements that m, a, and b are collinear and that am=bm.
 
@@ -106,13 +106,13 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **on_bline x a b:**
 
-- **on_circle x o a:**
+- **on_circle x o a:** From two distinct points o, a, builds x a point on the circle of center o through a. Adds the congruence statement saying ox=oa. Construction returns a circle, so can be subjected to intersections. Equivalent to eqdistance x a a o (see eqdistance above).
 
-- **on_line x a b:**
+- **on_line x a b:** From tow distinct point a, b, builds x another point on the line ab. Adds the collinearity statement saying a, b, c are on the same line. Construction returns a line, so can be subject to intersections.
 
 - **on_pline x a b c:** From three non-colinear points a, b, c, with b different from c, builds x on the line parallel to bc through a. Adds the parallel statement saying xa is parallel to bc. Construction returns a line, so can be subjected to intersections. (Compare to the simpler on_pline0 below).
 
-- **on_tline x a b c:**
+- **on_tline x a b c:** From three points a, b, c, with b different from c, builds x on the line through a perpendicular to bc. Adds the perpendicularity statement saying xa is perpendicular to bc. Construction returns a line, so can be subjected to intersections.
 
 - **orthocenter x a b c:**
 
@@ -170,9 +170,9 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **eqangle3 x a b d e f:**
 
-- **tangent x y a o b:**
+- **tangent x y a o b:** From three different points a, b, c, builds x and y, the points of tangency of the two lines through a tangent to the circle of center o through b. Adds the congruence statements ox=ob and oy=ob (corresponding to the fact that x and y are on the circle of center o through b), and the perpendicularity statements saying xa is perpendicular to ox, and that ay is perpendicular to oy (explicitating that the lines touch the circle at points of tangency).
 
-- **on_circum x a b c:** 
+- **on_circum x a b c:** From three non-collinear points a, b, and c, builds x a point on the circle through a, b, and c. Adds the statement that four points a, b, c, and x are concyclic.
 
 New Definitions
 ---------------
