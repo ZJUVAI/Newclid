@@ -164,9 +164,13 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **on_opline x a b:** From a pair of different points a, b, builds x, a point on the line ab such that a is NOT between x and b. Adds the statement that a, b, and x are collinear. Construction returns a half-line, so can be subjected to intersections.
 
-- **cc_tangent0 x y o a w b:**
+- **cc_tangent x y z i o a w b:** From four points o, a, w, b, such that o is neither a nor w, and such that w and b are distinct, builds x, y, z, i on a pair of lines xy and zi that are simultaneously tangent to both the circle of center o through a and the circle of center w through b. x and z are the tangent points on the circle centered at o through a, and y and i are the tangent points on the circle centered at w through b. Adds the congruency statements ox=oa and oz=oa (saying x, z are in the circle of center o through a) and wy=wb and wi=wb (saying y, i are in the circle of center w through b), as well as the perpendicularity statements related to the tangents: yx is perpendicular to ox (because xy is tangent to the circle centered at o at point x), yx is perpendicular to wy (because xy is tangent to the circle centered at w at point y), zi is perpendicular to zo (because zi is tangent to the circle centered at o at point z), and zi is perpencicular to wi (because zi is tangent to the circle centered at w at point i).
 
-- **cc_tangent x y z i o a w b:**
+.. figure:: ../../_static/Images/defs/cc_tangent.png
+    :width: 400
+    :align: center
+
+    cc_tangent x y z i o a w b
 
 - **eqangle3 x a b d e f:**
 
