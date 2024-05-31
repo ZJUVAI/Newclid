@@ -100,7 +100,7 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **mirror x a b:** From two points a, b that are different, builds x, the reflection of point a with respect to point b (so that b is the midpoint of ax). Adds the statements that a, b, and x are collinear and that ba=bx.
 
-- **nsquare x a b:**
+- **nsquare x a b:** Given two distinct points a, b, builds x such that the triangle xab is an isosceles right triangle. Adds the congruence statement that ax=ab and the perpendicularity statement saying ax is perpendicular to ab.
 
 - **on_aline x a b c d e:**
 
@@ -114,9 +114,9 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **on_tline x a b c:** From three points a, b, c, with b different from c, builds x on the line through a perpendicular to bc. Adds the perpendicularity statement saying xa is perpendicular to bc. Construction returns a line, so can be subjected to intersections.
 
-- **orthocenter x a b c:**
+- **orthocenter x a b c:** From three non-collinear points a, b, and c, builds x the orthocenter of the triangle abc. Adds the three perpendicularity statement corresponding to the fact that x is in the intersection of the heights of the triangle, that is, that ax is perpendicular to bc, that bx is perpendicular to ac and that cx is perpendicular to ab.
 
-- **parallelogram a b c x:**
+- **parallelogram a b c x:** From three non-collinear points a, b, and c, builds x such that abcx is a parallelogram. Adds the parallel statements that ab//cx and ax//bc, as well as the congruence statements ab=cx and ax=bc.
 
 - **pentagon a b c d e:** From nothing, creates five points a, b, c, d, e. The coordinates are a random conformal deformation (isometry combined with scaling) of a random inscribed convex pentagon.
 
@@ -132,7 +132,7 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **reflect x a b c:** From three non-collinear points a, b, c, in particular with b different from c, builds x the reflection of a by the line bc. Adds the congruence statements for the reflection saying ab=xb and ac=xc, as well as the perpendiculatity statement saying ax is perpendicular to bc.
 
-- **risos a b c:**
+- **risos a b c:** From nothing, builds a, b, c such that the triangle abc is an isosceles right triangle with a right angle at a. Adds the congruence statement ab=ac, the perpendicular statement saying ab is perpendicular ac, and also the statement refering to the congruence of the base angles, that is, that angle abc is congruent to angle bca.
 
 - **segment a b:** From nothing, adds two points a, b, with random coordinates.
 
@@ -154,11 +154,11 @@ The definitions available in the defs.txt file are the following (definitions in
 
 - **3peq x y z a b c:**
 
-- **trisect x y a b c:**
+- **trisect x y a b c:** 
 
-- **trisegment x y a b:**
+- **trisegment x y a b:** Given two different points a, b, builds x, y the two points trisecting the segment ab. Adds the collinearity statements saying x is in the segment ab, and the one saying y is in the segment ab, as well as the two congruent statements associated to the trisection: ax=xy and xy=yb.
 
-- **on_dia x a b:**
+- **on_dia x a b:** Given two different points a, b, builds x a point such that the triangle axb is a right triangle with a right angle at x. Adds the perpendicularity statement saying ax is perpendicular to bx. Construction returns a circle, so it can be subjected to intersections.
 
 - **ieq_triangle a b c:**
 
@@ -195,7 +195,7 @@ New Definitions
 
 - **eqratio6 x a c e f g h:** From six points a, c, e, f, g, h, builds x,  a point such that ax/cx=ef/gh. Adds the ratio equality statement corresponding to ax/cx=ef/gh. Construction returns a line if ef/gh=1, and a circle otherwise, and can be subjected to intersection in any case. This definition was created to allow a common case for prescription of eqratio statements, when the new point shows up twice in the ratio equality (particularly common when subdividing a segment).
 
-- **rconst a b c x r:**
+- **rconst a b c x r:** Given three points a, b, c such that a is different from b, and a fraction r, builds x a point such that ab/cx=r. r should be entered as a fraction m/n, m, n two integers separated by "/". Adds the statement corresponding exactly to ab/cx=r. The construction returns a circle, so can be subjected to intersections. This definition was created to allow for the prescription of pairs of segments satisfying a given constant ratio.
 
 - **aconst a b c x r:**
 
