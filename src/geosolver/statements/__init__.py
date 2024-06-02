@@ -2,9 +2,9 @@ from typing import TYPE_CHECKING
 
 
 from geosolver.dependencies.caching import DependencyCache
-from geosolver.statement.adder import IntrinsicRules, StatementAdder
-from geosolver.statement.checker import StatementChecker
-from geosolver.statement.enumerator import StatementsEnumerator
+from geosolver.statements.adder import IntrinsicRules, StatementAdder
+from geosolver.statements.checker import StatementChecker
+from geosolver.statements.enumerator import StatementsEnumerator
 
 
 if TYPE_CHECKING:

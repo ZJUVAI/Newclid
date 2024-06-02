@@ -5,7 +5,7 @@ from pathlib import Path
 from geosolver.agent.human_agent import HumanAgent
 from geosolver.api import GeometricSolverBuilder
 from geosolver.configs import default_configs_path
-from geosolver.statement.adder import IntrinsicRules
+from geosolver.statements.adder import IntrinsicRules
 
 
 def main():

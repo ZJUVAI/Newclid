@@ -1,26 +1,26 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
-
-from geosolver.predicates import Predicate
-
-if TYPE_CHECKING:
-    from geosolver.geometry import Node, Point
 
 
-@dataclass(unsafe_hash=True)
+@dataclass
 class Construction:
-    """One predicate."""
+    """One predicate applied to a set of points and values."""
 
-    name: Predicate
-    args: tuple[str | "Point"]
+    name: str
+    args: tuple[str]
 
-    def __str__(self) -> str:
-        return name_and_arguments_to_str(self.name, self.args, " ")
+    def __post_init__(self):
+        self.hash_tuple = (self.name, *self.args)
 
     def translate(self, mapping: dict[str, str]) -> Construction:
         args = [mapping[a] if a in mapping else a for a in self.args]
         return Construction(self.name, tuple(args))
+
+    def __str__(self) -> str:
+        return " ".join(self.hash_tuple)
+
+    def __hash__(self) -> tuple[str, ...]:
+        return hash(self.hash_tuple)
 
     @classmethod
     def from_txt(cls, data: str) -> Construction:
@@ -28,24 +28,8 @@ class Construction:
         return Construction(data[0], tuple(data[1:]))
 
 
-def name_and_arguments_to_str(
-    name: str, args: list[str | int | "Node"], join: str
-) -> list[str]:
-    return join.join([name] + arguments_to_str(args))
-
-
-def arguments_to_str(args: list[str | int | "Node"]) -> list[str]:
-    args_str = []
-    for arg in args:
-        if isinstance(arg, (int, str, float)):
-            args_str.append(str(arg))
-        else:
-            args_str.append(arg.name)
-    return args_str
-
-
 class Clause:
-    """One construction (>= 1 predicate)."""
+    """One clause to define one or multiple points through one or more constructions."""
 
     def __init__(self, points: list[str], constructions: list[Construction]):
         self.points = []
@@ -89,8 +73,8 @@ class Clause:
     def from_txt(cls, data: str) -> Clause:
         if data == " =":
             return Clause([], [])
-        points, constructions = data.split(" = ")
+        points, statements = data.split(" = ")
         return Clause(
             points.split(" "),
-            [Construction.from_txt(c) for c in constructions.split(", ")],
+            [Construction.from_txt(c) for c in statements.split(", ")],
         )

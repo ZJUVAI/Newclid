@@ -1,6 +1,6 @@
 """Implements geometric objects used in the graph representation."""
 from __future__ import annotations
-from typing import Any, Type
+from typing import Any, Optional, Type
 
 
 class Node:
@@ -304,6 +304,7 @@ def bfs_backtrack(root: Node, leafs: list[Node], parent: dict[Node, Node]) -> li
 
 
 class Point(Node):
+    rely_on: list[Point] = None
     pass
 
 
@@ -397,6 +398,8 @@ def name_map(struct: Any) -> Any:
 
 class Angle(Node):
     """Node of type Angle."""
+
+    opposite: Optional[Angle] = None
 
     def new_val(self) -> Measure:
         return Measure()

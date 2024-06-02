@@ -5,7 +5,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 
-from geosolver.construction import Clause
+from geosolver.definitions.clause import Clause
+from geosolver.statement import Statement
 import geosolver.pretty as pt
 import geosolver.trace_back as trace_back
 
@@ -26,7 +27,8 @@ def get_proof_steps(
 ]:
     """Extract proof steps from the built DAG."""
     goal_args = proof.symbols_graph.names2nodes(goal.args)
-    query = Dependency(goal.name, goal_args, None, None)
+    goal = Statement(goal.name, goal_args)
+    query = Dependency(goal, None, None)
 
     setup, aux, log, setup_points = trace_back.get_logs(
         query, proof, merge_trivials=merge_trivials
@@ -51,13 +53,15 @@ def natural_language_statement(logical_statement: Dependency) -> str:
     Returns:
       a string of (pseudo) natural language of the predicate for human reader.
     """
-    names = [a.name.upper() for a in logical_statement.args]
+    names = [a.name.upper() for a in logical_statement.statement.args]
     names = [(n[0] + "_" + n[1:]) if len(n) > 1 else n for n in names]
-    return pt.pretty_nl(logical_statement.name, names)
+    return pt.pretty_nl(logical_statement.statement.name, names)
 
 
 def proof_step_string(
-    proof_step: Dependency, refs: dict[tuple[str, ...], int], last_step: bool
+    proof_step: tuple[list[Dependency], list[Dependency]],
+    refs: dict[tuple[str, ...], int],
+    last_step: bool,
 ) -> str:
     """Translate proof to natural language.
 
@@ -73,7 +77,8 @@ def proof_step_string(
 
     premises_nl = " & ".join(
         [
-            natural_language_statement(p) + " [{:02}]".format(refs[p.hashed()])
+            natural_language_statement(p)
+            + " [{:02}]".format(refs[p.statement.hash_tuple])
             for p in premises
         ]
     )
@@ -81,11 +86,11 @@ def proof_step_string(
     if not premises:
         premises_nl = "similarly"
 
-    refs[conclusion.hashed()] = len(refs)
+    refs[conclusion.statement.hash_tuple] = len(refs)
 
     conclusion_nl = natural_language_statement(conclusion)
     if not last_step:
-        conclusion_nl += " [{:02}]".format(refs[conclusion.hashed()])
+        conclusion_nl += " [{:02}]".format(refs[conclusion.statement.hash_tuple])
 
     return f"{premises_nl} \u21d2 {conclusion_nl}"
 
@@ -112,7 +117,8 @@ def write_solution(
         if not premises:
             continue
         premises_nl += [
-            natural_language_statement(p) + " [{:02}]".format(refs[p.hashed()])
+            natural_language_statement(p)
+            + " [{:02}]".format(refs[p.statement.hash_tuple])
             for p in premises
         ]
     solution += ": Points\n" + "\n".join(premises_nl)
@@ -122,7 +128,8 @@ def write_solution(
     for premises, [points] in aux:
         solution += " ".join([p.name.upper() for p in points]) + " "
         aux_premises_nl += [
-            natural_language_statement(p) + " [{:02}]".format(refs[p.hashed()])
+            natural_language_statement(p)
+            + " [{:02}]".format(refs[p.statement.hash_tuple])
             for p in premises
         ]
     solution += ": Points\n" + "\n".join(aux_premises_nl)

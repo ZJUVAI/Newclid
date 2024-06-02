@@ -8,8 +8,8 @@ import traceback
 from typing import Optional
 from typing_extensions import Self
 
-from geosolver.construction import Clause
-from geosolver.definition import Definition
+from geosolver.definitions.clause import Clause
+from geosolver.definitions.definition import Definition
 from geosolver.theorem import Theorem
 from geosolver.proof import Proof
 from geosolver.configs import default_defs_path, default_rules_path
@@ -18,7 +18,7 @@ from geosolver.agent.interface import AuxAction, DeductiveAgent
 from geosolver.run_loop import run_loop
 from geosolver.problem import Problem, setup_str_from_problem
 from geosolver.proof_writing import write_solution
-from geosolver.statement.adder import IntrinsicRules
+from geosolver.statements.adder import IntrinsicRules
 
 
 class GeometricSolver:
@@ -67,7 +67,6 @@ class GeometricSolver:
             self.deductive_agent,
             self.proof_state,
             self.rules,
-            self.problem,
             max_steps=max_steps,
             timeout=timeout,
         )

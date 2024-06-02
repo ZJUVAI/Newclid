@@ -1,13 +1,14 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING
+from geosolver.statement import Statement
 from geosolver.dependencies.dependency import Dependency
 from geosolver.dependencies.why_predicates import why_dependency
-from geosolver.geometry import Point
 
 if TYPE_CHECKING:
     from geosolver.proof import Proof
     from geosolver.dependencies.caching import DependencyCache
     from geosolver.symbols_graph import SymbolsGraph
-    from geosolver.statement.checker import StatementChecker
+    from geosolver.statements.checker import StatementChecker
 
 
 class EmptyDependency:
@@ -17,11 +18,12 @@ class EmptyDependency:
         self.level = level
         self.rule_name = rule_name or ""
         self.empty = True
-        self.why = []
+        self.why: list[Dependency] = []
         self.trace = None
+        self.construction = None
 
-    def populate(self, name: str, args: list["Point"]) -> Dependency:
-        dep = Dependency(name, args, self.rule_name, self.level)
+    def populate(self, statement: Statement) -> Dependency:
+        dep = Dependency(statement, self.rule_name, self.level)
         dep.trace2 = self.trace
         dep.why = list(self.why)
         return dep
@@ -34,15 +36,13 @@ class EmptyDependency:
     def extend(
         self,
         proof: "Proof",
-        name0: str,
-        args0: list["Point"],
-        name: str,
-        args: list["Point"],
+        statement0: Statement,
+        statement: Statement,
     ) -> "EmptyDependency":
         """Extend the dependency list by (name, args)."""
-        dep0 = self.populate(name0, args0)
+        dep0 = self.populate(statement0)
         deps = EmptyDependency(level=self.level, rule_name=None)
-        dep = Dependency(name, args, None, deps.level)
+        dep = Dependency(statement, None, deps.level)
         dep.why = why_dependency(
             dep,
             proof.symbols_graph,
@@ -58,18 +58,17 @@ class EmptyDependency:
         symbols_graph: "SymbolsGraph",
         statements_checker: "StatementChecker",
         dependency_cache: "DependencyCache",
-        name0: str,
-        args0: list["Point"],
-        name_args: list[tuple[str, list["Point"]]],
+        statement0: Statement,
+        statements: list[Statement],
     ) -> "EmptyDependency":
         """Extend the dependency list by many name_args."""
-        if not name_args:
+        if not statements:
             return self
-        dep0 = self.populate(name0, args0)
+        dep0 = self.populate(statement0)
         deps = EmptyDependency(level=self.level, rule_name=None)
         deps.why = [dep0]
-        for name, args in name_args:
-            dep = Dependency(name, args, None, deps.level)
+        for statement in statements:
+            dep = Dependency(statement, None, deps.level)
             dep.why = why_dependency(
                 dep,
                 symbols_graph,

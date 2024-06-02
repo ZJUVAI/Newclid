@@ -1,5 +1,5 @@
 from __future__ import annotations
-from geosolver.construction import Clause, Construction
+from geosolver.definitions.clause import Clause, Construction
 from geosolver.problem import reshape
 
 
@@ -51,7 +51,7 @@ class Definition:
     @classmethod
     def from_txt(cls, data: str) -> Definition:
         """Load definitions from a str object."""
-        construction, rely, deps, basics, numerics, _ = data.split("\n")
+        statement, rely, deps, basics, numerics, _ = data.split("\n")
         basics = [] if not basics else [b.strip() for b in basics.split(";")]
 
         levels = []
@@ -70,7 +70,7 @@ class Definition:
         numerics = [] if not numerics else numerics.split(", ")
 
         return cls(
-            construction=Construction.from_txt(construction),
+            construction=Construction.from_txt(statement),
             rely=parse_rely(rely),
             deps=Clause.from_txt(deps),
             basics=levels,

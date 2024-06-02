@@ -136,7 +136,7 @@ def _ratio_pretty(args: list[str]):
     return "{}{}:{}{} = {}{}:{}{}".format(*args)
 
 
-def pretty(txt: str) -> str:
+def pretty(txt: tuple[str, ...]) -> str:
     """Pretty formating a predicate string."""
     if isinstance(txt, str):
         txt = txt.split(" ")

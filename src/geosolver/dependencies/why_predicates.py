@@ -1,7 +1,8 @@
 from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar
-from geosolver.dependencies.caching import DependencyCache, hashed
+from geosolver.statement import Statement
+from geosolver.dependencies.caching import DependencyCache
 
 from geosolver.dependencies.dependency import Dependency
 from geosolver.geometry import (
@@ -21,7 +22,7 @@ from geosolver.predicates import Predicate
 
 
 if TYPE_CHECKING:
-    from geosolver.statement.checker import StatementChecker
+    from geosolver.statements.checker import StatementChecker
     from geosolver.symbols_graph import SymbolsGraph
 
 
@@ -32,15 +33,15 @@ def why_dependency(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    cached_me = dependency_cache.get(dependency.name, dependency.args)
+    cached_me = dependency_cache.get(dependency.statement)
     if cached_me is not None:
         dependency.rule_name = cached_me.rule_name
         return cached_me.why
 
-    if dependency.name == Predicate.IND.value:
+    predicate = Predicate(dependency.statement.name)
+    if predicate is Predicate.IND:
         return []
 
-    predicate = Predicate(dependency.name)
     why_predicate = PREDICATE_TO_WHY[predicate]
     return why_predicate(
         dependency, symbols_graph, statements_checker, dependency_cache, level
@@ -64,7 +65,7 @@ def _why_para(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    a, b, c, d = dep.args
+    a, b, c, d = dep.statement.args
 
     if {a, b} == {c, d}:
         return []
@@ -74,9 +75,9 @@ def _why_para(
     if ab == cd:
         if {a, b} == {c, d}:
             return []
-        coll_dep = Dependency(
-            Predicate.COLLINEAR.value, list({a, b, c, d}), "t??", None
-        )
+
+        coll = Statement(Predicate.COLLINEAR, list({a, b, c, d}))
+        coll_dep = Dependency(coll, "t??", None)
         coll_dep.why = _why_coll(
             coll_dep, symbols_graph, statements_checker, dependency_cache, level
         )
@@ -87,7 +88,8 @@ def _why_para(
         x_, y_ = xy.points
         if {x, y} == {x_, y_}:
             continue
-        collx_dep = Dependency(Predicate.COLLINEAR_X.value, [x, y, x_, y_], None, level)
+        collx = Statement(Predicate.COLLINEAR_X, [x, y, x_, y_])
+        collx_dep = Dependency(collx, None, level)
         collx_dep.why = _why_collx(
             collx_dep, symbols_graph, statements_checker, dependency_cache, level
         )
@@ -104,10 +106,11 @@ def _why_midpoint(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    m, a, b = dep.args
+    m, a, b = dep.statement.args
     ma = symbols_graph.get_segment(m, a)
     mb = symbols_graph.get_segment(m, b)
-    coll_dep = Dependency(Predicate.COLLINEAR.value, [m, a, b], None, None)
+    coll = Statement(Predicate.COLLINEAR, [m, a, b])
+    coll_dep = Dependency(coll, None, None)
     coll_dep.why = _why_coll(
         coll_dep, symbols_graph, statements_checker, dependency_cache, None
     )
@@ -121,7 +124,7 @@ def _why_perp(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    a, b, c, d = dep.args
+    a, b, c, d = dep.statement.args
     ab = symbols_graph.get_line(a, b)
     cd = symbols_graph.get_line(c, d)
 
@@ -130,7 +133,8 @@ def _why_perp(
         x_, y_ = xy.points
         if {x, y} == {x_, y_}:
             continue
-        collx_dep = Dependency(Predicate.COLLINEAR_X.value, [x, y, x_, y_], None, level)
+        collx = Statement(Predicate.COLLINEAR_X, [x, y, x_, y_])
+        collx_dep = Dependency(collx, None, level)
         collx_dep.why = _why_collx(
             collx_dep, symbols_graph, statements_checker, dependency_cache, level
         )
@@ -140,10 +144,11 @@ def _why_perp(
     a, b = ab.points
     c, d = cd.points
 
-    if hashed(dep.name, [a, b, c, d]) != dep.hashed():
-        d = Dependency(dep.name, [a, b, c, d], None, level)
-        d.why = why_eqangle
-        why_eqangle = [d]
+    perp_repr = Statement(dep.statement.name, [a, b, c, d])
+    if perp_repr.hash_tuple != dep.statement.hash_tuple:
+        repr_dep = Dependency(perp_repr, None, level)
+        repr_dep.why = why_eqangle
+        why_eqangle = [repr_dep]
 
     why_perp += why_eqangle
     return why_perp
@@ -156,7 +161,7 @@ def _why_cong(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    a, b, c, d = dep.args
+    a, b, c, d = dep.statement.args
     ab = symbols_graph.get_segment(a, b)
     cd = symbols_graph.get_segment(c, d)
     return _why_equal(ab, cd, level)
@@ -169,7 +174,7 @@ def _why_coll(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    _, why = _line_of_and_why(dep.args, level)
+    _, why = _line_of_and_why(dep.statement.args, level)
     return why
 
 
@@ -180,15 +185,17 @@ def _why_collx(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    if statements_checker.check_coll(dep.args):
-        args = list(set(dep.args))
-        cached_dep = dependency_cache.get(Predicate.COLLINEAR.value, args)
+    if statements_checker.check_coll(dep.statement.args):
+        args = list(set(dep.statement.args))
+        coll = Statement(Predicate.COLLINEAR, args)
+        cached_dep = dependency_cache.get(coll)
         if cached_dep is not None:
             return [cached_dep]
         _, why = _line_of_and_why(args, level)
         return why
 
-    para_dep = Dependency(Predicate.PARALLEL.value, dep.args, dep.rule_name, dep.level)
+    para = Statement(Predicate.PARALLEL, dep.statement.args)
+    para_dep = Dependency(para, dep.rule_name, dep.level)
     return _why_para(
         para_dep, symbols_graph, statements_checker, dependency_cache, level
     )
@@ -228,7 +235,7 @@ def _why_cyclic(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    _, why = _circle_of_and_why(dep.args, level)
+    _, why = _circle_of_and_why(dep.statement.args, level)
     return why
 
 
@@ -263,7 +270,7 @@ def _why_circle(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    o, a, b, c = dep.args
+    o, a, b, c = dep.statement.args
     oa = symbols_graph.get_segment(o, a)
     ob = symbols_graph.get_segment(o, b)
     oc = symbols_graph.get_segment(o, c)
@@ -277,7 +284,7 @@ def _why_eqangle(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    a, b, c, d, m, n, p, q = dep.args
+    a, b, c, d, m, n, p, q = dep.statement.args
 
     ab, why1 = symbols_graph.get_line_thru_pair_why(a, b)
     cd, why2 = symbols_graph.get_line_thru_pair_why(c, d)
@@ -294,7 +301,8 @@ def _why_eqangle(
             para_points = [a, b, m, n]
         elif {p, q} == {m, n}:
             para_points = [a, b, c, d]
-        para_dep = Dependency(Predicate.PARALLEL.value, para_points, None, level)
+        para = Statement(Predicate.PARALLEL, para_points)
+        para_dep = Dependency(para, None, level)
         para_dep.why = _why_para(
             para_dep, symbols_graph, statements_checker, dependency_cache, level
         )
@@ -309,7 +317,8 @@ def _why_eqangle(
         x_, y_ = xy.points
         if {x, y} == {x_, y_}:
             continue
-        collx_dep = Dependency(Predicate.COLLINEAR_X.value, [x, y, x_, y_], None, level)
+        collx = Statement(Predicate.COLLINEAR_X, [x, y, x_, y_])
+        collx_dep = Dependency(collx, None, level)
         collx_dep.why = whyxy
         why_eqangle.append(collx_dep)
 
@@ -317,7 +326,9 @@ def _why_eqangle(
     c, d = cd.points
     m, n = mn.points
     p, q = pq.points
-    diff = hashed(dep.name, [a, b, c, d, m, n, p, q]) != dep.hashed()
+
+    representent_statement = Statement(dep.statement.name, [a, b, c, d, m, n, p, q])
+    different_from_repr = representent_statement.hash_tuple != dep.statement.hash_tuple
 
     why_eqangle_values = None
     if ab._val and cd._val and mn._val and pq._val:
@@ -327,12 +338,11 @@ def _why_eqangle(
 
     if why_eqangle_values:
         (dab, dcd, dmn, dpq), why_eqangle_values = why_eqangle_values
-        if diff:
-            d = Dependency(
-                Predicate.EQANGLE.value, [a, b, c, d, m, n, p, q], None, level
-            )
-            d.why = why_eqangle_values
-            why_eqangle_values = [d]
+        if different_from_repr:
+            eqangle = Statement(Predicate.EQANGLE, [a, b, c, d, m, n, p, q])
+            eqangle_dep = Dependency(eqangle, None, level)
+            eqangle_dep.why = why_eqangle_values
+            why_eqangle_values = [eqangle_dep]
         return why_eqangle + why_eqangle_values
 
     if (ab == cd and mn == pq) or (ab == mn and cd == pq):
@@ -353,22 +363,26 @@ def _why_eqangle(
         return why_eqangle
 
     if is_equal(ab, mn) or is_equal(cd, pq):
-        dep1 = Dependency(Predicate.PARALLEL.value, [a, b, m, n], None, level)
+        para1 = Statement(Predicate.PARALLEL, [a, b, m, n])
+        dep1 = Dependency(para1, None, level)
         dep1.why = _why_para(
             dep1, symbols_graph, statements_checker, dependency_cache, level
         )
-        dep2 = Dependency(Predicate.PARALLEL.value, [c, d, p, q], None, level)
+        para2 = Statement(Predicate.PARALLEL, [c, d, p, q])
+        dep2 = Dependency(para2, None, level)
         dep2.why = _why_para(
             dep2, symbols_graph, statements_checker, dependency_cache, level
         )
         why_eqangle += [dep1, dep2]
 
     elif is_equal(ab, cd) or is_equal(mn, pq):
-        dep1 = Dependency(Predicate.PARALLEL.value, [a, b, c, d], None, level)
+        para1 = Statement(Predicate.PARALLEL, [a, b, c, d])
+        dep1 = Dependency(para1, None, level)
         dep1.why = _why_para(
             dep1, symbols_graph, statements_checker, dependency_cache, level
         )
-        dep2 = Dependency(Predicate.PARALLEL.value, [m, n, p, q], None, level)
+        para2 = Statement(Predicate.PARALLEL, [m, n, p, q])
+        dep2 = Dependency(para2, None, level)
         dep2.why = _why_para(
             dep2, symbols_graph, statements_checker, dependency_cache, level
         )
@@ -386,7 +400,7 @@ def _why_eqratio(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    a, b, c, d, m, n, p, q = dep.args
+    a, b, c, d, m, n, p, q = dep.statement.args
     ab = symbols_graph.get_segment(a, b)
     cd = symbols_graph.get_segment(c, d)
     mn = symbols_graph.get_segment(m, n)
@@ -405,9 +419,8 @@ def _why_eqratio(
             congruent_points = [a, b, c, d]
 
         if congruent_points is not None:
-            cong_dep = Dependency(
-                Predicate.CONGRUENT.value, congruent_points, None, level
-            )
+            cong = Statement(Predicate.CONGRUENT, congruent_points)
+            cong_dep = Dependency(cong, None, level)
             cong_dep.why = _why_cong(
                 cong_dep, symbols_graph, statements_checker, dependency_cache, level
             )
@@ -438,21 +451,25 @@ def _why_eqratio(
         return why_eqratio
 
     if is_equal(ab, mn) or is_equal(cd, pq):
-        dep1 = Dependency(Predicate.CONGRUENT.value, [a, b, m, n], None, level)
+        cong1 = Statement(Predicate.CONGRUENT, [a, b, m, n])
+        dep1 = Dependency(cong1, None, level)
         dep1.why = _why_cong(
             dep1, symbols_graph, statements_checker, dependency_cache, level
         )
-        dep2 = Dependency(Predicate.CONGRUENT.value, [c, d, p, q], None, level)
+        cong2 = Statement(Predicate.CONGRUENT, [c, d, p, q])
+        dep2 = Dependency(cong2, None, level)
         dep2.why = _why_cong(
             dep2, symbols_graph, statements_checker, dependency_cache, level
         )
         why_eqratio += [dep1, dep2]
     elif is_equal(ab, cd) or is_equal(mn, pq):
-        dep1 = Dependency(Predicate.CONGRUENT.value, [a, b, c, d], None, level)
+        cong1 = Statement(Predicate.CONGRUENT, [a, b, c, d])
+        dep1 = Dependency(cong1, None, level)
         dep1.why = _why_cong(
             dep1, symbols_graph, statements_checker, dependency_cache, level
         )
-        dep2 = Dependency(Predicate.CONGRUENT.value, [m, n, p, q], None, level)
+        cong2 = Statement(Predicate.CONGRUENT, [m, n, p, q])
+        dep2 = Dependency(cong2, None, level)
         dep2.why = _why_cong(
             dep2, symbols_graph, statements_checker, dependency_cache, level
         )
@@ -470,16 +487,19 @@ def _why_eqratio3(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    a, b, c, d, m, n = dep.args
-    dep1 = Dependency(Predicate.PARALLEL.value, [a, b, c, d], "", level)
+    a, b, c, d, m, n = dep.statement.args
+    para = Statement(Predicate.PARALLEL, [a, b, c, d])
+    dep1 = Dependency(para, "", level)
     dep1.why = _why_para(
         dep1, symbols_graph, statements_checker, dependency_cache, level
     )
-    dep2 = Dependency(Predicate.COLLINEAR.value, [m, a, c], "", level)
+    coll_mac = Statement(Predicate.COLLINEAR, [m, a, c])
+    dep2 = Dependency(coll_mac, "", level)
     dep2.why = _why_coll(
         dep2, symbols_graph, statements_checker, dependency_cache, level
     )
-    dep3 = Dependency(Predicate.COLLINEAR.value, [n, b, d], "", level)
+    coll_nbd = Statement(Predicate.COLLINEAR, [n, b, d])
+    dep3 = Dependency(coll_nbd, "", level)
     dep3.why = _why_coll(
         dep3, symbols_graph, statements_checker, dependency_cache, level
     )
@@ -494,12 +514,14 @@ def _why_simtri(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    a, b, c, x, y, z = dep.args
-    dep1 = Dependency(Predicate.EQANGLE.value, [a, b, a, c, x, y, x, z], "", level)
+    a, b, c, x, y, z = dep.statement.args
+    eqangle1 = Statement(Predicate.EQANGLE, [a, b, a, c, x, y, x, z])
+    dep1 = Dependency(eqangle1, "", level)
     dep1.why = _why_eqangle(
         dep1, symbols_graph, statements_checker, dependency_cache, level
     )
-    dep2 = Dependency(Predicate.EQANGLE.value, [b, a, b, c, y, x, y, z], "", level)
+    eqangle2 = Statement(Predicate.EQANGLE, [b, a, b, c, y, x, y, z])
+    dep2 = Dependency(eqangle2, "", level)
     dep2.why = _why_eqangle(
         dep2, symbols_graph, statements_checker, dependency_cache, level
     )
@@ -514,12 +536,14 @@ def _why_simtri_both(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    a, b, c, p, q, r = dep.args
-    dep1 = Dependency(Predicate.EQRATIO.value, [b, a, b, c, q, p, q, r], "", level)
+    a, b, c, p, q, r = dep.statement.args
+    eqratio1 = Statement(Predicate.EQRATIO, [b, a, b, c, q, p, q, r])
+    dep1 = Dependency(eqratio1, "", level)
     dep1.why = _why_eqratio(
         dep1, symbols_graph, statements_checker, dependency_cache, level
     )
-    dep2 = Dependency(Predicate.EQRATIO.value, [c, a, c, b, r, p, r, q], "", level)
+    eqratio2 = Statement(Predicate.EQRATIO, [c, a, c, b, r, p, r, q])
+    dep2 = Dependency(eqratio2, "", level)
     dep2.why = _why_eqratio(
         dep2, symbols_graph, statements_checker, dependency_cache, level
     )
@@ -534,16 +558,19 @@ def _why_contri(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    a, b, c, x, y, z = dep.args
-    dep1 = Dependency(Predicate.EQANGLE.value, [b, a, b, c, y, x, y, z], "", level)
+    a, b, c, x, y, z = dep.statement.args
+    eqangle1 = Statement(Predicate.EQANGLE, [b, a, b, c, y, x, y, z])
+    dep1 = Dependency(eqangle1, "", level)
     dep1.why = _why_eqangle(
         dep1, symbols_graph, statements_checker, dependency_cache, level
     )
-    dep2 = Dependency(Predicate.EQANGLE.value, [c, a, c, b, z, x, z, y], "", level)
+    eqangle2 = Statement(Predicate.EQANGLE, [c, a, c, b, z, x, z, y])
+    dep2 = Dependency(eqangle2, "", level)
     dep2.why = _why_eqangle(
         dep2, symbols_graph, statements_checker, dependency_cache, level
     )
-    dep3 = Dependency(Predicate.CONGRUENT.value, [a, b, x, y], "", level)
+    cong = Statement(Predicate.CONGRUENT, [a, b, x, y])
+    dep3 = Dependency(cong, "", level)
     dep3.why = _why_cong(
         dep3, symbols_graph, statements_checker, dependency_cache, level
     )
@@ -558,16 +585,19 @@ def why_contri_2(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    a, b, c, x, y, z = dep.args
-    dep1 = Dependency(Predicate.EQANGLE.value, [b, a, b, c, y, z, y, x], "", level)
+    a, b, c, x, y, z = dep.statement.args
+    eqangle1 = Statement(Predicate.EQANGLE, [b, a, b, c, y, z, y, x])
+    dep1 = Dependency(eqangle1, "", level)
     dep1.why = _why_eqangle(
         dep1, symbols_graph, statements_checker, dependency_cache, level
     )
-    dep2 = Dependency(Predicate.EQANGLE.value, [c, a, c, b, z, y, z, x], "", level)
+    eqangle2 = Statement(Predicate.EQANGLE, [c, a, c, b, z, y, z, x])
+    dep2 = Dependency(eqangle2, "", level)
     dep2.why = _why_eqangle(
         dep2, symbols_graph, statements_checker, dependency_cache, level
     )
-    dep3 = Dependency(Predicate.CONGRUENT.value, [a, b, x, y], "", level)
+    cong = Statement(Predicate.CONGRUENT, [a, b, x, y])
+    dep3 = Dependency(cong, "", level)
     dep3.why = _why_cong(
         dep3, symbols_graph, statements_checker, dependency_cache, level
     )
@@ -582,16 +612,19 @@ def _why_contri_both(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    a, b, c, x, y, z = dep.args
-    dep1 = Dependency(Predicate.CONGRUENT.value, [a, b, x, y], "", level)
+    a, b, c, x, y, z = dep.statement.args
+    cong1 = Statement(Predicate.CONGRUENT, [a, b, x, y])
+    dep1 = Dependency(cong1, "", level)
     dep1.why = _why_cong(
         dep1, symbols_graph, statements_checker, dependency_cache, level
     )
-    dep2 = Dependency(Predicate.CONGRUENT.value, [b, c, y, z], "", level)
+    cong2 = Statement(Predicate.CONGRUENT, [b, c, y, z])
+    dep2 = Dependency(cong2, "", level)
     dep2.why = _why_cong(
         dep2, symbols_graph, statements_checker, dependency_cache, level
     )
-    dep3 = Dependency(Predicate.CONGRUENT.value, [c, a, z, x], "", level)
+    cong3 = Statement(Predicate.CONGRUENT, [c, a, z, x])
+    dep3 = Dependency(cong3, "", level)
     dep3.why = _why_cong(
         dep3, symbols_graph, statements_checker, dependency_cache, level
     )
@@ -606,7 +639,7 @@ def _why_aconst(
     dependency_cache: "DependencyCache",
     level: int,
 ) -> list[Dependency]:
-    a, b, c, d, ang0 = dep.args
+    a, b, c, d, ang0 = dep.statement.args
 
     measure = ang0._val
     for ang in measure.neighbors(Angle):
@@ -626,17 +659,19 @@ def _why_aconst(
             if statements_checker.check_coll(args):
                 if len(set(args)) <= 2:
                     continue
-                para_dep = Dependency(Predicate.COLLINEAR.value, args, None, None)
-                para_dep.why = _why_coll(
-                    para_dep,
+                coll = Statement(Predicate.COLLINEAR, args)
+                coll_dep = Dependency(coll, None, None)
+                coll_dep.why = _why_coll(
+                    coll_dep,
                     symbols_graph,
                     statements_checker,
                     dependency_cache,
                     level,
                 )
-                why_aconst.append(para_dep)
+                why_aconst.append(coll_dep)
             else:
-                para_dep = Dependency(Predicate.PARALLEL.value, args, None, None)
+                para = Statement(Predicate.PARALLEL, args)
+                para_dep = Dependency(para, None, None)
                 para_dep.why = _why_para(
                     para_dep,
                     symbols_graph,
@@ -657,7 +692,7 @@ def _why_rconst(
     dependency_cache: "DependencyCache",
     level: int,
 ):
-    a, b, c, d, rat0 = dep.args
+    a, b, c, d, rat0 = dep.statement.args
 
     val = rat0._val
 
@@ -676,7 +711,8 @@ def _why_rconst(
         why_rconst = []
         for args in [(a, b, a1, b1), (c, d, c1, d1)]:
             if len(set(args)) > 2:
-                cong_dep = Dependency(Predicate.CONGRUENT.value, args, None, None)
+                cong = Statement(Predicate.CONGRUENT, args)
+                cong_dep = Dependency(cong, None, None)
                 cong_dep.why = _why_cong(
                     cong_dep, symbols_graph, statements_checker, dependency_cache, level
                 )
@@ -782,18 +818,18 @@ def _maybe_make_equal_pairs(
     if ab != mn:
         return
     why = []
-    eqname = (
-        Predicate.PARALLEL.value if isinstance(ab, Line) else Predicate.CONGRUENT.value
-    )
+    eqpredicate = Predicate.PARALLEL if isinstance(ab, Line) else Predicate.CONGRUENT
     colls = [a, b, m, n]
-    if len(set(colls)) > 2 and eqname == Predicate.PARALLEL.value:
-        collx_dep = Dependency(Predicate.COLLINEAR_X.value, colls, None, level)
+    if len(set(colls)) > 2 and eqpredicate is Predicate.PARALLEL:
+        collx = Statement(Predicate.COLLINEAR_X, colls)
+        collx_dep = Dependency(collx, None, level)
         collx_dep.why = _why_collx(
             collx_dep, symbols_graph, statements_checker, dependency_cache, level
         )
         why += [collx_dep]
 
-    eqdep = Dependency(eqname, [c, d, p, q], None, level)
+    eq_statement = Statement(eqpredicate, [c, d, p, q])
+    eqdep = Dependency(eq_statement, None, level)
     eqdep.why = why_dependency(
         eqdep, symbols_graph, statements_checker, dependency_cache, level
     )
@@ -848,9 +884,8 @@ def _why_eqangle_directions(
     (e_, f_), (g_, h_) = d3_._obj.points, d4_._obj.points
     deps = []
     if why0:
-        dep = Dependency(
-            Predicate.EQANGLE.value, [a_, b_, c_, d_, e_, f_, g_, h_], "", None
-        )
+        eqangle = Statement(Predicate.EQANGLE, [a_, b_, c_, d_, e_, f_, g_, h_])
+        dep = Dependency(eqangle, "", None)
         dep.why = why0
         deps.append(dep)
 
@@ -866,10 +901,11 @@ def _why_eqangle_directions(
         xy, xy_ = d_xy._obj, d_xy_._obj
         if why:
             if xy == xy_:
-                name = Predicate.COLLINEAR_X.value
+                predicate = Predicate.COLLINEAR_X
             else:
-                name = Predicate.PARALLEL.value
-            dep = Dependency(name, [x_, y_, x, y], "", None)
+                predicate = Predicate.PARALLEL
+            because_statement = Statement(predicate, [x_, y_, x, y])
+            dep = Dependency(because_statement, "", None)
             dep.why = why
             deps.append(dep)
 
@@ -917,9 +953,8 @@ def _why_eqratio_directions(
     (e_, f_), (g_, h_) = d3_._obj.points, d4_._obj.points
     deps = []
     if why0:
-        dep = Dependency(
-            Predicate.EQRATIO.value, [a_, b_, c_, d_, e_, f_, g_, h_], "", level
-        )
+        eqratio = Statement(Predicate.EQRATIO, [a_, b_, c_, d_, e_, f_, g_, h_])
+        dep = Dependency(eqratio, "", level)
         dep.why = why0
         deps.append(dep)
 
@@ -931,7 +966,8 @@ def _why_eqratio_directions(
         [(a_, b_), (c_, d_), (e_, f_), (g_, h_)],
     ):
         if why:
-            dep = Dependency(Predicate.CONGRUENT.value, [x, y, x_, y_], "", level)
+            cong = Statement(Predicate.CONGRUENT, [x, y, x_, y_])
+            dep = Dependency(cong, "", level)
             dep.why = why
             deps.append(dep)
 

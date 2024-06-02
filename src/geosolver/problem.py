@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
-from geosolver.construction import Clause, Construction
+from geosolver.definitions.clause import Clause, Construction
+from geosolver.statement import Statement
 from geosolver.predicates import Predicate
-from geosolver.dependencies.caching import hashed_txt
 
 import geosolver.pretty as pt
 
@@ -15,7 +15,7 @@ from geosolver.ratios import simplify
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
-    from geosolver.definition import Definition
+    from geosolver.definitions.definition import Definition
 
 
 CONSTRUCTION_RULE = "c0"
@@ -48,13 +48,11 @@ class Problem:
         for clause in self.clauses:
             clauses.append(clause.translate(mapping))
 
+        goal = self.goal
         if self.goal:
             goal = self.goal.translate(mapping)
-        else:
-            goal = self.goal
 
         p = Problem(self.url, clauses, goal)
-        p.mapping = mapping
         return p
 
     def __str__(self) -> str:
@@ -103,7 +101,9 @@ class Problem:
         return {p.url: p for p in data}
 
 
-def setup_str_from_problem(problem: Problem, definitions: list["Definition"]) -> str:
+def setup_str_from_problem(
+    problem: Problem, definitions: dict[str, "Definition"]
+) -> str:
     """Construct the <theorem_premises> string from Problem object."""
     ref = 0
 
@@ -142,7 +142,8 @@ def setup_str_from_problem(problem: Problem, definitions: list["Definition"]) ->
                         m, n = simplify(int(v), 180)
                         args = [y, z, y, x, f"{m}pi/{n}"]
 
-                    p2deps[points].append(hashed_txt(name, args))
+                    basic = Statement(name, tuple(args))
+                    p2deps[points].append(basic.hash_tuple)
 
         for k, v in p2deps.items():
             p2deps[k] = sort_deps(v)
@@ -170,7 +171,7 @@ def setup_str_from_problem(problem: Problem, definitions: list["Definition"]) ->
 
     string = "{S} " + " ; ".join([s.strip() for s in string])
     goal = problem.goal
-    string += " ? " + pt.pretty([goal.name] + goal.args)
+    string += " ? " + pt.pretty(goal.hash_tuple)
     return string
 
 

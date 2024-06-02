@@ -6,6 +6,7 @@ from geosolver.dependencies.why_predicates import why_dependency
 from geosolver.predicates import Predicate
 from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE
+from geosolver.statement import Statement
 
 if TYPE_CHECKING:
     from geosolver.proof import Proof
@@ -18,12 +19,12 @@ def point_levels(
     """Reformat setup into levels of point constructions."""
     levels = []
     for con in setup:
-        plevel = max([p.plevel for p in con.args if isinstance(p, Point)])
+        plevel = max([p.plevel for p in con.statement.args if isinstance(p, Point)])
 
         while len(levels) - 1 < plevel:
             levels.append((set(), []))
 
-        for p in con.args:
+        for p in con.statement.args:
             if not isinstance(p, Point):
                 continue
             if existing_points and p in existing_points:
@@ -49,8 +50,9 @@ def point_log(
 
     for points, cons in levels:
         for con in cons:
-            if con.hashed() not in ref_id:
-                ref_id[con.hashed()] = len(ref_id)
+            con_hash = con.statement.hash_tuple
+            if con_hash not in ref_id:
+                ref_id[con_hash] = len(ref_id)
 
         log.append((points, cons))
 
@@ -63,7 +65,7 @@ def setup_to_levels(
     """Reformat setup into levels of point constructions."""
     levels = []
     for d in setup:
-        plevel = max([p.plevel for p in d.args if isinstance(p, Point)])
+        plevel = max([p.plevel for p in d.statement.args if isinstance(p, Point)])
         while len(levels) - 1 < plevel:
             levels.append([])
 
@@ -84,7 +86,7 @@ def separate_dependency_difference(
     set[Point],
 ]:
     """Identify and separate the dependency difference."""
-    setup = []
+    setup: list[Dependency] = []
     log_, log = log, []
     for prems, cons in log_:
         if not prems:
@@ -99,11 +101,11 @@ def separate_dependency_difference(
         if not cons_:
             continue
 
-        prems = [p for p in prems if p.name != Predicate.IND.value]
+        prems = [p for p in prems if p.statement.predicate != Predicate.IND]
         log.append((prems, cons_))
 
-    points = set(query.args)
-    queue = list(query.args)
+    points = set(query.statement.args)
+    queue = list(query.statement.args)
     i = 0
     while i < len(queue):
         q = queue[i]
@@ -117,12 +119,16 @@ def separate_dependency_difference(
 
     setup_, setup, aux_setup, aux_points = setup, [], [], set()
     for con in setup_:
-        if con.name == Predicate.IND.value:
+        if con.statement.predicate is Predicate.IND:
             continue
-        elif any([p not in points for p in con.args if isinstance(p, Point)]):
+        elif any([p not in points for p in con.statement.args if isinstance(p, Point)]):
             aux_setup.append(con)
             aux_points.update(
-                [p for p in con.args if isinstance(p, Point) and p not in points]
+                [
+                    p
+                    for p in con.statement.args
+                    if isinstance(p, Point) and p not in points
+                ]
             )
         else:
             setup.append(con)
@@ -140,45 +146,46 @@ def recursive_traceback(
 
     def read(q: "Dependency") -> None:
         q = q.remove_loop()
-        hashed = q.hashed()
+        hashed = q.statement.hash_tuple
         if hashed in visited:
             return
 
-        if hashed[0] in [
-            Predicate.NON_COLLINEAR.value,
-            Predicate.NON_PARALLEL.value,
-            Predicate.NON_PERPENDICULAR.value,
-            Predicate.DIFFERENT.value,
-            Predicate.SAMESIDE.value,
+        if q.statement.predicate in [
+            Predicate.NON_COLLINEAR,
+            Predicate.NON_PARALLEL,
+            Predicate.NON_PERPENDICULAR,
+            Predicate.DIFFERENT,
+            Predicate.SAMESIDE,
         ]:
             return
 
         nonlocal stack
 
         stack.append(hashed)
-        prems = []
+        prems: list["Dependency"] = []
 
         if q.rule_name != CONSTRUCTION_RULE:
-            all_deps = []
+            all_deps: list["Dependency"] = []
             dep_names = set()
-            for d in q.why:
-                if d.hashed() in dep_names:
+            for dep in q.why:
+                dep_hash = dep.statement.hash_tuple
+                if dep_hash in dep_names:
                     continue
-                dep_names.add(d.hashed())
-                all_deps.append(d)
+                dep_names.add(dep_hash)
+                all_deps.append(dep)
 
-            for d in all_deps:
-                h = d.hashed()
-                if h not in visited:
-                    read(d)
-                if h in visited:
-                    prems.append(d)
+            for dep in all_deps:
+                dep_hash = dep.statement.hash_tuple
+                if dep_hash not in visited:
+                    read(dep)
+                if dep_hash in visited:
+                    prems.append(dep)
 
         visited.add(hashed)
-        hashs = sorted([d.hashed() for d in prems])
+        hashs = sorted([d.statement.hash_tuple for d in prems])
         found = False
         for ps, qs in log:
-            if sorted([d.hashed() for d in ps]) == hashs:
+            if sorted([d.statement.hash_tuple for d in ps]) == hashs:
                 qs += [q]
                 found = True
                 break
@@ -206,13 +213,14 @@ def collx_to_coll_setup(
     for level in setup_to_levels(setup):
         hashs = set()
         for dep in level:
-            if dep.name == Predicate.COLLINEAR_X.value:
-                dep.name = Predicate.COLLINEAR.value
-                dep.args = list(set(dep.args))
+            if dep.statement.predicate == Predicate.COLLINEAR_X:
+                dep.statement.predicate = Predicate.COLLINEAR
+                dep.statement.args = list(set(dep.statement.args))
 
-            if dep.hashed() in hashs:
+            dep_hash = dep.statement.hash_tuple
+            if dep_hash in hashs:
                 continue
-            hashs.add(dep.hashed())
+            hashs.add(dep_hash)
             result.append(dep)
 
     return result
@@ -231,28 +239,33 @@ def collx_to_coll(
     setup = collx_to_coll_setup(setup)
     aux_setup = collx_to_coll_setup(aux_setup)
 
-    con_set = set([p.hashed() for p in setup + aux_setup])
+    con_set = set([p.statement.hash_tuple for p in setup + aux_setup])
     log_, log = log, []
     for prems, cons in log_:
         prem_set = set()
         prems_, prems = prems, []
         for p in prems_:
-            if p.name == Predicate.COLLINEAR_X.value:
-                p.name = Predicate.COLLINEAR.value
-                p.args = list(set(p.args))
-            if p.hashed() in prem_set:
+            if p.statement.predicate is Predicate.COLLINEAR_X:
+                p.statement = Statement(
+                    Predicate.COLLINEAR, list(set(p.statement.args))
+                )
+
+            prem_hash = p.statement.hash_tuple
+            if prem_hash in prem_set:
                 continue
-            prem_set.add(p.hashed())
+            prem_set.add(prem_hash)
             prems.append(p)
 
         cons_, cons = cons, []
         for c in cons_:
-            if c.name == Predicate.COLLINEAR_X.value:
-                c.name = Predicate.COLLINEAR.value
-                c.args = list(set(c.args))
-            if c.hashed() in con_set:
+            if c.statement.predicate == Predicate.COLLINEAR_X:
+                c.statement = Statement(
+                    Predicate.COLLINEAR, list(set(c.statement.args))
+                )
+            con_hash = c.statement.hash_tuple
+            if con_hash in con_set:
                 continue
-            con_set.add(c.hashed())
+            con_set.add(con_hash)
             cons.append(c)
 
         if not cons or not prems:
@@ -306,9 +319,9 @@ def shorten_and_shave(
     log, _ = shorten_proof(log, merge_trivials=merge_trivials)
 
     all_prems = sum([list(prems) for prems, _ in log], [])
-    all_prems = set([p.hashed() for p in all_prems])
-    setup = [d for d in setup if d.hashed() in all_prems]
-    aux_setup = [d for d in aux_setup if d.hashed() in all_prems]
+    all_prems = set([p.statement.hash_tuple for p in all_prems])
+    setup = [d for d in setup if d.statement.hash_tuple in all_prems]
+    aux_setup = [d for d in aux_setup if d.statement.hash_tuple in all_prems]
     return setup, aux_setup, log
 
 
@@ -318,12 +331,12 @@ def join_prems(
     expanded: set[tuple[str, ...]],
 ) -> list["Dependency"]:
     """Join proof steps with the same premises."""
-    h = con.hashed()
-    if h in expanded or h not in con2prems:
+    con_hash = con.statement.hash_tuple
+    if con_hash in expanded or con_hash not in con2prems:
         return [con]
 
     result = []
-    for p in con2prems[h]:
+    for p in con2prems[con_hash]:
         result += join_prems(p, con2prems, expanded)
     return result
 
@@ -342,10 +355,10 @@ def shorten_proof(
         assert len(cons) == 1
         con = cons[0]
         if con.rule_name == "":
-            con2prem[con.hashed()] = prems
+            con2prem[con.statement.hash_tuple] = prems
         elif not merge_trivials:
             # except for the ones that are premises to non-trivial steps.
-            pops.update({p.hashed() for p in prems})
+            pops.update({p.statement.hash_tuple for p in prems})
 
     for p in pops:
         if p in con2prem:
@@ -355,18 +368,20 @@ def shorten_proof(
     log2 = []
     for i, (prems, cons) in enumerate(log):
         con = cons[0]
-        if i < len(log) - 1 and con.hashed() in con2prem:
+        con_hash = con.statement.hash_tuple
+        if i < len(log) - 1 and con_hash in con2prem:
             continue
 
         hashs = set()
         new_prems = []
 
         for p in sum([join_prems(p, con2prem, expanded) for p in prems], []):
-            if p.hashed() not in hashs:
+            p_hash = p.statement.hash_tuple
+            if p_hash not in hashs:
                 new_prems.append(p)
-                hashs.add(p.hashed())
+                hashs.add(p_hash)
 
         log2 += [(new_prems, [con])]
-        expanded.add(con.hashed())
+        expanded.add(con_hash)
 
     return log2, con2prem

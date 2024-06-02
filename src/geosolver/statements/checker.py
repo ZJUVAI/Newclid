@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
+from geosolver.statement import Statement, angle_to_num_den, ratio_to_num_den
 from geosolver.predicates import Predicate
 from geosolver.geometry import (
     Angle,
@@ -20,11 +20,11 @@ from geosolver.numerical.check import (
 )
 
 from geosolver.listing import list_eqratio3
-from geosolver.symbols_graph import SymbolsGraph
+
 
 if TYPE_CHECKING:
-    pass
-
+    from geosolver.symbols_graph import SymbolsGraph
+    from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 
 from collections import defaultdict
 
@@ -32,45 +32,45 @@ from collections import defaultdict
 class StatementChecker:
     def __init__(
         self,
-        symbols_graph: SymbolsGraph,
-        alegbraic_manipulator: AlgebraicManipulator,
+        symbols_graph: "SymbolsGraph",
+        alegbraic_manipulator: "AlgebraicManipulator",
     ) -> None:
         self.symbols_graph = symbols_graph
         self.alegbraic_manipulator = alegbraic_manipulator
-        self.NAME_TO_CHECK = {
-            Predicate.COLLINEAR.value: self.check_coll,
-            Predicate.PARALLEL.value: self.check_para,
-            Predicate.PERPENDICULAR.value: self.check_perp,
-            Predicate.MIDPOINT.value: self.check_midp,
-            Predicate.CONGRUENT.value: self.check_cong,
-            Predicate.CIRCLE.value: self.check_circle,
-            Predicate.CYCLIC.value: self.check_cyclic,
-            Predicate.EQANGLE.value: self.check_const_or_eqangle,
-            Predicate.EQANGLE6.value: self.check_const_or_eqangle,
-            Predicate.EQRATIO.value: self.check_const_or_eqratio,
-            Predicate.EQRATIO3.value: self.check_eqratio3,
-            Predicate.EQRATIO6.value: self.check_const_or_eqratio,
-            Predicate.SIMILAR_TRIANGLE.value: self.check_simtri,
-            Predicate.SIMILAR_TRIANGLE_REFLECTED.value: self.check_simtri,
-            Predicate.SIMILAR_TRIANGLE_BOTH.value: self.check_simtri,
-            Predicate.CONTRI_TRIANGLE.value: self.check_contri,
-            Predicate.CONTRI_TRIANGLE_REFLECTED.value: self.check_contri,
-            Predicate.CONTRI_TRIANGLE_BOTH.value: self.check_contri,
-            Predicate.CONSTANT_ANGLE.value: self.check_aconst,
-            Predicate.S_ANGLE.value: self.check_sangle,
-            Predicate.CONSTANT_RATIO.value: self.check_rconst,
-            Predicate.COMPUTE_ANGLE.value: self.check_acompute,
-            Predicate.COMPUTE_RATIO.value: self.check_rcompute,
-            Predicate.SAMESIDE.value: self.check_sameside,
-            Predicate.DIFFERENT.value: self.check_diff,
-            Predicate.NON_COLLINEAR.value: self.check_ncoll,
-            Predicate.NON_PARALLEL.value: self.check_npara,
-            Predicate.NON_PERPENDICULAR.value: self.check_nperp,
+        self.PREDICATE_TO_CHECK = {
+            Predicate.COLLINEAR: self.check_coll,
+            Predicate.PARALLEL: self.check_para,
+            Predicate.PERPENDICULAR: self.check_perp,
+            Predicate.MIDPOINT: self.check_midp,
+            Predicate.CONGRUENT: self.check_cong,
+            Predicate.CIRCLE: self.check_circle,
+            Predicate.CYCLIC: self.check_cyclic,
+            Predicate.EQANGLE: self.check_const_or_eqangle,
+            Predicate.EQANGLE6: self.check_const_or_eqangle,
+            Predicate.EQRATIO: self.check_const_or_eqratio,
+            Predicate.EQRATIO3: self.check_eqratio3,
+            Predicate.EQRATIO6: self.check_const_or_eqratio,
+            Predicate.SIMILAR_TRIANGLE: self.check_simtri,
+            Predicate.SIMILAR_TRIANGLE_REFLECTED: self.check_simtri,
+            Predicate.SIMILAR_TRIANGLE_BOTH: self.check_simtri,
+            Predicate.CONTRI_TRIANGLE: self.check_contri,
+            Predicate.CONTRI_TRIANGLE_REFLECTED: self.check_contri,
+            Predicate.CONTRI_TRIANGLE_BOTH: self.check_contri,
+            Predicate.CONSTANT_ANGLE: self.check_aconst,
+            Predicate.S_ANGLE: self.check_sangle,
+            Predicate.CONSTANT_RATIO: self.check_rconst,
+            Predicate.COMPUTE_ANGLE: self.check_acompute,
+            Predicate.COMPUTE_RATIO: self.check_rcompute,
+            Predicate.SAMESIDE: self.check_sameside,
+            Predicate.DIFFERENT: self.check_diff,
+            Predicate.NON_COLLINEAR: self.check_ncoll,
+            Predicate.NON_PARALLEL: self.check_npara,
+            Predicate.NON_PERPENDICULAR: self.check_nperp,
         }
 
-    def check(self, name: str, args: list[Point]) -> bool:
+    def check(self, statement: Statement) -> bool:
         """Symbolically check if a predicate is True."""
-        return self.NAME_TO_CHECK[name](args)
+        return self.PREDICATE_TO_CHECK[statement.predicate](statement.args)
 
     def check_const_or_eqangle(self, args: list[Point]) -> bool:
         if len(args) == 5:
@@ -247,15 +247,10 @@ class StatementChecker:
 
     # Algebraic checks
 
-    def check_aconst(self, points: list[Point], verbose: bool = False) -> bool:
+    def check_aconst(self, points: list[Point]) -> bool:
         """Check if the angle is equal to a certain constant."""
-        a, b, c, d, nd = points
-        _ = verbose
-        if isinstance(nd, str):
-            name = nd
-        else:
-            name = nd.name
-        num, den = name.split("pi/")
+        a, b, c, d, angle = points
+        num, den = angle_to_num_den(angle)
         ang, _ = self.alegbraic_manipulator.get_or_create_const_ang(int(num), int(den))
 
         ab = self.symbols_graph.get_line(a, b)
@@ -271,13 +266,9 @@ class StatementChecker:
                 return True
         return False
 
-    def check_sangle(self, points: list[Point], verbose: bool = False) -> bool:
-        a, b, c, nd = points
-        if isinstance(nd, str):
-            name = nd
-        else:
-            name = nd.name
-        num, den = map(int, name.split("pi/"))
+    def check_sangle(self, points: list[Point]) -> bool:
+        a, b, c, angle = points
+        num, den = angle_to_num_den(angle)
         ang, _ = self.alegbraic_manipulator.get_or_create_const_ang(num, den)
 
         ab = self.symbols_graph.get_line(a, b)
@@ -293,15 +284,10 @@ class StatementChecker:
                 return True
         return False
 
-    def check_rconst(self, points: list[Point], verbose: bool = False) -> bool:
+    def check_rconst(self, points: list[Point]) -> bool:
         """Check whether a ratio is equal to some given constant."""
-        _ = verbose
-        a, b, c, d, nd = points
-        if isinstance(nd, str):
-            name = nd
-        else:
-            name = nd.name
-        num, den = name.split("/")
+        a, b, c, d, ratio = points
+        num, den = ratio_to_num_den(ratio)
         rat, _ = self.alegbraic_manipulator.get_or_create_const_rat(int(num), int(den))
 
         ab = self.symbols_graph.get_segment(a, b)

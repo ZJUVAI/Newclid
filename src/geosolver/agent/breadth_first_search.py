@@ -202,8 +202,8 @@ class BFSDDAR(DeductiveAgent):
             else:
                 return None
 
-        next_mapping = self._current_derivation_stack.pop(0)
-        return ApplyDerivationAction(self._current_derivation_name, next_mapping)
+        derived_statement, reason = self._current_derivation_stack.pop(0)
+        return ApplyDerivationAction(statement=derived_statement, reason=reason)
 
 
 def concat_derivations(derivations: Derivations, new: Derivations):

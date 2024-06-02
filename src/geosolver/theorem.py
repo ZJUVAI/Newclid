@@ -1,6 +1,6 @@
 from __future__ import annotations
+from geosolver.definitions.clause import Construction
 from geosolver.predicates import Predicate
-from geosolver.construction import Construction
 
 
 class Theorem:
@@ -11,7 +11,7 @@ class Theorem:
             raise ValueError("Cannot have more or less than one conclusion")
         self.name = "_".join([p.name for p in premise + conclusion])
         self.rule_name = None
-        self.premise = premise
+        self.premises = premise
         self.is_arg_reduce = False
         self.conclusion = conclusion[0]
 
@@ -27,15 +27,15 @@ class Theorem:
         ]:
             return
 
-        prem_args = set(sum([list(p.args) for p in self.premise], []))
+        prem_args = set(sum([list(premise.args) for premise in self.premises], []))
         con_args = set(self.conclusion.args)
         if len(prem_args) <= len(con_args):
             self.is_arg_reduce = True
 
     def __str__(self) -> str:
-        premise_txt = ", ".join([str(clause) for clause in self.premise])
+        premises_txt = ", ".join([str(premise) for premise in self.premises])
         conclusion_txt = ", ".join([str(self.conclusion)])
-        return f"{premise_txt} => {conclusion_txt}"
+        return f"{premises_txt} => {conclusion_txt}"
 
     @classmethod
     def from_txt_file(cls, fname: str) -> list[Theorem]:
