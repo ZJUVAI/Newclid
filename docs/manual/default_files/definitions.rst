@@ -5,32 +5,74 @@ Definitions are the basic building blocks for the statement of problems. Each de
 
 The definitions available in the defs.txt file are the following (definitions in section :ref:`New Definitions` were added by us and are available in new_defs.txt):
 
+Constructions that are not points directly should be subject to intersection.
 
-- **angle_bisector x a b c:** From non-collinear points a, b, c, creates x in the internal bisector of angle abc, with vertex at b. Adds the statement that angle abx and angle xbc are congruent. Construction returns a line that can be subjected to intersections.
+Legacy definitions
+------------------
 
-.. figure:: ../../_static/Images/defs/angle_bisector.png
-    :width: 400
-    :align: center
+angle_bisector x a b c
+^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
 
-    angle_bisector x a b c
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |angle_bisector|
+     - From non-collinear points a, b, c, creates x in the internal bisector of angle abc, with vertex at b.
+     - :math:`\widehat{abx}=\widehat{xbc}` (eqangle b a b x b x b c).
+     - Line
 
-- **angle_mirror x a b c:** From non-collinear points a, b, c, creates x on the opposite side of bc with respect to a in a way that angle abx doubles angle abc. Adds the statement that angle abc and angle cbx are congruent. Construction returns a ray that can be subjected to intersections.
+.. |angle_bisector| image:: ../../_static/Images/defs/angle_bisector.png
+    :width: 100%
 
-.. figure:: ../../_static/Images/defs/angle_mirror.png
-    :width: 400
-    :align: center
 
-    angle_mirror x a b c
+angle_mirror x a b c
+^^^^^^^^^^^^^^^^^^^^
 
-- **circle x a b c:** From non-collinear points a, b, c, creates x the center of the circle through a, b, c. Adds the congruence statements that xa=xb and xb=xc.
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
 
-.. figure:: ../../_static/Images/defs/circle.png
-    :width: 400
-    :align: center
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |angle_mirror|
+     - From non-collinear points a, b, c, creates x on the opposite side of bc with respect to a in a way that angle abx doubles angle abc. 
+     - :math:`\widehat{abc}=\widehat{cbx}` (eqangle b a b c b c b x).
+     - Ray
 
-    circle x a b c
+.. |angle_mirror| image:: ../../_static/Images/defs/angle_mirror.png
+    :width: 100%
 
-- **circumcenter x a b c:** Same construction as **circle x a b c**.
+
+circle x a b c 
+^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |circle|
+     - From non-collinear points a, b, c, creates x the center of the circle through a, b, c. 
+     - :math:`xa=xb \wedge xb=xc`  (cong x a x b, cong x b x c)
+     - Point
+
+.. |circle| image:: ../../_static/Images/defs/circle.png
+    :width: 100%
+
+
+circumcenter x a b c
+^^^^^^^^^^^^^^^^^^^^
+
+Same construction as **circle x a b c**.
 
 - **eq_quadrangle a b c d:** From nothings, adds four points in a quadrilateral abcd with two opposing sides (AD and BC) of same length. Adds the congruence statement that ad=bc.
 
