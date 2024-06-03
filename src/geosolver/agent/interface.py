@@ -4,18 +4,22 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, NamedTuple, Optional, Union
 from abc import abstractmethod
 
+from geosolver.dependencies.empty_dependency import EmptyDependency
+
 
 if TYPE_CHECKING:
     from geosolver.proof import Proof
     from geosolver.geometry import Point
-    from geosolver.problem import Theorem
-    from geosolver.statement.adder import ToCache
+    from geosolver.theorem import Theorem
+    from geosolver.statements.adder import ToCache
     from geosolver.dependencies.dependency import Dependency
     from geosolver.match_theorems import MatchCache
     from geosolver.algebraic.algebraic_manipulator import Derivations
     from geosolver.problem import Problem
+    from geosolver.statements.statement import Statement
 
-Mapping = dict[str, "Point"]
+
+Mapping = dict[str, Union["Point", str]]
 
 
 class ResetAction(NamedTuple):
@@ -42,8 +46,8 @@ class DeriveAlgebraAction(NamedTuple):
 
 
 class ApplyDerivationAction(NamedTuple):
-    derivation_name: str
-    derivation_arguments: tuple["Point", ...]
+    statement: "Statement"
+    reason: EmptyDependency
 
 
 class AuxAction(NamedTuple):
@@ -123,3 +127,7 @@ class DeductiveAgent:
     def remember_effects(self, action: Action, feedback: Feedback):
         """Remember the action effects."""
         pass
+
+    @abstractmethod
+    def reset(self):
+        """Resets the agent internal state."""

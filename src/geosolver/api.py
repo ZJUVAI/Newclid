@@ -7,15 +7,19 @@ from pathlib import Path
 import traceback
 from typing import Optional
 from typing_extensions import Self
+import copy as cp
 
+from geosolver.definitions.clause import Clause
+from geosolver.definitions.definition import Definition
+from geosolver.theorem import Theorem
 from geosolver.proof import Proof
 from geosolver.configs import default_defs_path, default_rules_path
 from geosolver.agent.breadth_first_search import BFSDDAR
 from geosolver.agent.interface import AuxAction, DeductiveAgent
 from geosolver.run_loop import run_loop
-from geosolver.problem import Problem, Theorem, Definition, Clause
+from geosolver.problem import Problem, setup_str_from_problem
 from geosolver.proof_writing import write_solution
-from geosolver.statement.adder import IntrinsicRules
+from geosolver.statements.adder import IntrinsicRules
 
 
 class GeometricSolver:
@@ -31,7 +35,7 @@ class GeometricSolver:
         self.problem = problem
         self.defs = defs
         self.rules = rules
-        self.problem_string = problem.txt()
+        self.problem_string = str(problem)
         if deductive_agent is None:
             deductive_agent = BFSDDAR()
         self.deductive_agent = deductive_agent
@@ -42,29 +46,30 @@ class GeometricSolver:
         return self.problem.goal
 
     def load_state(self, proof_state: "Proof"):
+        del self.proof_state
         self.proof_state = proof_state
 
     def load_problem_string(self, problem_string: str):
         self.problem_string = problem_string
 
     def get_problem_string(self) -> str:
-        return self.problem.txt()
+        return self.problem_string
 
     def get_proof_state(self) -> str:
-        return self.proof_state
+        return cp.deepcopy(self.proof_state)
 
     def get_defs(self):
         return self.defs
 
     def get_setup_string(self) -> str:
-        return self.problem.setup_str_from_problem(self.defs)
+        return setup_str_from_problem(self.problem, self.defs)
 
     def run(self, max_steps: int = 10000, timeout: float = 600.0) -> bool:
+        self._reset()
         success, infos = run_loop(
             self.deductive_agent,
             self.proof_state,
             self.rules,
-            self.problem,
             max_steps=max_steps,
             timeout=timeout,
         )
@@ -119,6 +124,15 @@ class GeometricSolver:
         feedback = self.proof_state.step(AuxAction(aux_string))
         if not feedback.success:
             raise ValueError(f"Auxiliary construction failed to be added: {aux_string}")
+
+    def _reset(self):
+        self.deductive_agent.reset()
+
+        proof_state = self.get_proof_state()
+        self.load_state(proof_state)
+
+        problem_string = self.get_problem_string()
+        self.load_problem_string(problem_string)
 
 
 class GeometricSolverBuilder:

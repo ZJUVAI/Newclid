@@ -15,7 +15,7 @@ from geosolver.numerical.geometries import (
     circle_segment_intersect,
     line_line_intersection,
 )
-from geosolver.lazy_loading import lazy_import
+from geosolver._lazy_loading import lazy_import
 
 
 if TYPE_CHECKING:

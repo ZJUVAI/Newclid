@@ -60,3 +60,6 @@ TODO.md
 
 # local files
 run.log
+
+# Local scripts
+benchmark.py

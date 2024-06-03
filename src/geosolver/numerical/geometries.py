@@ -9,7 +9,7 @@ import math
 from typing import TYPE_CHECKING, Optional, Union
 
 from numpy.random import uniform as unif
-from geosolver.lazy_loading import lazy_import
+from geosolver._lazy_loading import lazy_import
 from geosolver.numerical import ATOM, close_enough
 
 if TYPE_CHECKING:
@@ -229,7 +229,7 @@ class Line:
             else:
                 return None
         elif x is not None and y is None:
-            if ans(b) > ATOM:
+            if abs(b) > ATOM:
                 return Point(x, (-c - a * x) / b)
             else:
                 return None
