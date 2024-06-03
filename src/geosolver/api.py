@@ -7,6 +7,7 @@ from pathlib import Path
 import traceback
 from typing import Optional
 from typing_extensions import Self
+import copy as cp
 
 from geosolver.definitions.clause import Clause
 from geosolver.definitions.definition import Definition
@@ -45,6 +46,7 @@ class GeometricSolver:
         return self.problem.goal
 
     def load_state(self, proof_state: "Proof"):
+        del self.proof_state
         self.proof_state = proof_state
 
     def load_problem_string(self, problem_string: str):
@@ -54,7 +56,7 @@ class GeometricSolver:
         return self.problem_string
 
     def get_proof_state(self) -> str:
-        return self.proof_state
+        return cp.deepcopy(self.proof_state)
 
     def get_defs(self):
         return self.defs
@@ -63,6 +65,7 @@ class GeometricSolver:
         return setup_str_from_problem(self.problem, self.defs)
 
     def run(self, max_steps: int = 10000, timeout: float = 600.0) -> bool:
+        self._reset()
         success, infos = run_loop(
             self.deductive_agent,
             self.proof_state,
@@ -121,6 +124,15 @@ class GeometricSolver:
         feedback = self.proof_state.step(AuxAction(aux_string))
         if not feedback.success:
             raise ValueError(f"Auxiliary construction failed to be added: {aux_string}")
+
+    def _reset(self):
+        self.deductive_agent.reset()
+
+        proof_state = self.get_proof_state()
+        self.load_state(proof_state)
+
+        problem_string = self.get_problem_string()
+        self.load_problem_string(problem_string)
 
 
 class GeometricSolverBuilder:

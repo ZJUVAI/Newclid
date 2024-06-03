@@ -64,17 +64,8 @@ class HumanAgent(DeductiveAgent):
 
     def __init__(self) -> None:
         super().__init__()
-        self._mappings: dict[str, tuple[Theorem, Mapping]] = {}
-        self._known_mappings: set[str] = set()
-
-        self._derivations: dict[str, tuple[Statement, Dependency]] = {}
-        self._known_derivations: set[Statement] = set()
-
-        self._all_added: list[Statement] = []
-        self._all_cached: list[Statement] = []
-
-        self.level = 0
         self._problem: Optional[Problem] = None
+        self.reset()
 
     def act(self, proof: Proof, theorems: list[Theorem]) -> Action:
         ACTION_TYPE_ACT = {
@@ -98,6 +89,18 @@ class HumanAgent(DeductiveAgent):
         if isinstance(action, (ApplyTheoremAction, ApplyDerivationAction)):
             self.level += 1
         return action
+
+    def reset(self):
+        self._mappings: dict[str, tuple[Theorem, Mapping]] = {}
+        self._known_mappings: set[str] = set()
+
+        self._derivations: dict[str, tuple[Statement, Dependency]] = {}
+        self._known_derivations: set[Statement] = set()
+
+        self._all_added: list[Statement] = []
+        self._all_cached: list[Statement] = []
+
+        self.level = 0
 
     def _act_show(self, theorems: list[Theorem]):
         return ShowAction()
