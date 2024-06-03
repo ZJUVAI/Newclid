@@ -1,4 +1,3 @@
-"""Unit tests for dd."""
 import pytest
 import pytest_check as check
 

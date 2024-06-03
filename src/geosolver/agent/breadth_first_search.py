@@ -28,7 +28,7 @@ from geosolver.geometry import Point
 
 
 if TYPE_CHECKING:
-    from geosolver.problem import Theorem
+    from geosolver.theorem import Theorem
     from geosolver.proof import Proof
 
 
@@ -216,8 +216,8 @@ class BFSDDAR(DeductiveAgent):
             else:
                 return None
 
-        next_mapping = self._current_derivation_stack.pop(0)
-        return ApplyDerivationAction(self._current_derivation_name, next_mapping)
+        derived_statement, reason = self._current_derivation_stack.pop(0)
+        return ApplyDerivationAction(statement=derived_statement, reason=reason)
 
     def reset(self):
         self._dd_agent.reset()

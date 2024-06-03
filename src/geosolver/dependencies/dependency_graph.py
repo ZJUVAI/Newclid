@@ -5,15 +5,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 
+from geosolver.statements.statement import Statement, name_and_arguments_to_str
+from geosolver.theorem import Theorem
 from geosolver.algebraic import AlgebraicRules
 from geosolver.dependencies.dependency import Dependency
-from geosolver.problem import (
-    CONSTRUCTION_RULE,
-    Theorem,
-    name_and_arguments_to_str,
-)
-from geosolver.statement.adder import IntrinsicRules, ToCache
-from geosolver.lazy_loading import lazy_import
+from geosolver.problem import CONSTRUCTION_RULE
+from geosolver.statements.adder import IntrinsicRules, ToCache
+from geosolver._lazy_loading import lazy_import
 
 if TYPE_CHECKING:
     import seaborn
@@ -81,10 +79,10 @@ class DependencyGraph:
             if dep_level is None:
                 dep_level = dependency.level
 
-        dep_args_names = [arg.name for arg in dependency.args]
+        dep_args_names = [arg.name for arg in dependency.statement.args]
         self.nx_graph.add_node(
             node,
-            name=dependency.name,
+            name=dependency.statement.name,
             level=dep_level,
             args=dep_args_names,
             type=dep_type,
@@ -112,7 +110,7 @@ class DependencyGraph:
                         why_u,
                         u_for_edge,
                         edge_name=u_for_edge.rule_name,
-                        edge_arguments=u_for_edge.args,
+                        edge_arguments=u_for_edge.statement.args,
                     )
 
         if isinstance(v_for_edge, Dependency):
@@ -124,13 +122,12 @@ class DependencyGraph:
     def add_theorem_edges(
         self, to_cache: list[ToCache], theorem: Theorem, args: List["Point"]
     ):
-        for cache_name, cache_args, added_dependency in to_cache:
+        for _statement, added_dependency in to_cache:
             self.add_dependency(added_dependency)
 
             # Check for identical mapping A.B.D.C == A.B.C.D
-            while (
-                len(added_dependency.why) == 1
-                and added_dependency.why[0].hashed() == added_dependency.hashed()
+            while len(added_dependency.why) == 1 and _same_hash(
+                added_dependency, added_dependency.why[0]
             ):
                 added_dependency = added_dependency.why[0]
 
@@ -145,13 +142,12 @@ class DependencyGraph:
     def add_algebra_edges(
         self, to_cache: list[ToCache], args: List[Union["Point", int]]
     ):
-        for cache_name, cache_args, added_dependency in to_cache:
+        for _statement, added_dependency in to_cache:
             self.add_dependency(added_dependency)
 
             # Check for identical mapping A.B.D.C == A.B.C.D
-            while (
-                len(added_dependency.why) == 1
-                and added_dependency.why[0].hashed() == added_dependency.hashed()
+            while len(added_dependency.why) == 1 and _same_hash(
+                added_dependency, added_dependency.why[0]
             ):
                 added_dependency = added_dependency.why[0]
 
@@ -165,13 +161,12 @@ class DependencyGraph:
                 )
 
     def add_construction_edges(self, to_cache: list[ToCache], args: List["Point"]):
-        for cache_name, cache_args, added_dependency in to_cache:
+        for _statement, added_dependency in to_cache:
             self.add_dependency(added_dependency, DependencyType.PREMISE)
 
             # Check for identical mapping A.B.D.C == A.B.C.D
-            while (
-                len(added_dependency.why) == 1
-                and added_dependency.why[0].hashed() == added_dependency.hashed()
+            while len(added_dependency.why) == 1 and _same_hash(
+                added_dependency, added_dependency.why[0]
             ):
                 added_dependency = added_dependency.why[0]
 
@@ -185,8 +180,8 @@ class DependencyGraph:
                     edge_arguments=args,
                 )
 
-    def add_goal(self, goal_name: str, goal_args: List["Point"]):
-        goal_dep = Dependency(goal_name, goal_args, None, None)
+    def add_goal(self, goal: Statement):
+        goal_dep = Dependency(goal, None, None)
         self.goal = dependency_node_name(goal_dep)
         self.add_dependency(goal_dep, DependencyType.GOAL)
 
@@ -305,7 +300,7 @@ def extract_sub_graph(
 
 
 def dependency_node_name(dependency: Dependency):
-    return node_name_from_hash(dependency.hashed())
+    return node_name_from_hash(dependency.statement.hash_tuple)
 
 
 def node_name_from_hash(hash_tuple: Tuple[str]):
@@ -343,3 +338,7 @@ def build_nodes_colors(n_colors: int):
         ],
         n_colors=n_colors,
     )
+
+
+def _same_hash(dep1: "Dependency", dep2: "Dependency") -> bool:
+    return dep1.statement.hash_tuple == dep2.statement.hash_tuple

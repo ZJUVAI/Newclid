@@ -7,16 +7,14 @@ from geosolver.agent.interface import ResetAction, StopAction, StopFeedback
 
 if TYPE_CHECKING:
     from geosolver.agent.interface import DeductiveAgent
-    from geosolver.problem import Theorem
+    from geosolver.theorem import Theorem
     from geosolver.proof import Proof
-    from geosolver.problem import Problem
 
 
 def run_loop(
     deductive_agent: "DeductiveAgent",
     proof: "Proof",
     theorems: list["Theorem"],
-    problem: "Problem",
     max_steps: int = 10000,
     timeout: float = 600.0,
 ) -> tuple[bool, dict]:
@@ -39,7 +37,7 @@ def run_loop(
         total_elapsed = time.time() - t0
 
         # Force StopAction on goal success
-        success = proof.check_goal(problem.goal)
+        success = proof.check_goal()
         if success:
             feedback = proof.step(StopAction())
             deductive_agent.remember_effects(action, feedback)

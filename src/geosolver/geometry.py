@@ -1,22 +1,6 @@
-# Copyright 2023 DeepMind Technologies Limited
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-
 """Implements geometric objects used in the graph representation."""
 from __future__ import annotations
-from collections import defaultdict
-from typing import Any, Type
+from typing import Any, Optional, Type
 
 
 class Node:
@@ -320,11 +304,14 @@ def bfs_backtrack(root: Node, leafs: list[Node], parent: dict[Node, Node]) -> li
 
 
 class Point(Node):
+    rely_on: list[Point] = None
     pass
 
 
 class Line(Node):
     """Node of type Line."""
+
+    points: tuple[Point, Point]
 
     def new_val(self) -> Direction:
         return Direction()
@@ -396,67 +383,6 @@ class Circle(Node):
         return [d for d in min_deps if d is not None]
 
 
-def why_equal(x: Node, y: Node, level: int = None) -> list[Any]:
-    if x == y:
-        return []
-    if not x._val or not y._val:
-        return None
-    if x._val == y._val:
-        return []
-    return x._val.why_equal([y._val], level)
-
-
-def get_lines_thru_all(*points: Point) -> list[Line]:
-    line2count = defaultdict(lambda: 0)
-    points = set(points)
-    for p in points:
-        for line_neighbor in p.neighbors(Line):
-            line2count[line_neighbor] += 1
-    return [line for line, count in line2count.items() if count == len(points)]
-
-
-def line_of_and_why(
-    points: list[Point], level: int | None = None
-) -> tuple[Line, list[Any]]:
-    """Why points are collinear."""
-    for l0 in get_lines_thru_all(*points):
-        for line in l0.equivs():
-            if all([p in line.edge_graph for p in points]):
-                x, y = line.points
-                colls = list({x, y} | set(points))
-                # if len(colls) < 3:
-                #   return l, []
-                why = line.why_coll(colls, level)
-                if why is not None:
-                    return line, why
-
-    return None, None
-
-
-def get_circles_thru_all(*points: list[Point]) -> list[Circle]:
-    circle2count = defaultdict(lambda: 0)
-    points = set(points)
-    for p in points:
-        for c in p.neighbors(Circle):
-            circle2count[c] += 1
-    return [c for c, count in circle2count.items() if count == len(points)]
-
-
-def circle_of_and_why(
-    points: list[Point], level: int = None
-) -> tuple[Circle, list[Any]]:
-    """Why points are concyclic."""
-    for c0 in get_circles_thru_all(*points):
-        for c in c0.equivs():
-            if all([p in c.edge_graph for p in points]):
-                cycls = list(set(points))
-                why = c.why_cyclic(cycls, level)
-                if why is not None:
-                    return c, why
-
-    return None, None
-
-
 def name_map(struct: Any) -> Any:
     if isinstance(struct, list):
         return [name_map(x) for x in struct]
@@ -472,6 +398,8 @@ def name_map(struct: Any) -> Any:
 
 class Angle(Node):
     """Node of type Angle."""
+
+    opposite: Optional[Angle] = None
 
     def new_val(self) -> Measure:
         return Measure()
