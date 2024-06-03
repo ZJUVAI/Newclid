@@ -376,7 +376,7 @@ class Proof:
     def resolve_statement_dependencies(
         self, statement: Statement, deps: EmptyDependency
     ) -> Tuple[list[Dependency], list[ToCache]]:
-        return self.statements.adder.add_piece(statement, deps)
+        return self.statements.adder.add(statement, deps)
 
     def do_algebra(
         self, statement: Statement, reason: EmptyDependency
