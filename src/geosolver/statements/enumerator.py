@@ -29,7 +29,7 @@ from geosolver.predicates import Predicate
 
 if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
-    from geosolver.statement.checker import StatementChecker
+    from geosolver.statements.checker import StatementChecker
 
 
 class StatementsEnumerator:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 from typing import NamedTuple, Optional, TypeVar
 
+from geosolver.statements.statement import Statement
+from geosolver.theorem import Theorem
 from geosolver.agent.interface import (
     Action,
     ApplyDerivationAction,
@@ -21,13 +23,12 @@ from geosolver.agent.interface import (
     StopAction,
     StopFeedback,
 )
-from geosolver.dependencies.caching import hashed
 from geosolver.predicates import Predicate
 from geosolver.dependencies.dependency import Dependency
 from geosolver.geometry import Point
-from geosolver.problem import Construction, Problem, Theorem, name_and_arguments_to_str
+from geosolver.problem import Problem
 from geosolver.proof import Proof, theorem_mapping_str
-from geosolver.statement.adder import ToCache
+from geosolver.statements.adder import ToCache
 
 from colorama import just_fix_windows_console
 from colorama import Fore, Style
@@ -63,17 +64,8 @@ class HumanAgent(DeductiveAgent):
 
     def __init__(self) -> None:
         super().__init__()
-        self._mappings: dict[str, tuple[Theorem, Mapping]] = {}
-        self._known_mappings: set[str] = set()
-
-        self._derivations: dict[str, tuple[str, Mapping]] = {}
-        self._known_derivations: set[str] = set()
-
-        self._all_added: list[Dependency] = []
-        self._all_cached: list[Construction] = []
-
-        self.level = 0
         self._problem: Optional[Problem] = None
+        self.reset()
 
     def act(self, proof: Proof, theorems: list[Theorem]) -> Action:
         ACTION_TYPE_ACT = {
@@ -98,6 +90,18 @@ class HumanAgent(DeductiveAgent):
             self.level += 1
         return action
 
+    def reset(self):
+        self._mappings: dict[str, tuple[Theorem, Mapping]] = {}
+        self._known_mappings: set[str] = set()
+
+        self._derivations: dict[str, tuple[Statement, Dependency]] = {}
+        self._known_derivations: set[Statement] = set()
+
+        self._all_added: list[Statement] = []
+        self._all_cached: list[Statement] = []
+
+        self.level = 0
+
     def _act_show(self, theorems: list[Theorem]):
         return ShowAction()
 
@@ -107,7 +111,7 @@ class HumanAgent(DeductiveAgent):
     def _act_match(self, theorems: list[Theorem]) -> MatchAction:
         choose_theorem_str = "\nChoose a theorem: \n"
         for th in theorems:
-            choose_theorem_str += f" - [{th.rule_name}]: {th.txt()}\n"
+            choose_theorem_str += f" - [{th.rule_name}]: {th}\n"
         choose_theorem_str += (
             "Theorem you want to match (type only the name within brackets): "
         )
@@ -129,14 +133,14 @@ class HumanAgent(DeductiveAgent):
         return DeriveAlgebraAction(level=self.level)
 
     def _act_apply_derivation(self, theorems: list[Theorem]) -> ApplyDerivationAction:
-        choosen_mapping_str = "\nAvailable derivations mappings: \n"
-        for mapping_str in self._derivations.keys():
-            choosen_mapping_str += f" - [{mapping_str}]\n"
-        choosen_mapping_str += "Mapping you want to apply: "
-        derivation, mapping = self._ask_for_key(
-            self._derivations, choosen_mapping_str, pop=True
+        choose_derivation_str = "\nAvailable derivations: \n"
+        for derived_statement_str in self._derivations.keys():
+            choose_derivation_str += f" - [{derived_statement_str}]\n"
+        choose_derivation_str += "Derivation you want to apply: "
+        derived_statement, reason = self._ask_for_key(
+            self._derivations, choose_derivation_str, pop=True
         )
-        return ApplyDerivationAction(derivation, mapping)
+        return ApplyDerivationAction(statement=derived_statement, reason=reason)
 
     def _act_aux(self, theorems: list[Theorem]) -> AuxAction:
         aux_string = self._ask_input("Auxiliary string: ")
@@ -192,7 +196,7 @@ class HumanAgent(DeductiveAgent):
         self, action: MatchAction, feedback: MatchFeedback
     ) -> tuple[str, bool]:
         matched_theorem = feedback.theorem
-        theorem_str = f"[{matched_theorem.rule_name}] ({matched_theorem.txt()})"
+        theorem_str = f"[{matched_theorem.rule_name}] ({matched_theorem})"
         if not feedback.mappings:
             return f"No match found for theorem {theorem_str}:\n", False
 
@@ -212,9 +216,9 @@ class HumanAgent(DeductiveAgent):
         theorem = action.theorem
         rname = theorem.rule_name
         if not feedback.success:
-            return f"Failed to apply theorem [{rname}] ({theorem.txt()})\n", False
+            return f"Failed to apply theorem [{rname}] ({theorem})\n", False
 
-        feedback_str = f"Successfully applied theorem [{rname}] ({theorem.txt()}):\n"
+        feedback_str = f"Successfully applied theorem [{rname}] ({theorem}):\n"
         if feedback.added:
             feedback_str += self._list_added_statements(feedback.added)
         if feedback.to_cache:
@@ -227,34 +231,31 @@ class HumanAgent(DeductiveAgent):
         self, action: DeriveAlgebraAction, feedback: DeriveFeedback
     ) -> tuple[str, bool]:
         new_mappings: list[tuple[str, tuple[Point, ...]]] = []
-        for name, mappings in feedback.derives.items():
-            for mapping in mappings:
-                new_mappings.append((name, mapping))
-        for name, mappings in feedback.eq4s.items():
-            for mapping in mappings:
-                new_mappings.append((name, mapping))
+        for predicate, derivations_and_dependencies in feedback.derives.items():
+            for derivation_and_dependency in derivations_and_dependencies:
+                new_mappings.append((predicate, derivation_and_dependency))
+        for predicate, derivations_and_dependencies in feedback.eq4s.items():
+            for derivation_and_dependency in derivations_and_dependencies:
+                new_mappings.append((predicate, derivation_and_dependency))
 
         if not new_mappings:
             return "No new derviation found.\n", False
 
         feedback_str = "New derivations:\n"
-        for name, mapping in new_mappings:
-            derivation_str = str(Construction(name, mapping[:-1]))
-            if derivation_str in self._known_derivations:
+        for predicate, derivation_and_dependency in new_mappings:
+            derived_statement, dependency = derivation_and_dependency
+            if derived_statement in self._known_derivations:
                 continue
-            self._derivations[derivation_str] = (name, mapping)
-            self._known_derivations.add(derivation_str)
-            feedback_str += f"  - [{derivation_str}]\n"
+            self._derivations[str(derived_statement)] = (derived_statement, dependency)
+            self._known_derivations.add(derived_statement)
+            feedback_str += f"  - [{derived_statement}]\n"
         return feedback_str, True
 
     def _remember_apply_derivation(
         self, action: ApplyDerivationAction, feedback: ApplyDerivationFeedback
     ) -> tuple[str, bool]:
-        derivation_str = name_and_arguments_to_str(
-            action.derivation_name, action.derivation_arguments[:-1], " "
-        )
         success = True
-        feedback_str = f"Successfully applied derivation [{derivation_str}]:\n"
+        feedback_str = f"Successfully applied derivation [{action.statement}]:\n"
         if feedback.added:
             feedback_str += self._list_added_statements(feedback.added)
         if feedback.to_cache:
@@ -288,19 +289,18 @@ class HumanAgent(DeductiveAgent):
 
     def _list_added_statements(self, added: list[Dependency]) -> str:
         feedback_str = "    Added statements:\n"
-        for added in added:
-            feedback_str += f"    - {added}\n"
-            self._all_added.append(added)
+        for dep in added:
+            feedback_str += f"    - {dep.statement}\n"
+            self._all_added.append(dep.statement)
         return feedback_str
 
     def _list_cached_statements(self, to_cache: list[ToCache]) -> str:
         feedback_str = "    Cached statements:\n"
         for cached in to_cache:
-            name, args, _deps = cached
-            cached_construction = Construction(name, args)
-            self._all_cached.append(cached_construction)
-            feedback_str += f"    - {cached_construction}"
-            if str(cached_construction) != str(_deps):
+            cached_statement, _deps = cached
+            self._all_cached.append(cached_statement)
+            feedback_str += f"    - {cached_statement}"
+            if str(cached_statement) != str(_deps):
                 feedback_str += f" ({_deps})"
             feedback_str += "\n"
         return feedback_str
@@ -353,9 +353,9 @@ class HumanAgent(DeductiveAgent):
         if additional_feedback:
             print()
             if self._all_cached:
-                print(_list_constructions("All cached statements:\n", self._all_cached))
+                print(_list_statements("All cached statements:\n", self._all_cached))
             if self._all_added:
-                print(_list_constructions("All added statements:\n", self._all_added))
+                print(_list_statements("All added statements:\n", self._all_added))
 
         print(color + feedback + Style.RESET_ALL)
         print("-" * 50)
@@ -371,9 +371,9 @@ class HumanAgent(DeductiveAgent):
     def _show_figure(self, proof: "Proof", block: bool = False):
         equal_angles = {}
         for eqangle in self._all_cached:
-            if eqangle.name != Predicate.EQANGLE.value:
+            if eqangle.predicate != Predicate.EQANGLE:
                 continue
-            hashed_eqangle = hashed(eqangle.name, eqangle.args)
+            hashed_eqangle = eqangle.hash_tuple
             if hashed_eqangle not in equal_angles:
                 equal_angles[hashed_eqangle] = eqangle.args
         proof.symbols_graph.draw_figure(
@@ -382,7 +382,7 @@ class HumanAgent(DeductiveAgent):
 
 
 def _pretty_problem(problem: "Problem"):
-    problem_initial_txt = problem.txt().replace("; ", "\n").split(" ? ")[0]
+    problem_initial_txt = str(problem).replace("; ", "\n").split(" ? ")[0]
     return (
         Fore.BLUE
         + f"Problem:\n{problem_initial_txt}\n"
@@ -394,10 +394,10 @@ def _pretty_problem(problem: "Problem"):
     )
 
 
-def _list_constructions(
-    heading: str, constructions: list[Construction], indent: str = ""
+def _list_statements(
+    heading: str, statements: list[Statement], indent: str = ""
 ) -> str:
     feedback_str = heading
-    for construction in constructions:
-        feedback_str += indent + f"- {construction}\n"
+    for statement in statements:
+        feedback_str += indent + f"- {statement}\n"
     return feedback_str

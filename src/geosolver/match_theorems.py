@@ -31,7 +31,8 @@ from geosolver.numerical.check import check_ncoll_numerical, same_clock
 
 if TYPE_CHECKING:
     from geosolver.proof import Proof
-    from geosolver.problem import Theorem, Clause
+    from geosolver.definitions.clause import Clause
+    from geosolver.theorem import Theorem
 
 
 def match_eqratio_eqratio_eqratio(
@@ -782,7 +783,7 @@ def match_generic(
 
     clauses = []
     numerical_checks = []
-    for clause in theorem.premise:
+    for clause in theorem.premises:
         if clause.name in [
             Predicate.NON_COLLINEAR.value,
             Predicate.NON_PARALLEL.value,

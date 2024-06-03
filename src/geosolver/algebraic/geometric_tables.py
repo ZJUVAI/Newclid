@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Generator
 
 from geosolver.geometry import Direction, Length, Line, Point
 from geosolver.ratios import simplify
-from geosolver.lazy_loading import lazy_import
+from geosolver._lazy_loading import lazy_import
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency

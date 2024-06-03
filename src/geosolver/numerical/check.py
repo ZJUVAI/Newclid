@@ -1,13 +1,14 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING
 from geosolver.predicates import Predicate
 import geosolver.geometry as gm
 
-from geosolver.lazy_loading import lazy_import
+from geosolver._lazy_loading import lazy_import
 from geosolver.numerical import ATOM, close_enough
 from geosolver.numerical.angles import ang_between
 from geosolver.numerical.geometries import Circle, Line, Point, bring_together
 from geosolver.listing import list_eqratio3
+from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
 
 if TYPE_CHECKING:
     import numpy
@@ -38,7 +39,7 @@ def check_ncoll_numerical(points: list[Point]) -> bool:
 
 def check_sangle_numerical(args: list[Point | gm.Angle]) -> bool:
     a, b, c, angle = args
-    num, den = map(int, angle.name.split("pi/"))
+    num, den = angle_to_num_den(angle)
     ang = ang_between(b, c, a)
     if ang < 0:
         ang += np.pi
@@ -47,7 +48,7 @@ def check_sangle_numerical(args: list[Point | gm.Angle]) -> bool:
 
 def check_aconst_numerical(args: list[Point | gm.Angle]) -> bool:
     a, b, c, d, angle = args
-    num, den = map(int, angle.name.split("pi/"))
+    num, den = angle_to_num_den(angle)
     d = d + a - c
     ang = ang_between(a, b, d)
     if ang < 0:
@@ -204,59 +205,55 @@ def check_contri_numerical(points: list[Point]) -> bool:
 
 def check_ratio_numerical(points: list[Point | gm.Ratio]) -> bool:
     a, b, c, d, ratio = points
-    m, n = map(int, ratio.name.split("/"))
+    m, n = ratio_to_num_den(ratio)
     ab = a.distance(b)
     cd = c.distance(d)
     return close_enough(ab * n, cd * m)
 
 
-NUMERICAL_CHECK_FUNCTIONS = {
-    Predicate.COLLINEAR.value: check_coll_numerical,
-    Predicate.PERPENDICULAR.value: check_perp_numerical,
-    Predicate.MIDPOINT.value: check_midp_numerical,
-    Predicate.CONGRUENT.value: check_cong_numerical,
-    Predicate.CIRCLE.value: check_circle_numerical,
-    Predicate.CYCLIC.value: check_cyclic_numerical,
-    Predicate.EQANGLE.value: check_eqangle_numerical,
-    Predicate.EQANGLE6.value: check_eqangle_numerical,
-    Predicate.EQRATIO.value: check_eqratio_numerical,
-    Predicate.EQRATIO3.value: check_eqratio3_numerical,
-    Predicate.EQRATIO6.value: check_eqratio_numerical,
-    Predicate.SIMILAR_TRIANGLE.value: check_simtri_numerical,
-    Predicate.SIMILAR_TRIANGLE_REFLECTED.value: check_simtri_numerical,
-    Predicate.SIMILAR_TRIANGLE_BOTH.value: check_simtri_numerical,
-    Predicate.CONTRI_TRIANGLE.value: check_contri_numerical,
-    Predicate.CONTRI_TRIANGLE_REFLECTED.value: check_contri_numerical,
-    Predicate.CONTRI_TRIANGLE_BOTH.value: check_contri_numerical,
-    Predicate.CONSTANT_ANGLE.value: check_aconst_numerical,
-    Predicate.S_ANGLE.value: check_sangle_numerical,
-    Predicate.SAMESIDE.value: check_sameside_numerical,
-    Predicate.NON_COLLINEAR.value: check_ncoll_numerical,
-    Predicate.CONSTANT_RATIO.value: check_ratio_numerical,
-    "para_or_coll": check_para_or_coll_numerical,
-    "const_angle": check_const_angle_numerical,
+PREDICATE_TO_NUMERICAL_CHECK = {
+    Predicate.COLLINEAR: check_coll_numerical,
+    Predicate.PERPENDICULAR: check_perp_numerical,
+    Predicate.MIDPOINT: check_midp_numerical,
+    Predicate.CONGRUENT: check_cong_numerical,
+    Predicate.CIRCLE: check_circle_numerical,
+    Predicate.CYCLIC: check_cyclic_numerical,
+    Predicate.EQANGLE: check_eqangle_numerical,
+    Predicate.EQANGLE6: check_eqangle_numerical,
+    Predicate.EQRATIO: check_eqratio_numerical,
+    Predicate.EQRATIO3: check_eqratio3_numerical,
+    Predicate.EQRATIO6: check_eqratio_numerical,
+    Predicate.SIMILAR_TRIANGLE: check_simtri_numerical,
+    Predicate.SIMILAR_TRIANGLE_REFLECTED: check_simtri_numerical,
+    Predicate.SIMILAR_TRIANGLE_BOTH: check_simtri_numerical,
+    Predicate.CONTRI_TRIANGLE: check_contri_numerical,
+    Predicate.CONTRI_TRIANGLE_REFLECTED: check_contri_numerical,
+    Predicate.CONTRI_TRIANGLE_BOTH: check_contri_numerical,
+    Predicate.CONSTANT_ANGLE: check_aconst_numerical,
+    Predicate.S_ANGLE: check_sangle_numerical,
+    Predicate.SAMESIDE: check_sameside_numerical,
+    Predicate.NON_COLLINEAR: check_ncoll_numerical,
+    Predicate.CONSTANT_RATIO: check_ratio_numerical,
+    Predicate.PARALLEL: check_para_or_coll_numerical,
 }
 
 
-def check_numerical(name: str, args: list[Union[gm.Point, Point]]) -> bool:
+def check_numerical(statement: Statement) -> bool:
     """Numerical check."""
-    if name == "on_line":
-        name = Predicate.COLLINEAR.value
-    elif name == Predicate.PARALLEL.value:
-        name = "para_or_coll"
-    elif name in [
-        Predicate.COMPUTE_RATIO.value,
-        Predicate.COMPUTE_ANGLE.value,
-        Predicate.FIX_L.value,
-        Predicate.FIX_C.value,
-        Predicate.FIX_B.value,
-        Predicate.FIX_T.value,
-        Predicate.FIX_P.value,
+
+    if statement.predicate in [
+        Predicate.COMPUTE_RATIO,
+        Predicate.COMPUTE_ANGLE,
+        Predicate.FIX_L,
+        Predicate.FIX_C,
+        Predicate.FIX_B,
+        Predicate.FIX_T,
+        Predicate.FIX_P,
     ]:
         return True
 
-    args = [p.num if isinstance(p, gm.Point) else p for p in args]
-    return NUMERICAL_CHECK_FUNCTIONS[name](args)
+    num_args = [p.num if isinstance(p, gm.Point) else p for p in statement.args]
+    return PREDICATE_TO_NUMERICAL_CHECK[statement.predicate](num_args)
 
 
 def same_clock(a: Point, b: Point, c: Point, d: Point, e: Point, f: Point) -> bool:
