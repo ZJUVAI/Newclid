@@ -1,18 +1,3 @@
-# Copyright 2023 DeepMind Technologies Limited
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-
 """Unit testing for the trace_back code."""
 
 
@@ -21,6 +6,7 @@ import pytest_check as check
 
 from geosolver.predicates import Predicate
 from geosolver.dependencies.dependency import Dependency
+from geosolver.statements.statement import Statement
 from geosolver.trace_back import get_logs
 from geosolver.api import GeometricSolverBuilder
 
@@ -40,22 +26,23 @@ class TestTraceback:
 
         solver.run()
 
-        goal_args = solver.proof_state.symbols_graph.names2nodes(solver.goal.args)
-        query = Dependency(solver.goal.name, goal_args, None, None)
+        goal_args = solver.proof_state.symbols_graph.names2nodes(
+            solver.problem.goal.args
+        )
+        goal = Statement(solver.problem.goal.name, goal_args)
+        query = Dependency(goal, None, None)
         setup, aux, _, _ = get_logs(query, solver.proof_state, merge_trivials=False)
 
-        # Convert each predicates to its hash string:
-        setup = [p.hashed() for p in setup]
-        aux = [p.hashed() for p in aux]
-
+        setup = [p.statement.hash_tuple for p in setup]
         check.equal(
             set(setup),
             {
                 (Predicate.PERPENDICULAR.value, "a", "c", "b", "d"),
-                ("perp", "a", "b", "c", "d"),
+                (Predicate.PERPENDICULAR.value, "a", "b", "c", "d"),
             },
         )
 
+        aux = [p.statement.hash_tuple for p in aux]
         check.equal(
             set(aux),
             {

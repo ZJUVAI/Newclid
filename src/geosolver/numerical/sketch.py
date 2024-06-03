@@ -3,7 +3,7 @@ from fractions import Fraction
 from typing import TYPE_CHECKING, Optional, Union
 
 import geosolver.geometry as gm
-from geosolver.lazy_loading import lazy_import
+from geosolver._lazy_loading import lazy_import
 from geosolver.numerical import close_enough
 from geosolver.numerical.angles import ang_between, ang_of
 from geosolver.numerical.distances import (
@@ -20,6 +20,7 @@ from geosolver.numerical.geometries import (
     line_circle_intersection,
     line_line_intersection,
 )
+from geosolver.statements.statement import angle_to_num_den
 
 if TYPE_CHECKING:
     import numpy
@@ -449,16 +450,16 @@ def sketch_rotatep90(args: tuple[gm.Point, ...]) -> Point:
 
 
 def sketch_s_angle(args: tuple[gm.Point, ...]) -> HalfLine:
-    a, b, y = args
-    num, den = map(int, y.name.split("pi/"))
+    a, b, angle = args
+    num, den = angle_to_num_den(angle)
     ang = num * np.pi / den
     x = b + (a - b).rotatea(ang)
     return HalfLine(b, x)
 
 
 def sketch_aconst(args: tuple[gm.Point, ...]) -> HalfLine:
-    a, b, c, r = args
-    num, den = map(int, r.name.split("pi/"))
+    a, b, c, angle = args
+    num, den = angle_to_num_den(angle)
     ang = num * np.pi / den
     x = c + (a - b).rotatea(ang)
     return HalfLine(c, x)

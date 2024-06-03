@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from geosolver.lazy_loading import lazy_import
+from geosolver._lazy_loading import lazy_import
 
 
 if TYPE_CHECKING:

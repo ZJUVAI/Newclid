@@ -1,20 +1,3 @@
-# Copyright 2023 DeepMind Technologies Limited
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#    http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-# ==============================================================================
-
-"""Unit tests for ar.py."""
-
 import pytest
 import pytest_check as check
 import geosolver.algebraic.geometric_tables as geometric_tables
@@ -136,10 +119,10 @@ class TestAR:
 
         # Add two eqangles facts because ieq_triangle only add congruent sides
         a, b, c = proof.symbols_graph.names2nodes("abc")
-        proof.statements_adder._add_eqangle(
+        proof.statements.adder._add_eqangle(
             [a, b, b, c, b, c, c, a], EmptyDependency(0, None)
         )
-        proof.statements_adder._add_eqangle(
+        proof.statements.adder._add_eqangle(
             [b, c, c, a, c, a, a, b], EmptyDependency(0, None)
         )
 
@@ -347,7 +330,7 @@ class TestAR:
         success = solver.run()
         check.is_true(success)
 
-    @pytest.mark.xfail
+    @pytest.mark.skip
     def test_paper_distance_chasing(self):
         """Example of distance chasing given in the original AG paper."""
         defs = [

@@ -28,26 +28,14 @@ from geosolver.geometry import Point
 
 
 if TYPE_CHECKING:
-    from geosolver.problem import Theorem
+    from geosolver.theorem import Theorem
     from geosolver.proof import Proof
 
 
 class BFSDD(DeductiveAgent):
     def __init__(self) -> None:
         super().__init__()
-        self.level = 0
-
-        self._theorem_mappings: list[tuple["Theorem", list[Mapping]]] = []
-        self._actions_taken: set[str] = set()
-        self._actions_failed: set[str] = set()
-
-        self._current_mappings: list[Mapping] = []
-        self._current_theorem: Optional["Theorem"] = None
-        self._level_start_time: float = time.time()
-
-        self._unmatched_theorems: list["Theorem"] = []
-        self._match_cache: Optional[MatchCache] = None
-        self._any_success_or_new_match_per_level: dict[int, bool] = {}
+        self.reset()
 
     def act(self, proof: "Proof", theorems: list["Theorem"]) -> Action:
         """Deduce new statements by applying
@@ -138,6 +126,21 @@ class BFSDD(DeductiveAgent):
         self._level_start_time = time.time()
         self.level += 1
 
+    def reset(self):
+        self.level = 0
+
+        self._theorem_mappings: list[tuple["Theorem", list[Mapping]]] = []
+        self._actions_taken: set[str] = set()
+        self._actions_failed: set[str] = set()
+
+        self._current_mappings: list[Mapping] = []
+        self._current_theorem: Optional["Theorem"] = None
+        self._level_start_time: float = time.time()
+
+        self._unmatched_theorems: list["Theorem"] = []
+        self._match_cache: Optional[MatchCache] = None
+        self._any_success_or_new_match_per_level: dict[int, bool] = {}
+
 
 def _action_str(theorem: "Theorem", mapping: Mapping) -> str:
     arg_names = [point.name for arg, point in mapping.items() if isinstance(arg, str)]
@@ -145,18 +148,27 @@ def _action_str(theorem: "Theorem", mapping: Mapping) -> str:
 
 
 class BFSDDAR(DeductiveAgent):
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        do_simple_derviations_asap: bool = False,
+        do_all_derivations_asap: bool = False,
+    ) -> None:
         super().__init__()
         self._dd_agent = BFSDD()
-        self._derivations: Derivations = {}
-        self._eq4s: Derivations = {}
-        self._current_derivation_name: Optional[str] = None
-        self._current_derivation_stack: list[tuple[Point, ...]] = []
-        self.level: int = -1
+        self._do_simple_derviations_asap = do_simple_derviations_asap
+        self._do_all_derivations_asap = do_all_derivations_asap
+        self.reset()
 
     def act(self, proof: "Proof", theorems: list["Theorem"]) -> Action:
         """Deduce new statements by applying
         breath-first search over all theorems one by one."""
+
+        if self._do_simple_derviations_asap or self._do_all_derivations_asap:
+            next_derivation = self._apply_next_derivation(
+                include_eq4s=self._do_all_derivations_asap
+            )
+            if next_derivation is not None:
+                return next_derivation
 
         if self.level != self._dd_agent.level:
             # Each new level of dd we derive first
@@ -187,14 +199,16 @@ class BFSDDAR(DeductiveAgent):
         else:
             self._dd_agent.remember_effects(action, feedback)
 
-    def _apply_next_derivation(self) -> Optional[ApplyDerivationAction]:
+    def _apply_next_derivation(
+        self, include_eq4s: bool = True
+    ) -> Optional[ApplyDerivationAction]:
         if not self._current_derivation_stack:
             if self._derivations:
                 (
                     self._current_derivation_name,
                     self._current_derivation_stack,
                 ) = self._derivations.popitem()
-            elif self._eq4s:
+            elif include_eq4s and self._eq4s:
                 (
                     self._current_derivation_name,
                     self._current_derivation_stack,
@@ -202,8 +216,16 @@ class BFSDDAR(DeductiveAgent):
             else:
                 return None
 
-        next_mapping = self._current_derivation_stack.pop(0)
-        return ApplyDerivationAction(self._current_derivation_name, next_mapping)
+        derived_statement, reason = self._current_derivation_stack.pop(0)
+        return ApplyDerivationAction(statement=derived_statement, reason=reason)
+
+    def reset(self):
+        self._dd_agent.reset()
+        self._derivations: Derivations = {}
+        self._eq4s: Derivations = {}
+        self._current_derivation_name: Optional[str] = None
+        self._current_derivation_stack: list[tuple[Point, ...]] = []
+        self.level: int = -1
 
 
 def concat_derivations(derivations: Derivations, new: Derivations):
