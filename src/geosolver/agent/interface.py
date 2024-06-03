@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, NamedTuple, Optional, Union
 from abc import abstractmethod
 
 from geosolver.dependencies.empty_dependency import EmptyDependency
-from geosolver.statements.statement import Statement
 
 
 if TYPE_CHECKING:
@@ -16,6 +15,8 @@ if TYPE_CHECKING:
     from geosolver.match_theorems import MatchCache
     from geosolver.algebraic.algebraic_manipulator import Derivations
     from geosolver.problem import Problem
+    from geosolver.statements.statement import Statement
+
 
 Mapping = dict[str, Union["Point", str]]
 
@@ -44,7 +45,7 @@ class DeriveAlgebraAction(NamedTuple):
 
 
 class ApplyDerivationAction(NamedTuple):
-    statement: Statement
+    statement: "Statement"
     reason: EmptyDependency
 
 

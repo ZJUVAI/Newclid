@@ -34,7 +34,7 @@ from geosolver.agent.interface import (
 )
 from geosolver.match_theorems import match_one_theorem
 from geosolver.statements.adder import IntrinsicRules, ToCache
-from geosolver.statements import StatementsHandler
+from geosolver.statements.handler import StatementsHandler
 from geosolver.symbols_graph import SymbolsGraph
 from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 from geosolver.geometry import Angle, Ratio

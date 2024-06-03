@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
-from geosolver.statements.statement import Statement
+
 from geosolver.dependencies.dependency import Dependency
 from geosolver.dependencies.why_predicates import why_dependency
 
@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from geosolver.dependencies.caching import DependencyCache
     from geosolver.symbols_graph import SymbolsGraph
     from geosolver.statements.checker import StatementChecker
+    from geosolver.statements.statement import Statement
 
 
 class EmptyDependency:
@@ -22,7 +23,7 @@ class EmptyDependency:
         self.trace = None
         self.construction = None
 
-    def populate(self, statement: Statement) -> Dependency:
+    def populate(self, statement: "Statement") -> Dependency:
         dep = Dependency(statement, self.rule_name, self.level)
         dep.trace2 = self.trace
         dep.why = list(self.why)
@@ -36,8 +37,8 @@ class EmptyDependency:
     def extend(
         self,
         proof: "Proof",
-        statement0: Statement,
-        statement: Statement,
+        statement0: "Statement",
+        statement: "Statement",
     ) -> "EmptyDependency":
         """Extend the dependency list by (name, args)."""
         dep0 = self.populate(statement0)
@@ -58,8 +59,8 @@ class EmptyDependency:
         symbols_graph: "SymbolsGraph",
         statements_checker: "StatementChecker",
         dependency_cache: "DependencyCache",
-        statement0: Statement,
-        statements: list[Statement],
+        statement0: "Statement",
+        statements: list["Statement"],
     ) -> "EmptyDependency":
         """Extend the dependency list by many name_args."""
         if not statements:
