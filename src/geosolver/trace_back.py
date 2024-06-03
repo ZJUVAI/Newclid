@@ -6,7 +6,7 @@ from geosolver.dependencies.why_predicates import why_dependency
 from geosolver.predicates import Predicate
 from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE
-from geosolver.statement import Statement
+from geosolver.statements.statement import Statement
 
 if TYPE_CHECKING:
     from geosolver.proof import Proof

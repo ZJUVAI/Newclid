@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, NamedTuple, Optional, Union
 from abc import abstractmethod
 
 from geosolver.dependencies.empty_dependency import EmptyDependency
-from geosolver.statement import Statement
+from geosolver.statements.statement import Statement
 
 
 if TYPE_CHECKING:

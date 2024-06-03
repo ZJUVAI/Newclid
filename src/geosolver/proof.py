@@ -9,7 +9,7 @@ import logging
 
 
 from geosolver.definitions.clause import Clause, Construction
-from geosolver.statement import Statement
+from geosolver.statements.statement import Statement
 from geosolver.definitions.definition import Definition
 from geosolver.theorem import Theorem
 from geosolver.dependencies.why_predicates import why_dependency

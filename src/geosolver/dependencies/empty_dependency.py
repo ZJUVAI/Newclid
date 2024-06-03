@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
-from geosolver.statement import Statement
+from geosolver.statements.statement import Statement
 from geosolver.dependencies.dependency import Dependency
 from geosolver.dependencies.why_predicates import why_dependency
 

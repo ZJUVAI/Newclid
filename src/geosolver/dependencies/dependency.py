@@ -6,7 +6,7 @@ from geosolver.problem import CONSTRUCTION_RULE
 
 
 if TYPE_CHECKING:
-    from geosolver.statement import Statement
+    from geosolver.statements.statement import Statement
 
 
 class Dependency:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar
-from geosolver.statement import Statement
+from geosolver.statements.statement import Statement
 from geosolver.dependencies.caching import DependencyCache
 
 from geosolver.dependencies.dependency import Dependency

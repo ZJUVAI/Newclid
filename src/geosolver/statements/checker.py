@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from geosolver.statement import Statement, angle_to_num_den, ratio_to_num_den
+from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
 from geosolver.predicates import Predicate
 from geosolver.geometry import (
     Angle,

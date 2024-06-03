@@ -8,7 +8,7 @@ from geosolver.numerical import ATOM, close_enough
 from geosolver.numerical.angles import ang_between
 from geosolver.numerical.geometries import Circle, Line, Point, bring_together
 from geosolver.listing import list_eqratio3
-from geosolver.statement import Statement, angle_to_num_den, ratio_to_num_den
+from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
 
 if TYPE_CHECKING:
     import numpy

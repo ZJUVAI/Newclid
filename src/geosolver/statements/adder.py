@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Optional, Tuple
 
 
 import geosolver.combinatorics as comb
-from geosolver.statement import Statement, angle_to_num_den, ratio_to_num_den
+from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
 from geosolver.dependencies.why_predicates import why_dependency
 from geosolver.predicates import Predicate
 import geosolver.numerical.check as nm

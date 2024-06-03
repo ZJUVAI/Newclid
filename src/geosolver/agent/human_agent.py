@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import NamedTuple, Optional, TypeVar
 
-from geosolver.statement import Statement
+from geosolver.statements.statement import Statement
 from geosolver.theorem import Theorem
 from geosolver.agent.interface import (
     Action,

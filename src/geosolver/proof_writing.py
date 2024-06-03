@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Optional
 
 
 from geosolver.definitions.clause import Clause
-from geosolver.statement import Statement
+from geosolver.statements.statement import Statement
 import geosolver.pretty as pt
 import geosolver.trace_back as trace_back
 

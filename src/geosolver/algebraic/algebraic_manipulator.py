@@ -11,7 +11,7 @@ from geosolver.numerical.check import check_numerical
 
 
 import geosolver.ratios
-from geosolver.statement import Statement, angle_to_num_den, ratio_to_num_den
+from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
 
 if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph

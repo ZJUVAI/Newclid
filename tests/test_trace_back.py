@@ -6,7 +6,7 @@ import pytest_check as check
 
 from geosolver.predicates import Predicate
 from geosolver.dependencies.dependency import Dependency
-from geosolver.statement import Statement
+from geosolver.statements.statement import Statement
 from geosolver.trace_back import get_logs
 from geosolver.api import GeometricSolverBuilder
 
