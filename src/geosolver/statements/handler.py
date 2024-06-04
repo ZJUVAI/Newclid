@@ -1,5 +1,6 @@
 from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 from geosolver.dependencies.caching import DependencyCache
+from geosolver.dependencies.why_predicates import StatementsHyperGraph
 from geosolver.statements.adder import IntrinsicRules, StatementAdder
 from geosolver.statements.checker import StatementChecker
 from geosolver.statements.enumerator import StatementsEnumerator
@@ -15,11 +16,17 @@ class StatementsHandler:
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> None:
         self.checker = StatementChecker(symbols_graph, alegbraic_manipulator)
+        self.graph = StatementsHyperGraph(
+            symbols_graph=symbols_graph,
+            statements_checker=self.checker,
+            dependency_cache=dependency_cache,
+        )
         self.adder = StatementAdder(
-            symbols_graph,
-            alegbraic_manipulator,
-            self.checker,
-            dependency_cache,
+            symbols_graph=symbols_graph,
+            statements_graph=self.graph,
+            alegbraic_manipulator=alegbraic_manipulator,
+            statements_checker=self.checker,
+            dependency_cache=dependency_cache,
             disabled_intrinsic_rules=disabled_intrinsic_rules,
         )
         self.enumerator = StatementsEnumerator(

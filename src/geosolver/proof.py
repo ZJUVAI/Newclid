@@ -12,7 +12,6 @@ from geosolver.definitions.clause import Clause, Construction
 from geosolver.statements.statement import Statement
 from geosolver.definitions.definition import Definition
 from geosolver.theorem import Theorem
-from geosolver.dependencies.why_predicates import why_dependency
 from geosolver.predicates import Predicate
 from geosolver.agent.interface import (
     Action,
@@ -158,6 +157,7 @@ class Proof:
                 symbols_graph = SymbolsGraph()
                 dependency_cache = DependencyCache()
                 alegbraic_manipulator = AlgebraicManipulator(symbols_graph)
+
                 statements_handler = StatementsHandler(
                     symbols_graph,
                     alegbraic_manipulator,
@@ -281,13 +281,7 @@ class Proof:
         premise_statement = Statement(premise.name, p_args)
         dep = Dependency(premise_statement, rule_name="Premise", level=dependency_level)
         try:
-            dep.why = why_dependency(
-                dep,
-                self.symbols_graph,
-                self.statements.checker,
-                self.dependency_cache,
-                dependency_level,
-            )
+            dep.why = self.statements.graph.resolve(dep, dependency_level)
             fail = False
         except Exception:
             fail = True

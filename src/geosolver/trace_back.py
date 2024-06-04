@@ -2,7 +2,6 @@
 
 from typing import TYPE_CHECKING
 
-from geosolver.dependencies.why_predicates import why_dependency
 from geosolver.predicates import Predicate
 from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE
@@ -286,13 +285,7 @@ def get_logs(
 ]:
     """Given a DAG and conclusion N, return the premise, aux, proof."""
     try:
-        query.why = why_dependency(
-            query,
-            proof.symbols_graph,
-            proof.statements.checker,
-            proof.dependency_cache,
-            query.level,
-        )
+        query.why = proof.statements.graph.resolve(query, query.level)
     except AttributeError:
         raise Exception("Cannot traceback the proof.")
     log = recursive_traceback(query)

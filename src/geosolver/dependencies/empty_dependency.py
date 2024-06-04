@@ -2,14 +2,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from geosolver.dependencies.dependency import Dependency
-from geosolver.dependencies.why_predicates import why_dependency
+
 
 if TYPE_CHECKING:
-    from geosolver.proof import Proof
-    from geosolver.dependencies.caching import DependencyCache
-    from geosolver.symbols_graph import SymbolsGraph
-    from geosolver.statements.checker import StatementChecker
     from geosolver.statements.statement import Statement
+    from geosolver.dependencies.why_predicates import StatementsHyperGraph
 
 
 class EmptyDependency:
@@ -36,29 +33,21 @@ class EmptyDependency:
 
     def extend(
         self,
-        proof: "Proof",
-        statement0: "Statement",
-        statement: "Statement",
+        statements_graph: "StatementsHyperGraph",
+        statement_to_extend: "Statement",
+        extention_statement: "Statement",
     ) -> "EmptyDependency":
         """Extend the dependency list by (name, args)."""
-        dep0 = self.populate(statement0)
+        dep0 = self.populate(statement_to_extend)
         deps = EmptyDependency(level=self.level, rule_name=None)
-        dep = Dependency(statement, None, deps.level)
-        dep.why = why_dependency(
-            dep,
-            proof.symbols_graph,
-            proof.statements.checker,
-            proof.dependency_cache,
-            None,
-        )
+        dep = Dependency(extention_statement, None, deps.level)
+        dep.why = statements_graph.resolve(dep, None)
         deps.why = [dep0, dep]
         return deps
 
     def extend_many(
         self,
-        symbols_graph: "SymbolsGraph",
-        statements_checker: "StatementChecker",
-        dependency_cache: "DependencyCache",
+        statements_graph: "StatementsHyperGraph",
         statement0: "Statement",
         statements: list["Statement"],
     ) -> "EmptyDependency":
@@ -70,12 +59,6 @@ class EmptyDependency:
         deps.why = [dep0]
         for statement in statements:
             dep = Dependency(statement, None, deps.level)
-            dep.why = why_dependency(
-                dep,
-                symbols_graph,
-                statements_checker,
-                dependency_cache,
-                None,
-            )
+            dep.why = statements_graph.resolve(dep, None)
             deps.why += [dep]
         return deps

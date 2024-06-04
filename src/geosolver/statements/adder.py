@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional, Tuple
 
 import geosolver.combinatorics as comb
 from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
-from geosolver.dependencies.why_predicates import why_dependency
+
 from geosolver.predicates import Predicate
 import geosolver.numerical.check as nm
 
@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
     from geosolver.statements.checker import StatementChecker
     from geosolver.dependencies.caching import DependencyCache
+    from geosolver.dependencies.why_predicates import StatementsHyperGraph
 
 
 class IntrinsicRules(Enum):
@@ -58,6 +59,7 @@ class StatementAdder:
     def __init__(
         self,
         symbols_graph: "SymbolsGraph",
+        statements_graph: "StatementsHyperGraph",
         alegbraic_manipulator: "AlgebraicManipulator",
         statements_checker: "StatementChecker",
         dependency_cache: "DependencyCache",
@@ -68,6 +70,7 @@ class StatementAdder:
 
         self.statements_checker = statements_checker
         self.dependency_cache = dependency_cache
+        self.statements_graph = statements_graph
 
         if disabled_intrinsic_rules is None:
             disabled_intrinsic_rules = []
@@ -313,13 +316,7 @@ class StatementAdder:
             if self.statements_checker.check_coll([p1, p2, p]):
                 coll = Statement(Predicate.COLLINEAR, [p1, p2, p])
                 coll_dep = Dependency(coll, None, None)
-                coll_dep.why = why_dependency(
-                    coll_dep,
-                    self.symbols_graph,
-                    self.statements_checker,
-                    self.dependency_cache,
-                    None,
-                )
+                coll_dep.why = self.statements_graph.resolve(coll_dep, None)
                 return coll_dep
 
     def _add_para(
@@ -388,22 +385,10 @@ class StatementAdder:
         elif self.statements_checker.check_coll([d, m, n]):
             extends.append(Statement(Predicate.COLLINEAR, [d, m, n]))
         else:
-            deps = deps.extend_many(
-                self.symbols_graph,
-                self.statements_checker,
-                self.dependency_cache,
-                perp,
-                extends,
-            )
+            deps = deps.extend_many(self.statements_graph, perp, extends)
             return self._add_para([c, d, m, n], deps)
 
-        deps = deps.extend_many(
-            self.symbols_graph,
-            self.statements_checker,
-            self.dependency_cache,
-            perp,
-            extends,
-        )
+        deps = deps.extend_many(self.statements_graph, perp, extends)
         return self._add_coll(list(set([c, d, m, n])), deps)
 
     def _maybe_make_para_from_perp(
@@ -475,7 +460,7 @@ class StatementAdder:
             if deps:
                 perp = Statement(Predicate.PERPENDICULAR, list(args))
                 para = Statement(Predicate.PARALLEL, [x, y, x_, y_])
-                deps = deps.extend(self, perp, para)
+                deps = deps.extend(self.statements_graph, perp, para)
             args[2 * i - 2] = x_
             args[2 * i - 1] = y_
 
@@ -641,13 +626,7 @@ class StatementAdder:
             if self.statements_checker.check_cyclic([p1, p2, p3, p]):
                 cyclic = Statement(Predicate.CYCLIC, [p1, p2, p3, p])
                 cyclic_dep = Dependency(cyclic, None, None)
-                cyclic_dep.why = why_dependency(
-                    cyclic_dep,
-                    self.symbols_graph,
-                    self.statements_checker,
-                    self.dependency_cache,
-                    None,
-                )
+                cyclic_dep.why = self.statements_graph.resolve(cyclic_dep, None)
                 return cyclic_dep
 
     def _maybe_add_cyclic_from_cong(
@@ -783,7 +762,7 @@ class StatementAdder:
             if deps:
                 eqangle = Statement(Predicate.EQANGLE, tuple(args))
                 para = Statement(Predicate.PARALLEL, [x, y, x_, y_])
-                deps = deps.extend(self, eqangle, para)
+                deps = deps.extend(self.statements_graph, eqangle, para)
                 args[2 * i - 2] = x_
                 args[2 * i - 1] = y_
 
@@ -952,7 +931,7 @@ class StatementAdder:
             if deps:
                 eqratio = Statement(Predicate.EQRATIO, tuple(args))
                 cong = Statement(Predicate.CONGRUENT, [x, y, x_, y_])
-                deps = deps.extend(self, eqratio, cong)
+                deps = deps.extend(self.statements_graph, eqratio, cong)
             args[2 * i - 2] = x_
             args[2 * i - 1] = y_
 
@@ -1179,13 +1158,7 @@ class StatementAdder:
 
             because_eq = Statement(eq_pred, [a, b, c, d])
             dep = Dependency(because_eq, None, deps.level)
-            dep.why = why_dependency(
-                dep,
-                self.symbols_graph,
-                self.statements_checker,
-                self.dependency_cache,
-                None,
-            )
+            dep.why = self.statements_graph.resolve(dep, None)
             deps.why = [dep0, dep]
 
         elif eq_pred is Predicate.PARALLEL:  # ab == cd.
@@ -1196,13 +1169,7 @@ class StatementAdder:
 
                 because_collx = Statement(Predicate.COLLINEAR_X, colls)
                 dep = Dependency(because_collx, None, deps.level)
-                dep.why = why_dependency(
-                    dep,
-                    self.symbols_graph,
-                    self.statements_checker,
-                    self.dependency_cache,
-                    None,
-                )
+                dep.why = self.statements_graph.resolve(dep, None)
                 deps.why = [dep0, dep]
 
         because_eq = Statement(eq_pred, [m, n, p, q])
@@ -1260,7 +1227,7 @@ class StatementAdder:
             if deps:
                 aconst = Statement(Predicate.CONSTANT_ANGLE, tuple(args))
                 para = Statement(Predicate.PARALLEL, [x, y, x_, y_])
-                deps = deps.extend(self, aconst, para)
+                deps = deps.extend(self.statements_graph, aconst, para)
             args[2 * i - 2] = x_
             args[2 * i - 1] = y_
 
@@ -1334,13 +1301,7 @@ class StatementAdder:
                 continue
             para = Statement(Predicate.PARALLEL, [p, q, p_, q_])
             para_dep = Dependency(para, None, deps.level)
-            para_dep.why = why_dependency(
-                para_dep,
-                self.symbols_graph,
-                self.statements_checker,
-                self.dependency_cache,
-                None,
-            )
+            para_dep.why = self.statements_graph.resolve(para_dep, None)
             deps.why += [para_dep]
 
         xba, abx, why = self.symbols_graph.get_or_create_angle_from_lines(
@@ -1412,7 +1373,7 @@ class StatementAdder:
             if deps:
                 rconst = Statement(Predicate.CONSTANT_RATIO, tuple(args))
                 cong = Statement(Predicate.CONGRUENT, [x, y, x_, y_])
-                deps = deps.extend(self, rconst, cong)
+                deps = deps.extend(self.statements_graph, rconst, cong)
             args[2 * i - 2] = x_
             args[2 * i - 1] = y_
 
