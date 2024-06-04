@@ -520,7 +520,6 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
 
 def _check_between(a: Point, b: Point, c: Point) -> bool:
     """Whether a is between b & c."""
-    # return (a - b).dot(c - b) > 0 and (a - c).dot(b - c) > 0
     return (a - b).dot(c - b) > ATOM and (a - c).dot(b - c) > ATOM
 
 
