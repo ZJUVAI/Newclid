@@ -1,7 +1,6 @@
 import pytest
 
 from geosolver.api import GeometricSolverBuilder
-from geosolver.configs import default_configs_path
 from geosolver.theorem import Theorem
 from geosolver.proof_writing import get_proof_steps, proof_step_string
 from geosolver.statements.adder import IntrinsicRules
@@ -276,7 +275,6 @@ def test_rule_used_to_solve_in_one_step(
     solver_builder = (
         GeometricSolverBuilder()
         .load_problem_from_txt(problem_txt)
-        .load_defs_from_file(default_configs_path().joinpath("new_defs.txt"))
         .with_disabled_intrinsic_rules(
             [
                 IntrinsicRules.PARA_FROM_PERP,

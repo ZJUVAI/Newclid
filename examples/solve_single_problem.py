@@ -4,7 +4,6 @@ from pathlib import Path
 
 from geosolver.agent.human_agent import HumanAgent
 from geosolver.api import GeometricSolverBuilder
-from geosolver.configs import default_configs_path
 from geosolver.statements.adder import IntrinsicRules
 
 
@@ -24,8 +23,6 @@ def main():
                 IntrinsicRules.PARA_FROM_EQANGLE,
             ]
         )
-        .load_defs_from_file(default_configs_path().joinpath("new_defs.txt"))
-        .load_rules_from_file(default_configs_path().joinpath("new_rules.txt"))
         .with_deductive_agent(HumanAgent())
         .build()
     )
@@ -35,7 +32,7 @@ def main():
     logging.info(f"Starting problem {problem_name} with ddar only.")
 
     problem_output_path = out_folder_path
-    problem_output_path.mkdir(exist_ok=True)
+    problem_output_path.mkdir(exist_ok=True, parents=True)
 
     solver.draw_figure(
         problem_output_path / f"{problem_name}_construction_figure.png",
