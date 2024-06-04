@@ -141,7 +141,7 @@ class Line:
         # Make sure a is always positive (or always negative for that matter)
         # With a == 0, Assuming a = +epsilon > 0
         # Then b such that ax + by = 0 with y>0 should be negative.
-        if a < -ATOM or np.fabs(a) < ATOM and b > ATOM:
+        if a < -ATOM or abs(a) < ATOM and b > ATOM:
             a, b, c = -a, -b, -c
 
         self.coefficients = a, b, c
@@ -225,16 +225,16 @@ class Line:
         # ax + by + c = 0
         if x is None and y is not None:
             if abs(a) > ATOM:
-                return Point((-c - b * y) / a, y)
+                return Point((-c - b * y) / (a + ATOM), y)
             else:
                 return None
         elif x is not None and y is None:
             if abs(b) > ATOM:
-                return Point(x, (-c - a * x) / b)
+                return Point(x, (-c - a * x) / (b + ATOM))
             else:
                 return None
         elif x is not None and y is not None:
-            if np.fabs(a * x + b * y + c) < ATOM:
+            if abs(a * x + b * y + c) < ATOM:
                 return Point(x, y)
         return None
 
@@ -463,7 +463,7 @@ def circle_circle_intersection(c1: Circle, c2: Circle) -> tuple[Point, Point]:
     if abs(d) < ATOM:
         raise InvalidQuadSolveError()
 
-    a = (r0**2 - r1**2 + d**2) / (2 * d)
+    a = (r0**2 - r1**2 + d**2) / (2 * d + ATOM)
     h = r0**2 - a**2
     if h < -ATOM:
         raise InvalidQuadSolveError()
@@ -487,7 +487,7 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
     p, q = center.x, center.y
 
     if abs(b) < ATOM:
-        x = -c / a
+        x = -c / (a + ATOM)
         x_p = x - p
         x_p2 = x_p * x_p
         y = solve_quad(1, -2 * q, q * q + x_p2 - r * r)
@@ -497,7 +497,7 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
         return (Point(x, y1), Point(x, y2))
 
     if abs(a) < ATOM:
-        y = -c / b
+        y = -c / (b + ATOM)
         y_q = y - q
         y_q2 = y_q * y_q
         x = solve_quad(1, -2 * p, p * p + y_q2 - r * r)
@@ -520,6 +520,7 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
 
 def _check_between(a: Point, b: Point, c: Point) -> bool:
     """Whether a is between b & c."""
+    # return (a - b).dot(c - b) > 0 and (a - c).dot(b - c) > 0
     return (a - b).dot(c - b) > ATOM and (a - c).dot(b - c) > ATOM
 
 

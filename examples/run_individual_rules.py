@@ -4,7 +4,6 @@ from pathlib import Path
 
 
 from geosolver.api import GeometricSolverBuilder
-from geosolver.configs import default_configs_path
 from geosolver.problem import Problem
 from geosolver.statements.adder import IntrinsicRules
 
@@ -15,7 +14,7 @@ def main():
     problem_file = "problems_datasets/testing_minimal_rules.txt"
     problems = Problem.to_dict(Problem.from_txt_file(problem_file, translate=False))
     for problem_name in problems.keys():
-        solver = (
+        solver_builder = (
             GeometricSolverBuilder()
             .load_problem_from_file(problem_file, problem_name, translate=False)
             .with_disabled_intrinsic_rules(
@@ -26,17 +25,16 @@ def main():
                     IntrinsicRules.PARA_FROM_EQANGLE,
                 ]
             )
-            .load_defs_from_file(default_configs_path().joinpath("new_defs.txt"))
-            .load_rules_from_file("minimal_rules.txt")
-            .build()
         )
+        solver_builder.rules = []
 
+        solver = solver_builder.build()
         out_folder_path = Path("./ddar_results/") / problem_name
 
         logging.info(f"Testing rule {problem_name} with ddar only.")
 
         problem_output_path = out_folder_path
-        problem_output_path.mkdir(exist_ok=True)
+        problem_output_path.mkdir(exist_ok=True, parents=True)
 
         solver.draw_figure(
             problem_output_path / f"{problem_name}_construction_figure.png",
