@@ -6,6 +6,10 @@ from geosolver.agent.interface import DeductiveAgent
 from geosolver.api import GeometricSolver, GeometricSolverBuilder
 from geosolver.agent.registry import AgentRegistry
 
+import numpy
+import random
+numpy.random.seed(42)
+random.seed(42)
 
 AGENTS_REGISTRY = AgentRegistry()
 

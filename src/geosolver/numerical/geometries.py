@@ -225,12 +225,12 @@ class Line:
         # ax + by + c = 0
         if x is None and y is not None:
             if abs(a) > ATOM:
-                return Point((-c - b * y) / (a + ATOM), y)
+                return Point((-c - b * y) / a, y)
             else:
                 return None
         elif x is not None and y is None:
             if abs(b) > ATOM:
-                return Point(x, (-c - a * x) / (b + ATOM))
+                return Point(x, (-c - a * x) / b)
             else:
                 return None
         elif x is not None and y is not None:
@@ -445,11 +445,12 @@ def solve_quad(a: float, b: float, c: float) -> tuple[float, float]:
     """Solve a x^2 + bx + c = 0."""
     a = 2 * a
     d = b * b - 2 * a * c
+    # if d < 0.:
     if d < -ATOM:
         return None  # the caller should expect this result.
 
     y = math.sqrt(d)
-    return (-b - y) / (a + ATOM), (-b + y) / (a + ATOM)
+    return (-b - y) / a, (-b + y) / a
 
 
 def circle_circle_intersection(c1: Circle, c2: Circle) -> tuple[Point, Point]:
@@ -487,7 +488,7 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
     p, q = center.x, center.y
 
     if abs(b) < ATOM:
-        x = -c / (a + ATOM)
+        x = -c / a
         x_p = x - p
         x_p2 = x_p * x_p
         y = solve_quad(1, -2 * q, q * q + x_p2 - r * r)
@@ -497,7 +498,7 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
         return (Point(x, y1), Point(x, y2))
 
     if abs(a) < ATOM:
-        y = -c / (b + ATOM)
+        y = -c / b
         y_q = y - q
         y_q2 = y_q * y_q
         x = solve_quad(1, -2 * p, p * p + y_q2 - r * r)
