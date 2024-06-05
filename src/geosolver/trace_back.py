@@ -211,19 +211,17 @@ def remove_loop(dependency: "Dependency") -> "Dependency":
     return dependency
 
 
-def _find_dependency_shortcut(
-    dependency: "Dependency", initial_hash_tuple: Optional[tuple[str, ...]] = None
-) -> Optional["Dependency"]:
-    if initial_hash_tuple is None:
-        initial_hash_tuple = dependency.statement.hash_tuple
-    for why_dep in dependency.why:
-        shortcut_found = _find_dependency_shortcut(
-            dependency, initial_hash_tuple=initial_hash_tuple
-        )
-        if shortcut_found:
-            return shortcut_found
-        if why_dep.statement.hash_tuple == initial_hash_tuple:
-            return why_dep
+def _find_dependency_shortcut(dependency: "Dependency") -> Optional["Dependency"]:
+    initial_hash_tuple = dependency.statement.hash_tuple
+
+    stack = [dependency]
+
+    while stack:
+        current_dep = stack.pop(0)
+        for why_dep in current_dep.why:
+            if why_dep.statement.hash_tuple == initial_hash_tuple:
+                return why_dep
+            stack.append(why_dep)
     return None
 
 
