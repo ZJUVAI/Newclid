@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
     from geosolver.statements.checker import StatementChecker
     from geosolver.dependencies.caching import DependencyCache
-    from geosolver.dependencies.why_predicates import StatementsHyperGraph
+    from geosolver.dependencies.statements_hypergraph import StatementsHyperGraph
 
 
 class IntrinsicRules(Enum):

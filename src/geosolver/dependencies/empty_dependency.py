@@ -6,7 +6,7 @@ from geosolver.dependencies.dependency import Dependency
 
 if TYPE_CHECKING:
     from geosolver.statements.statement import Statement
-    from geosolver.dependencies.why_predicates import StatementsHyperGraph
+    from geosolver.dependencies.statements_hypergraph import StatementsHyperGraph
 
 
 class EmptyDependency:

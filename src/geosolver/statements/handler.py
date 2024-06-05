@@ -1,6 +1,6 @@
 from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 from geosolver.dependencies.caching import DependencyCache
-from geosolver.dependencies.why_predicates import StatementsHyperGraph
+from geosolver.dependencies.statements_hypergraph import StatementsHyperGraph
 from geosolver.statements.adder import IntrinsicRules, StatementAdder
 from geosolver.statements.checker import StatementChecker
 from geosolver.statements.enumerator import StatementsEnumerator
