@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     import numpy
 
 np: "numpy" = lazy_import("numpy")
-np.random.seed(42)
+
 
 class Point:
     """Numerical point."""
@@ -159,7 +159,6 @@ class Line:
         x, y, _ = other.coefficients
         # b/a > y/x
         return b * x - a * y > ATOM
-        return b * x - a * y > ATOM
 
     def __gt__(self, other: "Line") -> bool:
         return self.greater_than(other)
@@ -177,13 +176,11 @@ class Line:
         x, y, _ = other.coefficients
         # b/a == y/x
         return close_enough(b * x,a * y)
-        return close_enough(b * x,a * y)
 
     def less_than(self, other: "Line") -> bool:
         a, b, _ = self.coefficients
         x, y, _ = other.coefficients
         # b/a > y/x
-        return -b * x + a * y > ATOM
         return -b * x + a * y > ATOM
 
     def intersect(self, obj: Union["Line", "Circle"]) -> tuple[Point, ...]:
@@ -228,12 +225,12 @@ class Line:
         # ax + by + c = 0
         if x is None and y is not None:
             if abs(a) > ATOM:
-                return Point((-c - b * y) / a, y)
+                return Point((-c - b * y) / (a + ATOM), y)
             else:
                 return None
         elif x is not None and y is None:
             if abs(b) > ATOM:
-                return Point(x, (-c - a * x) / b)
+                return Point(x, (-c - a * x) / (b + ATOM))
             else:
                 return None
         elif x is not None and y is not None:
@@ -446,9 +443,8 @@ class InvalidQuadSolveError(Exception):
 
 def solve_quad(a: float, b: float, c: float) -> tuple[float, float]:
     """Solve a x^2 + bx + c = 0."""
-    a = 2.0 * a
+    a = 2 * a
     d = b * b - 2 * a * c
-    # if d < 0.:
     if d < -ATOM:
         return None  # the caller should expect this result.
 
@@ -473,7 +469,6 @@ def circle_circle_intersection(c1: Circle, c2: Circle) -> tuple[Point, Point]:
         raise InvalidQuadSolveError()
     h = np.sqrt(h)
     d += ATOM
-    d += ATOM
     x2 = x0 + a * (x1 - x0) / d
     y2 = y0 + a * (y1 - y0) / d
     x3 = x2 + h * (y1 - y0) / d
@@ -492,7 +487,7 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
     p, q = center.x, center.y
 
     if abs(b) < ATOM:
-        x = -c / a
+        x = -c / (a + ATOM)
         x_p = x - p
         x_p2 = x_p * x_p
         y = solve_quad(1, -2 * q, q * q + x_p2 - r * r)
@@ -502,7 +497,7 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
         return (Point(x, y1), Point(x, y2))
 
     if abs(a) < ATOM:
-        y = -c / b
+        y = -c / (b + ATOM)
         y_q = y - q
         y_q2 = y_q * y_q
         x = solve_quad(1, -2 * p, p * p + y_q2 - r * r)
@@ -546,18 +541,18 @@ def line_segment_intersection(line: Line, A: Point, B: Point) -> Point:
     x1, y1, x2, y2 = A.x, A.y, B.x, B.y
     dx, dy = x2 - x1, y2 - y1
     alpha = (-c - a * x1 - b * y1) / (a * dx + b * dy + ATOM)
-    alpha = (-c - a * x1 - b * y1) / (a * dx + b * dy + ATOM)
     return Point(x1 + alpha * dx, y1 + alpha * dy)
 
 
 def line_line_intersection(line_1: Line, line_2: Line) -> Point:
-    a1, b1, c1 = line_1.coefficients  # a1x + b1y + c1 = 0
-    a2, b2, c2 = line_2.coefficients  # a2x + b2y + c2 = 0
-
+    a1, b1, c1 = line_1.coefficients
+    a2, b2, c2 = line_2.coefficients
+    # a1x + b1y + c1 = 0
+    # a2x + b2y + c2 = 0
     d = a1 * b2 - a2 * b1
     if abs(d) < ATOM:
         raise InvalidLineIntersectError
-    return Point((c2 * b1 - c1 * b2) / (d + ATOM), (c1 * a2 - c2 * a1) / (d + ATOM))
+    return Point((c2 * b1 - c1 * b2) / d, (c1 * a2 - c2 * a1) / d)
 
 
 def bring_together(
