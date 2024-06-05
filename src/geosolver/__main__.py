@@ -58,6 +58,12 @@ def cli_arguments() -> Namespace:
         help="Time (in seconds) before forced termination.",
     )
     parser.add_argument(
+        "--seed",
+        default=42,
+        type=int,
+        help="Seed for random sampling",
+    )
+    parser.add_argument(
         "-o",
         "--output-folder",
         default=None,

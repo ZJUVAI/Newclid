@@ -23,7 +23,13 @@ class Dependency:
         self.trace2 = None
         self.algebra = None
 
-    def _find(self, dep_hashed: tuple[str, ...]) -> "Dependency":
+    def _find(
+        self, dep_hashed: tuple[str, ...], f_visited: set = set()
+    ) -> "Dependency":
+        f_visited.add(self.hashed())
+        if self.hashed() == dep_hashed:
+            return self, f_visited
+
         for w in self.why:
             f = w._find(dep_hashed)
             if f:
