@@ -1,13 +1,11 @@
 from __future__ import annotations
 from collections import defaultdict
-from enum import Enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar
 
 
 from geosolver.dependencies.dependency_graph import (
-    build_edges_colors,
-    build_nodes_colors,
+    build_diverse_colors,
     rgba_to_hex,
 )
 from geosolver.statements.statement import Statement
@@ -42,10 +40,6 @@ nx: "networkx" = lazy_import("networkx")
 
 
 class StatementsHyperGraph:
-    class Nodes(Enum):
-        Statement = "statement"
-        Dependency = "dependency"
-
     def __init__(
         self,
         symbols_graph: "SymbolsGraph",
@@ -60,25 +54,19 @@ class StatementsHyperGraph:
     def resolve(self, dependency: "Dependency", level: int) -> list["Dependency"]:
         if dependency not in self.nx_graph.nodes:
             self.nx_graph.add_node(
-                dependency, type=self.Nodes.Dependency, level=dependency.level
+                dependency,
+                level=dependency.level,
+                name=dependency.rule_name,
             )
         if dependency.statement not in self.nx_graph.nodes:
-            self.nx_graph.add_node(
-                dependency.statement, type=self.Nodes.Statement, level=dependency.level
-            )
-        self.nx_graph.add_edge(
-            dependency, dependency.statement, name=dependency.rule_name
-        )
+            self.nx_graph.add_node(dependency.statement)
+        self.nx_graph.add_edge(dependency, dependency.statement)
 
         why_deps = _why_dependency(self, dependency, level)
         for why_dep in why_deps:
             if why_dep.statement not in self.nx_graph.nodes:
-                self.nx_graph.add_node(
-                    why_dep.statement, type=self.Nodes.Statement, level=why_dep.level
-                )
-            self.nx_graph.add_edge(
-                why_dep.statement, dependency, name=dependency.rule_name
-            )
+                self.nx_graph.add_node(why_dep.statement)
+            self.nx_graph.add_edge(why_dep.statement, dependency)
 
         return why_deps
 
@@ -87,58 +75,52 @@ class StatementsHyperGraph:
         # populates the nodes and edges data structures
         vis_graph: "networkx.DiGraph" = nx.DiGraph()
 
-        levels = [
-            lvl for _, lvl in self.nx_graph.nodes(data="level") if lvl is not None
-        ]
-        max_level = max(levels) if levels else 0
-        nodes_colors = build_nodes_colors(max_level + 1)
+        colors = build_diverse_colors()
+        dep_index = 0
         for node, data in self.nx_graph.nodes(data=True):
-            node_type: self.Nodes = data.get("type")
             node_name = self._node_name(node)
-            if node_type is self.Nodes.Dependency:
+            if isinstance(node, Dependency):
                 size = 2
                 shape = "square"
-            elif node_type is self.Nodes.Statement:
+                label = node.rule_name
+                color_index = dep_index % len(colors)
+                color = rgba_to_hex(*colors[color_index], a=1.0)
+                level = data.get("level", -1)
+                title = f"Level {level}"
+                mass = 0.1
+                print(dep_index, color, colors)
+                dep_index += 1
+            elif isinstance(node, Statement):
                 size = 40
                 shape = "box"
-
-            level: Optional[int] = data.get("level")
-            if level is None:
-                level = -1
-            color = rgba_to_hex(*nodes_colors[level], a=1.0)
+                title = node_name
+                label = node_name
+                mass = 1.0
 
             vis_graph.add_node(
-                node_name, size=size, shape=shape, color=color, title=f"Level {level}"
+                node_name,
+                label=label,
+                title=title,
+                color=color,
+                size=size,
+                shape=shape,
+                mass=mass,
             )
 
-        edges_colors = build_edges_colors()
-        edge_index = 0
         for u, v, data in self.nx_graph.edges(data=True):
-            edge_name = data.get("name")
-            label = edge_name
-            arrows = {"middle": {"enabled": True}, "to": {"enabled": True}}
+            arrows = {"to": {"enabled": True}}
             font = {"size": 8}
 
-            edge_color_index = edge_index % len(edges_colors)
-            base_edge_color = edges_colors[edge_color_index]
-
-            idle_edge_color = rgba_to_hex(*base_edge_color, a=0.6)
-            edge_color = rgba_to_hex(*base_edge_color, a=1.0)
-            color = {
-                "color": idle_edge_color,
-                "highlight": edge_color,
-                "hover": edge_color,
-            }
+            attached_dependency: Dependency = u if isinstance(u, Dependency) else v
+            color = vis_graph.nodes[self._node_name(attached_dependency)]["color"]
 
             vis_graph.add_edge(
                 self._node_name(u),
                 self._node_name(v),
-                label=label,
                 arrows=arrows,
                 font=font,
                 color=color,
             )
-            edge_index += 1
 
         nt.from_nx(vis_graph)
         nt.options.interaction.hover = True
@@ -157,9 +139,9 @@ class StatementsHyperGraph:
         nt.show(str(html_path), notebook=False)
 
     @staticmethod
-    def _node_name(node: Statement | Dependency):
+    def _node_name(node: Statement | Dependency) -> str:
         if isinstance(node, Dependency):
-            return str(node.statement) + "-dep"
+            return str(node.rule_name) + f" for {node.statement}"
         if isinstance(node, Statement):
             return str(node)
         raise TypeError

@@ -215,7 +215,7 @@ class DependencyGraph:
             if dep_type == DependencyType.GOAL.value:
                 vis_graph.nodes[node]["size"] = 40
 
-        edges_colors = build_edges_colors()
+        edges_colors = build_diverse_colors()
         for u, v, k, data in vis_graph.edges(data=True, keys=True):
             name = k.split(".")[0]
             theorem = rules.get(name)
@@ -317,7 +317,7 @@ def rgba_to_hex(r, g, b, a=0.5):
     return f"#{hexes.upper()}"
 
 
-def build_edges_colors() -> List[str]:
+def build_diverse_colors() -> List[str]:
     return sns.color_palette("colorblind", n_colors=20)
 
 
