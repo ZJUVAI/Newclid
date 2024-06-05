@@ -54,7 +54,6 @@ class Point:
         return "P({},{})".format(self.x, self.y)
 
     def close(self, point: "Point", tol: float = ATOM) -> bool:
-    def close(self, point: "Point", tol: float = ATOM) -> bool:
         return abs(self.x - point.x) < tol and abs(self.y - point.y) < tol
 
     def midpoint(self, p: "Point") -> "Point":
@@ -142,7 +141,6 @@ class Line:
         # Make sure a is always positive (or always negative for that matter)
         # With a == 0, Assuming a = +epsilon > 0
         # Then b such that ax + by = 0 with y>0 should be negative.
-        if a < -ATOM or abs(a) < ATOM and b > ATOM:
         if a < -ATOM or abs(a) < ATOM and b > ATOM:
             a, b, c = -a, -b, -c
 
@@ -240,7 +238,6 @@ class Line:
                 return None
         elif x is not None and y is not None:
             if abs(a * x + b * y + c) < ATOM:
-            if abs(a * x + b * y + c) < ATOM:
                 return Point(x, y)
         return None
 
@@ -248,18 +245,14 @@ class Line:
         d1 = self(p1.x, p1.y)
         d2 = self(p2.x, p2.y)
         if abs(d1) < ATOM or abs(d2) < ATOM:
-        if abs(d1) < ATOM or abs(d2) < ATOM:
             return None
-        return d1 * d2 < -ATOM
         return d1 * d2 < -ATOM
 
     def same_side(self, p1: "Point", p2: "Point") -> Optional[bool]:
         d1 = self(p1.x, p1.y)
         d2 = self(p2.x, p2.y)
         if abs(d1) < ATOM or abs(d2) < ATOM:
-        if abs(d1) < ATOM or abs(d2) < ATOM:
             return None
-        return d1 * d2 > ATOM
         return d1 * d2 > ATOM
 
     def sign(self, point: "Point") -> int:
@@ -380,9 +373,7 @@ class HalfLine(Line):
         va = a - self.tail
         vb = b - self.tail
         if v.dot(va) > ATOM:
-        if v.dot(va) > ATOM:
             return a
-        if v.dot(vb) > ATOM:
         if v.dot(vb) > ATOM:
             return b
         raise InvalidLineIntersectError()
@@ -394,7 +385,6 @@ class HalfLine(Line):
             center = center.foot(self)
         a, b = line_circle_intersection(self, Circle(center.foot(self), radius))
 
-        if (a - self.tail).dot(self.head - self.tail) > ATOM:
         if (a - self.tail).dot(self.head - self.tail) > ATOM:
             a, b = self.tail, a
         else:
@@ -475,13 +465,10 @@ def circle_circle_intersection(c1: Circle, c2: Circle) -> tuple[Point, Point]:
 
     d = math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
     if abs(d) < ATOM:
-    if abs(d) < ATOM:
         raise InvalidQuadSolveError()
 
     a = (r0**2 - r1**2 + d**2) / (2 * d + ATOM)
-    a = (r0**2 - r1**2 + d**2) / (2 * d + ATOM)
     h = r0**2 - a**2
-    if h < -ATOM:
     if h < -ATOM:
         raise InvalidQuadSolveError()
     h = np.sqrt(h)
@@ -568,7 +555,6 @@ def line_line_intersection(line_1: Line, line_2: Line) -> Point:
     a2, b2, c2 = line_2.coefficients  # a2x + b2y + c2 = 0
 
     d = a1 * b2 - a2 * b1
-    if abs(d) < ATOM:
     if abs(d) < ATOM:
         raise InvalidLineIntersectError
     return Point((c2 * b1 - c1 * b2) / (d + ATOM), (c1 * a2 - c2 * a1) / (d + ATOM))
