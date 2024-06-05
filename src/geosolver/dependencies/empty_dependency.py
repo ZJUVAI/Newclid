@@ -22,7 +22,6 @@ class EmptyDependency:
 
     def populate(self, statement: "Statement") -> Dependency:
         dep = Dependency(statement, self.rule_name, self.level)
-        dep.trace2 = self.trace
         dep.why = list(self.why)
         return dep
 

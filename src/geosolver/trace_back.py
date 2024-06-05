@@ -1,6 +1,6 @@
 """Implements DAG-level traceback."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from geosolver.predicates import Predicate
 from geosolver.geometry import Point
@@ -143,13 +143,13 @@ def recursive_traceback(
     log = []
     stack = []
 
-    def read(q: "Dependency") -> None:
-        q = q.remove_loop()
-        hashed = q.statement.hash_tuple
+    def read(query_dep: "Dependency") -> None:
+        query_dep = remove_loop(query_dep)
+        hashed = query_dep.statement.hash_tuple
         if hashed in visited:
             return
 
-        if q.statement.predicate in [
+        if query_dep.statement.predicate in [
             Predicate.NON_COLLINEAR,
             Predicate.NON_PARALLEL,
             Predicate.NON_PERPENDICULAR,
@@ -163,10 +163,10 @@ def recursive_traceback(
         stack.append(hashed)
         prems: list["Dependency"] = []
 
-        if q.rule_name != CONSTRUCTION_RULE:
+        if query_dep.rule_name != CONSTRUCTION_RULE:
             all_deps: list["Dependency"] = []
             dep_names = set()
-            for dep in q.why:
+            for dep in query_dep.why:
                 dep_hash = dep.statement.hash_tuple
                 if dep_hash in dep_names:
                     continue
@@ -185,11 +185,11 @@ def recursive_traceback(
         found = False
         for ps, qs in log:
             if sorted([d.statement.hash_tuple for d in ps]) == hashs:
-                qs += [q]
+                qs += [query_dep]
                 found = True
                 break
         if not found:
-            log.append((prems, [q]))
+            log.append((prems, [query_dep]))
 
         stack.pop(-1)
 
@@ -202,6 +202,29 @@ def recursive_traceback(
             log.append((ps, [q]))
 
     return log
+
+
+def remove_loop(dependency: "Dependency") -> "Dependency":
+    shortcut_found = _find_dependency_shortcut(dependency)
+    if shortcut_found:
+        return shortcut_found
+    return dependency
+
+
+def _find_dependency_shortcut(
+    dependency: "Dependency", initial_hash_tuple: Optional[tuple[str, ...]] = None
+) -> Optional["Dependency"]:
+    if initial_hash_tuple is None:
+        initial_hash_tuple = dependency.statement.hash_tuple
+    for why_dep in dependency.why:
+        shortcut_found = _find_dependency_shortcut(
+            dependency, initial_hash_tuple=initial_hash_tuple
+        )
+        if shortcut_found:
+            return shortcut_found
+        if why_dep.statement.hash_tuple == initial_hash_tuple:
+            return why_dep
+    return None
 
 
 def collx_to_coll_setup(
