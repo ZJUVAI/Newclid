@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
     from geosolver.statements.checker import StatementChecker
     from geosolver.dependencies.caching import DependencyCache
-    from geosolver.dependencies.statements_hypergraph import StatementsHyperGraph
+    from geosolver.dependencies.why_graph import WhyHyperGraph
 
 
 class IntrinsicRules(Enum):
@@ -59,7 +59,7 @@ class StatementAdder:
     def __init__(
         self,
         symbols_graph: "SymbolsGraph",
-        statements_graph: "StatementsHyperGraph",
+        statements_graph: "WhyHyperGraph",
         alegbraic_manipulator: "AlgebraicManipulator",
         statements_checker: "StatementChecker",
         dependency_cache: "DependencyCache",

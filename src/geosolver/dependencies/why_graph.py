@@ -19,7 +19,9 @@ vis: "pyvis" = lazy_import("pyvis")
 nx: "networkx" = lazy_import("networkx")
 
 
-class StatementsHyperGraph:
+class WhyHyperGraph:
+    """Hyper graph linking statements by dependencies as hyper-edges."""
+
     def __init__(
         self,
         symbols_graph: "SymbolsGraph",

@@ -3,7 +3,6 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar
 
 
-from geosolver.dependencies.statements_hypergraph import StatementsHyperGraph
 from geosolver.statements.statement import Statement
 from geosolver.dependencies.caching import DependencyCache
 
@@ -27,10 +26,11 @@ from geosolver.predicates import Predicate
 if TYPE_CHECKING:
     from geosolver.statements.checker import StatementChecker
     from geosolver.symbols_graph import SymbolsGraph
+    from geosolver.dependencies.why_graph import WhyHyperGraph
 
 
 def why_dependency(
-    statements_graph: StatementsHyperGraph, dependency: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dependency: "Dependency", level: int
 ) -> list[Dependency]:
     cached_me = statements_graph.dependency_cache.get(dependency.statement)
     if cached_me is not None:
@@ -56,7 +56,7 @@ def _why_equal(x: Node, y: Node, level: int = None) -> list[Any]:
 
 
 def _why_para(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     a, b, c, d = dep.statement.args
 
@@ -89,7 +89,7 @@ def _why_para(
 
 
 def _why_midpoint(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     m, a, b = dep.statement.args
     ma = statements_graph.symbols_graph.get_segment(m, a)
@@ -101,7 +101,7 @@ def _why_midpoint(
 
 
 def _why_perp(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     a, b, c, d = dep.statement.args
     ab = statements_graph.symbols_graph.get_line(a, b)
@@ -132,7 +132,7 @@ def _why_perp(
 
 
 def _why_cong(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     a, b, c, d = dep.statement.args
     ab = statements_graph.symbols_graph.get_segment(a, b)
@@ -141,14 +141,14 @@ def _why_cong(
 
 
 def _why_coll(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     _, why = _line_of_and_why(dep.statement.args, level)
     return why
 
 
 def _why_collx(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     if statements_graph.statements_checker.check_coll(dep.statement.args):
         args = list(set(dep.statement.args))
@@ -192,7 +192,7 @@ def _get_lines_thru_all(*points: Point) -> list[Line]:
 
 
 def _why_cyclic(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     _, why = _circle_of_and_why(dep.statement.args, level)
     return why
@@ -223,7 +223,7 @@ def _get_circles_thru_all(*points: list[Point]) -> list[Circle]:
 
 
 def _why_circle(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     o, a, b, c = dep.statement.args
     oa = statements_graph.symbols_graph.get_segment(o, a)
@@ -233,7 +233,7 @@ def _why_circle(
 
 
 def _why_eqangle(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     a, b, c, d, m, n, p, q = dep.statement.args
 
@@ -330,7 +330,7 @@ def _why_eqangle(
 
 
 def _why_eqratio(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     a, b, c, d, m, n, p, q = dep.statement.args
     ab = statements_graph.symbols_graph.get_segment(a, b)
@@ -398,7 +398,7 @@ def _why_eqratio(
 
 
 def _why_eqratio3(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     a, b, c, d, m, n = dep.statement.args
     para = Statement(Predicate.PARALLEL, [a, b, c, d])
@@ -415,7 +415,7 @@ def _why_eqratio3(
 
 
 def _why_simtri(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     a, b, c, x, y, z = dep.statement.args
     eqangle1 = Statement(Predicate.EQANGLE, [a, b, a, c, x, y, x, z])
@@ -429,7 +429,7 @@ def _why_simtri(
 
 
 def _why_simtri_both(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     a, b, c, p, q, r = dep.statement.args
     eqratio1 = Statement(Predicate.EQRATIO, [b, a, b, c, q, p, q, r])
@@ -443,7 +443,7 @@ def _why_simtri_both(
 
 
 def _why_contri(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     a, b, c, x, y, z = dep.statement.args
     eqangle1 = Statement(Predicate.EQANGLE, [b, a, b, c, y, x, y, z])
@@ -460,7 +460,7 @@ def _why_contri(
 
 
 def why_contri_2(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     a, b, c, x, y, z = dep.statement.args
     eqangle1 = Statement(Predicate.EQANGLE, [b, a, b, c, y, z, y, x])
@@ -477,7 +477,7 @@ def why_contri_2(
 
 
 def _why_contri_both(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     a, b, c, x, y, z = dep.statement.args
     cong1 = Statement(Predicate.CONGRUENT, [a, b, x, y])
@@ -494,7 +494,7 @@ def _why_contri_both(
 
 
 def _why_aconst(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     a, b, c, d, ang0 = dep.statement.args
 
@@ -530,7 +530,7 @@ def _why_aconst(
         return why_aconst
 
 
-def _why_rconst(statements_graph: StatementsHyperGraph, dep: "Dependency", level: int):
+def _why_rconst(statements_graph: "WhyHyperGraph", dep: "Dependency", level: int):
     a, b, c, d, rat0 = dep.statement.args
     val = rat0._val
 
@@ -559,7 +559,7 @@ def _why_rconst(statements_graph: StatementsHyperGraph, dep: "Dependency", level
 
 
 def _why_numerical(
-    statements_graph: StatementsHyperGraph, dep: "Dependency", level: int
+    statements_graph: "WhyHyperGraph", dep: "Dependency", level: int
 ) -> list[Dependency]:
     return []
 
@@ -631,7 +631,7 @@ def _find_equal_pair(
 
 
 def _maybe_make_equal_pairs(
-    statements_graph: StatementsHyperGraph,
+    statements_graph: "WhyHyperGraph",
     a: Point,
     b: Point,
     c: Point,

@@ -6,7 +6,7 @@ from geosolver.dependencies.dependency import Dependency
 
 if TYPE_CHECKING:
     from geosolver.statements.statement import Statement
-    from geosolver.dependencies.statements_hypergraph import StatementsHyperGraph
+    from geosolver.dependencies.why_graph import WhyHyperGraph
 
 
 class EmptyDependency:
@@ -32,7 +32,7 @@ class EmptyDependency:
 
     def extend(
         self,
-        statements_graph: "StatementsHyperGraph",
+        statements_graph: "WhyHyperGraph",
         statement_to_extend: "Statement",
         extention_statement: "Statement",
     ) -> "EmptyDependency":
@@ -46,7 +46,7 @@ class EmptyDependency:
 
     def extend_many(
         self,
-        statements_graph: "StatementsHyperGraph",
+        statements_graph: "WhyHyperGraph",
         statement0: "Statement",
         statements: list["Statement"],
     ) -> "EmptyDependency":
