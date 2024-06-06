@@ -1,10 +1,11 @@
+from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 
 from geosolver.dependencies.caching import DependencyCache
 from geosolver.dependencies.dependency import Dependency
-from geosolver.dependencies.dependency_graph import build_diverse_colors, rgba_to_hex
+from geosolver.dependencies.dependency_graph import rgba_to_hex
 from geosolver.dependencies.why_predicates import why_dependency
 from geosolver.statements.checker import StatementChecker
 from geosolver.statements.statement import Statement
@@ -14,7 +15,9 @@ from geosolver._lazy_loading import lazy_import
 if TYPE_CHECKING:
     import pyvis
     import networkx
+    import seaborn
 
+sns: "seaborn" = lazy_import("seaborn")
 vis: "pyvis" = lazy_import("pyvis")
 nx: "networkx" = lazy_import("networkx")
 
@@ -57,7 +60,7 @@ class WhyHyperGraph:
         # populates the nodes and edges data structures
         vis_graph: "networkx.DiGraph" = nx.DiGraph()
 
-        colors = build_diverse_colors()
+        colors = sns.color_palette("colorblind", n_colors=20)
         dep_index = 0
         for node, data in self.nx_graph.nodes(data=True):
             node_name = self._node_name(node)
@@ -100,20 +103,31 @@ class WhyHyperGraph:
             )
 
         nt.from_nx(vis_graph)
-        nt.options.layout.hierarchical = True
         nt.options.interaction.hover = True
-        nt.options.physics.solver = "barnesHut"
-        nt.options.physics.use_barnes_hut(
+        nt.options.physics.solver = "hierarchicalRepulsion"
+        nt.options.edges.toggle_smoothness("vertical")
+        nt.options.layout = {
+            "hierarchical": {
+                "enabled": True,
+                "levelSeparation": 380,
+                "nodeSpacing": 340,
+                "treeSpacing": 20,
+                "sortMethod": "directed",
+                "shakeTowards": "roots",
+            }
+        }
+
+        nt.options.physics.use_hrepulsion(
             {
-                "gravity": -15000,
-                "central_gravity": 2.0,
-                "spring_length": 100,
-                "spring_strength": 0.05,
-                "damping": 0.2,
-                "overlap": 0.01,
+                "central_gravity": 0,
+                "spring_length": 210,
+                "spring_strength": 0.145,
+                "node_distance": 250,
+                "damping": 0.36,
+                "avoid_overlap": 0.11,
             }
         )
-        nt.show_buttons(filter_=["physics"])
+        nt.show_buttons(filter_=["physics", "layout"])
         nt.show(str(html_path), notebook=False)
 
     @staticmethod
