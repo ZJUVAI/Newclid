@@ -31,7 +31,6 @@ class Dependency:
             if w.statement.hash_tuple == dep_hashed:
                 return w
 
-
     def remove_loop(self) -> "Dependency":
         f = self._find(self.statement.hash_tuple)
         if f:
