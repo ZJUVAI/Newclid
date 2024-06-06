@@ -592,10 +592,11 @@ class Proof:
 
         # check two things
         new_points_nums = [p.num for p in new_points]
-        if check_too_close_numerical(new_points_nums, existing_numerical_points):
-            raise PointTooCloseError()
-        if check_too_far_numerical(new_points_nums, existing_numerical_points):
-            raise PointTooFarError()
+        if len(existing_numerical_points) > 0:
+            if check_too_close_numerical(new_points_nums, existing_numerical_points,0.01):
+                raise PointTooCloseError()
+            if check_too_far_numerical(new_points_nums, existing_numerical_points,100):
+                raise PointTooFarError()
 
         # Commit: now that all conditions are passed.
         # add these points to current graph.
