@@ -1,7 +1,7 @@
-from datetime import datetime
 import logging
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 from pathlib import Path
+import time
 from typing import Optional
 
 from geosolver import AGENTS_REGISTRY
@@ -159,7 +159,7 @@ def resolve_output_path(path_str: Optional[str], problem_name: str) -> Path:
     if path_str is None:
         if problem_name:
             return Path("run_results") / problem_name
-        return Path("run_results") / str(datetime.now())
+        return Path("run_results") / str(time.strftime("%Y%m%d_%H%M%S"))
     return Path(path_str)
 
 
