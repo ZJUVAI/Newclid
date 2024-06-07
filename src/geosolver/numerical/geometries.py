@@ -11,15 +11,16 @@ from typing import TYPE_CHECKING, Optional, Union
 from numpy.random import uniform as unif
 from geosolver._lazy_loading import lazy_import
 from geosolver.numerical import ATOM, close_enough
+from typing import overload
 
 if TYPE_CHECKING:
     import numpy
 
 np: "numpy" = lazy_import("numpy")
-np.random.seed(42)
+
 
 class Point:
-    """Numerical point."""
+    """Numerical point/vector."""
 
     def __init__(self, x, y):
         self.x = x
@@ -53,13 +54,28 @@ class Point:
     def __str__(self) -> str:
         return "P({},{})".format(self.x, self.y)
 
+    def __abs__(self) -> str:
+        return np.sqrt(self.dot(self))
+
+    def __iter__(self) -> str:
+        return iter((self.x, self.y))
+
+    def __eq__(self, p: "Point"):
+        return abs(self.x - p.x) < ATOM and abs(self.y - p.y) < ATOM
+
+    def angle(self) -> float:
+        return np.arctan2(self.y, self.x)
+
     def close(self, point: "Point", tol: float = ATOM) -> bool:
+        """Test if two points are close to each other"""
         return abs(self.x - point.x) < tol and abs(self.y - point.y) < tol
 
     def midpoint(self, p: "Point") -> "Point":
+        """Find the midpoint of two points"""
         return Point(0.5 * (self.x + p.x), 0.5 * (self.y + p.y))
 
     def distance(self, p: Union["Point", "Line", "Circle"]) -> float:
+        """Return the distance of a point and a shape"""
         if isinstance(p, Line):
             return p.distance(self)
         if isinstance(p, Circle):
@@ -69,6 +85,7 @@ class Point:
         return np.sqrt(dx * dx + dy * dy)
 
     def distance2(self, p: "Point") -> float:
+        """Return the distance^2 of 2 points"""
         if isinstance(p, Line):
             return p.distance(self)
         dx = self.x - p.x
@@ -76,35 +93,43 @@ class Point:
         return dx * dx + dy * dy
 
     def rotatea(self, ang: float) -> "Point":
+        """Return the point rotated around O by an angle ang"""
         sinb, cosb = np.sin(ang), np.cos(ang)
         return self.rotate(sinb, cosb)
 
     def rotate(self, sinb: float, cosb: float) -> "Point":
+        """Return the vector rotated around O by an angle b defined by sinb and cosb"""
         x, y = self.x, self.y
         return Point(x * cosb - y * sinb, x * sinb + y * cosb)
 
     def flip(self) -> "Point":
+        """Return the point fliped by the y-axis (vertically)"""
         return Point(-self.x, self.y)
 
     def perpendicular_line(self, line: "Line") -> "Line":
+        """Return the perpendicular line through the point"""
         return line.perpendicular_line(self)
 
     def foot(self, line: "Line") -> "Point":
+        """Return the perpendicular foot of the point to a line"""
         if isinstance(line, Line):
             perpendicular_line = line.perpendicular_line(self)
             return line_line_intersection(perpendicular_line, line)
-        elif isinstance(line, Circle):
+        elif isinstance(line, Circle):  # a line could be a circle!
             c, r = line.center, line.radius
             return c + (self - c) * r / self.distance(c)
         raise ValueError("Dropping foot to weird type {}".format(type(line)))
 
     def parallel_line(self, line: "Line") -> "Line":
+        """Return the parallel line through the point to a line"""
         return line.parallel_line(self)
 
     def norm(self) -> float:
+        """Return the norm of the vector"""
         return np.sqrt(self.x**2 + self.y**2)
 
     def cos(self, other: "Point") -> float:
+        """Return the cos of the smaller angle between two vectors"""
         x, y = self.x, self.y
         a, b = other.x, other.y
         return (x * a + y * b) / self.norm() / other.norm()
@@ -119,8 +144,16 @@ class Point:
         return self.distance(other) <= ATOM
 
 
+class Segment:
+    """Numerical segment."""
+
+    def __init__(self, p1: Point, p2: Point):
+        self.p1 = p1
+        self.p2 = p2
+
+
 class Line:
-    """Numerical line."""
+    """Numerical line : ax+by+c=0"""
 
     def __init__(
         self,
@@ -141,7 +174,7 @@ class Line:
         # Make sure a is always positive (or always negative for that matter)
         # With a == 0, Assuming a = +epsilon > 0
         # Then b such that ax + by = 0 with y>0 should be negative.
-        if a < -ATOM or np.fabs(a) < ATOM and b > ATOM:
+        if a < -ATOM or abs(a) < ATOM and b > ATOM:
             a, b, c = -a, -b, -c
 
         self.coefficients = a, b, c
@@ -175,7 +208,7 @@ class Line:
         a, b, _ = self.coefficients
         x, y, _ = other.coefficients
         # b/a == y/x
-        return close_enough(b * x,a * y)
+        return close_enough(b * x, a * y)
 
     def less_than(self, other: "Line") -> bool:
         a, b, _ = self.coefficients
@@ -193,7 +226,15 @@ class Line:
         a, b, c = self.coefficients
         return abs(self(p.x, p.y)) / math.sqrt(a * a + b * b)
 
-    def __call__(self, x: "Point", y: "Point" = None) -> float:
+    @overload
+    def __call__(self, x: Point) -> float:
+        ...
+
+    @overload
+    def __call__(self, x: float, y: float) -> float:
+        ...
+
+    def __call__(self, x, y=None) -> float:
         if isinstance(x, Point) and y is None:
             return self(x.x, x.y)
         a, b, c = self.coefficients
@@ -220,21 +261,21 @@ class Line:
         return a * x + b * y
 
     def point_at(self, x: float = None, y: float = None) -> Optional[Point]:
-        """Get a point on line closest to (x, y)."""
+        """Get a point on line satisfying x=x and y=y, return None if impossible."""
         a, b, c = self.coefficients
         # ax + by + c = 0
         if x is None and y is not None:
             if abs(a) > ATOM:
-                return Point((-c - b * y) / a, y)
+                return Point((-c - b * y) / (a + ATOM), y)
             else:
                 return None
         elif x is not None and y is None:
             if abs(b) > ATOM:
-                return Point(x, (-c - a * x) / b)
+                return Point(x, (-c - a * x) / (b + ATOM))
             else:
                 return None
         elif x is not None and y is not None:
-            if np.fabs(a * x + b * y + c) < ATOM:
+            if abs(a * x + b * y + c) < ATOM:
                 return Point(x, y)
         return None
 
@@ -341,6 +382,12 @@ class Circle:
         return [result]
 
 
+class Angle:
+    def __init__(self, l1: Line, l2: Line):
+        self.l1 = l1
+        self.l2 = l2
+
+
 class HalfLine(Line):
     """Numerical ray."""
 
@@ -443,7 +490,7 @@ class InvalidQuadSolveError(Exception):
 
 def solve_quad(a: float, b: float, c: float) -> tuple[float, float]:
     """Solve a x^2 + bx + c = 0."""
-    a = 2.0 * a
+    a = 2 * a
     d = b * b - 2 * a * c
     if d < -ATOM:
         return None  # the caller should expect this result.
@@ -463,7 +510,7 @@ def circle_circle_intersection(c1: Circle, c2: Circle) -> tuple[Point, Point]:
     if abs(d) < ATOM:
         raise InvalidQuadSolveError()
 
-    a = (r0**2 - r1**2 + d**2) / (2 * d)
+    a = (r0**2 - r1**2 + d**2) / (2 * d + ATOM)
     h = r0**2 - a**2
     if h < -ATOM:
         raise InvalidQuadSolveError()
@@ -487,7 +534,7 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
     p, q = center.x, center.y
 
     if abs(b) < ATOM:
-        x = -c / a
+        x = -c / (a + ATOM)
         x_p = x - p
         x_p2 = x_p * x_p
         y = solve_quad(1, -2 * q, q * q + x_p2 - r * r)
@@ -497,7 +544,7 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
         return (Point(x, y1), Point(x, y2))
 
     if abs(a) < ATOM:
-        y = -c / b
+        y = -c / (b + ATOM)
         y_q = y - q
         y_q2 = y_q * y_q
         x = solve_quad(1, -2 * p, p * p + y_q2 - r * r)
@@ -520,6 +567,7 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
 
 def _check_between(a: Point, b: Point, c: Point) -> bool:
     """Whether a is between b & c."""
+    # return (a - b).dot(c - b) > 0 and (a - c).dot(b - c) > 0
     return (a - b).dot(c - b) > ATOM and (a - c).dot(b - c) > ATOM
 
 
@@ -544,13 +592,14 @@ def line_segment_intersection(line: Line, A: Point, B: Point) -> Point:
 
 
 def line_line_intersection(line_1: Line, line_2: Line) -> Point:
-    a1, b1, c1 = line_1.coefficients  # a1x + b1y + c1 = 0
-    a2, b2, c2 = line_2.coefficients  # a2x + b2y + c2 = 0
-
+    a1, b1, c1 = line_1.coefficients
+    a2, b2, c2 = line_2.coefficients
+    # a1x + b1y + c1 = 0
+    # a2x + b2y + c2 = 0
     d = a1 * b2 - a2 * b1
     if abs(d) < ATOM:
         raise InvalidLineIntersectError
-    return Point((c2 * b1 - c1 * b2) / (d + ATOM), (c1 * a2 - c2 * a1) / (d + ATOM))
+    return Point((c2 * b1 - c1 * b2) / d, (c1 * a2 - c2 * a1) / d)
 
 
 def bring_together(
