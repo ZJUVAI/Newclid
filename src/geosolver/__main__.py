@@ -58,6 +58,12 @@ def cli_arguments() -> Namespace:
         help="Time (in seconds) before forced termination.",
     )
     parser.add_argument(
+        "--seed",
+        default=None,
+        type=int,
+        help="Seed for random sampling",
+    )
+    parser.add_argument(
         "-o",
         "--output-folder",
         default=None,
@@ -127,14 +133,14 @@ def main():
     agent = AGENTS_REGISTRY.load_agent(args.agent)
     solver_builder.with_deductive_agent(agent)
 
-    solver = solver_builder.build()
+    solver = solver_builder.build(args.seed)
     outpath = resolve_output_path(args.output_folder, problem_name=solver.problem.url)
 
     if not quiet:
         outpath.mkdir(parents=True, exist_ok=True)
         solver.draw_figure(outpath / "construction_figure.png")
 
-    success = solver.run(max_steps=args.max_steps, timeout=args.timeout)
+    success = solver.run(max_steps=args.max_steps, timeout=args.timeout, seed=args.seed)
 
     if not success:
         logging.info(f"Failed to solved the problem.\nInfos:{solver.run_infos}")

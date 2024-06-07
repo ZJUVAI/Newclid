@@ -8,6 +8,7 @@ import traceback
 from typing import Optional
 from typing_extensions import Self
 import copy as cp
+import numpy as np
 
 from geosolver.definitions.clause import Clause
 from geosolver.definitions.definition import Definition
@@ -40,6 +41,8 @@ class GeometricSolver:
             deductive_agent = BFSDDAR()
         self.deductive_agent = deductive_agent
         self.run_infos = None
+        # rng control
+        self.rnd_gen = proof_state.get_rnd_generator()
 
     @property
     def goal(self):
@@ -64,8 +67,14 @@ class GeometricSolver:
     def get_setup_string(self) -> str:
         return setup_str_from_problem(self.problem, self.defs)
 
-    def run(self, max_steps: int = 10000, timeout: float = 600.0) -> bool:
-        self._reset()
+    def update_random_generator(self, seed: int = 42):
+        self.rnd_gen = np.random.default_rng(seed)
+        return self.rnd_gen
+
+    def run(
+        self, max_steps: int = 10000, timeout: float = 600.0, seed: int = 42
+    ) -> bool:
+        self._reset(seed)
         success, infos = run_loop(
             self.deductive_agent,
             self.proof_state,
@@ -125,11 +134,17 @@ class GeometricSolver:
         if not feedback.success:
             raise ValueError(f"Auxiliary construction failed to be added: {aux_string}")
 
-    def _reset(self):
-        self.deductive_agent.reset()
+    def reset_rnd_generator(self, seed: int = 42):
+        rnd_gen = np.random.default_rng(seed)
+        self.proof_state.set_rnd_generator(rnd_gen)
+        self.rnd_gen = self.proof_state.get_rnd_generator()
 
+    def _reset(self, seed: int = 42):
+        self.deductive_agent.reset()
         proof_state = self.get_proof_state()
         self.load_state(proof_state)
+
+        self.reset_rnd_generator(seed)
 
         problem_string = self.get_problem_string()
         self.load_problem_string(problem_string)
@@ -143,7 +158,7 @@ class GeometricSolverBuilder:
         self.deductive_agent: Optional[DeductiveAgent] = None
         self.disabled_intrinsic_rules: Optional[list[IntrinsicRules]] = None
 
-    def build(self) -> "GeometricSolver":
+    def build(self, seed: int = 42) -> "GeometricSolver":
         if self.problem is None:
             raise ValueError("Did not load problem before building solver.")
 
@@ -155,12 +170,21 @@ class GeometricSolverBuilder:
         if self.rules is None:
             self.rules = Theorem.from_txt_file(default_rules_path())
 
+        rnd_gen = np.random.default_rng(seed)
+
         proof_state = Proof.build_problem(
-            self.problem, self.defs, self.disabled_intrinsic_rules
+            problem=self.problem,
+            definitions=self.defs,
+            disabled_intrinsic_rules=self.disabled_intrinsic_rules,
+            rnd_generator=rnd_gen,
         )
 
         return GeometricSolver(
-            proof_state, self.problem, self.defs, self.rules, self.deductive_agent
+            proof_state,
+            self.problem,
+            self.defs,
+            self.rules,
+            self.deductive_agent,
         )
 
     def load_problem_from_file(
