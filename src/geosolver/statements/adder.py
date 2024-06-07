@@ -60,6 +60,9 @@ class IntrinsicRules(Enum):
     ACONST_FROM_PARA = "i19"
     RCONST_FROM_CONG = "i20"
 
+    SANGLE_FROM_LINES = "i21"
+    SANGLE_FROM_PARA = "i22"
+
 
 class StatementAdder:
     def __init__(
@@ -212,7 +215,7 @@ class StatementAdder:
             ab, cd, deps=None
         )
         deps = deps.extend_by_why(
-            Statement(Predicate.CONSTANT_ANGLE, args), why, reason=deps.reason
+            Statement(Predicate.CONSTANT_ANGLE, args), why, extention_reason=deps.reason
         )
 
         a, b = ab._d
@@ -296,7 +299,7 @@ class StatementAdder:
                 abcd_deps = deps.extend_by_why(
                     Statement(Predicate.COLLINEAR, og_points),
                     why=whys + why0,
-                    reason=Reason(IntrinsicRules.POINT_ON_SAME_LINE),
+                    extention_reason=Reason(IntrinsicRules.POINT_ON_SAME_LINE),
                 )
 
             is_coll = self.statements_checker.check_coll(args)
@@ -333,7 +336,7 @@ class StatementAdder:
             deps = deps.extend_by_why(
                 Statement(Predicate.PARALLEL, points),
                 why=why1 + why2,
-                reason=Reason(IntrinsicRules.PARA_FROM_LINES),
+                extention_reason=Reason(IntrinsicRules.PARA_FROM_LINES),
             )
 
         para = Statement(Predicate.PARALLEL, [a, b, c, d])
@@ -385,7 +388,7 @@ class StatementAdder:
                 self.statements_graph,
                 perp,
                 extends,
-                reason=Reason(IntrinsicRules.PARA_FROM_PERP),
+                extention_reason=Reason(IntrinsicRules.PARA_FROM_PERP),
             )
             return self._add_para([c, d, m, n], deps)
 
@@ -393,7 +396,7 @@ class StatementAdder:
             self.statements_graph,
             perp,
             extends,
-            reason=Reason(IntrinsicRules.PARA_FROM_PERP),
+            extention_reason=Reason(IntrinsicRules.PARA_FROM_PERP),
         )
         return self._add_coll(list(set([c, d, m, n])), deps)
 
@@ -442,7 +445,7 @@ class StatementAdder:
         if IntrinsicRules.PERP_FROM_LINES not in self.DISABLED_INTRINSIC_RULES:
             deps = deps.extend_by_why(
                 Statement(Predicate.PERPENDICULAR, points),
-                reason=Reason(IntrinsicRules.PERP_FROM_LINES),
+                extention_reason=Reason(IntrinsicRules.PERP_FROM_LINES),
                 why=why1 + why2,
             )
 
@@ -469,7 +472,7 @@ class StatementAdder:
                     self.statements_graph,
                     perp,
                     para,
-                    reason=Reason(IntrinsicRules.PERP_FROM_PARA),
+                    extention_reason=Reason(IntrinsicRules.PERP_FROM_PARA),
                 )
             args[2 * i - 2] = x_
             args[2 * i - 1] = y_
@@ -481,7 +484,7 @@ class StatementAdder:
         perp = Statement(Predicate.PERPENDICULAR, [a, b, c, d])
         if IntrinsicRules.PERP_FROM_ANGLE not in self.DISABLED_INTRINSIC_RULES:
             deps = deps.extend_by_why(
-                perp, why=why, reason=Reason(IntrinsicRules.PERP_FROM_ANGLE)
+                perp, why=why, extention_reason=Reason(IntrinsicRules.PERP_FROM_ANGLE)
             )
 
         dab, dcd = a12._d
@@ -611,7 +614,7 @@ class StatementAdder:
                 abcdef_deps = abcdef_deps.extend_by_why(
                     cyclic,
                     why=whys + why0,
-                    reason=Reason(IntrinsicRules.CYCLIC_FROM_CIRCLE),
+                    extention_reason=Reason(IntrinsicRules.CYCLIC_FROM_CIRCLE),
                 )
 
             is_cyclic = self.statements_checker.check_cyclic(args)
@@ -693,7 +696,7 @@ class StatementAdder:
             deps = deps.extend_by_why(
                 eqangle,
                 why=why1 + why2 + why3 + why4,
-                reason=Reason(IntrinsicRules.EQANGLE_FROM_LINES),
+                extention_reason=Reason(IntrinsicRules.EQANGLE_FROM_LINES),
             )
 
         if IntrinsicRules.PARA_FROM_EQANGLE not in self.DISABLED_INTRINSIC_RULES:
@@ -772,7 +775,7 @@ class StatementAdder:
                     self.statements_graph,
                     eqangle,
                     para,
-                    reason=Reason(IntrinsicRules.EQANGLE_FROM_PARA),
+                    extention_reason=Reason(IntrinsicRules.EQANGLE_FROM_PARA),
                 )
                 args[2 * i - 2] = x_
                 args[2 * i - 1] = y_
@@ -793,7 +796,7 @@ class StatementAdder:
             deps = deps.extend_by_why(
                 eqangle,
                 why=why1 + why2,
-                reason=Reason(IntrinsicRules.EQANGLE_FROM_CONGRUENT_ANGLE),
+                extention_reason=Reason(IntrinsicRules.EQANGLE_FROM_CONGRUENT_ANGLE),
             )
 
         dab, dcd = ab_cd._d
@@ -948,7 +951,7 @@ class StatementAdder:
                     self.statements_graph,
                     eqratio,
                     cong,
-                    reason=Reason(IntrinsicRules.EQRATIO_FROM_CONG),
+                    extention_reason=Reason(IntrinsicRules.EQRATIO_FROM_CONG),
                 )
             args[2 * i - 2] = x_
             args[2 * i - 1] = y_
@@ -968,7 +971,9 @@ class StatementAdder:
             deps = deps.extend_by_why(
                 Statement(Predicate.EQRATIO, tuple(args)),
                 why=why1 + why2,
-                reason=Reason(IntrinsicRules.EQRATIO_FROM_PROPORTIONAL_SEGMENTS),
+                extention_reason=Reason(
+                    IntrinsicRules.EQRATIO_FROM_PROPORTIONAL_SEGMENTS
+                ),
             )
 
         lab, lcd = ab_cd._l
@@ -1209,7 +1214,9 @@ class StatementAdder:
             args = points[:-1] + [nd]
             aconst = Statement(Predicate.CONSTANT_ANGLE, tuple(args))
             deps = deps.extend_by_why(
-                aconst, why=why1 + why2, reason=Reason(IntrinsicRules.ACONST_FROM_LINES)
+                aconst,
+                why=why1 + why2,
+                extention_reason=Reason(IntrinsicRules.ACONST_FROM_LINES),
             )
 
         self.symbols_graph.get_node_val(ab, deps=None)
@@ -1247,7 +1254,9 @@ class StatementAdder:
         aconst = Statement(Predicate.CONSTANT_ANGLE, [a, b, c, d, nd])
         if IntrinsicRules.ACONST_FROM_ANGLE not in self.DISABLED_INTRINSIC_RULES:
             deps = deps.extend_by_why(
-                aconst, why=why, reason=Reason(IntrinsicRules.ACONST_FROM_ANGLE)
+                aconst,
+                why=why,
+                extention_reason=Reason(IntrinsicRules.ACONST_FROM_ANGLE),
             )
 
         dab, dcd = ab_cd._d
@@ -1297,16 +1306,28 @@ class StatementAdder:
         if ab.val == bx.val:
             return add, to_cache
 
-        deps.why += why1 + why2
+        sangle = Statement(Predicate.S_ANGLE, (a, b, x))
+        if IntrinsicRules.SANGLE_FROM_LINES not in self.DISABLED_INTRINSIC_RULES:
+            deps = deps.extend_by_why(
+                sangle,
+                why=why1 + why2,
+                extention_reason=Reason(IntrinsicRules.SANGLE_FROM_LINES),
+            )
 
-        for p, q, pq in [(a, b, ab), (b, x, bx)]:
-            p_, q_ = pq.val._obj.points
-            if {p, q} == {p_, q_}:
-                continue
-            para = Statement(Predicate.PARALLEL, [p, q, p_, q_])
-            para_dep = Dependency(para, None, deps.level)
-            para_dep.why = self.statements_graph.resolve(para_dep, None)
-            deps.why += [para_dep]
+        if IntrinsicRules.SANGLE_FROM_PARA not in self.DISABLED_INTRINSIC_RULES:
+            paras = []
+            for p, q, pq in [(a, b, ab), (b, x, bx)]:
+                p_, q_ = pq.val._obj.points
+                if {p, q} == {p_, q_}:
+                    continue
+                paras.append(Statement(Predicate.PARALLEL, (p, q, p_, q_)))
+            if paras:
+                deps = deps.extend_many(
+                    self.statements_graph,
+                    sangle,
+                    paras,
+                    Reason(IntrinsicRules.SANGLE_FROM_PARA),
+                )
 
         xba, abx, why = self.symbols_graph.get_or_create_angle_from_lines(
             bx, ab, deps=None
@@ -1314,7 +1335,9 @@ class StatementAdder:
         if IntrinsicRules.SANGLE_FROM_ANGLE not in self.DISABLED_INTRINSIC_RULES:
             aconst = Statement(Predicate.CONSTANT_ANGLE, [b, x, a, b, nd])
             deps = deps.extend_by_why(
-                aconst, why=why, reason=Reason(IntrinsicRules.SANGLE_FROM_ANGLE)
+                aconst,
+                why=why,
+                extention_reason=Reason(IntrinsicRules.SANGLE_FROM_ANGLE),
             )
 
         dab, dbx = abx._d
@@ -1379,7 +1402,7 @@ class StatementAdder:
                     self.statements_graph,
                     rconst,
                     cong,
-                    reason=Reason(IntrinsicRules.RCONST_FROM_CONG),
+                    extention_reason=Reason(IntrinsicRules.RCONST_FROM_CONG),
                 )
             args[2 * i - 2] = x_
             args[2 * i - 1] = y_
@@ -1391,7 +1414,9 @@ class StatementAdder:
         rconst = Statement(Predicate.CONSTANT_RATIO, [a, b, c, d, nd])
         if IntrinsicRules.RCONST_FROM_RATIO not in self.DISABLED_INTRINSIC_RULES:
             deps = deps.extend_by_why(
-                rconst, why=why, reason=Reason(IntrinsicRules.RCONST_FROM_RATIO)
+                rconst,
+                why=why,
+                extention_reason=Reason(IntrinsicRules.RCONST_FROM_RATIO),
             )
 
         lab, lcd = ab_cd._l

@@ -31,46 +31,48 @@ class EmptyDependency:
     def extend(
         self,
         statements_graph: "WhyHyperGraph",
-        statement_to_extend: "Statement",
+        original_statement: "Statement",
         extention_statement: "Statement",
-        reason: Reason,
+        extention_reason: Reason,
     ) -> "EmptyDependency":
         """Extend the dependency list by (name, args)."""
-        dep0 = self.populate(statement_to_extend)
-        deps = EmptyDependency(reason=reason, level=self.level)
-        dep = Dependency(extention_statement, reason=reason, level=deps.level)
+        original_dep = self.populate(original_statement)
+        deps = EmptyDependency(reason=extention_reason, level=self.level)
+        dep = Dependency(extention_statement, reason=extention_reason, level=deps.level)
         dep.why = statements_graph.resolve(dep, None)
-        deps.why = [dep0, dep]
+        deps.why = [original_dep, dep]
         return deps
 
     def extend_by_why(
         self,
-        statement_to_extend: "Statement",
+        original_statement: "Statement",
         why: list[Dependency],
-        reason: Reason,
+        extention_reason: Reason,
     ) -> "EmptyDependency":
         if not why:
             return self
-        dep0 = self.populate(statement_to_extend)
-        deps = EmptyDependency(reason=reason, level=self.level)
-        deps.why = [dep0] + why
+        original_dep = self.populate(original_statement)
+        deps = EmptyDependency(reason=extention_reason, level=self.level)
+        deps.why = [original_dep] + why
         return deps
 
     def extend_many(
         self,
         statements_graph: "WhyHyperGraph",
-        statement0: "Statement",
-        statements: list["Statement"],
-        reason: Reason,
+        original_statement: "Statement",
+        extention_statements: list["Statement"],
+        extention_reason: Reason,
     ) -> "EmptyDependency":
         """Extend the dependency list by many name_args."""
-        if not statements:
+        if not extention_statements:
             return self
-        dep0 = self.populate(statement0)
-        deps = EmptyDependency(reason=reason, level=self.level)
-        deps.why = [dep0]
-        for statement in statements:
-            dep = Dependency(statement, reason=None, level=deps.level)
+        original_dep = self.populate(original_statement)
+        deps = EmptyDependency(reason=extention_reason, level=self.level)
+        deps.why = [original_dep]
+        for extention_statement in extention_statements:
+            dep = Dependency(
+                extention_statement, reason=extention_reason, level=deps.level
+            )
             dep.why = statements_graph.resolve(dep, None)
-            deps.why += [dep]
+            deps.why.append(dep)
         return deps
