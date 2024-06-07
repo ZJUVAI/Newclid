@@ -38,11 +38,8 @@ class WhyHyperGraph:
 
     def resolve(self, dependency: "Dependency", level: int) -> list["Dependency"]:
         if dependency not in self.nx_graph.nodes:
-            self.nx_graph.add_node(
-                dependency,
-                level=dependency.level,
-                name=dependency.rule_name,
-            )
+            dep_name = dependency.reason.name if dependency.reason else ""
+            self.nx_graph.add_node(dependency, level=dependency.level, name=dep_name)
         if dependency.statement not in self.nx_graph.nodes:
             self.nx_graph.add_node(dependency.statement)
         self.nx_graph.add_edge(dependency, dependency.statement)
@@ -67,7 +64,7 @@ class WhyHyperGraph:
             if isinstance(node, Dependency):
                 size = 2
                 shape = "square"
-                label = node.rule_name
+                label = node.reason.name
                 color_index = dep_index % len(colors)
                 color = rgba_to_hex(*colors[color_index], a=1.0)
                 mass = 0.1
@@ -133,7 +130,8 @@ class WhyHyperGraph:
     @staticmethod
     def _node_name(node: Statement | Dependency) -> str:
         if isinstance(node, Dependency):
-            return str(node.rule_name) + f" for {node.statement}"
+            dep_name = node.reason.name if node.reason else "Dependency"
+            return dep_name + f" for {node.statement}"
         if isinstance(node, Statement):
             return str(node)
         raise TypeError

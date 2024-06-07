@@ -106,10 +106,11 @@ class DependencyGraph:
             self.add_dependency(u_for_edge, dependency_type)
             if not none_why:
                 for why_u in u_for_edge.why:
+                    dep_name = u_for_edge.reason.name if u_for_edge.reason else ""
                     self.add_edge(
                         why_u,
                         u_for_edge,
-                        edge_name=u_for_edge.rule_name,
+                        edge_name=dep_name,
                         edge_arguments=u_for_edge.statement.args,
                     )
 
@@ -135,7 +136,7 @@ class DependencyGraph:
                 self.add_edge(
                     why_added,
                     added_dependency,
-                    edge_name=added_dependency.rule_name,
+                    edge_name=added_dependency.reason.name,
                     edge_arguments=args,
                 )
 
@@ -151,7 +152,7 @@ class DependencyGraph:
             ):
                 added_dependency = added_dependency.why[0]
 
-            dep_rule_name = added_dependency.rule_name
+            dep_rule_name = added_dependency.reason.name
             for why_added in added_dependency.why:
                 self.add_edge(
                     why_added,
@@ -170,7 +171,7 @@ class DependencyGraph:
             ):
                 added_dependency = added_dependency.why[0]
 
-            dep_rule_name = added_dependency.rule_name
+            dep_rule_name = added_dependency.reason.name
             for why_added in added_dependency.why:
                 self.add_dependency(why_added)
                 self.add_edge(

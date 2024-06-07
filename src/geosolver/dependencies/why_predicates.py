@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar
 from geosolver.statements.statement import Statement
 from geosolver.dependencies.caching import DependencyCache
 
-from geosolver.dependencies.dependency import Dependency
+from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.geometry import (
     Angle,
     Circle,
@@ -34,7 +34,7 @@ def why_dependency(
 ) -> list[Dependency]:
     cached_me = statements_graph.dependency_cache.get(dependency.statement)
     if cached_me is not None:
-        dependency.rule_name = cached_me.rule_name
+        dependency.reason = cached_me.reason
         return cached_me.why
 
     predicate = Predicate(dependency.statement.name)
@@ -70,7 +70,7 @@ def _why_para(
             return []
 
         coll = Statement(Predicate.COLLINEAR, list({a, b, c, d}))
-        coll_dep = Dependency(coll, "t??", None)
+        coll_dep = Dependency(coll, Reason("t??"), None)
         coll_dep.why = _why_coll(statements_graph, coll_dep, level)
         return [coll_dep]
 
@@ -160,7 +160,7 @@ def _why_collx(
         return why
 
     para = Statement(Predicate.PARALLEL, dep.statement.args)
-    para_dep = Dependency(para, dep.rule_name, dep.level)
+    para_dep = Dependency(para, dep.reason, dep.level)
     return _why_para(statements_graph, para_dep, statements_graph, level)
 
 
@@ -410,7 +410,7 @@ def _why_eqratio3(
     coll_nbd = Statement(Predicate.COLLINEAR, [n, b, d])
     dep3 = Dependency(coll_nbd, "", level)
     dep3.why = _why_coll(statements_graph, dep3, level)
-    dep.rule_name = "br07"
+    dep.reason = Reason("br07")
     return [dep1, dep2, dep3]
 
 
@@ -424,7 +424,7 @@ def _why_simtri(
     eqangle2 = Statement(Predicate.EQANGLE, [b, a, b, c, y, x, y, z])
     dep2 = Dependency(eqangle2, "", level)
     dep2.why = _why_eqangle(statements_graph, dep2, level)
-    dep.rule_name = "br34"
+    dep.reason = Reason("br34")
     return [dep1, dep2]
 
 
@@ -438,7 +438,7 @@ def _why_simtri_both(
     eqratio2 = Statement(Predicate.EQRATIO, [c, a, c, b, r, p, r, q])
     dep2 = Dependency(eqratio2, "", level)
     dep2.why = _why_eqratio(statements_graph, dep2, level)
-    dep.rule_name = "br38"
+    dep.reason = Reason("br38")
     return [dep1, dep2]
 
 
@@ -455,7 +455,7 @@ def _why_contri(
     cong = Statement(Predicate.CONGRUENT, [a, b, x, y])
     dep3 = Dependency(cong, "", level)
     dep3.why = _why_cong(statements_graph, dep3, level)
-    dep.rule_name = "br36"
+    dep.reason = Reason("br36")
     return [dep1, dep2, dep3]
 
 
@@ -472,7 +472,7 @@ def why_contri_2(
     cong = Statement(Predicate.CONGRUENT, [a, b, x, y])
     dep3 = Dependency(cong, "", level)
     dep3.why = _why_cong(statements_graph, dep3, level)
-    dep.rule_name = "br37"
+    dep.reason = Reason("br37")
     return [dep1, dep2, dep3]
 
 
@@ -489,7 +489,7 @@ def _why_contri_both(
     cong3 = Statement(Predicate.CONGRUENT, [c, a, z, x])
     dep3 = Dependency(cong3, "", level)
     dep3.why = _why_cong(statements_graph, dep3, level)
-    dep.rule_name = "br32"
+    dep.reason = Reason("br32")
     return [dep1, dep2, dep3]
 
 
@@ -658,7 +658,10 @@ def _maybe_make_equal_pairs(
 
     eq_statement = Statement(eqpredicate, [c, d, p, q])
     eqdep = Dependency(eq_statement, None, level)
-    eqdep.why = statements_graph.resolve(eqdep, level)
+    if eqpredicate is Predicate.PARALLEL:
+        eqdep.why = _why_para(statements_graph, eqdep, level)
+    elif eqpredicate is Predicate.CONGRUENT:
+        eqdep.why = _why_cong(statements_graph, eqdep, level)
     why += [eqdep]
     return why
 

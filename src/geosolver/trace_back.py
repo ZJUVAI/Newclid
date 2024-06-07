@@ -93,7 +93,7 @@ def separate_dependency_difference(
             continue
         cons_ = []
         for con in cons:
-            if con.rule_name == CONSTRUCTION_RULE:
+            if con.reason and con.reason.object is CONSTRUCTION_RULE:
                 setup.append(con)
             else:
                 cons_.append(con)
@@ -163,7 +163,7 @@ def recursive_traceback(
         stack.append(hashed)
         prems: list["Dependency"] = []
 
-        if query_dep.rule_name != CONSTRUCTION_RULE:
+        if not query_dep.reason or query_dep.reason.object is not CONSTRUCTION_RULE:
             all_deps: list["Dependency"] = []
             dep_names = set()
             for dep in query_dep.why:
@@ -368,7 +368,7 @@ def shorten_proof(
     for prems, cons in log:
         assert len(cons) == 1
         con = cons[0]
-        if con.rule_name == "":
+        if not con.reason:
             con2prem[con.statement.hash_tuple] = prems
         elif not merge_trivials:
             # except for the ones that are premises to non-trivial steps.

@@ -1,6 +1,9 @@
 """Implements geometric objects used in the graph representation."""
 from __future__ import annotations
-from typing import Any, Optional, Type
+from typing import TYPE_CHECKING, Any, Optional, Type
+
+if TYPE_CHECKING:
+    from geosolver.dependencies.dependency import Dependency
 
 
 class Node:
@@ -64,7 +67,7 @@ class Node:
     def why_rep(self) -> list[Any]:
         return self.why_equal([self.rep()], None)
 
-    def rep_and_why(self) -> tuple[Node, list[Any]]:
+    def rep_and_why(self) -> tuple[Node, list["Dependency"]]:
         rep = self.rep()
         return rep, self.why_equal([rep], None)
 

@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Dict, Tuple
 
 from geosolver.algebraic import AlgebraicRules
 from geosolver.algebraic.geometric_tables import AngleTable, DistanceTable, RatioTable
+from geosolver.dependencies.dependency import Reason, Dependency
 from geosolver.predicates import Predicate
 from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.geometry import Angle, Ratio, is_equiv
@@ -15,7 +16,6 @@ from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to
 
 if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
-    from geosolver.dependencies.dependency import Dependency
 
 Derivation = tuple[Statement, EmptyDependency]
 Derivations = dict[Predicate, list[Derivation]]
@@ -81,8 +81,8 @@ class AlgebraicManipulator:
         for x in self.rtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
             dep = EmptyDependency(
+                reason=Reason(AlgebraicRules.Ratio_Chase),
                 level=level,
-                rule_name=AlgebraicRules.Ratio_Chase.value,
             )
             dep.why = why
 
@@ -119,8 +119,8 @@ class AlgebraicManipulator:
         for x in self.atable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
             dep = EmptyDependency(
+                reason=Reason(AlgebraicRules.Angle_Chase),
                 level=level,
-                rule_name=AlgebraicRules.Angle_Chase.value,
             )
             dep.why = why
 
@@ -170,8 +170,8 @@ class AlgebraicManipulator:
         for x in self.dtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
             dep = EmptyDependency(
+                reason=Reason(AlgebraicRules.Distance_Chase),
                 level=level,
-                rule_name=AlgebraicRules.Distance_Chase.value,
             )
             dep.why = why
 

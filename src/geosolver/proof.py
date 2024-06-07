@@ -49,14 +49,10 @@ from geosolver.numerical.distances import (
 )
 from geosolver.numerical.sketch import sketch
 
-from geosolver.problem import (
-    CONSTRUCTION_RULE,
-    Problem,
-)
-
+from geosolver.problem import CONSTRUCTION_RULE, Problem
 from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.dependencies.caching import DependencyCache
-from geosolver.dependencies.dependency import Dependency
+from geosolver.dependencies.dependency import Reason, Dependency
 from geosolver.dependencies.dependency_graph import DependencyGraph
 
 
@@ -236,7 +232,7 @@ class Proof:
     def _resolve_mapping_dependency(
         self, theorem: "Theorem", mapping: Mapping, dependency_level: int
     ) -> tuple[Optional[EmptyDependency], Optional[ToCache]]:
-        deps = EmptyDependency(level=dependency_level, rule_name=theorem.rule_name)
+        deps = EmptyDependency(reason=Reason(theorem), level=dependency_level)
         fail = False
 
         for premise in theorem.premises:
@@ -279,7 +275,9 @@ class Proof:
                 p_args = b, a, b, c, y, z, y, x
 
         premise_statement = Statement(premise.name, p_args)
-        dep = Dependency(premise_statement, rule_name="Premise", level=dependency_level)
+        dep = Dependency(
+            premise_statement, reason=Reason("Premise"), level=dependency_level
+        )
         try:
             dep.why = self.statements.graph.resolve(dep, dependency_level)
             fail = False
@@ -373,10 +371,10 @@ class Proof:
         return self.statements.adder.add(statement, deps)
 
     def do_algebra(
-        self, statement: Statement, reason: EmptyDependency
+        self, statement: Statement, deps: EmptyDependency
     ) -> tuple[list[Dependency], list[ToCache]]:
         """Derive (but not add) new algebraic predicates."""
-        new_deps, to_cache = self.statements.adder.add_algebra(statement, reason)
+        new_deps, to_cache = self.statements.adder.add_algebra(statement, deps)
         self.dependency_graph.add_algebra_edges(to_cache, statement.args)
         return new_deps, to_cache
 
@@ -501,11 +499,8 @@ class Proof:
                 if construction.name == "midpoint"
                 else construction.name
             )
-            deps = EmptyDependency(level=0, rule_name=CONSTRUCTION_RULE)
+            deps = EmptyDependency(reason=Reason(CONSTRUCTION_RULE), level=0)
             construction_statement = Construction(c_name, construction.args)
-            deps.construction = Dependency(
-                construction_statement, rule_name=None, level=0
-            )
 
             for construction in cdef.deps.constructions:
                 args = self.symbols_graph.names2points(
@@ -520,7 +515,7 @@ class Proof:
                     )
 
                 construction = Dependency(
-                    construction_statement, rule_name=CONSTRUCTION_RULE, level=0
+                    construction_statement, reason=CONSTRUCTION_RULE, level=0
                 )
                 self.dependency_graph.add_dependency(construction)
                 deps.why += [construction]

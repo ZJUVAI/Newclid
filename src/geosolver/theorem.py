@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Optional
 from geosolver.definitions.clause import Construction
 from geosolver.predicates import Predicate
 
@@ -10,7 +11,7 @@ class Theorem:
         if len(conclusion) != 1:
             raise ValueError("Cannot have more or less than one conclusion")
         self.name = "_".join([p.name for p in premise + conclusion])
-        self.rule_name = None
+        self.rule_name: Optional[str] = None
         self.premises = premise
         self.is_arg_reduce = False
         self.conclusion = conclusion[0]
