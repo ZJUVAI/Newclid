@@ -72,7 +72,11 @@ class GeometricSolver:
         return self.rnd_gen
 
     def run(
-        self, max_steps: int = 10000, timeout: float = 600.0, seed: int = 42
+        self,
+        max_steps: int = 10000,
+        timeout: float = 600.0,
+        stop_on_goal: bool = True,
+        seed: Optional[int] = None,
     ) -> bool:
         self._reset(seed)
         success, infos = run_loop(
@@ -80,6 +84,7 @@ class GeometricSolver:
             self.proof_state,
             self.rules,
             max_steps=max_steps,
+            stop_on_goal=stop_on_goal,
             timeout=timeout,
         )
         self.run_infos = infos
@@ -134,20 +139,20 @@ class GeometricSolver:
         if not feedback.success:
             raise ValueError(f"Auxiliary construction failed to be added: {aux_string}")
 
-    def reset_rnd_generator(self, seed: int = 42):
-        rnd_gen = np.random.default_rng(seed)
-        self.proof_state.set_rnd_generator(rnd_gen)
-        self.rnd_gen = self.proof_state.get_rnd_generator()
-
-    def _reset(self, seed: int = 42):
+    def _reset(self, seed: int):
         self.deductive_agent.reset()
         proof_state = self.get_proof_state()
         self.load_state(proof_state)
 
-        self.reset_rnd_generator(seed)
+        self._reset_rnd_generator(seed)
 
         problem_string = self.get_problem_string()
         self.load_problem_string(problem_string)
+
+    def _reset_rnd_generator(self, seed: int):
+        rnd_gen = np.random.default_rng(seed)
+        self.proof_state.set_rnd_generator(rnd_gen)
+        self.rnd_gen = self.proof_state.get_rnd_generator()
 
 
 class GeometricSolverBuilder:

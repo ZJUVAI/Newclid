@@ -15,8 +15,9 @@ def run_loop(
     deductive_agent: "DeductiveAgent",
     proof: "Proof",
     theorems: list["Theorem"],
-    max_steps: int = 10000,
-    timeout: float = 600.0,
+    max_steps: int,
+    timeout: float,
+    stop_on_goal: bool,
 ) -> tuple[bool, dict]:
     """Run DeductiveAgent until saturation or goal found."""
     infos = {}
@@ -36,9 +37,9 @@ def run_loop(
         step += 1
         total_elapsed = time.time() - t0
 
-        # Force StopAction on goal success
         success = proof.check_goal()
-        if success:
+        if success and stop_on_goal:
+            # Force StopAction on goal success
             feedback = proof.step(StopAction())
             deductive_agent.remember_effects(action, feedback)
 
