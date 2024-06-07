@@ -1,7 +1,7 @@
-from datetime import datetime
 import logging
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 from pathlib import Path
+import time
 from typing import Optional
 
 from geosolver import AGENTS_REGISTRY
@@ -56,6 +56,12 @@ def cli_arguments() -> Namespace:
         default=6000.0,
         type=float,
         help="Time (in seconds) before forced termination.",
+    )
+    parser.add_argument(
+        "--seed",
+        default=None,
+        type=int,
+        help="Seed for random sampling",
     )
     parser.add_argument(
         "-o",
@@ -136,14 +142,14 @@ def main():
     agent = AGENTS_REGISTRY.load_agent(args.agent)
     solver_builder.with_deductive_agent(agent)
 
-    solver = solver_builder.build()
+    solver = solver_builder.build(args.seed)
     outpath = resolve_output_path(args.output_folder, problem_name=solver.problem.url)
 
     if not quiet:
         outpath.mkdir(parents=True, exist_ok=True)
         solver.draw_figure(outpath / "construction_figure.png")
 
-    success = solver.run(max_steps=args.max_steps, timeout=args.timeout)
+    success = solver.run(max_steps=args.max_steps, timeout=args.timeout, seed=args.seed)
 
     if not success:
         logging.info(f"Failed to solved the problem.\nInfos:{solver.run_infos}")
@@ -171,7 +177,7 @@ def resolve_output_path(path_str: Optional[str], problem_name: str) -> Path:
     if path_str is None:
         if problem_name:
             return Path("run_results") / problem_name
-        return Path("run_results") / str(datetime.now())
+        return Path("run_results") / str(time.strftime("%Y%m%d_%H%M%S"))
     return Path(path_str)
 
 

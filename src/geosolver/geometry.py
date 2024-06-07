@@ -1,4 +1,5 @@
 """Implements geometric objects used in the graph representation."""
+
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional, Type
 

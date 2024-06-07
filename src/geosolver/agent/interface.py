@@ -1,4 +1,5 @@
 """Implements Deductive Database (DD)."""
+
 from __future__ import annotations
 from typing import TYPE_CHECKING, NamedTuple, Optional, Union
 from abc import abstractmethod
