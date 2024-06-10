@@ -114,10 +114,11 @@ def cli_arguments() -> Namespace:
         help="Logging level.",
     )
     parser.add_argument(
-        "--no-goal",
+        "--just-draw-figure",
         default=False,
         action="store_true",
-        help="Ignore the goal of the problem and only do the figure drawing.",
+        help="Only do the figure drawing "
+        "withut running the solving process and removing the goal.",
     )
     args, _ = parser.parse_known_args()
     return args
@@ -128,10 +129,10 @@ def main():
     logging.basicConfig(level=args.log_level)
 
     quiet: bool = args.quiet
-    no_goal: bool = args.no_goal
+    just_draw: bool = args.just_draw_figure
     seed: Optional[int] = args.seed
 
-    solver_builder = GeometricSolverBuilder(seed=seed, no_goal=no_goal)
+    solver_builder = GeometricSolverBuilder(seed=seed, no_goal=just_draw)
 
     load_problem(args.problem, args.translate, solver_builder)
 
@@ -147,7 +148,7 @@ def main():
     if not quiet:
         outpath.mkdir(parents=True, exist_ok=True)
         solver.draw_figure(outpath / "construction_figure.png")
-    if no_goal:
+    if just_draw:
         return
 
     success = solver.run(max_steps=args.max_steps, timeout=args.timeout, seed=args.seed)
