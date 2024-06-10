@@ -1,6 +1,5 @@
 """Helper functions for manipulating points when matching theorems for DD."""
 
-
 from typing import Any, Generator
 
 from geosolver.combinatorics import memoized

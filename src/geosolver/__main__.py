@@ -1,7 +1,7 @@
-from datetime import datetime
 import logging
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 from pathlib import Path
+import time
 from typing import Optional
 
 from geosolver import AGENTS_REGISTRY
@@ -58,6 +58,12 @@ def cli_arguments() -> Namespace:
         help="Time (in seconds) before forced termination.",
     )
     parser.add_argument(
+        "--seed",
+        default=None,
+        type=int,
+        help="Seed for random sampling",
+    )
+    parser.add_argument(
         "-o",
         "--output-folder",
         default=None,
@@ -107,6 +113,13 @@ def cli_arguments() -> Namespace:
         type=float,
         help="Logging level.",
     )
+    parser.add_argument(
+        "--just-draw-figure",
+        default=False,
+        action="store_true",
+        help="Only do the figure drawing "
+        "withut running the solving process and removing the goal.",
+    )
     args, _ = parser.parse_known_args()
     return args
 
@@ -116,8 +129,10 @@ def main():
     logging.basicConfig(level=args.log_level)
 
     quiet: bool = args.quiet
+    just_draw: bool = args.just_draw_figure
+    seed: Optional[int] = args.seed
 
-    solver_builder = GeometricSolverBuilder()
+    solver_builder = GeometricSolverBuilder(seed=seed, no_goal=just_draw)
 
     load_problem(args.problem, args.translate, solver_builder)
 
@@ -133,8 +148,10 @@ def main():
     if not quiet:
         outpath.mkdir(parents=True, exist_ok=True)
         solver.draw_figure(outpath / "construction_figure.png")
+    if just_draw:
+        return
 
-    success = solver.run(max_steps=args.max_steps, timeout=args.timeout)
+    success = solver.run(max_steps=args.max_steps, timeout=args.timeout, seed=args.seed)
 
     if not success:
         logging.info(f"Failed to solved the problem.\nInfos:{solver.run_infos}")
@@ -159,7 +176,7 @@ def resolve_output_path(path_str: Optional[str], problem_name: str) -> Path:
     if path_str is None:
         if problem_name:
             return Path("run_results") / problem_name
-        return Path("run_results") / str(datetime.now())
+        return Path("run_results") / str(time.strftime("%Y%m%d_%H%M%S"))
     return Path(path_str)
 
 

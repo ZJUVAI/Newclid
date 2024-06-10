@@ -6,7 +6,6 @@ from geosolver.agent.interface import DeductiveAgent
 from geosolver.api import GeometricSolver, GeometricSolverBuilder
 from geosolver.agent.registry import AgentRegistry
 
-
 AGENTS_REGISTRY = AgentRegistry()
 
 

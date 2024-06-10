@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING
 
 from geosolver._lazy_loading import lazy_import
 
-
 if TYPE_CHECKING:
     import numpy
     from geosolver.numerical.geometries import Point
@@ -22,7 +21,9 @@ def ang_between(tail: "Point", head1: "Point", head2: "Point") -> float:
     diff = ang1 - ang2
     # return diff % (2*np.pi)
     if diff > np.pi:
+        # if diff - np.pi > ATOM:
         return diff - 2 * np.pi
     if diff < -np.pi:
+        # if -np.pi - diff > ATOM:
         return 2 * np.pi + diff
     return diff

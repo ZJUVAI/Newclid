@@ -41,6 +41,7 @@ def check_sangle_numerical(args: list[Point | gm.Angle]) -> bool:
     a, b, c, angle = args
     num, den = angle_to_num_den(angle)
     ang = ang_between(b, c, a)
+    # if ang < -ATOM:
     if ang < 0:
         ang += np.pi
     return close_enough(ang, num * np.pi / den)
@@ -51,6 +52,7 @@ def check_aconst_numerical(args: list[Point | gm.Angle]) -> bool:
     num, den = angle_to_num_den(angle)
     d = d + a - c
     ang = ang_between(a, b, d)
+    # if ang < -ATOM:
     if ang < 0:
         ang += np.pi
     return close_enough(ang, num * np.pi / den)
@@ -63,6 +65,7 @@ def check_sameside_numerical(points: list[Point]) -> bool:
     bc = b - c
     yx = y - x
     yz = y - z
+    # return ba.dot(bc) * yx.dot(yz) > ATOM
     return ba.dot(bc) * yx.dot(yz) > 0
 
 
@@ -133,6 +136,7 @@ def check_eqangle_numerical(points: list[Point]) -> bool:
     hg = h - g
 
     sameclock = (ba.x * dc.y - ba.y * dc.x) * (fe.x * hg.y - fe.y * hg.x) > 0
+    # sameclock = (ba.x * dc.y - ba.y * dc.x) * (fe.x * hg.y - fe.y * hg.x) > ATOM
     if not sameclock:
         ba = ba * -1.0
 
@@ -145,7 +149,7 @@ def check_eqangle_numerical(points: list[Point]) -> bool:
     y = a3 - a4
 
     xy = (x - y) % (2 * np.pi)
-    return close_enough(xy, 0, tol=1e-11) or close_enough(xy, 2 * np.pi, tol=1e-11)
+    return close_enough(xy, 0) or close_enough(xy, 2 * np.pi)
 
 
 def check_eqratio_numerical(points: list[Point]) -> bool:
@@ -183,8 +187,7 @@ def check_simtri_numerical(points: list[Point]) -> bool:
     xy = x.distance(y)
     yz = y.distance(z)
     zx = z.distance(x)
-    tol = 1e-9
-    return close_enough(ab * yz, bc * xy, tol) and close_enough(bc * zx, ca * yz, tol)
+    return close_enough(ab * yz, bc * xy) and close_enough(bc * zx, ca * yz)
 
 
 def check_contri_numerical(points: list[Point]) -> bool:
@@ -195,12 +198,7 @@ def check_contri_numerical(points: list[Point]) -> bool:
     xy = x.distance(y)
     yz = y.distance(z)
     zx = z.distance(x)
-    tol = 1e-9
-    return (
-        close_enough(ab, xy, tol)
-        and close_enough(bc, yz, tol)
-        and close_enough(ca, zx, tol)
-    )
+    return close_enough(ab, xy) and close_enough(bc, yz) and close_enough(ca, zx)
 
 
 def check_ratio_numerical(points: list[Point | gm.Ratio]) -> bool:
@@ -258,6 +256,7 @@ def check_numerical(statement: Statement) -> bool:
 
 def same_clock(a: Point, b: Point, c: Point, d: Point, e: Point, f: Point) -> bool:
     return clock(a, b, c) * clock(d, e, f) > 0
+    # return clock(a, b, c) * clock(d, e, f) > ATOM
 
 
 def clock(a: Point, b: Point, c: Point):
@@ -271,3 +270,4 @@ def same_sign(a: Point, b: Point, c: Point, d: Point, e: Point, f: Point) -> boo
     ab, cb = a - b, c - b
     de, fe = d - e, f - e
     return (ab.x * cb.y - ab.y * cb.x) * (de.x * fe.y - de.y * fe.x) > 0
+    # return (ab.x * cb.y - ab.y * cb.x) * (de.x * fe.y - de.y * fe.x) > ATOM

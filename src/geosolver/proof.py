@@ -7,7 +7,6 @@ from typing import Optional, Tuple, Union
 from typing_extensions import Self
 import logging
 
-
 from geosolver.definitions.clause import Clause, Construction
 from geosolver.statements.statement import Statement
 from geosolver.definitions.definition import Definition
@@ -59,6 +58,9 @@ from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.dependencies.caching import DependencyCache
 from geosolver.dependencies.dependency import Dependency
 from geosolver.dependencies.dependency_graph import DependencyGraph
+
+from numpy.random import Generator
+import numpy as np
 
 
 FREE = [
@@ -112,6 +114,7 @@ class Proof:
         alegbraic_manipulator: AlgebraicManipulator,
         symbols_graph: SymbolsGraph,
         statements_handler: StatementsHandler,
+        rnd_generator: Generator = None,
     ):
         self.dependency_cache = dependency_cache
         self.symbols_graph = symbols_graph
@@ -134,6 +137,10 @@ class Proof:
             AuxAction: self._step_auxiliary_construction,
             StopAction: self._step_stop,
         }
+        # rng control
+        self.rnd_gen = (
+            rnd_generator if rnd_generator is not None else np.random.default_rng()
+        )
 
     @classmethod
     def build_problem(
@@ -141,7 +148,8 @@ class Proof:
         problem: Problem,
         definitions: dict[str, Definition],
         disabled_intrinsic_rules: Optional[list[IntrinsicRules]] = None,
-        max_attempts=100,
+        max_attempts: int = 10000,
+        rnd_generator: Generator = None,
     ) -> Self:
         """Build a problem into a Proof state object."""
         proof = None
@@ -157,19 +165,20 @@ class Proof:
             try:
                 symbols_graph = SymbolsGraph()
                 dependency_cache = DependencyCache()
-                alegbraic_manipulator = AlgebraicManipulator(symbols_graph)
+                algebraic_manipulator = AlgebraicManipulator(symbols_graph)
                 statements_handler = StatementsHandler(
                     symbols_graph,
-                    alegbraic_manipulator,
+                    algebraic_manipulator,
                     dependency_cache,
                     disabled_intrinsic_rules,
                 )
 
                 proof = Proof(
                     dependency_cache=dependency_cache,
-                    alegbraic_manipulator=alegbraic_manipulator,
+                    alegbraic_manipulator=algebraic_manipulator,
                     symbols_graph=symbols_graph,
                     statements_handler=statements_handler,
+                    rnd_generator=rnd_generator,
                 )
                 added = []
                 to_cache = []
@@ -370,8 +379,16 @@ class Proof:
             problem,
             self._definitions,
             disabled_intrinsic_rules=self.statements.adder.DISABLED_INTRINSIC_RULES,
+            rnd_generator=self.rnd_gen,
         )
         return proof
+
+    def get_rnd_generator(self):
+        return self.rnd_gen
+
+    def set_rnd_generator(self, rnd_gen: Generator):
+        del self.rnd_gen
+        self.rnd_gen = rnd_gen
 
     def resolve_statement_dependencies(
         self, statement: Statement, deps: EmptyDependency
@@ -551,7 +568,9 @@ class Proof:
                 mapping = dict(zip(cdef.construction.args, c.args))
                 for n in cdef.numerics:
                     args = self.map_args_to_objects(n, mapping)
-                    to_be_intersected += sketch(n.name, args)
+                    to_be_intersected += sketch(
+                        n.name, args, rnd_generator=self.get_rnd_generator()
+                    )
 
             return to_be_intersected
 
@@ -566,7 +585,11 @@ class Proof:
 
         def draw_fn() -> list[num_geo.Point]:
             to_be_intersected = range_fn()
-            return num_geo.reduce(to_be_intersected, existing_numerical_points)
+            return num_geo.reduce(
+                to_be_intersected,
+                existing_numerical_points,
+                rnd_generator=self.get_rnd_generator(),
+            )
 
         rely_on: set[Point] = set()
         for construction in clause.constructions:
@@ -592,10 +615,17 @@ class Proof:
 
         # check two things
         new_points_nums = [p.num for p in new_points]
-        if check_too_close_numerical(new_points_nums, existing_numerical_points):
-            raise PointTooCloseError()
-        if check_too_far_numerical(new_points_nums, existing_numerical_points):
-            raise PointTooFarError()
+        if len(existing_numerical_points) > 0:
+            if check_too_close_numerical(
+                new_points_nums, existing_numerical_points, 0.01
+            ):
+                raise PointTooCloseError()
+            if check_too_far_numerical(new_points_nums, existing_numerical_points, 100):
+                raise PointTooFarError()
+            # if check_too_close_numerical(new_points_nums, existing_numerical_points):
+            #     raise PointTooCloseError()
+            # if check_too_far_numerical(new_points_nums, existing_numerical_points):
+            #     raise PointTooFarError()
 
         # Commit: now that all conditions are passed.
         # add these points to current graph.

@@ -52,5 +52,14 @@ TODO.md
 # builds
 **/_build
 
+# Swap files
+**/*.nfs*c*
+
+# local env
+.conda/
+
+# local files
+run.log
+
 # Local scripts
 benchmark.py
