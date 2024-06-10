@@ -252,7 +252,7 @@ class StatementAdder:
     ) -> Tuple[list[Dependency], list[ToCache]]:
         """Add a predicate that `points` are collinear."""
         points = list(set(points))
-        og_points = list(points)
+        og_points = points.copy()
 
         all_lines: list[Line] = []
         for p1, p2 in comb.arrangement_pairs(points):
@@ -272,12 +272,12 @@ class StatementAdder:
                 line = self.symbols_graph.get_new_line_thru_pair(p1, p2)
                 new.add(line)
 
-        existed: list[Line] = list(sorted(existed, key=lambda node: node.name))
-        new: list[Line] = list(sorted(new, key=lambda node: node.name))
-        if not existed:
-            line0, *lines = new
+        sorted_existed: list[Line] = list(sorted(existed, key=lambda node: node.name))
+        sorted_new: list[Line] = list(sorted(new, key=lambda node: node.name))
+        if not sorted_existed:
+            line0, *lines = sorted_new
         else:
-            line0, lines = existed[0], existed[1:] + new
+            line0, lines = sorted_existed[0], sorted_existed[1:] + sorted_new
 
         add = []
         to_cache = []
@@ -339,12 +339,13 @@ class StatementAdder:
                 extention_reason=Reason(IntrinsicRules.PARA_FROM_LINES),
             )
 
-        para = Statement(Predicate.PARALLEL, [a, b, c, d])
+        para = Statement(Predicate.PARALLEL, (a, b, c, d))
         dep = deps.populate(para)
-        self._make_equal(ab, cd, dep)
+        to_cache = [(para, dep)]
+
         dep.algebra = ab._val, cd._val
 
-        to_cache = [(para, dep)]
+        self._make_equal(ab, cd, dep)
         if not is_equal(ab, cd):
             return [dep], to_cache
         return [], to_cache
