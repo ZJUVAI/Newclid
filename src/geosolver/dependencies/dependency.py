@@ -27,7 +27,7 @@ class Reason:
 class Dependency:
     """Dependency is a directed hyper-edge of the StatementsHyperGraph.
 
-    It links a statement to a list a statements that justify it
+    It links a statement to a list of statements that justify it
     and their own dependencies.
 
     """

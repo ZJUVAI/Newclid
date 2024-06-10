@@ -242,5 +242,6 @@ class AlgebraicManipulator(ReasoningEngine):
         cd, _ = self.symbols_graph.get_line_thru_pair_why(c, d)
         self.dtable.add_cong(ab, cd, a, b, c, d, dep)
 
-        ab, cd = dep.algebra
-        self.rtable.add_eq(ab, cd, dep)
+        ab = self.symbols_graph.get_or_create_segment(a, b, deps=None)
+        cd = self.symbols_graph.get_or_create_segment(c, d, deps=None)
+        self.rtable.add_eq(ab._val, cd._val, dep)
