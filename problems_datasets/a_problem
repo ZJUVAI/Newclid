@@ -1,0 +1,2 @@
+problem
+a b = segment a b; c = on_tline c a a b, on_circle c a b; e = s_angle b a e 55o, on_circle e a b; d = s_angle b a d 30o, on_circle d a b; f = on_line f a e, on_line f b c; g = on_line g a d, on_line g b c ? cong c f g b

@@ -113,6 +113,12 @@ def cli_arguments() -> Namespace:
         type=float,
         help="Logging level.",
     )
+    parser.add_argument(
+        "--no-goal",
+        default=False,
+        action="store_true",
+        help="Draw and display the dependency graph of the proof state.",
+    )
     args, _ = parser.parse_known_args()
     return args
 
@@ -122,6 +128,7 @@ def main():
     logging.basicConfig(level=args.log_level)
 
     quiet: bool = args.quiet
+    no_goal: bool = args.no_goal
 
     solver_builder = GeometricSolverBuilder()
 
@@ -133,12 +140,14 @@ def main():
     agent = AGENTS_REGISTRY.load_agent(args.agent)
     solver_builder.with_deductive_agent(agent)
 
-    solver = solver_builder.build(args.seed)
+    solver = solver_builder.build(args.seed, no_goal)
     outpath = resolve_output_path(args.output_folder, problem_name=solver.problem.url)
 
     if not quiet:
         outpath.mkdir(parents=True, exist_ok=True)
         solver.draw_figure(outpath / "construction_figure.png")
+    if no_goal:
+        return
 
     success = solver.run(max_steps=args.max_steps, timeout=args.timeout, seed=args.seed)
 

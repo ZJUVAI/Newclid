@@ -163,7 +163,7 @@ class GeometricSolverBuilder:
         self.deductive_agent: Optional[DeductiveAgent] = None
         self.disabled_intrinsic_rules: Optional[list[IntrinsicRules]] = None
 
-    def build(self, seed: int = 42) -> "GeometricSolver":
+    def build(self, seed: int = 42, no_goal=False) -> "GeometricSolver":
         if self.problem is None:
             raise ValueError("Did not load problem before building solver.")
 
@@ -176,6 +176,9 @@ class GeometricSolverBuilder:
             self.rules = Theorem.from_txt_file(default_rules_path())
 
         rnd_gen = np.random.default_rng(seed)
+
+        if no_goal:
+            self.problem.goal = None
 
         proof_state = Proof.build_problem(
             problem=self.problem,
