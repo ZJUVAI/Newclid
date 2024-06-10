@@ -129,8 +129,9 @@ def main():
 
     quiet: bool = args.quiet
     no_goal: bool = args.no_goal
+    seed: Optional[int] = args.seed
 
-    solver_builder = GeometricSolverBuilder()
+    solver_builder = GeometricSolverBuilder(seed=seed, no_goal=no_goal)
 
     load_problem(args.problem, args.translate, solver_builder)
 
@@ -140,7 +141,7 @@ def main():
     agent = AGENTS_REGISTRY.load_agent(args.agent)
     solver_builder.with_deductive_agent(agent)
 
-    solver = solver_builder.build(args.seed, no_goal)
+    solver = solver_builder.build()
     outpath = resolve_output_path(args.output_folder, problem_name=solver.problem.url)
 
     if not quiet:
