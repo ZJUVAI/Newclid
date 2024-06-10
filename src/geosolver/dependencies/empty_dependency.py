@@ -9,8 +9,8 @@ if TYPE_CHECKING:
     from geosolver.dependencies.why_graph import WhyHyperGraph
 
 
-class EmptyDependency:
-    """Empty dependency predicate ready to get filled up."""
+class DependencyBuilder:
+    """A builder to construct a subgraph of reasoning."""
 
     def __init__(self, reason: Reason, level: int):
         assert isinstance(reason, Reason)
@@ -18,15 +18,10 @@ class EmptyDependency:
         self.level = level
         self.why: list[Dependency] = []
 
-    def populate(self, statement: "Statement") -> Dependency:
+    def add_head(self, statement: "Statement") -> Dependency:
         dep = Dependency(statement, self.reason, level=self.level)
         dep.why = self.why.copy()
         return dep
-
-    def copy(self) -> "EmptyDependency":
-        other = EmptyDependency(reason=self.reason, level=self.level)
-        other.why = self.why.copy()
-        return other
 
     def extend(
         self,
@@ -34,27 +29,29 @@ class EmptyDependency:
         original_statement: "Statement",
         extention_statement: "Statement",
         extention_reason: Reason,
-    ) -> "EmptyDependency":
+    ) -> "DependencyBuilder":
         """Extend the dependency list by (name, args)."""
-        original_dep = self.populate(original_statement)
-        deps = EmptyDependency(reason=extention_reason, level=self.level)
-        dep = Dependency(extention_statement, reason=extention_reason, level=deps.level)
+        original_dep = self.add_head(original_statement)
+        dep_builder = DependencyBuilder(reason=extention_reason, level=self.level)
+        dep = Dependency(
+            extention_statement, reason=extention_reason, level=dep_builder.level
+        )
         dep.why = statements_graph.resolve(dep, None)
-        deps.why = [original_dep, dep]
-        return deps
+        dep_builder.why = [original_dep, dep]
+        return dep_builder
 
     def extend_by_why(
         self,
         original_statement: "Statement",
         why: list[Dependency],
         extention_reason: Reason,
-    ) -> "EmptyDependency":
+    ) -> "DependencyBuilder":
         if not why:
             return self
-        original_dep = self.populate(original_statement)
-        deps = EmptyDependency(reason=extention_reason, level=self.level)
-        deps.why = [original_dep] + why
-        return deps
+        original_dep = self.add_head(original_statement)
+        dep_builder = DependencyBuilder(reason=extention_reason, level=self.level)
+        dep_builder.why = [original_dep] + why
+        return dep_builder
 
     def extend_many(
         self,
@@ -62,17 +59,22 @@ class EmptyDependency:
         original_statement: "Statement",
         extention_statements: list["Statement"],
         extention_reason: Reason,
-    ) -> "EmptyDependency":
+    ) -> "DependencyBuilder":
         """Extend the dependency list by many name_args."""
         if not extention_statements:
             return self
-        original_dep = self.populate(original_statement)
-        deps = EmptyDependency(reason=extention_reason, level=self.level)
-        deps.why = [original_dep]
+        original_dep = self.add_head(original_statement)
+        dep_builder = DependencyBuilder(reason=extention_reason, level=self.level)
+        dep_builder.why = [original_dep]
         for extention_statement in extention_statements:
             dep = Dependency(
-                extention_statement, reason=extention_reason, level=deps.level
+                extention_statement, reason=extention_reason, level=dep_builder.level
             )
             dep.why = statements_graph.resolve(dep, None)
-            deps.why.append(dep)
-        return deps
+            dep_builder.why.append(dep)
+        return dep_builder
+
+    def copy(self) -> "DependencyBuilder":
+        other = DependencyBuilder(reason=self.reason, level=self.level)
+        other.why = self.why.copy()
+        return other

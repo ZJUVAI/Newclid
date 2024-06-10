@@ -30,14 +30,14 @@ class Node:
         self.name = name or str(self)
         self.graph = graph
 
-        self.edge_graph: dict[Node, dict[Self, "Dependency"]] = {}
+        self.edge_graph: dict[Node, dict[Self, list["Dependency"]]] = {}
         # Edge graph: what other nodes is connected to this node.
         # edge graph = {
         #   other1: {self1: deps, self2: deps},
         #   other2: {self2: deps, self3: deps}
         # }
 
-        self.merge_graph: dict[Self, dict[Self, "Dependency"]] = {}
+        self.merge_graph: dict[Self, dict[Self, list["Dependency"]]] = {}
         # Merge graph: history of merges with other nodes.
         # merge_graph = {self1: {self2: deps1, self3: deps2}}
 
@@ -47,7 +47,7 @@ class Node:
         self._val = None
         self._obj = None
 
-        self.deps = []
+        self.deps: list["Dependency"] = []
 
         # numerical representation.
         self.num = None
@@ -103,11 +103,11 @@ class Node:
             else:
                 self.edge_graph[x] = dict(xdict)
 
-    def merge(self, nodes: list[Node], deps: list[Any]) -> None:
+    def merge(self, nodes: list[Node], deps: list["Dependency"]) -> None:
         for node in nodes:
             self.merge_one(node, deps)
 
-    def merge_one(self, node: Node, deps: list[Any]) -> None:
+    def merge_one(self, node: Node, deps: list["Dependency"]) -> None:
         node.rep().set_rep(self.rep())
 
         if node in self.merge_graph:

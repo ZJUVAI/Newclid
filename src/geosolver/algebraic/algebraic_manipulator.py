@@ -6,7 +6,7 @@ from geosolver.algebraic import AlgebraicRules
 from geosolver.algebraic.geometric_tables import AngleTable, DistanceTable, RatioTable
 from geosolver.dependencies.dependency import Reason, Dependency
 from geosolver.predicates import Predicate
-from geosolver.dependencies.empty_dependency import EmptyDependency
+from geosolver.dependencies.empty_dependency import DependencyBuilder
 from geosolver.geometry import Angle, Ratio, is_equiv
 from geosolver.numerical.check import check_numerical
 
@@ -17,7 +17,7 @@ from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to
 if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
 
-Derivation = tuple[Statement, EmptyDependency]
+Derivation = tuple[Statement, DependencyBuilder]
 Derivations = dict[Predicate, list[Derivation]]
 
 
@@ -80,7 +80,7 @@ class AlgebraicManipulator:
 
         for x in self.rtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
-            dep = EmptyDependency(
+            dep = DependencyBuilder(
                 reason=Reason(AlgebraicRules.Ratio_Chase),
                 level=level,
             )
@@ -118,7 +118,7 @@ class AlgebraicManipulator:
 
         for x in self.atable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
-            dep = EmptyDependency(
+            dep = DependencyBuilder(
                 reason=Reason(AlgebraicRules.Angle_Chase),
                 level=level,
             )
@@ -169,7 +169,7 @@ class AlgebraicManipulator:
         }
         for x in self.dtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
-            dep = EmptyDependency(
+            dep = DependencyBuilder(
                 reason=Reason(AlgebraicRules.Distance_Chase),
                 level=level,
             )
@@ -243,13 +243,13 @@ class AlgebraicManipulator:
         n, d = geosolver.ratios.simplify(n, d)
         ang = self.aconst[(n, d)] = self.symbols_graph.new_node(Angle, f"{n}pi/{d}")
         ang.set_directions(None, None)
-        self.symbols_graph.get_node_val(ang, deps=None)
+        self.symbols_graph.get_node_val(ang, dep=None)
 
     def _create_const_rat(self, n: int, d: int) -> None:
         n, d = geosolver.ratios.simplify(n, d)
         rat = self.rconst[(n, d)] = self.symbols_graph.new_node(Ratio, f"{n}/{d}")
         rat.set_lengths(None, None)
-        self.symbols_graph.get_node_val(rat, deps=None)
+        self.symbols_graph.get_node_val(rat, dep=None)
 
     def get_or_create_const_ang(self, n: int, d: int) -> tuple[Angle, Angle]:
         n, d = geosolver.ratios.simplify(n, d)

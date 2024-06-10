@@ -68,9 +68,9 @@ class SymbolsGraph:
         self._pair2line: dict[tuple[Point, Point], Line] = {}
         self._triplet2circle: dict[tuple[Point, Point, Point], Circle] = {}
 
-    def connect(self, a: Node, b: Node, deps: "Dependency") -> None:
-        a.connect_to(b, deps)
-        b.connect_to(a, deps)
+    def connect(self, a: Node, b: Node, dep: "Dependency") -> None:
+        a.connect_to(b, dep)
+        b.connect_to(a, dep)
 
     def all_points(self) -> list[Point]:
         """Return all nodes of type Point."""
@@ -107,7 +107,7 @@ class SymbolsGraph:
         self.add_node(node)
         return node
 
-    def get_node_val(self, node: Node, deps: Optional["Dependency"]) -> Node:
+    def get_node_val(self, node: Node, dep: Optional["Dependency"]) -> Node:
         """Get a node value (equality) node, creating it if necessary."""
         if node._val:
             return node._val
@@ -117,7 +117,7 @@ class SymbolsGraph:
         name = f"{marker}({node.name})"
 
         v = self.new_node(val_type, name)
-        self.connect(node, v, deps=deps)
+        self.connect(node, v, dep=dep)
         return v
 
     def get_point(self, pointname: str, default_fn: Callable[[str], Point]) -> Point:
@@ -127,7 +127,7 @@ class SymbolsGraph:
             return self._name2node[pointname]
         return default_fn(pointname)
 
-    def merge(self, nodes: list[Node], deps: "Dependency") -> Node:
+    def merge(self, nodes: list[Node], dep: "Dependency") -> Node:
         """Merge all nodes."""
         if len(nodes) < 2:
             return
@@ -142,11 +142,11 @@ class SymbolsGraph:
                 node0 = node
                 nodes1 = [n for n in nodes if n != node0]
                 break
-        return self.merge_into(node0, nodes1, deps)
+        return self.merge_into(node0, nodes1, dep)
 
-    def merge_into(self, node0: Node, nodes1: list[Node], deps: "Dependency") -> Node:
+    def merge_into(self, node0: Node, nodes1: list[Node], dep: "Dependency") -> Node:
         """Merge nodes1 into a single node0."""
-        node0.merge(nodes1, deps)
+        node0.merge(nodes1, dep)
         for n in nodes1:
             if n.rep() != n:
                 self.remove([n])
@@ -154,10 +154,10 @@ class SymbolsGraph:
         nodes = [node0] + nodes1
         if any([node._val for node in nodes]):
             for node in nodes:
-                self.get_node_val(node, deps=None)
+                self.get_node_val(node, dep=None)
 
             vals1 = [n._val for n in nodes1]
-            node0._val.merge(vals1, deps)
+            node0._val.merge(vals1, dep)
 
             for v in vals1:
                 if v.rep() != v:
@@ -211,9 +211,7 @@ class SymbolsGraph:
                 circle2count[c] += 1
         return [c for c, count in circle2count.items() if count >= 3]
 
-    def get_or_create_segment(
-        self, p1: Point, p2: Point, deps: "Dependency"
-    ) -> Segment:
+    def get_or_create_segment(self, p1: Point, p2: Point, dep: "Dependency") -> Segment:
         """Get or create a Segment object between two Points p1 and p2."""
         if p1 == p2:
             raise ValueError(f"Creating same 0-length segment {p1.name}")
@@ -225,18 +223,18 @@ class SymbolsGraph:
         if p1.name > p2.name:
             p1, p2 = p2, p1
         s = self.new_node(Segment, name=f"{p1.name.upper()}{p2.name.upper()}")
-        self.connect(p1, s, deps=deps)
-        self.connect(p2, s, deps=deps)
+        self.connect(p1, s, dep=dep)
+        self.connect(p2, s, dep=dep)
         s.points = {p1, p2}
         return s
 
     def get_or_create_angle_from_lines(
-        self, l1: Line, l2: Line, deps: "Dependency"
+        self, l1: Line, l2: Line, dep: "Dependency"
     ) -> tuple[Angle, Angle, list["Dependency"]]:
-        return self.get_or_create_angle_from_directions(l1._val, l2._val, deps)
+        return self.get_or_create_angle_from_directions(l1._val, l2._val, dep)
 
     def get_or_create_angle_from_directions(
-        self, d1: Direction, d2: Direction, deps: "Dependency"
+        self, d1: Direction, d2: Direction, dep: "Dependency"
     ) -> tuple[Angle, Angle, list["Dependency"]]:
         """Get or create an angle between two Direction d1 and d2."""
         for a in self.type2nodes[Angle]:
@@ -250,9 +248,9 @@ class SymbolsGraph:
         d2, why2 = d2.rep_and_why()
         a12 = self.new_node(Angle, f"{d1.name}-{d2.name}")
         a21 = self.new_node(Angle, f"{d2.name}-{d1.name}")
-        self.connect(d1, a12, deps)
-        self.connect(d2, a21, deps)
-        self.connect(a12, a21, deps)
+        self.connect(d1, a12, dep)
+        self.connect(d2, a21, dep)
+        self.connect(a12, a21, dep)
         a12.set_directions(d1, d2)
         a21.set_directions(d2, d1)
         a12.opposite = a21
@@ -260,12 +258,12 @@ class SymbolsGraph:
         return a12, a21, why1 + why2
 
     def get_or_create_ratio_from_segments(
-        self, s1: Segment, s2: Segment, deps: "Dependency"
+        self, s1: Segment, s2: Segment, dep: "Dependency"
     ) -> tuple[Ratio, Ratio, list["Dependency"]]:
-        return self.get_or_create_ratio_from_lenghts(s1._val, s2._val, deps)
+        return self.get_or_create_ratio_from_lenghts(s1._val, s2._val, dep)
 
     def get_or_create_ratio_from_lenghts(
-        self, l1: Length, l2: Length, deps: "Dependency"
+        self, l1: Length, l2: Length, dep: "Dependency"
     ) -> tuple[Ratio, Ratio, list["Dependency"]]:
         """Get or create a new Ratio from two Lenghts l1 and l2."""
         for r in self.type2nodes[Ratio]:
@@ -279,9 +277,9 @@ class SymbolsGraph:
         l2, why2 = l2.rep_and_why()
         r12 = self.new_node(Ratio, f"{l1.name}/{l2.name}")
         r21 = self.new_node(Ratio, f"{l2.name}/{l1.name}")
-        self.connect(l1, r12, deps)
-        self.connect(l2, r21, deps)
-        self.connect(r12, r21, deps)
+        self.connect(l1, r12, dep)
+        self.connect(l2, r21, dep)
+        self.connect(r12, r21, dep)
         r12.set_lengths(l1, l2)
         r21.set_lengths(l2, l1)
         r12.opposite = r21
@@ -296,8 +294,8 @@ class SymbolsGraph:
         line.num = num_geo.Line(p1.num, p2.num)
         line.points = p1, p2
 
-        self.connect(p1, line, deps=None)
-        self.connect(p2, line, deps=None)
+        self.connect(p1, line, dep=None)
+        self.connect(p2, line, dep=None)
         self._pair2line[(p1, p2)] = line
         return line
 
@@ -337,9 +335,9 @@ class SymbolsGraph:
         circle.num = num_geo.Circle(p1=p1.num, p2=p2.num, p3=p3.num)
         circle.points = p1, p2, p3
 
-        self.connect(p1, circle, deps=None)
-        self.connect(p2, circle, deps=None)
-        self.connect(p3, circle, deps=None)
+        self.connect(p1, circle, dep=None)
+        self.connect(p2, circle, dep=None)
+        self.connect(p3, circle, dep=None)
         self._triplet2circle[(p1, p2, p3)] = circle
         return circle
 

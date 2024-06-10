@@ -2,7 +2,7 @@ import pytest
 import pytest_check as check
 import geosolver.algebraic.geometric_tables as geometric_tables
 from geosolver.dependencies.dependency import Reason
-from geosolver.dependencies.empty_dependency import EmptyDependency
+from geosolver.dependencies.empty_dependency import DependencyBuilder
 from geosolver.numerical.check import clock
 from geosolver.api import GeometricSolverBuilder
 from tests.fixtures import build_until_works
@@ -121,10 +121,10 @@ class TestAR:
         # Add two eqangles facts because ieq_triangle only add congruent sides
         a, b, c = proof.symbols_graph.names2nodes("abc")
         proof.statements.adder._add_eqangle(
-            [a, b, b, c, b, c, c, a], EmptyDependency(Reason("None"), 0)
+            [a, b, b, c, b, c, c, a], DependencyBuilder(Reason("None"), 0)
         )
         proof.statements.adder._add_eqangle(
-            [b, c, c, a, c, a, a, b], EmptyDependency(Reason("None"), 0)
+            [b, c, c, a, c, a, a, b], DependencyBuilder(Reason("None"), 0)
         )
 
         # Create an external angle table:
