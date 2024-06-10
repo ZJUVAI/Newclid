@@ -117,7 +117,7 @@ def cli_arguments() -> Namespace:
         "--no-goal",
         default=False,
         action="store_true",
-        help="Draw and display the dependency graph of the proof state.",
+        help="Ignore the goal of the problem and only do the figure drawing.",
     )
     args, _ = parser.parse_known_args()
     return args
