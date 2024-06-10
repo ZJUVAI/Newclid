@@ -27,7 +27,7 @@ from geosolver.listing import list_eqratio3
 ToCache = Tuple[Statement, Dependency]
 
 if TYPE_CHECKING:
-    from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
+    from geosolver.reasoning_engines.algebraic_reasoning import AlgebraicManipulator
     from geosolver.symbols_graph import SymbolsGraph
     from geosolver.statements.checker import StatementChecker
     from geosolver.dependencies.caching import DependencyCache
@@ -342,7 +342,6 @@ class StatementAdder:
         para = Statement(Predicate.PARALLEL, [a, b, c, d])
         dep = deps.populate(para)
         self._make_equal(ab, cd, dep)
-        dep.algebra = ab._val, cd._val
 
         to_cache = [(para, dep)]
         if not is_equal(ab, cd):

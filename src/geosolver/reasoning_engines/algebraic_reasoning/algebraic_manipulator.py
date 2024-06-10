@@ -1,10 +1,10 @@
 from __future__ import annotations
+from enum import Enum
 from typing import TYPE_CHECKING, Dict, Tuple
 
 
-from geosolver.algebraic import AlgebraicRules
-from geosolver.algebraic.geometric_tables import AngleTable, DistanceTable, RatioTable
-from geosolver.dependencies.dependency import Reason, Dependency
+from geosolver.dependencies.dependency import Dependency, Reason
+from geosolver.reasoning_engines.interface import ExternalReasoningEngine
 from geosolver.predicates import Predicate
 from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.geometry import Angle, Ratio, is_equiv
@@ -14,6 +14,12 @@ from geosolver.numerical.check import check_numerical
 import geosolver.ratios
 from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
 
+from geosolver.reasoning_engines.algebraic_reasoning.geometric_tables import (
+    AngleTable,
+    DistanceTable,
+    RatioTable,
+)
+
 if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
 
@@ -21,7 +27,13 @@ Derivation = tuple[Statement, EmptyDependency]
 Derivations = dict[Predicate, list[Derivation]]
 
 
-class AlgebraicManipulator:
+class AlgebraicRules(Enum):
+    Distance_Chase = "a00"
+    Ratio_Chase = "a01"
+    Angle_Chase = "a02"
+
+
+class AlgebraicManipulator(ExternalReasoningEngine):
     def __init__(self, symbols_graph: "SymbolsGraph") -> None:
         self.symbols_graph = symbols_graph
 
@@ -47,14 +59,15 @@ class AlgebraicManipulator:
             Predicate.CONSTANT_RATIO: self._add_rconst,
         }
 
-    def add_algebra(self, dep: "Dependency") -> None:
+    def ingest(self, dependency: "Dependency") -> None:
         """Add new algebraic predicates."""
-        adder = self.PREDICATE_TO_ADDER.get(dep.statement.predicate)
+        adder = self.PREDICATE_TO_ADDER.get(dependency.statement.predicate)
         if adder is not None:
-            adder(dep)
+            adder(dependency)
 
-    def derive_algebra(self, level: int) -> tuple[Derivations, Derivations]:
+    def resolve(self, **kwargs) -> tuple[Derivations, Derivations]:
         """Derive new algebraic predicates."""
+        level: int = kwargs.get("level")
         derives = {}
         ang_derives = self.derive_angle_algebra(level)
         derives.update(ang_derives)
@@ -81,8 +94,8 @@ class AlgebraicManipulator:
         for x in self.rtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
             dep = EmptyDependency(
-                reason=Reason(AlgebraicRules.Ratio_Chase),
                 level=level,
+                reason=Reason(AlgebraicRules.Ratio_Chase),
             )
             dep.why = why
 
@@ -119,8 +132,8 @@ class AlgebraicManipulator:
         for x in self.atable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
             dep = EmptyDependency(
-                reason=Reason(AlgebraicRules.Angle_Chase),
                 level=level,
+                reason=Reason(AlgebraicRules.Angle_Chase),
             )
             dep.why = why
 
@@ -170,8 +183,8 @@ class AlgebraicManipulator:
         for x in self.dtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
             dep = EmptyDependency(
-                reason=Reason(AlgebraicRules.Distance_Chase),
                 level=level,
+                reason=Reason(AlgebraicRules.Distance_Chase),
             )
             dep.why = why
 
@@ -201,8 +214,10 @@ class AlgebraicManipulator:
         return added
 
     def _add_para(self, dep: "Dependency"):
-        ab, cd = dep.algebra
-        self.atable.add_para(ab, cd, dep)
+        a, b, c, d = dep.statement.args
+        ab, _ = self.symbols_graph.get_line_thru_pair_why(a, b)
+        cd, _ = self.symbols_graph.get_line_thru_pair_why(c, d)
+        self.atable.add_para(ab._val, cd._val, dep)
 
     def _add_perp(self, dep: "Dependency"):
         ab, cd = dep.algebra

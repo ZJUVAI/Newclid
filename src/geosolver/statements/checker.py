@@ -24,7 +24,7 @@ from geosolver.listing import list_eqratio3
 
 if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
-    from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
+    from geosolver.reasoning_engines.algebraic_reasoning import AlgebraicManipulator
 
 from collections import defaultdict
 

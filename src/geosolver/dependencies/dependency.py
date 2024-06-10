@@ -8,7 +8,7 @@ from geosolver.theorem import Theorem
 if TYPE_CHECKING:
     from geosolver.statements.statement import Statement
     from geosolver.statements.adder import IntrinsicRules
-    from geosolver.algebraic import AlgebraicRules
+    from geosolver.reasoning_engines.algebraic_reasoning import AlgebraicRules
 
 
 @dataclass

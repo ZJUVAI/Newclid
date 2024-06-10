@@ -1,4 +1,4 @@
-from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
+from geosolver.reasoning_engines.algebraic_reasoning import AlgebraicManipulator
 from geosolver.dependencies.caching import DependencyCache
 from geosolver.dependencies.why_graph import WhyHyperGraph
 from geosolver.statements.adder import IntrinsicRules, StatementAdder

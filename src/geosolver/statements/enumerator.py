@@ -2,7 +2,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING, Generator
 
-from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
+from geosolver.reasoning_engines.algebraic_reasoning import AlgebraicManipulator
 from geosolver.combinatorics import (
     all_4points,
     all_8points,

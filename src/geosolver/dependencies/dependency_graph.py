@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 from geosolver.statements.statement import Statement, name_and_arguments_to_str
 from geosolver.theorem import Theorem
-from geosolver.algebraic import AlgebraicRules
+from geosolver.reasoning_engines.algebraic_reasoning import AlgebraicRules
 from geosolver.dependencies.dependency import Dependency
 from geosolver.problem import CONSTRUCTION_RULE
 from geosolver.statements.adder import IntrinsicRules, ToCache
