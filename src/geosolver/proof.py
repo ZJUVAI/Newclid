@@ -9,7 +9,7 @@ import logging
 
 from geosolver.definitions.clause import Clause, Construction
 from geosolver.reasoning_engines.algebraic_reasoning import AlgebraicManipulator
-from geosolver.reasoning_engines.interface import ExternalReasoningEngine
+from geosolver.reasoning_engines.interface import ReasoningEngine
 from geosolver.statements.statement import Statement
 from geosolver.definitions.definition import Definition
 from geosolver.theorem import Theorem
@@ -108,7 +108,7 @@ class Proof:
         self,
         dependency_cache: DependencyCache,
         alegbraic_manipulator: AlgebraicManipulator,
-        external_reasoning_engine: list[ExternalReasoningEngine],
+        external_reasoning_engine: list[ReasoningEngine],
         symbols_graph: SymbolsGraph,
         statements_handler: StatementsHandler,
         rnd_generator: Generator = None,

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Dict, Tuple
 
 
 from geosolver.dependencies.dependency import Dependency, Reason
-from geosolver.reasoning_engines.interface import ExternalReasoningEngine
+from geosolver.reasoning_engines.interface import Derivation, ReasoningEngine
 from geosolver.predicates import Predicate
 from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.geometry import Angle, Ratio, is_equiv
@@ -23,7 +23,6 @@ from geosolver.reasoning_engines.algebraic_reasoning.geometric_tables import (
 if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
 
-Derivation = tuple[Statement, EmptyDependency]
 Derivations = dict[Predicate, list[Derivation]]
 
 
@@ -33,7 +32,7 @@ class AlgebraicRules(Enum):
     Angle_Chase = "a02"
 
 
-class AlgebraicManipulator(ExternalReasoningEngine):
+class AlgebraicManipulator(ReasoningEngine):
     def __init__(self, symbols_graph: "SymbolsGraph") -> None:
         self.symbols_graph = symbols_graph
 
