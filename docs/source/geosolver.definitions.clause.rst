@@ -1,8 +1,7 @@
-Adder
-
+Clause
 ======
 
-.. automodule:: geosolver.statement.adder
+.. automodule:: geosolver.definitions.clause
    :members:
    :undoc-members:
    :show-inheritance:

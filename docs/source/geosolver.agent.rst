@@ -13,3 +13,4 @@ Agent
    geosolver.agent.breadth_first_search
    geosolver.agent.human_agent
    geosolver.agent.interface
+   geosolver.agent.registry
