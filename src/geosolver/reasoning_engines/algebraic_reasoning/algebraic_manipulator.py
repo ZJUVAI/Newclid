@@ -1,18 +1,17 @@
 from __future__ import annotations
 from enum import Enum
-from typing import TYPE_CHECKING, Dict, Tuple
+from typing import TYPE_CHECKING
 
 
 from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.reasoning_engines.interface import Derivation, ReasoningEngine
 from geosolver.predicates import Predicate
 from geosolver.dependencies.empty_dependency import EmptyDependency
-from geosolver.geometry import Angle, Ratio, is_equiv
+from geosolver.geometry import is_equiv
 from geosolver.numerical.check import check_numerical
 
 
-import geosolver.ratios
-from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
+from geosolver.statements.statement import Statement
 
 from geosolver.reasoning_engines.algebraic_reasoning.geometric_tables import (
     AngleTable,
@@ -39,13 +38,6 @@ class AlgebraicManipulator(ReasoningEngine):
         self.atable = AngleTable()
         self.dtable = DistanceTable()
         self.rtable = RatioTable()
-
-        self.rconst: Dict[Tuple[int, int], Ratio] = {}  # contains all constant ratios
-        self.aconst: Dict[Tuple[int, int], Angle] = {}  # contains all constant angles.
-
-        # Half pi constant is always added by default.
-        self.halfpi, _ = self.get_or_create_const_ang(1, 2)
-        self.vhalfpi = self.halfpi.val
 
         self.PREDICATE_TO_ADDER = {
             Predicate.PARALLEL: self._add_para,
@@ -151,7 +143,7 @@ class AlgebraicManipulator(ReasoningEngine):
             if len(x) == 3:
                 ef, pq, (n, d) = x
                 points = (*ef._obj.points, *pq._obj.points)
-                angle, opposite_angle = self.get_or_create_const_ang(n, d)
+                angle, opposite_angle = self.symbols_graph.get_or_create_const_ang(n, d)
                 angle.opposite = opposite_angle
                 aconst = Statement(Predicate.CONSTANT_ANGLE, (*points, angle))
                 if not check_numerical(aconst):
@@ -206,7 +198,7 @@ class AlgebraicManipulator(ReasoningEngine):
                 a, b, c, d, num, den = x
                 if not (a != b and c != d and (a != c or b != d)):
                     continue
-                ratio, _ = self.get_or_create_const_rat(num, den)
+                ratio, _ = self.symbols_graph.get_or_create_const_rat(num, den)
                 rconst = Statement(Predicate.CONSTANT_RATIO, (a, b, c, d, ratio))
                 added[Predicate.CONSTANT_RATIO].append((rconst, dep))
 
@@ -252,62 +244,3 @@ class AlgebraicManipulator(ReasoningEngine):
 
         ab, cd = dep.algebra
         self.rtable.add_eq(ab, cd, dep)
-
-    def _create_const_ang(self, n: int, d: int) -> None:
-        n, d = geosolver.ratios.simplify(n, d)
-        ang = self.aconst[(n, d)] = self.symbols_graph.new_node(Angle, f"{n}pi/{d}")
-        ang.set_directions(None, None)
-        self.symbols_graph.get_node_val(ang, deps=None)
-
-    def _create_const_rat(self, n: int, d: int) -> None:
-        n, d = geosolver.ratios.simplify(n, d)
-        rat = self.rconst[(n, d)] = self.symbols_graph.new_node(Ratio, f"{n}/{d}")
-        rat.set_lengths(None, None)
-        self.symbols_graph.get_node_val(rat, deps=None)
-
-    def get_or_create_const_ang(self, n: int, d: int) -> tuple[Angle, Angle]:
-        n, d = geosolver.ratios.simplify(n, d)
-        if (n, d) not in self.aconst:
-            self._create_const_ang(n, d)
-        ang1 = self.aconst[(n, d)]
-
-        n, d = geosolver.ratios.simplify(d - n, d)
-        if (n, d) not in self.aconst:
-            self._create_const_ang(n, d)
-        ang2 = self.aconst[(n, d)]
-        return ang1, ang2
-
-    def get_or_create_const_rat(self, n: int, d: int) -> tuple[Ratio, Ratio]:
-        n, d = geosolver.ratios.simplify(n, d)
-        if (n, d) not in self.rconst:
-            self._create_const_rat(n, d)
-        rat1 = self.rconst[(n, d)]
-
-        if (d, n) not in self.rconst:
-            self._create_const_rat(d, n)
-        rat2 = self.rconst[(d, n)]
-        return rat1, rat2
-
-    def get_or_create_const(
-        self, const_str: str, const_concept: Predicate | str
-    ) -> tuple[Angle, Angle] | tuple[Ratio, Ratio]:
-        const_concept = Predicate(const_concept)
-        if const_concept in (Predicate.CONSTANT_ANGLE, Predicate.S_ANGLE):
-            if "pi/" in const_str:
-                # pi fraction
-                num, den = angle_to_num_den(const_str)
-            elif const_str.endswith("o"):
-                # degrees
-                num, den = geosolver.ratios.simplify(int(const_str[:-1]), 180)
-            else:
-                raise ValueError("Could not interpret constant angle: %s", const_str)
-            return self.get_or_create_const_ang(num, den)
-
-        elif const_concept is Predicate.CONSTANT_RATIO:
-            if "/" in const_str:
-                num, den = ratio_to_num_den(const_str)
-                return self.get_or_create_const_rat(num, den)
-
-        raise NotImplementedError(
-            "Unsupported concept for constants: %s", const_concept.value
-        )

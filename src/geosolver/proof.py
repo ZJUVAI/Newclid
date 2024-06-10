@@ -168,7 +168,6 @@ class Proof:
                 algebraic_manipulator = AlgebraicManipulator(symbols_graph)
                 statements_handler = StatementsHandler(
                     symbols_graph,
-                    algebraic_manipulator,
                     dependency_cache,
                     disabled_intrinsic_rules,
                 )
@@ -712,9 +711,7 @@ class Proof:
         self, construction: Statement, mapping: Optional[dict[str, str]] = None
     ) -> list[Point | Angle | Ratio]:
         def make_const(x):
-            arg_obj, _ = self.alegbraic_manipulator.get_or_create_const(
-                x, construction.name
-            )
+            arg_obj, _ = self.symbols_graph.get_or_create_const(x, construction.name)
             return arg_obj
 
         args_objs = []

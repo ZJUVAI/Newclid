@@ -27,7 +27,6 @@ from geosolver.listing import list_eqratio3
 ToCache = Tuple[Statement, Dependency]
 
 if TYPE_CHECKING:
-    from geosolver.reasoning_engines.algebraic_reasoning import AlgebraicManipulator
     from geosolver.symbols_graph import SymbolsGraph
     from geosolver.statements.checker import StatementChecker
     from geosolver.dependencies.caching import DependencyCache
@@ -69,13 +68,11 @@ class StatementAdder:
         self,
         symbols_graph: "SymbolsGraph",
         statements_graph: "WhyHyperGraph",
-        alegbraic_manipulator: "AlgebraicManipulator",
         statements_checker: "StatementChecker",
         dependency_cache: "DependencyCache",
         disabled_intrinsic_rules: Optional[list[IntrinsicRules | str]] = None,
     ) -> None:
         self.symbols_graph = symbols_graph
-        self.alegbraic_manipulator = alegbraic_manipulator
 
         self.statements_checker = statements_checker
         self.dependency_cache = dependency_cache
@@ -175,12 +172,12 @@ class StatementAdder:
         # If eqangle on the same directions switched then they are perpendicular
         if (
             isinstance(x, Angle)
-            and x not in self.alegbraic_manipulator.aconst.values()
-            and y not in self.alegbraic_manipulator.aconst.values()
+            and x not in self.symbols_graph.aconst.values()
+            and y not in self.symbols_graph.aconst.values()
             and x.directions == y.directions[::-1]
             and x.directions[0] != x.directions[1]
         ):
-            merges = [self.alegbraic_manipulator.vhalfpi, vx, vy]
+            merges = [self.symbols_graph.vhalfpi, vx, vy]
 
         self.symbols_graph.merge(merges, deps)
 
@@ -224,7 +221,7 @@ class StatementAdder:
         new_deps = []
         to_cache = []
         if not is_equal(ab, angle):
-            if angle == self.alegbraic_manipulator.halfpi:
+            if angle == self.symbols_graph.halfpi:
                 _add, _to_cache = self._add_perp([x, y, m, n], deps)
                 new_deps += _add
                 to_cache += _to_cache
@@ -236,7 +233,7 @@ class StatementAdder:
 
         opposite_angle = angle.opposite
         if not is_equal(ba, opposite_angle):
-            if opposite_angle == self.alegbraic_manipulator.halfpi:
+            if opposite_angle == self.symbols_graph.halfpi:
                 _add, _to_cache = self._add_perp([m, n, x, y], deps)
                 new_deps += _add
                 to_cache += _to_cache
@@ -404,7 +401,7 @@ class StatementAdder:
     ) -> Optional[Tuple[list[Dependency], list[ToCache]]]:
         """Maybe add a new parallel predicate from perp predicate."""
         a, b, c, d = points
-        halfpi = self.alegbraic_manipulator.aconst[(1, 2)]
+        halfpi = self.symbols_graph.aconst[(1, 2)]
         for ang in halfpi.val.neighbors(Angle):
             if ang == halfpi:
                 continue
@@ -1200,9 +1197,9 @@ class StatementAdder:
         a, b, c, d, ang = points
 
         num, den = angle_to_num_den(ang)
-        nd, dn = self.alegbraic_manipulator.get_or_create_const_ang(num, den)
+        nd, dn = self.symbols_graph.get_or_create_const_ang(num, den)
 
-        if nd == self.alegbraic_manipulator.halfpi:
+        if nd == self.symbols_graph.halfpi:
             return self._add_perp([a, b, c, d], deps)
 
         ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
@@ -1289,9 +1286,9 @@ class StatementAdder:
         a, b, x, angle = points
         num, den = angle_to_num_den(angle)
         ang = int(num * 180 / den) % 180
-        nd, dn = self.alegbraic_manipulator.get_or_create_const_ang(num, den)
+        nd, dn = self.symbols_graph.get_or_create_const_ang(num, den)
 
-        if nd == self.alegbraic_manipulator.halfpi:
+        if nd == self.symbols_graph.halfpi:
             return self._add_perp([a, b, b, x], deps)
 
         ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
@@ -1370,7 +1367,7 @@ class StatementAdder:
         a, b, c, d, ratio = args
 
         num, den = ratio_to_num_den(ratio)
-        nd, dn = self.alegbraic_manipulator.get_or_create_const_rat(num, den)
+        nd, dn = self.symbols_graph.get_or_create_const_rat(num, den)
 
         if num == den:
             return self._add_cong([a, b, c, d], deps)
