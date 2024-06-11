@@ -491,6 +491,8 @@ def circle_circle_intersection(c1: Circle, c2: Circle) -> tuple[Point, Point]:
     h = r0**2 - a**2
     if h < -ATOM:
         raise InvalidQuadSolveError()
+    if h < 0:
+        h = 0
     h = np.sqrt(h)
     d += ATOM
     x2 = x0 + a * (x1 - x0) / d
