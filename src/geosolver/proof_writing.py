@@ -154,8 +154,9 @@ def write_solution(
     for i, step in enumerate(proof_steps):
         _, [con] = step
         nl = proof_step_string(step, refs, last_step=i == len(proof_steps) - 1)
-        rule_name = r2name.get(con.rule_name, f"({con.rule_name})")
-        nl = nl.replace("\u21d2", f"{rule_name}\u21d2 ")
+        reason_name = con.reason.name if con.reason else ""
+        reason_pretty = r2name.get(reason_name, f"({reason_name})")
+        nl = nl.replace("\u21d2", f"{reason_pretty}\u21d2 ")
         solution += "{:03}. ".format(i + 1) + nl + "\n"
 
     solution += "==========================\n"

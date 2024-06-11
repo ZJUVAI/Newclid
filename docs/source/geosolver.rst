@@ -12,9 +12,10 @@ Geosolver
 
    geosolver.agent
    geosolver.algebraic
+   geosolver.definitions
    geosolver.dependencies
    geosolver.numerical
-   geosolver.statement
+   geosolver.statements
 
 
 .. toctree::
@@ -24,6 +25,7 @@ Geosolver
    geosolver.combinatorics
    geosolver.configs
    geosolver.geometry
+   geosolver.listing
    geosolver.match_theorems
    geosolver.points_manipulation
    geosolver.predicates
@@ -34,4 +36,5 @@ Geosolver
    geosolver.ratios
    geosolver.run_loop
    geosolver.symbols_graph
+   geosolver.theorem
    geosolver.trace_back

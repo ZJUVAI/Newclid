@@ -1,9 +1,10 @@
 from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Optional, Type
+from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Type
 
 
+from geosolver.ratios import simplify
 from geosolver.dependencies.why_predicates import _line_of_and_why
 import geosolver.numerical.geometries as num_geo
 from geosolver.numerical.draw_figure import draw_figure as draw_numerical_figure
@@ -21,6 +22,8 @@ from geosolver.geometry import (
     Value,
 )
 from geosolver._lazy_loading import lazy_import
+from geosolver.predicates import Predicate
+from geosolver.statements.statement import angle_to_num_den, ratio_to_num_den
 
 if TYPE_CHECKING:
     import networkx
@@ -67,6 +70,10 @@ class SymbolsGraph:
         self._name2node: dict[str, Node] = {}
         self._pair2line: dict[tuple[Point, Point], Line] = {}
         self._triplet2circle: dict[tuple[Point, Point, Point], Circle] = {}
+        self.rconst: Dict[Tuple[int, int], Ratio] = {}  # contains all constant ratios
+        self.aconst: Dict[Tuple[int, int], Angle] = {}  # contains all constant angles.
+        self.halfpi, _ = self.get_or_create_const_ang(1, 2)
+        self.vhalfpi = self.halfpi.val
 
     def connect(self, a: Node, b: Node, deps: "Dependency") -> None:
         a.connect_to(b, deps)
@@ -210,6 +217,65 @@ class SymbolsGraph:
             for c in p.neighbors(Circle):
                 circle2count[c] += 1
         return [c for c, count in circle2count.items() if count >= 3]
+
+    def _create_const_ang(self, n: int, d: int) -> None:
+        n, d = simplify(n, d)
+        ang = self.aconst[(n, d)] = self.new_node(Angle, f"{n}pi/{d}")
+        ang.set_directions(None, None)
+        self.get_node_val(ang, deps=None)
+
+    def _create_const_rat(self, n: int, d: int) -> None:
+        n, d = simplify(n, d)
+        rat = self.rconst[(n, d)] = self.new_node(Ratio, f"{n}/{d}")
+        rat.set_lengths(None, None)
+        self.get_node_val(rat, deps=None)
+
+    def get_or_create_const_ang(self, n: int, d: int) -> tuple[Angle, Angle]:
+        n, d = simplify(n, d)
+        if (n, d) not in self.aconst:
+            self._create_const_ang(n, d)
+        ang1 = self.aconst[(n, d)]
+
+        n, d = simplify(d - n, d)
+        if (n, d) not in self.aconst:
+            self._create_const_ang(n, d)
+        ang2 = self.aconst[(n, d)]
+        return ang1, ang2
+
+    def get_or_create_const_rat(self, n: int, d: int) -> tuple[Ratio, Ratio]:
+        n, d = simplify(n, d)
+        if (n, d) not in self.rconst:
+            self._create_const_rat(n, d)
+        rat1 = self.rconst[(n, d)]
+
+        if (d, n) not in self.rconst:
+            self._create_const_rat(d, n)
+        rat2 = self.rconst[(d, n)]
+        return rat1, rat2
+
+    def get_or_create_const(
+        self, const_str: str, const_concept: Predicate | str
+    ) -> tuple[Angle, Angle] | tuple[Ratio, Ratio]:
+        const_concept = Predicate(const_concept)
+        if const_concept in (Predicate.CONSTANT_ANGLE, Predicate.S_ANGLE):
+            if "pi/" in const_str:
+                # pi fraction
+                num, den = angle_to_num_den(const_str)
+            elif const_str.endswith("o"):
+                # degrees
+                num, den = simplify(int(const_str[:-1]), 180)
+            else:
+                raise ValueError("Could not interpret constant angle: %s", const_str)
+            return self.get_or_create_const_ang(num, den)
+
+        elif const_concept is Predicate.CONSTANT_RATIO:
+            if "/" in const_str:
+                num, den = ratio_to_num_den(const_str)
+                return self.get_or_create_const_rat(num, den)
+
+        raise NotImplementedError(
+            "Unsupported concept for constants: %s", const_concept.value
+        )
 
     def get_or_create_segment(
         self, p1: Point, p2: Point, deps: "Dependency"

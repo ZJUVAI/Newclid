@@ -24,7 +24,6 @@ from geosolver.listing import list_eqratio3
 
 if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
-    from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 
 from collections import defaultdict
 
@@ -33,10 +32,8 @@ class StatementChecker:
     def __init__(
         self,
         symbols_graph: "SymbolsGraph",
-        alegbraic_manipulator: "AlgebraicManipulator",
     ) -> None:
         self.symbols_graph = symbols_graph
-        self.alegbraic_manipulator = alegbraic_manipulator
         self.PREDICATE_TO_CHECK = {
             Predicate.COLLINEAR: self.check_coll,
             Predicate.PARALLEL: self.check_para,
@@ -251,7 +248,7 @@ class StatementChecker:
         """Check if the angle is equal to a certain constant."""
         a, b, c, d, angle = points
         num, den = angle_to_num_den(angle)
-        ang, _ = self.alegbraic_manipulator.get_or_create_const_ang(int(num), int(den))
+        ang, _ = self.symbols_graph.get_or_create_const_ang(int(num), int(den))
 
         ab = self.symbols_graph.get_line(a, b)
         cd = self.symbols_graph.get_line(c, d)
@@ -269,7 +266,7 @@ class StatementChecker:
     def check_sangle(self, points: list[Point]) -> bool:
         a, b, c, angle = points
         num, den = angle_to_num_den(angle)
-        ang, _ = self.alegbraic_manipulator.get_or_create_const_ang(num, den)
+        ang, _ = self.symbols_graph.get_or_create_const_ang(num, den)
 
         ab = self.symbols_graph.get_line(a, b)
         cb = self.symbols_graph.get_line(c, b)
@@ -288,7 +285,7 @@ class StatementChecker:
         """Check whether a ratio is equal to some given constant."""
         a, b, c, d, ratio = points
         num, den = ratio_to_num_den(ratio)
-        rat, _ = self.alegbraic_manipulator.get_or_create_const_rat(int(num), int(den))
+        rat, _ = self.symbols_graph.get_or_create_const_rat(int(num), int(den))
 
         ab = self.symbols_graph.get_segment(a, b)
         cd = self.symbols_graph.get_segment(c, d)
@@ -315,7 +312,7 @@ class StatementChecker:
         if not (ab.val and cd.val):
             return False
 
-        for ang0 in self.alegbraic_manipulator.aconst.values():
+        for ang0 in self.symbols_graph.aconst.values():
             for ang in ang0.val.neighbors(Angle):
                 d1, d2 = ang.directions
                 if ab.val == d1 and cd.val == d2:
@@ -334,7 +331,7 @@ class StatementChecker:
         if not (ab.val and cd.val):
             return False
 
-        for rat0 in self.alegbraic_manipulator.rconst.values():
+        for rat0 in self.symbols_graph.rconst.values():
             for rat in rat0.val.neighbors(Ratio):
                 l1, l2 = rat.lengths
                 if ab.val == l1 and cd.val == l2:

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Dict, List, Optional, Tuple, Union
 
 from geosolver.statements.statement import Statement, name_and_arguments_to_str
 from geosolver.theorem import Theorem
-from geosolver.algebraic import AlgebraicRules
+from geosolver.reasoning_engines.algebraic_reasoning import AlgebraicRules
 from geosolver.dependencies.dependency import Dependency
 from geosolver.problem import CONSTRUCTION_RULE
 from geosolver.statements.adder import IntrinsicRules, ToCache
@@ -106,10 +106,11 @@ class DependencyGraph:
             self.add_dependency(u_for_edge, dependency_type)
             if not none_why:
                 for why_u in u_for_edge.why:
+                    dep_name = u_for_edge.reason.name if u_for_edge.reason else ""
                     self.add_edge(
                         why_u,
                         u_for_edge,
-                        edge_name=u_for_edge.rule_name,
+                        edge_name=dep_name,
                         edge_arguments=u_for_edge.statement.args,
                     )
 
@@ -135,7 +136,7 @@ class DependencyGraph:
                 self.add_edge(
                     why_added,
                     added_dependency,
-                    edge_name=added_dependency.rule_name,
+                    edge_name=added_dependency.reason.name,
                     edge_arguments=args,
                 )
 
@@ -151,7 +152,7 @@ class DependencyGraph:
             ):
                 added_dependency = added_dependency.why[0]
 
-            dep_rule_name = added_dependency.rule_name
+            dep_rule_name = added_dependency.reason.name
             for why_added in added_dependency.why:
                 self.add_edge(
                     why_added,
@@ -170,7 +171,7 @@ class DependencyGraph:
             ):
                 added_dependency = added_dependency.why[0]
 
-            dep_rule_name = added_dependency.rule_name
+            dep_rule_name = added_dependency.reason.name
             for why_added in added_dependency.why:
                 self.add_dependency(why_added)
                 self.add_edge(
@@ -215,7 +216,7 @@ class DependencyGraph:
             if dep_type == DependencyType.GOAL.value:
                 vis_graph.nodes[node]["size"] = 40
 
-        edges_colors = build_edges_colors()
+        edges_colors = build_diverse_colors()
         for u, v, k, data in vis_graph.edges(data=True, keys=True):
             name = k.split(".")[0]
             theorem = rules.get(name)
@@ -317,7 +318,7 @@ def rgba_to_hex(r, g, b, a=0.5):
     return f"#{hexes.upper()}"
 
 
-def build_edges_colors() -> List[str]:
+def build_diverse_colors() -> List[str]:
     return sns.color_palette("colorblind", n_colors=20)
 
 

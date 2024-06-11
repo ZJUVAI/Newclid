@@ -4,8 +4,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, NamedTuple, Optional, Union
 from abc import abstractmethod
 
-from geosolver.dependencies.empty_dependency import EmptyDependency
-
 
 if TYPE_CHECKING:
     from geosolver.proof import Proof
@@ -14,9 +12,12 @@ if TYPE_CHECKING:
     from geosolver.statements.adder import ToCache
     from geosolver.dependencies.dependency import Dependency
     from geosolver.match_theorems import MatchCache
-    from geosolver.algebraic.algebraic_manipulator import Derivations
+    from geosolver.reasoning_engines.algebraic_reasoning.algebraic_manipulator import (
+        Derivations,
+    )
     from geosolver.problem import Problem
     from geosolver.statements.statement import Statement
+    from geosolver.dependencies.empty_dependency import EmptyDependency
 
 
 Mapping = dict[str, Union["Point", str]]
@@ -41,13 +42,13 @@ class MatchAction(NamedTuple):
     cache: Optional["MatchCache"] = None
 
 
-class DeriveAlgebraAction(NamedTuple):
+class ResolveEngineAction(NamedTuple):
     level: int
 
 
 class ApplyDerivationAction(NamedTuple):
     statement: "Statement"
-    reason: EmptyDependency
+    reason: "EmptyDependency"
 
 
 class AuxAction(NamedTuple):
@@ -59,7 +60,7 @@ Action = Union[
     StopAction,
     ApplyTheoremAction,
     MatchAction,
-    DeriveAlgebraAction,
+    ResolveEngineAction,
     ApplyDerivationAction,
     AuxAction,
 ]
