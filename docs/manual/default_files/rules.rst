@@ -41,13 +41,13 @@ r01 : cong2cyclic
          => cyclic A B C D
 
 r02 : eqangle2para
-^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
 
    * - Figure
-     - :math:`<AB, PQ>=<CD, PQ>\implies AB \parallel CD`
+     - :math:`\langle AB, PQ\rangle=\langle CD, PQ\rangle\implies AB \parallel CD`
    * -
       .. image:: ../../_static/Images/rules/r02.png
      -
@@ -63,7 +63,7 @@ r03 : cyclic2eqangle
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{cyclic}(ABPQ)\implies <PA,PB>=<QA,QB>`
+     - :math:`\text{cyclic}(ABPQ)\implies \langle PA,PB\rangle=\langle QA,QB\rangle`
    * -
       .. image:: ../../_static/Images/rules/r03.png
      -
@@ -79,7 +79,7 @@ r04 : eqangle2cyclic
    :header-rows: 1
 
    * - Figure
-     - :math:`<PA,PB>=<QA,QB> \implies \text{cyclic}(ABPQ)`
+     - :math:`\langle PA,PB\rangle=\langle QA,QB\rangle \implies \text{cyclic}(ABPQ)`
    * -
       .. image:: ../../_static/Images/rules/r04.png
      -
@@ -89,13 +89,13 @@ r04 : eqangle2cyclic
          => cyclic A B P Q
 
 r05 : eqangle_on_circle2cong
-^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{cyclic}(ABCPQR)\wedge <CA,CB>=<RP,RQ>\implies |AB|=|PQ|`
+     - :math:`\text{cyclic}(ABCPQR)\wedge \langle CA,CB\rangle=\langle RP,RQ\rangle\implies |AB|=|PQ|`
    * -
       .. image:: ../../_static/Images/rules/r05.png
      -
@@ -138,13 +138,13 @@ r07 : para2eqratio3
          => eqratio3 A B C D O O
 
 r08 : perp_perp2eqangle
-^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
 
    * - Figure
-     - :math:`AB \perp CD \wedge EF \perp GH \implies <AB, EF> = <CD, GH>`
+     - :math:`AB \perp CD \wedge EF \perp GH \implies \langle AB, EF\rangle = \langle CD, GH\rangle`
    * -
       .. image:: ../../_static/Images/rules/r08.png
      -
@@ -154,14 +154,14 @@ r08 : perp_perp2eqangle
          => eqangle A B E F C D G H
 
 r09 : eqangle2eqangle_sum
-^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
 
    * - Figure
-     - :math:`<ab, cd> = <mn, pq> \wedge <cd, ef> = <pq, ru>`
-       :math:`\implies <ab, ef> = <mn, ru>`
+     - :math:`\langle ab, cd\rangle = \langle mn, pq\rangle \wedge \langle cd, ef\rangle = \langle pq, ru\rangle`
+       :math:`\implies \langle ab, ef\rangle = \langle mn, ru\rangle`
    * -
       .. image:: ../../_static/Images/rules/r09.png
      -
@@ -171,7 +171,7 @@ r09 : eqangle2eqangle_sum
          => eqangle a b e f m n r u
 
 r10 : eqratio_mul
-^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
@@ -186,29 +186,31 @@ r10 : eqratio_mul
          => eqratio a b e f m n r u
 
 r11 : eqratio2angle_bisector
-^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
 
    * - Figure
-     - :math:`\frac{db}{dc} = \frac{ab}{ac} \wedge \text{coll}(dbc) \implies <ab, ad, ad, ac>`
+     - Formula
    * -
       .. image:: ../../_static/Images/rules/r11.png
      -
+       :math:`\frac{db}{dc} = \frac{ab}{ac} \wedge \text{coll}(dbc) \implies \langle ab, ad, ad, ac\rangle`
+
        .. code-block :: text
 
          eqratio6 d b d c a b a c, coll d b c, ncoll a b c
          => eqangle6 a b a d a d a c
 
 r12 : angle_bisector2eqratio
-^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
 
    * - Figure
-     - :math:`<ab, ad> = <ad, ac> \wedge \text{coll}(dbc) \implies \frac{db}{dc} = \frac{ab}{ac}`
+     - :math:`\langle ab, ad\rangle = \langle ad, ac\rangle \wedge \text{coll}(dbc) \implies \frac{db}{dc} = \frac{ab}{ac}`
    * -
       .. image:: ../../_static/Images/rules/r12.png
      -
@@ -218,29 +220,31 @@ r12 : angle_bisector2eqratio
          => eqratio6 d b d c a b a c
 
 r13 : isosceles_cong2eqangle
-^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
 
    * - Figure
-     - :math:`|OA|=|OB| \implies <OA, AB> = <AB, OB>`
+     - Formula
    * -
       .. image:: ../../_static/Images/rules/r13.png
      -
+       :math:`|OA|=|OB| \implies \langle OA, AB\rangle = \langle AB, OB\rangle`
+
        .. code-block :: text
 
          cong O A O B, ncoll O A B
          => eqangle O A A B A B O B
 
 r14 : isosceles_eqangle2cong
-^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
 
    * - Figure
-     - :math:`<AO, AB> = <BA, BO> \implies |OA|=|OB|`
+     - :math:`\langle AO, AB\rangle = \langle BA, BO\rangle \implies |OA|=|OB|`
    * -
       .. image:: ../../_static/Images/rules/r14.png
      -
@@ -250,13 +254,13 @@ r14 : isosceles_eqangle2cong
          => cong O A O B
 
 r15 : circle_perp2eqangle
-^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{circle}(O, ABC) \wedge OA \perp AX \implies <AX, AB> = <CA, CB>`
+     - :math:`\text{circle}(O, ABC) \wedge OA \perp AX \implies \langle AX, AB\rangle = \langle CA, CB\rangle`
    * -
       .. image:: ../../_static/Images/rules/r15.png
      -
@@ -266,13 +270,13 @@ r15 : circle_perp2eqangle
          => eqangle A X A B C A C B
 
 r16 : circle_eqangle2perp
-^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{circle}(O, ABC) \wedge <AX, AB>=<CA, CB> \implies \text{perp}(OA, AX)`
+     - :math:`\text{circle}(O, ABC) \wedge \langle AX, AB\rangle=\langle CA, CB\rangle \implies \text{perp}(OA, AX)`
        :math:`\implies \text{perp}(OA, AX)`
    * -
       .. image:: ../../_static/Images/rules/r16.png
@@ -283,14 +287,14 @@ r16 : circle_eqangle2perp
          => perp O A A X
 
 r17 : circle_midp2eqangle
-^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
 
    * - Figure
      - :math:`\text{circle}(O,ABC) \wedge \text{midp}(M, BC)`
-       :math:`\implies <AB, AC>=<OB, OM>`
+       :math:`\implies \langle AB, AC\rangle=\langle OB, OM\rangle`
    * -
       .. image:: ../../_static/Images/rules/r17.png
      -
@@ -306,7 +310,7 @@ r18 : eqangle2midp
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{circle}(O,ABC) \wedge \text{coll}(MBC) \wedge <AB, AC>=<OB, OM>`
+     - :math:`\text{circle}(O,ABC) \wedge \text{coll}(MBC) \wedge \langle AB, AC\rangle=\langle OB, OM\rangle`
        :math:`\implies \text{midp}(M, BC)`
    * -
       .. image:: ../../_static/Images/rules/r18.png
@@ -317,7 +321,7 @@ r18 : eqangle2midp
          => midp M B C
 
 r19 : right_triangle_midp2cong
-^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
@@ -355,7 +359,7 @@ r21 : cyclic_para2eqangle
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{cyclic}(ABCD) \wedge AB \parallel CD \implies <AD, CD> = <CD, CB>`
+     - :math:`\text{cyclic}(ABCD) \wedge AB \parallel CD \implies \langle AD, CD\rangle = \langle CD, CB\rangle`
    * -
       .. image:: ../../_static/Images/rules/r21.png
      -
@@ -365,7 +369,7 @@ r21 : cyclic_para2eqangle
          => eqangle A D C D C D C B
 
 r22 : midp_perp2cong
-^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
@@ -502,7 +506,7 @@ r30 : eqangle_perp2perp
    :header-rows: 1
 
    * - Figure
-     - :math:`<AB, PQ>=<CD, UV> \wedge \text{perp}(PQ, UV) \implies \text{perp}(AB, CD)`
+     - :math:`\langle AB, PQ\rangle=\langle CD, UV\rangle \wedge \text{perp}(PQ, UV) \implies \text{perp}(AB, CD)`
    * -
       .. image:: ../../_static/Images/rules/r30.png
      -
@@ -551,7 +555,7 @@ r33 : cong_eqangle2contri
    :header-rows: 1
 
    * - Figure
-     - :math:`|AB| = |PQ| \wedge |BC| = |QR| \wedge <BA, B> = <QP, QR>`
+     - :math:`|AB| = |PQ| \wedge |BC| = |QR| \wedge \langle BA, B\rangle = \langle QP, QR\rangle`
        :math:`\implies \text{contri*}(ABC, PQR)`
    * -
       .. image:: ../../_static/Images/rules/r33.png
@@ -562,13 +566,13 @@ r33 : cong_eqangle2contri
          => contri* A B C P Q R
 
 r34 : eqangle2simtri
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
 
    * - Figure
-     - :math:`<BA, BC> = <QP, QR> \wedge <CA, CB> = <RP, RQ>`
+     - :math:`\langle BA, BC\rangle = \langle QP, QR\rangle \wedge \langle CA, CB\rangle = \langle RP, RQ\rangle`
        :math:`\implies \text{simtri}(ABC, PQR)`
    * -
       .. image:: ../../_static/Images/rules/r34.png
@@ -585,7 +589,7 @@ r35 : eqangle2simtri2
    :header-rows: 1
 
    * - Figure
-     - :math:`<BA, BC> = <QP, QR> \wedge <CA, CB> = <RP, RQ>`
+     - :math:`\langle BA, BC\rangle = \langle QP, QR\rangle \wedge \langle CA, CB\rangle = \langle RP, RQ\rangle`
        :math:`\implies \text{simtri2}(ABC, PQR)`
    * -
       .. image:: ../../_static/Images/rules/r35.png
@@ -596,13 +600,13 @@ r35 : eqangle2simtri2
          => simtri2 A B C P Q R
 
 r36 : eqangle_cong2contri
-^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
 
    * - Figure
-     - :math:`<BA, BC> = <QP, QR> \wedge <CA, CB> = <RP, RQ>`
+     - :math:`\langle BA, BC\rangle = \langle QP, QR\rangle \wedge \langle CA, CB\rangle = \langle RP, RQ\rangle`
        :math:`\wedge |AB| = |PQ| \wedge |BC| = |QR| \wedge \text{ncoll}(ABC)`
        :math:`\wedge |AP| = |QB| \implies \text{contri}(ABC, PQR)`
    * -
@@ -621,7 +625,7 @@ r37 : eqangle_cong2contri
    :header-rows: 1
 
    * - Figure
-     - :math:`<BA, BC> = <QP, QR> \wedge <CA, CB> = <RP, RQ>`
+     - :math:`\langle BA, BC\rangle = \langle QP, QR\rangle \wedge \langle CA, CB\rangle = \langle RP, RQ\rangle`
        :math:`\wedge |AB| = |PQ| \wedge |BC| = |QR| \wedge \text{ncoll}(ABC)`
        :math:`\wedge |AP| = |QB| \implies \text{contri2}(ABC, PQR)`
    * -
@@ -634,7 +638,7 @@ r37 : eqangle_cong2contri
          => contri2 A B C P Q R
 
 r38 : eqratio_eqangle2simtri
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
@@ -658,7 +662,7 @@ r39 : eqratio_eqangle2simtri
    :header-rows: 1
 
    * - Figure
-     - :math:`\frac{BA}{BC} = \frac{QP}{QR} \wedge <BA, B> = <QP, Q>`
+     - :math:`\frac{BA}{BC} = \frac{QP}{QR} \wedge \langle BA, B\rangle = \langle QP, Q\rangle`
        :math:`\wedge \text{ncoll}(ABC) \implies \text{simtri*}(ABC, PQR)`
    * -
       .. image:: ../../_static/Images/rules/r39.png
@@ -670,7 +674,7 @@ r39 : eqratio_eqangle2simtri
          => simtri* A B C P Q R
 
 r40 : eqratio_eqratio_cong2contri
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
@@ -709,7 +713,7 @@ r41 : para2eqratio
          => para M N A B
 
 r42 : eqratio62para
-^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
@@ -743,7 +747,7 @@ r43 : perp_flip
          => perp A D B C
 
 r44 : coll_transitive
-^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
@@ -762,7 +766,7 @@ r44 : coll_transitive
          => coll X Y Z
 
 r45 : cyclic_perp_coll
-^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
@@ -781,7 +785,7 @@ r45 : cyclic_perp_coll
          => coll L M N
 
 r46 : eqangle_opposite
-^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
@@ -805,16 +809,18 @@ r47 : perp_midp
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{midp}(M, A, B) \wedge \text{perp}(X, M, A, B) \wedge \text{midp}(N, B, C)`
-       :math:`\wedge \text{perp}(X, N, B, C) \wedge \text{midp}(P, C, A)`
-       :math:`\implies \text{perp}(X, P, C, A)`
+     - Formula
    * -
       .. image:: ../../_static/Images/rules/r47.png
      -
+       :math:`\text{midp}(m, a, b) \wedge \text{perp}(x, m, a, b) \wedge \text{midp}(n, b, c)`
+       :math:`\wedge \text{perp}(x, n, b, c) \wedge \text{midp}(p, c, a)`
+       :math:`\implies \text{perp}(x, p, c, a)`
+
        .. code-block :: text
 
-         midp M A B, perp X M A B, midp N B C, perp X N B C, midp P C A
-         => perp X P C A
+         midp m a b, perp x m a b, midp n b c, perp x n b c, midp p c a
+         => perp x p c a
 
 r48 : midp_coll
 ^^^^^^^^^^^^^^^
@@ -822,21 +828,21 @@ r48 : midp_coll
    :widths: 50 25
    :header-rows: 1
 
-   * - Figure
-     - :math:`\text{midp}(M, A, B) \wedge \text{coll}(M, X, C)`
-       :math:`\wedge \text{midp}(N, B, C) \wedge \text{coll}(N, X, C)`
-       :math:`\wedge \text{midp}(P, C, A)`
-       :math:`\implies \text{coll}(X, P, B)`
+   * - figure
+     - :math:`\text{midp}(m, a, b) \wedge \text{coll}(m, x, c)`
+       :math:`\wedge \text{midp}(n, b, c) \wedge \text{coll}(n, x, c)`
+       :math:`\wedge \text{midp}(p, c, a)`
+       :math:`\implies \text{coll}(x, p, b)`
    * -
-      .. image:: ../../_static/Images/rules/r48.png
+      .. image:: ../../_static/images/rules/r48.png
      -
        .. code-block :: text
 
-         midp M A B, coll M X C, midp N B C, coll N X C, midp P C A
-         => coll X P B
+         midp m a b, coll m x c, midp n b c, coll n x c, midp p c a
+         => coll x p b
 
 r49 : circle_cyclic_cong
-^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25
    :header-rows: 1
