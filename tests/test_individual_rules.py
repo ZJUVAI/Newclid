@@ -11,16 +11,13 @@ EXPECTED_TO_FAIL = [
     "eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R",
 ]
 
-EXPECTED_TRACEBACK_FAIL = [
-    "perp A B C D, perp E F G H, npara A B E F => eqangle A B E F C D G H",
-]
-
 EXPECTED_TO_USE_OTHER_RULE = [
     "cyclic A B C D, para A B C D => eqangle A D C D C D C B",
     "eqangle A B P Q C D U V, perp P Q U V => perp A B C D",
 ]
 
 EXPECTED_WRONG_PROOF_LENGTH = [
+    "perp A B C D, perp E F G H, npara A B E F => eqangle A B E F C D G H",
     "cong O A O B, cong O B O C, cong O C O D => cyclic A B C D",
     "cyclic A B C P Q R, eqangle C A C B R P R Q => cong A B P Q",
     "cyclic A B C D, para A B C D => eqangle A D C D C D C B",
@@ -45,7 +42,6 @@ EXPECTED_WRONG_PROOF_LENGTH = [
 ]
 
 
-# @pytest.mark.skip
 @pytest.mark.parametrize(
     "rule_name,rule_txt,problem_txt",
     [
@@ -295,15 +291,9 @@ def test_rule_used_to_solve_in_one_step(
 
     assert success
 
-    try:
-        setup, aux, proof_steps, refs = get_proof_steps(
-            solver.proof_state, solver.problem.goal
-        )
-    except TypeError as err:
-        if rule_txt not in EXPECTED_TRACEBACK_FAIL:
-            raise err
-        pytest.xfail(f"Rule {rule_txt} is expected to have a traceback error.")
-
+    setup, aux, proof_steps, refs = get_proof_steps(
+        solver.proof_state, solver.problem.goal
+    )
     nl_proof_step = [
         proof_step_string(step, refs, last_step=i == len(proof_steps) - 1)
         for i, step in enumerate(proof_steps)

@@ -137,7 +137,6 @@ class Proof:
             AuxAction: self._step_auxiliary_construction,
             StopAction: self._step_stop,
         }
-        # rng control
         self.rnd_gen = (
             rnd_generator if rnd_generator is not None else np.random.default_rng()
         )
@@ -245,9 +244,9 @@ class Proof:
     def _resolve_mapping_dependency(
         self, theorem: "Theorem", mapping: Mapping, dependency_level: int
     ) -> tuple[Optional[DependencyBuilder], Optional[ToCache]]:
-        dep_builder = DependencyBuilder(reason=Reason(theorem), level=dependency_level)
         fail = False
 
+        deps: list["Dependency"] = []
         for premise in theorem.premises:
             p_args = [mapping[a] for a in premise.args]
             dep, fail = self._resolve_premise_dependency(
@@ -259,8 +258,11 @@ class Proof:
                 continue
 
             to_cache = (dep.statement, dep)
-            dep_builder.why.append(dep)
+            deps.append(dep)
 
+        dep_builder = DependencyBuilder(
+            reason=Reason(theorem), level=dependency_level, why=deps
+        )
         return dep_builder, to_cache
 
     def _resolve_premise_dependency(
@@ -286,16 +288,13 @@ class Proof:
             if not same_clock(a.num, b.num, c.num, x.num, y.num, z.num):
                 p_args = b, a, b, c, y, z, y, x
 
-        premise_statement = Statement(premise.name, p_args)
-        dep = Dependency(
-            premise_statement, reason=Reason("Premise"), level=dependency_level
-        )
-        try:
-            dep.why = self.statements.graph.resolve(dep, dependency_level)
-            fail = False
-        except Exception:
-            fail = True
+        premise_statement = Statement(premise.name, tuple(p_args))
 
+        dep = None
+        fail = False
+        dep = self.statements.graph.build_resolved_dependency(
+            premise_statement, dependency_level
+        )
         if dep.why is None:
             fail = True
 
@@ -495,9 +494,10 @@ class Proof:
         new_points = [Point(name) for name in clause.points]
 
         new_points_dep_points = set()
-        new_points_dep = []
+        new_points_dep: list[DependencyBuilder] = []
 
         # Step 1: check for all dependencies.
+        reason = Reason(CONSTRUCTION_RULE)
         for construction in clause.constructions:
             cdef = definitions[construction.name]
 
@@ -518,9 +518,9 @@ class Proof:
                 if construction.name == "midpoint"
                 else construction.name
             )
-            dep_builder = DependencyBuilder(reason=Reason(CONSTRUCTION_RULE), level=0)
-            construction_statement = Construction(c_name, construction.args)
+            construction = Construction(c_name, construction.args)
 
+            deps: list[Dependency] = []
             for construction in cdef.clause.constructions:
                 args = self.symbols_graph.names2points(
                     [mapping[a] for a in construction.args]
@@ -533,13 +533,15 @@ class Proof:
                         construction.name + " " + " ".join([x.name for x in args])
                     )
 
-                construction = Dependency(
-                    construction_statement, reason=CONSTRUCTION_RULE, level=0
+                construction_dep = self.statements.graph.build_dependency(
+                    construction_statement,
+                    DependencyBuilder(reason=reason, level=0, why=[]),
                 )
-                self.dependency_graph.add_dependency(construction)
-                dep_builder.why += [construction]
+                self.dependency_graph.add_dependency(construction_dep)
+                deps.append(construction_dep)
 
-            new_points_dep += [dep_builder]
+            dep_builder = DependencyBuilder(reason=reason, why=deps, level=0)
+            new_points_dep.append(dep_builder)
 
         # Step 2: draw.
         def range_fn() -> (
@@ -613,10 +615,6 @@ class Proof:
                 raise PointTooCloseError()
             if check_too_far_numerical(new_points_nums, existing_numerical_points, 100):
                 raise PointTooFarError()
-            # if check_too_close_numerical(new_points_nums, existing_numerical_points):
-            #     raise PointTooCloseError()
-            # if check_too_far_numerical(new_points_nums, existing_numerical_points):
-            #     raise PointTooFarError()
 
         # Commit: now that all conditions are passed.
         # add these points to current graph.
@@ -624,7 +622,10 @@ class Proof:
             self.symbols_graph.add_node(p)
 
         for p in new_points:
-            p.why = sum([d.why for d in new_points_dep], [])  # to generate txt logs.
+            why_point: list["Dependency"] = []
+            for d in new_points_dep:
+                why_point.extend(d.why)
+            p.why = why_point  # to generate txt logs.
             p.group = new_points
             p.dep_points = new_points_dep_points
             p.dep_points.update(new_points)

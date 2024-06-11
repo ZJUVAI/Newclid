@@ -129,7 +129,7 @@ class StatementAdder:
             Predicate.FIX_T,
             Predicate.FIX_P,
         ]:
-            dep = dep_builder.add_head(statement)
+            dep = self.statements_graph.build_dependency(statement, dep_builder)
             deps_to_cache.append((statement, dep))
             new_deps = [dep]
         elif statement.predicate is Predicate.IND:
@@ -216,6 +216,7 @@ class StatementAdder:
             abcd_deps = dep_builder
             if IntrinsicRules.POINT_ON_SAME_LINE not in self.DISABLED_INTRINSIC_RULES:
                 abcd_deps = dep_builder.extend_by_why(
+                    self.statements_graph,
                     Statement(Predicate.COLLINEAR, og_points),
                     why=whys + why0,
                     extention_reason=Reason(IntrinsicRules.POINT_ON_SAME_LINE),
@@ -223,7 +224,7 @@ class StatementAdder:
 
             is_coll = self.statements_checker.check_coll(args)
             coll = Statement(Predicate.COLLINEAR, args)
-            dep = abcd_deps.add_head(coll)
+            dep = self.statements_graph.build_dependency(coll, abcd_deps)
             to_cache.append((coll, dep))
             self.symbols_graph.merge_into(line0, [line], dep)
 
@@ -236,10 +237,8 @@ class StatementAdder:
         """Return the dep(.why) explaining why p is coll with points."""
         for p1, p2 in comb.arrangement_pairs(points):
             if self.statements_checker.check_coll([p1, p2, p]):
-                coll = Statement(Predicate.COLLINEAR, [p1, p2, p])
-                coll_dep = Dependency(coll, None, None)
-                coll_dep.why = self.statements_graph.resolve(coll_dep, None)
-                return coll_dep
+                coll = Statement(Predicate.COLLINEAR, (p1, p2, p))
+                return self.statements_graph.build_resolved_dependency(coll)
 
     def _add_para(
         self, points: list[Point], dep_builder: DependencyBuilder
@@ -253,13 +252,14 @@ class StatementAdder:
 
         if IntrinsicRules.PARA_FROM_LINES not in self.DISABLED_INTRINSIC_RULES:
             dep_builder = dep_builder.extend_by_why(
+                self.statements_graph,
                 Statement(Predicate.PARALLEL, points),
                 why=why1 + why2,
                 extention_reason=Reason(IntrinsicRules.PARA_FROM_LINES),
             )
 
         para = Statement(Predicate.PARALLEL, (a, b, c, d))
-        dep = dep_builder.add_head(para)
+        dep = self.statements_graph.build_dependency(para, dep_builder)
         to_cache = [(para, dep)]
 
         self._make_equal(ab, cd, dep)
@@ -361,6 +361,7 @@ class StatementAdder:
 
         if IntrinsicRules.PERP_FROM_LINES not in self.DISABLED_INTRINSIC_RULES:
             dep_builder = dep_builder.extend_by_why(
+                self.statements_graph,
                 Statement(Predicate.PERPENDICULAR, points),
                 extention_reason=Reason(IntrinsicRules.PERP_FROM_LINES),
                 why=why1 + why2,
@@ -401,14 +402,17 @@ class StatementAdder:
         perp = Statement(Predicate.PERPENDICULAR, [a, b, c, d])
         if IntrinsicRules.PERP_FROM_ANGLE not in self.DISABLED_INTRINSIC_RULES:
             dep_builder = dep_builder.extend_by_why(
-                perp, why=why, extention_reason=Reason(IntrinsicRules.PERP_FROM_ANGLE)
+                self.statements_graph,
+                perp,
+                why=why,
+                extention_reason=Reason(IntrinsicRules.PERP_FROM_ANGLE),
             )
 
         dab, dcd = a12._d
         a, b = dab._obj.points
         c, d = dcd._obj.points
 
-        dep = dep_builder.add_head(perp)
+        dep = self.statements_graph.build_dependency(perp, dep_builder)
         self._make_equal(a12, a21, dep=dep)
 
         eqangle = Statement(Predicate.EQANGLE, [a, b, c, d, c, d, a, b])
@@ -427,7 +431,7 @@ class StatementAdder:
         cd = self.symbols_graph.get_or_create_segment(c, d, None)
 
         cong = Statement(Predicate.CONGRUENT, [a, b, c, d])
-        dep = dep_builder.add_head(cong)
+        dep = self.statements_graph.build_dependency(cong, dep_builder)
         self._make_equal(ab, cd, dep=dep)
 
         to_cache = [(cong, dep)]
@@ -527,6 +531,7 @@ class StatementAdder:
             if IntrinsicRules.CYCLIC_FROM_CIRCLE:
                 cyclic = Statement(Predicate.CYCLIC, og_points)
                 abcdef_deps = abcdef_deps.extend_by_why(
+                    self.statements_graph,
                     cyclic,
                     why=whys + why0,
                     extention_reason=Reason(IntrinsicRules.CYCLIC_FROM_CIRCLE),
@@ -535,7 +540,7 @@ class StatementAdder:
             is_cyclic = self.statements_checker.check_cyclic(args)
 
             cyclic = Statement(Predicate.CYCLIC, args)
-            dep = abcdef_deps.add_head(cyclic)
+            dep = self.statements_graph.build_dependency(cyclic, abcdef_deps)
             to_cache.append((cyclic, dep))
             self.symbols_graph.merge_into(circle0, [circle], dep)
             if not is_cyclic:
@@ -546,10 +551,8 @@ class StatementAdder:
     def _cyclic_dep(self, points: list[Point], p: Point) -> list[Dependency]:
         for p1, p2, p3 in comb.arrangement_triplets(points):
             if self.statements_checker.check_cyclic([p1, p2, p3, p]):
-                cyclic = Statement(Predicate.CYCLIC, [p1, p2, p3, p])
-                cyclic_dep = Dependency(cyclic, None, None)
-                cyclic_dep.why = self.statements_graph.resolve(cyclic_dep, None)
-                return cyclic_dep
+                cyclic = Statement(Predicate.CYCLIC, (p1, p2, p3, p))
+                return self.statements_graph.build_resolved_dependency(cyclic)
 
     def _maybe_add_cyclic_from_cong(
         self, a: Point, b: Point, c: Point, cong_ab_ac: Dependency
@@ -583,10 +586,8 @@ class StatementAdder:
         why += [cong_ab_ac]
 
         dep_builder = DependencyBuilder(
-            Reason(IntrinsicRules.CYCLIC_FROM_CONG), level=cong_ab_ac.level
+            Reason(IntrinsicRules.CYCLIC_FROM_CONG), level=cong_ab_ac.level, why=why
         )
-        dep_builder.why = why
-
         return self._add_cyclic([b, c, x, y], dep_builder)
 
     def _add_eqangle(
@@ -609,6 +610,7 @@ class StatementAdder:
         if IntrinsicRules.EQANGLE_FROM_LINES not in self.DISABLED_INTRINSIC_RULES:
             eqangle = Statement(Predicate.EQANGLE, points)
             dep_builder = dep_builder.extend_by_why(
+                self.statements_graph,
                 eqangle,
                 why=why1 + why2 + why3 + why4,
                 extention_reason=Reason(IntrinsicRules.EQANGLE_FROM_LINES),
@@ -695,7 +697,6 @@ class StatementAdder:
                 args[2 * i - 2] = x_
                 args[2 * i - 1] = y_
 
-        add = []
         ab_cd, cd_ab, why1 = self.symbols_graph.get_or_create_angle_from_lines(
             ab, cd, dep=None
         )
@@ -709,6 +710,7 @@ class StatementAdder:
         ):
             eqangle = Statement(Predicate.EQANGLE, args)
             dep_builder = dep_builder.extend_by_why(
+                self.statements_graph,
                 eqangle,
                 why=why1 + why2,
                 extention_reason=Reason(IntrinsicRules.EQANGLE_FROM_CONGRUENT_ANGLE),
@@ -722,25 +724,26 @@ class StatementAdder:
         m, n = dmn._obj.points
         p, q = dpq._obj.points
 
+        add = []
         to_cache = []
 
-        deps1 = None
+        dep1 = None
         eqangle = Statement(Predicate.EQANGLE, [a, b, c, d, m, n, p, q])
         if dep_builder:
-            deps1 = dep_builder.add_head(eqangle)
+            dep1 = self.statements_graph.build_dependency(eqangle, dep_builder)
         if not is_equal(ab_cd, mn_pq):
-            add += [deps1]
-        to_cache.append((eqangle, deps1))
-        self._make_equal(ab_cd, mn_pq, dep=deps1)
+            add += [dep1]
+        to_cache.append((eqangle, dep1))
+        self._make_equal(ab_cd, mn_pq, dep=dep1)
 
-        deps2 = None
+        dep2 = None
         eqangle_sym = Statement(Predicate.EQANGLE, [c, d, a, b, p, q, m, n])
         if dep_builder:
-            deps2 = dep_builder.add_head(eqangle_sym)
+            dep2 = self.statements_graph.build_dependency(eqangle_sym, dep_builder)
         if not is_equal(cd_ab, pq_mn):
-            add += [deps2]
-        to_cache.append((eqangle_sym, deps2))
-        self._make_equal(cd_ab, pq_mn, dep=deps2)
+            add += [dep2]
+        to_cache.append((eqangle_sym, dep2))
+        self._make_equal(cd_ab, pq_mn, dep=dep2)
 
         return add, to_cache
 
@@ -882,6 +885,7 @@ class StatementAdder:
             not in self.DISABLED_INTRINSIC_RULES
         ):
             dep_builder = dep_builder.extend_by_why(
+                self.statements_graph,
                 Statement(Predicate.EQRATIO, tuple(args)),
                 why=why1 + why2,
                 extention_reason=Reason(
@@ -899,23 +903,21 @@ class StatementAdder:
 
         to_cache = []
 
-        deps1 = None
+        dep1 = None
         eqratio = Statement(Predicate.EQRATIO, [a, b, c, d, m, n, p, q])
-        if dep_builder:
-            deps1 = dep_builder.add_head(eqratio)
+        dep1 = self.statements_graph.build_dependency(eqratio, dep_builder)
         if not is_equal(ab_cd, mn_pq):
-            add += [deps1]
-        to_cache.append((eqratio, deps1))
-        self._make_equal(ab_cd, mn_pq, dep=deps1)
+            add += [dep1]
+        to_cache.append((eqratio, dep1))
+        self._make_equal(ab_cd, mn_pq, dep=dep1)
 
-        deps2 = None
+        dep2 = None
         eqratio_sym = Statement(Predicate.EQRATIO, [c, d, a, b, p, q, m, n])
-        if dep_builder:
-            deps2 = dep_builder.add_head(eqratio_sym)
+        dep2 = self.statements_graph.build_dependency(eqratio_sym, dep_builder)
         if not is_equal(cd_ab, pq_mn):
-            add += [deps2]
-        to_cache.append((eqratio_sym, deps2))
-        self._make_equal(cd_ab, pq_mn, dep=deps2)
+            add += [dep2]
+        to_cache.append((eqratio_sym, dep2))
+        self._make_equal(cd_ab, pq_mn, dep=dep2)
         return add, to_cache
 
     def _add_simtri_check(
@@ -1107,7 +1109,7 @@ class StatementAdder:
                 )
 
         because_eq = Statement(eq_pred, [m, n, p, q])
-        dep = dep_builder.add_head(because_eq)
+        dep = self.statements_graph.build_dependency(because_eq, dep_builder)
         self._make_equal(mn, pq, dep=dep)
 
         to_cache = [(because_eq, dep)]
@@ -1137,6 +1139,7 @@ class StatementAdder:
             args = points[:-1] + [nd]
             aconst = Statement(Predicate.CONSTANT_ANGLE, tuple(args))
             dep_builder = dep_builder.extend_by_why(
+                self.statements_graph,
                 aconst,
                 why=why1 + why2,
                 extention_reason=Reason(IntrinsicRules.ACONST_FROM_LINES),
@@ -1177,6 +1180,7 @@ class StatementAdder:
         aconst = Statement(Predicate.CONSTANT_ANGLE, [a, b, c, d, nd])
         if IntrinsicRules.ACONST_FROM_ANGLE not in self.DISABLED_INTRINSIC_RULES:
             dep_builder = dep_builder.extend_by_why(
+                self.statements_graph,
                 aconst,
                 why=why,
                 extention_reason=Reason(IntrinsicRules.ACONST_FROM_ANGLE),
@@ -1190,17 +1194,17 @@ class StatementAdder:
         add = []
         to_cache = []
         if not is_equal(ab_cd, nd):
-            deps1 = dep_builder.add_head(aconst)
-            self._make_equal(ab_cd, nd, dep=deps1)
-            to_cache.append((aconst, deps1))
-            add += [deps1]
+            dep1 = self.statements_graph.build_dependency(aconst, dep_builder)
+            self._make_equal(ab_cd, nd, dep=dep1)
+            to_cache.append((aconst, dep1))
+            add += [dep1]
 
         aconst2 = Statement(Predicate.CONSTANT_ANGLE, [a, b, c, d, nd])
         if not is_equal(cd_ab, dn):
-            deps2 = dep_builder.add_head(aconst2)
-            self._make_equal(cd_ab, dn, dep=deps2)
-            to_cache.append((aconst2, deps2))
-            add += [deps2]
+            dep2 = self.statements_graph.build_dependency(aconst2, dep_builder)
+            self._make_equal(cd_ab, dn, dep=dep2)
+            to_cache.append((aconst2, dep2))
+            add += [dep2]
 
         return add, to_cache
 
@@ -1229,6 +1233,7 @@ class StatementAdder:
         sangle = Statement(Predicate.S_ANGLE, (a, b, x))
         if IntrinsicRules.SANGLE_FROM_LINES not in self.DISABLED_INTRINSIC_RULES:
             dep_builder = dep_builder.extend_by_why(
+                self.statements_graph,
                 sangle,
                 why=why1 + why2,
                 extention_reason=Reason(IntrinsicRules.SANGLE_FROM_LINES),
@@ -1255,6 +1260,7 @@ class StatementAdder:
         if IntrinsicRules.SANGLE_FROM_ANGLE not in self.DISABLED_INTRINSIC_RULES:
             aconst = Statement(Predicate.CONSTANT_ANGLE, [b, x, a, b, nd])
             dep_builder = dep_builder.extend_by_why(
+                self.statements_graph,
                 aconst,
                 why=why,
                 extention_reason=Reason(IntrinsicRules.SANGLE_FROM_ANGLE),
@@ -1266,19 +1272,17 @@ class StatementAdder:
 
         if not is_equal(xba, nd):
             aconst = Statement(Predicate.S_ANGLE, [c, x, a, b, nd])
-            deps1 = dep_builder.add_head(aconst)
-
-            self._make_equal(xba, nd, dep=deps1)
-            to_cache.append((aconst, deps1))
-            add += [deps1]
+            dep1 = self.statements_graph.build_dependency(aconst, dep_builder)
+            self._make_equal(xba, nd, dep=dep1)
+            to_cache.append((aconst, dep1))
+            add += [dep1]
 
         if not is_equal(abx, dn):
             aconst2 = Statement(Predicate.S_ANGLE, [a, b, c, x, dn])
-            deps2 = dep_builder.add_head(aconst2)
-
-            self._make_equal(abx, dn, dep=deps2)
-            to_cache.append((aconst2, deps2))
-            add += [deps2]
+            dep2 = self.statements_graph.build_dependency(aconst2, dep_builder)
+            self._make_equal(abx, dn, dep=dep2)
+            to_cache.append((aconst2, dep2))
+            add += [dep2]
 
         return add, to_cache
 
@@ -1332,6 +1336,7 @@ class StatementAdder:
         rconst = Statement(Predicate.CONSTANT_RATIO, [a, b, c, d, nd])
         if IntrinsicRules.RCONST_FROM_RATIO not in self.DISABLED_INTRINSIC_RULES:
             dep_builder = dep_builder.extend_by_why(
+                self.statements_graph,
                 rconst,
                 why=why,
                 extention_reason=Reason(IntrinsicRules.RCONST_FROM_RATIO),
@@ -1344,14 +1349,14 @@ class StatementAdder:
         add = []
         to_cache = []
         if not is_equal(ab_cd, nd):
-            dep1 = dep_builder.add_head(rconst)
+            dep1 = self.statements_graph.build_dependency(rconst, dep_builder)
             self._make_equal(nd, ab_cd, dep=dep1)
             to_cache.append((rconst, dep1))
             add.append(dep1)
 
         if not is_equal(cd_ab, dn):
             rconst2 = Statement(Predicate.CONSTANT_RATIO, [c, d, a, b, dn])
-            dep2 = dep_builder.add_head(rconst2)
+            dep2 = self.statements_graph.build_dependency(rconst2, dep_builder)
             self._make_equal(dn, cd_ab, dep=dep2)
             to_cache.append((rconst2, dep2))
             add.append(dep2)

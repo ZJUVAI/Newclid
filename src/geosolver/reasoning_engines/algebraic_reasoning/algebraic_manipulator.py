@@ -85,10 +85,8 @@ class AlgebraicManipulator(ReasoningEngine):
         for x in self.rtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
             dep = DependencyBuilder(
-                reason=Reason(AlgebraicRules.Ratio_Chase),
-                level=level,
+                reason=Reason(AlgebraicRules.Ratio_Chase), why=why, level=level
             )
-            dep.why = why
 
             if len(x) == 2:
                 mn, pq = x
@@ -123,10 +121,8 @@ class AlgebraicManipulator(ReasoningEngine):
         for x in self.atable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
             dep = DependencyBuilder(
-                reason=Reason(AlgebraicRules.Angle_Chase),
-                level=level,
+                reason=Reason(AlgebraicRules.Angle_Chase), why=why, level=level
             )
-            dep.why = why
 
             if len(x) == 2:
                 ab, cd = x
@@ -174,10 +170,8 @@ class AlgebraicManipulator(ReasoningEngine):
         for x in self.dtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
             dep = DependencyBuilder(
-                reason=Reason(AlgebraicRules.Distance_Chase),
-                level=level,
+                reason=Reason(AlgebraicRules.Distance_Chase), why=why, level=level
             )
-            dep.why = why
 
             if len(x) == 2:
                 a, b = x

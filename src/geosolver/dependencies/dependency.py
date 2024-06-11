@@ -1,29 +1,36 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
+from typing_extensions import Self
 
 from geosolver.theorem import Theorem
-
+from geosolver.statements.statement import Statement
 
 if TYPE_CHECKING:
-    from geosolver.statements.statement import Statement
     from geosolver.statements.adder import IntrinsicRules
     from geosolver.reasoning_engines.algebraic_reasoning import AlgebraicRules
 
 
-@dataclass
+@dataclass(frozen=True)
 class Reason:
     object: Theorem | "AlgebraicRules" | "IntrinsicRules" | str
+    name: str = ""
 
     def __post_init__(self):
-        if isinstance(self.object, Theorem):
-            self.name = self.object.rule_name
-        elif isinstance(self.object, str):
-            self.name = self.object
-        else:
-            self.name = self.object.value
+        if not self.name:
+            if isinstance(self.object, Theorem):
+                name = self.object.rule_name
+            elif isinstance(self.object, str):
+                name = self.object
+            else:
+                name = self.object.value
+            object.__setattr__(self, "name", name)
+
+    def __hash__(self) -> int:
+        return hash(self.name)
 
 
+@dataclass(frozen=True)
 class Dependency:
     """Dependency is a directed hyper-edge of the StatementsHyperGraph.
 
@@ -32,9 +39,10 @@ class Dependency:
 
     """
 
-    def __init__(self, statement: "Statement", reason: Optional[Reason], level: int):
-        self.statement = statement
-        self.reason = reason
-        self.level = level
+    statement: Statement
+    why: tuple[Self]
+    reason: Optional[Reason] = None
+    level: Optional[int] = None
 
-        self.why: list[Dependency] = []
+    def __hash__(self) -> int:
+        return hash((self.statement, self.reason))

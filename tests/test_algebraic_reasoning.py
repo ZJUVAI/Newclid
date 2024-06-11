@@ -121,10 +121,10 @@ class TestAR:
         # Add two eqangles facts because ieq_triangle only add congruent sides
         a, b, c = proof.symbols_graph.names2nodes("abc")
         proof.statements.adder._add_eqangle(
-            [a, b, b, c, b, c, c, a], DependencyBuilder(Reason("None"), 0)
+            [a, b, b, c, b, c, c, a], DependencyBuilder(Reason("None"), 0, why=[])
         )
         proof.statements.adder._add_eqangle(
-            [b, c, c, a, c, a, a, b], DependencyBuilder(Reason("None"), 0)
+            [b, c, c, a, c, a, a, b], DependencyBuilder(Reason("None"), 0, why=[])
         )
 
         # Create an external angle table:
