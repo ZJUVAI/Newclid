@@ -68,14 +68,7 @@ class AlgebraicManipulator(ReasoningEngine):
         rat_derives = self.derive_ratio_algebra(level)
         derives.update(rat_derives)
 
-        # Separate eqangle and eqratio derivations
-        # As they are too numerous => slow down DD+AR.
-        # & reserve them only for last effort.
-        eq4s = {
-            Predicate.EQANGLE: derives.pop(Predicate.EQANGLE),
-            Predicate.EQRATIO: derives.pop(Predicate.EQRATIO),
-        }
-        return DeriveFeedback(derives, eq4s)
+        return DeriveFeedback(derives)
 
     def derive_ratio_algebra(self, level: int) -> Derivations:
         """Derive new eqratio predicates."""

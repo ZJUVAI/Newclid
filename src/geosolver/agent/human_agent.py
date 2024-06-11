@@ -234,9 +234,6 @@ class HumanAgent(DeductiveAgent):
         for predicate, derivations_and_dependencies in feedback.derives.items():
             for derivation_and_dependency in derivations_and_dependencies:
                 new_mappings.append((predicate, derivation_and_dependency))
-        for predicate, derivations_and_dependencies in feedback.eq4s.items():
-            for derivation_and_dependency in derivations_and_dependencies:
-                new_mappings.append((predicate, derivation_and_dependency))
 
         if not new_mappings:
             return "No new derivation found.\n", False

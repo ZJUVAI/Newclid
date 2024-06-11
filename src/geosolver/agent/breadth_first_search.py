@@ -164,9 +164,7 @@ class BFSDDAR(DeductiveAgent):
         breath-first search over all theorems one by one."""
 
         if self._do_simple_derviations_asap or self._do_all_derivations_asap:
-            next_derivation = self._apply_next_derivation(
-                include_eq4s=self._do_all_derivations_asap
-            )
+            next_derivation = self._apply_next_derivation()
             if next_derivation is not None:
                 return next_derivation
 
@@ -190,7 +188,6 @@ class BFSDDAR(DeductiveAgent):
     def remember_effects(self, action: Action, feedback: Feedback):
         if isinstance(feedback, DeriveFeedback):
             concat_derivations(self._derivations, feedback.derives)
-            concat_derivations(self._eq4s, feedback.eq4s)
         elif isinstance(feedback, ApplyDerivationFeedback):
             new_statements = len(feedback.added) > 1
             if new_statements:
@@ -199,20 +196,13 @@ class BFSDDAR(DeductiveAgent):
         else:
             self._dd_agent.remember_effects(action, feedback)
 
-    def _apply_next_derivation(
-        self, include_eq4s: bool = True
-    ) -> Optional[ApplyDerivationAction]:
+    def _apply_next_derivation(self) -> Optional[ApplyDerivationAction]:
         if not self._current_derivation_stack:
             if self._derivations:
                 (
                     self._current_derivation_name,
                     self._current_derivation_stack,
                 ) = self._derivations.popitem()
-            elif include_eq4s and self._eq4s:
-                (
-                    self._current_derivation_name,
-                    self._current_derivation_stack,
-                ) = self._eq4s.popitem()
             else:
                 return None
 
@@ -222,7 +212,6 @@ class BFSDDAR(DeductiveAgent):
     def reset(self):
         self._dd_agent.reset()
         self._derivations: Derivations = {}
-        self._eq4s: Derivations = {}
         self._current_derivation_name: Optional[str] = None
         self._current_derivation_stack: list[tuple[Point, ...]] = []
         self.level: int = -1

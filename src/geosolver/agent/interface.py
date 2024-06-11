@@ -90,7 +90,6 @@ class MatchFeedback(NamedTuple):
 
 class DeriveFeedback(NamedTuple):
     derives: "Derivations"
-    eq4s: "Derivations"
 
 
 class ApplyDerivationFeedback(NamedTuple):
