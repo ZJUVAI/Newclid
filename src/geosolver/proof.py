@@ -394,7 +394,7 @@ class Proof:
         self, statement: Statement, deps: EmptyDependency
     ) -> tuple[list[Dependency], list[ToCache]]:
         """Derive (but not add) new algebraic predicates."""
-        new_deps, to_cache = self.statements.adder.add_algebra(statement, deps)
+        new_deps, to_cache = self.statements.adder.add(statement, deps)
         self.dependency_graph.add_algebra_edges(to_cache, statement.args)
         return new_deps, to_cache
 

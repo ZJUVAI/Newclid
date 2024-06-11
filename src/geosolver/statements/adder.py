@@ -19,7 +19,6 @@ from geosolver.geometry import (
     Point,
     Segment,
     is_equal,
-    is_equiv,
 )
 from geosolver.listing import list_eqratio3
 
@@ -111,15 +110,6 @@ class StatementAdder:
             Predicate.CONSTANT_RATIO: self._add_rconst,
         }
 
-        self.PREDICATE_TO_ALGEBRA = {
-            Predicate.PARALLEL: self._add_algebra_para,
-            Predicate.CONSTANT_ANGLE: self._add_algebra_aconst,
-            Predicate.CONSTANT_RATIO: self._add_rconst,
-            Predicate.CONGRUENT_2: self._add_algebra_cong,
-            Predicate.EQRATIO: self._add_eqratio,
-            Predicate.EQANGLE: self._add_eqangle,
-        }
-
     def add(
         self, statement: Statement, deps: EmptyDependency
     ) -> Tuple[list[Dependency], list[ToCache]]:
@@ -149,11 +139,6 @@ class StatementAdder:
 
         return new_deps, deps_to_cache
 
-    def add_algebra(
-        self, statement: Statement, deps: EmptyDependency
-    ) -> Tuple[list[Dependency], list[ToCache]]:
-        return self.PREDICATE_TO_ALGEBRA[statement.predicate](statement.args, deps)
-
     def _make_equal(self, x: Node, y: Node, deps: Dependency) -> None:
         """Make that two nodes x and y are equal, i.e. merge their value node."""
         if x.val is None:
@@ -180,69 +165,6 @@ class StatementAdder:
             merges = [self.symbols_graph.vhalfpi, vx, vy]
 
         self.symbols_graph.merge(merges, deps)
-
-    def _add_algebra_para(
-        self, args: tuple[Point, Point, Point, Point], deps: EmptyDependency
-    ):
-        a, b, c, d = args
-        ab = self.symbols_graph.get_line_thru_pair(a, b)
-        cd = self.symbols_graph.get_line_thru_pair(c, d)
-        if is_equiv(ab, cd):
-            return [], []
-        return self._add_para(args, deps)
-
-    def _add_algebra_cong(
-        self, args: tuple[Point, Point, Point, Point], deps: EmptyDependency
-    ):
-        a, b, c, d = args
-        if not (a != b and c != d and (a != c or b != d)):
-            return [], []
-        return self._add_cong(args, deps)
-
-    def _add_algebra_aconst(
-        self,
-        args: tuple[Point, Point, Point, Point, Angle],
-        deps: EmptyDependency,
-    ):
-        a, b, c, d, angle = args
-        ab = self.symbols_graph.get_line_thru_pair(a, b)
-        cd = self.symbols_graph.get_line_thru_pair(c, d)
-
-        ab, ba, why = self.symbols_graph.get_or_create_angle_from_lines(
-            ab, cd, deps=None
-        )
-        deps = deps.extend_by_why(
-            Statement(Predicate.CONSTANT_ANGLE, args), why, extention_reason=deps.reason
-        )
-
-        a, b = ab._d
-        (x, y), (m, n) = a._obj.points, b._obj.points
-
-        new_deps = []
-        to_cache = []
-        if not is_equal(ab, angle):
-            if angle == self.symbols_graph.halfpi:
-                _add, _to_cache = self._add_perp([x, y, m, n], deps)
-                new_deps += _add
-                to_cache += _to_cache
-            aconst = Statement(Predicate.CONSTANT_ANGLE, [x, y, m, n, angle])
-            dep1 = deps.populate(aconst)
-            to_cache.append((aconst, dep1))
-            self._make_equal(angle, ab, deps=dep1)
-            new_deps.append(dep1)
-
-        opposite_angle = angle.opposite
-        if not is_equal(ba, opposite_angle):
-            if opposite_angle == self.symbols_graph.halfpi:
-                _add, _to_cache = self._add_perp([m, n, x, y], deps)
-                new_deps += _add
-                to_cache += _to_cache
-            aconst = Statement(Predicate.CONSTANT_ANGLE, [m, n, x, y, opposite_angle])
-            dep2 = deps.populate(aconst)
-            to_cache.append((aconst, dep2))
-            self._make_equal(opposite_angle, ba, deps=dep2)
-            new_deps.append(dep2)
-        return new_deps, to_cache
 
     def _add_coll(
         self, points: list[Point], deps: EmptyDependency
@@ -1187,13 +1109,14 @@ class StatementAdder:
         self, points: list[Point], deps: EmptyDependency
     ) -> Tuple[list[Dependency], list[ToCache]]:
         """Add that an angle is equal to some constant."""
+        points = list(points)
         a, b, c, d, ang = points
 
         num, den = angle_to_num_den(ang)
         nd, dn = self.symbols_graph.get_or_create_const_ang(num, den)
 
-        if nd == self.symbols_graph.halfpi:
-            return self._add_perp([a, b, c, d], deps)
+        # if nd == self.symbols_graph.halfpi:
+        #     return self._add_perp([a, b, c, d], deps)
 
         ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
         cd, why2 = self.symbols_graph.get_line_thru_pair_why(c, d)
@@ -1256,6 +1179,12 @@ class StatementAdder:
         add = []
         to_cache = []
         if not is_equal(ab_cd, nd):
+            # This "if", if deleted, tests will still be passed
+            # It's added because it's present in _add_algebra_aconst
+            if nd == self.symbols_graph.halfpi:
+                _add, _to_cache = self._add_perp([a, b, c, d], deps)
+                add += _add
+                to_cache += _to_cache
             deps1 = deps.populate(aconst)
             self._make_equal(ab_cd, nd, deps=deps1)
             to_cache.append((aconst, deps1))
@@ -1263,6 +1192,12 @@ class StatementAdder:
 
         aconst2 = Statement(Predicate.CONSTANT_ANGLE, [a, b, c, d, nd])
         if not is_equal(cd_ab, dn):
+            # This "if", if deleted, tests will still be passed
+            # It's added because it's present in _add_algebra_aconst
+            if dn == self.symbols_graph.halfpi:
+                _add, _to_cache = self._add_perp([c, d, a, b], deps)
+                add += _add
+                to_cache += _to_cache
             deps2 = deps.populate(aconst2)
             self._make_equal(cd_ab, dn, deps=deps2)
             to_cache.append((aconst2, deps2))
