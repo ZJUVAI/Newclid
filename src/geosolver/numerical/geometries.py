@@ -274,12 +274,12 @@ class Line:
         # ax + by + c = 0
         if x is None and y is not None:
             if abs(a) > ATOM:
-                return Point((-c - b * y) / (a + ATOM), y)
+                return Point((-c - b * y) / a, y)
             else:
                 return None
         elif x is not None and y is None:
             if abs(b) > ATOM:
-                return Point(x, (-c - a * x) / (b + ATOM))
+                return Point(x, (-c - a * x) / b)
             else:
                 return None
         elif x is not None and y is not None:
@@ -534,7 +534,7 @@ def circle_circle_intersection(c1: Circle, c2: Circle) -> tuple[Point, Point]:
     if abs(d) < ATOM:
         raise InvalidQuadSolveError()
 
-    a = (r0**2 - r1**2 + d**2) / (2 * d + ATOM)
+    a = (r0**2 - r1**2 + d**2) / (2 * d)
     h = r0**2 - a**2
     if h < -ATOM:
         raise InvalidQuadSolveError()
@@ -558,7 +558,7 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
     p, q = center.x, center.y
 
     if abs(b) < ATOM:
-        x = -c / (a + ATOM)
+        x = -c / a
         x_p = x - p
         x_p2 = x_p * x_p
         y = solve_quad(1, -2 * q, q * q + x_p2 - r * r)
@@ -568,7 +568,7 @@ def line_circle_intersection(line: Line, circle: Circle) -> tuple[Point, Point]:
         return (Point(x, y1), Point(x, y2))
 
     if abs(a) < ATOM:
-        y = -c / (b + ATOM)
+        y = -c / b
         y_q = y - q
         y_q2 = y_q * y_q
         x = solve_quad(1, -2 * p, p * p + y_q2 - r * r)
