@@ -136,7 +136,7 @@ def match_perp_perp_npara_eqangle(
 ) -> Generator[dict[str, Point], None, None]:
     """Match perp A B C D, perp E F G H, npara A B E F => eqangle A B E F C D G H."""
     dpairs = []
-    for ang in proof.alegbraic_manipulator.vhalfpi.neighbors(Angle):
+    for ang in proof.symbols_graph.vhalfpi.neighbors(Angle):
         d1, d2 = ang.directions
         if d1 is None or d2 is None:
             continue
@@ -297,7 +297,7 @@ def match_perp_perp_ncoll_para(
 ) -> Generator[dict[str, Point], None, None]:
     """Match perp A B C D, perp C D E F, ncoll A B E => para A B E F."""
     d2d = defaultdict(list)
-    for ang in proof.alegbraic_manipulator.vhalfpi.neighbors(Angle):
+    for ang in proof.symbols_graph.vhalfpi.neighbors(Angle):
         d1, d2 = ang.directions
         if d1 is None or d2 is None:
             continue
@@ -336,7 +336,7 @@ def match_eqangle_perp_perp(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle A B P Q C D U V, perp P Q U V => perp A B C D."""
-    for ang in proof.alegbraic_manipulator.vhalfpi.neighbors(Angle):
+    for ang in proof.symbols_graph.vhalfpi.neighbors(Angle):
         # d1 perp d2
         d1, d2 = ang.directions
         if d1 is None or d2 is None:

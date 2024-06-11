@@ -12,7 +12,7 @@ from geosolver.agent.interface import (
     AuxAction,
     AuxFeedback,
     DeductiveAgent,
-    DeriveAlgebraAction,
+    ResolveEngineAction,
     DeriveFeedback,
     Feedback,
     Mapping,
@@ -47,7 +47,7 @@ class HumanAgent(DeductiveAgent):
         "show": ShowAction,
         "match": MatchAction,
         "apply": ApplyTheoremAction,
-        "resolve derivations": DeriveAlgebraAction,
+        "resolve derivations": ResolveEngineAction,
         "derive": ApplyDerivationAction,
         "aux": AuxAction,
         "stop": StopAction,
@@ -56,7 +56,7 @@ class HumanAgent(DeductiveAgent):
         MatchAction: "Match a theorem to know on which mappings it can be applied.",
         StopAction: "Stop the proof",
         ApplyTheoremAction: "Apply a theorem on a mapping of points.",
-        DeriveAlgebraAction: "Resolve available derivation from current proof state.",
+        ResolveEngineAction: "Resolve available derivation from current proof state.",
         ApplyDerivationAction: "Apply a derivation.",
         AuxAction: "Add an auxiliary construction to the setup.",
         ShowAction: "Show the geometric figure of the current proof.",
@@ -72,7 +72,7 @@ class HumanAgent(DeductiveAgent):
             StopAction: self._act_stop,
             MatchAction: self._act_match,
             ApplyTheoremAction: self._act_apply_theorem,
-            DeriveAlgebraAction: self._act_resolve_derivations,
+            ResolveEngineAction: self._act_resolve_derivations,
             ApplyDerivationAction: self._act_apply_derivation,
             AuxAction: self._act_aux,
             ShowAction: self._act_show,
@@ -129,8 +129,8 @@ class HumanAgent(DeductiveAgent):
         )
         return ApplyTheoremAction(theorem, mapping)
 
-    def _act_resolve_derivations(self, theorems: list[Theorem]) -> DeriveAlgebraAction:
-        return DeriveAlgebraAction(level=self.level)
+    def _act_resolve_derivations(self, theorems: list[Theorem]) -> ResolveEngineAction:
+        return ResolveEngineAction(level=self.level)
 
     def _act_apply_derivation(self, theorems: list[Theorem]) -> ApplyDerivationAction:
         choose_derivation_str = "\nAvailable derivations: \n"
@@ -228,7 +228,7 @@ class HumanAgent(DeductiveAgent):
         return feedback_str, True
 
     def _remember_derivations(
-        self, action: DeriveAlgebraAction, feedback: DeriveFeedback
+        self, action: ResolveEngineAction, feedback: DeriveFeedback
     ) -> tuple[str, bool]:
         new_mappings: list[tuple[str, tuple[Point, ...]]] = []
         for predicate, derivations_and_dependencies in feedback.derives.items():

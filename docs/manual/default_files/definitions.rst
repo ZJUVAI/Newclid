@@ -74,33 +74,100 @@ circumcenter x a b c
 
 Same construction as **circle x a b c**.
 
-- **eq_quadrangle a b c d:** From nothings, adds four points in a quadrilateral abcd with two opposing sides (AD and BC) of same length. Adds the congruence statement that ad=bc.
+eq_quadrangle a b c d
+^^^^^^^^^^^^^^^^^^^^^
 
-.. figure:: ../../_static/Images/defs/eq_quadrangle.png
-    :width: 400
-    :align: center
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
 
-    eq_quadrangle a b c d
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |eq_quadrangle|
+     - From nothings, adds four points in a quadrilateral abcd with two opposing sides (AD and BC) of same length.
+     - :math:`ad=bc`  (cong d a b c)
+     - Points
 
-- **iso_trapezoid a b c d:** From nothing, adds four points on a trapezoid abcd with parallel opposing sides ab and cd and non-parallel opposing sides ad and bc of same length. Adds the congruence statement that ad=bc and the parallel statement that ab//cd.
+.. |eq_quadrangle| image:: ../../_static/Images/defs/eq_quadrangle.png
+    :width: 100%
 
-.. figure:: ../../_static/Images/defs/iso_trapezoid.png
-    :width: 400
-    :align: center
+iso_trapezoid a b c d
+^^^^^^^^^^^^^^^^^^^^^
 
-    iso_trapezoid a b c d
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
 
-- **eq_triangle x b c:** From two different points b, c, adds a third point x such that the triangle xbc is equilateral. Adds the two side congruence statements xb=bc and xc=bc, as well as the two angle congruence statements that the angles xbc and xcb are congruent, as well as angles xbc and cxb.
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |iso_trapezoid|
+     - From nothing, adds four points on a trapezoid abcd with parallel opposing sides ab and cd and non-parallel opposing sides ad and bc of same length. Adds the congruence statement that ad=bc and the parallel statement that ab//cd.
+     - :math:`ab//cd \wedge ad=bc`  (para d c a b, cong d a b c)
+     - Points
 
-.. figure:: ../../_static/Images/defs/iso_trapezoid.png
-    :width: 400
-    :align: center
+.. |iso_trapezoid| image:: ../../_static/Images/defs/iso_trapezoid.png
+    :width: 100%
 
-    eq_triangle x b c
+eq_triangle x b c
+^^^^^^^^^^^^^^^^^
 
-- **eqangle2 x a b c:** From three non-collinear points a, b, c, adds a third point x such that the quadrilateral abcx has two opposed angles that are congruent, bax and bcx. Adds the statement that angles bax and bcx are congruent. Should be able to be subjected to intersections.
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
 
-- **eqdia_quadrangle a b c d:** From nothing, adds four points on a quadrilateral abcd with the two diagonals of same length. Adds the congruence statement that bd=ac.
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |eq_triangle|
+     - From two different points b, c, adds a third point x such that the triangle xbc is equilateral.
+     - :math:`\begin{cases}xb=bx \wedge bc=cx \\ \widehat{xbc} = \widehat{bcx} \wedge \widehat{cxb} = \widehat{xbc}\end{cases}`  (cong x b b c, cong b c c x; eqangle b x b c c b c x, eqangle x c x b b x b c)
+     - Point
+
+.. |eq_triangle| image:: ../../_static/Images/defs/eq_triangle.png
+    :width: 100%
+
+eqangle2 x a b c
+^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |eqangle2|
+     - From three non-collinear points a, b, c, adds a third point x such that the quadrilateral abcx has two opposite angles that are congruent, bax and bcx.
+     - :math:`\widehat{bax} = \widehat{xcb}`  (eqangle a b a x c x c b)
+     - Point (Locus could be hyperbola.)
+
+.. |eqangle2| image:: ../../_static/Images/defs/eqangle2.png
+    :width: 100%
+
+eqdia_quadrangle a b c d
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |eqdia_quadrangle|
+     - From nothing, adds four points on a quadrilateral abcd with the two diagonals of same length.
+     - :math:`bd=ac`  (cong d b a c)
+     - Points
+
+.. |eqdia_quadrangle| image:: ../../_static/Images/defs/eqdia_quadrangle.png
+    :width: 100%
 
 - **eqdistance x a b c:** From two different points b, c, and with a base point a (that can be b or c themselves), adds x such that the distance from x to a is equal to the distance from b to c. Adds the congruence statement that ax=bc. Construction returns a circle that can be subjected to intersections.
 
@@ -206,7 +273,7 @@ Same construction as **circle x a b c**.
 
 - **on_opline x a b:** From a pair of different points a, b, builds x, a point on the line ab such that a is NOT between x and b. Adds the statement that a, b, and x are collinear. Construction returns a half-line, so can be subjected to intersections.
 
-- **cc_tangent x y z i o a w b:** From four points o, a, w, b, such that o is neither a nor w, and such that w and b are distinct, builds x, y, z, i on a pair of lines xy and zi that are simultaneously tangent to both the circle of center o through a and the circle of center w through b. x and z are the tangent points on the circle centered at o through a, and y and i are the tangent points on the circle centered at w through b. Adds the congruency statements ox=oa and oz=oa (saying x, z are in the circle of center o through a) and wy=wb and wi=wb (saying y, i are in the circle of center w through b), as well as the perpendicularity statements related to the tangents: yx is perpendicular to ox (because xy is tangent to the circle centered at o at point x), yx is perpendicular to wy (because xy is tangent to the circle centered at w at point y), zi is perpendicular to zo (because zi is tangent to the circle centered at o at point z), and zi is perpencicular to wi (because zi is tangent to the circle centered at w at point i).
+- **cc_tangent x y z i o a w b:** From four points o, a, w, b, such that o is neither a nor w, and such that w and b are distinct, builds x, y, z, i on a pair of lines xy and zi that are simultaneously tangent to both the circle of center o through a and the circle of center w through b. x and z are the tangent points on the circle centered at o through a, and y and i are the tangent points on the circle centered at w through b. Adds the congruency statements ox=oa and oz=oa (saying x, z are in the circle of center o through a) and wy=wb and wi=wb (saying y, i are in the circle of center w through b), as well as the perpendicularity statements related to the tangents: yx is perpendicular to ox (because xy is tangent to the circle centered at o at point x), yx is perpendicular to wy (because xy is tangent to the circle centered at w at point y), zi is perpendicular to zo (because zi is tangent to the circle centered at o at point z), and zi is perpendicular to wi (because zi is tangent to the circle centered at w at point i).
 
 .. figure:: ../../_static/Images/defs/cc_tangent.png
     :width: 400

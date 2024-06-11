@@ -1,4 +1,3 @@
-from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 from geosolver.dependencies.caching import DependencyCache
 from geosolver.dependencies.why_graph import WhyHyperGraph
 from geosolver.statements.adder import IntrinsicRules, StatementAdder
@@ -11,11 +10,10 @@ class StatementsHandler:
     def __init__(
         self,
         symbols_graph: "SymbolsGraph",
-        alegbraic_manipulator: "AlgebraicManipulator",
         dependency_cache: "DependencyCache",
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> None:
-        self.checker = StatementChecker(symbols_graph, alegbraic_manipulator)
+        self.checker = StatementChecker(symbols_graph)
         self.graph = WhyHyperGraph(
             symbols_graph=symbols_graph,
             statements_checker=self.checker,
@@ -24,11 +22,8 @@ class StatementsHandler:
         self.adder = StatementAdder(
             symbols_graph=symbols_graph,
             statements_graph=self.graph,
-            alegbraic_manipulator=alegbraic_manipulator,
             statements_checker=self.checker,
             dependency_cache=dependency_cache,
             disabled_intrinsic_rules=disabled_intrinsic_rules,
         )
-        self.enumerator = StatementsEnumerator(
-            symbols_graph, self.checker, alegbraic_manipulator
-        )
+        self.enumerator = StatementsEnumerator(symbols_graph, self.checker)

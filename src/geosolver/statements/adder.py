@@ -19,7 +19,6 @@ from geosolver.geometry import (
     Point,
     Segment,
     is_equal,
-    is_equiv,
 )
 from geosolver.listing import list_eqratio3
 
@@ -27,7 +26,6 @@ from geosolver.listing import list_eqratio3
 ToCache = Tuple[Statement, Dependency]
 
 if TYPE_CHECKING:
-    from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
     from geosolver.symbols_graph import SymbolsGraph
     from geosolver.statements.checker import StatementChecker
     from geosolver.dependencies.caching import DependencyCache
@@ -69,13 +67,11 @@ class StatementAdder:
         self,
         symbols_graph: "SymbolsGraph",
         statements_graph: "WhyHyperGraph",
-        alegbraic_manipulator: "AlgebraicManipulator",
         statements_checker: "StatementChecker",
         dependency_cache: "DependencyCache",
         disabled_intrinsic_rules: Optional[list[IntrinsicRules | str]] = None,
     ) -> None:
         self.symbols_graph = symbols_graph
-        self.alegbraic_manipulator = alegbraic_manipulator
 
         self.statements_checker = statements_checker
         self.dependency_cache = dependency_cache
@@ -114,15 +110,6 @@ class StatementAdder:
             Predicate.CONSTANT_RATIO: self._add_rconst,
         }
 
-        self.PREDICATE_TO_ALGEBRA = {
-            Predicate.PARALLEL: self._add_algebra_para,
-            Predicate.CONSTANT_ANGLE: self._add_algebra_aconst,
-            Predicate.CONSTANT_RATIO: self._add_rconst,
-            Predicate.CONGRUENT_2: self._add_algebra_cong,
-            Predicate.EQRATIO: self._add_eqratio,
-            Predicate.EQANGLE: self._add_eqangle,
-        }
-
     def add(
         self, statement: Statement, dep_builder: DependencyBuilder
     ) -> Tuple[list[Dependency], list[ToCache]]:
@@ -152,13 +139,6 @@ class StatementAdder:
 
         return new_deps, deps_to_cache
 
-    def add_algebra(
-        self, statement: Statement, dep_builder: DependencyBuilder
-    ) -> Tuple[list[Dependency], list[ToCache]]:
-        return self.PREDICATE_TO_ALGEBRA[statement.predicate](
-            statement.args, dep_builder
-        )
-
     def _make_equal(self, x: Node, y: Node, dep: Dependency) -> None:
         """Make that two nodes x and y are equal, i.e. merge their value node."""
         if x.val is None:
@@ -177,79 +157,14 @@ class StatementAdder:
         # If eqangle on the same directions switched then they are perpendicular
         if (
             isinstance(x, Angle)
-            and x not in self.alegbraic_manipulator.aconst.values()
-            and y not in self.alegbraic_manipulator.aconst.values()
+            and x not in self.symbols_graph.aconst.values()
+            and y not in self.symbols_graph.aconst.values()
             and x.directions == y.directions[::-1]
             and x.directions[0] != x.directions[1]
         ):
-            merges = [self.alegbraic_manipulator.vhalfpi, vx, vy]
+            merges = [self.symbols_graph.vhalfpi, vx, vy]
 
         self.symbols_graph.merge(merges, dep)
-
-    def _add_algebra_para(
-        self, args: tuple[Point, Point, Point, Point], dep_builder: DependencyBuilder
-    ):
-        a, b, c, d = args
-        ab = self.symbols_graph.get_line_thru_pair(a, b)
-        cd = self.symbols_graph.get_line_thru_pair(c, d)
-        if is_equiv(ab, cd):
-            return [], []
-        return self._add_para(args, dep_builder)
-
-    def _add_algebra_cong(
-        self, args: tuple[Point, Point, Point, Point], dep_builder: DependencyBuilder
-    ):
-        a, b, c, d = args
-        if not (a != b and c != d and (a != c or b != d)):
-            return [], []
-        return self._add_cong(args, dep_builder)
-
-    def _add_algebra_aconst(
-        self,
-        args: tuple[Point, Point, Point, Point, Angle],
-        dep_builder: DependencyBuilder,
-    ):
-        a, b, c, d, angle = args
-        ab = self.symbols_graph.get_line_thru_pair(a, b)
-        cd = self.symbols_graph.get_line_thru_pair(c, d)
-
-        ab, ba, why = self.symbols_graph.get_or_create_angle_from_lines(
-            ab, cd, dep=None
-        )
-        dep_builder = dep_builder.extend_by_why(
-            Statement(Predicate.CONSTANT_ANGLE, args),
-            why,
-            extention_reason=dep_builder.reason,
-        )
-
-        a, b = ab._d
-        (x, y), (m, n) = a._obj.points, b._obj.points
-
-        new_deps = []
-        to_cache = []
-        if not is_equal(ab, angle):
-            if angle == self.alegbraic_manipulator.halfpi:
-                _add, _to_cache = self._add_perp([x, y, m, n], dep_builder)
-                new_deps += _add
-                to_cache += _to_cache
-            aconst = Statement(Predicate.CONSTANT_ANGLE, [x, y, m, n, angle])
-            dep1 = dep_builder.add_head(aconst)
-            to_cache.append((aconst, dep1))
-            self._make_equal(angle, ab, dep=dep1)
-            new_deps.append(dep1)
-
-        opposite_angle = angle.opposite
-        if not is_equal(ba, opposite_angle):
-            if opposite_angle == self.alegbraic_manipulator.halfpi:
-                _add, _to_cache = self._add_perp([m, n, x, y], dep_builder)
-                new_deps += _add
-                to_cache += _to_cache
-            aconst = Statement(Predicate.CONSTANT_ANGLE, [m, n, x, y, opposite_angle])
-            dep2 = dep_builder.add_head(aconst)
-            to_cache.append((aconst, dep2))
-            self._make_equal(opposite_angle, ba, dep=dep2)
-            new_deps.append(dep2)
-        return new_deps, to_cache
 
     def _add_coll(
         self, points: list[Point], dep_builder: DependencyBuilder
@@ -347,8 +262,6 @@ class StatementAdder:
         dep = dep_builder.add_head(para)
         to_cache = [(para, dep)]
 
-        dep.algebra = ab._val, cd._val
-
         self._make_equal(ab, cd, dep)
         if not is_equal(ab, cd):
             return [dep], to_cache
@@ -410,7 +323,7 @@ class StatementAdder:
     ) -> Optional[Tuple[list[Dependency], list[ToCache]]]:
         """Maybe add a new parallel predicate from perp predicate."""
         a, b, c, d = points
-        halfpi = self.alegbraic_manipulator.aconst[(1, 2)]
+        halfpi = self.symbols_graph.aconst[(1, 2)]
         for ang in halfpi.val.neighbors(Angle):
             if ang == halfpi:
                 continue
@@ -496,7 +409,6 @@ class StatementAdder:
         c, d = dcd._obj.points
 
         dep = dep_builder.add_head(perp)
-        dep.algebra = [dab, dcd]
         self._make_equal(a12, a21, dep=dep)
 
         eqangle = Statement(Predicate.EQANGLE, [a, b, c, d, c, d, a, b])
@@ -517,7 +429,6 @@ class StatementAdder:
         cong = Statement(Predicate.CONGRUENT, [a, b, c, d])
         dep = dep_builder.add_head(cong)
         self._make_equal(ab, cd, dep=dep)
-        dep.algebra = ab._val, cd._val
 
         to_cache = [(cong, dep)]
         dep_builder = []
@@ -817,7 +728,6 @@ class StatementAdder:
         eqangle = Statement(Predicate.EQANGLE, [a, b, c, d, m, n, p, q])
         if dep_builder:
             deps1 = dep_builder.add_head(eqangle)
-            deps1.algebra = [dab, dcd, dmn, dpq]
         if not is_equal(ab_cd, mn_pq):
             add += [deps1]
         to_cache.append((eqangle, deps1))
@@ -827,7 +737,6 @@ class StatementAdder:
         eqangle_sym = Statement(Predicate.EQANGLE, [c, d, a, b, p, q, m, n])
         if dep_builder:
             deps2 = dep_builder.add_head(eqangle_sym)
-            deps2.algebra = [dcd, dab, dpq, dmn]
         if not is_equal(cd_ab, pq_mn):
             add += [deps2]
         to_cache.append((eqangle_sym, deps2))
@@ -994,7 +903,6 @@ class StatementAdder:
         eqratio = Statement(Predicate.EQRATIO, [a, b, c, d, m, n, p, q])
         if dep_builder:
             deps1 = dep_builder.add_head(eqratio)
-            deps1.algebra = [ab._val, cd._val, mn._val, pq._val]
         if not is_equal(ab_cd, mn_pq):
             add += [deps1]
         to_cache.append((eqratio, deps1))
@@ -1004,7 +912,6 @@ class StatementAdder:
         eqratio_sym = Statement(Predicate.EQRATIO, [c, d, a, b, p, q, m, n])
         if dep_builder:
             deps2 = dep_builder.add_head(eqratio_sym)
-            deps2.algebra = [cd._val, ab._val, pq._val, mn._val]
         if not is_equal(cd_ab, pq_mn):
             add += [deps2]
         to_cache.append((eqratio_sym, deps2))
@@ -1203,7 +1110,6 @@ class StatementAdder:
         dep = dep_builder.add_head(because_eq)
         self._make_equal(mn, pq, dep=dep)
 
-        dep.algebra = mn._val, pq._val
         to_cache = [(because_eq, dep)]
 
         if is_equal(mn, pq):
@@ -1214,12 +1120,13 @@ class StatementAdder:
         self, points: list[Point], dep_builder: DependencyBuilder
     ) -> Tuple[list[Dependency], list[ToCache]]:
         """Add that an angle is equal to some constant."""
+        points = list(points)
         a, b, c, d, ang = points
 
         num, den = angle_to_num_den(ang)
-        nd, dn = self.alegbraic_manipulator.get_or_create_const_ang(num, den)
+        nd, dn = self.symbols_graph.get_or_create_const_ang(num, den)
 
-        if nd == self.alegbraic_manipulator.halfpi:
+        if nd == self.symbols_graph.halfpi:
             return self._add_perp([a, b, c, d], dep_builder)
 
         ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
@@ -1284,7 +1191,6 @@ class StatementAdder:
         to_cache = []
         if not is_equal(ab_cd, nd):
             deps1 = dep_builder.add_head(aconst)
-            deps1.algebra = dab, dcd, ang % 180
             self._make_equal(ab_cd, nd, dep=deps1)
             to_cache.append((aconst, deps1))
             add += [deps1]
@@ -1292,7 +1198,6 @@ class StatementAdder:
         aconst2 = Statement(Predicate.CONSTANT_ANGLE, [a, b, c, d, nd])
         if not is_equal(cd_ab, dn):
             deps2 = dep_builder.add_head(aconst2)
-            deps2.algebra = dcd, dab, 180 - ang % 180
             self._make_equal(cd_ab, dn, dep=deps2)
             to_cache.append((aconst2, deps2))
             add += [deps2]
@@ -1305,10 +1210,9 @@ class StatementAdder:
         """Add that an angle abx is equal to constant y."""
         a, b, x, angle = points
         num, den = angle_to_num_den(angle)
-        ang = int(num * 180 / den) % 180
-        nd, dn = self.alegbraic_manipulator.get_or_create_const_ang(num, den)
+        nd, dn = self.symbols_graph.get_or_create_const_ang(num, den)
 
-        if nd == self.alegbraic_manipulator.halfpi:
+        if nd == self.symbols_graph.halfpi:
             return self._add_perp([a, b, b, x], dep_builder)
 
         ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
@@ -1363,7 +1267,6 @@ class StatementAdder:
         if not is_equal(xba, nd):
             aconst = Statement(Predicate.S_ANGLE, [c, x, a, b, nd])
             deps1 = dep_builder.add_head(aconst)
-            deps1.algebra = dbx, dab, ang
 
             self._make_equal(xba, nd, dep=deps1)
             to_cache.append((aconst, deps1))
@@ -1372,7 +1275,6 @@ class StatementAdder:
         if not is_equal(abx, dn):
             aconst2 = Statement(Predicate.S_ANGLE, [a, b, c, x, dn])
             deps2 = dep_builder.add_head(aconst2)
-            deps2.algebra = dab, dbx, 180 - ang
 
             self._make_equal(abx, dn, dep=deps2)
             to_cache.append((aconst2, deps2))
@@ -1387,7 +1289,7 @@ class StatementAdder:
         a, b, c, d, ratio = args
 
         num, den = ratio_to_num_den(ratio)
-        nd, dn = self.alegbraic_manipulator.get_or_create_const_rat(num, den)
+        nd, dn = self.symbols_graph.get_or_create_const_rat(num, den)
 
         if num == den:
             return self._add_cong([a, b, c, d], dep_builder)
@@ -1443,7 +1345,6 @@ class StatementAdder:
         to_cache = []
         if not is_equal(ab_cd, nd):
             dep1 = dep_builder.add_head(rconst)
-            dep1.algebra = ab._val, cd._val, num, den
             self._make_equal(nd, ab_cd, dep=dep1)
             to_cache.append((rconst, dep1))
             add.append(dep1)
@@ -1451,8 +1352,7 @@ class StatementAdder:
         if not is_equal(cd_ab, dn):
             rconst2 = Statement(Predicate.CONSTANT_RATIO, [c, d, a, b, dn])
             dep2 = dep_builder.add_head(rconst2)
-            dep2.algebra = cd._val, ab._val, num, den
-            self._make_equal(dn, cd_ab, dep=dep2)  # TODO FIX THAT
+            self._make_equal(dn, cd_ab, dep=dep2)
             to_cache.append((rconst2, dep2))
             add.append(dep2)
 

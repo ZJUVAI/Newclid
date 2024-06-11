@@ -1,8 +1,7 @@
 Adder
+=====
 
-======
-
-.. automodule:: geosolver.statement.adder
+.. automodule:: geosolver.statements.adder
    :members:
    :undoc-members:
    :show-inheritance:

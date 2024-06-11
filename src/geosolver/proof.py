@@ -8,6 +8,8 @@ from typing_extensions import Self
 import logging
 
 from geosolver.definitions.clause import Clause, Construction
+from geosolver.reasoning_engines.algebraic_reasoning import AlgebraicManipulator
+from geosolver.reasoning_engines.interface import ReasoningEngine
 from geosolver.statements.statement import Statement
 from geosolver.definitions.definition import Definition
 from geosolver.theorem import Theorem
@@ -22,7 +24,7 @@ from geosolver.agent.interface import (
     ApplyTheoremFeedback,
     AuxAction,
     AuxFeedback,
-    DeriveAlgebraAction,
+    ResolveEngineAction,
     DeriveFeedback,
     MatchAction,
     MatchFeedback,
@@ -34,7 +36,6 @@ from geosolver.match_theorems import match_one_theorem
 from geosolver.statements.adder import IntrinsicRules, ToCache
 from geosolver.statements.handler import StatementsHandler
 from geosolver.symbols_graph import SymbolsGraph
-from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 from geosolver.geometry import Angle, Ratio
 from geosolver.geometry import Circle, Point
 import geosolver.numerical.geometries as num_geo
@@ -107,12 +108,16 @@ class Proof:
         self,
         dependency_cache: DependencyCache,
         alegbraic_manipulator: AlgebraicManipulator,
+        external_reasoning_engine: list[ReasoningEngine],
         symbols_graph: SymbolsGraph,
         statements_handler: StatementsHandler,
         rnd_generator: Generator = None,
     ):
         self.dependency_cache = dependency_cache
         self.symbols_graph = symbols_graph
+        self.external_reasoning_engines = external_reasoning_engine + [
+            alegbraic_manipulator
+        ]
         self.alegbraic_manipulator = alegbraic_manipulator
         self.statements = statements_handler
         self.dependency_graph = DependencyGraph()
@@ -127,7 +132,7 @@ class Proof:
         self._ACTION_TYPE_TO_STEP = {
             MatchAction: self._step_match_theorem,
             ApplyTheoremAction: self._step_apply_theorem,
-            DeriveAlgebraAction: self._step_derive_algebra,
+            ResolveEngineAction: self._step_derive_algebra,
             ApplyDerivationAction: self._step_apply_derivation,
             AuxAction: self._step_auxiliary_construction,
             StopAction: self._step_stop,
@@ -163,7 +168,6 @@ class Proof:
                 algebraic_manipulator = AlgebraicManipulator(symbols_graph)
                 statements_handler = StatementsHandler(
                     symbols_graph,
-                    algebraic_manipulator,
                     dependency_cache,
                     disabled_intrinsic_rules,
                 )
@@ -171,6 +175,7 @@ class Proof:
                 proof = Proof(
                     dependency_cache=dependency_cache,
                     alegbraic_manipulator=algebraic_manipulator,
+                    external_reasoning_engine=[],
                     symbols_graph=symbols_graph,
                     statements_handler=statements_handler,
                     rnd_generator=rnd_generator,
@@ -298,10 +303,9 @@ class Proof:
 
     def _step_apply_theorem(self, action: ApplyTheoremAction) -> ApplyTheoremFeedback:
         added, to_cache, success = self._apply_theorem(action.theorem, action.mapping)
-        if self.alegbraic_manipulator and added:
-            # Add algebra to AR, but do NOT derive nor add to the proof state (yet)
-            for dep in added:
-                self.alegbraic_manipulator.add_algebra(dep)
+        for dep in added:
+            for external_reasoning_engine in self.external_reasoning_engines:
+                external_reasoning_engine.ingest(dep)
         self.cache_deps(to_cache)
         return ApplyTheoremFeedback(success, added, to_cache)
 
@@ -319,8 +323,8 @@ class Proof:
         self.dependency_graph.add_theorem_edges(to_cache, theorem, args)
         return add, [premise_to_cache] + to_cache, True
 
-    def _step_derive_algebra(self, action: DeriveAlgebraAction) -> DeriveFeedback:
-        derives, eq4s = self.alegbraic_manipulator.derive_algebra(action.level)
+    def _step_derive_algebra(self, action: ResolveEngineAction) -> DeriveFeedback:
+        derives, eq4s = self.alegbraic_manipulator.resolve(level=action.level)
         return DeriveFeedback(derives, eq4s)
 
     def _step_apply_derivation(
@@ -349,7 +353,7 @@ class Proof:
     def reset(self) -> ResetFeedback:
         self.cache_deps(self._init_to_cache)
         for add in self._init_added:
-            self.alegbraic_manipulator.add_algebra(add)
+            self.alegbraic_manipulator.ingest(add)
         return ResetFeedback(self._problem, self._init_added, self._init_to_cache)
 
     def copy(self):
@@ -389,7 +393,7 @@ class Proof:
         self, statement: Statement, dep_builder: DependencyBuilder
     ) -> tuple[list[Dependency], list[ToCache]]:
         """Derive (but not add) new algebraic predicates."""
-        new_deps, to_cache = self.statements.adder.add_algebra(statement, dep_builder)
+        new_deps, to_cache = self.statements.adder.add(statement, dep_builder)
         self.dependency_graph.add_algebra_edges(to_cache, statement.args)
         return new_deps, to_cache
 
@@ -706,9 +710,7 @@ class Proof:
         self, construction: Statement, mapping: Optional[dict[str, str]] = None
     ) -> list[Point | Angle | Ratio]:
         def make_const(x):
-            arg_obj, _ = self.alegbraic_manipulator.get_or_create_const(
-                x, construction.name
-            )
+            arg_obj, _ = self.symbols_graph.get_or_create_const(x, construction.name)
             return arg_obj
 
         args_objs = []

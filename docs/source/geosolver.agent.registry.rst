@@ -1,8 +1,7 @@
-Checker
-
+Registry
 ========
 
-.. automodule:: geosolver.statement.checker
+.. automodule:: geosolver.agent.registry
    :members:
    :undoc-members:
    :show-inheritance:

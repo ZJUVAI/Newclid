@@ -12,7 +12,9 @@ if TYPE_CHECKING:
     from geosolver.statements.adder import ToCache
     from geosolver.dependencies.dependency import Dependency
     from geosolver.match_theorems import MatchCache
-    from geosolver.algebraic.algebraic_manipulator import Derivations
+    from geosolver.reasoning_engines.algebraic_reasoning.algebraic_manipulator import (
+        Derivations,
+    )
     from geosolver.problem import Problem
     from geosolver.statements.statement import Statement
     from geosolver.dependencies.empty_dependency import DependencyBuilder
@@ -40,7 +42,7 @@ class MatchAction(NamedTuple):
     cache: Optional["MatchCache"] = None
 
 
-class DeriveAlgebraAction(NamedTuple):
+class ResolveEngineAction(NamedTuple):
     level: int
 
 
@@ -58,7 +60,7 @@ Action = Union[
     StopAction,
     ApplyTheoremAction,
     MatchAction,
-    DeriveAlgebraAction,
+    ResolveEngineAction,
     ApplyDerivationAction,
     AuxAction,
 ]

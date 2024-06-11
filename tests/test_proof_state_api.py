@@ -1,10 +1,30 @@
-"""Unit tests for graph.py."""
+from pathlib import Path
+
 import pytest
 import pytest_check as check
 from geosolver.api import GeometricSolverBuilder
 
 
 MAX_LEVEL = 10
+
+
+def test_false_problem_should_still_draw(tmp_path: Path):
+    false_problem_str = (
+        "a b = segment a b; "
+        "c = on_tline c a a b, on_circle c a b; "
+        "e = s_angle b a e 55o, on_circle e a b; "
+        "d = s_angle b a d 30o, on_circle d a b; "
+        "f = on_line f a e, on_line f b c; "
+        "g = on_line g a d, on_line g b c "
+        "? cong c f g b"
+    )
+
+    solver = (
+        GeometricSolverBuilder(no_goal=True)
+        .load_problem_from_txt(false_problem_str)
+        .build()
+    )
+    solver.draw_figure(tmp_path / "figure.png")
 
 
 class TestProof:
