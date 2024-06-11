@@ -3,8 +3,9 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 
+from geosolver.agent.interface import DeriveFeedback
 from geosolver.dependencies.dependency import Dependency, Reason
-from geosolver.reasoning_engines.interface import Derivation, ReasoningEngine
+from geosolver.reasoning_engines.interface import Derivations, ReasoningEngine
 from geosolver.predicates import Predicate
 from geosolver.dependencies.empty_dependency import EmptyDependency
 from geosolver.geometry import is_equiv
@@ -21,8 +22,6 @@ from geosolver.reasoning_engines.algebraic_reasoning.geometric_tables import (
 
 if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
-
-Derivations = dict[Predicate, list[Derivation]]
 
 
 class AlgebraicRules(Enum):
@@ -56,7 +55,7 @@ class AlgebraicManipulator(ReasoningEngine):
         if adder is not None:
             adder(dependency)
 
-    def resolve(self, **kwargs) -> tuple[Derivations, Derivations]:
+    def resolve(self, **kwargs) -> DeriveFeedback:
         """Derive new algebraic predicates."""
         level: int = kwargs.get("level")
         derives = {}
@@ -72,11 +71,11 @@ class AlgebraicManipulator(ReasoningEngine):
         # Separate eqangle and eqratio derivations
         # As they are too numerous => slow down DD+AR.
         # & reserve them only for last effort.
-        eqs = {
+        eq4s = {
             Predicate.EQANGLE: derives.pop(Predicate.EQANGLE),
             Predicate.EQRATIO: derives.pop(Predicate.EQRATIO),
         }
-        return derives, eqs
+        return DeriveFeedback(derives, eq4s)
 
     def derive_ratio_algebra(self, level: int) -> Derivations:
         """Derive new eqratio predicates."""

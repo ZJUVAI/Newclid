@@ -107,18 +107,14 @@ class Proof:
     def __init__(
         self,
         dependency_cache: DependencyCache,
-        alegbraic_manipulator: AlgebraicManipulator,
-        external_reasoning_engine: list[ReasoningEngine],
+        external_reasoning_engines: dict[str, ReasoningEngine],
         symbols_graph: SymbolsGraph,
         statements_handler: StatementsHandler,
         rnd_generator: Generator = None,
     ):
         self.dependency_cache = dependency_cache
         self.symbols_graph = symbols_graph
-        self.external_reasoning_engines = external_reasoning_engine + [
-            alegbraic_manipulator
-        ]
-        self.alegbraic_manipulator = alegbraic_manipulator
+        self.external_reasoning_engines = external_reasoning_engines
         self.statements = statements_handler
         self.dependency_graph = DependencyGraph()
 
@@ -132,7 +128,7 @@ class Proof:
         self._ACTION_TYPE_TO_STEP = {
             MatchAction: self._step_match_theorem,
             ApplyTheoremAction: self._step_apply_theorem,
-            ResolveEngineAction: self._step_derive_algebra,
+            ResolveEngineAction: self._step_derive,
             ApplyDerivationAction: self._step_apply_derivation,
             AuxAction: self._step_auxiliary_construction,
             StopAction: self._step_stop,
@@ -174,8 +170,7 @@ class Proof:
 
                 proof = Proof(
                     dependency_cache=dependency_cache,
-                    alegbraic_manipulator=algebraic_manipulator,
-                    external_reasoning_engine=[],
+                    external_reasoning_engines={"AR": algebraic_manipulator},
                     symbols_graph=symbols_graph,
                     statements_handler=statements_handler,
                     rnd_generator=rnd_generator,
@@ -305,7 +300,7 @@ class Proof:
     def _step_apply_theorem(self, action: ApplyTheoremAction) -> ApplyTheoremFeedback:
         added, to_cache, success = self._apply_theorem(action.theorem, action.mapping)
         for dep in added:
-            for external_reasoning_engine in self.external_reasoning_engines:
+            for _, external_reasoning_engine in self.external_reasoning_engines.items():
                 external_reasoning_engine.ingest(dep)
         self.cache_deps(to_cache)
         return ApplyTheoremFeedback(success, added, to_cache)
@@ -324,14 +319,17 @@ class Proof:
         self.dependency_graph.add_theorem_edges(to_cache, theorem, args)
         return add, [premise_to_cache] + to_cache, True
 
-    def _step_derive_algebra(self, action: ResolveEngineAction) -> DeriveFeedback:
-        derives, eq4s = self.alegbraic_manipulator.resolve(level=action.level)
-        return DeriveFeedback(derives, eq4s)
+    def _step_derive(self, action: ResolveEngineAction) -> DeriveFeedback:
+        return self.external_reasoning_engines[action.engineid].resolve(
+            level=action.level
+        )
 
     def _step_apply_derivation(
         self, action: ApplyDerivationAction
     ) -> ApplyDerivationFeedback:
-        added, to_cache = self.do_algebra(action.statement, action.reason)
+        added, to_cache = self.resolve_statement_dependencies(
+            action.statement, action.reason
+        )
         self.cache_deps(to_cache)
         return ApplyDerivationFeedback(added, to_cache)
 
@@ -354,7 +352,8 @@ class Proof:
     def reset(self) -> ResetFeedback:
         self.cache_deps(self._init_to_cache)
         for add in self._init_added:
-            self.alegbraic_manipulator.ingest(add)
+            for _, ext in self.external_reasoning_engines.items():
+                ext.ingest(add)
         return ResetFeedback(self._problem, self._init_added, self._init_to_cache)
 
     def copy(self):
@@ -389,14 +388,6 @@ class Proof:
         self, statement: Statement, deps: EmptyDependency
     ) -> Tuple[list[Dependency], list[ToCache]]:
         return self.statements.adder.add(statement, deps)
-
-    def do_algebra(
-        self, statement: Statement, deps: EmptyDependency
-    ) -> tuple[list[Dependency], list[ToCache]]:
-        """Derive (but not add) new algebraic predicates."""
-        new_deps, to_cache = self.statements.adder.add(statement, deps)
-        self.dependency_graph.add_algebra_edges(to_cache, statement.args)
-        return new_deps, to_cache
 
     def cache_deps(self, deps_to_cache: list[ToCache]):
         for to_cache in deps_to_cache:

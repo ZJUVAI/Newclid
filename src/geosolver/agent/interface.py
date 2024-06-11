@@ -44,6 +44,7 @@ class MatchAction(NamedTuple):
 
 class ResolveEngineAction(NamedTuple):
     level: int
+    engineid: str
 
 
 class ApplyDerivationAction(NamedTuple):
