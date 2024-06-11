@@ -80,18 +80,19 @@ class WhyHyperGraph:
         )
 
     def _add_dependency(self, dependency: Dependency):
+        level = dependency.level if dependency.level else -5
         if dependency.statement not in self.nx_graph.nodes:
-            self.nx_graph.add_node(dependency.statement)
+            self.nx_graph.add_node(dependency.statement, level=level - 0.5)
         if dependency not in self.nx_graph.nodes:
             dep_name = dependency.reason.name if dependency.reason else ""
-            self.nx_graph.add_node(dependency, level=dependency.level, name=dep_name)
+            self.nx_graph.add_node(dependency, level=level, name=dep_name)
         self.nx_graph.add_edge(dependency, dependency.statement)
 
         if not dependency.why:
             return
         for why_dep in dependency.why:
             if why_dep.statement not in self.nx_graph.nodes:
-                self.nx_graph.add_node(why_dep.statement)
+                self.nx_graph.add_node(why_dep.statement, level=level + 0.5)
             self.nx_graph.add_edge(why_dep.statement, dependency)
 
     def show_html(self, html_path: Path):
@@ -116,6 +117,7 @@ class WhyHyperGraph:
                 shape = "box"
                 label = node_name
                 mass = 1.0
+                color = None
 
             vis_graph.add_node(
                 node_name,
