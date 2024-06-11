@@ -239,7 +239,7 @@ class HumanAgent(DeductiveAgent):
                 new_mappings.append((predicate, derivation_and_dependency))
 
         if not new_mappings:
-            return "No new derviation found.\n", False
+            return "No new derivation found.\n", False
 
         feedback_str = "New derivations:\n"
         for predicate, derivation_and_dependency in new_mappings:

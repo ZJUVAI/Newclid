@@ -8,7 +8,7 @@
 import math
 from typing import TYPE_CHECKING, Optional, Union
 
-from numpy.random import uniform as unif
+from numpy.random import Generator
 from geosolver._lazy_loading import lazy_import
 from geosolver.numerical import ATOM, close_enough
 from typing import overload
@@ -82,7 +82,11 @@ class Point:
             return abs(p.radius - self.distance(p.center))
         dx = self.x - p.x
         dy = self.y - p.y
-        return np.sqrt(dx * dx + dy * dy)
+        dx2 = dx * dx
+        dy2 = dy * dy
+        dx2 = dx2 if abs(dx2) > ATOM else 0.0
+        dy2 = dy2 if abs(dy2) > ATOM else 0.0
+        return np.sqrt(dx2 + dy2)
 
     def distance2(self, p: "Point") -> float:
         """Return the distance^2 of 2 points"""
@@ -90,6 +94,10 @@ class Point:
             return p.distance(self)
         dx = self.x - p.x
         dy = self.y - p.y
+        dx2 = dx * dx
+        dy2 = dy * dy
+        dx2 = dx2 if abs(dx2) > ATOM else 0.0
+        dy2 = dy2 if abs(dy2) > ATOM else 0.0
         return dx * dx + dy * dy
 
     def rotatea(self, ang: float) -> "Point":
@@ -306,10 +314,16 @@ class Line:
         x, y, z = other.coefficients
         return abs(a * y - b * x) <= ATOM and abs(b * z - c * y) <= ATOM
 
-    def sample_within(self, points: list[Point], n: int = 5) -> list[Point]:
+    def sample_within(
+        self, points: list[Point], n: int = 5, rnd_gen: Generator = None
+    ) -> list[Point]:
         """Sample a point within the boundary of points."""
         center = sum(points, Point(0.0, 0.0)) * (1.0 / len(points))
         radius = max([p.distance(center) for p in points])
+
+        if rnd_gen is None:
+            rnd_gen = np.random.default_rng()
+
         if close_enough(center.distance(self), radius):
             center = center.foot(self)
         a, b = line_circle_intersection(self, Circle(center.foot(self), radius))
@@ -317,7 +331,7 @@ class Line:
         result = None
         best = -1.0
         for _ in range(n):
-            rand = unif(0.0, 1.0)
+            rand = rnd_gen.uniform(0.0, 1.0)
             x = a + (b - a) * rand
             mind = min([x.distance(p) for p in points])
             if mind > best:
@@ -367,12 +381,17 @@ class Circle:
         if isinstance(obj, Circle):
             return circle_circle_intersection(self, obj)
 
-    def sample_within(self, points: list[Point], n: int = 5) -> list[Point]:
+    def sample_within(
+        self, points: list[Point], n: int = 5, rnd_gen: Generator = None
+    ) -> list[Point]:
         """Sample a point within the boundary of points."""
         result = None
         best = -1.0
+        if rnd_gen is None:
+            rnd_gen = np.random.default_rng()
+
         for _ in range(n):
-            ang = unif(0.0, 2.0) * np.pi
+            ang = rnd_gen.uniform(0.0, 2.0) * np.pi
             x = self.center + Point(np.cos(ang), np.sin(ang)) * self.radius
             mind = min([x.distance(p) for p in points])
             if mind > best:
@@ -422,7 +441,9 @@ class HalfLine(Line):
             return b
         raise InvalidLineIntersectError()
 
-    def sample_within(self, points: list[Point], n: int = 5) -> list[Point]:
+    def sample_within(
+        self, points: list[Point], n: int = 5, rnd_gen: Generator = None
+    ) -> list[Point]:
         center = sum(points, Point(0.0, 0.0)) * (1.0 / len(points))
         radius = max([p.distance(center) for p in points])
         if close_enough(center.distance(self.line), radius):
@@ -436,8 +457,11 @@ class HalfLine(Line):
 
         result = None
         best = -1.0
+        if rnd_gen is None:
+            rnd_gen = np.random.default_rng()
+
         for _ in range(n):
-            x = a + (b - a) * unif(0.0, 1.0)
+            x = a + (b - a) * rnd_gen.uniform(0.0, 1.0)
             mind = min([x.distance(p) for p in points])
             if mind > best:
                 best = mind
@@ -587,7 +611,7 @@ def line_segment_intersection(line: Line, A: Point, B: Point) -> Point:
     a, b, c = line.coefficients
     x1, y1, x2, y2 = A.x, A.y, B.x, B.y
     dx, dy = x2 - x1, y2 - y1
-    alpha = (-c - a * x1 - b * y1) / (a * dx + b * dy + ATOM)
+    alpha = (-c - a * x1 - b * y1) / (a * dx + b * dy)
     return Point(x1 + alpha * dx, y1 + alpha * dy)
 
 
@@ -617,13 +641,14 @@ def bring_together(
 def reduce(
     objs: list[Union[Point, Line, Circle, HalfLine, HoleCircle]],
     existing_points: list[Point],
+    rnd_generator: Generator,
 ) -> list[Point]:
     """Reduce intersecting objects into one point of intersections."""
     if all(isinstance(o, Point) for o in objs):
         return objs
 
     elif len(objs) == 1:
-        return objs[0].sample_within(existing_points)
+        return objs[0].sample_within(existing_points, rnd_gen=rnd_generator)
 
     elif len(objs) == 2:
         a, b = objs
