@@ -1,21 +1,25 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 
 from geosolver.dependencies.caching import DependencyCache
-from geosolver.dependencies.dependency import Dependency
+from geosolver.dependencies.dependency import Dependency, Reason
+from geosolver.dependencies.empty_dependency import DependencyBuilder
 from geosolver.dependencies.dependency_graph import rgba_to_hex
+
 from geosolver.dependencies.why_predicates import why_dependency
 from geosolver.statements.checker import StatementChecker
 from geosolver.statements.statement import Statement
 from geosolver.symbols_graph import SymbolsGraph
 from geosolver._lazy_loading import lazy_import
 
+
 if TYPE_CHECKING:
     import pyvis
     import networkx
     import seaborn
+
 
 sns: "seaborn" = lazy_import("seaborn")
 vis: "pyvis" = lazy_import("pyvis")
@@ -36,21 +40,60 @@ class WhyHyperGraph:
         self.statements_checker = statements_checker
         self.dependency_cache = dependency_cache
 
-    def resolve(self, dependency: "Dependency", level: int) -> list["Dependency"]:
+    def build_dependency(
+        self, statement: "Statement", builder: "DependencyBuilder"
+    ) -> "Dependency":
+        dependency = Dependency(
+            statement=statement,
+            why=tuple(builder.why),
+            reason=builder.reason,
+            level=builder.level,
+        )
+        self._add_dependency(dependency)
+        return dependency
+
+    def build_resolved_dependency(
+        self,
+        statement: "Statement",
+        level: Optional[int] = None,
+        use_cache: bool = True,
+    ) -> Optional["Dependency"]:
+        reason, why = why_dependency(self, statement, level, use_cache=use_cache)
+        if why is not None:
+            why = tuple(why)
+        dependency = Dependency(
+            statement=statement, why=why, reason=reason, level=level
+        )
+        self._add_dependency(dependency)
+        return dependency
+
+    def build_dependency_from_statement(
+        self,
+        statement: "Statement",
+        why: tuple["Dependency"],
+        reason: Optional[Reason] = None,
+        level: Optional[int] = None,
+    ):
+        return self.build_dependency(
+            statement,
+            DependencyBuilder(reason=reason, level=level, why=why),
+        )
+
+    def _add_dependency(self, dependency: Dependency):
+        level = dependency.level if dependency.level else -5
+        if dependency.statement not in self.nx_graph.nodes:
+            self.nx_graph.add_node(dependency.statement, level=level - 0.5)
         if dependency not in self.nx_graph.nodes:
             dep_name = dependency.reason.name if dependency.reason else ""
-            self.nx_graph.add_node(dependency, level=dependency.level, name=dep_name)
-        if dependency.statement not in self.nx_graph.nodes:
-            self.nx_graph.add_node(dependency.statement)
+            self.nx_graph.add_node(dependency, level=level, name=dep_name)
         self.nx_graph.add_edge(dependency, dependency.statement)
 
-        why_deps = why_dependency(self, dependency, level)
-        for why_dep in why_deps:
+        if not dependency.why:
+            return
+        for why_dep in dependency.why:
             if why_dep.statement not in self.nx_graph.nodes:
-                self.nx_graph.add_node(why_dep.statement)
+                self.nx_graph.add_node(why_dep.statement, level=level + 0.5)
             self.nx_graph.add_edge(why_dep.statement, dependency)
-
-        return why_deps
 
     def show_html(self, html_path: Path):
         nt = vis.network.Network("1080px", directed=True)
@@ -74,6 +117,7 @@ class WhyHyperGraph:
                 shape = "box"
                 label = node_name
                 mass = 1.0
+                color = None
 
             vis_graph.add_node(
                 node_name,

@@ -182,7 +182,7 @@ class DependencyGraph:
                 )
 
     def add_goal(self, goal: Statement):
-        goal_dep = Dependency(goal, None, None)
+        goal_dep = Dependency(goal, why=())
         self.goal = dependency_node_name(goal_dep)
         self.add_dependency(goal_dep, DependencyType.GOAL)
 

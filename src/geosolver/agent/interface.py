@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     )
     from geosolver.problem import Problem
     from geosolver.statements.statement import Statement
-    from geosolver.dependencies.empty_dependency import EmptyDependency
+    from geosolver.dependencies.empty_dependency import DependencyBuilder
 
 
 Mapping = dict[str, Union["Point", str]]
@@ -48,7 +48,7 @@ class ResolveEngineAction(NamedTuple):
 
 class ApplyDerivationAction(NamedTuple):
     statement: "Statement"
-    reason: "EmptyDependency"
+    reason: "DependencyBuilder"
 
 
 class AuxAction(NamedTuple):

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.reasoning_engines.interface import Derivation, ReasoningEngine
 from geosolver.predicates import Predicate
-from geosolver.dependencies.empty_dependency import EmptyDependency
+from geosolver.dependencies.empty_dependency import DependencyBuilder
 from geosolver.geometry import is_equiv
 from geosolver.numerical.check import check_numerical
 
@@ -84,11 +84,9 @@ class AlgebraicManipulator(ReasoningEngine):
 
         for x in self.rtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
-            dep = EmptyDependency(
-                level=level,
-                reason=Reason(AlgebraicRules.Ratio_Chase),
+            dep = DependencyBuilder(
+                reason=Reason(AlgebraicRules.Ratio_Chase), why=why, level=level
             )
-            dep.why = why
 
             if len(x) == 2:
                 mn, pq = x
@@ -122,11 +120,9 @@ class AlgebraicManipulator(ReasoningEngine):
 
         for x in self.atable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
-            dep = EmptyDependency(
-                level=level,
-                reason=Reason(AlgebraicRules.Angle_Chase),
+            dep = DependencyBuilder(
+                reason=Reason(AlgebraicRules.Angle_Chase), why=why, level=level
             )
-            dep.why = why
 
             if len(x) == 2:
                 ab, cd = x
@@ -173,11 +169,9 @@ class AlgebraicManipulator(ReasoningEngine):
         }
         for x in self.dtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
-            dep = EmptyDependency(
-                level=level,
-                reason=Reason(AlgebraicRules.Distance_Chase),
+            dep = DependencyBuilder(
+                reason=Reason(AlgebraicRules.Distance_Chase), why=why, level=level
             )
-            dep.why = why
 
             if len(x) == 2:
                 a, b = x
@@ -223,10 +217,10 @@ class AlgebraicManipulator(ReasoningEngine):
         mn, _ = self.symbols_graph.get_line_thru_pair_why(m, n)
         pq, _ = self.symbols_graph.get_line_thru_pair_why(p, q)
         ab_cd, _, _ = self.symbols_graph.get_or_create_angle_from_lines(
-            ab, cd, deps=None
+            ab, cd, dep=None
         )
         mn_pq, _, _ = self.symbols_graph.get_or_create_angle_from_lines(
-            mn, pq, deps=None
+            mn, pq, dep=None
         )
         ab, cd = ab_cd._d
         mn, pq = mn_pq._d
@@ -237,10 +231,10 @@ class AlgebraicManipulator(ReasoningEngine):
 
     def _add_eqratio(self, dep: "Dependency"):
         a, b, c, d, m, n, p, q = dep.statement.args
-        ab = self.symbols_graph.get_or_create_segment(a, b, deps=None)._val
-        cd = self.symbols_graph.get_or_create_segment(c, d, deps=None)._val
-        pq = self.symbols_graph.get_or_create_segment(p, q, deps=None)._val
-        mn = self.symbols_graph.get_or_create_segment(m, n, deps=None)._val
+        ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)._val
+        cd = self.symbols_graph.get_or_create_segment(c, d, dep=None)._val
+        pq = self.symbols_graph.get_or_create_segment(p, q, dep=None)._val
+        mn = self.symbols_graph.get_or_create_segment(m, n, dep=None)._val
         if (ab, cd) == (pq, mn):
             self.rtable.add_eq(ab, cd, dep)
         else:
@@ -253,7 +247,7 @@ class AlgebraicManipulator(ReasoningEngine):
         ab, _ = self.symbols_graph.get_line_thru_pair_why(a, b)
         cd, _ = self.symbols_graph.get_line_thru_pair_why(c, d)
         ab_cd, _, _ = self.symbols_graph.get_or_create_angle_from_lines(
-            ab, cd, deps=None
+            ab, cd, dep=None
         )
         ab, cd = ab_cd._d
         num, den = angle_to_num_den(ang)
@@ -264,8 +258,8 @@ class AlgebraicManipulator(ReasoningEngine):
     ):  # not sure, in addr, add ab_cd as well as cd_ab
         a, b, c, d, ratio = dep.statement.args
         num, den = ratio_to_num_den(ratio)
-        ab = self.symbols_graph.get_or_create_segment(a, b, deps=None)
-        cd = self.symbols_graph.get_or_create_segment(c, d, deps=None)
+        ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)
+        cd = self.symbols_graph.get_or_create_segment(c, d, dep=None)
         self.rtable.add_const_ratio(ab, cd, num, den, dep)
 
     def _add_cong(self, dep: "Dependency"):
@@ -274,6 +268,6 @@ class AlgebraicManipulator(ReasoningEngine):
         cd, _ = self.symbols_graph.get_line_thru_pair_why(c, d)
         self.dtable.add_cong(ab, cd, a, b, c, d, dep)
 
-        ab = self.symbols_graph.get_or_create_segment(a, b, deps=None)
-        cd = self.symbols_graph.get_or_create_segment(c, d, deps=None)
+        ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)
+        cd = self.symbols_graph.get_or_create_segment(c, d, dep=None)
         self.rtable.add_eq(ab._val, cd._val, dep)

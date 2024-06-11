@@ -5,7 +5,6 @@ import pytest
 import pytest_check as check
 
 from geosolver.predicates import Predicate
-from geosolver.dependencies.dependency import Dependency
 from geosolver.statements.statement import Statement
 from geosolver.trace_back import get_logs
 from geosolver.api import GeometricSolverBuilder
@@ -30,8 +29,7 @@ class TestTraceback:
             solver.problem.goal.args
         )
         goal = Statement(solver.problem.goal.name, goal_args)
-        query = Dependency(goal, None, None)
-        setup, aux, _, _ = get_logs(query, solver.proof_state, merge_trivials=False)
+        setup, aux, _, _ = get_logs(goal, solver.proof_state, merge_trivials=False)
 
         setup = [p.statement.hash_tuple for p in setup]
         check.equal(

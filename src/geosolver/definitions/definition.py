@@ -10,13 +10,13 @@ class Definition:
         self,
         construction: Construction,
         rely: dict[str, str],
-        deps: Clause,
+        clause: Clause,
         basics: list[tuple[list[str], list[Construction]]],
         numerics: list[Construction],
     ):
         self.construction = construction
         self.rely = rely
-        self.deps = deps
+        self.clause = clause
         self.basics = basics
         self.numerics = numerics
 
@@ -51,7 +51,7 @@ class Definition:
     @classmethod
     def from_txt(cls, data: str) -> Definition:
         """Load definitions from a str object."""
-        statement, rely, deps, basics, numerics, _ = data.split("\n")
+        statement, rely, clause, basics, numerics, _ = data.split("\n")
         basics = [] if not basics else [b.strip() for b in basics.split(";")]
 
         levels = []
@@ -72,7 +72,7 @@ class Definition:
         return cls(
             construction=Construction.from_txt(statement),
             rely=parse_rely(rely),
-            deps=Clause.from_txt(deps),
+            clause=Clause.from_txt(clause),
             basics=levels,
             numerics=[Construction.from_txt(c) for c in numerics],
         )

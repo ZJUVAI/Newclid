@@ -38,7 +38,9 @@ def _cross_product(elems1: List[Element], elems2: List[Element]):
             yield e1, e2
 
 
-def cross_product(elems1: List[Element], elems2: List[Element]) -> List[Tuple[Element]]:
+def cross_product(
+    elems1: List[Element], elems2: List[Element]
+) -> List[Tuple[Element, Element]]:
     return list(_cross_product(tuple(elems1), tuple(elems2)))
 
 
@@ -51,7 +53,7 @@ def _arrangement_pairs(elems):
             yield e1, e2
 
 
-def arrangement_pairs(elems: List[Element]) -> List[Tuple[Element]]:
+def arrangement_pairs(elems: List[Element]) -> List[Tuple[Element, Element]]:
     return list(_arrangement_pairs(tuple(elems)))
 
 
@@ -65,7 +67,9 @@ def _arrangement_triplets(elems):
                 yield e1, e2, e3
 
 
-def arrangement_triplets(elems: List[Element]) -> List[Tuple[Element]]:
+def arrangement_triplets(
+    elems: List[Element],
+) -> List[Tuple[Element, Element, Element]]:
     return list(_arrangement_triplets(tuple(elems)))
 
 
@@ -79,7 +83,9 @@ def _arrangement_quadruplets(elems):
                 yield e1, e2, e3, e4
 
 
-def arrangement_quadruplets(elems: List[Element]) -> List[Tuple[Element]]:
+def arrangement_quadruplets(
+    elems: List[Element],
+) -> List[Tuple[Element, Element, Element, Element]]:
     return list(_arrangement_quadruplets(tuple(elems)))
 
 
