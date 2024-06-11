@@ -38,4 +38,3 @@ class Dependency:
         self.level = level
 
         self.why: list[Dependency] = []
-        self.algebra = None

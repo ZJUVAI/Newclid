@@ -488,7 +488,6 @@ class StatementAdder:
         c, d = dcd._obj.points
 
         dep = deps.populate(perp)
-        dep.algebra = [dab, dcd]
         self._make_equal(a12, a21, deps=dep)
 
         eqangle = Statement(Predicate.EQANGLE, [a, b, c, d, c, d, a, b])
@@ -509,7 +508,6 @@ class StatementAdder:
         cong = Statement(Predicate.CONGRUENT, [a, b, c, d])
         dep = deps.populate(cong)
         self._make_equal(ab, cd, deps=dep)
-        dep.algebra = ab._val, cd._val
 
         to_cache = [(cong, dep)]
         deps = []
@@ -809,7 +807,6 @@ class StatementAdder:
         eqangle = Statement(Predicate.EQANGLE, [a, b, c, d, m, n, p, q])
         if deps:
             deps1 = deps.populate(eqangle)
-            deps1.algebra = [dab, dcd, dmn, dpq]
         if not is_equal(ab_cd, mn_pq):
             add += [deps1]
         to_cache.append((eqangle, deps1))
@@ -819,7 +816,6 @@ class StatementAdder:
         eqangle_sym = Statement(Predicate.EQANGLE, [c, d, a, b, p, q, m, n])
         if deps:
             deps2 = deps.populate(eqangle_sym)
-            deps2.algebra = [dcd, dab, dpq, dmn]
         if not is_equal(cd_ab, pq_mn):
             add += [deps2]
         to_cache.append((eqangle_sym, deps2))
@@ -986,7 +982,6 @@ class StatementAdder:
         eqratio = Statement(Predicate.EQRATIO, [a, b, c, d, m, n, p, q])
         if deps:
             deps1 = deps.populate(eqratio)
-            deps1.algebra = [ab._val, cd._val, mn._val, pq._val]
         if not is_equal(ab_cd, mn_pq):
             add += [deps1]
         to_cache.append((eqratio, deps1))
@@ -996,7 +991,6 @@ class StatementAdder:
         eqratio_sym = Statement(Predicate.EQRATIO, [c, d, a, b, p, q, m, n])
         if deps:
             deps2 = deps.populate(eqratio_sym)
-            deps2.algebra = [cd._val, ab._val, pq._val, mn._val]
         if not is_equal(cd_ab, pq_mn):
             add += [deps2]
         to_cache.append((eqratio_sym, deps2))
@@ -1183,7 +1177,6 @@ class StatementAdder:
         dep = deps.populate(because_eq)
         self._make_equal(mn, pq, deps=dep)
 
-        dep.algebra = mn._val, pq._val
         to_cache = [(because_eq, dep)]
 
         if is_equal(mn, pq):
@@ -1264,7 +1257,6 @@ class StatementAdder:
         to_cache = []
         if not is_equal(ab_cd, nd):
             deps1 = deps.populate(aconst)
-            deps1.algebra = dab, dcd, ang % 180
             self._make_equal(ab_cd, nd, deps=deps1)
             to_cache.append((aconst, deps1))
             add += [deps1]
@@ -1272,7 +1264,6 @@ class StatementAdder:
         aconst2 = Statement(Predicate.CONSTANT_ANGLE, [a, b, c, d, nd])
         if not is_equal(cd_ab, dn):
             deps2 = deps.populate(aconst2)
-            deps2.algebra = dcd, dab, 180 - ang % 180
             self._make_equal(cd_ab, dn, deps=deps2)
             to_cache.append((aconst2, deps2))
             add += [deps2]
@@ -1285,7 +1276,6 @@ class StatementAdder:
         """Add that an angle abx is equal to constant y."""
         a, b, x, angle = points
         num, den = angle_to_num_den(angle)
-        ang = int(num * 180 / den) % 180
         nd, dn = self.symbols_graph.get_or_create_const_ang(num, den)
 
         if nd == self.symbols_graph.halfpi:
@@ -1343,7 +1333,6 @@ class StatementAdder:
         if not is_equal(xba, nd):
             aconst = Statement(Predicate.S_ANGLE, [c, x, a, b, nd])
             deps1 = deps.populate(aconst)
-            deps1.algebra = dbx, dab, ang
 
             self._make_equal(xba, nd, deps=deps1)
             to_cache.append((aconst, deps1))
@@ -1352,7 +1341,6 @@ class StatementAdder:
         if not is_equal(abx, dn):
             aconst2 = Statement(Predicate.S_ANGLE, [a, b, c, x, dn])
             deps2 = deps.populate(aconst2)
-            deps2.algebra = dab, dbx, 180 - ang
 
             self._make_equal(abx, dn, deps=deps2)
             to_cache.append((aconst2, deps2))
@@ -1423,7 +1411,6 @@ class StatementAdder:
         to_cache = []
         if not is_equal(ab_cd, nd):
             dep1 = deps.populate(rconst)
-            dep1.algebra = ab._val, cd._val, num, den
             self._make_equal(nd, ab_cd, deps=dep1)
             to_cache.append((rconst, dep1))
             add.append(dep1)
@@ -1431,7 +1418,6 @@ class StatementAdder:
         if not is_equal(cd_ab, dn):
             rconst2 = Statement(Predicate.CONSTANT_RATIO, [c, d, a, b, dn])
             dep2 = deps.populate(rconst2)
-            dep2.algebra = cd._val, ab._val, num, den
             self._make_equal(dn, cd_ab, deps=dep2)  # TODO FIX THAT
             to_cache.append((rconst2, dep2))
             add.append(dep2)

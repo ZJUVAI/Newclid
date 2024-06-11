@@ -11,7 +11,7 @@ from geosolver.geometry import is_equiv
 from geosolver.numerical.check import check_numerical
 
 
-from geosolver.statements.statement import Statement
+from geosolver.statements.statement import Statement, ratio_to_num_den, angle_to_num_den
 
 from geosolver.reasoning_engines.algebraic_reasoning.geometric_tables import (
     AngleTable,
@@ -211,30 +211,62 @@ class AlgebraicManipulator(ReasoningEngine):
         self.atable.add_para(ab._val, cd._val, dep)
 
     def _add_perp(self, dep: "Dependency"):
-        ab, cd = dep.algebra
+        a, b, c, d, _ = dep.statement.args
+        ab = self.symbols_graph.get_line_thru_pair(a, b)
+        cd = self.symbols_graph.get_line_thru_pair(c, d)
         self.atable.add_const_angle(ab, cd, 90, dep)
 
     def _add_eqangle(self, dep: "Dependency"):
-        ab, cd, mn, pq = dep.algebra
+        a, b, c, d, m, n, p, q = dep.statement.args
+        ab, _ = self.symbols_graph.get_line_thru_pair_why(a, b)
+        cd, _ = self.symbols_graph.get_line_thru_pair_why(c, d)
+        mn, _ = self.symbols_graph.get_line_thru_pair_why(m, n)
+        pq, _ = self.symbols_graph.get_line_thru_pair_why(p, q)
+        ab_cd, _, _ = self.symbols_graph.get_or_create_angle_from_lines(
+            ab, cd, deps=None
+        )
+        mn_pq, _, _ = self.symbols_graph.get_or_create_angle_from_lines(
+            mn, pq, deps=None
+        )
+        ab, cd = ab_cd._d
+        mn, pq = mn_pq._d
         if (ab, cd) == (pq, mn):
             self.atable.add_const_angle(ab, cd, 90, dep)
         else:
             self.atable.add_eqangle(ab, cd, mn, pq, dep)
 
     def _add_eqratio(self, dep: "Dependency"):
-        ab, cd, mn, pq = dep.algebra
+        a, b, c, d, m, n, p, q = dep.statement.args
+        ab = self.symbols_graph.get_or_create_segment(a, b, deps=None)._val
+        cd = self.symbols_graph.get_or_create_segment(c, d, deps=None)._val
+        pq = self.symbols_graph.get_or_create_segment(p, q, deps=None)._val
+        mn = self.symbols_graph.get_or_create_segment(m, n, deps=None)._val
         if (ab, cd) == (pq, mn):
             self.rtable.add_eq(ab, cd, dep)
         else:
             self.rtable.add_eqratio(ab, cd, mn, pq, dep)
 
-    def _add_aconst(self, dep: "Dependency"):
-        bx, ab, y = dep.algebra
-        self.atable.add_const_angle(bx, ab, y, dep)
+    def _add_aconst(
+        self, dep: "Dependency"
+    ):  # not sure, in addr, add ab_cd as well as cd_ab
+        a, b, c, d, ang = dep.statement.args
+        ab, _ = self.symbols_graph.get_line_thru_pair_why(a, b)
+        cd, _ = self.symbols_graph.get_line_thru_pair_why(c, d)
+        ab_cd, _, _ = self.symbols_graph.get_or_create_angle_from_lines(
+            ab, cd, deps=None
+        )
+        ab, cd = ab_cd._d
+        num, den = angle_to_num_den(ang)
+        self.atable.add_const_angle(ab, cd, num * 180 / den % 180, dep)
 
-    def _add_rconst(self, dep: "Dependency"):
-        l1, l2, m, n = dep.algebra
-        self.rtable.add_const_ratio(l1, l2, m, n, dep)
+    def _add_rconst(
+        self, dep: "Dependency"
+    ):  # not sure, in addr, add ab_cd as well as cd_ab
+        a, b, c, d, ratio = dep.statement.args
+        num, den = ratio_to_num_den(ratio)
+        ab = self.symbols_graph.get_or_create_segment(a, b, deps=None)
+        cd = self.symbols_graph.get_or_create_segment(c, d, deps=None)
+        self.rtable.add_const_ratio(ab, cd, num, den, dep)
 
     def _add_cong(self, dep: "Dependency"):
         a, b, c, d = dep.statement.args
