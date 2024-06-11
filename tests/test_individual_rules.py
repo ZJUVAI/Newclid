@@ -321,12 +321,12 @@ def test_rule_used_to_solve_in_one_step(
     for i, (step, _nl_step) in enumerate(zip(proof_steps, nl_proof_step)):
         _, [step_dependency] = step
 
-        found_rule = step_dependency.rule_name
-        if found_rule.startswith("b"):
+        found_rule_name = step_dependency.reason.name if step_dependency.reason else ""
+        if found_rule_name.startswith("b"):
             # Backtracked an hard-coded rule
-            found_rule = found_rule[1:]
+            found_rule_name = found_rule_name[1:]
 
-        expected_rule = found_rule == theorem.rule_name
+        expected_rule = found_rule_name == theorem.rule_name
         if rule_txt in EXPECTED_TO_USE_OTHER_RULE:
             if expected_rule:
                 raise AssertionError(

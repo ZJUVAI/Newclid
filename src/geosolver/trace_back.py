@@ -1,8 +1,7 @@
 """Implements DAG-level traceback."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-from geosolver.dependencies.why_predicates import why_dependency
 from geosolver.predicates import Predicate
 from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE
@@ -94,7 +93,7 @@ def separate_dependency_difference(
             continue
         cons_ = []
         for con in cons:
-            if con.rule_name == CONSTRUCTION_RULE:
+            if con.reason and con.reason.object is CONSTRUCTION_RULE:
                 setup.append(con)
             else:
                 cons_.append(con)
@@ -144,13 +143,13 @@ def recursive_traceback(
     log = []
     stack = []
 
-    def read(q: "Dependency") -> None:
-        q = q.remove_loop()
-        hashed = q.statement.hash_tuple
+    def read(query_dep: "Dependency") -> None:
+        query_dep = remove_loop(query_dep)
+        hashed = query_dep.statement.hash_tuple
         if hashed in visited:
             return
 
-        if q.statement.predicate in [
+        if query_dep.statement.predicate in [
             Predicate.NON_COLLINEAR,
             Predicate.NON_PARALLEL,
             Predicate.NON_PERPENDICULAR,
@@ -164,10 +163,10 @@ def recursive_traceback(
         stack.append(hashed)
         prems: list["Dependency"] = []
 
-        if q.rule_name != CONSTRUCTION_RULE:
+        if not query_dep.reason or query_dep.reason.object is not CONSTRUCTION_RULE:
             all_deps: list["Dependency"] = []
             dep_names = set()
-            for dep in q.why:
+            for dep in query_dep.why:
                 dep_hash = dep.statement.hash_tuple
                 if dep_hash in dep_names:
                     continue
@@ -186,11 +185,11 @@ def recursive_traceback(
         found = False
         for ps, qs in log:
             if sorted([d.statement.hash_tuple for d in ps]) == hashs:
-                qs += [q]
+                qs += [query_dep]
                 found = True
                 break
         if not found:
-            log.append((prems, [q]))
+            log.append((prems, [query_dep]))
 
         stack.pop(-1)
 
@@ -203,6 +202,27 @@ def recursive_traceback(
             log.append((ps, [q]))
 
     return log
+
+
+def remove_loop(dependency: "Dependency") -> "Dependency":
+    shortcut_found = _find_dependency_shortcut(dependency)
+    if shortcut_found:
+        return shortcut_found
+    return dependency
+
+
+def _find_dependency_shortcut(dependency: "Dependency") -> Optional["Dependency"]:
+    initial_hash_tuple = dependency.statement.hash_tuple
+
+    stack = [dependency]
+
+    while stack:
+        current_dep = stack.pop(0)
+        for why_dep in current_dep.why:
+            if why_dep.statement.hash_tuple == initial_hash_tuple:
+                return why_dep
+            stack.append(why_dep)
+    return None
 
 
 def collx_to_coll_setup(
@@ -286,13 +306,7 @@ def get_logs(
 ]:
     """Given a DAG and conclusion N, return the premise, aux, proof."""
     try:
-        query.why = why_dependency(
-            query,
-            proof.symbols_graph,
-            proof.statements.checker,
-            proof.dependency_cache,
-            query.level,
-        )
+        query.why = proof.statements.graph.resolve(query, query.level)
     except AttributeError:
         raise Exception("Cannot traceback the proof.")
     log = recursive_traceback(query)
@@ -354,7 +368,7 @@ def shorten_proof(
     for prems, cons in log:
         assert len(cons) == 1
         con = cons[0]
-        if con.rule_name == "":
+        if not con.reason:
             con2prem[con.statement.hash_tuple] = prems
         elif not merge_trivials:
             # except for the ones that are premises to non-trivial steps.

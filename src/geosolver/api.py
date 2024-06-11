@@ -109,6 +109,9 @@ class GeometricSolver:
             out_file, Theorem.to_dict(self.rules)
         )
 
+    def draw_why_graph(self, out_file: Path):
+        self.proof_state.statements.graph.show_html(out_file)
+
     def write_all_outputs(self, output_folder_path: Path):
         output_folder_path.mkdir(exist_ok=True, parents=True)
         self.write_solution(output_folder_path / "proof_steps.txt")

@@ -86,6 +86,13 @@ def cli_arguments() -> Namespace:
         help="Draw and display all available graphs of the proof state.",
     )
     parser.add_argument(
+        "-wg",
+        "--why-graph",
+        default=False,
+        action="store_true",
+        help="Draw and display the WhyGraph of the proof state.",
+    )
+    parser.add_argument(
         "-dg",
         "--dependency-graph",
         default=False,
@@ -125,6 +132,8 @@ def cli_arguments() -> Namespace:
 
 
 def main():
+    import seaborn as sns
+
     args = cli_arguments()
     logging.basicConfig(level=args.log_level)
 
@@ -170,6 +179,9 @@ def main():
         solver.draw_dependency_graph(outpath / "dependency_graph.html")
     if args.all_graphs or args.proof_subgraph:
         solver.draw_proof_subgraph(outpath / "proof_subgraph.html")
+    if args.all_graphs or args.why_graph:
+        sns.color_palette()
+        solver.draw_why_graph(outpath / "why_hypergraph.html")
 
 
 def resolve_output_path(path_str: Optional[str], problem_name: str) -> Path:
