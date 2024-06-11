@@ -2,7 +2,7 @@
 
 from typing import TYPE_CHECKING, Optional
 
-from geosolver.predicates import Predicate
+from geosolver.predicates import NUMERICAL_PREDICATES, Predicate
 from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE
 from geosolver.statements.statement import Statement
@@ -149,13 +149,7 @@ def recursive_traceback(
         if hashed in visited:
             return
 
-        if query_dep.statement.predicate in [
-            Predicate.NON_COLLINEAR,
-            Predicate.NON_PARALLEL,
-            Predicate.NON_PERPENDICULAR,
-            Predicate.DIFFERENT,
-            Predicate.SAMESIDE,
-        ]:
+        if query_dep.statement.predicate in NUMERICAL_PREDICATES:
             return
 
         nonlocal stack

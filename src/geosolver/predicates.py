@@ -66,3 +66,12 @@ class Predicate(Enum):
     # What is that also ?
     IND = "ind"
     INCI = "inci"
+
+
+NUMERICAL_PREDICATES = (
+    Predicate.NON_COLLINEAR,
+    Predicate.NON_PARALLEL,
+    Predicate.NON_PERPENDICULAR,
+    Predicate.DIFFERENT,
+    Predicate.SAMESIDE,
+)
