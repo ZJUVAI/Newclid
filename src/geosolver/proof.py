@@ -318,9 +318,9 @@ class Proof:
         return add, [premise_to_cache] + to_cache, True
 
     def _step_derive(self, action: ResolveEngineAction) -> DeriveFeedback:
-        return self.external_reasoning_engines[action.engineid].resolve(
-            level=action.level
-        )
+        choosen_engine = self.external_reasoning_engines[action.engineid]
+        derivations = choosen_engine.resolve(level=action.level)
+        return DeriveFeedback(derivations)
 
     def _step_apply_derivation(
         self, action: ApplyDerivationAction

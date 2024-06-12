@@ -4,6 +4,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, NamedTuple, Optional, Union
 from abc import abstractmethod
 
+from geosolver.reasoning_engines.interface import Derivation
+
 
 if TYPE_CHECKING:
     from geosolver.proof import Proof
@@ -12,9 +14,7 @@ if TYPE_CHECKING:
     from geosolver.statements.adder import ToCache
     from geosolver.dependencies.dependency import Dependency
     from geosolver.match_theorems import MatchCache
-    from geosolver.reasoning_engines.algebraic_reasoning.algebraic_manipulator import (
-        Derivations,
-    )
+
     from geosolver.problem import Problem
     from geosolver.statements.statement import Statement
     from geosolver.dependencies.empty_dependency import DependencyBuilder
@@ -89,7 +89,7 @@ class MatchFeedback(NamedTuple):
 
 
 class DeriveFeedback(NamedTuple):
-    derives: "Derivations"
+    derives: list[Derivation]
 
 
 class ApplyDerivationFeedback(NamedTuple):

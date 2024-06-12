@@ -24,7 +24,7 @@ from geosolver.agent.interface import (
 )
 from geosolver.match_theorems import MatchCache
 from geosolver.predicates import Predicate
-from geosolver.reasoning_engines.interface import Derivations
+from geosolver.reasoning_engines.interface import Derivation
 
 
 if TYPE_CHECKING:
@@ -221,7 +221,7 @@ class BFSDDAR(DeductiveAgent):
 
     def reset(self):
         self._dd_agent.reset()
-        self._derivations: Derivations = []
-        self._eq4s: Derivations = []
-        self._current_derivation_stack: Derivations = []
+        self._derivations: list[Derivation] = []
+        self._eq4s: list[Derivation] = []
+        self._current_derivation_stack: list[Derivation] = []
         self.level: int = -1
