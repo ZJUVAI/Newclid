@@ -1,50 +1,48 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Optional
+from typing_extensions import Self
 
-
-from geosolver.problem import CONSTRUCTION_RULE
-
+from geosolver.theorem import Theorem
+from geosolver.statements.statement import Statement
 
 if TYPE_CHECKING:
-    from geosolver.statements.statement import Statement
+    from geosolver.statements.adder import IntrinsicRules
+    from geosolver.reasoning_engines.algebraic_reasoning import AlgebraicRules
 
 
+@dataclass(frozen=True)
+class Reason:
+    object: Theorem | "AlgebraicRules" | "IntrinsicRules" | str
+    name: str = ""
+
+    def __post_init__(self):
+        if not self.name:
+            if isinstance(self.object, Theorem):
+                name = self.object.rule_name
+            elif isinstance(self.object, str):
+                name = self.object
+            else:
+                name = self.object.value
+            object.__setattr__(self, "name", name)
+
+    def __hash__(self) -> int:
+        return hash(self.name)
+
+
+@dataclass(frozen=True)
 class Dependency:
-    """Dependency is a predicate that other predicates depend on."""
+    """Dependency is a directed hyper-edge of the StatementsHyperGraph.
 
-    def __init__(self, statement: "Statement", rule_name: str, level: int):
-        self.statement = statement
-        self.rule_name = rule_name or ""
-        self.level = level
-        self.why: list[Dependency] = []
+    It links a statement to a list of statements that justify it
+    and their own dependencies.
 
-        self._stat = None
-        self.trace = None
-        self.trace2 = None
-        self.algebra = None
+    """
 
-    def _find(self, dep_hashed: tuple[str, ...]) -> "Dependency":
-        for w in self.why:
-            f = w._find(dep_hashed)
-            if f:
-                return f
-            if w.statement.hash_tuple == dep_hashed:
-                return w
+    statement: Statement
+    why: tuple[Self]
+    reason: Optional[Reason] = None
+    level: Optional[int] = None
 
-    def remove_loop(self) -> "Dependency":
-        f = self._find(self.statement.hash_tuple)
-        if f:
-            return f
-        return self
-
-    def copy(self) -> "Dependency":
-        dep = Dependency(self.statement, self.rule_name, self.level)
-        dep.trace = self.trace
-        dep.why = list(self.why)
-        return dep
-
-    def populate(self, statement: Statement) -> "Dependency":
-        assert self.rule_name == CONSTRUCTION_RULE, self.rule_name
-        dep = Dependency(statement, self.rule_name, self.level)
-        dep.why = list(self.why)
-        return dep
+    def __hash__(self) -> int:
+        return hash((self.statement, self.reason))

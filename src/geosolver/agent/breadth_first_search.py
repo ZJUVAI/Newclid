@@ -5,14 +5,16 @@ import logging
 from typing import TYPE_CHECKING, Optional
 import time
 
-from geosolver.algebraic.algebraic_manipulator import Derivations
+from geosolver.reasoning_engines.algebraic_reasoning.algebraic_manipulator import (
+    Derivations,
+)
 from geosolver.agent.interface import (
     ApplyDerivationAction,
     ApplyDerivationFeedback,
     ApplyTheoremFeedback,
     DeductiveAgent,
     Action,
-    DeriveAlgebraAction,
+    ResolveEngineAction,
     DeriveFeedback,
     Feedback,
     Mapping,
@@ -173,7 +175,7 @@ class BFSDDAR(DeductiveAgent):
         if self.level != self._dd_agent.level:
             # Each new level of dd we derive first
             self.level = self._dd_agent.level
-            return DeriveAlgebraAction(self.level)
+            return ResolveEngineAction(self.level)
 
         dd_action = self._dd_agent.act(proof, theorems)
         if isinstance(dd_action, StopAction):

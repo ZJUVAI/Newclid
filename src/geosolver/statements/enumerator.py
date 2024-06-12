@@ -2,7 +2,6 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING, Generator
 
-from geosolver.algebraic.algebraic_manipulator import AlgebraicManipulator
 from geosolver.combinatorics import (
     all_4points,
     all_8points,
@@ -37,11 +36,9 @@ class StatementsEnumerator:
         self,
         symbols_graph: "SymbolsGraph",
         statements_checker: "StatementChecker",
-        alegbraic_manipulator: "AlgebraicManipulator",
     ) -> None:
         self.symbols_graph = symbols_graph
         self.statements_checker = statements_checker
-        self.alegbraic_manipulator = alegbraic_manipulator
 
     def all(
         self, predicate_name: str | Predicate
@@ -211,7 +208,7 @@ class StatementsEnumerator:
                     yield a, b, c, d
 
     def _all_perps(self) -> Generator[tuple[Point, ...], None, None]:
-        for ang in self.alegbraic_manipulator.vhalfpi.neighbors(Angle):
+        for ang in self.symbols_graph.vhalfpi.neighbors(Angle):
             d1, d2 = ang.directions
             if d1 is None or d2 is None:
                 continue

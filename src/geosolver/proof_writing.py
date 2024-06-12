@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 
-from geosolver.definitions.clause import Clause
+from geosolver.definitions.clause import Construction
 from geosolver.statements.statement import Statement
 import geosolver.pretty as pt
 import geosolver.trace_back as trace_back
@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 def get_proof_steps(
-    proof: "Proof", goal: "Clause", merge_trivials: bool = False
+    proof: "Proof", goal: "Construction", merge_trivials: bool = False
 ) -> tuple[
     list[Dependency],
     list[Dependency],
@@ -28,10 +28,9 @@ def get_proof_steps(
     """Extract proof steps from the built DAG."""
     goal_args = proof.symbols_graph.names2nodes(goal.args)
     goal = Statement(goal.name, goal_args)
-    query = Dependency(goal, None, None)
 
     setup, aux, log, setup_points = trace_back.get_logs(
-        query, proof, merge_trivials=merge_trivials
+        goal, proof, merge_trivials=merge_trivials
     )
 
     refs = {}
@@ -154,8 +153,9 @@ def write_solution(
     for i, step in enumerate(proof_steps):
         _, [con] = step
         nl = proof_step_string(step, refs, last_step=i == len(proof_steps) - 1)
-        rule_name = r2name.get(con.rule_name, f"({con.rule_name})")
-        nl = nl.replace("\u21d2", f"{rule_name}\u21d2 ")
+        reason_name = con.reason.name if con.reason else ""
+        reason_pretty = r2name.get(reason_name, f"({reason_name})")
+        nl = nl.replace("\u21d2", f"{reason_pretty}\u21d2 ")
         solution += "{:03}. ".format(i + 1) + nl + "\n"
 
     solution += "==========================\n"

@@ -1,7 +1,11 @@
 """Implements geometric objects used in the graph representation."""
 
 from __future__ import annotations
-from typing import Any, Optional, Type
+from typing import TYPE_CHECKING, Any, Generator, Optional, Type
+from typing_extensions import Self
+
+if TYPE_CHECKING:
+    from geosolver.dependencies.dependency import Dependency
 
 
 class Node:
@@ -26,14 +30,14 @@ class Node:
         self.name = name or str(self)
         self.graph = graph
 
-        self.edge_graph = {}
+        self.edge_graph: dict[Node, dict[Self, list["Dependency"]]] = {}
         # Edge graph: what other nodes is connected to this node.
         # edge graph = {
         #   other1: {self1: deps, self2: deps},
         #   other2: {self2: deps, self3: deps}
         # }
 
-        self.merge_graph = {}
+        self.merge_graph: dict[Self, dict[Self, list["Dependency"]]] = {}
         # Merge graph: history of merges with other nodes.
         # merge_graph = {self1: {self2: deps1, self3: deps2}}
 
@@ -43,7 +47,7 @@ class Node:
         self._val = None
         self._obj = None
 
-        self.deps = []
+        self.deps: list["Dependency"] = []
 
         # numerical representation.
         self.num = None
@@ -65,7 +69,7 @@ class Node:
     def why_rep(self) -> list[Any]:
         return self.why_equal([self.rep()], None)
 
-    def rep_and_why(self) -> tuple[Node, list[Any]]:
+    def rep_and_why(self) -> tuple[Self, list["Dependency"]]:
         rep = self.rep()
         return rep, self.why_equal([rep], None)
 
@@ -99,11 +103,11 @@ class Node:
             else:
                 self.edge_graph[x] = dict(xdict)
 
-    def merge(self, nodes: list[Node], deps: list[Any]) -> None:
+    def merge(self, nodes: list[Node], deps: list["Dependency"]) -> None:
         for node in nodes:
             self.merge_one(node, deps)
 
-    def merge_one(self, node: Node, deps: list[Any]) -> None:
+    def merge_one(self, node: Node, deps: list["Dependency"]) -> None:
         node.rep().set_rep(self.rep())
 
         if node in self.merge_graph:
@@ -142,10 +146,10 @@ class Node:
             return None
         return self._obj.rep()
 
-    def equivs(self) -> set[Node]:
+    def equivs(self) -> set[Self]:
         return self.rep().members
 
-    def connect_to(self, node: Node, deps: list[Any] = None) -> None:
+    def connect_to(self, node: Node, deps: list["Dependency"] = None) -> None:
         rep = self.rep()
 
         if node in rep.edge_graph:
@@ -182,7 +186,7 @@ class Node:
 
         return parent
 
-    def why_equal(self, others: list[Node], level: int) -> list[Any]:
+    def why_equal(self, others: list[Node], level: int) -> list["Dependency"]:
         """BFS why this node is equal to other nodes."""
         others = set(others)
         found = 0
@@ -215,7 +219,7 @@ class Node:
 
     def why_equal_groups(
         self, groups: list[list[Node]], level: int
-    ) -> tuple[list[Any], list[Node]]:
+    ) -> tuple[list["Dependency"], list[Node]]:
         """BFS for why self is equal to at least one member of each group."""
         others = [None for _ in groups]
         found = 0
@@ -250,10 +254,10 @@ class Node:
 
         return bfs_backtrack(self, others, parent), others
 
-    def why_val(self, level: int) -> list[Any]:
+    def why_val(self, level: int) -> list["Dependency"]:
         return self._val.why_equal([self.val], level)
 
-    def why_connect(self, node: Node, level: int = None) -> list[Any]:
+    def why_connect(self, node: Node, level: int = None) -> list["Dependency"]:
         rep = self.rep()
         equivs = list(rep.edge_graph[node].keys())
         if not equivs:
@@ -263,7 +267,7 @@ class Node:
         return [dep] + self.why_equal(equiv, level)
 
 
-def why_connect(*pairs: list[tuple[Node, Node]]) -> list[Any]:
+def why_connect(*pairs: tuple[Node, Node]) -> list[Any]:
     result = []
     for node1, node2 in pairs:
         result += node1.why_connect(node2)
@@ -285,7 +289,9 @@ def is_equal(x: Node, y: Node, level: int = None) -> bool:
     return is_equiv(x._val, y._val, level)
 
 
-def bfs_backtrack(root: Node, leafs: list[Node], parent: dict[Node, Node]) -> list[Any]:
+def bfs_backtrack(
+    root: Node, leafs: list[Node], parent: dict[Node, Node]
+) -> list["Dependency"]:
     """Return the path given BFS trace of parent nodes."""
     backtracked = {root}  # no need to backtrack further when touching this set.
     deps = []
@@ -298,7 +304,8 @@ def bfs_backtrack(root: Node, leafs: list[Node], parent: dict[Node, Node]) -> li
             return None
         while node not in backtracked:
             backtracked.add(node)
-            deps.append(node.merge_graph[parent[node]])
+            dep = node.merge_graph[parent[node]]
+            deps.append(dep)
             node = parent[node]
 
     return deps
@@ -317,16 +324,18 @@ class Line(Node):
     def new_val(self) -> Direction:
         return Direction()
 
-    def why_coll(self, points: list[Point], level: int = None) -> list[Any]:
+    def why_coll(
+        self, points: list[Point], level: int = None
+    ) -> Optional[list["Dependency"]]:
         """Why points are connected to self."""
         level = level or float("inf")
 
-        groups = []
+        groups: list[list[Point]] = []
         for p in points:
             group = [
                 level
-                for level, d in self.edge_graph[p].items()
-                if d is None or d.level < level
+                for level, dependency in self.edge_graph[p].items()
+                if dependency is None or dependency.level < level
             ]
             if not group:
                 return None
@@ -359,7 +368,7 @@ class Circle(Node):
         """Why points are connected to self."""
         level = level or float("inf")
 
-        groups = []
+        groups: list[list[Circle]] = []
         for p in points:
             group = [
                 c for c, d in self.edge_graph[p].items() if d is None or d.level < level
@@ -451,7 +460,7 @@ class Value(Node):
 
 def all_angles(
     d1: Direction, d2: Direction, level: int = None
-) -> tuple[Angle, list[Direction], list[Direction]]:
+) -> Generator[Angle, list[Direction], list[Direction]]:
     level = level or float("inf")
     d1s = d1.equivs_upto(level)
     d2s = d2.equivs_upto(level)
@@ -462,7 +471,9 @@ def all_angles(
             yield ang, d1s, d2s
 
 
-def all_ratios(d1, d2, level=None) -> tuple[Angle, list[Direction], list[Direction]]:
+def all_ratios(
+    d1: Direction, d2: Direction, level=None
+) -> Generator[Angle, list[Direction], list[Direction]]:
     level = level or float("inf")
     d1s = d1.equivs_upto(level)
     d2s = d2.equivs_upto(level)
