@@ -14,3 +14,4 @@ Dependencies
    geosolver.dependencies.dependency
    geosolver.dependencies.dependency_graph
    geosolver.dependencies.empty_dependency
+   geosolver.dependencies.why_predicates

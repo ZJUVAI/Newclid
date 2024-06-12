@@ -2,14 +2,14 @@
 
 from typing import TYPE_CHECKING, Optional
 
-from geosolver.predicates import Predicate
+from geosolver.predicates import NUMERICAL_PREDICATES, Predicate
 from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE
 from geosolver.statements.statement import Statement
+from geosolver.dependencies.dependency import Dependency
 
 if TYPE_CHECKING:
     from geosolver.proof import Proof
-    from geosolver.dependencies.dependency import Dependency
 
 
 def point_levels(
@@ -149,13 +149,7 @@ def recursive_traceback(
         if hashed in visited:
             return
 
-        if query_dep.statement.predicate in [
-            Predicate.NON_COLLINEAR,
-            Predicate.NON_PARALLEL,
-            Predicate.NON_PERPENDICULAR,
-            Predicate.DIFFERENT,
-            Predicate.SAMESIDE,
-        ]:
+        if query_dep.statement.predicate in NUMERICAL_PREDICATES:
             return
 
         nonlocal stack
@@ -163,7 +157,11 @@ def recursive_traceback(
         stack.append(hashed)
         prems: list["Dependency"] = []
 
-        if not query_dep.reason or query_dep.reason.object is not CONSTRUCTION_RULE:
+        if (
+            not query_dep.reason
+            or query_dep.reason.object is not CONSTRUCTION_RULE
+            and query_dep.why
+        ):
             all_deps: list["Dependency"] = []
             dep_names = set()
             for dep in query_dep.why:
@@ -213,11 +211,12 @@ def remove_loop(dependency: "Dependency") -> "Dependency":
 
 def _find_dependency_shortcut(dependency: "Dependency") -> Optional["Dependency"]:
     initial_hash_tuple = dependency.statement.hash_tuple
-
     stack = [dependency]
 
     while stack:
         current_dep = stack.pop(0)
+        if current_dep.why is None:
+            continue
         for why_dep in current_dep.why:
             if why_dep.statement.hash_tuple == initial_hash_tuple:
                 return why_dep
@@ -265,11 +264,7 @@ def collx_to_coll(
         prem_set = set()
         prems_, prems = prems, []
         for p in prems_:
-            if p.statement.predicate is Predicate.COLLINEAR_X:
-                p.statement = Statement(
-                    Predicate.COLLINEAR, list(set(p.statement.args))
-                )
-
+            p = _dep_coll_to_collx(p)
             prem_hash = p.statement.hash_tuple
             if prem_hash in prem_set:
                 continue
@@ -278,10 +273,7 @@ def collx_to_coll(
 
         cons_, cons = cons, []
         for c in cons_:
-            if c.statement.predicate == Predicate.COLLINEAR_X:
-                c.statement = Statement(
-                    Predicate.COLLINEAR, list(set(c.statement.args))
-                )
+            c = _dep_coll_to_collx(c)
             con_hash = c.statement.hash_tuple
             if con_hash in con_set:
                 continue
@@ -296,8 +288,17 @@ def collx_to_coll(
     return setup, aux_setup, log
 
 
+def _dep_coll_to_collx(dep: "Dependency"):
+    if dep.statement.predicate == Predicate.COLLINEAR_X:
+        coll_statement = Statement(Predicate.COLLINEAR, list(set(dep.statement.args)))
+        return Dependency(
+            coll_statement, why=dep.why, reason=dep.reason, level=dep.level
+        )
+    return dep
+
+
 def get_logs(
-    query: "Dependency", proof: "Proof", merge_trivials: bool = False
+    goal: "Statement", proof: "Proof", merge_trivials: bool = False
 ) -> tuple[
     list["Dependency"],
     list["Dependency"],
@@ -305,12 +306,11 @@ def get_logs(
     set[Point],
 ]:
     """Given a DAG and conclusion N, return the premise, aux, proof."""
-    try:
-        query.why = proof.statements.graph.resolve(query, query.level)
-    except AttributeError:
-        raise Exception("Cannot traceback the proof.")
-    log = recursive_traceback(query)
-    log, setup, aux_setup, setup_points, _ = separate_dependency_difference(query, log)
+    goal_dep = proof.statements.graph.build_resolved_dependency(goal)
+    log = recursive_traceback(goal_dep)
+    log, setup, aux_setup, setup_points, _ = separate_dependency_difference(
+        goal_dep, log
+    )
 
     setup, aux_setup, log = collx_to_coll(setup, aux_setup, log)
 

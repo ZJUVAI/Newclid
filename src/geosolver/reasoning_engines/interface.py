@@ -2,13 +2,13 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 from geosolver.agent.interface import DeriveFeedback
-from geosolver.dependencies.empty_dependency import EmptyDependency
+from geosolver.dependencies.empty_dependency import DependencyBuilder
 from geosolver.statements.statement import Statement
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
 
-Derivation = tuple[Statement, EmptyDependency]
+Derivation = tuple[Statement, DependencyBuilder]
 Derivations = list[Derivation]
 
 

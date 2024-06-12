@@ -1,8 +1,7 @@
 Checker
+=======
 
-========
-
-.. automodule:: geosolver.statement.checker
+.. automodule:: geosolver.statements.checker
    :members:
    :undoc-members:
    :show-inheritance:
