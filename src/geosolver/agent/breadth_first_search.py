@@ -5,9 +5,6 @@ import logging
 from typing import TYPE_CHECKING, Optional
 import time
 
-from geosolver.reasoning_engines.algebraic_reasoning.algebraic_manipulator import (
-    Derivations,
-)
 from geosolver.agent.interface import (
     ApplyDerivationAction,
     ApplyDerivationFeedback,
@@ -26,7 +23,8 @@ from geosolver.agent.interface import (
     StopFeedback,
 )
 from geosolver.match_theorems import MatchCache
-from geosolver.geometry import Point
+from geosolver.predicates import Predicate
+from geosolver.reasoning_engines.interface import Derivations
 
 
 if TYPE_CHECKING:
@@ -175,7 +173,7 @@ class BFSDDAR(DeductiveAgent):
         if self.level != self._dd_agent.level:
             # Each new level of dd we derive first
             self.level = self._dd_agent.level
-            return ResolveEngineAction(self.level)
+            return ResolveEngineAction(self.level, "AR")
 
         dd_action = self._dd_agent.act(proof, theorems)
         if isinstance(dd_action, StopAction):
@@ -191,8 +189,12 @@ class BFSDDAR(DeductiveAgent):
 
     def remember_effects(self, action: Action, feedback: Feedback):
         if isinstance(feedback, DeriveFeedback):
-            concat_derivations(self._derivations, feedback.derives)
-            concat_derivations(self._eq4s, feedback.eq4s)
+            for derive in feedback.derives:
+                predicate = derive.statement.predicate
+                if predicate == Predicate.EQANGLE or predicate == Predicate.EQRATIO:
+                    self._eq4s.append(derive)
+                else:
+                    self._derivations.append(derive)
         elif isinstance(feedback, ApplyDerivationFeedback):
             new_statements = len(feedback.added) > 1
             if new_statements:
@@ -206,34 +208,20 @@ class BFSDDAR(DeductiveAgent):
     ) -> Optional[ApplyDerivationAction]:
         if not self._current_derivation_stack:
             if self._derivations:
-                (
-                    self._current_derivation_name,
-                    self._current_derivation_stack,
-                ) = self._derivations.popitem()
+                self._current_derivation_stack = self._derivations
+                self._derivations = []
             elif include_eq4s and self._eq4s:
-                (
-                    self._current_derivation_name,
-                    self._current_derivation_stack,
-                ) = self._eq4s.popitem()
+                self._current_derivation_stack = self._eq4s
+                self._eq4s = []
             else:
                 return None
 
-        derived_statement, reason = self._current_derivation_stack.pop(0)
+        derived_statement, reason = self._current_derivation_stack.pop()
         return ApplyDerivationAction(statement=derived_statement, reason=reason)
 
     def reset(self):
         self._dd_agent.reset()
-        self._derivations: Derivations = {}
-        self._eq4s: Derivations = {}
-        self._current_derivation_name: Optional[str] = None
-        self._current_derivation_stack: list[tuple[Point, ...]] = []
+        self._derivations: Derivations = []
+        self._eq4s: Derivations = []
+        self._current_derivation_stack: Derivations = []
         self.level: int = -1
-
-
-def concat_derivations(derivations: Derivations, new: Derivations):
-    for new_key, new_vals in new.items():
-        if not new_vals:
-            continue
-        if new_key not in derivations:
-            derivations[new_key] = []
-        derivations[new_key] += new_vals

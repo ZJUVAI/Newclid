@@ -36,6 +36,8 @@ class HumanAgentWithPredefinedInput(HumanAgent):
 
 
 def pop_last_mapping(human_agent: HumanAgentWithPredefinedInput):
+    if not human_agent._mappings:
+        raise ValueError("No more mappings to pop. Actions were probably invalid.")
     return list(human_agent._mappings.keys())[-1]
 
 
