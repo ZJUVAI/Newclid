@@ -231,9 +231,10 @@ class HumanAgent(DeductiveAgent):
         self, action: ResolveEngineAction, feedback: DeriveFeedback
     ) -> tuple[str, bool]:
         new_mappings: list[tuple[str, tuple[Point, ...]]] = []
-        for predicate, derivations_and_dependencies in feedback.derives.items():
-            for derivation_and_dependency in derivations_and_dependencies:
-                new_mappings.append((predicate, derivation_and_dependency))
+        for derivation_and_dependency in feedback.derives:
+            new_mappings.append(
+                (derivation_and_dependency[0].predicate, derivation_and_dependency)
+            )
 
         if not new_mappings:
             return "No new derivation found.\n", False

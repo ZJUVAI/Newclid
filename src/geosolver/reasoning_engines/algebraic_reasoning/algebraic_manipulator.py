@@ -58,21 +58,21 @@ class AlgebraicManipulator(ReasoningEngine):
     def resolve(self, **kwargs) -> DeriveFeedback:
         """Derive new algebraic predicates."""
         level: int = kwargs.get("level")
-        derives = {}
+        derives = []
         ang_derives = self.derive_angle_algebra(level)
-        derives.update(ang_derives)
+        derives += ang_derives
 
         cong_derives = self.derive_cong_algebra(level)
-        derives.update(cong_derives)
+        derives += cong_derives
 
         rat_derives = self.derive_ratio_algebra(level)
-        derives.update(rat_derives)
+        derives += rat_derives
 
         return DeriveFeedback(derives)
 
     def derive_ratio_algebra(self, level: int) -> Derivations:
         """Derive new eqratio predicates."""
-        added = {Predicate.CONGRUENT_2: [], Predicate.EQRATIO: []}
+        added = []
 
         for x in self.rtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
@@ -89,7 +89,7 @@ class AlgebraicManipulator(ReasoningEngine):
 
                 (m, n), (p, q) = mn._obj.points, pq._obj.points
                 cong = Statement(Predicate.CONGRUENT_2, (m, n, p, q))
-                added[Predicate.CONGRUENT_2].append((cong, dep))
+                added.append((cong, dep))
 
             if len(x) == 4:
                 ab, cd, mn, pq = x
@@ -100,17 +100,13 @@ class AlgebraicManipulator(ReasoningEngine):
                     *pq._obj.points,
                 )
                 eqratio = Statement(Predicate.EQRATIO, points)
-                added[Predicate.EQRATIO].append((eqratio, dep))
+                added.append((eqratio, dep))
 
         return added
 
     def derive_angle_algebra(self, level: int) -> Derivations:
         """Derive new eqangles predicates."""
-        added = {
-            Predicate.EQANGLE: [],
-            Predicate.CONSTANT_ANGLE: [],
-            Predicate.PARALLEL: [],
-        }
+        added = []
 
         for x in self.atable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
@@ -130,7 +126,7 @@ class AlgebraicManipulator(ReasoningEngine):
                 if not check_numerical(para):
                     continue
 
-                added[Predicate.PARALLEL].append((para, dep))
+                added.append((para, dep))
 
             if len(x) == 3:
                 ef, pq, (n, d) = x
@@ -141,7 +137,7 @@ class AlgebraicManipulator(ReasoningEngine):
                 if not check_numerical(aconst):
                     continue
 
-                added[Predicate.CONSTANT_ANGLE].append((aconst, dep))
+                added.append((aconst, dep))
 
             if len(x) == 4:
                 ab, cd, mn, pq = x
@@ -152,17 +148,13 @@ class AlgebraicManipulator(ReasoningEngine):
                     *pq._obj.points,
                 )
                 eqangle = Statement(Predicate.EQANGLE, points)
-                added[Predicate.EQANGLE].append((eqangle, dep))
+                added.append((eqangle, dep))
 
         return added
 
     def derive_cong_algebra(self, level: int) -> Derivations:
         """Derive new cong predicates."""
-        added = {
-            Predicate.INCI: [],
-            Predicate.CONGRUENT: [],
-            Predicate.CONSTANT_RATIO: [],
-        }
+        added = []
         for x in self.dtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
             dep = EmptyDependency(
@@ -177,14 +169,14 @@ class AlgebraicManipulator(ReasoningEngine):
                     continue
 
                 inci = Statement(Predicate.INCI, (a, b))
-                added[Predicate.INCI].append((inci, dep))
+                added.append((inci, dep))
 
             if len(x) == 4:
                 a, b, c, d = x
                 if not (a != b and c != d and (a != c or b != d)):
                     continue
                 cong = Statement(Predicate.CONGRUENT, (a, b, c, d))
-                added[Predicate.CONGRUENT].append((cong, dep))
+                added.append((cong, dep))
 
             if len(x) == 6:
                 a, b, c, d, num, den = x
@@ -192,7 +184,7 @@ class AlgebraicManipulator(ReasoningEngine):
                     continue
                 ratio, _ = self.symbols_graph.get_or_create_const_rat(num, den)
                 rconst = Statement(Predicate.CONSTANT_RATIO, (a, b, c, d, ratio))
-                added[Predicate.CONSTANT_RATIO].append((rconst, dep))
+                added.append((rconst, dep))
 
         return added
 
