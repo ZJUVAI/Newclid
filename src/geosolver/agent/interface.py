@@ -44,6 +44,7 @@ class MatchAction(NamedTuple):
 
 class ResolveEngineAction(NamedTuple):
     level: int
+    engineid: str
 
 
 class ApplyDerivationAction(NamedTuple):
@@ -89,7 +90,6 @@ class MatchFeedback(NamedTuple):
 
 class DeriveFeedback(NamedTuple):
     derives: "Derivations"
-    eq4s: "Derivations"
 
 
 class ApplyDerivationFeedback(NamedTuple):

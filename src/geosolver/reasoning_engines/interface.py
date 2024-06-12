@@ -1,13 +1,20 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
+from geosolver.agent.interface import DeriveFeedback
 from geosolver.dependencies.empty_dependency import DependencyBuilder
 from geosolver.statements.statement import Statement
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
 
-Derivation = tuple[Statement, DependencyBuilder]
+
+class Derivation(NamedTuple):
+    statement: Statement
+    dep_builder: DependencyBuilder
+
+
+Derivations = list[Derivation]
 
 
 class ReasoningEngine(ABC):
@@ -16,5 +23,5 @@ class ReasoningEngine(ABC):
         """Ingest a new dependency from the core reasoning engine."""
 
     @abstractmethod
-    def resolve(self, **kwargs) -> list[Derivation]:
+    def resolve(self, **kwargs) -> DeriveFeedback:
         """Deduces new statements and their initialized dependencies."""
