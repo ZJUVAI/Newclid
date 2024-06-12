@@ -59,9 +59,6 @@ class Point:
     def __iter__(self) -> str:
         return iter((self.x, self.y))
 
-    # def __eq__(self, p: "Point"):
-    #     return abs(self.x - p.x) < ATOM and abs(self.y - p.y) < ATOM
-
     def angle(self) -> float:
         return np.arctan2(self.y, self.x)
 
