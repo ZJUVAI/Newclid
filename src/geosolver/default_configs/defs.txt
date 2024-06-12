@@ -456,6 +456,6 @@ radiuscircle a y
 
 rconst2 x a b r
 x : a b x
-a b = 
+a b = diff a b
 x : rconst x a x b r
-rconst a b r
+rconst2 a b r
