@@ -130,7 +130,7 @@ class HumanAgent(DeductiveAgent):
         return ApplyTheoremAction(theorem, mapping)
 
     def _act_resolve_derivations(self, theorems: list[Theorem]) -> ResolveEngineAction:
-        return ResolveEngineAction(level=self.level)
+        return ResolveEngineAction(level=self.level, engineid="AR")
 
     def _act_apply_derivation(self, theorems: list[Theorem]) -> ApplyDerivationAction:
         choose_derivation_str = "\nAvailable derivations: \n"
@@ -231,12 +231,10 @@ class HumanAgent(DeductiveAgent):
         self, action: ResolveEngineAction, feedback: DeriveFeedback
     ) -> tuple[str, bool]:
         new_mappings: list[tuple[str, tuple[Point, ...]]] = []
-        for predicate, derivations_and_dependencies in feedback.derives.items():
-            for derivation_and_dependency in derivations_and_dependencies:
-                new_mappings.append((predicate, derivation_and_dependency))
-        for predicate, derivations_and_dependencies in feedback.eq4s.items():
-            for derivation_and_dependency in derivations_and_dependencies:
-                new_mappings.append((predicate, derivation_and_dependency))
+        for derivation_and_dependency in feedback.derives:
+            new_mappings.append(
+                (derivation_and_dependency[0].predicate, derivation_and_dependency)
+            )
 
         if not new_mappings:
             return "No new derivation found.\n", False
