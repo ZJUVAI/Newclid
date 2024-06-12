@@ -189,11 +189,12 @@ class BFSDDAR(DeductiveAgent):
 
     def remember_effects(self, action: Action, feedback: Feedback):
         if isinstance(feedback, DeriveFeedback):
-            for s, d in feedback.derives:
-                if s.predicate == Predicate.EQANGLE or s.predicate == Predicate.EQRATIO:
-                    self._eq4s.append((s, d))
+            for derive in feedback.derives:
+                predicate = derive.statement.predicate
+                if predicate == Predicate.EQANGLE or predicate == Predicate.EQRATIO:
+                    self._eq4s.append(derive)
                 else:
-                    self._derivations.append((s, d))
+                    self._derivations.append(derive)
         elif isinstance(feedback, ApplyDerivationFeedback):
             new_statements = len(feedback.added) > 1
             if new_statements:
