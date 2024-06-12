@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING, Optional, Union
 from numpy.random import Generator
 from geosolver._lazy_loading import lazy_import
 from geosolver.numerical import ATOM, close_enough
-from typing import overload
 
 if TYPE_CHECKING:
     import numpy
@@ -20,7 +19,7 @@ np: "numpy" = lazy_import("numpy")
 
 
 class Point:
-    """Numerical point/vector."""
+    """Numerical point."""
 
     def __init__(self, x, y):
         self.x = x
@@ -54,28 +53,13 @@ class Point:
     def __str__(self) -> str:
         return "P({},{})".format(self.x, self.y)
 
-    def __abs__(self) -> str:
-        return np.sqrt(self.dot(self))
-
-    def __iter__(self) -> str:
-        return iter((self.x, self.y))
-
-    def __eq__(self, p: "Point"):
-        return abs(self.x - p.x) < ATOM and abs(self.y - p.y) < ATOM
-
-    def angle(self) -> float:
-        return np.arctan2(self.y, self.x)
-
     def close(self, point: "Point", tol: float = ATOM) -> bool:
-        """Test if two points are close to each other"""
         return abs(self.x - point.x) < tol and abs(self.y - point.y) < tol
 
     def midpoint(self, p: "Point") -> "Point":
-        """Find the midpoint of two points"""
         return Point(0.5 * (self.x + p.x), 0.5 * (self.y + p.y))
 
     def distance(self, p: Union["Point", "Line", "Circle"]) -> float:
-        """Return the distance of a point and a shape"""
         if isinstance(p, Line):
             return p.distance(self)
         if isinstance(p, Circle):
@@ -89,7 +73,6 @@ class Point:
         return np.sqrt(dx2 + dy2)
 
     def distance2(self, p: "Point") -> float:
-        """Return the distance^2 of 2 points"""
         if isinstance(p, Line):
             return p.distance(self)
         dx = self.x - p.x
@@ -101,43 +84,35 @@ class Point:
         return dx * dx + dy * dy
 
     def rotatea(self, ang: float) -> "Point":
-        """Return the point rotated around O by an angle ang"""
         sinb, cosb = np.sin(ang), np.cos(ang)
         return self.rotate(sinb, cosb)
 
     def rotate(self, sinb: float, cosb: float) -> "Point":
-        """Return the vector rotated around O by an angle b defined by sinb and cosb"""
         x, y = self.x, self.y
         return Point(x * cosb - y * sinb, x * sinb + y * cosb)
 
     def flip(self) -> "Point":
-        """Return the point fliped by the y-axis (vertically)"""
         return Point(-self.x, self.y)
 
     def perpendicular_line(self, line: "Line") -> "Line":
-        """Return the perpendicular line through the point"""
         return line.perpendicular_line(self)
 
     def foot(self, line: "Line") -> "Point":
-        """Return the perpendicular foot of the point to a line"""
         if isinstance(line, Line):
             perpendicular_line = line.perpendicular_line(self)
             return line_line_intersection(perpendicular_line, line)
-        elif isinstance(line, Circle):  # a line could be a circle!
+        elif isinstance(line, Circle):
             c, r = line.center, line.radius
             return c + (self - c) * r / self.distance(c)
         raise ValueError("Dropping foot to weird type {}".format(type(line)))
 
     def parallel_line(self, line: "Line") -> "Line":
-        """Return the parallel line through the point to a line"""
         return line.parallel_line(self)
 
     def norm(self) -> float:
-        """Return the norm of the vector"""
         return np.sqrt(self.x**2 + self.y**2)
 
     def cos(self, other: "Point") -> float:
-        """Return the cos of the smaller angle between two vectors"""
         x, y = self.x, self.y
         a, b = other.x, other.y
         return (x * a + y * b) / self.norm() / other.norm()
@@ -152,16 +127,8 @@ class Point:
         return self.distance(other) <= ATOM
 
 
-class Segment:
-    """Numerical segment."""
-
-    def __init__(self, p1: Point, p2: Point):
-        self.p1 = p1
-        self.p2 = p2
-
-
 class Line:
-    """Numerical line : ax+by+c=0"""
+    """Numerical line."""
 
     def __init__(
         self,
@@ -234,15 +201,7 @@ class Line:
         a, b, c = self.coefficients
         return abs(self(p.x, p.y)) / math.sqrt(a * a + b * b)
 
-    @overload
-    def __call__(self, x: Point) -> float:
-        ...
-
-    @overload
-    def __call__(self, x: float, y: float) -> float:
-        ...
-
-    def __call__(self, x, y=None) -> float:
+    def __call__(self, x: "Point", y: "Point" = None) -> float:
         if isinstance(x, Point) and y is None:
             return self(x.x, x.y)
         a, b, c = self.coefficients
@@ -269,7 +228,7 @@ class Line:
         return a * x + b * y
 
     def point_at(self, x: float = None, y: float = None) -> Optional[Point]:
-        """Get a point on line satisfying x=x and y=y, return None if impossible."""
+        """Get a point on line closest to (x, y)."""
         a, b, c = self.coefficients
         # ax + by + c = 0
         if x is None and y is not None:
@@ -399,12 +358,6 @@ class Circle:
                 result = x
 
         return [result]
-
-
-class Angle:
-    def __init__(self, l1: Line, l2: Line):
-        self.l1 = l1
-        self.l2 = l2
 
 
 class HalfLine(Line):
