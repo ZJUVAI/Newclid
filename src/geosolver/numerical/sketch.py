@@ -735,7 +735,7 @@ def sketch_eqratio(args: tuple[gm.Point, ...], **kwargs) -> Circle:
 
 
 def sketch_rconst(args: tuple[gm.Point, ...], **kwargs) -> Circle:
-    """Sketches point x such that ab/cx=m/n"""
+    """Sketches point x such that ab/cx=r"""
     A, B, C, r = args
     dab = A.distance(B)
     length = float(dab / Fraction(r.name))
@@ -764,3 +764,21 @@ def sketch_eqratio6(args: tuple[gm.Point, ...], **kwargs) -> Circle | Line:
 def sketch_radiuscircle(args: tuple[gm.Point, ...], **kwargs) -> Circle:
     a, y = args
     return Circle(center=a, radius=y)
+
+
+def sketch_rconst2(args: tuple[gm.Point, ...], **kwargs) -> Circle | Line:
+    """Sketches point x such that ax/bx=r"""
+
+    A, B, r = args
+    ratio = Fraction(r.name)
+
+    if ratio == 1 / 1:
+        M = (A + B) * 0.5
+        return M.perpendicular_line(Line(A, B))
+
+    else:
+        extremum_1 = (1 / (1 - ratio)) * (A - ratio * B)
+        extremum_2 = (1 / (1 + ratio)) * (ratio * B + A)
+        center = (extremum_1 + extremum_2) * 0.5
+        radius = 0.5 * extremum_1.distance(extremum_2)
+        return Circle(center=center, radius=radius)

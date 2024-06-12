@@ -453,3 +453,9 @@ a : x a
 a = a
 x : lconst x a y
 radiuscircle a y
+
+rconst2 x a b r
+x : a b x
+a b = 
+x : rconst x a x b r
+rconst a b r
