@@ -6,7 +6,7 @@
 
 
 import math
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union, overload
 
 from numpy.random import Generator
 from geosolver._lazy_loading import lazy_import
@@ -52,6 +52,18 @@ class Point:
 
     def __str__(self) -> str:
         return "P({},{})".format(self.x, self.y)
+
+    def __abs__(self) -> str:
+        return np.sqrt(self.dot(self))
+
+    def __iter__(self) -> str:
+        return iter((self.x, self.y))
+
+    # def __eq__(self, p: "Point"):
+    #     return abs(self.x - p.x) < ATOM and abs(self.y - p.y) < ATOM
+
+    def angle(self) -> float:
+        return np.arctan2(self.y, self.x)
 
     def close(self, point: "Point", tol: float = ATOM) -> bool:
         return abs(self.x - point.x) < tol and abs(self.y - point.y) < tol
@@ -125,6 +137,14 @@ class Point:
 
     def is_same(self, other: "Point") -> bool:
         return self.distance(other) <= ATOM
+
+
+class Segment:
+    """Numerical segment."""
+
+    def __init__(self, p1: Point, p2: Point):
+        self.p1 = p1
+        self.p2 = p2
 
 
 class Line:
@@ -201,7 +221,15 @@ class Line:
         a, b, c = self.coefficients
         return abs(self(p.x, p.y)) / math.sqrt(a * a + b * b)
 
-    def __call__(self, x: "Point", y: "Point" = None) -> float:
+    @overload
+    def __call__(self, x: Point) -> float:
+        ...
+
+    @overload
+    def __call__(self, x: float, y: float) -> float:
+        ...
+
+    def __call__(self, x, y=None) -> float:
         if isinstance(x, Point) and y is None:
             return self(x.x, x.y)
         a, b, c = self.coefficients
@@ -298,6 +326,12 @@ class Line:
                 result = x
 
         return [result]
+
+
+class Angle:
+    def __init__(self, l1: Line, l2: Line):
+        self.l1 = l1
+        self.l2 = l2
 
 
 class Circle:
