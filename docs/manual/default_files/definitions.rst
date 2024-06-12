@@ -169,15 +169,100 @@ eqdia_quadrangle a b c d
 .. |eqdia_quadrangle| image:: ../../_static/Images/defs/eqdia_quadrangle.png
     :width: 100%
 
-- **eqdistance x a b c:** From two different points b, c, and with a base point a (that can be b or c themselves), adds x such that the distance from x to a is equal to the distance from b to c. Adds the congruence statement that ax=bc. Construction returns a circle that can be subjected to intersections.
+eqdistance x a b c
+^^^^^^^^^^^^^^^^^^
 
-- **foot x a b c:** From three non-collinear points a, b, c, adds x that is the perpendicular projection of a onto line bc. Adds the statements that x, b, and c are collinear, and that ax is perpendicular to bc.
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
 
-- **free a:** From nothing, adds a point a with random coordinates.
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |eqdistance|
+     - From two different points b, c, and with a base point a (that can be either b or c itself), adds x such that the distance from x to a is equal to the distance from b to c.
+     - :math:`ax=bc`  (cong x a b c)
+     - Circle
 
-- **incenter x a b c:** From three non-collinear points a, b, c, adds x the incenter of the triangle abc. Adds the corresponding three angle congruence statements corresponding to the fact that the incenter is the meeting of the three internal bisectors of the angles of the triangle.
+.. |eqdistance| image:: ../../_static/Images/defs/eqdistance.png
+    :width: 100%
 
-- **incenter2 x y z i a b c:** From three non-collinear points a, b, c, adds i, the incenter of the triangle abc, as well as x, y, and z, the tangent points of the incircle with sides bc, ac, and ab, respectively. Adds the three angle congruence statements corresponding to the fact that the incenter is the meeting of the three internal bisectors of the angles of the triangle, as well as the three collinear statements that place x, y, and z in the corresponding sides of the triangle abc. It also adds the perpendicular statements that ix is perpendicular to bc, that iy is perpendicular to ac, and that iz is perpendicular to ab, given by the tangency of circle and triangle. Finally, it adds the congruence statements ix=iy and iy=iz, given by the fact that x, y, z are in the circle of center i.
+foot x a b c
+^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |foot|
+     - From three non-collinear points a, b, c, adds x that is the perpendicular projection of a onto line bc.
+     - :math:`\begin{cases}x,b,c\ collinear\\ ax\perp bc\end{cases}`  (coll x b c, perp x a b c)
+     - Point
+
+.. |foot| image:: ../../_static/Images/defs/foot.png
+    :width: 100%
+
+free a
+^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |free|
+     - From nothing, adds point a with random coordinates.
+     - No statement added
+     - Point
+
+.. |free| image:: ../../_static/Images/defs/free.png
+    :width: 100%
+
+incenter x a b c
+^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |incenter|
+     - From three non-collinear points a, b, c, adds x the incenter of the triangle abc. It acknowledges the fact that it is the intersection of the three internal bisectors of the angles of the triangle.
+     - :math:`\begin{cases}\widehat{bax}=\widehat{xac}\\ \widehat{acx}=\widehat{xcb}\\ \widehat{cbx}=\widehat{xba}\end{cases}`  (eqangle a b a x a x a c, eqangle c a c x c x c b, eqangle b c b x b x b a)
+     - Point
+
+.. |incenter| image:: ../../_static/Images/defs/incenter.png
+    :width: 100%
+
+incenter2 x y z i a b c
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |incenter2|
+     - From three non-collinear points a, b, c, adds i, the incenter of the triangle abc, as well as x, y, and z, the tangent points of the incircle with sides bc, ac, and ab, respectively. It acknowledges the fact that the incenter is the intersection of the three internal bisectors of the angles of the triangle, and that a radius of a circle and the tangent line are perpendicular at the point of tangency.
+     - :math:`\begin{cases}\widehat{bax}=\widehat{xac}\\ \widehat{acx}=\widehat{xcb}\\ \widehat{cbx}=\widehat{xba}\\ x,b,c\ collinear\\ ix\perp bc\\ y,c,a\ collinear\\ iy\perp ca\\ z,a,b\ collinear\\ iz\perp ab\\ ix=iy, iy=iz\end{cases}`  (eqangle a b a i a i a c, eqangle c a c i c i c b, eqangle b c b i b i b a, coll x b c, perp i x b c, coll y c a, perp i y c a, coll z a b, perp i z a b, cong i x i y, cong i y i z)
+     - Points
+
+.. |incenter2| image:: ../../_static/Images/defs/incenter2.png
+    :width: 100%
 
 - **excenter x a b c:** From three non-collinear points a, b, c, adds x the excenter of triangle abc in a way that the corresponding excircle is externally tangent to side bc. Symbolically, it works exactly as the incenter construction because the angle constructions in DD do not differentiate the two bisectors of an angle crossing.
 
