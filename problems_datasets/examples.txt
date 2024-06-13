@@ -100,5 +100,7 @@ double_angle_implies_central_angle
 a o x = triangle a o x; c = eqdistance c o o a; b = angle_mirror b a o x, on_aline0 b a o o x a c c ? cong o b o a
 double_angle_implies_central_angle_2
 a o = segment a o; b = eqdistance b o o a; x = angle_bisector x a o b; c = eqangle3 c a b o a x ? cong o c o a
+checking_rconst2
+a b = segment a b; x = rconst2 x a b 1/3 ? rconst a x b x 1/3
 testing_problem
 a b = segment a b; x = s_angle a b x 63o; y = s_angle a b y 143o ? aconst y b b x 4pi/9

@@ -704,7 +704,7 @@ class Proof:
         return added, to_cache, plevel
 
     def map_args_to_objects(
-        self, construction: Statement, mapping: Optional[dict[str, str]] = None
+        self, construction: Construction, mapping: Optional[dict[str, str]] = None
     ) -> list[Point | Angle | Ratio]:
         def make_const(x):
             arg_obj, _ = self.symbols_graph.get_or_create_const(x, construction.name)
