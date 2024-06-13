@@ -102,5 +102,13 @@ double_angle_implies_central_angle_2
 a o = segment a o; b = eqdistance b o o a; x = angle_bisector x a o b; c = eqangle3 c a b o a x ? cong o c o a
 checking_rconst2
 a b = segment a b; x = rconst2 x a b 1/3 ? rconst a x b x 1/3
+menelaus_test
+a b c = triangle a b c; f = on_line f a b, rconst2 f a b 1/2; d = on_line d b c, rconst2 d b c 1/2; e = on_line e d f, on_line e c a ? rconst c e a e 4/1
+menelaus_frac1_test
+a b c = triangle a b c; f = on_line f a b, rconst2 f a b 1/1; d = on_line d b c; e = on_line e d f, on_line e c a ? eqratio b d d c e a e c
+menelaus_crossed_cong_test
+a b c = triangle a b c; d = on_line d b c; e = on_line e c a, eqdistance e c d c; f = on_line f a b, on_line f d e ? eqratio b d e a f b a f
+frac1_cong
+a b = segment a b; c = free c; d = rconst a b c d 1/1 ? cong a b c d
 testing_problem
-a b = segment a b; x = s_angle a b x 63o; y = s_angle a b y 143o ? aconst y b b x 4pi/9
+a b c = triangle a b c; o = circle o a b c; p = on_circle p o a; q = on_tline q p o p; pa = reflect pa p b c; pb = reflect pb p c a; pc = reflect pc p a b; qa = reflect qa q b c; qb = reflect qb q c a; qc = reflect qc q a b; a1 = on_line a1 pb qb, on_line a1 pc qc; b1 = on_line b1 pa qa, on_line b1 pc qc; c1 = on_line c1 pa qa, on_line c1 pb qb; o1 = circle o1 a1 b1 c1; x = on_circle x o a, on_circle x o1 a1 ? cyclic pa pb c x
