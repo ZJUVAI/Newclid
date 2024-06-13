@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import Optional, Tuple, Union
+from typing import TYPE_CHECKING, Optional, Tuple, Union
 from typing_extensions import Self
 import logging
 
@@ -54,9 +54,14 @@ from geosolver.dependencies.empty_dependency import DependencyBuilder
 from geosolver.dependencies.caching import DependencyCache
 from geosolver.dependencies.dependency import Reason, Dependency
 from geosolver.dependencies.dependency_graph import DependencyGraph
+from geosolver._lazy_loading import lazy_import
 
-from numpy.random import Generator
-import numpy as np
+
+if TYPE_CHECKING:
+    import numpy.random
+
+
+np_random: "numpy.random" = lazy_import("numpy.random")
 
 
 FREE = [
@@ -110,7 +115,7 @@ class Proof:
         external_reasoning_engines: dict[str, ReasoningEngine],
         symbols_graph: SymbolsGraph,
         statements_handler: StatementsHandler,
-        rnd_generator: Generator = None,
+        rnd_generator: "numpy.random.Generator" = None,
     ):
         self.dependency_cache = dependency_cache
         self.symbols_graph = symbols_graph
@@ -134,7 +139,7 @@ class Proof:
             StopAction: self._step_stop,
         }
         self.rnd_gen = (
-            rnd_generator if rnd_generator is not None else np.random.default_rng()
+            rnd_generator if rnd_generator is not None else np_random.default_rng()
         )
 
     @classmethod
@@ -144,7 +149,7 @@ class Proof:
         definitions: dict[str, Definition],
         disabled_intrinsic_rules: Optional[list[IntrinsicRules]] = None,
         max_attempts: int = 10000,
-        rnd_generator: Generator = None,
+        rnd_generator: "numpy.random.Generator" = None,
     ) -> Self:
         """Build a problem into a Proof state object."""
         proof = None
@@ -378,7 +383,7 @@ class Proof:
     def get_rnd_generator(self):
         return self.rnd_gen
 
-    def set_rnd_generator(self, rnd_gen: Generator):
+    def set_rnd_generator(self, rnd_gen: "numpy.random.Generator"):
         del self.rnd_gen
         self.rnd_gen = rnd_gen
 

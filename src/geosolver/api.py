@@ -5,10 +5,10 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 import traceback
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from typing_extensions import Self
 import copy as cp
-import numpy as np
+
 
 from geosolver.definitions.clause import Clause
 from geosolver.definitions.definition import Definition
@@ -21,6 +21,13 @@ from geosolver.run_loop import run_loop
 from geosolver.problem import Problem, setup_str_from_problem
 from geosolver.proof_writing import write_solution
 from geosolver.statements.adder import IntrinsicRules
+from geosolver._lazy_loading import lazy_import
+
+
+if TYPE_CHECKING:
+    import numpy
+
+np: "numpy" = lazy_import("numpy")
 
 
 class GeometricSolver:
