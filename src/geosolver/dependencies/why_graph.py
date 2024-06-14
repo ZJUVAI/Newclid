@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional
 
 from geosolver.dependencies.caching import DependencyCache
 from geosolver.dependencies.dependency import Dependency, Reason
-from geosolver.dependencies.dependency_building import DependencyBuilder
+from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.dependencies.dependency_graph import rgba_to_hex
 
 from geosolver.dependencies.why_predicates import why_dependency
@@ -41,13 +41,18 @@ class WhyHyperGraph:
         self.dependency_cache = dependency_cache
 
     def build_dependency(
-        self, statement: "Statement", builder: "DependencyBuilder"
+        self, statement: "Statement", body: "DependencyBody"
     ) -> "Dependency":
+        """Build a Dependency from a statement and a body.
+
+        ..image:: _static/Images/dependency_building/build_dependency.png
+
+        """
         dependency = Dependency(
             statement=statement,
-            why=tuple(builder.why),
-            reason=builder.reason,
-            level=builder.level,
+            why=tuple(body.why),
+            reason=body.reason,
+            level=body.level,
         )
         self._add_dependency(dependency)
         return dependency
@@ -76,7 +81,7 @@ class WhyHyperGraph:
     ):
         return self.build_dependency(
             statement,
-            DependencyBuilder(reason=reason, level=level, why=why),
+            DependencyBody(reason=reason, level=level, why=why),
         )
 
     def _add_dependency(self, dependency: Dependency):

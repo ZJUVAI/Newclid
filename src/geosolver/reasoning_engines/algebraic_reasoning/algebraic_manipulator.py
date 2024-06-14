@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.reasoning_engines.interface import Derivation, ReasoningEngine
 from geosolver.predicates import Predicate
-from geosolver.dependencies.dependency_building import DependencyBuilder
+from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.geometry import is_equiv
 from geosolver.numerical.check import check_numerical
 
@@ -75,7 +75,7 @@ class AlgebraicManipulator(ReasoningEngine):
 
         for x in self.rtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
-            dep = DependencyBuilder(
+            dep = DependencyBody(
                 reason=Reason(AlgebraicRules.Ratio_Chase), why=why, level=level
             )
 
@@ -107,7 +107,7 @@ class AlgebraicManipulator(ReasoningEngine):
 
         for x in self.atable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
-            dep = DependencyBuilder(
+            dep = DependencyBody(
                 reason=Reason(AlgebraicRules.Angle_Chase), why=why, level=level
             )
 
@@ -152,7 +152,7 @@ class AlgebraicManipulator(ReasoningEngine):
         added = []
         for x in self.dtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
-            dep = DependencyBuilder(
+            dep = DependencyBody(
                 reason=Reason(AlgebraicRules.Distance_Chase), why=why, level=level
             )
 

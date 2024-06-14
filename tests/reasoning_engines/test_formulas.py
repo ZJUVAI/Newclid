@@ -4,7 +4,7 @@ from typing_extensions import Self
 
 from geosolver.api import GeometricSolverBuilder
 from geosolver.dependencies.dependency import Dependency, Reason
-from geosolver.dependencies.dependency_building import DependencyBuilder
+from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.geometry import Point
 from geosolver.predicates import Predicate
 from geosolver.reasoning_engines.formulas import (
@@ -103,7 +103,7 @@ class TestMenelaus:
             [
                 Derivation(
                     Statement(Predicate.CONSTANT_RATIO, (c, e, a, e, expected_r)),
-                    DependencyBuilder(
+                    DependencyBody(
                         Reason("Menelaus"), why=given_dependencies, level=None
                     ),
                 ),
