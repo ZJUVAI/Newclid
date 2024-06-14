@@ -4,7 +4,7 @@ from collections import defaultdict
 from fractions import Fraction as frac
 from typing import TYPE_CHECKING, Any, Generator
 
-from geosolver.geometry import Direction, Length, Line, Point
+from geosolver.geometry import Direction, Length, Line, Node, Point
 from geosolver.ratios import simplify
 from geosolver._lazy_loading import lazy_import
 
@@ -164,8 +164,8 @@ class Table:
 
     def __init__(self, const: str = "1"):
         self.const = const
-        self.v2e = {}
-        self.add_free(const)  # the table {var: expression}
+        self.v2e = {}  # the table {var: {vark : coefk}} var = sum coefk*vark
+        self.add_free(const)
 
         # to cache what is already derived/inputted
         self.eqs = set()
@@ -186,7 +186,7 @@ class Table:
             self.v2e[v] = replace(e, v0, e0)
 
     def add_expr(self, vc: list[tuple[str, float]]) -> bool:
-        """Add a new equality, represented by the list of tuples vc=[(v, c), ..]."""
+        """Add a new equality (sum cv = 0), represented by the list of tuples vc=[(v, c), ..]."""
         result = {}
         free = []
 
@@ -499,11 +499,11 @@ class GeometricTable(Table):
         super().__init__(name)
         self.v2obj = {}
 
-    def get_name(self, objs: list[Any]) -> list[str]:
+    def get_name(self, objs: list[Node]) -> list[str]:
         self.v2obj.update({o.name: o for o in objs})
         return [o.name for o in objs]
 
-    def map2obj(self, names: list[str]) -> list[Any]:
+    def map2obj(self, names: list[str]) -> list[Node]:
         return [self.v2obj[n] for n in names]
 
     def get_all_eqs_and_why(self, return_quads: bool) -> Generator[Any, None, None]:
