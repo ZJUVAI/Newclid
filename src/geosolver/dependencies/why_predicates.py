@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Callable, Optional, TypeVar
+from typing import TYPE_CHECKING, Callable, Optional, TypeVar
 
 
 from geosolver.statements.statement import Statement
@@ -39,6 +39,7 @@ def why_dependency(
 
     predicate = Predicate(statement.name)
     reason = Reason(f"why_{predicate.value}_resolution")
+
     if predicate is Predicate.IND:
         return reason, []
 
@@ -49,7 +50,7 @@ def why_dependency(
     return reason, why
 
 
-def _why_equal(x: Node, y: Node, level: int = None) -> list[Any]:
+def _why_equal(x: Node, y: Node, level: int = None) -> list[Dependency]:
     if x == y:
         return []
     if not x._val or not y._val:
@@ -411,103 +412,6 @@ def _why_eqratio(
     return None, why_eqratio
 
 
-def _why_eqratio3(
-    statements_graph: "WhyHyperGraph", statement: "Statement", level: int
-) -> tuple[Optional[Reason], list[Dependency]]:
-    a, b, c, d, m, n = statement.args
-    return Reason("br07"), _why_statement_list(
-        statements_graph,
-        [
-            Statement(Predicate.PARALLEL, [a, b, c, d]),
-            Statement(Predicate.COLLINEAR, [m, a, c]),
-            Statement(Predicate.COLLINEAR, [n, b, d]),
-        ],
-        level=level,
-    )
-
-
-def _why_simtri(
-    statements_graph: "WhyHyperGraph", statement: "Statement", level: int
-) -> tuple[Optional[Reason], list[Dependency]]:
-    a, b, c, x, y, z = statement.args
-    return Reason("br34"), _why_statement_list(
-        statements_graph,
-        [
-            Statement(Predicate.EQANGLE, [a, b, a, c, x, y, x, z]),
-            Statement(Predicate.EQANGLE, [b, a, b, c, y, x, y, z]),
-        ],
-        level=level,
-    )
-
-
-def _why_simtri_both(
-    statements_graph: "WhyHyperGraph", statement: "Statement", level: int
-) -> tuple[Optional[Reason], list[Dependency]]:
-    a, b, c, p, q, r = statement.args
-    return Reason("br38"), _why_statement_list(
-        statements_graph,
-        [
-            Statement(Predicate.EQRATIO, [b, a, b, c, q, p, q, r]),
-            Statement(Predicate.EQRATIO, [c, a, c, b, r, p, r, q]),
-        ],
-        level=level,
-    )
-
-
-def _why_contri(
-    statements_graph: "WhyHyperGraph", statement: "Statement", level: int
-) -> tuple[Optional[Reason], list[Dependency]]:
-    a, b, c, x, y, z = statement.args
-    return Reason("br36"), _why_statement_list(
-        statements_graph,
-        [
-            Statement(Predicate.EQANGLE, [b, a, b, c, y, x, y, z]),
-            Statement(Predicate.EQANGLE, [c, a, c, b, z, x, z, y]),
-            Statement(Predicate.CONGRUENT, [a, b, x, y]),
-        ],
-        level=level,
-    )
-
-
-def why_contri_2(
-    statements_graph: "WhyHyperGraph", statement: "Statement", level: int
-) -> tuple[Optional[Reason], list[Dependency]]:
-    a, b, c, x, y, z = statement.args
-    return Reason("br37"), _why_statement_list(
-        statements_graph,
-        [
-            Statement(Predicate.EQANGLE, [b, a, b, c, y, z, y, x]),
-            Statement(Predicate.EQANGLE, [c, a, c, b, z, y, z, x]),
-            Statement(Predicate.CONGRUENT, [a, b, x, y]),
-        ],
-        level=level,
-    )
-
-
-def _why_contri_both(
-    statements_graph: "WhyHyperGraph", statement: "Statement", level: int
-) -> tuple[Optional[Reason], list[Dependency]]:
-    a, b, c, x, y, z = statement.args
-    return Reason("br32"), _why_statement_list(
-        statements_graph,
-        [
-            Statement(Predicate.CONGRUENT, [a, b, x, y]),
-            Statement(Predicate.CONGRUENT, [b, c, y, z]),
-            Statement(Predicate.CONGRUENT, [c, a, z, x]),
-        ],
-        level=level,
-    )
-
-
-def _why_statement_list(
-    statements_graph: "WhyHyperGraph", statements: list[Statement], level: int
-):
-    return [
-        statements_graph.build_resolved_dependency(statement, level, use_cache=False)
-        for statement in statements
-    ]
-
-
 def _why_aconst(
     statements_graph: "WhyHyperGraph", statement: "Statement", level: int
 ) -> tuple[Optional[Reason], list[Dependency]]:
@@ -604,12 +508,6 @@ PREDICATE_TO_WHY: dict[
     Predicate.EQANGLE6: _why_eqangle,
     Predicate.EQRATIO: _why_eqratio,
     Predicate.EQRATIO6: _why_eqratio,
-    Predicate.EQRATIO3: _why_eqratio3,
-    Predicate.SIMILAR_TRIANGLE: _why_simtri,
-    Predicate.SIMILAR_TRIANGLE_BOTH: _why_simtri_both,
-    Predicate.CONTRI_TRIANGLE: _why_contri,
-    Predicate.CONTRI_TRIANGLE_REFLECTED: why_contri_2,
-    Predicate.CONTRI_TRIANGLE_BOTH: _why_contri_both,
     Predicate.CONSTANT_ANGLE: _why_aconst,
     Predicate.CONSTANT_RATIO: _why_rconst,
     Predicate.DIFFERENT: _why_numerical,

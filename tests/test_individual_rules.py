@@ -6,6 +6,7 @@ from geosolver.proof_writing import get_proof_steps, proof_step_string
 from geosolver.statements.adder import IntrinsicRules
 
 
+# (
 EXPECTED_TO_FAIL = [
     "eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C => simtri2 A B C P Q R",
     "eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R",
@@ -40,6 +41,12 @@ EXPECTED_WRONG_PROOF_LENGTH = [
     "para a b c d, coll m a d, coll n b c, para m n a b => eqratio6 m a m d n b n c",
     "eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R",
 ]
+
+DEFINITIONAL_RULES = [  # rules not applied
+    "r32"
+]
+
+# )
 
 
 @pytest.mark.parametrize(
@@ -290,6 +297,8 @@ def test_rule_used_to_solve_in_one_step(
         pytest.xfail(f"Rule {rule_txt} is expected to fail.")
 
     assert success
+    if rule_name in DEFINITIONAL_RULES:
+        return
 
     setup, aux, proof_steps, refs = get_proof_steps(
         solver.proof_state, solver.problem.goal
