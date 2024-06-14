@@ -97,14 +97,10 @@ r05 : eqangle_on_circle2cong
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{cyclic}(ABCPQR)\wedge \langle CA,CB\rangle=\langle RP,RQ\rangle\implies |AB|=|PQ|`
-     - 
+     - Formal Statement
+     - Description
    * - |r05|
-     -
-       .. code-block :: text
-
-         cyclic A B C P Q R, eqangle C A C B R P R Q
-         => cong A B P Q
+     - :math:`\begin{cases}ABCPQR\text{ in a circle}\\ \angle (CA\times CB)=\angle (RP\times RQ)\end{cases}\implies |AB|=|PQ|`
      - 
 
 .. |r05| image:: ../../_static/Images/rules/r05.png
@@ -117,14 +113,10 @@ r06 : Base of half triangle
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{midp}(E, AB) \wedge \text{midp}(F, AC) \implies EF \parallel BC`
-     - 
+     - Formal Statement
+     - Description
    * - |r06|
-     -
-       .. code-block :: text
-
-         midp E A B, midp F A C
-         => para E F B C
+     - :math:`\begin{cases}E\text{ midpoint of } AB\\ F\text{ midpoint of }AC\end{cases} \implies EF \parallel BC`
      - 
 
 .. |r06| image:: ../../_static/Images/rules/r06.png
@@ -137,15 +129,10 @@ r07 : para2eqratio3
    :header-rows: 1
 
    * - Figure
-     - :math:`AB \parallel CD \wedge \text{coll}(OAC) \wedge \text{coll}(OBD)`
-       :math:`\implies \text{eqratio3}(A, B, C, D, O, O)`
-     - 
+     - Formal Statement
+     - Description
    * - |r07|
-     -
-       .. code-block :: text
-
-         para A B C D, coll O A C, coll O B D
-         => eqratio3 A B C D O O
+     - :math:`\begin{cases}AB\parallel CD\\ OAC \text{ collinear}\\ OBD\text{ collinear}\end{cases}\implies \begin{cases}\frac{OA}{OC}=\frac{OB}{OD}\\ \frac{AO}{AC}=\frac{BO}{BD}\\ \frac{OC}{AC}=\frac{OD}{BD}\end{cases}`
      - 
 
 .. |r07| image:: ../../_static/Images/rules/r07.png
@@ -158,35 +145,26 @@ r08 : perp_perp2eqangle
    :header-rows: 1
 
    * - Figure
-     - :math:`AB \perp CD \wedge EF \perp GH \implies \langle AB, EF\rangle = \langle CD, GH\rangle`
-     - 
+     - Formal Statement
+     - Description
    * - |r08|
-     -
-       .. code-block :: text
-
-         perp A B C D, perp E F G H, npara A B E F
-         => eqangle A B E F C D G H
+     - :math:`AB \perp CD \wedge EF \perp GH \implies \angle (AB\times EF) = \angle (CD\times GH)`
      - 
 
 .. |r08| image:: ../../_static/Images/rules/r08.png
     :width: 100%
 
-r09 : eqangle2eqangle_sum
-^^^^^^^^^^^^^^^^^^^^^^^^^
+r09 : Sum of angles of a triangle
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
 
    * - Figure
-     - :math:`\langle ab, cd\rangle = \langle mn, pq\rangle \wedge \langle cd, ef\rangle = \langle pq, ru\rangle`
-       :math:`\implies \langle ab, ef\rangle = \langle mn, ru\rangle`
-     - 
+     - Formal Statement
+     - Description
    * - |r09|
-     -
-       .. code-block :: text
-
-         eqangle a b c d m n p q, eqangle c d e f p q r u
-         => eqangle a b e f m n r u
+     - :math:`\begin{cases}\angle (AB\times CD)=\angle (MN\times PQ)\\ \angle (CD\times EF)=\angle (PQ\times RU)\end{cases}\implies \angle(AB\times EF)=\angle(MN\times RU)`
      - 
 
 .. |r09| image:: ../../_static/Images/rules/r09.png
@@ -199,15 +177,11 @@ r10 : Ratio cancellation
    :header-rows: 1
 
    * - Figure
-     - :math:`\frac{ab}{cd} = \frac{mn}{pq} \wedge \frac{cd}{ef} = \frac{pq}{ru} \implies \frac{ab}{ef} = \frac{mn}{ru}`
-     - 
+     - Formal Statement
+     - Description
    * - (Just a multiplication)
-     -
-       .. code-block :: text
-
-         eqratio a b c d m n p q, eqratio c d e f p q r u
-         => eqratio a b e f m n r u
-     - 
+     - :math:`\frac{AB}{CD} = \frac{MN}{PQ} \wedge \frac{CD}{EF} = \frac{PQ}{RU} \implies \frac{AB}{EF} = \frac{MN}{RU}`
+     - This is a simple algebraic fact: if you multiply the two equalities from the hypothesis together, there will be a cancellation of numerators and denominators giving you the consequence.
 
 r11 : eqratio2angle_bisector
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -216,16 +190,10 @@ r11 : eqratio2angle_bisector
    :header-rows: 1
 
    * - Figure
-     - Formula
-     - 
+     - Formal Statement
+     - Description
    * - |r11|
-     -
-       :math:`\frac{db}{dc} = \frac{ab}{ac} \wedge \text{coll}(dbc) \implies \langle ab, ad, ad, ac\rangle`
-
-       .. code-block :: text
-
-         eqratio6 d b d c a b a c, coll d b c, ncoll a b c
-         => eqangle6 a b a d a d a c
+     - :math:`\begin{cases}\frac{DB}{DC} = \frac{AB}{AC} \\DBC\text{ collinear} \end{cases}\implies \angle (AB\times AD)=\angle(AD\times AC)`
      - 
 
 .. |r11| image:: ../../_static/Images/rules/r11.png
@@ -238,14 +206,10 @@ r12 : Bisector theorem
    :header-rows: 1
 
    * - Figure
-     - :math:`\langle ab, ad\rangle = \langle ad, ac\rangle \wedge \text{coll}(dbc) \implies \frac{db}{dc} = \frac{ab}{ac}`
-     - 
+     - Formal Statement
+     - Description
    * - |r12|
-     -
-       .. code-block :: text
-
-         eqangle6 a b a d a d a c, coll d b c, ncoll a b c
-         => eqratio6 d b d c a b a c
+     - :math:`\begin{cases}\angle (AB\times AD) = \angle (AD\times AC) \\ DBC\text{ collinear}\end{cases} \implies \frac{DB}{DC} = \frac{AB}{AC}`
      - 
 
 .. |r12| image:: ../../_static/Images/rules/r12.png
@@ -258,16 +222,10 @@ r13 : Isosceles triangle equal angles
    :header-rows: 1
 
    * - Figure
-     - Formula
-     - 
+     - Formal Statement
+     - Description
    * - |r13|
-     -
-       :math:`|OA|=|OB| \implies \langle OA, AB\rangle = \langle AB, OB\rangle`
-
-       .. code-block :: text
-
-         cong O A O B, ncoll O A B
-         => eqangle O A A B A B O B
+     - :math:`|OA|=|OB| \implies \angle (OA\times AB) = \angle (AB\times OB)`
      - 
 
 .. |r13| image:: ../../_static/Images/rules/r13.png
@@ -280,14 +238,10 @@ r14 : Equal base angles imply isosceles
    :header-rows: 1
 
    * - Figure
-     - :math:`\langle AO, AB\rangle = \langle BA, BO\rangle \implies |OA|=|OB|`
-     - 
+     - Formal Statement
+     - Description
    * - |r14|
-     -
-       .. code-block :: text
-
-         eqangle6 A O A B B A B O, ncoll O A B
-         => cong O A O B
+     - :math:`\angle (AO\times AB) = \angle (BA\times BO) \implies |OA|=|OB|`
      - 
 
 .. |r14| image:: ../../_static/Images/rules/r14.png
@@ -300,14 +254,10 @@ r15 : circle_perp2eqangle
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{circle}(O, ABC) \wedge OA \perp AX \implies \langle AX, AB\rangle = \langle CA, CB\rangle`
-     - 
+     - Formal Statement
+     - Description
    * - |r15|
-     -
-       .. code-block :: text
-
-         circle O A B C, perp O A A X
-         => eqangle A X A B C A C B
+     - :math:`\begin{cases} O\text{ center of circle }ABC \\ OA \perp AX\end{cases} \implies \angle (AX\times AB) = \angle (CA\times CB)`
      - 
 
 .. |r15| image:: ../../_static/Images/rules/r15.png
@@ -320,15 +270,10 @@ r16 : circle_eqangle2perp
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{circle}(O, ABC) \wedge \langle AX, AB\rangle=\langle CA, CB\rangle \implies \text{perp}(OA, AX)`
-       :math:`\implies \text{perp}(OA, AX)`
-     - 
+     - Formal Statement
+     - Description
    * - |r16|
-     -
-       .. code-block :: text
-
-         circle O A B C, eqangle A X A B C A C B
-         => perp O A A X
+     - :math:`\begin{cases} O\text{ center of circle }ABC \\ \angle (AX\times AB)=\angle(CA\times CB)\end{cases} \implies OA\perp AX`
      - 
 
 .. |r16| image:: ../../_static/Images/rules/r16.png
@@ -341,15 +286,10 @@ r17 : circle_midp2eqangle
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{circle}(O,ABC) \wedge \text{midp}(M, BC)`
-       :math:`\implies \langle AB, AC\rangle=\langle OB, OM\rangle`
-     - 
+     - Formal Statement
+     - Description
    * - |r17|
-     -
-       .. code-block :: text
-
-         circle O A B C, midp M B C
-         => eqangle A B A C O B O M
+     - :math:`\begin{cases} O\text{ center of circle }ABC \\ M\text{ midpoint of }BC\end{cases} \implies \angle(AB\times AC)=\angle(OB\times OM)`
      - 
 
 .. |r17| image:: ../../_static/Images/rules/r17.png
@@ -362,15 +302,10 @@ r18 : eqangle2midp
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{circle}(O,ABC) \wedge \text{coll}(MBC) \wedge \langle AB, AC\rangle=\langle OB, OM\rangle`
-       :math:`\implies \text{midp}(M, BC)`
-     - 
+     - Formal Statement
+     - Description
    * - |r18|
-     -
-       .. code-block :: text
-
-         circle O A B C, coll M B C, eqangle A B A C O B O M
-         => midp M B C
+     - :math:`\begin{cases} O\text{ center of circle }ABC \\ MBC\text{ collinear}\\ \angle(AB\times AC)=\angle(OB\times OM)\end{cases} \implies M\text{ midpoint of }BC`
      - 
 
 .. |r18| image:: ../../_static/Images/rules/r18.png
@@ -384,7 +319,7 @@ r19 : right_triangle_midp2cong
 
    * - Figure
      - :math:`\text{perp}(AB, BC) \wedge \text{midp}(M, AC) \implies |AM|=|BM|`
-     - 
+     - Description
    * - |r19|
      -
        .. code-block :: text
@@ -404,7 +339,7 @@ r20 : circle2perp
 
    * - Figure
      - :math:`\text{circle}(OABC) \wedge \text{coll}(OAC) \implies \text{perp}(AB, BC)`
-     - 
+     - Description
    * - |r20|
      -
        .. code-block :: text
@@ -424,7 +359,7 @@ r21 : cyclic_para2eqangle
 
    * - Figure
      - :math:`\text{cyclic}(ABCD) \wedge AB \parallel CD \implies \langle AD, CD\rangle = \langle CD, CB\rangle`
-     - 
+     - Description
    * - |r21|
      -
        .. code-block :: text
@@ -444,7 +379,7 @@ r22 : midp_perp2cong
 
    * - Figure
      - :math:`\text{midp}(M, AB) \wedge \text{perp}(OM, AB) \implies |OA|=|OB|`
-     - 
+     - Description
    * - |r22|
      -
        .. code-block :: text
@@ -464,7 +399,7 @@ r23 : cong2perp
 
    * - Figure
      - :math:`|AP|=|BP| \wedge |AQ|=|BQ| \implies \text{perp}(AB, PQ)`
-     - 
+     - Description
    * - |r23|
      -
        .. code-block :: text
@@ -484,7 +419,7 @@ r24 : cong_cyclic2perp
 
    * - Figure
      - :math:`|AP|=|BP| \wedge |AQ|=|BQ| \wedge \text{cyclic}(ABPQ) \implies \text{perp}(PA, AQ)`
-     - 
+     - Description
    * - |r24|
      -
        .. code-block :: text
@@ -504,7 +439,7 @@ r25 : midp2para
 
    * - Figure
      - :math:`\text{midp}(M, AB) \wedge \text{midp}(M, CD) \implies AC \parallel BD`
-     - 
+     - Description
    * - |r25|
      -
        .. code-block :: text
@@ -524,7 +459,7 @@ r26 : midp_para2midp
 
    * - Figure
      - :math:`\text{midp}(M, AB) \wedge AC \parallel BD \wedge AD \parallel BC \implies \text{midp}(M, CD)`
-     - 
+     - Description
    * - |r26|
      -
        .. code-block :: text
@@ -546,7 +481,7 @@ r27 : eqratio_sameside2para
      - :math:`\frac{OA}{AC} = \frac{OB}{BD} \wedge \text{coll}(OAC)`
        :math:`\text{coll}(OBD) \wedge \text{sameside}(AOC, BOD)`
        :math:`\implies AB \parallel CD`
-     - 
+     - Description
    * - |r27|
      -
        .. code-block :: text
@@ -567,7 +502,7 @@ r28 : para2coll
 
    * - Figure
      - :math:`AB \parallel AC \implies \text{coll}(ABC)`
-     - 
+     - Description
    * - |r28|
      -
        .. code-block :: text
@@ -587,7 +522,7 @@ r29 : midp2eqratio
 
    * - Figure
      - :math:`\text{midp}(M, AB) \wedge \text{midp}(N, CD) \implies \frac{MA}{AB} = \frac{NC}{CD}`
-     - 
+     - Description
    * - |r29|
      -
        .. code-block :: text
@@ -607,7 +542,7 @@ r30 : eqangle_perp2perp
 
    * - Figure
      - :math:`\langle AB, PQ\rangle=\langle CD, UV\rangle \wedge \text{perp}(PQ, UV) \implies \text{perp}(AB, CD)`
-     - 
+     - Description
    * - |r30|
      -
        .. code-block :: text
@@ -627,7 +562,7 @@ r31 : eqratio_cong2cong
 
    * - Figure
      - :math:`\frac{AB}{PQ} = \frac{CD}{UV} \wedge |PQ| = |UV| \implies |AB| = |CD|`
-     - 
+     - Description
    * - |r31|
      -
        .. code-block :: text
@@ -648,7 +583,7 @@ r32 : cong_cong2contri
    * - Figure
      - :math:`|AB| = |PQ| \wedge |BC| = |QR| \wedge |CA| = |RP|`
        :math:`\implies \text{contri*}(ABC, PQR)`
-     - 
+     - Description
    * - |r32|
      -
        .. code-block :: text
@@ -669,7 +604,7 @@ r33 : cong_eqangle2contri
    * - Figure
      - :math:`|AB| = |PQ| \wedge |BC| = |QR| \wedge \langle BA, B\rangle = \langle QP, QR\rangle`
        :math:`\implies \text{contri*}(ABC, PQR)`
-     - 
+     - Description
    * - |r33|
      -
        .. code-block :: text
@@ -690,7 +625,7 @@ r34 : eqangle2simtri
    * - Figure
      - :math:`\langle BA, BC\rangle = \langle QP, QR\rangle \wedge \langle CA, CB\rangle = \langle RP, RQ\rangle`
        :math:`\implies \text{simtri}(ABC, PQR)`
-     - 
+     - Description
    * - |r34|
      -
        .. code-block :: text
@@ -711,7 +646,7 @@ r35 : eqangle2simtri2
    * - Figure
      - :math:`\langle BA, BC\rangle = \langle QP, QR\rangle \wedge \langle CA, CB\rangle = \langle RP, RQ\rangle`
        :math:`\implies \text{simtri2}(ABC, PQR)`
-     - 
+     - Description
    * - |r35|
      -
        .. code-block :: text
@@ -733,7 +668,7 @@ r36 : eqangle_cong2contri
      - :math:`\langle BA, BC\rangle = \langle QP, QR\rangle \wedge \langle CA, CB\rangle = \langle RP, RQ\rangle`
        :math:`\wedge |AB| = |PQ| \wedge |BC| = |QR| \wedge \text{ncoll}(ABC)`
        :math:`\wedge |AP| = |QB| \implies \text{contri}(ABC, PQR)`
-     - 
+     - Description
    * - |r36|
      -
        .. code-block :: text
@@ -756,7 +691,7 @@ r37 : eqangle_cong2contri
      - :math:`\langle BA, BC\rangle = \langle QP, QR\rangle \wedge \langle CA, CB\rangle = \langle RP, RQ\rangle`
        :math:`\wedge |AB| = |PQ| \wedge |BC| = |QR| \wedge \text{ncoll}(ABC)`
        :math:`\wedge |AP| = |QB| \implies \text{contri2}(ABC, PQR)`
-     - 
+     - Description
    * - |r37|
      -
        .. code-block :: text
@@ -778,7 +713,7 @@ r38 : eqratio_eqangle2simtri
    * - Figure
      - :math:`\frac{BA}{BC} = \frac{QP}{QR} \wedge \frac{CA}{CB} = \frac{RP}{RQ}`
        :math:`\wedge \text{ncoll}(ABC) \implies \text{simtri*}(ABC, PQR)`
-     - 
+     - Description
    * - |r38|
      -
        .. code-block :: text
@@ -800,7 +735,7 @@ r39 : eqratio_eqangle2simtri
    * - Figure
      - :math:`\frac{BA}{BC} = \frac{QP}{QR} \wedge \langle BA, B\rangle = \langle QP, Q\rangle`
        :math:`\wedge \text{ncoll}(ABC) \implies \text{simtri*}(ABC, PQR)`
-     - 
+     - Description
    * - |r39|
      -
        .. code-block :: text
@@ -823,7 +758,7 @@ r40 : eqratio_eqratio_cong2contri
      - :math:`\frac{BA}{BC} = \frac{QP}{QR} \wedge \frac{CA}{CB} = \frac{RP}{RQ}`
        :math:`\wedge \text{ncoll}(ABC) \wedge |AB| = |PQ|`
        :math:`\implies \text{contri*}(ABC, PQR)`
-     - 
+     - Description
    * - |r40|
      -
        .. code-block :: text
@@ -847,7 +782,7 @@ r41 : para2eqratio
        :math:`\wedge \text{eqratio6}(M, A, M, D, N, B, N, C)`
        :math:`\wedge \text{sameside}(M, A, D, N, B, C)`
        :math:`\implies \text{para}(M, N, A, B)`
-     - 
+     - Description
    * - |r41|
      -
        .. code-block :: text
@@ -869,7 +804,7 @@ r42 : eqratio62para
    * - Figure
      - :math:`\text{para}(A, B, C, D) \wedge \text{coll}(M, A, D) \wedge \text{coll}(N, B, C)`
        :math:`\implies \text{eqratio6}(M, A, M, D, N, B, N, C)`
-     - 
+     - Description
    * - |r42|
      -
        .. code-block :: text
@@ -893,7 +828,7 @@ r43 : Orthocenter theorem
    * - Figure
      - :math:`\text{perp}(A, B, C, D) \wedge \text{perp}(A, C, B, D)`
        :math:`\implies \text{perp}(A, D, B, C)`
-     - 
+     - Description
    * - |r43|
      -
        .. code-block :: text
@@ -916,7 +851,7 @@ r44 : Pappus's theorem
        :math:`\wedge \text{coll}(X, P, B) \wedge \text{coll}(Y, A, R) \wedge \text{coll}(Y, P, C)`
        :math:`\wedge \text{coll}(Z, B, R) \wedge \text{coll}(Z, C, Q)`
        :math:`\implies \text{coll}(X, Y, Z)`
-     -
+     - Description
    * - |r44|
      -
        .. code-block :: text
@@ -939,7 +874,7 @@ r45 : Simson line theorem
        :math:`\wedge \text{coll}(M, B, C) \wedge \text{perp}(P, M, B, C)`
        :math:`\wedge \text{coll}(N, A, B) \wedge \text{perp}(P, N, A, B)`
        :math:`\implies \text{coll}(L, M, N)`
-     - 
+     - Description
    * - |r45|
      -
        .. code-block :: text
@@ -961,7 +896,7 @@ r46 : Incenter theorem
      - :math:`\text{eqangle}(A, B, A, X, A, X, A, C) \wedge \text{eqangle}(B, A, B, X, B, X, B, C)`
        :math:`\wedge \text{ncoll}(A, B, C)`
        :math:`\implies \text{eqangle}(C, B, C, X, C, X, C, A)`
-     - 
+     - Description
    * - |r46|
      -
        .. code-block :: text
@@ -980,8 +915,8 @@ r47 : Circumcenter theorem
    :header-rows: 1
 
    * - Figure
-     - Formula
-     - 
+     - Formal Description
+     - Description
    * - |r47|
      -
        :math:`\text{midp}(m, a, b) \wedge \text{perp}(x, m, a, b) \wedge \text{midp}(n, b, c)`
@@ -1003,12 +938,12 @@ r48 : Centroid theorem
    :widths: 50 25 25
    :header-rows: 1
 
-   * - figure
+   * - Figure
      - :math:`\text{midp}(m, a, b) \wedge \text{coll}(m, x, c)`
        :math:`\wedge \text{midp}(n, b, c) \wedge \text{coll}(n, x, c)`
        :math:`\wedge \text{midp}(p, c, a)`
        :math:`\implies \text{coll}(x, p, b)`
-     - 
+     - Description
    * - |r48|
      -
        .. code-block :: text
@@ -1029,7 +964,7 @@ r49 : Recognize center of cyclic
    * - Figure
      - :math:`\text{circle}(O, A, B, C) \wedge \text{cyclic}(A, B, C, D)`
        :math:`\implies \text{cong}(O, A, O, D)`
-     - 
+     - Description
    * - |r49|
      -
        .. code-block :: text
