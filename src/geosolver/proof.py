@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import TYPE_CHECKING, Optional, Tuple, Union
+from typing import TYPE_CHECKING, Optional, Tuple, Type, Union
 from typing_extensions import Self
 import logging
 
@@ -119,7 +119,7 @@ class Proof:
     ):
         self.dependency_cache = dependency_cache
         self.symbols_graph = symbols_graph
-        self.external_reasoning_engines = external_reasoning_engines
+        self.reasoning_engines = external_reasoning_engines
         self.statements = statements_handler
         self.dependency_graph = DependencyGraph()
 
@@ -148,6 +148,7 @@ class Proof:
         problem: Problem,
         definitions: dict[str, Definition],
         disabled_intrinsic_rules: Optional[list[IntrinsicRules]] = None,
+        additional_reasoning_engine: Optional[dict[str, Type[ReasoningEngine]]] = None,
         max_attempts: int = 10000,
         rnd_generator: "numpy.random.Generator" = None,
     ) -> Self:
@@ -171,10 +172,16 @@ class Proof:
                     dependency_cache,
                     disabled_intrinsic_rules,
                 )
+                reasoning_engines = {"AR": algebraic_manipulator}
+
+                for engine_name, engine_type in additional_reasoning_engine.items():
+                    if engine_name in reasoning_engines:
+                        raise ValueError(f"Conflicting engine names for {engine_name}")
+                    reasoning_engines[engine_name] = engine_type(symbols_graph)
 
                 proof = Proof(
                     dependency_cache=dependency_cache,
-                    external_reasoning_engines={"AR": algebraic_manipulator},
+                    external_reasoning_engines=reasoning_engines,
                     symbols_graph=symbols_graph,
                     statements_handler=statements_handler,
                     rnd_generator=rnd_generator,
@@ -303,7 +310,7 @@ class Proof:
     def _step_apply_theorem(self, action: ApplyTheoremAction) -> ApplyTheoremFeedback:
         added, to_cache, success = self._apply_theorem(action.theorem, action.mapping)
         for dep in added:
-            for _, external_reasoning_engine in self.external_reasoning_engines.items():
+            for _, external_reasoning_engine in self.reasoning_engines.items():
                 external_reasoning_engine.ingest(dep)
         self.cache_deps(to_cache)
         return ApplyTheoremFeedback(success, added, to_cache)
@@ -323,7 +330,7 @@ class Proof:
         return add, [premise_to_cache] + to_cache, True
 
     def _step_derive(self, action: ResolveEngineAction) -> DeriveFeedback:
-        choosen_engine = self.external_reasoning_engines[action.engineid]
+        choosen_engine = self.reasoning_engines[action.engine_id]
         derivations = choosen_engine.resolve(level=action.level)
         return DeriveFeedback(derivations)
 
@@ -355,9 +362,14 @@ class Proof:
     def reset(self) -> ResetFeedback:
         self.cache_deps(self._init_to_cache)
         for add in self._init_added:
-            for _, ext in self.external_reasoning_engines.items():
+            for _, ext in self.reasoning_engines.items():
                 ext.ingest(add)
-        return ResetFeedback(self._problem, self._init_added, self._init_to_cache)
+        return ResetFeedback(
+            problem=self._problem,
+            added=self._init_added,
+            to_cache=self._init_to_cache,
+            available_engines=list(self.reasoning_engines.keys()),
+        )
 
     def copy(self):
         """Make a blank copy of proof state."""

@@ -44,7 +44,7 @@ class MatchAction(NamedTuple):
 
 class ResolveEngineAction(NamedTuple):
     level: int
-    engineid: str
+    engine_id: str
 
 
 class ApplyDerivationAction(NamedTuple):
@@ -69,6 +69,7 @@ Action = Union[
 
 class ResetFeedback(NamedTuple):
     problem: "Problem"
+    available_engines: list[str]
     added: list["Dependency"]
     to_cache: list["ToCache"]
 

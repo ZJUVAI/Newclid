@@ -170,10 +170,17 @@ class BFSDDAR(DeductiveAgent):
             if next_derivation is not None:
                 return next_derivation
 
+        if self._current_next_engines:
+            # If we have a stack of engines to use, we do that first
+            next_engine = self._current_next_engines.pop()
+            return ResolveEngineAction(self.level, engine_id=next_engine)
+
         if self.level != self._dd_agent.level:
             # Each new level of dd we derive first
             self.level = self._dd_agent.level
-            return ResolveEngineAction(self.level, "AR")
+            self._current_next_engines = self.available_engines.copy()
+            next_engine = self._current_next_engines.pop()
+            return ResolveEngineAction(self.level, engine_id=next_engine)
 
         dd_action = self._dd_agent.act(proof, theorems)
         if isinstance(dd_action, StopAction):
@@ -188,6 +195,8 @@ class BFSDDAR(DeductiveAgent):
         return dd_action
 
     def remember_effects(self, action: Action, feedback: Feedback):
+        if isinstance(feedback, ResetFeedback):
+            self.available_engines = feedback.available_engines
         if isinstance(feedback, DeriveFeedback):
             for derive in feedback.derives:
                 predicate = derive.statement.predicate
@@ -224,4 +233,5 @@ class BFSDDAR(DeductiveAgent):
         self._derivations: list[Derivation] = []
         self._eq4s: list[Derivation] = []
         self._current_derivation_stack: list[Derivation] = []
+        self._current_next_engines: list[str] = []
         self.level: int = -1

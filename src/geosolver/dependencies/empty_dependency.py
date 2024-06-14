@@ -86,4 +86,4 @@ class DependencyBuilder:
     def __eq__(self, value: object) -> bool:
         if not isinstance(value, DependencyBuilder):
             return False
-        return self.reason == value.reason and self.why == value.why
+        return self.reason == value.reason and set(self.why) == set(value.why)
