@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
     from geosolver.problem import Problem
     from geosolver.statements.statement import Statement
-    from geosolver.dependencies.empty_dependency import DependencyBuilder
+    from geosolver.dependencies.dependency_building import DependencyBuilder
 
 
 Mapping = dict[str, Union["Point", str]]

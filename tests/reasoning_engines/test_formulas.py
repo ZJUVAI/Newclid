@@ -4,7 +4,7 @@ from typing_extensions import Self
 
 from geosolver.api import GeometricSolverBuilder
 from geosolver.dependencies.dependency import Dependency, Reason
-from geosolver.dependencies.empty_dependency import DependencyBuilder
+from geosolver.dependencies.dependency_building import DependencyBuilder
 from geosolver.geometry import Point
 from geosolver.predicates import Predicate
 from geosolver.reasoning_engines.formulas import (

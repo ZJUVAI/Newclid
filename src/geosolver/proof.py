@@ -50,7 +50,7 @@ from geosolver.numerical.distances import (
 from geosolver.numerical.sketch import sketch
 
 from geosolver.problem import CONSTRUCTION_RULE, Problem
-from geosolver.dependencies.empty_dependency import DependencyBuilder
+from geosolver.dependencies.dependency_building import DependencyBuilder
 from geosolver.dependencies.caching import DependencyCache
 from geosolver.dependencies.dependency import Reason, Dependency
 from geosolver.dependencies.dependency_graph import DependencyGraph

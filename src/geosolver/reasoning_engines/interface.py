@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, NamedTuple
 
-from geosolver.dependencies.empty_dependency import DependencyBuilder
+from geosolver.dependencies.dependency_building import DependencyBuilder
 from geosolver.statements.statement import Statement
 
 if TYPE_CHECKING:

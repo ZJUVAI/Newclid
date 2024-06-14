@@ -2,7 +2,7 @@ from fractions import Fraction
 from itertools import combinations
 from typing import TYPE_CHECKING
 from geosolver.dependencies.dependency import Dependency, Reason
-from geosolver.dependencies.empty_dependency import DependencyBuilder
+from geosolver.dependencies.dependency_building import DependencyBuilder
 from geosolver.geometry import Ratio
 from geosolver.predicates import Predicate
 from geosolver.reasoning_engines.interface import Derivation, ReasoningEngine

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.reasoning_engines.interface import Derivation, ReasoningEngine
 from geosolver.predicates import Predicate
-from geosolver.dependencies.empty_dependency import DependencyBuilder
+from geosolver.dependencies.dependency_building import DependencyBuilder
 from geosolver.geometry import is_equiv
 from geosolver.numerical.check import check_numerical
 
