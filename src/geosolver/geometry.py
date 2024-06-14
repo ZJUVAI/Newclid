@@ -266,6 +266,9 @@ class Node:
         dep = rep.edge_graph[node][equiv]
         return [dep] + self.why_equal(equiv, level)
 
+    def __repr__(self) -> str:
+        return self.name
+
 
 def why_connect(*pairs: tuple[Node, Node]) -> list[Any]:
     result = []

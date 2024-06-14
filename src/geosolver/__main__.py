@@ -132,8 +132,6 @@ def cli_arguments() -> Namespace:
 
 
 def main():
-    import seaborn as sns
-
     args = cli_arguments()
     logging.basicConfig(level=args.log_level)
 
@@ -180,6 +178,8 @@ def main():
     if args.all_graphs or args.proof_subgraph:
         solver.draw_proof_subgraph(outpath / "proof_subgraph.html")
     if args.all_graphs or args.why_graph:
+        import seaborn as sns
+
         sns.color_palette()
         solver.draw_why_graph(outpath / "why_hypergraph.html")
 

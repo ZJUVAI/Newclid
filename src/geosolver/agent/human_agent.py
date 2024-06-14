@@ -130,7 +130,7 @@ class HumanAgent(DeductiveAgent):
         return ApplyTheoremAction(theorem, mapping)
 
     def _act_resolve_derivations(self, theorems: list[Theorem]) -> ResolveEngineAction:
-        return ResolveEngineAction(level=self.level, engineid="AR")
+        return ResolveEngineAction(level=self.level, engine_id="AR")
 
     def _act_apply_derivation(self, theorems: list[Theorem]) -> ApplyDerivationAction:
         choose_derivation_str = "\nAvailable derivations: \n"

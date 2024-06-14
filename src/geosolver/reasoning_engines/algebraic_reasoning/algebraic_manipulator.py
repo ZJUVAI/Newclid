@@ -3,13 +3,8 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 
-from geosolver.agent.interface import DeriveFeedback
 from geosolver.dependencies.dependency import Dependency, Reason
-from geosolver.reasoning_engines.interface import (
-    Derivation,
-    Derivations,
-    ReasoningEngine,
-)
+from geosolver.reasoning_engines.interface import Derivation, ReasoningEngine
 from geosolver.predicates import Predicate
 from geosolver.dependencies.empty_dependency import DependencyBuilder
 from geosolver.geometry import is_equiv
@@ -59,7 +54,7 @@ class AlgebraicManipulator(ReasoningEngine):
         if adder is not None:
             adder(dependency)
 
-    def resolve(self, **kwargs) -> DeriveFeedback:
+    def resolve(self, **kwargs) -> list[Derivation]:
         """Derive new algebraic predicates."""
         level: int = kwargs.get("level")
         derives = []
@@ -72,9 +67,9 @@ class AlgebraicManipulator(ReasoningEngine):
         rat_derives = self.derive_ratio_algebra(level)
         derives += rat_derives
 
-        return DeriveFeedback(derives)
+        return derives
 
-    def derive_ratio_algebra(self, level: int) -> Derivations:
+    def derive_ratio_algebra(self, level: int) -> list[Derivation]:
         """Derive new eqratio predicates."""
         added = []
 
@@ -106,7 +101,7 @@ class AlgebraicManipulator(ReasoningEngine):
 
         return added
 
-    def derive_angle_algebra(self, level: int) -> Derivations:
+    def derive_angle_algebra(self, level: int) -> list[Derivation]:
         """Derive new eqangles predicates."""
         added = []
 
@@ -152,7 +147,7 @@ class AlgebraicManipulator(ReasoningEngine):
 
         return added
 
-    def derive_cong_algebra(self, level: int) -> Derivations:
+    def derive_cong_algebra(self, level: int) -> list[Derivation]:
         """Derive new cong predicates."""
         added = []
         for x in self.dtable.get_all_eqs_and_why():
