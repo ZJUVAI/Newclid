@@ -38,12 +38,10 @@ class ApplyTheoremAction(NamedTuple):
 
 class MatchAction(NamedTuple):
     theorem: "Theorem"
-    level: int
     cache: Optional["MatchCache"] = None
 
 
 class ResolveEngineAction(NamedTuple):
-    level: int
     engine_id: str
 
 
@@ -117,9 +115,6 @@ Feedback = Union[
 
 class DeductiveAgent:
     """Common interface for deductive agents"""
-
-    def __init__(self) -> None:
-        self.level = None
 
     @abstractmethod
     def act(self, proof: "Proof", theorems: list["Theorem"]) -> Action:

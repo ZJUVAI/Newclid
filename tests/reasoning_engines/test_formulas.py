@@ -103,9 +103,7 @@ class TestMenelaus:
             [
                 Derivation(
                     Statement(Predicate.CONSTANT_RATIO, (c, e, a, e, expected_r)),
-                    DependencyBody(
-                        Reason("Menelaus"), why=given_dependencies, level=None
-                    ),
+                    DependencyBody(Reason("Menelaus"), why=given_dependencies),
                 ),
             ]
         )

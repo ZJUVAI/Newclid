@@ -303,8 +303,8 @@ class SymbolsGraph:
         for a in self.type2nodes[Angle]:
             if a.directions == (d1.rep(), d2.rep()):  # directions = _d.rep()
                 d1_, d2_ = a._d
-                why1 = d1.why_equal([d1_], None) + d1_.why_rep()
-                why2 = d2.why_equal([d2_], None) + d2_.why_rep()
+                why1 = d1.why_equal([d1_]) + d1_.why_rep()
+                why2 = d2.why_equal([d2_]) + d2_.why_rep()
                 return a, a.opposite, why1 + why2
 
         d1, why1 = d1.rep_and_why()
@@ -332,8 +332,8 @@ class SymbolsGraph:
         for r in self.type2nodes[Ratio]:
             if r.lengths == (l1.rep(), l2.rep()):
                 l1_, l2_ = r._l
-                why1 = l1.why_equal([l1_], None) + l1_.why_rep()
-                why2 = l2.why_equal([l2_], None) + l2_.why_rep()
+                why1 = l1.why_equal([l1_]) + l1_.why_rep()
+                why2 = l2.why_equal([l2_]) + l2_.why_rep()
                 return r, r.opposite, why1 + why2
 
         l1, why1 = l1.rep_and_why()

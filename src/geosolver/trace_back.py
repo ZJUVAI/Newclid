@@ -291,9 +291,7 @@ def collx_to_coll(
 def _dep_coll_to_collx(dep: "Dependency"):
     if dep.statement.predicate == Predicate.COLLINEAR_X:
         coll_statement = Statement(Predicate.COLLINEAR, list(set(dep.statement.args)))
-        return Dependency(
-            coll_statement, why=dep.why, reason=dep.reason, level=dep.level
-        )
+        return Dependency(coll_statement, why=dep.why, reason=dep.reason)
     return dep
 
 

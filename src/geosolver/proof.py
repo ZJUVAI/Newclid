@@ -53,7 +53,6 @@ from geosolver.problem import CONSTRUCTION_RULE, Problem
 from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.dependencies.caching import DependencyCache
 from geosolver.dependencies.dependency import Reason, Dependency
-from geosolver.dependencies.dependency_graph import DependencyGraph
 from geosolver._lazy_loading import lazy_import
 
 
@@ -121,7 +120,6 @@ class Proof:
         self.symbols_graph = symbols_graph
         self.reasoning_engines = external_reasoning_engines
         self.statements = statements_handler
-        self.dependency_graph = DependencyGraph()
 
         self._goal: Optional[Construction] = None
         self._resolved_mapping_deps: dict[str, tuple[DependencyBody, ToCache]] = {}
@@ -212,7 +210,6 @@ class Proof:
 
             goal_args = proof.map_args_to_objects(problem.goal)
             goal = Statement(problem.goal.name, goal_args)
-            proof.dependency_graph.add_goal(goal)
             if check_numerical(goal):
                 break
         else:
@@ -236,9 +233,7 @@ class Proof:
         )
         mappings = []
         for mapping in potential_mappings:
-            dep_body, to_cache = self._resolve_mapping_dependency(
-                theorem, mapping, action.level
-            )
+            dep_body, to_cache = self._resolve_mapping_dependency(theorem, mapping)
             if dep_body is None:
                 continue
 
@@ -249,16 +244,14 @@ class Proof:
         return MatchFeedback(theorem, mappings)
 
     def _resolve_mapping_dependency(
-        self, theorem: "Theorem", mapping: Mapping, dependency_level: int
+        self, theorem: "Theorem", mapping: Mapping
     ) -> tuple[Optional[DependencyBody], Optional[ToCache]]:
         fail = False
 
         deps: list["Dependency"] = []
         for premise in theorem.premises:
             p_args = [mapping[a] for a in premise.args]
-            dep, fail = self._resolve_premise_dependency(
-                theorem, premise, p_args, dependency_level
-            )
+            dep, fail = self._resolve_premise_dependency(theorem, premise, p_args)
             if fail:
                 return None, None
             if dep is None:
@@ -267,9 +260,7 @@ class Proof:
             to_cache = (dep.statement, dep)
             deps.append(dep)
 
-        dep_body = DependencyBody(
-            reason=Reason(theorem), level=dependency_level, why=deps
-        )
+        dep_body = DependencyBody(reason=Reason(theorem), why=deps)
         return dep_body, to_cache
 
     def _resolve_premise_dependency(
@@ -277,7 +268,6 @@ class Proof:
         theorem: "Theorem",
         premise: "Construction",
         p_args: list["Point"],
-        dependency_level: int,
     ) -> Tuple[Optional[Dependency], bool]:
         if premise.name in [Predicate.PARALLEL.value, Predicate.CONGRUENT.value]:
             a, b, c, d = p_args
@@ -299,9 +289,7 @@ class Proof:
 
         dep = None
         fail = False
-        dep = self.statements.graph.build_resolved_dependency(
-            premise_statement, dependency_level
-        )
+        dep = self.statements.graph.build_resolved_dependency(premise_statement)
         if dep.why is None:
             fail = True
 
@@ -326,12 +314,11 @@ class Proof:
         add, to_cache = self.resolve_statement_dependencies(
             conclusion_statement, dep_body=dep_body
         )
-        self.dependency_graph.add_theorem_edges(to_cache, theorem, args)
         return add, [premise_to_cache] + to_cache, True
 
     def _step_derive(self, action: ResolveEngineAction) -> DeriveFeedback:
         choosen_engine = self.reasoning_engines[action.engine_id]
-        derivations = choosen_engine.resolve(level=action.level)
+        derivations = choosen_engine.resolve()
         return DeriveFeedback(derivations)
 
     def _step_apply_derivation(
@@ -541,14 +528,13 @@ class Proof:
                         construction.name + " " + " ".join([x.name for x in args])
                     )
 
-                construction_body = DependencyBody(reason=reason, level=0, why=[])
+                construction_body = DependencyBody(reason=reason, why=[])
                 construction_dep = construction_body.build(
                     self.statements.graph, statement
                 )
-                self.dependency_graph.add_dependency(construction_dep)
                 deps.append(construction_dep)
 
-            dep_body = DependencyBody(reason=reason, why=deps, level=0)
+            dep_body = DependencyBody(reason=reason, why=deps)
             new_points_dep.append(dep_body)
 
         # Step 2: draw.
@@ -702,7 +688,6 @@ class Proof:
                     adds, basic_to_cache = self.resolve_statement_dependencies(
                         basic_statement, dep_body=dep_body
                     )
-                    self.dependency_graph.add_construction_edges(basic_to_cache, args)
                     to_cache += basic_to_cache
 
                     basics.append((basic_statement, dep_body))
