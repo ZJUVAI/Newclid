@@ -37,6 +37,8 @@ class Dependency:
     It links a statement to a list of statements that justify it
     and their own dependencies.
 
+    .. image:: ../_static/Images/dependency_building/dependency_structure.svg
+
     """
 
     statement: Statement

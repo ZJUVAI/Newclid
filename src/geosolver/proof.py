@@ -535,15 +535,15 @@ class Proof:
                 )
                 new_points_dep_points.update(args)
 
-                construction_statement = Statement(construction.name, args)
-                if not self.check(construction_statement):
+                statement = Statement(construction.name, args)
+                if not self.check(statement):
                     raise DepCheckFailError(
                         construction.name + " " + " ".join([x.name for x in args])
                     )
 
-                construction_dep = self.statements.graph.build_dependency(
-                    construction_statement,
-                    DependencyBody(reason=reason, level=0, why=[]),
+                construction_body = DependencyBody(reason=reason, level=0, why=[])
+                construction_dep = construction_body.build(
+                    self.statements.graph, statement
                 )
                 self.dependency_graph.add_dependency(construction_dep)
                 deps.append(construction_dep)

@@ -129,7 +129,7 @@ class StatementAdder:
             Predicate.FIX_T,
             Predicate.FIX_P,
         ]:
-            dep = self.statements_graph.build_dependency(statement, dep_body)
+            dep = dep_body.build(self.statements_graph, statement)
             deps_to_cache.append((statement, dep))
             new_deps = [dep]
         elif statement.predicate is Predicate.IND:
@@ -224,7 +224,7 @@ class StatementAdder:
 
             is_coll = self.statements_checker.check_coll(args)
             coll = Statement(Predicate.COLLINEAR, args)
-            dep = self.statements_graph.build_dependency(coll, abcd_deps)
+            dep = abcd_deps.build(self.statements_graph, coll)
             to_cache.append((coll, dep))
             self.symbols_graph.merge_into(line0, [line], dep)
 
@@ -259,7 +259,7 @@ class StatementAdder:
             )
 
         para = Statement(Predicate.PARALLEL, (a, b, c, d))
-        dep = self.statements_graph.build_dependency(para, dep_body)
+        dep = dep_body.build(self.statements_graph, para)
         to_cache = [(para, dep)]
 
         self._make_equal(ab, cd, dep)
@@ -412,7 +412,7 @@ class StatementAdder:
         a, b = dab._obj.points
         c, d = dcd._obj.points
 
-        dep = self.statements_graph.build_dependency(perp, dep_body)
+        dep = dep_body.build(self.statements_graph, perp)
         self._make_equal(a12, a21, dep=dep)
 
         eqangle = Statement(Predicate.EQANGLE, [a, b, c, d, c, d, a, b])
@@ -431,7 +431,7 @@ class StatementAdder:
         cd = self.symbols_graph.get_or_create_segment(c, d, None)
 
         cong = Statement(Predicate.CONGRUENT, [a, b, c, d])
-        dep = self.statements_graph.build_dependency(cong, dep_body)
+        dep = dep_body.build(self.statements_graph, cong)
         self._make_equal(ab, cd, dep=dep)
 
         to_cache = [(cong, dep)]
@@ -540,7 +540,7 @@ class StatementAdder:
             is_cyclic = self.statements_checker.check_cyclic(args)
 
             cyclic = Statement(Predicate.CYCLIC, args)
-            dep = self.statements_graph.build_dependency(cyclic, abcdef_deps)
+            dep = abcdef_deps.build(self.statements_graph, cyclic)
             to_cache.append((cyclic, dep))
             self.symbols_graph.merge_into(circle0, [circle], dep)
             if not is_cyclic:
@@ -730,7 +730,7 @@ class StatementAdder:
         dep1 = None
         eqangle = Statement(Predicate.EQANGLE, [a, b, c, d, m, n, p, q])
         if dep_body:
-            dep1 = self.statements_graph.build_dependency(eqangle, dep_body)
+            dep1 = dep_body.build(self.statements_graph, eqangle)
         if not is_equal(ab_cd, mn_pq):
             add += [dep1]
         to_cache.append((eqangle, dep1))
@@ -739,7 +739,7 @@ class StatementAdder:
         dep2 = None
         eqangle_sym = Statement(Predicate.EQANGLE, [c, d, a, b, p, q, m, n])
         if dep_body:
-            dep2 = self.statements_graph.build_dependency(eqangle_sym, dep_body)
+            dep2 = dep_body.build(self.statements_graph, eqangle_sym)
         if not is_equal(cd_ab, pq_mn):
             add += [dep2]
         to_cache.append((eqangle_sym, dep2))
@@ -905,7 +905,7 @@ class StatementAdder:
 
         dep1 = None
         eqratio = Statement(Predicate.EQRATIO, [a, b, c, d, m, n, p, q])
-        dep1 = self.statements_graph.build_dependency(eqratio, dep_body)
+        dep1 = dep_body.build(self.statements_graph, eqratio)
         if not is_equal(ab_cd, mn_pq):
             add += [dep1]
         to_cache.append((eqratio, dep1))
@@ -913,7 +913,7 @@ class StatementAdder:
 
         dep2 = None
         eqratio_sym = Statement(Predicate.EQRATIO, [c, d, a, b, p, q, m, n])
-        dep2 = self.statements_graph.build_dependency(eqratio_sym, dep_body)
+        dep2 = dep_body.build(self.statements_graph, eqratio_sym)
         if not is_equal(cd_ab, pq_mn):
             add += [dep2]
         to_cache.append((eqratio_sym, dep2))
@@ -1107,7 +1107,7 @@ class StatementAdder:
                 )
 
         because_eq = Statement(eq_pred, [m, n, p, q])
-        dep = self.statements_graph.build_dependency(because_eq, dep_body)
+        dep = dep_body.build(self.statements_graph, because_eq)
         self._make_equal(mn, pq, dep=dep)
 
         to_cache = [(because_eq, dep)]
@@ -1192,14 +1192,14 @@ class StatementAdder:
         add = []
         to_cache = []
         if not is_equal(ab_cd, nd):
-            dep1 = self.statements_graph.build_dependency(aconst, dep_body)
+            dep1 = dep_body.build(self.statements_graph, aconst)
             self._make_equal(ab_cd, nd, dep=dep1)
             to_cache.append((aconst, dep1))
             add += [dep1]
 
         aconst2 = Statement(Predicate.CONSTANT_ANGLE, [a, b, c, d, nd])
         if not is_equal(cd_ab, dn):
-            dep2 = self.statements_graph.build_dependency(aconst2, dep_body)
+            dep2 = dep_body.build(self.statements_graph, aconst2)
             self._make_equal(cd_ab, dn, dep=dep2)
             to_cache.append((aconst2, dep2))
             add += [dep2]
@@ -1270,14 +1270,14 @@ class StatementAdder:
 
         if not is_equal(xba, nd):
             aconst = Statement(Predicate.S_ANGLE, [c, x, a, b, nd])
-            dep1 = self.statements_graph.build_dependency(aconst, dep_body)
+            dep1 = dep_body.build(self.statements_graph, aconst)
             self._make_equal(xba, nd, dep=dep1)
             to_cache.append((aconst, dep1))
             add += [dep1]
 
         if not is_equal(abx, dn):
             aconst2 = Statement(Predicate.S_ANGLE, [a, b, c, x, dn])
-            dep2 = self.statements_graph.build_dependency(aconst2, dep_body)
+            dep2 = dep_body.build(self.statements_graph, aconst2)
             self._make_equal(abx, dn, dep=dep2)
             to_cache.append((aconst2, dep2))
             add += [dep2]
@@ -1347,14 +1347,14 @@ class StatementAdder:
         add = []
         to_cache = []
         if not is_equal(ab_cd, nd):
-            dep1 = self.statements_graph.build_dependency(rconst, dep_body)
+            dep1 = dep_body.build(self.statements_graph, rconst)
             self._make_equal(nd, ab_cd, dep=dep1)
             to_cache.append((rconst, dep1))
             add.append(dep1)
 
         if not is_equal(cd_ab, dn):
             rconst2 = Statement(Predicate.CONSTANT_RATIO, [c, d, a, b, dn])
-            dep2 = self.statements_graph.build_dependency(rconst2, dep_body)
+            dep2 = dep_body.build(self.statements_graph, rconst2)
             self._make_equal(dn, cd_ab, dep=dep2)
             to_cache.append((rconst2, dep2))
             add.append(dep2)

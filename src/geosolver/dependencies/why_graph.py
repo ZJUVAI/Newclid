@@ -45,7 +45,7 @@ class WhyHyperGraph:
     ) -> "Dependency":
         """Build a Dependency from a statement and a body.
 
-        ..image:: _static/Images/dependency_building/build_dependency.png
+        .. image:: ../_static/Images/dependency_building/build_dependency.svg
 
         """
         dependency = Dependency(
@@ -63,6 +63,11 @@ class WhyHyperGraph:
         level: Optional[int] = None,
         use_cache: bool = True,
     ) -> Optional["Dependency"]:
+        """Build and resolve a dependency from a statement.
+
+        .. image:: ../_static/Images/dependency_building/build_resolved_dependency.svg
+
+        """
         reason, why = why_dependency(self, statement, level, use_cache=use_cache)
         if why is not None:
             why = tuple(why)
@@ -79,6 +84,12 @@ class WhyHyperGraph:
         reason: Optional[Reason] = None,
         level: Optional[int] = None,
     ):
+        """Build a dependency from a statement a reason
+        and a list of other dependencies.
+
+        .. image:: ../_static/Images/dependency_building/build_dependency_from_statement.svg
+
+        """
         return self.build_dependency(
             statement,
             DependencyBody(reason=reason, level=level, why=why),
