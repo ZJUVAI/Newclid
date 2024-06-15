@@ -1,7 +1,7 @@
 """Implements geometric objects used in the graph representation."""
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Generator, Optional, Type
+from typing import TYPE_CHECKING, Any, Generator, Optional, Type, TypeVar
 from typing_extensions import Self
 
 if TYPE_CHECKING:
@@ -60,7 +60,7 @@ class Node:
         node.merge_edge_graph(self.edge_graph)
         node.members.update(self.members)
 
-    def rep(self) -> Node:
+    def rep(self) -> Self:
         x = self
         while x.rep_by:
             x = x.rep_by
@@ -73,9 +73,11 @@ class Node:
         rep = self.rep()
         return rep, self.why_equal([rep])
 
+    NT = TypeVar("NT")
+
     def neighbors(
-        self, oftype: Type[Node], return_set: bool = False, do_rep: bool = True
-    ) -> list[Node]:
+        self, oftype: Type[NT], return_set: bool = False, do_rep: bool = True
+    ) -> list[NT] | set[NT]:
         """Neighbors of this node in the proof state graph."""
         if do_rep:
             rep = self.rep()
@@ -300,7 +302,10 @@ def bfs_backtrack(
 
 class Point(Node):
     rely_on: list[Point] = None
-    pass
+    plevel: int
+    group: list[Self]
+    dep_points = set[Self]
+    why: list["Dependency"]  # to generate txt logs.
 
 
 class Line(Node):
@@ -341,6 +346,9 @@ class Line(Node):
 
 
 class Segment(Node):
+    points: tuple[Point, Point]
+    _val: Length
+
     def new_val(self) -> Length:
         return Length()
 
@@ -390,6 +398,8 @@ class Angle(Node):
     """Node of type Angle."""
 
     opposite: Optional[Angle] = None
+    _d: tuple[Optional[Direction], Optional[Direction]] = (None, None)
+    _val: Measure
 
     def new_val(self) -> Measure:
         return Measure()
@@ -408,6 +418,10 @@ class Angle(Node):
 class Ratio(Node):
     """Node of type Ratio."""
 
+    opposite: Optional[Angle] = None
+    _l: tuple[Optional[Length], Optional[Length]] = (None, None)
+    _val: Value
+
     def new_val(self) -> Value:
         return Value()
 
@@ -423,18 +437,22 @@ class Ratio(Node):
 
 
 class Direction(Node):
+    _obj: Line
     pass
 
 
 class Measure(Node):
+    _obj: Angle
     pass
 
 
 class Length(Node):
+    _obj: Segment
     pass
 
 
 class Value(Node):
+    _obj: Ratio
     pass
 
 
@@ -444,22 +462,22 @@ def all_angles(
     d1s = d1.equivs_upto()
     d2s = d2.equivs_upto()
 
-    for ang in d1.rep().neighbors(Angle):
-        d1_, d2_ = ang._d
+    for angle in d1.rep().neighbors(Angle):
+        d1_, d2_ = angle._d
         if d1_ in d1s and d2_ in d2s:
-            yield ang, d1s, d2s
+            yield angle, d1s, d2s
 
 
 def all_ratios(
     d1: Direction, d2: Direction
-) -> Generator[Angle, list[Direction], list[Direction]]:
+) -> Generator[Ratio, list[Direction], list[Direction]]:
     d1s = d1.equivs_upto()
     d2s = d2.equivs_upto()
 
-    for ang in d1.rep().neighbors(Ratio):
-        d1_, d2_ = ang._l
+    for ratio in d1.rep().neighbors(Ratio):
+        d1_, d2_ = ratio._l
         if d1_ in d1s and d2_ in d2s:
-            yield ang, d1s, d2s
+            yield ratio, d1s, d2s
 
 
 RANKING = {

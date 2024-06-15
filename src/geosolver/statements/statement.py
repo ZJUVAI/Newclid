@@ -13,7 +13,7 @@ class Statement:
     """One predicate applied to a set of points and values."""
 
     predicate: Predicate
-    args: tuple["Point" | "Ratio" | int | str, ...]
+    args: tuple["Point" | "Ratio" | "Angle" | int | str, ...]
 
     def __post_init__(self):
         self.predicate = Predicate(self.predicate)
