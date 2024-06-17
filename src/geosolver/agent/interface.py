@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
     from geosolver.problem import Problem
     from geosolver.statements.statement import Statement
-    from geosolver.dependencies.dependency_building import DependencyBuilder
+    from geosolver.dependencies.dependency_building import DependencyBody
 
 
 Mapping = dict[str, Union["Point", str]]
@@ -38,18 +38,16 @@ class ApplyTheoremAction(NamedTuple):
 
 class MatchAction(NamedTuple):
     theorem: "Theorem"
-    level: int
     cache: Optional["MatchCache"] = None
 
 
 class ResolveEngineAction(NamedTuple):
-    level: int
     engine_id: str
 
 
 class ApplyDerivationAction(NamedTuple):
     statement: "Statement"
-    reason: "DependencyBuilder"
+    reason: "DependencyBody"
 
 
 class AuxAction(NamedTuple):
@@ -117,9 +115,6 @@ Feedback = Union[
 
 class DeductiveAgent:
     """Common interface for deductive agents"""
-
-    def __init__(self) -> None:
-        self.level = None
 
     @abstractmethod
     def act(self, proof: "Proof", theorems: list["Theorem"]) -> Action:

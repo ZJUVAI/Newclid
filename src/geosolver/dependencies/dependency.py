@@ -37,12 +37,13 @@ class Dependency:
     It links a statement to a list of statements that justify it
     and their own dependencies.
 
+    .. image:: ../_static/Images/dependency_building/dependency_structure.svg
+
     """
 
     statement: Statement
     why: tuple[Self]
     reason: Optional[Reason] = None
-    level: Optional[int] = None
 
     def __hash__(self) -> int:
         return hash((self.statement, self.reason))

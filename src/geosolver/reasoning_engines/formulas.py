@@ -2,7 +2,7 @@ from fractions import Fraction
 from itertools import combinations
 from typing import TYPE_CHECKING
 from geosolver.dependencies.dependency import Dependency, Reason
-from geosolver.dependencies.dependency_building import DependencyBuilder
+from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.geometry import Ratio
 from geosolver.predicates import Predicate
 from geosolver.reasoning_engines.interface import Derivation, ReasoningEngine
@@ -42,8 +42,6 @@ class MenelausFormula(ReasoningEngine):
             self._rconst_hash_to_dep[hash_key] = dependency
 
     def resolve(self, **kwargs) -> list[Derivation]:
-        level: int = kwargs.get("level")
-
         while self._new_colls:
             coll = self._new_colls.pop()
             coll_hash = coll.statement.hash_tuple[1:]
@@ -90,10 +88,10 @@ class MenelausFormula(ReasoningEngine):
             initial_coll_triplet = tuple(sorted(representent_triplet))
             coll_deps.append(self._coll_hash_to_dep[initial_coll_triplet])
 
-            dep_builder = DependencyBuilder(
-                Reason("Menelaus"), why=coll_deps + rconst_hit_deps, level=level
+            dep_body = DependencyBody(
+                Reason("Menelaus"), why=coll_deps + rconst_hit_deps
             )
-            new_deps.append(Derivation(new_statement, dep_builder))
+            new_deps.append(Derivation(new_statement, dep_body))
             self.triplet_candidates.pop(representent_triplet)
 
         return new_deps
