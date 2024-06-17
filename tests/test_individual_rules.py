@@ -8,12 +8,12 @@ from geosolver.statements.adder import IntrinsicRules
 
 # (
 EXPECTED_TO_FAIL = [
-    "eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C => simtri2 A B C P Q R",
-    "eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R",
+    # "eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C => simtri2 A B C P Q R",
+    # "eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R",
 ]
 
 EXPECTED_TO_USE_OTHER_RULE = [
-    "cyclic A B C D, para A B C D => eqangle A D C D C D C B",
+    # "cyclic A B C D, para A B C D => eqangle A D C D C D C B",
     "eqangle A B P Q C D U V, perp P Q U V => perp A B C D",
 ]
 
@@ -290,6 +290,25 @@ def test_rule_used_to_solve_in_one_step(
                 IntrinsicRules.CYCLIC_FROM_CONG,
                 IntrinsicRules.CONG_FROM_EQRATIO,
                 IntrinsicRules.PARA_FROM_EQANGLE,
+                IntrinsicRules.POINT_ON_SAME_LINE,
+                IntrinsicRules.PARA_FROM_LINES,
+                IntrinsicRules.PERP_FROM_LINES,
+                IntrinsicRules.PERP_FROM_ANGLE,
+                IntrinsicRules.EQANGLE_FROM_LINES,
+                IntrinsicRules.EQANGLE_FROM_CONGRUENT_ANGLE,
+                IntrinsicRules.EQRATIO_FROM_PROPORTIONAL_SEGMENTS,
+                IntrinsicRules.CYCLIC_FROM_CIRCLE,
+                IntrinsicRules.ACONST_FROM_LINES,
+                IntrinsicRules.ACONST_FROM_ANGLE,
+                IntrinsicRules.SANGLE_FROM_ANGLE,
+                IntrinsicRules.RCONST_FROM_RATIO,
+                IntrinsicRules.PERP_FROM_PARA,
+                IntrinsicRules.EQANGLE_FROM_PARA,
+                IntrinsicRules.EQRATIO_FROM_CONG,
+                IntrinsicRules.ACONST_FROM_PARA,
+                IntrinsicRules.RCONST_FROM_CONG,
+                IntrinsicRules.SANGLE_FROM_LINES,
+                IntrinsicRules.SANGLE_FROM_PARA,
             ]
         )
     )
