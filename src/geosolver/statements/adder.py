@@ -938,15 +938,25 @@ class StatementAdder:
         self, points: list[Point], dep_body: DependencyBody
     ) -> tuple[list[Dependency], list[ToCache]]:
         if nm.same_clock(*[p.num for p in points]):
-            return self._add_simtri(points, dep_body)
-        return self._add_simtri_reflect(points, dep_body)
+            added, to_cache = self._add_simtri(points, dep_body)
+        else:
+            added, to_cache = self._add_simtri_reflect(points, dep_body)
+        self._simple_add(
+            Predicate.SIMILAR_TRIANGLE_BOTH, tuple(points), dep_body, added, to_cache
+        )
+        return added, to_cache
 
     def _add_contri_check(
         self, points: list[Point], dep_body: DependencyBody
     ) -> tuple[list[Dependency], list[ToCache]]:
         if nm.same_clock(*[p.num for p in points]):
-            return self._add_contri(points, dep_body)
-        return self._add_contri_reflect(points, dep_body)
+            added, to_cache = self._add_contri(points, dep_body)
+        else:
+            added, to_cache = self._add_contri_reflect(points, dep_body)
+        self._simple_add(
+            Predicate.CONTRI_TRIANGLE_BOTH, points, dep_body, added, to_cache
+        )
+        return added, to_cache
 
     def _add_simtri(
         self, points: list[Point], dep_body: DependencyBody
