@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional
 
 from geosolver.dependencies.caching import DependencyCache
 from geosolver.dependencies.dependency import Dependency, Reason
-from geosolver.dependencies.empty_dependency import DependencyBuilder
+from geosolver.dependencies.dependency_building import DependencyBuilder
 from geosolver.dependencies.dependency_graph import rgba_to_hex
 
 from geosolver.dependencies.why_predicates import why_dependency
