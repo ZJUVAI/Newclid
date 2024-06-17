@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, NamedTuple
 
-from geosolver.dependencies.dependency_building import DependencyBuilder
+from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.statements.statement import Statement
 
 if TYPE_CHECKING:
@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 
 class Derivation(NamedTuple):
     statement: Statement
-    dep_builder: DependencyBuilder
+    dep_body: DependencyBody
 
 
 class ReasoningEngine(ABC):

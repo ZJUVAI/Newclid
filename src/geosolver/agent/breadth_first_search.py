@@ -104,7 +104,7 @@ class BFSDD(DeductiveAgent):
         if self._match_cache is None:
             self._match_cache = MatchCache(proof)
         next_theorem = self._unmatched_theorems.pop(0)
-        return MatchAction(next_theorem, cache=self._match_cache, level=self.level)
+        return MatchAction(next_theorem, cache=self._match_cache)
 
     def _next_level(self, theorems: list["Theorem"]):
         self._update_level()
@@ -173,14 +173,14 @@ class BFSDDAR(DeductiveAgent):
         if self._current_next_engines:
             # If we have a stack of engines to use, we do that first
             next_engine = self._current_next_engines.pop()
-            return ResolveEngineAction(self.level, engine_id=next_engine)
+            return ResolveEngineAction(engine_id=next_engine)
 
         if self.level != self._dd_agent.level:
             # Each new level of dd we derive first
             self.level = self._dd_agent.level
             self._current_next_engines = self.available_engines.copy()
             next_engine = self._current_next_engines.pop()
-            return ResolveEngineAction(self.level, engine_id=next_engine)
+            return ResolveEngineAction(engine_id=next_engine)
 
         dd_action = self._dd_agent.act(proof, theorems)
         if isinstance(dd_action, StopAction):
