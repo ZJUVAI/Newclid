@@ -11,7 +11,7 @@ import geosolver.numerical.check as nm
 
 
 from geosolver.dependencies.dependency import Reason, Dependency
-from geosolver.dependencies.empty_dependency import DependencyBuilder
+from geosolver.dependencies.dependency_building import DependencyBuilder
 from geosolver.geometry import (
     Angle,
     Line,

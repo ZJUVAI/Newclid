@@ -82,3 +82,8 @@ class DependencyBuilder:
 
     def copy(self) -> "DependencyBuilder":
         return DependencyBuilder(reason=self.reason, level=self.level, why=self.why)
+
+    def __eq__(self, value: object) -> bool:
+        if not isinstance(value, DependencyBuilder):
+            return False
+        return self.reason == value.reason and set(self.why) == set(value.why)

@@ -2,7 +2,7 @@ import pytest
 import pytest_check as check
 import geosolver.reasoning_engines.algebraic_reasoning.geometric_tables as geometric_tables
 from geosolver.dependencies.dependency import Reason
-from geosolver.dependencies.empty_dependency import DependencyBuilder
+from geosolver.dependencies.dependency_building import DependencyBuilder
 from geosolver.numerical.check import clock
 from geosolver.api import GeometricSolverBuilder
 from tests.fixtures import build_until_works

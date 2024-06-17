@@ -70,7 +70,7 @@ def pretty_angle(a: str, b: str, c: str, d: str) -> str:
 
 def pretty_nl(name: str, args: list[str]) -> str:
     """Natural lang formatting a predicate."""
-    if name == Predicate.CONSTANT_ANGLE.value:
+    if name in [Predicate.CONSTANT_ANGLE.value, Predicate.S_ANGLE.value]:
         a, b, c, d, y = args
         return f"{pretty_angle(a, b, c, d)} = {y}"
     if name == Predicate.CONSTANT_RATIO.value:
@@ -130,6 +130,7 @@ def pretty_nl(name: str, args: list[str]) -> str:
     if name == "foot":
         a, b, c, d = args
         return f"{a} is the foot of {b} on {c}{d}"
+    raise NotImplementedError(f"Cannot write pretty name for {name}")
 
 
 def _ratio_pretty(args: list[str]):
