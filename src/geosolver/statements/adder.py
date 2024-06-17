@@ -940,11 +940,10 @@ class StatementAdder:
     def _add_simtri_check(
         self, points: list[Point], dep_builder: DependencyBuilder
     ) -> tuple[list[Dependency], list[ToCache]]:
-        added1, to_cache1 = [], []
         if nm.same_clock(*[p.num for p in points]):
-            added1, to_cache1 = self._add_simtri(points, dep_builder)
-        added2, to_cache2 = self._add_simtri_reflect(points, dep_builder)
-        added, to_cache = added1 + added2, to_cache1 + to_cache2
+            added, to_cache = self._add_simtri(points, dep_builder)
+        else:
+            added, to_cache = self._add_simtri_reflect(points, dep_builder)
         self._simple_add(
             Predicate.SIMILAR_TRIANGLE_BOTH, tuple(points), dep_builder, added, to_cache
         )
@@ -953,11 +952,10 @@ class StatementAdder:
     def _add_contri_check(
         self, points: list[Point], dep_builder: DependencyBuilder
     ) -> tuple[list[Dependency], list[ToCache]]:
-        added1, to_cache1 = [], []
         if nm.same_clock(*[p.num for p in points]):
-            added1, to_cache1 = self._add_contri(points, dep_builder)
-        added2, to_cache2 = self._add_contri_reflect(points, dep_builder)
-        added, to_cache = added1 + added2, to_cache1 + to_cache2
+            added, to_cache = self._add_contri(points, dep_builder)
+        else:
+            added, to_cache = self._add_contri_reflect(points, dep_builder)
         self._simple_add(
             Predicate.CONTRI_TRIANGLE_BOTH, points, dep_builder, added, to_cache
         )
