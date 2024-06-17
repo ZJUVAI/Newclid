@@ -44,7 +44,6 @@ class Dependency:
     statement: Statement
     why: tuple[Self]
     reason: Optional[Reason] = None
-    level: Optional[int] = None
 
     def __hash__(self) -> int:
         return hash((self.statement, self.reason))

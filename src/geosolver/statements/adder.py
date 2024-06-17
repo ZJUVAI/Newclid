@@ -582,12 +582,10 @@ class StatementAdder:
 
         ax = self.symbols_graph.get_or_create_segment(a, x, dep=None)
         ay = self.symbols_graph.get_or_create_segment(a, y, dep=None)
-        why = ab._val.why_equal([ax._val, ay._val], level=None)
+        why = ab._val.why_equal([ax._val, ay._val])
         why += [cong_ab_ac]
 
-        dep_body = DependencyBody(
-            Reason(IntrinsicRules.CYCLIC_FROM_CONG), level=cong_ab_ac.level, why=why
-        )
+        dep_body = DependencyBody(Reason(IntrinsicRules.CYCLIC_FROM_CONG), why=why)
         return self._add_cyclic([b, c, x, y], dep_body)
 
     def _add_eqangle(
@@ -1046,20 +1044,19 @@ class StatementAdder:
         dep_body: DependencyBody,
     ) -> Optional[Tuple[list[Dependency], list[ToCache]]]:
         """Add ab/cd = mn/pq in case maybe either two of (ab,cd,mn,pq) are equal."""
-        level = dep_body.level
-        if is_equal(ab, cd, level):
+        if is_equal(ab, cd):
             return self._make_equal_pairs(
                 a, b, c, d, m, n, p, q, ab, cd, mn, pq, dep_body
             )
-        elif is_equal(mn, pq, level):
+        elif is_equal(mn, pq):
             return self._make_equal_pairs(
                 m, n, p, q, a, b, c, d, mn, pq, ab, cd, dep_body
             )
-        elif is_equal(ab, mn, level):
+        elif is_equal(ab, mn):
             return self._make_equal_pairs(
                 a, b, m, n, c, d, p, q, ab, mn, cd, pq, dep_body
             )
-        elif is_equal(cd, pq, level):
+        elif is_equal(cd, pq):
             return self._make_equal_pairs(
                 c, d, p, q, a, b, m, n, cd, pq, ab, mn, dep_body
             )

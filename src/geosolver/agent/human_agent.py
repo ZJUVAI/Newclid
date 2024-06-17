@@ -117,7 +117,7 @@ class HumanAgent(DeductiveAgent):
         )
         theorem_dict = {th.rule_name: th for th in theorems}
         theorem = self._ask_for_key(theorem_dict, choose_theorem_str)
-        return MatchAction(theorem, level=self.level)
+        return MatchAction(theorem)
 
     def _act_apply_theorem(self, theorems: list[Theorem]) -> ApplyTheoremAction:
         choosen_mapping_str = "\nAvailable theorems mappings: \n"
@@ -130,7 +130,7 @@ class HumanAgent(DeductiveAgent):
         return ApplyTheoremAction(theorem, mapping)
 
     def _act_resolve_derivations(self, theorems: list[Theorem]) -> ResolveEngineAction:
-        return ResolveEngineAction(level=self.level, engine_id="AR")
+        return ResolveEngineAction(engine_id="AR")
 
     def _act_apply_derivation(self, theorems: list[Theorem]) -> ApplyDerivationAction:
         choose_derivation_str = "\nAvailable derivations: \n"

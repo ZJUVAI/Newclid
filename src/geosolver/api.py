@@ -104,18 +104,8 @@ class GeometricSolver:
     def draw_figure(self, out_file: Path):
         self.proof_state.symbols_graph.draw_figure(out_file)
 
-    def draw_dependency_graph(self, out_file: Path):
-        self.proof_state.dependency_graph.show_html(
-            out_file, Theorem.to_dict(self.rules)
-        )
-
     def draw_symbols_graph(self, out_file: Path):
         self.proof_state.symbols_graph.draw_html(out_file)
-
-    def draw_proof_subgraph(self, out_file: Path):
-        self.proof_state.dependency_graph.proof_subgraph.show_html(
-            out_file, Theorem.to_dict(self.rules)
-        )
 
     def draw_why_graph(self, out_file: Path):
         self.proof_state.statements.graph.show_html(out_file)
@@ -125,8 +115,6 @@ class GeometricSolver:
         self.write_solution(output_folder_path / "proof_steps.txt")
         self.draw_figure(output_folder_path / "proof_figure.png")
         self.draw_symbols_graph(output_folder_path / "symbols_graph.html")
-        self.draw_dependency_graph(output_folder_path / "dependency_graph.html")
-        self.draw_proof_subgraph(output_folder_path / "proof_subgraph.html")
         logging.info("Written all outputs at %s", output_folder_path)
 
     def get_existing_points(self) -> list[str]:

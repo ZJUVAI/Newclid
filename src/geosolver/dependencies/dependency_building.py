@@ -13,10 +13,9 @@ class DependencyBody:
     """Statement-less body of a dependency that can be extended
     before becoming a dependency."""
 
-    def __init__(self, reason: Reason, level: int, why: tuple[Dependency]):
+    def __init__(self, reason: Reason, why: tuple[Dependency]):
         assert isinstance(reason, Reason)
         self.reason: Reason = reason
-        self.level: int = level
         self.why: tuple[Dependency] = tuple(why)
 
     def build(
@@ -41,14 +40,11 @@ class DependencyBody:
         .. image:: ../_static/Images/dependency_building/extend.svg
 
         """
-        extension_dep = statements_graph.build_resolved_dependency(
-            extention_statement, level=self.level
-        )
+        extension_dep = statements_graph.build_resolved_dependency(extention_statement)
         if extension_dep is None:
             raise
         return DependencyBody(
             reason=extention_reason,
-            level=self.level,
             why=(self.build(statements_graph, statement), extension_dep),
         )
 
@@ -68,12 +64,11 @@ class DependencyBody:
         if not extention_statements:
             return self
         extended_dep = [
-            statements_graph.build_resolved_dependency(e_statement, level=self.level)
+            statements_graph.build_resolved_dependency(e_statement)
             for e_statement in extention_statements
         ]
         return DependencyBody(
             reason=extention_reason,
-            level=self.level,
             why=(self.build(statements_graph, original_statement), *extended_dep),
         )
 
@@ -94,12 +89,11 @@ class DependencyBody:
             return self
         return DependencyBody(
             reason=extention_reason,
-            level=self.level,
             why=(self.build(statements_graph, original_statement), *why),
         )
 
     def copy(self) -> "DependencyBody":
-        return DependencyBody(reason=self.reason, level=self.level, why=self.why)
+        return DependencyBody(reason=self.reason, why=self.why)
 
     def __eq__(self, value: object) -> bool:
         if not isinstance(value, DependencyBody):
