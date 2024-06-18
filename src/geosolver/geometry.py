@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 class Symbol:
-    r"""Node in the proof state graph.
+    r"""Node in the symbols graph.
 
     Can be Point, Line, Circle, etc.
 
@@ -241,27 +241,8 @@ class Symbol:
 
         return bfs_backtrack(self, others, parent), others
 
-    def why_val(self) -> list["Dependency"]:
-        return self._val.why_equal([self.val])
-
-    def why_connect(self, node: Symbol) -> list["Dependency"]:
-        rep = self.rep()
-        equivs = list(rep.edge_graph[node].keys())
-        if not equivs:
-            return None
-        equiv = equivs[0]
-        dep = rep.edge_graph[node][equiv]
-        return [dep] + self.why_equal(equiv)
-
     def __repr__(self) -> str:
         return self.name
-
-
-def why_connect(*pairs: tuple[Symbol, Symbol]) -> list[Any]:
-    result = []
-    for node1, node2 in pairs:
-        result += node1.why_connect(node2)
-    return result
 
 
 def is_equiv(x: Symbol, y: Symbol) -> bool:
@@ -312,6 +293,7 @@ class Line(Symbol):
     """Node of type Line."""
 
     points: tuple[Point, Point]
+    _val: Direction
 
     def new_val(self) -> Direction:
         return Direction()
@@ -356,6 +338,8 @@ class Segment(Symbol):
 class Circle(Symbol):
     """Node of type Circle."""
 
+    points: list[Point]
+
     def why_cyclic(self, points: list[Point]) -> list[Any]:
         """Why points are connected to self."""
         groups: list[list[Circle]] = []
@@ -379,19 +363,6 @@ class Circle(Symbol):
         if min_deps is None:
             return None
         return [d for d in min_deps if d is not None]
-
-
-def name_map(struct: Any) -> Any:
-    if isinstance(struct, list):
-        return [name_map(x) for x in struct]
-    elif isinstance(struct, tuple):
-        return tuple([name_map(x) for x in struct])
-    elif isinstance(struct, set):
-        return set([name_map(x) for x in struct])
-    elif isinstance(struct, dict):
-        return {name_map(x): name_map(y) for x, y in struct.items()}
-    else:
-        return getattr(struct, "name", "")
 
 
 class Angle(Symbol):
