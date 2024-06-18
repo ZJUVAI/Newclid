@@ -12,7 +12,7 @@ from geosolver.geometry import (
     Direction,
     Line,
     Measure,
-    Node,
+    Symbol,
     Point,
     Ratio,
     Value,
@@ -50,7 +50,7 @@ def why_dependency(
     return reason, why
 
 
-def _why_equal(x: Node, y: Node) -> list[Any]:
+def _why_equal(x: Symbol, y: Symbol) -> list[Any]:
     if x == y:
         return []
     if not x._val or not y._val:
