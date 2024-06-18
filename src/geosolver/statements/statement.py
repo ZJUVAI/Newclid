@@ -132,6 +132,16 @@ def _hash_two_times_two_unorded_lines(
     c, d = sorted([c, d])
     e, f = sorted([e, f])
     g, h = sorted([g, h])
+    # res = []
+    # for i in range(2):
+    #     for j in range(2):
+    #         if i == 0:
+    #             _a, _b, _e, _f, _c, _d, _g, _h = c, d, g, h, a, b, e, f
+    #         else:
+    #             _a, _b, _e, _f, _c, _d, _g, _h = a, b, e, f, c, d, g, h
+    #         if j == 0:
+    #             _a, _b, _c, _d, _e, _f, _g, _h = _e, _f, _g, _h, _a, _b, _c, _d
+    #         res.append(deepcopy((_a, _b, _c, _d, _e, _f, _g, _h)))
     if tuple(sorted([a, b, e, f])) > tuple(sorted([c, d, g, h])):
         a, b, e, f, c, d, g, h = c, d, g, h, a, b, e, f
     if (a, b, c, d) > (e, f, g, h):

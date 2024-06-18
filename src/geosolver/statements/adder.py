@@ -62,6 +62,9 @@ class IntrinsicRules(Enum):
     SANGLE_FROM_PARA = "i22"
 
 
+ALL_INTRINSIC_RULES = [rule for rule in IntrinsicRules]
+
+
 class StatementAdder:
     def __init__(
         self,

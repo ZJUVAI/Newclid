@@ -201,6 +201,9 @@ class GeometricSolverBuilder:
     def load_problem_from_file(
         self, problems_path: Path, problem_name: str, translate: bool = True
     ) -> Self:
+        """
+        `tranlate = True` by default for better LLM training
+        """
         problems = Problem.to_dict(
             Problem.from_txt_file(problems_path, translate=translate)
         )
