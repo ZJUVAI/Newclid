@@ -1,7 +1,7 @@
 from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Type, TypeVar
 
 
 from geosolver.ratios import simplify
@@ -109,7 +109,9 @@ class SymbolsGraph:
         if isinstance(node, Point):
             self._name2point[node.name] = node
 
-    def new_node(self, oftype: Type[Symbol], name: str = "") -> Symbol:
+    S = TypeVar("S")
+
+    def new_node(self, oftype: Type[S], name: str = "") -> S:
         node = oftype(name, self)
         self.add_node(node)
         return node
@@ -356,7 +358,7 @@ class SymbolsGraph:
             p1, p2 = p2, p1
         name = p1.name.lower() + p2.name.lower()
         line = self.new_node(Line, name)
-        line.num = num_geo.Line(p1.num, p2.num)
+        line.num = num_geo.LineNum(p1.num, p2.num)
         line.points = p1, p2
 
         self.connect(p1, line, dep=None)
@@ -397,7 +399,7 @@ class SymbolsGraph:
         p1, p2, p3 = sorted([p1, p2, p3], key=lambda x: x.name)
         name = p1.name.lower() + p2.name.lower() + p3.name.lower()
         circle = self.new_node(Circle, f"({name})")
-        circle.num = num_geo.Circle(p1=p1.num, p2=p2.num, p3=p3.num)
+        circle.num = num_geo.CircleNum(p1=p1.num, p2=p2.num, p3=p3.num)
         circle.points = p1, p2, p3
 
         self.connect(p1, circle, dep=None)
