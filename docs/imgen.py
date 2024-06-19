@@ -357,7 +357,11 @@ def apply_sameside(Op: Point, A: Point, B: Point, E: Point, X: Point, Y: Point):
 
 
 def random_color():
-    return (random(), random(), random())
+    return (
+        random() * 0.5 + 0.5,
+        random() * 0.5 + 0.5,
+        random() * 0.5 + 0.5,
+    )
 
 
 def add_perp(ax, A: Point, B: Point, C: Point, D: Point):
