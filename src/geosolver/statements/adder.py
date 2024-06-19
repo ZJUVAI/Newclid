@@ -434,7 +434,7 @@ class StatementAdder:
         cd = self.symbols_graph.get_or_create_segment(c, d, None)
 
         cong = Statement(Predicate.CONGRUENT, [a, b, c, d])
-        dep = self.statements_graph.build_dependency(cong, dep_body)
+        dep = dep_body.build(self.statements_graph, cong)
         self._make_equal(ab, cd, dep=dep)
 
         to_cache = [(cong, dep)]
@@ -775,9 +775,9 @@ class StatementAdder:
         """Add four eqratios through a list of 5 points
             (due to parallel lines with common point).
 
-        #        o
-        #      a - b
-        #     c --- d
+           o
+         a - b
+        c --- d
 
         """
         o, a, b, c, d = points
