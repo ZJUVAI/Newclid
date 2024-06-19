@@ -117,7 +117,7 @@ def cli_arguments() -> Namespace:
         "--ar-verbose",
         default="",
         type=str,
-        help="Subset of {a, d, r}, denoting wether to print equational tables of angles, distances, ratios",
+        help="Choose one or more from {a, d, r}, to print table of equations of angles (a), distances (d), ratios (r).",
     )
     args, _ = parser.parse_known_args()
     return args
