@@ -1,7 +1,7 @@
 from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Type
+from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Type, TypeVar
 
 
 from geosolver.ratios import simplify
@@ -15,7 +15,7 @@ from geosolver.geometry import (
     Length,
     Line,
     Measure,
-    Node,
+    Symbol,
     Point,
     Ratio,
     Segment,
@@ -37,14 +37,14 @@ if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
 
 
-NODES_VALUES: dict[Type[Node], Type[Node]] = {
+NODES_VALUES: dict[Type[Symbol], Type[Symbol]] = {
     Line: Direction,
     Segment: Length,
     Angle: Measure,
     Ratio: Value,
 }
 
-NODES_VALUES_MARKERS: dict[Type[Node], str] = {
+NODES_VALUES_MARKERS: dict[Type[Symbol], str] = {
     Direction: "d",
     Length: "l",
     Measure: "m",
@@ -54,7 +54,7 @@ NODES_VALUES_MARKERS: dict[Type[Node], str] = {
 
 class SymbolsGraph:
     def __init__(self) -> None:
-        self.type2nodes: dict[Type[Node], list[Node]] = {
+        self.type2nodes: dict[Type[Symbol], list[Symbol]] = {
             Point: [],
             Line: [],
             Segment: [],
@@ -67,7 +67,7 @@ class SymbolsGraph:
             Value: [],
         }
         self._name2point: dict[str, Point] = {}
-        self._name2node: dict[str, Node] = {}
+        self._name2node: dict[str, Symbol] = {}
         self._pair2line: dict[tuple[Point, Point], Line] = {}
         self._triplet2circle: dict[tuple[Point, Point, Point], Circle] = {}
         self.rconst: Dict[Tuple[int, int], Ratio] = {}  # contains all constant ratios
@@ -75,7 +75,7 @@ class SymbolsGraph:
         self.halfpi, _ = self.get_or_create_const_ang(1, 2)
         self.vhalfpi = self.halfpi.val
 
-    def connect(self, a: Node, b: Node, dep: "Dependency") -> None:
+    def connect(self, a: Symbol, b: Symbol, dep: "Dependency") -> None:
         a.connect_to(b, dep)
         b.connect_to(a, dep)
 
@@ -83,7 +83,7 @@ class SymbolsGraph:
         """Return all nodes of type Point."""
         return list(self.type2nodes[Point])
 
-    def names2nodes(self, pnames: list[str]) -> list[Node]:
+    def names2nodes(self, pnames: list[str]) -> list[Symbol]:
         return [self._name2node[name] for name in pnames]
 
     def names2points(
@@ -102,19 +102,21 @@ class SymbolsGraph:
 
         return result
 
-    def add_node(self, node: Node) -> None:
+    def add_node(self, node: Symbol) -> None:
         self.type2nodes[type(node)].append(node)
         self._name2node[node.name] = node
 
         if isinstance(node, Point):
             self._name2point[node.name] = node
 
-    def new_node(self, oftype: Type[Node], name: str = "") -> Node:
+    S = TypeVar("S")
+
+    def new_node(self, oftype: Type[S], name: str = "") -> S:
         node = oftype(name, self)
         self.add_node(node)
         return node
 
-    def get_node_val(self, node: Node, dep: Optional["Dependency"]) -> Node:
+    def get_node_val(self, node: Symbol, dep: Optional["Dependency"]) -> Symbol:
         """Get a node value (equality) node, creating it if necessary."""
         if node._val:
             return node._val
@@ -134,7 +136,7 @@ class SymbolsGraph:
             return self._name2node[pointname]
         return default_fn(pointname)
 
-    def merge(self, nodes: list[Node], dep: "Dependency") -> Node:
+    def merge(self, nodes: list[Symbol], dep: "Dependency") -> Symbol:
         """Merge all nodes."""
         if len(nodes) < 2:
             return
@@ -151,7 +153,9 @@ class SymbolsGraph:
                 break
         return self.merge_into(node0, nodes1, dep)
 
-    def merge_into(self, node0: Node, nodes1: list[Node], dep: "Dependency") -> Node:
+    def merge_into(
+        self, node0: Symbol, nodes1: list[Symbol], dep: "Dependency"
+    ) -> Symbol:
         """Merge nodes1 into a single node0."""
         node0.merge(nodes1, dep)
         for n in nodes1:
@@ -172,7 +176,7 @@ class SymbolsGraph:
 
         return node0
 
-    def remove(self, nodes: list[Node]) -> None:
+    def remove(self, nodes: list[Symbol]) -> None:
         """Remove nodes out of self because they are merged."""
         if not nodes:
             return
@@ -354,7 +358,7 @@ class SymbolsGraph:
             p1, p2 = p2, p1
         name = p1.name.lower() + p2.name.lower()
         line = self.new_node(Line, name)
-        line.num = num_geo.Line(p1.num, p2.num)
+        line.num = num_geo.LineNum(p1.num, p2.num)
         line.points = p1, p2
 
         self.connect(p1, line, dep=None)
@@ -395,7 +399,7 @@ class SymbolsGraph:
         p1, p2, p3 = sorted([p1, p2, p3], key=lambda x: x.name)
         name = p1.name.lower() + p2.name.lower() + p3.name.lower()
         circle = self.new_node(Circle, f"({name})")
-        circle.num = num_geo.Circle(p1=p1.num, p2=p2.num, p3=p3.num)
+        circle.num = num_geo.CircleNum(p1=p1.num, p2=p2.num, p3=p3.num)
         circle.points = p1, p2, p3
 
         self.connect(p1, circle, dep=None)

@@ -1,15 +1,15 @@
 """Implements geometric objects used in the graph representation."""
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Generator, Optional, Type
+from typing import TYPE_CHECKING, Any, Generator, Optional, Type, TypeVar
 from typing_extensions import Self
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
 
 
-class Node:
-    r"""Node in the proof state graph.
+class Symbol:
+    r"""Symbol in the symbols graph.
 
     Can be Point, Line, Circle, etc.
 
@@ -30,7 +30,7 @@ class Node:
         self.name = name or str(self)
         self.graph = graph
 
-        self.edge_graph: dict[Node, dict[Self, list["Dependency"]]] = {}
+        self.edge_graph: dict[Symbol, dict[Self, list["Dependency"]]] = {}
         # Edge graph: what other nodes is connected to this node.
         # edge graph = {
         #   other1: {self1: deps, self2: deps},
@@ -44,8 +44,8 @@ class Node:
         self.rep_by = None  # represented by.
         self.members = {self}
 
-        self._val: Optional[Node] = None
-        self._obj: Optional[Node] = None
+        self._val: Optional[Symbol] = None
+        self._obj: Optional[Symbol] = None
 
         self.deps: list["Dependency"] = []
 
@@ -53,14 +53,14 @@ class Node:
         self.num = None
         self.change = set()  # what other nodes' num rely on this node?
 
-    def set_rep(self, node: Node) -> None:
+    def set_rep(self, node: Symbol) -> None:
         if node == self:
             return
         self.rep_by = node
         node.merge_edge_graph(self.edge_graph)
         node.members.update(self.members)
 
-    def rep(self) -> Node:
+    def rep(self) -> Self:
         x = self
         while x.rep_by:
             x = x.rep_by
@@ -73,9 +73,11 @@ class Node:
         rep = self.rep()
         return rep, self.why_equal([rep])
 
+    NT = TypeVar("NT")
+
     def neighbors(
-        self, oftype: Type[Node], return_set: bool = False, do_rep: bool = True
-    ) -> list[Node]:
+        self, oftype: Type[NT], return_set: bool = False, do_rep: bool = True
+    ) -> list[NT] | set[NT]:
         """Neighbors of this node in the proof state graph."""
         if do_rep:
             rep = self.rep()
@@ -95,7 +97,7 @@ class Node:
         return list(result)
 
     def merge_edge_graph(
-        self, new_edge_graph: dict[Node, dict[Node, list[Node]]]
+        self, new_edge_graph: dict[Symbol, dict[Symbol, list[Symbol]]]
     ) -> None:
         for x, xdict in new_edge_graph.items():
             if x in self.edge_graph:
@@ -103,11 +105,11 @@ class Node:
             else:
                 self.edge_graph[x] = dict(xdict)
 
-    def merge(self, nodes: list[Node], deps: list["Dependency"]) -> None:
+    def merge(self, nodes: list[Symbol], deps: list["Dependency"]) -> None:
         for node in nodes:
             self.merge_one(node, deps)
 
-    def merge_one(self, node: Node, deps: list["Dependency"]) -> None:
+    def merge_one(self, node: Symbol, deps: list["Dependency"]) -> None:
         node.rep().set_rep(self.rep())
 
         if node in self.merge_graph:
@@ -116,7 +118,7 @@ class Node:
         self.merge_graph[node] = deps
         node.merge_graph[self] = deps
 
-    def is_val(self, node: Node) -> bool:
+    def is_val(self, node: Symbol) -> bool:
         return (
             isinstance(self, Line)
             and isinstance(node, Direction)
@@ -128,20 +130,20 @@ class Node:
             and isinstance(node, Value)
         )
 
-    def set_val(self, node: Node) -> None:
+    def set_val(self, node: Symbol) -> None:
         self._val = node
 
-    def set_obj(self, node: Node) -> None:
+    def set_obj(self, node: Symbol) -> None:
         self._obj = node
 
     @property
-    def val(self) -> Node:
+    def val(self) -> Symbol:
         if self._val is None:
             return None
         return self._val.rep()
 
     @property
-    def obj(self) -> Node:
+    def obj(self) -> Symbol:
         if self._obj is None:
             return None
         return self._obj.rep()
@@ -149,7 +151,7 @@ class Node:
     def equivs(self) -> set[Self]:
         return self.rep().members
 
-    def connect_to(self, node: Node, deps: list["Dependency"] = None) -> None:
+    def connect_to(self, node: Symbol, deps: list["Dependency"] = None) -> None:
         rep = self.rep()
 
         if node in rep.edge_graph:
@@ -161,7 +163,7 @@ class Node:
             self.set_val(node)
             node.set_obj(self)
 
-    def equivs_upto(self) -> dict[Node, Node]:
+    def equivs_upto(self) -> dict[Symbol, Symbol]:
         """What are the equivalent nodes."""
         parent = {self: None}
         visited = set()
@@ -181,7 +183,7 @@ class Node:
 
         return parent
 
-    def why_equal(self, others: list[Node]) -> list["Dependency"]:
+    def why_equal(self, others: list[Symbol]) -> list["Dependency"]:
         """BFS why this node is equal to other nodes."""
         others = set(others)
         found = 0
@@ -208,8 +210,8 @@ class Node:
         return bfs_backtrack(self, others, parent)
 
     def why_equal_groups(
-        self, groups: list[list[Node]]
-    ) -> tuple[list["Dependency"], list[Node]]:
+        self, groups: list[list[Symbol]]
+    ) -> tuple[list["Dependency"], list[Symbol]]:
         """BFS for why self is equal to at least one member of each group."""
         others = [None for _ in groups]
         found = 0
@@ -239,34 +241,15 @@ class Node:
 
         return bfs_backtrack(self, others, parent), others
 
-    def why_val(self) -> list["Dependency"]:
-        return self._val.why_equal([self.val])
-
-    def why_connect(self, node: Node) -> list["Dependency"]:
-        rep = self.rep()
-        equivs = list(rep.edge_graph[node].keys())
-        if not equivs:
-            return None
-        equiv = equivs[0]
-        dep = rep.edge_graph[node][equiv]
-        return [dep] + self.why_equal(equiv)
-
     def __repr__(self) -> str:
         return self.name
 
 
-def why_connect(*pairs: tuple[Node, Node]) -> list[Any]:
-    result = []
-    for node1, node2 in pairs:
-        result += node1.why_connect(node2)
-    return result
-
-
-def is_equiv(x: Node, y: Node) -> bool:
+def is_equiv(x: Symbol, y: Symbol) -> bool:
     return x.why_equal([y]) is not None
 
 
-def is_equal(x: Node, y: Node) -> bool:
+def is_equal(x: Symbol, y: Symbol) -> bool:
     if x == y:
         return True
     if x._val is None or y._val is None:
@@ -277,7 +260,7 @@ def is_equal(x: Node, y: Node) -> bool:
 
 
 def bfs_backtrack(
-    root: Node, leafs: list[Node], parent: dict[Node, Node]
+    root: Symbol, leafs: list[Symbol], parent: dict[Symbol, Symbol]
 ) -> list["Dependency"]:
     """Return the path given BFS trace of parent nodes."""
     backtracked = {root}  # no need to backtrack further when touching this set.
@@ -298,15 +281,19 @@ def bfs_backtrack(
     return deps
 
 
-class Point(Node):
+class Point(Symbol):
     rely_on: list[Point] = None
-    pass
+    plevel: int
+    group: list[Self]
+    dep_points = set[Self]
+    why: list["Dependency"]  # to generate txt logs.
 
 
-class Line(Node):
-    """Node of type Line."""
+class Line(Symbol):
+    """Symbol of type Line."""
 
     points: tuple[Point, Point]
+    _val: Direction
 
     def new_val(self) -> Direction:
         return Direction()
@@ -340,13 +327,18 @@ class Line(Node):
         return [d for d in min_deps if d is not None]
 
 
-class Segment(Node):
+class Segment(Symbol):
+    points: tuple[Point, Point]
+    _val: Length
+
     def new_val(self) -> Length:
         return Length()
 
 
-class Circle(Node):
-    """Node of type Circle."""
+class Circle(Symbol):
+    """Symbol of type Circle."""
+
+    points: list[Point]
 
     def why_cyclic(self, points: list[Point]) -> list[Any]:
         """Why points are connected to self."""
@@ -373,23 +365,12 @@ class Circle(Node):
         return [d for d in min_deps if d is not None]
 
 
-def name_map(struct: Any) -> Any:
-    if isinstance(struct, list):
-        return [name_map(x) for x in struct]
-    elif isinstance(struct, tuple):
-        return tuple([name_map(x) for x in struct])
-    elif isinstance(struct, set):
-        return set([name_map(x) for x in struct])
-    elif isinstance(struct, dict):
-        return {name_map(x): name_map(y) for x, y in struct.items()}
-    else:
-        return getattr(struct, "name", "")
-
-
-class Angle(Node):
-    """Node of type Angle."""
+class Angle(Symbol):
+    """Symbol of type Angle."""
 
     opposite: Optional[Angle] = None
+    _d: tuple[Optional[Direction], Optional[Direction]] = (None, None)
+    _val: Measure
 
     def new_val(self) -> Measure:
         return Measure()
@@ -405,8 +386,12 @@ class Angle(Node):
         return d1.rep(), d2.rep()
 
 
-class Ratio(Node):
-    """Node of type Ratio."""
+class Ratio(Symbol):
+    """Symbol of type Ratio."""
+
+    opposite: Optional[Angle] = None
+    _l: tuple[Optional[Length], Optional[Length]] = (None, None)
+    _val: Value
 
     def new_val(self) -> Value:
         return Value()
@@ -422,19 +407,23 @@ class Ratio(Node):
         return l1.rep(), l2.rep()
 
 
-class Direction(Node):
+class Direction(Symbol):
+    _obj: Line
     pass
 
 
-class Measure(Node):
+class Measure(Symbol):
+    _obj: Angle
     pass
 
 
-class Length(Node):
+class Length(Symbol):
+    _obj: Segment
     pass
 
 
-class Value(Node):
+class Value(Symbol):
+    _obj: Ratio
     pass
 
 
@@ -444,22 +433,22 @@ def all_angles(
     d1s = d1.equivs_upto()
     d2s = d2.equivs_upto()
 
-    for ang in d1.rep().neighbors(Angle):
-        d1_, d2_ = ang._d
+    for angle in d1.rep().neighbors(Angle):
+        d1_, d2_ = angle._d
         if d1_ in d1s and d2_ in d2s:
-            yield ang, d1s, d2s
+            yield angle, d1s, d2s
 
 
 def all_ratios(
     d1: Direction, d2: Direction
-) -> Generator[Angle, list[Direction], list[Direction]]:
+) -> Generator[Ratio, list[Direction], list[Direction]]:
     d1s = d1.equivs_upto()
     d2s = d2.equivs_upto()
 
-    for ang in d1.rep().neighbors(Ratio):
-        d1_, d2_ = ang._l
+    for ratio in d1.rep().neighbors(Ratio):
+        d1_, d2_ = ratio._l
         if d1_ in d1s and d2_ in d2s:
-            yield ang, d1s, d2s
+            yield ratio, d1s, d2s
 
 
 RANKING = {

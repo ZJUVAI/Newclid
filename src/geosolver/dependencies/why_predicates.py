@@ -11,9 +11,11 @@ from geosolver.geometry import (
     Circle,
     Direction,
     Line,
-    Node,
+    Measure,
+    Symbol,
     Point,
     Ratio,
+    Value,
     all_angles,
     all_ratios,
     bfs_backtrack,
@@ -49,7 +51,7 @@ def why_dependency(
     return reason, why
 
 
-def _why_equal(x: Node, y: Node) -> list[Dependency]:
+def _why_equal(x: Symbol, y: Symbol) -> list[Dependency]:
     if x == y:
         return []
     if not x._val or not y._val:
@@ -405,7 +407,7 @@ def _why_aconst(
 ) -> tuple[Optional[Reason], list[Dependency]]:
     a, b, c, d, ang0 = statement.args
 
-    measure = ang0._val
+    measure: Measure = ang0._val
     for ang in measure.neighbors(Angle):
         if ang == ang0:
             continue
@@ -443,8 +445,8 @@ def _why_rconst(
     statements_graph: "WhyHyperGraph", statement: "Statement"
 ) -> tuple[Optional[Reason], list[Dependency]]:
     a, b, c, d, rat0 = statement.args
-    val = rat0._val
 
+    val: Value = rat0._val
     for rat in val.neighbors(Ratio):
         if rat == rat0:
             continue

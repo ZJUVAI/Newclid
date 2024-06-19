@@ -5,9 +5,16 @@ import pytest_check as check
 from geosolver.geometry import Angle
 from geosolver.numerical.angles import ang_between
 from geosolver.numerical.check import check_coll_numerical, check_eqangle_numerical
-import geosolver.numerical.geometries as geo_num
-import geosolver.numerical.sketch as nm
+from geosolver.numerical.geometries import (
+    CircleNum,
+    HalfLine,
+    LineNum,
+    PointNum,
+    line_circle_intersection,
+    line_line_intersection,
+)
 from geosolver.numerical.sketch import (
+    head_from,
     sketch_2l1c,
     sketch_3peq,
     sketch_aline,
@@ -55,23 +62,23 @@ class TestNumerical:
 
     def test_sketch_2l1c(self):
         rnd_gen = np.random.default_rng()
-        p = geo_num.Point(0.0, 0.0)
+        p = PointNum(0.0, 0.0)
         pi = np.pi
         anga = rnd_gen.uniform(-0.4 * pi, 0.4 * pi)
-        a = geo_num.Point(np.cos(anga), np.sin(anga))
+        a = PointNum(np.cos(anga), np.sin(anga))
         angb = rnd_gen.uniform(0.6 * pi, 1.4 * pi)
-        b = geo_num.Point(np.cos(angb), np.sin(angb))
+        b = PointNum(np.cos(angb), np.sin(angb))
 
         angc = rnd_gen.uniform(anga + 0.05 * pi, angb - 0.05 * pi)
-        c = geo_num.Point(np.cos(angc), np.sin(angc)) * rnd_gen.uniform(0.2, 0.8)
+        c = PointNum(np.cos(angc), np.sin(angc)) * rnd_gen.uniform(0.2, 0.8)
 
         x, y, z, i = sketch_2l1c([a, b, c, p])
         check.is_true(check_coll_numerical([x, c, a]))
         check.is_true(check_coll_numerical([y, c, b]))
         check.almost_equal(z.distance(p), 1.0)
         check.is_true(check_coll_numerical([p, i, z]))
-        check.is_true(geo_num.Line(i, x).is_perp(geo_num.Line(c, a)))
-        check.is_true(geo_num.Line(i, y).is_perp(geo_num.Line(c, b)))
+        check.is_true(LineNum(i, x).is_perp(LineNum(c, a)))
+        check.is_true(LineNum(i, y).is_perp(LineNum(c, b)))
         check.almost_equal(i.distance(x), i.distance(y))
         check.almost_equal(i.distance(x), i.distance(z))
 
@@ -90,7 +97,7 @@ class TestNumerical:
         rnd_gen = np.random.default_rng()
         a, b, c, d, e = geosolver.numerical.sketch.random_points(5, rnd_gen)
         ex = sketch_aline([a, b, c, d, e])
-        check.is_instance(ex, geo_num.HalfLine)
+        check.is_instance(ex, HalfLine)
         check.equal(ex.tail, e)
         x = ex.head
         check.almost_equal(ang_between(b, a, c), ang_between(e, d, x))
@@ -99,7 +106,7 @@ class TestNumerical:
         rnd_gen = np.random.default_rng()
         a, b, c = geosolver.numerical.sketch.random_points(3, rnd_gen)
         bx = sketch_amirror([a, b, c])
-        check.is_instance(bx, geo_num.HalfLine)
+        check.is_instance(bx, HalfLine)
         assert bx.tail == b
         x = bx.head
 
@@ -114,10 +121,10 @@ class TestNumerical:
         check.almost_equal(b.distance(line), 0.0)
 
         perpendicular_line = a.perpendicular_line(line)
-        x = geo_num.line_line_intersection(perpendicular_line, geo_num.Line(b, c))
+        x = line_line_intersection(perpendicular_line, LineNum(b, c))
         check.almost_equal(a.distance(line), x.distance(line))
 
-        d, _ = geo_num.line_circle_intersection(line, geo_num.Circle(b, radius=1))
+        d, _ = line_circle_intersection(line, CircleNum(b, radius=1))
         ang1 = ang_between(b, a, d)
         ang2 = ang_between(b, d, c)
         check.almost_equal(ang1, ang2)
@@ -126,14 +133,14 @@ class TestNumerical:
         rnd_gen = np.random.default_rng()
         a, b = geosolver.numerical.sketch.random_points(2, rnd_gen)
         line_ab = sketch_bline([a, b])
-        check.is_true(geo_num.Line(a, b).is_perp(line_ab))
+        check.is_true(LineNum(a, b).is_perp(line_ab))
         check.almost_equal(a.distance(line_ab), b.distance(line_ab))
 
     def test_sketch_cc_tangent(self):
         rnd_gen = np.random.default_rng()
 
-        o = geo_num.Point(0.0, 0.0)
-        w = geo_num.Point(1.0, 0.0)
+        o = PointNum(0.0, 0.0)
+        w = PointNum(1.0, 0.0)
 
         ra = rnd_gen.uniform(0.0, 0.6)
         rb = rnd_gen.uniform(0.4, 1.0)
@@ -141,12 +148,12 @@ class TestNumerical:
         a = rnd_gen.uniform(0.0, np.pi)
         b = rnd_gen.uniform(0.0, np.pi)
 
-        a = o + ra * geo_num.Point(np.cos(a), np.sin(a))
-        b = w + rb * geo_num.Point(np.sin(b), np.cos(b))
+        a = o + ra * PointNum(np.cos(a), np.sin(a))
+        b = w + rb * PointNum(np.sin(b), np.cos(b))
 
         x, y, z, t = sketch_cc_tangent([o, a, w, b])
-        xy = geo_num.Line(x, y)
-        zt = geo_num.Line(z, t)
+        xy = LineNum(x, y)
+        zt = LineNum(z, t)
         check.almost_equal(o.distance(xy), o.distance(a))
         check.almost_equal(o.distance(zt), o.distance(a))
         check.almost_equal(w.distance(xy), w.distance(b))
@@ -161,11 +168,11 @@ class TestNumerical:
 
     def test_sketch_e5128(self):
         rnd_gen = np.random.default_rng()
-        b = geo_num.Point(0.0, 0.0)
-        c = geo_num.Point(0.0, 1.0)
+        b = PointNum(0.0, 0.0)
+        c = PointNum(0.0, 1.0)
         ang = rnd_gen.uniform(-np.pi / 2, 3 * np.pi / 2)
-        d = nm.head_from(c, ang, 1.0)
-        a = geo_num.Point(rnd_gen.uniform(0.5, 2.0), 0.0)
+        d = head_from(c, ang, 1.0)
+        a = PointNum(rnd_gen.uniform(0.5, 2.0), 0.0)
 
         e, g = sketch_e5128([a, b, c, d])
         ang1 = ang_between(a, b, d)
@@ -176,15 +183,15 @@ class TestNumerical:
         rnd_gen = np.random.default_rng()
         a, b, c, d = sketch_eq_quadrangle([], rnd_gen=rnd_gen)
         check.almost_equal(a.distance(d), c.distance(b))
-        ac = geo_num.Line(a, c)
+        ac = LineNum(a, c)
         assert ac.diff_side(b, d), (ac(b), ac(d))
-        bd = geo_num.Line(b, d)
+        bd = LineNum(b, d)
         assert bd.diff_side(a, c), (bd(a), bd(c))
 
     def test_sketch_iso_trapezoid(self):
         rnd_gen = np.random.default_rng()
         a, b, c, d = sketch_iso_trapezoid([], rnd_gen=rnd_gen)
-        assert geo_num.Line(a, b).is_parallel(geo_num.Line(c, d))
+        assert LineNum(a, b).is_parallel(LineNum(c, d))
         check.almost_equal(a.distance(d), b.distance(c))
 
     def test_sketch_eqangle3(self):
@@ -205,8 +212,8 @@ class TestNumerical:
     def test_sketch_edia_quadrangle(self):
         rnd_gen = np.random.default_rng()
         a, b, c, d = sketch_eqdia_quadrangle([], rnd_gen=rnd_gen)
-        assert geo_num.Line(a, c).diff_side(b, d)
-        assert geo_num.Line(b, d).diff_side(a, c)
+        assert LineNum(a, c).diff_side(b, d)
+        assert LineNum(b, d).diff_side(a, c)
         check.almost_equal(a.distance(c), b.distance(d))
 
     def test_sketch_isos(self):
@@ -218,53 +225,51 @@ class TestNumerical:
     def test_sketch_quadrange(self):
         rnd_gen = np.random.default_rng()
         a, b, c, d = sketch_quadrangle([], rnd_gen=rnd_gen)
-        check.is_true(geo_num.Line(a, c).diff_side(b, d))
-        check.is_true(geo_num.Line(b, d).diff_side(a, c))
+        check.is_true(LineNum(a, c).diff_side(b, d))
+        check.is_true(LineNum(b, d).diff_side(a, c))
 
     def test_sketch_r_trapezoid(self):
         rnd_gen = np.random.default_rng()
         a, b, c, d = sketch_r_trapezoid([], rnd_gen=rnd_gen)
-        check.is_true(geo_num.Line(a, b).is_perp(geo_num.Line(a, d)))
-        check.is_true(geo_num.Line(a, b).is_parallel(geo_num.Line(c, d)))
-        check.is_true(geo_num.Line(a, c).diff_side(b, d))
-        check.is_true(geo_num.Line(b, d).diff_side(a, c))
+        check.is_true(LineNum(a, b).is_perp(LineNum(a, d)))
+        check.is_true(LineNum(a, b).is_parallel(LineNum(c, d)))
+        check.is_true(LineNum(a, c).diff_side(b, d))
+        check.is_true(LineNum(b, d).diff_side(a, c))
 
     def test_sketch_r_triangle(self):
         rnd_gen = np.random.default_rng()
         a, b, c = sketch_r_triangle([], rnd_gen=rnd_gen)
-        check.is_true(geo_num.Line(a, b).is_perp(geo_num.Line(a, c)))
+        check.is_true(LineNum(a, b).is_perp(LineNum(a, c)))
 
     def test_sketch_rectangle(self):
         rnd_gen = np.random.default_rng()
         a, b, c, d = sketch_rectangle([], rnd_gen=rnd_gen)
-        check.is_true(geo_num.Line(a, b).is_perp(geo_num.Line(b, c)))
-        check.is_true(geo_num.Line(b, c).is_perp(geo_num.Line(c, d)))
-        check.is_true(geo_num.Line(c, d).is_perp(geo_num.Line(d, a)))
+        check.is_true(LineNum(a, b).is_perp(LineNum(b, c)))
+        check.is_true(LineNum(b, c).is_perp(LineNum(c, d)))
+        check.is_true(LineNum(c, d).is_perp(LineNum(d, a)))
 
     def test_sketch_reflect(self):
         rnd_gen = np.random.default_rng()
         a, b, c = geosolver.numerical.sketch.random_points(3, rnd_gen)
         x = sketch_reflect([a, b, c])
-        check.is_true(geo_num.Line(a, x).is_perp(geo_num.Line(b, c)))
-        check.almost_equal(
-            x.distance(geo_num.Line(b, c)), a.distance(geo_num.Line(b, c))
-        )
+        check.is_true(LineNum(a, x).is_perp(LineNum(b, c)))
+        check.almost_equal(x.distance(LineNum(b, c)), a.distance(LineNum(b, c)))
 
     def test_sketch_risos(self):
         rnd_gen = np.random.default_rng()
         a, b, c = sketch_risos([], rnd_gen=rnd_gen)
         check.almost_equal(a.distance(b), a.distance(c))
-        check.is_true(geo_num.Line(a, b).is_perp(geo_num.Line(a, c)))
+        check.is_true(LineNum(a, b).is_perp(LineNum(a, c)))
 
     def test_sketch_rotaten90(self):
         rnd_gen = np.random.default_rng()
         a, b = geosolver.numerical.sketch.random_points(2, rnd_gen)
         x = sketch_rotaten90([a, b])
         check.almost_equal(a.distance(x), a.distance(b))
-        check.is_true(geo_num.Line(a, x).is_perp(geo_num.Line(a, b)))
-        d = geo_num.Point(0.0, 0.0)
-        e = geo_num.Point(0.0, 1.0)
-        f = geo_num.Point(1.0, 0.0)
+        check.is_true(LineNum(a, x).is_perp(LineNum(a, b)))
+        d = PointNum(0.0, 0.0)
+        e = PointNum(0.0, 1.0)
+        f = PointNum(1.0, 0.0)
         check.almost_equal(ang_between(d, e, f), ang_between(a, b, x))
 
     def test_sketch_rotatep90(self):
@@ -272,10 +277,10 @@ class TestNumerical:
         a, b = geosolver.numerical.sketch.random_points(2, rnd_gen)
         x = sketch_rotatep90([a, b])
         check.almost_equal(a.distance(x), a.distance(b))
-        check.is_true(geo_num.Line(a, x).is_perp(geo_num.Line(a, b)))
-        d = geo_num.Point(0.0, 0.0)
-        e = geo_num.Point(0.0, 1.0)
-        f = geo_num.Point(1.0, 0.0)
+        check.is_true(LineNum(a, x).is_perp(LineNum(a, b)))
+        d = PointNum(0.0, 0.0)
+        e = PointNum(0.0, 1.0)
+        f = PointNum(1.0, 0.0)
         check.almost_equal(ang_between(d, f, e), ang_between(a, b, x))
 
     def test_sketch_s_angle(self):
@@ -286,13 +291,13 @@ class TestNumerical:
         ang = num * np.pi / den
         y = Angle(f"{num}pi/{den}")
         bx = sketch_s_angle([a, b, y])
-        check.is_instance(bx, geo_num.HalfLine)
+        check.is_instance(bx, HalfLine)
         check.equal(bx.tail, b)
         x = bx.head
 
-        d = geo_num.Point(1.0, 0.0)
-        e = geo_num.Point(0.0, 0.0)
-        f = geo_num.Point(np.cos(ang), np.sin(ang))
+        d = PointNum(1.0, 0.0)
+        e = PointNum(0.0, 0.0)
+        f = PointNum(np.cos(ang), np.sin(ang))
         check.almost_equal(ang_between(e, d, f), ang_between(b, a, x))
 
     def test_sketch_shift(self):
@@ -305,23 +310,23 @@ class TestNumerical:
         rnd_gen = np.random.default_rng()
         a, b = geosolver.numerical.sketch.random_points(2, rnd_gen)
         c, d = sketch_square([a, b])
-        check.is_true(geo_num.Line(a, b).is_perp(geo_num.Line(b, c)))
-        check.is_true(geo_num.Line(b, c).is_perp(geo_num.Line(c, d)))
-        check.is_true(geo_num.Line(c, d).is_perp(geo_num.Line(d, a)))
+        check.is_true(LineNum(a, b).is_perp(LineNum(b, c)))
+        check.is_true(LineNum(b, c).is_perp(LineNum(c, d)))
+        check.is_true(LineNum(c, d).is_perp(LineNum(d, a)))
         check.almost_equal(a.distance(b), b.distance(c))
 
     def test_sketch_isquare(self):
         a, b, c, d = sketch_isquare([], rnd_gen=np.random.default_rng())
-        check.is_true(geo_num.Line(a, b).is_perp(geo_num.Line(b, c)))
-        check.is_true(geo_num.Line(b, c).is_perp(geo_num.Line(c, d)))
-        check.is_true(geo_num.Line(c, d).is_perp(geo_num.Line(d, a)))
+        check.is_true(LineNum(a, b).is_perp(LineNum(b, c)))
+        check.is_true(LineNum(b, c).is_perp(LineNum(c, d)))
+        check.is_true(LineNum(c, d).is_perp(LineNum(d, a)))
         check.almost_equal(a.distance(b), b.distance(c))
 
     def test_sketch_trapezoid(self):
         a, b, c, d = sketch_trapezoid([], rnd_gen=np.random.default_rng())
-        check.is_true(geo_num.Line(a, b).is_parallel(geo_num.Line(c, d)))
-        check.is_true(geo_num.Line(a, c).diff_side(b, d))
-        check.is_true(geo_num.Line(b, d).diff_side(a, c))
+        check.is_true(LineNum(a, b).is_parallel(LineNum(c, d)))
+        check.is_true(LineNum(a, c).diff_side(b, d))
+        check.is_true(LineNum(b, d).diff_side(a, c))
 
     def test_sketch_triangle(self):
         a, b, c = sketch_triangle([], rnd_gen=np.random.default_rng())

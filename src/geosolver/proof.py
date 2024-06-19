@@ -8,6 +8,16 @@ from typing_extensions import Self
 import logging
 
 from geosolver.definitions.clause import Clause, Construction
+from geosolver.numerical.geometries import (
+    CircleNum,
+    HalfLine,
+    HoleCircle,
+    InvalidLineIntersectError,
+    InvalidQuadSolveError,
+    LineNum,
+    PointNum,
+    reduce,
+)
 from geosolver.reasoning_engines.algebraic_reasoning import AlgebraicManipulator
 from geosolver.reasoning_engines.interface import ReasoningEngine
 from geosolver.statements.statement import Statement
@@ -36,9 +46,7 @@ from geosolver.match_theorems import match_one_theorem
 from geosolver.statements.adder import IntrinsicRules, ToCache
 from geosolver.statements.handler import StatementsHandler
 from geosolver.symbols_graph import SymbolsGraph
-from geosolver.geometry import Angle, Ratio
-from geosolver.geometry import Circle, Point
-import geosolver.numerical.geometries as num_geo
+from geosolver.geometry import Angle, Ratio, Circle, Point
 
 from geosolver.numerical.check import check_numerical, same_clock
 from geosolver.numerical.distances import (
@@ -196,8 +204,8 @@ class Proof:
                 proof._plevel = plevel
 
             except (
-                num_geo.InvalidLineIntersectError,
-                num_geo.InvalidQuadSolveError,
+                InvalidLineIntersectError,
+                InvalidQuadSolveError,
                 DepCheckFailError,
                 PointTooCloseError,
                 PointTooFarError,
@@ -339,7 +347,7 @@ class Proof:
             )
             self._plevel = plevel
             success = True
-        except (num_geo.InvalidQuadSolveError, num_geo.InvalidLineIntersectError):
+        except (InvalidQuadSolveError, InvalidLineIntersectError):
             success = False
         return AuxFeedback(success, added, to_cache)
 
@@ -426,7 +434,7 @@ class Proof:
             circle = self.symbols_graph.new_node(
                 Circle, f"({center.name},{point.name})"
             )
-            circle.num = num_geo.Circle(center.num, p1=point.num)
+            circle.num = CircleNum(center.num, p1=point.num)
             circle.points = center, point
 
         if name in ["on_circle", "tangent"]:
@@ -434,7 +442,7 @@ class Proof:
             circle = self.symbols_graph.new_node(
                 Circle, f"({center.name},{point.name})"
             )
-            circle.num = num_geo.Circle(center.num, p1=point.num)
+            circle.num = CircleNum(center.num, p1=point.num)
             circle.points = center, point
 
         if name in ["incenter", "excenter", "incenter2", "excenter2"]:
@@ -443,18 +451,18 @@ class Proof:
             circle = self.symbols_graph.new_node(
                 Circle, f"({d.name},h.{a.name}{b.name})"
             )
-            p = d.num.foot(num_geo.Line(a.num, b.num))
-            circle.num = num_geo.Circle(d.num, p1=p)
+            p = d.num.foot(LineNum(a.num, b.num))
+            circle.num = CircleNum(d.num, p1=p)
             circle.points = d, a, b, c
 
         if name in ["cc_tangent"]:
             o, a, w, b = args[-4:]
             c1 = self.symbols_graph.new_node(Circle, f"({o.name},{a.name})")
-            c1.num = num_geo.Circle(o.num, p1=a.num)
+            c1.num = CircleNum(o.num, p1=a.num)
             c1.points = o, a
 
             c2 = self.symbols_graph.new_node(Circle, f"({w.name},{b.name})")
-            c2.num = num_geo.Circle(w.num, p1=b.num)
+            c2.num = CircleNum(w.num, p1=b.num)
             c2.points = w, b
 
         if name in ["ninepoints"]:
@@ -466,7 +474,7 @@ class Proof:
             p1 = (b.num + c.num) * 0.5
             p2 = (c.num + a.num) * 0.5
             p3 = (a.num + b.num) * 0.5
-            circle.num = num_geo.Circle(p1=p1, p2=p2, p3=p3)
+            circle.num = CircleNum(p1=p1, p2=p2, p3=p3)
             circle.points = (None, None, a, b, c)
 
         if name in ["2l1c"]:
@@ -475,7 +483,7 @@ class Proof:
             circle = self.symbols_graph.new_node(
                 Circle, f"({o.name},{a.name}{b.name}{c.name})"
             )
-            circle.num = num_geo.Circle(p1=a.num, p2=b.num, p3=c.num)
+            circle.num = CircleNum(p1=a.num, p2=b.num, p3=c.num)
             circle.points = (a, b, c)
 
     def add_clause(
@@ -539,15 +547,7 @@ class Proof:
 
         # Step 2: draw.
         def range_fn() -> (
-            list[
-                Union[
-                    num_geo.Point,
-                    num_geo.Line,
-                    num_geo.Circle,
-                    num_geo.HalfLine,
-                    num_geo.HoleCircle,
-                ]
-            ]
+            list[Union[PointNum, LineNum, CircleNum, HalfLine, HoleCircle]]
         ):
             to_be_intersected = []
             for c in clause.constructions:
@@ -570,9 +570,9 @@ class Proof:
 
         existing_numerical_points = [p.num for p in existing_points]
 
-        def draw_fn() -> list[num_geo.Point]:
+        def draw_fn() -> list[PointNum]:
             to_be_intersected = range_fn()
-            return num_geo.reduce(
+            return reduce(
                 to_be_intersected,
                 existing_numerical_points,
                 rnd_generator=self.get_rnd_generator(),
@@ -592,11 +592,11 @@ class Proof:
         nums = draw_fn()
         for p, num, num0 in zip(new_points, nums, clause.nums):
             p.co_change = new_points
-            if isinstance(num0, num_geo.Point):
+            if isinstance(num0, PointNum):
                 num = num0
             elif isinstance(num0, (tuple, list)):
                 x, y = num0
-                num = num_geo.Point(x, y)
+                num = PointNum(x, y)
 
             p.num = num
 

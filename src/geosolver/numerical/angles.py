@@ -4,18 +4,18 @@ from geosolver._lazy_loading import lazy_import
 
 if TYPE_CHECKING:
     import numpy
-    from geosolver.numerical.geometries import Point
+    from geosolver.numerical.geometries import PointNum
 
 np: "numpy" = lazy_import("numpy")
 
 
-def ang_of(tail: "Point", head: "Point") -> float:
+def ang_of(tail: "PointNum", head: "PointNum") -> float:
     vector = head - tail
     arctan = np.arctan2(vector.y, vector.x) % (2 * np.pi)
     return arctan
 
 
-def ang_between(tail: "Point", head1: "Point", head2: "Point") -> float:
+def ang_between(tail: "PointNum", head1: "PointNum", head2: "PointNum") -> float:
     ang1 = ang_of(tail, head1)
     ang2 = ang_of(tail, head2)
     diff = ang1 - ang2

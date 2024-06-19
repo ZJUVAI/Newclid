@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, TypeVar, Union
 from geosolver.predicates import Predicate
 
 if TYPE_CHECKING:
-    from geosolver.geometry import Node, Point, Angle, Ratio
+    from geosolver.geometry import Symbol, Point, Angle, Ratio
 
 
 @dataclass
@@ -13,7 +13,7 @@ class Statement:
     """One predicate applied to a set of points and values."""
 
     predicate: Predicate
-    args: tuple["Point" | "Ratio" | int | str, ...]
+    args: tuple["Point" | "Ratio" | "Angle" | int | str, ...]
 
     def __post_init__(self):
         self.predicate = Predicate(self.predicate)
@@ -40,7 +40,7 @@ class Statement:
 
 
 def name_and_arguments_to_str(
-    name: str, args: list[str | int | "Node"], join: str
+    name: str, args: list[str | int | "Symbol"], join: str
 ) -> list[str]:
     return join.join([name] + _arguments_to_str(args))
 
@@ -72,7 +72,7 @@ def _symbol_to_txt(symbol: "Point" | "Ratio" | int | str):
     return symbol.name
 
 
-def _arguments_to_str(args: list[str | int | "Node"]) -> list[str]:
+def _arguments_to_str(args: list[str | int | "Symbol"]) -> list[str]:
     args_str = []
     for arg in args:
         if isinstance(arg, (int, str, float)):

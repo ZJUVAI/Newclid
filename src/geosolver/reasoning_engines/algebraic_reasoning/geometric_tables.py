@@ -4,7 +4,7 @@ from collections import defaultdict
 from fractions import Fraction as frac
 from typing import TYPE_CHECKING, Any, Generator, Literal
 
-from geosolver.geometry import Direction, Length, Line, Node, Point
+from geosolver.geometry import Direction, Length, Line, Symbol, Point
 from geosolver.ratios import simplify
 from geosolver._lazy_loading import lazy_import
 
@@ -540,11 +540,11 @@ class GeometricTable(Table):
         super().__init__(name)
         self.v2obj = {}
 
-    def get_name(self, objs: list[Node]) -> list[str]:
+    def get_name(self, objs: list[Symbol]) -> list[str]:
         self.v2obj.update({o.name: o for o in objs})
         return [o.name for o in objs]
 
-    def map2obj(self, names: list[str]) -> list[Node]:
+    def map2obj(self, names: list[str]) -> list[Symbol]:
         return [self.v2obj[n] for n in names]
 
     def get_all_eqs_and_why(self, return_quads: bool) -> Generator[Any, None, None]:
