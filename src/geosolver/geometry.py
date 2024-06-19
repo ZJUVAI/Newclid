@@ -44,8 +44,8 @@ class Node:
         self.rep_by = None  # represented by.
         self.members = {self}
 
-        self._val = None
-        self._obj = None
+        self._val: Optional[Node] = None
+        self._obj: Optional[Node] = None
 
         self.deps: list["Dependency"] = []
 

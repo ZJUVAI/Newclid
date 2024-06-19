@@ -9,7 +9,9 @@ if TYPE_CHECKING:
 
 class DependencyCache:
     def __init__(self):
-        self.cache = {}
+        self.cache: dict[
+            tuple[str, ...], Dependency
+        ] = {}  # Statement hash -> Dependency
 
     def add_dependency(self, statement: Statement, dep: "Dependency"):
         dep_hash = statement.hash_tuple

@@ -1,9 +1,8 @@
+from __future__ import annotations
 import os
 
-from matplotlib.patches import Arc, RegularPolygon
 import numpy as np
 from numpy.random import random, choice
-from numpy import radians as rad
 from random import sample
 from random import seed as pyseed
 import matplotlib.pyplot as plt
@@ -12,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from geosolver import AGENTS_REGISTRY
 from geosolver.api import GeometricSolverBuilder
 from geosolver.configs import default_configs_path
 
@@ -123,18 +123,6 @@ def draw_angle(ax: plt.Axes, angle: Angle, color1: Any, color2: Any) -> None:
     """Draw an angle on plt ax."""
     draw_line(ax, angle.l1, color1)
     draw_line(ax, angle.l2, color2)
-    intersection = angle.l1.intersect(angle.l2)
-    v1 = angle.l1.point_at(100) - intersection
-    v2 = angle.l2.point_at(100) - intersection
-    # a1 = np.arctan2(v1.x, v1.y) % (np.pi*2)
-    # a2 = np.arctan2(v2.x, v2.y) % (np.pi*2)
-    a_ = np.arctan2(v1.y, v1.x) / np.pi
-    t_ = np.arctan2(v2.y, v2.x) / np.pi - a_
-    a_ %= 2
-    t_ %= 2
-    if t_ > 1:
-        t_ -= 1
-    draw_arc_arrow(ax, 0.1, intersection.x, intersection.y, a_ * 180, t_ * 180)
 
 
 def draw_circle(
@@ -299,10 +287,14 @@ def apply_coll(*points: list[Point]):
     direction = points[1] - points[0]
     direction /= abs(direction)
     for i in range(2, len(points)):
+        # print(i)
         p = points[i]
+        # print(p, points[i])
         res = points[1] + direction.dot(p - points[1]) * direction
         p.x = res.x
         p.y = res.y
+        # assert not math.isnan(p.x)
+        # assert not math.isnan(p.y)
 
 
 def apply_eqratio3(A: Point, B: Point, C: Point, D: Point, M: Point, N: Point):
@@ -398,52 +390,6 @@ def add_eqangle(
     draw_angle(ax, Angle(Line(E, F), Line(G, H)), color1=color1, color2=color2)
 
 
-def draw_arc_arrow(ax, radius, centX, centY, angle_, theta2_, color_="lightblue"):
-    if theta2_ > 0:
-        arc = Arc(
-            [centX, centY],
-            radius,
-            radius,
-            angle=angle_,
-            theta1=0,
-            theta2=theta2_,
-            capstyle="round",
-            linestyle="-",
-            lw=1,
-            color=color_,
-        )
-    else:
-        arc = Arc(
-            [centX, centY],
-            radius,
-            radius,
-            angle=angle_ + theta2_,
-            theta1=0,
-            theta2=-theta2_,
-            capstyle="round",
-            linestyle="-",
-            lw=1,
-            color=color_,
-        )
-    ax.add_patch(arc)
-
-    # ========Create the arrow head
-    endX = centX + (radius / 2) * np.cos(
-        rad(theta2_ * 0.9 + angle_)
-    )  # Do trig to determine end position
-    endY = centY + (radius / 2) * np.sin(rad(theta2_ * 0.9 + angle_))
-
-    ax.add_patch(  # Create triangle as arrow head
-        RegularPolygon(
-            (endX, endY),  # (x,y)
-            3,  # number of vertices
-            radius=radius / 13,  # radius
-            orientation=rad(angle_ + theta2_ * 0.9),  # orientation
-            color=color_,
-        )
-    )
-
-
 add_eqangle6 = add_eqangle
 
 
@@ -533,7 +479,7 @@ def draw_rule(
                     break
 
     to_be_ignored = ["contri", "contri2", "contri*", "simtri", "simtri2", "simtri*"]
-    for _ in range(500):
+    for _ in range(200):
         construction = choice(props)
         if construction.name in to_be_ignored:
             continue
@@ -585,13 +531,23 @@ def draw_rule(
 
 def demo_draw_rule(k, save_to=None, block=True):
     solver_builder = GeometricSolverBuilder()
+    load_problem(
+        "../problems_datasets/testing_minimal_rules.txt:r00", False, solver_builder
+    )
+    solver_builder.load_defs_from_file(resolve_config_path(None))
+
     relative_path = r"..\src\geosolver\default_configs\new_rules.txt"
     absolute_path = os.path.abspath(relative_path)
     solver_builder.load_rules_from_file(absolute_path)
 
+    agent = AGENTS_REGISTRY.load_agent("bfsddar")
+    solver_builder.with_deductive_agent(agent)
+
+    solver = solver_builder.build()
+
+    # print(len(solver.rules))
     print(k)
-    rule = solver_builder.rules[k]
-    print(solver_builder.rules[k])
+    rule = solver.rules[k]
     init_points = dict()
     shift = 0.8
     init_points[0] = 20
@@ -691,23 +647,6 @@ def demo_draw_rule(k, save_to=None, block=True):
     init_points[40] = 2
     init_points[41] = 2
     init_points[42] = 2
-    init_points[43] = 2
-    init_points[44] = {
-        "a": (-3.5, -0.2),
-        "b": (-1.9, 0.7),
-        "c": (-0.1, 1.7),
-        "p": (-3.2, -2),
-        "q": (-1.4, -1.9),
-        "r": (1.4, -1.6),
-        "x": (-2.7, -0.9),
-        "y": (-2, -0.6),
-        "z": (-0.8, -0.1),
-    }
-    init_points[45] = 2
-    init_points[46] = 2
-    init_points[47] = 2
-    init_points[48] = 2
-    init_points[49] = 2
 
     draw_rule(rule, init_points.get(k, 0), save_to=save_to, block=block)
 
@@ -715,5 +654,3 @@ def demo_draw_rule(k, save_to=None, block=True):
 if __name__ == "__main__":
     for k in range(50):
         demo_draw_rule(k, f"_static/Images/rules/r{k:02d}", block=False)
-    # k = 46
-    # demo_draw_rule(k, f"./_static/Images/rules/r{k:02d}", block=False)

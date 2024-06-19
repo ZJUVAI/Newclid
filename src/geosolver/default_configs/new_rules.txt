@@ -48,4 +48,5 @@ eqangle a b a x a x a c, eqangle b a b x b x b c, ncoll a b c => eqangle c b c x
 midp m a b, perp x m a b, midp n b c, perp x n b c, midp p c a => perp x p c a
 midp m a b, coll m x c, midp n b c, coll n x c, midp p c a => coll x p b
 circle O A B C, cyclic A B C D => cong O A O D
-cyclic A B C D, cong O A O B, cong O A O C => cong O D O C
+midp M A B => rconst M A A B 1/2
+cyclic A B C D, cong O A O B, cong O C O D => cong O A O C
