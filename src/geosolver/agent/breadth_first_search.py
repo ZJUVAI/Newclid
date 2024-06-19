@@ -150,12 +150,12 @@ def _action_str(theorem: "Theorem", mapping: Mapping) -> str:
 class BFSDDAR(DeductiveAgent):
     def __init__(
         self,
-        do_simple_derviations_asap: bool = False,
+        do_simple_derivations_asap: bool = False,
         do_all_derivations_asap: bool = False,
     ) -> None:
         super().__init__()
         self._dd_agent = BFSDD()
-        self._do_simple_derviations_asap = do_simple_derviations_asap
+        self._do_simple_derivations_asap = do_simple_derivations_asap
         self._do_all_derivations_asap = do_all_derivations_asap
         self.reset()
 
@@ -163,7 +163,7 @@ class BFSDDAR(DeductiveAgent):
         """Deduce new statements by applying
         breath-first search over all theorems one by one."""
 
-        if self._do_simple_derviations_asap or self._do_all_derivations_asap:
+        if self._do_simple_derivations_asap or self._do_all_derivations_asap:
             next_derivation = self._apply_next_derivation(
                 include_eq4s=self._do_all_derivations_asap
             )
