@@ -1,5 +1,13 @@
 from __future__ import annotations
 from dataclasses import dataclass
+from enum import Enum
+
+
+class ArgType(Enum):
+    POINT = "Point"
+    RATIO = "Ratio"
+    Angle = "Angle"
+    Length = "Length"
 
 
 @dataclass
@@ -8,13 +16,14 @@ class Construction:
 
     name: str
     args: tuple[str]
+    args_types: tuple[ArgType]
 
     def __post_init__(self):
         self.hash_tuple = (self.name, *self.args)
 
     def translate(self, mapping: dict[str, str]) -> Construction:
         args = [mapping[a] if a in mapping else a for a in self.args]
-        return Construction(self.name, tuple(args))
+        return Construction(self.name, tuple(args), self.args_types)
 
     def __str__(self) -> str:
         return " ".join(self.hash_tuple)
@@ -25,7 +34,20 @@ class Construction:
     @classmethod
     def from_txt(cls, data: str) -> Construction:
         data = data.split(" ")
-        return Construction(data[0], tuple(data[1:]))
+        name = data[0]
+
+        args_names = []
+        args_types = []
+        for args_str in data[1:]:
+            arg_type = ArgType.POINT
+            if ":" in args_str:
+                args_str, arg_type = args_str.split(":")
+            args_names.append(args_str)
+            args_types.append(ArgType(arg_type))
+
+        return Construction(
+            name=name, args=tuple(args_names), args_types=tuple(args_types)
+        )
 
 
 class Clause:

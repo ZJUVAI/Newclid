@@ -122,10 +122,12 @@ class Node:
             and isinstance(node, Direction)
             or isinstance(self, Segment)
             and isinstance(node, Length)
+            or isinstance(self, Length)
+            and isinstance(node, LengthValue)
             or isinstance(self, Angle)
-            and isinstance(node, Measure)
+            and isinstance(node, AngleValue)
             or isinstance(self, Ratio)
-            and isinstance(node, Value)
+            and isinstance(node, RatioValue)
         )
 
     def set_val(self, node: Node) -> None:
@@ -391,8 +393,8 @@ class Angle(Node):
 
     opposite: Optional[Angle] = None
 
-    def new_val(self) -> Measure:
-        return Measure()
+    def new_val(self) -> AngleValue:
+        return AngleValue()
 
     def set_directions(self, d1: Direction, d2: Direction) -> None:
         self._d = d1, d2
@@ -408,8 +410,8 @@ class Angle(Node):
 class Ratio(Node):
     """Node of type Ratio."""
 
-    def new_val(self) -> Value:
-        return Value()
+    def new_val(self) -> RatioValue:
+        return RatioValue()
 
     def set_lengths(self, l1: Length, l2: Length) -> None:
         self._l = l1, l2
@@ -426,7 +428,7 @@ class Direction(Node):
     pass
 
 
-class Measure(Node):
+class AngleValue(Node):
     pass
 
 
@@ -434,7 +436,11 @@ class Length(Node):
     pass
 
 
-class Value(Node):
+class LengthValue(Node):
+    pass
+
+
+class RatioValue(Node):
     pass
 
 
@@ -462,6 +468,13 @@ def all_ratios(
             yield ang, d1s, d2s
 
 
+def all_lengths(segment: Segment) -> Generator[Angle, list[Direction], list[Direction]]:
+    equivalent_segments = segment.equivs_upto()
+    for neighbor_lenght in segment.rep().neighbors(Length):
+        if neighbor_lenght._obj in equivalent_segments:
+            yield neighbor_lenght, equivalent_segments
+
+
 RANKING = {
     Point: 0,
     Line: 1,
@@ -471,6 +484,7 @@ RANKING = {
     Length: 5,
     Angle: 6,
     Ratio: 7,
-    Measure: 8,
-    Value: 9,
+    AngleValue: 8,
+    RatioValue: 9,
+    LengthValue: 10,
 }

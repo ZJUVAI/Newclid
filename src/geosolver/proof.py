@@ -208,7 +208,7 @@ class Proof:
             if not problem.goal:
                 break
 
-            goal_args = proof.map_args_to_objects(problem.goal)
+            goal_args = proof.map_construction_args_to_objects(problem.goal)
             goal = Statement(problem.goal.name, goal_args)
             if check_numerical(goal):
                 break
@@ -308,7 +308,9 @@ class Proof:
     ) -> Tuple[list[Dependency], list[ToCache], bool]:
         mapping_str = theorem_mapping_str(theorem, mapping)
         dep_body, premise_to_cache = self._resolved_mapping_deps[mapping_str]
-        args = self.map_args_to_objects(theorem.conclusion, mapping_to_names(mapping))
+        args = self.map_construction_args_to_objects(
+            theorem.conclusion, mapping_to_names(mapping)
+        )
 
         conclusion_statement = Statement(theorem.conclusion.name, tuple(args))
         add, to_cache = self.resolve_statement_dependencies(
@@ -412,7 +414,7 @@ class Proof:
     def check_goal(self):
         success = False
         if self._goal is not None:
-            goal_args = self.map_args_to_objects(self._goal)
+            goal_args = self.map_construction_args_to_objects(self._goal)
             goal_statement = Statement(self._goal.name, goal_args)
             if self.check(goal_statement):
                 success = True
@@ -493,27 +495,31 @@ class Proof:
 
         # Step 1: check for all dependencies.
         reason = Reason(CONSTRUCTION_RULE)
-        for construction in clause.constructions:
-            cdef = definitions[construction.name]
+        for clause_construction in clause.constructions:
+            cdef = definitions[clause_construction.name]
 
-            if len(cdef.construction.args) != len(construction.args):
-                if len(cdef.construction.args) - len(construction.args) == len(
+            if len(cdef.construction.args) != len(clause_construction.args):
+                if len(cdef.construction.args) - len(clause_construction.args) == len(
                     clause.points
                 ):
-                    construction.args = tuple(clause.points) + construction.args
+                    clause_construction.args = (
+                        tuple(clause.points) + clause_construction.args
+                    )
                 else:
                     correct_form = " ".join(
-                        cdef.points + ["=", construction.name] + cdef.args
+                        cdef.points + ["=", clause_construction.name] + cdef.args
                     )
                     raise ValueError("Argument mismatch. " + correct_form)
 
-            mapping = dict(zip(cdef.construction.args, construction.args))
+            mapping = dict(zip(cdef.construction.args, clause_construction.args))
             c_name = (
                 Predicate.MIDPOINT.value
-                if construction.name == "midpoint"
-                else construction.name
+                if clause_construction.name == "midpoint"
+                else clause_construction.name
             )
-            construction = Construction(c_name, construction.args)
+            construction = Construction(
+                c_name, clause_construction.args, clause_construction.args_types
+            )
 
             deps: list[Dependency] = []
             for construction in cdef.clause.constructions:
@@ -538,6 +544,27 @@ class Proof:
             new_points_dep.append(dep_body)
 
         # Step 2: draw.
+
+        is_total_free = (
+            len(clause.constructions) == 1 and clause.constructions[0].name in FREE
+        )
+        is_semi_free = (
+            len(clause.constructions) == 1 and clause.constructions[0].name in INTERSECT
+        )
+
+        existing_numerical_points = [p.num for p in existing_points]
+
+        rely_on: set[Point] = set()
+        for construction in clause.constructions:
+            cdef = definitions[construction.name]
+            mapping = dict(zip(cdef.construction.args, construction.args))
+            for n in cdef.numerics:
+                args = self.map_construction_args_to_objects(n, mapping)
+                rely_on.update([a for a in args if isinstance(a, Point)])
+
+        for p in rely_on:
+            p.change.update(new_points)
+
         def range_fn() -> (
             list[
                 Union[
@@ -554,21 +581,12 @@ class Proof:
                 cdef = definitions[c.name]
                 mapping = dict(zip(cdef.construction.args, c.args))
                 for n in cdef.numerics:
-                    args = self.map_args_to_objects(n, mapping)
+                    args = self.map_construction_args_to_objects(n, mapping)
                     to_be_intersected += sketch(
                         n.name, args, rnd_generator=self.get_rnd_generator()
                     )
 
             return to_be_intersected
-
-        is_total_free = (
-            len(clause.constructions) == 1 and clause.constructions[0].name in FREE
-        )
-        is_semi_free = (
-            len(clause.constructions) == 1 and clause.constructions[0].name in INTERSECT
-        )
-
-        existing_numerical_points = [p.num for p in existing_points]
 
         def draw_fn() -> list[num_geo.Point]:
             to_be_intersected = range_fn()
@@ -577,17 +595,6 @@ class Proof:
                 existing_numerical_points,
                 rnd_generator=self.get_rnd_generator(),
             )
-
-        rely_on: set[Point] = set()
-        for construction in clause.constructions:
-            cdef = definitions[construction.name]
-            mapping = dict(zip(cdef.construction.args, construction.args))
-            for n in cdef.numerics:
-                args = self.map_args_to_objects(n, mapping)
-                rely_on.update([a for a in args if isinstance(a, Point)])
-
-        for p in rely_on:
-            p.change.update(new_points)
 
         nums = draw_fn()
         for p, num, num0 in zip(new_points, nums, clause.nums):
@@ -666,7 +673,7 @@ class Proof:
             mapping = dict(zip(cdef.construction.args, construction.args))
 
             # not necessary for proofing, but for visualization.
-            c_args = self.map_args_to_objects(construction)
+            c_args = self.map_construction_args_to_objects(construction)
             self.additionally_draw(construction, c_args)
 
             for points, bs in cdef.basics:
@@ -683,7 +690,7 @@ class Proof:
                     continue
 
                 for b in bs:
-                    args = self.map_args_to_objects(b, mapping)
+                    args = self.map_construction_args_to_objects(b, mapping)
                     basic_statement = Statement(b.name, args)
                     adds, basic_to_cache = self.resolve_statement_dependencies(
                         basic_statement, dep_body=dep_body
@@ -700,12 +707,14 @@ class Proof:
 
         return added, to_cache, plevel
 
-    def map_args_to_objects(
+    def map_construction_args_to_objects(
         self, construction: Construction, mapping: Optional[dict[str, str]] = None
     ) -> list[Point | Angle | Ratio]:
         def make_const(x):
-            arg_obj, _ = self.symbols_graph.get_or_create_const(x, construction.name)
-            return arg_obj
+            arg_objs = self.symbols_graph.get_or_create_const(x, construction.name)
+            if isinstance(arg_objs, tuple):
+                return arg_objs[0]
+            return arg_objs
 
         args_objs = []
         for arg in construction.args:

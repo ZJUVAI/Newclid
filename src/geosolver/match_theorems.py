@@ -19,11 +19,11 @@ from geosolver.geometry import (
     Direction,
     Length,
     Line,
-    Measure,
+    AngleValue,
     Point,
     Ratio,
     Segment,
-    Value,
+    RatioValue,
     is_equal,
 )
 from geosolver.numerical.check import check_ncoll_numerical, same_clock
@@ -41,8 +41,8 @@ def match_eqratio_eqratio_eqratio(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqratio a b c d m n p q, eqratio c d e f p q r u => eqratio a b e f m n r u."""
-    for m1 in proof.symbols_graph.type2nodes[Value]:
-        for m2 in proof.symbols_graph.type2nodes[Value]:
+    for m1 in proof.symbols_graph.type2nodes[RatioValue]:
+        for m2 in proof.symbols_graph.type2nodes[RatioValue]:
             rats1 = []
             for rat in m1.neighbors(Ratio):
                 l1, l2 = rat.lengths
@@ -88,8 +88,8 @@ def match_eqangle_eqangle_eqangle(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle a b c d m n p q, eqangle c d e f p q r u => eqangle a b e f m n r u."""
-    for m1 in proof.symbols_graph.type2nodes[Measure]:
-        for m2 in proof.symbols_graph.type2nodes[Measure]:
+    for m1 in proof.symbols_graph.type2nodes[AngleValue]:
+        for m2 in proof.symbols_graph.type2nodes[AngleValue]:
             angs1 = []
             for ang in m1.neighbors(Angle):
                 d1, d2 = ang.directions
@@ -400,7 +400,7 @@ def match_eqangle_para(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle A B P Q C D P Q => para A B C D."""
-    for measure in proof.symbols_graph.type2nodes[Measure]:
+    for measure in proof.symbols_graph.type2nodes[AngleValue]:
         angs = measure.neighbors(Angle)
         d12, d21 = defaultdict(list), defaultdict(list)
         for ang in angs:

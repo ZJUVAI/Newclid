@@ -761,9 +761,11 @@ def sketch_eqratio6(args: tuple[gm.Point, ...], **kwargs) -> Circle | Line:
         return Circle(center=center, radius=radius)
 
 
-def sketch_radiuscircle(args: tuple[gm.Point, ...], **kwargs) -> Circle:
-    a, y = args
-    return Circle(center=a, radius=y)
+def sketch_lconst(args: tuple[gm.Point, ...], **kwargs) -> Circle:
+    """Sketches point x such that x in at lenght l of point a"""
+
+    a, length = args
+    return Circle(center=a, radius=float(length.name))
 
 
 def sketch_rconst2(args: tuple[gm.Point, ...], **kwargs) -> Circle | Line:
