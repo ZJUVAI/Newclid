@@ -150,10 +150,19 @@ def make_rconst_hashs_from_colls(
     point_is_up: dict[str, bool] = {}
 
     is_first_point = True
+    used_triplets = []
     for point in main_coll:
         corresponding_triplet = [
             triplet for triplet in triplet_points if point in triplet
-        ][0]
+        ]
+        if not corresponding_triplet:
+            return []
+
+        corresponding_triplet = corresponding_triplet[0]
+        if corresponding_triplet in used_triplets:
+            return []
+
+        used_triplets.append(corresponding_triplet)
 
         non_mid_points = list([p for p in corresponding_triplet if p != point])
 

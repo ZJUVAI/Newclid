@@ -124,6 +124,18 @@ class TestMenelaus:
             True,
             [("a", "f", "a", "b"), ("b", "c", "c", "d"), ("d", "e", "e", "f")],
         ),
+        (
+            ("a", "b", "i"),
+            [("a", "b", "e"), ("a", "c", "k"), ("b", "c", "j")],
+            False,
+            [],
+        ),
+        (
+            ("a", "c", "e"),
+            [("a", "b", "f"), ("d", "c", "e"), ("b", "c", "d")],
+            False,
+            [],
+        ),
     ],
 )
 def test_make_rconst_hashs_from_colls(
