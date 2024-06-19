@@ -7,6 +7,7 @@ from typing import Optional
 from geosolver import AGENTS_REGISTRY
 from geosolver.api import GeometricSolverBuilder
 from geosolver.configs import default_configs_path
+from geosolver.reasoning_engines import algebraic_reasoning
 
 
 def cli_arguments() -> Namespace:
@@ -112,6 +113,12 @@ def cli_arguments() -> Namespace:
         help="Only do the figure drawing "
         "withut running the solving process and removing the goal.",
     )
+    parser.add_argument(
+        "--ar-verbose",
+        default="",
+        type=str,
+        help="Subset of {a, d, r}, denoting wether to print equational tables of angles, distances, ratios",
+    )
     args, _ = parser.parse_known_args()
     return args
 
@@ -123,6 +130,7 @@ def main():
     quiet: bool = args.quiet
     just_draw: bool = args.just_draw_figure
     seed: Optional[int] = args.seed
+    algebraic_reasoning.config["verbose"] = args.ar_verbose
 
     solver_builder = GeometricSolverBuilder(seed=seed, no_goal=just_draw)
 

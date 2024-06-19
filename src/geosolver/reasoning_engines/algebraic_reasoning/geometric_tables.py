@@ -2,7 +2,7 @@
 
 from collections import defaultdict
 from fractions import Fraction as frac
-from typing import TYPE_CHECKING, Any, Generator
+from typing import TYPE_CHECKING, Any, Generator, Literal
 
 from geosolver.geometry import Direction, Length, Line, Node, Point
 from geosolver.ratios import simplify
@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 np: "numpy" = lazy_import("numpy")
 opt: "scipy.optimize" = lazy_import("scipy.optimize")
+EqDict = dict[str, dict[str, frac]]
 
 
 class InfQuotientError(Exception):
@@ -159,12 +160,52 @@ def chain2(elems: list[Any]) -> Generator[tuple[Any, Any], None, None]:
         yield e1, elems[i + 1]
 
 
+def _fix_width(s: Any, width: int, align: Literal["right", "left", "center"] = "right"):
+    if align != "right":
+        raise NotImplementedError
+    s = str(s)
+    return " " * (width - len(s)) + s
+
+
+def report(eqdict: EqDict):
+    print(">>>>>>>>>table begins")
+    maxlv = 0
+    maxlcoef = 0
+    setv_right = set()
+    setv_left = set()
+    for leftv, eq in eqdict.items():
+        setv_left.add(leftv)
+        maxlv = max(maxlv, len(str(leftv)))
+        for rightv, coef in eq.items():
+            setv_right.add(rightv)
+            maxlv = max(maxlv, len(str(rightv)))
+            maxlcoef = max(maxlcoef, len(str(coef)))
+    listv_left = sorted(setv_left)
+    listv_right = sorted(setv_right)
+    for leftv in listv_left:
+        print(end=f"{_fix_width(leftv, maxlv)} = ")
+        for rightv in listv_right:
+            try:
+                coef = eqdict[leftv][rightv]
+                if coef == frac(0):
+                    raise ValueError
+                print(end=f"{_fix_width(coef, maxlcoef)} * {_fix_width(rightv, maxlv)}")
+                if rightv != listv_right[-1]:
+                    print(end=" + ")
+            except (KeyError, ValueError) as _:
+                print(end=f"{_fix_width('', maxlv+maxlcoef+3)}")
+                if rightv != listv_right[-1]:
+                    print(end="   ")
+        print()
+    print("table ends<<<<<<<<<<<")
+
+
 class Table:
     """The coefficient matrix."""
 
     def __init__(self, const: str = "1"):
         self.const = const
-        self.v2e = {}  # the table {var: {vark : coefk}} var = sum coefk*vark
+        self.v2e: EqDict = {}  # the table {var: {vark : coefk}} var = sum coefk*vark
         self.add_free(const)
 
         # to cache what is already derived/inputted
