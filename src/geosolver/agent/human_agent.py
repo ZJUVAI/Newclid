@@ -133,14 +133,14 @@ class HumanAgent(DeductiveAgent):
 
     def _act_resolve_derivations(self, theorems: list[Theorem]) -> ResolveEngineAction:
         choice_str = "\nAvailable reasoning engines: \n"
-        for engine_id in self._known_engines:
+        engines_to_choose = {
+            engine_id.lower(): engine_id for engine_id in self._known_engines
+        }
+        for engine_id in engines_to_choose.keys():
             choice_str += f" - [{engine_id}]\n"
 
         choice_str += "Reasoning engine you want to resolve: "
-        engine_id = self._ask_for_key(
-            {engine_id.lower(): engine_id for engine_id in self._known_engines},
-            choice_str,
-        )
+        engine_id = self._ask_for_key(engines_to_choose, choice_str)
 
         return ResolveEngineAction(engine_id=engine_id)
 
