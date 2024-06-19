@@ -11,18 +11,14 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
-import matplotlib.pyplot as plt
 
 from geosolver.api import GeometricSolverBuilder
 from geosolver.configs import default_configs_path
 
 
-from typing import Optional
-
-
 from geosolver.numerical.geometries import Circle, Line, Point, Angle, Segment
 
-from typing import Optional, Any
+from typing import Any
 from geosolver.theorem import Theorem
 
 
@@ -73,7 +69,7 @@ def resolve_output_path(path_str: Optional[str], problem_name: str) -> Path:
 
 def draw_line(
     ax: plt.Axes,
-    l: Line,
+    line: Line,
     style: Any = "white",
     lw: float = 1.2,
     alpha: float = 0.8,
@@ -86,8 +82,8 @@ def draw_line(
         color = style
         ls = "-"
 
-    p1 = Point(100, 100).foot(l)
-    p2 = Point(-100, -100).foot(l)
+    p1 = Point(100, 100).foot(line)
+    p2 = Point(-100, -100).foot(line)
     # print(p1, p2)
     ax.plot((p1.x, p2.x), (p1.y, p2.y), color=color, lw=lw, alpha=alpha, ls=ls)
 
@@ -259,15 +255,15 @@ def apply_cyclic(*points: list[Point]):
         p.x, p.y = res.x, res.y
 
 
-def apply_circle(O: Point, A: Point, B: Point, C: Point):
+def apply_circle(Op: Point, A: Point, B: Point, C: Point):
     A, B, C = sample([A, B, C], 3)
     if random() < 0.5:
         res = Circle(p1=A, p2=B, p3=C).center
-        O.x = res.x
-        O.y = res.y
+        Op.x = res.x
+        Op.y = res.y
     else:
-        apply_cong(O, A, O, B, False)
-        apply_cong(O, A, O, C, False)
+        apply_cong(Op, A, Op, B, False)
+        apply_cong(Op, A, Op, C, False)
 
 
 def apply_para(A: Point, B: Point, C: Point, D: Point, rand: bool = True):
@@ -352,26 +348,28 @@ def apply_eqratio(
 apply_eqratio6 = apply_eqratio
 
 
-def apply_sameside(O: Point, A: Point, B: Point, E: Point, X: Point, Y: Point):
+def apply_sameside(Op: Point, A: Point, B: Point, E: Point, X: Point, Y: Point):
     while True:
         if random() < 0.5:
-            A, O, B, X, E, Y = X, E, Y, A, O, B
+            A, Op, B, X, E, Y = X, E, Y, A, Op, B
         if random() < 0.5:
             X, Y = Y, X
-        if Y != A and Y != B and Y != O:
+        if Y != A and Y != B and Y != Op:
             break
-    sign = 1 if (B - O).dot(A - O) > 0 else -1
+    sign = 1 if (B - Op).dot(A - Op) > 0 else -1
     res = E + sign * (Y - E)
     Y.x, Y.y = res.x, res.y
 
 
 # Adding
 
-random_color = lambda: (
-    random() * 0.5 + 0.5,
-    random() * 0.5 + 0.5,
-    random() * 0.5 + 0.5,
-)
+
+def random_color():
+    return (
+        random() * 0.5 + 0.5,
+        random() * 0.5 + 0.5,
+        random() * 0.5 + 0.5,
+    )
 
 
 def add_perp(ax, A: Point, B: Point, C: Point, D: Point):
@@ -478,13 +476,13 @@ def add_eqratio(*args, **kwargs):
 add_eqratio6 = add_eqratio
 
 
-def add_circle(ax, O: Point, A: Point, B: Point, C: Point):
+def add_circle(ax, Op: Point, A: Point, B: Point, C: Point):
     add_cyclic(ax, A, B, C)
 
 
-def add_sameside(ax, A: Point, O: Point, B: Point, X: Point, E: Point, Y: Point):
-    draw_segment(ax, Segment(O, A))
-    draw_segment(ax, Segment(O, B))
+def add_sameside(ax, A: Point, Op: Point, B: Point, X: Point, E: Point, Y: Point):
+    draw_segment(ax, Segment(Op, A))
+    draw_segment(ax, Segment(Op, B))
     draw_segment(ax, Segment(E, X))
     draw_segment(ax, Segment(E, Y))
 
@@ -515,7 +513,7 @@ def draw_rule(
     def reset_if_unrational(name2point):
         rational = False
         flag = False
-        while rational == False:
+        while not rational:
             if flag:
                 for name in name2point:
                     name2point[name] = Point(x=random(), y=random())
@@ -531,7 +529,7 @@ def draw_rule(
                     if p.distance(p1) < 0.01:
                         rational = False
                         break
-                if rational == False:
+                if not rational:
                     break
 
     to_be_ignored = ["contri", "contri2", "contri*", "simtri", "simtri2", "simtri*"]
