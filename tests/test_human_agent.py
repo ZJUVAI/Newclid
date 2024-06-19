@@ -86,7 +86,8 @@ class TestHumanAgent:
 
     def test_should_resolve_and_apply_derivation(self):
         self.human_agent.inputs_given = [
-            "resolve derivations",
+            "resolve",
+            "ar",
             "derive",
             "aconst b x a y 1pi/2",
             "stop",
