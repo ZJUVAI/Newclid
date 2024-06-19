@@ -45,6 +45,7 @@ ag_ckpt_vocab/
 # Experiment data
 ddar_results/
 run_results/
+profiles/
 
 # TODO
 TODO.md
@@ -63,3 +64,6 @@ run.log
 
 # Local scripts
 benchmark.py
+
+# Docs autobuilt
+docs/source

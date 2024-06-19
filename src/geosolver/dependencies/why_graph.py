@@ -5,8 +5,7 @@ from typing import TYPE_CHECKING, Optional
 
 from geosolver.dependencies.caching import DependencyCache
 from geosolver.dependencies.dependency import Dependency, Reason
-from geosolver.dependencies.empty_dependency import DependencyBuilder
-from geosolver.dependencies.dependency_graph import rgba_to_hex
+from geosolver.dependencies.dependency_building import DependencyBody
 
 from geosolver.dependencies.why_predicates import why_dependency
 from geosolver.statements.checker import StatementChecker
@@ -41,13 +40,15 @@ class WhyHyperGraph:
         self.dependency_cache = dependency_cache
 
     def build_dependency(
-        self, statement: "Statement", builder: "DependencyBuilder"
+        self, statement: "Statement", body: "DependencyBody"
     ) -> "Dependency":
+        """Build a Dependency from a statement and a body.
+
+        .. image:: ../_static/Images/dependency_building/build_dependency.svg
+
+        """
         dependency = Dependency(
-            statement=statement,
-            why=tuple(builder.why),
-            reason=builder.reason,
-            level=builder.level,
+            statement=statement, why=tuple(body.why), reason=body.reason
         )
         self._add_dependency(dependency)
         return dependency
@@ -55,15 +56,17 @@ class WhyHyperGraph:
     def build_resolved_dependency(
         self,
         statement: "Statement",
-        level: Optional[int] = None,
         use_cache: bool = True,
     ) -> Optional["Dependency"]:
-        reason, why = why_dependency(self, statement, level, use_cache=use_cache)
+        """Build and resolve a dependency from a statement.
+
+        .. image:: ../_static/Images/dependency_building/build_resolved_dependency.svg
+
+        """
+        reason, why = why_dependency(self, statement, use_cache=use_cache)
         if why is not None:
             why = tuple(why)
-        dependency = Dependency(
-            statement=statement, why=why, reason=reason, level=level
-        )
+        dependency = Dependency(statement=statement, why=why, reason=reason)
         self._add_dependency(dependency)
         return dependency
 
@@ -72,27 +75,28 @@ class WhyHyperGraph:
         statement: "Statement",
         why: tuple["Dependency"],
         reason: Optional[Reason] = None,
-        level: Optional[int] = None,
     ):
-        return self.build_dependency(
-            statement,
-            DependencyBuilder(reason=reason, level=level, why=why),
-        )
+        """Build a dependency from a statement a reason
+        and a list of other dependencies.
+
+        .. image:: ../_static/Images/dependency_building/build_dependency_from_statement.svg
+
+        """
+        return self.build_dependency(statement, DependencyBody(reason=reason, why=why))
 
     def _add_dependency(self, dependency: Dependency):
-        level = dependency.level if dependency.level else -5
         if dependency.statement not in self.nx_graph.nodes:
-            self.nx_graph.add_node(dependency.statement, level=level - 0.5)
+            self.nx_graph.add_node(dependency.statement)
         if dependency not in self.nx_graph.nodes:
             dep_name = dependency.reason.name if dependency.reason else ""
-            self.nx_graph.add_node(dependency, level=level, name=dep_name)
+            self.nx_graph.add_node(dependency, name=dep_name)
         self.nx_graph.add_edge(dependency, dependency.statement)
 
         if not dependency.why:
             return
         for why_dep in dependency.why:
             if why_dep.statement not in self.nx_graph.nodes:
-                self.nx_graph.add_node(why_dep.statement, level=level + 0.5)
+                self.nx_graph.add_node(why_dep.statement)
             self.nx_graph.add_edge(why_dep.statement, dependency)
 
     def show_html(self, html_path: Path):
@@ -179,3 +183,13 @@ class WhyHyperGraph:
         if isinstance(node, Statement):
             return str(node)
         raise TypeError
+
+
+def rgba_to_hex(r, g, b, a=0.5):
+    hexes = "%02x%02x%02x%02x" % (
+        int(r * 255),
+        int(g * 255),
+        int(b * 255),
+        int(a * 255),
+    )
+    return f"#{hexes.upper()}"

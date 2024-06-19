@@ -39,6 +39,7 @@ EXPECTED_WRONG_PROOF_LENGTH = [
     "midp M A B, para A C B D, para A D B C => midp M C D",
     "para a b c d, coll m a d, coll n b c, para m n a b => eqratio6 m a m d n b n c",
     "eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R",
+    "midp M A B => rconst M A A B 1/2",
 ]
 
 
@@ -259,6 +260,11 @@ EXPECTED_WRONG_PROOF_LENGTH = [
             "r42",
             "para a b c d, coll m a d, coll n b c, para m n a b => eqratio6 m a m d n b n c",
             "a = free a; b = free b; c = free c; d = on_pline d c a b; m = on_line m a d; n = on_line n b c, on_pline n m a b ? eqratio6 m a m d n b n c",
+        ),
+        (
+            "r50",
+            "midp M A B => rconst M A A B 1/2",
+            "a b = segment a b; m = midpoint m a b ? rconst m a a b 1/2",
         ),
     ],
 )

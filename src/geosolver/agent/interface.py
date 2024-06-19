@@ -4,6 +4,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, NamedTuple, Optional, Union
 from abc import abstractmethod
 
+from geosolver.reasoning_engines.interface import Derivation
+
 
 if TYPE_CHECKING:
     from geosolver.proof import Proof
@@ -12,12 +14,10 @@ if TYPE_CHECKING:
     from geosolver.statements.adder import ToCache
     from geosolver.dependencies.dependency import Dependency
     from geosolver.match_theorems import MatchCache
-    from geosolver.reasoning_engines.algebraic_reasoning.algebraic_manipulator import (
-        Derivations,
-    )
+
     from geosolver.problem import Problem
     from geosolver.statements.statement import Statement
-    from geosolver.dependencies.empty_dependency import DependencyBuilder
+    from geosolver.dependencies.dependency_building import DependencyBody
 
 
 Mapping = dict[str, Union["Point", str]]
@@ -38,18 +38,16 @@ class ApplyTheoremAction(NamedTuple):
 
 class MatchAction(NamedTuple):
     theorem: "Theorem"
-    level: int
     cache: Optional["MatchCache"] = None
 
 
 class ResolveEngineAction(NamedTuple):
-    level: int
-    engineid: str
+    engine_id: str
 
 
 class ApplyDerivationAction(NamedTuple):
     statement: "Statement"
-    reason: "DependencyBuilder"
+    reason: "DependencyBody"
 
 
 class AuxAction(NamedTuple):
@@ -69,6 +67,7 @@ Action = Union[
 
 class ResetFeedback(NamedTuple):
     problem: "Problem"
+    available_engines: list[str]
     added: list["Dependency"]
     to_cache: list["ToCache"]
 
@@ -89,7 +88,7 @@ class MatchFeedback(NamedTuple):
 
 
 class DeriveFeedback(NamedTuple):
-    derives: "Derivations"
+    derives: list[Derivation]
 
 
 class ApplyDerivationFeedback(NamedTuple):
@@ -116,9 +115,6 @@ Feedback = Union[
 
 class DeductiveAgent:
     """Common interface for deductive agents"""
-
-    def __init__(self) -> None:
-        self.level = None
 
     @abstractmethod
     def act(self, proof: "Proof", theorems: list["Theorem"]) -> Action:

@@ -254,10 +254,9 @@ class SymbolsGraph:
         return rat1, rat2
 
     def get_or_create_const(
-        self, const_str: str, const_concept: Predicate | str
+        self, const_str: str, const_name: str
     ) -> tuple[Angle, Angle] | tuple[Ratio, Ratio]:
-        const_concept = Predicate(const_concept)
-        if const_concept in (Predicate.CONSTANT_ANGLE, Predicate.S_ANGLE):
+        if const_name in (Predicate.CONSTANT_ANGLE.value, Predicate.S_ANGLE.value):
             if "pi/" in const_str:
                 # pi fraction
                 num, den = angle_to_num_den(const_str)
@@ -268,14 +267,12 @@ class SymbolsGraph:
                 raise ValueError("Could not interpret constant angle: %s", const_str)
             return self.get_or_create_const_ang(num, den)
 
-        elif const_concept is Predicate.CONSTANT_RATIO:
+        elif const_name in (Predicate.CONSTANT_RATIO.value, "rconst2"):
             if "/" in const_str:
                 num, den = ratio_to_num_den(const_str)
                 return self.get_or_create_const_rat(num, den)
 
-        raise NotImplementedError(
-            "Unsupported concept for constants: %s", const_concept.value
-        )
+        raise NotImplementedError("Unsupported concept for constants: %s", const_name)
 
     def get_or_create_segment(self, p1: Point, p2: Point, dep: "Dependency") -> Segment:
         """Get or create a Segment object between two Points p1 and p2."""
@@ -306,8 +303,8 @@ class SymbolsGraph:
         for a in self.type2nodes[Angle]:
             if a.directions == (d1.rep(), d2.rep()):  # directions = _d.rep()
                 d1_, d2_ = a._d
-                why1 = d1.why_equal([d1_], None) + d1_.why_rep()
-                why2 = d2.why_equal([d2_], None) + d2_.why_rep()
+                why1 = d1.why_equal([d1_]) + d1_.why_rep()
+                why2 = d2.why_equal([d2_]) + d2_.why_rep()
                 return a, a.opposite, why1 + why2
 
         d1, why1 = d1.rep_and_why()
@@ -335,8 +332,8 @@ class SymbolsGraph:
         for r in self.type2nodes[Ratio]:
             if r.lengths == (l1.rep(), l2.rep()):
                 l1_, l2_ = r._l
-                why1 = l1.why_equal([l1_], None) + l1_.why_rep()
-                why2 = l2.why_equal([l2_], None) + l2_.why_rep()
+                why1 = l1.why_equal([l1_]) + l1_.why_rep()
+                why2 = l2.why_equal([l2_]) + l2_.why_rep()
                 return r, r.opposite, why1 + why2
 
         l1, why1 = l1.rep_and_why()

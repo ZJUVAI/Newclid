@@ -5,13 +5,14 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 import traceback
-from typing import Optional
+from typing import TYPE_CHECKING, Optional, Type
 from typing_extensions import Self
 import copy as cp
-import numpy as np
+
 
 from geosolver.definitions.clause import Clause
 from geosolver.definitions.definition import Definition
+from geosolver.reasoning_engines.interface import ReasoningEngine
 from geosolver.theorem import Theorem
 from geosolver.proof import Proof
 from geosolver.configs import default_defs_path, default_rules_path
@@ -21,6 +22,13 @@ from geosolver.run_loop import run_loop
 from geosolver.problem import Problem, setup_str_from_problem
 from geosolver.proof_writing import write_solution
 from geosolver.statements.adder import IntrinsicRules
+from geosolver._lazy_loading import lazy_import
+
+
+if TYPE_CHECKING:
+    import numpy
+
+np: "numpy" = lazy_import("numpy")
 
 
 class GeometricSolver:
@@ -96,18 +104,8 @@ class GeometricSolver:
     def draw_figure(self, out_file: Path):
         self.proof_state.symbols_graph.draw_figure(out_file)
 
-    def draw_dependency_graph(self, out_file: Path):
-        self.proof_state.dependency_graph.show_html(
-            out_file, Theorem.to_dict(self.rules)
-        )
-
     def draw_symbols_graph(self, out_file: Path):
         self.proof_state.symbols_graph.draw_html(out_file)
-
-    def draw_proof_subgraph(self, out_file: Path):
-        self.proof_state.dependency_graph.proof_subgraph.show_html(
-            out_file, Theorem.to_dict(self.rules)
-        )
 
     def draw_why_graph(self, out_file: Path):
         self.proof_state.statements.graph.show_html(out_file)
@@ -117,8 +115,6 @@ class GeometricSolver:
         self.write_solution(output_folder_path / "proof_steps.txt")
         self.draw_figure(output_folder_path / "proof_figure.png")
         self.draw_symbols_graph(output_folder_path / "symbols_graph.html")
-        self.draw_dependency_graph(output_folder_path / "dependency_graph.html")
-        self.draw_proof_subgraph(output_folder_path / "proof_subgraph.html")
         logging.info("Written all outputs at %s", output_folder_path)
 
     def get_existing_points(self) -> list[str]:
@@ -165,6 +161,7 @@ class GeometricSolverBuilder:
         self.rules: Optional[list[Theorem]] = None
         self.deductive_agent: Optional[DeductiveAgent] = None
         self.disabled_intrinsic_rules: Optional[list[IntrinsicRules]] = None
+        self.additional_reasoning_engine: dict[str, Type[ReasoningEngine]] = {}
         self.seed = seed
         self.no_goal = no_goal
 
@@ -189,6 +186,7 @@ class GeometricSolverBuilder:
             problem=self.problem,
             definitions=self.defs,
             disabled_intrinsic_rules=self.disabled_intrinsic_rules,
+            additional_reasoning_engine=self.additional_reasoning_engine,
             rnd_generator=rnd_gen,
         )
 
@@ -235,12 +233,18 @@ class GeometricSolverBuilder:
         self.defs = Definition.to_dict(Definition.from_string(defs_txt))
         return self
 
-    def with_deductive_agent(self, deductive_agent: DeductiveAgent):
+    def with_deductive_agent(self, deductive_agent: DeductiveAgent) -> Self:
         self.deductive_agent = deductive_agent
         return self
 
     def with_disabled_intrinsic_rules(
         self, disabled_intrinsic_rules: list[IntrinsicRules]
-    ):
+    ) -> Self:
         self.disabled_intrinsic_rules = disabled_intrinsic_rules
+        return self
+
+    def with_additional_reasoning_engine(
+        self, reasoning_engine: Type[ReasoningEngine], engine_name: str
+    ) -> Self:
+        self.additional_reasoning_engine[engine_name] = reasoning_engine
         return self

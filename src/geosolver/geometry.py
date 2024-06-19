@@ -67,11 +67,11 @@ class Node:
         return x
 
     def why_rep(self) -> list[Any]:
-        return self.why_equal([self.rep()], None)
+        return self.why_equal([self.rep()])
 
     def rep_and_why(self) -> tuple[Self, list["Dependency"]]:
         rep = self.rep()
-        return rep, self.why_equal([rep], None)
+        return rep, self.why_equal([rep])
 
     def neighbors(
         self, oftype: Type[Node], return_set: bool = False, do_rep: bool = True
@@ -161,8 +161,8 @@ class Node:
             self.set_val(node)
             node.set_obj(self)
 
-    def equivs_upto(self, level: int) -> dict[Node, Node]:
-        """What are the equivalent nodes up to a certain level."""
+    def equivs_upto(self) -> dict[Node, Node]:
+        """What are the equivalent nodes."""
         parent = {self: None}
         visited = set()
         queue = [self]
@@ -174,19 +174,14 @@ class Node:
             visited.add(current)
 
             for neighbor in current.merge_graph:
-                if (
-                    level is not None
-                    and current.merge_graph[neighbor].level is not None
-                    and current.merge_graph[neighbor].level >= level
-                ):
+                if neighbor in visited:
                     continue
-                if neighbor not in visited:
-                    queue.append(neighbor)
-                    parent[neighbor] = current
+                queue.append(neighbor)
+                parent[neighbor] = current
 
         return parent
 
-    def why_equal(self, others: list[Node], level: int) -> list["Dependency"]:
+    def why_equal(self, others: list[Node]) -> list["Dependency"]:
         """BFS why this node is equal to other nodes."""
         others = set(others)
         found = 0
@@ -205,20 +200,15 @@ class Node:
             i += 1
 
             for neighbor in current.merge_graph:
-                if (
-                    level is not None
-                    and current.merge_graph[neighbor].level is not None
-                    and current.merge_graph[neighbor].level >= level
-                ):
+                if neighbor in parent:
                     continue
-                if neighbor not in parent:
-                    queue.append(neighbor)
-                    parent[neighbor] = current
+                queue.append(neighbor)
+                parent[neighbor] = current
 
         return bfs_backtrack(self, others, parent)
 
     def why_equal_groups(
-        self, groups: list[list[Node]], level: int
+        self, groups: list[list[Node]]
     ) -> tuple[list["Dependency"], list[Node]]:
         """BFS for why self is equal to at least one member of each group."""
         others = [None for _ in groups]
@@ -242,29 +232,27 @@ class Node:
             i += 1
 
             for neighbor in current.merge_graph:
-                if (
-                    level is not None
-                    and current.merge_graph[neighbor].level is not None
-                    and current.merge_graph[neighbor].level >= level
-                ):
+                if neighbor in parent:
                     continue
-                if neighbor not in parent:
-                    queue.append(neighbor)
-                    parent[neighbor] = current
+                queue.append(neighbor)
+                parent[neighbor] = current
 
         return bfs_backtrack(self, others, parent), others
 
-    def why_val(self, level: int) -> list["Dependency"]:
-        return self._val.why_equal([self.val], level)
+    def why_val(self) -> list["Dependency"]:
+        return self._val.why_equal([self.val])
 
-    def why_connect(self, node: Node, level: int = None) -> list["Dependency"]:
+    def why_connect(self, node: Node) -> list["Dependency"]:
         rep = self.rep()
         equivs = list(rep.edge_graph[node].keys())
         if not equivs:
             return None
         equiv = equivs[0]
         dep = rep.edge_graph[node][equiv]
-        return [dep] + self.why_equal(equiv, level)
+        return [dep] + self.why_equal(equiv)
+
+    def __repr__(self) -> str:
+        return self.name
 
 
 def why_connect(*pairs: tuple[Node, Node]) -> list[Any]:
@@ -274,19 +262,18 @@ def why_connect(*pairs: tuple[Node, Node]) -> list[Any]:
     return result
 
 
-def is_equiv(x: Node, y: Node, level: int = None) -> bool:
-    level = level or float("inf")
-    return x.why_equal([y], level) is not None
+def is_equiv(x: Node, y: Node) -> bool:
+    return x.why_equal([y]) is not None
 
 
-def is_equal(x: Node, y: Node, level: int = None) -> bool:
+def is_equal(x: Node, y: Node) -> bool:
     if x == y:
         return True
     if x._val is None or y._val is None:
         return False
     if x.val != y.val:
         return False
-    return is_equiv(x._val, y._val, level)
+    return is_equiv(x._val, y._val)
 
 
 def bfs_backtrack(
@@ -324,18 +311,15 @@ class Line(Node):
     def new_val(self) -> Direction:
         return Direction()
 
-    def why_coll(
-        self, points: list[Point], level: int = None
-    ) -> Optional[list["Dependency"]]:
+    def why_coll(self, points: list[Point]) -> Optional[list["Dependency"]]:
         """Why points are connected to self."""
-        level = level or float("inf")
 
         groups: list[list[Point]] = []
         for p in points:
             group = [
                 level
                 for level, dependency in self.edge_graph[p].items()
-                if dependency is None or dependency.level < level
+                if dependency is None
             ]
             if not group:
                 return None
@@ -343,7 +327,7 @@ class Line(Node):
 
         min_deps = None
         for line in groups[0]:
-            deps, others = line.why_equal_groups(groups[1:], level)
+            deps, others = line.why_equal_groups(groups[1:])
             if deps is None:
                 continue
             for p, o in zip(points, [line] + others):
@@ -364,22 +348,18 @@ class Segment(Node):
 class Circle(Node):
     """Node of type Circle."""
 
-    def why_cyclic(self, points: list[Point], level: int = None) -> list[Any]:
+    def why_cyclic(self, points: list[Point]) -> list[Any]:
         """Why points are connected to self."""
-        level = level or float("inf")
-
         groups: list[list[Circle]] = []
         for p in points:
-            group = [
-                c for c, d in self.edge_graph[p].items() if d is None or d.level < level
-            ]
+            group = [c for c, d in self.edge_graph[p].items() if d is None]
             if not group:
                 return None
             groups.append(group)
 
         min_deps = None
         for circle in groups[0]:
-            deps, others = circle.why_equal_groups(groups[1:], level)
+            deps, others = circle.why_equal_groups(groups[1:])
             if deps is None:
                 continue
             for p, o in zip(points, [circle] + others):
@@ -459,11 +439,10 @@ class Value(Node):
 
 
 def all_angles(
-    d1: Direction, d2: Direction, level: int = None
+    d1: Direction, d2: Direction
 ) -> Generator[Angle, list[Direction], list[Direction]]:
-    level = level or float("inf")
-    d1s = d1.equivs_upto(level)
-    d2s = d2.equivs_upto(level)
+    d1s = d1.equivs_upto()
+    d2s = d2.equivs_upto()
 
     for ang in d1.rep().neighbors(Angle):
         d1_, d2_ = ang._d
@@ -472,11 +451,10 @@ def all_angles(
 
 
 def all_ratios(
-    d1: Direction, d2: Direction, level=None
+    d1: Direction, d2: Direction
 ) -> Generator[Angle, list[Direction], list[Direction]]:
-    level = level or float("inf")
-    d1s = d1.equivs_upto(level)
-    d2s = d2.equivs_upto(level)
+    d1s = d1.equivs_upto()
+    d2s = d2.equivs_upto()
 
     for ang in d1.rep().neighbors(Ratio):
         d1_, d2_ = ang._l

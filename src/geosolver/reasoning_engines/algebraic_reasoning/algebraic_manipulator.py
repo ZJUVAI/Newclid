@@ -3,15 +3,10 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 
-from geosolver.agent.interface import DeriveFeedback
 from geosolver.dependencies.dependency import Dependency, Reason
-from geosolver.reasoning_engines.interface import (
-    Derivation,
-    Derivations,
-    ReasoningEngine,
-)
+from geosolver.reasoning_engines.interface import Derivation, ReasoningEngine
 from geosolver.predicates import Predicate
-from geosolver.dependencies.empty_dependency import DependencyBuilder
+from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.geometry import is_equiv
 from geosolver.numerical.check import check_numerical
 
@@ -59,30 +54,27 @@ class AlgebraicManipulator(ReasoningEngine):
         if adder is not None:
             adder(dependency)
 
-    def resolve(self, **kwargs) -> DeriveFeedback:
+    def resolve(self, **kwargs) -> list[Derivation]:
         """Derive new algebraic predicates."""
-        level: int = kwargs.get("level")
         derives = []
-        ang_derives = self.derive_angle_algebra(level)
+        ang_derives = self.derive_angle_algebra()
         derives += ang_derives
 
-        cong_derives = self.derive_cong_algebra(level)
+        cong_derives = self.derive_cong_algebra()
         derives += cong_derives
 
-        rat_derives = self.derive_ratio_algebra(level)
+        rat_derives = self.derive_ratio_algebra()
         derives += rat_derives
 
-        return DeriveFeedback(derives)
+        return derives
 
-    def derive_ratio_algebra(self, level: int) -> Derivations:
+    def derive_ratio_algebra(self) -> list[Derivation]:
         """Derive new eqratio predicates."""
         added = []
 
         for x in self.rtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
-            dep = DependencyBuilder(
-                reason=Reason(AlgebraicRules.Ratio_Chase), why=why, level=level
-            )
+            dep = DependencyBody(reason=Reason(AlgebraicRules.Ratio_Chase), why=why)
 
             if len(x) == 2:
                 mn, pq = x
@@ -106,15 +98,13 @@ class AlgebraicManipulator(ReasoningEngine):
 
         return added
 
-    def derive_angle_algebra(self, level: int) -> Derivations:
+    def derive_angle_algebra(self) -> list[Derivation]:
         """Derive new eqangles predicates."""
         added = []
 
         for x in self.atable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
-            dep = DependencyBuilder(
-                reason=Reason(AlgebraicRules.Angle_Chase), why=why, level=level
-            )
+            dep = DependencyBody(reason=Reason(AlgebraicRules.Angle_Chase), why=why)
 
             if len(x) == 2:
                 ab, cd = x
@@ -152,14 +142,12 @@ class AlgebraicManipulator(ReasoningEngine):
 
         return added
 
-    def derive_cong_algebra(self, level: int) -> Derivations:
+    def derive_cong_algebra(self) -> list[Derivation]:
         """Derive new cong predicates."""
         added = []
         for x in self.dtable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
-            dep = DependencyBuilder(
-                reason=Reason(AlgebraicRules.Distance_Chase), why=why, level=level
-            )
+            dep = DependencyBody(reason=Reason(AlgebraicRules.Distance_Chase), why=why)
 
             if len(x) == 2:
                 a, b = x
