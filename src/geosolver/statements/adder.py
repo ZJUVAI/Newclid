@@ -16,7 +16,7 @@ from geosolver.geometry import (
     Angle,
     Length,
     Line,
-    Node,
+    Symbol,
     Point,
     Segment,
     is_equal,
@@ -144,7 +144,7 @@ class StatementAdder:
 
         return new_deps, deps_to_cache
 
-    def _make_equal(self, x: Node, y: Node, dep: Dependency) -> None:
+    def _make_equal(self, x: Symbol, y: Symbol, dep: Dependency) -> None:
         """Make that two nodes x and y are equal, i.e. merge their value node."""
         if x.val is None:
             x, y = y, x
