@@ -3,16 +3,16 @@ import pytest
 from geosolver.api import GeometricSolverBuilder
 from geosolver.theorem import Theorem
 from geosolver.proof_writing import get_proof_steps, proof_step_string
-from geosolver.statements.adder import IntrinsicRules
+from geosolver.statements.adder import ALL_INTRINSIC_RULES
 
 
 EXPECTED_TO_FAIL = [
-    "eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C => simtri2 A B C P Q R",
-    "eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R",
+    # "eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C => simtri2 A B C P Q R",
+    # "eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R",
 ]
 
 EXPECTED_TO_USE_OTHER_RULE = [
-    "cyclic A B C D, para A B C D => eqangle A D C D C D C B",
+    # "cyclic A B C D, para A B C D => eqangle A D C D C D C B",
     "eqangle A B P Q C D U V, perp P Q U V => perp A B C D",
 ]
 
@@ -30,15 +30,20 @@ EXPECTED_WRONG_PROOF_LENGTH = [
     "perp A B B C, midp M A C => cong A M B M",
     "circle O A B C, coll O A C => perp A B B C",
     "midp M A B, midp N C D => eqratio M A A B N C C D",
-    "cong A B P Q, cong B C Q R, eqangle6 B A B C Q P Q R, ncoll A B C => contri* A B C P Q R",
-    "eqangle6 B A B C Q P Q R, eqangle6 C A C B R P R Q, ncoll A B C => simtri A B C P Q R",
-    "eqratio6 B A B C Q P Q R, eqangle6 B A B C Q P Q R, ncoll A B C => simtri* A B C P Q R",
+    # "cong A B P Q, cong B C Q R, eqangle6 B A B C Q P Q R, ncoll A B C => contri* A B C P Q R",
+    # "eqangle6 B A B C Q P Q R, eqangle6 C A C B R P R Q, ncoll A B C => simtri A B C P Q R",
+    # "eqratio6 B A B C Q P Q R, eqangle6 B A B C Q P Q R, ncoll A B C => simtri* A B C P Q R",
     "eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C, cong A B P Q => contri* A B C P Q R",
     "eqratio A B P Q C D U V, cong P Q U V => cong A B C D",
     "circle O A B C, coll M B C, eqangle A B A C O B O M => midp M B C",
     "midp M A B, para A C B D, para A D B C => midp M C D",
     "para a b c d, coll m a d, coll n b c, para m n a b => eqratio6 m a m d n b n c",
-    "eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R",
+    # "eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R",
+    "midp M A B => rconst M A A B 1/2",
+]
+
+DEFINITIONAL_RULES = [  # rules not applied
+    "r32"
 ]
 
 
@@ -260,6 +265,11 @@ EXPECTED_WRONG_PROOF_LENGTH = [
             "para a b c d, coll m a d, coll n b c, para m n a b => eqratio6 m a m d n b n c",
             "a = free a; b = free b; c = free c; d = on_pline d c a b; m = on_line m a d; n = on_line n b c, on_pline n m a b ? eqratio6 m a m d n b n c",
         ),
+        (
+            "r50",
+            "midp M A B => rconst M A A B 1/2",
+            "a b = segment a b; m = midpoint m a b ? rconst m a a b 1/2",
+        ),
     ],
 )
 def test_rule_used_to_solve_in_one_step(
@@ -271,14 +281,7 @@ def test_rule_used_to_solve_in_one_step(
     solver_builder = (
         GeometricSolverBuilder()
         .load_problem_from_txt(problem_txt)
-        .with_disabled_intrinsic_rules(
-            [
-                IntrinsicRules.PARA_FROM_PERP,
-                IntrinsicRules.CYCLIC_FROM_CONG,
-                IntrinsicRules.CONG_FROM_EQRATIO,
-                IntrinsicRules.PARA_FROM_EQANGLE,
-            ]
-        )
+        .with_disabled_intrinsic_rules(ALL_INTRINSIC_RULES)
     )
     solver_builder.rules = [theorem]
     solver = solver_builder.build()
@@ -290,6 +293,8 @@ def test_rule_used_to_solve_in_one_step(
         pytest.xfail(f"Rule {rule_txt} is expected to fail.")
 
     assert success
+    if rule_name in DEFINITIONAL_RULES:
+        return
 
     setup, aux, proof_steps, refs = get_proof_steps(
         solver.proof_state, solver.problem.goal

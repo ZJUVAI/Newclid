@@ -1,6 +1,6 @@
 from __future__ import annotations
 from enum import Enum
-from typing import TYPE_CHECKING, Optional, Tuple
+from typing import TYPE_CHECKING, Optional
 
 
 import geosolver.combinatorics as comb
@@ -23,7 +23,7 @@ from geosolver.geometry import (
 from geosolver.listing import list_eqratio3
 
 
-ToCache = Tuple[Statement, Dependency]
+ToCache = tuple[Statement, Dependency]
 
 if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
@@ -60,6 +60,9 @@ class IntrinsicRules(Enum):
 
     SANGLE_FROM_LINES = "i21"
     SANGLE_FROM_PARA = "i22"
+
+
+ALL_INTRINSIC_RULES = [rule for rule in IntrinsicRules]
 
 
 class StatementAdder:
@@ -99,7 +102,7 @@ class StatementAdder:
             Predicate.EQRATIO: self._add_eqratio,
             Predicate.EQRATIO6: self._add_eqratio,
             Predicate.EQRATIO3: self._add_eqratio3,
-            Predicate.EQRATIO4: self._add_eqratio4,
+            # Predicate.EQRATIO4: self._add_eqratio4,
             Predicate.SIMILAR_TRIANGLE: self._add_simtri,
             Predicate.SIMILAR_TRIANGLE_REFLECTED: self._add_simtri_reflect,
             Predicate.SIMILAR_TRIANGLE_BOTH: self._add_simtri_check,
@@ -112,7 +115,7 @@ class StatementAdder:
 
     def add(
         self, statement: Statement, dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add a new predicate."""
         piece_adder = self.PREDICATE_TO_ADDER.get(statement.predicate)
         if piece_adder is not None:
@@ -168,7 +171,7 @@ class StatementAdder:
 
     def _add_coll(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add a predicate that `points` are collinear."""
         points = list(set(points))
         og_points = points.copy()
@@ -242,7 +245,7 @@ class StatementAdder:
 
     def _add_para(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add a new predicate that 4 points (2 lines) are parallel."""
         a, b, c, d = points
         ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
@@ -278,7 +281,7 @@ class StatementAdder:
         m: Point,
         n: Point,
         dep_body: DependencyBody,
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add a new parallel or collinear predicate."""
         perp = Statement(Predicate.PERPENDICULAR, [a, b, c, d])
         extends = [Statement(Predicate.PERPENDICULAR, [x, y, m, n])]
@@ -320,7 +323,7 @@ class StatementAdder:
 
     def _maybe_make_para_from_perp(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Optional[Tuple[list[Dependency], list[ToCache]]]:
+    ) -> Optional[tuple[list[Dependency], list[ToCache]]]:
         """Maybe add a new parallel predicate from perp predicate."""
         a, b, c, d = points
         halfpi = self.symbols_graph.aconst[(1, 2)]
@@ -345,7 +348,7 @@ class StatementAdder:
 
     def _add_perp(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add a new perpendicular predicate from 4 points (2 lines)."""
 
         if IntrinsicRules.PARA_FROM_PERP not in self.DISABLED_INTRINSIC_RULES:
@@ -424,7 +427,7 @@ class StatementAdder:
 
     def _add_cong(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add that two segments (4 points) are congruent."""
         a, b, c, d = points
         ab = self.symbols_graph.get_or_create_segment(a, b, None)
@@ -445,6 +448,7 @@ class StatementAdder:
         ):
             return dep_body, to_cache
 
+        # Make a=c if possible
         if b in [c, d]:
             a, b = b, a
         if a == d:
@@ -457,7 +461,7 @@ class StatementAdder:
 
     def _add_cong2(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         m, n, a, b = points
         add, to_cache = self._add_cong([m, a, n, a], dep_body)
         _add, _to_cache = self._add_cong([m, b, n, b], dep_body)
@@ -465,7 +469,7 @@ class StatementAdder:
 
     def _add_midp(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         m, a, b = points
         add_coll, to_cache_coll = self._add_coll(points, dep_body)
         add_cong, to_cache_cong = self._add_cong([m, a, m, b], dep_body)
@@ -473,7 +477,7 @@ class StatementAdder:
 
     def _add_circle(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         o, a, b, c = points
         add_ab, to_cache_ab = self._add_cong([o, a, o, b], dep_body)
         add_ac, to_cache_ac = self._add_cong([o, a, o, c], dep_body)
@@ -481,7 +485,7 @@ class StatementAdder:
 
     def _add_cyclic(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add a new cyclic predicate that 4 points are concyclic."""
         points = list(set(points))
         og_points = list(points)
@@ -556,7 +560,7 @@ class StatementAdder:
 
     def _maybe_add_cyclic_from_cong(
         self, a: Point, b: Point, c: Point, cong_ab_ac: Dependency
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Maybe add a new cyclic predicate from given congruent segments."""
         ab = self.symbols_graph.get_or_create_segment(a, b, None)
 
@@ -590,7 +594,7 @@ class StatementAdder:
 
     def _add_eqangle(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add eqangle made by 8 points in `points`."""
         if dep_body:
             dep_body = dep_body.copy()
@@ -667,7 +671,7 @@ class StatementAdder:
         mn: Line,
         pq: Line,
         dep_body: DependencyBody,
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add eqangle core."""
         if dep_body:
             dep_body = dep_body.copy()
@@ -747,7 +751,7 @@ class StatementAdder:
 
     def _add_eqratio3(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add three eqratios through a list of 6 points (due to parallel lines).
 
           a -- b
@@ -761,13 +765,15 @@ class StatementAdder:
             _add, _to_cache = self._add_eqratio(ratio_points, dep_body)
             add += _add
             to_cache += _to_cache
+
+        self._simple_add(Predicate.EQRATIO3, tuple(points), dep_body, add, to_cache)
         return add, to_cache
 
     def _add_eqratio4(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add four eqratios through a list of 5 points
-        (due to parallel lines with common point).
+            (due to parallel lines with common point).
 
            o
          a - b
@@ -781,7 +787,7 @@ class StatementAdder:
 
     def _add_eqratio(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add a new eqratio from 8 points."""
         if dep_body:
             dep_body = dep_body.copy()
@@ -843,7 +849,7 @@ class StatementAdder:
         mn: Segment,
         pq: Segment,
         dep_body: DependencyBody,
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add a new eqratio from 8 points (core)."""
         if dep_body:
             dep_body = dep_body.copy()
@@ -918,23 +924,46 @@ class StatementAdder:
         self._make_equal(cd_ab, pq_mn, dep=dep2)
         return add, to_cache
 
+    def _simple_add(
+        self,
+        predicate: Predicate,
+        points: tuple[Point, ...],
+        dep_body: DependencyBody,
+        added: list[Dependency],
+        to_cache: list[ToCache],
+    ):
+        statement = Statement(predicate, points)
+        dep = self.statements_graph.build_dependency(statement, dep_body)
+        added.append(dep)
+        to_cache.append((statement, dep))
+
     def _add_simtri_check(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         if nm.same_clock(*[p.num for p in points]):
-            return self._add_simtri(points, dep_body)
-        return self._add_simtri_reflect(points, dep_body)
+            added, to_cache = self._add_simtri(points, dep_body)
+        else:
+            added, to_cache = self._add_simtri_reflect(points, dep_body)
+        self._simple_add(
+            Predicate.SIMILAR_TRIANGLE_BOTH, tuple(points), dep_body, added, to_cache
+        )
+        return added, to_cache
 
     def _add_contri_check(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         if nm.same_clock(*[p.num for p in points]):
-            return self._add_contri(points, dep_body)
-        return self._add_contri_reflect(points, dep_body)
+            added, to_cache = self._add_contri(points, dep_body)
+        else:
+            added, to_cache = self._add_contri_reflect(points, dep_body)
+        self._simple_add(
+            Predicate.CONTRI_TRIANGLE_BOTH, points, dep_body, added, to_cache
+        )
+        return added, to_cache
 
     def _add_simtri(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add two similar triangles."""
         add, to_cache = [], []
         hashs = [dep.statement.hash_tuple for dep in dep_body.why]
@@ -954,11 +983,15 @@ class StatementAdder:
             _add, _to_cache = self._add_eqratio(args, dep_body=dep_body)
             add += _add
             to_cache += _to_cache
+
+        self._simple_add(
+            Predicate.SIMILAR_TRIANGLE, tuple(points), dep_body, add, to_cache
+        )
         return add, to_cache
 
     def _add_simtri_reflect(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add two similar reflected triangles."""
         add, to_cache = [], []
         hashs = [dep.statement.hash_tuple for dep in dep_body.why]
@@ -978,11 +1011,18 @@ class StatementAdder:
             add += _add
             to_cache += _to_cache
 
+        self._simple_add(
+            Predicate.SIMILAR_TRIANGLE_REFLECTED,
+            tuple(points),
+            dep_body,
+            add,
+            to_cache,
+        )
         return add, to_cache
 
     def _add_contri(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add two congruent triangles."""
         add, to_cache = [], []
         hashs = [dep.statement.hash_tuple for dep in dep_body.why]
@@ -1001,11 +1041,15 @@ class StatementAdder:
             _add, _to_cache = self._add_cong(args, dep_body)
             add += _add
             to_cache += _to_cache
+
+        self._simple_add(
+            Predicate.CONTRI_TRIANGLE, tuple(points), dep_body, add, to_cache
+        )
         return add, to_cache
 
     def _add_contri_reflect(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add two congruent reflected triangles."""
         add, to_cache = [], []
         hashs = [dep.statement.hash_tuple for dep in dep_body.why]
@@ -1025,6 +1069,13 @@ class StatementAdder:
             add += _add
             to_cache += _to_cache
 
+        self._simple_add(
+            Predicate.CONTRI_TRIANGLE_REFLECTED,
+            tuple(points),
+            dep_body,
+            add,
+            to_cache,
+        )
         return add, to_cache
 
     def _maybe_make_equal_pairs(
@@ -1042,7 +1093,7 @@ class StatementAdder:
         mn: Line,
         pq: Line,
         dep_body: DependencyBody,
-    ) -> Optional[Tuple[list[Dependency], list[ToCache]]]:
+    ) -> Optional[tuple[list[Dependency], list[ToCache]]]:
         """Add ab/cd = mn/pq in case maybe either two of (ab,cd,mn,pq) are equal."""
         if is_equal(ab, cd):
             return self._make_equal_pairs(
@@ -1078,7 +1129,7 @@ class StatementAdder:
         mn: Line,
         pq: Line,
         dep_body: DependencyBody,
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add ab/cd = mn/pq in case either two of (ab,cd,mn,pq) are equal."""
         if isinstance(ab, Segment):
             dep_pred = Predicate.EQRATIO
@@ -1115,7 +1166,7 @@ class StatementAdder:
 
     def _add_aconst(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add that an angle is equal to some constant."""
         points = list(points)
         a, b, c, d, ang = points
@@ -1205,7 +1256,7 @@ class StatementAdder:
 
     def _add_s_angle(
         self, points: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add that an angle abx is equal to constant y."""
         a, b, x, angle = points
         num, den = angle_to_num_den(angle)
@@ -1283,7 +1334,7 @@ class StatementAdder:
 
     def _add_rconst(
         self, args: list[Point], dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[ToCache]]:
         """Add new algebraic predicates of type eqratio-constant."""
         a, b, c, d, ratio = args
 

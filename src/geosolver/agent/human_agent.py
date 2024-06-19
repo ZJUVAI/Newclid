@@ -47,7 +47,7 @@ class HumanAgent(DeductiveAgent):
         "show": ShowAction,
         "match": MatchAction,
         "apply": ApplyTheoremAction,
-        "resolve derivations": ResolveEngineAction,
+        "resolve": ResolveEngineAction,
         "derive": ApplyDerivationAction,
         "aux": AuxAction,
         "stop": StopAction,
@@ -100,6 +100,8 @@ class HumanAgent(DeductiveAgent):
         self._all_added: list[Statement] = []
         self._all_cached: list[Statement] = []
 
+        self._known_engines: list[str] = []
+
         self.level = 0
 
     def _act_show(self, theorems: list[Theorem]):
@@ -130,7 +132,17 @@ class HumanAgent(DeductiveAgent):
         return ApplyTheoremAction(theorem, mapping)
 
     def _act_resolve_derivations(self, theorems: list[Theorem]) -> ResolveEngineAction:
-        return ResolveEngineAction(engine_id="AR")
+        choice_str = "\nAvailable reasoning engines: \n"
+        engines_to_choose = {
+            engine_id.lower(): engine_id for engine_id in self._known_engines
+        }
+        for engine_id in engines_to_choose.keys():
+            choice_str += f" - [{engine_id}]\n"
+
+        choice_str += "Reasoning engine you want to resolve: "
+        engine_id = self._ask_for_key(engines_to_choose, choice_str)
+
+        return ResolveEngineAction(engine_id=engine_id)
 
     def _act_apply_derivation(self, theorems: list[Theorem]) -> ApplyDerivationAction:
         choose_derivation_str = "\nAvailable derivations: \n"
@@ -174,6 +186,7 @@ class HumanAgent(DeductiveAgent):
         self, action: ResetAction, feedback: ResetFeedback
     ) -> tuple[str, bool]:
         self._problem = feedback.problem
+        self._known_engines = feedback.available_engines
         feedback_str = f"\nStarting problem {self._problem.url}:"
         feedback_str += "\n" + "=" * (len(feedback_str) - 2) + "\n"
 
@@ -298,8 +311,8 @@ class HumanAgent(DeductiveAgent):
             cached_statement, _deps = cached
             self._all_cached.append(cached_statement)
             feedback_str += f"    - {cached_statement}"
-            if str(cached_statement) != str(_deps):
-                feedback_str += f" ({_deps})"
+            if str(cached_statement) != str(_deps.statement):
+                feedback_str += f" ({_deps.statement})"
             feedback_str += "\n"
         return feedback_str
 

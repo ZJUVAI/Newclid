@@ -318,14 +318,10 @@ r19 : right_triangle_midp2cong
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{perp}(AB, BC) \wedge \text{midp}(M, AC) \implies |AM|=|BM|`
+     - Formal Statement
      - Description
    * - |r19|
-     -
-       .. code-block :: text
-
-         perp A B B C, midp M A C
-         => cong A M B M
+     - :math:`\begin{cases}AB\perp BC \\ M\text{ midpoint of}AC\end{cases} \implies |AM|=|BM|`
      - 
 
 .. |r19| image:: ../../_static/Images/rules/r19.png
@@ -338,14 +334,10 @@ r20 : circle2perp
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{circle}(OABC) \wedge \text{coll}(OAC) \implies \text{perp}(AB, BC)`
+     - Formal Statement
      - Description
    * - |r20|
-     -
-       .. code-block :: text
-
-         circle O A B C, coll O A C
-         => perp A B B C
+     - :math:`\begin{cases}O \text{ center of the circle } ABC \\ OAC\text{ collinear} \end{cases}\implies AB \perp BC`
      - 
 
 .. |r20| image:: ../../_static/Images/rules/r20.png
@@ -358,14 +350,10 @@ r21 : cyclic_para2eqangle
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{cyclic}(ABCD) \wedge AB \parallel CD \implies \langle AD, CD\rangle = \langle CD, CB\rangle`
+     - Formal Statement
      - Description
    * - |r21|
-     -
-       .. code-block :: text
-
-         cyclic A B C D, para A B C D
-         => eqangle A D C D C D C B
+     - :math:`\begin{cases}ABCD\text{ in a circle} \\ AB \parallel CD\end{cases} \implies \angle (AD\times CD) = \angle (CD\times CB)`
      - 
 
 .. |r21| image:: ../../_static/Images/rules/r21.png
@@ -378,14 +366,10 @@ r22 : midp_perp2cong
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{midp}(M, AB) \wedge \text{perp}(OM, AB) \implies |OA|=|OB|`
+     - Formal Statement
      - Description
    * - |r22|
-     -
-       .. code-block :: text
-
-         midp M A B, perp O M A B
-         => cong O A O B
+     - :math:`\begin{cases}M \text{ midpoint of }AB \\ OM\perp AB \end{cases} \implies |OA|=|OB|`
      - 
 
 .. |r22| image:: ../../_static/Images/rules/r22.png
@@ -398,14 +382,10 @@ r23 : cong2perp
    :header-rows: 1
 
    * - Figure
-     - :math:`|AP|=|BP| \wedge |AQ|=|BQ| \implies \text{perp}(AB, PQ)`
+     - Formal Statement
      - Description
    * - |r23|
-     -
-       .. code-block :: text
-
-         cong A P B P, cong A Q B Q
-         => perp A B P Q
+     - :math:`|AP|=|BP| \wedge |AQ|=|BQ| \implies AB\perp PQ`
      - 
 
 .. |r23| image:: ../../_static/Images/rules/r23.png
@@ -418,14 +398,10 @@ r24 : cong_cyclic2perp
    :header-rows: 1
 
    * - Figure
-     - :math:`|AP|=|BP| \wedge |AQ|=|BQ| \wedge \text{cyclic}(ABPQ) \implies \text{perp}(PA, AQ)`
+     - Formal Statement
      - Description
    * - |r24|
-     -
-       .. code-block :: text
-
-         cong A P B P, cong A Q B Q, cyclic A B P Q
-         => perp P A A Q
+     - :math:`\begin{cases}|AP|=|BP| \\ |AQ|=|BQ| \\ ABPQ\text{ in a circle}\end{cases} \implies PA\perp AQ`
      - 
 
 .. |r24| image:: ../../_static/Images/rules/r24.png
@@ -438,34 +414,26 @@ r25 : midp2para
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{midp}(M, AB) \wedge \text{midp}(M, CD) \implies AC \parallel BD`
+     - Formal Statement
      - Description
    * - |r25|
-     -
-       .. code-block :: text
-
-         midp M A B, midp M C D
-         => para A C B D
+     - :math:`\begin{cases}M\text{ midpoint of }AB \\M \text{ midpoint of }CD\end{cases} \implies AC \parallel BD`
      - 
 
 .. |r25| image:: ../../_static/Images/rules/r25.png
     :width: 100%
 
-r26 : midp_para2midp
-^^^^^^^^^^^^^^^^^^^^
+r26 : Diagonals of parallelogram
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{midp}(M, AB) \wedge AC \parallel BD \wedge AD \parallel BC \implies \text{midp}(M, CD)`
+     - Formal Statement
      - Description
    * - |r26|
-     -
-       .. code-block :: text
-
-         midp M A B, para A C B D, para A D B C
-         => midp M C D
+     - :math:`\begin{cases}M \text{ midpoint of }AB \\ AC \parallel BD \\ AD \parallel BC \end{cases}\implies M \text{ midpoint of }CD`
      - 
 
 .. |r26| image:: ../../_static/Images/rules/r26.png
@@ -478,17 +446,10 @@ r27 : eqratio_sameside2para
    :header-rows: 1
 
    * - Figure
-     - :math:`\frac{OA}{AC} = \frac{OB}{BD} \wedge \text{coll}(OAC)`
-       :math:`\text{coll}(OBD) \wedge \text{sameside}(AOC, BOD)`
-       :math:`\implies AB \parallel CD`
+     - Formal Statement
      - Description
    * - |r27|
-     -
-       .. code-block :: text
-
-         eqratio O A A C O B B D, coll O A C,
-         coll O B D, ncoll A B C, sameside A O C B O D
-         => para A B C D
+     - :math:`\begin{cases}\frac{OA}{AC}=\frac{OB}{BD}\\ OAC\text{ collinear}\\OBD\text{ collinear}\\ OAC\text{ has the same orientation as }BOD\implies AB\parallel CD\end{cases}\implies AB\parallel CD`
      - 
 
 .. |r27| image:: ../../_static/Images/rules/r27.png

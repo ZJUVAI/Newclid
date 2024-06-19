@@ -17,10 +17,13 @@ from geosolver.reasoning_engines.algebraic_reasoning.geometric_tables import (
     AngleTable,
     DistanceTable,
     RatioTable,
+    report,
 )
 
 if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
+
+config = dict()
 
 
 class AlgebraicRules(Enum):
@@ -36,6 +39,7 @@ class AlgebraicManipulator(ReasoningEngine):
         self.atable = AngleTable()
         self.dtable = DistanceTable()
         self.rtable = RatioTable()
+        self.verbose = config.get("verbose", "")
 
         self.PREDICATE_TO_ADDER = {
             Predicate.PARALLEL: self._add_para,
@@ -65,6 +69,13 @@ class AlgebraicManipulator(ReasoningEngine):
 
         rat_derives = self.derive_ratio_algebra()
         derives += rat_derives
+
+        if "a" in self.verbose:
+            report(self.atable.v2e)
+        if "d" in self.verbose:
+            report(self.dtable.v2e)
+        if "r" in self.verbose:
+            report(self.rtable.v2e)
 
         return derives
 

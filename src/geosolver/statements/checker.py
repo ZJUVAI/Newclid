@@ -48,11 +48,11 @@ class StatementChecker:
             Predicate.EQRATIO3: self.check_eqratio3,
             Predicate.EQRATIO6: self.check_const_or_eqratio,
             Predicate.SIMILAR_TRIANGLE: self.check_simtri,
-            Predicate.SIMILAR_TRIANGLE_REFLECTED: self.check_simtri,
-            Predicate.SIMILAR_TRIANGLE_BOTH: self.check_simtri,
+            Predicate.SIMILAR_TRIANGLE_REFLECTED: self.check_simtri_reflected,
+            Predicate.SIMILAR_TRIANGLE_BOTH: self.check_simtri_both,
             Predicate.CONTRI_TRIANGLE: self.check_contri,
-            Predicate.CONTRI_TRIANGLE_REFLECTED: self.check_contri,
-            Predicate.CONTRI_TRIANGLE_BOTH: self.check_contri,
+            Predicate.CONTRI_TRIANGLE_REFLECTED: self.check_contri_reflected,
+            Predicate.CONTRI_TRIANGLE_BOTH: self.check_contri_both,
             Predicate.CONSTANT_ANGLE: self.check_aconst,
             Predicate.S_ANGLE: self.check_sangle,
             Predicate.CONSTANT_RATIO: self.check_rconst,
@@ -366,7 +366,22 @@ class StatementChecker:
             [b, a, b, c, y, x, y, z]
         )
 
+    def check_simtri_reflected(self, points: list[Point]) -> bool:
+        a, b, c, x, y, z = points
+        return self.check_eqangle([a, b, a, c, x, z, x, y]) and self.check_eqangle(
+            [b, a, b, c, y, z, y, x]
+        )
+
+    def check_simtri_both(self, points: list[Point]) -> bool:
+        return self.check_simtri(points) or self.check_simtri_reflected(points)
+
     def check_contri(self, points: list[Point]) -> bool:
+        return self.check_contri_both(points) and self.check_simtri(points)
+
+    def check_contri_reflected(self, points: list[Point]) -> bool:
+        return self.check_contri_both(points) and self.check_simtri_reflected(points)
+
+    def check_contri_both(self, points: list[Point]) -> bool:
         a, b, c, x, y, z = points
         return (
             self.check_cong([a, b, x, y])

@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 
 class Symbol:
-    r"""Node in the symbols graph.
+    r"""Symbol in the symbols graph.
 
     Can be Point, Line, Circle, etc.
 
@@ -44,8 +44,8 @@ class Symbol:
         self.rep_by = None  # represented by.
         self.members = {self}
 
-        self._val = None
-        self._obj = None
+        self._val: Optional[Symbol] = None
+        self._obj: Optional[Symbol] = None
 
         self.deps: list["Dependency"] = []
 
@@ -290,7 +290,7 @@ class Point(Symbol):
 
 
 class Line(Symbol):
-    """Node of type Line."""
+    """Symbol of type Line."""
 
     points: tuple[Point, Point]
     _val: Direction
@@ -336,7 +336,7 @@ class Segment(Symbol):
 
 
 class Circle(Symbol):
-    """Node of type Circle."""
+    """Symbol of type Circle."""
 
     points: list[Point]
 
@@ -366,7 +366,7 @@ class Circle(Symbol):
 
 
 class Angle(Symbol):
-    """Node of type Angle."""
+    """Symbol of type Angle."""
 
     opposite: Optional[Angle] = None
     _d: tuple[Optional[Direction], Optional[Direction]] = (None, None)
@@ -387,7 +387,7 @@ class Angle(Symbol):
 
 
 class Ratio(Symbol):
-    """Node of type Ratio."""
+    """Symbol of type Ratio."""
 
     opposite: Optional[Angle] = None
     _l: tuple[Optional[Length], Optional[Length]] = (None, None)
