@@ -5,11 +5,11 @@ from geosolver.predicates import Predicate
 from geosolver.numerical.angles import ang_of
 from geosolver.numerical.check import clock
 from geosolver.numerical.geometries import (
-    Circle,
+    CircleNum,
     InvalidLineIntersectError,
     InvalidQuadSolveError,
-    Line,
-    Point,
+    LineNum,
+    PointNum,
     bring_together,
     circle_circle_intersection,
     circle_segment_intersect,
@@ -157,9 +157,9 @@ def set_theme(theme) -> None:
 
 def draw_angle(
     ax: "matplotlib.pyplot.Axes",
-    head: Point,
-    p1: Point,
-    p2: Point,
+    head: PointNum,
+    p1: PointNum,
+    p2: PointNum,
     color: Any = "red",
     alpha: float = 0.5,
 ) -> None:
@@ -182,8 +182,8 @@ def draw_angle(
 
 
 def draw_circle(
-    ax: "matplotlib.pyplot.Axes", circle: Circle, color: Any = "cyan"
-) -> Circle:
+    ax: "matplotlib.pyplot.Axes", circle: CircleNum, color: Any = "cyan"
+) -> CircleNum:
     """Draw a circle."""
     if circle.num is not None:
         circle = circle.num
@@ -193,14 +193,14 @@ def draw_circle(
             return
         points = [p.num for p in points]
         p1, p2, p3 = points[:3]
-        circle = Circle(p1=p1, p2=p2, p3=p3)
+        circle = CircleNum(p1=p1, p2=p2, p3=p3)
 
     _draw_circle(ax, circle, color)
     return circle
 
 
 def _draw_circle(
-    ax: "matplotlib.pyplot.Axes", c: Circle, color: Any = "cyan", lw: float = 1.2
+    ax: "matplotlib.pyplot.Axes", c: CircleNum, color: Any = "cyan", lw: float = 1.2
 ) -> None:
     ls = "-"
     if color == "--":
@@ -221,8 +221,8 @@ def _draw_circle(
 
 
 def draw_line(
-    ax: "matplotlib.pyplot.Axes", line: Line, color: Any = "white"
-) -> tuple[Point, Point]:
+    ax: "matplotlib.pyplot.Axes", line: LineNum, color: Any = "white"
+) -> tuple[PointNum, PointNum]:
     """Draw a line."""
     points = line.neighbors(gm.Point)
     if len(points) <= 1:
@@ -249,8 +249,8 @@ def draw_line(
 
 def _draw_line(
     ax: "matplotlib.pyplot.Axes",
-    p1: Point,
-    p2: Point,
+    p1: PointNum,
+    p2: PointNum,
     color: Any = "white",
     lw: float = 1.2,
     alpha: float = 0.8,
@@ -267,10 +267,10 @@ def _draw_line(
 
 def draw_point(
     ax: "matplotlib.pyplot.Axes",
-    p: Point,
+    p: PointNum,
     name: str,
-    lines: list[Line],
-    circles: list[Circle],
+    lines: list[LineNum],
+    circles: list[CircleNum],
     color: Any = "white",
     size: float = 15,
 ) -> None:
@@ -290,7 +290,7 @@ def draw_point(
 
 
 def mark_segment(
-    ax: "matplotlib.pyplot.Axes", p1: Point, p2: Point, color: Any, alpha: float
+    ax: "matplotlib.pyplot.Axes", p1: PointNum, p2: PointNum, color: Any, alpha: float
 ) -> None:
     _ = alpha
     x, y = (p1.x + p2.x) / 2, (p1.y + p2.y) / 2
@@ -299,10 +299,10 @@ def mark_segment(
 
 def highlight_angle(
     ax: "matplotlib.pyplot.Axes",
-    a: Point,
-    b: Point,
-    c: Point,
-    d: Point,
+    a: PointNum,
+    b: PointNum,
+    c: PointNum,
+    d: PointNum,
     color: Any,
     alpha: float,
 ) -> None:
@@ -327,7 +327,7 @@ def highlight(
 
     if name == Predicate.CYCLIC.value:
         a, b, c, d = args
-        _draw_circle(ax, Circle(p1=a, p2=b, p3=c), color=color1, lw=2.0)
+        _draw_circle(ax, CircleNum(p1=a, p2=b, p3=c), color=color1, lw=2.0)
     if name == Predicate.COLLINEAR.value:
         a, b, c = args
         a, b = max(a, b, c), min(a, b, c)
@@ -339,14 +339,14 @@ def highlight(
     if name == Predicate.EQANGLE.value:
         a, b, c, d, e, f, g, h = args
 
-        x = line_line_intersection(Line(a, b), Line(c, d))
+        x = line_line_intersection(LineNum(a, b), LineNum(c, d))
         if b.distance(x) > a.distance(x):
             a, b = b, a
         if d.distance(x) > c.distance(x):
             c, d = d, c
         a, b, d = x, a, c
 
-        y = line_line_intersection(Line(e, f), Line(g, h))
+        y = line_line_intersection(LineNum(e, f), LineNum(g, h))
         if f.distance(y) > e.distance(y):
             e, f = f, e
         if h.distance(y) > g.distance(y):
@@ -388,12 +388,15 @@ def highlight(
 
 
 def naming_position(
-    ax: "matplotlib.pyplot.Axes", p: Point, lines: list[Line], circles: list[Circle]
+    ax: "matplotlib.pyplot.Axes",
+    p: PointNum,
+    lines: list[LineNum],
+    circles: list[CircleNum],
 ) -> tuple[float, float]:
     """Figure out a good naming position on the drawing."""
     _ = ax
     r = 0.08
-    c = Circle(center=p, radius=r)
+    c = CircleNum(center=p, radius=r)
     avoid = []
     for p1, p2 in lines:
         try:
@@ -416,7 +419,7 @@ def naming_position(
     d, a = max(angs)
     ang = a + d / 2
 
-    name_pos = p + Point(np.cos(ang), np.sin(ang)) * r
+    name_pos = p + PointNum(np.cos(ang), np.sin(ang)) * r
 
     x, y = (name_pos.x - r / 1.5, name_pos.y - r / 1.5)
     return x, y

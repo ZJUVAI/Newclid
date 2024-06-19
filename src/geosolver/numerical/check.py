@@ -6,7 +6,7 @@ import geosolver.geometry as gm
 from geosolver._lazy_loading import lazy_import
 from geosolver.numerical import ATOM, close_enough
 from geosolver.numerical.angles import ang_between
-from geosolver.numerical.geometries import Circle, Line, Point, bring_together
+from geosolver.numerical.geometries import CircleNum, LineNum, PointNum, bring_together
 from geosolver.listing import list_eqratio3
 from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
 
@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 np: "numpy" = lazy_import("numpy")
 
 
-def check_circle_numerical(points: list[Point]) -> bool:
+def check_circle_numerical(points: list[PointNum]) -> bool:
     if len(points) != 4:
         return False
     o, a, b, c = points
@@ -24,20 +24,20 @@ def check_circle_numerical(points: list[Point]) -> bool:
     return close_enough(oa, ob) and close_enough(ob, oc)
 
 
-def check_coll_numerical(points: list[Point]) -> bool:
+def check_coll_numerical(points: list[PointNum]) -> bool:
     a, b = points[:2]
-    line = Line(a, b)
+    line = LineNum(a, b)
     for p in points[2:]:
         if abs(line(p.x, p.y)) > ATOM:
             return False
     return True
 
 
-def check_ncoll_numerical(points: list[Point]) -> bool:
+def check_ncoll_numerical(points: list[PointNum]) -> bool:
     return not check_coll_numerical(points)
 
 
-def check_sangle_numerical(args: list[Point | gm.Angle]) -> bool:
+def check_sangle_numerical(args: list[PointNum | gm.Angle]) -> bool:
     a, b, c, angle = args
     num, den = angle_to_num_den(angle)
     ang = ang_between(b, c, a)
@@ -47,7 +47,7 @@ def check_sangle_numerical(args: list[Point | gm.Angle]) -> bool:
     return close_enough(ang, num * np.pi / den)
 
 
-def check_aconst_numerical(args: list[Point | gm.Angle]) -> bool:
+def check_aconst_numerical(args: list[PointNum | gm.Angle]) -> bool:
     a, b, c, d, angle = args
     num, den = angle_to_num_den(angle)
     d = d + a - c
@@ -58,7 +58,7 @@ def check_aconst_numerical(args: list[Point | gm.Angle]) -> bool:
     return close_enough(ang, num * np.pi / den)
 
 
-def check_sameside_numerical(points: list[Point]) -> bool:
+def check_sameside_numerical(points: list[PointNum]) -> bool:
     b, a, c, y, x, z = points
     # whether b is to the same side of a & c as y is to x & z
     ba = b - a
@@ -69,37 +69,37 @@ def check_sameside_numerical(points: list[Point]) -> bool:
     return ba.dot(bc) * yx.dot(yz) > 0
 
 
-def check_para_numerical(points: list[Point]) -> bool:
+def check_para_numerical(points: list[PointNum]) -> bool:
     a, b, c, d = points
-    ab = Line(a, b)
-    cd = Line(c, d)
+    ab = LineNum(a, b)
+    cd = LineNum(c, d)
     if ab.same(cd):
         return False
     return ab.is_parallel(cd)
 
 
-def check_para_or_coll_numerical(points: list[Point]) -> bool:
+def check_para_or_coll_numerical(points: list[PointNum]) -> bool:
     return check_para_numerical(points) or check_coll_numerical(points)
 
 
-def check_perp_numerical(points: list[Point]) -> bool:
+def check_perp_numerical(points: list[PointNum]) -> bool:
     a, b, c, d = points
-    ab = Line(a, b)
-    cd = Line(c, d)
+    ab = LineNum(a, b)
+    cd = LineNum(c, d)
     return ab.is_perp(cd)
 
 
-def check_cyclic_numerical(points: list[Point]) -> bool:
+def check_cyclic_numerical(points: list[PointNum]) -> bool:
     points = list(set(points))
     a, b, c, *ps = points
-    circle = Circle(p1=a, p2=b, p3=c)
+    circle = CircleNum(p1=a, p2=b, p3=c)
     for d in ps:
         if not close_enough(d.distance(circle.center), circle.radius):
             return False
     return True
 
 
-def check_const_angle_numerical(points: list[Point]) -> bool:
+def check_const_angle_numerical(points: list[PointNum]) -> bool:
     """Check if the angle is equal to the given constant."""
     a, b, c, d, m, n = points
     a, b, c, d = bring_together(a, b, c, d)
@@ -113,14 +113,14 @@ def check_const_angle_numerical(points: list[Point]) -> bool:
     return close_enough(m / n % 1, y / np.pi % 1)
 
 
-def check_eqangle_numerical(points: list[Point]) -> bool:
+def check_eqangle_numerical(points: list[PointNum]) -> bool:
     """Check if 8 points make 2 equal angles."""
     a, b, c, d, e, f, g, h = points
 
-    ab = Line(a, b)
-    cd = Line(c, d)
-    ef = Line(e, f)
-    gh = Line(g, h)
+    ab = LineNum(a, b)
+    cd = LineNum(c, d)
+    ef = LineNum(e, f)
+    gh = LineNum(g, h)
 
     if ab.is_parallel(cd):
         return ef.is_parallel(gh)
@@ -152,7 +152,7 @@ def check_eqangle_numerical(points: list[Point]) -> bool:
     return close_enough(xy, 0) or close_enough(xy, 2 * np.pi)
 
 
-def check_eqratio_numerical(points: list[Point]) -> bool:
+def check_eqratio_numerical(points: list[PointNum]) -> bool:
     a, b, c, d, e, f, g, h = points
     ab = a.distance(b)
     cd = c.distance(d)
@@ -161,24 +161,24 @@ def check_eqratio_numerical(points: list[Point]) -> bool:
     return close_enough(ab * gh, cd * ef)
 
 
-def check_eqratio3_numerical(points: list[Point]) -> bool:
+def check_eqratio3_numerical(points: list[PointNum]) -> bool:
     for ratio in list_eqratio3(points):
         if not check_eqratio_numerical(ratio):
             return False
     return True
 
 
-def check_cong_numerical(points: list[Point]) -> bool:
+def check_cong_numerical(points: list[PointNum]) -> bool:
     a, b, c, d = points
     return close_enough(a.distance(b), c.distance(d))
 
 
-def check_midp_numerical(points: list[Point]) -> bool:
+def check_midp_numerical(points: list[PointNum]) -> bool:
     a, b, c = points
     return check_coll_numerical(points) and close_enough(a.distance(b), a.distance(c))
 
 
-def check_simtri_numerical(points: list[Point]) -> bool:
+def check_simtri_numerical(points: list[PointNum]) -> bool:
     """Check if 6 points make a pair of similar triangles."""
     a, b, c, x, y, z = points
     ab = a.distance(b)
@@ -190,7 +190,7 @@ def check_simtri_numerical(points: list[Point]) -> bool:
     return close_enough(ab * yz, bc * xy) and close_enough(bc * zx, ca * yz)
 
 
-def check_contri_numerical(points: list[Point]) -> bool:
+def check_contri_numerical(points: list[PointNum]) -> bool:
     a, b, c, x, y, z = points
     ab = a.distance(b)
     bc = b.distance(c)
@@ -201,7 +201,7 @@ def check_contri_numerical(points: list[Point]) -> bool:
     return close_enough(ab, xy) and close_enough(bc, yz) and close_enough(ca, zx)
 
 
-def check_ratio_numerical(points: list[Point | gm.Ratio]) -> bool:
+def check_ratio_numerical(points: list[PointNum | gm.Ratio]) -> bool:
     a, b, c, d, ratio = points
     m, n = ratio_to_num_den(ratio)
     ab = a.distance(b)
@@ -254,18 +254,22 @@ def check_numerical(statement: Statement) -> bool:
     return PREDICATE_TO_NUMERICAL_CHECK[statement.predicate](num_args)
 
 
-def same_clock(a: Point, b: Point, c: Point, d: Point, e: Point, f: Point) -> bool:
+def same_clock(
+    a: PointNum, b: PointNum, c: PointNum, d: PointNum, e: PointNum, f: PointNum
+) -> bool:
     return clock(a, b, c) * clock(d, e, f) > 0
     # return clock(a, b, c) * clock(d, e, f) > ATOM
 
 
-def clock(a: Point, b: Point, c: Point):
+def clock(a: PointNum, b: PointNum, c: PointNum):
     ba = b - a
     cb = c - b
     return ba.x * cb.y - ba.y * cb.x
 
 
-def same_sign(a: Point, b: Point, c: Point, d: Point, e: Point, f: Point) -> bool:
+def same_sign(
+    a: PointNum, b: PointNum, c: PointNum, d: PointNum, e: PointNum, f: PointNum
+) -> bool:
     a, b, c, d, e, f = map(lambda p: p.sym, [a, b, c, d, e, f])
     ab, cb = a - b, c - b
     de, fe = d - e, f - e
