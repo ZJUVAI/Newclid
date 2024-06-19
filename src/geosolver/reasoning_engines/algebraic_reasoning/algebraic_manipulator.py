@@ -39,7 +39,7 @@ class AlgebraicManipulator(ReasoningEngine):
         self.atable = AngleTable()
         self.dtable = DistanceTable()
         self.rtable = RatioTable()
-        self.verbose = config["verbose"]
+        self.verbose = config.get("verbose", "")
 
         self.PREDICATE_TO_ADDER = {
             Predicate.PARALLEL: self._add_para,
