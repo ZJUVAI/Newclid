@@ -110,5 +110,17 @@ menelaus_crossed_cong_test
 a b c = triangle a b c; d = on_line d b c; e = on_line e c a, eqdistance e c d c; f = on_line f a b, on_line f d e ? eqratio b d e a f b a f
 frac1_cong
 a b = segment a b; c = free c; d = rconst a b c d 1/1 ? cong a b c d
+eqratio_lconst_check
+a = free a; b = lconst b a 3; c = free c; d = lconst d c 4; e = free e; f = lconst f e 6; g = free g; h = eqratio h a b c d e f g ? lconst h g 8
+cong_lconst_check
+a = free a; b = lconst b a 4; c = free c; d = eqdistance d c a b ? lconst d c 4
+lconst_cong_check
+a = free a; b = lconst b a 4; c = free c; d = lconst d c 4 ? cong a b c d
+lconst_eqratio_check
+a = free a; b = lconst b a 4; c = free c; d = lconst d c 6; e = free e; f = lconst f e 2; g = free g; h = lconst h g 3 ? eqratio a b c d e f g h 
+rconst_lconst_check
+a = free a; b = lconst b a 12; c = free c; d = rconst a b c d 3/4 ? lconst c d 16
+lconst_rconst_check
+a = free a; b = lconst b a 8; c = free c; d = lconst d c 4 ? rconst a b c d 2/1
 testing_problem
 a b c = triangle a b c; o = circle o a b c; p = on_circle p o a; q = on_tline q p o p; pa = reflect pa p b c; pb = reflect pb p c a; pc = reflect pc p a b; qa = reflect qa q b c; qb = reflect qb q c a; qc = reflect qc q a b; a1 = on_line a1 pb qb, on_line a1 pc qc; b1 = on_line b1 pa qa, on_line b1 pc qc; c1 = on_line c1 pa qa, on_line c1 pb qb; o1 = circle o1 a1 b1 c1; x = on_circle x o a, on_circle x o1 a1 ? cyclic pa pb c x
