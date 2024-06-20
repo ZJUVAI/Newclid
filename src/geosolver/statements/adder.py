@@ -418,12 +418,13 @@ class StatementAdder:
         c, d = dcd._obj.points
 
         dep = dep_body.build(self.statements_graph, perp)
+        was_already_equal = is_equal(a12, a21)
         self._make_equal(a12, a21, dep=dep)
 
         eqangle = Statement(Predicate.EQANGLE, [a, b, c, d, c, d, a, b])
         to_cache = [(perp, dep), (eqangle, dep)]
 
-        if not is_equal(a12, a21):
+        if not was_already_equal:
             return [dep], to_cache
         return [], to_cache
 

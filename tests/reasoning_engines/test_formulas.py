@@ -23,7 +23,7 @@ class TestPythagorean:
         self.solver_builder = GeometricSolverBuilder()
         self.reasoning_fixture = reasoning_fixture
         points_names = ["a", "b", "c"]
-        lengths = ["3.0", "4.0"]
+        lengths = ["3.0", "4.0", "5.0"]
 
         self.symbols_graph = (
             SymbolsGraphBuilder()
@@ -34,18 +34,25 @@ class TestPythagorean:
         self.points = self.symbols_graph.names2points(points_names)
         self.lengths = self.symbols_graph.names2nodes(lengths)
 
-    def test_implication_ddar_fails(self):
-        solver = self.solver_builder.load_problem_from_txt(
+    @pytest.mark.parametrize("use_engine", [True, False])
+    def test_implication_simple_problem(self, use_engine: bool):
+        solver_builder = self.solver_builder.load_problem_from_txt(
             "a = free a; "
             "b = lconst b a 3; "
             "c = on_tline c a b a, lconst c a 4 "
             "? lconst c b 5"
-        ).build()
-        success = solver.run()
-        assert not success
+        )
+        if use_engine:
+            solver_builder.with_additional_reasoning_engine(
+                PythagoreanFormula, "Pythagorean"
+            )
 
-    def test_implication(self):
-        """Should be able to use Pythagorean theorem to get the missing side length.
+        solver = solver_builder.build()
+        success = solver.run()
+        assert success == use_engine
+
+    def test_implication_hypotenuse(self):
+        """Should be able to use Pythagorean theorem to get the missing hypotenuse.
 
         perp AB AC => AB² + AC² = BC²
 
@@ -53,10 +60,9 @@ class TestPythagorean:
 
         """
         a, b, c = self.points
-        l_3, l_4 = self.lengths
+        l_3, l_4, l_5 = self.lengths
 
         self.reasoning_fixture.given_engine(PythagoreanFormula(self.symbols_graph))
-
         given_dependencies = [
             Dependency(Statement(Predicate.PERPENDICULAR, (a, b, a, c)), why=[]),
             Dependency(Statement(Predicate.CONSTANT_LENGTH, (a, b, l_3)), why=[]),
@@ -66,12 +72,40 @@ class TestPythagorean:
             self.reasoning_fixture.given_added_dependency(dep)
 
         self.reasoning_fixture.when_resolving_dependencies()
-
-        expected_l = self.symbols_graph.get_or_create_const_length(5.0)
         self.reasoning_fixture.then_new_derivations_should_be(
             [
                 Derivation(
-                    Statement(Predicate.CONSTANT_LENGTH, (b, c, expected_l)),
+                    Statement(Predicate.CONSTANT_LENGTH, (b, c, l_5)),
+                    DependencyBody(Reason("Pythagorean"), why=given_dependencies),
+                ),
+            ]
+        )
+
+    def test_implication_side(self):
+        """Should be able to use Pythagorean theorem to get the missing side length.
+
+        perp AB AC => AB² + AC² = BC²
+
+        Thus if AB=3 and BC=5, we should find BC=4.
+
+        """
+        a, b, c = self.points
+        l_3, l_4, l_5 = self.lengths
+
+        self.reasoning_fixture.given_engine(PythagoreanFormula(self.symbols_graph))
+        given_dependencies = [
+            Dependency(Statement(Predicate.PERPENDICULAR, (a, b, a, c)), why=[]),
+            Dependency(Statement(Predicate.CONSTANT_LENGTH, (a, b, l_3)), why=[]),
+            Dependency(Statement(Predicate.CONSTANT_LENGTH, (b, c, l_5)), why=[]),
+        ]
+        for dep in given_dependencies:
+            self.reasoning_fixture.given_added_dependency(dep)
+
+        self.reasoning_fixture.when_resolving_dependencies()
+        self.reasoning_fixture.then_new_derivations_should_be(
+            [
+                Derivation(
+                    Statement(Predicate.CONSTANT_LENGTH, (a, c, l_4)),
                     DependencyBody(Reason("Pythagorean"), why=given_dependencies),
                 ),
             ]
@@ -80,7 +114,25 @@ class TestPythagorean:
     # TODO
     @pytest.mark.skip
     def test_implication_not_intersection(self):
-        """Should be able to use Pythagorean theorem even if the perp is"""
+        """Should be able to use Pythagorean theorem
+        even if the perp is not an intesection itself."""
+
+    @pytest.mark.parametrize("use_engine", [False])
+    def test_reciprocal_simple_problem(self, use_engine: bool):
+        solver_builder = self.solver_builder.load_problem_from_txt(
+            "a = free a; "
+            "b = lconst b a 3; "
+            "c = lconst c b 5, lconst c a 4 "
+            "? perp a b a c"
+        )
+        if use_engine:
+            solver_builder.with_additional_reasoning_engine(
+                PythagoreanFormula, "Pythagorean"
+            )
+
+        solver = solver_builder.build()
+        success = solver.run()
+        assert success == use_engine
 
 
 class TestMenelaus:
@@ -100,31 +152,21 @@ class TestMenelaus:
         self.points = self.symbols_graph.names2points(points_names)
         self.ratios = self.symbols_graph.names2nodes(ratios)
 
-    def test_implication_ddar_fails(self):
-        solver = self.solver_builder.load_problem_from_txt(
+    @pytest.mark.parametrize("use_engine", [True, False])
+    def test_simple_problem(self, use_engine: bool):
+        solver_builder = self.solver_builder.load_problem_from_txt(
             "a b c = triangle a b c; "
             "f = on_line f a b, rconst2 f a b 1/2; "
             "d = on_line d b c, rconst2 d b c 1/2; "
             "e = on_line e d f, on_line e c a "
             "? rconst c e a e 4/1"
-        ).build()
-        success = solver.run()
-        assert not success
-
-    def test_implication_menelaus_succeed(self):
-        solver = (
-            self.solver_builder.load_problem_from_txt(
-                "a b c = triangle a b c; "
-                "f = on_line f a b, rconst2 f a b 1/2; "
-                "d = on_line d b c, rconst2 d b c 1/2; "
-                "e = on_line e d f, on_line e c a "
-                "? rconst c e a e 4/1"
-            )
-            .with_additional_reasoning_engine(MenelausFormula, "Menelaus")
-            .build()
         )
+        if use_engine:
+            solver_builder.with_additional_reasoning_engine(MenelausFormula, "Menelaus")
+
+        solver = solver_builder.build()
         success = solver.run()
-        assert success
+        assert success == use_engine
 
     def test_implication(self):
         """Should be able to use Menelaus theorem to get the completing ratio.

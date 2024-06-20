@@ -358,8 +358,8 @@ class Proof:
 
     def reset(self) -> ResetFeedback:
         self.cache_deps(self._init_to_cache)
-        for add in self._init_added:
-            for _, ext in self.reasoning_engines.items():
+        for _, ext in self.reasoning_engines.items():
+            for add in self._init_added:
                 ext.ingest(add)
         return ResetFeedback(
             problem=self._problem,

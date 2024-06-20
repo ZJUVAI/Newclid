@@ -17,9 +17,11 @@ if TYPE_CHECKING:
 
 
 class PythagoreanFormula(ReasoningEngine):
-    """Allow the use of Pythagorean theorem to get the missing side length.
+    """Allow the use of Pythagorean theorem
 
-    perp AB AC => AB² + AC² = BC²
+    Either to get the missing side length or perp from lengths.
+
+    perp AB AC <=> AB² + AC² = BC²
 
     """
 
@@ -30,31 +32,47 @@ class PythagoreanFormula(ReasoningEngine):
         self._intesection_dep: dict[Point, Dependency] = {}
         self._segments_length_dep: dict[tuple[str, str], Dependency] = {}
 
+        self.PREDICATE_TO_INGEST = {
+            Predicate.PERPENDICULAR: self._ingest_perp,
+            Predicate.CONSTANT_LENGTH: self._ingest_lconst,
+        }
+
     def ingest(self, dependency: Dependency):
+        ingest_method = self.PREDICATE_TO_INGEST.get(dependency.statement.predicate)
+        if ingest_method is not None:
+            return ingest_method(dependency)
+        pass
+
+    def _ingest_perp(self, dependency: Dependency):
         statement = dependency.statement
-        if statement.predicate is Predicate.PERPENDICULAR:
-            intersection = None
-            others = []
-            for p in statement.args:
-                if p in others:
-                    intersection = p
-                    others.remove(p)
-                else:
-                    others.append(p)
+        intersection = None
+        others = []
+        for p in statement.args:
+            if p in others:
+                intersection = p
+                others.remove(p)
+            else:
+                others.append(p)
 
-            if intersection is None:
-                return
+        if intersection is None:
+            return
 
-            self._perp_intesections[intersection] = tuple(others)
-            self._intesection_dep[intersection] = dependency
+        self._perp_intesections[intersection] = tuple(others)
+        self._intesection_dep[intersection] = dependency
 
-        elif statement.predicate is Predicate.CONSTANT_LENGTH:
-            segment_hash = statement.hash_tuple[1:3]
-            lenght = statement.args[-1]
-            self._segments_lengths[segment_hash] = lenght
-            self._segments_length_dep[segment_hash] = dependency
+    def _ingest_lconst(self, dependency: Dependency):
+        statement = dependency.statement
+        segment_hash = statement.hash_tuple[1:3]
+        lenght = statement.args[-1]
+        self._segments_lengths[segment_hash] = lenght
+        self._segments_length_dep[segment_hash] = dependency
 
     def resolve(self, **kwargs) -> list[Derivation]:
+        new_deps = self._resolve_implication()
+        new_deps.extend(self._resolve_reciprocal())
+        return new_deps
+
+    def _resolve_implication(self) -> list[Derivation]:
         new_deps = []
         for intersection, (side1p, side2p) in self._perp_intesections.items():
             potential_values = [
@@ -78,13 +96,17 @@ class PythagoreanFormula(ReasoningEngine):
             missing_segment = potential_values[missing_index]
             missing_hypotenuse = missing_index == 0
             if not missing_hypotenuse:
-                raise NotImplementedError
-            else:
-                hypothenuse, side = (
+                hypotenuse, side = (
                     _length_to_float(values[0]),
                     _length_to_float(values[1]),
                 )
-                new_length_val = self.pythagorean_hypotenuse(hypothenuse, side)
+                new_length_val = self.pythagorean_side(hypotenuse, side)
+            else:
+                side1, side2 = (
+                    _length_to_float(values[0]),
+                    _length_to_float(values[1]),
+                )
+                new_length_val = self.pythagorean_hypotenuse(side1, side2)
 
             new_length = self.symbols_graph.get_or_create_const_length(new_length_val)
             new_statement = Statement(
@@ -101,8 +123,10 @@ class PythagoreanFormula(ReasoningEngine):
                 Reason("Pythagorean"), why=(why_perp, *why_lconsts)
             )
             new_deps.append(Derivation(new_statement, dep_body))
-
         return new_deps
+
+    def _resolve_reciprocal(self) -> list[Derivation]:
+        return []
 
     @staticmethod
     def pythagorean_hypotenuse(side1: float, side2: float) -> float:
