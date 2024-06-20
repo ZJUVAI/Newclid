@@ -1,6 +1,6 @@
 from __future__ import annotations
 from collections import defaultdict
-from decimal import Decimal
+from fractions import Fraction
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Type, TypeVar
 
@@ -237,6 +237,7 @@ class SymbolsGraph:
     def _create_const_rat(self, n: int, d: int) -> None:
         n, d = simplify(n, d)
         rat = self.rconst[(n, d)] = self.new_node(Ratio, f"{n}/{d}")
+        rat.value = Fraction(n, d)
         rat.set_lengths(None, None)
         self.get_node_val(rat, dep=None)
 
@@ -263,10 +264,11 @@ class SymbolsGraph:
         rat2 = self.rconst[(d, n)]
         return rat1, rat2
 
-    def get_or_create_const_length(self, length: Decimal) -> Length:
+    def get_or_create_const_length(self, length: float) -> Length:
         if length not in self.lconst:
-            length = self.lconst[length] = self.new_node(Length, str(length))
-            self.get_node_val(length, None)
+            length_node = self.lconst[length] = self.new_node(Length, str(length))
+            length_node.value = length
+            self.get_node_val(length_node, None)
         return self.lconst[length]
 
     def get_or_create_const(
@@ -292,7 +294,7 @@ class SymbolsGraph:
                 return self.get_or_create_const_rat(num, den)
 
         elif construction_name == Predicate.CONSTANT_LENGTH.value:
-            return self.get_or_create_const_length(Decimal(const_value))
+            return self.get_or_create_const_length(float(const_value))
 
         raise NotImplementedError(
             "Unsupported construction for constants: %s", construction_name.name

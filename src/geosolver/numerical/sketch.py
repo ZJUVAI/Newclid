@@ -3,8 +3,8 @@ from fractions import Fraction
 from typing import TYPE_CHECKING, Optional, Union
 from numpy.random import Generator
 
-import geosolver.geometry as gm
 from geosolver._lazy_loading import lazy_import
+from geosolver.geometry import Angle, Length, Point, Ratio
 from geosolver.numerical import close_enough
 from geosolver.numerical.angles import ang_between, ang_of
 from geosolver.numerical.distances import (
@@ -33,11 +33,11 @@ np_random: "numpy.random" = lazy_import("numpy.random")
 
 def sketch(
     name: str,
-    args: list[Union[PointNum, gm.Point]],
+    args: list[Union[PointNum, Point, Ratio, Length, Angle]],
     rnd_generator: Generator = None,
 ) -> list[Union[PointNum, LineNum, CircleNum, HalfLine, HoleCircle]]:
     fun = globals()["sketch_" + name]
-    args = [p.num if isinstance(p, gm.Point) else p for p in args]
+    args = [p.num if isinstance(p, Point) else p for p in args]
     out = fun(args, rnd_gen=rnd_generator)
 
     # out can be one or multiple {Point/Line/HalfLine}
@@ -48,9 +48,9 @@ def sketch(
 
 def try_to_sketch_intersect(
     name1: str,
-    args1: list[Union[gm.Point, PointNum]],
+    args1: list[Union[Point, PointNum]],
     name2: str,
-    args2: list[Union[gm.Point, PointNum]],
+    args2: list[Union[Point, PointNum]],
     existing_points: list[PointNum],
     rnd_generator: Generator = None,
 ) -> Optional[PointNum]:
@@ -86,7 +86,7 @@ def try_to_sketch_intersect(
     return None
 
 
-def sketch_aline(args: tuple[gm.Point, ...], **kwargs) -> HalfLine:
+def sketch_aline(args: tuple[PointNum, ...], **kwargs) -> HalfLine:
     """Sketch the construction aline."""
     A, B, C, D, E = args
     ab = A - B
@@ -107,7 +107,7 @@ def sketch_aline(args: tuple[gm.Point, ...], **kwargs) -> HalfLine:
     return HalfLine(E, X)
 
 
-def sketch_acircle(args: tuple[gm.Point, ...], **kwargs) -> CircleNum:
+def sketch_acircle(args: tuple[PointNum, ...], **kwargs) -> CircleNum:
     a, b, c, d, f = args
     de = sketch_aline([c, a, b, f, d])
     fe = sketch_aline([a, c, b, d, f])
@@ -115,7 +115,7 @@ def sketch_acircle(args: tuple[gm.Point, ...], **kwargs) -> CircleNum:
     return CircleNum(p1=d, p2=e, p3=f)
 
 
-def sketch_amirror(args: tuple[gm.Point, ...], **kwargs) -> HalfLine:
+def sketch_amirror(args: tuple[PointNum, ...], **kwargs) -> HalfLine:
     """Sketch the angle mirror."""
     A, B, C = args
     ab = A - B
@@ -131,7 +131,7 @@ def sketch_amirror(args: tuple[gm.Point, ...], **kwargs) -> HalfLine:
     return HalfLine(B, X)
 
 
-def sketch_bisect(args: tuple[gm.Point, ...], **kwargs) -> LineNum:
+def sketch_bisect(args: tuple[PointNum, ...], **kwargs) -> LineNum:
     a, b, c = args
     ab = a.distance(b)
     bc = b.distance(c)
@@ -140,34 +140,34 @@ def sketch_bisect(args: tuple[gm.Point, ...], **kwargs) -> LineNum:
     return LineNum(b, m)
 
 
-def sketch_exbisect(args: tuple[gm.Point, ...], **kwargs) -> LineNum:
+def sketch_exbisect(args: tuple[PointNum, ...], **kwargs) -> LineNum:
     a, b, c = args
     return sketch_bisect(args).perpendicular_line(b)
 
 
-def sketch_bline(args: tuple[gm.Point, ...], **kwargs) -> LineNum:
+def sketch_bline(args: tuple[PointNum, ...], **kwargs) -> LineNum:
     a, b = args
     m = (a + b) * 0.5
     return m.perpendicular_line(LineNum(a, b))
 
 
-def sketch_dia(args: tuple[gm.Point, ...], **kwargs) -> CircleNum:
+def sketch_dia(args: tuple[PointNum, ...], **kwargs) -> CircleNum:
     a, b = args
     return CircleNum((a + b) * 0.5, p1=a)
 
 
-def sketch_tangent(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, PointNum]:
+def sketch_tangent(args: tuple[PointNum, ...], **kwargs) -> tuple[PointNum, PointNum]:
     a, o, b = args
     dia = sketch_dia([a, o])
     return circle_circle_intersection(CircleNum(o, p1=b), dia)
 
 
-def sketch_circle(args: tuple[gm.Point, ...], **kwargs) -> CircleNum:
+def sketch_circle(args: tuple[PointNum, ...], **kwargs) -> CircleNum:
     a, b, c = args
     return CircleNum(center=a, radius=b.distance(c))
 
 
-def sketch_cc_tangent(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, ...]:
+def sketch_cc_tangent(args: tuple[PointNum, ...], **kwargs) -> tuple[PointNum, ...]:
     """Sketch tangents to two circles."""
     o, a, w, b = args
     ra, rb = o.distance(a), w.distance(b)
@@ -199,12 +199,12 @@ def sketch_cc_tangent(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, .
     return x, y, z, t
 
 
-def sketch_hcircle(args: tuple[gm.Point, ...], **kwargs) -> HoleCircle:
+def sketch_hcircle(args: tuple[PointNum, ...], **kwargs) -> HoleCircle:
     a, b = args
     return HoleCircle(center=a, radius=a.distance(b), hole=b)
 
 
-def sketch_e5128(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, PointNum]:
+def sketch_e5128(args: tuple[PointNum, ...], **kwargs) -> tuple[PointNum, PointNum]:
     a, b, c, d = args
 
     g = (a + b) * 0.5
@@ -218,7 +218,7 @@ def sketch_e5128(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, PointN
 
 
 def random_rfss(*points: PointNum, rnd_gen: Generator) -> list[PointNum]:
-    """Random rotate-flip-scale-shift a point cloud."""
+    """Random rotate-flip-scale-shift a PointNum cloud."""
     # center point cloud.
     average = sum(points, PointNum(0.0, 0.0)) * (1.0 / len(points))
     points = [p - average for p in points]
@@ -244,7 +244,7 @@ def head_from(tail: PointNum, ang: float, length: float = 1) -> PointNum:
 
 
 def sketch_eq_quadrangle(
-    args: tuple[gm.Point, ...], rnd_gen: Generator
+    args: tuple[PointNum, ...], rnd_gen: Generator
 ) -> tuple[PointNum, ...]:
     """Sketch quadrangle with two equal opposite sides."""
     a = PointNum(0.0, 0.0)
@@ -262,7 +262,7 @@ def sketch_eq_quadrangle(
 
 
 def sketch_iso_trapezoid(
-    args: tuple[gm.Point, ...], rnd_gen: Generator
+    args: tuple[PointNum, ...], rnd_gen: Generator
 ) -> tuple[PointNum, ...]:
     a = PointNum(0.0, 0.0)
     b = PointNum(1.0, 0.0)
@@ -275,7 +275,7 @@ def sketch_iso_trapezoid(
     return a, b, c, d
 
 
-def sketch_eqangle2(args: tuple[gm.Point, ...], rnd_gen: Generator) -> PointNum:
+def sketch_eqangle2(args: tuple[PointNum, ...], rnd_gen: Generator) -> PointNum:
     """Sketch the def eqangle2."""
     a, b, c = args
 
@@ -295,7 +295,7 @@ def sketch_eqangle2(args: tuple[gm.Point, ...], rnd_gen: Generator) -> PointNum:
     return line_line_intersection(LineNum(c, y), LineNum(a, e))
 
 
-def sketch_eqangle3(args: tuple[gm.Point, ...], **kwargs) -> CircleNum:
+def sketch_eqangle3(args: tuple[PointNum, ...], **kwargs) -> CircleNum:
     a, b, d, e, f = args
     de = d.distance(e)
     ef = e.distance(f)
@@ -306,7 +306,7 @@ def sketch_eqangle3(args: tuple[gm.Point, ...], **kwargs) -> CircleNum:
 
 
 def sketch_eqdia_quadrangle(
-    args: tuple[gm.Point, ...], rnd_gen: Generator
+    args: tuple[PointNum, ...], rnd_gen: Generator
 ) -> tuple[PointNum, ...]:
     """Sketch quadrangle with two equal diagonals."""
     m = rnd_gen.uniform(0.3, 0.7)
@@ -329,11 +329,11 @@ def random_points(n: int = 3, rnd_gen: Generator = None) -> list[PointNum]:
     return [PointNum(rnd_gen.uniform(-1, 1), rnd_gen.uniform(-1, 1)) for _ in range(n)]
 
 
-def sketch_free(args: tuple[gm.Point, ...], rnd_gen: Generator) -> PointNum:
+def sketch_free(args: tuple[PointNum, ...], rnd_gen: Generator) -> PointNum:
     return random_points(1, rnd_gen)[0]
 
 
-def sketch_isos(args: tuple[gm.Point, ...], rnd_gen: Generator) -> tuple[PointNum, ...]:
+def sketch_isos(args: tuple[PointNum, ...], rnd_gen: Generator) -> tuple[PointNum, ...]:
     base = rnd_gen.uniform(0.5, 1.5)
     height = rnd_gen.uniform(0.5, 1.5)
 
@@ -344,28 +344,28 @@ def sketch_isos(args: tuple[gm.Point, ...], rnd_gen: Generator) -> tuple[PointNu
     return a, b, c
 
 
-def sketch_line(args: tuple[gm.Point, ...], **kwargs) -> LineNum:
+def sketch_line(args: tuple[PointNum, ...], **kwargs) -> LineNum:
     a, b = args
     return LineNum(a, b)
 
 
-def sketch_cyclic(args: tuple[gm.Point, ...], **kwargs) -> CircleNum:
+def sketch_cyclic(args: tuple[PointNum, ...], **kwargs) -> CircleNum:
     a, b, c = args
     return CircleNum(p1=a, p2=b, p3=c)
 
 
-def sketch_hline(args: tuple[gm.Point, ...], **kwargs) -> HalfLine:
+def sketch_hline(args: tuple[PointNum, ...], **kwargs) -> HalfLine:
     a, b = args
     return HalfLine(a, b)
 
 
-def sketch_midp(args: tuple[gm.Point, ...], **kwargs) -> PointNum:
+def sketch_midp(args: tuple[PointNum, ...], **kwargs) -> PointNum:
     a, b = args
     return (a + b) * 0.5
 
 
 def sketch_pentagon(
-    args: tuple[gm.Point, ...], rnd_gen: Generator
+    args: tuple[PointNum, ...], rnd_gen: Generator
 ) -> tuple[PointNum, ...]:
     points = [PointNum(1.0, 0.0)]
     ang = 0.0
@@ -380,18 +380,18 @@ def sketch_pentagon(
     return a, b, c, d, e
 
 
-def sketch_pline(args: tuple[gm.Point, ...], **kwargs) -> LineNum:
+def sketch_pline(args: tuple[PointNum, ...], **kwargs) -> LineNum:
     a, b, c = args
     return a.parallel_line(LineNum(b, c))
 
 
-def sketch_pmirror(args: tuple[gm.Point, ...], **kwargs) -> PointNum:
+def sketch_pmirror(args: tuple[PointNum, ...], **kwargs) -> PointNum:
     a, b = args
     return b * 2 - a
 
 
 def sketch_quadrangle(
-    args: tuple[gm.Point, ...], rnd_gen: Generator
+    args: tuple[PointNum, ...], rnd_gen: Generator
 ) -> tuple[PointNum, ...]:
     """Sketch a random quadrangle."""
     m = rnd_gen.uniform(0.3, 0.7)
@@ -410,7 +410,7 @@ def sketch_quadrangle(
 
 
 def sketch_r_trapezoid(
-    args: tuple[gm.Point, ...], rnd_gen: Generator
+    args: tuple[PointNum, ...], rnd_gen: Generator
 ) -> tuple[PointNum, ...]:
     a = PointNum(0.0, 1.0)
     d = PointNum(0.0, 0.0)
@@ -421,7 +421,7 @@ def sketch_r_trapezoid(
 
 
 def sketch_r_triangle(
-    args: tuple[gm.Point, ...], rnd_gen: Generator
+    args: tuple[PointNum, ...], rnd_gen: Generator
 ) -> tuple[PointNum, ...]:
     a = PointNum(0.0, 0.0)
     b = PointNum(0.0, rnd_gen.uniform(0.5, 2.0))
@@ -431,7 +431,7 @@ def sketch_r_triangle(
 
 
 def sketch_rectangle(
-    args: tuple[gm.Point, ...], rnd_gen: Generator
+    args: tuple[PointNum, ...], rnd_gen: Generator
 ) -> tuple[PointNum, ...]:
     a = PointNum(0.0, 0.0)
     b = PointNum(0.0, 1.0)
@@ -442,14 +442,14 @@ def sketch_rectangle(
     return a, b, c, d
 
 
-def sketch_reflect(args: tuple[gm.Point, ...], **kwargs) -> PointNum:
+def sketch_reflect(args: tuple[PointNum, ...], **kwargs) -> PointNum:
     a, b, c = args
     m = a.foot(LineNum(b, c))
     return m * 2 - a
 
 
 def sketch_risos(
-    args: tuple[gm.Point, ...], rnd_gen: Generator
+    args: tuple[PointNum, ...], rnd_gen: Generator
 ) -> tuple[PointNum, ...]:
     a = PointNum(0.0, 0.0)
     b = PointNum(0.0, 1.0)
@@ -458,19 +458,19 @@ def sketch_risos(
     return a, b, c
 
 
-def sketch_rotaten90(args: tuple[gm.Point, ...], **kwargs) -> PointNum:
+def sketch_rotaten90(args: tuple[PointNum, ...], **kwargs) -> PointNum:
     a, b = args
     ang = -np.pi / 2
     return a + (b - a).rotate(np.sin(ang), np.cos(ang))
 
 
-def sketch_rotatep90(args: tuple[gm.Point, ...], **kwargs) -> PointNum:
+def sketch_rotatep90(args: tuple[PointNum, ...], **kwargs) -> PointNum:
     a, b = args
     ang = np.pi / 2
     return a + (b - a).rotate(np.sin(ang), np.cos(ang))
 
 
-def sketch_s_angle(args: tuple[gm.Point, ...], **kwargs) -> HalfLine:
+def sketch_s_angle(args: tuple[PointNum, ...], **kwargs) -> HalfLine:
     a, b, angle = args
     num, den = angle_to_num_den(angle)
     ang = num * np.pi / den
@@ -478,7 +478,7 @@ def sketch_s_angle(args: tuple[gm.Point, ...], **kwargs) -> HalfLine:
     return HalfLine(b, x)
 
 
-def sketch_aconst(args: tuple[gm.Point, ...], **kwargs) -> HalfLine:
+def sketch_aconst(args: tuple[PointNum, ...], **kwargs) -> HalfLine:
     a, b, c, angle = args
     num, den = angle_to_num_den(angle)
     ang = num * np.pi / den
@@ -487,18 +487,18 @@ def sketch_aconst(args: tuple[gm.Point, ...], **kwargs) -> HalfLine:
 
 
 def sketch_segment(
-    args: tuple[gm.Point, ...], rnd_gen: Generator
+    args: tuple[PointNum, ...], rnd_gen: Generator
 ) -> tuple[PointNum, PointNum]:
     a, b = random_points(2, rnd_gen)
     return a, b
 
 
-def sketch_shift(args: tuple[gm.Point, ...], **kwargs) -> PointNum:
+def sketch_shift(args: tuple[PointNum, ...], **kwargs) -> PointNum:
     a, b, c = args
     return c + (b - a)
 
 
-def sketch_square(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, PointNum]:
+def sketch_square(args: tuple[PointNum, ...], **kwargs) -> tuple[PointNum, PointNum]:
     a, b = args
     c = b + (a - b).rotatea(-np.pi / 2)
     d = a + (b - a).rotatea(np.pi / 2)
@@ -506,7 +506,7 @@ def sketch_square(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, Point
 
 
 def sketch_isquare(
-    args: tuple[gm.Point, ...], rnd_gen: Generator
+    args: tuple[PointNum, ...], rnd_gen: Generator
 ) -> tuple[PointNum, ...]:
     a = PointNum(0.0, 0.0)
     b = PointNum(1.0, 0.0)
@@ -516,13 +516,13 @@ def sketch_isquare(
     return a, b, c, d
 
 
-def sketch_tline(args: tuple[gm.Point, ...], **kwargs) -> LineNum:
+def sketch_tline(args: tuple[PointNum, ...], **kwargs) -> LineNum:
     a, b, c = args
     return a.perpendicular_line(LineNum(b, c))
 
 
 def sketch_trapezoid(
-    args: tuple[gm.Point, ...], rnd_gen: Generator
+    args: tuple[PointNum, ...], rnd_gen: Generator
 ) -> tuple[PointNum, ...]:
     d = PointNum(0.0, 0.0)
     c = PointNum(1.0, 0.0)
@@ -536,7 +536,7 @@ def sketch_trapezoid(
 
 
 def sketch_triangle(
-    args: tuple[gm.Point, ...], rnd_gen: Generator
+    args: tuple[PointNum, ...], rnd_gen: Generator
 ) -> tuple[PointNum, ...]:
     a = PointNum(0.0, 0.0)
     b = PointNum(1.0, 0.0)
@@ -548,7 +548,7 @@ def sketch_triangle(
 
 
 def sketch_triangle12(
-    args: tuple[gm.Point, ...], rnd_gen: Generator
+    args: tuple[PointNum, ...], rnd_gen: Generator
 ) -> tuple[PointNum, ...]:
     b = PointNum(0.0, 0.0)
     c = PointNum(rnd_gen.uniform(1.5, 2.5), 0.0)
@@ -557,7 +557,7 @@ def sketch_triangle12(
     return a, b, c
 
 
-def sketch_trisect(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, PointNum]:
+def sketch_trisect(args: tuple[PointNum, ...], **kwargs) -> tuple[PointNum, PointNum]:
     """Sketch two trisectors of an angle."""
     a, b, c = args
     ang1 = ang_of(b, a)
@@ -588,25 +588,25 @@ def sketch_trisect(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, Poin
 
 
 def sketch_trisegment(
-    args: tuple[gm.Point, ...], **kwargs
+    args: tuple[PointNum, ...], **kwargs
 ) -> tuple[PointNum, PointNum]:
     a, b = args
     x, y = a + (b - a) * (1.0 / 3), a + (b - a) * (2.0 / 3)
     return x, y
 
 
-def sketch_on_opline(args: tuple[gm.Point, ...], **kwargs) -> HalfLine:
+def sketch_on_opline(args: tuple[PointNum, ...], **kwargs) -> HalfLine:
     a, b = args
     return HalfLine(a, a + a - b)
 
 
-def sketch_on_hline(args: tuple[gm.Point, ...], **kwargs) -> HalfLine:
+def sketch_on_hline(args: tuple[PointNum, ...], **kwargs) -> HalfLine:
     a, b = args
     return HalfLine(a, b)
 
 
 def sketch_ieq_triangle(
-    args: tuple[gm.Point, ...], rnd_gen: Generator
+    args: tuple[PointNum, ...], rnd_gen: Generator
 ) -> tuple[PointNum, ...]:
     a = PointNum(0.0, 0.0)
     b = PointNum(1.0, 0.0)
@@ -616,7 +616,7 @@ def sketch_ieq_triangle(
     return a, b, c
 
 
-def sketch_incenter2(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, ...]:
+def sketch_incenter2(args: tuple[PointNum, ...], **kwargs) -> tuple[PointNum, ...]:
     a, b, c = args
     l1 = sketch_bisect([b, a, c])
     l2 = sketch_bisect([a, b, c])
@@ -627,7 +627,7 @@ def sketch_incenter2(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, ..
     return x, y, z, i
 
 
-def sketch_excenter2(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, ...]:
+def sketch_excenter2(args: tuple[PointNum, ...], **kwargs) -> tuple[PointNum, ...]:
     a, b, c = args
     l1 = sketch_bisect([b, a, c])
     l2 = sketch_exbisect([a, b, c])
@@ -638,7 +638,7 @@ def sketch_excenter2(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, ..
     return x, y, z, i
 
 
-def sketch_centroid(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, ...]:
+def sketch_centroid(args: tuple[PointNum, ...], **kwargs) -> tuple[PointNum, ...]:
     a, b, c = args
     x = (b + c) * 0.5
     y = (c + a) * 0.5
@@ -647,7 +647,7 @@ def sketch_centroid(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, ...
     return x, y, z, i
 
 
-def sketch_ninepoints(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, ...]:
+def sketch_ninepoints(args: tuple[PointNum, ...], **kwargs) -> tuple[PointNum, ...]:
     a, b, c = args
     x = (b + c) * 0.5
     y = (c + a) * 0.5
@@ -656,7 +656,7 @@ def sketch_ninepoints(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, .
     return x, y, z, c.center
 
 
-def sketch_2l1c(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, ...]:
+def sketch_2l1c(args: tuple[PointNum, ...], **kwargs) -> tuple[PointNum, ...]:
     """Sketch a circle touching two lines and another circle."""
     a, b, c, p = args
     bc, ac = LineNum(b, c), LineNum(a, c)
@@ -685,7 +685,7 @@ def sketch_2l1c(args: tuple[gm.Point, ...], **kwargs) -> tuple[PointNum, ...]:
     return x.foot(ac), x.foot(bc), g, x
 
 
-def sketch_3peq(args: tuple[gm.Point, ...], rnd_gen: Generator) -> tuple[PointNum, ...]:
+def sketch_3peq(args: tuple[PointNum, ...], rnd_gen: Generator) -> tuple[PointNum, ...]:
     a, b, c = args
     ab, _, ca = LineNum(a, b), LineNum(b, c), LineNum(c, a)
 
@@ -701,14 +701,14 @@ def sketch_3peq(args: tuple[gm.Point, ...], rnd_gen: Generator) -> tuple[PointNu
 ###### NEW FUNCTIONS FOR NEW DEFINITIONS ---- V. S.
 
 
-def sketch_isosvertex(args: tuple[gm.Point, ...], **kwargs) -> LineNum:
+def sketch_isosvertex(args: tuple[PointNum, ...], **kwargs) -> LineNum:
     b, c = args
     m = (b + c) / 2.0
 
     return m.perpendicular_line(LineNum(b, c))
 
 
-def sketch_aline0(args: tuple[gm.Point, ...], **kwargs) -> LineNum:
+def sketch_aline0(args: tuple[PointNum, ...], **kwargs) -> LineNum:
     """Sketch the construction aline."""
     A, B, C, D, E, F, G = args
     ab = A - B
@@ -729,7 +729,7 @@ def sketch_aline0(args: tuple[gm.Point, ...], **kwargs) -> LineNum:
     return LineNum(G, X)
 
 
-def sketch_eqratio(args: tuple[gm.Point, ...], **kwargs) -> CircleNum:
+def sketch_eqratio(args: tuple[PointNum, ...], **kwargs) -> CircleNum:
     A, B, C, D, E, F, G = args
 
     dab = A.distance(B)
@@ -740,15 +740,17 @@ def sketch_eqratio(args: tuple[gm.Point, ...], **kwargs) -> CircleNum:
     return CircleNum(center=G, radius=dgx)
 
 
-def sketch_rconst(args: tuple[gm.Point, ...], **kwargs) -> CircleNum:
+def sketch_rconst(
+    args: tuple[PointNum, PointNum, PointNum, Ratio], **kwargs
+) -> CircleNum:
     """Sketches point x such that ab/cx=r"""
     A, B, C, r = args
     dab = A.distance(B)
-    length = float(dab / Fraction(r.name))
+    length = float(dab / r.value)
     return CircleNum(center=C, radius=length)
 
 
-def sketch_eqratio6(args: tuple[gm.Point, ...], **kwargs) -> CircleNum | LineNum:
+def sketch_eqratio6(args: tuple[PointNum, ...], **kwargs) -> CircleNum | LineNum:
     """Sketches a point x such that ax/cx=ef/gh"""
     A, C, E, F, G, H = args
     d_ef = E.distance(F)
@@ -767,26 +769,28 @@ def sketch_eqratio6(args: tuple[gm.Point, ...], **kwargs) -> CircleNum | LineNum
         return CircleNum(center=center, radius=radius)
 
 
-def sketch_lconst(args: tuple[gm.Point, ...], **kwargs) -> CircleNum:
+def sketch_lconst(args: tuple[PointNum, Length], **kwargs) -> CircleNum:
     """Sketches point x such that x in at lenght l of point a"""
 
     a, length = args
-    return CircleNum(center=a, radius=float(length.name))
+    return CircleNum(center=a, radius=length.value)
 
 
-def sketch_rconst2(args: tuple[gm.Point, ...], **kwargs) -> CircleNum | LineNum:
+def sketch_rconst2(
+    args: tuple[PointNum, PointNum, Ratio], **kwargs
+) -> CircleNum | LineNum:
     """Sketches point x such that ax/bx=r"""
 
     A, B, r = args
-    ratio = Fraction(r.name)
+    ratio = r.value
 
-    if ratio == 1 / 1:
+    if ratio == Fraction(1, 1):
         M = (A + B) * 0.5
         return M.perpendicular_line(LineNum(A, B))
 
-    else:
-        extremum_1 = (1 / (1 - ratio)) * (A - ratio * B)
-        extremum_2 = (1 / (1 + ratio)) * (ratio * B + A)
-        center = (extremum_1 + extremum_2) * 0.5
-        radius = 0.5 * extremum_1.distance(extremum_2)
-        return CircleNum(center=center, radius=radius)
+    ratio = float(r.value)
+    extremum_1 = (1 / (1 - ratio)) * (A - ratio * B)
+    extremum_2 = (1 / (1 + ratio)) * (ratio * B + A)
+    center = (extremum_1 + extremum_2) * 0.5
+    radius = 0.5 * extremum_1.distance(extremum_2)
+    return CircleNum(center=center, radius=radius)

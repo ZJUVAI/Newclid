@@ -9,11 +9,78 @@ from geosolver.geometry import Point
 from geosolver.predicates import Predicate
 from geosolver.reasoning_engines.formulas import (
     MenelausFormula,
+    PythagoreanFormula,
     make_rconst_hashs_from_colls,
 )
 from geosolver.reasoning_engines.interface import Derivation, ReasoningEngine
 from geosolver.statements.statement import Statement
 from geosolver.symbols_graph import SymbolsGraph
+
+
+class TestPythagorean:
+    @pytest.fixture(autouse=True)
+    def setup(self, reasoning_fixture: "ReasoningEngineFixture"):
+        self.solver_builder = GeometricSolverBuilder()
+        self.reasoning_fixture = reasoning_fixture
+        points_names = ["a", "b", "c"]
+        lengths = ["3.0", "4.0"]
+
+        self.symbols_graph = (
+            SymbolsGraphBuilder()
+            .with_point_named(points_names)
+            .with_lengths(lengths)
+            .build()
+        )
+        self.points = self.symbols_graph.names2points(points_names)
+        self.lengths = self.symbols_graph.names2nodes(lengths)
+
+    def test_implication_ddar_fails(self):
+        solver = self.solver_builder.load_problem_from_txt(
+            "a = free a; "
+            "b = lconst b a 3; "
+            "c = on_tline c a b a, lconst c a 4 "
+            "? lconst c b 5"
+        ).build()
+        success = solver.run()
+        assert not success
+
+    def test_implication(self):
+        """Should be able to use Pythagorean theorem to get the missing side length.
+
+        perp AB AC => AB² + AC² = BC²
+
+        Thus if AB=3 and AC=4, we should find BC=5.
+
+        """
+        a, b, c = self.points
+        l_3, l_4 = self.lengths
+
+        self.reasoning_fixture.given_engine(PythagoreanFormula(self.symbols_graph))
+
+        given_dependencies = [
+            Dependency(Statement(Predicate.PERPENDICULAR, (a, b, a, c)), why=[]),
+            Dependency(Statement(Predicate.CONSTANT_LENGTH, (a, b, l_3)), why=[]),
+            Dependency(Statement(Predicate.CONSTANT_LENGTH, (a, c, l_4)), why=[]),
+        ]
+        for dep in given_dependencies:
+            self.reasoning_fixture.given_added_dependency(dep)
+
+        self.reasoning_fixture.when_resolving_dependencies()
+
+        expected_l = self.symbols_graph.get_or_create_const_length(5.0)
+        self.reasoning_fixture.then_new_derivations_should_be(
+            [
+                Derivation(
+                    Statement(Predicate.CONSTANT_LENGTH, (b, c, expected_l)),
+                    DependencyBody(Reason("Pythagorean"), why=given_dependencies),
+                ),
+            ]
+        )
+
+    # TODO
+    @pytest.mark.skip
+    def test_implication_not_intersection(self):
+        """Should be able to use Pythagorean theorem even if the perp is"""
 
 
 class TestMenelaus:
@@ -66,20 +133,10 @@ class TestMenelaus:
         => AF/FB * BD/DC * CE/DA = 1
 
         """
+        a, b, c, d, e, f = self.points
+        r1_3, r1_2 = self.ratios
 
-        points_names = ["a", "b", "c", "d", "e", "f"]
-        ratios = ["1/3", "1/2"]
-
-        symbols_graph = (
-            SymbolsGraphBuilder()
-            .with_point_named(points_names)
-            .with_ratios(ratios)
-            .build()
-        )
-        a, b, c, d, e, f = symbols_graph.names2points(points_names)
-        r1_3, r1_2 = symbols_graph.names2nodes(ratios)
-
-        self.reasoning_fixture.given_engine(MenelausFormula(symbols_graph))
+        self.reasoning_fixture.given_engine(MenelausFormula(self.symbols_graph))
 
         given_dependencies = [
             Dependency(Statement(Predicate.COLLINEAR, (a, b, f)), why=[]),
@@ -90,12 +147,12 @@ class TestMenelaus:
             Dependency(Statement(Predicate.CONSTANT_RATIO, (b, d, d, c, r1_2)), why=[]),
         ]
         for dep in given_dependencies:
-            self.reasoning_fixture.given_added_dependencies(dep)
+            self.reasoning_fixture.given_added_dependency(dep)
 
         self.reasoning_fixture.when_resolving_dependencies()
 
         expected_r_inv_fraction = Fraction(r1_2.name) * Fraction(r1_3.name)
-        expected_r, _ = symbols_graph.get_or_create_const_rat(
+        expected_r, _ = self.symbols_graph.get_or_create_const_rat(
             expected_r_inv_fraction.denominator, expected_r_inv_fraction.numerator
         )
 
@@ -108,31 +165,33 @@ class TestMenelaus:
             ]
         )
 
-
-@pytest.mark.parametrize(
-    "main_coll,triplet_points,inverse,output",
-    [
-        (
-            ("a", "c", "e"),
-            [("a", "b", "f"), ("d", "e", "f"), ("b", "c", "d")],
-            False,
-            [("a", "b", "a", "f"), ("c", "d", "b", "c"), ("e", "f", "d", "e")],
-        ),
-        (
-            ("a", "c", "e"),
-            [("a", "b", "f"), ("d", "e", "f"), ("b", "c", "d")],
-            True,
-            [("a", "f", "a", "b"), ("b", "c", "c", "d"), ("d", "e", "e", "f")],
-        ),
-    ],
-)
-def test_make_rconst_hashs_from_colls(
-    main_coll: tuple[str, ...],
-    triplet_points: list[tuple[str, ...]],
-    inverse: bool,
-    output: list[tuple[str, ...]],
-):
-    assert make_rconst_hashs_from_colls(main_coll, triplet_points, inverse) == output
+    @staticmethod
+    @pytest.mark.parametrize(
+        "main_coll,triplet_points,inverse,output",
+        [
+            (
+                ("a", "c", "e"),
+                [("a", "b", "f"), ("d", "e", "f"), ("b", "c", "d")],
+                False,
+                [("a", "b", "a", "f"), ("c", "d", "b", "c"), ("e", "f", "d", "e")],
+            ),
+            (
+                ("a", "c", "e"),
+                [("a", "b", "f"), ("d", "e", "f"), ("b", "c", "d")],
+                True,
+                [("a", "f", "a", "b"), ("b", "c", "c", "d"), ("d", "e", "e", "f")],
+            ),
+        ],
+    )
+    def test_make_rconst_hashs_from_colls(
+        main_coll: tuple[str, ...],
+        triplet_points: list[tuple[str, ...]],
+        inverse: bool,
+        output: list[tuple[str, ...]],
+    ):
+        assert (
+            make_rconst_hashs_from_colls(main_coll, triplet_points, inverse) == output
+        )
 
 
 @pytest.fixture
@@ -144,7 +203,7 @@ class ReasoningEngineFixture:
     def given_engine(self, engine: ReasoningEngine):
         self._engine = engine
 
-    def given_added_dependencies(self, dependency: Dependency):
+    def given_added_dependency(self, dependency: Dependency):
         self._engine.ingest(dependency)
 
     def when_resolving_dependencies(self):
@@ -158,6 +217,7 @@ class SymbolsGraphBuilder:
     def __init__(self) -> None:
         self.points: list[Point] = []
         self.ratios_tuples: list[tuple[int, int]] = []
+        self.lengths: list[float] = []
 
     def with_point_named(self, points_names: list[str]) -> Self:
         self.points += [Point(name) for name in points_names]
@@ -169,10 +229,16 @@ class SymbolsGraphBuilder:
             self.ratios_tuples.append((fraction.numerator, fraction.denominator))
         return self
 
+    def with_lengths(self, lengths: list[str]) -> Self:
+        self.lengths.extend([float(length) for length in lengths])
+        return self
+
     def build(self) -> SymbolsGraph:
         symbols_graph = SymbolsGraph()
         for point in self.points:
             symbols_graph.add_node(point)
         for ratio in self.ratios_tuples:
             symbols_graph.get_or_create_const_rat(*ratio)
+        for length in self.lengths:
+            symbols_graph.get_or_create_const_length(length)
         return symbols_graph

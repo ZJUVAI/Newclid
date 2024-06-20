@@ -1,9 +1,12 @@
 from fractions import Fraction
 from itertools import combinations
+from math import sqrt
 from typing import TYPE_CHECKING
+
+
 from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.dependencies.dependency_building import DependencyBody
-from geosolver.geometry import Ratio
+from geosolver.geometry import Length, Point, Ratio
 from geosolver.predicates import Predicate
 from geosolver.reasoning_engines.interface import Derivation, ReasoningEngine
 from geosolver.statements.statement import Statement
@@ -13,11 +16,115 @@ if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
 
 
-def menelaus_solver(r1: Fraction, r2: Fraction) -> Fraction:
-    return 1 / (r1 * r2)
+class PythagoreanFormula(ReasoningEngine):
+    """Allow the use of Pythagorean theorem to get the missing side length.
+
+    perp AB AC => AB² + AC² = BC²
+
+    """
+
+    def __init__(self, symbols_graph: "SymbolsGraph") -> None:
+        self.symbols_graph = symbols_graph
+        self._perp_intesections: dict[Point, tuple[Point, Point]] = {}
+        self._segments_lengths: dict[tuple[str, str], Length] = {}
+        self._intesection_dep: dict[Point, Dependency] = {}
+        self._segments_length_dep: dict[tuple[str, str], Dependency] = {}
+
+    def ingest(self, dependency: Dependency):
+        statement = dependency.statement
+        if statement.predicate is Predicate.PERPENDICULAR:
+            intersection = None
+            others = []
+            for p in statement.args:
+                if p in others:
+                    intersection = p
+                    others.remove(p)
+                else:
+                    others.append(p)
+
+            if intersection is None:
+                return
+
+            self._perp_intesections[intersection] = tuple(others)
+            self._intesection_dep[intersection] = dependency
+
+        elif statement.predicate is Predicate.CONSTANT_LENGTH:
+            segment_hash = statement.hash_tuple[1:3]
+            lenght = statement.args[-1]
+            self._segments_lengths[segment_hash] = lenght
+            self._segments_length_dep[segment_hash] = dependency
+
+    def resolve(self, **kwargs) -> list[Derivation]:
+        new_deps = []
+        for intersection, (side1p, side2p) in self._perp_intesections.items():
+            potential_values = [
+                (side1p, side2p),
+                (intersection, side1p),
+                (intersection, side2p),
+            ]
+
+            values = [None, None, None]
+            for pos, candidate in enumerate(potential_values):
+                candidate_hash = tuple(sorted(c.name for c in candidate))
+                if candidate_hash in self._segments_lengths:
+                    lenght = self._segments_lengths[candidate_hash]
+                    values[pos] = lenght
+
+            if len([value for value in values if value is not None]) != 2:
+                return
+
+            missing_index = values.index(None)
+            values.remove(None)
+            missing_segment = potential_values[missing_index]
+            missing_hypotenuse = missing_index == 0
+            if not missing_hypotenuse:
+                raise NotImplementedError
+            else:
+                hypothenuse, side = (
+                    _length_to_float(values[0]),
+                    _length_to_float(values[1]),
+                )
+                new_length_val = self.pythagorean_hypotenuse(hypothenuse, side)
+
+            new_length = self.symbols_graph.get_or_create_const_length(new_length_val)
+            new_statement = Statement(
+                Predicate.CONSTANT_LENGTH, (*missing_segment, new_length)
+            )
+
+            why_perp = self._intesection_dep[intersection]
+            why_lconsts = [
+                self._segments_length_dep[(seg[0].name, seg[1].name)]
+                for seg in potential_values
+                if seg != missing_segment
+            ]
+            dep_body = DependencyBody(
+                Reason("Pythagorean"), why=(why_perp, *why_lconsts)
+            )
+            new_deps.append(Derivation(new_statement, dep_body))
+
+        return new_deps
+
+    @staticmethod
+    def pythagorean_hypotenuse(side1: float, side2: float) -> float:
+        return sqrt(side1**2 + side2**2)
+
+    @staticmethod
+    def pythagorean_side(hypotenuse: float, side: float) -> float:
+        return sqrt(hypotenuse**2 - side**2)
+
+
+def _length_to_float(length: Length) -> float:
+    return float(length.name)
 
 
 class MenelausFormula(ReasoningEngine):
+    """Allow the use of Menelaus theorem to get the completing ratio.
+
+    ncoll e d f, coll a b f, coll c d b, coll e d f, coll c e a
+    => AF/FB * BD/DC * CE/DA = 1
+
+    """
+
     def __init__(self, symbols_graph: "SymbolsGraph") -> None:
         self.ratios: list[Ratio] = []
         self.symbols_graph = symbols_graph
@@ -63,9 +170,7 @@ class MenelausFormula(ReasoningEngine):
 
             rconst_hit_deps = [self._rconst_hash_to_dep[hit] for hit in hits]
             know_ratios = [dep.statement.args[-1] for dep in rconst_hit_deps]
-            new_ratio_frac = menelaus_solver(
-                *[_ratio_to_fraction(r) for r in know_ratios]
-            )
+            new_ratio_frac = self.menelaus_solver(*[r.value for r in know_ratios])
             new_ratio, _ = self.symbols_graph.get_or_create_const_rat(
                 new_ratio_frac.numerator, new_ratio_frac.denominator
             )
@@ -95,6 +200,10 @@ class MenelausFormula(ReasoningEngine):
             self.triplet_candidates.pop(representent_triplet)
 
         return new_deps
+
+    @staticmethod
+    def menelaus_solver(r1: Fraction, r2: Fraction) -> Fraction:
+        return 1 / (r1 * r2)
 
     def _make_candidates_from_coll(self, coll_points: tuple[str, ...]):
         self.coll_candidates[coll_points] = []
@@ -192,7 +301,3 @@ def _rconst_hash(both_point: str, up_point: str, down_point: str):
 
 def _rconst_hash_to_coll_hash(rconst_hash: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(sorted(set(rconst_hash)))
-
-
-def _ratio_to_fraction(ratio: Ratio) -> Fraction:
-    return Fraction(ratio.name)

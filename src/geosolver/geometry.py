@@ -1,6 +1,7 @@
 """Implements geometric objects used in the graph representation."""
 
 from __future__ import annotations
+from fractions import Fraction
 from typing import TYPE_CHECKING, Any, Generator, Optional, Type, TypeVar
 from typing_extensions import Self
 
@@ -394,6 +395,7 @@ class Ratio(Symbol):
     opposite: Optional[Angle] = None
     _l: tuple[Optional[Length], Optional[Length]] = (None, None)
     _val: RatioValue
+    value: Fraction
 
     def new_val(self) -> RatioValue:
         return RatioValue()
@@ -415,6 +417,7 @@ class Direction(Symbol):
 
 class Length(Symbol):
     _obj: Segment
+    value: float
 
 
 class LengthValue(Symbol):
