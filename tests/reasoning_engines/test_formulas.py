@@ -117,7 +117,7 @@ class TestPythagorean:
         """Should be able to use Pythagorean theorem
         even if the perp is not an intesection itself."""
 
-    @pytest.mark.parametrize("use_engine", [False])
+    @pytest.mark.parametrize("use_engine", [False, True])
     def test_reciprocal_simple_problem(self, use_engine: bool):
         solver_builder = self.solver_builder.load_problem_from_txt(
             "a = free a; "
@@ -133,6 +133,36 @@ class TestPythagorean:
         solver = solver_builder.build()
         success = solver.run()
         assert success == use_engine
+
+    def test_reciprocal(self):
+        """Should be able to use Pythagorean theorem to get perp from constant lengths.
+
+        AB² + AC² = BC² => perp AB AC
+
+        Thus if AB=3 and AC=4 and BC=5, we should find perp AB AC
+
+        """
+        a, b, c = self.points
+        l_3, l_4, l_5 = self.lengths
+
+        self.reasoning_fixture.given_engine(PythagoreanFormula(self.symbols_graph))
+        given_dependencies = [
+            Dependency(Statement(Predicate.CONSTANT_LENGTH, (b, c, l_5)), why=[]),
+            Dependency(Statement(Predicate.CONSTANT_LENGTH, (a, b, l_3)), why=[]),
+            Dependency(Statement(Predicate.CONSTANT_LENGTH, (a, c, l_4)), why=[]),
+        ]
+        for dep in given_dependencies:
+            self.reasoning_fixture.given_added_dependency(dep)
+
+        self.reasoning_fixture.when_resolving_dependencies()
+        self.reasoning_fixture.then_new_derivations_should_be(
+            [
+                Derivation(
+                    Statement(Predicate.PERPENDICULAR, (a, b, a, c)),
+                    DependencyBody(Reason("Pythagorean"), why=given_dependencies),
+                ),
+            ]
+        )
 
 
 class TestMenelaus:

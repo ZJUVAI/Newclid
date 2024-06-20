@@ -240,7 +240,7 @@ class LineNum:
     def is_perp(self, other: "LineNum") -> bool:
         a, b, _ = self.coefficients
         x, y, _ = other.coefficients
-        return abs(a * x + b * y) < ATOM
+        return abs(a * x + b * y) < 5 * ATOM
 
     def cross(self, other: "LineNum") -> float:
         a, b, _ = self.coefficients

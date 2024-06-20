@@ -126,7 +126,52 @@ class PythagoreanFormula(ReasoningEngine):
         return new_deps
 
     def _resolve_reciprocal(self) -> list[Derivation]:
-        return []
+        new_perps = []
+
+        potential_triangles_bases: dict[str, list[str]] = {}
+        for segment, _length in self._segments_lengths.items():
+            for i, p_name in enumerate(segment):
+                if p_name not in potential_triangles_bases:
+                    potential_triangles_bases[p_name] = []
+                other_point = segment[1 - i]
+                potential_triangles_bases[p_name].append(other_point)
+
+        for base, other_points in potential_triangles_bases.items():
+            for two_points in combinations(other_points, 2):
+                p1name, p2name = two_points
+
+                hypotenuse = tuple(sorted((p1name, p2name)))
+                side1 = tuple(sorted((base, p1name)))
+                side2 = tuple(sorted((base, p2name)))
+
+                if any(
+                    seg not in self._segments_lengths
+                    for seg in (hypotenuse, side1, side2)
+                ):
+                    continue
+
+                if not self.pythagorean_perp(
+                    *[
+                        self._segments_lengths[seg].value
+                        for seg in (hypotenuse, side1, side2)
+                    ]
+                ):
+                    continue
+
+                hypotenusedep = self._segments_length_dep[hypotenuse]
+                side1dep = self._segments_length_dep[side1]
+                side2dep = self._segments_length_dep[side2]
+                dep_body = DependencyBody(
+                    Reason("Pythagorean"), why=(hypotenusedep, side1dep, side2dep)
+                )
+
+                new_statement = Statement(
+                    Predicate.PERPENDICULAR,
+                    (*side1dep.statement.args[:2], *side2dep.statement.args[:2]),
+                )
+                new_perps.append(Derivation(new_statement, dep_body))
+
+        return new_perps
 
     @staticmethod
     def pythagorean_hypotenuse(side1: float, side2: float) -> float:
@@ -135,6 +180,10 @@ class PythagoreanFormula(ReasoningEngine):
     @staticmethod
     def pythagorean_side(hypotenuse: float, side: float) -> float:
         return sqrt(hypotenuse**2 - side**2)
+
+    @staticmethod
+    def pythagorean_perp(hypotenuse: float, side1: float, side2: float) -> bool:
+        return side1**2 + side2**2 == hypotenuse**2
 
 
 def _length_to_float(length: Length) -> float:
