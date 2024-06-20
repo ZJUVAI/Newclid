@@ -542,15 +542,10 @@ r33 : cong_eqangle2contri
    :header-rows: 1
 
    * - Figure
-     - :math:`|AB| = |PQ| \wedge |BC| = |QR| \wedge \langle BA, B\rangle = \langle QP, QR\rangle`
-       :math:`\implies \text{contri*}(ABC, PQR)`
+     - Formal Statement
      - Description
    * - |r33|
-     - 
-       .. code-block :: text
-
-         cong A B P Q, cong B C Q R, eqangle6 B A B C Q P Q R, ncoll A B C
-         => contri* A B C P Q R
+     - :math:`\begin{cases}|AB| = |PQ| \\ |BC| = |QR| \\ \angle (BA\times BC) = \angle (QP\times QR)\end{cases}\implies \Delta ABC\cong^\ast\Delta PQR`
      - 
 
 .. |r33| image:: ../../_static/Images/rules/r33.png
@@ -563,15 +558,10 @@ r34 : eqangle2simtri
    :header-rows: 1
 
    * - Figure
-     - :math:`\langle BA, BC\rangle = \langle QP, QR\rangle \wedge \langle CA, CB\rangle = \langle RP, RQ\rangle`
-       :math:`\implies \text{simtri}(ABC, PQR)`
+     - Formal Statement
      - Description
    * - |r34|
-     -
-       .. code-block :: text
-
-         eqangle6 B A B C Q P Q R, eqangle6 C A C B R P R Q, ncoll A B C
-         => simtri A B C P Q R
+     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QP\times QR) \\ \angle (CA\times CB) = \angle (RP\times RQ)\end{cases}\implies \Delta ABC\sim \Delta PQR`
      - 
 
 .. |r34| image:: ../../_static/Images/rules/r34.png
@@ -584,15 +574,10 @@ r35 : eqangle2simtri2
    :header-rows: 1
 
    * - Figure
-     - :math:`\langle BA, BC\rangle = \langle QP, QR\rangle \wedge \langle CA, CB\rangle = \langle RP, RQ\rangle`
-       :math:`\implies \text{simtri2}(ABC, PQR)`
+     - Formal Statement
      - Description
    * - |r35|
-     -
-       .. code-block :: text
-
-         eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C
-         => simtri2 A B C P Q R
+     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QR\times QP) \\ \angle (CA\times CB) = \angle (RQ\times RP)\end{cases}\implies \Delta ABC\sim^2 \Delta PQR`
      - 
 
 .. |r35| image:: ../../_static/Images/rules/r35.png
@@ -605,17 +590,10 @@ r36 : eqangle_cong2contri
    :header-rows: 1
 
    * - Figure
-     - :math:`\langle BA, BC\rangle = \langle QP, QR\rangle \wedge \langle CA, CB\rangle = \langle RP, RQ\rangle`
-       :math:`\wedge |AB| = |PQ| \wedge |BC| = |QR| \wedge \text{ncoll}(ABC)`
-       :math:`\wedge |AP| = |QB| \implies \text{contri}(ABC, PQR)`
+     - Formal Statement
      - Description
    * - |r36|
-     -
-       .. code-block :: text
-
-         eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P,
-         ncoll A B C, cong A B P Q
-         => contri A B C P Q R
+     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QP\times QR) \\ \angle (CA\times CB) = \angle (RP\times RQ)\\ |AB| = |PQ| \\ |BC| = |QR| \\ ABC\text{ non-collinear}\\ |AP| = |QB| \end{cases}\implies \Delta ABC\cong \Delta PQR`
      - 
 
 .. |r36| image:: ../../_static/Images/rules/r36.png
@@ -628,17 +606,10 @@ r37 : eqangle_cong2contri
    :header-rows: 1
 
    * - Figure
-     - :math:`\langle BA, BC\rangle = \langle QP, QR\rangle \wedge \langle CA, CB\rangle = \langle RP, RQ\rangle`
-       :math:`\wedge |AB| = |PQ| \wedge |BC| = |QR| \wedge \text{ncoll}(ABC)`
-       :math:`\wedge |AP| = |QB| \implies \text{contri2}(ABC, PQR)`
+     - Formal Statement
      - Description
    * - |r37|
-     -
-       .. code-block :: text
-
-         eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P,
-         ncoll A B C, cong A B P Q
-         => contri2 A B C P Q R
+     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QP\times QR) \\ \angle (CA\times CB) = \angle (RP\times RQ)\\ |AB| = |PQ| \\ |BC| = |QR| \\ ABC\text{ non-collinear}\\|AP| = |QB| \end{cases}\implies \Delta ABC\cong^2 \Delta PQR`
      - 
 
 .. |r37| image:: ../../_static/Images/rules/r37.png
@@ -651,16 +622,10 @@ r38 : eqratio_eqangle2simtri
    :header-rows: 1
 
    * - Figure
-     - :math:`\frac{BA}{BC} = \frac{QP}{QR} \wedge \frac{CA}{CB} = \frac{RP}{RQ}`
-       :math:`\wedge \text{ncoll}(ABC) \implies \text{simtri*}(ABC, PQR)`
+     - Formal Statement
      - Description
    * - |r38|
-     -
-       .. code-block :: text
-
-         eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q,
-         ncoll A B C
-         => simtri* A B C P Q R
+     - :math:`\begin{cases}\frac{BA}{BC} = \frac{QP}{QR} \\ \frac{CA}{CB} = \frac{RP}{RQ}\\ ABC\text{ non-collinear} \end{cases}\implies \Delta ABC\sim^\ast \Delta PQR`
      - 
 
 .. |r38| image:: ../../_static/Images/rules/r38.png
@@ -673,16 +638,10 @@ r39 : eqratio_eqangle2simtri
    :header-rows: 1
 
    * - Figure
-     - :math:`\frac{BA}{BC} = \frac{QP}{QR} \wedge \langle BA, B\rangle = \langle QP, Q\rangle`
-       :math:`\wedge \text{ncoll}(ABC) \implies \text{simtri*}(ABC, PQR)`
+     - Formal Statement
      - Description
    * - |r39|
-     -
-       .. code-block :: text
-
-         eqratio6 B A B C Q P Q R, eqangle6 B A B C Q P Q R,
-         ncoll A B C
-         => simtri* A B C P Q R
+     - :math:`\begin{cases}\frac{BA}{BC} = \frac{QP}{QR} \\ \angle (BA\times BC)\rangle = \angle (QP\times QR)\\ ABC\text{ non-collinear}\end{cases} \implies \Delta ABC\sim^\ast \Delta PQR`
      - 
 
 .. |r39| image:: ../../_static/Images/rules/r39.png
