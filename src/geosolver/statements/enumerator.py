@@ -17,11 +17,11 @@ from geosolver.geometry import (
     Direction,
     Length,
     Line,
-    Measure,
+    AngleValue,
     Point,
     Ratio,
     Segment,
-    Value,
+    RatioValue,
 )
 from geosolver.predicates import Predicate
 
@@ -83,7 +83,7 @@ class StatementsEnumerator:
     ) -> Generator[tuple[Line, ...], None, None]:
         """No eqangles betcause para-para, or para-corresponding, or same."""
 
-        for measure in self.symbols_graph.type2nodes[Measure]:
+        for measure in self.symbols_graph.type2nodes[AngleValue]:
             angs = measure.neighbors(Angle)
             line_pairss = []
             for ang in angs:
@@ -105,7 +105,7 @@ class StatementsEnumerator:
         """List all sets of 8 points that make two equal angles."""
         # Case 1: (l1-l2) = (l3-l4), including because l1//l3, l2//l4 (para-para)
         angss = []
-        for measure in self.symbols_graph.type2nodes[Measure]:
+        for measure in self.symbols_graph.type2nodes[AngleValue]:
             angs = measure.neighbors(Angle)
             angss.append(angs)
 
@@ -229,7 +229,7 @@ class StatementsEnumerator:
     def _all_eqratios_8points(self) -> Generator[tuple[Point, ...], None, None]:
         """List all sets of 8 points that make two equal ratios."""
         ratss = []
-        for value in self.symbols_graph.type2nodes[Value]:
+        for value in self.symbols_graph.type2nodes[RatioValue]:
             rats = value.neighbors(Ratio)
             ratss.append(rats)
 

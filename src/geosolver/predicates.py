@@ -43,6 +43,8 @@ class Predicate(Enum):
     """aconst A B C D r - True if the angle needed to go from line AB to line CD, around the intersection point, on the clockwise direction is r, in radians. The syntax of y should be a fraction of pi, as 2pi/3 for an angle of 120 degrees."""
     CONSTANT_RATIO = "rconst"
     """rconst A B C D r - True if AB/CD=r, r should be given with numerator and denominator separated by /, as in 2/3."""
+    CONSTANT_LENGTH = "lconst"
+    """rconst A B l - True if AB=l, l should be given as a float."""
     COMPUTE_ANGLE = "acompute"
     COMPUTE_RATIO = "rcompute"
     S_ANGLE = "s_angle"

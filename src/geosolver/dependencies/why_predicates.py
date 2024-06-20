@@ -8,14 +8,13 @@ from geosolver.statements.statement import Statement
 from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.geometry import (
     Angle,
+    AngleValue,
     Circle,
     Direction,
     Line,
-    Measure,
     Symbol,
     Point,
     Ratio,
-    Value,
     all_angles,
     all_ratios,
     bfs_backtrack,
@@ -407,7 +406,7 @@ def _why_aconst(
 ) -> tuple[Optional[Reason], list[Dependency]]:
     a, b, c, d, ang0 = statement.args
 
-    measure: Measure = ang0._val
+    measure: AngleValue = ang0._val
     for ang in measure.neighbors(Angle):
         if ang == ang0:
             continue
@@ -446,7 +445,7 @@ def _why_rconst(
 ) -> tuple[Optional[Reason], list[Dependency]]:
     a, b, c, d, rat0 = statement.args
 
-    val: Value = rat0._val
+    val: AngleValue = rat0._val
     for rat in val.neighbors(Ratio):
         if rat == rat0:
             continue

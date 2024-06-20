@@ -1,6 +1,7 @@
 """Implements geometric objects used in the graph representation."""
 
 from __future__ import annotations
+from fractions import Fraction
 from typing import TYPE_CHECKING, Any, Generator, Optional, Type, TypeVar
 from typing_extensions import Self
 
@@ -124,10 +125,12 @@ class Symbol:
             and isinstance(node, Direction)
             or isinstance(self, Segment)
             and isinstance(node, Length)
+            or isinstance(self, Length)
+            and isinstance(node, LengthValue)
             or isinstance(self, Angle)
-            and isinstance(node, Measure)
+            and isinstance(node, AngleValue)
             or isinstance(self, Ratio)
-            and isinstance(node, Value)
+            and isinstance(node, RatioValue)
         )
 
     def set_val(self, node: Symbol) -> None:
@@ -370,10 +373,10 @@ class Angle(Symbol):
 
     opposite: Optional[Angle] = None
     _d: tuple[Optional[Direction], Optional[Direction]] = (None, None)
-    _val: Measure
+    _val: AngleValue
 
-    def new_val(self) -> Measure:
-        return Measure()
+    def new_val(self) -> AngleValue:
+        return AngleValue()
 
     def set_directions(self, d1: Direction, d2: Direction) -> None:
         self._d = d1, d2
@@ -391,10 +394,11 @@ class Ratio(Symbol):
 
     opposite: Optional[Angle] = None
     _l: tuple[Optional[Length], Optional[Length]] = (None, None)
-    _val: Value
+    _val: RatioValue
+    value: Fraction
 
-    def new_val(self) -> Value:
-        return Value()
+    def new_val(self) -> RatioValue:
+        return RatioValue()
 
     def set_lengths(self, l1: Length, l2: Length) -> None:
         self._l = l1, l2
@@ -409,22 +413,23 @@ class Ratio(Symbol):
 
 class Direction(Symbol):
     _obj: Line
-    pass
-
-
-class Measure(Symbol):
-    _obj: Angle
-    pass
 
 
 class Length(Symbol):
     _obj: Segment
-    pass
+    value: float
 
 
-class Value(Symbol):
+class LengthValue(Symbol):
+    _obj: Length
+
+
+class AngleValue(Symbol):
+    _obj: Angle
+
+
+class RatioValue(Symbol):
     _obj: Ratio
-    pass
 
 
 def all_angles(
@@ -451,6 +456,13 @@ def all_ratios(
             yield ratio, d1s, d2s
 
 
+def all_lengths(segment: Segment) -> Generator[Angle, list[Direction], list[Direction]]:
+    equivalent_segments = segment.equivs_upto()
+    for neighbor_lenght in segment.rep().neighbors(Length):
+        if neighbor_lenght._obj in equivalent_segments:
+            yield neighbor_lenght, equivalent_segments
+
+
 RANKING = {
     Point: 0,
     Line: 1,
@@ -460,6 +472,7 @@ RANKING = {
     Length: 5,
     Angle: 6,
     Ratio: 7,
-    Measure: 8,
-    Value: 9,
+    AngleValue: 8,
+    RatioValue: 9,
+    LengthValue: 10,
 }

@@ -209,6 +209,12 @@ def check_ratio_numerical(points: list[PointNum | gm.Ratio]) -> bool:
     return close_enough(ab * n, cd * m)
 
 
+def check_length_numerical(points: list[PointNum | gm.Length]) -> bool:
+    a, b, length = points
+    ab = a.distance(b)
+    return close_enough(ab, float(length.name))
+
+
 PREDICATE_TO_NUMERICAL_CHECK = {
     Predicate.COLLINEAR: check_coll_numerical,
     Predicate.PERPENDICULAR: check_perp_numerical,
@@ -232,6 +238,7 @@ PREDICATE_TO_NUMERICAL_CHECK = {
     Predicate.SAMESIDE: check_sameside_numerical,
     Predicate.NON_COLLINEAR: check_ncoll_numerical,
     Predicate.CONSTANT_RATIO: check_ratio_numerical,
+    Predicate.CONSTANT_LENGTH: check_length_numerical,
     Predicate.PARALLEL: check_para_or_coll_numerical,
 }
 

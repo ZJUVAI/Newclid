@@ -1,5 +1,6 @@
 from __future__ import annotations
 from collections import defaultdict
+from fractions import Fraction
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Type, TypeVar
 
@@ -13,13 +14,14 @@ from geosolver.geometry import (
     Circle,
     Direction,
     Length,
+    LengthValue,
     Line,
-    Measure,
+    AngleValue,
     Symbol,
     Point,
     Ratio,
     Segment,
-    Value,
+    RatioValue,
 )
 from geosolver._lazy_loading import lazy_import
 from geosolver.predicates import Predicate
@@ -40,15 +42,17 @@ if TYPE_CHECKING:
 NODES_VALUES: dict[Type[Symbol], Type[Symbol]] = {
     Line: Direction,
     Segment: Length,
-    Angle: Measure,
-    Ratio: Value,
+    Angle: AngleValue,
+    Ratio: RatioValue,
+    Length: LengthValue,
 }
 
 NODES_VALUES_MARKERS: dict[Type[Symbol], str] = {
     Direction: "d",
     Length: "l",
-    Measure: "m",
-    Value: "r",
+    AngleValue: "m",
+    RatioValue: "r",
+    LengthValue: "f",
 }
 
 
@@ -63,8 +67,9 @@ class SymbolsGraph:
             Length: [],
             Angle: [],
             Ratio: [],
-            Measure: [],
-            Value: [],
+            AngleValue: [],
+            RatioValue: [],
+            LengthValue: [],
         }
         self._name2point: dict[str, Point] = {}
         self._name2node: dict[str, Symbol] = {}
@@ -72,6 +77,7 @@ class SymbolsGraph:
         self._triplet2circle: dict[tuple[Point, Point, Point], Circle] = {}
         self.rconst: Dict[Tuple[int, int], Ratio] = {}  # contains all constant ratios
         self.aconst: Dict[Tuple[int, int], Angle] = {}  # contains all constant angles.
+        self.lconst: Dict[float, Length] = {}  # contains all constant lenghts.
         self.halfpi, _ = self.get_or_create_const_ang(1, 2)
         self.vhalfpi = self.halfpi.val
 
@@ -231,6 +237,7 @@ class SymbolsGraph:
     def _create_const_rat(self, n: int, d: int) -> None:
         n, d = simplify(n, d)
         rat = self.rconst[(n, d)] = self.new_node(Ratio, f"{n}/{d}")
+        rat.value = Fraction(n, d)
         rat.set_lengths(None, None)
         self.get_node_val(rat, dep=None)
 
@@ -257,26 +264,41 @@ class SymbolsGraph:
         rat2 = self.rconst[(d, n)]
         return rat1, rat2
 
+    def get_or_create_const_length(self, length: float) -> Length:
+        if length not in self.lconst:
+            length_node = self.lconst[length] = self.new_node(Length, str(length))
+            length_node.value = length
+            self.get_node_val(length_node, None)
+        return self.lconst[length]
+
     def get_or_create_const(
-        self, const_str: str, const_name: str
-    ) -> tuple[Angle, Angle] | tuple[Ratio, Ratio]:
-        if const_name in (Predicate.CONSTANT_ANGLE.value, Predicate.S_ANGLE.value):
-            if "pi/" in const_str:
+        self, const_value: str, construction_name: str
+    ) -> tuple[Angle, Angle] | tuple[Ratio, Ratio] | Length:
+        if construction_name in (
+            Predicate.CONSTANT_ANGLE.value,
+            Predicate.S_ANGLE.value,
+        ):
+            if "pi/" in const_value:
                 # pi fraction
-                num, den = angle_to_num_den(const_str)
-            elif const_str.endswith("o"):
+                num, den = angle_to_num_den(const_value)
+            elif const_value.endswith("o"):
                 # degrees
-                num, den = simplify(int(const_str[:-1]), 180)
+                num, den = simplify(int(const_value[:-1]), 180)
             else:
-                raise ValueError("Could not interpret constant angle: %s", const_str)
+                raise ValueError("Could not interpret constant angle: %s", const_value)
             return self.get_or_create_const_ang(num, den)
 
-        elif const_name in (Predicate.CONSTANT_RATIO.value, "rconst2"):
-            if "/" in const_str:
-                num, den = ratio_to_num_den(const_str)
+        elif construction_name in (Predicate.CONSTANT_RATIO.value, "rconst2"):
+            if "/" in const_value:
+                num, den = ratio_to_num_den(const_value)
                 return self.get_or_create_const_rat(num, den)
 
-        raise NotImplementedError("Unsupported concept for constants: %s", const_name)
+        elif construction_name == Predicate.CONSTANT_LENGTH.value:
+            return self.get_or_create_const_length(float(const_value))
+
+        raise NotImplementedError(
+            "Unsupported construction for constants: %s", construction_name.name
+        )
 
     def get_or_create_segment(self, p1: Point, p2: Point, dep: "Dependency") -> Segment:
         """Get or create a Segment object between two Points p1 and p2."""

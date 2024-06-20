@@ -14,6 +14,7 @@ from geosolver.dependencies.dependency import Reason, Dependency
 from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.geometry import (
     Angle,
+    Length,
     Line,
     Symbol,
     Point,
@@ -111,6 +112,7 @@ class StatementAdder:
             Predicate.CONTRI_TRIANGLE_BOTH: self._add_contri_check,
             Predicate.CONSTANT_ANGLE: self._add_aconst,
             Predicate.CONSTANT_RATIO: self._add_rconst,
+            Predicate.CONSTANT_LENGTH: self._add_lconst,
         }
 
     def add(
@@ -416,12 +418,13 @@ class StatementAdder:
         c, d = dcd._obj.points
 
         dep = dep_body.build(self.statements_graph, perp)
+        was_already_equal = is_equal(a12, a21)
         self._make_equal(a12, a21, dep=dep)
 
         eqangle = Statement(Predicate.EQANGLE, [a, b, c, d, c, d, a, b])
         to_cache = [(perp, dep), (eqangle, dep)]
 
-        if not is_equal(a12, a21):
+        if not was_already_equal:
             return [dep], to_cache
         return [], to_cache
 
@@ -1407,4 +1410,22 @@ class StatementAdder:
             to_cache.append((rconst2, dep2))
             add.append(dep2)
 
+        return add, to_cache
+
+    def _add_lconst(
+        self, args: tuple[Point, Point, Length], dep_body: DependencyBody
+    ) -> tuple[list[Dependency], list[ToCache]]:
+        """Add new algebraic predicates of type eqratio-constant."""
+        a, b, length = args
+
+        ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)
+        l_ab = self.symbols_graph.get_node_val(ab, dep=None)
+
+        lconst = Statement(Predicate.CONSTANT_LENGTH, args)
+
+        lconst_dep = dep_body.build(self.statements_graph, lconst)
+        self._make_equal(length, l_ab, dep=lconst_dep)
+
+        add = [lconst_dep]
+        to_cache = [(lconst, lconst_dep)]
         return add, to_cache

@@ -85,15 +85,21 @@ def _arguments_to_str(args: list[str | int | "Symbol"]) -> list[str]:
 P = TypeVar("P")
 
 
-def _hash_unordered_set_of_points(name: str, args: list[P]) -> list[str | P]:
+def _hash_unordered_set_of_points(name: str, args: list[P]) -> tuple[str | P]:
     return (name,) + tuple(sorted(list(set(args))))
 
 
-def _hash_ordered_list_of_points(name: str, args: list[P]) -> list[str | P]:
+def _hash_unordered_set_of_points_with_value(
+    name: str, args: list[P]
+) -> tuple[str | P]:
+    return _hash_unordered_set_of_points(name, args[:-1]) + (args[-1],)
+
+
+def _hash_ordered_list_of_points(name: str, args: list[P]) -> tuple[str | P]:
     return (name,) + tuple(args)
 
 
-def _hash_point_then_set_of_points(name: str, args: list[P]):
+def _hash_point_then_set_of_points(name: str, args: list[P]) -> tuple[str | P]:
     return (name, args[0]) + tuple(sorted(args[1:]))
 
 
@@ -184,6 +190,7 @@ PREDICATE_TO_HASH = {
     Predicate.MIDPOINT: _hash_point_and_line,
     Predicate.CONSTANT_ANGLE: _hash_ordered_two_lines_with_value,
     Predicate.CONSTANT_RATIO: _hash_ordered_two_lines_with_value,
+    Predicate.CONSTANT_LENGTH: _hash_unordered_set_of_points_with_value,
     Predicate.EQANGLE: _hash_two_times_two_unorded_lines,
     Predicate.EQRATIO: _hash_two_times_two_unorded_lines,
     Predicate.EQANGLE6: _hash_two_times_two_unorded_lines,

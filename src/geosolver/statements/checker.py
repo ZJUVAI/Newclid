@@ -5,10 +5,12 @@ from geosolver.predicates import Predicate
 from geosolver.geometry import (
     Angle,
     Circle,
+    Length,
     Line,
     Point,
     Ratio,
     all_angles,
+    all_lengths,
     all_ratios,
     is_equal,
 )
@@ -56,6 +58,7 @@ class StatementChecker:
             Predicate.CONSTANT_ANGLE: self.check_aconst,
             Predicate.S_ANGLE: self.check_sangle,
             Predicate.CONSTANT_RATIO: self.check_rconst,
+            Predicate.CONSTANT_LENGTH: self.check_lconst,
             Predicate.COMPUTE_ANGLE: self.check_acompute,
             Predicate.COMPUTE_RATIO: self.check_rcompute,
             Predicate.SAMESIDE: self.check_sameside,
@@ -244,7 +247,7 @@ class StatementChecker:
 
     # Algebraic checks
 
-    def check_aconst(self, points: list[Point]) -> bool:
+    def check_aconst(self, points: tuple[Point, Point, Point, Point, Angle]) -> bool:
         """Check if the angle is equal to a certain constant."""
         a, b, c, d, angle = points
         num, den = angle_to_num_den(angle)
@@ -263,7 +266,7 @@ class StatementChecker:
                 return True
         return False
 
-    def check_sangle(self, points: list[Point]) -> bool:
+    def check_sangle(self, points: tuple[Point, Point, Point, Angle]) -> bool:
         a, b, c, angle = points
         num, den = angle_to_num_den(angle)
         ang, _ = self.symbols_graph.get_or_create_const_ang(num, den)
@@ -281,7 +284,7 @@ class StatementChecker:
                 return True
         return False
 
-    def check_rconst(self, points: list[Point]) -> bool:
+    def check_rconst(self, points: tuple[Point, Point, Point, Point, Ratio]) -> bool:
         """Check whether a ratio is equal to some given constant."""
         a, b, c, d, ratio = points
         num, den = ratio_to_num_den(ratio)
@@ -298,6 +301,19 @@ class StatementChecker:
 
         for rat1, _, _ in all_ratios(ab._val, cd._val):
             if is_equal(rat1, rat):
+                return True
+        return False
+
+    def check_lconst(self, points: tuple[Point, Point, Length]) -> bool:
+        """Check whether a length is equal to some given constant."""
+        a, b, length = points
+        ab = self.symbols_graph.get_segment(a, b)
+
+        if not ab or not ab.val:
+            return False
+
+        for len1, _ in all_lengths(ab):
+            if is_equal(len1, length):
                 return True
         return False
 

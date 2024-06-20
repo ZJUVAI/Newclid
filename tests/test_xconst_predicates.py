@@ -294,15 +294,10 @@ class TestConstants:
         success = solver.run()
         check.is_true(success)
 
-    @pytest.mark.skip
     def test_lconst(self):
         """Should be able to prescribe a constant lenght"""
-        solver = (
-            self.solver_builder.load_problem_from_txt(
-                "a = free a; " "b = lconst b a 3 ? lconst b a 3"
-            )
-            .load_defs_from_file("new_defs.txt")
-            .build()
-        )
+        solver = self.solver_builder.load_problem_from_txt(
+            "a = free a; " "b = lconst b a 3 ? lconst b a 3"
+        ).build()
         success = solver.run()
         check.is_true(success)

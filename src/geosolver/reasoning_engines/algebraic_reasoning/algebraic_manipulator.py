@@ -192,10 +192,10 @@ class AlgebraicManipulator(ReasoningEngine):
         self.atable.add_para(ab._val, cd._val, dep)
 
     def _add_perp(self, dep: "Dependency"):
-        a, b, c, d, _ = dep.statement.args
+        a, b, c, d = dep.statement.args
         ab = self.symbols_graph.get_line_thru_pair(a, b)
         cd = self.symbols_graph.get_line_thru_pair(c, d)
-        self.atable.add_const_angle(ab, cd, 90, dep)
+        self.atable.add_const_angle(ab.val, cd.val, 90, dep)
 
     def _add_eqangle(self, dep: "Dependency"):
         a, b, c, d, m, n, p, q = dep.statement.args
