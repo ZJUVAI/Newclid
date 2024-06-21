@@ -56,6 +56,8 @@ class AlgebraicManipulator(ReasoningEngine):
             Predicate.CONSTANT_LENGTH: self._add_lconst,
         }
 
+        self.derive_buffer = []
+
     def ingest(self, dependency: "Dependency") -> None:
         """Add new algebraic predicates."""
         adder = self.PREDICATE_TO_ADDER.get(dependency.statement.predicate)
@@ -64,15 +66,9 @@ class AlgebraicManipulator(ReasoningEngine):
 
     def resolve(self, **kwargs) -> list[Derivation]:
         """Derive new algebraic predicates."""
-        derives = []
-        ang_derives = self.derive_angle_algebra()
-        derives += ang_derives
-
-        cong_derives = self.derive_cong_algebra()
-        derives += cong_derives
-
-        rat_derives = self.derive_ratio_algebra()
-        derives += rat_derives
+        self.derive_angle_algebra()
+        self.derive_cong_algebra()
+        self.derive_ratio_algebra()
 
         if "a" in self.verbose:
             report(self.atable.v2e)
@@ -81,11 +77,12 @@ class AlgebraicManipulator(ReasoningEngine):
         if "r" in self.verbose:
             report(self.rtable.v2e)
 
-        return derives
+        res = self.derive_buffer
+        self.derive_buffer = []
+        return res
 
-    def derive_ratio_algebra(self) -> list[Derivation]:
+    def derive_ratio_algebra(self):
         """Derive new eqratio predicates."""
-        add = []
 
         for *x, why in self.rtable.get_all_eqs_and_why():
             dep_body = DependencyBody(
@@ -98,14 +95,14 @@ class AlgebraicManipulator(ReasoningEngine):
                     continue
 
                 (m, n), (p, q) = mn._obj.points, pq._obj.points
-                cong = Statement(Predicate.CONGRUENT_2, (m, n, p, q))
-                add.append(Derivation(cong, dep_body))
+                cong = Statement(Predicate.CONGRUENT, (m, n, p, q))
+                self.derive_buffer.append(Derivation(cong, dep_body))
             elif len(x) == 3:
                 mn, pq, v = x
                 (m, n) = mn._obj.points
                 num, denum = get_quotient(exp(v))
                 if pq == self.symbols_graph.get_or_create_const_rat(1, 1):
-                    add.append(
+                    self.derive_buffer.append(
                         Derivation(
                             Statement(
                                 Predicate.CONSTANT_LENGTH,
@@ -128,7 +125,7 @@ class AlgebraicManipulator(ReasoningEngine):
                 )
                 if is_equiv(ratio, ratio1):
                     continue
-                add.append(
+                self.derive_buffer.append(
                     Derivation(
                         Statement(Predicate.CONSTANT_RATIO, (m, n, p, q, ratio)),
                         dep_body,
@@ -143,13 +140,12 @@ class AlgebraicManipulator(ReasoningEngine):
                     *pq._obj.points,
                 )
                 eqratio = Statement(Predicate.EQRATIO, points)
-                add.append(Derivation(eqratio, dep_body))
+                self.derive_buffer.append(Derivation(eqratio, dep_body))
 
-        return add
+        return self.derive_buffer
 
-    def derive_angle_algebra(self) -> list[Derivation]:
+    def derive_angle_algebra(self):
         """Derive new eqangles predicates."""
-        added = []
 
         for x in self.atable.get_all_eqs_and_why():
             x, why = x[:-1], x[-1]
@@ -165,7 +161,7 @@ class AlgebraicManipulator(ReasoningEngine):
                 if not check_numerical(para):
                     continue
 
-                added.append(Derivation(para, dep))
+                self.derive_buffer.append(Derivation(para, dep))
 
             if len(x) == 3:
                 ef, pq, v = x
@@ -176,7 +172,7 @@ class AlgebraicManipulator(ReasoningEngine):
                 if not check_numerical(aconst):
                     continue
 
-                added.append(Derivation(aconst, dep))
+                self.derive_buffer.append(Derivation(aconst, dep))
 
             if len(x) == 4:
                 ab, cd, mn, pq = x
@@ -187,13 +183,12 @@ class AlgebraicManipulator(ReasoningEngine):
                     *pq._obj.points,
                 )
                 eqangle = Statement(Predicate.EQANGLE, points)
-                added.append(Derivation(eqangle, dep))
+                self.derive_buffer.append(Derivation(eqangle, dep))
 
-        return added
+        return self.derive_buffer
 
-    def derive_cong_algebra(self) -> list[Derivation]:
+    def derive_cong_algebra(self):
         """Derive new cong predicates."""
-        return []
 
     def _add_para(self, dep: "Dependency"):
         a, b, c, d = dep.statement.args
