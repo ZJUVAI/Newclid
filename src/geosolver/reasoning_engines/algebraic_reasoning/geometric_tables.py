@@ -642,7 +642,7 @@ class AngleTable(GeometricTable):
         if self.pi not in e:
             return super().modulo(e)
 
-        e[self.pi] = e[self.pi] % Coef(1)
+        e[self.pi] = e[self.pi] % Coef(1)  # why mod 1, should mod 2??
         return strip(e)
 
     def add_para(self, d1: Direction, d2: Direction, dep: "Dependency") -> None:
@@ -653,13 +653,11 @@ class AngleTable(GeometricTable):
     ) -> None:
         if ang and d2._obj.num > d1._obj.num:
             d1, d2 = d2, d1
-            ang = 180 - ang
+            ang = 1 - ang
 
         d1, d2 = self.get_name([d1, d2])
 
-        num, den = simplify(ang, 180)
-        ang = Coef(int(num) / int(den))
-        return super().add_eq3(d1, d2, ang, dep)
+        return super().add_eq3(d1, d2, Coef(ang), dep)
 
     def add_eqangle(
         self,

@@ -39,9 +39,7 @@ class AlgebraicManipulator(ReasoningEngine):
     def __init__(self, symbols_graph: "SymbolsGraph") -> None:
         self.symbols_graph = symbols_graph
 
-        self.atable = AngleTable(
-            "pi", self.symbols_graph.get_or_create_const_ang(180, 1)
-        )
+        self.atable = AngleTable("pi", self.symbols_graph.get_or_create_const_ang(1, 1))
         self.dtable = DistanceTable()
         self.rtable = RatioTable("1", self.symbols_graph.get_or_create_const_rat(1, 1))
         self.verbose = config.get("verbose", "")
@@ -207,7 +205,7 @@ class AlgebraicManipulator(ReasoningEngine):
         a, b, c, d = dep.statement.args
         ab = self.symbols_graph.get_line_thru_pair(a, b)
         cd = self.symbols_graph.get_line_thru_pair(c, d)
-        self.atable.add_const_angle(ab.val, cd.val, 90, dep)
+        self.atable.add_const_angle(ab.val, cd.val, 0.5, dep)
 
     def _add_eqangle(self, dep: "Dependency"):
         a, b, c, d, m, n, p, q = dep.statement.args
@@ -223,10 +221,7 @@ class AlgebraicManipulator(ReasoningEngine):
         )
         ab, cd = ab_cd._d
         mn, pq = mn_pq._d
-        if (ab, cd) == (pq, mn):
-            self.atable.add_const_angle(ab, cd, 90, dep)
-        else:
-            self.atable.add_eqangle(ab, cd, mn, pq, dep)
+        self.atable.add_eqangle(ab, cd, mn, pq, dep)
 
     def _add_eqratio(self, dep: "Dependency"):
         a, b, c, d, m, n, p, q = dep.statement.args
@@ -258,7 +253,7 @@ class AlgebraicManipulator(ReasoningEngine):
         )
         ab, cd = ab_cd._d
         num, den = angle_to_num_den(ang)
-        self.atable.add_const_angle(ab, cd, num * 180 / den % 180, dep)
+        self.atable.add_const_angle(ab, cd, num / den, dep)
 
     def _add_rconst(
         self, dep: "Dependency"

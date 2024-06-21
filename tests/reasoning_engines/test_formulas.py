@@ -21,7 +21,7 @@ class TestPythagorean:
         self.solver_builder = GeometricSolverBuilder()
         self.reasoning_fixture = reasoning_fixture
         points_names = ["a", "b", "c"]
-        lengths = ["3.0", "4.0", "5.0"]
+        lengths = ["3", "4", "5"]
 
         self.symbols_graph = (
             SymbolsGraphBuilder()

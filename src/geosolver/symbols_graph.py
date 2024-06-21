@@ -57,6 +57,13 @@ NODES_VALUES_MARKERS: dict[Type[Symbol], str] = {
 }
 
 
+def length_str(length):
+    res = f"{length:.3f}"
+    while res[-1] == "0" or res[-1] == ".":
+        res = res[:-1]
+    return res
+
+
 class SymbolsGraph:
     def __init__(self) -> None:
         self.type2nodes: dict[Type[Symbol], list[Symbol]] = {
@@ -267,9 +274,11 @@ class SymbolsGraph:
         rat2 = self.rconst[(d, n)]
         return rat1, rat2
 
-    def get_or_create_const_length(self, length: float) -> Length:
+    def get_or_create_const_length(self, length) -> Length:
         if length not in self.lconst:
-            length_node = self.lconst[length] = self.new_node(Length, str(length))
+            length_node = self.lconst[length] = self.new_node(
+                Length, length_str(length)
+            )
             length_node.value = length
             self.get_node_val(length_node, None)
         return self.lconst[length]
