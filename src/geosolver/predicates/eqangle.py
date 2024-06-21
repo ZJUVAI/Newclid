@@ -4,8 +4,7 @@ from typing_extensions import Self
 
 from geosolver.combinatorics import all_8points, cross_product, permutations_pairs
 from geosolver.dependencies.dependency import Dependency, Reason
-from geosolver.dependencies.dependency_building import DependencyBody
-from geosolver.dependencies.why_graph import WhyHyperGraph
+
 from geosolver.dependencies.why_predicates import (
     find_equal_pair,
     why_equal,
@@ -17,7 +16,6 @@ from geosolver.geometry import (
     Direction,
     Line,
     Point,
-    Ratio,
     all_angles,
     bfs_backtrack,
 )
@@ -34,7 +32,11 @@ import geosolver.predicates as preds
 
 from geosolver._lazy_loading import lazy_import
 
+
 if TYPE_CHECKING:
+    from geosolver.dependencies.dependency_building import DependencyBody
+    from geosolver.dependencies.why_graph import WhyHyperGraph
+
     import numpy
 
 np: "numpy" = lazy_import("numpy")
@@ -52,9 +54,9 @@ class EqAngle(Predicate):
 
     @staticmethod
     def add(
-        args: list[Point | Ratio | Angle],
-        dep_body: DependencyBody,
-        dep_graph: WhyHyperGraph,
+        args: list[Point],
+        dep_body: "DependencyBody",
+        dep_graph: "WhyHyperGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -134,7 +136,7 @@ class EqAngle(Predicate):
         mn: Line,
         pq: Line,
         dep_body: DependencyBody,
-        dep_graph: WhyHyperGraph,
+        dep_graph: "WhyHyperGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[ToCache]]:
@@ -213,7 +215,7 @@ class EqAngle(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: WhyHyperGraph, statement: Statement
+        statements_graph: "WhyHyperGraph", statement: Statement
     ) -> tuple[Optional[Reason], list[Dependency]]:
         a, b, c, d, m, n, p, q = statement.args
 
@@ -309,7 +311,7 @@ class EqAngle(Predicate):
         return None, why_eqangle
 
     @staticmethod
-    def check(args: list[Point | Angle], symbols_graph: SymbolsGraph) -> bool:
+    def check(args: list[Point], symbols_graph: SymbolsGraph) -> bool:
         """Check if two angles are equal."""
         a, b, c, d, m, n, p, q = args
 

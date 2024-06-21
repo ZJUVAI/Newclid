@@ -1,9 +1,8 @@
 from __future__ import annotations
-from typing import Generator
+from typing import TYPE_CHECKING, Generator
 from typing_extensions import Self
 
 from geosolver.dependencies.dependency import Dependency, Reason
-from geosolver.dependencies.why_graph import WhyHyperGraph
 from geosolver.dependencies.why_predicates import line_of_and_why
 from geosolver.geometry import Point
 from geosolver.numerical.geometries import PointNum
@@ -13,6 +12,9 @@ from geosolver.symbols_graph import SymbolsGraph
 
 
 import geosolver.predicates as preds
+
+if TYPE_CHECKING:
+    from geosolver.dependencies.why_graph import WhyHyperGraph
 
 
 class Collx(Predicate):
@@ -26,7 +28,7 @@ class Collx(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: WhyHyperGraph, statement: Statement
+        statements_graph: "WhyHyperGraph", statement: Statement
     ) -> tuple[Reason | None, list[Dependency]]:
         if preds.Coll.check(statement.args):
             args = list(set(statement.args))

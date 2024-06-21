@@ -1,11 +1,10 @@
 from __future__ import annotations
-from typing import Generator
+from typing import TYPE_CHECKING, Generator
 from typing_extensions import Self
 
 from geosolver.combinatorics import all_4points, permutations_pairs
 from geosolver.dependencies.dependency import Dependency, Reason
-from geosolver.dependencies.dependency_building import DependencyBody
-from geosolver.dependencies.why_graph import WhyHyperGraph
+
 
 from geosolver.geometry import Direction, Line, Point
 from geosolver.intrinsic_rules import IntrinsicRules
@@ -18,6 +17,10 @@ from geosolver.symbols_graph import SymbolsGraph, is_equal
 
 import geosolver.predicates as preds
 
+if TYPE_CHECKING:
+    from geosolver.dependencies.dependency_building import DependencyBody
+    from geosolver.dependencies.why_graph import WhyHyperGraph
+
 
 class Para(Predicate):
     """para A B C D -
@@ -29,8 +32,8 @@ class Para(Predicate):
     @staticmethod
     def add(
         args: list[Point],
-        dep_body: DependencyBody,
-        dep_graph: WhyHyperGraph,
+        dep_body: "DependencyBody",
+        dep_graph: "WhyHyperGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -60,7 +63,7 @@ class Para(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: WhyHyperGraph, statement: Statement
+        statements_graph: "WhyHyperGraph", statement: Statement
     ) -> tuple[Reason | None, list[Dependency]]:
         a, b, c, d = statement.args
 

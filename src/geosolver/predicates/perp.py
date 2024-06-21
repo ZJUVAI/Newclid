@@ -1,12 +1,12 @@
 from __future__ import annotations
-from typing import Generator, Optional
+from typing import TYPE_CHECKING, Generator, Optional
 from typing_extensions import Self
 
 from geosolver.combinatorics import all_4points, cross_product
 from geosolver.dependencies.dependency import Dependency, Reason
-from geosolver.dependencies.dependency_building import DependencyBody
-from geosolver.dependencies.why_graph import WhyHyperGraph
-from geosolver.geometry import Angle, Line, Point, Ratio
+
+
+from geosolver.geometry import Angle, Line, Point
 from geosolver.intrinsic_rules import IntrinsicRules
 from geosolver.numerical.geometries import LineNum, PointNum
 from geosolver.predicates.predicate import Predicate
@@ -15,6 +15,10 @@ from geosolver.symbols_graph import SymbolsGraph, is_equal
 
 import geosolver.predicates as preds
 from geosolver.predicates.eqangle import why_eqangle_directions
+
+if TYPE_CHECKING:
+    from geosolver.dependencies.why_graph import WhyHyperGraph
+    from geosolver.dependencies.dependency_building import DependencyBody
 
 
 class Perp(Predicate):
@@ -26,9 +30,9 @@ class Perp(Predicate):
 
     @staticmethod
     def add(
-        args: list[Point | Ratio | Angle],
-        dep_body: DependencyBody,
-        dep_graph: WhyHyperGraph,
+        args: list[Point],
+        dep_body: "DependencyBody",
+        dep_graph: "WhyHyperGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -115,7 +119,7 @@ class Perp(Predicate):
     def _maybe_make_para_from_perp(
         points: list[Point],
         dep_body: DependencyBody,
-        dep_graph: WhyHyperGraph,
+        dep_graph: "WhyHyperGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> Optional[tuple[list[Dependency], list[tuple[Statement, Dependency]]]]:
@@ -154,7 +158,7 @@ class Perp(Predicate):
         m: Point,
         n: Point,
         dep_body: DependencyBody,
-        dep_graph: WhyHyperGraph,
+        dep_graph: "WhyHyperGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -211,7 +215,7 @@ class Perp(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: WhyHyperGraph, statement: Statement
+        statements_graph: "WhyHyperGraph", statement: Statement
     ) -> tuple[Reason | None, list[Dependency]]:
         a, b, c, d = statement.args
         ab = statements_graph.symbols_graph.get_line(a, b)
