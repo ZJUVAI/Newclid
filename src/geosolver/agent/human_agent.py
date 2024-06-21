@@ -6,7 +6,7 @@ This is a useful tool for analysis and understanding how GeoSolver behaves.
 from __future__ import annotations
 from typing import NamedTuple, Optional, TypeVar
 
-from geosolver.predicates.eqangle import EqAngle
+import geosolver.predicates as preds
 from geosolver.reasoning_engines.engines_interface import Derivation
 from geosolver.statements.statement import Statement
 from geosolver.theorem import Theorem
@@ -388,7 +388,7 @@ class HumanAgent(DeductiveAgent):
     def _show_figure(self, proof: "Proof", block: bool = False):
         equal_angles = {}
         for eqangle in self._all_cached:
-            if eqangle.predicate != EqAngle.NAME:
+            if eqangle.predicate != preds.EqAngle.NAME:
                 continue
             hashed_eqangle = eqangle.hash_tuple
             if hashed_eqangle not in equal_angles:

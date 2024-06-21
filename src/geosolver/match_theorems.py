@@ -6,7 +6,8 @@ from typing import TYPE_CHECKING, Callable, Generator, Optional
 import geosolver.combinatorics as comb
 
 from geosolver.predicates.coll import Coll
-from geosolver.predicates.predicate_name import PredicateName
+from geosolver.predicates.eqangle import EqAngle6
+from geosolver.predicate_name import PredicateName
 from geosolver.agent.agents_interface import Mapping
 from geosolver.points_manipulation import (
     diff_point,
@@ -551,7 +552,7 @@ def match_eqangle6_eqangle6_ncoll_simtri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 B A B C Q P Q R, eqangle6 C A C B R P R Q, ncoll A B C => simtri A B C P Q R."""
-    enums = g_matcher(PredicateName.EQANGLE6.value)
+    enums = g_matcher(EqAngle6.NAME)
 
     record = set()
     for b, a, b, c, q, p, q, r in enums:
@@ -599,7 +600,7 @@ def match_eqangle6_eqangle6_ncoll_simtri2(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C => simtri2 A B C P Q R."""
-    enums = g_matcher(PredicateName.EQANGLE6.value)
+    enums = g_matcher(EqAngle6.NAME)
 
     record = set()
     for b, a, b, c, q, r, q, p in enums:
@@ -623,7 +624,7 @@ def match_eqangle6_eqangle6_ncoll_cong_contri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 B A B C Q P Q R, eqangle6 C A C B R P R Q, ncoll A B C, cong A B P Q => contri A B C P Q R."""
-    enums = g_matcher(PredicateName.EQANGLE6.value)
+    enums = g_matcher(EqAngle6.NAME)
 
     record = set()
     for b, a, b, c, q, p, q, r in enums:
@@ -677,7 +678,7 @@ def match_eqangle6_eqangle6_ncoll_cong_contri2(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C, cong A B P Q => contri2 A B C P Q R."""
-    enums = g_matcher(PredicateName.EQANGLE6.value)
+    enums = g_matcher(EqAngle6.NAME)
 
     record = set()
     for b, a, b, c, q, r, q, p in enums:
@@ -741,7 +742,7 @@ def match_eqangle6_ncoll_cyclic(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 P A P B Q A Q B, ncoll P Q A B => cyclic A B P Q."""
-    for a, b, a, c, x, y, x, z in g_matcher(PredicateName.EQANGLE6.value):
+    for a, b, a, c, x, y, x, z in g_matcher(EqAngle6.NAME):
         if (b, c) != (y, z) or a == x:
             continue
         if check_ncoll_numerical([x.num for x in [a, b, c, x]]):

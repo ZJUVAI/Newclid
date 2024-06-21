@@ -1,22 +1,21 @@
 """Utilities for string manipulation in the DSL."""
 
-from geosolver.predicates import Coll, Collx, Para
-from geosolver.predicates.eqangle import EqAngle
-from geosolver.predicates.perp import Perp
-from geosolver.predicates.predicate_name import PredicateName
+import geosolver.predicates as preds
+from geosolver.predicate_name import PredicateName
 from geosolver.listing import list_eqratio3
+from geosolver.pretty_angle import pretty_angle
 
 
 MAP_SYMBOL = {
-    "C": Coll.NAME,
-    "X": Collx.NAME,
-    "P": Para.NAME,
-    "T": Perp.NAME,
+    "C": preds.Coll.NAME,
+    "X": preds.Collx.NAME,
+    "P": preds.Para.NAME,
+    "T": preds.Perp.NAME,
     "M": PredicateName.MIDPOINT.value,
     "D": PredicateName.CONGRUENT.value,
     "I": PredicateName.CIRCLE.value,
     "O": PredicateName.CYCLIC.value,
-    "^": EqAngle.NAME,
+    "^": preds.EqAngle.NAME,
     "/": PredicateName.EQRATIO.value,
     "%": PredicateName.EQRATIO.value,
     "S": PredicateName.SIMILAR_TRIANGLE.value,
@@ -76,9 +75,6 @@ def pretty_nl(name: str, args: list[str]) -> str:
     if name in [PredicateName.MIDPOINT.value, "midpoint", "M"]:
         x, a, b = args
         return f"{x} is midpoint of {a}{b}"
-    if name in [PredicateName.EQANGLE6.value, "^"]:
-        pass
-
     if name in [PredicateName.EQRATIO.value, PredicateName.EQRATIO6.value, "/"]:
         return _ratio_pretty(args)
     if name == PredicateName.EQRATIO3.value:
@@ -140,16 +136,16 @@ def pretty(txt: tuple[str, ...]) -> str:
     if name == PredicateName.CONSTANT_RATIO.value:
         a, b, c, d, y = args
         return f"/ {pretty2r(a, b, c, d)} {y}"
-    if name == Coll.NAME:
+    if name == preds.Coll.NAME:
         return "C " + " ".join(args)
-    if name == Collx.NAME:
+    if name == preds.Collx.NAME:
         return "X " + " ".join(args)
     if name == PredicateName.CYCLIC.value:
         return "O " + " ".join(args)
     if name in [PredicateName.MIDPOINT.value, "midpoint"]:
         x, a, b = args
         return f"M {x} {a} {b}"
-    if name == EqAngle.NAME:
+    if name == preds.EqAngle.NAME:
         a, b, c, d, e, f, g, h = args
         return f"^ {pretty2a(a, b, c, d)} {pretty2a(e, f, g, h)}"
     if name == PredicateName.EQRATIO.value:
@@ -161,13 +157,13 @@ def pretty(txt: tuple[str, ...]) -> str:
     if name == PredicateName.CONGRUENT.value:
         a, b, c, d = args
         return f"D {a} {b} {c} {d}"
-    if name == Perp.NAME:
+    if name == preds.Perp.NAME:
         if len(args) == 2:  # this is algebraic derivation.
             ab, cd = args  # ab = 'd( ... )'
             return f"T {ab} {cd}"
         a, b, c, d = args
         return f"T {a} {b} {c} {d}"
-    if name == Para.NAME:
+    if name == preds.Para.NAME:
         if len(args) == 2:  # this is algebraic derivation.
             ab, cd = args  # ab = 'd( ... )'
             return f"P {ab} {cd}"
@@ -194,14 +190,3 @@ def pretty(txt: tuple[str, ...]) -> str:
         a, b, c, d = args
         return f"F {a} {b} {c} {d}"
     return " ".join(txt)
-
-
-def pretty_angle(a: str, b: str, c: str, d: str) -> str:
-    if b in (c, d):
-        a, b = b, a
-    if a == d:
-        c, d = d, c
-
-    if a == c:
-        return f"\u2220{b}{a}{d}"
-    return f"\u2220({a}{b}-{c}{d})"

@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Generator, Optional
+from typing import TYPE_CHECKING, Generator, Optional, Union
 from typing_extensions import Self
 
 from geosolver.geometry import Point, Ratio, Angle
@@ -18,14 +18,14 @@ if TYPE_CHECKING:
     from geosolver.statements.adder import ToCache
     from geosolver.symbols_graph import SymbolsGraph
 
-PredicateArgument = Point | Ratio | Angle
+PredicateArgument = Union[Point, Ratio, Angle]
 
 
 class Predicate(ABC):
     NAME: str
 
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def add(
         args: list[PredicateArgument],
         dep_body: "DependencyBody",
@@ -36,38 +36,38 @@ class Predicate(ABC):
         """Make a dependency body into a list of dependencies
         with the given arguments."""
 
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def why(
         statements_graph: "WhyHyperGraph", statement: "Statement"
     ) -> tuple[Optional[Reason], list[Dependency]]:
         """Resolve the reason and list of dependencies
         justifying why this predicate could be true."""
 
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def check(args: list[PredicateArgument], symbols_graph: SymbolsGraph) -> bool:
         """Symbolicaly checks if the predicate is true for the given arguments."""
 
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def check_numerical(args: list["PointNum" | Ratio | Angle]) -> bool:
         """Numericaly checks if the predicate is true for the given arguments."""
 
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def enumerate(
         symbols_graph: "SymbolsGraph",
     ) -> Generator[tuple[Point, ...], None, None]:
         """Enumerate all sets of arguments for which the predicate is true."""
 
-    @abstractmethod
     @staticmethod
+    @abstractmethod
     def pretty(args: list[str]) -> str:
         """Write the predicate in a natural language."""
 
-    @abstractmethod
     @classmethod
+    @abstractmethod
     def hash(
         cls: Self, args: list[PredicateArgument]
     ) -> tuple[str | PredicateArgument]:

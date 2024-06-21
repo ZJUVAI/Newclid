@@ -7,10 +7,9 @@ from typing import TYPE_CHECKING, Any
 
 from geosolver.defs.clause import Clause, Construction
 from geosolver.statements.statement import Statement
-from geosolver.predicates.predicate_name import PredicateName
+from geosolver.predicate_name import PredicateName
 
-import geosolver.pretty as pt
-
+from geosolver.pretty import pretty
 from geosolver.ratios import simplify
 
 if TYPE_CHECKING:
@@ -157,7 +156,7 @@ def setup_str_from_problem(
             deps_str = []
             for dep in p2deps[gr]:
                 ref_str = "{:02}".format(ref)
-                dep_str = pt.pretty(dep)
+                dep_str = pretty(dep)
 
                 if dep[0] == PredicateName.CONSTANT_ANGLE.value:
                     m, n = map(int, dep[-1].split("pi/"))
@@ -171,12 +170,12 @@ def setup_str_from_problem(
 
     string = "{S} " + " ; ".join([s.strip() for s in string])
     goal = problem.goal
-    string += " ? " + pt.pretty(goal.hash_tuple)
+    string += " ? " + pretty(goal.hash_tuple)
     return string
 
 
 def compare_fn(dep: "Dependency") -> tuple["Dependency", str]:
-    return (dep, pt.pretty(dep))
+    return (dep, pretty(dep))
 
 
 def sort_deps(deps: list["Dependency"]) -> list["Dependency"]:

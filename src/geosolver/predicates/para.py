@@ -16,7 +16,7 @@ from geosolver.statements.statement import Statement, hashed_unordered_two_lines
 from geosolver.dependencies.why_predicates import why_equal
 from geosolver.symbols_graph import SymbolsGraph, is_equal
 
-from geosolver.predicates.coll import Coll
+import geosolver.predicates as preds
 
 
 class Para(Predicate):
@@ -73,7 +73,7 @@ class Para(Predicate):
             if {a, b} == {c, d}:
                 return None, []
 
-            coll = Statement(Coll.NAME, list({a, b, c, d}))
+            coll = Statement(preds.Coll.NAME, list({a, b, c, d}))
             coll_dep = statements_graph.build_resolved_dependency(coll, use_cache=False)
             return None, [coll_dep]
 
@@ -82,7 +82,7 @@ class Para(Predicate):
             x_, y_ = xy.points
             if {x, y} == {x_, y_}:
                 continue
-            collx = Statement(Coll.NAME, [x, y, x_, y_])
+            collx = Statement(preds.Coll.NAME, [x, y, x_, y_])
             collx_dep = statements_graph.build_resolved_dependency(
                 collx, use_cache=False
             )
@@ -104,7 +104,7 @@ class Para(Predicate):
 
     @staticmethod
     def check_numerical(args: list[PointNum]) -> bool:
-        if Coll.check_numerical(args):
+        if preds.Coll.check_numerical(args):
             return True
 
         a, b, c, d = args

@@ -9,7 +9,11 @@ from geosolver.agent.breadth_first_search import BFSDD, BFSDDAR
 
 class AgentRegistry:
     def __init__(self) -> None:
-        self.agents = {"bfsddar": BFSDDAR, "bfsdd": BFSDD, "human": HumanAgent}
+        self.agents = {
+            "bfsddar": BFSDDAR,
+            "bfsdd": BFSDD,
+            "human": HumanAgent,
+        }
 
     def register(
         self,

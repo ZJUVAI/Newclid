@@ -1,10 +1,8 @@
 from typing import TYPE_CHECKING
 
-from geosolver.predicates.coll import Coll
-from geosolver.predicates.para import Para
-from geosolver.predicates.perp import Perp
+import geosolver.predicates as preds
 from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
-from geosolver.predicates.predicate_name import PredicateName
+from geosolver.predicate_name import PredicateName
 from geosolver.geometry import (
     Angle,
     Circle,
@@ -38,7 +36,6 @@ class StatementChecker:
             PredicateName.CONGRUENT: self.check_cong,
             PredicateName.CIRCLE: self.check_circle,
             PredicateName.CYCLIC: self.check_cyclic,
-            PredicateName.EQANGLE6: self.check_const_or_eqangle,
             PredicateName.EQRATIO: self.check_const_or_eqratio,
             PredicateName.EQRATIO3: self.check_eqratio3,
             PredicateName.EQRATIO6: self.check_const_or_eqratio,
@@ -300,19 +297,19 @@ class StatementChecker:
     # Negative checks (with numerical double check)
 
     def check_ncoll(self, points: list[Point]) -> bool:
-        if Coll.check(points):
+        if preds.Coll.check(points):
             return False
-        return not Coll.check_numerical([p.num for p in points])
+        return not preds.Coll.check_numerical([p.num for p in points])
 
     def check_npara(self, points: list[Point]) -> bool:
-        if Para.check(points):
+        if preds.Para.check(points):
             return False
-        return not Para.check_numerical([p.num for p in points])
+        return not preds.Para.check_numerical([p.num for p in points])
 
     def check_nperp(self, points: list[Point]) -> bool:
-        if Perp.check(points):
+        if preds.Perp.check(points):
             return False
-        return not Perp.check_numerical([p.num for p in points])
+        return not preds.Perp.check_numerical([p.num for p in points])
 
     # Numerical only checks
 

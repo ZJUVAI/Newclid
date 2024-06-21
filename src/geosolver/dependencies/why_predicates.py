@@ -3,9 +3,8 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Callable, Optional, TypeVar
 
 
-from geosolver.predicates.coll import Coll
-from geosolver.predicates.collx import Collx
-from geosolver.predicates.para import Para
+import geosolver.predicates as preds
+
 from geosolver.statements.statement import Statement
 
 from geosolver.dependencies.dependency import Dependency, Reason
@@ -21,8 +20,7 @@ from geosolver.geometry import (
     all_ratios,
     bfs_backtrack,
 )
-from geosolver.predicates.predicate_name import PredicateName
-from geosolver.symbols_graph import is_equal
+from geosolver.predicate_name import PredicateName
 
 
 if TYPE_CHECKING:
@@ -68,7 +66,7 @@ def _why_midpoint(
     m, a, b = statement.args
     ma = statements_graph.symbols_graph.get_segment(m, a)
     mb = statements_graph.symbols_graph.get_segment(m, b)
-    coll = Statement(Coll.NAME, [m, a, b])
+    coll = Statement(preds.Coll.NAME, [m, a, b])
     coll_dep = statements_graph.build_resolved_dependency(coll, use_cache=False)
     return None, [coll_dep] + why_equal(ma, mb)
 
@@ -194,22 +192,22 @@ def _why_eqratio(
         )
         return None, why_eqratio
 
-    if is_equal(ab, mn) or is_equal(cd, pq):
-        cong1 = Statement(PredicateName.CONGRUENT, [a, b, m, n])
-        dep1 = statements_graph.build_resolved_dependency(cong1, use_cache=False)
-        cong2 = Statement(PredicateName.CONGRUENT, [c, d, p, q])
-        dep2 = statements_graph.build_resolved_dependency(cong2, use_cache=False)
-        why_eqratio += [dep1, dep2]
-    elif is_equal(ab, cd) or is_equal(mn, pq):
-        cong1 = Statement(PredicateName.CONGRUENT, [a, b, c, d])
-        dep1 = statements_graph.build_resolved_dependency(cong1, use_cache=False)
-        cong2 = Statement(PredicateName.CONGRUENT, [m, n, p, q])
-        dep2 = statements_graph.build_resolved_dependency(cong2, use_cache=False)
-        why_eqratio += [dep1, dep2]
-    elif ab._val and cd._val and mn._val and pq._val:
-        why_eqratio = _why_eqratio_directions(
-            statements_graph, ab._val, cd._val, mn._val, pq._val
-        )
+    # if is_equal(ab, mn) or is_equal(cd, pq):
+    #     cong1 = Statement(PredicateName.CONGRUENT, [a, b, m, n])
+    #     dep1 = statements_graph.build_resolved_dependency(cong1, use_cache=False)
+    #     cong2 = Statement(PredicateName.CONGRUENT, [c, d, p, q])
+    #     dep2 = statements_graph.build_resolved_dependency(cong2, use_cache=False)
+    #     why_eqratio += [dep1, dep2]
+    # elif is_equal(ab, cd) or is_equal(mn, pq):
+    #     cong1 = Statement(PredicateName.CONGRUENT, [a, b, c, d])
+    #     dep1 = statements_graph.build_resolved_dependency(cong1, use_cache=False)
+    #     cong2 = Statement(PredicateName.CONGRUENT, [m, n, p, q])
+    #     dep2 = statements_graph.build_resolved_dependency(cong2, use_cache=False)
+    #     why_eqratio += [dep1, dep2]
+    # elif ab._val and cd._val and mn._val and pq._val:
+    #     why_eqratio = _why_eqratio_directions(
+    #         statements_graph, ab._val, cd._val, mn._val, pq._val
+    #     )
 
     return None, why_eqratio
 
@@ -237,13 +235,13 @@ def _why_aconst(
             if statements_graph.statements_checker.check_coll(args):
                 if len(set(args)) <= 2:
                     continue
-                coll = Statement(Coll.NAME, args)
+                coll = Statement(preds.Coll.NAME, args)
                 coll_dep = statements_graph.build_resolved_dependency(
                     coll, use_cache=False
                 )
                 why_aconst.append(coll_dep)
             else:
-                para = Statement(Para.NAME, args)
+                para = Statement(preds.Para.NAME, args)
                 para_dep = statements_graph.build_resolved_dependency(
                     para, use_cache=False
                 )
@@ -300,7 +298,6 @@ PREDICATE_TO_WHY: dict[
     PredicateName.CONGRUENT: _why_cong,
     PredicateName.CYCLIC: _why_cyclic,
     PredicateName.CIRCLE: _why_circle,
-    PredicateName.EQANGLE6: "_why_eqangle",
     PredicateName.EQRATIO: _why_eqratio,
     PredicateName.EQRATIO6: _why_eqratio,
     PredicateName.CONSTANT_ANGLE: _why_aconst,
@@ -355,10 +352,10 @@ def why_maybe_make_equal_pairs(
     if ab != mn:
         return
     why = []
-    eqpredicate = Para.NAME if isinstance(ab, Line) else PredicateName.CONGRUENT
+    eqpredicate = preds.Para.NAME if isinstance(ab, Line) else PredicateName.CONGRUENT
     colls = [a, b, m, n]
-    if len(set(colls)) > 2 and eqpredicate is Para.NAME:
-        collx = Statement(Collx.NAME, colls)
+    if len(set(colls)) > 2 and eqpredicate is preds.Para.NAME:
+        collx = Statement(preds.Collx.NAME, colls)
         why.append(statements_graph.build_resolved_dependency(collx, use_cache=False))
 
     eq_statement = Statement(eqpredicate, [c, d, p, q])

@@ -4,7 +4,6 @@ import numpy as np
 import pytest_check as check
 from geosolver.geometry import Angle
 from geosolver.numerical.angles import ang_between
-from geosolver.numerical.check import check_coll_numerical, check_eqangle_numerical
 from geosolver.numerical.geometries import (
     CircleNum,
     HalfLine,
@@ -50,6 +49,8 @@ from geosolver.numerical.sketch import (
     sketch_trisegment,
 )
 import geosolver.numerical.sketch
+from geosolver.predicates.coll import Coll
+from geosolver.predicates.eqangle import EqAngle
 from geosolver.ratios import simplify
 
 
@@ -73,10 +74,10 @@ class TestNumerical:
         c = PointNum(np.cos(angc), np.sin(angc)) * rnd_gen.uniform(0.2, 0.8)
 
         x, y, z, i = sketch_2l1c([a, b, c, p])
-        check.is_true(check_coll_numerical([x, c, a]))
-        check.is_true(check_coll_numerical([y, c, b]))
+        check.is_true(Coll.check_numerical([x, c, a]))
+        check.is_true(Coll.check_numerical([y, c, b]))
         check.almost_equal(z.distance(p), 1.0)
-        check.is_true(check_coll_numerical([p, i, z]))
+        check.is_true(Coll.check_numerical([p, i, z]))
         check.is_true(LineNum(i, x).is_perp(LineNum(c, a)))
         check.is_true(LineNum(i, y).is_perp(LineNum(c, b)))
         check.almost_equal(i.distance(x), i.distance(y))
@@ -87,10 +88,10 @@ class TestNumerical:
         a, b, c = geosolver.numerical.sketch.random_points(3, rnd_gen)
         x, y, z = sketch_3peq([a, b, c], rnd_gen=rnd_gen)
 
-        check.is_true(check_coll_numerical([a, b, x]))
-        check.is_true(check_coll_numerical([a, c, y]))
-        check.is_true(check_coll_numerical([b, c, z]))
-        check.is_true(check_coll_numerical([x, y, z]))
+        check.is_true(Coll.check_numerical([a, b, x]))
+        check.is_true(Coll.check_numerical([a, c, y]))
+        check.is_true(Coll.check_numerical([b, c, z]))
+        check.is_true(Coll.check_numerical([x, y, z]))
         check.almost_equal(z.distance(x), z.distance(y))
 
     def test_sketch_aline(self):
@@ -199,7 +200,7 @@ class TestNumerical:
         points = geosolver.numerical.sketch.random_points(5, rnd_gen=rnd_gen)
         x = sketch_eqangle3(points).sample_within(points, rnd_gen=rnd_gen)[0]
         a, b, d, e, f = points
-        check.is_true(check_eqangle_numerical([x, a, x, b, d, e, d, f]))
+        check.is_true(EqAngle.check_numerical([x, a, x, b, d, e, d, f]))
 
     def test_sketch_eqangle2(self):
         rnd_gen = np.random.default_rng()
@@ -330,7 +331,7 @@ class TestNumerical:
 
     def test_sketch_triangle(self):
         a, b, c = sketch_triangle([], rnd_gen=np.random.default_rng())
-        check.is_false(check_coll_numerical([a, b, c]))
+        check.is_false(Coll.check_numerical([a, b, c]))
 
     def test_sketch_triangle12(self):
         a, b, c = sketch_triangle12([], rnd_gen=np.random.default_rng())

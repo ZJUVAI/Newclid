@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Optional
 
 from geosolver.predicates.coll import Coll
 from geosolver.predicates.collx import Collx
-from geosolver.predicates.predicate_name import NUMERICAL_PREDICATES, PredicateName
+from geosolver.predicate_name import NUMERICAL_PREDICATES, PredicateName
 from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE
 from geosolver.statements.statement import Statement

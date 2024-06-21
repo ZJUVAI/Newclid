@@ -2,8 +2,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Callable, Optional
 import pytest
 
-from geosolver.agent.human_agent import HumanAgent
 from geosolver.api import GeometricSolverBuilder
+from geosolver.agent.human_agent import HumanAgent
 from tests.fixtures import build_until_works
 
 if TYPE_CHECKING:

@@ -1,7 +1,8 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
-from geosolver.predicates.coll import Coll
-from geosolver.predicates.predicate_name import PredicateName
+import geosolver.predicates as preds
+
+from geosolver.predicate_name import PredicateName
 import geosolver.geometry as gm
 
 
@@ -28,7 +29,7 @@ def check_circle_numerical(points: list[PointNum]) -> bool:
 
 
 def check_ncoll_numerical(points: list[PointNum]) -> bool:
-    return not Coll.check_numerical(points)
+    return not preds.Coll.check_numerical(points)
 
 
 def check_sangle_numerical(args: list[PointNum | gm.Angle]) -> bool:
@@ -110,7 +111,9 @@ def check_cong_numerical(points: list[PointNum]) -> bool:
 
 def check_midp_numerical(points: list[PointNum]) -> bool:
     a, b, c = points
-    return Coll.check_numerical(points) and close_enough(a.distance(b), a.distance(c))
+    return preds.Coll.check_numerical(points) and close_enough(
+        a.distance(b), a.distance(c)
+    )
 
 
 def check_simtri_numerical(points: list[PointNum]) -> bool:
@@ -155,7 +158,6 @@ PREDICATE_TO_NUMERICAL_CHECK = {
     PredicateName.CONGRUENT: check_cong_numerical,
     PredicateName.CIRCLE: check_circle_numerical,
     PredicateName.CYCLIC: check_cyclic_numerical,
-    PredicateName.EQANGLE6: "check_eqangle_numerical",
     PredicateName.EQRATIO: check_eqratio_numerical,
     PredicateName.EQRATIO3: check_eqratio3_numerical,
     PredicateName.EQRATIO6: check_eqratio_numerical,

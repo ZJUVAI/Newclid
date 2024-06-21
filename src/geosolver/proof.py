@@ -19,13 +19,12 @@ from geosolver.numerical.geometries import (
     reduce,
 )
 from geosolver.intrinsic_rules import IntrinsicRules
-from geosolver.predicates.eqangle import EqAngle
-from geosolver.predicates.para import Para
+import geosolver.predicates as preds
 from geosolver.reasoning_engines.engines_interface import ReasoningEngine
 from geosolver.statements.statement import Statement
 from geosolver.defs.definition import Definition
 from geosolver.theorem import Theorem
-from geosolver.predicates.predicate_name import PredicateName
+from geosolver.predicate_name import PredicateName
 from geosolver.agent.agents_interface import (
     Action,
     Feedback,
@@ -278,7 +277,7 @@ class Proof:
         premise: "Construction",
         p_args: list["Point"],
     ) -> Tuple[Optional[Dependency], bool]:
-        if premise.name in [Para.NAME, PredicateName.CONGRUENT.value]:
+        if premise.name in [preds.Para.NAME, PredicateName.CONGRUENT.value]:
             a, b, c, d = p_args
             if {a, b} == {c, d}:
                 return None, False
@@ -286,10 +285,7 @@ class Proof:
         if theorem.name in [
             "cong_cong_eqangle6_ncoll_contri*",
             "eqratio6_eqangle6_ncoll_simtri*",
-        ] and premise.name in [
-            EqAngle.NAME,
-            PredicateName.EQANGLE6.value,
-        ]:  # SAS or RAR
+        ] and premise.name in [preds.EqAngle.NAME, preds.EqAngle6.NAME]:  # SAS or RAR
             b, a, b, c, y, x, y, z = p_args
             if not same_clock(a.num, b.num, c.num, x.num, y.num, z.num):
                 p_args = b, a, b, c, y, z, y, x

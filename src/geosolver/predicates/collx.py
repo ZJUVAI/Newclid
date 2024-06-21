@@ -11,8 +11,8 @@ from geosolver.predicates.predicate import Predicate
 from geosolver.statements.statement import Statement, hashed_unordered_two_lines_points
 from geosolver.symbols_graph import SymbolsGraph
 
-from geosolver.predicates.coll import Coll
-from geosolver.predicates.para import Para
+
+import geosolver.predicates as preds
 
 
 class Collx(Predicate):
@@ -22,23 +22,23 @@ class Collx(Predicate):
     def add(
         *args, **kwargs
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
-        return Coll.add(*args, **kwargs)
+        return preds.Coll.add(*args, **kwargs)
 
     @staticmethod
     def why(
         statements_graph: WhyHyperGraph, statement: Statement
     ) -> tuple[Reason | None, list[Dependency]]:
-        if Coll.check(statement.args):
+        if preds.Coll.check(statement.args):
             args = list(set(statement.args))
-            coll = Statement(Coll.NAME, args)
+            coll = Statement(preds.Coll.NAME, args)
             cached_dep = statements_graph.dependency_cache.get(coll)
             if cached_dep is not None:
                 return None, [cached_dep]
             _, why = line_of_and_why(args)
             return None, why
 
-        para = Statement(Para.NAME, statement.args)
-        return Para.why(statements_graph, para)
+        para = Statement(preds.Para.NAME, statement.args)
+        return preds.Para.why(statements_graph, para)
 
     @staticmethod
     def check(args: list[Point], symbols_graph: SymbolsGraph) -> bool:

@@ -26,7 +26,7 @@ from geosolver.agent.agents_interface import (
 )
 from geosolver.match_theorems import MatchCache
 from geosolver.predicates.eqangle import EqAngle
-from geosolver.predicates.predicate_name import PredicateName
+from geosolver.predicate_name import PredicateName
 from geosolver.reasoning_engines.engines_interface import Derivation
 
 

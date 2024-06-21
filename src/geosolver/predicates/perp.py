@@ -13,10 +13,8 @@ from geosolver.predicates.predicate import Predicate
 from geosolver.statements.statement import Statement, hashed_unordered_two_lines_points
 from geosolver.symbols_graph import SymbolsGraph, is_equal
 
-from geosolver.predicates.coll import Coll
-from geosolver.predicates.collx import Collx
-from geosolver.predicates.para import Para
-from geosolver.predicates.eqangle import EqAngle, why_eqangle_directions
+import geosolver.predicates as preds
+from geosolver.predicates.eqangle import why_eqangle_directions
 
 
 class Perp(Predicate):
@@ -77,7 +75,7 @@ class Perp(Predicate):
                 and IntrinsicRules.PERP_FROM_PARA not in disabled_intrinsic_rules
             ):
                 perp = Statement(Perp.NAME, list(args))
-                para = Statement(Para.NAME, [x, y, x_, y_])
+                para = Statement(preds.Para.NAME, [x, y, x_, y_])
                 dep_body = dep_body.extend(
                     dep_graph,
                     perp,
@@ -106,7 +104,7 @@ class Perp(Predicate):
         was_already_equal = is_equal(a12, a21)
         symbols_graph.make_equal(a12, a21, dep=dep)
 
-        eqangle = Statement(EqAngle.NAME, [a, b, c, d, c, d, a, b])
+        eqangle = Statement(preds.EqAngle.NAME, [a, b, c, d, c, d, a, b])
         to_cache = [(perp, dep), (eqangle, dep)]
 
         if not was_already_equal:
@@ -165,23 +163,23 @@ class Perp(Predicate):
         extends = [Statement(Perp.NAME, [x, y, m, n])]
         if {a, b} == {x, y}:
             pass
-        elif Para.check([a, b, x, y], symbols_graph):
-            extends.append(Statement(Para.NAME, [a, b, x, y]))
-        elif Coll.check([a, b, x, y], dep_graph):
-            extends.append(Statement(Coll.NAME, set(list([a, b, x, y]))))
+        elif preds.Para.check([a, b, x, y], symbols_graph):
+            extends.append(Statement(preds.Para.NAME, [a, b, x, y]))
+        elif preds.Coll.check([a, b, x, y], dep_graph):
+            extends.append(Statement(preds.Coll.NAME, set(list([a, b, x, y]))))
         else:
             return None
 
         if m in [c, d] or n in [c, d] or c in [m, n] or d in [m, n]:
             pass
-        elif Coll.check([c, d, m], dep_graph):
-            extends.append(Statement(Coll.NAME, [c, d, m]))
-        elif Coll.check([c, d, n], dep_graph):
-            extends.append(Statement(Coll.NAME, [c, d, n]))
-        elif Coll.check([c, m, n], dep_graph):
-            extends.append(Statement(Coll.NAME, [c, m, n]))
-        elif Coll.check([d, m, n], dep_graph):
-            extends.append(Statement(Coll.NAME, [d, m, n]))
+        elif preds.Coll.check([c, d, m], dep_graph):
+            extends.append(Statement(preds.Coll.NAME, [c, d, m]))
+        elif preds.Coll.check([c, d, n], dep_graph):
+            extends.append(Statement(preds.Coll.NAME, [c, d, n]))
+        elif preds.Coll.check([c, m, n], dep_graph):
+            extends.append(Statement(preds.Coll.NAME, [c, m, n]))
+        elif preds.Coll.check([d, m, n], dep_graph):
+            extends.append(Statement(preds.Coll.NAME, [d, m, n]))
         else:
             dep_body = dep_body.extend_many(
                 dep_graph,
@@ -189,7 +187,7 @@ class Perp(Predicate):
                 extends,
                 extention_reason=Reason(IntrinsicRules.PARA_FROM_PERP),
             )
-            return Para.add(
+            return preds.Para.add(
                 [c, d, m, n],
                 dep_body,
                 dep_graph=dep_graph,
@@ -203,7 +201,7 @@ class Perp(Predicate):
             extends,
             extention_reason=Reason(IntrinsicRules.PARA_FROM_PERP),
         )
-        return Coll.add(
+        return preds.Coll.add(
             list(set([c, d, m, n])),
             dep_body,
             dep_graph=dep_graph,
@@ -230,7 +228,7 @@ class Perp(Predicate):
 
             if {x, y} == {x_, y_}:
                 continue
-            collx = Statement(Collx.NAME, [x, y, x_, y_])
+            collx = Statement(preds.Collx.NAME, [x, y, x_, y_])
             why_perp.append(
                 statements_graph.build_resolved_dependency(collx, use_cache=False)
             )

@@ -1,9 +1,8 @@
 from typing import TYPE_CHECKING, Any, Optional
 
 import geosolver.geometry as gm
-from geosolver.predicates import Coll, Para, Perp
-from geosolver.predicates.eqangle import EqAngle
-from geosolver.predicates.predicate_name import PredicateName
+import geosolver.predicates as preds
+from geosolver.predicate_name import PredicateName
 from geosolver.numerical.angles import ang_of
 from geosolver.numerical.check import clock
 from geosolver.numerical.geometries import (
@@ -330,15 +329,15 @@ def highlight(
     if name == PredicateName.CYCLIC.value:
         a, b, c, d = args
         _draw_circle(ax, CircleNum(p1=a, p2=b, p3=c), color=color1, lw=2.0)
-    if name == Coll.NAME:
+    if name == preds.Coll.NAME:
         a, b, c = args
         a, b = max(a, b, c), min(a, b, c)
         _draw_line(ax, a, b, color=color1, lw=2.0)
-    if name == Para.NAME:
+    if name == preds.Para.NAME:
         a, b, c, d = args
         _draw_line(ax, a, b, color=color1, lw=2.0)
         _draw_line(ax, c, d, color=color2, lw=2.0)
-    if name == EqAngle.NAME:
+    if name == preds.EqAngle.NAME:
         a, b, c, d, e, f, g, h = args
 
         x = line_line_intersection(LineNum(a, b), LineNum(c, d))
@@ -365,7 +364,7 @@ def highlight(
         if color2 == "--":
             color2 = "red"
         draw_angle(ax, e, f, h, color=color2, alpha=0.5)
-    if name == Perp.NAME:
+    if name == preds.Perp.NAME:
         a, b, c, d = args
         _draw_line(ax, a, b, color=color1, lw=2.0)
         _draw_line(ax, c, d, color=color1, lw=2.0)

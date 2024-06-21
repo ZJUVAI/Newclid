@@ -20,7 +20,7 @@ from geosolver.geometry import (
     Segment,
     RatioValue,
 )
-from geosolver.predicates.predicate_name import PredicateName
+from geosolver.predicate_name import PredicateName
 
 
 if TYPE_CHECKING:
@@ -59,7 +59,6 @@ class StatementsEnumerator:
             PredicateName.CONGRUENT: self._all_congs,
             PredicateName.CIRCLE: self._all_circles,
             PredicateName.CYCLIC: self._all_cyclics,
-            PredicateName.EQANGLE6: self._all_eqangles_6points,
             PredicateName.EQRATIO: self._all_eqratios_8points,
             PredicateName.EQRATIO6: self._all_eqratios_6points,
         }
@@ -93,31 +92,6 @@ class StatementsEnumerator:
                 for pair1, pair2 in cross_product(pairs1, pairs2):
                     (l1, l2), (l3, l4) = pair1, pair2
                     yield l1, l2, l3, l4
-
-    def _all_eqangles_6points(self) -> Generator[tuple[Point, ...], None, None]:
-        """List all sets of 6 points that make two equal angles."""
-        record = set()
-        for a, b, c, d, e, f, g, h in self._all_eqangles_8points():
-            if (
-                a not in (c, d)
-                and b not in (c, d)
-                or e not in (g, h)
-                and f not in (g, h)
-            ):
-                continue
-
-            if b in (c, d):
-                a, b = b, a  # now a in c, d
-            if f in (g, h):
-                e, f = f, e  # now e in g, h
-            if a == d:
-                c, d = d, c  # now a == c
-            if e == h:
-                g, h = h, g  # now e == g
-            if (a, b, c, d, e, f, g, h) in record:
-                continue
-            record.add((a, b, c, d, e, f, g, h))
-            yield a, b, c, d, e, f, g, h  # where a==c, e==g
 
     def _all_congs(self) -> Generator[tuple[Point, ...], None, None]:
         for lenght in self.symbols_graph.type2nodes[Length]:

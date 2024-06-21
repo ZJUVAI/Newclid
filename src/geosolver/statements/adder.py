@@ -3,14 +3,12 @@ from typing import TYPE_CHECKING, Optional
 
 
 import geosolver.combinatorics as comb
-from geosolver.predicates.coll import Coll
+import geosolver.predicates as preds
+
 from geosolver.intrinsic_rules import IntrinsicRules
-from geosolver.predicates.collx import Collx
-from geosolver.predicates.eqangle import EqAngle
-from geosolver.predicates.para import Para
 from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
 
-from geosolver.predicates.predicate_name import PredicateName
+from geosolver.predicate_name import PredicateName
 import geosolver.numerical.check as nm
 
 
@@ -60,7 +58,6 @@ class StatementAdder:
             PredicateName.CONGRUENT_2: self._add_cong2,
             PredicateName.CIRCLE: self._add_circle,
             PredicateName.CYCLIC: self._add_cyclic,
-            PredicateName.EQANGLE6: "self._add_eqangle",
             PredicateName.S_ANGLE: self._add_s_angle,
             PredicateName.EQRATIO: self._add_eqratio,
             PredicateName.EQRATIO6: self._add_eqratio,
@@ -152,7 +149,7 @@ class StatementAdder:
         self, points: list[Point], dep_body: DependencyBody
     ) -> tuple[list[Dependency], list[ToCache]]:
         m, a, b = points
-        add_coll, to_cache_coll = Coll.add(points, dep_body)
+        add_coll, to_cache_coll = preds.Coll.add(points, dep_body)
         add_cong, to_cache_cong = self._add_cong([m, a, m, b], dep_body)
         return add_coll + add_cong, to_cache_coll + to_cache_cong
 
@@ -651,7 +648,7 @@ class StatementAdder:
                 and IntrinsicRules.ACONST_FROM_PARA not in self.DISABLED_INTRINSIC_RULES
             ):
                 aconst = Statement(PredicateName.CONSTANT_ANGLE, tuple(args))
-                para = Statement(Para.NAME, [x, y, x_, y_])
+                para = Statement(preds.Para.NAME, [x, y, x_, y_])
                 dep_body = dep_body.extend(
                     self.statements_graph,
                     aconst,
@@ -733,7 +730,7 @@ class StatementAdder:
                 p_, q_ = pq.val._obj.points
                 if {p, q} == {p_, q_}:
                     continue
-                paras.append(Statement(Para.NAME, (p, q, p_, q_)))
+                paras.append(Statement(preds.Para.NAME, (p, q, p_, q_)))
             if paras:
                 dep_body = dep_body.extend_many(
                     self.statements_graph,
@@ -932,8 +929,8 @@ def _make_equal_pairs(
         eq_pred = PredicateName.CONGRUENT
         intrinsic_rule = IntrinsicRules.CONG_FROM_EQRATIO
     else:
-        dep_pred = EqAngle.NAME
-        eq_pred = Para.NAME
+        dep_pred = preds.EqAngle.NAME
+        eq_pred = preds.Para.NAME
         intrinsic_rule = IntrinsicRules.PARA_FROM_EQANGLE
 
     reason = Reason(intrinsic_rule)
@@ -942,10 +939,10 @@ def _make_equal_pairs(
         because_eq = Statement(eq_pred, [a, b, c, d])
         dep_body = dep_body.extend(dep_graph, eq, because_eq, reason)
 
-    elif eq_pred is Para.NAME:  # ab == cd.
+    elif eq_pred is preds.Para.NAME:  # ab == cd.
         colls = [a, b, c, d]
         if len(set(colls)) > 2:
-            because_collx = Statement(Collx.NAME, colls)
+            because_collx = Statement(preds.Collx.NAME, colls)
             dep_body = dep_body.extend(dep_graph, eq, because_collx, reason)
 
     because_eq = Statement(eq_pred, [m, n, p, q])

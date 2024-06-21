@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Type, TypeVar
 
 
-from geosolver.ratios import simplify
 from geosolver.dependencies.why_predicates import line_of_and_why
+from geosolver.ratios import simplify
 import geosolver.numerical.geometries as num_geo
 from geosolver.numerical.draw_figure import draw_figure as draw_numerical_figure
 from geosolver.geometry import (
@@ -24,7 +24,7 @@ from geosolver.geometry import (
     RatioValue,
 )
 from geosolver._lazy_loading import lazy_import
-from geosolver.predicates.predicate_name import PredicateName
+from geosolver.predicate_name import PredicateName
 from geosolver.statements.statement import angle_to_num_den, ratio_to_num_den
 
 if TYPE_CHECKING:

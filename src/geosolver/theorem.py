@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional
 from geosolver.defs.clause import Construction
-from geosolver.predicates.predicate_name import PredicateName
+from geosolver.predicate_name import PredicateName
 
 
 class Theorem:

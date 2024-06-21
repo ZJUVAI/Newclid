@@ -11,8 +11,6 @@ class PredicateName(Enum):
     """circle O A B C - True if O is the center of the circle through A, B, and C (circumcenter of triangle ABC). Can be equivalent to cong O A O B + cong O A O C, and equivalent pairs of congruences."""
     CYCLIC = "cyclic"
     """cyclic A B C D - True if the 4 (or more) points in the arguments lie on the same circle."""
-    EQANGLE = "eqangle"
-    """eqangle A B C D E F G H - True if one can rigidly move the crossing of lines AB and CD to get on top of the crossing of EF and GH, respectively (no reflections allowed). In particular, eqangle A B C D C D A B is only true if AB is perpendicular to CD."""
     EQANGLE6 = "eqangle6"
     EQRATIO = "eqratio"
     """eqratio A B C D E F G H - True if AB/CD=EF/GH, as ratios between lengths of segments."""

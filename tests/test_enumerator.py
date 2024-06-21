@@ -12,7 +12,7 @@ from geosolver.numerical.check import (
 from geosolver.predicates import Coll, Para, Perp
 from geosolver.predicates.eqangle import EqAngle
 from geosolver.predicates.predicate import Predicate
-from geosolver.predicates.predicate_name import PredicateName
+from geosolver.predicate_name import PredicateName
 
 
 class TestProof:

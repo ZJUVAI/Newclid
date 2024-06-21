@@ -7,7 +7,7 @@ from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.geometry import Point
 from geosolver.predicates import Coll, Perp
-from geosolver.predicates.predicate_name import PredicateName
+from geosolver.predicate_name import PredicateName
 from geosolver.reasoning_engines.formulas import (
     MenelausFormula,
     PythagoreanFormula,

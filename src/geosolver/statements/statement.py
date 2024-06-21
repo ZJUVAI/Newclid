@@ -2,8 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypeVar, Union
 
-from geosolver.predicates.eqangle import EqAngle
-from geosolver.predicates.predicate_name import PredicateName
+from geosolver.predicate_name import PredicateName
 
 if TYPE_CHECKING:
     from geosolver.geometry import Symbol, Point, Angle, Ratio
@@ -60,10 +59,6 @@ def hash_statement_str(
         return (name, *args)
     if isinstance(name, PredicateName):
         name = predicate.value
-    if predicate is PredicateName.EQANGLE6:
-        name = EqAngle.NAME
-    if predicate is PredicateName.EQRATIO6:
-        name = PredicateName.EQRATIO.value
     return PREDICATE_TO_HASH[predicate](name, args)
 
 
@@ -189,7 +184,6 @@ PREDICATE_TO_HASH = {
     PredicateName.CONSTANT_RATIO: hash_ordered_two_lines_with_value,
     PredicateName.CONSTANT_LENGTH: hash_unordered_set_of_points_with_value,
     PredicateName.EQRATIO: hash_two_times_two_unorded_lines,
-    EqAngle.NAME6: hash_two_times_two_unorded_lines,
     PredicateName.EQRATIO6: hash_two_times_two_unorded_lines,
     PredicateName.SAMESIDE: hash_ordered_list_of_points,
     PredicateName.S_ANGLE: hash_ordered_list_of_points,

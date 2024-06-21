@@ -3,7 +3,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Generator, Optional
 from typing_extensions import Self
 
-from geosolver.dependencies.dependency import Reason
+from geosolver.dependencies.dependency import Reason, Dependency
 from geosolver.dependencies.why_graph import WhyHyperGraph
 from geosolver.dependencies.why_predicates import line_of_and_why
 from geosolver.numerical import ATOM
@@ -18,7 +18,6 @@ from geosolver.statements.statement import Statement, hash_unordered_set_of_poin
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency_building import DependencyBody
-    from geosolver.dependencies.dependency import Dependency
     from geosolver.statements.adder import ToCache
     from geosolver.symbols_graph import SymbolsGraph
 
