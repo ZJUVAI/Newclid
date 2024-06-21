@@ -54,7 +54,7 @@ class TestPythagorean:
     def test_implication_hypotenuse(self):
         """Should be able to use Pythagorean theorem to get the missing hypotenuse.
 
-        perp AB AC => AB² + AC² = BC²
+        AB ⟂ AC => AB² + AC² = BC²
 
         Thus if AB=3 and AC=4, we should find BC=5.
 
@@ -84,9 +84,9 @@ class TestPythagorean:
     def test_implication_side(self):
         """Should be able to use Pythagorean theorem to get the missing side length.
 
-        perp AB AC => AB² + AC² = BC²
+        AB ⟂ AC => AB² + AC² = BC²
 
-        Thus if AB=3 and BC=5, we should find BC=4.
+        Thus if AB=3 and BC=5, we should find AC=4.
 
         """
         a, b, c = self.points
@@ -137,9 +137,9 @@ class TestPythagorean:
     def test_reciprocal(self):
         """Should be able to use Pythagorean theorem to get perp from constant lengths.
 
-        AB² + AC² = BC² => perp AB AC
+        AB² + AC² = BC² => AB ⟂ AC
 
-        Thus if AB=3 and AC=4 and BC=5, we should find perp AB AC
+        Thus if AB=3 and AC=4 and BC=5, we should find AB ⟂ AC
 
         """
         a, b, c = self.points
