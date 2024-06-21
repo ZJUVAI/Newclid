@@ -299,9 +299,9 @@ class Table:
             if v not in self.v2i:
                 self.v2i[v] = len(self.v2i)
 
-        (m, n), lenght = self.A.shape, len(self.v2i)
-        if lenght > m:
-            self.A = np.concatenate([self.A, np.zeros([lenght - m, n])], 0)
+        (m, n), length = self.A.shape, len(self.v2i)
+        if length > m:
+            self.A = np.concatenate([self.A, np.zeros([length - m, n])], 0)
 
         new_column = np.zeros([len(self.v2i), 2])  # N, 2
         for v, c in vc:
@@ -351,15 +351,7 @@ class Table:
         self.eqs.add((v4, v3, v2, v1))
 
     def check_record_eq(self, v1: str, v2: str, v3: str, v4: str) -> bool:
-        if (v1, v2, v3, v4) in self.eqs:
-            return True
-        if (v2, v1, v4, v3) in self.eqs:
-            return True
-        if (v3, v4, v1, v2) in self.eqs:
-            return True
-        if (v4, v3, v2, v1) in self.eqs:
-            return True
-        return False
+        return (v1, v2, v3, v4) in self.eqs
 
     def add_eq2(self, a: str, b: str, m, n, dep: "Dependency") -> None:
         """
@@ -375,7 +367,6 @@ class Table:
         a - b = f * constant
         """
         self.eqs.add((a, b, Coef(f)))
-        self.eqs.add((b, a, Coef(1) - Coef(f)))
 
         if not self.add_expr([(a, Coef(1)), (b, Coef(-1)), (self.const, -Coef(f))]):
             return []
@@ -428,9 +419,10 @@ class Table:
                 for v1, v2 in vv:
                     if self.const in {v1, v2}:
                         continue
-                    if (v1, v2) in self.eqs or (v2, v1) in self.eqs:
+                    if (v1, v2) in self.eqs:
                         continue
                     self.eqs.add((v1, v2))
+                    self.eqs.add((v2, v1))
                     # why v1 - v2 = e12 ?  (note modulo(e12) == 0)
                     why_dict = minus(
                         {v1: Coef(1), v2: Coef(-1)}, minus(self.v2e[v1], self.v2e[v2])
@@ -639,10 +631,8 @@ class AngleTable(GeometricTable):
 
     def modulo(self, e: SumCV) -> SumCV:
         e = strip(e)
-        if self.pi not in e:
-            return super().modulo(e)
-
-        e[self.pi] = e[self.pi] % Coef(1)  # why mod 1, should mod 2??
+        if self.pi in e:
+            e[self.pi] = e[self.pi] % Coef(1)  # why mod 1, should mod 2??
         return strip(e)
 
     def add_para(self, d1: Direction, d2: Direction, dep: "Dependency") -> None:
