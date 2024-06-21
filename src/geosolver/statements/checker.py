@@ -1,27 +1,24 @@
 from typing import TYPE_CHECKING
 
+from geosolver.predicates.coll import Coll
+from geosolver.predicates.para import Para
+from geosolver.predicates.perp import Perp
 from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
 from geosolver.predicates.predicate_name import PredicateName
 from geosolver.geometry import (
     Angle,
     Circle,
     Length,
-    Line,
     Point,
     Ratio,
     all_angles,
     all_lengths,
     all_ratios,
-    is_equal,
 )
-from geosolver.numerical.check import (
-    check_coll_numerical,
-    check_para_numerical,
-    check_perp_numerical,
-    check_sameside_numerical,
-)
+from geosolver.numerical.check import check_sameside_numerical
 
 from geosolver.listing import list_eqratio3
+from geosolver.symbols_graph import is_equal
 
 
 if TYPE_CHECKING:
@@ -37,13 +34,10 @@ class StatementChecker:
     ) -> None:
         self.symbols_graph = symbols_graph
         self.PREDICATE_TO_CHECK = {
-            PredicateName.PARALLEL: self.check_para,
-            PredicateName.PERPENDICULAR: self.check_perp,
             PredicateName.MIDPOINT: self.check_midp,
             PredicateName.CONGRUENT: self.check_cong,
             PredicateName.CIRCLE: self.check_circle,
             PredicateName.CYCLIC: self.check_cyclic,
-            PredicateName.EQANGLE: self.check_const_or_eqangle,
             PredicateName.EQANGLE6: self.check_const_or_eqangle,
             PredicateName.EQRATIO: self.check_const_or_eqratio,
             PredicateName.EQRATIO3: self.check_eqratio3,
@@ -71,49 +65,12 @@ class StatementChecker:
         """Symbolically check if a predicate is True."""
         return self.PREDICATE_TO_CHECK[statement.predicate](statement.args)
 
-    def check_const_or_eqangle(self, args: list[Point]) -> bool:
-        if len(args) == 5:
-            return self.check_aconst(args)
-        return self.check_eqangle(args)
-
     def check_const_or_eqratio(self, args: list[Point]) -> bool:
         if len(args) == 5:
             return self.check_rconst(args)
         return self.check_eqratio(args)
 
     # Basic checks
-
-    def check_para(self, points: list[Point]) -> bool:
-        a, b, c, d = points
-        if (a == b) or (c == d):
-            return False
-        ab = self.symbols_graph.get_line(a, b)
-        cd = self.symbols_graph.get_line(c, d)
-        if not ab or not cd:
-            return False
-
-        return is_equal(ab, cd)
-
-    def check_para_or_coll(self, points: list[Point]) -> bool:
-        return self.check_para(points) or self.check_coll(points)
-
-    def check_perpl(self, ab: Line, cd: Line) -> bool:
-        if ab.val is None or cd.val is None:
-            return False
-        if ab.val == cd.val:
-            return False
-        a12, a21 = self.symbols_graph.get_angle(ab.val, cd.val)
-        if a12 is None or a21 is None:
-            return False
-        return is_equal(a12, a21)
-
-    def check_perp(self, points: list[Point]) -> bool:
-        a, b, c, d = points
-        ab = self.symbols_graph.get_line(a, b)
-        cd = self.symbols_graph.get_line(c, d)
-        if not ab or not cd:
-            return False
-        return self.check_perpl(ab, cd)
 
     def check_cong(self, points: list[Point]) -> bool:
         a, b, c, d = points
@@ -127,60 +84,6 @@ class StatementChecker:
         return is_equal(ab, cd)
 
     # Angles and ratios checks
-
-    def check_eqangle(self, points: list[Point]) -> bool:
-        """Check if two angles are equal."""
-        a, b, c, d, m, n, p, q = points
-
-        if {a, b} == {c, d} and {m, n} == {p, q}:
-            return True
-        if {a, b} == {m, n} and {c, d} == {p, q}:
-            return True
-
-        if (a == b) or (c == d) or (m == n) or (p == q):
-            return False
-        ab = self.symbols_graph.get_line(a, b)
-        cd = self.symbols_graph.get_line(c, d)
-        mn = self.symbols_graph.get_line(m, n)
-        pq = self.symbols_graph.get_line(p, q)
-
-        if {a, b} == {c, d} and mn and pq and is_equal(mn, pq):
-            return True
-        if {a, b} == {m, n} and cd and pq and is_equal(cd, pq):
-            return True
-        if {p, q} == {m, n} and ab and cd and is_equal(ab, cd):
-            return True
-        if {p, q} == {c, d} and ab and mn and is_equal(ab, mn):
-            return True
-
-        if not ab or not cd or not mn or not pq:
-            return False
-
-        if is_equal(ab, cd) and is_equal(mn, pq):
-            return True
-        if is_equal(ab, mn) and is_equal(cd, pq):
-            return True
-
-        if not (ab.val and cd.val and mn.val and pq.val):
-            return False
-
-        if (ab.val, cd.val) == (mn.val, pq.val) or (ab.val, mn.val) == (
-            cd.val,
-            pq.val,
-        ):
-            return True
-
-        for ang1, _, _ in all_angles(ab._val, cd._val):
-            for ang2, _, _ in all_angles(mn._val, pq._val):
-                if is_equal(ang1, ang2):
-                    return True
-
-        if self.check_perp([a, b, m, n]) and self.check_perp([c, d, p, q]):
-            return True
-        if self.check_perp([a, b, p, q]) and self.check_perp([c, d, m, n]):
-            return True
-
-        return False
 
     def check_eqratio(self, points: list[Point]) -> bool:
         """Check if 8 points make an eqratio predicate."""
@@ -397,19 +300,19 @@ class StatementChecker:
     # Negative checks (with numerical double check)
 
     def check_ncoll(self, points: list[Point]) -> bool:
-        if self.check_coll(points):
+        if Coll.check(points):
             return False
-        return not check_coll_numerical([p.num for p in points])
+        return not Coll.check_numerical([p.num for p in points])
 
     def check_npara(self, points: list[Point]) -> bool:
-        if self.check_para(points):
+        if Para.check(points):
             return False
-        return not check_para_numerical([p.num for p in points])
+        return not Para.check_numerical([p.num for p in points])
 
     def check_nperp(self, points: list[Point]) -> bool:
-        if self.check_perp(points):
+        if Perp.check(points):
             return False
-        return not check_perp_numerical([p.num for p in points])
+        return not Perp.check_numerical([p.num for p in points])
 
     # Numerical only checks
 

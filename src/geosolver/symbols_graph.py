@@ -142,6 +142,33 @@ class SymbolsGraph:
             return self._name2node[pointname]
         return default_fn(pointname)
 
+    def make_equal(self, x: Symbol, y: Symbol, dep: Dependency) -> None:
+        """Make that two nodes x and y are equal, i.e. merge their value node."""
+        if x.val is None:
+            x, y = y, x
+
+        self.get_node_val(x, dep=None)
+        self.get_node_val(y, dep=None)
+        vx = x._val
+        vy = y._val
+
+        if vx == vy:
+            return
+
+        merges = [vx, vy]
+
+        # If eqangle on the same directions switched then they are perpendicular
+        if (
+            isinstance(x, Angle)
+            and x not in self.aconst.values()
+            and y not in self.aconst.values()
+            and x.directions == y.directions[::-1]
+            and x.directions[0] != x.directions[1]
+        ):
+            merges = [self.vhalfpi, vx, vy]
+
+        self.merge(merges, dep)
+
     def merge(self, nodes: list[Symbol], dep: "Dependency") -> Symbol:
         """Merge all nodes."""
         if len(nodes) < 2:
@@ -484,3 +511,17 @@ class SymbolsGraph:
             block=block,
             **kwargs,
         )
+
+
+def is_equiv(x: Symbol, y: Symbol) -> bool:
+    return x.why_equal([y]) is not None
+
+
+def is_equal(x: Symbol, y: Symbol) -> bool:
+    if x == y:
+        return True
+    if x._val is None or y._val is None:
+        return False
+    if x.val != y.val:
+        return False
+    return is_equiv(x._val, y._val)

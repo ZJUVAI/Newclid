@@ -1,7 +1,8 @@
 from typing import TYPE_CHECKING, Any, Optional
 
 import geosolver.geometry as gm
-from geosolver.predicates.coll import Coll
+from geosolver.predicates import Coll, Para, Perp
+from geosolver.predicates.eqangle import EqAngle
 from geosolver.predicates.predicate_name import PredicateName
 from geosolver.numerical.angles import ang_of
 from geosolver.numerical.check import clock
@@ -333,11 +334,11 @@ def highlight(
         a, b, c = args
         a, b = max(a, b, c), min(a, b, c)
         _draw_line(ax, a, b, color=color1, lw=2.0)
-    if name == PredicateName.PARALLEL.value:
+    if name == Para.NAME:
         a, b, c, d = args
         _draw_line(ax, a, b, color=color1, lw=2.0)
         _draw_line(ax, c, d, color=color2, lw=2.0)
-    if name == PredicateName.EQANGLE.value:
+    if name == EqAngle.NAME:
         a, b, c, d, e, f, g, h = args
 
         x = line_line_intersection(LineNum(a, b), LineNum(c, d))
@@ -364,7 +365,7 @@ def highlight(
         if color2 == "--":
             color2 = "red"
         draw_angle(ax, e, f, h, color=color2, alpha=0.5)
-    if name == PredicateName.PERPENDICULAR.value:
+    if name == Perp.NAME:
         a, b, c, d = args
         _draw_line(ax, a, b, color=color1, lw=2.0)
         _draw_line(ax, c, d, color=color1, lw=2.0)

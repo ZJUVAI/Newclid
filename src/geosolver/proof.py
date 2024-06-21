@@ -18,7 +18,9 @@ from geosolver.numerical.geometries import (
     PointNum,
     reduce,
 )
-from geosolver.predicates.intrinsic_rules import IntrinsicRules
+from geosolver.intrinsic_rules import IntrinsicRules
+from geosolver.predicates.eqangle import EqAngle
+from geosolver.predicates.para import Para
 from geosolver.reasoning_engines.engines_interface import ReasoningEngine
 from geosolver.statements.statement import Statement
 from geosolver.defs.definition import Definition
@@ -276,10 +278,7 @@ class Proof:
         premise: "Construction",
         p_args: list["Point"],
     ) -> Tuple[Optional[Dependency], bool]:
-        if premise.name in [
-            PredicateName.PARALLEL.value,
-            PredicateName.CONGRUENT.value,
-        ]:
+        if premise.name in [Para.NAME, PredicateName.CONGRUENT.value]:
             a, b, c, d = p_args
             if {a, b} == {c, d}:
                 return None, False
@@ -288,7 +287,7 @@ class Proof:
             "cong_cong_eqangle6_ncoll_contri*",
             "eqratio6_eqangle6_ncoll_simtri*",
         ] and premise.name in [
-            PredicateName.EQANGLE.value,
+            EqAngle.NAME,
             PredicateName.EQANGLE6.value,
         ]:  # SAS or RAR
             b, a, b, c, y, x, y, z = p_args

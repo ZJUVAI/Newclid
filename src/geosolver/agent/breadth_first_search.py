@@ -25,6 +25,7 @@ from geosolver.agent.agents_interface import (
     StopFeedback,
 )
 from geosolver.match_theorems import MatchCache
+from geosolver.predicates.eqangle import EqAngle
 from geosolver.predicates.predicate_name import PredicateName
 from geosolver.reasoning_engines.engines_interface import Derivation
 
@@ -222,10 +223,7 @@ class BFSDDAR(DeductiveAgent):
         if isinstance(feedback, DeriveFeedback):
             for derive in feedback.derivations:
                 predicate = derive.statement.predicate
-                if (
-                    predicate == PredicateName.EQANGLE
-                    or predicate == PredicateName.EQRATIO
-                ):
+                if predicate == EqAngle.NAME or predicate == PredicateName.EQRATIO:
                     self._eq4s.append(derive)
                 else:
                     self._derivations.append(derive)

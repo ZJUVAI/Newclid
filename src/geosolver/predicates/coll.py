@@ -1,3 +1,4 @@
+from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING, Generator, Optional
 from typing_extensions import Self
@@ -8,7 +9,7 @@ from geosolver.dependencies.why_predicates import line_of_and_why
 from geosolver.numerical import ATOM
 from geosolver.numerical.geometries import LineNum, PointNum
 from geosolver.predicates.predicate import Predicate, PredicateArgument
-from geosolver.predicates.intrinsic_rules import IntrinsicRules
+from geosolver.intrinsic_rules import IntrinsicRules
 
 from geosolver.geometry import Point, Line
 from geosolver.combinatorics import arrangement_pairs, permutations_triplets
@@ -23,7 +24,8 @@ if TYPE_CHECKING:
 
 
 class Coll(Predicate):
-    """Represent that the 3 (or more) points in the arguments are collinear."""
+    """coll A B C ... -
+    Represent that the 3 (or more) points in the arguments are collinear."""
 
     NAME = "coll"
 
@@ -117,7 +119,7 @@ class Coll(Predicate):
         return None, why
 
     @staticmethod
-    def check(args: list[PredicateArgument]) -> bool:
+    def check(args: list[PredicateArgument], symbols_graph: SymbolsGraph) -> bool:
         points = list(set(args))
         if len(points) < 3:
             return True
@@ -145,8 +147,8 @@ class Coll(Predicate):
                 yield x, y, z
 
     @staticmethod
-    def pretty(points: list[str]) -> str:
-        return "" + ",".join(points) + " are collinear"
+    def pretty(args: list[str]) -> str:
+        return "" + ",".join(args) + " are collinear"
 
     @classmethod
     def hash(

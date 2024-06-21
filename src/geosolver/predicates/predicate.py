@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from geosolver.dependencies.why_graph import WhyHyperGraph
 
     from geosolver.numerical.geometries import PointNum
-    from geosolver.predicates.intrinsic_rules import IntrinsicRules
+    from geosolver.intrinsic_rules import IntrinsicRules
     from geosolver.statements.adder import ToCache
     from geosolver.symbols_graph import SymbolsGraph
 
@@ -46,7 +46,7 @@ class Predicate(ABC):
 
     @abstractmethod
     @staticmethod
-    def check(args: list[PredicateArgument]) -> bool:
+    def check(args: list[PredicateArgument], symbols_graph: SymbolsGraph) -> bool:
         """Symbolicaly checks if the predicate is true for the given arguments."""
 
     @abstractmethod
@@ -63,8 +63,8 @@ class Predicate(ABC):
 
     @abstractmethod
     @staticmethod
-    def pretty(points: list[str]) -> str:
-        """Write the predicate in a natural language"""
+    def pretty(args: list[str]) -> str:
+        """Write the predicate in a natural language."""
 
     @abstractmethod
     @classmethod

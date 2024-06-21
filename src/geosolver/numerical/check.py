@@ -4,12 +4,14 @@ from geosolver.predicates.coll import Coll
 from geosolver.predicates.predicate_name import PredicateName
 import geosolver.geometry as gm
 
-from geosolver._lazy_loading import lazy_import
+
 from geosolver.numerical import close_enough
 from geosolver.numerical.angles import ang_between
-from geosolver.numerical.geometries import CircleNum, LineNum, PointNum, bring_together
+from geosolver.numerical.geometries import CircleNum, PointNum, bring_together
 from geosolver.listing import list_eqratio3
 from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
+
+from geosolver._lazy_loading import lazy_import
 
 if TYPE_CHECKING:
     import numpy
@@ -61,26 +63,6 @@ def check_sameside_numerical(points: list[PointNum]) -> bool:
     return ba.dot(bc) * yx.dot(yz) > 0
 
 
-def check_para_numerical(points: list[PointNum]) -> bool:
-    a, b, c, d = points
-    ab = LineNum(a, b)
-    cd = LineNum(c, d)
-    if ab.same(cd):
-        return False
-    return ab.is_parallel(cd)
-
-
-def check_para_or_coll_numerical(points: list[PointNum]) -> bool:
-    return check_para_numerical(points) or Coll.check_numerical(points)
-
-
-def check_perp_numerical(points: list[PointNum]) -> bool:
-    a, b, c, d = points
-    ab = LineNum(a, b)
-    cd = LineNum(c, d)
-    return ab.is_perp(cd)
-
-
 def check_cyclic_numerical(points: list[PointNum]) -> bool:
     points = list(set(points))
     a, b, c, *ps = points
@@ -103,45 +85,6 @@ def check_const_angle_numerical(points: list[PointNum]) -> bool:
     y = a3 - a4
 
     return close_enough(m / n % 1, y / np.pi % 1)
-
-
-def check_eqangle_numerical(points: list[PointNum]) -> bool:
-    """Check if 8 points make 2 equal angles."""
-    a, b, c, d, e, f, g, h = points
-
-    ab = LineNum(a, b)
-    cd = LineNum(c, d)
-    ef = LineNum(e, f)
-    gh = LineNum(g, h)
-
-    if ab.is_parallel(cd):
-        return ef.is_parallel(gh)
-    if ef.is_parallel(gh):
-        return ab.is_parallel(cd)
-
-    a, b, c, d = bring_together(a, b, c, d)
-    e, f, g, h = bring_together(e, f, g, h)
-
-    ba = b - a
-    dc = d - c
-    fe = f - e
-    hg = h - g
-
-    sameclock = (ba.x * dc.y - ba.y * dc.x) * (fe.x * hg.y - fe.y * hg.x) > 0
-    # sameclock = (ba.x * dc.y - ba.y * dc.x) * (fe.x * hg.y - fe.y * hg.x) > ATOM
-    if not sameclock:
-        ba = ba * -1.0
-
-    a1 = np.arctan2(fe.y, fe.x)
-    a2 = np.arctan2(hg.y, hg.x)
-    x = a1 - a2
-
-    a3 = np.arctan2(ba.y, ba.x)
-    a4 = np.arctan2(dc.y, dc.x)
-    y = a3 - a4
-
-    xy = (x - y) % (2 * np.pi)
-    return close_enough(xy, 0) or close_enough(xy, 2 * np.pi)
 
 
 def check_eqratio_numerical(points: list[PointNum]) -> bool:
@@ -208,13 +151,11 @@ def check_length_numerical(points: list[PointNum | gm.Length]) -> bool:
 
 
 PREDICATE_TO_NUMERICAL_CHECK = {
-    PredicateName.PERPENDICULAR: check_perp_numerical,
     PredicateName.MIDPOINT: check_midp_numerical,
     PredicateName.CONGRUENT: check_cong_numerical,
     PredicateName.CIRCLE: check_circle_numerical,
     PredicateName.CYCLIC: check_cyclic_numerical,
-    PredicateName.EQANGLE: check_eqangle_numerical,
-    PredicateName.EQANGLE6: check_eqangle_numerical,
+    PredicateName.EQANGLE6: "check_eqangle_numerical",
     PredicateName.EQRATIO: check_eqratio_numerical,
     PredicateName.EQRATIO3: check_eqratio3_numerical,
     PredicateName.EQRATIO6: check_eqratio_numerical,
@@ -230,7 +171,6 @@ PREDICATE_TO_NUMERICAL_CHECK = {
     PredicateName.NON_COLLINEAR: check_ncoll_numerical,
     PredicateName.CONSTANT_RATIO: check_ratio_numerical,
     PredicateName.CONSTANT_LENGTH: check_length_numerical,
-    PredicateName.PARALLEL: check_para_or_coll_numerical,
 }
 
 

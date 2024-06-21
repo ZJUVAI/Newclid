@@ -251,20 +251,6 @@ class Symbol:
         return self.name
 
 
-def is_equiv(x: Symbol, y: Symbol) -> bool:
-    return x.why_equal([y]) is not None
-
-
-def is_equal(x: Symbol, y: Symbol) -> bool:
-    if x == y:
-        return True
-    if x._val is None or y._val is None:
-        return False
-    if x.val != y.val:
-        return False
-    return is_equiv(x._val, y._val)
-
-
 def bfs_backtrack(
     root: Symbol, leafs: list[Symbol], parent: dict[Symbol, Symbol]
 ) -> list["Dependency"]:

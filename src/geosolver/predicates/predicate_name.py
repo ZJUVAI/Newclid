@@ -2,11 +2,6 @@ from enum import Enum
 
 
 class PredicateName(Enum):
-    COLLINEAR_X = "collx"
-    PARALLEL = "para"
-    """para A B C D - True if the line AB is parallel to the line CD."""
-    PERPENDICULAR = "perp"
-    """perp A B C D - True if the line AB is perpendicular to the line CD. A perp statement will add the corresponding 90-degree angle statement as well."""
     MIDPOINT = "midp"
     """midp M A B - True if the M is the midpoint of the segment AB. Can be equivalent to coll M A B + cong A M B M."""
     CONGRUENT = "cong"

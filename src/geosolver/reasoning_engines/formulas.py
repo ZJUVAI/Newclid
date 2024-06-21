@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.geometry import Length, Point, Ratio
-from geosolver.predicates.coll import Coll
+from geosolver.predicates import Coll, Perp
 from geosolver.predicates.predicate_name import PredicateName
 from geosolver.reasoning_engines.engines_interface import Derivation, ReasoningEngine
 from geosolver.statements.statement import Statement
@@ -34,7 +34,7 @@ class PythagoreanFormula(ReasoningEngine):
         self._segments_length_dep: dict[tuple[str, str], Dependency] = {}
 
         self.PREDICATE_TO_INGEST = {
-            PredicateName.PERPENDICULAR: self._ingest_perp,
+            Perp.NAME: self._ingest_perp,
             PredicateName.CONSTANT_LENGTH: self._ingest_lconst,
         }
 
@@ -167,7 +167,7 @@ class PythagoreanFormula(ReasoningEngine):
                 )
 
                 new_statement = Statement(
-                    PredicateName.PERPENDICULAR,
+                    Perp.NAME,
                     (*side1dep.statement.args[:2], *side2dep.statement.args[:2]),
                 )
                 new_perps.append(Derivation(new_statement, dep_body))

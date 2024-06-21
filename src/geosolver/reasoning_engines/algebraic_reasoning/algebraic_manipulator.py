@@ -4,10 +4,12 @@ from typing import TYPE_CHECKING
 
 
 from geosolver.dependencies.dependency import Dependency, Reason
+from geosolver.predicates import Para, Perp
+from geosolver.predicates.eqangle import EqAngle
 from geosolver.reasoning_engines.engines_interface import Derivation, ReasoningEngine
 from geosolver.predicates.predicate_name import PredicateName
 from geosolver.dependencies.dependency_building import DependencyBody
-from geosolver.geometry import is_equiv
+from geosolver.symbols_graph import is_equiv
 from geosolver.numerical.check import check_numerical
 
 
@@ -42,10 +44,10 @@ class AlgebraicManipulator(ReasoningEngine):
         self.verbose = config.get("verbose", "")
 
         self.PREDICATE_TO_ADDER = {
-            PredicateName.PARALLEL: self._add_para,
-            PredicateName.PERPENDICULAR: self._add_perp,
+            Para.NAME: self._add_para,
+            Perp.NAME: self._add_perp,
             PredicateName.CONGRUENT: self._add_cong,
-            PredicateName.EQANGLE: self._add_eqangle,
+            EqAngle.NAME: self._add_eqangle,
             PredicateName.EQRATIO: self._add_eqratio,
             PredicateName.CONSTANT_ANGLE: self._add_aconst,
             PredicateName.S_ANGLE: self._add_aconst,
@@ -123,7 +125,7 @@ class AlgebraicManipulator(ReasoningEngine):
                     continue
 
                 points = (*ab._obj.points, *cd._obj.points)
-                para = Statement(PredicateName.PARALLEL, points)
+                para = Statement(Para.NAME, points)
                 if not check_numerical(para):
                     continue
 
@@ -148,7 +150,7 @@ class AlgebraicManipulator(ReasoningEngine):
                     *mn._obj.points,
                     *pq._obj.points,
                 )
-                eqangle = Statement(PredicateName.EQANGLE, points)
+                eqangle = Statement(EqAngle.NAME, points)
                 added.append(Derivation(eqangle, dep))
 
         return added

@@ -3,8 +3,6 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Generator
 
 from geosolver.combinatorics import (
-    all_4points,
-    all_8points,
     arrangement_pairs,
     cross_product,
     permutations_pairs,
@@ -14,7 +12,6 @@ from geosolver.combinatorics import (
 from geosolver.geometry import (
     Angle,
     Circle,
-    Direction,
     Length,
     Line,
     AngleValue,
@@ -58,13 +55,10 @@ class StatementsEnumerator:
             return []
 
         PREDICATE_TO_METHOD = {
-            PredicateName.PARALLEL: self._all_paras,
-            PredicateName.PERPENDICULAR: self._all_perps,
             PredicateName.MIDPOINT: self._all_midps,
             PredicateName.CONGRUENT: self._all_congs,
             PredicateName.CIRCLE: self._all_circles,
             PredicateName.CYCLIC: self._all_cyclics,
-            PredicateName.EQANGLE: self._all_eqangles_8points,
             PredicateName.EQANGLE6: self._all_eqangles_6points,
             PredicateName.EQRATIO: self._all_eqratios_8points,
             PredicateName.EQRATIO6: self._all_eqratios_6points,
@@ -100,81 +94,6 @@ class StatementsEnumerator:
                     (l1, l2), (l3, l4) = pair1, pair2
                     yield l1, l2, l3, l4
 
-    def _all_eqangles_8points(self) -> Generator[tuple[Point, ...], None, None]:
-        """List all sets of 8 points that make two equal angles."""
-        # Case 1: (l1-l2) = (l3-l4), including because l1//l3, l2//l4 (para-para)
-        angss = []
-        for measure in self.symbols_graph.type2nodes[AngleValue]:
-            angs = measure.neighbors(Angle)
-            angss.append(angs)
-
-        # include the angs that do not have any measure.
-        angss.extend(
-            [[ang] for ang in self.symbols_graph.type2nodes[Angle] if ang.val is None]
-        )
-
-        line_pairss = []
-        for angs in angss:
-            line_pairs = set()
-            for ang in angs:
-                d1, d2 = ang.directions
-                if d1 is None or d2 is None:
-                    continue
-                l1s = d1.neighbors(Line)
-                l2s = d2.neighbors(Line)
-                line_pairs.update(set(cross_product(l1s, l2s)))
-            line_pairss.append(line_pairs)
-
-        # include (d1, d2) in which d1 does not have any angles.
-        noang_ds = [
-            d
-            for d in self.symbols_graph.type2nodes[Direction]
-            if not d.neighbors(Angle)
-        ]
-
-        for d1 in noang_ds:
-            for d2 in self.symbols_graph.type2nodes[Direction]:
-                if d1 == d2:
-                    continue
-                l1s = d1.neighbors(Line)
-                l2s = d2.neighbors(Line)
-                if len(l1s) < 2 and len(l2s) < 2:
-                    continue
-                line_pairss.append(set(cross_product(l1s, l2s)))
-                line_pairss.append(set(cross_product(l2s, l1s)))
-
-        # Case 2: d1 // d2 => (d1-d3) = (d2-d3)
-        # include lines that does not have any direction.
-        nodir_ls = [
-            line for line in self.symbols_graph.type2nodes[Line] if line.val is None
-        ]
-
-        for line in nodir_ls:
-            for d in self.symbols_graph.type2nodes[Direction]:
-                l1s = d.neighbors(Line)
-                if len(l1s) < 2:
-                    continue
-                l2s = [line]
-                line_pairss.append(set(cross_product(l1s, l2s)))
-                line_pairss.append(set(cross_product(l2s, l1s)))
-
-        record = set()
-        for line_pairs in line_pairss:
-            for pair1, pair2 in permutations_pairs(list(line_pairs)):
-                (l1, l2), (l3, l4) = pair1, pair2
-                if l1 == l2 or l3 == l4:
-                    continue
-                if (l1, l2) == (l3, l4):
-                    continue
-                if (l1, l2, l3, l4) in record:
-                    continue
-                record.add((l1, l2, l3, l4))
-                for a, b, c, d, e, f, g, h in all_8points(l1, l2, l3, l4):
-                    yield (a, b, c, d, e, f, g, h)
-
-        for a, b, c, d, e, f, g, h in self._all_eqangle_same_lines():
-            yield a, b, c, d, e, f, g, h
-
     def _all_eqangles_6points(self) -> Generator[tuple[Point, ...], None, None]:
         """List all sets of 6 points that make two equal angles."""
         record = set()
@@ -199,23 +118,6 @@ class StatementsEnumerator:
                 continue
             record.add((a, b, c, d, e, f, g, h))
             yield a, b, c, d, e, f, g, h  # where a==c, e==g
-
-    def _all_paras(self) -> Generator[tuple[Point, ...], None, None]:
-        for d in self.symbols_graph.type2nodes[Direction]:
-            for l1, l2 in permutations_pairs(d.neighbors(Line)):
-                for a, b, c, d in all_4points(l1, l2):
-                    yield a, b, c, d
-
-    def _all_perps(self) -> Generator[tuple[Point, ...], None, None]:
-        for ang in self.symbols_graph.vhalfpi.neighbors(Angle):
-            d1, d2 = ang.directions
-            if d1 is None or d2 is None:
-                continue
-            if d1 == d2:
-                continue
-            for l1, l2 in cross_product(d1.neighbors(Line), d2.neighbors(Line)):
-                for a, b, c, d in all_4points(l1, l2):
-                    yield a, b, c, d
 
     def _all_congs(self) -> Generator[tuple[Point, ...], None, None]:
         for lenght in self.symbols_graph.type2nodes[Length]:
@@ -374,9 +276,3 @@ class StatementsEnumerator:
                 if len(ps) >= 3:
                     for a, b, c in permutations_triplets(ps):
                         yield p, a, b, c
-
-    def _all_eqangle_same_lines(self) -> Generator[tuple[Point, ...], None, None]:
-        for l1, l2 in permutations_pairs(self.symbols_graph.type2nodes[Line]):
-            for a, b, c, d, e, f, g, h in all_8points(l1, l2, l1, l2):
-                if (a, b, c, d) != (e, f, g, h):
-                    yield a, b, c, d, e, f, g, h

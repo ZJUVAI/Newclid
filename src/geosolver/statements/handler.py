@@ -1,6 +1,6 @@
 from geosolver.dependencies.caching import DependencyCache
 from geosolver.dependencies.why_graph import WhyHyperGraph
-from geosolver.predicates.intrinsic_rules import IntrinsicRules
+from geosolver.intrinsic_rules import IntrinsicRules
 from geosolver.statements.adder import StatementAdder
 from geosolver.statements.checker import StatementChecker
 from geosolver.statements.enumerator import StatementsEnumerator

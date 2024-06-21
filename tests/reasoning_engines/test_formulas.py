@@ -6,7 +6,7 @@ from geosolver.api import GeometricSolverBuilder
 from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.geometry import Point
-from geosolver.predicates.coll import Coll
+from geosolver.predicates import Coll, Perp
 from geosolver.predicates.predicate_name import PredicateName
 from geosolver.reasoning_engines.formulas import (
     MenelausFormula,
@@ -65,7 +65,7 @@ class TestPythagorean:
 
         self.reasoning_fixture.given_engine(PythagoreanFormula(self.symbols_graph))
         given_dependencies = [
-            Dependency(Statement(PredicateName.PERPENDICULAR, (a, b, a, c)), why=[]),
+            Dependency(Statement(Perp.NAME, (a, b, a, c)), why=[]),
             Dependency(Statement(PredicateName.CONSTANT_LENGTH, (a, b, l_3)), why=[]),
             Dependency(Statement(PredicateName.CONSTANT_LENGTH, (a, c, l_4)), why=[]),
         ]
@@ -95,7 +95,7 @@ class TestPythagorean:
 
         self.reasoning_fixture.given_engine(PythagoreanFormula(self.symbols_graph))
         given_dependencies = [
-            Dependency(Statement(PredicateName.PERPENDICULAR, (a, b, a, c)), why=[]),
+            Dependency(Statement(Perp.NAME, (a, b, a, c)), why=[]),
             Dependency(Statement(PredicateName.CONSTANT_LENGTH, (a, b, l_3)), why=[]),
             Dependency(Statement(PredicateName.CONSTANT_LENGTH, (b, c, l_5)), why=[]),
         ]
@@ -159,7 +159,7 @@ class TestPythagorean:
         self.reasoning_fixture.then_new_derivations_should_be(
             [
                 Derivation(
-                    Statement(PredicateName.PERPENDICULAR, (a, b, a, c)),
+                    Statement(Perp.NAME, (a, b, a, c)),
                     DependencyBody(Reason("Pythagorean"), why=given_dependencies),
                 ),
             ]

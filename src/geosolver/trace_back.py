@@ -3,6 +3,7 @@
 from typing import TYPE_CHECKING, Optional
 
 from geosolver.predicates.coll import Coll
+from geosolver.predicates.collx import Collx
 from geosolver.predicates.predicate_name import NUMERICAL_PREDICATES, PredicateName
 from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE
@@ -233,7 +234,7 @@ def collx_to_coll_setup(
     for level in setup_to_levels(setup):
         hashs = set()
         for dep in level:
-            if dep.statement.predicate == PredicateName.COLLINEAR_X:
+            if dep.statement.predicate == Collx.NAME:
                 dep.statement.predicate = Coll.NAME
                 dep.statement.args = list(set(dep.statement.args))
 
@@ -290,7 +291,7 @@ def collx_to_coll(
 
 
 def _dep_coll_to_collx(dep: "Dependency"):
-    if dep.statement.predicate == PredicateName.COLLINEAR_X:
+    if dep.statement.predicate == Collx.NAME:
         coll_statement = Statement(Coll.NAME, list(set(dep.statement.args)))
         return Dependency(coll_statement, why=dep.why, reason=dep.reason)
     return dep

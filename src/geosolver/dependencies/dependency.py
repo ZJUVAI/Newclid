@@ -7,7 +7,7 @@ from geosolver.theorem import Theorem
 from geosolver.statements.statement import Statement
 
 if TYPE_CHECKING:
-    from geosolver.predicates.intrinsic_rules import IntrinsicRules
+    from geosolver.intrinsic_rules import IntrinsicRules
     from geosolver.reasoning_engines.algebraic_reasoning import AlgebraicRules
 
 

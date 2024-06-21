@@ -25,9 +25,9 @@ from geosolver.geometry import (
     Ratio,
     Segment,
     RatioValue,
-    is_equal,
 )
 from geosolver.numerical.check import check_ncoll_numerical, same_clock
+from geosolver.symbols_graph import is_equal
 
 
 if TYPE_CHECKING:

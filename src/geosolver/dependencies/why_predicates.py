@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING, Callable, Optional, TypeVar
 
 
 from geosolver.predicates.coll import Coll
+from geosolver.predicates.collx import Collx
+from geosolver.predicates.para import Para
 from geosolver.statements.statement import Statement
 
 from geosolver.dependencies.dependency import Dependency, Reason
@@ -16,12 +18,11 @@ from geosolver.geometry import (
     Symbol,
     Point,
     Ratio,
-    all_angles,
     all_ratios,
     bfs_backtrack,
-    is_equal,
 )
 from geosolver.predicates.predicate_name import PredicateName
+from geosolver.symbols_graph import is_equal
 
 
 if TYPE_CHECKING:
@@ -51,7 +52,7 @@ def why_dependency(
     return reason, why
 
 
-def _why_equal(x: Symbol, y: Symbol) -> list[Dependency]:
+def why_equal(x: Symbol, y: Symbol) -> list[Dependency]:
     if x == y:
         return []
     if not x._val or not y._val:
@@ -59,36 +60,6 @@ def _why_equal(x: Symbol, y: Symbol) -> list[Dependency]:
     if x._val == y._val:
         return []
     return x._val.why_equal([y._val])
-
-
-def _why_para(
-    statements_graph: "WhyHyperGraph", statement: "Statement"
-) -> tuple[Optional[Reason], list[Dependency]]:
-    a, b, c, d = statement.args
-
-    if {a, b} == {c, d}:
-        return []
-
-    ab = statements_graph.symbols_graph.get_line(a, b)
-    cd = statements_graph.symbols_graph.get_line(c, d)
-    if ab == cd:
-        if {a, b} == {c, d}:
-            return None, []
-
-        coll = Statement(Coll.NAME, list({a, b, c, d}))
-        coll_dep = statements_graph.build_resolved_dependency(coll, use_cache=False)
-        return None, [coll_dep]
-
-    whypara = []
-    for (x, y), xy in zip([(a, b), (c, d)], [ab, cd]):
-        x_, y_ = xy.points
-        if {x, y} == {x_, y_}:
-            continue
-        collx = Statement(Coll.NAME, [x, y, x_, y_])
-        collx_dep = statements_graph.build_resolved_dependency(collx, use_cache=False)
-        whypara.append(collx_dep)
-
-    return None, whypara + _why_equal(ab, cd)
 
 
 def _why_midpoint(
@@ -99,48 +70,7 @@ def _why_midpoint(
     mb = statements_graph.symbols_graph.get_segment(m, b)
     coll = Statement(Coll.NAME, [m, a, b])
     coll_dep = statements_graph.build_resolved_dependency(coll, use_cache=False)
-    return None, [coll_dep] + _why_equal(ma, mb)
-
-
-def _why_perp(
-    statements_graph: "WhyHyperGraph", statement: "Statement"
-) -> tuple[Optional[Reason], list[Dependency]]:
-    a, b, c, d = statement.args
-    ab = statements_graph.symbols_graph.get_line(a, b)
-    cd = statements_graph.symbols_graph.get_line(c, d)
-
-    why_perp = []
-    for (x, y), xy in zip([(a, b), (c, d)], [ab, cd]):
-        if xy is None:
-            raise ValueError(
-                f"Line {x.name.capitalize()}{y.name.capitalize()} does not exist"
-            )
-
-        x_, y_ = xy.points
-
-        if {x, y} == {x_, y_}:
-            continue
-        collx = Statement(PredicateName.COLLINEAR_X, [x, y, x_, y_])
-        why_perp.append(
-            statements_graph.build_resolved_dependency(collx, use_cache=False)
-        )
-
-    why_eqangle = _why_eqangle_directions(
-        statements_graph, ab._val, cd._val, cd._val, ab._val
-    )
-    a, b = ab.points
-    c, d = cd.points
-
-    perp_repr = Statement(statement.name, [a, b, c, d])
-    if perp_repr.hash_tuple != statement.hash_tuple:
-        perp_repr_dep = statements_graph.build_dependency_from_statement(
-            perp_repr, why=why_eqangle, reason=Reason("_why_perp_repr")
-        )
-        why_eqangle = [perp_repr_dep]
-
-    if why_eqangle:
-        why_perp += why_eqangle
-    return None, why_perp
+    return None, [coll_dep] + why_equal(ma, mb)
 
 
 def _why_cong(
@@ -149,23 +79,7 @@ def _why_cong(
     a, b, c, d = statement.args
     ab = statements_graph.symbols_graph.get_segment(a, b)
     cd = statements_graph.symbols_graph.get_segment(c, d)
-    return None, _why_equal(ab, cd)
-
-
-def _why_collx(
-    statements_graph: "WhyHyperGraph", statement: "Statement"
-) -> tuple[Optional[Reason], list[Dependency]]:
-    if statements_graph.statements_checker.check_coll(statement.args):
-        args = list(set(statement.args))
-        coll = Statement(Coll.NAME, args)
-        cached_dep = statements_graph.dependency_cache.get(coll)
-        if cached_dep is not None:
-            return None, [cached_dep]
-        _, why = line_of_and_why(args)
-        return None, why
-
-    para = Statement(PredicateName.PARALLEL, statement.args)
-    return _why_para(statements_graph, para)
+    return None, why_equal(ab, cd)
 
 
 def line_of_and_why(
@@ -231,102 +145,7 @@ def _why_circle(
     oa = statements_graph.symbols_graph.get_segment(o, a)
     ob = statements_graph.symbols_graph.get_segment(o, b)
     oc = statements_graph.symbols_graph.get_segment(o, c)
-    return None, _why_equal(oa, ob) + _why_equal(oa, oc)
-
-
-def _why_eqangle(
-    statements_graph: "WhyHyperGraph", statement: "Statement"
-) -> tuple[Optional[Reason], list[Dependency]]:
-    a, b, c, d, m, n, p, q = statement.args
-
-    ab, why1 = statements_graph.symbols_graph.get_line_thru_pair_why(a, b)
-    cd, why2 = statements_graph.symbols_graph.get_line_thru_pair_why(c, d)
-    mn, why3 = statements_graph.symbols_graph.get_line_thru_pair_why(m, n)
-    pq, why4 = statements_graph.symbols_graph.get_line_thru_pair_why(p, q)
-
-    if ab is None or cd is None or mn is None or pq is None:
-        para_points = None
-        if {a, b} == {m, n}:
-            para_points = [c, d, p, q]
-        elif {a, b} == {c, d}:
-            para_points = [p, q, m, n]
-        elif {c, d} == {p, q}:
-            para_points = [a, b, m, n]
-        elif {p, q} == {m, n}:
-            para_points = [a, b, c, d]
-        para = Statement(PredicateName.PARALLEL, para_points)
-        para_dep = statements_graph.build_resolved_dependency(para, use_cache=False)
-        return None, [para_dep]
-
-    why_eqangle = []
-    for (x, y), xy, whyxy in zip(
-        [(a, b), (c, d), (m, n), (p, q)],
-        [ab, cd, mn, pq],
-        [why1, why2, why3, why4],
-    ):
-        x_, y_ = xy.points
-        if {x, y} == {x_, y_}:
-            continue
-        collx = Statement(PredicateName.COLLINEAR_X, [x, y, x_, y_])
-        collx_dep = statements_graph.build_dependency_from_statement(
-            collx, why=whyxy, reason=Reason("_why_eqangle_collx")
-        )
-        why_eqangle.append(collx_dep)
-
-    a, b = ab.points
-    c, d = cd.points
-    m, n = mn.points
-    p, q = pq.points
-
-    representent_statement = Statement(statement.name, [a, b, c, d, m, n, p, q])
-    different_from_repr = representent_statement.hash_tuple != statement.hash_tuple
-
-    why_eqangle_values = None
-    if ab._val and cd._val and mn._val and pq._val:
-        why_eqangle_values = _why_eqangle_directions(
-            statements_graph, ab._val, cd._val, mn._val, pq._val
-        )
-
-    if why_eqangle_values:
-        if different_from_repr:
-            eqangle = Statement(PredicateName.EQANGLE, [a, b, c, d, m, n, p, q])
-            eqangle_dep = statements_graph.build_dependency_from_statement(
-                eqangle, why=why_eqangle_values, reason=Reason("_why_eqangle_eqangle")
-            )
-            why_eqangle_values = [eqangle_dep]
-        return None, why_eqangle + why_eqangle_values
-
-    if (ab == cd and mn == pq) or (ab == mn and cd == pq):
-        return None, why_eqangle
-
-    equal_pair_points, equal_pair_lines = _find_equal_pair(
-        a, b, c, d, m, n, p, q, ab, cd, mn, pq
-    )
-    if equal_pair_points is not None and equal_pair_lines is not None:
-        why_eqangle += _maybe_make_equal_pairs(
-            statements_graph, *equal_pair_points, *equal_pair_lines
-        )
-        return None, why_eqangle
-
-    if is_equal(ab, mn) or is_equal(cd, pq):
-        para1 = Statement(PredicateName.PARALLEL, [a, b, m, n])
-        dep1 = statements_graph.build_resolved_dependency(para1, use_cache=False)
-        para2 = Statement(PredicateName.PARALLEL, [c, d, p, q])
-        dep2 = statements_graph.build_resolved_dependency(para2, use_cache=False)
-        why_eqangle += [dep1, dep2]
-
-    elif is_equal(ab, cd) or is_equal(mn, pq):
-        para1 = Statement(PredicateName.PARALLEL, [a, b, c, d])
-        dep1 = statements_graph.build_resolved_dependency(para1, use_cache=False)
-        para2 = Statement(PredicateName.PARALLEL, [m, n, p, q])
-        dep2 = statements_graph.build_resolved_dependency(para2, use_cache=False)
-        why_eqangle += [dep1, dep2]
-    elif ab._val and cd._val and mn._val and pq._val:
-        why_eqangle = _why_eqangle_directions(
-            statements_graph, ab._val, cd._val, mn._val, pq._val
-        )
-
-    return None, why_eqangle
+    return None, why_equal(oa, ob) + why_equal(oa, oc)
 
 
 def _why_eqratio(
@@ -366,11 +185,11 @@ def _why_eqratio(
     if (ab == cd and mn == pq) or (ab == mn and cd == pq):
         return None, []
 
-    equal_pair_points, equal_pair_lines = _find_equal_pair(
+    equal_pair_points, equal_pair_lines = find_equal_pair(
         a, b, c, d, m, n, p, q, ab, cd, mn, pq
     )
     if equal_pair_points is not None:
-        why_eqratio += _maybe_make_equal_pairs(
+        why_eqratio += why_maybe_make_equal_pairs(
             statements_graph, *equal_pair_points, *equal_pair_lines
         )
         return None, why_eqratio
@@ -424,13 +243,13 @@ def _why_aconst(
                 )
                 why_aconst.append(coll_dep)
             else:
-                para = Statement(PredicateName.PARALLEL, args)
+                para = Statement(Para.NAME, args)
                 para_dep = statements_graph.build_resolved_dependency(
                     para, use_cache=False
                 )
                 why_aconst.append(para_dep)
 
-        why_aconst += _why_equal(ang, ang0)
+        why_aconst += why_equal(ang, ang0)
         return None, why_aconst
 
 
@@ -460,7 +279,7 @@ def _why_rconst(
                     statements_graph.build_resolved_dependency(cong, use_cache=False)
                 )
 
-        why_rconst += _why_equal(rat, rat0)
+        why_rconst += why_equal(rat, rat0)
         return None, why_rconst
 
 
@@ -477,15 +296,11 @@ PREDICATE_TO_WHY: dict[
         tuple[Optional[Reason], list[Dependency]],
     ],
 ] = {
-    PredicateName.PARALLEL: _why_para,
     PredicateName.MIDPOINT: _why_midpoint,
-    PredicateName.PERPENDICULAR: _why_perp,
     PredicateName.CONGRUENT: _why_cong,
-    PredicateName.COLLINEAR_X: _why_collx,
     PredicateName.CYCLIC: _why_cyclic,
     PredicateName.CIRCLE: _why_circle,
-    PredicateName.EQANGLE: _why_eqangle,
-    PredicateName.EQANGLE6: _why_eqangle,
+    PredicateName.EQANGLE6: "_why_eqangle",
     PredicateName.EQRATIO: _why_eqratio,
     PredicateName.EQRATIO6: _why_eqratio,
     PredicateName.CONSTANT_ANGLE: _why_aconst,
@@ -502,7 +317,7 @@ P = TypeVar("P")
 L = TypeVar("L")
 
 
-def _find_equal_pair(
+def find_equal_pair(
     a: P, b: P, c: P, d: P, m: P, n: P, p: P, q: P, ab: L, cd: L, mn: L, pq: L
 ) -> tuple[Optional[list[P]], Optional[list[L]]]:
     points = None
@@ -523,7 +338,7 @@ def _find_equal_pair(
     return points, lines
 
 
-def _maybe_make_equal_pairs(
+def why_maybe_make_equal_pairs(
     statements_graph: "WhyHyperGraph",
     a: Point,
     b: Point,
@@ -540,12 +355,10 @@ def _maybe_make_equal_pairs(
     if ab != mn:
         return
     why = []
-    eqpredicate = (
-        PredicateName.PARALLEL if isinstance(ab, Line) else PredicateName.CONGRUENT
-    )
+    eqpredicate = Para.NAME if isinstance(ab, Line) else PredicateName.CONGRUENT
     colls = [a, b, m, n]
-    if len(set(colls)) > 2 and eqpredicate is PredicateName.PARALLEL:
-        collx = Statement(PredicateName.COLLINEAR_X, colls)
+    if len(set(colls)) > 2 and eqpredicate is Para.NAME:
+        collx = Statement(Collx.NAME, colls)
         why.append(statements_graph.build_resolved_dependency(collx, use_cache=False))
 
     eq_statement = Statement(eqpredicate, [c, d, p, q])
@@ -553,80 +366,6 @@ def _maybe_make_equal_pairs(
         statements_graph.build_resolved_dependency(eq_statement, use_cache=False)
     )
     return why
-
-
-def _why_eqangle_directions(
-    statements_graph: "WhyHyperGraph",
-    d1: Direction,
-    d2: Direction,
-    d3: Direction,
-    d4: Direction,
-) -> Optional[list[Dependency]]:
-    """Why two angles are equal, returns a Dependency objects."""
-    all12 = list(all_angles(d1, d2))
-    all34 = list(all_angles(d3, d4))
-
-    min_why = None
-    for ang12, d1s, d2s in all12:
-        for ang34, d3s, d4s in all34:
-            why0 = _why_equal(ang12, ang34)
-            if why0 is None:
-                continue
-            d1_, d2_ = ang12._d
-            d3_, d4_ = ang34._d
-            why1 = bfs_backtrack(d1, [d1_], d1s)
-            why2 = bfs_backtrack(d2, [d2_], d2s)
-            why3 = bfs_backtrack(d3, [d3_], d3s)
-            why4 = bfs_backtrack(d4, [d4_], d4s)
-            why = why0 + why1 + why2 + why3 + why4
-            if min_why is None or len(why) < len(min_why[0]):
-                min_why = why, ang12, ang34, why0, why1, why2, why3, why4
-
-    if min_why is None:
-        return None
-
-    _, ang12, ang34, why0, why1, why2, why3, why4 = min_why
-    why0 = _why_equal(ang12, ang34)
-    d1_, d2_ = ang12._d
-    d3_, d4_ = ang34._d
-
-    if d1 == d1_ and d2 == d2_ and d3 == d3_ and d4 == d4_:
-        return why0
-
-    (a_, b_), (c_, d_) = d1_._obj.points, d2_._obj.points
-    (e_, f_), (g_, h_) = d3_._obj.points, d4_._obj.points
-    deps = []
-    if why0:
-        eqangle = Statement(PredicateName.EQANGLE, [a_, b_, c_, d_, e_, f_, g_, h_])
-        deps.append(
-            statements_graph.build_dependency_from_statement(
-                eqangle, why=why0, reason=Reason("")
-            )
-        )
-
-    (a, b), (c, d) = d1._obj.points, d2._obj.points
-    (e, f), (g, h) = d3._obj.points, d4._obj.points
-    for why, d_xy, (x, y), d_xy_, (x_, y_) in zip(
-        [why1, why2, why3, why4],
-        [d1, d2, d3, d4],
-        [(a, b), (c, d), (e, f), (g, h)],
-        [d1_, d2_, d3_, d4_],
-        [(a_, b_), (c_, d_), (e_, f_), (g_, h_)],
-    ):
-        xy, xy_ = d_xy._obj, d_xy_._obj
-        if why:
-            if xy == xy_:
-                predicate = PredicateName.COLLINEAR_X
-            else:
-                predicate = PredicateName.PARALLEL
-            because_statement = Statement(predicate, [x_, y_, x, y])
-            deps.append(
-                statements_graph.build_dependency_from_statement(
-                    because_statement, why=why, reason=Reason("")
-                )
-            )
-
-    return deps
 
 
 def _why_eqratio_directions(
@@ -646,7 +385,7 @@ def _why_eqratio_directions(
     min_why = None
     for ang12, d1s, d2s in all12:
         for ang34, d3s, d4s in all34:
-            why0 = _why_equal(ang12, ang34)
+            why0 = why_equal(ang12, ang34)
             if why0 is None:
                 continue
             d1_, d2_ = ang12._l

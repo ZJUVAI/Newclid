@@ -2,6 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypeVar, Union
 
+from geosolver.predicates.eqangle import EqAngle
 from geosolver.predicates.predicate_name import PredicateName
 
 if TYPE_CHECKING:
@@ -60,7 +61,7 @@ def hash_statement_str(
     if isinstance(name, PredicateName):
         name = predicate.value
     if predicate is PredicateName.EQANGLE6:
-        name = PredicateName.EQANGLE.value
+        name = EqAngle.NAME
     if predicate is PredicateName.EQRATIO6:
         name = PredicateName.EQRATIO.value
     return PREDICATE_TO_HASH[predicate](name, args)
@@ -175,11 +176,8 @@ def hash_eqratio_3(
 
 
 PREDICATE_TO_HASH = {
-    PredicateName.PARALLEL: hashed_unordered_two_lines_points,
     PredicateName.CONGRUENT: hashed_unordered_two_lines_points,
     PredicateName.CONGRUENT_2: hashed_unordered_two_lines_points,
-    PredicateName.PERPENDICULAR: hashed_unordered_two_lines_points,
-    PredicateName.COLLINEAR_X: hashed_unordered_two_lines_points,
     PredicateName.NON_PARALLEL: hashed_unordered_two_lines_points,
     PredicateName.NON_PERPENDICULAR: hashed_unordered_two_lines_points,
     PredicateName.CYCLIC: hash_unordered_set_of_points,
@@ -190,9 +188,8 @@ PREDICATE_TO_HASH = {
     PredicateName.CONSTANT_ANGLE: hash_ordered_two_lines_with_value,
     PredicateName.CONSTANT_RATIO: hash_ordered_two_lines_with_value,
     PredicateName.CONSTANT_LENGTH: hash_unordered_set_of_points_with_value,
-    PredicateName.EQANGLE: hash_two_times_two_unorded_lines,
     PredicateName.EQRATIO: hash_two_times_two_unorded_lines,
-    PredicateName.EQANGLE6: hash_two_times_two_unorded_lines,
+    EqAngle.NAME6: hash_two_times_two_unorded_lines,
     PredicateName.EQRATIO6: hash_two_times_two_unorded_lines,
     PredicateName.SAMESIDE: hash_ordered_list_of_points,
     PredicateName.S_ANGLE: hash_ordered_list_of_points,

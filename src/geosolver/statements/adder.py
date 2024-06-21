@@ -4,7 +4,10 @@ from typing import TYPE_CHECKING, Optional
 
 import geosolver.combinatorics as comb
 from geosolver.predicates.coll import Coll
-from geosolver.predicates.intrinsic_rules import IntrinsicRules
+from geosolver.intrinsic_rules import IntrinsicRules
+from geosolver.predicates.collx import Collx
+from geosolver.predicates.eqangle import EqAngle
+from geosolver.predicates.para import Para
 from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
 
 from geosolver.predicates.predicate_name import PredicateName
@@ -13,16 +16,9 @@ import geosolver.numerical.check as nm
 
 from geosolver.dependencies.dependency import Reason, Dependency
 from geosolver.dependencies.dependency_building import DependencyBody
-from geosolver.geometry import (
-    Angle,
-    Length,
-    Line,
-    Symbol,
-    Point,
-    Segment,
-    is_equal,
-)
+from geosolver.geometry import Length, Line, Point, Segment
 from geosolver.listing import list_eqratio3
+from geosolver.symbols_graph import is_equal
 
 
 ToCache = tuple[Statement, Dependency]
@@ -59,16 +55,12 @@ class StatementAdder:
         ]
 
         self.PREDICATE_TO_ADDER = {
-            PredicateName.COLLINEAR_X: self._add_coll,
-            PredicateName.PARALLEL: self._add_para,
-            PredicateName.PERPENDICULAR: self._add_perp,
             PredicateName.MIDPOINT: self._add_midp,
             PredicateName.CONGRUENT: self._add_cong,
             PredicateName.CONGRUENT_2: self._add_cong2,
             PredicateName.CIRCLE: self._add_circle,
             PredicateName.CYCLIC: self._add_cyclic,
-            PredicateName.EQANGLE: self._add_eqangle,
-            PredicateName.EQANGLE6: self._add_eqangle,
+            PredicateName.EQANGLE6: "self._add_eqangle",
             PredicateName.S_ANGLE: self._add_s_angle,
             PredicateName.EQRATIO: self._add_eqratio,
             PredicateName.EQRATIO6: self._add_eqratio,
@@ -113,216 +105,6 @@ class StatementAdder:
             raise ValueError(f"Not recognize predicate {statement.predicate}")
 
         return new_deps, deps_to_cache
-
-    def _make_equal(self, x: Symbol, y: Symbol, dep: Dependency) -> None:
-        """Make that two nodes x and y are equal, i.e. merge their value node."""
-        if x.val is None:
-            x, y = y, x
-
-        self.symbols_graph.get_node_val(x, dep=None)
-        self.symbols_graph.get_node_val(y, dep=None)
-        vx = x._val
-        vy = y._val
-
-        if vx == vy:
-            return
-
-        merges = [vx, vy]
-
-        # If eqangle on the same directions switched then they are perpendicular
-        if (
-            isinstance(x, Angle)
-            and x not in self.symbols_graph.aconst.values()
-            and y not in self.symbols_graph.aconst.values()
-            and x.directions == y.directions[::-1]
-            and x.directions[0] != x.directions[1]
-        ):
-            merges = [self.symbols_graph.vhalfpi, vx, vy]
-
-        self.symbols_graph.merge(merges, dep)
-
-    def _add_para(
-        self, points: list[Point], dep_body: DependencyBody
-    ) -> tuple[list[Dependency], list[ToCache]]:
-        """Add a new predicate that 4 points (2 lines) are parallel."""
-        a, b, c, d = points
-        ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
-        cd, why2 = self.symbols_graph.get_line_thru_pair_why(c, d)
-
-        (a, b), (c, d) = ab.points, cd.points
-
-        if IntrinsicRules.PARA_FROM_LINES not in self.DISABLED_INTRINSIC_RULES:
-            dep_body = dep_body.extend_by_why(
-                self.statements_graph,
-                Statement(PredicateName.PARALLEL, points),
-                why=why1 + why2,
-                extention_reason=Reason(IntrinsicRules.PARA_FROM_LINES),
-            )
-
-        para = Statement(PredicateName.PARALLEL, (a, b, c, d))
-        dep = dep_body.build(self.statements_graph, para)
-        to_cache = [(para, dep)]
-
-        self._make_equal(ab, cd, dep)
-        if not is_equal(ab, cd):
-            return [dep], to_cache
-        return [], to_cache
-
-    def _add_para_or_coll_from_perp(
-        self,
-        a: Point,
-        b: Point,
-        c: Point,
-        d: Point,
-        x: Point,
-        y: Point,
-        m: Point,
-        n: Point,
-        dep_body: DependencyBody,
-    ) -> tuple[list[Dependency], list[ToCache]]:
-        """Add a new parallel or collinear predicate."""
-        perp = Statement(PredicateName.PERPENDICULAR, [a, b, c, d])
-        extends = [Statement(PredicateName.PERPENDICULAR, [x, y, m, n])]
-        if {a, b} == {x, y}:
-            pass
-        elif self.statements_checker.check_para([a, b, x, y]):
-            extends.append(Statement(PredicateName.PARALLEL, [a, b, x, y]))
-        elif self.statements_checker.check_coll([a, b, x, y]):
-            extends.append(Statement(Coll.NAME, set(list([a, b, x, y]))))
-        else:
-            return None
-
-        if m in [c, d] or n in [c, d] or c in [m, n] or d in [m, n]:
-            pass
-        elif self.statements_checker.check_coll([c, d, m]):
-            extends.append(Statement(Coll.NAME, [c, d, m]))
-        elif self.statements_checker.check_coll([c, d, n]):
-            extends.append(Statement(Coll.NAME, [c, d, n]))
-        elif self.statements_checker.check_coll([c, m, n]):
-            extends.append(Statement(Coll.NAME, [c, m, n]))
-        elif self.statements_checker.check_coll([d, m, n]):
-            extends.append(Statement(Coll.NAME, [d, m, n]))
-        else:
-            dep_body = dep_body.extend_many(
-                self.statements_graph,
-                perp,
-                extends,
-                extention_reason=Reason(IntrinsicRules.PARA_FROM_PERP),
-            )
-            return self._add_para([c, d, m, n], dep_body)
-
-        dep_body = dep_body.extend_many(
-            self.statements_graph,
-            perp,
-            extends,
-            extention_reason=Reason(IntrinsicRules.PARA_FROM_PERP),
-        )
-        return self._add_coll(list(set([c, d, m, n])), dep_body)
-
-    def _maybe_make_para_from_perp(
-        self, points: list[Point], dep_body: DependencyBody
-    ) -> Optional[tuple[list[Dependency], list[ToCache]]]:
-        """Maybe add a new parallel predicate from perp predicate."""
-        a, b, c, d = points
-        halfpi = self.symbols_graph.aconst[(1, 2)]
-        for ang in halfpi.val.neighbors(Angle):
-            if ang == halfpi:
-                continue
-            d1, d2 = ang.directions
-            x, y = d1._obj.points
-            m, n = d2._obj.points
-
-            for args in [
-                (a, b, c, d, x, y, m, n),
-                (a, b, c, d, m, n, x, y),
-                (c, d, a, b, x, y, m, n),
-                (c, d, a, b, m, n, x, y),
-            ]:
-                para_or_coll = self._add_para_or_coll_from_perp(*args, dep_body)
-                if para_or_coll is not None:
-                    return para_or_coll
-
-        return None
-
-    def _add_perp(
-        self, points: list[Point], dep_body: DependencyBody
-    ) -> tuple[list[Dependency], list[ToCache]]:
-        """Add a new perpendicular predicate from 4 points (2 lines)."""
-
-        if IntrinsicRules.PARA_FROM_PERP not in self.DISABLED_INTRINSIC_RULES:
-            para_from_perp = self._maybe_make_para_from_perp(points, dep_body)
-            if para_from_perp is not None:
-                return para_from_perp
-
-        a, b, c, d = points
-        ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
-        cd, why2 = self.symbols_graph.get_line_thru_pair_why(c, d)
-
-        (a, b), (c, d) = ab.points, cd.points
-
-        if IntrinsicRules.PERP_FROM_LINES not in self.DISABLED_INTRINSIC_RULES:
-            dep_body = dep_body.extend_by_why(
-                self.statements_graph,
-                Statement(PredicateName.PERPENDICULAR, points),
-                extention_reason=Reason(IntrinsicRules.PERP_FROM_LINES),
-                why=why1 + why2,
-            )
-
-        self.symbols_graph.get_node_val(ab, dep=None)
-        self.symbols_graph.get_node_val(cd, dep=None)
-
-        if ab.val == cd.val:
-            raise ValueError(f"{ab.name} and {cd.name} Cannot be perp.")
-
-        args = [a, b, c, d]
-        i = 0
-        for x, y, xy in [(a, b, ab), (c, d, cd)]:
-            i += 1
-            x_, y_ = xy._val._obj.points
-            if {x, y} == {x_, y_}:
-                continue
-            if (
-                dep_body
-                and IntrinsicRules.PERP_FROM_PARA not in self.DISABLED_INTRINSIC_RULES
-            ):
-                perp = Statement(PredicateName.PERPENDICULAR, list(args))
-                para = Statement(PredicateName.PARALLEL, [x, y, x_, y_])
-                dep_body = dep_body.extend(
-                    self.statements_graph,
-                    perp,
-                    para,
-                    extention_reason=Reason(IntrinsicRules.PERP_FROM_PARA),
-                )
-            args[2 * i - 2] = x_
-            args[2 * i - 1] = y_
-
-        a12, a21, why = self.symbols_graph.get_or_create_angle_from_lines(
-            ab, cd, dep=None
-        )
-
-        perp = Statement(PredicateName.PERPENDICULAR, [a, b, c, d])
-        if IntrinsicRules.PERP_FROM_ANGLE not in self.DISABLED_INTRINSIC_RULES:
-            dep_body = dep_body.extend_by_why(
-                self.statements_graph,
-                perp,
-                why=why,
-                extention_reason=Reason(IntrinsicRules.PERP_FROM_ANGLE),
-            )
-
-        dab, dcd = a12._d
-        a, b = dab._obj.points
-        c, d = dcd._obj.points
-
-        dep = dep_body.build(self.statements_graph, perp)
-        was_already_equal = is_equal(a12, a21)
-        self._make_equal(a12, a21, dep=dep)
-
-        eqangle = Statement(PredicateName.EQANGLE, [a, b, c, d, c, d, a, b])
-        to_cache = [(perp, dep), (eqangle, dep)]
-
-        if not was_already_equal:
-            return [dep], to_cache
-        return [], to_cache
 
     def _add_cong(
         self, points: list[Point], dep_body: DependencyBody
@@ -490,163 +272,6 @@ class StatementAdder:
 
         dep_body = DependencyBody(Reason(IntrinsicRules.CYCLIC_FROM_CONG), why=why)
         return self._add_cyclic([b, c, x, y], dep_body)
-
-    def _add_eqangle(
-        self, points: list[Point], dep_body: DependencyBody
-    ) -> tuple[list[Dependency], list[ToCache]]:
-        """Add eqangle made by 8 points in `points`."""
-        if dep_body:
-            dep_body = dep_body.copy()
-        a, b, c, d, m, n, p, q = points
-        ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
-        cd, why2 = self.symbols_graph.get_line_thru_pair_why(c, d)
-        mn, why3 = self.symbols_graph.get_line_thru_pair_why(m, n)
-        pq, why4 = self.symbols_graph.get_line_thru_pair_why(p, q)
-
-        a, b = ab.points
-        c, d = cd.points
-        m, n = mn.points
-        p, q = pq.points
-
-        if IntrinsicRules.EQANGLE_FROM_LINES not in self.DISABLED_INTRINSIC_RULES:
-            eqangle = Statement(PredicateName.EQANGLE, points)
-            dep_body = dep_body.extend_by_why(
-                self.statements_graph,
-                eqangle,
-                why=why1 + why2 + why3 + why4,
-                extention_reason=Reason(IntrinsicRules.EQANGLE_FROM_LINES),
-            )
-
-        if IntrinsicRules.PARA_FROM_EQANGLE not in self.DISABLED_INTRINSIC_RULES:
-            maybe_pairs = self._maybe_make_equal_pairs(
-                a, b, c, d, m, n, p, q, ab, cd, mn, pq, dep_body
-            )
-            if maybe_pairs is not None:
-                return maybe_pairs
-
-        self.symbols_graph.get_node_val(ab, dep=None)
-        self.symbols_graph.get_node_val(cd, dep=None)
-        self.symbols_graph.get_node_val(mn, dep=None)
-        self.symbols_graph.get_node_val(pq, dep=None)
-
-        add, to_cache = [], []
-
-        if (
-            ab.val != cd.val
-            and mn.val != pq.val
-            and (ab.val != mn.val or cd.val != pq.val)
-        ):
-            _add, _to_cache = self._add_eqangle8(
-                a, b, c, d, m, n, p, q, ab, cd, mn, pq, dep_body
-            )
-            add += _add
-            to_cache += _to_cache
-
-        if (
-            ab.val != mn.val
-            and cd.val != pq.val
-            and (ab.val != cd.val or mn.val != pq.val)
-        ):
-            _add, _to_cache = self._add_eqangle8(
-                a, b, m, n, c, d, p, q, ab, mn, cd, pq, dep_body
-            )
-            add += _add
-            to_cache += _to_cache
-
-        return add, to_cache
-
-    def _add_eqangle8(
-        self,
-        a: Point,
-        b: Point,
-        c: Point,
-        d: Point,
-        m: Point,
-        n: Point,
-        p: Point,
-        q: Point,
-        ab: Line,
-        cd: Line,
-        mn: Line,
-        pq: Line,
-        dep_body: DependencyBody,
-    ) -> tuple[list[Dependency], list[ToCache]]:
-        """Add eqangle core."""
-        if dep_body:
-            dep_body = dep_body.copy()
-
-        args = [a, b, c, d, m, n, p, q]
-        i = 0
-        for x, y, xy in [(a, b, ab), (c, d, cd), (m, n, mn), (p, q, pq)]:
-            i += 1
-            x_, y_ = xy._val._obj.points
-            if {x, y} == {x_, y_}:
-                continue
-            if (
-                dep_body
-                and IntrinsicRules.EQANGLE_FROM_PARA
-                not in self.DISABLED_INTRINSIC_RULES
-            ):
-                eqangle = Statement(PredicateName.EQANGLE, tuple(args))
-                para = Statement(PredicateName.PARALLEL, [x, y, x_, y_])
-                dep_body = dep_body.extend(
-                    self.statements_graph,
-                    eqangle,
-                    para,
-                    extention_reason=Reason(IntrinsicRules.EQANGLE_FROM_PARA),
-                )
-                args[2 * i - 2] = x_
-                args[2 * i - 1] = y_
-
-        ab_cd, cd_ab, why1 = self.symbols_graph.get_or_create_angle_from_lines(
-            ab, cd, dep=None
-        )
-        mn_pq, pq_mn, why2 = self.symbols_graph.get_or_create_angle_from_lines(
-            mn, pq, dep=None
-        )
-
-        if (
-            IntrinsicRules.EQANGLE_FROM_CONGRUENT_ANGLE
-            not in self.DISABLED_INTRINSIC_RULES
-        ):
-            eqangle = Statement(PredicateName.EQANGLE, args)
-            dep_body = dep_body.extend_by_why(
-                self.statements_graph,
-                eqangle,
-                why=why1 + why2,
-                extention_reason=Reason(IntrinsicRules.EQANGLE_FROM_CONGRUENT_ANGLE),
-            )
-
-        dab, dcd = ab_cd._d
-        dmn, dpq = mn_pq._d
-
-        a, b = dab._obj.points
-        c, d = dcd._obj.points
-        m, n = dmn._obj.points
-        p, q = dpq._obj.points
-
-        add = []
-        to_cache = []
-
-        dep1 = None
-        eqangle = Statement(PredicateName.EQANGLE, [a, b, c, d, m, n, p, q])
-        if dep_body:
-            dep1 = dep_body.build(self.statements_graph, eqangle)
-        if not is_equal(ab_cd, mn_pq):
-            add += [dep1]
-        to_cache.append((eqangle, dep1))
-        self._make_equal(ab_cd, mn_pq, dep=dep1)
-
-        dep2 = None
-        eqangle_sym = Statement(PredicateName.EQANGLE, [c, d, a, b, p, q, m, n])
-        if dep_body:
-            dep2 = dep_body.build(self.statements_graph, eqangle_sym)
-        if not is_equal(cd_ab, pq_mn):
-            add += [dep2]
-        to_cache.append((eqangle_sym, dep2))
-        self._make_equal(cd_ab, pq_mn, dep=dep2)
-
-        return add, to_cache
 
     def _add_eqratio3(
         self, points: list[Point], dep_body: DependencyBody
@@ -981,92 +606,6 @@ class StatementAdder:
         )
         return add, to_cache
 
-    def _maybe_make_equal_pairs(
-        self,
-        a: Point,
-        b: Point,
-        c: Point,
-        d: Point,
-        m: Point,
-        n: Point,
-        p: Point,
-        q: Point,
-        ab: Line,
-        cd: Line,
-        mn: Line,
-        pq: Line,
-        dep_body: DependencyBody,
-    ) -> Optional[tuple[list[Dependency], list[ToCache]]]:
-        """Add ab/cd = mn/pq in case maybe either two of (ab,cd,mn,pq) are equal."""
-        if is_equal(ab, cd):
-            return self._make_equal_pairs(
-                a, b, c, d, m, n, p, q, ab, cd, mn, pq, dep_body
-            )
-        elif is_equal(mn, pq):
-            return self._make_equal_pairs(
-                m, n, p, q, a, b, c, d, mn, pq, ab, cd, dep_body
-            )
-        elif is_equal(ab, mn):
-            return self._make_equal_pairs(
-                a, b, m, n, c, d, p, q, ab, mn, cd, pq, dep_body
-            )
-        elif is_equal(cd, pq):
-            return self._make_equal_pairs(
-                c, d, p, q, a, b, m, n, cd, pq, ab, mn, dep_body
-            )
-        else:
-            return None
-
-    def _make_equal_pairs(
-        self,
-        a: Point,
-        b: Point,
-        c: Point,
-        d: Point,
-        m: Point,
-        n: Point,
-        p: Point,
-        q: Point,
-        ab: Line,
-        cd: Line,
-        mn: Line,
-        pq: Line,
-        dep_body: DependencyBody,
-    ) -> tuple[list[Dependency], list[ToCache]]:
-        """Add ab/cd = mn/pq in case either two of (ab,cd,mn,pq) are equal."""
-        if isinstance(ab, Segment):
-            dep_pred = PredicateName.EQRATIO
-            eq_pred = PredicateName.CONGRUENT
-            intrinsic_rule = IntrinsicRules.CONG_FROM_EQRATIO
-        else:
-            dep_pred = PredicateName.EQANGLE
-            eq_pred = PredicateName.PARALLEL
-            intrinsic_rule = IntrinsicRules.PARA_FROM_EQANGLE
-
-        reason = Reason(intrinsic_rule)
-        eq = Statement(dep_pred, [a, b, c, d, m, n, p, q])
-        if ab != cd:
-            because_eq = Statement(eq_pred, [a, b, c, d])
-            dep_body = dep_body.extend(self.statements_graph, eq, because_eq, reason)
-
-        elif eq_pred is PredicateName.PARALLEL:  # ab == cd.
-            colls = [a, b, c, d]
-            if len(set(colls)) > 2:
-                because_collx = Statement(PredicateName.COLLINEAR_X, colls)
-                dep_body = dep_body.extend(
-                    self.statements_graph, eq, because_collx, reason
-                )
-
-        because_eq = Statement(eq_pred, [m, n, p, q])
-        dep = dep_body.build(self.statements_graph, because_eq)
-        self._make_equal(mn, pq, dep=dep)
-
-        to_cache = [(because_eq, dep)]
-
-        if is_equal(mn, pq):
-            return [], to_cache
-        return [dep], to_cache
-
     def _add_aconst(
         self, points: list[Point], dep_body: DependencyBody
     ) -> tuple[list[Dependency], list[ToCache]]:
@@ -1112,7 +651,7 @@ class StatementAdder:
                 and IntrinsicRules.ACONST_FROM_PARA not in self.DISABLED_INTRINSIC_RULES
             ):
                 aconst = Statement(PredicateName.CONSTANT_ANGLE, tuple(args))
-                para = Statement(PredicateName.PARALLEL, [x, y, x_, y_])
+                para = Statement(Para.NAME, [x, y, x_, y_])
                 dep_body = dep_body.extend(
                     self.statements_graph,
                     aconst,
@@ -1194,7 +733,7 @@ class StatementAdder:
                 p_, q_ = pq.val._obj.points
                 if {p, q} == {p_, q_}:
                     continue
-                paras.append(Statement(PredicateName.PARALLEL, (p, q, p_, q_)))
+                paras.append(Statement(Para.NAME, (p, q, p_, q_)))
             if paras:
                 dep_body = dep_body.extend_many(
                     self.statements_graph,
@@ -1329,3 +868,92 @@ class StatementAdder:
         add = [lconst_dep]
         to_cache = [(lconst, lconst_dep)]
         return add, to_cache
+
+
+def maybe_make_equal_pairs(
+    a: Point,
+    b: Point,
+    c: Point,
+    d: Point,
+    m: Point,
+    n: Point,
+    p: Point,
+    q: Point,
+    ab: Line,
+    cd: Line,
+    mn: Line,
+    pq: Line,
+    dep_body: DependencyBody,
+    dep_graph: WhyHyperGraph,
+    symbols_graph: SymbolsGraph,
+) -> Optional[tuple[list[Dependency], list[ToCache]]]:
+    """Add ab/cd = mn/pq in case maybe either two of (ab,cd,mn,pq) are equal."""
+    points = None
+    lines = None
+    if is_equal(ab, cd):
+        points = (a, b, c, d, m, n, p, q)
+        lines = (ab, cd, mn, pq)
+    elif is_equal(mn, pq):
+        points = (m, n, p, q, a, b, c, d)
+        lines = (mn, pq, ab, cd)
+    elif is_equal(ab, mn):
+        points = (a, b, m, n, c, d, p, q)
+        lines = (ab, mn, cd, pq)
+    elif is_equal(cd, pq):
+        points = (c, d, p, q, a, b, m, n)
+        lines = (cd, pq, ab, mn)
+
+    if points is None:
+        return None
+
+    return _make_equal_pairs(*points, *lines, dep_body, dep_graph, symbols_graph)
+
+
+def _make_equal_pairs(
+    a: Point,
+    b: Point,
+    c: Point,
+    d: Point,
+    m: Point,
+    n: Point,
+    p: Point,
+    q: Point,
+    ab: Line,
+    cd: Line,
+    mn: Line,
+    pq: Line,
+    dep_body: DependencyBody,
+    dep_graph: WhyHyperGraph,
+    symbols_graph: SymbolsGraph,
+) -> tuple[list[Dependency], list[ToCache]]:
+    """Add ab/cd = mn/pq in case either two of (ab,cd,mn,pq) are equal."""
+    if isinstance(ab, Segment):
+        dep_pred = PredicateName.EQRATIO
+        eq_pred = PredicateName.CONGRUENT
+        intrinsic_rule = IntrinsicRules.CONG_FROM_EQRATIO
+    else:
+        dep_pred = EqAngle.NAME
+        eq_pred = Para.NAME
+        intrinsic_rule = IntrinsicRules.PARA_FROM_EQANGLE
+
+    reason = Reason(intrinsic_rule)
+    eq = Statement(dep_pred, [a, b, c, d, m, n, p, q])
+    if ab != cd:
+        because_eq = Statement(eq_pred, [a, b, c, d])
+        dep_body = dep_body.extend(dep_graph, eq, because_eq, reason)
+
+    elif eq_pred is Para.NAME:  # ab == cd.
+        colls = [a, b, c, d]
+        if len(set(colls)) > 2:
+            because_collx = Statement(Collx.NAME, colls)
+            dep_body = dep_body.extend(dep_graph, eq, because_collx, reason)
+
+    because_eq = Statement(eq_pred, [m, n, p, q])
+    dep = dep_body.build(dep_graph, because_eq)
+    symbols_graph.make_equal(mn, pq, dep=dep)
+
+    to_cache = [(because_eq, dep)]
+
+    if is_equal(mn, pq):
+        return [], to_cache
+    return [dep], to_cache
