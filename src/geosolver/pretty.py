@@ -130,6 +130,9 @@ def pretty_nl(name: str, args: list[str]) -> str:
     if name == "foot":
         a, b, c, d = args
         return f"{a} is the foot of {b} on {c}{d}"
+    if name == Predicate.CONSTANT_LENGTH.value:
+        a, b, v = args
+        return f"{a}{b} = {v}"
     raise NotImplementedError(f"Cannot write pretty name for {name}")
 
 
