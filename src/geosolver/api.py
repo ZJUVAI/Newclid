@@ -12,9 +12,7 @@ import copy as cp
 
 from geosolver.definitions.clause import Clause
 from geosolver.definitions.definition import Definition
-from geosolver.reasoning_engines.algebraic_reasoning.algebraic_manipulator import (
-    AlgebraicManipulator,
-)
+from geosolver.reasoning_engines import AlgebraicManipulator
 from geosolver.reasoning_engines.interface import ReasoningEngine
 from geosolver.theorem import Theorem
 from geosolver.proof import Proof
