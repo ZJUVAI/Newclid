@@ -8,6 +8,8 @@ from typing_extensions import Self
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
 
+T = TypeVar("T")
+
 
 class Symbol:
     r"""Symbol in the symbols graph.
@@ -17,14 +19,17 @@ class Symbol:
     Each node maintains a merge history to
     other nodes if they are (found out to be) equivalent
 
+    ::
         a -> b -
                 \
             c -> d -> e -> f -> g
+
 
     d.merged_to = e
     d.rep = g
     d.merged_from = {a, b, c, d}
     d.equivs = {a, b, c, d, e, f, g}
+
     """
 
     def __init__(self, name: str = "", graph: Any = None):
@@ -74,11 +79,9 @@ class Symbol:
         rep = self.rep()
         return rep, self.why_equal([rep])
 
-    NT = TypeVar("NT")
-
     def neighbors(
-        self, oftype: Type[NT], return_set: bool = False, do_rep: bool = True
-    ) -> list[NT] | set[NT]:
+        self, oftype: Type[T], return_set: bool = False, do_rep: bool = True
+    ) -> list[T] | set[T]:
         """Neighbors of this node in the proof state graph."""
         if do_rep:
             rep = self.rep()

@@ -55,6 +55,8 @@ NODES_VALUES_MARKERS: dict[Type[Symbol], str] = {
     LengthValue: "f",
 }
 
+S = TypeVar("S")
+
 
 class SymbolsGraph:
     def __init__(self) -> None:
@@ -114,8 +116,6 @@ class SymbolsGraph:
 
         if isinstance(node, Point):
             self._name2point[node.name] = node
-
-    S = TypeVar("S")
 
     def new_node(self, oftype: Type[S], name: str = "") -> S:
         node = oftype(name, self)

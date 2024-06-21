@@ -12,7 +12,6 @@
    manual/adding_problems
    manual/adding_rules
    manual/default_files/index
-   manual/dependency_graph
    source/geosolver
 
 Indices and tables

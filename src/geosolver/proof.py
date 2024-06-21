@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Optional, Tuple, Type, Union
 from typing_extensions import Self
 import logging
 
-from geosolver.definitions.clause import Clause, Construction
+from geosolver.defs.clause import Clause, Construction
 from geosolver.numerical.geometries import (
     CircleNum,
     HalfLine,
@@ -18,12 +18,12 @@ from geosolver.numerical.geometries import (
     PointNum,
     reduce,
 )
-from geosolver.reasoning_engines.interface import ReasoningEngine
+from geosolver.reasoning_engines.engines_interface import ReasoningEngine
 from geosolver.statements.statement import Statement
-from geosolver.definitions.definition import Definition
+from geosolver.defs.definition import Definition
 from geosolver.theorem import Theorem
 from geosolver.predicates import Predicate
-from geosolver.agent.interface import (
+from geosolver.agent.agents_interface import (
     Action,
     Feedback,
     Mapping,
@@ -333,7 +333,7 @@ class Proof:
         self, action: ImportDerivationAction
     ) -> ImportDerivationFeedback:
         added, to_cache = self.resolve_statement_dependencies(
-            action.statement, action.reason
+            action.derivation.statement, action.derivation.dep_body
         )
         self.cache_deps(to_cache)
         return ImportDerivationFeedback(added, to_cache)

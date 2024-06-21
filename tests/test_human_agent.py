@@ -88,7 +88,7 @@ class TestHumanAgent:
         self.human_agent.inputs_given = [
             "resolve",
             "ar",
-            "derive",
+            "import",
             "aconst b x a y 1pi/2",
             "stop",
         ]

@@ -1,9 +1,15 @@
+"""Human based agent.
+
+This is a useful tool for analysis and understanding how GeoSolver behaves.
+
+"""
 from __future__ import annotations
 from typing import NamedTuple, Optional, TypeVar
 
+from geosolver.reasoning_engines.engines_interface import Derivation
 from geosolver.statements.statement import Statement
 from geosolver.theorem import Theorem
-from geosolver.agent.interface import (
+from geosolver.agent.agents_interface import (
     Action,
     ImportDerivationAction,
     ImportDerivationFeedback,
@@ -25,7 +31,6 @@ from geosolver.agent.interface import (
 )
 from geosolver.predicates import Predicate
 from geosolver.dependencies.dependency import Dependency
-from geosolver.geometry import Point
 from geosolver.problem import Problem
 from geosolver.proof import Proof, theorem_mapping_str
 from geosolver.statements.adder import ToCache
@@ -39,20 +44,26 @@ T = TypeVar("T")
 
 
 class ShowAction(NamedTuple):
-    pass
+    """Display the figure of the current proof state."""
 
 
 class HumanAgent(DeductiveAgent):
-    INPUT_TO_ACTION_TYPE = {
+    """Human decisions based agent.
+
+    Allow the user to interact with the solver as a deductive agent would.
+
+    """
+
+    _INPUT_TO_ACTION_TYPE = {
         "show": ShowAction,
         "match": MatchAction,
         "apply": ApplyTheoremAction,
         "resolve": ResolveEngineAction,
-        "derive": ImportDerivationAction,
+        "import": ImportDerivationAction,
         "aux": AuxAction,
         "stop": StopAction,
     }
-    ACTION_TYPE_DESCRIPTION = {
+    _ACTION_TYPE_DESCRIPTION = {
         MatchAction: "Match a theorem to know on which mappings it can be applied.",
         StopAction: "Stop the proof",
         ApplyTheoremAction: "Apply a theorem on a mapping of points.",
@@ -94,7 +105,7 @@ class HumanAgent(DeductiveAgent):
         self._mappings: dict[str, tuple[Theorem, Mapping]] = {}
         self._known_mappings: set[str] = set()
 
-        self._derivations: dict[str, tuple[Statement, Dependency]] = {}
+        self._derivations: dict[str, Derivation] = {}
         self._known_derivations: set[Statement] = set()
 
         self._all_added: list[Statement] = []
@@ -149,10 +160,10 @@ class HumanAgent(DeductiveAgent):
         for derived_statement_str in self._derivations.keys():
             choose_derivation_str += f" - [{derived_statement_str}]\n"
         choose_derivation_str += "Derivation you want to apply: "
-        derived_statement, reason = self._ask_for_key(
+        derivation = self._ask_for_key(
             self._derivations, choose_derivation_str, pop=True
         )
-        return ImportDerivationAction(statement=derived_statement, reason=reason)
+        return ImportDerivationAction(derivation=derivation)
 
     def _act_aux(self, theorems: list[Theorem]) -> AuxAction:
         aux_string = self._ask_input("Auxiliary string: ")
@@ -243,30 +254,25 @@ class HumanAgent(DeductiveAgent):
     def _remember_derivations(
         self, action: ResolveEngineAction, feedback: DeriveFeedback
     ) -> tuple[str, bool]:
-        new_mappings: list[tuple[str, tuple[Point, ...]]] = []
-        for derivation_and_dependency in feedback.derives:
-            new_mappings.append(
-                (derivation_and_dependency[0].predicate, derivation_and_dependency)
-            )
-
-        if not new_mappings:
+        if not feedback.derivations:
             return "No new derivation found.\n", False
 
         feedback_str = "New derivations:\n"
-        for predicate, derivation_and_dependency in new_mappings:
-            derived_statement, dependency = derivation_and_dependency
-            if derived_statement in self._known_derivations:
+        for derivation in feedback.derivations:
+            if derivation.statement in self._known_derivations:
                 continue
-            self._derivations[str(derived_statement)] = (derived_statement, dependency)
-            self._known_derivations.add(derived_statement)
-            feedback_str += f"  - [{derived_statement}]\n"
+            self._derivations[str(derivation.statement)] = derivation
+            self._known_derivations.add(derivation.statement)
+            feedback_str += f"  - [{derivation.statement}]\n"
         return feedback_str, True
 
     def _remember_apply_derivation(
         self, action: ImportDerivationAction, feedback: ImportDerivationFeedback
     ) -> tuple[str, bool]:
         success = True
-        feedback_str = f"Successfully applied derivation [{action.statement}]:\n"
+        feedback_str = (
+            f"Successfully applied derivation [{action.derivation.statement}]:\n"
+        )
         if feedback.added:
             feedback_str += self._list_added_statements(feedback.added)
         if feedback.to_cache:
@@ -317,8 +323,8 @@ class HumanAgent(DeductiveAgent):
         return feedback_str
 
     def _choose_action_type(self):
-        availables_action_types = self.INPUT_TO_ACTION_TYPE.copy()
-        for action_input, action_type in self.INPUT_TO_ACTION_TYPE.items():
+        availables_action_types = self._INPUT_TO_ACTION_TYPE.copy()
+        for action_input, action_type in self._INPUT_TO_ACTION_TYPE.items():
             if action_type == ApplyTheoremAction and not self._mappings:
                 availables_action_types.pop(action_input)
             if action_type == ImportDerivationAction and not self._derivations:
@@ -326,7 +332,7 @@ class HumanAgent(DeductiveAgent):
 
         choose_action_type_str = "\nChoose an action type:\n"
         for action_input, action_type in availables_action_types.items():
-            action_description = self.ACTION_TYPE_DESCRIPTION[action_type]
+            action_description = self._ACTION_TYPE_DESCRIPTION[action_type]
             choose_action_type_str += f" -  [{action_input}]: {action_description}\n"
         choose_action_type_str += "Your choice: "
         return self._ask_for_key(availables_action_types, choose_action_type_str)

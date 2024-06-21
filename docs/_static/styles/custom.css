@@ -13,3 +13,18 @@
 .wy-nav-content {
     max-width: 100%;
 }
+
+.red {
+    color:red;
+    font-style: italic;
+}
+
+.orange {
+    color:orange;
+    font-style: italic;
+}
+
+.green {
+    color:green;
+    font-style: italic;
+}

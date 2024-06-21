@@ -1,10 +1,13 @@
-"""Implements Deductive Database (DD)."""
+"""Action / Feedback interface
+
+Make all interactions explicit between DeductiveAgent and the Proof state to allow
+for independent developpement of different kinds of DeductiveAgent.
+
+"""
 
 from __future__ import annotations
 from typing import TYPE_CHECKING, NamedTuple, Optional, Union
 from abc import abstractmethod
-
-from geosolver.reasoning_engines.interface import Derivation
 
 
 if TYPE_CHECKING:
@@ -15,42 +18,50 @@ if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
     from geosolver.match_theorems import MatchCache
 
+    from geosolver.reasoning_engines.engines_interface import Derivation
     from geosolver.problem import Problem
-    from geosolver.statements.statement import Statement
-    from geosolver.dependencies.dependency_building import DependencyBody
 
 
 Mapping = dict[str, Union["Point", str]]
 
 
 class ResetAction(NamedTuple):
-    pass
+    """Reset the proof state to its initial state."""
 
 
 class StopAction(NamedTuple):
-    pass
+    """Stop the proof, often used when an agent is exausted."""
 
 
 class ApplyTheoremAction(NamedTuple):
+    """Apply a theorem with a given mapping of arguments."""
+
     theorem: "Theorem"
     mapping: Mapping
 
 
 class MatchAction(NamedTuple):
+    """Match a theorem to fing available mapping of arguments."""
+
     theorem: "Theorem"
     cache: Optional["MatchCache"] = None
 
 
 class ResolveEngineAction(NamedTuple):
+    """Resolve new derivations using a specified reasoning engine."""
+
     engine_id: str
 
 
 class ImportDerivationAction(NamedTuple):
-    statement: "Statement"
-    reason: "DependencyBody"
+    """Import new dependencies from a given derivation."""
+
+    derivation: "Derivation"
 
 
 class AuxAction(NamedTuple):
+    """Add an auxiliary construction."""
+
     aux_string: str
 
 
@@ -66,6 +77,8 @@ Action = Union[
 
 
 class ResetFeedback(NamedTuple):
+    """Feedback from the initial proof state."""
+
     problem: "Problem"
     available_engines: list[str]
     added: list["Dependency"]
@@ -73,30 +86,42 @@ class ResetFeedback(NamedTuple):
 
 
 class StopFeedback(NamedTuple):
+    """Feedback from the proof stop."""
+
     success: bool
 
 
 class ApplyTheoremFeedback(NamedTuple):
+    """Feedback from an applied theorem to the proof."""
+
     success: bool
     added: list["Dependency"]
     to_cache: list["ToCache"]
 
 
 class MatchFeedback(NamedTuple):
+    """Feedback from matching a theorem in the current proof state."""
+
     theorem: "Theorem"
     mappings: list[Mapping]
 
 
 class DeriveFeedback(NamedTuple):
-    derives: list[Derivation]
+    """Feedback from resolving a reasoning engine."""
+
+    derivations: list["Derivation"]
 
 
 class ImportDerivationFeedback(NamedTuple):
+    """Feedback from importing a derivation."""
+
     added: list["Dependency"]
     to_cache: list["ToCache"]
 
 
 class AuxFeedback(NamedTuple):
+    """Feedback from adding an auxiliary construction."""
+
     success: bool
     added: list["Dependency"]
     to_cache: list["ToCache"]

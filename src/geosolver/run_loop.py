@@ -2,11 +2,11 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING
 
-from geosolver.agent.interface import ResetAction, StopAction, StopFeedback
+from geosolver.agent.agents_interface import ResetAction, StopAction, StopFeedback
 
 
 if TYPE_CHECKING:
-    from geosolver.agent.interface import DeductiveAgent
+    from geosolver.agent.agents_interface import DeductiveAgent
     from geosolver.theorem import Theorem
     from geosolver.proof import Proof
 

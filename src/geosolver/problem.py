@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
-from geosolver.definitions.clause import Clause, Construction
+from geosolver.defs.clause import Clause, Construction
 from geosolver.statements.statement import Statement
 from geosolver.predicates import Predicate
 
@@ -15,7 +15,7 @@ from geosolver.ratios import simplify
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
-    from geosolver.definitions.definition import Definition
+    from geosolver.defs.definition import Definition
 
 
 CONSTRUCTION_RULE = "c0"

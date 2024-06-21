@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Optional
-from geosolver.definitions.clause import Construction
+from geosolver.defs.clause import Construction
 from geosolver.predicates import Predicate
 
 
