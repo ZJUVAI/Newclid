@@ -2,7 +2,7 @@
 
 from collections import defaultdict
 from math import log
-from typing import TYPE_CHECKING, Any, Generator, Literal, TypeVar
+from typing import TYPE_CHECKING, Any, Generator, Literal, Optional, TypeVar
 
 from geosolver.geometry import Direction, Length, Line, Symbol, Point
 from geosolver.numerical import ATOM, NLOGATOM
@@ -133,7 +133,7 @@ def div(e1: SumCV, e2: SumCV) -> Coef:
     return Coef(n) / Coef(d)
 
 
-def recon(e: SumCV, const: str) -> tuple[str, SumCV] | None:
+def recon(e: SumCV, const: str) -> Optional[tuple[str, SumCV]]:
     """Reconcile one variable in the expression e=0, given const."""
     e = strip(e)
     if len(e) == 0:
