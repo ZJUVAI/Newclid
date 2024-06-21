@@ -130,5 +130,9 @@ r50_vs_square
 a b = segment a b; c = eqdistance c b a b, on_tline c b a b; d = eqdistance d c c b, eqdistance d a a b; o = on_line o a c, on_line o b d ? cong o a o d
 r50_vs_trapezoid
 a b c = triangle a b c; d = on_circum d a b c, on_pline d c a b; e = on_tline e b b a, on_circum e b c d; o = midpoint o a e ? cong o a o d
+pyt_test_formula_to_perp
+a = free a; b = lconst b a 4; c = lconst c a 5, lconst c b 3 ? perp a b b c
+pyt_test_perp_to_formula
+a = free a; b = lconst b a 4; c = on_tline c b a b, lconst c b 3 ? lconst a c 5
 testing_problem
 a b c = triangle a b c; o = circle o a b c; p = on_circle p o a; q = on_tline q p o p; pa = reflect pa p b c; pb = reflect pb p c a; pc = reflect pc p a b; qa = reflect qa q b c; qb = reflect qb q c a; qc = reflect qc q a b; a1 = on_line a1 pb qb, on_line a1 pc qc; b1 = on_line b1 pa qa, on_line b1 pc qc; c1 = on_line c1 pa qa, on_line c1 pb qb; o1 = circle o1 a1 b1 c1; x = on_circle x o a, on_circle x o1 a1 ? cyclic pa pb c x
