@@ -4,7 +4,7 @@ from collections import defaultdict
 from math import log
 from typing import TYPE_CHECKING, Any, Generator, Literal, TypeVar
 
-from geosolver.geometry import Direction, Length, Line, Node, Point
+from geosolver.geometry import Direction, Length, Line, Symbol, Point
 from geosolver.numerical import ATOM, NLOGATOM
 from geosolver.ratios import simplify
 from geosolver._lazy_loading import lazy_import
@@ -61,7 +61,7 @@ class InfQuotientError(Exception):
 MAX_DENOMINATOR = 1000000
 
 # tolerance for fraction approximation
-TOL = 1e-15
+TOL = 1e-10
 
 
 def get_quotient(v) -> tuple[int, int]:
@@ -568,15 +568,15 @@ def update_groups(
 class GeometricTable(Table):
     """Abstract class representing the coefficient matrix (table) A."""
 
-    def __init__(self, const: str, const_obj: Node):
+    def __init__(self, const: str, const_obj: Symbol):
         super().__init__(const)
         self.v2obj = {const: const_obj}
 
-    def get_name(self, objs: list[Node]) -> list[str]:
+    def get_name(self, objs: list[Symbol]) -> list[str]:
         self.v2obj.update({o.name: o for o in objs})
         return [o.name for o in objs]
 
-    def map2obj(self, names: list[str]) -> list[Node]:
+    def map2obj(self, names: list[str]) -> list[Symbol]:
         return [self.v2obj[n] for n in names]
 
     def get_all_eqs_and_why(self, return_quads: bool) -> Generator[Any, None, None]:
@@ -600,7 +600,7 @@ class GeometricTable(Table):
 class RatioTable(GeometricTable):
     """Coefficient matrix A for log(distance)."""
 
-    def __init__(self, const: str, const_obj: Node):
+    def __init__(self, const: str, const_obj: Symbol):
         super().__init__(const, const_obj)
         self.one = self.const
 
@@ -633,7 +633,7 @@ class RatioTable(GeometricTable):
 class AngleTable(GeometricTable):
     """Coefficient matrix A for slope(direction)."""
 
-    def __init__(self, const: str, const_obj: Node):
+    def __init__(self, const: str, const_obj: Symbol):
         super().__init__(const, const_obj)
         self.pi = self.const
 

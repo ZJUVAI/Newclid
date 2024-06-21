@@ -462,14 +462,10 @@ r28 : para2coll
    :header-rows: 1
 
    * - Figure
-     - :math:`AB \parallel AC \implies \text{coll}(ABC)`
+     - Formal Statement
      - Description
    * - |r28|
-     -
-       .. code-block :: text
-
-         para A B A C
-         => coll A B C
+     - :math:`AB \parallel AC \implies ABC\text{ collinear}`
      - 
 
 .. |r28| image:: ../../_static/Images/rules/r28.png
@@ -482,14 +478,10 @@ r29 : midp2eqratio
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{midp}(M, AB) \wedge \text{midp}(N, CD) \implies \frac{MA}{AB} = \frac{NC}{CD}`
+     - Formal Statement
      - Description
    * - |r29|
-     -
-       .. code-block :: text
-
-         midp M A B, midp N C D
-         => eqratio M A A B N C C D
+     - :math:`\begin{cases} M \text{ midpoint of }AB \\ N\text{ midpoint of } CD \end{cases}\implies \frac{MA}{AB} = \frac{NC}{CD}`
      - 
 
 .. |r29| image:: ../../_static/Images/rules/r29.png
@@ -502,14 +494,10 @@ r30 : eqangle_perp2perp
    :header-rows: 1
 
    * - Figure
-     - :math:`\langle AB, PQ\rangle=\langle CD, UV\rangle \wedge \text{perp}(PQ, UV) \implies \text{perp}(AB, CD)`
+     - Formal Statement
      - Description
    * - |r30|
-     -
-       .. code-block :: text
-
-         eqangle A B P Q C D U V, perp P Q U V
-         => perp A B C D
+     - :math:`\begin{cases}\angle (AB\times PQ)=\angle (CD\times UV) \\ PQ\perp UV \end{cases}\implies AB\perp CD`
      - 
 
 .. |r30| image:: ../../_static/Images/rules/r30.png
@@ -522,14 +510,10 @@ r31 : eqratio_cong2cong
    :header-rows: 1
 
    * - Figure
-     - :math:`\frac{AB}{PQ} = \frac{CD}{UV} \wedge |PQ| = |UV| \implies |AB| = |CD|`
+     - Formal Statement
      - Description
    * - |r31|
-     -
-       .. code-block :: text
-
-         eqratio A B P Q C D U V, cong P Q U V
-         => cong A B C D
+     - :math:`\frac{AB}{PQ} = \frac{CD}{UV} \wedge |PQ| = |UV| \implies |AB| = |CD|`
      - 
 
 .. |r31| image:: ../../_static/Images/rules/r06.png
@@ -542,15 +526,10 @@ r32 : cong_cong2contri
    :header-rows: 1
 
    * - Figure
-     - :math:`|AB| = |PQ| \wedge |BC| = |QR| \wedge |CA| = |RP|`
-       :math:`\implies \text{contri*}(ABC, PQR)`
+     - Formal Statement
      - Description
    * - |r32|
-     -
-       .. code-block :: text
-
-         cong A B P Q, cong B C Q R, cong C A R P, ncoll A B C
-         => contri* A B C P Q R
+     - :math:`\begin{cases}|AB| = |PQ| \\ |BC| = |QR| \\ |CA| = |RP|\end{cases}\implies \Delta ABC\cong^\ast \Delta PQR`
      - 
 
 .. |r32| image:: ../../_static/Images/rules/r32.png
@@ -563,15 +542,10 @@ r33 : cong_eqangle2contri
    :header-rows: 1
 
    * - Figure
-     - :math:`|AB| = |PQ| \wedge |BC| = |QR| \wedge \langle BA, B\rangle = \langle QP, QR\rangle`
-       :math:`\implies \text{contri*}(ABC, PQR)`
+     - Formal Statement
      - Description
    * - |r33|
-     -
-       .. code-block :: text
-
-         cong A B P Q, cong B C Q R, eqangle6 B A B C Q P Q R, ncoll A B C
-         => contri* A B C P Q R
+     - :math:`\begin{cases}|AB| = |PQ| \\ |BC| = |QR| \\ \angle (BA\times BC) = \angle (QP\times QR)\end{cases}\implies \Delta ABC\cong^\ast\Delta PQR`
      - 
 
 .. |r33| image:: ../../_static/Images/rules/r33.png
@@ -584,15 +558,10 @@ r34 : eqangle2simtri
    :header-rows: 1
 
    * - Figure
-     - :math:`\langle BA, BC\rangle = \langle QP, QR\rangle \wedge \langle CA, CB\rangle = \langle RP, RQ\rangle`
-       :math:`\implies \text{simtri}(ABC, PQR)`
+     - Formal Statement
      - Description
    * - |r34|
-     -
-       .. code-block :: text
-
-         eqangle6 B A B C Q P Q R, eqangle6 C A C B R P R Q, ncoll A B C
-         => simtri A B C P Q R
+     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QP\times QR) \\ \angle (CA\times CB) = \angle (RP\times RQ)\end{cases}\implies \Delta ABC\sim \Delta PQR`
      - 
 
 .. |r34| image:: ../../_static/Images/rules/r34.png
@@ -605,15 +574,10 @@ r35 : eqangle2simtri2
    :header-rows: 1
 
    * - Figure
-     - :math:`\langle BA, BC\rangle = \langle QP, QR\rangle \wedge \langle CA, CB\rangle = \langle RP, RQ\rangle`
-       :math:`\implies \text{simtri2}(ABC, PQR)`
+     - Formal Statement
      - Description
    * - |r35|
-     -
-       .. code-block :: text
-
-         eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C
-         => simtri2 A B C P Q R
+     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QR\times QP) \\ \angle (CA\times CB) = \angle (RQ\times RP)\end{cases}\implies \Delta ABC\sim^2 \Delta PQR`
      - 
 
 .. |r35| image:: ../../_static/Images/rules/r35.png
@@ -626,17 +590,10 @@ r36 : eqangle_cong2contri
    :header-rows: 1
 
    * - Figure
-     - :math:`\langle BA, BC\rangle = \langle QP, QR\rangle \wedge \langle CA, CB\rangle = \langle RP, RQ\rangle`
-       :math:`\wedge |AB| = |PQ| \wedge |BC| = |QR| \wedge \text{ncoll}(ABC)`
-       :math:`\wedge |AP| = |QB| \implies \text{contri}(ABC, PQR)`
+     - Formal Statement
      - Description
    * - |r36|
-     -
-       .. code-block :: text
-
-         eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P,
-         ncoll A B C, cong A B P Q
-         => contri A B C P Q R
+     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QP\times QR) \\ \angle (CA\times CB) = \angle (RP\times RQ)\\ |AB| = |PQ| \\ |BC| = |QR| \\ ABC\text{ non-collinear}\\ |AP| = |QB| \end{cases}\implies \Delta ABC\cong \Delta PQR`
      - 
 
 .. |r36| image:: ../../_static/Images/rules/r36.png
@@ -649,17 +606,10 @@ r37 : eqangle_cong2contri
    :header-rows: 1
 
    * - Figure
-     - :math:`\langle BA, BC\rangle = \langle QP, QR\rangle \wedge \langle CA, CB\rangle = \langle RP, RQ\rangle`
-       :math:`\wedge |AB| = |PQ| \wedge |BC| = |QR| \wedge \text{ncoll}(ABC)`
-       :math:`\wedge |AP| = |QB| \implies \text{contri2}(ABC, PQR)`
+     - Formal Statement
      - Description
    * - |r37|
-     -
-       .. code-block :: text
-
-         eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P,
-         ncoll A B C, cong A B P Q
-         => contri2 A B C P Q R
+     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QP\times QR) \\ \angle (CA\times CB) = \angle (RP\times RQ)\\ |AB| = |PQ| \\ |BC| = |QR| \\ ABC\text{ non-collinear}\\|AP| = |QB| \end{cases}\implies \Delta ABC\cong^2 \Delta PQR`
      - 
 
 .. |r37| image:: ../../_static/Images/rules/r37.png
@@ -672,16 +622,10 @@ r38 : eqratio_eqangle2simtri
    :header-rows: 1
 
    * - Figure
-     - :math:`\frac{BA}{BC} = \frac{QP}{QR} \wedge \frac{CA}{CB} = \frac{RP}{RQ}`
-       :math:`\wedge \text{ncoll}(ABC) \implies \text{simtri*}(ABC, PQR)`
+     - Formal Statement
      - Description
    * - |r38|
-     -
-       .. code-block :: text
-
-         eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q,
-         ncoll A B C
-         => simtri* A B C P Q R
+     - :math:`\begin{cases}\frac{BA}{BC} = \frac{QP}{QR} \\ \frac{CA}{CB} = \frac{RP}{RQ}\\ ABC\text{ non-collinear} \end{cases}\implies \Delta ABC\sim^\ast \Delta PQR`
      - 
 
 .. |r38| image:: ../../_static/Images/rules/r38.png
@@ -694,16 +638,10 @@ r39 : eqratio_eqangle2simtri
    :header-rows: 1
 
    * - Figure
-     - :math:`\frac{BA}{BC} = \frac{QP}{QR} \wedge \langle BA, B\rangle = \langle QP, Q\rangle`
-       :math:`\wedge \text{ncoll}(ABC) \implies \text{simtri*}(ABC, PQR)`
+     - Formal Statement
      - Description
    * - |r39|
-     -
-       .. code-block :: text
-
-         eqratio6 B A B C Q P Q R, eqangle6 B A B C Q P Q R,
-         ncoll A B C
-         => simtri* A B C P Q R
+     - :math:`\begin{cases}\frac{BA}{BC} = \frac{QP}{QR} \\ \angle (BA\times BC)\rangle = \angle (QP\times QR)\\ ABC\text{ non-collinear}\end{cases} \implies \Delta ABC\sim^\ast \Delta PQR`
      - 
 
 .. |r39| image:: ../../_static/Images/rules/r39.png
@@ -787,15 +725,10 @@ r43 : Orthocenter theorem
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{perp}(A, B, C, D) \wedge \text{perp}(A, C, B, D)`
-       :math:`\implies \text{perp}(A, D, B, C)`
+     - Formal Statement
      - Description
    * - |r43|
-     -
-       .. code-block :: text
-
-         perp A B C D, perp A C B D
-         => perp A D B C
+     - :math:`AB\perp CD \wedge AC\perp BD\implies AD\perp BC`
      - 
 
 .. |r43| image:: ../../_static/Images/rules/r43.png

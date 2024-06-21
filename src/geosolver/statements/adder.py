@@ -16,7 +16,7 @@ from geosolver.geometry import (
     Angle,
     Length,
     Line,
-    Node,
+    Symbol,
     Point,
     Segment,
     is_equal,
@@ -144,13 +144,13 @@ class StatementAdder:
 
         return new_deps, deps_to_cache
 
-    def _make_equal(self, x: Node, y: Node, dep: Dependency) -> None:
+    def _make_equal(self, x: Symbol, y: Symbol, dep: Dependency) -> None:
         """Make that two nodes x and y are equal, i.e. merge their value node."""
         if x.val is None:
             x, y = y, x
 
-        self.symbols_graph.get_or_create_node_val(x, dep=None)
-        self.symbols_graph.get_or_create_node_val(y, dep=None)
+        self.symbols_graph.get_node_val(x, dep=None)
+        self.symbols_graph.get_node_val(y, dep=None)
         vx = x._val
         vy = y._val
 
@@ -372,8 +372,8 @@ class StatementAdder:
                 why=why1 + why2,
             )
 
-        self.symbols_graph.get_or_create_node_val(ab, dep=None)
-        self.symbols_graph.get_or_create_node_val(cd, dep=None)
+        self.symbols_graph.get_node_val(ab, dep=None)
+        self.symbols_graph.get_node_val(cd, dep=None)
 
         if ab.val == cd.val:
             raise ValueError(f"{ab.name} and {cd.name} Cannot be perp.")
@@ -418,12 +418,13 @@ class StatementAdder:
         c, d = dcd._obj.points
 
         dep = dep_body.build(self.statements_graph, perp)
+        was_already_equal = is_equal(a12, a21)
         self._make_equal(a12, a21, dep=dep)
 
         eqangle = Statement(Predicate.EQANGLE, [a, b, c, d, c, d, a, b])
         to_cache = [(perp, dep), (eqangle, dep)]
 
-        if not is_equal(a12, a21):
+        if not was_already_equal:
             return [dep], to_cache
         return [], to_cache
 
@@ -627,10 +628,10 @@ class StatementAdder:
             if maybe_pairs is not None:
                 return maybe_pairs
 
-        self.symbols_graph.get_or_create_node_val(ab, dep=None)
-        self.symbols_graph.get_or_create_node_val(cd, dep=None)
-        self.symbols_graph.get_or_create_node_val(mn, dep=None)
-        self.symbols_graph.get_or_create_node_val(pq, dep=None)
+        self.symbols_graph.get_node_val(ab, dep=None)
+        self.symbols_graph.get_node_val(cd, dep=None)
+        self.symbols_graph.get_node_val(mn, dep=None)
+        self.symbols_graph.get_node_val(pq, dep=None)
 
         add, to_cache = [], []
 
@@ -806,10 +807,10 @@ class StatementAdder:
             if add is not None:
                 return add
 
-        self.symbols_graph.get_or_create_node_val(ab, dep=None)
-        self.symbols_graph.get_or_create_node_val(cd, dep=None)
-        self.symbols_graph.get_or_create_node_val(mn, dep=None)
-        self.symbols_graph.get_or_create_node_val(pq, dep=None)
+        self.symbols_graph.get_node_val(ab, dep=None)
+        self.symbols_graph.get_node_val(cd, dep=None)
+        self.symbols_graph.get_node_val(mn, dep=None)
+        self.symbols_graph.get_node_val(pq, dep=None)
 
         add = []
         to_cache = []
@@ -1193,8 +1194,8 @@ class StatementAdder:
                 extention_reason=Reason(IntrinsicRules.ACONST_FROM_LINES),
             )
 
-        self.symbols_graph.get_or_create_node_val(ab, dep=None)
-        self.symbols_graph.get_or_create_node_val(cd, dep=None)
+        self.symbols_graph.get_node_val(ab, dep=None)
+        self.symbols_graph.get_node_val(cd, dep=None)
 
         if ab.val == cd.val:
             raise ValueError(f"{ab.name} - {cd.name} cannot be {nd.name}")
@@ -1270,8 +1271,8 @@ class StatementAdder:
         ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
         bx, why2 = self.symbols_graph.get_line_thru_pair_why(b, x)
 
-        self.symbols_graph.get_or_create_node_val(ab, dep=None)
-        self.symbols_graph.get_or_create_node_val(bx, dep=None)
+        self.symbols_graph.get_node_val(ab, dep=None)
+        self.symbols_graph.get_node_val(bx, dep=None)
 
         add, to_cache = [], []
 
@@ -1349,8 +1350,8 @@ class StatementAdder:
         ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)
         cd = self.symbols_graph.get_or_create_segment(c, d, dep=None)
 
-        self.symbols_graph.get_or_create_node_val(ab, dep=None)
-        self.symbols_graph.get_or_create_node_val(cd, dep=None)
+        self.symbols_graph.get_node_val(ab, dep=None)
+        self.symbols_graph.get_node_val(cd, dep=None)
 
         if ab.val == cd.val:
             raise ValueError(f"{ab.name} and {cd.name} cannot be equal")
@@ -1418,7 +1419,7 @@ class StatementAdder:
         a, b, length = args
 
         ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)
-        l_ab = self.symbols_graph.get_or_create_node_val(ab, dep=None)
+        l_ab = self.symbols_graph.get_node_val(ab, dep=None)
 
         lconst = Statement(Predicate.CONSTANT_LENGTH, args)
 

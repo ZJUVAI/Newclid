@@ -233,10 +233,10 @@ class AlgebraicManipulator(ReasoningEngine):
         self.atable.add_para(ab._val, cd._val, dep)
 
     def _add_perp(self, dep: "Dependency"):
-        a, b, c, d, _ = dep.statement.args
+        a, b, c, d = dep.statement.args
         ab = self.symbols_graph.get_line_thru_pair(a, b)
         cd = self.symbols_graph.get_line_thru_pair(c, d)
-        self.atable.add_const_angle(ab, cd, 90, dep)
+        self.atable.add_const_angle(ab.val, cd.val, 90, dep)
 
     def _add_eqangle(self, dep: "Dependency"):
         a, b, c, d, m, n, p, q = dep.statement.args
@@ -259,16 +259,16 @@ class AlgebraicManipulator(ReasoningEngine):
 
     def _add_eqratio(self, dep: "Dependency"):
         a, b, c, d, m, n, p, q = dep.statement.args
-        ab = self.symbols_graph.get_or_create_node_val(
+        ab = self.symbols_graph.get_node_val(
             self.symbols_graph.get_or_create_segment(a, b, dep=None), dep=None
         )
-        cd = self.symbols_graph.get_or_create_node_val(
+        cd = self.symbols_graph.get_node_val(
             self.symbols_graph.get_or_create_segment(c, d, dep=None), dep=None
         )
-        pq = self.symbols_graph.get_or_create_node_val(
+        pq = self.symbols_graph.get_node_val(
             self.symbols_graph.get_or_create_segment(p, q, dep=None), dep=None
         )
-        mn = self.symbols_graph.get_or_create_node_val(
+        mn = self.symbols_graph.get_node_val(
             self.symbols_graph.get_or_create_segment(m, n, dep=None), dep=None
         )
         if (ab, cd) == (pq, mn):
@@ -297,8 +297,8 @@ class AlgebraicManipulator(ReasoningEngine):
         ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)
         cd = self.symbols_graph.get_or_create_segment(c, d, dep=None)
         self.rtable.add_const_ratio(
-            self.symbols_graph.get_or_create_node_val(ab, dep=None),
-            self.symbols_graph.get_or_create_node_val(cd, dep=None),
+            self.symbols_graph.get_node_val(ab, dep=None),
+            self.symbols_graph.get_node_val(cd, dep=None),
             num,
             den,
             dep,

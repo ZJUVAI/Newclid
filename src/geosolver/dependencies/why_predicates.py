@@ -8,10 +8,11 @@ from geosolver.statements.statement import Statement
 from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.geometry import (
     Angle,
+    AngleValue,
     Circle,
     Direction,
     Line,
-    Node,
+    Symbol,
     Point,
     Ratio,
     all_angles,
@@ -49,7 +50,7 @@ def why_dependency(
     return reason, why
 
 
-def _why_equal(x: Node, y: Node) -> list[Dependency]:
+def _why_equal(x: Symbol, y: Symbol) -> list[Dependency]:
     if x == y:
         return []
     if not x._val or not y._val:
@@ -405,7 +406,7 @@ def _why_aconst(
 ) -> tuple[Optional[Reason], list[Dependency]]:
     a, b, c, d, ang0 = statement.args
 
-    measure = ang0._val
+    measure: AngleValue = ang0._val
     for ang in measure.neighbors(Angle):
         if ang == ang0:
             continue
@@ -443,8 +444,8 @@ def _why_rconst(
     statements_graph: "WhyHyperGraph", statement: "Statement"
 ) -> tuple[Optional[Reason], list[Dependency]]:
     a, b, c, d, rat0 = statement.args
-    val = rat0._val
 
+    val: AngleValue = rat0._val
     for rat in val.neighbors(Ratio):
         if rat == rat0:
             continue

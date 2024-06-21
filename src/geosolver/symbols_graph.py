@@ -3,7 +3,7 @@ from collections import defaultdict
 from decimal import Decimal
 from fractions import Fraction
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, Optional, Self, Tuple, Type
+from typing import TYPE_CHECKING, Callable, Dict, Optional, Self, Tuple, Type, TypeVar
 
 
 from geosolver.ratios import simplify
@@ -18,7 +18,7 @@ from geosolver.geometry import (
     LengthValue,
     Line,
     AngleValue,
-    Node,
+    Symbol,
     Point,
     Ratio,
     Segment,
@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
 
 
-NODES_VALUES: dict[Type[Node], Type[Node]] = {
+NODES_VALUES: dict[Type[Symbol], Type[Symbol]] = {
     Line: Direction,
     Segment: Length,
     Angle: AngleValue,
@@ -48,7 +48,7 @@ NODES_VALUES: dict[Type[Node], Type[Node]] = {
     Length: LengthValue,
 }
 
-NODES_VALUES_MARKERS: dict[Type[Node], str] = {
+NODES_VALUES_MARKERS: dict[Type[Symbol], str] = {
     Direction: "d",
     Length: "l",
     AngleValue: "m",
@@ -59,7 +59,7 @@ NODES_VALUES_MARKERS: dict[Type[Node], str] = {
 
 class SymbolsGraph:
     def __init__(self) -> None:
-        self.type2nodes: dict[Type[Node], list[Node]] = {
+        self.type2nodes: dict[Type[Symbol], list[Symbol]] = {
             Point: [],
             Line: [],
             Segment: [],
@@ -73,7 +73,7 @@ class SymbolsGraph:
             LengthValue: [],
         }
         self._name2point: dict[str, Point] = {}
-        self._name2node: dict[str, Node] = {}
+        self._name2node: dict[str, Symbol] = {}
         self._pair2line: dict[tuple[Point, Point], Line] = {}
         self._triplet2circle: dict[tuple[Point, Point, Point], Circle] = {}
         self.rconst: Dict[Tuple[int, int], Ratio] = {}  # contains all constant ratios
@@ -82,7 +82,7 @@ class SymbolsGraph:
         self.halfpi, _ = self.get_or_create_const_ang(1, 2)
         self.vhalfpi = self.halfpi.val
 
-    def connect(self, a: Node, b: Node, dep: "Dependency") -> None:
+    def connect(self, a: Symbol, b: Symbol, dep: "Dependency") -> None:
         a.connect_to(b, dep)
         b.connect_to(a, dep)
 
@@ -90,7 +90,7 @@ class SymbolsGraph:
         """Return all nodes of type Point."""
         return list(self.type2nodes[Point])
 
-    def names2nodes(self, pnames: list[str]) -> list[Node]:
+    def names2nodes(self, pnames: list[str]) -> list[Symbol]:
         return [self._name2node[name] for name in pnames]
 
     def names2points(
@@ -109,19 +109,21 @@ class SymbolsGraph:
 
         return result
 
-    def add_node(self, node: Node) -> None:
+    def add_node(self, node: Symbol) -> None:
         self.type2nodes[type(node)].append(node)
         self._name2node[node.name] = node
 
         if isinstance(node, Point):
             self._name2point[node.name] = node
 
-    def new_node(self, oftype: Type[Node], name: str = "") -> Node:
+    S = TypeVar("S")
+
+    def new_node(self, oftype: Type[S], name: str = "") -> S:
         node = oftype(name, self)
         self.add_node(node)
         return node
 
-    def get_or_create_node_val(self, node: Node, dep: Optional["Dependency"]) -> Node:
+    def get_node_val(self, node: Symbol, dep: Optional["Dependency"]) -> Symbol:
         """Get a node value (equality) node, creating it if necessary."""
         if node._val:
             return node._val
@@ -141,7 +143,7 @@ class SymbolsGraph:
             return self._name2node[pointname]
         return default_fn(pointname)
 
-    def merge(self, nodes: list[Node], dep: "Dependency") -> Node:
+    def merge(self, nodes: list[Symbol], dep: "Dependency") -> Symbol:
         """Merge all nodes."""
         if len(nodes) < 2:
             return
@@ -158,7 +160,9 @@ class SymbolsGraph:
                 break
         return self.merge_into(node0, nodes1, dep)
 
-    def merge_into(self, node0: Node, nodes1: list[Node], dep: "Dependency") -> Node:
+    def merge_into(
+        self, node0: Symbol, nodes1: list[Symbol], dep: "Dependency"
+    ) -> Symbol:
         """Merge nodes1 into a single node0."""
         node0.merge(nodes1, dep)
         for n in nodes1:
@@ -168,7 +172,7 @@ class SymbolsGraph:
         nodes = [node0] + nodes1
         if any([node._val for node in nodes]):
             for node in nodes:
-                self.get_or_create_node_val(node, dep=None)
+                self.get_node_val(node, dep=None)
 
             vals1 = [n._val for n in nodes1]
             node0._val.merge(vals1, dep)
@@ -179,7 +183,7 @@ class SymbolsGraph:
 
         return node0
 
-    def remove(self, nodes: list[Node]) -> None:
+    def remove(self, nodes: list[Symbol]) -> None:
         """Remove nodes out of self because they are merged."""
         if not nodes:
             return
@@ -229,13 +233,14 @@ class SymbolsGraph:
         n, d = simplify(n, d)
         ang = self.aconst[(n, d)] = self.new_node(Angle, f"{n}pi/{d}")
         ang.set_directions(None, None)
-        self.get_or_create_node_val(ang, dep=None)
+        self.get_node_val(ang, dep=None)
 
     def _create_const_rat(self, n: int, d: int) -> None:
         n, d = simplify(n, d)
         rat = self.rconst[(n, d)] = self.new_node(Ratio, f"{n}/{d}")
+        rat.value = Fraction(n, d)
         rat.set_lengths(None, None)
-        self.get_or_create_node_val(rat, dep=None)
+        self.get_node_val(rat, dep=None)
 
     def get_or_create_const_ang(self, n: int, d: int) -> tuple[Angle, Angle]:
         n, d = simplify(n, d)
@@ -262,10 +267,11 @@ class SymbolsGraph:
         rat2 = self.rconst[(d, n)]
         return rat1, rat2
 
-    def get_or_create_const_length(self, length: Decimal) -> Length:
+    def get_or_create_const_length(self, length: float) -> Length:
         if length not in self.lconst:
-            length = self.lconst[length] = self.new_node(Length, str(length))
-            self.get_or_create_node_val(length, None)
+            length_node = self.lconst[length] = self.new_node(Length, str(length))
+            length_node.value = length
+            self.get_node_val(length_node, None)
         return self.lconst[length]
 
     def get_or_create_const(
@@ -291,7 +297,7 @@ class SymbolsGraph:
                 return self.get_or_create_const_rat(num, den)
 
         elif construction_name == Predicate.CONSTANT_LENGTH.value:
-            return self.get_or_create_const_length(Decimal(const_value))
+            return self.get_or_create_const_length(float(const_value))
 
         raise NotImplementedError(
             "Unsupported construction for constants: %s", construction_name.name
@@ -379,7 +385,7 @@ class SymbolsGraph:
             p1, p2 = p2, p1
         name = p1.name.lower() + p2.name.lower()
         line = self.new_node(Line, name)
-        line.num = num_geo.Line(p1.num, p2.num)
+        line.num = num_geo.LineNum(p1.num, p2.num)
         line.points = p1, p2
 
         self.connect(p1, line, dep=None)
@@ -420,7 +426,7 @@ class SymbolsGraph:
         p1, p2, p3 = sorted([p1, p2, p3], key=lambda x: x.name)
         name = p1.name.lower() + p2.name.lower() + p3.name.lower()
         circle = self.new_node(Circle, f"({name})")
-        circle.num = num_geo.Circle(p1=p1.num, p2=p2.num, p3=p3.num)
+        circle.num = num_geo.CircleNum(p1=p1.num, p2=p2.num, p3=p3.num)
         circle.points = p1, p2, p3
 
         self.connect(p1, circle, dep=None)
