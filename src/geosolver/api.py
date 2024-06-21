@@ -22,7 +22,7 @@ from geosolver.agent.agents_interface import AuxAction, DeductiveAgent
 from geosolver.run_loop import run_loop
 from geosolver.problem import Problem, setup_str_from_problem
 from geosolver.proof_writing import write_solution
-from geosolver.statements.adder import IntrinsicRules
+from geosolver.predicates.intrinsic_rules import IntrinsicRules
 from geosolver._lazy_loading import lazy_import
 
 

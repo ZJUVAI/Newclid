@@ -1,9 +1,7 @@
 from enum import Enum
 
 
-class Predicate(Enum):
-    COLLINEAR = "coll"
-    """coll A B C - True if the 3 (or more) points in the arguments are collinear."""
+class PredicateName(Enum):
     COLLINEAR_X = "collx"
     PARALLEL = "para"
     """para A B C D - True if the line AB is parallel to the line CD."""
@@ -71,9 +69,9 @@ class Predicate(Enum):
 
 
 NUMERICAL_PREDICATES = (
-    Predicate.NON_COLLINEAR,
-    Predicate.NON_PARALLEL,
-    Predicate.NON_PERPENDICULAR,
-    Predicate.DIFFERENT,
-    Predicate.SAMESIDE,
+    PredicateName.NON_COLLINEAR,
+    PredicateName.NON_PARALLEL,
+    PredicateName.NON_PERPENDICULAR,
+    PredicateName.DIFFERENT,
+    PredicateName.SAMESIDE,
 )

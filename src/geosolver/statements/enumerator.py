@@ -23,7 +23,7 @@ from geosolver.geometry import (
     Segment,
     RatioValue,
 )
-from geosolver.predicates import Predicate
+from geosolver.predicates.predicate_name import PredicateName
 
 
 if TYPE_CHECKING:
@@ -41,34 +41,33 @@ class StatementsEnumerator:
         self.statements_checker = statements_checker
 
     def all(
-        self, predicate_name: str | Predicate
+        self, predicate_name: str | PredicateName
     ) -> Generator[tuple[Point, ...], None, None]:
         """Enumerate all instances of a certain predicate."""
 
         try:
-            predicate = Predicate(predicate_name)
+            predicate = PredicateName(predicate_name)
         except ValueError:
             raise ValueError(f"Unrecognize predicate: {predicate_name}")
 
         if predicate in [
-            Predicate.NON_COLLINEAR,
-            Predicate.NON_PARALLEL,
-            Predicate.NON_PERPENDICULAR,
+            PredicateName.NON_COLLINEAR,
+            PredicateName.NON_PARALLEL,
+            PredicateName.NON_PERPENDICULAR,
         ]:
             return []
 
         PREDICATE_TO_METHOD = {
-            Predicate.COLLINEAR: self._all_colls,
-            Predicate.PARALLEL: self._all_paras,
-            Predicate.PERPENDICULAR: self._all_perps,
-            Predicate.MIDPOINT: self._all_midps,
-            Predicate.CONGRUENT: self._all_congs,
-            Predicate.CIRCLE: self._all_circles,
-            Predicate.CYCLIC: self._all_cyclics,
-            Predicate.EQANGLE: self._all_eqangles_8points,
-            Predicate.EQANGLE6: self._all_eqangles_6points,
-            Predicate.EQRATIO: self._all_eqratios_8points,
-            Predicate.EQRATIO6: self._all_eqratios_6points,
+            PredicateName.PARALLEL: self._all_paras,
+            PredicateName.PERPENDICULAR: self._all_perps,
+            PredicateName.MIDPOINT: self._all_midps,
+            PredicateName.CONGRUENT: self._all_congs,
+            PredicateName.CIRCLE: self._all_circles,
+            PredicateName.CYCLIC: self._all_cyclics,
+            PredicateName.EQANGLE: self._all_eqangles_8points,
+            PredicateName.EQANGLE6: self._all_eqangles_6points,
+            PredicateName.EQRATIO: self._all_eqratios_8points,
+            PredicateName.EQRATIO6: self._all_eqratios_6points,
         }
 
         if predicate not in PREDICATE_TO_METHOD:
@@ -357,11 +356,6 @@ class StatementsEnumerator:
         for c in self.symbols_graph.type2nodes[Circle]:
             for x, y, z, t in permutations_quadruplets(c.neighbors(Point)):
                 yield x, y, z, t
-
-    def _all_colls(self) -> Generator[tuple[Point, ...], None, None]:
-        for line in self.symbols_graph.type2nodes[Line]:
-            for x, y, z in permutations_triplets(line.neighbors(Point)):
-                yield x, y, z
 
     def _all_midps(self) -> Generator[tuple[Point, ...], None, None]:
         for line in self.symbols_graph.type2nodes[Line]:

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from geosolver.api import GeometricSolverBuilder
 from geosolver.problem import Problem
-from geosolver.statements.adder import IntrinsicRules
+from geosolver.predicates.intrinsic_rules import IntrinsicRules
 
 
 def main():

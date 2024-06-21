@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING
 
 from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
-from geosolver.predicates import Predicate
+from geosolver.predicates.predicate_name import PredicateName
 from geosolver.geometry import (
     Angle,
     Circle,
@@ -37,35 +37,34 @@ class StatementChecker:
     ) -> None:
         self.symbols_graph = symbols_graph
         self.PREDICATE_TO_CHECK = {
-            Predicate.COLLINEAR: self.check_coll,
-            Predicate.PARALLEL: self.check_para,
-            Predicate.PERPENDICULAR: self.check_perp,
-            Predicate.MIDPOINT: self.check_midp,
-            Predicate.CONGRUENT: self.check_cong,
-            Predicate.CIRCLE: self.check_circle,
-            Predicate.CYCLIC: self.check_cyclic,
-            Predicate.EQANGLE: self.check_const_or_eqangle,
-            Predicate.EQANGLE6: self.check_const_or_eqangle,
-            Predicate.EQRATIO: self.check_const_or_eqratio,
-            Predicate.EQRATIO3: self.check_eqratio3,
-            Predicate.EQRATIO6: self.check_const_or_eqratio,
-            Predicate.SIMILAR_TRIANGLE: self.check_simtri,
-            Predicate.SIMILAR_TRIANGLE_REFLECTED: self.check_simtri_reflected,
-            Predicate.SIMILAR_TRIANGLE_BOTH: self.check_simtri_both,
-            Predicate.CONTRI_TRIANGLE: self.check_contri,
-            Predicate.CONTRI_TRIANGLE_REFLECTED: self.check_contri_reflected,
-            Predicate.CONTRI_TRIANGLE_BOTH: self.check_contri_both,
-            Predicate.CONSTANT_ANGLE: self.check_aconst,
-            Predicate.S_ANGLE: self.check_sangle,
-            Predicate.CONSTANT_RATIO: self.check_rconst,
-            Predicate.CONSTANT_LENGTH: self.check_lconst,
-            Predicate.COMPUTE_ANGLE: self.check_acompute,
-            Predicate.COMPUTE_RATIO: self.check_rcompute,
-            Predicate.SAMESIDE: self.check_sameside,
-            Predicate.DIFFERENT: self.check_diff,
-            Predicate.NON_COLLINEAR: self.check_ncoll,
-            Predicate.NON_PARALLEL: self.check_npara,
-            Predicate.NON_PERPENDICULAR: self.check_nperp,
+            PredicateName.PARALLEL: self.check_para,
+            PredicateName.PERPENDICULAR: self.check_perp,
+            PredicateName.MIDPOINT: self.check_midp,
+            PredicateName.CONGRUENT: self.check_cong,
+            PredicateName.CIRCLE: self.check_circle,
+            PredicateName.CYCLIC: self.check_cyclic,
+            PredicateName.EQANGLE: self.check_const_or_eqangle,
+            PredicateName.EQANGLE6: self.check_const_or_eqangle,
+            PredicateName.EQRATIO: self.check_const_or_eqratio,
+            PredicateName.EQRATIO3: self.check_eqratio3,
+            PredicateName.EQRATIO6: self.check_const_or_eqratio,
+            PredicateName.SIMILAR_TRIANGLE: self.check_simtri,
+            PredicateName.SIMILAR_TRIANGLE_REFLECTED: self.check_simtri_reflected,
+            PredicateName.SIMILAR_TRIANGLE_BOTH: self.check_simtri_both,
+            PredicateName.CONTRI_TRIANGLE: self.check_contri,
+            PredicateName.CONTRI_TRIANGLE_REFLECTED: self.check_contri_reflected,
+            PredicateName.CONTRI_TRIANGLE_BOTH: self.check_contri_both,
+            PredicateName.CONSTANT_ANGLE: self.check_aconst,
+            PredicateName.S_ANGLE: self.check_sangle,
+            PredicateName.CONSTANT_RATIO: self.check_rconst,
+            PredicateName.CONSTANT_LENGTH: self.check_lconst,
+            PredicateName.COMPUTE_ANGLE: self.check_acompute,
+            PredicateName.COMPUTE_RATIO: self.check_rcompute,
+            PredicateName.SAMESIDE: self.check_sameside,
+            PredicateName.DIFFERENT: self.check_diff,
+            PredicateName.NON_COLLINEAR: self.check_ncoll,
+            PredicateName.NON_PARALLEL: self.check_npara,
+            PredicateName.NON_PERPENDICULAR: self.check_nperp,
         }
 
     def check(self, statement: Statement) -> bool:
@@ -83,16 +82,6 @@ class StatementChecker:
         return self.check_eqratio(args)
 
     # Basic checks
-
-    def check_coll(self, points: list[Point]) -> bool:
-        points = list(set(points))
-        if len(points) < 3:
-            return True
-        line2count = defaultdict(lambda: 0)
-        for p in points:
-            for line in p.neighbors(Line):
-                line2count[line] += 1
-        return any([count == len(points) for _, count in line2count.items()])
 
     def check_para(self, points: list[Point]) -> bool:
         a, b, c, d = points

@@ -1,12 +1,13 @@
 from __future__ import annotations
-from enum import Enum
 from typing import TYPE_CHECKING, Optional
 
 
 import geosolver.combinatorics as comb
+from geosolver.predicates.coll import Coll
+from geosolver.predicates.intrinsic_rules import IntrinsicRules
 from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
 
-from geosolver.predicates import Predicate
+from geosolver.predicates.predicate_name import PredicateName
 import geosolver.numerical.check as nm
 
 
@@ -31,36 +32,6 @@ if TYPE_CHECKING:
     from geosolver.statements.checker import StatementChecker
     from geosolver.dependencies.caching import DependencyCache
     from geosolver.dependencies.why_graph import WhyHyperGraph
-
-
-class IntrinsicRules(Enum):
-    PARA_FROM_PERP = "i00"
-    CYCLIC_FROM_CONG = "i01"
-    CONG_FROM_EQRATIO = "i02"
-    PARA_FROM_EQANGLE = "i03"
-
-    POINT_ON_SAME_LINE = "i04"
-    PARA_FROM_LINES = "i05"
-    PERP_FROM_LINES = "i06"
-    PERP_FROM_ANGLE = "i07"
-    EQANGLE_FROM_LINES = "i08"
-    EQANGLE_FROM_CONGRUENT_ANGLE = "i09"
-    EQRATIO_FROM_PROPORTIONAL_SEGMENTS = "i10"
-    CYCLIC_FROM_CIRCLE = "i11"
-
-    ACONST_FROM_LINES = "i12"
-    ACONST_FROM_ANGLE = "i13"
-    SANGLE_FROM_ANGLE = "i14"
-    RCONST_FROM_RATIO = "i15"
-
-    PERP_FROM_PARA = "i16"
-    EQANGLE_FROM_PARA = "i17"
-    EQRATIO_FROM_CONG = "i18"
-    ACONST_FROM_PARA = "i19"
-    RCONST_FROM_CONG = "i20"
-
-    SANGLE_FROM_LINES = "i21"
-    SANGLE_FROM_PARA = "i22"
 
 
 ALL_INTRINSIC_RULES = [rule for rule in IntrinsicRules]
@@ -88,31 +59,30 @@ class StatementAdder:
         ]
 
         self.PREDICATE_TO_ADDER = {
-            Predicate.COLLINEAR: self._add_coll,
-            Predicate.COLLINEAR_X: self._add_coll,
-            Predicate.PARALLEL: self._add_para,
-            Predicate.PERPENDICULAR: self._add_perp,
-            Predicate.MIDPOINT: self._add_midp,
-            Predicate.CONGRUENT: self._add_cong,
-            Predicate.CONGRUENT_2: self._add_cong2,
-            Predicate.CIRCLE: self._add_circle,
-            Predicate.CYCLIC: self._add_cyclic,
-            Predicate.EQANGLE: self._add_eqangle,
-            Predicate.EQANGLE6: self._add_eqangle,
-            Predicate.S_ANGLE: self._add_s_angle,
-            Predicate.EQRATIO: self._add_eqratio,
-            Predicate.EQRATIO6: self._add_eqratio,
-            Predicate.EQRATIO3: self._add_eqratio3,
+            PredicateName.COLLINEAR_X: self._add_coll,
+            PredicateName.PARALLEL: self._add_para,
+            PredicateName.PERPENDICULAR: self._add_perp,
+            PredicateName.MIDPOINT: self._add_midp,
+            PredicateName.CONGRUENT: self._add_cong,
+            PredicateName.CONGRUENT_2: self._add_cong2,
+            PredicateName.CIRCLE: self._add_circle,
+            PredicateName.CYCLIC: self._add_cyclic,
+            PredicateName.EQANGLE: self._add_eqangle,
+            PredicateName.EQANGLE6: self._add_eqangle,
+            PredicateName.S_ANGLE: self._add_s_angle,
+            PredicateName.EQRATIO: self._add_eqratio,
+            PredicateName.EQRATIO6: self._add_eqratio,
+            PredicateName.EQRATIO3: self._add_eqratio3,
             # Predicate.EQRATIO4: self._add_eqratio4,
-            Predicate.SIMILAR_TRIANGLE: self._add_simtri,
-            Predicate.SIMILAR_TRIANGLE_REFLECTED: self._add_simtri_reflect,
-            Predicate.SIMILAR_TRIANGLE_BOTH: self._add_simtri_check,
-            Predicate.CONTRI_TRIANGLE: self._add_contri,
-            Predicate.CONTRI_TRIANGLE_REFLECTED: self._add_contri_reflect,
-            Predicate.CONTRI_TRIANGLE_BOTH: self._add_contri_check,
-            Predicate.CONSTANT_ANGLE: self._add_aconst,
-            Predicate.CONSTANT_RATIO: self._add_rconst,
-            Predicate.CONSTANT_LENGTH: self._add_lconst,
+            PredicateName.SIMILAR_TRIANGLE: self._add_simtri,
+            PredicateName.SIMILAR_TRIANGLE_REFLECTED: self._add_simtri_reflect,
+            PredicateName.SIMILAR_TRIANGLE_BOTH: self._add_simtri_check,
+            PredicateName.CONTRI_TRIANGLE: self._add_contri,
+            PredicateName.CONTRI_TRIANGLE_REFLECTED: self._add_contri_reflect,
+            PredicateName.CONTRI_TRIANGLE_BOTH: self._add_contri_check,
+            PredicateName.CONSTANT_ANGLE: self._add_aconst,
+            PredicateName.CONSTANT_RATIO: self._add_rconst,
+            PredicateName.CONSTANT_LENGTH: self._add_lconst,
         }
 
     def add(
@@ -126,18 +96,18 @@ class StatementAdder:
         deps_to_cache = []
         # Cached or compute piece
         if statement.predicate in [
-            Predicate.COMPUTE_ANGLE,
-            Predicate.COMPUTE_RATIO,
-            Predicate.FIX_L,
-            Predicate.FIX_C,
-            Predicate.FIX_B,
-            Predicate.FIX_T,
-            Predicate.FIX_P,
+            PredicateName.COMPUTE_ANGLE,
+            PredicateName.COMPUTE_RATIO,
+            PredicateName.FIX_L,
+            PredicateName.FIX_C,
+            PredicateName.FIX_B,
+            PredicateName.FIX_T,
+            PredicateName.FIX_P,
         ]:
             dep = dep_body.build(self.statements_graph, statement)
             deps_to_cache.append((statement, dep))
             new_deps = [dep]
-        elif statement.predicate is Predicate.IND:
+        elif statement.predicate is PredicateName.IND:
             new_deps = []
         else:
             raise ValueError(f"Not recognize predicate {statement.predicate}")
@@ -171,80 +141,6 @@ class StatementAdder:
 
         self.symbols_graph.merge(merges, dep)
 
-    def _add_coll(
-        self, points: list[Point], dep_body: DependencyBody
-    ) -> tuple[list[Dependency], list[ToCache]]:
-        """Add a predicate that `points` are collinear."""
-        points = list(set(points))
-        og_points = points.copy()
-
-        all_lines: list[Line] = []
-        for p1, p2 in comb.arrangement_pairs(points):
-            all_lines.append(self.symbols_graph.get_line_thru_pair(p1, p2))
-        points = sum([line.neighbors(Point) for line in all_lines], [])
-        points = list(set(points))
-
-        existed: set[Line] = set()
-        new: set[Line] = set()
-        for p1, p2 in comb.arrangement_pairs(points):
-            if p1.name > p2.name:
-                p1, p2 = p2, p1
-            if (p1, p2) in self.symbols_graph._pair2line:
-                line = self.symbols_graph._pair2line[(p1, p2)]
-                existed.add(line)
-            else:
-                line = self.symbols_graph.get_new_line_thru_pair(p1, p2)
-                new.add(line)
-
-        sorted_existed: list[Line] = list(sorted(existed, key=lambda node: node.name))
-        sorted_new: list[Line] = list(sorted(new, key=lambda node: node.name))
-        if not sorted_existed:
-            line0, *lines = sorted_new
-        else:
-            line0, lines = sorted_existed[0], sorted_existed[1:] + sorted_new
-
-        add = []
-        to_cache = []
-        line0, why0 = line0.rep_and_why()
-        a, b = line0.points
-        for line in lines:
-            c, d = line.points
-            args = list({a, b, c, d})
-            if len(args) < 3:
-                continue
-
-            whys: list[Dependency] = []
-            for x in args:
-                if x not in og_points:
-                    whys.append(self._coll_dep(og_points, x))
-
-            abcd_deps = dep_body
-            if IntrinsicRules.POINT_ON_SAME_LINE not in self.DISABLED_INTRINSIC_RULES:
-                abcd_deps = dep_body.extend_by_why(
-                    self.statements_graph,
-                    Statement(Predicate.COLLINEAR, og_points),
-                    why=whys + why0,
-                    extention_reason=Reason(IntrinsicRules.POINT_ON_SAME_LINE),
-                )
-
-            is_coll = self.statements_checker.check_coll(args)
-            coll = Statement(Predicate.COLLINEAR, args)
-            dep = abcd_deps.build(self.statements_graph, coll)
-            to_cache.append((coll, dep))
-            self.symbols_graph.merge_into(line0, [line], dep)
-
-            if not is_coll:
-                add += [dep]
-
-        return add, to_cache
-
-    def _coll_dep(self, points: list[Point], p: Point) -> list[Dependency]:
-        """Return the dep(.why) explaining why p is coll with points."""
-        for p1, p2 in comb.arrangement_pairs(points):
-            if self.statements_checker.check_coll([p1, p2, p]):
-                coll = Statement(Predicate.COLLINEAR, (p1, p2, p))
-                return self.statements_graph.build_resolved_dependency(coll)
-
     def _add_para(
         self, points: list[Point], dep_body: DependencyBody
     ) -> tuple[list[Dependency], list[ToCache]]:
@@ -258,12 +154,12 @@ class StatementAdder:
         if IntrinsicRules.PARA_FROM_LINES not in self.DISABLED_INTRINSIC_RULES:
             dep_body = dep_body.extend_by_why(
                 self.statements_graph,
-                Statement(Predicate.PARALLEL, points),
+                Statement(PredicateName.PARALLEL, points),
                 why=why1 + why2,
                 extention_reason=Reason(IntrinsicRules.PARA_FROM_LINES),
             )
 
-        para = Statement(Predicate.PARALLEL, (a, b, c, d))
+        para = Statement(PredicateName.PARALLEL, (a, b, c, d))
         dep = dep_body.build(self.statements_graph, para)
         to_cache = [(para, dep)]
 
@@ -285,27 +181,27 @@ class StatementAdder:
         dep_body: DependencyBody,
     ) -> tuple[list[Dependency], list[ToCache]]:
         """Add a new parallel or collinear predicate."""
-        perp = Statement(Predicate.PERPENDICULAR, [a, b, c, d])
-        extends = [Statement(Predicate.PERPENDICULAR, [x, y, m, n])]
+        perp = Statement(PredicateName.PERPENDICULAR, [a, b, c, d])
+        extends = [Statement(PredicateName.PERPENDICULAR, [x, y, m, n])]
         if {a, b} == {x, y}:
             pass
         elif self.statements_checker.check_para([a, b, x, y]):
-            extends.append(Statement(Predicate.PARALLEL, [a, b, x, y]))
+            extends.append(Statement(PredicateName.PARALLEL, [a, b, x, y]))
         elif self.statements_checker.check_coll([a, b, x, y]):
-            extends.append(Statement(Predicate.COLLINEAR, set(list([a, b, x, y]))))
+            extends.append(Statement(Coll.NAME, set(list([a, b, x, y]))))
         else:
             return None
 
         if m in [c, d] or n in [c, d] or c in [m, n] or d in [m, n]:
             pass
         elif self.statements_checker.check_coll([c, d, m]):
-            extends.append(Statement(Predicate.COLLINEAR, [c, d, m]))
+            extends.append(Statement(Coll.NAME, [c, d, m]))
         elif self.statements_checker.check_coll([c, d, n]):
-            extends.append(Statement(Predicate.COLLINEAR, [c, d, n]))
+            extends.append(Statement(Coll.NAME, [c, d, n]))
         elif self.statements_checker.check_coll([c, m, n]):
-            extends.append(Statement(Predicate.COLLINEAR, [c, m, n]))
+            extends.append(Statement(Coll.NAME, [c, m, n]))
         elif self.statements_checker.check_coll([d, m, n]):
-            extends.append(Statement(Predicate.COLLINEAR, [d, m, n]))
+            extends.append(Statement(Coll.NAME, [d, m, n]))
         else:
             dep_body = dep_body.extend_many(
                 self.statements_graph,
@@ -367,7 +263,7 @@ class StatementAdder:
         if IntrinsicRules.PERP_FROM_LINES not in self.DISABLED_INTRINSIC_RULES:
             dep_body = dep_body.extend_by_why(
                 self.statements_graph,
-                Statement(Predicate.PERPENDICULAR, points),
+                Statement(PredicateName.PERPENDICULAR, points),
                 extention_reason=Reason(IntrinsicRules.PERP_FROM_LINES),
                 why=why1 + why2,
             )
@@ -389,8 +285,8 @@ class StatementAdder:
                 dep_body
                 and IntrinsicRules.PERP_FROM_PARA not in self.DISABLED_INTRINSIC_RULES
             ):
-                perp = Statement(Predicate.PERPENDICULAR, list(args))
-                para = Statement(Predicate.PARALLEL, [x, y, x_, y_])
+                perp = Statement(PredicateName.PERPENDICULAR, list(args))
+                para = Statement(PredicateName.PARALLEL, [x, y, x_, y_])
                 dep_body = dep_body.extend(
                     self.statements_graph,
                     perp,
@@ -404,7 +300,7 @@ class StatementAdder:
             ab, cd, dep=None
         )
 
-        perp = Statement(Predicate.PERPENDICULAR, [a, b, c, d])
+        perp = Statement(PredicateName.PERPENDICULAR, [a, b, c, d])
         if IntrinsicRules.PERP_FROM_ANGLE not in self.DISABLED_INTRINSIC_RULES:
             dep_body = dep_body.extend_by_why(
                 self.statements_graph,
@@ -421,7 +317,7 @@ class StatementAdder:
         was_already_equal = is_equal(a12, a21)
         self._make_equal(a12, a21, dep=dep)
 
-        eqangle = Statement(Predicate.EQANGLE, [a, b, c, d, c, d, a, b])
+        eqangle = Statement(PredicateName.EQANGLE, [a, b, c, d, c, d, a, b])
         to_cache = [(perp, dep), (eqangle, dep)]
 
         if not was_already_equal:
@@ -436,7 +332,7 @@ class StatementAdder:
         ab = self.symbols_graph.get_or_create_segment(a, b, None)
         cd = self.symbols_graph.get_or_create_segment(c, d, None)
 
-        cong = Statement(Predicate.CONGRUENT, [a, b, c, d])
+        cong = Statement(PredicateName.CONGRUENT, [a, b, c, d])
         dep = dep_body.build(self.statements_graph, cong)
         self._make_equal(ab, cd, dep=dep)
 
@@ -474,7 +370,7 @@ class StatementAdder:
         self, points: list[Point], dep_body: DependencyBody
     ) -> tuple[list[Dependency], list[ToCache]]:
         m, a, b = points
-        add_coll, to_cache_coll = self._add_coll(points, dep_body)
+        add_coll, to_cache_coll = Coll.add(points, dep_body)
         add_cong, to_cache_cong = self._add_cong([m, a, m, b], dep_body)
         return add_coll + add_cong, to_cache_coll + to_cache_cong
 
@@ -536,7 +432,7 @@ class StatementAdder:
 
             abcdef_deps = dep_body
             if IntrinsicRules.CYCLIC_FROM_CIRCLE:
-                cyclic = Statement(Predicate.CYCLIC, og_points)
+                cyclic = Statement(PredicateName.CYCLIC, og_points)
                 abcdef_deps = abcdef_deps.extend_by_why(
                     self.statements_graph,
                     cyclic,
@@ -546,7 +442,7 @@ class StatementAdder:
 
             is_cyclic = self.statements_checker.check_cyclic(args)
 
-            cyclic = Statement(Predicate.CYCLIC, args)
+            cyclic = Statement(PredicateName.CYCLIC, args)
             dep = abcdef_deps.build(self.statements_graph, cyclic)
             to_cache.append((cyclic, dep))
             self.symbols_graph.merge_into(circle0, [circle], dep)
@@ -558,7 +454,7 @@ class StatementAdder:
     def _cyclic_dep(self, points: list[Point], p: Point) -> list[Dependency]:
         for p1, p2, p3 in comb.arrangement_triplets(points):
             if self.statements_checker.check_cyclic([p1, p2, p3, p]):
-                cyclic = Statement(Predicate.CYCLIC, (p1, p2, p3, p))
+                cyclic = Statement(PredicateName.CYCLIC, (p1, p2, p3, p))
                 return self.statements_graph.build_resolved_dependency(cyclic)
 
     def _maybe_add_cyclic_from_cong(
@@ -613,7 +509,7 @@ class StatementAdder:
         p, q = pq.points
 
         if IntrinsicRules.EQANGLE_FROM_LINES not in self.DISABLED_INTRINSIC_RULES:
-            eqangle = Statement(Predicate.EQANGLE, points)
+            eqangle = Statement(PredicateName.EQANGLE, points)
             dep_body = dep_body.extend_by_why(
                 self.statements_graph,
                 eqangle,
@@ -691,8 +587,8 @@ class StatementAdder:
                 and IntrinsicRules.EQANGLE_FROM_PARA
                 not in self.DISABLED_INTRINSIC_RULES
             ):
-                eqangle = Statement(Predicate.EQANGLE, tuple(args))
-                para = Statement(Predicate.PARALLEL, [x, y, x_, y_])
+                eqangle = Statement(PredicateName.EQANGLE, tuple(args))
+                para = Statement(PredicateName.PARALLEL, [x, y, x_, y_])
                 dep_body = dep_body.extend(
                     self.statements_graph,
                     eqangle,
@@ -713,7 +609,7 @@ class StatementAdder:
             IntrinsicRules.EQANGLE_FROM_CONGRUENT_ANGLE
             not in self.DISABLED_INTRINSIC_RULES
         ):
-            eqangle = Statement(Predicate.EQANGLE, args)
+            eqangle = Statement(PredicateName.EQANGLE, args)
             dep_body = dep_body.extend_by_why(
                 self.statements_graph,
                 eqangle,
@@ -733,7 +629,7 @@ class StatementAdder:
         to_cache = []
 
         dep1 = None
-        eqangle = Statement(Predicate.EQANGLE, [a, b, c, d, m, n, p, q])
+        eqangle = Statement(PredicateName.EQANGLE, [a, b, c, d, m, n, p, q])
         if dep_body:
             dep1 = dep_body.build(self.statements_graph, eqangle)
         if not is_equal(ab_cd, mn_pq):
@@ -742,7 +638,7 @@ class StatementAdder:
         self._make_equal(ab_cd, mn_pq, dep=dep1)
 
         dep2 = None
-        eqangle_sym = Statement(Predicate.EQANGLE, [c, d, a, b, p, q, m, n])
+        eqangle_sym = Statement(PredicateName.EQANGLE, [c, d, a, b, p, q, m, n])
         if dep_body:
             dep2 = dep_body.build(self.statements_graph, eqangle_sym)
         if not is_equal(cd_ab, pq_mn):
@@ -769,7 +665,7 @@ class StatementAdder:
             add += _add
             to_cache += _to_cache
 
-        self._simple_add(Predicate.EQRATIO3, tuple(points), dep_body, add, to_cache)
+        self._simple_add(PredicateName.EQRATIO3, tuple(points), dep_body, add, to_cache)
         return add, to_cache
 
     def _add_eqratio4(
@@ -868,8 +764,8 @@ class StatementAdder:
                 and IntrinsicRules.EQRATIO_FROM_CONG
                 not in self.DISABLED_INTRINSIC_RULES
             ):
-                eqratio = Statement(Predicate.EQRATIO, tuple(args))
-                cong = Statement(Predicate.CONGRUENT, [x, y, x_, y_])
+                eqratio = Statement(PredicateName.EQRATIO, tuple(args))
+                cong = Statement(PredicateName.CONGRUENT, [x, y, x_, y_])
                 dep_body = dep_body.extend(
                     self.statements_graph,
                     eqratio,
@@ -893,7 +789,7 @@ class StatementAdder:
         ):
             dep_body = dep_body.extend_by_why(
                 self.statements_graph,
-                Statement(Predicate.EQRATIO, tuple(args)),
+                Statement(PredicateName.EQRATIO, tuple(args)),
                 why=why1 + why2,
                 extention_reason=Reason(
                     IntrinsicRules.EQRATIO_FROM_PROPORTIONAL_SEGMENTS
@@ -911,7 +807,7 @@ class StatementAdder:
         to_cache = []
 
         dep1 = None
-        eqratio = Statement(Predicate.EQRATIO, [a, b, c, d, m, n, p, q])
+        eqratio = Statement(PredicateName.EQRATIO, [a, b, c, d, m, n, p, q])
         dep1 = dep_body.build(self.statements_graph, eqratio)
         if not is_equal(ab_cd, mn_pq):
             add += [dep1]
@@ -919,7 +815,7 @@ class StatementAdder:
         self._make_equal(ab_cd, mn_pq, dep=dep1)
 
         dep2 = None
-        eqratio_sym = Statement(Predicate.EQRATIO, [c, d, a, b, p, q, m, n])
+        eqratio_sym = Statement(PredicateName.EQRATIO, [c, d, a, b, p, q, m, n])
         dep2 = dep_body.build(self.statements_graph, eqratio_sym)
         if not is_equal(cd_ab, pq_mn):
             add += [dep2]
@@ -929,7 +825,7 @@ class StatementAdder:
 
     def _simple_add(
         self,
-        predicate: Predicate,
+        predicate: PredicateName,
         points: tuple[Point, ...],
         dep_body: DependencyBody,
         added: list[Dependency],
@@ -948,7 +844,11 @@ class StatementAdder:
         else:
             added, to_cache = self._add_simtri_reflect(points, dep_body)
         self._simple_add(
-            Predicate.SIMILAR_TRIANGLE_BOTH, tuple(points), dep_body, added, to_cache
+            PredicateName.SIMILAR_TRIANGLE_BOTH,
+            tuple(points),
+            dep_body,
+            added,
+            to_cache,
         )
         return added, to_cache
 
@@ -960,7 +860,7 @@ class StatementAdder:
         else:
             added, to_cache = self._add_contri_reflect(points, dep_body)
         self._simple_add(
-            Predicate.CONTRI_TRIANGLE_BOTH, points, dep_body, added, to_cache
+            PredicateName.CONTRI_TRIANGLE_BOTH, points, dep_body, added, to_cache
         )
         return added, to_cache
 
@@ -972,7 +872,7 @@ class StatementAdder:
         hashs = [dep.statement.hash_tuple for dep in dep_body.why]
 
         for args in comb.enum_triangle(points):
-            eqangle6 = Statement(Predicate.EQANGLE6, args)
+            eqangle6 = Statement(PredicateName.EQANGLE6, args)
             if eqangle6.hash_tuple in hashs:
                 continue
             _add, _to_cache = self._add_eqangle(args, dep_body=dep_body)
@@ -980,7 +880,7 @@ class StatementAdder:
             to_cache += _to_cache
 
         for args in comb.enum_triangle(points):
-            eqratio6 = Statement(Predicate.EQRATIO6, args)
+            eqratio6 = Statement(PredicateName.EQRATIO6, args)
             if eqratio6.hash_tuple in hashs:
                 continue
             _add, _to_cache = self._add_eqratio(args, dep_body=dep_body)
@@ -988,7 +888,7 @@ class StatementAdder:
             to_cache += _to_cache
 
         self._simple_add(
-            Predicate.SIMILAR_TRIANGLE, tuple(points), dep_body, add, to_cache
+            PredicateName.SIMILAR_TRIANGLE, tuple(points), dep_body, add, to_cache
         )
         return add, to_cache
 
@@ -999,7 +899,7 @@ class StatementAdder:
         add, to_cache = [], []
         hashs = [dep.statement.hash_tuple for dep in dep_body.why]
         for args in comb.enum_triangle_reflect(points):
-            eqangle6 = Statement(Predicate.EQANGLE6, args)
+            eqangle6 = Statement(PredicateName.EQANGLE6, args)
             if eqangle6.hash_tuple in hashs:
                 continue
             _add, _to_cache = self._add_eqangle(args, dep_body=dep_body)
@@ -1007,7 +907,7 @@ class StatementAdder:
             to_cache += _to_cache
 
         for args in comb.enum_triangle(points):
-            eqratio6 = Statement(Predicate.EQRATIO6, args)
+            eqratio6 = Statement(PredicateName.EQRATIO6, args)
             if eqratio6.hash_tuple in hashs:
                 continue
             _add, _to_cache = self._add_eqratio(args, dep_body=dep_body)
@@ -1015,7 +915,7 @@ class StatementAdder:
             to_cache += _to_cache
 
         self._simple_add(
-            Predicate.SIMILAR_TRIANGLE_REFLECTED,
+            PredicateName.SIMILAR_TRIANGLE_REFLECTED,
             tuple(points),
             dep_body,
             add,
@@ -1030,7 +930,7 @@ class StatementAdder:
         add, to_cache = [], []
         hashs = [dep.statement.hash_tuple for dep in dep_body.why]
         for args in comb.enum_triangle(points):
-            eqangle6 = Statement(Predicate.EQANGLE6, args)
+            eqangle6 = Statement(PredicateName.EQANGLE6, args)
             if eqangle6.hash_tuple in hashs:
                 continue
             _add, _to_cache = self._add_eqangle(args, dep_body=dep_body)
@@ -1038,7 +938,7 @@ class StatementAdder:
             to_cache += _to_cache
 
         for args in comb.enum_sides(points):
-            cong = Statement(Predicate.CONGRUENT, args)
+            cong = Statement(PredicateName.CONGRUENT, args)
             if cong.hash_tuple in hashs:
                 continue
             _add, _to_cache = self._add_cong(args, dep_body)
@@ -1046,7 +946,7 @@ class StatementAdder:
             to_cache += _to_cache
 
         self._simple_add(
-            Predicate.CONTRI_TRIANGLE, tuple(points), dep_body, add, to_cache
+            PredicateName.CONTRI_TRIANGLE, tuple(points), dep_body, add, to_cache
         )
         return add, to_cache
 
@@ -1057,7 +957,7 @@ class StatementAdder:
         add, to_cache = [], []
         hashs = [dep.statement.hash_tuple for dep in dep_body.why]
         for args in comb.enum_triangle_reflect(points):
-            eqangle6 = Statement(Predicate.EQANGLE6, args)
+            eqangle6 = Statement(PredicateName.EQANGLE6, args)
             if eqangle6.hash_tuple in hashs:
                 continue
             _add, _to_cache = self._add_eqangle(args, dep_body)
@@ -1065,7 +965,7 @@ class StatementAdder:
             to_cache += _to_cache
 
         for args in comb.enum_sides(points):
-            cong = Statement(Predicate.CONGRUENT, args)
+            cong = Statement(PredicateName.CONGRUENT, args)
             if cong.hash_tuple in hashs:
                 continue
             _add, _to_cache = self._add_cong(args, dep_body)
@@ -1073,7 +973,7 @@ class StatementAdder:
             to_cache += _to_cache
 
         self._simple_add(
-            Predicate.CONTRI_TRIANGLE_REFLECTED,
+            PredicateName.CONTRI_TRIANGLE_REFLECTED,
             tuple(points),
             dep_body,
             add,
@@ -1135,12 +1035,12 @@ class StatementAdder:
     ) -> tuple[list[Dependency], list[ToCache]]:
         """Add ab/cd = mn/pq in case either two of (ab,cd,mn,pq) are equal."""
         if isinstance(ab, Segment):
-            dep_pred = Predicate.EQRATIO
-            eq_pred = Predicate.CONGRUENT
+            dep_pred = PredicateName.EQRATIO
+            eq_pred = PredicateName.CONGRUENT
             intrinsic_rule = IntrinsicRules.CONG_FROM_EQRATIO
         else:
-            dep_pred = Predicate.EQANGLE
-            eq_pred = Predicate.PARALLEL
+            dep_pred = PredicateName.EQANGLE
+            eq_pred = PredicateName.PARALLEL
             intrinsic_rule = IntrinsicRules.PARA_FROM_EQANGLE
 
         reason = Reason(intrinsic_rule)
@@ -1149,10 +1049,10 @@ class StatementAdder:
             because_eq = Statement(eq_pred, [a, b, c, d])
             dep_body = dep_body.extend(self.statements_graph, eq, because_eq, reason)
 
-        elif eq_pred is Predicate.PARALLEL:  # ab == cd.
+        elif eq_pred is PredicateName.PARALLEL:  # ab == cd.
             colls = [a, b, c, d]
             if len(set(colls)) > 2:
-                because_collx = Statement(Predicate.COLLINEAR_X, colls)
+                because_collx = Statement(PredicateName.COLLINEAR_X, colls)
                 dep_body = dep_body.extend(
                     self.statements_graph, eq, because_collx, reason
                 )
@@ -1186,7 +1086,7 @@ class StatementAdder:
         (a, b), (c, d) = ab.points, cd.points
         if IntrinsicRules.ACONST_FROM_LINES not in self.DISABLED_INTRINSIC_RULES:
             args = points[:-1] + [nd]
-            aconst = Statement(Predicate.CONSTANT_ANGLE, tuple(args))
+            aconst = Statement(PredicateName.CONSTANT_ANGLE, tuple(args))
             dep_body = dep_body.extend_by_why(
                 self.statements_graph,
                 aconst,
@@ -1211,8 +1111,8 @@ class StatementAdder:
                 dep_body
                 and IntrinsicRules.ACONST_FROM_PARA not in self.DISABLED_INTRINSIC_RULES
             ):
-                aconst = Statement(Predicate.CONSTANT_ANGLE, tuple(args))
-                para = Statement(Predicate.PARALLEL, [x, y, x_, y_])
+                aconst = Statement(PredicateName.CONSTANT_ANGLE, tuple(args))
+                para = Statement(PredicateName.PARALLEL, [x, y, x_, y_])
                 dep_body = dep_body.extend(
                     self.statements_graph,
                     aconst,
@@ -1226,7 +1126,7 @@ class StatementAdder:
             ab, cd, dep=None
         )
 
-        aconst = Statement(Predicate.CONSTANT_ANGLE, [a, b, c, d, nd])
+        aconst = Statement(PredicateName.CONSTANT_ANGLE, [a, b, c, d, nd])
         if IntrinsicRules.ACONST_FROM_ANGLE not in self.DISABLED_INTRINSIC_RULES:
             dep_body = dep_body.extend_by_why(
                 self.statements_graph,
@@ -1248,7 +1148,7 @@ class StatementAdder:
             to_cache.append((aconst, dep1))
             add += [dep1]
 
-        aconst2 = Statement(Predicate.CONSTANT_ANGLE, [a, b, c, d, nd])
+        aconst2 = Statement(PredicateName.CONSTANT_ANGLE, [a, b, c, d, nd])
         if not is_equal(cd_ab, dn):
             dep2 = dep_body.build(self.statements_graph, aconst2)
             self._make_equal(cd_ab, dn, dep=dep2)
@@ -1279,7 +1179,7 @@ class StatementAdder:
         if ab.val == bx.val:
             return add, to_cache
 
-        sangle = Statement(Predicate.S_ANGLE, (a, b, x))
+        sangle = Statement(PredicateName.S_ANGLE, (a, b, x))
         if IntrinsicRules.SANGLE_FROM_LINES not in self.DISABLED_INTRINSIC_RULES:
             dep_body = dep_body.extend_by_why(
                 self.statements_graph,
@@ -1294,7 +1194,7 @@ class StatementAdder:
                 p_, q_ = pq.val._obj.points
                 if {p, q} == {p_, q_}:
                     continue
-                paras.append(Statement(Predicate.PARALLEL, (p, q, p_, q_)))
+                paras.append(Statement(PredicateName.PARALLEL, (p, q, p_, q_)))
             if paras:
                 dep_body = dep_body.extend_many(
                     self.statements_graph,
@@ -1307,7 +1207,7 @@ class StatementAdder:
             bx, ab, dep=None
         )
         if IntrinsicRules.SANGLE_FROM_ANGLE not in self.DISABLED_INTRINSIC_RULES:
-            aconst = Statement(Predicate.CONSTANT_ANGLE, [b, x, a, b, nd])
+            aconst = Statement(PredicateName.CONSTANT_ANGLE, [b, x, a, b, nd])
             dep_body = dep_body.extend_by_why(
                 self.statements_graph,
                 aconst,
@@ -1320,14 +1220,14 @@ class StatementAdder:
         c, x = dbx._obj.points
 
         if not is_equal(xba, nd):
-            aconst = Statement(Predicate.S_ANGLE, [c, x, a, b, nd])
+            aconst = Statement(PredicateName.S_ANGLE, [c, x, a, b, nd])
             dep1 = dep_body.build(self.statements_graph, aconst)
             self._make_equal(xba, nd, dep=dep1)
             to_cache.append((aconst, dep1))
             add += [dep1]
 
         if not is_equal(abx, dn):
-            aconst2 = Statement(Predicate.S_ANGLE, [a, b, c, x, dn])
+            aconst2 = Statement(PredicateName.S_ANGLE, [a, b, c, x, dn])
             dep2 = dep_body.build(self.statements_graph, aconst2)
             self._make_equal(abx, dn, dep=dep2)
             to_cache.append((aconst2, dep2))
@@ -1367,8 +1267,8 @@ class StatementAdder:
                 dep_body
                 and IntrinsicRules.RCONST_FROM_CONG not in self.DISABLED_INTRINSIC_RULES
             ):
-                rconst = Statement(Predicate.CONSTANT_RATIO, tuple(args))
-                cong = Statement(Predicate.CONGRUENT, [x, y, x_, y_])
+                rconst = Statement(PredicateName.CONSTANT_RATIO, tuple(args))
+                cong = Statement(PredicateName.CONGRUENT, [x, y, x_, y_])
                 dep_body = dep_body.extend(
                     self.statements_graph,
                     rconst,
@@ -1382,7 +1282,7 @@ class StatementAdder:
             ab, cd, dep=None
         )
 
-        rconst = Statement(Predicate.CONSTANT_RATIO, [a, b, c, d, nd])
+        rconst = Statement(PredicateName.CONSTANT_RATIO, [a, b, c, d, nd])
         if IntrinsicRules.RCONST_FROM_RATIO not in self.DISABLED_INTRINSIC_RULES:
             dep_body = dep_body.extend_by_why(
                 self.statements_graph,
@@ -1404,7 +1304,7 @@ class StatementAdder:
             add.append(dep1)
 
         if not is_equal(cd_ab, dn):
-            rconst2 = Statement(Predicate.CONSTANT_RATIO, [c, d, a, b, dn])
+            rconst2 = Statement(PredicateName.CONSTANT_RATIO, [c, d, a, b, dn])
             dep2 = dep_body.build(self.statements_graph, rconst2)
             self._make_equal(dn, cd_ab, dep=dep2)
             to_cache.append((rconst2, dep2))
@@ -1421,7 +1321,7 @@ class StatementAdder:
         ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)
         l_ab = self.symbols_graph.get_node_val(ab, dep=None)
 
-        lconst = Statement(Predicate.CONSTANT_LENGTH, args)
+        lconst = Statement(PredicateName.CONSTANT_LENGTH, args)
 
         lconst_dep = dep_body.build(self.statements_graph, lconst)
         self._make_equal(length, l_ab, dep=lconst_dep)

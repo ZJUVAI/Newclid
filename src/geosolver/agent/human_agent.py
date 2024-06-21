@@ -29,7 +29,7 @@ from geosolver.agent.agents_interface import (
     StopAction,
     StopFeedback,
 )
-from geosolver.predicates import Predicate
+from geosolver.predicates.predicate_name import PredicateName
 from geosolver.dependencies.dependency import Dependency
 from geosolver.problem import Problem
 from geosolver.proof import Proof, theorem_mapping_str
@@ -388,7 +388,7 @@ class HumanAgent(DeductiveAgent):
     def _show_figure(self, proof: "Proof", block: bool = False):
         equal_angles = {}
         for eqangle in self._all_cached:
-            if eqangle.predicate != Predicate.EQANGLE:
+            if eqangle.predicate != PredicateName.EQANGLE:
                 continue
             hashed_eqangle = eqangle.hash_tuple
             if hashed_eqangle not in equal_angles:

@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING
 from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.geometry import Length, Point, Ratio
-from geosolver.predicates import Predicate
+from geosolver.predicates.coll import Coll
+from geosolver.predicates.predicate_name import PredicateName
 from geosolver.reasoning_engines.engines_interface import Derivation, ReasoningEngine
 from geosolver.statements.statement import Statement
 
@@ -33,8 +34,8 @@ class PythagoreanFormula(ReasoningEngine):
         self._segments_length_dep: dict[tuple[str, str], Dependency] = {}
 
         self.PREDICATE_TO_INGEST = {
-            Predicate.PERPENDICULAR: self._ingest_perp,
-            Predicate.CONSTANT_LENGTH: self._ingest_lconst,
+            PredicateName.PERPENDICULAR: self._ingest_perp,
+            PredicateName.CONSTANT_LENGTH: self._ingest_lconst,
         }
 
     def ingest(self, dependency: Dependency):
@@ -110,7 +111,7 @@ class PythagoreanFormula(ReasoningEngine):
 
             new_length = self.symbols_graph.get_or_create_const_length(new_length_val)
             new_statement = Statement(
-                Predicate.CONSTANT_LENGTH, (*missing_segment, new_length)
+                PredicateName.CONSTANT_LENGTH, (*missing_segment, new_length)
             )
 
             why_perp = self._intesection_dep[intersection]
@@ -166,7 +167,7 @@ class PythagoreanFormula(ReasoningEngine):
                 )
 
                 new_statement = Statement(
-                    Predicate.PERPENDICULAR,
+                    PredicateName.PERPENDICULAR,
                     (*side1dep.statement.args[:2], *side2dep.statement.args[:2]),
                 )
                 new_perps.append(Derivation(new_statement, dep_body))
@@ -212,9 +213,9 @@ class MenelausFormula(ReasoningEngine):
 
     def ingest(self, dependency: Dependency):
         statement = dependency.statement
-        if statement.predicate is Predicate.COLLINEAR:
+        if statement.predicate is Coll.NAME:
             self._new_colls.append(dependency)
-        elif statement.predicate is Predicate.CONSTANT_RATIO:
+        elif statement.predicate is PredicateName.CONSTANT_RATIO:
             unique_points = set(statement.args[:-1])
             if len(unique_points) != 3:
                 return
@@ -256,7 +257,7 @@ class MenelausFormula(ReasoningEngine):
             ratio_point = self.symbols_graph.names2points(completed_ratio_points)
 
             new_statement = Statement(
-                Predicate.CONSTANT_RATIO, (*ratio_point, new_ratio)
+                PredicateName.CONSTANT_RATIO, (*ratio_point, new_ratio)
             )
 
             coll_deps = [

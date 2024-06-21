@@ -18,11 +18,12 @@ from geosolver.numerical.geometries import (
     PointNum,
     reduce,
 )
+from geosolver.predicates.intrinsic_rules import IntrinsicRules
 from geosolver.reasoning_engines.engines_interface import ReasoningEngine
 from geosolver.statements.statement import Statement
 from geosolver.defs.definition import Definition
 from geosolver.theorem import Theorem
-from geosolver.predicates import Predicate
+from geosolver.predicates.predicate_name import PredicateName
 from geosolver.agent.agents_interface import (
     Action,
     Feedback,
@@ -42,7 +43,7 @@ from geosolver.agent.agents_interface import (
     StopFeedback,
 )
 from geosolver.match_theorems import match_one_theorem
-from geosolver.statements.adder import IntrinsicRules, ToCache
+from geosolver.statements.adder import ToCache
 from geosolver.statements.handler import StatementsHandler
 from geosolver.symbols_graph import SymbolsGraph
 from geosolver.geometry import Angle, Ratio, Circle, Point
@@ -275,7 +276,10 @@ class Proof:
         premise: "Construction",
         p_args: list["Point"],
     ) -> Tuple[Optional[Dependency], bool]:
-        if premise.name in [Predicate.PARALLEL.value, Predicate.CONGRUENT.value]:
+        if premise.name in [
+            PredicateName.PARALLEL.value,
+            PredicateName.CONGRUENT.value,
+        ]:
             a, b, c, d = p_args
             if {a, b} == {c, d}:
                 return None, False
@@ -284,8 +288,8 @@ class Proof:
             "cong_cong_eqangle6_ncoll_contri*",
             "eqratio6_eqangle6_ncoll_simtri*",
         ] and premise.name in [
-            Predicate.EQANGLE.value,
-            Predicate.EQANGLE6.value,
+            PredicateName.EQANGLE.value,
+            PredicateName.EQANGLE6.value,
         ]:  # SAS or RAR
             b, a, b, c, y, x, y, z = p_args
             if not same_clock(a.num, b.num, c.num, x.num, y.num, z.num):
@@ -406,14 +410,14 @@ class Proof:
     def check(self, statement: Statement) -> bool:
         """Symbolically check if a statement is currently considered True."""
         if statement.predicate in [
-            Predicate.FIX_L,
-            Predicate.FIX_C,
-            Predicate.FIX_B,
-            Predicate.FIX_T,
-            Predicate.FIX_P,
+            PredicateName.FIX_L,
+            PredicateName.FIX_C,
+            PredicateName.FIX_B,
+            PredicateName.FIX_T,
+            PredicateName.FIX_P,
         ]:
             return self.dependency_cache.contains(statement)
-        if statement.predicate is Predicate.IND:
+        if statement.predicate is PredicateName.IND:
             return True
         return self.statements.checker.check(statement)
 
@@ -429,7 +433,7 @@ class Proof:
     def additionally_draw(self, name: str, args: list[Point]) -> None:
         """Draw some extra line/circles for illustration purpose."""
 
-        if name in [Predicate.CIRCLE.value]:
+        if name in [PredicateName.CIRCLE.value]:
             center, point = args[:2]
             circle = self.symbols_graph.new_node(
                 Circle, f"({center.name},{point.name})"
@@ -519,7 +523,7 @@ class Proof:
 
             mapping = dict(zip(cdef.construction.args, clause_construction.args))
             c_name = (
-                Predicate.MIDPOINT.value
+                PredicateName.MIDPOINT.value
                 if clause_construction.name == "midpoint"
                 else clause_construction.name
             )

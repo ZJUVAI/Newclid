@@ -4,7 +4,8 @@
 import pytest
 import pytest_check as check
 
-from geosolver.predicates import Predicate
+from geosolver.predicates.coll import Coll
+from geosolver.predicates.predicate_name import PredicateName
 from geosolver.statements.statement import Statement
 from geosolver.trace_back import get_logs
 from geosolver.api import GeometricSolverBuilder
@@ -35,16 +36,13 @@ class TestTraceback:
         check.equal(
             set(setup),
             {
-                (Predicate.PERPENDICULAR.value, "a", "c", "b", "d"),
-                (Predicate.PERPENDICULAR.value, "a", "b", "c", "d"),
+                (PredicateName.PERPENDICULAR.value, "a", "c", "b", "d"),
+                (PredicateName.PERPENDICULAR.value, "a", "b", "c", "d"),
             },
         )
 
         aux = [p.statement.hash_tuple for p in aux]
         check.equal(
             set(aux),
-            {
-                (Predicate.COLLINEAR.value, "a", "c", "e"),
-                (Predicate.COLLINEAR.value, "b", "d", "e"),
-            },
+            {(Coll.NAME, "a", "c", "e"), (Coll.NAME, "b", "d", "e")},
         )

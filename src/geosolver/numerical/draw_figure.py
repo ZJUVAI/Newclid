@@ -1,7 +1,8 @@
 from typing import TYPE_CHECKING, Any, Optional
 
 import geosolver.geometry as gm
-from geosolver.predicates import Predicate
+from geosolver.predicates.coll import Coll
+from geosolver.predicates.predicate_name import PredicateName
 from geosolver.numerical.angles import ang_of
 from geosolver.numerical.check import clock
 from geosolver.numerical.geometries import (
@@ -325,18 +326,18 @@ def highlight(
     """Draw highlights."""
     args = list(map(lambda x: x.num if isinstance(x, gm.Point) else x, args))
 
-    if name == Predicate.CYCLIC.value:
+    if name == PredicateName.CYCLIC.value:
         a, b, c, d = args
         _draw_circle(ax, CircleNum(p1=a, p2=b, p3=c), color=color1, lw=2.0)
-    if name == Predicate.COLLINEAR.value:
+    if name == Coll.NAME:
         a, b, c = args
         a, b = max(a, b, c), min(a, b, c)
         _draw_line(ax, a, b, color=color1, lw=2.0)
-    if name == Predicate.PARALLEL.value:
+    if name == PredicateName.PARALLEL.value:
         a, b, c, d = args
         _draw_line(ax, a, b, color=color1, lw=2.0)
         _draw_line(ax, c, d, color=color2, lw=2.0)
-    if name == Predicate.EQANGLE.value:
+    if name == PredicateName.EQANGLE.value:
         a, b, c, d, e, f, g, h = args
 
         x = line_line_intersection(LineNum(a, b), LineNum(c, d))
@@ -363,7 +364,7 @@ def highlight(
         if color2 == "--":
             color2 = "red"
         draw_angle(ax, e, f, h, color=color2, alpha=0.5)
-    if name == Predicate.PERPENDICULAR.value:
+    if name == PredicateName.PERPENDICULAR.value:
         a, b, c, d = args
         _draw_line(ax, a, b, color=color1, lw=2.0)
         _draw_line(ax, c, d, color=color1, lw=2.0)
@@ -371,15 +372,15 @@ def highlight(
         a, b, c, d, m, n = args
         _draw_line(ax, a, b, color=color1, lw=2.0)
         _draw_line(ax, c, d, color=color2, lw=2.0)
-    if name == Predicate.CONGRUENT.value:
+    if name == PredicateName.CONGRUENT.value:
         a, b, c, d = args
         _draw_line(ax, a, b, color=color1, lw=2.0)
         _draw_line(ax, c, d, color=color2, lw=2.0)
-    if name == Predicate.MIDPOINT.value:
+    if name == PredicateName.MIDPOINT.value:
         m, a, b = args
         _draw_line(ax, a, m, color=color1, lw=2.0, alpha=0.5)
         _draw_line(ax, b, m, color=color2, lw=2.0, alpha=0.5)
-    if name == Predicate.EQRATIO.value:
+    if name == PredicateName.EQRATIO.value:
         a, b, c, d, m, n, p, q = args
         _draw_line(ax, a, b, color=color1, lw=2.0, alpha=0.5)
         _draw_line(ax, c, d, color=color2, lw=2.0, alpha=0.5)

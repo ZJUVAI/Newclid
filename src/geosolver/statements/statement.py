@@ -2,7 +2,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, TypeVar, Union
 
-from geosolver.predicates import Predicate
+from geosolver.predicates.predicate_name import PredicateName
 
 if TYPE_CHECKING:
     from geosolver.geometry import Symbol, Point, Angle, Ratio
@@ -12,11 +12,11 @@ if TYPE_CHECKING:
 class Statement:
     """One predicate applied to a set of points and values."""
 
-    predicate: Predicate
+    predicate: PredicateName
     args: tuple["Point" | "Ratio" | "Angle" | int | str, ...]
 
     def __post_init__(self):
-        self.predicate = Predicate(self.predicate)
+        self.predicate = PredicateName(self.predicate)
         self.hash_tuple = hash_statement(self.name, self.args)
 
     def translate(self, mapping: dict[str, str]) -> Statement:
@@ -49,18 +49,20 @@ def hash_statement(name: str, args: list["Point" | "Ratio" | int]):
     return hash_statement_str(name, [_symbol_to_txt(p) for p in args])
 
 
-def hash_statement_str(name: Union[str, Predicate], args: list[str]) -> tuple[str, ...]:
+def hash_statement_str(
+    name: Union[str, PredicateName], args: list[str]
+) -> tuple[str, ...]:
     """Return a tuple unique to name and args upto arg permutation equivariant."""
     try:
-        predicate = Predicate(name)
+        predicate = PredicateName(name)
     except ValueError:
         return (name, *args)
-    if isinstance(name, Predicate):
+    if isinstance(name, PredicateName):
         name = predicate.value
-    if predicate is Predicate.EQANGLE6:
-        name = Predicate.EQANGLE.value
-    if predicate is Predicate.EQRATIO6:
-        name = Predicate.EQRATIO.value
+    if predicate is PredicateName.EQANGLE6:
+        name = PredicateName.EQANGLE.value
+    if predicate is PredicateName.EQRATIO6:
+        name = PredicateName.EQRATIO.value
     return PREDICATE_TO_HASH[predicate](name, args)
 
 
@@ -85,25 +87,23 @@ def _arguments_to_str(args: list[str | int | "Symbol"]) -> list[str]:
 P = TypeVar("P")
 
 
-def _hash_unordered_set_of_points(name: str, args: list[P]) -> tuple[str | P]:
+def hash_unordered_set_of_points(name: str, args: list[P]) -> tuple[str | P]:
     return (name,) + tuple(sorted(list(set(args))))
 
 
-def _hash_unordered_set_of_points_with_value(
-    name: str, args: list[P]
-) -> tuple[str | P]:
-    return _hash_unordered_set_of_points(name, args[:-1]) + (args[-1],)
+def hash_unordered_set_of_points_with_value(name: str, args: list[P]) -> tuple[str | P]:
+    return hash_unordered_set_of_points(name, args[:-1]) + (args[-1],)
 
 
-def _hash_ordered_list_of_points(name: str, args: list[P]) -> tuple[str | P]:
+def hash_ordered_list_of_points(name: str, args: list[P]) -> tuple[str | P]:
     return (name,) + tuple(args)
 
 
-def _hash_point_then_set_of_points(name: str, args: list[P]) -> tuple[str | P]:
+def hash_point_then_set_of_points(name: str, args: list[P]) -> tuple[str | P]:
     return (name, args[0]) + tuple(sorted(args[1:]))
 
 
-def _hashed_unordered_two_lines_points(
+def hashed_unordered_two_lines_points(
     name: str, args: tuple[P, P, P, P]
 ) -> tuple[str, P, P, P, P]:
     a, b, c, d = args
@@ -115,7 +115,7 @@ def _hashed_unordered_two_lines_points(
     return (name, a, b, c, d)
 
 
-def _hash_ordered_two_lines_with_value(
+def hash_ordered_two_lines_with_value(
     name: str, args: tuple[P, P, P, P, P]
 ) -> tuple[str, P, P, P, P, P]:
     a, b, c, d, y = args
@@ -124,13 +124,13 @@ def _hash_ordered_two_lines_with_value(
     return name, a, b, c, d, y
 
 
-def _hash_point_and_line(name: str, args: tuple[P, P, P]) -> tuple[str, P, P, P]:
+def hash_point_and_line(name: str, args: tuple[P, P, P]) -> tuple[str, P, P, P]:
     a, b, c = args
     b, c = sorted([b, c])
     return (name, a, b, c)
 
 
-def _hash_two_times_two_unorded_lines(
+def hash_two_times_two_unorded_lines(
     name: str, args: tuple[P, P, P, P, P, P, P, P]
 ) -> tuple[str, P, P, P, P, P, P, P, P]:
     a, b, c, d, e, f, g, h = args
@@ -156,7 +156,7 @@ def _hash_two_times_two_unorded_lines(
     return (name,) + (a, b, c, d, e, f, g, h)
 
 
-def _hash_triangle(
+def hash_triangle(
     name: str, args: tuple[P, P, P, P, P, P]
 ) -> tuple[str, P, P, P, P, P, P]:
     a, b, c, x, y, z = args
@@ -165,7 +165,7 @@ def _hash_triangle(
     return (name, a, b, c, x, y, z)
 
 
-def _hash_eqratio_3(
+def hash_eqratio_3(
     name: str, args: tuple[P, P, P, P, P, P]
 ) -> tuple[str, P, P, P, P, P, P]:
     a, b, c, d, o, o = args
@@ -175,35 +175,34 @@ def _hash_eqratio_3(
 
 
 PREDICATE_TO_HASH = {
-    Predicate.PARALLEL: _hashed_unordered_two_lines_points,
-    Predicate.CONGRUENT: _hashed_unordered_two_lines_points,
-    Predicate.CONGRUENT_2: _hashed_unordered_two_lines_points,
-    Predicate.PERPENDICULAR: _hashed_unordered_two_lines_points,
-    Predicate.COLLINEAR_X: _hashed_unordered_two_lines_points,
-    Predicate.NON_PARALLEL: _hashed_unordered_two_lines_points,
-    Predicate.NON_PERPENDICULAR: _hashed_unordered_two_lines_points,
-    Predicate.COLLINEAR: _hash_unordered_set_of_points,
-    Predicate.CYCLIC: _hash_unordered_set_of_points,
-    Predicate.NON_COLLINEAR: _hash_unordered_set_of_points,
-    Predicate.DIFFERENT: _hash_unordered_set_of_points,
-    Predicate.CIRCLE: _hash_point_then_set_of_points,
-    Predicate.MIDPOINT: _hash_point_and_line,
-    Predicate.CONSTANT_ANGLE: _hash_ordered_two_lines_with_value,
-    Predicate.CONSTANT_RATIO: _hash_ordered_two_lines_with_value,
-    Predicate.CONSTANT_LENGTH: _hash_unordered_set_of_points_with_value,
-    Predicate.EQANGLE: _hash_two_times_two_unorded_lines,
-    Predicate.EQRATIO: _hash_two_times_two_unorded_lines,
-    Predicate.EQANGLE6: _hash_two_times_two_unorded_lines,
-    Predicate.EQRATIO6: _hash_two_times_two_unorded_lines,
-    Predicate.SAMESIDE: _hash_ordered_list_of_points,
-    Predicate.S_ANGLE: _hash_ordered_list_of_points,
-    Predicate.SIMILAR_TRIANGLE: _hash_triangle,
-    Predicate.SIMILAR_TRIANGLE_REFLECTED: _hash_triangle,
-    Predicate.SIMILAR_TRIANGLE_BOTH: _hash_triangle,
-    Predicate.CONTRI_TRIANGLE: _hash_triangle,
-    Predicate.CONTRI_TRIANGLE_REFLECTED: _hash_triangle,
-    Predicate.CONTRI_TRIANGLE_BOTH: _hash_triangle,
-    Predicate.EQRATIO3: _hash_eqratio_3,
+    PredicateName.PARALLEL: hashed_unordered_two_lines_points,
+    PredicateName.CONGRUENT: hashed_unordered_two_lines_points,
+    PredicateName.CONGRUENT_2: hashed_unordered_two_lines_points,
+    PredicateName.PERPENDICULAR: hashed_unordered_two_lines_points,
+    PredicateName.COLLINEAR_X: hashed_unordered_two_lines_points,
+    PredicateName.NON_PARALLEL: hashed_unordered_two_lines_points,
+    PredicateName.NON_PERPENDICULAR: hashed_unordered_two_lines_points,
+    PredicateName.CYCLIC: hash_unordered_set_of_points,
+    PredicateName.NON_COLLINEAR: hash_unordered_set_of_points,
+    PredicateName.DIFFERENT: hash_unordered_set_of_points,
+    PredicateName.CIRCLE: hash_point_then_set_of_points,
+    PredicateName.MIDPOINT: hash_point_and_line,
+    PredicateName.CONSTANT_ANGLE: hash_ordered_two_lines_with_value,
+    PredicateName.CONSTANT_RATIO: hash_ordered_two_lines_with_value,
+    PredicateName.CONSTANT_LENGTH: hash_unordered_set_of_points_with_value,
+    PredicateName.EQANGLE: hash_two_times_two_unorded_lines,
+    PredicateName.EQRATIO: hash_two_times_two_unorded_lines,
+    PredicateName.EQANGLE6: hash_two_times_two_unorded_lines,
+    PredicateName.EQRATIO6: hash_two_times_two_unorded_lines,
+    PredicateName.SAMESIDE: hash_ordered_list_of_points,
+    PredicateName.S_ANGLE: hash_ordered_list_of_points,
+    PredicateName.SIMILAR_TRIANGLE: hash_triangle,
+    PredicateName.SIMILAR_TRIANGLE_REFLECTED: hash_triangle,
+    PredicateName.SIMILAR_TRIANGLE_BOTH: hash_triangle,
+    PredicateName.CONTRI_TRIANGLE: hash_triangle,
+    PredicateName.CONTRI_TRIANGLE_REFLECTED: hash_triangle,
+    PredicateName.CONTRI_TRIANGLE_BOTH: hash_triangle,
+    PredicateName.EQRATIO3: hash_eqratio_3,
 }
 
 

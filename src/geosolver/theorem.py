@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import Optional
 from geosolver.defs.clause import Construction
-from geosolver.predicates import Predicate
+from geosolver.predicates.predicate_name import PredicateName
 
 
 class Theorem:
@@ -17,14 +17,14 @@ class Theorem:
         self.conclusion = conclusion[0]
 
         if self.conclusion.name in [
-            Predicate.EQRATIO3.value,
-            Predicate.MIDPOINT.value,
-            Predicate.CONTRI_TRIANGLE.value,
-            Predicate.SIMILAR_TRIANGLE.value,
-            Predicate.CONTRI_TRIANGLE_REFLECTED.value,
-            Predicate.SIMILAR_TRIANGLE_REFLECTED.value,
-            Predicate.SIMILAR_TRIANGLE_BOTH.value,
-            Predicate.CONTRI_TRIANGLE_BOTH.value,
+            PredicateName.EQRATIO3.value,
+            PredicateName.MIDPOINT.value,
+            PredicateName.CONTRI_TRIANGLE.value,
+            PredicateName.SIMILAR_TRIANGLE.value,
+            PredicateName.CONTRI_TRIANGLE_REFLECTED.value,
+            PredicateName.SIMILAR_TRIANGLE_REFLECTED.value,
+            PredicateName.SIMILAR_TRIANGLE_BOTH.value,
+            PredicateName.CONTRI_TRIANGLE_BOTH.value,
         ]:
             return
 

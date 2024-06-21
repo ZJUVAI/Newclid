@@ -2,7 +2,8 @@
 
 from typing import TYPE_CHECKING, Optional
 
-from geosolver.predicates import NUMERICAL_PREDICATES, Predicate
+from geosolver.predicates.coll import Coll
+from geosolver.predicates.predicate_name import NUMERICAL_PREDICATES, PredicateName
 from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE
 from geosolver.statements.statement import Statement
@@ -100,7 +101,7 @@ def separate_dependency_difference(
         if not cons_:
             continue
 
-        prems = [p for p in prems if p.statement.predicate != Predicate.IND]
+        prems = [p for p in prems if p.statement.predicate != PredicateName.IND]
         log.append((prems, cons_))
 
     points = set(query.statement.args)
@@ -118,7 +119,7 @@ def separate_dependency_difference(
 
     setup_, setup, aux_setup, aux_points = setup, [], [], set()
     for con in setup_:
-        if con.statement.predicate is Predicate.IND:
+        if con.statement.predicate is PredicateName.IND:
             continue
         elif any([p not in points for p in con.statement.args if isinstance(p, Point)]):
             aux_setup.append(con)
@@ -232,8 +233,8 @@ def collx_to_coll_setup(
     for level in setup_to_levels(setup):
         hashs = set()
         for dep in level:
-            if dep.statement.predicate == Predicate.COLLINEAR_X:
-                dep.statement.predicate = Predicate.COLLINEAR
+            if dep.statement.predicate == PredicateName.COLLINEAR_X:
+                dep.statement.predicate = Coll.NAME
                 dep.statement.args = list(set(dep.statement.args))
 
             dep_hash = dep.statement.hash_tuple
@@ -289,8 +290,8 @@ def collx_to_coll(
 
 
 def _dep_coll_to_collx(dep: "Dependency"):
-    if dep.statement.predicate == Predicate.COLLINEAR_X:
-        coll_statement = Statement(Predicate.COLLINEAR, list(set(dep.statement.args)))
+    if dep.statement.predicate == PredicateName.COLLINEAR_X:
+        coll_statement = Statement(Coll.NAME, list(set(dep.statement.args)))
         return Dependency(coll_statement, why=dep.why, reason=dep.reason)
     return dep
 

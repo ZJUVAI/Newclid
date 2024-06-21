@@ -1,10 +1,11 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
-from geosolver.predicates import Predicate
+from geosolver.predicates.coll import Coll
+from geosolver.predicates.predicate_name import PredicateName
 import geosolver.geometry as gm
 
 from geosolver._lazy_loading import lazy_import
-from geosolver.numerical import ATOM, close_enough
+from geosolver.numerical import close_enough
 from geosolver.numerical.angles import ang_between
 from geosolver.numerical.geometries import CircleNum, LineNum, PointNum, bring_together
 from geosolver.listing import list_eqratio3
@@ -24,17 +25,8 @@ def check_circle_numerical(points: list[PointNum]) -> bool:
     return close_enough(oa, ob) and close_enough(ob, oc)
 
 
-def check_coll_numerical(points: list[PointNum]) -> bool:
-    a, b = points[:2]
-    line = LineNum(a, b)
-    for p in points[2:]:
-        if abs(line(p.x, p.y)) > ATOM:
-            return False
-    return True
-
-
 def check_ncoll_numerical(points: list[PointNum]) -> bool:
-    return not check_coll_numerical(points)
+    return not Coll.check_numerical(points)
 
 
 def check_sangle_numerical(args: list[PointNum | gm.Angle]) -> bool:
@@ -79,7 +71,7 @@ def check_para_numerical(points: list[PointNum]) -> bool:
 
 
 def check_para_or_coll_numerical(points: list[PointNum]) -> bool:
-    return check_para_numerical(points) or check_coll_numerical(points)
+    return check_para_numerical(points) or Coll.check_numerical(points)
 
 
 def check_perp_numerical(points: list[PointNum]) -> bool:
@@ -175,7 +167,7 @@ def check_cong_numerical(points: list[PointNum]) -> bool:
 
 def check_midp_numerical(points: list[PointNum]) -> bool:
     a, b, c = points
-    return check_coll_numerical(points) and close_enough(a.distance(b), a.distance(c))
+    return Coll.check_numerical(points) and close_enough(a.distance(b), a.distance(c))
 
 
 def check_simtri_numerical(points: list[PointNum]) -> bool:
@@ -216,30 +208,29 @@ def check_length_numerical(points: list[PointNum | gm.Length]) -> bool:
 
 
 PREDICATE_TO_NUMERICAL_CHECK = {
-    Predicate.COLLINEAR: check_coll_numerical,
-    Predicate.PERPENDICULAR: check_perp_numerical,
-    Predicate.MIDPOINT: check_midp_numerical,
-    Predicate.CONGRUENT: check_cong_numerical,
-    Predicate.CIRCLE: check_circle_numerical,
-    Predicate.CYCLIC: check_cyclic_numerical,
-    Predicate.EQANGLE: check_eqangle_numerical,
-    Predicate.EQANGLE6: check_eqangle_numerical,
-    Predicate.EQRATIO: check_eqratio_numerical,
-    Predicate.EQRATIO3: check_eqratio3_numerical,
-    Predicate.EQRATIO6: check_eqratio_numerical,
-    Predicate.SIMILAR_TRIANGLE: check_simtri_numerical,
-    Predicate.SIMILAR_TRIANGLE_REFLECTED: check_simtri_numerical,
-    Predicate.SIMILAR_TRIANGLE_BOTH: check_simtri_numerical,
-    Predicate.CONTRI_TRIANGLE: check_contri_numerical,
-    Predicate.CONTRI_TRIANGLE_REFLECTED: check_contri_numerical,
-    Predicate.CONTRI_TRIANGLE_BOTH: check_contri_numerical,
-    Predicate.CONSTANT_ANGLE: check_aconst_numerical,
-    Predicate.S_ANGLE: check_sangle_numerical,
-    Predicate.SAMESIDE: check_sameside_numerical,
-    Predicate.NON_COLLINEAR: check_ncoll_numerical,
-    Predicate.CONSTANT_RATIO: check_ratio_numerical,
-    Predicate.CONSTANT_LENGTH: check_length_numerical,
-    Predicate.PARALLEL: check_para_or_coll_numerical,
+    PredicateName.PERPENDICULAR: check_perp_numerical,
+    PredicateName.MIDPOINT: check_midp_numerical,
+    PredicateName.CONGRUENT: check_cong_numerical,
+    PredicateName.CIRCLE: check_circle_numerical,
+    PredicateName.CYCLIC: check_cyclic_numerical,
+    PredicateName.EQANGLE: check_eqangle_numerical,
+    PredicateName.EQANGLE6: check_eqangle_numerical,
+    PredicateName.EQRATIO: check_eqratio_numerical,
+    PredicateName.EQRATIO3: check_eqratio3_numerical,
+    PredicateName.EQRATIO6: check_eqratio_numerical,
+    PredicateName.SIMILAR_TRIANGLE: check_simtri_numerical,
+    PredicateName.SIMILAR_TRIANGLE_REFLECTED: check_simtri_numerical,
+    PredicateName.SIMILAR_TRIANGLE_BOTH: check_simtri_numerical,
+    PredicateName.CONTRI_TRIANGLE: check_contri_numerical,
+    PredicateName.CONTRI_TRIANGLE_REFLECTED: check_contri_numerical,
+    PredicateName.CONTRI_TRIANGLE_BOTH: check_contri_numerical,
+    PredicateName.CONSTANT_ANGLE: check_aconst_numerical,
+    PredicateName.S_ANGLE: check_sangle_numerical,
+    PredicateName.SAMESIDE: check_sameside_numerical,
+    PredicateName.NON_COLLINEAR: check_ncoll_numerical,
+    PredicateName.CONSTANT_RATIO: check_ratio_numerical,
+    PredicateName.CONSTANT_LENGTH: check_length_numerical,
+    PredicateName.PARALLEL: check_para_or_coll_numerical,
 }
 
 
@@ -247,13 +238,13 @@ def check_numerical(statement: Statement) -> bool:
     """Numerical check."""
 
     if statement.predicate in [
-        Predicate.COMPUTE_RATIO,
-        Predicate.COMPUTE_ANGLE,
-        Predicate.FIX_L,
-        Predicate.FIX_C,
-        Predicate.FIX_B,
-        Predicate.FIX_T,
-        Predicate.FIX_P,
+        PredicateName.COMPUTE_RATIO,
+        PredicateName.COMPUTE_ANGLE,
+        PredicateName.FIX_L,
+        PredicateName.FIX_C,
+        PredicateName.FIX_B,
+        PredicateName.FIX_T,
+        PredicateName.FIX_P,
     ]:
         return True
 

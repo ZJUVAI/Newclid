@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 
 from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.reasoning_engines.engines_interface import Derivation, ReasoningEngine
-from geosolver.predicates import Predicate
+from geosolver.predicates.predicate_name import PredicateName
 from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.geometry import is_equiv
 from geosolver.numerical.check import check_numerical
@@ -42,14 +42,14 @@ class AlgebraicManipulator(ReasoningEngine):
         self.verbose = config.get("verbose", "")
 
         self.PREDICATE_TO_ADDER = {
-            Predicate.PARALLEL: self._add_para,
-            Predicate.PERPENDICULAR: self._add_perp,
-            Predicate.CONGRUENT: self._add_cong,
-            Predicate.EQANGLE: self._add_eqangle,
-            Predicate.EQRATIO: self._add_eqratio,
-            Predicate.CONSTANT_ANGLE: self._add_aconst,
-            Predicate.S_ANGLE: self._add_aconst,
-            Predicate.CONSTANT_RATIO: self._add_rconst,
+            PredicateName.PARALLEL: self._add_para,
+            PredicateName.PERPENDICULAR: self._add_perp,
+            PredicateName.CONGRUENT: self._add_cong,
+            PredicateName.EQANGLE: self._add_eqangle,
+            PredicateName.EQRATIO: self._add_eqratio,
+            PredicateName.CONSTANT_ANGLE: self._add_aconst,
+            PredicateName.S_ANGLE: self._add_aconst,
+            PredicateName.CONSTANT_RATIO: self._add_rconst,
         }
 
     def ingest(self, dependency: "Dependency") -> None:
@@ -93,7 +93,7 @@ class AlgebraicManipulator(ReasoningEngine):
                     continue
 
                 (m, n), (p, q) = mn._obj.points, pq._obj.points
-                cong = Statement(Predicate.CONGRUENT_2, (m, n, p, q))
+                cong = Statement(PredicateName.CONGRUENT_2, (m, n, p, q))
                 added.append(Derivation(cong, dep))
 
             if len(x) == 4:
@@ -104,7 +104,7 @@ class AlgebraicManipulator(ReasoningEngine):
                     *mn._obj.points,
                     *pq._obj.points,
                 )
-                eqratio = Statement(Predicate.EQRATIO, points)
+                eqratio = Statement(PredicateName.EQRATIO, points)
                 added.append(Derivation(eqratio, dep))
 
         return added
@@ -123,7 +123,7 @@ class AlgebraicManipulator(ReasoningEngine):
                     continue
 
                 points = (*ab._obj.points, *cd._obj.points)
-                para = Statement(Predicate.PARALLEL, points)
+                para = Statement(PredicateName.PARALLEL, points)
                 if not check_numerical(para):
                     continue
 
@@ -134,7 +134,7 @@ class AlgebraicManipulator(ReasoningEngine):
                 points = (*ef._obj.points, *pq._obj.points)
                 angle, opposite_angle = self.symbols_graph.get_or_create_const_ang(n, d)
                 angle.opposite = opposite_angle
-                aconst = Statement(Predicate.CONSTANT_ANGLE, (*points, angle))
+                aconst = Statement(PredicateName.CONSTANT_ANGLE, (*points, angle))
                 if not check_numerical(aconst):
                     continue
 
@@ -148,7 +148,7 @@ class AlgebraicManipulator(ReasoningEngine):
                     *mn._obj.points,
                     *pq._obj.points,
                 )
-                eqangle = Statement(Predicate.EQANGLE, points)
+                eqangle = Statement(PredicateName.EQANGLE, points)
                 added.append(Derivation(eqangle, dep))
 
         return added
@@ -165,14 +165,14 @@ class AlgebraicManipulator(ReasoningEngine):
                 if a == b:
                     continue
 
-                inci = Statement(Predicate.INCI, (a, b))
+                inci = Statement(PredicateName.INCI, (a, b))
                 added.append(Derivation(inci, dep))
 
             if len(x) == 4:
                 a, b, c, d = x
                 if not (a != b and c != d and (a != c or b != d)):
                     continue
-                cong = Statement(Predicate.CONGRUENT, (a, b, c, d))
+                cong = Statement(PredicateName.CONGRUENT, (a, b, c, d))
                 added.append(Derivation(cong, dep))
 
             if len(x) == 6:
@@ -180,7 +180,7 @@ class AlgebraicManipulator(ReasoningEngine):
                 if not (a != b and c != d and (a != c or b != d)):
                     continue
                 ratio, _ = self.symbols_graph.get_or_create_const_rat(num, den)
-                rconst = Statement(Predicate.CONSTANT_RATIO, (a, b, c, d, ratio))
+                rconst = Statement(PredicateName.CONSTANT_RATIO, (a, b, c, d, ratio))
                 added.append(Derivation(rconst, dep))
 
         return added

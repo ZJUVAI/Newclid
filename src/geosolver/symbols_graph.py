@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Type, TypeVar
 
 
 from geosolver.ratios import simplify
-from geosolver.dependencies.why_predicates import _line_of_and_why
+from geosolver.dependencies.why_predicates import line_of_and_why
 import geosolver.numerical.geometries as num_geo
 from geosolver.numerical.draw_figure import draw_figure as draw_numerical_figure
 from geosolver.geometry import (
@@ -24,7 +24,7 @@ from geosolver.geometry import (
     RatioValue,
 )
 from geosolver._lazy_loading import lazy_import
-from geosolver.predicates import Predicate
+from geosolver.predicates.predicate_name import PredicateName
 from geosolver.statements.statement import angle_to_num_den, ratio_to_num_den
 
 if TYPE_CHECKING:
@@ -275,8 +275,8 @@ class SymbolsGraph:
         self, const_value: str, construction_name: str
     ) -> tuple[Angle, Angle] | tuple[Ratio, Ratio] | Length:
         if construction_name in (
-            Predicate.CONSTANT_ANGLE.value,
-            Predicate.S_ANGLE.value,
+            PredicateName.CONSTANT_ANGLE.value,
+            PredicateName.S_ANGLE.value,
         ):
             if "pi/" in const_value:
                 # pi fraction
@@ -288,12 +288,12 @@ class SymbolsGraph:
                 raise ValueError("Could not interpret constant angle: %s", const_value)
             return self.get_or_create_const_ang(num, den)
 
-        elif construction_name in (Predicate.CONSTANT_RATIO.value, "rconst2"):
+        elif construction_name in (PredicateName.CONSTANT_RATIO.value, "rconst2"):
             if "/" in const_value:
                 num, den = ratio_to_num_den(const_value)
                 return self.get_or_create_const_rat(num, den)
 
-        elif construction_name == Predicate.CONSTANT_LENGTH.value:
+        elif construction_name == PredicateName.CONSTANT_LENGTH.value:
             return self.get_or_create_const_length(float(const_value))
 
         raise NotImplementedError(
@@ -404,7 +404,7 @@ class SymbolsGraph:
         if (p1, p2) in self._pair2line:
             return self._pair2line[(p1, p2)].rep_and_why()
 
-        line, why = _line_of_and_why([p1, p2])
+        line, why = line_of_and_why([p1, p2])
         if line is None:
             line = self.get_new_line_thru_pair(p1, p2)
             why = []
