@@ -195,36 +195,7 @@ class AlgebraicManipulator(ReasoningEngine):
 
     def derive_cong_algebra(self) -> list[Derivation]:
         """Derive new cong predicates."""
-        added = []
-        for x in self.dtable.get_all_eqs_and_why():
-            pass
-            # x, why = x[:-1], x[-1]
-            # dep = DependencyBody(reason=Reason(AlgebraicRules.Distance_Chase), why=why)
-
-            # if len(x) == 2:
-            #     a, b = x
-            #     if a == b:
-            #         continue
-
-            #     inci = Statement(Predicate.INCI, (a, b))
-            #     added.append(Derivation(inci, dep))
-
-            # if len(x) == 4:
-            #     a, b, c, d = x
-            #     if not (a != b and c != d and (a != c or b != d)):
-            #         continue
-            #     cong = Statement(Predicate.CONGRUENT, (a, b, c, d))
-            #     added.append(Derivation(cong, dep))
-
-            # if len(x) == 6:
-            #     a, b, c, d, num, den = x
-            #     if not (a != b and c != d and (a != c or b != d)):
-            #         continue
-            #     ratio, _ = self.symbols_graph.get_or_create_const_rat(num, den)
-            #     rconst = Statement(Predicate.CONSTANT_RATIO, (a, b, c, d, ratio))
-            #     added.append(Derivation(rconst, dep))
-
-        return added
+        return []
 
     def _add_para(self, dep: "Dependency"):
         a, b, c, d = dep.statement.args
