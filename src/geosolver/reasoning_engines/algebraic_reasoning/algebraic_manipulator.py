@@ -284,4 +284,4 @@ class AlgebraicManipulator(ReasoningEngine):
 
         ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)
         cd = self.symbols_graph.get_or_create_segment(c, d, dep=None)
-        self.rtable.add_eq(ab._val, cd._val, dep)
+        self.rtable.add_eq(ab.val, cd.val, dep)
