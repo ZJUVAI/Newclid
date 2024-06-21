@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Optional
 import time
 
 from geosolver.agent.interface import (
-    ApplyDerivationAction,
-    ApplyDerivationFeedback,
+    ImportDerivationAction,
+    ImportDerivationFeedback,
     ApplyTheoremFeedback,
     DeductiveAgent,
     Action,
@@ -204,7 +204,7 @@ class BFSDDAR(DeductiveAgent):
                     self._eq4s.append(derive)
                 else:
                     self._derivations.append(derive)
-        elif isinstance(feedback, ApplyDerivationFeedback):
+        elif isinstance(feedback, ImportDerivationFeedback):
             new_statements = len(feedback.added) > 1
             if new_statements:
                 # dd is not saturated anymore
@@ -214,7 +214,7 @@ class BFSDDAR(DeductiveAgent):
 
     def _apply_next_derivation(
         self, include_eq4s: bool = True
-    ) -> Optional[ApplyDerivationAction]:
+    ) -> Optional[ImportDerivationAction]:
         if not self._current_derivation_stack:
             if self._derivations:
                 self._current_derivation_stack = self._derivations
@@ -226,7 +226,7 @@ class BFSDDAR(DeductiveAgent):
                 return None
 
         derived_statement, reason = self._current_derivation_stack.pop()
-        return ApplyDerivationAction(statement=derived_statement, reason=reason)
+        return ImportDerivationAction(statement=derived_statement, reason=reason)
 
     def reset(self):
         self._dd_agent.reset()

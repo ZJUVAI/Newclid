@@ -5,8 +5,8 @@ from geosolver.statements.statement import Statement
 from geosolver.theorem import Theorem
 from geosolver.agent.interface import (
     Action,
-    ApplyDerivationAction,
-    ApplyDerivationFeedback,
+    ImportDerivationAction,
+    ImportDerivationFeedback,
     ApplyTheoremAction,
     ApplyTheoremFeedback,
     AuxAction,
@@ -48,7 +48,7 @@ class HumanAgent(DeductiveAgent):
         "match": MatchAction,
         "apply": ApplyTheoremAction,
         "resolve": ResolveEngineAction,
-        "derive": ApplyDerivationAction,
+        "derive": ImportDerivationAction,
         "aux": AuxAction,
         "stop": StopAction,
     }
@@ -57,7 +57,7 @@ class HumanAgent(DeductiveAgent):
         StopAction: "Stop the proof",
         ApplyTheoremAction: "Apply a theorem on a mapping of points.",
         ResolveEngineAction: "Resolve available derivation from current proof state.",
-        ApplyDerivationAction: "Apply a derivation.",
+        ImportDerivationAction: "Apply a derivation.",
         AuxAction: "Add an auxiliary construction to the setup.",
         ShowAction: "Show the geometric figure of the current proof.",
     }
@@ -73,7 +73,7 @@ class HumanAgent(DeductiveAgent):
             MatchAction: self._act_match,
             ApplyTheoremAction: self._act_apply_theorem,
             ResolveEngineAction: self._act_resolve_derivations,
-            ApplyDerivationAction: self._act_apply_derivation,
+            ImportDerivationAction: self._act_apply_derivation,
             AuxAction: self._act_aux,
             ShowAction: self._act_show,
         }
@@ -86,7 +86,7 @@ class HumanAgent(DeductiveAgent):
             if isinstance(action, ShowAction):
                 action = self._show_figure(proof)
 
-        if isinstance(action, (ApplyTheoremAction, ApplyDerivationAction)):
+        if isinstance(action, (ApplyTheoremAction, ImportDerivationAction)):
             self.level += 1
         return action
 
@@ -144,7 +144,7 @@ class HumanAgent(DeductiveAgent):
 
         return ResolveEngineAction(engine_id=engine_id)
 
-    def _act_apply_derivation(self, theorems: list[Theorem]) -> ApplyDerivationAction:
+    def _act_apply_derivation(self, theorems: list[Theorem]) -> ImportDerivationAction:
         choose_derivation_str = "\nAvailable derivations: \n"
         for derived_statement_str in self._derivations.keys():
             choose_derivation_str += f" - [{derived_statement_str}]\n"
@@ -152,7 +152,7 @@ class HumanAgent(DeductiveAgent):
         derived_statement, reason = self._ask_for_key(
             self._derivations, choose_derivation_str, pop=True
         )
-        return ApplyDerivationAction(statement=derived_statement, reason=reason)
+        return ImportDerivationAction(statement=derived_statement, reason=reason)
 
     def _act_aux(self, theorems: list[Theorem]) -> AuxAction:
         aux_string = self._ask_input("Auxiliary string: ")
@@ -165,7 +165,7 @@ class HumanAgent(DeductiveAgent):
             MatchFeedback: self._remember_match,
             ApplyTheoremFeedback: self._remember_apply_theorem,
             DeriveFeedback: self._remember_derivations,
-            ApplyDerivationFeedback: self._remember_apply_derivation,
+            ImportDerivationFeedback: self._remember_apply_derivation,
             AuxFeedback: self._remember_aux,
         }
 
@@ -263,7 +263,7 @@ class HumanAgent(DeductiveAgent):
         return feedback_str, True
 
     def _remember_apply_derivation(
-        self, action: ApplyDerivationAction, feedback: ApplyDerivationFeedback
+        self, action: ImportDerivationAction, feedback: ImportDerivationFeedback
     ) -> tuple[str, bool]:
         success = True
         feedback_str = f"Successfully applied derivation [{action.statement}]:\n"
@@ -321,7 +321,7 @@ class HumanAgent(DeductiveAgent):
         for action_input, action_type in self.INPUT_TO_ACTION_TYPE.items():
             if action_type == ApplyTheoremAction and not self._mappings:
                 availables_action_types.pop(action_input)
-            if action_type == ApplyDerivationAction and not self._derivations:
+            if action_type == ImportDerivationAction and not self._derivations:
                 availables_action_types.pop(action_input)
 
         choose_action_type_str = "\nChoose an action type:\n"

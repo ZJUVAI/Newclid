@@ -12,6 +12,9 @@ import copy as cp
 
 from geosolver.definitions.clause import Clause
 from geosolver.definitions.definition import Definition
+from geosolver.reasoning_engines.algebraic_reasoning.algebraic_manipulator import (
+    AlgebraicManipulator,
+)
 from geosolver.reasoning_engines.interface import ReasoningEngine
 from geosolver.theorem import Theorem
 from geosolver.proof import Proof
@@ -161,7 +164,9 @@ class GeometricSolverBuilder:
         self.rules: Optional[list[Theorem]] = None
         self.deductive_agent: Optional[DeductiveAgent] = None
         self.disabled_intrinsic_rules: Optional[list[IntrinsicRules]] = None
-        self.additional_reasoning_engine: dict[str, Type[ReasoningEngine]] = {}
+        self.additional_reasoning_engine: dict[str, Type[ReasoningEngine]] = {
+            "AR": AlgebraicManipulator
+        }
         self.seed = seed
         self.no_goal = no_goal
 

@@ -45,7 +45,7 @@ class ResolveEngineAction(NamedTuple):
     engine_id: str
 
 
-class ApplyDerivationAction(NamedTuple):
+class ImportDerivationAction(NamedTuple):
     statement: "Statement"
     reason: "DependencyBody"
 
@@ -60,7 +60,7 @@ Action = Union[
     ApplyTheoremAction,
     MatchAction,
     ResolveEngineAction,
-    ApplyDerivationAction,
+    ImportDerivationAction,
     AuxAction,
 ]
 
@@ -91,7 +91,7 @@ class DeriveFeedback(NamedTuple):
     derives: list[Derivation]
 
 
-class ApplyDerivationFeedback(NamedTuple):
+class ImportDerivationFeedback(NamedTuple):
     added: list["Dependency"]
     to_cache: list["ToCache"]
 
@@ -108,7 +108,7 @@ Feedback = Union[
     ApplyTheoremFeedback,
     MatchFeedback,
     DeriveFeedback,
-    ApplyDerivationFeedback,
+    ImportDerivationFeedback,
     AuxFeedback,
 ]
 
