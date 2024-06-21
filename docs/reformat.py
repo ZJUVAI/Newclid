@@ -22,6 +22,9 @@ def rename_modules(filepath: Path):
 
 if __name__ == "__main__":
     path = Path(__file__).parent / "source"
+
+    os.remove(path / "modules.rst")
+
     for folderpath, folders, files in os.walk(path):
         for filename in [file for file in files if file.endswith(".rst")]:
             rename_modules(Path(folderpath) / filename)

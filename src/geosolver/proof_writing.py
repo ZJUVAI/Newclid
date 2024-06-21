@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 
-from geosolver.definitions.clause import Construction
+from geosolver.defs.clause import Construction
 from geosolver.statements.statement import Statement
 import geosolver.pretty as pt
 import geosolver.trace_back as trace_back

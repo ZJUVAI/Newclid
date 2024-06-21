@@ -2,8 +2,7 @@
 GeoSolver: Symbolic solver for Geometric problems
 =================================================
 
-A standalone package of the geometric solver introduced 
-in the Nature 2024 paper:
+An extension of the geometric solver introduced in the Nature 2024 paper:
 `Solving Olympiad Geometry without Human Demonstrations
 <https://www.nature.com/articles/s41586-023-06747-5>`_.
 

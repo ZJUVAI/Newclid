@@ -1,1 +1,1 @@
-"""Interface and implementation of Deductive Agents."""
+"""Interface and implementations of Deductive Agents."""

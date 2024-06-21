@@ -2,7 +2,7 @@
 
 from typing import Type
 
-from geosolver.agent.interface import DeductiveAgent
+from geosolver.agent.agents_interface import DeductiveAgent
 from geosolver.api import GeometricSolver, GeometricSolverBuilder
 from geosolver.agent.registry import AgentRegistry
 

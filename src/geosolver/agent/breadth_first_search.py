@@ -1,13 +1,15 @@
-"""Iterative level by level implementation of DD."""
+"""Classical Breadth-First Search based agents.
+
+"""
 
 from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Optional
 import time
 
-from geosolver.agent.interface import (
-    ApplyDerivationAction,
-    ApplyDerivationFeedback,
+from geosolver.agent.agents_interface import (
+    ImportDerivationAction,
+    ImportDerivationFeedback,
     ApplyTheoremFeedback,
     DeductiveAgent,
     Action,
@@ -24,7 +26,7 @@ from geosolver.agent.interface import (
 )
 from geosolver.match_theorems import MatchCache
 from geosolver.predicates import Predicate
-from geosolver.reasoning_engines.interface import Derivation
+from geosolver.reasoning_engines.engines_interface import Derivation
 
 
 if TYPE_CHECKING:
@@ -33,6 +35,13 @@ if TYPE_CHECKING:
 
 
 class BFSDD(DeductiveAgent):
+    """Apply Deductive Derivation to exaustion by Breadth-First Search.
+
+    BFSDD will match and apply all available rules level by level
+    until reaching a fixpoint we call exaustion.
+
+    """
+
     def __init__(self) -> None:
         super().__init__()
         self.reset()
@@ -148,6 +157,19 @@ def _action_str(theorem: "Theorem", mapping: Mapping) -> str:
 
 
 class BFSDDAR(DeductiveAgent):
+    """The traditional engine of GeoSolver presented in the original AlphaGeometry.
+
+    BFSDDAR is composed of two phases:
+
+    1. BFSDD exhaustively runs all rules until exaustion. Each new BFSDD level,
+       potential additional derivations will be collected from reasoning engines
+       such as the AlgebraicManipulator (AR).
+    2. Once BFSDD's fixpoint is reached, we import derivations from reasoning engines
+       to get new predicates, and restart the DD loop.
+       If no new predicate can be found, then BFSDDAR is exausted.
+
+    """
+
     def __init__(
         self,
         do_simple_derivations_asap: bool = False,
@@ -198,13 +220,13 @@ class BFSDDAR(DeductiveAgent):
         if isinstance(feedback, ResetFeedback):
             self.available_engines = feedback.available_engines
         if isinstance(feedback, DeriveFeedback):
-            for derive in feedback.derives:
+            for derive in feedback.derivations:
                 predicate = derive.statement.predicate
                 if predicate == Predicate.EQANGLE or predicate == Predicate.EQRATIO:
                     self._eq4s.append(derive)
                 else:
                     self._derivations.append(derive)
-        elif isinstance(feedback, ApplyDerivationFeedback):
+        elif isinstance(feedback, ImportDerivationFeedback):
             new_statements = len(feedback.added) > 1
             if new_statements:
                 # dd is not saturated anymore
@@ -214,7 +236,7 @@ class BFSDDAR(DeductiveAgent):
 
     def _apply_next_derivation(
         self, include_eq4s: bool = True
-    ) -> Optional[ApplyDerivationAction]:
+    ) -> Optional[ImportDerivationAction]:
         if not self._current_derivation_stack:
             if self._derivations:
                 self._current_derivation_stack = self._derivations
@@ -225,8 +247,7 @@ class BFSDDAR(DeductiveAgent):
             else:
                 return None
 
-        derived_statement, reason = self._current_derivation_stack.pop()
-        return ApplyDerivationAction(statement=derived_statement, reason=reason)
+        return ImportDerivationAction(derivation=self._current_derivation_stack.pop())
 
     def reset(self):
         self._dd_agent.reset()

@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Optional, Tuple, Type, Union
 from typing_extensions import Self
 import logging
 
-from geosolver.definitions.clause import Clause, Construction
+from geosolver.defs.clause import Clause, Construction
 from geosolver.numerical.geometries import (
     CircleNum,
     HalfLine,
@@ -18,18 +18,17 @@ from geosolver.numerical.geometries import (
     PointNum,
     reduce,
 )
-from geosolver.reasoning_engines.algebraic_reasoning import AlgebraicManipulator
-from geosolver.reasoning_engines.interface import ReasoningEngine
+from geosolver.reasoning_engines.engines_interface import ReasoningEngine
 from geosolver.statements.statement import Statement
-from geosolver.definitions.definition import Definition
+from geosolver.defs.definition import Definition
 from geosolver.theorem import Theorem
 from geosolver.predicates import Predicate
-from geosolver.agent.interface import (
+from geosolver.agent.agents_interface import (
     Action,
     Feedback,
     Mapping,
-    ApplyDerivationAction,
-    ApplyDerivationFeedback,
+    ImportDerivationAction,
+    ImportDerivationFeedback,
     ApplyTheoremAction,
     ApplyTheoremFeedback,
     AuxAction,
@@ -140,7 +139,7 @@ class Proof:
             MatchAction: self._step_match_theorem,
             ApplyTheoremAction: self._step_apply_theorem,
             ResolveEngineAction: self._step_derive,
-            ApplyDerivationAction: self._step_apply_derivation,
+            ImportDerivationAction: self._step_apply_derivation,
             AuxAction: self._step_auxiliary_construction,
             StopAction: self._step_stop,
         }
@@ -172,13 +171,12 @@ class Proof:
             try:
                 symbols_graph = SymbolsGraph()
                 dependency_cache = DependencyCache()
-                algebraic_manipulator = AlgebraicManipulator(symbols_graph)
                 statements_handler = StatementsHandler(
                     symbols_graph,
                     dependency_cache,
                     disabled_intrinsic_rules,
                 )
-                reasoning_engines = {"AR": algebraic_manipulator}
+                reasoning_engines = {}
 
                 for engine_name, engine_type in additional_reasoning_engine.items():
                     if engine_name in reasoning_engines:
@@ -332,13 +330,13 @@ class Proof:
         return DeriveFeedback(derivations)
 
     def _step_apply_derivation(
-        self, action: ApplyDerivationAction
-    ) -> ApplyDerivationFeedback:
+        self, action: ImportDerivationAction
+    ) -> ImportDerivationFeedback:
         added, to_cache = self.resolve_statement_dependencies(
-            action.statement, action.reason
+            action.derivation.statement, action.derivation.dep_body
         )
         self.cache_deps(to_cache)
-        return ApplyDerivationFeedback(added, to_cache)
+        return ImportDerivationFeedback(added, to_cache)
 
     def _step_auxiliary_construction(self, action: AuxAction) -> AuxFeedback:
         aux_clause = Clause.from_txt(action.aux_string)

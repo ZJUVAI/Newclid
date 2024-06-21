@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Callable, Generator, Optional
 import geosolver.combinatorics as comb
 
 from geosolver.predicates import Predicate
-from geosolver.agent.interface import Mapping
+from geosolver.agent.agents_interface import Mapping
 from geosolver.points_manipulation import (
     diff_point,
     intersect1,
@@ -31,7 +31,7 @@ from geosolver.numerical.check import check_ncoll_numerical, same_clock
 
 if TYPE_CHECKING:
     from geosolver.proof import Proof
-    from geosolver.definitions.clause import Clause
+    from geosolver.defs.clause import Clause
     from geosolver.theorem import Theorem
 
 

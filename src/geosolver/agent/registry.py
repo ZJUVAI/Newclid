@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Callable, Type
 
 from geosolver.agent.human_agent import HumanAgent
-from geosolver.agent.interface import DeductiveAgent
+from geosolver.agent.agents_interface import DeductiveAgent
 from geosolver.agent.breadth_first_search import BFSDD, BFSDDAR
 
 

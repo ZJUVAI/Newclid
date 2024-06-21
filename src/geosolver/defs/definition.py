@@ -1,5 +1,5 @@
 from __future__ import annotations
-from geosolver.definitions.clause import Clause, Construction
+from geosolver.defs.clause import Clause, Construction
 from geosolver.problem import reshape
 
 
