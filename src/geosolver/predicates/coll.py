@@ -8,19 +8,25 @@ from geosolver.dependencies.dependency import Reason, Dependency
 from geosolver.dependencies.why_predicates import line_of_and_why
 from geosolver.numerical import ATOM
 from geosolver.numerical.geometries import LineNum, PointNum
+
 from geosolver.predicates.predicate import Predicate, PredicateArgument
 from geosolver.intrinsic_rules import IntrinsicRules
 
 from geosolver.geometry import Point, Line
 from geosolver.combinatorics import arrangement_pairs, permutations_triplets
-from geosolver.statements.statement import Statement, hash_unordered_set_of_points
+from geosolver.statements.statement import (
+    Statement,
+    hash_unordered_set_of_points,
+    hashed_unordered_two_lines_points,
+)
+from geosolver.symbols_graph import SymbolsGraph
 
+import geosolver.predicates as preds
 
 if TYPE_CHECKING:
     from geosolver.dependencies.why_graph import WhyHyperGraph
     from geosolver.dependencies.dependency_building import DependencyBody
     from geosolver.statements.adder import ToCache
-    from geosolver.symbols_graph import SymbolsGraph
 
 
 class Coll(Predicate):
@@ -155,3 +161,51 @@ class Coll(Predicate):
         cls: Self, args: list[PredicateArgument]
     ) -> tuple[str | PredicateArgument]:
         return hash_unordered_set_of_points(cls.NAME, args)
+
+
+class Collx(Predicate):
+    NAME = "collx"
+
+    @staticmethod
+    def add(
+        *args, **kwargs
+    ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
+        return preds.Coll.add(*args, **kwargs)
+
+    @staticmethod
+    def why(
+        statements_graph: "WhyHyperGraph", statement: Statement
+    ) -> tuple[Reason | None, list[Dependency]]:
+        if preds.Coll.check(statement.args):
+            args = list(set(statement.args))
+            coll = Statement(preds.Coll.NAME, args)
+            cached_dep = statements_graph.dependency_cache.get(coll)
+            if cached_dep is not None:
+                return None, [cached_dep]
+            _, why = line_of_and_why(args)
+            return None, why
+
+        para = Statement(preds.Para.NAME, statement.args)
+        return preds.Para.why(statements_graph, para)
+
+    @staticmethod
+    def check(args: list[Point], symbols_graph: SymbolsGraph) -> bool:
+        raise NotImplementedError
+
+    @staticmethod
+    def check_numerical(args: list[PointNum]) -> bool:
+        raise NotImplementedError
+
+    @staticmethod
+    def enumerate(
+        symbols_graph: SymbolsGraph,
+    ) -> Generator[tuple[Point, ...], None, None]:
+        raise NotImplementedError
+
+    @staticmethod
+    def pretty(args: list[str]) -> str:
+        return "" + ",".join(list(set(args))) + " are collinear"
+
+    @classmethod
+    def hash(cls: Self, args: list[Point]) -> tuple[str]:
+        return hashed_unordered_two_lines_points(cls.NAME, args)

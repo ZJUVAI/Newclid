@@ -2,17 +2,8 @@
 import pytest
 import pytest_check as check
 from geosolver.api import GeometricSolverBuilder
-from geosolver.numerical.check import (
-    check_circle_numerical,
-    check_cong_numerical,
-    check_cyclic_numerical,
-    check_eqratio_numerical,
-    check_midp_numerical,
-)
-from geosolver.predicates import Coll, Para, Perp
-from geosolver.predicates.eqangle import EqAngle
+import geosolver.predicates as preds
 from geosolver.predicates.predicate import Predicate
-from geosolver.predicate_name import PredicateName
 
 
 class TestProof:
@@ -39,38 +30,21 @@ class TestProof:
         self.enumerator = self.proof.statements.enumerator
 
     @pytest.mark.slow
-    @pytest.mark.parametrize("predicate", (Coll, Para, Perp, EqAngle))
+    @pytest.mark.parametrize(
+        "predicate",
+        (
+            preds.Coll,
+            preds.Para,
+            preds.Perp,
+            preds.EqAngle,
+            preds.Cong,
+            preds.Cyclic,
+            preds.MidPoint,
+            preds.Circumcenter,
+            preds.EqRatio,
+        ),
+    )
     def test_enumerate(self, predicate: Predicate):
         for points in predicate.enumerate(self.symbols_graph):
             check.is_true(predicate.check(points))
             check.is_true(predicate.check_numerical([p.num for p in points]))
-
-    def test_enumerate_congs(self):
-        for a, b, c, d in self.enumerator.all(PredicateName.CONGRUENT):
-            check.is_true(self.checker.check_cong([a, b, c, d]))
-            check.is_true(check_cong_numerical([a.num, b.num, c.num, d.num]))
-
-    def test_enumerate_cyclics(self):
-        for a, b, c, d, x, y, z, t in self.enumerator.all(PredicateName.CYCLIC):
-            check.is_true(self.checker.check_cyclic([a, b, c, d, x, y, z, t]))
-            check.is_true(check_cyclic_numerical([a.num, b.num, c.num, d.num]))
-
-    def test_enumerate_midps(self):
-        for a, b, c in self.enumerator.all(PredicateName.MIDPOINT):
-            check.is_true(self.checker.check_midp([a, b, c]))
-            check.is_true(check_midp_numerical([a.num, b.num, c.num]))
-
-    def test_enumerate_circles(self):
-        for a, b, c, d in self.enumerator.all(PredicateName.CIRCLE):
-            check.is_true(self.checker.check_circle([a, b, c, d]))
-            check.is_true(check_circle_numerical([a.num, b.num, c.num, d.num]))
-
-    @pytest.mark.slow
-    def test_enumerate_eqratios(self):
-        for a, b, c, d, x, y, z, t in self.enumerator.all(PredicateName.EQRATIO):
-            check.is_true(self.checker.check_eqratio([a, b, c, d, x, y, z, t]))
-            check.is_true(
-                check_eqratio_numerical(
-                    [a.num, b.num, c.num, d.num, x.num, y.num, z.num, t.num]
-                )
-            )

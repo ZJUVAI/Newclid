@@ -421,30 +421,6 @@ class RatioValue(Symbol):
     _obj: Ratio
 
 
-def all_angles(
-    d1: Direction, d2: Direction
-) -> Generator[Angle, list[Direction], list[Direction]]:
-    d1s = d1.equivs_upto()
-    d2s = d2.equivs_upto()
-
-    for angle in d1.rep().neighbors(Angle):
-        d1_, d2_ = angle._d
-        if d1_ in d1s and d2_ in d2s:
-            yield angle, d1s, d2s
-
-
-def all_ratios(
-    d1: Direction, d2: Direction
-) -> Generator[Ratio, list[Direction], list[Direction]]:
-    d1s = d1.equivs_upto()
-    d2s = d2.equivs_upto()
-
-    for ratio in d1.rep().neighbors(Ratio):
-        d1_, d2_ = ratio._l
-        if d1_ in d1s and d2_ in d2s:
-            yield ratio, d1s, d2s
-
-
 def all_lengths(segment: Segment) -> Generator[Angle, list[Direction], list[Direction]]:
     equivalent_segments = segment.equivs_upto()
     for neighbor_lenght in segment.rep().neighbors(Length):

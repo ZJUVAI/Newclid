@@ -1,24 +1,15 @@
 from __future__ import annotations
-from collections import defaultdict
 from typing import TYPE_CHECKING, Generator
 
 from geosolver.combinatorics import (
     arrangement_pairs,
     cross_product,
-    permutations_pairs,
-    permutations_quadruplets,
-    permutations_triplets,
 )
 from geosolver.geometry import (
     Angle,
-    Circle,
-    Length,
     Line,
     AngleValue,
     Point,
-    Ratio,
-    Segment,
-    RatioValue,
 )
 from geosolver.predicate_name import PredicateName
 
@@ -54,14 +45,7 @@ class StatementsEnumerator:
         ]:
             return []
 
-        PREDICATE_TO_METHOD = {
-            PredicateName.MIDPOINT: self._all_midps,
-            PredicateName.CONGRUENT: self._all_congs,
-            PredicateName.CIRCLE: self._all_circles,
-            PredicateName.CYCLIC: self._all_cyclics,
-            PredicateName.EQRATIO: self._all_eqratios_8points,
-            PredicateName.EQRATIO6: self._all_eqratios_6points,
-        }
+        PREDICATE_TO_METHOD = {}
 
         if predicate not in PREDICATE_TO_METHOD:
             raise NotImplementedError(
@@ -92,161 +76,3 @@ class StatementsEnumerator:
                 for pair1, pair2 in cross_product(pairs1, pairs2):
                     (l1, l2), (l3, l4) = pair1, pair2
                     yield l1, l2, l3, l4
-
-    def _all_congs(self) -> Generator[tuple[Point, ...], None, None]:
-        for lenght in self.symbols_graph.type2nodes[Length]:
-            for s1, s2 in permutations_pairs(lenght.neighbors(Segment)):
-                (a, b), (c, d) = s1.points, s2.points
-                for x, y in [(a, b), (b, a)]:
-                    for m, n in [(c, d), (d, c)]:
-                        yield x, y, m, n
-
-    def _all_eqratios_8points(self) -> Generator[tuple[Point, ...], None, None]:
-        """List all sets of 8 points that make two equal ratios."""
-        ratss = []
-        for value in self.symbols_graph.type2nodes[RatioValue]:
-            rats = value.neighbors(Ratio)
-            ratss.append(rats)
-
-        # include the rats that do not have any val.
-        ratss.extend(
-            [[rat] for rat in self.symbols_graph.type2nodes[Ratio] if rat.val is None]
-        )
-
-        seg_pairss = []
-        for rats in ratss:
-            seg_pairs = set()
-            for rat in rats:
-                l1, l2 = rat.lengths
-                if l1 is None or l2 is None:
-                    continue
-                s1s = l1.neighbors(Segment)
-                s2s = l2.neighbors(Segment)
-                seg_pairs.update(cross_product(s1s, s2s))
-            seg_pairss.append(seg_pairs)
-
-        # include (l1, l2) in which l1 does not have any ratio.
-        norat_ls = [
-            lenght
-            for lenght in self.symbols_graph.type2nodes[Length]
-            if not lenght.neighbors(Ratio)
-        ]
-
-        for l1 in norat_ls:
-            for l2 in self.symbols_graph.type2nodes[Length]:
-                if l1 == l2:
-                    continue
-                s1s = l1.neighbors(Segment)
-                s2s = l2.neighbors(Segment)
-                if len(s1s) < 2 and len(s2s) < 2:
-                    continue
-                seg_pairss.append(set(cross_product(s1s, s2s)))
-                seg_pairss.append(set(cross_product(s2s, s1s)))
-
-        # include Seg that does not have any Length.
-        nolen_ss = [s for s in self.symbols_graph.type2nodes[Segment] if s.val is None]
-
-        for seg in nolen_ss:
-            for lenght in self.symbols_graph.type2nodes[Length]:
-                s1s = lenght.neighbors(Segment)
-                if len(s1s) == 1:
-                    continue
-                s2s = [seg]
-                seg_pairss.append(set(cross_product(s1s, s2s)))
-                seg_pairss.append(set(cross_product(s2s, s1s)))
-
-        record = set()
-        for seg_pairs in seg_pairss:
-            for pair1, pair2 in permutations_pairs(list(seg_pairs)):
-                (s1, s2), (s3, s4) = pair1, pair2
-                if s1 == s2 or s3 == s4:
-                    continue
-                if (s1, s2) == (s3, s4):
-                    continue
-                if (s1, s2, s3, s4) in record:
-                    continue
-                record.add((s1, s2, s3, s4))
-                a, b = s1.points
-                c, d = s2.points
-                e, f = s3.points
-                g, h = s4.points
-
-                for x, y in [(a, b), (b, a)]:
-                    for z, t in [(c, d), (d, c)]:
-                        for m, n in [(e, f), (f, e)]:
-                            for p, q in [(g, h), (h, g)]:
-                                yield (x, y, z, t, m, n, p, q)
-
-        segss = []
-        # finally the list of ratios that is equal to 1.0
-        for length in self.symbols_graph.type2nodes[Length]:
-            segs = length.neighbors(Segment)
-            segss.append(tuple(segs))
-
-        segs_pair = list(permutations_pairs(list(segss)))
-        segs_pair += list(zip(segss, segss))
-        for segs1, segs2 in segs_pair:
-            for s1, s2 in permutations_pairs(list(segs1)):
-                for s3, s4 in permutations_pairs(list(segs2)):
-                    if (s1, s2) == (s3, s4) or (s1, s3) == (s2, s4):
-                        continue
-                    if (s1, s2, s3, s4) in record:
-                        continue
-                    record.add((s1, s2, s3, s4))
-                    a, b = s1.points
-                    c, d = s2.points
-                    e, f = s3.points
-                    g, h = s4.points
-
-                    for x, y in [(a, b), (b, a)]:
-                        for z, t in [(c, d), (d, c)]:
-                            for m, n in [(e, f), (f, e)]:
-                                for p, q in [(g, h), (h, g)]:
-                                    yield (x, y, z, t, m, n, p, q)
-
-    def _all_eqratios_6points(self) -> Generator[tuple[Point, ...], None, None]:
-        """List all sets of 6 points that make two equal angles."""
-        record = set()
-        for a, b, c, d, e, f, g, h in self._all_eqratios_8points():
-            if (
-                a not in (c, d)
-                and b not in (c, d)
-                or e not in (g, h)
-                and f not in (g, h)
-            ):
-                continue
-            if b in (c, d):
-                a, b = b, a
-            if f in (g, h):
-                e, f = f, e
-            if a == d:
-                c, d = d, c
-            if e == h:
-                g, h = h, g
-            if (a, b, c, d, e, f, g, h) in record:
-                continue
-            record.add((a, b, c, d, e, f, g, h))
-            yield a, b, c, d, e, f, g, h  # now a==c, e==g
-
-    def _all_cyclics(self) -> Generator[tuple[Point, ...], None, None]:
-        for c in self.symbols_graph.type2nodes[Circle]:
-            for x, y, z, t in permutations_quadruplets(c.neighbors(Point)):
-                yield x, y, z, t
-
-    def _all_midps(self) -> Generator[tuple[Point, ...], None, None]:
-        for line in self.symbols_graph.type2nodes[Line]:
-            for a, b, c in permutations_triplets(line.neighbors(Point)):
-                if self.statements_checker.check_cong([a, b, a, c]):
-                    yield a, b, c
-
-    def _all_circles(self) -> Generator[tuple[Point, ...], None, None]:
-        for lenght in self.symbols_graph.type2nodes[Length]:
-            p2p = defaultdict(list)
-            for s in lenght.neighbors(Segment):
-                a, b = s.points
-                p2p[a].append(b)
-                p2p[b].append(a)
-            for p, ps in p2p.items():
-                if len(ps) >= 3:
-                    for a, b, c in permutations_triplets(ps):
-                        yield p, a, b, c

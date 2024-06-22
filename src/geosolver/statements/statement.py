@@ -161,30 +161,14 @@ def hash_triangle(
     return (name, a, b, c, x, y, z)
 
 
-def hash_eqratio_3(
-    name: str, args: tuple[P, P, P, P, P, P]
-) -> tuple[str, P, P, P, P, P, P]:
-    a, b, c, d, o, o = args
-    (a, c), (b, d) = sorted([(a, c), (b, d)], key=sorted)
-    (a, b), (c, d) = sorted([(a, b), (c, d)], key=sorted)
-    return (name, a, b, c, d, o, o)
-
-
 PREDICATE_TO_HASH = {
-    PredicateName.CONGRUENT: hashed_unordered_two_lines_points,
-    PredicateName.CONGRUENT_2: hashed_unordered_two_lines_points,
     PredicateName.NON_PARALLEL: hashed_unordered_two_lines_points,
     PredicateName.NON_PERPENDICULAR: hashed_unordered_two_lines_points,
-    PredicateName.CYCLIC: hash_unordered_set_of_points,
     PredicateName.NON_COLLINEAR: hash_unordered_set_of_points,
     PredicateName.DIFFERENT: hash_unordered_set_of_points,
-    PredicateName.CIRCLE: hash_point_then_set_of_points,
-    PredicateName.MIDPOINT: hash_point_and_line,
     PredicateName.CONSTANT_ANGLE: hash_ordered_two_lines_with_value,
     PredicateName.CONSTANT_RATIO: hash_ordered_two_lines_with_value,
     PredicateName.CONSTANT_LENGTH: hash_unordered_set_of_points_with_value,
-    PredicateName.EQRATIO: hash_two_times_two_unorded_lines,
-    PredicateName.EQRATIO6: hash_two_times_two_unorded_lines,
     PredicateName.SAMESIDE: hash_ordered_list_of_points,
     PredicateName.S_ANGLE: hash_ordered_list_of_points,
     PredicateName.SIMILAR_TRIANGLE: hash_triangle,
@@ -193,7 +177,6 @@ PREDICATE_TO_HASH = {
     PredicateName.CONTRI_TRIANGLE: hash_triangle,
     PredicateName.CONTRI_TRIANGLE_REFLECTED: hash_triangle,
     PredicateName.CONTRI_TRIANGLE_BOTH: hash_triangle,
-    PredicateName.EQRATIO3: hash_eqratio_3,
 }
 
 

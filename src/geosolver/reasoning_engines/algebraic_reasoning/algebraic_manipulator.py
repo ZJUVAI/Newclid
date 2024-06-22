@@ -3,9 +3,8 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 
+import geosolver.predicates as preds
 from geosolver.dependencies.dependency import Dependency, Reason
-from geosolver.predicates import Para, Perp
-from geosolver.predicates.eqangle import EqAngle
 from geosolver.reasoning_engines.engines_interface import Derivation, ReasoningEngine
 from geosolver.predicate_name import PredicateName
 from geosolver.dependencies.dependency_building import DependencyBody
@@ -44,11 +43,11 @@ class AlgebraicManipulator(ReasoningEngine):
         self.verbose = config.get("verbose", "")
 
         self.PREDICATE_TO_ADDER = {
-            Para.NAME: self._add_para,
-            Perp.NAME: self._add_perp,
-            PredicateName.CONGRUENT: self._add_cong,
-            EqAngle.NAME: self._add_eqangle,
-            PredicateName.EQRATIO: self._add_eqratio,
+            preds.Para.NAME: self._add_para,
+            preds.Perp.NAME: self._add_perp,
+            preds.Cong.NAME: self._add_cong,
+            preds.EqAngle.NAME: self._add_eqangle,
+            preds.EqRatio.NAME: self._add_eqratio,
             PredicateName.CONSTANT_ANGLE: self._add_aconst,
             PredicateName.S_ANGLE: self._add_aconst,
             PredicateName.CONSTANT_RATIO: self._add_rconst,
@@ -95,7 +94,7 @@ class AlgebraicManipulator(ReasoningEngine):
                     continue
 
                 (m, n), (p, q) = mn._obj.points, pq._obj.points
-                cong = Statement(PredicateName.CONGRUENT_2, (m, n, p, q))
+                cong = Statement(preds.Cong.NAME_2, (m, n, p, q))
                 added.append(Derivation(cong, dep))
 
             if len(x) == 4:
@@ -106,7 +105,7 @@ class AlgebraicManipulator(ReasoningEngine):
                     *mn._obj.points,
                     *pq._obj.points,
                 )
-                eqratio = Statement(PredicateName.EQRATIO, points)
+                eqratio = Statement(preds.EqRatio.NAME, points)
                 added.append(Derivation(eqratio, dep))
 
         return added
@@ -125,7 +124,7 @@ class AlgebraicManipulator(ReasoningEngine):
                     continue
 
                 points = (*ab._obj.points, *cd._obj.points)
-                para = Statement(Para.NAME, points)
+                para = Statement(preds.Para.NAME, points)
                 if not check_numerical(para):
                     continue
 
@@ -150,7 +149,7 @@ class AlgebraicManipulator(ReasoningEngine):
                     *mn._obj.points,
                     *pq._obj.points,
                 )
-                eqangle = Statement(EqAngle.NAME, points)
+                eqangle = Statement(preds.EqAngle.NAME, points)
                 added.append(Derivation(eqangle, dep))
 
         return added
@@ -174,7 +173,7 @@ class AlgebraicManipulator(ReasoningEngine):
                 a, b, c, d = x
                 if not (a != b and c != d and (a != c or b != d)):
                     continue
-                cong = Statement(PredicateName.CONGRUENT, (a, b, c, d))
+                cong = Statement(preds.Cong.NAME, (a, b, c, d))
                 added.append(Derivation(cong, dep))
 
             if len(x) == 6:

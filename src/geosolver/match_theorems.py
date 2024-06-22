@@ -4,9 +4,8 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Callable, Generator, Optional
 
 import geosolver.combinatorics as comb
+import geosolver.predicates as preds
 
-from geosolver.predicates.coll import Coll
-from geosolver.predicates.eqangle import EqAngle6
 from geosolver.predicate_name import PredicateName
 from geosolver.agent.agents_interface import Mapping
 from geosolver.points_manipulation import (
@@ -164,29 +163,30 @@ def match_circle_coll_eqangle_midp(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match circle O A B C, coll M B C, eqangle A B A C O B O M => midp M B C."""
-    for p, a, b, c in proof.statements.enumerator.all(PredicateName.CIRCLE):
-        ab = proof.symbols_graph.get_line(a, b)
+    symbols_graph = proof.symbols_graph
+    for p, a, b, c in preds.Circumcenter.enumerate(symbols_graph):
+        ab = symbols_graph.get_line(a, b)
         if ab is None:
             continue
         if ab.val is None:
             continue
-        ac = proof.symbols_graph.get_line(a, c)
+        ac = symbols_graph.get_line(a, c)
         if ac is None:
             continue
         if ac.val is None:
             continue
-        pb = proof.symbols_graph.get_line(p, b)
+        pb = symbols_graph.get_line(p, b)
         if pb is None:
             continue
         if pb.val is None:
             continue
 
-        bc = proof.symbols_graph.get_line(b, c)
+        bc = symbols_graph.get_line(b, c)
         if bc is None:
             continue
         bc_points = bc.neighbors(Point, return_set=True)
 
-        anga, _ = proof.symbols_graph.get_angle(ab.val, ac.val)
+        anga, _ = symbols_graph.get_angle(ab.val, ac.val)
 
         for angp in pb.val.neighbors(Angle):
             if not is_equal(anga, angp):
@@ -238,14 +238,15 @@ def match_circle_eqangle_perp(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match circle O A B C, eqangle A X A B C A C B => perp O A A X."""
-    for p, a, b, c in proof.statements.enumerator.all(PredicateName.CIRCLE):
-        ca = proof.symbols_graph.get_line(c, a)
+    symbols_graph = proof.symbols_graph
+    for p, a, b, c in preds.Circumcenter.enumerate(symbols_graph):
+        ca = symbols_graph.get_line(c, a)
         if ca is None:
             continue
-        cb = proof.symbols_graph.get_line(c, b)
+        cb = symbols_graph.get_line(c, b)
         if cb is None:
             continue
-        ab = proof.symbols_graph.get_line(a, b)
+        ab = symbols_graph.get_line(a, b)
         if ab is None:
             continue
 
@@ -256,7 +257,7 @@ def match_circle_eqangle_perp(
         if ab.val is None:
             continue
 
-        c_ang, _ = proof.symbols_graph.get_angle(cb.val, ca.val)
+        c_ang, _ = symbols_graph.get_angle(cb.val, ca.val)
         if c_ang is None:
             continue
 
@@ -279,14 +280,15 @@ def match_circle_perp_eqangle(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match circle O A B C, perp O A A X => eqangle A X A B C A C B."""
-    for p, a, b, c in proof.statements.enumerator.all(PredicateName.CIRCLE):
-        pa = proof.symbols_graph.get_line(p, a)
+    symbols_graph = proof.symbols_graph
+    for p, a, b, c in preds.Circumcenter.enumerate(symbols_graph):
+        pa = symbols_graph.get_line(p, a)
         if pa is None:
             continue
         if pa.val is None:
             continue
         for line_neighbor in a.neighbors(Line):
-            if proof.statements.checker.check_perpl(pa, line_neighbor):
+            if preds.Perp.check_perpl(pa, line_neighbor, symbols_graph):
                 x = diff_point(line_neighbor, a)
                 if x is not None:
                     yield dict(zip("OABCX", [p, a, b, c, x]))
@@ -427,7 +429,7 @@ def match_cyclic_eqangle(
 ) -> Generator[dict[str, Point], None, None]:
     """Match cyclic A B P Q => eqangle P A P B Q A Q B."""
     record = set()
-    for a, b, c, d in g_matcher(PredicateName.CYCLIC.value):
+    for a, b, c, d in g_matcher(preds.Cyclic.NAME):
         if (a, b, c, d) in record:
             continue
         record.add((a, b, c, d))
@@ -463,7 +465,7 @@ def match_cong_cong_cong_ncoll_contri(
 ) -> Generator[dict[str, Point], None, None]:
     """Match cong A B P Q, cong B C Q R, cong C A R P, ncoll A B C => contri* A B C P Q R."""
     record = set()
-    for a, b, p, q in g_matcher(PredicateName.CONGRUENT.value):
+    for a, b, p, q in g_matcher(preds.Cong.NAME):
         for c in proof.symbols_graph.type2nodes[Point]:
             for r in proof.symbols_graph.type2nodes[Point]:
                 if any([x in record for x in rotate_simtri(a, b, c, p, q, r)]):
@@ -484,7 +486,7 @@ def match_cong_cong_eqangle6_ncoll_contri(
 ) -> Generator[dict[str, Point], None, None]:
     """Match cong A B P Q, cong B C Q R, eqangle6 B A B C Q P Q R, ncoll A B C => contri* A B C P Q R."""
     record = set()
-    for a, b, p, q in g_matcher(PredicateName.CONGRUENT.value):
+    for a, b, p, q in g_matcher(preds.Cong.NAME):
         for c in proof.symbols_graph.type2nodes[Point]:
             if c in (a, b):
                 continue
@@ -526,7 +528,7 @@ def match_eqratio6_eqangle6_ncoll_simtri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R."""
-    enums = g_matcher(PredicateName.EQRATIO6.value)
+    enums = g_matcher(preds.EqRatio6.NAME)
 
     record = set()
     for b, a, b, c, q, p, q, r in enums:
@@ -552,7 +554,7 @@ def match_eqangle6_eqangle6_ncoll_simtri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 B A B C Q P Q R, eqangle6 C A C B R P R Q, ncoll A B C => simtri A B C P Q R."""
-    enums = g_matcher(EqAngle6.NAME)
+    enums = g_matcher(preds.EqAngle6.NAME)
 
     record = set()
     for b, a, b, c, q, p, q, r in enums:
@@ -576,7 +578,7 @@ def match_eqratio6_eqratio6_ncoll_simtri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R."""
-    enums = g_matcher(PredicateName.EQRATIO6.value)
+    enums = g_matcher(preds.EqRatio6.NAME)
 
     record = set()
     for b, a, b, c, q, p, q, r in enums:
@@ -600,7 +602,7 @@ def match_eqangle6_eqangle6_ncoll_simtri2(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C => simtri2 A B C P Q R."""
-    enums = g_matcher(EqAngle6.NAME)
+    enums = g_matcher(preds.EqAngle6.NAME)
 
     record = set()
     for b, a, b, c, q, r, q, p in enums:
@@ -624,7 +626,7 @@ def match_eqangle6_eqangle6_ncoll_cong_contri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 B A B C Q P Q R, eqangle6 C A C B R P R Q, ncoll A B C, cong A B P Q => contri A B C P Q R."""
-    enums = g_matcher(EqAngle6.NAME)
+    enums = g_matcher(preds.EqAngle6.NAME)
 
     record = set()
     for b, a, b, c, q, p, q, r in enums:
@@ -651,7 +653,7 @@ def match_eqratio6_eqratio6_ncoll_cong_contri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C, cong A B P Q => contri* A B C P Q R."""
-    enums = g_matcher(PredicateName.EQRATIO6.value)
+    enums = g_matcher(preds.EqRatio6.NAME)
 
     record = set()
     for b, a, b, c, q, p, q, r in enums:
@@ -678,7 +680,7 @@ def match_eqangle6_eqangle6_ncoll_cong_contri2(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C, cong A B P Q => contri2 A B C P Q R."""
-    enums = g_matcher(EqAngle6.NAME)
+    enums = g_matcher(preds.EqAngle6.NAME)
 
     record = set()
     for b, a, b, c, q, r, q, p in enums:
@@ -705,7 +707,7 @@ def match_eqratio6_coll_ncoll_eqangle6(
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqratio6 d b d c a b a c, coll d b c, ncoll a b c => eqangle6 a b a d a d a c."""
     records = set()
-    for b, d, c in g_matcher(Coll.NAME):
+    for b, d, c in g_matcher(preds.Coll.NAME):
         for a in proof.symbols_graph.all_points():
             if proof.statements.checker.check_coll([a, b, c]):
                 continue
@@ -724,7 +726,7 @@ def match_eqangle6_coll_ncoll_eqratio6(
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 a b a d a d a c, coll d b c, ncoll a b c => eqratio6 d b d c a b a c."""
     records = set()
-    for b, d, c in g_matcher(Coll.NAME):
+    for b, d, c in g_matcher(preds.Coll.NAME):
         for a in proof.symbols_graph.all_points():
             if proof.statements.checker.check_coll([a, b, c]):
                 continue
@@ -742,7 +744,7 @@ def match_eqangle6_ncoll_cyclic(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 P A P B Q A Q B, ncoll P Q A B => cyclic A B P Q."""
-    for a, b, a, c, x, y, x, z in g_matcher(EqAngle6.NAME):
+    for a, b, a, c, x, y, x, z in g_matcher(preds.EqAngle6.NAME):
         if (b, c) != (y, z) or a == x:
             continue
         if check_ncoll_numerical([x.num for x in [a, b, c, x]]):

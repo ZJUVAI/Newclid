@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING, Any, Optional
 
 import geosolver.geometry as gm
 import geosolver.predicates as preds
-from geosolver.predicate_name import PredicateName
 from geosolver.numerical.angles import ang_of
 from geosolver.numerical.check import clock
 from geosolver.numerical.geometries import (
@@ -326,7 +325,7 @@ def highlight(
     """Draw highlights."""
     args = list(map(lambda x: x.num if isinstance(x, gm.Point) else x, args))
 
-    if name == PredicateName.CYCLIC.value:
+    if name == preds.Cyclic.NAME:
         a, b, c, d = args
         _draw_circle(ax, CircleNum(p1=a, p2=b, p3=c), color=color1, lw=2.0)
     if name == preds.Coll.NAME:
@@ -372,15 +371,15 @@ def highlight(
         a, b, c, d, m, n = args
         _draw_line(ax, a, b, color=color1, lw=2.0)
         _draw_line(ax, c, d, color=color2, lw=2.0)
-    if name == PredicateName.CONGRUENT.value:
+    if name == preds.Cong.NAME:
         a, b, c, d = args
         _draw_line(ax, a, b, color=color1, lw=2.0)
         _draw_line(ax, c, d, color=color2, lw=2.0)
-    if name == PredicateName.MIDPOINT.value:
+    if name == preds.MidPoint.NAME:
         m, a, b = args
         _draw_line(ax, a, m, color=color1, lw=2.0, alpha=0.5)
         _draw_line(ax, b, m, color=color2, lw=2.0, alpha=0.5)
-    if name == PredicateName.EQRATIO.value:
+    if name == preds.EqRatio.NAME:
         a, b, c, d, m, n, p, q = args
         _draw_line(ax, a, b, color=color1, lw=2.0, alpha=0.5)
         _draw_line(ax, c, d, color=color2, lw=2.0, alpha=0.5)

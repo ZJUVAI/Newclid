@@ -1,7 +1,9 @@
 from __future__ import annotations
 from typing import Optional
 from geosolver.defs.clause import Construction
+
 from geosolver.predicate_name import PredicateName
+import geosolver.predicates as preds
 
 
 class Theorem:
@@ -17,8 +19,8 @@ class Theorem:
         self.conclusion = conclusion[0]
 
         if self.conclusion.name in [
-            PredicateName.EQRATIO3.value,
-            PredicateName.MIDPOINT.value,
+            preds.EqRatio3.NAME,
+            preds.MidPoint.NAME,
             PredicateName.CONTRI_TRIANGLE.value,
             PredicateName.SIMILAR_TRIANGLE.value,
             PredicateName.CONTRI_TRIANGLE_REFLECTED.value,

@@ -1,28 +1,24 @@
 from typing import TYPE_CHECKING
 
 import geosolver.predicates as preds
+from geosolver.predicates.eqangle import all_angles
+from geosolver.predicates.eqratio import all_ratios
 from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
 from geosolver.predicate_name import PredicateName
 from geosolver.geometry import (
     Angle,
-    Circle,
     Length,
     Point,
     Ratio,
-    all_angles,
     all_lengths,
-    all_ratios,
 )
 from geosolver.numerical.check import check_sameside_numerical
 
-from geosolver.listing import list_eqratio3
 from geosolver.symbols_graph import is_equal
 
 
 if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
-
-from collections import defaultdict
 
 
 class StatementChecker:
@@ -32,13 +28,6 @@ class StatementChecker:
     ) -> None:
         self.symbols_graph = symbols_graph
         self.PREDICATE_TO_CHECK = {
-            PredicateName.MIDPOINT: self.check_midp,
-            PredicateName.CONGRUENT: self.check_cong,
-            PredicateName.CIRCLE: self.check_circle,
-            PredicateName.CYCLIC: self.check_cyclic,
-            PredicateName.EQRATIO: self.check_const_or_eqratio,
-            PredicateName.EQRATIO3: self.check_eqratio3,
-            PredicateName.EQRATIO6: self.check_const_or_eqratio,
             PredicateName.SIMILAR_TRIANGLE: self.check_simtri,
             PredicateName.SIMILAR_TRIANGLE_REFLECTED: self.check_simtri_reflected,
             PredicateName.SIMILAR_TRIANGLE_BOTH: self.check_simtri_both,
@@ -61,80 +50,6 @@ class StatementChecker:
     def check(self, statement: Statement) -> bool:
         """Symbolically check if a predicate is True."""
         return self.PREDICATE_TO_CHECK[statement.predicate](statement.args)
-
-    def check_const_or_eqratio(self, args: list[Point]) -> bool:
-        if len(args) == 5:
-            return self.check_rconst(args)
-        return self.check_eqratio(args)
-
-    # Basic checks
-
-    def check_cong(self, points: list[Point]) -> bool:
-        a, b, c, d = points
-        if {a, b} == {c, d}:
-            return True
-
-        ab = self.symbols_graph.get_segment(a, b)
-        cd = self.symbols_graph.get_segment(c, d)
-        if ab is None or cd is None:
-            return False
-        return is_equal(ab, cd)
-
-    # Angles and ratios checks
-
-    def check_eqratio(self, points: list[Point]) -> bool:
-        """Check if 8 points make an eqratio predicate."""
-        a, b, c, d, m, n, p, q = points
-
-        if {a, b} == {c, d} and {m, n} == {p, q}:
-            return True
-        if {a, b} == {m, n} and {c, d} == {p, q}:
-            return True
-
-        ab = self.symbols_graph.get_segment(a, b)
-        cd = self.symbols_graph.get_segment(c, d)
-        mn = self.symbols_graph.get_segment(m, n)
-        pq = self.symbols_graph.get_segment(p, q)
-
-        if {a, b} == {c, d} and mn and pq and is_equal(mn, pq):
-            return True
-        if {a, b} == {m, n} and cd and pq and is_equal(cd, pq):
-            return True
-        if {p, q} == {m, n} and ab and cd and is_equal(ab, cd):
-            return True
-        if {p, q} == {c, d} and ab and mn and is_equal(ab, mn):
-            return True
-
-        if not ab or not cd or not mn or not pq:
-            return False
-
-        if is_equal(ab, cd) and is_equal(mn, pq):
-            return True
-        if is_equal(ab, mn) and is_equal(cd, pq):
-            return True
-
-        if not (ab.val and cd.val and mn.val and pq.val):
-            return False
-
-        if (ab.val, cd.val) == (mn.val, pq.val) or (ab.val, mn.val) == (
-            cd.val,
-            pq.val,
-        ):
-            return True
-
-        for rat1, _, _ in all_ratios(ab._val, cd._val):
-            for rat2, _, _ in all_ratios(mn._val, pq._val):
-                if is_equal(rat1, rat2):
-                    return True
-        return False
-
-    def check_eqratio3(self, points: list[Point]) -> bool:
-        for ratio in list_eqratio3(points):
-            if not self.check_eqratio(ratio):
-                return False
-        return True
-
-    # Algebraic checks
 
     def check_aconst(self, points: tuple[Point, Point, Point, Point, Angle]) -> bool:
         """Check if the angle is equal to a certain constant."""
@@ -242,28 +157,6 @@ class StatementChecker:
                 if ab.val == l1 and cd.val == l2:
                     return True
         return False
-
-    # High order checks
-
-    def check_midp(self, points: list[Point]) -> bool:
-        if not self.check_coll(points):
-            return False
-        m, a, b = points
-        return self.check_cong([m, a, m, b])
-
-    def check_circle(self, points: list[Point]) -> bool:
-        o, a, b, c = points
-        return self.check_cong([o, a, o, b]) and self.check_cong([o, a, o, c])
-
-    def check_cyclic(self, points: list[Point]) -> bool:
-        points = list(set(points))
-        if len(points) < 4:
-            return True
-        circle2count = defaultdict(lambda: 0)
-        for p in points:
-            for c in p.neighbors(Circle):
-                circle2count[c] += 1
-        return any([count == len(points) for _, count in circle2count.items()])
 
     def check_simtri(self, points: list[Point]) -> bool:
         a, b, c, x, y, z = points

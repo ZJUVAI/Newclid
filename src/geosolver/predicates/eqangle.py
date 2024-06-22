@@ -16,12 +16,12 @@ from geosolver.geometry import (
     Direction,
     Line,
     Point,
-    all_angles,
     bfs_backtrack,
 )
 from geosolver.intrinsic_rules import IntrinsicRules
 from geosolver.numerical import close_enough
 from geosolver.numerical.geometries import LineNum, PointNum, bring_together
+import geosolver.predicates.coll
 from geosolver.predicates.predicate import Predicate
 from geosolver.pretty_angle import pretty_angle
 from geosolver.statements.adder import ToCache, maybe_make_equal_pairs
@@ -40,6 +40,18 @@ if TYPE_CHECKING:
     import numpy
 
 np: "numpy" = lazy_import("numpy")
+
+
+def all_angles(
+    d1: Direction, d2: Direction
+) -> Generator[Angle, list[Direction], list[Direction]]:
+    d1s = d1.equivs_upto()
+    d2s = d2.equivs_upto()
+
+    for angle in d1.rep().neighbors(Angle):
+        d1_, d2_ = angle._d
+        if d1_ in d1s and d2_ in d2s:
+            yield angle, d1s, d2s
 
 
 class EqAngle(Predicate):
@@ -84,8 +96,10 @@ class EqAngle(Predicate):
             )
 
         if IntrinsicRules.PARA_FROM_EQANGLE not in disabled_intrinsic_rules:
+            points = (a, b, c, d, m, n, p, q)
+            lines = (ab, cd, mn, pq)
             maybe_pairs = maybe_make_equal_pairs(
-                a, b, c, d, m, n, p, q, ab, cd, mn, pq, dep_body
+                *points, *lines, dep_body, dep_graph, symbols_graph
             )
             if maybe_pairs is not None:
                 return maybe_pairs
@@ -247,7 +261,7 @@ class EqAngle(Predicate):
             x_, y_ = xy.points
             if {x, y} == {x_, y_}:
                 continue
-            collx = Statement(preds.Collx.NAME, [x, y, x_, y_])
+            collx = Statement(geosolver.predicates.coll.Collx.NAME, [x, y, x_, y_])
             collx_dep = statements_graph.build_dependency_from_statement(
                 collx, why=whyxy, reason=Reason("_why_eqangle_collx")
             )
@@ -500,28 +514,10 @@ class EqAngle(Predicate):
         return hash_two_times_two_unorded_lines(cls.NAME, args)
 
 
-class EqAngle6(Predicate):
+class EqAngle6(EqAngle):
     """eqangle6 AB CD EF -"""
 
     NAME = "eqangle6"
-
-    @staticmethod
-    def add(
-        *args, **kwargs
-    ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
-        return EqAngle.add(*args, **kwargs)
-
-    @staticmethod
-    def why(*args, **kwargs) -> tuple[Optional[Reason], list[Dependency]]:
-        return EqAngle.why(*args, **kwargs)
-
-    @staticmethod
-    def check(*args, **kwargs) -> bool:
-        return EqAngle.check(*args, **kwargs)
-
-    @staticmethod
-    def check_numerical(*args, **kwargs) -> bool:
-        return EqAngle.check_numerical(*args, **kwargs)
 
     @staticmethod
     def enumerate(symbols_graph: SymbolsGraph) -> Generator[ToCache[Point], None, None]:
@@ -548,10 +544,6 @@ class EqAngle6(Predicate):
                 continue
             record.add((a, b, c, d, e, f, g, h))
             yield a, b, c, d, e, f, g, h  # where a==c, e==g
-
-    @staticmethod
-    def pretty(*args, **kwargs) -> str:
-        return EqAngle.pretty(*args, **kwargs)
 
     @classmethod
     def hash(cls: Self, args: list[Point]) -> tuple[str, ...]:
@@ -619,7 +611,7 @@ def why_eqangle_directions(
         xy, xy_ = d_xy._obj, d_xy_._obj
         if why:
             if xy == xy_:
-                predicate = preds.Collx.NAME
+                predicate = geosolver.predicates.coll.Collx.NAME
             else:
                 predicate = preds.Para.NAME
             because_statement = Statement(predicate, [x_, y_, x, y])

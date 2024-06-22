@@ -2,22 +2,6 @@ from enum import Enum
 
 
 class PredicateName(Enum):
-    MIDPOINT = "midp"
-    """midp M A B - True if the M is the midpoint of the segment AB. Can be equivalent to coll M A B + cong A M B M."""
-    CONGRUENT = "cong"
-    """cong A B C D - True if segments AB and CD are congruent."""
-    CONGRUENT_2 = "cong2"
-    CIRCLE = "circle"
-    """circle O A B C - True if O is the center of the circle through A, B, and C (circumcenter of triangle ABC). Can be equivalent to cong O A O B + cong O A O C, and equivalent pairs of congruences."""
-    CYCLIC = "cyclic"
-    """cyclic A B C D - True if the 4 (or more) points in the arguments lie on the same circle."""
-    EQANGLE6 = "eqangle6"
-    EQRATIO = "eqratio"
-    """eqratio A B C D E F G H - True if AB/CD=EF/GH, as ratios between lengths of segments."""
-    EQRATIO6 = "eqratio6"
-    EQRATIO3 = "eqratio3"
-    """eqratio3 A B C D M N - True in an instance of Thales theorem which has AB//MN//CD. It adds the corresponding eqratios to MA/MC=NB/ND, AM/AC=BN/BD, and MC/AC=ND/BD. See _add_eqratio3 in adder.py."""
-    EQRATIO4 = "eqratio4"
     SIMILAR_TRIANGLE = "simtri"
     """simtri A B C P Q R - True if triangles ABC and PQR are similar under orientation-preserving transformations taking A to P, B to Q and C to R. It is equivalent to the three eqangle and eqratio predicates on the corresponding angles and sides."""
     SIMILAR_TRIANGLE_REFLECTED = "simtri2"

@@ -9,6 +9,7 @@ from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.geometry import Angle, Line, Point
 from geosolver.intrinsic_rules import IntrinsicRules
 from geosolver.numerical.geometries import LineNum, PointNum
+import geosolver.predicates.coll
 from geosolver.predicates.predicate import Predicate
 from geosolver.statements.statement import Statement, hashed_unordered_two_lines_points
 from geosolver.symbols_graph import SymbolsGraph, is_equal
@@ -232,7 +233,7 @@ class Perp(Predicate):
 
             if {x, y} == {x_, y_}:
                 continue
-            collx = Statement(preds.Collx.NAME, [x, y, x_, y_])
+            collx = Statement(geosolver.predicates.coll.Collx.NAME, [x, y, x_, y_])
             why_perp.append(
                 statements_graph.build_resolved_dependency(collx, use_cache=False)
             )

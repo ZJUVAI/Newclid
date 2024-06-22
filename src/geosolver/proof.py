@@ -277,7 +277,7 @@ class Proof:
         premise: "Construction",
         p_args: list["Point"],
     ) -> Tuple[Optional[Dependency], bool]:
-        if premise.name in [preds.Para.NAME, PredicateName.CONGRUENT.value]:
+        if premise.name in [preds.Para.NAME, preds.Cong.NAME]:
             a, b, c, d = p_args
             if {a, b} == {c, d}:
                 return None, False
@@ -428,7 +428,7 @@ class Proof:
     def additionally_draw(self, name: str, args: list[Point]) -> None:
         """Draw some extra line/circles for illustration purpose."""
 
-        if name in [PredicateName.CIRCLE.value]:
+        if name in [preds.Circumcenter.NAME]:
             center, point = args[:2]
             circle = self.symbols_graph.new_node(
                 Circle, f"({center.name},{point.name})"
@@ -518,7 +518,7 @@ class Proof:
 
             mapping = dict(zip(cdef.construction.args, clause_construction.args))
             c_name = (
-                PredicateName.MIDPOINT.value
+                preds.MidPoint.NAME
                 if clause_construction.name == "midpoint"
                 else clause_construction.name
             )

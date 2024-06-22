@@ -2,7 +2,6 @@
 
 import geosolver.predicates as preds
 from geosolver.predicate_name import PredicateName
-from geosolver.listing import list_eqratio3
 from geosolver.pretty_angle import pretty_angle
 
 
@@ -11,13 +10,13 @@ MAP_SYMBOL = {
     "X": preds.Collx.NAME,
     "P": preds.Para.NAME,
     "T": preds.Perp.NAME,
-    "M": PredicateName.MIDPOINT.value,
-    "D": PredicateName.CONGRUENT.value,
-    "I": PredicateName.CIRCLE.value,
-    "O": PredicateName.CYCLIC.value,
+    "M": preds.MidPoint.NAME,
+    "D": preds.Cong.NAME,
+    "I": preds.Circumcenter.NAME,
+    "O": preds.Cyclic.NAME,
     "^": preds.EqAngle.NAME,
-    "/": PredicateName.EQRATIO.value,
-    "%": PredicateName.EQRATIO.value,
+    "/": preds.EqRatio.NAME,
+    "%": preds.EqRatio.NAME,
     "S": PredicateName.SIMILAR_TRIANGLE.value,
     "=": PredicateName.CONTRI_TRIANGLE.value,
     "A": PredicateName.COMPUTE_ANGLE.value,
@@ -70,18 +69,6 @@ def pretty_nl(name: str, args: list[str]) -> str:
     if name == PredicateName.COMPUTE_ANGLE.value:
         a, b, c, d = args
         return f"{pretty_angle(a, b, c, d)}"
-    if name in [PredicateName.CYCLIC.value, "O"]:
-        return "" + ",".join(args) + " are concyclic"
-    if name in [PredicateName.MIDPOINT.value, "midpoint", "M"]:
-        x, a, b = args
-        return f"{x} is midpoint of {a}{b}"
-    if name in [PredicateName.EQRATIO.value, PredicateName.EQRATIO6.value, "/"]:
-        return _ratio_pretty(args)
-    if name == PredicateName.EQRATIO3.value:
-        return " & ".join(_ratio_pretty(ratio) for ratio in list_eqratio3(args))
-    if name in [PredicateName.CONGRUENT.value, "D"]:
-        a, b, c, d = args
-        return f"{a}{b} = {c}{d}"
     if name in [
         PredicateName.SIMILAR_TRIANGLE_REFLECTED.value,
         PredicateName.SIMILAR_TRIANGLE.value,
@@ -96,17 +83,11 @@ def pretty_nl(name: str, args: list[str]) -> str:
     ]:
         a, b, c, x, y, z = args
         return f"\u0394{a}{b}{c} is congruent to \u0394{x}{y}{z}"
-    if name in [PredicateName.CIRCLE.value, "I"]:
-        o, a, b, c = args
-        return f"{o} is the circumcenter of \\Delta {a}{b}{c}"
+
     if name == "foot":
         a, b, c, d = args
         return f"{a} is the foot of {b} on {c}{d}"
     raise NotImplementedError(f"Cannot write pretty name for {name}")
-
-
-def _ratio_pretty(args: list[str]):
-    return "{}{}:{}{} = {}{}:{}{}".format(*args)
 
 
 def pretty(txt: tuple[str, ...]) -> str:
@@ -140,21 +121,21 @@ def pretty(txt: tuple[str, ...]) -> str:
         return "C " + " ".join(args)
     if name == preds.Collx.NAME:
         return "X " + " ".join(args)
-    if name == PredicateName.CYCLIC.value:
+    if name == preds.Cyclic.NAME:
         return "O " + " ".join(args)
-    if name in [PredicateName.MIDPOINT.value, "midpoint"]:
+    if name in [preds.MidPoint.NAME, "midpoint"]:
         x, a, b = args
         return f"M {x} {a} {b}"
     if name == preds.EqAngle.NAME:
         a, b, c, d, e, f, g, h = args
         return f"^ {pretty2a(a, b, c, d)} {pretty2a(e, f, g, h)}"
-    if name == PredicateName.EQRATIO.value:
+    if name == preds.EqRatio.NAME:
         a, b, c, d, e, f, g, h = args
         return f"/ {pretty2r(a, b, c, d)} {pretty2r(e, f, g, h)}"
-    if name == PredicateName.EQRATIO3.value:
+    if name == preds.EqRatio3.NAME:
         a, b, c, d, o, o = args
         return f"S {o} {a} {b} {o} {c} {d}"
-    if name == PredicateName.CONGRUENT.value:
+    if name == preds.Cong.NAME:
         a, b, c, d = args
         return f"D {a} {b} {c} {d}"
     if name == preds.Perp.NAME:
@@ -183,7 +164,7 @@ def pretty(txt: tuple[str, ...]) -> str:
     ]:
         a, b, c, x, y, z = args
         return f"= {a} {b} {c} {x} {y} {z}"
-    if name == PredicateName.CIRCLE.value:
+    if name == preds.Circumcenter.NAME:
         o, a, b, c = args
         return f"I {o} {a} {b} {c}"
     if name == "foot":
