@@ -6,8 +6,8 @@ from enum import Enum
 class ArgType(Enum):
     POINT = "Point"
     RATIO = "Ratio"
-    Angle = "Angle"
-    Length = "Length"
+    ANGLE = "Angle"
+    LENGTH = "Length"
 
 
 @dataclass

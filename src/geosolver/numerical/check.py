@@ -7,9 +7,8 @@ import geosolver.geometry as gm
 
 
 from geosolver.numerical import close_enough
-from geosolver.numerical.angles import ang_between
 from geosolver.numerical.geometries import PointNum, bring_together
-from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
+from geosolver.statements.statement import Statement
 
 from geosolver._lazy_loading import lazy_import
 
@@ -21,27 +20,6 @@ np: "numpy" = lazy_import("numpy")
 
 def check_ncoll_numerical(points: list[PointNum]) -> bool:
     return not preds.Coll.check_numerical(points)
-
-
-def check_sangle_numerical(args: list[PointNum | gm.Angle]) -> bool:
-    a, b, c, angle = args
-    num, den = angle_to_num_den(angle)
-    ang = ang_between(b, c, a)
-    # if ang < -ATOM:
-    if ang < 0:
-        ang += np.pi
-    return close_enough(ang, num * np.pi / den)
-
-
-def check_aconst_numerical(args: list[PointNum | gm.Angle]) -> bool:
-    a, b, c, d, angle = args
-    num, den = angle_to_num_den(angle)
-    d = d + a - c
-    ang = ang_between(a, b, d)
-    # if ang < -ATOM:
-    if ang < 0:
-        ang += np.pi
-    return close_enough(ang, num * np.pi / den)
 
 
 def check_sameside_numerical(points: list[PointNum]) -> bool:
@@ -92,20 +70,6 @@ def check_contri_numerical(points: list[PointNum]) -> bool:
     return close_enough(ab, xy) and close_enough(bc, yz) and close_enough(ca, zx)
 
 
-def check_ratio_numerical(points: list[PointNum | gm.Ratio]) -> bool:
-    a, b, c, d, ratio = points
-    m, n = ratio_to_num_den(ratio)
-    ab = a.distance(b)
-    cd = c.distance(d)
-    return close_enough(ab * n, cd * m)
-
-
-def check_length_numerical(points: list[PointNum | gm.Length]) -> bool:
-    a, b, length = points
-    ab = a.distance(b)
-    return close_enough(ab, float(length.name))
-
-
 PREDICATE_TO_NUMERICAL_CHECK = {
     PredicateName.SIMILAR_TRIANGLE: check_simtri_numerical,
     PredicateName.SIMILAR_TRIANGLE_REFLECTED: check_simtri_numerical,
@@ -113,12 +77,8 @@ PREDICATE_TO_NUMERICAL_CHECK = {
     PredicateName.CONTRI_TRIANGLE: check_contri_numerical,
     PredicateName.CONTRI_TRIANGLE_REFLECTED: check_contri_numerical,
     PredicateName.CONTRI_TRIANGLE_BOTH: check_contri_numerical,
-    PredicateName.CONSTANT_ANGLE: check_aconst_numerical,
-    PredicateName.S_ANGLE: check_sangle_numerical,
     PredicateName.SAMESIDE: check_sameside_numerical,
     PredicateName.NON_COLLINEAR: check_ncoll_numerical,
-    PredicateName.CONSTANT_RATIO: check_ratio_numerical,
-    PredicateName.CONSTANT_LENGTH: check_length_numerical,
 }
 
 

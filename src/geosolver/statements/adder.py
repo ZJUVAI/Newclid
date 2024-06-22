@@ -7,7 +7,7 @@ import geosolver.predicates as preds
 
 from geosolver.intrinsic_rules import IntrinsicRules
 import geosolver.predicates.coll
-from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
+from geosolver.statements.statement import Statement
 
 from geosolver.predicate_name import PredicateName
 import geosolver.numerical.check as nm
@@ -15,7 +15,7 @@ import geosolver.numerical.check as nm
 
 from geosolver.dependencies.dependency import Reason, Dependency
 from geosolver.dependencies.dependency_building import DependencyBody
-from geosolver.geometry import Length, Line, Point, Segment
+from geosolver.geometry import Line, Point, Segment
 from geosolver.symbols_graph import is_equal
 
 
@@ -53,16 +53,12 @@ class StatementAdder:
         ]
 
         self.PREDICATE_TO_ADDER = {
-            PredicateName.S_ANGLE: self._add_s_angle,
             PredicateName.SIMILAR_TRIANGLE: self._add_simtri,
             PredicateName.SIMILAR_TRIANGLE_REFLECTED: self._add_simtri_reflect,
             PredicateName.SIMILAR_TRIANGLE_BOTH: self._add_simtri_check,
             PredicateName.CONTRI_TRIANGLE: self._add_contri,
             PredicateName.CONTRI_TRIANGLE_REFLECTED: self._add_contri_reflect,
             PredicateName.CONTRI_TRIANGLE_BOTH: self._add_contri_check,
-            PredicateName.CONSTANT_ANGLE: self._add_aconst,
-            PredicateName.CONSTANT_RATIO: self._add_rconst,
-            PredicateName.CONSTANT_LENGTH: self._add_lconst,
         }
 
     def add(
@@ -93,22 +89,6 @@ class StatementAdder:
             raise ValueError(f"Not recognize predicate {statement.predicate}")
 
         return new_deps, deps_to_cache
-
-    def _add_eqratio4(
-        self, points: list[Point], dep_body: DependencyBody
-    ) -> tuple[list[Dependency], list[ToCache]]:
-        """Add four eqratios through a list of 5 points
-            (due to parallel lines with common point).
-
-           o
-         a - b
-        c --- d
-
-        """
-        o, a, b, c, d = points
-        add, to_cache = self._add_eqratio3([a, b, c, d, o, o], dep_body)
-        _add, _to_cache = self._add_eqratio([o, a, o, c, a, b, c, d], dep_body)
-        return add + _add, to_cache + _to_cache
 
     def _simple_add(
         self,
@@ -266,269 +246,6 @@ class StatementAdder:
             add,
             to_cache,
         )
-        return add, to_cache
-
-    def _add_aconst(
-        self, points: list[Point], dep_body: DependencyBody
-    ) -> tuple[list[Dependency], list[ToCache]]:
-        """Add that an angle is equal to some constant."""
-        points = list(points)
-        a, b, c, d, ang = points
-
-        num, den = angle_to_num_den(ang)
-        nd, dn = self.symbols_graph.get_or_create_const_ang(num, den)
-
-        if nd == self.symbols_graph.halfpi:
-            return self._add_perp([a, b, c, d], dep_body)
-
-        ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
-        cd, why2 = self.symbols_graph.get_line_thru_pair_why(c, d)
-
-        (a, b), (c, d) = ab.points, cd.points
-        if IntrinsicRules.ACONST_FROM_LINES not in self.DISABLED_INTRINSIC_RULES:
-            args = points[:-1] + [nd]
-            aconst = Statement(PredicateName.CONSTANT_ANGLE, tuple(args))
-            dep_body = dep_body.extend_by_why(
-                self.statements_graph,
-                aconst,
-                why=why1 + why2,
-                extention_reason=Reason(IntrinsicRules.ACONST_FROM_LINES),
-            )
-
-        self.symbols_graph.get_node_val(ab, dep=None)
-        self.symbols_graph.get_node_val(cd, dep=None)
-
-        if ab.val == cd.val:
-            raise ValueError(f"{ab.name} - {cd.name} cannot be {nd.name}")
-
-        args = [a, b, c, d, nd]
-        i = 0
-        for x, y, xy in [(a, b, ab), (c, d, cd)]:
-            i += 1
-            x_, y_ = xy._val._obj.points
-            if {x, y} == {x_, y_}:
-                continue
-            if (
-                dep_body
-                and IntrinsicRules.ACONST_FROM_PARA not in self.DISABLED_INTRINSIC_RULES
-            ):
-                aconst = Statement(PredicateName.CONSTANT_ANGLE, tuple(args))
-                para = Statement(preds.Para.NAME, [x, y, x_, y_])
-                dep_body = dep_body.extend(
-                    self.statements_graph,
-                    aconst,
-                    para,
-                    Reason(IntrinsicRules.ACONST_FROM_PARA),
-                )
-            args[2 * i - 2] = x_
-            args[2 * i - 1] = y_
-
-        ab_cd, cd_ab, why = self.symbols_graph.get_or_create_angle_from_lines(
-            ab, cd, dep=None
-        )
-
-        aconst = Statement(PredicateName.CONSTANT_ANGLE, [a, b, c, d, nd])
-        if IntrinsicRules.ACONST_FROM_ANGLE not in self.DISABLED_INTRINSIC_RULES:
-            dep_body = dep_body.extend_by_why(
-                self.statements_graph,
-                aconst,
-                why=why,
-                extention_reason=Reason(IntrinsicRules.ACONST_FROM_ANGLE),
-            )
-
-        dab, dcd = ab_cd._d
-        a, b = dab._obj.points
-        c, d = dcd._obj.points
-
-        ang = int(num) * 180 / int(den)
-        add = []
-        to_cache = []
-        if not is_equal(ab_cd, nd):
-            dep1 = dep_body.build(self.statements_graph, aconst)
-            self._make_equal(ab_cd, nd, dep=dep1)
-            to_cache.append((aconst, dep1))
-            add += [dep1]
-
-        aconst2 = Statement(PredicateName.CONSTANT_ANGLE, [a, b, c, d, nd])
-        if not is_equal(cd_ab, dn):
-            dep2 = dep_body.build(self.statements_graph, aconst2)
-            self._make_equal(cd_ab, dn, dep=dep2)
-            to_cache.append((aconst2, dep2))
-            add += [dep2]
-
-        return add, to_cache
-
-    def _add_s_angle(
-        self, points: list[Point], dep_body: DependencyBody
-    ) -> tuple[list[Dependency], list[ToCache]]:
-        """Add that an angle abx is equal to constant y."""
-        a, b, x, angle = points
-        num, den = angle_to_num_den(angle)
-        nd, dn = self.symbols_graph.get_or_create_const_ang(num, den)
-
-        if nd == self.symbols_graph.halfpi:
-            return self._add_perp([a, b, b, x], dep_body)
-
-        ab, why1 = self.symbols_graph.get_line_thru_pair_why(a, b)
-        bx, why2 = self.symbols_graph.get_line_thru_pair_why(b, x)
-
-        self.symbols_graph.get_node_val(ab, dep=None)
-        self.symbols_graph.get_node_val(bx, dep=None)
-
-        add, to_cache = [], []
-
-        if ab.val == bx.val:
-            return add, to_cache
-
-        sangle = Statement(PredicateName.S_ANGLE, (a, b, x))
-        if IntrinsicRules.SANGLE_FROM_LINES not in self.DISABLED_INTRINSIC_RULES:
-            dep_body = dep_body.extend_by_why(
-                self.statements_graph,
-                sangle,
-                why=why1 + why2,
-                extention_reason=Reason(IntrinsicRules.SANGLE_FROM_LINES),
-            )
-
-        if IntrinsicRules.SANGLE_FROM_PARA not in self.DISABLED_INTRINSIC_RULES:
-            paras = []
-            for p, q, pq in [(a, b, ab), (b, x, bx)]:
-                p_, q_ = pq.val._obj.points
-                if {p, q} == {p_, q_}:
-                    continue
-                paras.append(Statement(preds.Para.NAME, (p, q, p_, q_)))
-            if paras:
-                dep_body = dep_body.extend_many(
-                    self.statements_graph,
-                    sangle,
-                    paras,
-                    Reason(IntrinsicRules.SANGLE_FROM_PARA),
-                )
-
-        xba, abx, why = self.symbols_graph.get_or_create_angle_from_lines(
-            bx, ab, dep=None
-        )
-        if IntrinsicRules.SANGLE_FROM_ANGLE not in self.DISABLED_INTRINSIC_RULES:
-            aconst = Statement(PredicateName.CONSTANT_ANGLE, [b, x, a, b, nd])
-            dep_body = dep_body.extend_by_why(
-                self.statements_graph,
-                aconst,
-                why=why,
-                extention_reason=Reason(IntrinsicRules.SANGLE_FROM_ANGLE),
-            )
-
-        dab, dbx = abx._d
-        a, b = dab._obj.points
-        c, x = dbx._obj.points
-
-        if not is_equal(xba, nd):
-            aconst = Statement(PredicateName.S_ANGLE, [c, x, a, b, nd])
-            dep1 = dep_body.build(self.statements_graph, aconst)
-            self._make_equal(xba, nd, dep=dep1)
-            to_cache.append((aconst, dep1))
-            add += [dep1]
-
-        if not is_equal(abx, dn):
-            aconst2 = Statement(PredicateName.S_ANGLE, [a, b, c, x, dn])
-            dep2 = dep_body.build(self.statements_graph, aconst2)
-            self._make_equal(abx, dn, dep=dep2)
-            to_cache.append((aconst2, dep2))
-            add += [dep2]
-
-        return add, to_cache
-
-    def _add_rconst(
-        self, args: list[Point], dep_body: DependencyBody
-    ) -> tuple[list[Dependency], list[ToCache]]:
-        """Add new algebraic predicates of type eqratio-constant."""
-        a, b, c, d, ratio = args
-
-        num, den = ratio_to_num_den(ratio)
-        nd, dn = self.symbols_graph.get_or_create_const_rat(num, den)
-
-        if num == den:
-            return self._add_cong([a, b, c, d], dep_body)
-
-        ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)
-        cd = self.symbols_graph.get_or_create_segment(c, d, dep=None)
-
-        self.symbols_graph.get_node_val(ab, dep=None)
-        self.symbols_graph.get_node_val(cd, dep=None)
-
-        if ab.val == cd.val:
-            raise ValueError(f"{ab.name} and {cd.name} cannot be equal")
-
-        args = [a, b, c, d, nd]
-        i = 0
-        for x, y, xy in [(a, b, ab), (c, d, cd)]:
-            i += 1
-            x_, y_ = list(xy._val._obj.points)
-            if {x, y} == {x_, y_}:
-                continue
-            if (
-                dep_body
-                and IntrinsicRules.RCONST_FROM_CONG not in self.DISABLED_INTRINSIC_RULES
-            ):
-                rconst = Statement(PredicateName.CONSTANT_RATIO, tuple(args))
-                cong = Statement(preds.Cong.NAME, [x, y, x_, y_])
-                dep_body = dep_body.extend(
-                    self.statements_graph,
-                    rconst,
-                    cong,
-                    extention_reason=Reason(IntrinsicRules.RCONST_FROM_CONG),
-                )
-            args[2 * i - 2] = x_
-            args[2 * i - 1] = y_
-
-        ab_cd, cd_ab, why = self.symbols_graph.get_or_create_ratio_from_segments(
-            ab, cd, dep=None
-        )
-
-        rconst = Statement(PredicateName.CONSTANT_RATIO, [a, b, c, d, nd])
-        if IntrinsicRules.RCONST_FROM_RATIO not in self.DISABLED_INTRINSIC_RULES:
-            dep_body = dep_body.extend_by_why(
-                self.statements_graph,
-                rconst,
-                why=why,
-                extention_reason=Reason(IntrinsicRules.RCONST_FROM_RATIO),
-            )
-
-        lab, lcd = ab_cd._l
-        a, b = list(lab._obj.points)
-        c, d = list(lcd._obj.points)
-
-        add = []
-        to_cache = []
-        if not is_equal(ab_cd, nd):
-            dep1 = dep_body.build(self.statements_graph, rconst)
-            self._make_equal(nd, ab_cd, dep=dep1)
-            to_cache.append((rconst, dep1))
-            add.append(dep1)
-
-        if not is_equal(cd_ab, dn):
-            rconst2 = Statement(PredicateName.CONSTANT_RATIO, [c, d, a, b, dn])
-            dep2 = dep_body.build(self.statements_graph, rconst2)
-            self._make_equal(dn, cd_ab, dep=dep2)
-            to_cache.append((rconst2, dep2))
-            add.append(dep2)
-
-        return add, to_cache
-
-    def _add_lconst(
-        self, args: tuple[Point, Point, Length], dep_body: DependencyBody
-    ) -> tuple[list[Dependency], list[ToCache]]:
-        """Add new algebraic predicates of type eqratio-constant."""
-        a, b, length = args
-
-        ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)
-        l_ab = self.symbols_graph.get_node_val(ab, dep=None)
-
-        lconst = Statement(PredicateName.CONSTANT_LENGTH, args)
-
-        lconst_dep = dep_body.build(self.statements_graph, lconst)
-        self._make_equal(length, l_ab, dep=lconst_dep)
-
-        add = [lconst_dep]
-        to_cache = [(lconst, lconst_dep)]
         return add, to_cache
 
 

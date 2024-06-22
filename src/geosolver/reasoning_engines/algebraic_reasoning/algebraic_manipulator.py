@@ -48,9 +48,9 @@ class AlgebraicManipulator(ReasoningEngine):
             preds.Cong.NAME: self._add_cong,
             preds.EqAngle.NAME: self._add_eqangle,
             preds.EqRatio.NAME: self._add_eqratio,
-            PredicateName.CONSTANT_ANGLE: self._add_aconst,
-            PredicateName.S_ANGLE: self._add_aconst,
-            PredicateName.CONSTANT_RATIO: self._add_rconst,
+            preds.ConstantAngle.NAME: self._add_aconst,
+            preds.SAngle.NAME: self._add_aconst,
+            preds.ConstantRatio.NAME: self._add_rconst,
         }
 
     def ingest(self, dependency: "Dependency") -> None:
@@ -135,7 +135,7 @@ class AlgebraicManipulator(ReasoningEngine):
                 points = (*ef._obj.points, *pq._obj.points)
                 angle, opposite_angle = self.symbols_graph.get_or_create_const_ang(n, d)
                 angle.opposite = opposite_angle
-                aconst = Statement(PredicateName.CONSTANT_ANGLE, (*points, angle))
+                aconst = Statement(preds.ConstantAngle.NAME, (*points, angle))
                 if not check_numerical(aconst):
                     continue
 
@@ -181,7 +181,7 @@ class AlgebraicManipulator(ReasoningEngine):
                 if not (a != b and c != d and (a != c or b != d)):
                     continue
                 ratio, _ = self.symbols_graph.get_or_create_const_rat(num, den)
-                rconst = Statement(PredicateName.CONSTANT_RATIO, (a, b, c, d, ratio))
+                rconst = Statement(preds.ConstantRatio.NAME, (a, b, c, d, ratio))
                 added.append(Derivation(rconst, dep))
 
         return added
@@ -231,7 +231,11 @@ class AlgebraicManipulator(ReasoningEngine):
     def _add_aconst(
         self, dep: "Dependency"
     ):  # not sure, in addr, add ab_cd as well as cd_ab
-        a, b, c, d, ang = dep.statement.args
+        if len(dep.statement.args) == 3:
+            a, b, c, ang = dep.statement.args
+            d = b
+        else:
+            a, b, c, d, ang = dep.statement.args
         ab, _ = self.symbols_graph.get_line_thru_pair_why(a, b)
         cd, _ = self.symbols_graph.get_line_thru_pair_why(c, d)
         ab_cd, _, _ = self.symbols_graph.get_or_create_angle_from_lines(

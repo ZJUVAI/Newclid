@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Optional, Tuple, Type, Union
 from typing_extensions import Self
 import logging
 
-from geosolver.defs.clause import Clause, Construction
+from geosolver.defs.clause import ArgType, Clause, Construction
 from geosolver.numerical.geometries import (
     CircleNum,
     HalfLine,
@@ -20,8 +20,9 @@ from geosolver.numerical.geometries import (
 )
 from geosolver.intrinsic_rules import IntrinsicRules
 import geosolver.predicates as preds
+from geosolver.ratios import simplify
 from geosolver.reasoning_engines.engines_interface import ReasoningEngine
-from geosolver.statements.statement import Statement
+from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
 from geosolver.defs.definition import Definition
 from geosolver.theorem import Theorem
 from geosolver.predicate_name import PredicateName
@@ -707,18 +708,36 @@ class Proof:
     def map_construction_args_to_objects(
         self, construction: Construction, mapping: Optional[dict[str, str]] = None
     ) -> list[Point | Angle | Ratio]:
-        def make_const(x):
-            arg_objs = self.symbols_graph.get_or_create_const(x, construction.name)
-            if isinstance(arg_objs, tuple):
-                return arg_objs[0]
-            return arg_objs
-
         args_objs = []
-        for arg in construction.args:
+        for arg, arg_type in zip(construction.args, construction.args_types):
             if mapping and arg in mapping:
                 arg = mapping[arg]
-            args_objs.append(self.symbols_graph.get_point(arg, make_const))
+            args_objs.append(arg_to_object(arg, arg_type, self.symbols_graph))
         return args_objs
+
+
+def arg_to_object(arg: str, arg_type: ArgType, symbols_graph: "SymbolsGraph"):
+    if arg_type is ArgType.POINT:
+        return symbols_graph.get_point(arg)
+    elif arg_type is ArgType.ANGLE:
+        if "pi/" in arg:
+            # pi fraction
+            num, den = angle_to_num_den(arg)
+        elif arg.endswith("o"):
+            # degrees
+            num, den = simplify(int(arg[:-1]), 180)
+        else:
+            raise ValueError("Could not interpret constant angle: %s", arg)
+        ang, _ = symbols_graph.get_or_create_const_ang(num, den)
+        return ang
+    elif arg_type is ArgType.RATIO:
+        if "/" not in arg:
+            raise ValueError("Cannot interpret %s as a ratio", arg)
+        num, den = ratio_to_num_den(arg)
+        rat, _ = symbols_graph.get_or_create_const_rat(num, den)
+        return rat
+    elif arg_type is ArgType.LENGTH:
+        return symbols_graph.get_or_create_const_length(float(arg))
 
 
 def mapping_to_names(mapping: Mapping) -> dict[str, str]:

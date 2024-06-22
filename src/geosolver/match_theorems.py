@@ -27,7 +27,7 @@ from geosolver.geometry import (
     RatioValue,
 )
 from geosolver.numerical.check import check_ncoll_numerical, same_clock
-from geosolver.symbols_graph import is_equal
+from geosolver.symbols_graph import SymbolsGraph, is_equal
 
 
 if TYPE_CHECKING:
@@ -367,7 +367,7 @@ def match_eqangle_ncoll_cyclic(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 P A P B Q A Q B, ncoll P Q A B => cyclic A B P Q."""
-    linepairs = proof.statements.enumerator.all_eqangles_distinct_linepairss()
+    linepairs = all_eqangles_distinct_linepairss(proof.symbols_graph)
     for l1, l2, l3, l4 in linepairs:
         if len(set([l1, l2, l3, l4])) < 4:
             continue  # they all must be distinct.
@@ -396,6 +396,30 @@ def match_eqangle_ncoll_cyclic(
             continue
 
         yield dict(zip("ABPQ", [a, b, p, q]))
+
+
+def all_eqangles_distinct_linepairss(
+    symbols_graph: "SymbolsGraph",
+) -> Generator[tuple[Line, ...], None, None]:
+    """No eqangles betcause para-para, or para-corresponding, or same."""
+
+    for measure in symbols_graph.type2nodes[AngleValue]:
+        angs = measure.neighbors(Angle)
+        line_pairss = []
+        for ang in angs:
+            d1, d2 = ang.directions
+            if d1 is None or d2 is None:
+                continue
+            l1s = d1.neighbors(Line)
+            l2s = d2.neighbors(Line)
+            # Any pair in this is para-para.
+            para_para = list(comb.cross_product(l1s, l2s))
+            line_pairss.append(para_para)
+
+        for pairs1, pairs2 in comb.arrangement_pairs(line_pairss):
+            for pair1, pair2 in comb.cross_product(pairs1, pairs2):
+                (l1, l2), (l3, l4) = pair1, pair2
+                yield l1, l2, l3, l4
 
 
 def match_eqangle_para(

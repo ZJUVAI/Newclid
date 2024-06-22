@@ -32,8 +32,8 @@ class Cong(Predicate):
     @staticmethod
     def add(
         args: list[Point],
-        dep_body: DependencyBody,
-        dep_graph: WhyHyperGraph,
+        dep_body: "DependencyBody",
+        dep_graph: "WhyHyperGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -76,7 +76,7 @@ class Cong(Predicate):
         b: Point,
         c: Point,
         cong_ab_ac: Dependency,
-        dep_graph: WhyHyperGraph,
+        dep_graph: "WhyHyperGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:

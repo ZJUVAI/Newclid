@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from geosolver.defs.clause import Clause, Construction
 from geosolver.statements.statement import Statement
-from geosolver.predicate_name import PredicateName
+import geosolver.predicates as preds
 
 from geosolver.pretty import pretty
 from geosolver.ratios import simplify
@@ -126,12 +126,9 @@ def setup_str_from_problem(
                 for b in bs:
                     args = [mapping[a] for a in b.args]
                     name = b.name
-                    if b.name in [
-                        PredicateName.S_ANGLE.value,
-                        PredicateName.CONSTANT_ANGLE.value,
-                    ]:
+                    if b.name in [preds.SAngle.NAME, preds.ConstantAngle.NAME]:
                         x, y, z, v = args
-                        name = PredicateName.CONSTANT_ANGLE.value
+                        name = preds.ConstantAngle.NAME
                         v = int(v)
 
                         if v < 0:
@@ -158,7 +155,7 @@ def setup_str_from_problem(
                 ref_str = "{:02}".format(ref)
                 dep_str = pretty(dep)
 
-                if dep[0] == PredicateName.CONSTANT_ANGLE.value:
+                if dep[0] == preds.ConstantAngle.NAME:
                     m, n = map(int, dep[-1].split("pi/"))
                     mn = f"{m}. pi / {n}."
                     dep_str = " ".join(dep_str.split()[:-1] + [mn])

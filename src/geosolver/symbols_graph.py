@@ -24,8 +24,6 @@ from geosolver.geometry import (
     RatioValue,
 )
 from geosolver._lazy_loading import lazy_import
-from geosolver.predicate_name import PredicateName
-from geosolver.statements.statement import angle_to_num_den, ratio_to_num_den
 
 if TYPE_CHECKING:
     import networkx
@@ -297,35 +295,6 @@ class SymbolsGraph:
             length_node.value = length
             self.get_node_val(length_node, None)
         return self.lconst[length]
-
-    def get_or_create_const(
-        self, const_value: str, construction_name: str
-    ) -> tuple[Angle, Angle] | tuple[Ratio, Ratio] | Length:
-        if construction_name in (
-            PredicateName.CONSTANT_ANGLE.value,
-            PredicateName.S_ANGLE.value,
-        ):
-            if "pi/" in const_value:
-                # pi fraction
-                num, den = angle_to_num_den(const_value)
-            elif const_value.endswith("o"):
-                # degrees
-                num, den = simplify(int(const_value[:-1]), 180)
-            else:
-                raise ValueError("Could not interpret constant angle: %s", const_value)
-            return self.get_or_create_const_ang(num, den)
-
-        elif construction_name in (PredicateName.CONSTANT_RATIO.value, "rconst2"):
-            if "/" in const_value:
-                num, den = ratio_to_num_den(const_value)
-                return self.get_or_create_const_rat(num, den)
-
-        elif construction_name == PredicateName.CONSTANT_LENGTH.value:
-            return self.get_or_create_const_length(float(const_value))
-
-        raise NotImplementedError(
-            "Unsupported construction for constants: %s", construction_name.name
-        )
 
     def get_or_create_segment(self, p1: Point, p2: Point, dep: "Dependency") -> Segment:
         """Get or create a Segment object between two Points p1 and p2."""

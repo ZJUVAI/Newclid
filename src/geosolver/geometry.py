@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from fractions import Fraction
-from typing import TYPE_CHECKING, Any, Generator, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Any, Optional, Type, TypeVar
 from typing_extensions import Self
 
 if TYPE_CHECKING:
@@ -419,13 +419,6 @@ class AngleValue(Symbol):
 
 class RatioValue(Symbol):
     _obj: Ratio
-
-
-def all_lengths(segment: Segment) -> Generator[Angle, list[Direction], list[Direction]]:
-    equivalent_segments = segment.equivs_upto()
-    for neighbor_lenght in segment.rep().neighbors(Length):
-        if neighbor_lenght._obj in equivalent_segments:
-            yield neighbor_lenght, equivalent_segments
 
 
 RANKING = {

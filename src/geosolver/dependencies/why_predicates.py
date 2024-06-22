@@ -9,7 +9,7 @@ import geosolver.predicates.coll
 from geosolver.statements.statement import Statement
 
 from geosolver.dependencies.dependency import Dependency, Reason
-from geosolver.geometry import Angle, AngleValue, Line, Symbol, Point, Ratio
+from geosolver.geometry import Line, Symbol, Point
 from geosolver.predicate_name import PredicateName
 
 
@@ -75,75 +75,6 @@ def _get_lines_thru_all(*points: Point) -> list[Line]:
     return [line for line, count in line2count.items() if count == len(points)]
 
 
-def _why_aconst(
-    statements_graph: "WhyHyperGraph", statement: "Statement"
-) -> tuple[Optional[Reason], list[Dependency]]:
-    a, b, c, d, ang0 = statement.args
-
-    measure: AngleValue = ang0._val
-    for ang in measure.neighbors(Angle):
-        if ang == ang0:
-            continue
-        d1, d2 = ang._d
-        l1, l2 = d1._obj, d2._obj
-        (a1, b1), (c1, d1) = l1.points, l2.points
-
-        if not statements_graph.statements_checker.check_para_or_coll(
-            [a, b, a1, b1]
-        ) or not statements_graph.statements_checker.check_para_or_coll([c, d, c1, d1]):
-            continue
-
-        why_aconst = []
-        for args in [(a, b, a1, b1), (c, d, c1, d1)]:
-            if statements_graph.statements_checker.check_coll(args):
-                if len(set(args)) <= 2:
-                    continue
-                coll = Statement(preds.Coll.NAME, args)
-                coll_dep = statements_graph.build_resolved_dependency(
-                    coll, use_cache=False
-                )
-                why_aconst.append(coll_dep)
-            else:
-                para = Statement(preds.Para.NAME, args)
-                para_dep = statements_graph.build_resolved_dependency(
-                    para, use_cache=False
-                )
-                why_aconst.append(para_dep)
-
-        why_aconst += why_equal(ang, ang0)
-        return None, why_aconst
-
-
-def _why_rconst(
-    statements_graph: "WhyHyperGraph", statement: "Statement"
-) -> tuple[Optional[Reason], list[Dependency]]:
-    a, b, c, d, rat0 = statement.args
-
-    val: AngleValue = rat0._val
-    for rat in val.neighbors(Ratio):
-        if rat == rat0:
-            continue
-        l1, l2 = rat._l
-        s1, s2 = l1._obj, l2._obj
-        (a1, b1), (c1, d1) = list(s1.points), list(s2.points)
-
-        if not statements_graph.statements_checker.check_cong(
-            [a, b, a1, b1]
-        ) or not statements_graph.statements_checker.check_cong([c, d, c1, d1]):
-            continue
-
-        why_rconst = []
-        for args in [(a, b, a1, b1), (c, d, c1, d1)]:
-            if len(set(args)) > 2:
-                cong = Statement(preds.Cong.NAME, args)
-                why_rconst.append(
-                    statements_graph.build_resolved_dependency(cong, use_cache=False)
-                )
-
-        why_rconst += why_equal(rat, rat0)
-        return None, why_rconst
-
-
 def _why_numerical(
     statements_graph: "WhyHyperGraph", statement: "Statement"
 ) -> tuple[Optional[Reason], list[Dependency]]:
@@ -157,8 +88,6 @@ PREDICATE_TO_WHY: dict[
         tuple[Optional[Reason], list[Dependency]],
     ],
 ] = {
-    PredicateName.CONSTANT_ANGLE: _why_aconst,
-    PredicateName.CONSTANT_RATIO: _why_rconst,
     PredicateName.DIFFERENT: _why_numerical,
     PredicateName.NON_PARALLEL: _why_numerical,
     PredicateName.NON_PERPENDICULAR: _why_numerical,

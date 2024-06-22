@@ -1,20 +1,10 @@
 from typing import TYPE_CHECKING
 
 import geosolver.predicates as preds
-from geosolver.predicates.eqangle import all_angles
-from geosolver.predicates.eqratio import all_ratios
-from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
+from geosolver.statements.statement import Statement
 from geosolver.predicate_name import PredicateName
-from geosolver.geometry import (
-    Angle,
-    Length,
-    Point,
-    Ratio,
-    all_lengths,
-)
+from geosolver.geometry import Angle, Point, Ratio
 from geosolver.numerical.check import check_sameside_numerical
-
-from geosolver.symbols_graph import is_equal
 
 
 if TYPE_CHECKING:
@@ -34,10 +24,6 @@ class StatementChecker:
             PredicateName.CONTRI_TRIANGLE: self.check_contri,
             PredicateName.CONTRI_TRIANGLE_REFLECTED: self.check_contri_reflected,
             PredicateName.CONTRI_TRIANGLE_BOTH: self.check_contri_both,
-            PredicateName.CONSTANT_ANGLE: self.check_aconst,
-            PredicateName.S_ANGLE: self.check_sangle,
-            PredicateName.CONSTANT_RATIO: self.check_rconst,
-            PredicateName.CONSTANT_LENGTH: self.check_lconst,
             PredicateName.COMPUTE_ANGLE: self.check_acompute,
             PredicateName.COMPUTE_RATIO: self.check_rcompute,
             PredicateName.SAMESIDE: self.check_sameside,
@@ -50,76 +36,6 @@ class StatementChecker:
     def check(self, statement: Statement) -> bool:
         """Symbolically check if a predicate is True."""
         return self.PREDICATE_TO_CHECK[statement.predicate](statement.args)
-
-    def check_aconst(self, points: tuple[Point, Point, Point, Point, Angle]) -> bool:
-        """Check if the angle is equal to a certain constant."""
-        a, b, c, d, angle = points
-        num, den = angle_to_num_den(angle)
-        ang, _ = self.symbols_graph.get_or_create_const_ang(int(num), int(den))
-
-        ab = self.symbols_graph.get_line(a, b)
-        cd = self.symbols_graph.get_line(c, d)
-        if not ab or not cd:
-            return False
-
-        if not (ab.val and cd.val):
-            return False
-
-        for ang1, _, _ in all_angles(ab._val, cd._val):
-            if is_equal(ang1, ang):
-                return True
-        return False
-
-    def check_sangle(self, points: tuple[Point, Point, Point, Angle]) -> bool:
-        a, b, c, angle = points
-        num, den = angle_to_num_den(angle)
-        ang, _ = self.symbols_graph.get_or_create_const_ang(num, den)
-
-        ab = self.symbols_graph.get_line(a, b)
-        cb = self.symbols_graph.get_line(c, b)
-        if not ab or not cb:
-            return False
-
-        if not (ab.val and cb.val):
-            return False
-
-        for ang1, _, _ in all_angles(ab._val, cb._val):
-            if is_equal(ang1, ang):
-                return True
-        return False
-
-    def check_rconst(self, points: tuple[Point, Point, Point, Point, Ratio]) -> bool:
-        """Check whether a ratio is equal to some given constant."""
-        a, b, c, d, ratio = points
-        num, den = ratio_to_num_den(ratio)
-        rat, _ = self.symbols_graph.get_or_create_const_rat(int(num), int(den))
-
-        ab = self.symbols_graph.get_segment(a, b)
-        cd = self.symbols_graph.get_segment(c, d)
-
-        if not ab or not cd:
-            return False
-
-        if not (ab.val and cd.val):
-            return False
-
-        for rat1, _, _ in all_ratios(ab._val, cd._val):
-            if is_equal(rat1, rat):
-                return True
-        return False
-
-    def check_lconst(self, points: tuple[Point, Point, Length]) -> bool:
-        """Check whether a length is equal to some given constant."""
-        a, b, length = points
-        ab = self.symbols_graph.get_segment(a, b)
-
-        if not ab or not ab.val:
-            return False
-
-        for len1, _ in all_lengths(ab):
-            if is_equal(len1, length):
-                return True
-        return False
 
     def check_acompute(self, points: list[Point]) -> bool:
         """Check if an angle has a constant value."""

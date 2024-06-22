@@ -60,12 +60,7 @@ def pretty2a(a: str, b: str, c: str, d: str) -> str:
 
 def pretty_nl(name: str, args: list[str]) -> str:
     """Natural lang formatting a predicate."""
-    if name in [PredicateName.CONSTANT_ANGLE.value, PredicateName.S_ANGLE.value]:
-        a, b, c, d, y = args
-        return f"{pretty_angle(a, b, c, d)} = {y}"
-    if name == PredicateName.CONSTANT_RATIO.value:
-        a, b, c, d, y = args
-        return f"{a}{b}:{c}{d} = {y}"
+
     if name == PredicateName.COMPUTE_ANGLE.value:
         a, b, c, d = args
         return f"{pretty_angle(a, b, c, d)}"
@@ -111,10 +106,10 @@ def pretty(txt: tuple[str, ...]) -> str:
     if name == PredicateName.COMPUTE_RATIO.value:
         a, b, c, d = args
         return "R " + " ".join(args)
-    if name == PredicateName.CONSTANT_ANGLE.value:
+    if name == preds.ConstantAngle.NAME:
         a, b, c, d, y = args
         return f"^ {pretty2a(a, b, c, d)} {y}"
-    if name == PredicateName.CONSTANT_RATIO.value:
+    if name == preds.ConstantRatio.NAME:
         a, b, c, d, y = args
         return f"/ {pretty2r(a, b, c, d)} {y}"
     if name == preds.Coll.NAME:

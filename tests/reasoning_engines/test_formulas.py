@@ -2,12 +2,11 @@ from fractions import Fraction
 import pytest
 from typing_extensions import Self
 
+import geosolver.predicates as preds
 from geosolver.api import GeometricSolverBuilder
 from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.geometry import Point
-from geosolver.predicates import Coll, Perp
-from geosolver.predicate_name import PredicateName
 from geosolver.reasoning_engines.formulas import (
     MenelausFormula,
     PythagoreanFormula,
@@ -65,9 +64,9 @@ class TestPythagorean:
 
         self.reasoning_fixture.given_engine(PythagoreanFormula(self.symbols_graph))
         given_dependencies = [
-            Dependency(Statement(Perp.NAME, (a, b, a, c)), why=[]),
-            Dependency(Statement(PredicateName.CONSTANT_LENGTH, (a, b, l_3)), why=[]),
-            Dependency(Statement(PredicateName.CONSTANT_LENGTH, (a, c, l_4)), why=[]),
+            Dependency(Statement(preds.Perp.NAME, (a, b, a, c)), why=[]),
+            Dependency(Statement(preds.ConstantLength.NAME, (a, b, l_3)), why=[]),
+            Dependency(Statement(preds.ConstantLength.NAME, (a, c, l_4)), why=[]),
         ]
         for dep in given_dependencies:
             self.reasoning_fixture.given_added_dependency(dep)
@@ -76,7 +75,7 @@ class TestPythagorean:
         self.reasoning_fixture.then_new_derivations_should_be(
             [
                 Derivation(
-                    Statement(PredicateName.CONSTANT_LENGTH, (b, c, l_5)),
+                    Statement(preds.ConstantLength.NAME, (b, c, l_5)),
                     DependencyBody(Reason("Pythagorean"), why=given_dependencies),
                 ),
             ]
@@ -95,9 +94,9 @@ class TestPythagorean:
 
         self.reasoning_fixture.given_engine(PythagoreanFormula(self.symbols_graph))
         given_dependencies = [
-            Dependency(Statement(Perp.NAME, (a, b, a, c)), why=[]),
-            Dependency(Statement(PredicateName.CONSTANT_LENGTH, (a, b, l_3)), why=[]),
-            Dependency(Statement(PredicateName.CONSTANT_LENGTH, (b, c, l_5)), why=[]),
+            Dependency(Statement(preds.Perp.NAME, (a, b, a, c)), why=[]),
+            Dependency(Statement(preds.ConstantLength.NAME, (a, b, l_3)), why=[]),
+            Dependency(Statement(preds.ConstantLength.NAME, (b, c, l_5)), why=[]),
         ]
         for dep in given_dependencies:
             self.reasoning_fixture.given_added_dependency(dep)
@@ -106,7 +105,7 @@ class TestPythagorean:
         self.reasoning_fixture.then_new_derivations_should_be(
             [
                 Derivation(
-                    Statement(PredicateName.CONSTANT_LENGTH, (a, c, l_4)),
+                    Statement(preds.ConstantLength.NAME, (a, c, l_4)),
                     DependencyBody(Reason("Pythagorean"), why=given_dependencies),
                 ),
             ]
@@ -148,9 +147,9 @@ class TestPythagorean:
 
         self.reasoning_fixture.given_engine(PythagoreanFormula(self.symbols_graph))
         given_dependencies = [
-            Dependency(Statement(PredicateName.CONSTANT_LENGTH, (b, c, l_5)), why=[]),
-            Dependency(Statement(PredicateName.CONSTANT_LENGTH, (a, b, l_3)), why=[]),
-            Dependency(Statement(PredicateName.CONSTANT_LENGTH, (a, c, l_4)), why=[]),
+            Dependency(Statement(preds.ConstantLength.NAME, (b, c, l_5)), why=[]),
+            Dependency(Statement(preds.ConstantLength.NAME, (a, b, l_3)), why=[]),
+            Dependency(Statement(preds.ConstantLength.NAME, (a, c, l_4)), why=[]),
         ]
         for dep in given_dependencies:
             self.reasoning_fixture.given_added_dependency(dep)
@@ -159,7 +158,7 @@ class TestPythagorean:
         self.reasoning_fixture.then_new_derivations_should_be(
             [
                 Derivation(
-                    Statement(Perp.NAME, (a, b, a, c)),
+                    Statement(preds.Perp.NAME, (a, b, a, c)),
                     DependencyBody(Reason("Pythagorean"), why=given_dependencies),
                 ),
             ]
@@ -212,16 +211,12 @@ class TestMenelaus:
         self.reasoning_fixture.given_engine(MenelausFormula(self.symbols_graph))
 
         given_dependencies = [
-            Dependency(Statement(Coll.NAME, (a, b, f)), why=[]),
-            Dependency(Statement(Coll.NAME, (c, b, d)), why=[]),
-            Dependency(Statement(Coll.NAME, (e, d, f)), why=[]),
-            Dependency(Statement(Coll.NAME, (c, e, a)), why=[]),
-            Dependency(
-                Statement(PredicateName.CONSTANT_RATIO, (a, f, f, b, r1_3)), why=[]
-            ),
-            Dependency(
-                Statement(PredicateName.CONSTANT_RATIO, (b, d, d, c, r1_2)), why=[]
-            ),
+            Dependency(Statement(preds.Coll.NAME, (a, b, f)), why=[]),
+            Dependency(Statement(preds.Coll.NAME, (c, b, d)), why=[]),
+            Dependency(Statement(preds.Coll.NAME, (e, d, f)), why=[]),
+            Dependency(Statement(preds.Coll.NAME, (c, e, a)), why=[]),
+            Dependency(Statement(preds.ConstantRatio.NAME, (a, f, f, b, r1_3)), why=[]),
+            Dependency(Statement(preds.ConstantRatio.NAME, (b, d, d, c, r1_2)), why=[]),
         ]
         for dep in given_dependencies:
             self.reasoning_fixture.given_added_dependency(dep)
@@ -236,7 +231,7 @@ class TestMenelaus:
         self.reasoning_fixture.then_new_derivations_should_be(
             [
                 Derivation(
-                    Statement(PredicateName.CONSTANT_RATIO, (c, e, a, e, expected_r)),
+                    Statement(preds.ConstantRatio.NAME, (c, e, a, e, expected_r)),
                     DependencyBody(Reason("Menelaus"), why=given_dependencies),
                 ),
             ]
