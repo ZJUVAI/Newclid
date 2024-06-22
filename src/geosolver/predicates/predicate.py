@@ -11,11 +11,11 @@ from geosolver.statements.statement import Statement
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
     from geosolver.dependencies.dependency_building import DependencyBody
-    from geosolver.dependencies.why_graph import WhyHyperGraph
+    from geosolver.dependencies.why_graph import DependencyGraph
 
     from geosolver.numerical.geometries import PointNum
     from geosolver.intrinsic_rules import IntrinsicRules
-    from geosolver.statements.adder import ToCache
+
     from geosolver.symbols_graph import SymbolsGraph
 
 PredicateArgument = Union[Point, Ratio, Angle]
@@ -29,17 +29,17 @@ class Predicate(ABC):
     def add(
         args: list[PredicateArgument],
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: "SymbolsGraph",
         disabled_intrinsic_rules: list["IntrinsicRules"],
-    ) -> tuple[list["Dependency"], list["ToCache"]]:
+    ) -> tuple[list["Dependency"], list[tuple["Statement", "Dependency"]]]:
         """Make a dependency body into a list of dependencies
         with the given arguments."""
 
     @staticmethod
     @abstractmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: "Statement"
+        dep_graph: "DependencyGraph", statement: "Statement"
     ) -> tuple[Optional[Reason], list[Dependency]]:
         """Resolve the reason and list of dependencies
         justifying why this predicate could be true."""

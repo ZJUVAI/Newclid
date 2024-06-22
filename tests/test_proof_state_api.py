@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 import pytest_check as check
 from geosolver.api import GeometricSolverBuilder
+import geosolver.predicates as preds
 
 
 MAX_LEVEL = 10
@@ -47,7 +48,6 @@ class TestProof:
         )
         self.proof = solver.proof_state
         self.symbols_graph = self.proof.symbols_graph
-        self.checker = self.proof.statements.checker
 
     def test_add_auxiliary_construction(self):
         solver = (
@@ -90,33 +90,41 @@ class TestProof:
         )
 
         # Explicit statements:
-        check.is_true(self.checker.check_cong([b, g1, g1, c]))
-        check.is_true(self.checker.check_cong([c, g2, g2, a]))
-        check.is_true(self.checker.check_cong([a, g3, g3, b]))
-        check.is_true(self.checker.check_perp([a, h1, b, c]))
-        check.is_true(self.checker.check_perp([b, h2, c, a]))
-        check.is_true(self.checker.check_perp([c, h3, a, b]))
-        check.is_true(self.checker.check_cong([o, a, o, b]))
-        check.is_true(self.checker.check_cong([o, b, o, c]))
-        check.is_true(self.checker.check_cong([o, a, o, c]))
-        check.is_true(self.checker.check_coll([a, g, g1]))
-        check.is_true(self.checker.check_coll([b, g, g2]))
-        check.is_true(self.checker.check_coll([g1, b, c]))
-        check.is_true(self.checker.check_coll([g2, c, a]))
-        check.is_true(self.checker.check_coll([g3, a, b]))
-        check.is_true(self.checker.check_perp([a, h, b, c]))
-        check.is_true(self.checker.check_perp([b, h, c, a]))
+        check.is_true(preds.Cong.check([b, g1, g1, c], self.symbols_graph))
+        check.is_true(preds.Cong.check([c, g2, g2, a], self.symbols_graph))
+        check.is_true(preds.Cong.check([a, g3, g3, b], self.symbols_graph))
+        check.is_true(preds.Perp.check([a, h1, b, c], self.symbols_graph))
+        check.is_true(preds.Perp.check([b, h2, c, a], self.symbols_graph))
+        check.is_true(preds.Perp.check([c, h3, a, b], self.symbols_graph))
+        check.is_true(preds.Cong.check([o, a, o, b], self.symbols_graph))
+        check.is_true(preds.Cong.check([o, b, o, c], self.symbols_graph))
+        check.is_true(preds.Cong.check([o, a, o, c], self.symbols_graph))
+        check.is_true(preds.Coll.check([a, g, g1], self.symbols_graph))
+        check.is_true(preds.Coll.check([b, g, g2], self.symbols_graph))
+        check.is_true(preds.Coll.check([g1, b, c], self.symbols_graph))
+        check.is_true(preds.Coll.check([g2, c, a], self.symbols_graph))
+        check.is_true(preds.Coll.check([g3, a, b], self.symbols_graph))
+        check.is_true(preds.Perp.check([a, h, b, c], self.symbols_graph))
+        check.is_true(preds.Perp.check([b, h, c, a], self.symbols_graph))
 
         # These are NOT part of the premises:
-        check.is_false(self.checker.check_perp([c, h, a, b]))
-        check.is_false(self.checker.check_coll([c, g, g3]))
+        check.is_false(preds.Perp.check([c, h, a, b], self.symbols_graph))
+        check.is_false(preds.Coll.check([c, g, g3], self.symbols_graph))
 
         # These are automatically inferred by the graph datastructure:
-        check.is_true(self.checker.check_eqangle([a, h1, b, c, b, h2, c, a]))
-        check.is_true(self.checker.check_eqangle([a, h1, b, h2, b, c, c, a]))
-        check.is_true(self.checker.check_eqratio([b, g1, g1, c, c, g2, g2, a]))
-        check.is_true(self.checker.check_eqratio([b, g1, g1, c, o, a, o, b]))
-        check.is_true(self.checker.check_para([a, h, a, h1]))
-        check.is_true(self.checker.check_para([b, h, b, h2]))
-        check.is_true(self.checker.check_coll([a, h, h1]))
-        check.is_true(self.checker.check_coll([b, h, h2]))
+        check.is_true(
+            preds.EqAngle.check([a, h1, b, c, b, h2, c, a], self.symbols_graph)
+        )
+        check.is_true(
+            preds.EqAngle.check([a, h1, b, h2, b, c, c, a], self.symbols_graph)
+        )
+        check.is_true(
+            preds.EqRatio.check([b, g1, g1, c, c, g2, g2, a], self.symbols_graph)
+        )
+        check.is_true(
+            preds.EqRatio.check([b, g1, g1, c, o, a, o, b], self.symbols_graph)
+        )
+        check.is_true(preds.Para.check([a, h, a, h1], self.symbols_graph))
+        check.is_true(preds.Para.check([b, h, b, h2], self.symbols_graph))
+        check.is_true(preds.Coll.check([a, h, h1], self.symbols_graph))
+        check.is_true(preds.Coll.check([b, h, h2], self.symbols_graph))

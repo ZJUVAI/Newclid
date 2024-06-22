@@ -430,31 +430,31 @@ a c e f g h = diff e f, diff g h
 x : eqratio a x c x e f g h
 eqratio6 a c e f g h
 
-rconst a b c x r:Ratio
+rconst a b c x r
 x : a b c x
 a b c = diff a b
 x : rconst a b c x r
 rconst a b c r
 
-rconst2 x a b r:Ratio
+rconst2 x a b r
 x : a b x
 a b = diff a b
 x : rconst x a x b r
 rconst2 a b r
 
-aconst a b c x r:Angle
+aconst a b c x r
 x : x a b c
 a b c = diff a b
 x : aconst a b c x r
 aconst a b c r
 
-s_angle a b x y:Angle
+s_angle a b x y
 x : a b x
 a b = diff a b
 x : s_angle a b x y
 s_angle a b y
 
-lconst x a l:Length
+lconst x a l
 a : x a
  =
 x : lconst x a l

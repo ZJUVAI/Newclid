@@ -10,7 +10,6 @@ from geosolver.statements.statement import Statement
 import geosolver.predicates as preds
 
 from geosolver.pretty import pretty
-from geosolver.ratios import simplify
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
@@ -125,20 +124,8 @@ def setup_str_from_problem(
 
                 for b in bs:
                     args = [mapping[a] for a in b.args]
-                    name = b.name
-                    if b.name in [preds.SAngle.NAME, preds.ConstantAngle.NAME]:
-                        x, y, z, v = args
-                        name = preds.ConstantAngle.NAME
-                        v = int(v)
-
-                        if v < 0:
-                            v = -v
-                            x, z = z, x
-
-                        m, n = simplify(int(v), 180)
-                        args = [y, z, y, x, f"{m}pi/{n}"]
-
-                    basic = Statement(name, tuple(args))
+                    basic_predicate = preds.NAME_TO_PREDICATE[b.name]
+                    basic = Statement(basic_predicate, tuple(args))
                     p2deps[points].append(basic.hash_tuple)
 
         for k, v in p2deps.items():
@@ -154,12 +141,6 @@ def setup_str_from_problem(
             for dep in p2deps[gr]:
                 ref_str = "{:02}".format(ref)
                 dep_str = pretty(dep)
-
-                if dep[0] == preds.ConstantAngle.NAME:
-                    m, n = map(int, dep[-1].split("pi/"))
-                    mn = f"{m}. pi / {n}."
-                    dep_str = " ".join(dep_str.split()[:-1] + [mn])
-
                 deps_str.append(dep_str + " " + ref_str)
                 ref += 1
 

@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Optional
 from geosolver.predicates import NUMERICAL_PREDICATES
 from geosolver.predicates.collinearity import Coll
 from geosolver.predicates.collinearity import Collx
-from geosolver.predicate_name import PredicateName
 from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE
 from geosolver.statements.statement import Statement
@@ -103,7 +102,7 @@ def separate_dependency_difference(
         if not cons_:
             continue
 
-        prems = [p for p in prems if p.statement.predicate != PredicateName.IND]
+        prems = [p for p in prems]
         log.append((prems, cons_))
 
     points = set(query.statement.args)
@@ -121,9 +120,7 @@ def separate_dependency_difference(
 
     setup_, setup, aux_setup, aux_points = setup, [], [], set()
     for con in setup_:
-        if con.statement.predicate is PredicateName.IND:
-            continue
-        elif any([p not in points for p in con.statement.args if isinstance(p, Point)]):
+        if any([p not in points for p in con.statement.args if isinstance(p, Point)]):
             aux_setup.append(con)
             aux_points.update(
                 [
@@ -295,13 +292,13 @@ def collx_to_coll(
 
 def _dep_coll_to_collx(dep: "Dependency"):
     if dep.statement.predicate == Collx.NAME:
-        coll_statement = Statement(Coll.NAME, list(set(dep.statement.args)))
+        coll_statement = Statement(Coll, list(set(dep.statement.args)))
         return Dependency(coll_statement, why=dep.why, reason=dep.reason)
     return dep
 
 
 def get_logs(
-    goal: "Statement", proof: "Proof", merge_trivials: bool = False
+    proof: "Proof", merge_trivials: bool
 ) -> tuple[
     list["Dependency"],
     list["Dependency"],
@@ -309,7 +306,7 @@ def get_logs(
     set[Point],
 ]:
     """Given a DAG and conclusion N, return the premise, aux, proof."""
-    goal_dep = proof.statements.graph.build_resolved_dependency(goal)
+    goal_dep = proof.dependency_graph.build_resolved_dependency(proof.goal)
     log = recursive_traceback(goal_dep)
     log, setup, aux_setup, setup_points, _ = separate_dependency_difference(
         goal_dep, log

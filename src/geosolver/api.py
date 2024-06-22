@@ -162,7 +162,7 @@ class GeometricSolverBuilder:
         self.rules: Optional[list[Theorem]] = None
         self.deductive_agent: Optional[DeductiveAgent] = None
         self.disabled_intrinsic_rules: Optional[list[IntrinsicRules]] = None
-        self.additional_reasoning_engine: dict[str, Type[ReasoningEngine]] = {
+        self.reasoning_engines: dict[str, Type[ReasoningEngine]] = {
             "AR": AlgebraicManipulator
         }
         self.seed = seed
@@ -189,7 +189,7 @@ class GeometricSolverBuilder:
             problem=self.problem,
             definitions=self.defs,
             disabled_intrinsic_rules=self.disabled_intrinsic_rules,
-            additional_reasoning_engine=self.additional_reasoning_engine,
+            reasoning_engine=self.reasoning_engines,
             rnd_generator=rnd_gen,
         )
 
@@ -252,5 +252,5 @@ class GeometricSolverBuilder:
     def with_additional_reasoning_engine(
         self, reasoning_engine: Type[ReasoningEngine], engine_name: str
     ) -> Self:
-        self.additional_reasoning_engine[engine_name] = reasoning_engine
+        self.reasoning_engines[engine_name] = reasoning_engine
         return self

@@ -33,7 +33,7 @@ from geosolver.agent.agents_interface import (
 from geosolver.dependencies.dependency import Dependency
 from geosolver.problem import Problem
 from geosolver.proof import Proof, theorem_mapping_str
-from geosolver.statements.adder import ToCache
+
 
 from colorama import just_fix_windows_console
 from colorama import Fore, Style
@@ -311,7 +311,9 @@ class HumanAgent(DeductiveAgent):
             self._all_added.append(dep.statement)
         return feedback_str
 
-    def _list_cached_statements(self, to_cache: list[ToCache]) -> str:
+    def _list_cached_statements(
+        self, to_cache: list[tuple["Statement", "Dependency"]]
+    ) -> str:
         feedback_str = "    Cached statements:\n"
         for cached in to_cache:
             cached_statement, _deps = cached
@@ -388,7 +390,7 @@ class HumanAgent(DeductiveAgent):
     def _show_figure(self, proof: "Proof", block: bool = False):
         equal_angles = {}
         for eqangle in self._all_cached:
-            if eqangle.predicate != preds.EqAngle.NAME:
+            if eqangle.predicate != preds.EqAngle:
                 continue
             hashed_eqangle = eqangle.hash_tuple
             if hashed_eqangle not in equal_angles:

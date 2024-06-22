@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Generator, Optional
-from typing_extensions import Self
 
 from geosolver.combinatorics import all_8points, cross_product, permutations_pairs
 from geosolver.dependencies.dependency import Dependency, Reason
@@ -21,12 +20,13 @@ from geosolver.geometry import (
 from geosolver.intrinsic_rules import IntrinsicRules
 from geosolver.numerical import close_enough
 from geosolver.numerical.geometries import LineNum, PointNum, bring_together
-import geosolver.predicates.collinearity
 from geosolver.predicates.predicate import Predicate
-from geosolver.pretty_angle import pretty_angle
-from geosolver.statements.adder import ToCache, maybe_make_equal_pairs
-from geosolver.statements.statement import Statement, hash_two_times_two_unorded_lines
-from geosolver.symbols_graph import SymbolsGraph, is_equal
+
+from geosolver.statements.statement import (
+    Statement,
+    hash_two_times_two_unorded_lines,
+)
+from geosolver.symbols_graph import SymbolsGraph, is_equal, maybe_make_equal_pairs
 
 import geosolver.predicates as preds
 
@@ -35,23 +35,11 @@ from geosolver._lazy_loading import lazy_import
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency_building import DependencyBody
-    from geosolver.dependencies.why_graph import WhyHyperGraph
+    from geosolver.dependencies.why_graph import DependencyGraph
 
     import numpy
 
 np: "numpy" = lazy_import("numpy")
-
-
-def all_angles(
-    d1: Direction, d2: Direction
-) -> Generator[Angle, list[Direction], list[Direction]]:
-    d1s = d1.equivs_upto()
-    d2s = d2.equivs_upto()
-
-    for angle in d1.rep().neighbors(Angle):
-        d1_, d2_ = angle._d
-        if d1_ in d1s and d2_ in d2s:
-            yield angle, d1s, d2s
 
 
 class EqAngle(Predicate):
@@ -68,7 +56,7 @@ class EqAngle(Predicate):
     def add(
         args: list[Point],
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -87,7 +75,7 @@ class EqAngle(Predicate):
         p, q = pq.points
 
         if IntrinsicRules.EQANGLE_FROM_LINES not in disabled_intrinsic_rules:
-            eqangle = Statement(EqAngle.NAME, args)
+            eqangle = Statement(EqAngle, args)
             dep_body = dep_body.extend_by_why(
                 dep_graph,
                 eqangle,
@@ -116,8 +104,15 @@ class EqAngle(Predicate):
             and mn.val != pq.val
             and (ab.val != mn.val or cd.val != pq.val)
         ):
+            points = (a, b, c, d, m, n, p, q)
+            lines = (ab, cd, mn, pq)
             _add, _to_cache = EqAngle._add_eqangle8(
-                a, b, c, d, m, n, p, q, ab, cd, mn, pq, dep_body
+                *points,
+                *lines,
+                dep_body,
+                dep_graph,
+                symbols_graph,
+                disabled_intrinsic_rules,
             )
             add += _add
             to_cache += _to_cache
@@ -127,8 +122,15 @@ class EqAngle(Predicate):
             and cd.val != pq.val
             and (ab.val != cd.val or mn.val != pq.val)
         ):
+            points = (a, b, m, n, c, d, p, q)
+            lines = (ab, mn, cd, pq)
             _add, _to_cache = EqAngle._add_eqangle8(
-                a, b, m, n, c, d, p, q, ab, mn, cd, pq, dep_body
+                *points,
+                *lines,
+                dep_body,
+                dep_graph,
+                symbols_graph,
+                disabled_intrinsic_rules,
             )
             add += _add
             to_cache += _to_cache
@@ -150,10 +152,10 @@ class EqAngle(Predicate):
         mn: Line,
         pq: Line,
         dep_body: DependencyBody,
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
-    ) -> tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[tuple["Statement", "Dependency"]]]:
         """Add eqangle core."""
         if dep_body:
             dep_body = dep_body.copy()
@@ -169,8 +171,8 @@ class EqAngle(Predicate):
                 dep_body
                 and IntrinsicRules.EQANGLE_FROM_PARA not in disabled_intrinsic_rules
             ):
-                eqangle = Statement(EqAngle.NAME, tuple(args))
-                para = Statement(preds.Para.NAME, [x, y, x_, y_])
+                eqangle = Statement(EqAngle, tuple(args))
+                para = Statement(preds.Para, [x, y, x_, y_])
                 dep_body = dep_body.extend(
                     dep_graph,
                     eqangle,
@@ -188,7 +190,7 @@ class EqAngle(Predicate):
         )
 
         if IntrinsicRules.EQANGLE_FROM_CONGRUENT_ANGLE not in disabled_intrinsic_rules:
-            eqangle = Statement(EqAngle.NAME, args)
+            eqangle = Statement(EqAngle, args)
             dep_body = dep_body.extend_by_why(
                 dep_graph,
                 eqangle,
@@ -208,7 +210,7 @@ class EqAngle(Predicate):
         to_cache = []
 
         dep1 = None
-        eqangle = Statement(EqAngle.NAME, [a, b, c, d, m, n, p, q])
+        eqangle = Statement(EqAngle, [a, b, c, d, m, n, p, q])
         if dep_body:
             dep1 = dep_body.build(dep_graph, eqangle)
         if not is_equal(ab_cd, mn_pq):
@@ -217,7 +219,7 @@ class EqAngle(Predicate):
         symbols_graph.make_equal(ab_cd, mn_pq, dep=dep1)
 
         dep2 = None
-        eqangle_sym = Statement(EqAngle.NAME, [c, d, a, b, p, q, m, n])
+        eqangle_sym = Statement(EqAngle, [c, d, a, b, p, q, m, n])
         if dep_body:
             dep2 = dep_body.build(dep_graph, eqangle_sym)
         if not is_equal(cd_ab, pq_mn):
@@ -229,14 +231,14 @@ class EqAngle(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: Statement
+        dep_graph: "DependencyGraph", statement: Statement
     ) -> tuple[Optional[Reason], list[Dependency]]:
         a, b, c, d, m, n, p, q = statement.args
 
-        ab, why1 = statements_graph.symbols_graph.get_line_thru_pair_why(a, b)
-        cd, why2 = statements_graph.symbols_graph.get_line_thru_pair_why(c, d)
-        mn, why3 = statements_graph.symbols_graph.get_line_thru_pair_why(m, n)
-        pq, why4 = statements_graph.symbols_graph.get_line_thru_pair_why(p, q)
+        ab, why1 = dep_graph.symbols_graph.get_line_thru_pair_why(a, b)
+        cd, why2 = dep_graph.symbols_graph.get_line_thru_pair_why(c, d)
+        mn, why3 = dep_graph.symbols_graph.get_line_thru_pair_why(m, n)
+        pq, why4 = dep_graph.symbols_graph.get_line_thru_pair_why(p, q)
 
         if ab is None or cd is None or mn is None or pq is None:
             para_points = None
@@ -248,8 +250,8 @@ class EqAngle(Predicate):
                 para_points = [a, b, m, n]
             elif {p, q} == {m, n}:
                 para_points = [a, b, c, d]
-            para = Statement(preds.Para.NAME, para_points)
-            para_dep = statements_graph.build_resolved_dependency(para, use_cache=False)
+            para = Statement(preds.Para, para_points)
+            para_dep = dep_graph.build_resolved_dependency(para, use_cache=False)
             return None, [para_dep]
 
         why_eqangle = []
@@ -261,10 +263,8 @@ class EqAngle(Predicate):
             x_, y_ = xy.points
             if {x, y} == {x_, y_}:
                 continue
-            collx = Statement(
-                geosolver.predicates.collinearity.Collx.NAME, [x, y, x_, y_]
-            )
-            collx_dep = statements_graph.build_dependency_from_statement(
+            collx = Statement(preds.Collx, [x, y, x_, y_])
+            collx_dep = dep_graph.build_dependency_from_statement(
                 collx, why=whyxy, reason=Reason("_why_eqangle_collx")
             )
             why_eqangle.append(collx_dep)
@@ -274,19 +274,22 @@ class EqAngle(Predicate):
         m, n = mn.points
         p, q = pq.points
 
-        representent_statement = Statement(statement.name, [a, b, c, d, m, n, p, q])
+        representent_predicate = preds.NAME_TO_PREDICATE[statement.name]
+        representent_statement = Statement(
+            representent_predicate, [a, b, c, d, m, n, p, q]
+        )
         different_from_repr = representent_statement.hash_tuple != statement.hash_tuple
 
         why_eqangle_values = None
         if ab._val and cd._val and mn._val and pq._val:
             why_eqangle_values = why_eqangle_directions(
-                statements_graph, ab._val, cd._val, mn._val, pq._val
+                dep_graph, ab._val, cd._val, mn._val, pq._val
             )
 
         if why_eqangle_values:
             if different_from_repr:
-                eqangle = Statement(EqAngle.NAME, [a, b, c, d, m, n, p, q])
-                eqangle_dep = statements_graph.build_dependency_from_statement(
+                eqangle = Statement(EqAngle, [a, b, c, d, m, n, p, q])
+                eqangle_dep = dep_graph.build_dependency_from_statement(
                     eqangle,
                     why=why_eqangle_values,
                     reason=Reason("_why_eqangle_eqangle"),
@@ -302,26 +305,26 @@ class EqAngle(Predicate):
         )
         if equal_pair_points is not None and equal_pair_lines is not None:
             why_eqangle += why_maybe_make_equal_pairs(
-                statements_graph, *equal_pair_points, *equal_pair_lines
+                dep_graph, *equal_pair_points, *equal_pair_lines
             )
             return None, why_eqangle
 
         if is_equal(ab, mn) or is_equal(cd, pq):
-            para1 = Statement(preds.Para.NAME, [a, b, m, n])
-            dep1 = statements_graph.build_resolved_dependency(para1, use_cache=False)
-            para2 = Statement(preds.Para.NAME, [c, d, p, q])
-            dep2 = statements_graph.build_resolved_dependency(para2, use_cache=False)
+            para1 = Statement(preds.Para, [a, b, m, n])
+            dep1 = dep_graph.build_resolved_dependency(para1, use_cache=False)
+            para2 = Statement(preds.Para, [c, d, p, q])
+            dep2 = dep_graph.build_resolved_dependency(para2, use_cache=False)
             why_eqangle += [dep1, dep2]
 
         elif is_equal(ab, cd) or is_equal(mn, pq):
-            para1 = Statement(preds.Para.NAME, [a, b, c, d])
-            dep1 = statements_graph.build_resolved_dependency(para1, use_cache=False)
-            para2 = Statement(preds.Para.NAME, [m, n, p, q])
-            dep2 = statements_graph.build_resolved_dependency(para2, use_cache=False)
+            para1 = Statement(preds.Para, [a, b, c, d])
+            dep1 = dep_graph.build_resolved_dependency(para1, use_cache=False)
+            para2 = Statement(preds.Para, [m, n, p, q])
+            dep2 = dep_graph.build_resolved_dependency(para2, use_cache=False)
             why_eqangle += [dep1, dep2]
         elif ab._val and cd._val and mn._val and pq._val:
             why_eqangle = why_eqangle_directions(
-                statements_graph, ab._val, cd._val, mn._val, pq._val
+                dep_graph, ab._val, cd._val, mn._val, pq._val
             )
 
         return None, why_eqangle
@@ -498,8 +501,9 @@ class EqAngle(Predicate):
         for a, b, c, d, e, f, g, h in EqAngle._all_eqangle_same_lines(symbols_graph):
             yield a, b, c, d, e, f, g, h
 
+    @staticmethod
     def _all_eqangle_same_lines(
-        self, symbols_graph: SymbolsGraph
+        symbols_graph: SymbolsGraph,
     ) -> Generator[tuple[Point, ...], None, None]:
         for l1, l2 in permutations_pairs(symbols_graph.type2nodes[Line]):
             for a, b, c, d, e, f, g, h in all_8points(l1, l2, l1, l2):
@@ -512,7 +516,7 @@ class EqAngle(Predicate):
         return f"{pretty_angle(a, b, c, d)} = {pretty_angle(e, f, g, h)}"
 
     @classmethod
-    def hash(cls: Self, args: list[Point]) -> tuple[str, ...]:
+    def hash(cls, args: list[Point]) -> tuple[str, ...]:
         return hash_two_times_two_unorded_lines(cls.NAME, args)
 
 
@@ -522,7 +526,9 @@ class EqAngle6(EqAngle):
     NAME = "eqangle6"
 
     @staticmethod
-    def enumerate(symbols_graph: SymbolsGraph) -> Generator[ToCache[Point], None, None]:
+    def enumerate(
+        symbols_graph: SymbolsGraph,
+    ) -> Generator[tuple["Statement", "Dependency"][Point], None, None]:
         """List all sets of 6 points that make two equal angles."""
         record = set()
         for a, b, c, d, e, f, g, h in EqAngle.enumerate(symbols_graph):
@@ -548,12 +554,12 @@ class EqAngle6(EqAngle):
             yield a, b, c, d, e, f, g, h  # where a==c, e==g
 
     @classmethod
-    def hash(cls: Self, args: list[Point]) -> tuple[str, ...]:
+    def hash(cls, args: list[Point]) -> tuple[str, ...]:
         return EqAngle.hash(args)
 
 
 def why_eqangle_directions(
-    statements_graph: "WhyHyperGraph",
+    dep_graph: "DependencyGraph",
     d1: Direction,
     d2: Direction,
     d3: Direction,
@@ -594,9 +600,9 @@ def why_eqangle_directions(
     (e_, f_), (g_, h_) = d3_._obj.points, d4_._obj.points
     deps = []
     if why0:
-        eqangle = Statement(EqAngle.NAME, [a_, b_, c_, d_, e_, f_, g_, h_])
+        eqangle = Statement(EqAngle, [a_, b_, c_, d_, e_, f_, g_, h_])
         deps.append(
-            statements_graph.build_dependency_from_statement(
+            dep_graph.build_dependency_from_statement(
                 eqangle, why=why0, reason=Reason("")
             )
         )
@@ -613,14 +619,37 @@ def why_eqangle_directions(
         xy, xy_ = d_xy._obj, d_xy_._obj
         if why:
             if xy == xy_:
-                predicate = geosolver.predicates.collinearity.Collx.NAME
+                predicate = preds.Collx
             else:
-                predicate = preds.Para.NAME
+                predicate = preds.Para
             because_statement = Statement(predicate, [x_, y_, x, y])
             deps.append(
-                statements_graph.build_dependency_from_statement(
+                dep_graph.build_dependency_from_statement(
                     because_statement, why=why, reason=Reason("")
                 )
             )
 
     return deps
+
+
+def all_angles(
+    d1: Direction, d2: Direction
+) -> Generator[Angle, list[Direction], list[Direction]]:
+    d1s = d1.equivs_upto()
+    d2s = d2.equivs_upto()
+
+    for angle in d1.rep().neighbors(Angle):
+        d1_, d2_ = angle._d
+        if d1_ in d1s and d2_ in d2s:
+            yield angle, d1s, d2s
+
+
+def pretty_angle(a: str, b: str, c: str, d: str) -> str:
+    if b in (c, d):
+        a, b = b, a
+    if a == d:
+        c, d = d, c
+
+    if a == c:
+        return f"\u2220{b}{a}{d}"
+    return f"\u2220({a}{b}-{c}{d})"

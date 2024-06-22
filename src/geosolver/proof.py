@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, Optional, Tuple, Type, Union
 from typing_extensions import Self
 import logging
 
-from geosolver.defs.clause import ArgType, Clause, Construction
+from geosolver.defs.clause import Clause, Construction
+from geosolver.dependencies.why_graph import DependencyGraph
 from geosolver.numerical.geometries import (
     CircleNum,
     HalfLine,
@@ -18,14 +19,13 @@ from geosolver.numerical.geometries import (
     PointNum,
     reduce,
 )
-from geosolver.intrinsic_rules import IntrinsicRules
+from geosolver.intrinsic_rules import IntrinsicRules, validate_disabled_rules
 import geosolver.predicates as preds
 from geosolver.ratios import simplify
 from geosolver.reasoning_engines.engines_interface import ReasoningEngine
 from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
 from geosolver.defs.definition import Definition
 from geosolver.theorem import Theorem
-from geosolver.predicate_name import PredicateName
 from geosolver.agent.agents_interface import (
     Action,
     Feedback,
@@ -45,11 +45,11 @@ from geosolver.agent.agents_interface import (
     StopFeedback,
 )
 from geosolver.match_theorems import match_one_theorem
-from geosolver.statements.adder import ToCache
+
 from geosolver.symbols_graph import SymbolsGraph
 from geosolver.geometry import Angle, Ratio, Circle, Point
 
-from geosolver.numerical.check import check_numerical, same_clock
+from geosolver.numerical.check import same_clock
 from geosolver.numerical.distances import (
     PointTooCloseError,
     PointTooFarError,
@@ -119,27 +119,34 @@ class Proof:
 
     def __init__(
         self,
-        dependency_cache: DependencyCache,
+        dependency_graph: DependencyGraph,
         external_reasoning_engines: dict[str, ReasoningEngine],
         symbols_graph: SymbolsGraph,
         rnd_generator: "numpy.random.Generator" = None,
+        disabled_intrinsic_rules: Optional[list[IntrinsicRules | str]] = None,
     ):
-        self.dependency_cache = dependency_cache
+        self.dependency_graph = dependency_graph
         self.symbols_graph = symbols_graph
         self.reasoning_engines = external_reasoning_engines
+        self.disabled_intrinsic_rules = validate_disabled_rules(
+            disabled_intrinsic_rules
+        )
+        self.goal: Optional[Statement] = None
 
-        self._goal: Optional[Construction] = None
-        self._resolved_mapping_deps: dict[str, tuple[DependencyBody, ToCache]] = {}
+        self._goal_construction: Optional[Construction] = None
+        self._resolved_mapping_deps: dict[
+            str, tuple[DependencyBody, tuple["Statement", "Dependency"]]
+        ] = {}
         self._problem: Optional[Problem] = None
         self._definitions: Optional[dict[str, Definition]] = None
         self._init_added: list[Dependency] = []
-        self._init_to_cache: list[ToCache] = []
+        self._init_to_cache: list[tuple["Statement", "Dependency"]] = []
         self._plevel: int = 0
         self._ACTION_TYPE_TO_STEP = {
             MatchAction: self._step_match_theorem,
             ApplyTheoremAction: self._step_apply_theorem,
             ResolveEngineAction: self._step_derive,
-            ImportDerivationAction: self._step_apply_derivation,
+            ImportDerivationAction: self._step_import_derivation,
             AuxAction: self._step_auxiliary_construction,
             StopAction: self._step_stop,
         }
@@ -153,7 +160,7 @@ class Proof:
         problem: Problem,
         definitions: dict[str, Definition],
         disabled_intrinsic_rules: Optional[list[IntrinsicRules]] = None,
-        additional_reasoning_engine: Optional[dict[str, Type[ReasoningEngine]]] = None,
+        reasoning_engine: Optional[dict[str, Type[ReasoningEngine]]] = None,
         max_attempts: int = 10000,
         rnd_generator: "numpy.random.Generator" = None,
     ) -> Self:
@@ -162,27 +169,26 @@ class Proof:
         added = None
         logging.info(f"Building proof from problem '{problem.url}': {problem}")
 
-        if disabled_intrinsic_rules is None:
-            disabled_intrinsic_rules = []
-
         err = DepCheckFailError(f"Numerical check failed {max_attempts} times")
         for _ in range(max_attempts):
             # Search for coordinates that checks premises conditions numerically.
             try:
                 symbols_graph = SymbolsGraph()
                 dependency_cache = DependencyCache()
-                reasoning_engines = {}
+                dependency_graph = DependencyGraph(symbols_graph, dependency_cache)
 
-                for engine_name, engine_type in additional_reasoning_engine.items():
+                reasoning_engines = {}
+                for engine_name, engine_type in reasoning_engine.items():
                     if engine_name in reasoning_engines:
                         raise ValueError(f"Conflicting engine names for {engine_name}")
                     reasoning_engines[engine_name] = engine_type(symbols_graph)
 
                 proof = Proof(
-                    dependency_cache=dependency_cache,
+                    dependency_graph=dependency_graph,
                     external_reasoning_engines=reasoning_engines,
                     symbols_graph=symbols_graph,
                     rnd_generator=rnd_generator,
+                    disabled_intrinsic_rules=disabled_intrinsic_rules,
                 )
                 added = []
                 to_cache = []
@@ -208,14 +214,17 @@ class Proof:
             if not problem.goal:
                 break
 
+            goal_predicate = preds.NAME_TO_PREDICATE[problem.goal.name]
             goal_args = proof.map_construction_args_to_objects(problem.goal)
-            goal = Statement(problem.goal.name, goal_args)
-            if check_numerical(goal):
+            goal = Statement(goal_predicate, goal_args)
+            if goal.check_numerical():
+                proof.goal = goal
                 break
+
         else:
             raise err
 
-        proof._goal = problem.goal
+        proof._goal_construction = problem.goal
         proof._problem = problem
         proof._definitions = definitions
         proof._init_added = added
@@ -234,7 +243,7 @@ class Proof:
     def _step_match_theorem(self, action: MatchAction) -> MatchFeedback:
         theorem = action.theorem
         potential_mappings = match_one_theorem(
-            self, theorem, cache=action.cache, goal=self._goal
+            self, theorem, cache=action.cache, goal=self._goal_construction
         )
         mappings = []
         for mapping in potential_mappings:
@@ -250,7 +259,7 @@ class Proof:
 
     def _resolve_mapping_dependency(
         self, theorem: "Theorem", mapping: Mapping
-    ) -> tuple[Optional[DependencyBody], Optional[ToCache]]:
+    ) -> tuple[Optional[DependencyBody], Optional[tuple["Statement", "Dependency"]]]:
         fail = False
 
         deps: list["Dependency"] = []
@@ -287,11 +296,12 @@ class Proof:
             if not same_clock(a.num, b.num, c.num, x.num, y.num, z.num):
                 p_args = b, a, b, c, y, z, y, x
 
-        premise_statement = Statement(premise.name, tuple(p_args))
+        premise_predicate = preds.NAME_TO_PREDICATE[premise.name]
+        premise_statement = Statement(premise_predicate, tuple(p_args))
 
         dep = None
         fail = False
-        dep = self.statements.graph.build_resolved_dependency(premise_statement)
+        dep = self.dependency_graph.build_resolved_dependency(premise_statement)
         if dep.why is None:
             fail = True
 
@@ -307,17 +317,16 @@ class Proof:
 
     def _apply_theorem(
         self, theorem: "Theorem", mapping: Mapping
-    ) -> Tuple[list[Dependency], list[ToCache], bool]:
+    ) -> Tuple[list[Dependency], list[tuple["Statement", "Dependency"]], bool]:
         mapping_str = theorem_mapping_str(theorem, mapping)
         dep_body, premise_to_cache = self._resolved_mapping_deps[mapping_str]
         args = self.map_construction_args_to_objects(
             theorem.conclusion, mapping_to_names(mapping)
         )
 
-        conclusion_statement = Statement(theorem.conclusion.name, tuple(args))
-        add, to_cache = self.resolve_statement_dependencies(
-            conclusion_statement, dep_body=dep_body
-        )
+        conclusion_predicate = preds.NAME_TO_PREDICATE[theorem.conclusion.name]
+        conclusion_statement = Statement(conclusion_predicate, tuple(args))
+        add, to_cache = self.add_statement(conclusion_statement, dep_body)
         return add, [premise_to_cache] + to_cache, True
 
     def _step_derive(self, action: ResolveEngineAction) -> DeriveFeedback:
@@ -325,10 +334,10 @@ class Proof:
         derivations = choosen_engine.resolve()
         return DeriveFeedback(derivations)
 
-    def _step_apply_derivation(
+    def _step_import_derivation(
         self, action: ImportDerivationAction
     ) -> ImportDerivationFeedback:
-        added, to_cache = self.resolve_statement_dependencies(
+        added, to_cache = self.add_statement(
             action.derivation.statement, action.derivation.dep_body
         )
         self.cache_deps(to_cache)
@@ -378,7 +387,8 @@ class Proof:
         proof = Proof.build_problem(
             problem,
             self._definitions,
-            disabled_intrinsic_rules=self.statements.adder.DISABLED_INTRINSIC_RULES,
+            disabled_intrinsic_rules=self.disabled_intrinsic_rules,
+            reasoning_engine=self.reasoning_engines,
             rnd_generator=self.rnd_gen,
         )
         return proof
@@ -390,37 +400,22 @@ class Proof:
         del self.rnd_gen
         self.rnd_gen = rnd_gen
 
-    def resolve_statement_dependencies(
+    def add_statement(
         self, statement: Statement, dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[ToCache]]:
-        return self.statements.adder.add(statement, dep_body)
+    ) -> Tuple[list[Dependency], list[tuple["Statement", "Dependency"]]]:
+        return statement.add(
+            dep_body,
+            self.dependency_graph,
+            self.symbols_graph,
+            self.disabled_intrinsic_rules,
+        )
 
-    def cache_deps(self, deps_to_cache: list[ToCache]):
+    def cache_deps(self, deps_to_cache: list[tuple["Statement", "Dependency"]]):
         for to_cache in deps_to_cache:
-            self.dependency_cache.add_dependency(*to_cache)
+            self.dependency_graph.dependency_cache.add_dependency(*to_cache)
 
-    def check(self, statement: Statement) -> bool:
-        """Symbolically check if a statement is currently considered True."""
-        if statement.predicate in [
-            PredicateName.FIX_L,
-            PredicateName.FIX_C,
-            PredicateName.FIX_B,
-            PredicateName.FIX_T,
-            PredicateName.FIX_P,
-        ]:
-            return self.dependency_cache.contains(statement)
-        if statement.predicate is PredicateName.IND:
-            return True
-        return self.statements.checker.check(statement)
-
-    def check_goal(self):
-        success = False
-        if self._goal is not None:
-            goal_args = self.map_construction_args_to_objects(self._goal)
-            goal_statement = Statement(self._goal.name, goal_args)
-            if self.check(goal_statement):
-                success = True
-        return success
+    def check_goal(self) -> bool:
+        return self.goal.check(self.symbols_graph)
 
     def additionally_draw(self, name: str, args: list[Point]) -> None:
         """Draw some extra line/circles for illustration purpose."""
@@ -487,7 +482,7 @@ class Proof:
         clause: Clause,
         plevel: int,
         definitions: dict[str, Definition],
-    ) -> tuple[list[Dependency], list[ToCache], int]:
+    ) -> tuple[list[Dependency], list[tuple["Statement", "Dependency"]], int]:
         """Add a new clause of construction, e.g. a new excenter."""
         existing_points = self.symbols_graph.all_points()
         new_points = [Point(name) for name in clause.points]
@@ -519,10 +514,7 @@ class Proof:
                 if clause_construction.name == "midpoint"
                 else clause_construction.name
             )
-            construction = Construction(
-                c_name, clause_construction.args, clause_construction.args_types
-            )
-
+            construction = Construction(c_name, clause_construction.args)
             deps: list[Dependency] = []
             for construction in cdef.clause.constructions:
                 args = self.symbols_graph.names2points(
@@ -530,15 +522,16 @@ class Proof:
                 )
                 new_points_dep_points.update(args)
 
-                statement = Statement(construction.name, args)
-                if not self.check(statement):
+                construction_predicate = preds.NAME_TO_PREDICATE[construction.name]
+                statement = Statement(construction_predicate, args)
+                if not statement.check(self.symbols_graph):
                     raise DepCheckFailError(
                         construction.name + " " + " ".join([x.name for x in args])
                     )
 
                 construction_body = DependencyBody(reason=reason, why=[])
                 construction_dep = construction_body.build(
-                    self.statements.graph, statement
+                    self.dependency_graph, statement
                 )
                 deps.append(construction_dep)
 
@@ -685,10 +678,9 @@ class Proof:
 
                 for b in bs:
                     args = self.map_construction_args_to_objects(b, mapping)
-                    basic_statement = Statement(b.name, args)
-                    adds, basic_to_cache = self.resolve_statement_dependencies(
-                        basic_statement, dep_body=dep_body
-                    )
+                    basic_predicate = preds.NAME_TO_PREDICATE[b.name]
+                    basic_statement = Statement(basic_predicate, args)
+                    adds, basic_to_cache = self.add_statement(basic_statement, dep_body)
                     to_cache += basic_to_cache
 
                     basics.append((basic_statement, dep_body))
@@ -705,35 +697,30 @@ class Proof:
         self, construction: Construction, mapping: Optional[dict[str, str]] = None
     ) -> list[Point | Angle | Ratio]:
         args_objs = []
-        for arg, arg_type in zip(construction.args, construction.args_types):
+        for arg in construction.args:
             if mapping and arg in mapping:
                 arg = mapping[arg]
-            args_objs.append(arg_to_object(arg, arg_type, self.symbols_graph))
+            args_objs.append(arg_to_object(arg, self.symbols_graph))
         return args_objs
 
 
-def arg_to_object(arg: str, arg_type: ArgType, symbols_graph: "SymbolsGraph"):
-    if arg_type is ArgType.POINT:
+def arg_to_object(arg: str, symbols_graph: "SymbolsGraph"):
+    if arg in symbols_graph._name2point:
         return symbols_graph.get_point(arg)
-    elif arg_type is ArgType.ANGLE:
+    elif "pi/" in arg or arg.endswith("o"):
         if "pi/" in arg:
             # pi fraction
             num, den = angle_to_num_den(arg)
-        elif arg.endswith("o"):
+        else:
             # degrees
             num, den = simplify(int(arg[:-1]), 180)
-        else:
-            raise ValueError("Could not interpret constant angle: %s", arg)
         ang, _ = symbols_graph.get_or_create_const_ang(num, den)
         return ang
-    elif arg_type is ArgType.RATIO:
-        if "/" not in arg:
-            raise ValueError("Cannot interpret %s as a ratio", arg)
+    elif "/" in arg:
         num, den = ratio_to_num_den(arg)
         rat, _ = symbols_graph.get_or_create_const_rat(num, den)
         return rat
-    elif arg_type is ArgType.LENGTH:
-        return symbols_graph.get_or_create_const_length(float(arg))
+    return symbols_graph.get_or_create_const_length(float(arg))
 
 
 def mapping_to_names(mapping: Mapping) -> dict[str, str]:

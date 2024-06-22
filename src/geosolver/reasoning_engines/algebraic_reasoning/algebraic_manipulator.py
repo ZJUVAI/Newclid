@@ -3,11 +3,9 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 
-from geosolver.numerical.check import check_numerical
 import geosolver.predicates as preds
 from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.reasoning_engines.engines_interface import Derivation, ReasoningEngine
-from geosolver.predicate_name import PredicateName
 from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.symbols_graph import is_equiv
 
@@ -43,14 +41,14 @@ class AlgebraicManipulator(ReasoningEngine):
         self.verbose = config.get("verbose", "")
 
         self.PREDICATE_TO_ADDER = {
-            preds.Para.NAME: self._add_para,
-            preds.Perp.NAME: self._add_perp,
-            preds.Cong.NAME: self._add_cong,
-            preds.EqAngle.NAME: self._add_eqangle,
-            preds.EqRatio.NAME: self._add_eqratio,
-            preds.ConstantAngle.NAME: self._add_aconst,
-            preds.SAngle.NAME: self._add_aconst,
-            preds.ConstantRatio.NAME: self._add_rconst,
+            preds.Para: self._add_para,
+            preds.Perp: self._add_perp,
+            preds.Cong: self._add_cong,
+            preds.EqAngle: self._add_eqangle,
+            preds.EqRatio: self._add_eqratio,
+            preds.ConstantAngle: self._add_aconst,
+            preds.SAngle: self._add_aconst,
+            preds.ConstantRatio: self._add_rconst,
         }
 
     def ingest(self, dependency: "Dependency") -> None:
@@ -94,7 +92,7 @@ class AlgebraicManipulator(ReasoningEngine):
                     continue
 
                 (m, n), (p, q) = mn._obj.points, pq._obj.points
-                cong = Statement(preds.Cong.NAME_2, (m, n, p, q))
+                cong = Statement(preds.Cong2, (m, n, p, q))
                 added.append(Derivation(cong, dep))
 
             if len(x) == 4:
@@ -105,7 +103,7 @@ class AlgebraicManipulator(ReasoningEngine):
                     *mn._obj.points,
                     *pq._obj.points,
                 )
-                eqratio = Statement(preds.EqRatio.NAME, points)
+                eqratio = Statement(preds.EqRatio, points)
                 added.append(Derivation(eqratio, dep))
 
         return added
@@ -124,8 +122,8 @@ class AlgebraicManipulator(ReasoningEngine):
                     continue
 
                 points = (*ab._obj.points, *cd._obj.points)
-                para = Statement(preds.Para.NAME, points)
-                if not check_numerical(para):
+                para = Statement(preds.Para, points)
+                if not para.check_numerical():
                     continue
 
                 added.append(Derivation(para, dep))
@@ -135,8 +133,8 @@ class AlgebraicManipulator(ReasoningEngine):
                 points = (*ef._obj.points, *pq._obj.points)
                 angle, opposite_angle = self.symbols_graph.get_or_create_const_ang(n, d)
                 angle.opposite = opposite_angle
-                aconst = Statement(preds.ConstantAngle.NAME, (*points, angle))
-                if not check_numerical(aconst):
+                aconst = Statement(preds.ConstantAngle, (*points, angle))
+                if not aconst.check_numerical():
                     continue
 
                 added.append(Derivation(aconst, dep))
@@ -149,7 +147,7 @@ class AlgebraicManipulator(ReasoningEngine):
                     *mn._obj.points,
                     *pq._obj.points,
                 )
-                eqangle = Statement(preds.EqAngle.NAME, points)
+                eqangle = Statement(preds.EqAngle, points)
                 added.append(Derivation(eqangle, dep))
 
         return added
@@ -162,18 +160,19 @@ class AlgebraicManipulator(ReasoningEngine):
             dep = DependencyBody(reason=Reason(AlgebraicRules.Distance_Chase), why=why)
 
             if len(x) == 2:
-                a, b = x
-                if a == b:
-                    continue
+                raise NotImplementedError
+                # a, b = x
+                # if a == b:
+                #     continue
 
-                inci = Statement(PredicateName.INCI, (a, b))
-                added.append(Derivation(inci, dep))
+                # inci = Statement(PredicateName.INCI, (a, b))
+                # added.append(Derivation(inci, dep))
 
             if len(x) == 4:
                 a, b, c, d = x
                 if not (a != b and c != d and (a != c or b != d)):
                     continue
-                cong = Statement(preds.Cong.NAME, (a, b, c, d))
+                cong = Statement(preds.Cong, (a, b, c, d))
                 added.append(Derivation(cong, dep))
 
             if len(x) == 6:
@@ -181,7 +180,7 @@ class AlgebraicManipulator(ReasoningEngine):
                 if not (a != b and c != d and (a != c or b != d)):
                     continue
                 ratio, _ = self.symbols_graph.get_or_create_const_rat(num, den)
-                rconst = Statement(preds.ConstantRatio.NAME, (a, b, c, d, ratio))
+                rconst = Statement(preds.ConstantRatio, (a, b, c, d, ratio))
                 added.append(Derivation(rconst, dep))
 
         return added

@@ -1,7 +1,6 @@
 from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING, Generator, Optional
-from typing_extensions import Self
 
 from geosolver.combinatorics import arrangement_triplets, permutations_quadruplets
 from geosolver.dependencies.dependency import Reason, Dependency
@@ -18,7 +17,7 @@ from geosolver.symbols_graph import SymbolsGraph
 
 
 if TYPE_CHECKING:
-    from geosolver.dependencies.why_graph import WhyHyperGraph
+    from geosolver.dependencies.why_graph import DependencyGraph
     from geosolver.dependencies.dependency_building import DependencyBody
 
 
@@ -32,7 +31,7 @@ class Cyclic(Predicate):
     def add(
         args: list[Point | Ratio | Angle],
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -83,7 +82,7 @@ class Cyclic(Predicate):
 
             abcdef_deps = dep_body
             if IntrinsicRules.CYCLIC_FROM_CIRCLE:
-                cyclic = Statement(Cyclic.NAME, og_points)
+                cyclic = Statement(Cyclic, og_points)
                 abcdef_deps = abcdef_deps.extend_by_why(
                     dep_graph,
                     cyclic,
@@ -92,7 +91,7 @@ class Cyclic(Predicate):
                 )
 
             is_cyclic = Cyclic.check(args, symbols_graph)
-            cyclic = Statement(Cyclic.NAME, args)
+            cyclic = Statement(Cyclic, args)
             dep = abcdef_deps.build(dep_graph, cyclic)
             to_cache.append((cyclic, dep))
             symbols_graph.merge_into(circle0, [circle], dep)
@@ -104,17 +103,17 @@ class Cyclic(Predicate):
     def _cyclic_dep(
         points: list[Point],
         p: Point,
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
     ) -> list[Dependency]:
         for p1, p2, p3 in arrangement_triplets(points):
             if Cyclic.check([p1, p2, p3, p], symbols_graph):
-                cyclic = Statement(Cyclic.NAME, (p1, p2, p3, p))
+                cyclic = Statement(Cyclic, (p1, p2, p3, p))
                 return dep_graph.build_resolved_dependency(cyclic)
 
     @staticmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: "Statement"
+        dep_graph: "DependencyGraph", statement: "Statement"
     ) -> tuple[Optional[Reason], list[Dependency]]:
         _, why = Cyclic._circle_of_and_why(statement.args)
         return None, why
@@ -177,5 +176,5 @@ class Cyclic(Predicate):
         return "" + ",".join(args) + " are concyclic"
 
     @classmethod
-    def hash(cls: Self, args: list[Point]) -> tuple[str]:
+    def hash(cls, args: list[Point]) -> tuple[str]:
         return hash_unordered_set_of_points(cls.NAME, args)

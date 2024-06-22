@@ -1,7 +1,6 @@
 from __future__ import annotations
 from collections import defaultdict
 from typing import TYPE_CHECKING, Generator, Optional
-from typing_extensions import Self
 
 from geosolver.dependencies.dependency import Reason, Dependency
 
@@ -20,7 +19,7 @@ import geosolver.predicates as preds
 
 
 if TYPE_CHECKING:
-    from geosolver.dependencies.why_graph import WhyHyperGraph
+    from geosolver.dependencies.why_graph import DependencyGraph
     from geosolver.dependencies.dependency_building import DependencyBody
 
 
@@ -33,13 +32,13 @@ class Circumcenter(Predicate):
     and equivalent pairs of congruences.
     """
 
-    NAME = "circumcenter"
+    NAME = "circle"
 
     @staticmethod
     def add(
         args: list[Point | Ratio | Angle],
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -54,12 +53,12 @@ class Circumcenter(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: "Statement"
+        dep_graph: "DependencyGraph", statement: "Statement"
     ) -> tuple[Optional[Reason], list[Dependency]]:
         o, a, b, c = statement.args
-        oa = statements_graph.symbols_graph.get_segment(o, a)
-        ob = statements_graph.symbols_graph.get_segment(o, b)
-        oc = statements_graph.symbols_graph.get_segment(o, c)
+        oa = dep_graph.symbols_graph.get_segment(o, a)
+        ob = dep_graph.symbols_graph.get_segment(o, b)
+        oc = dep_graph.symbols_graph.get_segment(o, c)
         return None, why_equal(oa, ob) + why_equal(oa, oc)
 
     @staticmethod
@@ -98,5 +97,5 @@ class Circumcenter(Predicate):
         return f"{o} is the circumcenter of \\Delta {a}{b}{c}"
 
     @classmethod
-    def hash(cls: Self, args: list[Point]) -> tuple[str, ...]:
+    def hash(cls, args: list[Point]) -> tuple[str, ...]:
         return hash_point_then_set_of_points(cls.NAME, args)

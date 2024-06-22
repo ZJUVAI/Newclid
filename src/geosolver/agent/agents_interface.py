@@ -14,12 +14,14 @@ if TYPE_CHECKING:
     from geosolver.proof import Proof
     from geosolver.geometry import Point
     from geosolver.theorem import Theorem
-    from geosolver.statements.adder import ToCache
+
     from geosolver.dependencies.dependency import Dependency
     from geosolver.match_theorems import MatchCache
 
     from geosolver.reasoning_engines.engines_interface import Derivation
     from geosolver.problem import Problem
+
+    from geosolver.statements.statement import Statement
 
 
 Mapping = dict[str, Union["Point", str]]
@@ -82,7 +84,7 @@ class ResetFeedback(NamedTuple):
     problem: "Problem"
     available_engines: list[str]
     added: list["Dependency"]
-    to_cache: list["ToCache"]
+    to_cache: list[tuple["Statement", "Dependency"]]
 
 
 class StopFeedback(NamedTuple):
@@ -96,7 +98,7 @@ class ApplyTheoremFeedback(NamedTuple):
 
     success: bool
     added: list["Dependency"]
-    to_cache: list["ToCache"]
+    to_cache: list[tuple["Statement", "Dependency"]]
 
 
 class MatchFeedback(NamedTuple):
@@ -116,7 +118,7 @@ class ImportDerivationFeedback(NamedTuple):
     """Feedback from importing a derivation."""
 
     added: list["Dependency"]
-    to_cache: list["ToCache"]
+    to_cache: list[tuple["Statement", "Dependency"]]
 
 
 class AuxFeedback(NamedTuple):
@@ -124,7 +126,7 @@ class AuxFeedback(NamedTuple):
 
     success: bool
     added: list["Dependency"]
-    to_cache: list["ToCache"]
+    to_cache: list[tuple["Statement", "Dependency"]]
 
 
 Feedback = Union[

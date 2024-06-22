@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Optional
 
 
 from geosolver.defs.clause import Construction
-from geosolver.statements.statement import Statement
 import geosolver.pretty as pt
 import geosolver.trace_back as trace_back
 
@@ -26,12 +25,7 @@ def get_proof_steps(
     dict[tuple[str, ...], int],
 ]:
     """Extract proof steps from the built DAG."""
-    goal_args = proof.symbols_graph.names2nodes(goal.args)
-    goal = Statement(goal.name, goal_args)
-
-    setup, aux, log, setup_points = trace_back.get_logs(
-        goal, proof, merge_trivials=merge_trivials
-    )
+    setup, aux, log, setup_points = trace_back.get_logs(proof, merge_trivials)
 
     refs = {}
     setup = trace_back.point_log(setup, refs, set())

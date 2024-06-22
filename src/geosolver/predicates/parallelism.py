@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Generator, Optional
-from typing_extensions import Self
 
 from geosolver.combinatorics import all_4points, permutations_pairs
 from geosolver.dependencies.dependency import Dependency, Reason
@@ -19,7 +18,7 @@ import geosolver.predicates as preds
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency_building import DependencyBody
-    from geosolver.dependencies.why_graph import WhyHyperGraph
+    from geosolver.dependencies.why_graph import DependencyGraph
 
 
 class Para(Predicate):
@@ -33,7 +32,7 @@ class Para(Predicate):
     def add(
         args: list[Point],
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -47,37 +46,37 @@ class Para(Predicate):
         if IntrinsicRules.PARA_FROM_LINES not in disabled_intrinsic_rules:
             dep_body = dep_body.extend_by_why(
                 dep_graph,
-                Statement(Para.NAME, args),
+                Statement(Para, args),
                 why=why1 + why2,
                 extention_reason=Reason(IntrinsicRules.PARA_FROM_LINES),
             )
 
-        para = Statement(Para.NAME, (a, b, c, d))
+        para = Statement(Para, (a, b, c, d))
         dep = dep_body.build(dep_graph, para)
         to_cache = [(para, dep)]
-
+        was_equal = is_equal(ab, cd)
         symbols_graph.make_equal(ab, cd, dep)
-        if not is_equal(ab, cd):
+        if not was_equal:
             return [dep], to_cache
         return [], to_cache
 
     @staticmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: Statement
+        dep_graph: "DependencyGraph", statement: Statement
     ) -> tuple[Optional[Reason], list[Dependency]]:
         a, b, c, d = statement.args
 
         if {a, b} == {c, d}:
             return []
 
-        ab = statements_graph.symbols_graph.get_line(a, b)
-        cd = statements_graph.symbols_graph.get_line(c, d)
+        ab = dep_graph.symbols_graph.get_line(a, b)
+        cd = dep_graph.symbols_graph.get_line(c, d)
         if ab == cd:
             if {a, b} == {c, d}:
                 return None, []
 
-            coll = Statement(preds.Coll.NAME, list({a, b, c, d}))
-            coll_dep = statements_graph.build_resolved_dependency(coll, use_cache=False)
+            coll = Statement(preds.Coll, list({a, b, c, d}))
+            coll_dep = dep_graph.build_resolved_dependency(coll, use_cache=False)
             return None, [coll_dep]
 
         whypara = []
@@ -85,10 +84,8 @@ class Para(Predicate):
             x_, y_ = xy.points
             if {x, y} == {x_, y_}:
                 continue
-            collx = Statement(preds.Coll.NAME, [x, y, x_, y_])
-            collx_dep = statements_graph.build_resolved_dependency(
-                collx, use_cache=False
-            )
+            collx = Statement(preds.Coll, [x, y, x_, y_])
+            collx_dep = dep_graph.build_resolved_dependency(collx, use_cache=False)
             whypara.append(collx_dep)
 
         return None, whypara + why_equal(ab, cd)
@@ -135,7 +132,7 @@ class Para(Predicate):
         return f"{a}{b} \u2225 {c}{d}"
 
     @classmethod
-    def hash(cls: Self, args: list[Point]) -> tuple[str]:
+    def hash(cls, args: list[Point]) -> tuple[str]:
         return hashed_unordered_two_lines_points(cls.NAME, args)
 
 
@@ -153,7 +150,7 @@ class NPara(Predicate):
     def add(
         args: list[Point],
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -161,13 +158,13 @@ class NPara(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: Statement
+        dep_graph: "DependencyGraph", statement: Statement
     ) -> tuple[Optional[Reason], list[Dependency]]:
         return None, []
 
     @staticmethod
     def check(args: list[Point], symbols_graph: SymbolsGraph) -> bool:
-        if Para.check(args):
+        if Para.check(args, symbols_graph):
             return False
         return not Para.check_numerical([p.num for p in args])
 
@@ -186,5 +183,5 @@ class NPara(Predicate):
         raise NotImplementedError
 
     @classmethod
-    def hash(cls: Self, args: list[Point]) -> tuple[str | Point]:
+    def hash(cls, args: list[Point]) -> tuple[str | Point]:
         return hashed_unordered_two_lines_points(cls.NAME, args)

@@ -26,8 +26,6 @@ class TestProof:
         )
         self.proof = solver.proof_state
         self.symbols_graph = self.proof.symbols_graph
-        self.checker = self.proof.statements.checker
-        self.enumerator = self.proof.statements.enumerator
 
     @pytest.mark.slow
     @pytest.mark.parametrize(
@@ -45,6 +43,7 @@ class TestProof:
         ),
     )
     def test_enumerate(self, predicate: Predicate):
-        for points in predicate.enumerate(self.symbols_graph):
-            check.is_true(predicate.check(points))
+        enumerated_points = predicate.enumerate(self.symbols_graph)
+        for points in enumerated_points:
+            check.is_true(predicate.check(points, self.symbols_graph))
             check.is_true(predicate.check_numerical([p.num for p in points]))

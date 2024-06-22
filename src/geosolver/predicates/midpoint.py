@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Generator, Optional
-from typing_extensions import Self
 
 from geosolver.dependencies.dependency import Reason, Dependency
 
@@ -19,23 +18,23 @@ import geosolver.predicates as preds
 
 
 if TYPE_CHECKING:
-    from geosolver.dependencies.why_graph import WhyHyperGraph
+    from geosolver.dependencies.why_graph import DependencyGraph
     from geosolver.dependencies.dependency_building import DependencyBody
 
 
 class MidPoint(Predicate):
-    """midpoint M A B -
+    """midp M A B -
     Represent that M is the midpoint of the segment AB.
 
     Can be equivalent to coll M A B and cong A M B M."""
 
-    NAME = "midpoint"
+    NAME = "midp"
 
     @staticmethod
     def add(
         args: list[Point | Ratio | Angle],
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -50,13 +49,13 @@ class MidPoint(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: "Statement"
+        dep_graph: "DependencyGraph", statement: "Statement"
     ) -> tuple[Optional[Reason], list[Dependency]]:
         m, a, b = statement.args
-        ma = statements_graph.symbols_graph.get_segment(m, a)
-        mb = statements_graph.symbols_graph.get_segment(m, b)
-        coll = Statement(preds.Coll.NAME, [m, a, b])
-        coll_dep = statements_graph.build_resolved_dependency(coll, use_cache=False)
+        ma = dep_graph.symbols_graph.get_segment(m, a)
+        mb = dep_graph.symbols_graph.get_segment(m, b)
+        coll = Statement(preds.Coll, [m, a, b])
+        coll_dep = dep_graph.build_resolved_dependency(coll, use_cache=False)
         return None, [coll_dep] + why_equal(ma, mb)
 
     @staticmethod
@@ -87,5 +86,5 @@ class MidPoint(Predicate):
         return f"{x} is midpoint of {a}{b}"
 
     @classmethod
-    def hash(cls: Self, args: list[Point]) -> tuple[str, ...]:
+    def hash(cls, args: list[Point]) -> tuple[str, ...]:
         return hash_point_and_line(cls.NAME, args)

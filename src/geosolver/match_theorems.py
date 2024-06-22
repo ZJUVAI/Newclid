@@ -7,7 +7,6 @@ import geosolver.combinatorics as comb
 from geosolver.defs.clause import Construction
 import geosolver.predicates as preds
 
-from geosolver.predicate_name import PredicateName
 from geosolver.agent.agents_interface import Mapping
 from geosolver.points_manipulation import (
     diff_point,
@@ -498,7 +497,7 @@ def match_cong_cong_cong_ncoll_contri(
     g_matcher: Callable[[str], list[tuple[Point, ...]]],
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
-    """Match cong A B P Q, cong B C Q R, cong C A R P, ncoll A B C => contri* A B C P Q R."""
+    """Match cong A B P Q, cong B C Q R, cong C A R P, ncoll A B C => contri A B C P Q R."""
     symbols_graph = proof.symbols_graph
     record = set()
     for a, b, p, q in g_matcher(preds.Cong.NAME):
@@ -520,7 +519,7 @@ def match_cong_cong_eqangle6_ncoll_contri(
     g_matcher: Callable[[str], list[tuple[Point, ...]]],
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
-    """Match cong A B P Q, cong B C Q R, eqangle6 B A B C Q P Q R, ncoll A B C => contri* A B C P Q R."""
+    """Match cong A B P Q, cong B C Q R, eqangle6 B A B C Q P Q R, ncoll A B C => contri A B C P Q R."""
     symbols_graph = proof.symbols_graph
     record = set()
     for a, b, p, q in g_matcher(preds.Cong.NAME):
@@ -564,7 +563,7 @@ def match_eqratio6_eqangle6_ncoll_simtri(
     g_matcher: Callable[[str], list[tuple[Point, ...]]],
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
-    """Match eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R."""
+    """Match eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri A B C P Q R."""
     symbols_graph = proof.symbols_graph
     enums = g_matcher(preds.EqRatio6.NAME)
 
@@ -616,7 +615,7 @@ def match_eqratio6_eqratio6_ncoll_simtri(
     g_matcher: Callable[[str], list[tuple[Point, ...]]],
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
-    """Match eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R."""
+    """Match eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri A B C P Q R."""
     symbols_graph = proof.symbols_graph
     enums = g_matcher(preds.EqRatio6.NAME)
 
@@ -641,7 +640,7 @@ def match_eqangle6_eqangle6_ncoll_simtri2(
     g_matcher: Callable[[str], list[tuple[Point, ...]]],
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
-    """Match eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C => simtri2 A B C P Q R."""
+    """Match eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C => simtrir A B C P Q R."""
     symbols_graph = proof.symbols_graph
     enums = g_matcher(preds.EqAngle6.NAME)
 
@@ -694,7 +693,7 @@ def match_eqratio6_eqratio6_ncoll_cong_contri(
     g_matcher: Callable[[str], list[tuple[Point, ...]]],
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
-    """Match eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C, cong A B P Q => contri* A B C P Q R."""
+    """Match eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C, cong A B P Q => contri A B C P Q R."""
     symbols_graph = proof.symbols_graph
     enums = g_matcher(preds.EqRatio6.NAME)
 
@@ -722,7 +721,7 @@ def match_eqangle6_eqangle6_ncoll_cong_contri2(
     g_matcher: Callable[[str], list[tuple[Point, ...]]],
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
-    """Match eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C, cong A B P Q => contri2 A B C P Q R."""
+    """Match eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C, cong A B P Q => contrir A B C P Q R."""
     symbols_graph = proof.symbols_graph
     enums = g_matcher(preds.EqAngle6.NAME)
 
@@ -855,7 +854,9 @@ def match_generic(
         checks_ok = True
         for check in numerical_checks:
             args = [mapping[a] for a in check.args]
-            checks_ok = preds.NAME_TO_PREDICATE[check.name].check(args)
+            checks_ok = preds.NAME_TO_PREDICATE[check.name].check(
+                args, proof.symbols_graph
+            )
             if not checks_ok:
                 break
         if not checks_ok:
@@ -924,19 +925,6 @@ def match_one_theorem(
     """Match all instances of a single theorem (rule)."""
     if cache is None:
         cache = MatchCache(proof)
-
-    name = theorem.name
-    if name.split("_")[-1] in [
-        PredicateName.COMPUTE_ANGLE.value,
-        PredicateName.COMPUTE_RATIO.value,
-        PredicateName.FIX_L.value,
-        PredicateName.FIX_C.value,
-        PredicateName.FIX_B.value,
-        PredicateName.FIX_T.value,
-        PredicateName.FIX_P.value,
-    ]:
-        if goal and goal.name != name:
-            return []
 
     if theorem.name in BUILT_IN_FNS:
         mps = BUILT_IN_FNS[theorem.name](proof, cache, theorem)

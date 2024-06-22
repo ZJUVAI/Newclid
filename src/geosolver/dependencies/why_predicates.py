@@ -5,38 +5,14 @@ from typing import TYPE_CHECKING, Optional, TypeVar
 
 import geosolver.predicates as preds
 
-import geosolver.predicates.collinearity
 from geosolver.statements.statement import Statement
 
-from geosolver.dependencies.dependency import Dependency, Reason
+from geosolver.dependencies.dependency import Dependency
 from geosolver.geometry import Line, Symbol, Point
-from geosolver.predicate_name import PredicateName
 
 
 if TYPE_CHECKING:
-    from geosolver.dependencies.why_graph import WhyHyperGraph
-
-
-def why_dependency(
-    statements_graph: "WhyHyperGraph",
-    statement: "Statement",
-    use_cache: bool = True,
-) -> tuple[Reason, list[Dependency]]:
-    if use_cache:
-        cached_me = statements_graph.dependency_cache.get(statement)
-        if cached_me is not None:
-            return cached_me.reason, cached_me.why
-
-    predicate = PredicateName(statement.name)
-    reason = Reason(f"why_{predicate.value}_resolution")
-
-    if predicate is PredicateName.IND:
-        return reason, []
-
-    _reason, why = preds.NAME_TO_PREDICATE[predicate].why(statements_graph, statement)
-    if _reason is not None:
-        reason = _reason
-    return reason, why
+    from geosolver.dependencies.why_graph import DependencyGraph
 
 
 def why_equal(x: Symbol, y: Symbol) -> list[Dependency]:
@@ -100,7 +76,7 @@ def find_equal_pair(
 
 
 def why_maybe_make_equal_pairs(
-    statements_graph: "WhyHyperGraph",
+    dep_graph: "DependencyGraph",
     a: Point,
     b: Point,
     c: Point,
@@ -116,14 +92,12 @@ def why_maybe_make_equal_pairs(
     if ab != mn:
         return
     why = []
-    eqpredicate = preds.Para.NAME if isinstance(ab, Line) else preds.Cong.NAME
+    eqpredicate = preds.Para if isinstance(ab, Line) else preds.Cong
     colls = [a, b, m, n]
-    if len(set(colls)) > 2 and eqpredicate is preds.Para.NAME:
-        collx = Statement(geosolver.predicates.collinearity.Collx.NAME, colls)
-        why.append(statements_graph.build_resolved_dependency(collx, use_cache=False))
+    if len(set(colls)) > 2 and eqpredicate is preds.Para:
+        collx = Statement(preds.Collx, colls)
+        why.append(dep_graph.build_resolved_dependency(collx, use_cache=False))
 
     eq_statement = Statement(eqpredicate, [c, d, p, q])
-    why.append(
-        statements_graph.build_resolved_dependency(eq_statement, use_cache=False)
-    )
+    why.append(dep_graph.build_resolved_dependency(eq_statement, use_cache=False))
     return why

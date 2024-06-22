@@ -1,31 +1,77 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, TypeVar, Union
+from typing import TYPE_CHECKING, Type, TypeVar
 
-from geosolver.predicate_name import PredicateName
+from geosolver.dependencies.dependency import Reason, Dependency
+from geosolver.geometry import Symbol, Point, Angle, Ratio, Length
 
 if TYPE_CHECKING:
-    from geosolver.geometry import Symbol, Point, Angle, Ratio
+    from geosolver.predicates.predicate import Predicate
+    from geosolver.dependencies.dependency_building import DependencyBody
+    from geosolver.dependencies.why_graph import DependencyGraph
+    from geosolver.symbols_graph import SymbolsGraph
+    from geosolver.intrinsic_rules import IntrinsicRules
 
 
 @dataclass
 class Statement:
     """One predicate applied to a set of points and values."""
 
-    predicate: PredicateName
-    args: tuple["Point" | "Ratio" | "Angle" | int | str, ...]
+    predicate: Type["Predicate"]
+    args: tuple["Point" | "Ratio" | "Angle" | "Length", ...]
 
     def __post_init__(self):
-        self.predicate = PredicateName(self.predicate)
-        self.hash_tuple = hash_statement(self.name, self.args)
+        assert not isinstance(self.predicate, str)
+        self.hash_tuple = self.predicate.hash([_symbol_to_txt(p) for p in self.args])
 
     def translate(self, mapping: dict[str, str]) -> Statement:
         args = [mapping[a] if a in mapping else a for a in self.args]
         return Statement(self.name, tuple(args))
 
+    def add(
+        self,
+        dep_body: "DependencyBody",
+        dep_graph: "DependencyGraph",
+        symbols_graph: "SymbolsGraph",
+        disabled_intrinsic_rules: list[IntrinsicRules],
+    ) -> tuple[list["Dependency"], list[tuple[Statement, "Dependency"]]]:
+        """Add the statement as an admitted fact."""
+        return self.predicate.add(
+            self.args,
+            dep_body=dep_body,
+            dep_graph=dep_graph,
+            symbols_graph=symbols_graph,
+            disabled_intrinsic_rules=disabled_intrinsic_rules,
+        )
+
+    def check(self, symbols_graph: "SymbolsGraph"):
+        """Symbolically check if the statement is currently considered True."""
+        return self.predicate.check(self.args, symbols_graph)
+
+    def check_numerical(self):
+        """Check if the statement is numerically sound."""
+        num_args = [p.num if isinstance(p, Point) else p for p in self.args]
+        return self.predicate.check_numerical(num_args)
+
+    def why(
+        self,
+        dep_graph: "DependencyGraph",
+        use_cache: bool = True,
+    ) -> tuple["Reason", list["Dependency"]]:
+        if use_cache:
+            cached_me = dep_graph.dependency_cache.get(self)
+            if cached_me is not None:
+                return cached_me.reason, cached_me.why
+
+        reason = Reason(f"why_{self.predicate.NAME}_resolution")
+        _reason, why = self.predicate.why(dep_graph, self)
+        if _reason is not None:
+            reason = _reason
+        return reason, why
+
     @property
     def name(self):
-        return self.predicate.value
+        return self.predicate.NAME
 
     def __str__(self) -> str:
         return name_and_arguments_to_str(self.name, self.args, " ")
@@ -43,23 +89,6 @@ def name_and_arguments_to_str(
     name: str, args: list[str | int | "Symbol"], join: str
 ) -> list[str]:
     return join.join([name] + _arguments_to_str(args))
-
-
-def hash_statement(name: str, args: list["Point" | "Ratio" | int]):
-    return hash_statement_str(name, [_symbol_to_txt(p) for p in args])
-
-
-def hash_statement_str(
-    name: Union[str, PredicateName], args: list[str]
-) -> tuple[str, ...]:
-    """Return a tuple unique to name and args upto arg permutation equivariant."""
-    try:
-        predicate = PredicateName(name)
-    except ValueError:
-        return (name, *args)
-    if isinstance(name, PredicateName):
-        name = predicate.value
-    return PREDICATE_TO_HASH[predicate](name, args)
 
 
 def _symbol_to_txt(symbol: "Point" | "Ratio" | int | str):
@@ -134,16 +163,6 @@ def hash_two_times_two_unorded_lines(
     c, d = sorted([c, d])
     e, f = sorted([e, f])
     g, h = sorted([g, h])
-    # res = []
-    # for i in range(2):
-    #     for j in range(2):
-    #         if i == 0:
-    #             _a, _b, _e, _f, _c, _d, _g, _h = c, d, g, h, a, b, e, f
-    #         else:
-    #             _a, _b, _e, _f, _c, _d, _g, _h = a, b, e, f, c, d, g, h
-    #         if j == 0:
-    #             _a, _b, _c, _d, _e, _f, _g, _h = _e, _f, _g, _h, _a, _b, _c, _d
-    #         res.append(deepcopy((_a, _b, _c, _d, _e, _f, _g, _h)))
     if tuple(sorted([a, b, e, f])) > tuple(sorted([c, d, g, h])):
         a, b, e, f, c, d, g, h = c, d, g, h, a, b, e, f
     if (a, b, c, d) > (e, f, g, h):
@@ -159,16 +178,6 @@ def hash_triangle(
     (a, x), (b, y), (c, z) = sorted([(a, x), (b, y), (c, z)], key=sorted)
     (a, b, c), (x, y, z) = sorted([(a, b, c), (x, y, z)], key=sorted)
     return (name, a, b, c, x, y, z)
-
-
-PREDICATE_TO_HASH = {
-    PredicateName.SIMILAR_TRIANGLE: hash_triangle,
-    PredicateName.SIMILAR_TRIANGLE_REFLECTED: hash_triangle,
-    PredicateName.SIMILAR_TRIANGLE_BOTH: hash_triangle,
-    PredicateName.CONTRI_TRIANGLE: hash_triangle,
-    PredicateName.CONTRI_TRIANGLE_REFLECTED: hash_triangle,
-    PredicateName.CONTRI_TRIANGLE_BOTH: hash_triangle,
-}
 
 
 def angle_to_num_den(angle: "Angle" | str) -> tuple[int, int]:

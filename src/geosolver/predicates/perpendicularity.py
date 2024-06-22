@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Generator, Optional
-from typing_extensions import Self
 
 from geosolver.combinatorics import all_4points, cross_product
 from geosolver.dependencies.dependency import Dependency, Reason
@@ -18,7 +17,7 @@ import geosolver.predicates as preds
 from geosolver.predicates.equal_angles import why_eqangle_directions
 
 if TYPE_CHECKING:
-    from geosolver.dependencies.why_graph import WhyHyperGraph
+    from geosolver.dependencies.why_graph import DependencyGraph
     from geosolver.dependencies.dependency_building import DependencyBody
 
 
@@ -33,7 +32,7 @@ class Perp(Predicate):
     def add(
         args: list[Point],
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -57,7 +56,7 @@ class Perp(Predicate):
         if IntrinsicRules.PERP_FROM_LINES not in disabled_intrinsic_rules:
             dep_body = dep_body.extend_by_why(
                 dep_graph,
-                Statement(Perp.NAME, args),
+                Statement(Perp, args),
                 extention_reason=Reason(IntrinsicRules.PERP_FROM_LINES),
                 why=why1 + why2,
             )
@@ -79,8 +78,8 @@ class Perp(Predicate):
                 dep_body
                 and IntrinsicRules.PERP_FROM_PARA not in disabled_intrinsic_rules
             ):
-                perp = Statement(Perp.NAME, list(args))
-                para = Statement(preds.Para.NAME, [x, y, x_, y_])
+                perp = Statement(Perp, list(args))
+                para = Statement(preds.Para, [x, y, x_, y_])
                 dep_body = dep_body.extend(
                     dep_graph,
                     perp,
@@ -92,7 +91,7 @@ class Perp(Predicate):
 
         a12, a21, why = symbols_graph.get_or_create_angle_from_lines(ab, cd, dep=None)
 
-        perp = Statement(Perp.NAME, [a, b, c, d])
+        perp = Statement(Perp, [a, b, c, d])
         if IntrinsicRules.PERP_FROM_ANGLE not in disabled_intrinsic_rules:
             dep_body = dep_body.extend_by_why(
                 dep_graph,
@@ -109,7 +108,7 @@ class Perp(Predicate):
         was_already_equal = is_equal(a12, a21)
         symbols_graph.make_equal(a12, a21, dep=dep)
 
-        eqangle = Statement(preds.EqAngle.NAME, [a, b, c, d, c, d, a, b])
+        eqangle = Statement(preds.EqAngle, [a, b, c, d, c, d, a, b])
         to_cache = [(perp, dep), (eqangle, dep)]
 
         if not was_already_equal:
@@ -120,7 +119,7 @@ class Perp(Predicate):
     def _maybe_make_para_from_perp(
         points: list[Point],
         dep_body: DependencyBody,
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> Optional[tuple[list[Dependency], list[tuple[Statement, Dependency]]]]:
@@ -159,32 +158,32 @@ class Perp(Predicate):
         m: Point,
         n: Point,
         dep_body: DependencyBody,
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
         """Add a new parallel or collinear predicate."""
-        perp = Statement(Perp.NAME, [a, b, c, d])
-        extends = [Statement(Perp.NAME, [x, y, m, n])]
+        perp = Statement(Perp, [a, b, c, d])
+        extends = [Statement(Perp, [x, y, m, n])]
         if {a, b} == {x, y}:
             pass
         elif preds.Para.check([a, b, x, y], symbols_graph):
-            extends.append(Statement(preds.Para.NAME, [a, b, x, y]))
+            extends.append(Statement(preds.Para, [a, b, x, y]))
         elif preds.Coll.check([a, b, x, y], dep_graph):
-            extends.append(Statement(preds.Coll.NAME, set(list([a, b, x, y]))))
+            extends.append(Statement(preds.Coll, set(list([a, b, x, y]))))
         else:
             return None
 
         if m in [c, d] or n in [c, d] or c in [m, n] or d in [m, n]:
             pass
         elif preds.Coll.check([c, d, m], dep_graph):
-            extends.append(Statement(preds.Coll.NAME, [c, d, m]))
+            extends.append(Statement(preds.Coll, [c, d, m]))
         elif preds.Coll.check([c, d, n], dep_graph):
-            extends.append(Statement(preds.Coll.NAME, [c, d, n]))
+            extends.append(Statement(preds.Coll, [c, d, n]))
         elif preds.Coll.check([c, m, n], dep_graph):
-            extends.append(Statement(preds.Coll.NAME, [c, m, n]))
+            extends.append(Statement(preds.Coll, [c, m, n]))
         elif preds.Coll.check([d, m, n], dep_graph):
-            extends.append(Statement(preds.Coll.NAME, [d, m, n]))
+            extends.append(Statement(preds.Coll, [d, m, n]))
         else:
             dep_body = dep_body.extend_many(
                 dep_graph,
@@ -216,11 +215,11 @@ class Perp(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: Statement
+        dep_graph: "DependencyGraph", statement: Statement
     ) -> tuple[Optional[Reason], list[Dependency]]:
         a, b, c, d = statement.args
-        ab = statements_graph.symbols_graph.get_line(a, b)
-        cd = statements_graph.symbols_graph.get_line(c, d)
+        ab = dep_graph.symbols_graph.get_line(a, b)
+        cd = dep_graph.symbols_graph.get_line(c, d)
 
         why_perp = []
         for (x, y), xy in zip([(a, b), (c, d)], [ab, cd]):
@@ -233,22 +232,18 @@ class Perp(Predicate):
 
             if {x, y} == {x_, y_}:
                 continue
-            collx = Statement(
-                geosolver.predicates.collinearity.Collx.NAME, [x, y, x_, y_]
-            )
-            why_perp.append(
-                statements_graph.build_resolved_dependency(collx, use_cache=False)
-            )
+            collx = Statement(preds.Collx, [x, y, x_, y_])
+            why_perp.append(dep_graph.build_resolved_dependency(collx, use_cache=False))
 
         why_eqangle = why_eqangle_directions(
-            statements_graph, ab._val, cd._val, cd._val, ab._val
+            dep_graph, ab._val, cd._val, cd._val, ab._val
         )
         a, b = ab.points
         c, d = cd.points
 
         perp_repr = Statement(statement.name, [a, b, c, d])
         if perp_repr.hash_tuple != statement.hash_tuple:
-            perp_repr_dep = statements_graph.build_dependency_from_statement(
+            perp_repr_dep = dep_graph.build_dependency_from_statement(
                 perp_repr, why=why_eqangle, reason=Reason("_why_perp_repr")
             )
             why_eqangle = [perp_repr_dep]
@@ -264,7 +259,7 @@ class Perp(Predicate):
         cd = symbols_graph.get_line(c, d)
         if not ab or not cd:
             return False
-        return Perp.check_perpl(ab, cd)
+        return Perp.check_perpl(ab, cd, symbols_graph)
 
     @staticmethod
     def check_perpl(ab: Line, cd: Line, symbols_graph: SymbolsGraph) -> bool:
@@ -307,7 +302,7 @@ class Perp(Predicate):
         return f"{a}{b} \u27c2 {c}{d}"
 
     @classmethod
-    def hash(cls: Self, args: list[Point]) -> tuple[str]:
+    def hash(cls, args: list[Point]) -> tuple[str]:
         return hashed_unordered_two_lines_points(cls.NAME, args)
 
 
@@ -324,7 +319,7 @@ class NPerp(Predicate):
     def add(
         args: list[Point],
         dep_body: geosolver.predicates.collinearity.DependencyBody,
-        dep_graph: geosolver.predicates.collinearity.WhyHyperGraph,
+        dep_graph: geosolver.predicates.collinearity.DependencyGraph,
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -332,7 +327,7 @@ class NPerp(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: geosolver.predicates.collinearity.WhyHyperGraph,
+        dep_graph: geosolver.predicates.collinearity.DependencyGraph,
         statement: Statement,
     ) -> tuple[Optional[Reason], list[Dependency]]:
         return None, []
@@ -358,5 +353,5 @@ class NPerp(Predicate):
         raise NotImplementedError
 
     @classmethod
-    def hash(cls: Self, args: list[Point]) -> tuple[str | Point]:
+    def hash(cls, args: list[Point]) -> tuple[str | Point]:
         return hashed_unordered_two_lines_points(cls.NAME, args)

@@ -478,7 +478,7 @@ def draw_rule(
                 if not rational:
                     break
 
-    to_be_ignored = ["contri", "contri2", "contri*", "simtri", "simtri2", "simtri*"]
+    to_be_ignored = ["contri", "contrir", "contri*", "simtri", "simtrir", "simtri*"]
     for _ in range(200):
         construction = choice(props)
         if construction.name in to_be_ignored:

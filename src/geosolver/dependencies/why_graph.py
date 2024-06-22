@@ -2,19 +2,17 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
-
-from geosolver.dependencies.caching import DependencyCache
 from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.dependencies.dependency_building import DependencyBody
 
-from geosolver.dependencies.why_predicates import why_dependency
-from geosolver.statements.checker import StatementChecker
-from geosolver.statements.statement import Statement
-from geosolver.symbols_graph import SymbolsGraph
 from geosolver._lazy_loading import lazy_import
 
 
 if TYPE_CHECKING:
+    from geosolver.symbols_graph import SymbolsGraph
+    from geosolver.dependencies.caching import DependencyCache
+    from geosolver.statements.statement import Statement
+
     import pyvis
     import networkx
     import seaborn
@@ -25,18 +23,16 @@ vis: "pyvis" = lazy_import("pyvis")
 nx: "networkx" = lazy_import("networkx")
 
 
-class WhyHyperGraph:
+class DependencyGraph:
     """Hyper graph linking statements by dependencies as hyper-edges."""
 
     def __init__(
         self,
         symbols_graph: "SymbolsGraph",
-        statements_checker: "StatementChecker",
         dependency_cache: "DependencyCache",
     ) -> None:
         self.nx_graph = nx.DiGraph()
         self.symbols_graph = symbols_graph
-        self.statements_checker = statements_checker
         self.dependency_cache = dependency_cache
 
     def build_dependency(
@@ -63,7 +59,7 @@ class WhyHyperGraph:
         .. image:: ../_static/Images/dependency_building/build_resolved_dependency.svg
 
         """
-        reason, why = why_dependency(self, statement, use_cache=use_cache)
+        reason, why = statement.why(self, use_cache=use_cache)
         if why is not None:
             why = tuple(why)
         dependency = Dependency(statement=statement, why=why, reason=reason)
@@ -74,7 +70,7 @@ class WhyHyperGraph:
         self,
         statement: "Statement",
         why: tuple["Dependency"],
-        reason: Optional[Reason] = None,
+        reason: Optional["Reason"] = None,
     ):
         """Build a dependency from a statement a reason
         and a list of other dependencies.

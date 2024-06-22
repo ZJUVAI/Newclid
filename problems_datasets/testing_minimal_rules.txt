@@ -63,23 +63,23 @@ p = free p; q = free q; u = free u; v = on_tline v u p q; a = free a; b = free b
 r31
 p = free p; q = free q; u = free u; v = eqdistance v u p q; a = free a; b = free b; c = free c; d = eqratio d p q a b u v c ? cong a b c d
 r32
-a b c = triangle a b c; p = free p; q = eqdistance q p a b; r = eqdistance r p a c, eqdistance r q c b ? contri* a b c p q r
+a b c = triangle a b c; p = free p; q = eqdistance q p a b; r = eqdistance r p a c, eqdistance r q c b ? contri a b c p q r
 r33
-a = free a; b = free b; c = free c; q = free q; p = eqdistance p q b a; r = eqdistance r q b c, on_aline0 r b a b c q p q ? contri* a b c p q r
+a = free a; b = free b; c = free c; q = free q; p = eqdistance p q b a; r = eqdistance r q b c, on_aline0 r b a b c q p q ? contri a b c p q r
 r34
 a = free a; b = free b; c = free c; q = free q; r = free r; p = on_aline0 p b c b a q r q, on_aline0 p c b c a r q r ? simtri a b c p q r
 r35
-a = free a; b = free b; c = free c; q = free q; r = free r; p = on_aline0 p b a b c q r q, on_aline0 p c a c b r q r ? simtri2 a b c p q r
+a = free a; b = free b; c = free c; q = free q; r = free r; p = on_aline0 p b a b c q r q, on_aline0 p c a c b r q r ? simtrir a b c p q r
 r36
 a = free a; b = free b; p = free p; q = eqdistance q p a b; r = free r; c = on_aline0 c q p q r b a b, eqangle3 c a b r p q ? contri a b c p q r
 r37
-a = free a; b = free b; p = free p; q = eqdistance q p a b; r = free r; c = on_aline0 c q r q p b a b, eqangle3 c a b r q p ? contri2 a b c p q r
+a = free a; b = free b; p = free p; q = eqdistance q p a b; r = free r; c = on_aline0 c q r q p b a b, eqangle3 c a b r q p ? contrir a b c p q r
 r38
-a = free a; b = free b; c = free c; q = free q; r = free r; p = eqratio p b c b a q r q, eqratio p c b c a r q r ? simtri* a b c p q r
+a = free a; b = free b; c = free c; q = free q; r = free r; p = eqratio p b c b a q r q, eqratio p c b c a r q r ? simtri a b c p q r
 r39
-a = free a; b = free b; c = free c; p = free p; q = free q; r = eqratio r b a b c q p q, on_aline0 r b a b c q p q ? simtri* a b c p q r
+a = free a; b = free b; c = free c; p = free p; q = free q; r = eqratio r b a b c q p q, on_aline0 r b a b c q p q ? simtri a b c p q r
 r40
-a = free a; b = free b; c = free c; p = free p; q = eqdistance q p a b; r = eqratio r b a b c q p q, eqratio6 r p q c a c b ? contri* a b c p q r
+a = free a; b = free b; c = free c; p = free p; q = eqdistance q p a b; r = eqratio r b a b c q p q, eqratio6 r p q c a c b ? contri a b c p q r
 r41
 a = free a; b = free b; c = free c; d = on_pline d c a b; n = on_line n b c; m = eqratio6 m a d n b n c, on_line m a d ? para m n a b
 r42

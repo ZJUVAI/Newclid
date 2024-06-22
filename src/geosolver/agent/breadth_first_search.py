@@ -201,8 +201,9 @@ class BFSDDAR(DeductiveAgent):
             # Each new level of dd we derive first
             self.level = self._dd_agent.level
             self._current_next_engines = self.available_engines.copy()
-            next_engine = self._current_next_engines.pop()
-            return ResolveEngineAction(engine_id=next_engine)
+            if self._current_next_engines:
+                next_engine = self._current_next_engines.pop()
+                return ResolveEngineAction(engine_id=next_engine)
 
         dd_action = self._dd_agent.act(proof, theorems)
         if isinstance(dd_action, StopAction):
@@ -222,7 +223,7 @@ class BFSDDAR(DeductiveAgent):
         if isinstance(feedback, DeriveFeedback):
             for derive in feedback.derivations:
                 predicate = derive.statement.predicate
-                if predicate in (preds.EqAngle.NAME, preds.EqRatio.NAME):
+                if predicate in (preds.EqAngle, preds.EqRatio):
                     self._eq4s.append(derive)
                 else:
                     self._derivations.append(derive)

@@ -32,8 +32,8 @@ class PythagoreanFormula(ReasoningEngine):
         self._segments_length_dep: dict[tuple[str, str], Dependency] = {}
 
         self.PREDICATE_TO_INGEST = {
-            preds.Perp.NAME: self._ingest_perp,
-            preds.ConstantLength.NAME: self._ingest_lconst,
+            preds.Perp: self._ingest_perp,
+            preds.ConstantLength: self._ingest_lconst,
         }
 
     def ingest(self, dependency: Dependency):
@@ -109,7 +109,7 @@ class PythagoreanFormula(ReasoningEngine):
 
             new_length = self.symbols_graph.get_or_create_const_length(new_length_val)
             new_statement = Statement(
-                preds.ConstantLength.NAME, (*missing_segment, new_length)
+                preds.ConstantLength, (*missing_segment, new_length)
             )
 
             why_perp = self._intesection_dep[intersection]
@@ -165,7 +165,7 @@ class PythagoreanFormula(ReasoningEngine):
                 )
 
                 new_statement = Statement(
-                    preds.Perp.NAME,
+                    preds.Perp,
                     (*side1dep.statement.args[:2], *side2dep.statement.args[:2]),
                 )
                 new_perps.append(Derivation(new_statement, dep_body))
@@ -211,9 +211,9 @@ class MenelausFormula(ReasoningEngine):
 
     def ingest(self, dependency: Dependency):
         statement = dependency.statement
-        if statement.predicate is preds.Coll.NAME:
+        if statement.predicate is preds.Coll:
             self._new_colls.append(dependency)
-        elif statement.predicate is preds.ConstantRatio.NAME:
+        elif statement.predicate is preds.ConstantRatio:
             unique_points = set(statement.args[:-1])
             if len(unique_points) != 3:
                 return
@@ -254,9 +254,7 @@ class MenelausFormula(ReasoningEngine):
 
             ratio_point = self.symbols_graph.names2points(completed_ratio_points)
 
-            new_statement = Statement(
-                preds.ConstantRatio.NAME, (*ratio_point, new_ratio)
-            )
+            new_statement = Statement(preds.ConstantRatio, (*ratio_point, new_ratio))
 
             coll_deps = [
                 self._coll_hash_to_dep[_rconst_hash_to_coll_hash(rconst_hash)]

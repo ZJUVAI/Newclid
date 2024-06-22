@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Generator, Optional
-from typing_extensions import Self
 
 from geosolver.dependencies.dependency import Reason, Dependency
 
@@ -14,7 +13,7 @@ from geosolver.predicates.predicate import Predicate
 from geosolver.intrinsic_rules import IntrinsicRules
 
 from geosolver.geometry import Angle, AngleValue, Point, Ratio
-from geosolver.pretty_angle import pretty_angle
+from geosolver.predicates.equal_angles import pretty_angle
 from geosolver.statements.statement import (
     Statement,
     angle_to_num_den,
@@ -29,7 +28,7 @@ from geosolver._lazy_loading import lazy_import
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency_building import DependencyBody
-    from geosolver.dependencies.why_graph import WhyHyperGraph
+    from geosolver.dependencies.why_graph import DependencyGraph
 
     import numpy
 
@@ -51,7 +50,7 @@ class ConstantAngle(Predicate):
     def add(
         args: list[Point],
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -77,7 +76,7 @@ class ConstantAngle(Predicate):
         (a, b), (c, d) = ab.points, cd.points
         if IntrinsicRules.ACONST_FROM_LINES not in disabled_intrinsic_rules:
             args = points[:-1] + [nd]
-            aconst = Statement(ConstantAngle.NAME, tuple(args))
+            aconst = Statement(ConstantAngle, tuple(args))
             dep_body = dep_body.extend_by_why(
                 dep_graph,
                 aconst,
@@ -102,8 +101,8 @@ class ConstantAngle(Predicate):
                 dep_body
                 and IntrinsicRules.ACONST_FROM_PARA not in disabled_intrinsic_rules
             ):
-                aconst = Statement(ConstantAngle.NAME, tuple(args))
-                para = Statement(preds.Para.NAME, [x, y, x_, y_])
+                aconst = Statement(ConstantAngle, tuple(args))
+                para = Statement(preds.Para, [x, y, x_, y_])
                 dep_body = dep_body.extend(
                     dep_graph,
                     aconst,
@@ -117,7 +116,7 @@ class ConstantAngle(Predicate):
             ab, cd, dep=None
         )
 
-        aconst = Statement(ConstantAngle.NAME, [a, b, c, d, nd])
+        aconst = Statement(ConstantAngle, [a, b, c, d, nd])
         if IntrinsicRules.ACONST_FROM_ANGLE not in disabled_intrinsic_rules:
             dep_body = dep_body.extend_by_why(
                 dep_graph,
@@ -139,7 +138,7 @@ class ConstantAngle(Predicate):
             to_cache.append((aconst, dep1))
             add += [dep1]
 
-        aconst2 = Statement(ConstantAngle.NAME, [a, b, c, d, nd])
+        aconst2 = Statement(ConstantAngle, [a, b, c, d, nd])
         if not is_equal(cd_ab, dn):
             dep2 = dep_body.build(dep_graph, aconst2)
             symbols_graph.make_equal(cd_ab, dn, dep=dep2)
@@ -150,10 +149,10 @@ class ConstantAngle(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: "Statement"
+        dep_graph: "DependencyGraph", statement: "Statement"
     ) -> tuple[Optional[Reason], list[Dependency]]:
         a, b, c, d, ang0 = statement.args
-        symbols_graph = statements_graph.symbols_graph
+        symbols_graph = dep_graph.symbols_graph
 
         measure: AngleValue = ang0._val
         for ang in measure.neighbors(Angle):
@@ -175,14 +174,14 @@ class ConstantAngle(Predicate):
                 if preds.Coll.check(args, symbols_graph):
                     if len(set(args)) <= 2:
                         continue
-                    coll = Statement(preds.Coll.NAME, args)
-                    coll_dep = statements_graph.build_resolved_dependency(
+                    coll = Statement(preds.Coll, args)
+                    coll_dep = dep_graph.build_resolved_dependency(
                         coll, use_cache=False
                     )
                     why_aconst.append(coll_dep)
                 else:
-                    para = Statement(preds.Para.NAME, args)
-                    para_dep = statements_graph.build_resolved_dependency(
+                    para = Statement(preds.Para, args)
+                    para_dep = dep_graph.build_resolved_dependency(
                         para, use_cache=False
                     )
                     why_aconst.append(para_dep)
@@ -232,7 +231,7 @@ class ConstantAngle(Predicate):
         return f"{pretty_angle(a, b, c, d)} = {y}"
 
     @classmethod
-    def hash(cls: Self, args: list[Point | Angle]) -> tuple[str | Angle, ...]:
+    def hash(cls, args: list[Point | Angle]) -> tuple[str | Angle, ...]:
         return hash_ordered_two_lines_with_value(cls.NAME, args)
 
 
@@ -251,7 +250,7 @@ class SAngle(Predicate):
     def add(
         args: list[Point | Angle],
         dep_body: DependencyBody,
-        dep_graph: WhyHyperGraph,
+        dep_graph: DependencyGraph,
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -280,7 +279,7 @@ class SAngle(Predicate):
         if ab.val == bx.val:
             return add, to_cache
 
-        sangle = Statement(SAngle.NAME, (a, b, c))
+        sangle = Statement(SAngle, (a, b, c))
         if IntrinsicRules.SANGLE_FROM_LINES not in disabled_intrinsic_rules:
             dep_body = dep_body.extend_by_why(
                 dep_graph,
@@ -295,7 +294,7 @@ class SAngle(Predicate):
                 p_, q_ = pq.val._obj.points
                 if {p, q} == {p_, q_}:
                     continue
-                paras.append(Statement(preds.Para.NAME, (p, q, p_, q_)))
+                paras.append(Statement(preds.Para, (p, q, p_, q_)))
             if paras:
                 dep_body = dep_body.extend_many(
                     dep_graph, sangle, paras, Reason(IntrinsicRules.SANGLE_FROM_PARA)
@@ -303,7 +302,7 @@ class SAngle(Predicate):
 
         xba, abx, why = symbols_graph.get_or_create_angle_from_lines(bx, ab, dep=None)
         if IntrinsicRules.SANGLE_FROM_ANGLE not in disabled_intrinsic_rules:
-            aconst = Statement(preds.ConstantAngle.NAME, [b, c, a, b, nd])
+            aconst = Statement(preds.ConstantAngle, [b, c, a, b, nd])
             dep_body = dep_body.extend_by_why(
                 dep_graph,
                 aconst,
@@ -316,14 +315,14 @@ class SAngle(Predicate):
         c, c = dbx._obj.points
 
         if not is_equal(xba, nd):
-            aconst = Statement(SAngle.NAME, [c, c, a, b, nd])
+            aconst = Statement(SAngle, [c, c, a, b, nd])
             dep1 = dep_body.build(dep_graph, aconst)
             symbols_graph.make_equal(xba, nd, dep=dep1)
             to_cache.append((aconst, dep1))
             add += [dep1]
 
         if not is_equal(abx, dn):
-            aconst2 = Statement(SAngle.NAME, [a, b, c, c, dn])
+            aconst2 = Statement(SAngle, [a, b, c, c, dn])
             dep2 = dep_body.build(dep_graph, aconst2)
             symbols_graph.make_equal(abx, dn, dep=dep2)
             to_cache.append((aconst2, dep2))
@@ -333,7 +332,7 @@ class SAngle(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: WhyHyperGraph, statement: Statement
+        dep_graph: DependencyGraph, statement: Statement
     ) -> tuple[Optional[Reason], list[Dependency]]:
         raise NotImplementedError
 
@@ -379,5 +378,5 @@ class SAngle(Predicate):
         return f"{pretty_angle(a, b, b, c)} = {angle}"
 
     @classmethod
-    def hash(cls: Self, args: list[Point | Angle]) -> tuple[str | Point | Angle]:
+    def hash(cls, args: list[Point | Angle]) -> tuple[str | Point | Angle]:
         return hash_ordered_list_of_points(cls.NAME, args)

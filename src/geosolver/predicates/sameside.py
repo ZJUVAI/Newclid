@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Generator, Optional
-from typing_extensions import Self
 
 from geosolver.dependencies.dependency import Reason, Dependency
 
@@ -15,7 +14,7 @@ from geosolver.symbols_graph import SymbolsGraph
 
 
 if TYPE_CHECKING:
-    from geosolver.dependencies.why_graph import WhyHyperGraph
+    from geosolver.dependencies.why_graph import DependencyGraph
     from geosolver.dependencies.dependency_building import DependencyBody
 
 
@@ -33,7 +32,7 @@ class SameSide(Predicate):
     def add(
         args: list[Point],
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -41,7 +40,7 @@ class SameSide(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: Statement
+        dep_graph: "DependencyGraph", statement: Statement
     ) -> tuple[Optional[Reason], list[Dependency]]:
         return None, []
 
@@ -69,5 +68,5 @@ class SameSide(Predicate):
         raise NotImplementedError
 
     @classmethod
-    def hash(cls: Self, args: list[Point]) -> tuple[str, ...]:
+    def hash(cls, args: list[Point]) -> tuple[str, ...]:
         return hash_ordered_list_of_points(cls.NAME, args)

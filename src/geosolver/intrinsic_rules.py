@@ -1,4 +1,6 @@
+from __future__ import annotations
 from enum import Enum
+from typing import Optional
 
 
 class IntrinsicRules(Enum):
@@ -29,3 +31,14 @@ class IntrinsicRules(Enum):
 
     SANGLE_FROM_LINES = "i21"
     SANGLE_FROM_PARA = "i22"
+
+
+ALL_INTRINSIC_RULES = [rule for rule in IntrinsicRules]
+
+
+def validate_disabled_rules(
+    disabled_intrinsic_rules: Optional[list[str | IntrinsicRules]],
+) -> list[IntrinsicRules]:
+    if disabled_intrinsic_rules is None:
+        disabled_intrinsic_rules = []
+    return [IntrinsicRules(r) for r in disabled_intrinsic_rules]

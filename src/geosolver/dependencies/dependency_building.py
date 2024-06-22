@@ -6,7 +6,7 @@ from geosolver.dependencies.dependency import Reason, Dependency
 
 if TYPE_CHECKING:
     from geosolver.statements.statement import Statement
-    from geosolver.dependencies.why_graph import WhyHyperGraph
+    from geosolver.dependencies.why_graph import DependencyGraph
 
 
 class DependencyBody:
@@ -18,19 +18,17 @@ class DependencyBody:
         self.reason: Reason = reason
         self.why: tuple[Dependency] = tuple(why)
 
-    def build(
-        self, statements_graph: "WhyHyperGraph", statement: Statement
-    ) -> Dependency:
+    def build(self, dep_graph: "DependencyGraph", statement: Statement) -> Dependency:
         """Build a Dependency by attaching a statement to a body.
 
         .. image:: ../_static/Images/dependency_building/build_dependency.svg
 
         """
-        return statements_graph.build_dependency(statement, body=self)
+        return dep_graph.build_dependency(statement, body=self)
 
     def extend(
         self,
-        statements_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         statement: "Statement",
         extention_statement: "Statement",
         extention_reason: Reason,
@@ -40,17 +38,17 @@ class DependencyBody:
         .. image:: ../_static/Images/dependency_building/extend.svg
 
         """
-        extension_dep = statements_graph.build_resolved_dependency(extention_statement)
+        extension_dep = dep_graph.build_resolved_dependency(extention_statement)
         if extension_dep is None:
             raise
         return DependencyBody(
             reason=extention_reason,
-            why=(self.build(statements_graph, statement), extension_dep),
+            why=(self.build(dep_graph, statement), extension_dep),
         )
 
     def extend_many(
         self,
-        statements_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         original_statement: "Statement",
         extention_statements: list["Statement"],
         extention_reason: Reason,
@@ -64,17 +62,17 @@ class DependencyBody:
         if not extention_statements:
             return self
         extended_dep = [
-            statements_graph.build_resolved_dependency(e_statement)
+            dep_graph.build_resolved_dependency(e_statement)
             for e_statement in extention_statements
         ]
         return DependencyBody(
             reason=extention_reason,
-            why=(self.build(statements_graph, original_statement), *extended_dep),
+            why=(self.build(dep_graph, original_statement), *extended_dep),
         )
 
     def extend_by_why(
         self,
-        statements_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         original_statement: "Statement",
         why: list[Dependency],
         extention_reason: Reason,
@@ -89,7 +87,7 @@ class DependencyBody:
             return self
         return DependencyBody(
             reason=extention_reason,
-            why=(self.build(statements_graph, original_statement), *why),
+            why=(self.build(dep_graph, original_statement), *why),
         )
 
     def copy(self) -> "DependencyBody":

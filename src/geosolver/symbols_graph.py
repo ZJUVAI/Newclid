@@ -2,10 +2,15 @@ from __future__ import annotations
 from collections import defaultdict
 from fractions import Fraction
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Type, TypeVar
+from typing import TYPE_CHECKING, Dict, Optional, Tuple, Type, TypeVar
 
 
+from geosolver.dependencies.dependency import Dependency, Reason
+from geosolver.dependencies.dependency_building import DependencyBody
+from geosolver.dependencies.why_graph import DependencyGraph
 from geosolver.dependencies.why_predicates import line_of_and_why
+import geosolver.predicates as preds
+from geosolver.intrinsic_rules import IntrinsicRules
 from geosolver.ratios import simplify
 import geosolver.numerical.geometries as num_geo
 from geosolver.numerical.draw_figure import draw_figure as draw_numerical_figure
@@ -24,6 +29,7 @@ from geosolver.geometry import (
     RatioValue,
 )
 from geosolver._lazy_loading import lazy_import
+from geosolver.statements.statement import Statement
 
 if TYPE_CHECKING:
     import networkx
@@ -31,10 +37,6 @@ if TYPE_CHECKING:
 
 nx: "networkx" = lazy_import("networkx")
 vis: "pyvis" = lazy_import("pyvis")
-
-
-if TYPE_CHECKING:
-    from geosolver.dependencies.dependency import Dependency
 
 
 NODES_VALUES: dict[Type[Symbol], Type[Symbol]] = {
@@ -133,12 +135,8 @@ class SymbolsGraph:
         self.connect(node, v, dep=dep)
         return v
 
-    def get_point(self, pointname: str, default_fn: Callable[[str], Point]) -> Point:
-        if pointname in self._name2point:
-            return self._name2point[pointname]
-        if pointname in self._name2node:
-            return self._name2node[pointname]
-        return default_fn(pointname)
+    def get_point(self, pointname: str) -> Point:
+        return self._name2point[pointname]
 
     def make_equal(self, x: Symbol, y: Symbol, dep: Dependency) -> None:
         """Make that two nodes x and y are equal, i.e. merge their value node."""
@@ -494,3 +492,92 @@ def is_equal(x: Symbol, y: Symbol) -> bool:
     if x.val != y.val:
         return False
     return is_equiv(x._val, y._val)
+
+
+def _make_equal_pairs(
+    a: Point,
+    b: Point,
+    c: Point,
+    d: Point,
+    m: Point,
+    n: Point,
+    p: Point,
+    q: Point,
+    ab: Line,
+    cd: Line,
+    mn: Line,
+    pq: Line,
+    dep_body: "DependencyBody",
+    dep_graph: "DependencyGraph",
+    symbols_graph: "SymbolsGraph",
+) -> tuple[list[Dependency], list[tuple["Statement", "Dependency"]]]:
+    """Add ab/cd = mn/pq in case either two of (ab,cd,mn,pq) are equal."""
+    if isinstance(ab, Segment):
+        dep_pred = preds.EqRatio
+        eq_pred = preds.Cong
+        intrinsic_rule = IntrinsicRules.CONG_FROM_EQRATIO
+    else:
+        dep_pred = preds.EqAngle
+        eq_pred = preds.Para
+        intrinsic_rule = IntrinsicRules.PARA_FROM_EQANGLE
+
+    reason = Reason(intrinsic_rule)
+    eq = Statement(dep_pred, [a, b, c, d, m, n, p, q])
+    if ab != cd:
+        because_eq = Statement(eq_pred, [a, b, c, d])
+        dep_body = dep_body.extend(dep_graph, eq, because_eq, reason)
+
+    elif eq_pred is preds.Para:  # ab == cd.
+        colls = [a, b, c, d]
+        if len(set(colls)) > 2:
+            because_collx = Statement(preds.Collx, colls)
+            dep_body = dep_body.extend(dep_graph, eq, because_collx, reason)
+
+    because_eq = Statement(eq_pred, [m, n, p, q])
+    dep = dep_body.build(dep_graph, because_eq)
+    symbols_graph.make_equal(mn, pq, dep=dep)
+
+    to_cache = [(because_eq, dep)]
+
+    if is_equal(mn, pq):
+        return [], to_cache
+    return [dep], to_cache
+
+
+def maybe_make_equal_pairs(
+    a: Point,
+    b: Point,
+    c: Point,
+    d: Point,
+    m: Point,
+    n: Point,
+    p: Point,
+    q: Point,
+    ab: Line,
+    cd: Line,
+    mn: Line,
+    pq: Line,
+    dep_body: "DependencyBody",
+    dep_graph: "DependencyGraph",
+    symbols_graph: "SymbolsGraph",
+) -> Optional[tuple[list["Dependency"], list[tuple["Statement", "Dependency"]]]]:
+    """Add ab/cd = mn/pq in case maybe either two of (ab,cd,mn,pq) are equal."""
+    points = None
+    lines = None
+    if is_equal(ab, cd):
+        points = (a, b, c, d, m, n, p, q)
+        lines = (ab, cd, mn, pq)
+    elif is_equal(mn, pq):
+        points = (m, n, p, q, a, b, c, d)
+        lines = (mn, pq, ab, cd)
+    elif is_equal(ab, mn):
+        points = (a, b, m, n, c, d, p, q)
+        lines = (ab, mn, cd, pq)
+    elif is_equal(cd, pq):
+        points = (c, d, p, q, a, b, m, n)
+        lines = (cd, pq, ab, mn)
+
+    if points is None:
+        return None
+
+    return _make_equal_pairs(*points, *lines, dep_body, dep_graph, symbols_graph)

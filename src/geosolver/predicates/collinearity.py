@@ -24,7 +24,7 @@ from geosolver.symbols_graph import SymbolsGraph
 import geosolver.predicates as preds
 
 if TYPE_CHECKING:
-    from geosolver.dependencies.why_graph import WhyHyperGraph
+    from geosolver.dependencies.why_graph import DependencyGraph
     from geosolver.dependencies.dependency_building import DependencyBody
 
 
@@ -38,7 +38,7 @@ class Coll(Predicate):
     def add(
         args: list[PredicateArgument],
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: "SymbolsGraph",
         disabled_intrinsic_rules: list["IntrinsicRules"],
     ) -> tuple[list["Dependency"], list[tuple[Statement, Dependency]]]:
@@ -84,19 +84,19 @@ class Coll(Predicate):
             whys: list[Dependency] = []
             for x in args:
                 if x not in og_points:
-                    whys.append(Coll._coll_dep(dep_graph, og_points, x))
+                    whys.append(Coll._coll_dep(og_points, x, dep_graph, symbols_graph))
 
             abcd_deps = dep_body
             if IntrinsicRules.POINT_ON_SAME_LINE not in disabled_intrinsic_rules:
                 abcd_deps = dep_body.extend_by_why(
                     dep_graph,
-                    Statement(Coll.NAME, og_points),
+                    Statement(Coll, og_points),
                     why=whys + why0,
                     extention_reason=Reason(IntrinsicRules.POINT_ON_SAME_LINE),
                 )
 
-            is_coll = Coll.check(args)
-            coll = Statement(Coll.NAME, args)
+            is_coll = Coll.check(args, symbols_graph)
+            coll = Statement(Coll, args)
             dep = abcd_deps.build(dep_graph, coll)
             to_cache.append((coll, dep))
             symbols_graph.merge_into(line0, [line], dep)
@@ -108,17 +108,20 @@ class Coll(Predicate):
 
     @staticmethod
     def _coll_dep(
-        dep_graph: "WhyHyperGraph", points: list[Point], p: Point
+        points: list[Point],
+        p: Point,
+        dep_graph: "DependencyGraph",
+        symbols_graph: "SymbolsGraph",
     ) -> list[Dependency]:
         """Return the dep(.why) explaining why p is coll with points."""
         for p1, p2 in arrangement_pairs(points):
-            if Coll.check([p1, p2, p]):
-                coll = Statement(Coll.NAME, (p1, p2, p))
+            if Coll.check([p1, p2, p], symbols_graph):
+                coll = Statement(Coll, (p1, p2, p))
                 return dep_graph.build_resolved_dependency(coll)
 
     @staticmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: "Statement"
+        dep_graph: "DependencyGraph", statement: "Statement"
     ) -> tuple[Optional[Reason], list[Dependency]]:
         _, why = line_of_and_why(statement.args)
         return None, why
@@ -173,19 +176,19 @@ class Collx(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: Statement
+        dep_graph: "DependencyGraph", statement: Statement
     ) -> tuple[Optional[Reason], list[Dependency]]:
-        if preds.Coll.check(statement.args):
+        if preds.Coll.check(statement.args, dep_graph.symbols_graph):
             args = list(set(statement.args))
-            coll = Statement(preds.Coll.NAME, args)
-            cached_dep = statements_graph.dependency_cache.get(coll)
+            coll = Statement(preds.Coll, args)
+            cached_dep = dep_graph.dependency_cache.get(coll)
             if cached_dep is not None:
                 return None, [cached_dep]
             _, why = line_of_and_why(args)
             return None, why
 
-        para = Statement(preds.Para.NAME, statement.args)
-        return preds.Para.why(statements_graph, para)
+        para = Statement(preds.Para, statement.args)
+        return preds.Para.why(dep_graph, para)
 
     @staticmethod
     def check(args: list[Point], symbols_graph: SymbolsGraph) -> bool:
@@ -206,7 +209,7 @@ class Collx(Predicate):
         return "" + ",".join(list(set(args))) + " are collinear"
 
     @classmethod
-    def hash(cls: Self, args: list[Point]) -> tuple[str]:
+    def hash(cls, args: list[Point]) -> tuple[str]:
         return hashed_unordered_two_lines_points(cls.NAME, args)
 
 
@@ -223,7 +226,7 @@ class NColl(Predicate):
     def add(
         args: list[Point],
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -231,7 +234,7 @@ class NColl(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: Statement
+        dep_graph: "DependencyGraph", statement: Statement
     ) -> tuple[Optional[Reason], list[Dependency]]:
         return None, []
 
@@ -256,5 +259,5 @@ class NColl(Predicate):
         raise NotImplementedError
 
     @classmethod
-    def hash(cls: Self, args: list[Point]) -> tuple[str]:
+    def hash(cls, args: list[Point]) -> tuple[str]:
         return hash_unordered_set_of_points(cls.NAME, args)

@@ -1,5 +1,4 @@
 import pytest
-import pytest_check as check
 
 from geosolver.api import GeometricSolverBuilder
 from geosolver.theorem import Theorem
@@ -45,7 +44,7 @@ class TestConstants:
             )
         )
         success = solver.run()
-        check.is_true(success)
+        assert success
 
     def test_aconst_pi_frac(self):
         """Should be able to prescribe and check a constant angle as pi fraction"""
@@ -81,7 +80,7 @@ class TestConstants:
             )
         )
         success = solver.run()
-        check.is_true(success)
+        assert success
 
     def test_s_angle_deg(self):
         """Should be able to prescribe and check a constant s_angle in degree"""
@@ -110,7 +109,7 @@ class TestConstants:
             )
         )
         success = solver.run()
-        check.is_true(success)
+        assert success
 
     @pytest.mark.xfail
     def test_s_angle_deg_not_perp(self):
@@ -140,7 +139,7 @@ class TestConstants:
             )
         )
         success = solver.run()
-        check.is_true(success)
+        assert success
 
     def test_s_angle_pi_frac(self):
         """Should be able to prescribe and check a constant s_angle as pi fraction"""
@@ -170,7 +169,7 @@ class TestConstants:
             )
         )
         success = solver.run()
-        check.is_true(success)
+        assert success
 
     def test_s_angle_in_perp_out(self):
         """Should be able to get a perp from prescribed s_angle in degree"""
@@ -200,7 +199,7 @@ class TestConstants:
             )
         )
         success = solver.run()
-        check.is_true(success)
+        assert success
 
     def test_s_angle_in_aconst_out(self):
         """Should be able to check aconst in radiant
@@ -231,7 +230,7 @@ class TestConstants:
             )
         )
         success = solver.run()
-        check.is_true(success)
+        assert success
 
     def test_rconst(self):
         """Shoulb be able to prescribe and check a constant ratio"""
@@ -266,7 +265,7 @@ class TestConstants:
             )
         )
         success = solver.run()
-        check.is_true(success)
+        assert success
 
     def test_rconst_as_theorem_conclusion(self):
         solver = self.solver_builder.load_problem_from_txt(
@@ -274,7 +273,7 @@ class TestConstants:
         )
         solver.rules = [Theorem.from_txt("midp m a b => rconst m a a b 1/2")]
         success = solver.build().run()
-        check.is_true(success)
+        assert success
 
     def test_triangle12_in_rconst_out(self):
         """Should obtain a constant ratio from triangle12"""
@@ -292,7 +291,7 @@ class TestConstants:
             ).load_defs_from_txt("\n".join(defs))
         )
         success = solver.run()
-        check.is_true(success)
+        assert success
 
     def test_lconst(self):
         """Should be able to prescribe a constant lenght"""
@@ -300,4 +299,4 @@ class TestConstants:
             "a = free a; " "b = lconst b a 3 ? lconst b a 3"
         ).build()
         success = solver.run()
-        check.is_true(success)
+        assert success

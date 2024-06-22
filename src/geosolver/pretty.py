@@ -1,32 +1,30 @@
 """Utilities for string manipulation in the DSL."""
 
 import geosolver.predicates as preds
-from geosolver.predicate_name import PredicateName
-from geosolver.pretty_angle import pretty_angle
 
 
 MAP_SYMBOL = {
-    "C": preds.Coll.NAME,
-    "X": preds.Collx.NAME,
-    "P": preds.Para.NAME,
-    "T": preds.Perp.NAME,
-    "M": preds.MidPoint.NAME,
-    "D": preds.Cong.NAME,
-    "I": preds.Circumcenter.NAME,
-    "O": preds.Cyclic.NAME,
-    "^": preds.EqAngle.NAME,
-    "/": preds.EqRatio.NAME,
-    "%": preds.EqRatio.NAME,
-    "S": PredicateName.SIMILAR_TRIANGLE.value,
-    "=": PredicateName.CONTRI_TRIANGLE.value,
-    "A": PredicateName.COMPUTE_ANGLE.value,
-    "R": PredicateName.COMPUTE_RATIO.value,
-    "Q": PredicateName.FIX_C.value,
-    "E": PredicateName.FIX_L.value,
-    "V": PredicateName.FIX_B.value,
-    "H": PredicateName.FIX_T.value,
-    "Z": PredicateName.FIX_P.value,
-    "Y": PredicateName.IND.value,
+    "C": preds.Coll,
+    "X": preds.Collx,
+    "P": preds.Para,
+    "T": preds.Perp,
+    "M": preds.MidPoint,
+    "D": preds.Cong,
+    "I": preds.Circumcenter,
+    "O": preds.Cyclic,
+    "^": preds.EqAngle,
+    "/": preds.EqRatio,
+    "%": preds.EqRatio,
+    "S": preds.Simtri,
+    "=": preds.Contri,
+    # "A": PredicateName.COMPUTE_ANGLE.value,
+    # "R": PredicateName.COMPUTE_RATIO.value,
+    # "Q": PredicateName.FIX_C.value,
+    # "E": PredicateName.FIX_L.value,
+    # "V": PredicateName.FIX_B.value,
+    # "H": PredicateName.FIX_T.value,
+    # "Z": PredicateName.FIX_P.value,
+    # "Y": PredicateName.IND.value,
 }
 
 
@@ -60,29 +58,10 @@ def pretty2a(a: str, b: str, c: str, d: str) -> str:
 
 def pretty_nl(name: str, args: list[str]) -> str:
     """Natural lang formatting a predicate."""
-
-    if name == PredicateName.COMPUTE_ANGLE.value:
-        a, b, c, d = args
-        return f"{pretty_angle(a, b, c, d)}"
-    if name in [
-        PredicateName.SIMILAR_TRIANGLE_REFLECTED.value,
-        PredicateName.SIMILAR_TRIANGLE.value,
-        PredicateName.SIMILAR_TRIANGLE_BOTH.value,
-    ]:
-        a, b, c, x, y, z = args
-        return f"\u0394{a}{b}{c} is similar to \u0394{x}{y}{z}"
-    if name in [
-        PredicateName.CONTRI_TRIANGLE_REFLECTED.value,
-        PredicateName.CONTRI_TRIANGLE.value,
-        PredicateName.CONTRI_TRIANGLE_BOTH.value,
-    ]:
-        a, b, c, x, y, z = args
-        return f"\u0394{a}{b}{c} is congruent to \u0394{x}{y}{z}"
-
-    if name == "foot":
-        a, b, c, d = args
-        return f"{a} is the foot of {b} on {c}{d}"
-    raise NotImplementedError(f"Cannot write pretty name for {name}")
+    predicate = preds.NAME_TO_PREDICATE.get(name)
+    if predicate is None:
+        raise NotImplementedError(f"Cannot write pretty name for {name}")
+    return predicate.pretty(args)
 
 
 def pretty(txt: tuple[str, ...]) -> str:
@@ -90,22 +69,22 @@ def pretty(txt: tuple[str, ...]) -> str:
     if isinstance(txt, str):
         txt = txt.split(" ")
     name, *args = txt
-    if name == PredicateName.IND.value:
-        return "Y " + " ".join(args)
-    if name in [
-        PredicateName.FIX_C.value,
-        PredicateName.FIX_L.value,
-        PredicateName.FIX_B.value,
-        PredicateName.FIX_T.value,
-        PredicateName.FIX_P.value,
-    ]:
-        return map_symbol_inv(name) + " " + " ".join(args)
-    if name == PredicateName.COMPUTE_ANGLE.value:
-        a, b, c, d = args
-        return "A " + " ".join(args)
-    if name == PredicateName.COMPUTE_RATIO.value:
-        a, b, c, d = args
-        return "R " + " ".join(args)
+    # if name == PredicateName.IND.value:
+    #     return "Y " + " ".join(args)
+    # if name in [
+    #     PredicateName.FIX_C.value,
+    #     PredicateName.FIX_L.value,
+    #     PredicateName.FIX_B.value,
+    #     PredicateName.FIX_T.value,
+    #     PredicateName.FIX_P.value,
+    # ]:
+    #     return map_symbol_inv(name) + " " + " ".join(args)
+    # if name == PredicateName.COMPUTE_ANGLE.value:
+    #     a, b, c, d = args
+    #     return "A " + " ".join(args)
+    # if name == PredicateName.COMPUTE_RATIO.value:
+    #     a, b, c, d = args
+    #     return "R " + " ".join(args)
     if name == preds.ConstantAngle.NAME:
         a, b, c, d, y = args
         return f"^ {pretty2a(a, b, c, d)} {y}"
@@ -145,18 +124,10 @@ def pretty(txt: tuple[str, ...]) -> str:
             return f"P {ab} {cd}"
         a, b, c, d = args
         return f"P {a} {b} {c} {d}"
-    if name in [
-        PredicateName.SIMILAR_TRIANGLE_REFLECTED.value,
-        PredicateName.SIMILAR_TRIANGLE.value,
-        PredicateName.SIMILAR_TRIANGLE_BOTH.value,
-    ]:
+    if name in [preds.SimtriReflect.NAME, preds.Simtri.NAME]:
         a, b, c, x, y, z = args
         return f"S {a} {b} {c} {x} {y} {z}"
-    if name in [
-        PredicateName.CONTRI_TRIANGLE_REFLECTED.value,
-        PredicateName.CONTRI_TRIANGLE.value,
-        PredicateName.CONTRI_TRIANGLE_BOTH.value,
-    ]:
+    if name in [preds.Contri.NAME, preds.ContriReflect.NAME]:
         a, b, c, x, y, z = args
         return f"= {a} {b} {c} {x} {y} {z}"
     if name == preds.Circumcenter.NAME:

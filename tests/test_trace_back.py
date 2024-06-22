@@ -5,7 +5,6 @@ import pytest
 import pytest_check as check
 
 from geosolver.predicates import Coll, Perp
-from geosolver.statements.statement import Statement
 from geosolver.trace_back import get_logs
 from geosolver.api import GeometricSolverBuilder
 
@@ -24,12 +23,7 @@ class TestTraceback:
         ).build()
 
         solver.run()
-
-        goal_args = solver.proof_state.symbols_graph.names2nodes(
-            solver.problem.goal.args
-        )
-        goal = Statement(solver.problem.goal.name, goal_args)
-        setup, aux, _, _ = get_logs(goal, solver.proof_state, merge_trivials=False)
+        setup, aux, _, _ = get_logs(solver.proof_state, merge_trivials=False)
 
         setup = [p.statement.hash_tuple for p in setup]
         check.equal(

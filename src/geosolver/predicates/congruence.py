@@ -1,10 +1,9 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Generator, Optional
-from typing_extensions import Self
 
 from geosolver.combinatorics import permutations_pairs
 from geosolver.dependencies.dependency import Reason, Dependency
-
+from geosolver.dependencies.dependency_building import DependencyBody
 
 from geosolver.dependencies.why_predicates import why_equal
 from geosolver.numerical import close_enough
@@ -19,8 +18,7 @@ from geosolver.symbols_graph import SymbolsGraph, is_equal
 import geosolver.predicates as preds
 
 if TYPE_CHECKING:
-    from geosolver.dependencies.why_graph import WhyHyperGraph
-    from geosolver.dependencies.dependency_building import DependencyBody
+    from geosolver.dependencies.why_graph import DependencyGraph
 
 
 class Cong(Predicate):
@@ -33,7 +31,7 @@ class Cong(Predicate):
     def add(
         args: list[Point],
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -42,7 +40,7 @@ class Cong(Predicate):
         ab = symbols_graph.get_or_create_segment(a, b, None)
         cd = symbols_graph.get_or_create_segment(c, d, None)
 
-        cong = Statement(Cong.NAME, [a, b, c, d])
+        cong = Statement(Cong, [a, b, c, d])
         cong_dep = dep_body.build(dep_graph, cong)
         symbols_graph.make_equal(ab, cd, dep=cong_dep)
 
@@ -64,7 +62,7 @@ class Cong(Predicate):
             c, d = d, c
 
         cyclic_deps, cyclic_cache = Cong._maybe_add_cyclic_from_cong(
-            a, b, d, cong_dep, symbols_graph
+            a, b, d, cong_dep, dep_graph, symbols_graph, disabled_intrinsic_rules
         )
         added += cyclic_deps
         to_cache += cyclic_cache
@@ -76,7 +74,7 @@ class Cong(Predicate):
         b: Point,
         c: Point,
         cong_ab_ac: Dependency,
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -115,11 +113,11 @@ class Cong(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: "Statement"
+        dep_graph: "DependencyGraph", statement: "Statement"
     ) -> tuple[Optional[Reason], list[Dependency]]:
         a, b, c, d = statement.args
-        ab = statements_graph.symbols_graph.get_segment(a, b)
-        cd = statements_graph.symbols_graph.get_segment(c, d)
+        ab = dep_graph.symbols_graph.get_segment(a, b)
+        cd = dep_graph.symbols_graph.get_segment(c, d)
         return None, why_equal(ab, cd)
 
     @staticmethod
@@ -156,7 +154,7 @@ class Cong(Predicate):
         return f"{a}{b} = {c}{d}"
 
     @classmethod
-    def hash(cls: Self, args: list[Point]) -> tuple[str, ...]:
+    def hash(cls, args: list[Point]) -> tuple[str, ...]:
         return hashed_unordered_two_lines_points(cls.NAME, args)
 
 
@@ -167,7 +165,7 @@ class Cong2(Predicate):
         self,
         points: list[Point],
         dep_body: DependencyBody,
-        dep_graph: WhyHyperGraph,
+        dep_graph: DependencyGraph,
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -182,7 +180,7 @@ class Cong2(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: WhyHyperGraph, statement: Statement
+        dep_graph: DependencyGraph, statement: Statement
     ) -> tuple[Optional[Reason], list[Dependency]]:
         raise NotImplementedError
 
@@ -205,5 +203,5 @@ class Cong2(Predicate):
         raise NotImplementedError
 
     @classmethod
-    def hash(cls: Self, args: list[Point]) -> tuple[str, ...]:
+    def hash(cls, args: list[Point]) -> tuple[str, ...]:
         return Cong.hash(args)

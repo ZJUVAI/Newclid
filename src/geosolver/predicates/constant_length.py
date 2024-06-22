@@ -21,7 +21,7 @@ from geosolver.symbols_graph import SymbolsGraph, is_equal
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency_building import DependencyBody
-    from geosolver.dependencies.why_graph import WhyHyperGraph
+    from geosolver.dependencies.why_graph import DependencyGraph
 
 
 class ConstantLength(Predicate):
@@ -37,7 +37,7 @@ class ConstantLength(Predicate):
     def add(
         args: list[Point | Ratio],
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -47,7 +47,7 @@ class ConstantLength(Predicate):
         ab = symbols_graph.get_or_create_segment(a, b, dep=None)
         l_ab = symbols_graph.get_node_val(ab, dep=None)
 
-        lconst = Statement(ConstantLength.NAME, args)
+        lconst = Statement(ConstantLength, args)
 
         lconst_dep = dep_body.build(dep_graph, lconst)
         symbols_graph.make_equal(length, l_ab, dep=lconst_dep)
@@ -58,7 +58,7 @@ class ConstantLength(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: Statement
+        dep_graph: "DependencyGraph", statement: Statement
     ) -> tuple[Optional[Reason], list[Dependency]]:
         raise NotImplementedError
 

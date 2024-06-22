@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Generator, Optional
-from typing_extensions import Self
 
 from geosolver.dependencies.dependency import Reason, Dependency
 
@@ -24,7 +23,7 @@ from geosolver.predicates.equal_ratios import all_ratios
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency_building import DependencyBody
-    from geosolver.dependencies.why_graph import WhyHyperGraph
+    from geosolver.dependencies.why_graph import DependencyGraph
 
 
 class ConstantRatio(Predicate):
@@ -40,7 +39,7 @@ class ConstantRatio(Predicate):
     def add(
         args: list[Point | Ratio],
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -79,8 +78,8 @@ class ConstantRatio(Predicate):
                 dep_body
                 and IntrinsicRules.RCONST_FROM_CONG not in disabled_intrinsic_rules
             ):
-                rconst = Statement(ConstantRatio.NAME, tuple(args))
-                cong = Statement(preds.Cong.NAME, [x, y, x_, y_])
+                rconst = Statement(ConstantRatio, tuple(args))
+                cong = Statement(preds.Cong, [x, y, x_, y_])
                 dep_body = dep_body.extend(
                     dep_graph,
                     rconst,
@@ -94,7 +93,7 @@ class ConstantRatio(Predicate):
             ab, cd, dep=None
         )
 
-        rconst = Statement(ConstantRatio.NAME, [a, b, c, d, nd])
+        rconst = Statement(ConstantRatio, [a, b, c, d, nd])
         if IntrinsicRules.RCONST_FROM_RATIO not in disabled_intrinsic_rules:
             dep_body = dep_body.extend_by_why(
                 dep_graph,
@@ -116,7 +115,7 @@ class ConstantRatio(Predicate):
             add.append(dep1)
 
         if not is_equal(cd_ab, dn):
-            rconst2 = Statement(ConstantRatio.NAME, [c, d, a, b, dn])
+            rconst2 = Statement(ConstantRatio, [c, d, a, b, dn])
             dep2 = dep_body.build(dep_graph, rconst2)
             symbols_graph.make_equal(dn, cd_ab, dep=dep2)
             to_cache.append((rconst2, dep2))
@@ -126,10 +125,10 @@ class ConstantRatio(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: "Statement"
+        dep_graph: "DependencyGraph", statement: "Statement"
     ) -> tuple[Optional[Reason], list[Dependency]]:
         a, b, c, d, rat0 = statement.args
-        symbols_graph = statements_graph.symbols_graph
+        symbols_graph = dep_graph.symbols_graph
 
         val: AngleValue = rat0._val
         for rat in val.neighbors(Ratio):
@@ -147,11 +146,9 @@ class ConstantRatio(Predicate):
             why_rconst = []
             for args in [(a, b, a1, b1), (c, d, c1, d1)]:
                 if len(set(args)) > 2:
-                    cong = Statement(preds.Cong.NAME, args)
+                    cong = Statement(preds.Cong, args)
                     why_rconst.append(
-                        statements_graph.build_resolved_dependency(
-                            cong, use_cache=False
-                        )
+                        dep_graph.build_resolved_dependency(cong, use_cache=False)
                     )
 
             why_rconst += why_equal(rat, rat0)
@@ -202,5 +199,5 @@ class ConstantRatio(Predicate):
         return f"{a}{b}:{c}{d} = {y}"
 
     @classmethod
-    def hash(cls: Self, args: list[Point | Ratio]) -> tuple[str | Point | Ratio]:
+    def hash(cls, args: list[Point | Ratio]) -> tuple[str | Point | Ratio]:
         return hash_ordered_two_lines_with_value(cls.NAME, args)

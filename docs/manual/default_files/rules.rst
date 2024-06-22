@@ -656,7 +656,7 @@ r40 : eqratio_eqratio_cong2contri
    * - Figure
      - :math:`\frac{BA}{BC} = \frac{QP}{QR} \wedge \frac{CA}{CB} = \frac{RP}{RQ}`
        :math:`\wedge \text{ncoll}(ABC) \wedge |AB| = |PQ|`
-       :math:`\implies \text{contri*}(ABC, PQR)`
+       :math:`\implies \text{contri}(ABC, PQR)`
      - Description
    * - |r40|
      -
@@ -664,7 +664,7 @@ r40 : eqratio_eqratio_cong2contri
 
          eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q,
          ncoll A B C, cong A B P Q
-         => contri* A B C P Q R
+         => contri A B C P Q R
      - 
 
 .. |r40| image:: ../../_static/Images/rules/r40.png

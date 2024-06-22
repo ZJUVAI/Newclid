@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Generator, Optional, TypeVar
-from typing_extensions import Self
 
 from geosolver.combinatorics import cross_product, permutations_pairs
 from geosolver.dependencies.dependency import Dependency, Reason
@@ -24,24 +23,22 @@ from geosolver.intrinsic_rules import IntrinsicRules
 from geosolver.numerical import close_enough
 from geosolver.numerical.geometries import PointNum
 from geosolver.predicates.predicate import Predicate
-from geosolver.statements.adder import ToCache, maybe_make_equal_pairs
-from geosolver.statements.statement import Statement, hash_two_times_two_unorded_lines
-from geosolver.symbols_graph import SymbolsGraph, is_equal
+
+from geosolver.statements.statement import (
+    Statement,
+    hash_two_times_two_unorded_lines,
+)
+from geosolver.symbols_graph import SymbolsGraph, is_equal, maybe_make_equal_pairs
 
 import geosolver.predicates as preds
-
-from geosolver._lazy_loading import lazy_import
 
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency_building import DependencyBody
-    from geosolver.dependencies.why_graph import WhyHyperGraph
-
-    import numpy
+    from geosolver.dependencies.why_graph import DependencyGraph
 
 
 T = TypeVar("T")
-np: "numpy" = lazy_import("numpy")
 
 
 class EqRatio(Predicate):
@@ -56,7 +53,7 @@ class EqRatio(Predicate):
     def add(
         args: list[Point],
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -89,8 +86,15 @@ class EqRatio(Predicate):
             and mn.val != pq.val
             and (ab.val != mn.val or cd.val != pq.val)
         ):
+            points = (a, b, c, d, m, n, p, q)
+            lines = (ab, cd, mn, pq)
             _add, _to_cache = EqRatio._add_eqratio8(
-                a, b, c, d, m, n, p, q, ab, cd, mn, pq, dep_body
+                *points,
+                *lines,
+                dep_body,
+                dep_graph,
+                symbols_graph,
+                disabled_intrinsic_rules,
             )
             add += _add
             to_cache += _to_cache
@@ -100,8 +104,15 @@ class EqRatio(Predicate):
             and cd.val != pq.val
             and (ab.val != cd.val or mn.val != pq.val)
         ):
+            points = (a, b, m, n, c, d, p, q)
+            lines = (ab, mn, cd, pq)
             _add, _to_cache = EqRatio._add_eqratio8(
-                a, b, m, n, c, d, p, q, ab, mn, cd, pq, dep_body
+                *points,
+                *lines,
+                dep_body,
+                dep_graph,
+                symbols_graph,
+                disabled_intrinsic_rules,
             )
             add += _add
             to_cache += _to_cache
@@ -122,10 +133,10 @@ class EqRatio(Predicate):
         mn: Segment,
         pq: Segment,
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
-    ) -> tuple[list[Dependency], list[ToCache]]:
+    ) -> tuple[list[Dependency], list[tuple["Statement", "Dependency"]]]:
         """Add a new eqratio from 8 points (core)."""
         if dep_body:
             dep_body = dep_body.copy()
@@ -140,8 +151,8 @@ class EqRatio(Predicate):
                 dep_body
                 and IntrinsicRules.EQRATIO_FROM_CONG not in disabled_intrinsic_rules
             ):
-                eqratio = Statement(EqRatio.NAME, tuple(args))
-                cong = Statement(preds.Cong.NAME, [x, y, x_, y_])
+                eqratio = Statement(EqRatio, tuple(args))
+                cong = Statement(preds.Cong, [x, y, x_, y_])
                 dep_body = dep_body.extend(
                     dep_graph,
                     eqratio,
@@ -165,7 +176,7 @@ class EqRatio(Predicate):
         ):
             dep_body = dep_body.extend_by_why(
                 dep_graph,
-                Statement(EqRatio.NAME, tuple(args)),
+                Statement(EqRatio, tuple(args)),
                 why=why1 + why2,
                 extention_reason=Reason(
                     IntrinsicRules.EQRATIO_FROM_PROPORTIONAL_SEGMENTS
@@ -183,7 +194,7 @@ class EqRatio(Predicate):
         to_cache = []
 
         dep1 = None
-        eqratio = Statement(EqRatio.NAME, [a, b, c, d, m, n, p, q])
+        eqratio = Statement(EqRatio, [a, b, c, d, m, n, p, q])
         dep1 = dep_body.build(dep_graph, eqratio)
         if not is_equal(ab_cd, mn_pq):
             add += [dep1]
@@ -191,7 +202,7 @@ class EqRatio(Predicate):
         symbols_graph.make_equal(ab_cd, mn_pq, dep=dep1)
 
         dep2 = None
-        eqratio_sym = Statement(EqRatio.NAME, [c, d, a, b, p, q, m, n])
+        eqratio_sym = Statement(EqRatio, [c, d, a, b, p, q, m, n])
         dep2 = dep_body.build(dep_graph, eqratio_sym)
         if not is_equal(cd_ab, pq_mn):
             add += [dep2]
@@ -201,13 +212,13 @@ class EqRatio(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: Statement
+        dep_graph: "DependencyGraph", statement: Statement
     ) -> tuple[Optional[Reason], list[Dependency]]:
         a, b, c, d, m, n, p, q = statement.args
-        ab = statements_graph.symbols_graph.get_segment(a, b)
-        cd = statements_graph.symbols_graph.get_segment(c, d)
-        mn = statements_graph.symbols_graph.get_segment(m, n)
-        pq = statements_graph.symbols_graph.get_segment(p, q)
+        ab = dep_graph.symbols_graph.get_segment(a, b)
+        cd = dep_graph.symbols_graph.get_segment(c, d)
+        mn = dep_graph.symbols_graph.get_segment(m, n)
+        pq = dep_graph.symbols_graph.get_segment(p, q)
 
         why_eqratio = []
         if ab is None or cd is None or mn is None or pq is None:
@@ -222,16 +233,14 @@ class EqRatio(Predicate):
                 congruent_points = [a, b, c, d]
 
             if congruent_points is not None:
-                cong = Statement(preds.Cong.NAME, congruent_points)
-                cong_dep = statements_graph.build_resolved_dependency(
-                    cong, use_cache=False
-                )
+                cong = Statement(preds.Cong, congruent_points)
+                cong_dep = dep_graph.build_resolved_dependency(cong, use_cache=False)
                 why_eqratio = [cong_dep]
             return None, why_eqratio
 
         if ab._val and cd._val and mn._val and pq._val:
             why_eqratio_from_directions = _why_eqratio_directions(
-                statements_graph, ab._val, cd._val, mn._val, pq._val
+                dep_graph, ab._val, cd._val, mn._val, pq._val
             )
             if why_eqratio_from_directions:
                 why_eqratio += why_eqratio_from_directions
@@ -244,25 +253,25 @@ class EqRatio(Predicate):
         )
         if equal_pair_points is not None:
             why_eqratio += why_maybe_make_equal_pairs(
-                statements_graph, *equal_pair_points, *equal_pair_lines
+                dep_graph, *equal_pair_points, *equal_pair_lines
             )
             return None, why_eqratio
 
         if is_equal(ab, mn) or is_equal(cd, pq):
-            cong1 = Statement(preds.Cong.NAME, [a, b, m, n])
-            dep1 = statements_graph.build_resolved_dependency(cong1, use_cache=False)
-            cong2 = Statement(preds.Cong.NAME, [c, d, p, q])
-            dep2 = statements_graph.build_resolved_dependency(cong2, use_cache=False)
+            cong1 = Statement(preds.Cong, [a, b, m, n])
+            dep1 = dep_graph.build_resolved_dependency(cong1, use_cache=False)
+            cong2 = Statement(preds.Cong, [c, d, p, q])
+            dep2 = dep_graph.build_resolved_dependency(cong2, use_cache=False)
             why_eqratio += [dep1, dep2]
         elif is_equal(ab, cd) or is_equal(mn, pq):
-            cong1 = Statement(preds.Cong.NAME, [a, b, c, d])
-            dep1 = statements_graph.build_resolved_dependency(cong1, use_cache=False)
-            cong2 = Statement(preds.Cong.NAME, [m, n, p, q])
-            dep2 = statements_graph.build_resolved_dependency(cong2, use_cache=False)
+            cong1 = Statement(preds.Cong, [a, b, c, d])
+            dep1 = dep_graph.build_resolved_dependency(cong1, use_cache=False)
+            cong2 = Statement(preds.Cong, [m, n, p, q])
+            dep2 = dep_graph.build_resolved_dependency(cong2, use_cache=False)
             why_eqratio += [dep1, dep2]
         elif ab._val and cd._val and mn._val and pq._val:
             why_eqratio = _why_eqratio_directions(
-                statements_graph, ab._val, cd._val, mn._val, pq._val
+                dep_graph, ab._val, cd._val, mn._val, pq._val
             )
 
         return None, why_eqratio
@@ -434,7 +443,7 @@ class EqRatio(Predicate):
         return _ratio_pretty(args)
 
     @classmethod
-    def hash(cls: Self, args: list[Point]) -> tuple[str, ...]:
+    def hash(cls, args: list[Point]) -> tuple[str, ...]:
         return hash_two_times_two_unorded_lines(cls.NAME, args)
 
 
@@ -444,7 +453,7 @@ class EqRatio6(EqRatio):
     NAME = "eqratio6"
 
     @classmethod
-    def hash(cls: Self, args: list[Point]) -> tuple[str, ...]:
+    def hash(cls, args: list[Point]) -> tuple[str, ...]:
         return EqRatio.hash(args)
 
     @staticmethod
@@ -499,7 +508,7 @@ class EqRatio3(Predicate):
     def add(
         args: list[Point | Ratio | Angle],
         dep_body: "DependencyBody",
-        dep_graph: "WhyHyperGraph",
+        dep_graph: "DependencyGraph",
         symbols_graph: SymbolsGraph,
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
@@ -517,7 +526,7 @@ class EqRatio3(Predicate):
             add += _add
             to_cache += _to_cache
 
-        statement = Statement(EqRatio3.NAME, tuple(args))
+        statement = Statement(EqRatio3, tuple(args))
         dep = dep_graph.build_dependency(statement, dep_body)
         add.append(dep)
         to_cache.append((statement, dep))
@@ -525,7 +534,7 @@ class EqRatio3(Predicate):
 
     @staticmethod
     def why(
-        statements_graph: "WhyHyperGraph", statement: Statement
+        dep_graph: "DependencyGraph", statement: Statement
     ) -> tuple[Optional[Reason], list[Dependency]]:
         raise NotImplementedError
 
@@ -554,7 +563,7 @@ class EqRatio3(Predicate):
         return " & ".join(_ratio_pretty(ratio) for ratio in EqRatio3._list(args))
 
     @classmethod
-    def hash(cls: Self, args: list[Point]) -> tuple[str, ...]:
+    def hash(cls, args: list[Point]) -> tuple[str, ...]:
         a, b, c, d, o, o = args
         (a, c), (b, d) = sorted([(a, c), (b, d)], key=sorted)
         (a, b), (c, d) = sorted([(a, b), (c, d)], key=sorted)
@@ -586,7 +595,7 @@ def all_ratios(
 
 
 def _why_eqratio_directions(
-    statements_graph: "WhyHyperGraph",
+    dep_graph: "DependencyGraph",
     d1: Direction,
     d2: Direction,
     d3: Direction,
@@ -626,9 +635,9 @@ def _why_eqratio_directions(
     (e_, f_), (g_, h_) = d3_._obj.points, d4_._obj.points
     deps = []
     if why0:
-        eqratio = Statement(EqRatio.NAME, [a_, b_, c_, d_, e_, f_, g_, h_])
+        eqratio = Statement(EqRatio, [a_, b_, c_, d_, e_, f_, g_, h_])
         deps.append(
-            statements_graph.build_dependency_from_statement(
+            dep_graph.build_dependency_from_statement(
                 eqratio, why=why0, reason=Reason("")
             )
         )
@@ -642,11 +651,9 @@ def _why_eqratio_directions(
     ):
         if not why:
             continue
-        cong = Statement(preds.Cong.NAME, [x, y, x_, y_])
+        cong = Statement(preds.Cong, [x, y, x_, y_])
         deps.append(
-            statements_graph.build_dependency_from_statement(
-                cong, why=why, reason=Reason("")
-            )
+            dep_graph.build_dependency_from_statement(cong, why=why, reason=Reason(""))
         )
 
     return deps

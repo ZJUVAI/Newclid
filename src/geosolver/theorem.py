@@ -2,9 +2,6 @@ from __future__ import annotations
 from typing import Optional
 from geosolver.defs.clause import Construction
 
-from geosolver.predicate_name import PredicateName
-import geosolver.predicates as preds
-
 
 class Theorem:
     """Deduction rule."""
@@ -17,23 +14,6 @@ class Theorem:
         self.premises = premise
         self.is_arg_reduce = False
         self.conclusion = conclusion[0]
-
-        if self.conclusion.name in [
-            preds.EqRatio3.NAME,
-            preds.MidPoint.NAME,
-            PredicateName.CONTRI_TRIANGLE.value,
-            PredicateName.SIMILAR_TRIANGLE.value,
-            PredicateName.CONTRI_TRIANGLE_REFLECTED.value,
-            PredicateName.SIMILAR_TRIANGLE_REFLECTED.value,
-            PredicateName.SIMILAR_TRIANGLE_BOTH.value,
-            PredicateName.CONTRI_TRIANGLE_BOTH.value,
-        ]:
-            return
-
-        prem_args = set(sum([list(premise.args) for premise in self.premises], []))
-        con_args = set(self.conclusion.args)
-        if len(prem_args) <= len(con_args):
-            self.is_arg_reduce = True
 
     def __str__(self) -> str:
         premises_txt = ", ".join([str(premise) for premise in self.premises])

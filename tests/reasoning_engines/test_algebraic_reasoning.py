@@ -1,10 +1,15 @@
 import pytest
 import pytest_check as check
+
+
 import geosolver.reasoning_engines.algebraic_reasoning.geometric_tables as geometric_tables
+import geosolver.predicates as preds
+
 from geosolver.dependencies.dependency import Reason
 from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.numerical.check import clock
 from geosolver.api import GeometricSolverBuilder
+from geosolver.statements.statement import Statement
 from tests.fixtures import build_until_works
 
 
@@ -120,11 +125,13 @@ class TestAR:
 
         # Add two eqangles facts because ieq_triangle only add congruent sides
         a, b, c = proof.symbols_graph.names2nodes("abc")
-        proof.statements.adder._add_eqangle(
-            [a, b, b, c, b, c, c, a], DependencyBody(Reason("None"), why=[])
+        proof.add_statement(
+            Statement(preds.EqAngle, [a, b, b, c, b, c, c, a]),
+            DependencyBody(Reason("None"), why=[]),
         )
-        proof.statements.adder._add_eqangle(
-            [b, c, c, a, c, a, a, b], DependencyBody(Reason("None"), why=[])
+        proof.add_statement(
+            Statement(preds.EqAngle, [b, c, c, a, c, a, a, b]),
+            DependencyBody(Reason("None"), why=[]),
         )
 
         # Create an external angle table:
@@ -238,7 +245,7 @@ class TestAR:
             )
         )
         success = solver.run()
-        check.is_true(success)
+        assert success
 
     def test_paper_ratio_chasing(self):
         """Example of ratio chasing given in the original AG paper."""
@@ -329,7 +336,7 @@ class TestAR:
             )
         )
         success = solver.run()
-        check.is_true(success)
+        assert success
 
     @pytest.mark.skip
     def test_paper_distance_chasing(self):
@@ -365,4 +372,4 @@ class TestAR:
             )
         )
         success = solver.run()
-        check.is_true(success)
+        assert success
