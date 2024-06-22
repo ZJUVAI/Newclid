@@ -183,7 +183,7 @@ class Cong2(Predicate):
     @staticmethod
     def why(
         statements_graph: WhyHyperGraph, statement: Statement
-    ) -> tuple[Reason | None, list[Dependency]]:
+    ) -> tuple[Optional[Reason], list[Dependency]]:
         raise NotImplementedError
 
     @staticmethod

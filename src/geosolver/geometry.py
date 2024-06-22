@@ -5,6 +5,8 @@ from fractions import Fraction
 from typing import TYPE_CHECKING, Any, Optional, Type, TypeVar
 from typing_extensions import Self
 
+from geosolver.numerical.geometries import PointNum
+
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
 
@@ -56,7 +58,7 @@ class Symbol:
         self.deps: list["Dependency"] = []
 
         # numerical representation.
-        self.num = None
+        self.num: Optional[PointNum] = None
         self.change = set()  # what other nodes' num rely on this node?
 
     def set_rep(self, node: Symbol) -> None:

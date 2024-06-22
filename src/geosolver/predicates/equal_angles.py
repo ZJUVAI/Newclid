@@ -21,7 +21,7 @@ from geosolver.geometry import (
 from geosolver.intrinsic_rules import IntrinsicRules
 from geosolver.numerical import close_enough
 from geosolver.numerical.geometries import LineNum, PointNum, bring_together
-import geosolver.predicates.coll
+import geosolver.predicates.collinearity
 from geosolver.predicates.predicate import Predicate
 from geosolver.pretty_angle import pretty_angle
 from geosolver.statements.adder import ToCache, maybe_make_equal_pairs
@@ -261,7 +261,9 @@ class EqAngle(Predicate):
             x_, y_ = xy.points
             if {x, y} == {x_, y_}:
                 continue
-            collx = Statement(geosolver.predicates.coll.Collx.NAME, [x, y, x_, y_])
+            collx = Statement(
+                geosolver.predicates.collinearity.Collx.NAME, [x, y, x_, y_]
+            )
             collx_dep = statements_graph.build_dependency_from_statement(
                 collx, why=whyxy, reason=Reason("_why_eqangle_collx")
             )
@@ -611,7 +613,7 @@ def why_eqangle_directions(
         xy, xy_ = d_xy._obj, d_xy_._obj
         if why:
             if xy == xy_:
-                predicate = geosolver.predicates.coll.Collx.NAME
+                predicate = geosolver.predicates.collinearity.Collx.NAME
             else:
                 predicate = preds.Para.NAME
             because_statement = Statement(predicate, [x_, y_, x, y])

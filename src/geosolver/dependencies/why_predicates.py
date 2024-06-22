@@ -1,11 +1,11 @@
 from __future__ import annotations
 from collections import defaultdict
-from typing import TYPE_CHECKING, Callable, Optional, TypeVar
+from typing import TYPE_CHECKING, Optional, TypeVar
 
 
 import geosolver.predicates as preds
 
-import geosolver.predicates.coll
+import geosolver.predicates.collinearity
 from geosolver.statements.statement import Statement
 
 from geosolver.dependencies.dependency import Dependency, Reason
@@ -33,8 +33,7 @@ def why_dependency(
     if predicate is PredicateName.IND:
         return reason, []
 
-    why_predicate = PREDICATE_TO_WHY[predicate]
-    _reason, why = why_predicate(statements_graph, statement)
+    _reason, why = preds.NAME_TO_PREDICATE[predicate].why(statements_graph, statement)
     if _reason is not None:
         reason = _reason
     return reason, why
@@ -73,27 +72,6 @@ def _get_lines_thru_all(*points: Point) -> list[Line]:
         for line_neighbor in p.neighbors(Line):
             line2count[line_neighbor] += 1
     return [line for line, count in line2count.items() if count == len(points)]
-
-
-def _why_numerical(
-    statements_graph: "WhyHyperGraph", statement: "Statement"
-) -> tuple[Optional[Reason], list[Dependency]]:
-    return None, []
-
-
-PREDICATE_TO_WHY: dict[
-    PredicateName,
-    Callable[
-        ["WhyHyperGraph", "Statement", int],
-        tuple[Optional[Reason], list[Dependency]],
-    ],
-] = {
-    PredicateName.DIFFERENT: _why_numerical,
-    PredicateName.NON_PARALLEL: _why_numerical,
-    PredicateName.NON_PERPENDICULAR: _why_numerical,
-    PredicateName.NON_COLLINEAR: _why_numerical,
-    PredicateName.SAMESIDE: _why_numerical,
-}
 
 
 P = TypeVar("P")
@@ -141,7 +119,7 @@ def why_maybe_make_equal_pairs(
     eqpredicate = preds.Para.NAME if isinstance(ab, Line) else preds.Cong.NAME
     colls = [a, b, m, n]
     if len(set(colls)) > 2 and eqpredicate is preds.Para.NAME:
-        collx = Statement(geosolver.predicates.coll.Collx.NAME, colls)
+        collx = Statement(geosolver.predicates.collinearity.Collx.NAME, colls)
         why.append(statements_graph.build_resolved_dependency(collx, use_cache=False))
 
     eq_statement = Statement(eqpredicate, [c, d, p, q])

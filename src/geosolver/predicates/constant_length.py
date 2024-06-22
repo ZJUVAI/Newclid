@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Generator
+from typing import TYPE_CHECKING, Generator, Optional
 from typing_extensions import Self
 
 from geosolver.dependencies.dependency import Reason, Dependency
@@ -59,7 +59,7 @@ class ConstantLength(Predicate):
     @staticmethod
     def why(
         statements_graph: "WhyHyperGraph", statement: Statement
-    ) -> tuple[Reason | None, list[Dependency]]:
+    ) -> tuple[Optional[Reason], list[Dependency]]:
         raise NotImplementedError
 
     @staticmethod

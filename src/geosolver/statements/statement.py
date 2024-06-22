@@ -162,11 +162,6 @@ def hash_triangle(
 
 
 PREDICATE_TO_HASH = {
-    PredicateName.NON_PARALLEL: hashed_unordered_two_lines_points,
-    PredicateName.NON_PERPENDICULAR: hashed_unordered_two_lines_points,
-    PredicateName.NON_COLLINEAR: hash_unordered_set_of_points,
-    PredicateName.DIFFERENT: hash_unordered_set_of_points,
-    PredicateName.SAMESIDE: hash_ordered_list_of_points,
     PredicateName.SIMILAR_TRIANGLE: hash_triangle,
     PredicateName.SIMILAR_TRIANGLE_REFLECTED: hash_triangle,
     PredicateName.SIMILAR_TRIANGLE_BOTH: hash_triangle,

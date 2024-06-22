@@ -9,13 +9,13 @@ from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.geometry import Angle, Line, Point
 from geosolver.intrinsic_rules import IntrinsicRules
 from geosolver.numerical.geometries import LineNum, PointNum
-import geosolver.predicates.coll
+import geosolver.predicates.collinearity
 from geosolver.predicates.predicate import Predicate
 from geosolver.statements.statement import Statement, hashed_unordered_two_lines_points
 from geosolver.symbols_graph import SymbolsGraph, is_equal
 
 import geosolver.predicates as preds
-from geosolver.predicates.eqangle import why_eqangle_directions
+from geosolver.predicates.equal_angles import why_eqangle_directions
 
 if TYPE_CHECKING:
     from geosolver.dependencies.why_graph import WhyHyperGraph
@@ -217,7 +217,7 @@ class Perp(Predicate):
     @staticmethod
     def why(
         statements_graph: "WhyHyperGraph", statement: Statement
-    ) -> tuple[Reason | None, list[Dependency]]:
+    ) -> tuple[Optional[Reason], list[Dependency]]:
         a, b, c, d = statement.args
         ab = statements_graph.symbols_graph.get_line(a, b)
         cd = statements_graph.symbols_graph.get_line(c, d)
@@ -233,7 +233,9 @@ class Perp(Predicate):
 
             if {x, y} == {x_, y_}:
                 continue
-            collx = Statement(geosolver.predicates.coll.Collx.NAME, [x, y, x_, y_])
+            collx = Statement(
+                geosolver.predicates.collinearity.Collx.NAME, [x, y, x_, y_]
+            )
             why_perp.append(
                 statements_graph.build_resolved_dependency(collx, use_cache=False)
             )
@@ -306,4 +308,55 @@ class Perp(Predicate):
 
     @classmethod
     def hash(cls: Self, args: list[Point]) -> tuple[str]:
+        return hashed_unordered_two_lines_points(cls.NAME, args)
+
+
+class NPerp(Predicate):
+    """nperp A B C D -
+    Represent that lines AB and CD are NOT perpendicular.
+
+    Numerical only.
+    """
+
+    NAME = "nperp"
+
+    @staticmethod
+    def add(
+        args: list[Point],
+        dep_body: geosolver.predicates.collinearity.DependencyBody,
+        dep_graph: geosolver.predicates.collinearity.WhyHyperGraph,
+        symbols_graph: SymbolsGraph,
+        disabled_intrinsic_rules: list[IntrinsicRules],
+    ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
+        raise NotImplementedError
+
+    @staticmethod
+    def why(
+        statements_graph: geosolver.predicates.collinearity.WhyHyperGraph,
+        statement: Statement,
+    ) -> tuple[Optional[Reason], list[Dependency]]:
+        return None, []
+
+    @staticmethod
+    def check(args: list[Point], symbols_graph: SymbolsGraph) -> bool:
+        if Perp.check(args, symbols_graph):
+            return False
+        return not Perp.check_numerical([p.num for p in args])
+
+    @staticmethod
+    def check_numerical(args: list[PointNum]) -> bool:
+        return not Perp.check_numerical([p for p in args])
+
+    @staticmethod
+    def enumerate(
+        symbols_graph: SymbolsGraph,
+    ) -> Generator[tuple[Point, ...], None, None]:
+        raise NotImplementedError
+
+    @staticmethod
+    def pretty(args: list[str]) -> str:
+        raise NotImplementedError
+
+    @classmethod
+    def hash(cls: Self, args: list[Point]) -> tuple[str | Point]:
         return hashed_unordered_two_lines_points(cls.NAME, args)

@@ -20,7 +20,7 @@ from geosolver.statements.statement import (
 from geosolver.symbols_graph import SymbolsGraph, is_equal
 
 import geosolver.predicates as preds
-from geosolver.predicates.eqratio import all_ratios
+from geosolver.predicates.equal_ratios import all_ratios
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency_building import DependencyBody

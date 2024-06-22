@@ -49,8 +49,8 @@ from geosolver.numerical.sketch import (
     sketch_trisegment,
 )
 import geosolver.numerical.sketch
-from geosolver.predicates.coll import Coll
-from geosolver.predicates.eqangle import EqAngle
+from geosolver.predicates.collinearity import Coll
+from geosolver.predicates.equal_angles import EqAngle
 from geosolver.ratios import simplify
 
 

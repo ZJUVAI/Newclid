@@ -26,7 +26,6 @@ import geosolver.predicates as preds
 if TYPE_CHECKING:
     from geosolver.dependencies.why_graph import WhyHyperGraph
     from geosolver.dependencies.dependency_building import DependencyBody
-    from geosolver.statements.adder import ToCache
 
 
 class Coll(Predicate):
@@ -42,7 +41,7 @@ class Coll(Predicate):
         dep_graph: "WhyHyperGraph",
         symbols_graph: "SymbolsGraph",
         disabled_intrinsic_rules: list["IntrinsicRules"],
-    ) -> tuple[list["Dependency"], list["ToCache"]]:
+    ) -> tuple[list["Dependency"], list[tuple[Statement, Dependency]]]:
         """Add a predicate that `points` are collinear."""
         points = list(set(args))
         og_points = points.copy()
@@ -175,7 +174,7 @@ class Collx(Predicate):
     @staticmethod
     def why(
         statements_graph: "WhyHyperGraph", statement: Statement
-    ) -> tuple[Reason | None, list[Dependency]]:
+    ) -> tuple[Optional[Reason], list[Dependency]]:
         if preds.Coll.check(statement.args):
             args = list(set(statement.args))
             coll = Statement(preds.Coll.NAME, args)
@@ -209,3 +208,53 @@ class Collx(Predicate):
     @classmethod
     def hash(cls: Self, args: list[Point]) -> tuple[str]:
         return hashed_unordered_two_lines_points(cls.NAME, args)
+
+
+class NColl(Predicate):
+    """ncoll A B C ... -
+    Represent that any of the 3 (or more) points is not aligned with the others.
+
+    Numerical only.
+    """
+
+    NAME = "ncoll"
+
+    @staticmethod
+    def add(
+        args: list[Point],
+        dep_body: "DependencyBody",
+        dep_graph: "WhyHyperGraph",
+        symbols_graph: SymbolsGraph,
+        disabled_intrinsic_rules: list[IntrinsicRules],
+    ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
+        raise NotImplementedError
+
+    @staticmethod
+    def why(
+        statements_graph: "WhyHyperGraph", statement: Statement
+    ) -> tuple[Optional[Reason], list[Dependency]]:
+        return None, []
+
+    @staticmethod
+    def check(args: list[Point], symbols_graph: SymbolsGraph) -> bool:
+        if preds.Coll.check(args, symbols_graph):
+            return False
+        return not preds.Coll.check_numerical([p.num for p in args])
+
+    @staticmethod
+    def check_numerical(args: list[PointNum]) -> bool:
+        return not preds.Coll.check_numerical(args)
+
+    @staticmethod
+    def enumerate(
+        symbols_graph: SymbolsGraph,
+    ) -> Generator[tuple[Point, ...], None, None]:
+        raise NotImplementedError
+
+    @staticmethod
+    def pretty(args: list[str]) -> str:
+        raise NotImplementedError
+
+    @classmethod
+    def hash(cls: Self, args: list[Point]) -> tuple[str]:
+        return hash_unordered_set_of_points(cls.NAME, args)

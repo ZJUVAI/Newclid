@@ -1,6 +1,5 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
-import geosolver.predicates as preds
 
 from geosolver.predicate_name import PredicateName
 import geosolver.geometry as gm
@@ -16,21 +15,6 @@ if TYPE_CHECKING:
     import numpy
 
 np: "numpy" = lazy_import("numpy")
-
-
-def check_ncoll_numerical(points: list[PointNum]) -> bool:
-    return not preds.Coll.check_numerical(points)
-
-
-def check_sameside_numerical(points: list[PointNum]) -> bool:
-    b, a, c, y, x, z = points
-    # whether b is to the same side of a & c as y is to x & z
-    ba = b - a
-    bc = b - c
-    yx = y - x
-    yz = y - z
-    # return ba.dot(bc) * yx.dot(yz) > ATOM
-    return ba.dot(bc) * yx.dot(yz) > 0
 
 
 def check_const_angle_numerical(points: list[PointNum]) -> bool:
@@ -77,8 +61,6 @@ PREDICATE_TO_NUMERICAL_CHECK = {
     PredicateName.CONTRI_TRIANGLE: check_contri_numerical,
     PredicateName.CONTRI_TRIANGLE_REFLECTED: check_contri_numerical,
     PredicateName.CONTRI_TRIANGLE_BOTH: check_contri_numerical,
-    PredicateName.SAMESIDE: check_sameside_numerical,
-    PredicateName.NON_COLLINEAR: check_ncoll_numerical,
 }
 
 

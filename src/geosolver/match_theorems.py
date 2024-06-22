@@ -4,6 +4,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Callable, Generator, Optional
 
 import geosolver.combinatorics as comb
+from geosolver.defs.clause import Construction
 import geosolver.predicates as preds
 
 from geosolver.predicate_name import PredicateName
@@ -810,14 +811,9 @@ def match_generic(
     clause2enum = {}
 
     clauses = []
-    numerical_checks = []
+    numerical_checks: list[Construction] = []
     for clause in theorem.premises:
-        if clause.name in [
-            PredicateName.NON_COLLINEAR.value,
-            PredicateName.NON_PARALLEL.value,
-            PredicateName.NON_PERPENDICULAR.value,
-            PredicateName.SAMESIDE.value,
-        ]:
+        if clause.name in [pred.NAME for pred in preds.NUMERICAL_PREDICATES]:
             numerical_checks.append(clause)
             continue
 
@@ -838,14 +834,7 @@ def match_generic(
         checks_ok = True
         for check in numerical_checks:
             args = [mapping[a] for a in check.args]
-            if check.name == PredicateName.NON_COLLINEAR.value:
-                checks_ok = proof.statements.checker.check_ncoll(args)
-            elif check.name == PredicateName.NON_PARALLEL.value:
-                checks_ok = proof.statements.checker.check_npara(args)
-            elif check.name == PredicateName.NON_PERPENDICULAR.value:
-                checks_ok = proof.statements.checker.check_nperp(args)
-            elif check.name == PredicateName.SAMESIDE.value:
-                checks_ok = proof.statements.checker.check_sameside(args)
+            checks_ok = preds.NAME_TO_PREDICATE[check.name].check(args)
             if not checks_ok:
                 break
         if not checks_ok:

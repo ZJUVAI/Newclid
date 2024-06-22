@@ -6,7 +6,7 @@ import geosolver.combinatorics as comb
 import geosolver.predicates as preds
 
 from geosolver.intrinsic_rules import IntrinsicRules
-import geosolver.predicates.coll
+import geosolver.predicates.collinearity
 from geosolver.statements.statement import Statement
 
 from geosolver.predicate_name import PredicateName
@@ -324,7 +324,9 @@ def _make_equal_pairs(
     elif eq_pred is preds.Para.NAME:  # ab == cd.
         colls = [a, b, c, d]
         if len(set(colls)) > 2:
-            because_collx = Statement(geosolver.predicates.coll.Collx.NAME, colls)
+            because_collx = Statement(
+                geosolver.predicates.collinearity.Collx.NAME, colls
+            )
             dep_body = dep_body.extend(dep_graph, eq, because_collx, reason)
 
     because_eq = Statement(eq_pred, [m, n, p, q])

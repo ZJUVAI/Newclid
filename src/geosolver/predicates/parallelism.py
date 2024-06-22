@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Generator
+from typing import TYPE_CHECKING, Generator, Optional
 from typing_extensions import Self
 
 from geosolver.combinatorics import all_4points, permutations_pairs
@@ -64,7 +64,7 @@ class Para(Predicate):
     @staticmethod
     def why(
         statements_graph: "WhyHyperGraph", statement: Statement
-    ) -> tuple[Reason | None, list[Dependency]]:
+    ) -> tuple[Optional[Reason], list[Dependency]]:
         a, b, c, d = statement.args
 
         if {a, b} == {c, d}:
@@ -136,4 +136,55 @@ class Para(Predicate):
 
     @classmethod
     def hash(cls: Self, args: list[Point]) -> tuple[str]:
+        return hashed_unordered_two_lines_points(cls.NAME, args)
+
+
+class NPara(Predicate):
+    """npara A B C D -
+    Represent that lines AB and CD are NOT parallel.
+
+    It can only be numerically checked
+    (angular coefficient of the equations of the lines are different).
+    """
+
+    NAME = "npara"
+
+    @staticmethod
+    def add(
+        args: list[Point],
+        dep_body: "DependencyBody",
+        dep_graph: "WhyHyperGraph",
+        symbols_graph: SymbolsGraph,
+        disabled_intrinsic_rules: list[IntrinsicRules],
+    ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
+        raise NotImplementedError
+
+    @staticmethod
+    def why(
+        statements_graph: "WhyHyperGraph", statement: Statement
+    ) -> tuple[Optional[Reason], list[Dependency]]:
+        return None, []
+
+    @staticmethod
+    def check(args: list[Point], symbols_graph: SymbolsGraph) -> bool:
+        if Para.check(args):
+            return False
+        return not Para.check_numerical([p.num for p in args])
+
+    @staticmethod
+    def check_numerical(args: list[PointNum]) -> bool:
+        return not Para.check_numerical([p for p in args])
+
+    @staticmethod
+    def enumerate(
+        symbols_graph: SymbolsGraph,
+    ) -> Generator[tuple[Point, ...], None, None]:
+        raise NotImplementedError
+
+    @staticmethod
+    def pretty(args: list[str]) -> str:
+        raise NotImplementedError
+
+    @classmethod
+    def hash(cls: Self, args: list[Point]) -> tuple[str | Point]:
         return hashed_unordered_two_lines_points(cls.NAME, args)

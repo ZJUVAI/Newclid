@@ -9,7 +9,7 @@ from geosolver.dependencies.why_predicates import why_equal
 from geosolver.numerical import close_enough
 from geosolver.numerical.angles import ang_between
 from geosolver.numerical.geometries import PointNum
-from geosolver.predicates.eqangle import all_angles
+from geosolver.predicates.equal_angles import all_angles
 from geosolver.predicates.predicate import Predicate
 from geosolver.intrinsic_rules import IntrinsicRules
 
@@ -334,7 +334,7 @@ class SAngle(Predicate):
     @staticmethod
     def why(
         statements_graph: WhyHyperGraph, statement: Statement
-    ) -> tuple[Reason | None, list[Dependency]]:
+    ) -> tuple[Optional[Reason], list[Dependency]]:
         raise NotImplementedError
 
     @staticmethod

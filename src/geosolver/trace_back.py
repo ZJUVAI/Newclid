@@ -2,8 +2,8 @@
 
 from typing import TYPE_CHECKING, Optional
 
-from geosolver.predicates.coll import Coll
-from geosolver.predicates.coll import Collx
+from geosolver.predicates.collinearity import Coll
+from geosolver.predicates.collinearity import Collx
 from geosolver.predicate_name import NUMERICAL_PREDICATES, PredicateName
 from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE
