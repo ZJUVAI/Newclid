@@ -4,11 +4,12 @@ from typing import TYPE_CHECKING, Optional
 from typing_extensions import Self
 
 from geosolver.theorem import Theorem
-from geosolver.statements.statement import Statement
+
 
 if TYPE_CHECKING:
     from geosolver.intrinsic_rules import IntrinsicRules
     from geosolver.reasoning_engines.algebraic_reasoning import AlgebraicRules
+    from geosolver.statements.statement import Statement
 
 
 @dataclass(frozen=True)
@@ -41,7 +42,7 @@ class Dependency:
 
     """
 
-    statement: Statement
+    statement: "Statement"
     why: tuple[Self]
     reason: Optional[Reason] = None
 

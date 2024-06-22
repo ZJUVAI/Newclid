@@ -46,7 +46,6 @@ from geosolver.agent.agents_interface import (
 )
 from geosolver.match_theorems import match_one_theorem
 from geosolver.statements.adder import ToCache
-from geosolver.statements.handler import StatementsHandler
 from geosolver.symbols_graph import SymbolsGraph
 from geosolver.geometry import Angle, Ratio, Circle, Point
 
@@ -123,13 +122,11 @@ class Proof:
         dependency_cache: DependencyCache,
         external_reasoning_engines: dict[str, ReasoningEngine],
         symbols_graph: SymbolsGraph,
-        statements_handler: StatementsHandler,
         rnd_generator: "numpy.random.Generator" = None,
     ):
         self.dependency_cache = dependency_cache
         self.symbols_graph = symbols_graph
         self.reasoning_engines = external_reasoning_engines
-        self.statements = statements_handler
 
         self._goal: Optional[Construction] = None
         self._resolved_mapping_deps: dict[str, tuple[DependencyBody, ToCache]] = {}
@@ -174,11 +171,6 @@ class Proof:
             try:
                 symbols_graph = SymbolsGraph()
                 dependency_cache = DependencyCache()
-                statements_handler = StatementsHandler(
-                    symbols_graph,
-                    dependency_cache,
-                    disabled_intrinsic_rules,
-                )
                 reasoning_engines = {}
 
                 for engine_name, engine_type in additional_reasoning_engine.items():
@@ -190,7 +182,6 @@ class Proof:
                     dependency_cache=dependency_cache,
                     external_reasoning_engines=reasoning_engines,
                     symbols_graph=symbols_graph,
-                    statements_handler=statements_handler,
                     rnd_generator=rnd_generator,
                 )
                 added = []
@@ -234,6 +225,11 @@ class Proof:
 
     def step(self, action: Action) -> Feedback:
         return self._ACTION_TYPE_TO_STEP[type(action)](action)
+
+    def check_numerical(statement: Statement) -> bool:
+        """Check if this statement is numericaly sound."""
+        num_args = [p.num if isinstance(p, Point) else p for p in statement.args]
+        return preds.NAME_TO_PREDICATE[statement.predicate].check_numerical(num_args)
 
     def _step_match_theorem(self, action: MatchAction) -> MatchFeedback:
         theorem = action.theorem

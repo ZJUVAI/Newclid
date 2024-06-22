@@ -27,7 +27,7 @@ from geosolver.geometry import (
     Segment,
     RatioValue,
 )
-from geosolver.numerical.check import check_ncoll_numerical, same_clock
+from geosolver.numerical.check import same_clock
 from geosolver.symbols_graph import SymbolsGraph, is_equal
 
 
@@ -43,8 +43,9 @@ def match_eqratio_eqratio_eqratio(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqratio a b c d m n p q, eqratio c d e f p q r u => eqratio a b e f m n r u."""
-    for m1 in proof.symbols_graph.type2nodes[RatioValue]:
-        for m2 in proof.symbols_graph.type2nodes[RatioValue]:
+    symbols_graph = proof.symbols_graph
+    for m1 in symbols_graph.type2nodes[RatioValue]:
+        for m2 in symbols_graph.type2nodes[RatioValue]:
             rats1 = []
             for rat in m1.neighbors(Ratio):
                 l1, l2 = rat.lengths
@@ -74,13 +75,13 @@ def match_eqratio_eqratio_eqratio(
                 # d12 - d1 = d34 - d3 = m1
                 # d2 - d12 = d4 - d34 = m2
                 # => d2 - d1 = d4 - d3 (= m1+m2)
-                a, b = proof.symbols_graph.two_points_of_length(l1)
-                c, d = proof.symbols_graph.two_points_of_length(l12)
-                m, n = proof.symbols_graph.two_points_of_length(l3)
-                p, q = proof.symbols_graph.two_points_of_length(l34)
+                a, b = symbols_graph.two_points_of_length(l1)
+                c, d = symbols_graph.two_points_of_length(l12)
+                m, n = symbols_graph.two_points_of_length(l3)
+                p, q = symbols_graph.two_points_of_length(l34)
                 # eqangle a b c d m n p q
-                e, f = proof.symbols_graph.two_points_of_length(l2)
-                r, u = proof.symbols_graph.two_points_of_length(l4)
+                e, f = symbols_graph.two_points_of_length(l2)
+                r, u = symbols_graph.two_points_of_length(l4)
                 yield dict(zip("abcdefmnpqru", [a, b, c, d, e, f, m, n, p, q, r, u]))
 
 
@@ -90,8 +91,9 @@ def match_eqangle_eqangle_eqangle(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle a b c d m n p q, eqangle c d e f p q r u => eqangle a b e f m n r u."""
-    for m1 in proof.symbols_graph.type2nodes[AngleValue]:
-        for m2 in proof.symbols_graph.type2nodes[AngleValue]:
+    symbols_graph = proof.symbols_graph
+    for m1 in symbols_graph.type2nodes[AngleValue]:
+        for m2 in symbols_graph.type2nodes[AngleValue]:
             angs1 = []
             for ang in m1.neighbors(Angle):
                 d1, d2 = ang.directions
@@ -121,13 +123,13 @@ def match_eqangle_eqangle_eqangle(
                 # d12 - d1 = d34 - d3 = m1
                 # d2 - d12 = d4 - d34 = m2
                 # => d2 - d1 = d4 - d3
-                a, b = proof.symbols_graph.two_points_on_direction(d1)
-                c, d = proof.symbols_graph.two_points_on_direction(d12)
-                m, n = proof.symbols_graph.two_points_on_direction(d3)
-                p, q = proof.symbols_graph.two_points_on_direction(d34)
+                a, b = symbols_graph.two_points_on_direction(d1)
+                c, d = symbols_graph.two_points_on_direction(d12)
+                m, n = symbols_graph.two_points_on_direction(d3)
+                p, q = symbols_graph.two_points_on_direction(d34)
                 # eqangle a b c d m n p q
-                e, f = proof.symbols_graph.two_points_on_direction(d2)
-                r, u = proof.symbols_graph.two_points_on_direction(d4)
+                e, f = symbols_graph.two_points_on_direction(d2)
+                r, u = symbols_graph.two_points_on_direction(d4)
                 yield dict(zip("abcdefmnpqru", [a, b, c, d, e, f, m, n, p, q, r, u]))
 
 
@@ -138,18 +140,19 @@ def match_perp_perp_npara_eqangle(
 ) -> Generator[dict[str, Point], None, None]:
     """Match perp A B C D, perp E F G H, npara A B E F => eqangle A B E F C D G H."""
     dpairs = []
-    for ang in proof.symbols_graph.vhalfpi.neighbors(Angle):
+    symbols_graph = proof.symbols_graph
+    for ang in symbols_graph.vhalfpi.neighbors(Angle):
         d1, d2 = ang.directions
         if d1 is None or d2 is None:
             continue
         dpairs.append((d1, d2))
 
     for (d1, d2), (d3, d4) in comb.arrangement_pairs(dpairs):
-        a, b = proof.symbols_graph.two_points_on_direction(d1)
-        c, d = proof.symbols_graph.two_points_on_direction(d2)
-        m, n = proof.symbols_graph.two_points_on_direction(d3)
-        p, q = proof.symbols_graph.two_points_on_direction(d4)
-        if proof.statements.checker.check_npara([a, b, m, n]):
+        a, b = symbols_graph.two_points_on_direction(d1)
+        c, d = symbols_graph.two_points_on_direction(d2)
+        m, n = symbols_graph.two_points_on_direction(d3)
+        p, q = symbols_graph.two_points_on_direction(d4)
+        if preds.NPara.check([a, b, m, n], symbols_graph):
             if ({a, b}, {c, d}) == ({m, n}, {p, q}):
                 continue
             if ({a, b}, {c, d}) == ({p, q}, {m, n}):
@@ -207,10 +210,11 @@ def match_midp_perp_cong(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match midp M A B, perp O M A B => cong O A O B."""
-    for m, a, b in proof.statements.enumerator._all_midps():
-        ab = proof.symbols_graph.get_line(a, b)
+    symbols_graph = proof.symbols_graph
+    for m, a, b in preds.MidPoint.enumerate(symbols_graph):
+        ab = symbols_graph.get_line(a, b)
         for line_neighbor in m.neighbors(Line):
-            if proof.statements.checker.check_perpl(line_neighbor, ab):
+            if preds.Perp.check_perpl(line_neighbor, ab, symbols_graph):
                 for o in line_neighbor.neighbors(Point):
                     if o != m:
                         yield dict(zip("ABMO", [a, b, m, o]))
@@ -222,14 +226,15 @@ def match_cyclic_eqangle_cong(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match cyclic A B C P Q R, eqangle C A C B R P R Q => cong A B P Q."""
-    for c in proof.symbols_graph.type2nodes[Circle]:
+    symbols_graph = proof.symbols_graph
+    for c in symbols_graph.type2nodes[Circle]:
         ps = c.neighbors(Point)
         for (a, b, c), (x, y, z) in comb.arrangement_pairs(
             list(comb.permutations_triplets(ps))
         ):
             if {a, b, c} == {x, y, z}:
                 continue
-            if proof.statements.checker.check_eqangle([c, a, c, b, z, x, z, y]):
+            if preds.EqAngle.check([c, a, c, b, z, x, z, y], symbols_graph):
                 yield dict(zip("ABCPQR", [a, b, c, x, y, z]))
 
 
@@ -301,8 +306,9 @@ def match_perp_perp_ncoll_para(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match perp A B C D, perp C D E F, ncoll A B E => para A B E F."""
+    symbols_graph = proof.symbols_graph
     d2d = defaultdict(list)
-    for ang in proof.symbols_graph.vhalfpi.neighbors(Angle):
+    for ang in symbols_graph.vhalfpi.neighbors(Angle):
         d1, d2 = ang.directions
         if d1 is None or d2 is None:
             continue
@@ -312,11 +318,11 @@ def match_perp_perp_ncoll_para(
     for x, ys in d2d.items():
         if len(ys) < 2:
             continue
-        c, d = proof.symbols_graph.two_points_on_direction(x)
+        c, d = symbols_graph.two_points_on_direction(x)
         for y1, y2 in comb.arrangement_pairs(ys):
-            a, b = proof.symbols_graph.two_points_on_direction(y1)
-            e, f = proof.symbols_graph.two_points_on_direction(y2)
-            if check_ncoll_numerical([a.num, b.num, e.num]):
+            a, b = symbols_graph.two_points_on_direction(y1)
+            e, f = symbols_graph.two_points_on_direction(y2)
+            if preds.Coll.check_numerical([a.num, b.num, e.num]):
                 yield dict(zip("ABCDEF", [a, b, c, d, e, f]))
 
 
@@ -326,12 +332,13 @@ def match_eqangle6_ncoll_cong(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 A O A B B A B O, ncoll O A B => cong O A O B."""
-    for a in proof.symbols_graph.type2nodes[Point]:
-        for b, c in comb.arrangement_pairs(proof.symbols_graph.type2nodes[Point]):
+    symbols_graph = proof.symbols_graph
+    for a in symbols_graph.type2nodes[Point]:
+        for b, c in comb.arrangement_pairs(symbols_graph.type2nodes[Point]):
             if a == b or a == c:
                 continue
-            if proof.statements.checker.check_eqangle([b, a, b, c, c, b, c, a]):
-                if proof.statements.checker.check_ncoll([a, b, c]):
+            if preds.EqAngle.check([b, a, b, c, c, b, c, a], symbols_graph):
+                if preds.NColl.check([a, b, c], symbols_graph):
                     yield dict(zip("OAB", [a, b, c]))
 
 
@@ -341,24 +348,25 @@ def match_eqangle_perp_perp(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle A B P Q C D U V, perp P Q U V => perp A B C D."""
-    for ang in proof.symbols_graph.vhalfpi.neighbors(Angle):
+    symbols_graph = proof.symbols_graph
+    for ang in symbols_graph.vhalfpi.neighbors(Angle):
         # d1 perp d2
         d1, d2 = ang.directions
         if d1 is None or d2 is None:
             continue
-        for d3, d4 in comb.arrangement_pairs(proof.symbols_graph.type2nodes[Direction]):
+        for d3, d4 in comb.arrangement_pairs(symbols_graph.type2nodes[Direction]):
             if d1 == d3 or d2 == d4:
                 continue
             # if d1 - d3 = d2 - d4 => d3 perp d4
-            a13, a31 = proof.symbols_graph.get_angle(d1, d3)
-            a24, a42 = proof.symbols_graph.get_angle(d2, d4)
+            a13, a31 = symbols_graph.get_angle(d1, d3)
+            a24, a42 = symbols_graph.get_angle(d2, d4)
             if a13 is None or a31 is None or a24 is None or a42 is None:
                 continue
             if is_equal(a13, a24) and is_equal(a31, a42):
-                a, b = proof.symbols_graph.two_points_on_direction(d1)
-                c, d = proof.symbols_graph.two_points_on_direction(d2)
-                m, n = proof.symbols_graph.two_points_on_direction(d3)
-                p, q = proof.symbols_graph.two_points_on_direction(d4)
+                a, b = symbols_graph.two_points_on_direction(d1)
+                c, d = symbols_graph.two_points_on_direction(d2)
+                m, n = symbols_graph.two_points_on_direction(d3)
+                p, q = symbols_graph.two_points_on_direction(d4)
                 yield dict(zip("ABCDPQUV", [m, n, p, q, a, b, c, d]))
 
 
@@ -368,7 +376,8 @@ def match_eqangle_ncoll_cyclic(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 P A P B Q A Q B, ncoll P Q A B => cyclic A B P Q."""
-    linepairs = all_eqangles_distinct_linepairss(proof.symbols_graph)
+    symbols_graph = proof.symbols_graph
+    linepairs = all_eqangles_distinct_linepairss(symbols_graph)
     for l1, l2, l3, l4 in linepairs:
         if len(set([l1, l2, l3, l4])) < 4:
             continue  # they all must be distinct.
@@ -393,7 +402,7 @@ def match_eqangle_ncoll_cyclic(
         if len(set([a, b, p, q])) < 4:
             continue
 
-        if not proof.statements.checker.check_ncoll([a, b, p, q]):
+        if not preds.NColl.check([a, b, p, q], symbols_graph):
             continue
 
         yield dict(zip("ABPQ", [a, b, p, q]))
@@ -429,7 +438,8 @@ def match_eqangle_para(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle A B P Q C D P Q => para A B C D."""
-    for measure in proof.symbols_graph.type2nodes[AngleValue]:
+    symbols_graph = proof.symbols_graph
+    for measure in symbols_graph.type2nodes[AngleValue]:
         angs = measure.neighbors(Angle)
         d12, d21 = defaultdict(list), defaultdict(list)
         for ang in angs:
@@ -440,10 +450,10 @@ def match_eqangle_para(
             d21[d2].append(d1)
 
         for d1, d2s in d12.items():
-            a, b = proof.symbols_graph.two_points_on_direction(d1)
+            a, b = symbols_graph.two_points_on_direction(d1)
             for d2, d3 in comb.arrangement_pairs(d2s):
-                c, d = proof.symbols_graph.two_points_on_direction(d2)
-                e, f = proof.symbols_graph.two_points_on_direction(d3)
+                c, d = symbols_graph.two_points_on_direction(d2)
+                e, f = symbols_graph.two_points_on_direction(d3)
                 yield dict(zip("ABCDPQ", [c, d, e, f, a, b]))
 
 
@@ -489,17 +499,18 @@ def match_cong_cong_cong_ncoll_contri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match cong A B P Q, cong B C Q R, cong C A R P, ncoll A B C => contri* A B C P Q R."""
+    symbols_graph = proof.symbols_graph
     record = set()
     for a, b, p, q in g_matcher(preds.Cong.NAME):
-        for c in proof.symbols_graph.type2nodes[Point]:
-            for r in proof.symbols_graph.type2nodes[Point]:
+        for c in symbols_graph.type2nodes[Point]:
+            for r in symbols_graph.type2nodes[Point]:
                 if any([x in record for x in rotate_simtri(a, b, c, p, q, r)]):
                     continue
-                if not proof.statements.checker.check_ncoll([a, b, c]):
+                if not preds.NColl.check([a, b, c], symbols_graph):
                     continue
-                if proof.statements.checker.check_cong(
-                    [b, c, q, r]
-                ) and proof.statements.checker.check_cong([c, a, r, p]):
+                if preds.Cong.check([b, c, q, r], symbols_graph) and preds.Cong.check(
+                    [c, a, r, p], symbols_graph
+                ):
                     record.add((a, b, c, p, q, r))
                     yield dict(zip("ABCPQR", [a, b, c, p, q, r]))
 
@@ -510,12 +521,13 @@ def match_cong_cong_eqangle6_ncoll_contri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match cong A B P Q, cong B C Q R, eqangle6 B A B C Q P Q R, ncoll A B C => contri* A B C P Q R."""
+    symbols_graph = proof.symbols_graph
     record = set()
     for a, b, p, q in g_matcher(preds.Cong.NAME):
-        for c in proof.symbols_graph.type2nodes[Point]:
+        for c in symbols_graph.type2nodes[Point]:
             if c in (a, b):
                 continue
-            for r in proof.symbols_graph.type2nodes[Point]:
+            for r in symbols_graph.type2nodes[Point]:
                 if r in (p, q):
                     continue
 
@@ -532,17 +544,17 @@ def match_cong_cong_eqangle6_ncoll_contri(
                 if in_record:
                     continue
 
-                if not proof.statements.checker.check_cong([b, c, q, r]):
+                if not preds.Cong.check([b, c, q, r], symbols_graph):
                     continue
-                if not proof.statements.checker.check_ncoll([a, b, c]):
+                if not preds.NColl.check([a, b, c], symbols_graph):
                     continue
 
                 if same_clock(a.num, b.num, c.num, p.num, q.num, r.num):
-                    if proof.statements.checker.check_eqangle([b, a, b, c, q, p, q, r]):
+                    if preds.EqAngle.check([b, a, b, c, q, p, q, r], symbols_graph):
                         record.add((a, b, c, p, q, r))
                         yield dict(zip("ABCPQR", [a, b, c, p, q, r]))
                 else:
-                    if proof.statements.checker.check_eqangle([b, a, b, c, q, r, q, p]):
+                    if preds.EqAngle.check([b, a, b, c, q, r, q, p], symbols_graph):
                         record.add((a, b, c, p, q, r))
                         yield dict(zip("ABCPQR", [a, b, c, p, q, r]))
 
@@ -553,6 +565,7 @@ def match_eqratio6_eqangle6_ncoll_simtri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R."""
+    symbols_graph = proof.symbols_graph
     enums = g_matcher(preds.EqRatio6.NAME)
 
     record = set()
@@ -561,14 +574,14 @@ def match_eqratio6_eqangle6_ncoll_simtri(
             continue
         if any([x in record for x in rotate_simtri(a, b, c, p, q, r)]):
             continue
-        if not proof.statements.checker.check_ncoll([a, b, c]):
+        if not preds.NColl.check([a, b, c], symbols_graph):
             continue
 
         if same_clock(a.num, b.num, c.num, p.num, q.num, r.num):
-            if proof.statements.checker.check_eqangle([b, a, b, c, q, p, q, r]):
+            if preds.EqAngle.check([b, a, b, c, q, p, q, r], symbols_graph):
                 record.add((a, b, c, p, q, r))
                 yield dict(zip("ABCPQR", [a, b, c, p, q, r]))
-        elif proof.statements.checker.check_eqangle([b, a, b, c, q, r, q, p]):
+        elif preds.EqAngle.check([b, a, b, c, q, r, q, p], symbols_graph):
             record.add((a, b, c, p, q, r))
             yield dict(zip("ABCPQR", [a, b, c, p, q, r]))
 
@@ -579,6 +592,7 @@ def match_eqangle6_eqangle6_ncoll_simtri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 B A B C Q P Q R, eqangle6 C A C B R P R Q, ncoll A B C => simtri A B C P Q R."""
+    symbols_graph = proof.symbols_graph
     enums = g_matcher(preds.EqAngle6.NAME)
 
     record = set()
@@ -587,9 +601,9 @@ def match_eqangle6_eqangle6_ncoll_simtri(
             continue
         if any([x in record for x in rotate_simtri(a, b, c, p, q, r)]):
             continue
-        if not proof.statements.checker.check_eqangle([c, a, c, b, r, p, r, q]):
+        if not preds.EqAngle.check([c, a, c, b, r, p, r, q], symbols_graph):
             continue
-        if not proof.statements.checker.check_ncoll([a, b, c]):
+        if not preds.NColl.check([a, b, c], symbols_graph):
             continue
 
         mapping = dict(zip("ABCPQR", [a, b, c, p, q, r]))
@@ -603,6 +617,7 @@ def match_eqratio6_eqratio6_ncoll_simtri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri* A B C P Q R."""
+    symbols_graph = proof.symbols_graph
     enums = g_matcher(preds.EqRatio6.NAME)
 
     record = set()
@@ -611,9 +626,9 @@ def match_eqratio6_eqratio6_ncoll_simtri(
             continue
         if any([x in record for x in rotate_simtri(a, b, c, p, q, r)]):
             continue
-        if not proof.statements.checker.check_eqratio([c, a, c, b, r, p, r, q]):
+        if not preds.EqRatio.check([c, a, c, b, r, p, r, q], symbols_graph):
             continue
-        if not proof.statements.checker.check_ncoll([a, b, c]):
+        if not preds.NColl.check([a, b, c], symbols_graph):
             continue
 
         mapping = dict(zip("ABCPQR", [a, b, c, p, q, r]))
@@ -627,6 +642,7 @@ def match_eqangle6_eqangle6_ncoll_simtri2(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C => simtri2 A B C P Q R."""
+    symbols_graph = proof.symbols_graph
     enums = g_matcher(preds.EqAngle6.NAME)
 
     record = set()
@@ -635,9 +651,9 @@ def match_eqangle6_eqangle6_ncoll_simtri2(
             continue
         if any([x in record for x in rotate_simtri(a, b, c, p, q, r)]):
             continue
-        if not proof.statements.checker.check_eqangle([c, a, c, b, r, q, r, p]):
+        if not preds.EqAngle.check([c, a, c, b, r, q, r, p], symbols_graph):
             continue
-        if not proof.statements.checker.check_ncoll([a, b, c]):
+        if not preds.NColl.check([a, b, c], symbols_graph):
             continue
 
         mapping = dict(zip("ABCPQR", [a, b, c, p, q, r]))
@@ -651,20 +667,21 @@ def match_eqangle6_eqangle6_ncoll_cong_contri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 B A B C Q P Q R, eqangle6 C A C B R P R Q, ncoll A B C, cong A B P Q => contri A B C P Q R."""
+    symbols_graph = proof.symbols_graph
     enums = g_matcher(preds.EqAngle6.NAME)
 
     record = set()
     for b, a, b, c, q, p, q, r in enums:
-        if not proof.statements.checker.check_cong([a, b, p, q]):
+        if not preds.Cong.check([a, b, p, q], symbols_graph):
             continue
         if (a, b, c) == (p, q, r):
             continue
         if any([x in record for x in rotate_contri(a, b, c, p, q, r)]):
             continue
-        if not proof.statements.checker.check_eqangle([c, a, c, b, r, p, r, q]):
+        if not preds.EqAngle.check([c, a, c, b, r, p, r, q], symbols_graph):
             continue
 
-        if not proof.statements.checker.check_ncoll([a, b, c]):
+        if not preds.NColl.check([a, b, c], symbols_graph):
             continue
 
         mapping = dict(zip("ABCPQR", [a, b, c, p, q, r]))
@@ -678,20 +695,21 @@ def match_eqratio6_eqratio6_ncoll_cong_contri(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C, cong A B P Q => contri* A B C P Q R."""
+    symbols_graph = proof.symbols_graph
     enums = g_matcher(preds.EqRatio6.NAME)
 
     record = set()
     for b, a, b, c, q, p, q, r in enums:
-        if not proof.statements.checker.check_cong([a, b, p, q]):
+        if not preds.Cong.check([a, b, p, q], symbols_graph):
             continue
         if (a, b, c) == (p, q, r):
             continue
         if any([x in record for x in rotate_contri(a, b, c, p, q, r)]):
             continue
-        if not proof.statements.checker.check_eqratio([c, a, c, b, r, p, r, q]):
+        if not preds.EqRatio.check([c, a, c, b, r, p, r, q], symbols_graph):
             continue
 
-        if not proof.statements.checker.check_ncoll([a, b, c]):
+        if not preds.NColl.check([a, b, c], symbols_graph):
             continue
 
         mapping = dict(zip("ABCPQR", [a, b, c, p, q, r]))
@@ -705,19 +723,20 @@ def match_eqangle6_eqangle6_ncoll_cong_contri2(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C, cong A B P Q => contri2 A B C P Q R."""
+    symbols_graph = proof.symbols_graph
     enums = g_matcher(preds.EqAngle6.NAME)
 
     record = set()
     for b, a, b, c, q, r, q, p in enums:
-        if not proof.statements.checker.check_cong([a, b, p, q]):
+        if not preds.Cong.check([a, b, p, q], symbols_graph):
             continue
         if (a, b, c) == (p, q, r):
             continue
         if any([x in record for x in rotate_contri(a, b, c, p, q, r)]):
             continue
-        if not proof.statements.checker.check_eqangle([c, a, c, b, r, q, r, p]):
+        if not preds.EqAngle.check([c, a, c, b, r, q, r, p], symbols_graph):
             continue
-        if not proof.statements.checker.check_ncoll([a, b, c]):
+        if not preds.NColl.check([a, b, c], symbols_graph):
             continue
 
         mapping = dict(zip("ABCPQR", [a, b, c, p, q, r]))
@@ -731,16 +750,17 @@ def match_eqratio6_coll_ncoll_eqangle6(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqratio6 d b d c a b a c, coll d b c, ncoll a b c => eqangle6 a b a d a d a c."""
+    symbols_graph = proof.symbols_graph
     records = set()
     for b, d, c in g_matcher(preds.Coll.NAME):
-        for a in proof.symbols_graph.all_points():
-            if proof.statements.checker.check_coll([a, b, c]):
+        for a in symbols_graph.all_points():
+            if preds.Coll.check([a, b, c], symbols_graph):
                 continue
             if (a, b, d, c) in records or (a, c, d, b) in records:
                 continue
             records.add((a, b, d, c))
 
-            if proof.statements.checker.check_eqratio([d, b, d, c, a, b, a, c]):
+            if preds.EqRatio.check([d, b, d, c, a, b, a, c], symbols_graph):
                 yield dict(zip("abcd", [a, b, c, d]))
 
 
@@ -750,16 +770,17 @@ def match_eqangle6_coll_ncoll_eqratio6(
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
     """Match eqangle6 a b a d a d a c, coll d b c, ncoll a b c => eqratio6 d b d c a b a c."""
+    symbols_graph = proof.symbols_graph
     records = set()
     for b, d, c in g_matcher(preds.Coll.NAME):
-        for a in proof.symbols_graph.all_points():
-            if proof.statements.checker.check_coll([a, b, c]):
+        for a in symbols_graph.all_points():
+            if preds.Coll.check([a, b, c], symbols_graph):
                 continue
             if (a, b, d, c) in records or (a, c, d, b) in records:
                 continue
             records.add((a, b, d, c))
 
-            if proof.statements.checker.check_eqangle([a, b, a, d, a, d, a, c]):
+            if preds.EqAngle.check([a, b, a, d, a, d, a, c], symbols_graph):
                 yield dict(zip("abcd", [a, b, c, d]))
 
 
@@ -772,7 +793,7 @@ def match_eqangle6_ncoll_cyclic(
     for a, b, a, c, x, y, x, z in g_matcher(preds.EqAngle6.NAME):
         if (b, c) != (y, z) or a == x:
             continue
-        if check_ncoll_numerical([x.num for x in [a, b, c, x]]):
+        if preds.NColl.check_numerical([x.num for x in [a, b, c, x]]):
             yield dict(zip("ABPQ", [b, c, a, x]))
 
 
@@ -885,7 +906,7 @@ class MatchCache:
         if cached is not None:
             return cached
 
-        result = list(self.proof.statements.enumerator.all(name))
+        result = list(preds.NAME_TO_PREDICATE[name].enumerate(self.proof.symbols_graph))
         self.cache[name] = result
         return result
 

@@ -3,13 +3,13 @@ from enum import Enum
 from typing import TYPE_CHECKING
 
 
+from geosolver.numerical.check import check_numerical
 import geosolver.predicates as preds
 from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.reasoning_engines.engines_interface import Derivation, ReasoningEngine
 from geosolver.predicate_name import PredicateName
 from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.symbols_graph import is_equiv
-from geosolver.numerical.check import check_numerical
 
 
 from geosolver.statements.statement import Statement, ratio_to_num_den, angle_to_num_den

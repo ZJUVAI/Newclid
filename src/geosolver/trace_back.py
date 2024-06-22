@@ -2,9 +2,10 @@
 
 from typing import TYPE_CHECKING, Optional
 
+from geosolver.predicates import NUMERICAL_PREDICATES
 from geosolver.predicates.collinearity import Coll
 from geosolver.predicates.collinearity import Collx
-from geosolver.predicate_name import NUMERICAL_PREDICATES, PredicateName
+from geosolver.predicate_name import PredicateName
 from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE
 from geosolver.statements.statement import Statement
@@ -151,7 +152,9 @@ def recursive_traceback(
         if hashed in visited:
             return
 
-        if query_dep.statement.predicate in NUMERICAL_PREDICATES:
+        if query_dep.statement.predicate in [
+            pred.NAME for pred in NUMERICAL_PREDICATES
+        ]:
             return
 
         nonlocal stack
