@@ -21,7 +21,7 @@ from geosolver.numerical.geometries import (
     line_circle_intersection,
     line_line_intersection,
 )
-from geosolver.statements.statement import angle_to_num_den
+from geosolver.statement import angle_to_num_den
 
 if TYPE_CHECKING:
     import numpy

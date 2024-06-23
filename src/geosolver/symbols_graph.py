@@ -29,7 +29,7 @@ from geosolver.geometry import (
     RatioValue,
 )
 from geosolver._lazy_loading import lazy_import
-from geosolver.statements.statement import Statement
+from geosolver.statement import Statement
 
 if TYPE_CHECKING:
     import networkx

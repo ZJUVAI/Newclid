@@ -10,7 +10,7 @@ from geosolver.dependencies.dependency import Reason
 from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.numerical.check import clock
 from geosolver.api import GeometricSolverBuilder
-from geosolver.statements.statement import Statement
+from geosolver.statement import Statement
 from tests.fixtures import build_until_works
 
 

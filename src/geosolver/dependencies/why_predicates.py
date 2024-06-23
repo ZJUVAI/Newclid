@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Optional, TypeVar
 
 import geosolver.predicates as preds
 
-from geosolver.statements.statement import Statement
+from geosolver.statement import Statement
 
 from geosolver.dependencies.dependency import Dependency
 from geosolver.geometry import Line, Symbol, Point

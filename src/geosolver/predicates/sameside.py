@@ -9,7 +9,7 @@ from geosolver.predicates.predicate import Predicate
 from geosolver.intrinsic_rules import IntrinsicRules
 
 from geosolver.geometry import Point
-from geosolver.statements.statement import Statement, hash_ordered_list_of_points
+from geosolver.statement import Statement, hash_ordered_list_of_points
 from geosolver.symbols_graph import SymbolsGraph
 
 

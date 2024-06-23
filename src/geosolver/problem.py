@@ -6,7 +6,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
 from geosolver.defs.clause import Clause, Construction
-from geosolver.statements.statement import Statement
+from geosolver.statement import Statement
 import geosolver.predicates as preds
 
 from geosolver.pretty import pretty

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Optional
 
-from geosolver.statements.statement import Statement
+from geosolver.statement import Statement
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency

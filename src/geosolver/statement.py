@@ -80,6 +80,10 @@ class Statement:
         return hash(self.hash_tuple)
 
 
+class SymbolicError(Exception):
+    """Exception of wrong symbolic manipulation"""
+
+
 def name_and_arguments_to_str(
     name: str, args: list[str | int | "Symbol"], join: str
 ) -> list[str]:

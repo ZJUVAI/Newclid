@@ -11,7 +11,7 @@ from geosolver._lazy_loading import lazy_import
 if TYPE_CHECKING:
     from geosolver.symbols_graph import SymbolsGraph
     from geosolver.dependencies.caching import DependencyCache
-    from geosolver.statements.statement import Statement
+    from geosolver.statement import Statement
 
     import pyvis
     import networkx

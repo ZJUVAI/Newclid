@@ -11,7 +11,7 @@ from geosolver.predicates.predicate import Predicate
 from geosolver.intrinsic_rules import IntrinsicRules
 
 from geosolver.geometry import AngleValue, Point, Ratio
-from geosolver.statements.statement import (
+from geosolver.statement import (
     Statement,
     hash_ordered_two_lines_with_value,
     ratio_to_num_den,

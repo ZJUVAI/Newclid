@@ -12,7 +12,7 @@ from geosolver.intrinsic_rules import IntrinsicRules
 
 from geosolver.geometry import Angle, Length, Point, Ratio, Segment
 from geosolver.combinatorics import permutations_triplets
-from geosolver.statements.statement import Statement, hash_point_then_set_of_points
+from geosolver.statement import Statement, hash_point_then_set_of_points
 from geosolver.symbols_graph import SymbolsGraph
 
 import geosolver.predicates as preds

@@ -14,7 +14,7 @@ from geosolver.intrinsic_rules import IntrinsicRules
 
 from geosolver.geometry import Angle, AngleValue, Point, Ratio
 from geosolver.predicates.equal_angles import pretty_angle
-from geosolver.statements.statement import (
+from geosolver.statement import (
     Statement,
     angle_to_num_den,
     hash_ordered_list_of_points,

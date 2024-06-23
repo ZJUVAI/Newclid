@@ -14,7 +14,7 @@ from geosolver.predicates.predicate import Predicate
 from geosolver.intrinsic_rules import IntrinsicRules
 
 from geosolver.geometry import Point
-from geosolver.statements.statement import Statement, hash_triangle
+from geosolver.statement import Statement, hash_triangle
 from geosolver.symbols_graph import SymbolsGraph
 
 

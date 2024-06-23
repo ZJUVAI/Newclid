@@ -7,7 +7,7 @@ from geosolver.predicates.collinearity import Coll
 from geosolver.predicates.collinearity import Collx
 from geosolver.geometry import Point
 from geosolver.problem import CONSTRUCTION_RULE
-from geosolver.statements.statement import Statement
+from geosolver.statement import Statement
 from geosolver.dependencies.dependency import Dependency
 
 if TYPE_CHECKING:

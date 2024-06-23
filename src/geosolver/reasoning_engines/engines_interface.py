@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, NamedTuple
 
 from geosolver.dependencies.dependency_building import DependencyBody
-from geosolver.statements.statement import Statement
+from geosolver.statement import Statement
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency

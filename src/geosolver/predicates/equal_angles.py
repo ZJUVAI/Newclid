@@ -22,7 +22,7 @@ from geosolver.numerical import close_enough
 from geosolver.numerical.geometries import LineNum, PointNum, bring_together
 from geosolver.predicates.predicate import Predicate
 
-from geosolver.statements.statement import (
+from geosolver.statement import (
     Statement,
     hash_two_times_two_unorded_lines,
 )
@@ -412,7 +412,6 @@ class EqAngle(Predicate):
         hg = h - g
 
         sameclock = (ba.x * dc.y - ba.y * dc.x) * (fe.x * hg.y - fe.y * hg.x) > 0
-        # sameclock = (ba.x * dc.y - ba.y * dc.x) * (fe.x * hg.y - fe.y * hg.x) > ATOM
         if not sameclock:
             ba = ba * -1.0
 

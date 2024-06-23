@@ -8,7 +8,7 @@ from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.geometry import Length, Point, Ratio
 from geosolver.reasoning_engines.engines_interface import Derivation, ReasoningEngine
-from geosolver.statements.statement import Statement
+from geosolver.statement import Statement
 
 
 if TYPE_CHECKING:

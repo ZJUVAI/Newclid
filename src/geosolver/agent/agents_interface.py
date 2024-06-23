@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from geosolver.reasoning_engines.engines_interface import Derivation
     from geosolver.problem import Problem
 
-    from geosolver.statements.statement import Statement
+    from geosolver.statement import Statement
 
 
 Mapping = dict[str, Union["Point", str]]

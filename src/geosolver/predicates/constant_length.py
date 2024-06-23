@@ -12,7 +12,7 @@ from geosolver.predicates.predicate import Predicate
 from geosolver.intrinsic_rules import IntrinsicRules
 
 from geosolver.geometry import Angle, Direction, Length, Point, Ratio, Segment
-from geosolver.statements.statement import (
+from geosolver.statement import (
     Statement,
     hash_unordered_set_of_points_with_value,
 )

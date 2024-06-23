@@ -9,7 +9,7 @@ from geosolver.theorem import Theorem
 if TYPE_CHECKING:
     from geosolver.intrinsic_rules import IntrinsicRules
     from geosolver.reasoning_engines.algebraic_reasoning import AlgebraicRules
-    from geosolver.statements.statement import Statement
+    from geosolver.statement import Statement
 
 
 @dataclass(frozen=True)

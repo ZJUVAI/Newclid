@@ -10,7 +10,7 @@ from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.symbols_graph import is_equiv
 
 
-from geosolver.statements.statement import Statement, ratio_to_num_den, angle_to_num_den
+from geosolver.statement import Statement, ratio_to_num_den, angle_to_num_den
 
 from geosolver.reasoning_engines.algebraic_reasoning.geometric_tables import (
     AngleTable,

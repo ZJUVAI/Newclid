@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from geosolver.dependencies.dependency import Reason, Dependency
 
 if TYPE_CHECKING:
-    from geosolver.statements.statement import Statement
+    from geosolver.statement import Statement
     from geosolver.dependencies.why_graph import DependencyGraph
 
 

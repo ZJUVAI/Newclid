@@ -11,7 +11,7 @@ from geosolver.intrinsic_rules import IntrinsicRules
 
 from geosolver.geometry import Angle, Line, Point, Ratio
 from geosolver.combinatorics import permutations_triplets
-from geosolver.statements.statement import Statement, hash_point_and_line
+from geosolver.statement import Statement, hash_point_and_line
 from geosolver.symbols_graph import SymbolsGraph
 
 import geosolver.predicates as preds

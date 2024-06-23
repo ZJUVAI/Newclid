@@ -24,7 +24,7 @@ from geosolver.numerical import close_enough
 from geosolver.numerical.geometries import PointNum
 from geosolver.predicates.predicate import Predicate
 
-from geosolver.statements.statement import (
+from geosolver.statement import (
     Statement,
     hash_two_times_two_unorded_lines,
 )

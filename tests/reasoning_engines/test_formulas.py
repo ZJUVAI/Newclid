@@ -13,7 +13,7 @@ from geosolver.reasoning_engines.formulas import (
     make_rconst_hashs_from_colls,
 )
 from geosolver.reasoning_engines.engines_interface import Derivation, ReasoningEngine
-from geosolver.statements.statement import Statement
+from geosolver.statement import Statement
 from geosolver.symbols_graph import SymbolsGraph
 
 

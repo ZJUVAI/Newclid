@@ -5,7 +5,7 @@ from typing_extensions import Self
 
 from geosolver.geometry import Point, Ratio, Angle
 from geosolver.dependencies.dependency import Reason
-from geosolver.statements.statement import Statement
+from geosolver.statement import Statement
 
 
 if TYPE_CHECKING:
@@ -72,3 +72,6 @@ class Predicate(ABC):
         cls: Self, args: list[PredicateArgument]
     ) -> tuple[str | PredicateArgument]:
         """Hash the predicate into a tuple of strings."""
+
+    def __repr__(self) -> str:
+        return self.NAME

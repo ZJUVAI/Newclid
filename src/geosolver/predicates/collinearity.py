@@ -14,7 +14,7 @@ from geosolver.intrinsic_rules import IntrinsicRules
 
 from geosolver.geometry import Point, Line
 from geosolver.combinatorics import arrangement_pairs, permutations_triplets
-from geosolver.statements.statement import (
+from geosolver.statement import (
     Statement,
     hash_unordered_set_of_points,
     hashed_unordered_two_lines_points,

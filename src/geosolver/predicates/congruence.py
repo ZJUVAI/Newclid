@@ -12,7 +12,7 @@ from geosolver.predicates.predicate import Predicate
 from geosolver.intrinsic_rules import IntrinsicRules
 
 from geosolver.geometry import Length, Point, Segment
-from geosolver.statements.statement import Statement, hashed_unordered_two_lines_points
+from geosolver.statement import Statement, hashed_unordered_two_lines_points
 from geosolver.symbols_graph import SymbolsGraph, is_equal
 
 import geosolver.predicates as preds

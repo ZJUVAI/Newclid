@@ -8,7 +8,7 @@ from typing import NamedTuple, Optional, TypeVar
 
 import geosolver.predicates as preds
 from geosolver.reasoning_engines.engines_interface import Derivation
-from geosolver.statements.statement import Statement
+from geosolver.statement import Statement
 from geosolver.theorem import Theorem
 from geosolver.agent.agents_interface import (
     Action,

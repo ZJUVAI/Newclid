@@ -9,7 +9,7 @@ from geosolver.geometry import Direction, Line, Point
 from geosolver.intrinsic_rules import IntrinsicRules
 from geosolver.numerical.geometries import LineNum, PointNum
 from geosolver.predicates.predicate import Predicate
-from geosolver.statements.statement import Statement, hashed_unordered_two_lines_points
+from geosolver.statement import Statement, hashed_unordered_two_lines_points
 
 from geosolver.dependencies.why_predicates import why_equal
 from geosolver.symbols_graph import SymbolsGraph, is_equal

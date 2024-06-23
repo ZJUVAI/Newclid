@@ -23,7 +23,7 @@ from geosolver.intrinsic_rules import IntrinsicRules, validate_disabled_rules
 import geosolver.predicates as preds
 from geosolver.ratios import simplify
 from geosolver.reasoning_engines.engines_interface import ReasoningEngine
-from geosolver.statements.statement import Statement, angle_to_num_den, ratio_to_num_den
+from geosolver.statement import Statement, angle_to_num_den, ratio_to_num_den
 from geosolver.defs.definition import Definition
 from geosolver.theorem import Theorem
 from geosolver.agent.agents_interface import (
