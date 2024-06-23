@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 class SameSide(Predicate):
     """sameside a b c x y z -
 
-    Represent that b is to the same side of a & c as y is to x & z.
+    Represent that a is to the same side of b & c as x is to y & z.
 
     Numerical only.
     """
@@ -65,7 +65,8 @@ class SameSide(Predicate):
 
     @staticmethod
     def pretty(args: list[str]) -> str:
-        raise NotImplementedError
+        a, b, c, x, y, z = args
+        return f"{a} is to the same side of {b}{c} as {x} to {y}{z}"
 
     @classmethod
     def hash(cls, args: list[Point]) -> tuple[str, ...]:

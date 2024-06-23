@@ -241,7 +241,8 @@ class Perp(Predicate):
         a, b = ab.points
         c, d = cd.points
 
-        perp_repr = Statement(statement.name, [a, b, c, d])
+        perp_repr_predicate = preds.NAME_TO_PREDICATE[statement.name]
+        perp_repr = Statement(perp_repr_predicate, [a, b, c, d])
         if perp_repr.hash_tuple != statement.hash_tuple:
             perp_repr_dep = dep_graph.build_dependency_from_statement(
                 perp_repr, why=why_eqangle, reason=Reason("_why_perp_repr")

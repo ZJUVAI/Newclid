@@ -256,7 +256,7 @@ class NColl(Predicate):
 
     @staticmethod
     def pretty(args: list[str]) -> str:
-        raise NotImplementedError
+        return "Points " + ",".join(args) + " are not aligned"
 
     @classmethod
     def hash(cls, args: list[Point]) -> tuple[str]:

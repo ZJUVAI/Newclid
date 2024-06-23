@@ -109,7 +109,7 @@ class GeometricSolver:
         self.proof_state.symbols_graph.draw_html(out_file)
 
     def draw_why_graph(self, out_file: Path):
-        self.proof_state.statements.graph.show_html(out_file)
+        self.proof_state.dependency_graph.show_html(out_file)
 
     def write_all_outputs(self, output_folder_path: Path):
         output_folder_path.mkdir(exist_ok=True, parents=True)

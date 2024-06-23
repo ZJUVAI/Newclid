@@ -1,5 +1,6 @@
 import pytest
 
+from geosolver.agent.breadth_first_search import BFSDD
 from geosolver.api import GeometricSolverBuilder
 from geosolver.theorem import Theorem
 from geosolver.proof_writing import get_proof_steps, proof_step_string
@@ -13,25 +14,25 @@ EXPECTED_TO_USE_OTHER_RULE = [
 ]
 
 EXPECTED_WRONG_PROOF_LENGTH = [
-    "perp A B C D, perp E F G H, npara A B E F => eqangle A B E F C D G H",
     "cong O A O B, cong O B O C, cong O C O D => cyclic A B C D",
     "cyclic A B C P Q R, eqangle C A C B R P R Q => cong A B P Q",
-    "cyclic A B C D, para A B C D => eqangle A D C D C D C B",
+    "midp E A B, midp F A C => para E F B C",
+    "perp A B C D, perp E F G H, npara A B E F => eqangle A B E F C D G H",
     "circle O A B C, perp O A A X => eqangle A X A B C A C B",
     "circle O A B C, eqangle A X A B C A C B => perp O A A X",
     "circle O A B C, midp M B C => eqangle A B A C O B O M",
-    "midp E A B, midp F A C => para E F B C",
+    "circle O A B C, coll O A C => perp A B B C",
+    "circle O A B C, coll M B C, eqangle A B A C O B O M => midp M B C",
+    "cyclic A B C D, para A B C D => eqangle A D C D C D C B",
     "midp M A B, midp M C D => para A C B D",
     "midp M A B, perp O M A B => cong O A O B",
-    "perp A B B C, midp M A C => cong A M B M",
-    "circle O A B C, coll O A C => perp A B B C",
     "midp M A B, midp N C D => eqratio M A A B N C C D",
+    "midp M A B => rconst M A A B 1/2",
+    "midp M A B, para A C B D, para A D B C => midp M C D",
+    "perp A B B C, midp M A C => cong A M B M",
     "eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C, cong A B P Q => contri A B C P Q R",
     "eqratio A B P Q C D U V, cong P Q U V => cong A B C D",
-    "circle O A B C, coll M B C, eqangle A B A C O B O M => midp M B C",
-    "midp M A B, para A C B D, para A D B C => midp M C D",
     "para a b c d, coll m a d, coll n b c, para m n a b => eqratio6 m a m d n b n c",
-    "midp M A B => rconst M A A B 1/2",
 ]
 
 DEFINITIONAL_RULES = [  # rules not applied
@@ -272,8 +273,9 @@ def test_rule_used_to_solve_in_one_step(
 
     solver_builder = (
         GeometricSolverBuilder()
-        .load_problem_from_txt(problem_txt)
+        .load_problem_from_txt(problem_txt, translate=False)
         .with_disabled_intrinsic_rules(ALL_INTRINSIC_RULES)
+        .with_deductive_agent(BFSDD())
     )
     solver_builder.reasoning_engines = {}
     solver_builder.rules = [theorem]

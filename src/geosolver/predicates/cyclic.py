@@ -78,7 +78,9 @@ class Cyclic(Predicate):
             whys = []
             for x in [a, b, c, d, e, f]:
                 if x not in og_points:
-                    whys.append(Cyclic._cyclic_dep(og_points, x, symbols_graph))
+                    whys.append(
+                        Cyclic._cyclic_dep(og_points, x, dep_graph, symbols_graph)
+                    )
 
             abcdef_deps = dep_body
             if IntrinsicRules.CYCLIC_FROM_CIRCLE:

@@ -415,6 +415,8 @@ class Proof:
             self.dependency_graph.dependency_cache.add_dependency(*to_cache)
 
     def check_goal(self) -> bool:
+        if self.goal is None:
+            return False
         return self.goal.check(self.symbols_graph)
 
     def additionally_draw(self, name: str, args: list[Point]) -> None:

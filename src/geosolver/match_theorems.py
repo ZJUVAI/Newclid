@@ -321,7 +321,7 @@ def match_perp_perp_ncoll_para(
         for y1, y2 in comb.arrangement_pairs(ys):
             a, b = symbols_graph.two_points_on_direction(y1)
             e, f = symbols_graph.two_points_on_direction(y2)
-            if preds.Coll.check_numerical([a.num, b.num, e.num]):
+            if preds.NColl.check_numerical([a.num, b.num, e.num]):
                 yield dict(zip("ABCDEF", [a, b, c, d, e, f]))
 
 
@@ -563,7 +563,7 @@ def match_eqratio6_eqangle6_ncoll_simtri(
     g_matcher: Callable[[str], list[tuple[Point, ...]]],
     theorem: "Theorem",
 ) -> Generator[dict[str, Point], None, None]:
-    """Match eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri A B C P Q R."""
+    """Match eqratio6 B A B C Q P Q R, eqangle6 B A B C Q P Q R, ncoll A B C => simtri A B C P Q R."""
     symbols_graph = proof.symbols_graph
     enums = g_matcher(preds.EqRatio6.NAME)
 
@@ -576,11 +576,13 @@ def match_eqratio6_eqangle6_ncoll_simtri(
         if not preds.NColl.check([a, b, c], symbols_graph):
             continue
 
-        if same_clock(a.num, b.num, c.num, p.num, q.num, r.num):
-            if preds.EqAngle.check([b, a, b, c, q, p, q, r], symbols_graph):
-                record.add((a, b, c, p, q, r))
-                yield dict(zip("ABCPQR", [a, b, c, p, q, r]))
-        elif preds.EqAngle.check([b, a, b, c, q, r, q, p], symbols_graph):
+        reflected = same_clock(a.num, b.num, c.num, p.num, q.num, r.num)
+        if (
+            not reflected
+            and preds.EqAngle.check([b, a, b, c, q, p, q, r], symbols_graph)
+        ) or (
+            reflected and preds.EqAngle.check([b, a, b, c, q, r, q, p], symbols_graph)
+        ):
             record.add((a, b, c, p, q, r))
             yield dict(zip("ABCPQR", [a, b, c, p, q, r]))
 

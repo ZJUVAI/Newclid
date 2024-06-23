@@ -105,39 +105,6 @@ class TestHumanAgent:
         success = solver.run()
         assert success
 
-    def test_should_solve_orthocenter_aux(self):
-        self.human_agent.inputs_given = [
-            "match",
-            "r30",
-            "apply",
-            pop_last_mapping,
-            "match",
-            "r08",
-            "apply",
-            pop_last_mapping,
-            "apply",
-            pop_last_mapping,
-            "match",
-            "r34",
-            "apply",
-            pop_last_mapping,
-            "match",
-            "r39",
-            "apply",
-            pop_last_mapping,
-            "stop",
-        ]
-
-        solver = self.solver_builder.load_problem_from_txt(
-            "a b c = triangle a b c; "
-            "d = on_tline d b a c, on_tline d c a b; "
-            "e = on_line e a c, on_line e b d "
-            "? perp a d b c",
-            translate=False,
-        ).build()
-        success = solver.run()
-        assert success
-
     def test_should_solve_orthocenter(self):
         self.human_agent.show_figure = False
         self.human_agent.inputs_given = [

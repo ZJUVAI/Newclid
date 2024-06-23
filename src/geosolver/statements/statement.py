@@ -79,11 +79,6 @@ class Statement:
     def __hash__(self) -> tuple[str, ...]:
         return hash(self.hash_tuple)
 
-    @classmethod
-    def from_txt(cls, data: str) -> Statement:
-        data = data.split(" ")
-        return Statement(data[0], tuple(data[1:]))
-
 
 def name_and_arguments_to_str(
     name: str, args: list[str | int | "Symbol"], join: str

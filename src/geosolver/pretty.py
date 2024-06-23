@@ -15,8 +15,8 @@ MAP_SYMBOL = {
     "^": preds.EqAngle,
     "/": preds.EqRatio,
     "%": preds.EqRatio,
-    "S": preds.Simtri,
-    "=": preds.Contri,
+    "S": preds.SimtriClock,
+    "=": preds.ContriClock,
     # "A": PredicateName.COMPUTE_ANGLE.value,
     # "R": PredicateName.COMPUTE_RATIO.value,
     # "Q": PredicateName.FIX_C.value,
@@ -124,10 +124,10 @@ def pretty(txt: tuple[str, ...]) -> str:
             return f"P {ab} {cd}"
         a, b, c, d = args
         return f"P {a} {b} {c} {d}"
-    if name in [preds.SimtriReflect.NAME, preds.Simtri.NAME]:
+    if name in [preds.SimtriReflect.NAME, preds.SimtriClock.NAME]:
         a, b, c, x, y, z = args
         return f"S {a} {b} {c} {x} {y} {z}"
-    if name in [preds.Contri.NAME, preds.ContriReflect.NAME]:
+    if name in [preds.ContriClock.NAME, preds.ContriReflect.NAME]:
         a, b, c, x, y, z = args
         return f"= {a} {b} {c} {x} {y} {z}"
     if name == preds.Circumcenter.NAME:

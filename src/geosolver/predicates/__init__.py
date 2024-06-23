@@ -17,8 +17,16 @@ from geosolver.predicates.constant_angle import ConstantAngle, SAngle
 from geosolver.predicates.different import Diff
 from geosolver.predicates.sameside import SameSide
 
-from geosolver.predicates.triangles_similar import Simtri, SimtriReflect
-from geosolver.predicates.triangles_congruent import Contri, ContriReflect
+from geosolver.predicates.triangles_similar import (
+    SimtriAny,
+    SimtriClock,
+    SimtriReflect,
+)
+from geosolver.predicates.triangles_congruent import (
+    ContriAny,
+    ContriClock,
+    ContriReflect,
+)
 
 SYMBOLIC_PREDICATES = (
     Coll,
@@ -39,10 +47,12 @@ SYMBOLIC_PREDICATES = (
     ConstantRatio,
     ConstantAngle,
     SAngle,
-    Simtri,
+    SimtriClock,
     SimtriReflect,
-    Contri,
+    SimtriAny,
+    ContriClock,
     ContriReflect,
+    ContriAny,
 )
 
 NUMERICAL_PREDICATES = (
