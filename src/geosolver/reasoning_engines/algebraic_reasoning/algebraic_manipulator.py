@@ -99,8 +99,8 @@ class AlgebraicManipulator(ReasoningEngine):
             elif len(x) == 3:
                 mn, pq, v = x
                 (m, n) = mn._obj.points
-                num, denum = get_quotient(exp(v))
                 if pq == self.symbols_graph.get_or_create_const_rat(1, 1):
+                    num, denum = get_quotient(exp(v + 1))
                     self.derive_buffer.append(
                         Derivation(
                             Statement(
@@ -117,6 +117,7 @@ class AlgebraicManipulator(ReasoningEngine):
                         )
                     )
                     continue
+                num, denum = get_quotient(exp(v))
                 ratio, *_ = self.symbols_graph.get_or_create_const_rat(num, denum)
                 (p, q) = pq._obj.points
                 ratio1, *_ = self.symbols_graph.get_or_create_ratio_from_lengths(
