@@ -401,13 +401,23 @@ class TestAR:
             "incenter2 x y z i a b c",
             "i : a b c, x : i b c, y : i c a, z : i a b",
             "a b c = ncoll a b c",
-            "i : eqangle a b a i a i a c, eqangle c a c i c i c b; eqangle b c b i b i b a; x : coll x b c, perp i x b c; y : coll y c a, perp i y c a; z : coll z a b, perp i z a b; cong i x i y, cong i y i z",
+            "i : eqangle a b a i a i a c, eqangle c a c i c i c b;"
+            " eqangle b c b i b i b a;"
+            " x : coll x b c, perp i x b c;"
+            " y : coll y c a, perp i y c a;"
+            " z : coll z a b, perp i z a b; "
+            "cong i x i y, cong i y i z",
             "incenter2 a b c",
             "",
             "excenter2 x y z i a b c",
             "i : a b c, x : i b c, y : i c a, z : i a b",
             "a b c = ncoll a b c",
-            "i : eqangle a b a i a i a c, eqangle c a c i c i c b; eqangle b c b i b i b a; x : coll x b c, perp i x b c; y : coll y c a, perp i y c a; z : coll z a b, perp i z a b; cong i x i y, cong i y i z",
+            "i : eqangle a b a i a i a c, eqangle c a c i c i c b;"
+            " eqangle b c b i b i b a;"
+            " x : coll x b c, perp i x b c;"
+            " y : coll y c a, perp i y c a;"
+            " z : coll z a b, perp i z a b; "
+            "cong i x i y, cong i y i z",
             "excenter2 a b c",
             "",
         ]
