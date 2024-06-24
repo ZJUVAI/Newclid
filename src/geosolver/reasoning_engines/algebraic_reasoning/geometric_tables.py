@@ -96,7 +96,7 @@ def minus(e1: dict[str, float], e2: dict[str, float]) -> dict[str, float]:
     return plus(e1, mult(e2, -1))
 
 
-def div(e1: dict[str, float], e2: dict[str, float]) -> float:
+def div(e1: dict[str, float], e2: dict[str, float]) -> frac:
     """Divide e1 by e2."""
     e1 = strip(e1)
     e2 = strip(e2)

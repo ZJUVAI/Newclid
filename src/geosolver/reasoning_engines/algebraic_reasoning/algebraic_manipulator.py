@@ -112,35 +112,29 @@ class AlgebraicManipulator(ReasoningEngine):
         """Derive new eqangles predicates."""
         added = []
 
-        for x in self.atable.get_all_eqs_and_why():
-            x, why = x[:-1], x[-1]
+        for eqs_and_why in self.atable.get_all_eqs_and_why():
+            eqs, why = eqs_and_why[:-1], eqs_and_why[-1]
             dep = DependencyBody(reason=Reason(AlgebraicRules.Angle_Chase), why=why)
 
-            if len(x) == 2:
-                ab, cd = x
+            if len(eqs) == 2:
+                ab, cd = eqs
                 if is_equiv(ab, cd):
                     continue
 
                 points = (*ab._obj.points, *cd._obj.points)
                 para = Statement(preds.Para, points)
-                if not para.check_numerical():
-                    continue
-
                 added.append(Derivation(para, dep))
 
-            if len(x) == 3:
-                ef, pq, (n, d) = x
+            if len(eqs) == 3:
+                ef, pq, (n, d) = eqs
                 points = (*ef._obj.points, *pq._obj.points)
                 angle, opposite_angle = self.symbols_graph.get_or_create_const_ang(n, d)
                 angle.opposite = opposite_angle
                 aconst = Statement(preds.ConstantAngle, (*points, angle))
-                if not aconst.check_numerical():
-                    continue
-
                 added.append(Derivation(aconst, dep))
 
-            if len(x) == 4:
-                ab, cd, mn, pq = x
+            if len(eqs) == 4:
+                ab, cd, mn, pq = eqs
                 points = (
                     *ab._obj.points,
                     *cd._obj.points,
