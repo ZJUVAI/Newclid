@@ -10,7 +10,6 @@ from geosolver.reasoning_engines.engines_interface import Derivation, ReasoningE
 from geosolver.predicates import Predicate
 from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.geometry import is_equiv
-from geosolver.numerical.check import check_numerical
 
 
 from geosolver.statements.statement import Statement, ratio_to_num_den, angle_to_num_den
@@ -158,9 +157,6 @@ class AlgebraicManipulator(ReasoningEngine):
 
                 points = (*ab._obj.points, *cd._obj.points)
                 para = Statement(Predicate.PARALLEL, points)
-                if not check_numerical(para):
-                    continue
-
                 self.derive_buffer.append(Derivation(para, dep))
 
             if len(x) == 3:
@@ -169,9 +165,6 @@ class AlgebraicManipulator(ReasoningEngine):
                 points = (*ef._obj.points, *pq._obj.points)
                 angle, _ = self.symbols_graph.get_or_create_const_ang(n, d)
                 aconst = Statement(Predicate.CONSTANT_ANGLE, (*points, angle))
-                if not check_numerical(aconst):
-                    continue
-
                 self.derive_buffer.append(Derivation(aconst, dep))
 
             if len(x) == 4:
