@@ -654,17 +654,10 @@ r40 : eqratio_eqratio_cong2contri
    :header-rows: 1
 
    * - Figure
-     - :math:`\frac{BA}{BC} = \frac{QP}{QR} \wedge \frac{CA}{CB} = \frac{RP}{RQ}`
-       :math:`\wedge \text{ncoll}(ABC) \wedge |AB| = |PQ|`
-       :math:`\implies \text{contri*}(ABC, PQR)`
+     - Formal Statement
      - Description
    * - |r40|
-     -
-       .. code-block :: text
-
-         eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q,
-         ncoll A B C, cong A B P Q
-         => contri* A B C P Q R
+     - :math:`\begin{cases}\frac{BA}{BC} = \frac{QP}{QR} \\ \frac{CA}{CB} = \frac{RP}{RQ}\\ ABC\text{ non-collinear} \\ |AB| = |PQ|\end{cases}\implies ABC\cong^\ast PQR`
      - 
 
 .. |r40| image:: ../../_static/Images/rules/r40.png
@@ -677,18 +670,10 @@ r41 : para2eqratio
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{para}(A, B, C, D) \wedge \text{coll}(M, A, D) \wedge \text{coll}(N, B, C)`
-       :math:`\wedge \text{eqratio6}(M, A, M, D, N, B, N, C)`
-       :math:`\wedge \text{sameside}(M, A, D, N, B, C)`
-       :math:`\implies \text{para}(M, N, A, B)`
+     - Formal Statement
      - Description
    * - |r41|
-     -
-       .. code-block :: text
-
-         para A B C D, coll M A D, coll N B C,
-         eqratio6 M A M D N B N C, sameside M A D N B C
-         => para M N A B
+     - :math:`\begin{cases}AB\parallel CD \\ MAD\text{ collinear} \\ NBC \text{ collinear} \\ \frac{MA}{MD}=\frac{NB}{NC}\\ MAD \text{ has the same orientation as }NBC \end{cases}\implies MN\parallel A B`
      - 
 
 .. |r41| image:: ../../_static/Images/rules/r41.png
@@ -701,15 +686,10 @@ r42 : eqratio62para
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{para}(A, B, C, D) \wedge \text{coll}(M, A, D) \wedge \text{coll}(N, B, C)`
-       :math:`\implies \text{eqratio6}(M, A, M, D, N, B, N, C)`
+     - Formal Statement
      - Description
    * - |r42|
-     -
-       .. code-block :: text
-
-         para A B C D, coll M A D, coll N B C, para M N A B
-         => eqratio6 M A M D N B N C
+     - :math:`\begin{cases}AB\parallel CD \\ MAD\text{ collinear} \\ NBC\text{ collinear}\end{cases}\implies \frac{MA}{MD}=\frac{NB}{NC}`
      - 
 
 .. |r42| image:: ../../_static/Images/rules/r42.png
