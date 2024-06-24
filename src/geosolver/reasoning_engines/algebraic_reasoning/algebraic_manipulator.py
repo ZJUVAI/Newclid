@@ -66,7 +66,6 @@ class AlgebraicManipulator(ReasoningEngine):
     def resolve(self, **kwargs) -> list[Derivation]:
         """Derive new algebraic predicates."""
         self.derive_angle_algebra()
-        self.derive_cong_algebra()
         self.derive_ratio_algebra()
 
         if "a" in self.verbose:
@@ -173,39 +172,6 @@ class AlgebraicManipulator(ReasoningEngine):
                 self.derive_buffer.append(Derivation(eqangle, dep))
 
         return self.derive_buffer
-
-    def derive_cong_algebra(self):
-        """Derive new cong predicates."""
-        added = []
-        for x in self.dtable.get_all_eqs_and_why():
-            x, why = x[:-1], x[-1]
-            dep = DependencyBody(reason=Reason(AlgebraicRules.Distance_Chase), why=why)
-
-            if len(x) == 2:
-                raise NotImplementedError
-                # a, b = x
-                # if a == b:
-                #     continue
-
-                # inci = Statement(PredicateName.INCI, (a, b))
-                # added.append(Derivation(inci, dep))
-
-            if len(x) == 4:
-                a, b, c, d = x
-                if not (a != b and c != d and (a != c or b != d)):
-                    continue
-                cong = Statement(preds.Cong, (a, b, c, d))
-                added.append(Derivation(cong, dep))
-
-            if len(x) == 6:
-                a, b, c, d, num, den = x
-                if not (a != b and c != d and (a != c or b != d)):
-                    continue
-                ratio, _ = self.symbols_graph.get_or_create_const_rat(num, den)
-                rconst = Statement(preds.ConstantRatio, (a, b, c, d, ratio))
-                added.append(Derivation(rconst, dep))
-
-        return added
 
     def _add_para(self, dep: "Dependency"):
         a, b, c, d = dep.statement.args
