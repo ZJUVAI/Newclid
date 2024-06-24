@@ -1,8 +1,10 @@
 from __future__ import annotations
 from collections import defaultdict
+from decimal import Decimal
 from fractions import Fraction
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Type, TypeVar
+from typing_extensions import Self
 
 
 from geosolver.ratios import simplify
@@ -56,6 +58,13 @@ NODES_VALUES_MARKERS: dict[Type[Symbol], str] = {
 }
 
 S = TypeVar("S")
+
+
+def length_str(length):
+    res = f"{length:.3f}"
+    while res[-1] == "0" or res[-1] == ".":
+        res = res[:-1]
+    return res
 
 
 class SymbolsGraph:
@@ -251,6 +260,8 @@ class SymbolsGraph:
         if (n, d) not in self.aconst:
             self._create_const_ang(n, d)
         ang2 = self.aconst[(n, d)]
+        ang1.opposite = ang2
+        ang2.opposite = ang1
         return ang1, ang2
 
     def get_or_create_const_rat(self, n: int, d: int) -> tuple[Ratio, Ratio]:
@@ -264,9 +275,11 @@ class SymbolsGraph:
         rat2 = self.rconst[(d, n)]
         return rat1, rat2
 
-    def get_or_create_const_length(self, length: float) -> Length:
+    def get_or_create_const_length(self, length) -> Length:
         if length not in self.lconst:
-            length_node = self.lconst[length] = self.new_node(Length, str(length))
+            length_node = self.lconst[length] = self.new_node(
+                Length, length_str(length)
+            )
             length_node.value = length
             self.get_node_val(length_node, None)
         return self.lconst[length]
@@ -300,7 +313,9 @@ class SymbolsGraph:
             "Unsupported construction for constants: %s", construction_name.name
         )
 
-    def get_or_create_segment(self, p1: Point, p2: Point, dep: "Dependency") -> Segment:
+    def get_or_create_segment(
+        self, p1: Point, p2: Point, dep: Optional["Dependency"]
+    ) -> Segment:
         """Get or create a Segment object between two Points p1 and p2."""
         if p1 == p2:
             raise ValueError(f"Creating same 0-length segment {p1.name}")
@@ -349,12 +364,12 @@ class SymbolsGraph:
     def get_or_create_ratio_from_segments(
         self, s1: Segment, s2: Segment, dep: "Dependency"
     ) -> tuple[Ratio, Ratio, list["Dependency"]]:
-        return self.get_or_create_ratio_from_lenghts(s1._val, s2._val, dep)
+        return self.get_or_create_ratio_from_lengths(s1._val, s2._val, dep)
 
-    def get_or_create_ratio_from_lenghts(
+    def get_or_create_ratio_from_lengths(
         self, l1: Length, l2: Length, dep: "Dependency"
     ) -> tuple[Ratio, Ratio, list["Dependency"]]:
-        """Get or create a new Ratio from two Lenghts l1 and l2."""
+        """Get or create a new Ratio from two Lengths l1 and l2."""
         for r in self.type2nodes[Ratio]:
             if r.lengths == (l1.rep(), l2.rep()):
                 l1_, l2_ = r._l
@@ -484,3 +499,36 @@ class SymbolsGraph:
             block=block,
             **kwargs,
         )
+
+
+class SymbolsGraphBuilder:
+    def __init__(self) -> None:
+        self.points: list[Point] = []
+        self.ratios_tuples: list[tuple[int, int]] = []
+        self.length_decimals: list[Decimal] = []
+
+    def with_points_named(self, points_names: list[str]) -> Self:
+        self.points += [Point(name) for name in points_names]
+        return self
+
+    def with_ratios(self, ratios: list[str]) -> Self:
+        for ratio in ratios:
+            fraction = Fraction(ratio)
+            self.ratios_tuples.append((fraction.numerator, fraction.denominator))
+        return self
+
+    def with_lengths(self, lengths: list[str]) -> Self:
+        for length in lengths:
+            decimal = Decimal(length)
+            self.length_decimals.append(decimal)
+        return self
+
+    def build(self) -> SymbolsGraph:
+        symbols_graph = SymbolsGraph()
+        for point in self.points:
+            symbols_graph.add_node(point)
+        for ratio in self.ratios_tuples:
+            symbols_graph.get_or_create_const_rat(*ratio)
+        for length in self.length_decimals:
+            symbols_graph.get_or_create_const_length(length)
+        return symbols_graph

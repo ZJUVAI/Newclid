@@ -1,11 +1,9 @@
 from fractions import Fraction
 import pytest
-from typing_extensions import Self
 
 from geosolver.api import GeometricSolverBuilder
 from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.dependencies.dependency_building import DependencyBody
-from geosolver.geometry import Point
 from geosolver.predicates import Predicate
 from geosolver.reasoning_engines.formulas import (
     MenelausFormula,
@@ -14,7 +12,7 @@ from geosolver.reasoning_engines.formulas import (
 )
 from geosolver.reasoning_engines.engines_interface import Derivation, ReasoningEngine
 from geosolver.statements.statement import Statement
-from geosolver.symbols_graph import SymbolsGraph
+from geosolver.symbols_graph import SymbolsGraphBuilder
 
 
 class TestPythagorean:
@@ -23,11 +21,11 @@ class TestPythagorean:
         self.solver_builder = GeometricSolverBuilder()
         self.reasoning_fixture = reasoning_fixture
         points_names = ["a", "b", "c"]
-        lengths = ["3.0", "4.0", "5.0"]
+        lengths = ["3", "4", "5"]
 
         self.symbols_graph = (
             SymbolsGraphBuilder()
-            .with_point_named(points_names)
+            .with_points_named(points_names)
             .with_lengths(lengths)
             .build()
         )
@@ -175,7 +173,7 @@ class TestMenelaus:
 
         self.symbols_graph = (
             SymbolsGraphBuilder()
-            .with_point_named(points_names)
+            .with_points_named(points_names)
             .with_ratios(ratios)
             .build()
         )
@@ -295,34 +293,3 @@ class ReasoningEngineFixture:
 
     def then_new_derivations_should_be(self, expected_derivation: list[Derivation]):
         assert self._derivations == expected_derivation
-
-
-class SymbolsGraphBuilder:
-    def __init__(self) -> None:
-        self.points: list[Point] = []
-        self.ratios_tuples: list[tuple[int, int]] = []
-        self.lengths: list[float] = []
-
-    def with_point_named(self, points_names: list[str]) -> Self:
-        self.points += [Point(name) for name in points_names]
-        return self
-
-    def with_ratios(self, ratios: list[str]) -> Self:
-        for ratio in ratios:
-            fraction = Fraction(ratio)
-            self.ratios_tuples.append((fraction.numerator, fraction.denominator))
-        return self
-
-    def with_lengths(self, lengths: list[str]) -> Self:
-        self.lengths.extend([float(length) for length in lengths])
-        return self
-
-    def build(self) -> SymbolsGraph:
-        symbols_graph = SymbolsGraph()
-        for point in self.points:
-            symbols_graph.add_node(point)
-        for ratio in self.ratios_tuples:
-            symbols_graph.get_or_create_const_rat(*ratio)
-        for length in self.lengths:
-            symbols_graph.get_or_create_const_length(length)
-        return symbols_graph

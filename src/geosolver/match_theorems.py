@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Callable, Generator, Optional
 
 import geosolver.combinatorics as comb
 
+from geosolver.defs.clause import Construction
 from geosolver.predicates import Predicate
 from geosolver.agent.agents_interface import Mapping
 from geosolver.points_manipulation import (
@@ -880,7 +881,7 @@ def match_one_theorem(
     proof: "Proof",
     theorem: "Theorem",
     cache: Optional[MatchCache] = None,
-    goal: Optional["Clause"] = None,
+    goals: Optional[list[Construction]] = None,
     max_mappings: int = 50_000,
 ) -> list[Mapping]:
     """Match all instances of a single theorem (rule)."""
@@ -897,7 +898,7 @@ def match_one_theorem(
         Predicate.FIX_T.value,
         Predicate.FIX_P.value,
     ]:
-        if goal and goal.name != name:
+        if goals and all(goal.name != name for goal in goals):
             return []
 
     if theorem.name in BUILT_IN_FNS:
@@ -912,16 +913,3 @@ def match_one_theorem(
             break
 
     return mappings
-
-
-def match_all_theorems(
-    proof: "Proof", theorems: list["Theorem"], goal: "Clause"
-) -> dict["Theorem", dict["Theorem", dict[str, Point]]]:
-    """Match all instances of all theorems (rules)."""
-    cache = MatchCache(proof)
-    theorem2mappings = {}
-    for theorem in theorems:
-        mappings = match_one_theorem(proof, cache, theorem, goal=goal)
-        if mappings:
-            theorem2mappings[theorem] = mappings
-    return theorem2mappings

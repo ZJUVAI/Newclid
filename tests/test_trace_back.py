@@ -26,9 +26,9 @@ class TestTraceback:
         solver.run()
 
         goal_args = solver.proof_state.symbols_graph.names2nodes(
-            solver.problem.goal.args
+            solver.problem.goals[0].args
         )
-        goal = Statement(solver.problem.goal.name, goal_args)
+        goal = Statement(solver.problem.goals[0].name, goal_args)
         setup, aux, _, _ = get_logs(goal, solver.proof_state, merge_trivials=False)
 
         setup = [p.statement.hash_tuple for p in setup]

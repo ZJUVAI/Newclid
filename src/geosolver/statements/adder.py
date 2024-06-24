@@ -66,6 +66,10 @@ class IntrinsicRules(Enum):
 ALL_INTRINSIC_RULES = [rule for rule in IntrinsicRules]
 
 
+class SymbolicError(Exception):
+    """A symbolic manipulation was wrong"""
+
+
 class StatementAdder:
     def __init__(
         self,
@@ -116,9 +120,17 @@ class StatementAdder:
         }
 
     def add(
-        self, statement: Statement, dep_body: DependencyBody
+        self,
+        statement: Statement,
+        dep_body: DependencyBody,
+        ensure_numerically_sound: bool = False,
     ) -> tuple[list[Dependency], list[ToCache]]:
         """Add a new predicate."""
+        if ensure_numerically_sound and not nm.check_numerical(statement):
+            raise SymbolicError(
+                f"Statement {statement} was symbolicaly added "
+                f"for reason {dep_body.reason} but is numerically false."
+            )
         piece_adder = self.PREDICATE_TO_ADDER.get(statement.predicate)
         if piece_adder is not None:
             return piece_adder(statement.args, dep_body)
@@ -441,15 +453,15 @@ class StatementAdder:
         self._make_equal(ab, cd, dep=dep)
 
         to_cache = [(cong, dep)]
-        dep_body = []
+        added = []
 
         if not is_equal(ab, cd):
-            dep_body += [dep]
+            added += [dep]
 
         if IntrinsicRules.CYCLIC_FROM_CONG in self.DISABLED_INTRINSIC_RULES or (
             a not in [c, d] and b not in [c, d]
         ):
-            return dep_body, to_cache
+            return added, to_cache
 
         # Make a=c if possible
         if b in [c, d]:
@@ -458,9 +470,9 @@ class StatementAdder:
             c, d = d, c
 
         cyclic_deps, cyclic_cache = self._maybe_add_cyclic_from_cong(a, b, d, dep)
-        dep_body += cyclic_deps
+        added += cyclic_deps
         to_cache += cyclic_cache
-        return dep_body, to_cache
+        return added, to_cache
 
     def _add_cong2(
         self, points: list[Point], dep_body: DependencyBody

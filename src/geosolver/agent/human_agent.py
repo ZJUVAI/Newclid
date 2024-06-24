@@ -406,7 +406,7 @@ def _pretty_problem(problem: "Problem"):
         + Style.RESET_ALL
         + "\n"
         + Fore.YELLOW
-        + f"Current goal:\n{problem.goal}"
+        + f"Current goals:\n{problem.goals}"
         + Style.RESET_ALL
     )
 
