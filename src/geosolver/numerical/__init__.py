@@ -1,4 +1,5 @@
 ATOM = 1e-12
+NLOGATOM = 12
 
 
 def close_enough(

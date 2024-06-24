@@ -117,7 +117,7 @@ a = free a; b = lconst b a 4; c = free c; d = eqdistance d c a b ? lconst d c 4
 lconst_cong_check
 a = free a; b = lconst b a 4; c = free c; d = lconst d c 4 ? cong a b c d
 lconst_eqratio_check
-a = free a; b = lconst b a 4; c = free c; d = lconst d c 6; e = free e; f = lconst f e 2; g = free g; h = lconst h g 3 ? eqratio a b c d e f g h 
+a = free a; b = lconst b a 4; c = free c; d = lconst d c 6; e = free e; f = lconst f e 2; g = free g; h = lconst h g 3 ? eqratio a b c d e f g h
 rconst_lconst_check
 a = free a; b = lconst b a 12; c = free c; d = rconst a b c d 3/4 ? lconst c d 16
 lconst_rconst_check

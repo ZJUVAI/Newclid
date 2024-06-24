@@ -1,5 +1,7 @@
 from __future__ import annotations
+from decimal import Decimal
 from enum import Enum
+from math import exp
 from typing import TYPE_CHECKING
 
 
@@ -16,6 +18,7 @@ from geosolver.reasoning_engines.algebraic_reasoning.geometric_tables import (
     AngleTable,
     DistanceTable,
     RatioTable,
+    get_quotient,
     report,
 )
 
@@ -35,9 +38,9 @@ class AlgebraicManipulator(ReasoningEngine):
     def __init__(self, symbols_graph: "SymbolsGraph") -> None:
         self.symbols_graph = symbols_graph
 
-        self.atable = AngleTable()
+        self.atable = AngleTable("pi", self.symbols_graph.get_or_create_const_ang(1, 1))
         self.dtable = DistanceTable()
-        self.rtable = RatioTable()
+        self.rtable = RatioTable("1", self.symbols_graph.get_or_create_const_rat(1, 1))
         self.verbose = config.get("verbose", "")
 
         self.PREDICATE_TO_ADDER = {
@@ -49,7 +52,10 @@ class AlgebraicManipulator(ReasoningEngine):
             preds.ConstantAngle: self._add_aconst,
             preds.SAngle: self._add_aconst,
             preds.ConstantRatio: self._add_rconst,
+            preds.ConstantLength: self._add_lconst,
         }
+
+        self.derive_buffer = []
 
     def ingest(self, dependency: "Dependency") -> None:
         """Add new algebraic predicates."""
@@ -59,15 +65,9 @@ class AlgebraicManipulator(ReasoningEngine):
 
     def resolve(self, **kwargs) -> list[Derivation]:
         """Derive new algebraic predicates."""
-        derives = []
-        ang_derives = self.derive_angle_algebra()
-        derives += ang_derives
-
-        cong_derives = self.derive_cong_algebra()
-        derives += cong_derives
-
-        rat_derives = self.derive_ratio_algebra()
-        derives += rat_derives
+        self.derive_angle_algebra()
+        self.derive_cong_algebra()
+        self.derive_ratio_algebra()
 
         if "a" in self.verbose:
             report(self.atable.v2e)
@@ -76,15 +76,17 @@ class AlgebraicManipulator(ReasoningEngine):
         if "r" in self.verbose:
             report(self.rtable.v2e)
 
-        return derives
+        res = self.derive_buffer
+        self.derive_buffer = []
+        return res
 
-    def derive_ratio_algebra(self) -> list[Derivation]:
+    def derive_ratio_algebra(self):
         """Derive new eqratio predicates."""
-        added = []
 
-        for x in self.rtable.get_all_eqs_and_why():
-            x, why = x[:-1], x[-1]
-            dep = DependencyBody(reason=Reason(AlgebraicRules.Ratio_Chase), why=why)
+        for *x, why in self.rtable.get_all_eqs_and_why():
+            dep_body = DependencyBody(
+                reason=Reason(AlgebraicRules.Ratio_Chase), why=why
+            )
 
             if len(x) == 2:
                 mn, pq = x
@@ -92,10 +94,37 @@ class AlgebraicManipulator(ReasoningEngine):
                     continue
 
                 (m, n), (p, q) = mn._obj.points, pq._obj.points
-                cong = Statement(preds.Cong2, (m, n, p, q))
-                added.append(Derivation(cong, dep))
-
-            if len(x) == 4:
+                cong = Statement(preds.Cong, (m, n, p, q))
+                self.derive_buffer.append(Derivation(cong, dep_body))
+            elif len(x) == 3:
+                mn, pq, v = x
+                (m, n) = mn._obj.points
+                num, denum = get_quotient(exp(v))
+                if pq == self.symbols_graph.get_or_create_const_rat(1, 1):
+                    new_length = self.symbols_graph.get_or_create_const_length(
+                        Decimal(num / denum)
+                    )
+                    self.derive_buffer.append(
+                        Derivation(
+                            Statement(preds.ConstantLength, (m, n, new_length)),
+                            dep_body,
+                        )
+                    )
+                    continue
+                ratio, *_ = self.symbols_graph.get_or_create_const_rat(num, denum)
+                (p, q) = pq._obj.points
+                ratio1, *_ = self.symbols_graph.get_or_create_ratio_from_lengths(
+                    mn, pq, None
+                )
+                if is_equiv(ratio, ratio1):
+                    continue
+                self.derive_buffer.append(
+                    Derivation(
+                        Statement(preds.ConstantRatio, (m, n, p, q, ratio)),
+                        dep_body,
+                    )
+                )
+            elif len(x) == 4:
                 ab, cd, mn, pq = x
                 points = (
                     *ab._obj.points,
@@ -104,13 +133,12 @@ class AlgebraicManipulator(ReasoningEngine):
                     *pq._obj.points,
                 )
                 eqratio = Statement(preds.EqRatio, points)
-                added.append(Derivation(eqratio, dep))
+                self.derive_buffer.append(Derivation(eqratio, dep_body))
 
-        return added
+        return self.derive_buffer
 
-    def derive_angle_algebra(self) -> list[Derivation]:
+    def derive_angle_algebra(self):
         """Derive new eqangles predicates."""
-        added = []
 
         for eqs_and_why in self.atable.get_all_eqs_and_why():
             eqs, why = eqs_and_why[:-1], eqs_and_why[-1]
@@ -123,15 +151,15 @@ class AlgebraicManipulator(ReasoningEngine):
 
                 points = (*ab._obj.points, *cd._obj.points)
                 para = Statement(preds.Para, points)
-                added.append(Derivation(para, dep))
+                self.derive_buffer.append(Derivation(para, dep))
 
             if len(eqs) == 3:
-                ef, pq, (n, d) = eqs
+                ef, pq, v = eqs
+                (n, d) = get_quotient(v)
                 points = (*ef._obj.points, *pq._obj.points)
-                angle, opposite_angle = self.symbols_graph.get_or_create_const_ang(n, d)
-                angle.opposite = opposite_angle
+                angle, _ = self.symbols_graph.get_or_create_const_ang(n, d)
                 aconst = Statement(preds.ConstantAngle, (*points, angle))
-                added.append(Derivation(aconst, dep))
+                self.derive_buffer.append(Derivation(aconst, dep))
 
             if len(eqs) == 4:
                 ab, cd, mn, pq = eqs
@@ -142,11 +170,11 @@ class AlgebraicManipulator(ReasoningEngine):
                     *pq._obj.points,
                 )
                 eqangle = Statement(preds.EqAngle, points)
-                added.append(Derivation(eqangle, dep))
+                self.derive_buffer.append(Derivation(eqangle, dep))
 
-        return added
+        return self.derive_buffer
 
-    def derive_cong_algebra(self) -> list[Derivation]:
+    def derive_cong_algebra(self):
         """Derive new cong predicates."""
         added = []
         for x in self.dtable.get_all_eqs_and_why():
@@ -189,7 +217,7 @@ class AlgebraicManipulator(ReasoningEngine):
         a, b, c, d = dep.statement.args
         ab = self.symbols_graph.get_line_thru_pair(a, b)
         cd = self.symbols_graph.get_line_thru_pair(c, d)
-        self.atable.add_const_angle(ab.val, cd.val, 90, dep)
+        self.atable.add_const_angle(ab.val, cd.val, 0.5, dep)
 
     def _add_eqangle(self, dep: "Dependency"):
         a, b, c, d, m, n, p, q = dep.statement.args
@@ -205,17 +233,22 @@ class AlgebraicManipulator(ReasoningEngine):
         )
         ab, cd = ab_cd._d
         mn, pq = mn_pq._d
-        if (ab, cd) == (pq, mn):
-            self.atable.add_const_angle(ab, cd, 90, dep)
-        else:
-            self.atable.add_eqangle(ab, cd, mn, pq, dep)
+        self.atable.add_eqangle(ab, cd, mn, pq, dep)
 
     def _add_eqratio(self, dep: "Dependency"):
         a, b, c, d, m, n, p, q = dep.statement.args
-        ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)._val
-        cd = self.symbols_graph.get_or_create_segment(c, d, dep=None)._val
-        pq = self.symbols_graph.get_or_create_segment(p, q, dep=None)._val
-        mn = self.symbols_graph.get_or_create_segment(m, n, dep=None)._val
+        ab = self.symbols_graph.get_node_val(
+            self.symbols_graph.get_or_create_segment(a, b, dep=None), dep=None
+        )
+        cd = self.symbols_graph.get_node_val(
+            self.symbols_graph.get_or_create_segment(c, d, dep=None), dep=None
+        )
+        pq = self.symbols_graph.get_node_val(
+            self.symbols_graph.get_or_create_segment(p, q, dep=None), dep=None
+        )
+        mn = self.symbols_graph.get_node_val(
+            self.symbols_graph.get_or_create_segment(m, n, dep=None), dep=None
+        )
         if (ab, cd) == (pq, mn):
             self.rtable.add_eq(ab, cd, dep)
         else:
@@ -236,7 +269,7 @@ class AlgebraicManipulator(ReasoningEngine):
         )
         ab, cd = ab_cd._d
         num, den = angle_to_num_den(ang)
-        self.atable.add_const_angle(ab, cd, num * 180 / den % 180, dep)
+        self.atable.add_const_angle(ab, cd, num / den, dep)
 
     def _add_rconst(
         self, dep: "Dependency"
@@ -245,7 +278,19 @@ class AlgebraicManipulator(ReasoningEngine):
         num, den = ratio_to_num_den(ratio)
         ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)
         cd = self.symbols_graph.get_or_create_segment(c, d, dep=None)
-        self.rtable.add_const_ratio(ab, cd, num, den, dep)
+        self.rtable.add_const_ratio(
+            self.symbols_graph.get_node_val(ab, dep=None),
+            self.symbols_graph.get_node_val(cd, dep=None),
+            num,
+            den,
+            dep,
+        )
+
+    def _add_lconst(self, dep: "Dependency"):
+        a, b, length = dep.statement.args
+        length_num = Decimal(length.name)
+        ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)
+        self.rtable.add_const_length(ab.val, length_num, dep)
 
     def _add_cong(self, dep: "Dependency"):
         a, b, c, d = dep.statement.args
@@ -255,4 +300,4 @@ class AlgebraicManipulator(ReasoningEngine):
 
         ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)
         cd = self.symbols_graph.get_or_create_segment(c, d, dep=None)
-        self.rtable.add_eq(ab._val, cd._val, dep)
+        self.rtable.add_eq(ab.val, cd.val, dep)

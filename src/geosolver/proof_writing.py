@@ -47,7 +47,6 @@ def natural_language_statement(logical_statement: Dependency) -> str:
       a string of (pseudo) natural language of the predicate for human reader.
     """
     names = [a.name.upper() for a in logical_statement.statement.args]
-    names = [(n[0] + "_" + n[1:]) if len(n) > 1 else n for n in names]
     return pt.pretty_nl(logical_statement.statement.name, names)
 
 
