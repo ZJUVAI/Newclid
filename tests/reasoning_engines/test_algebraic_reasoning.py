@@ -1,10 +1,16 @@
 import pytest
 import pytest_check as check
+from geosolver.predicates import Predicate
+from geosolver.reasoning_engines.algebraic_reasoning.algebraic_manipulator import (
+    AlgebraicManipulator,
+)
 import geosolver.reasoning_engines.algebraic_reasoning.geometric_tables as geometric_tables
-from geosolver.dependencies.dependency import Reason
+from geosolver.dependencies.dependency import Dependency, Reason
 from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.numerical.check import clock
 from geosolver.api import GeometricSolverBuilder
+from geosolver.statements.statement import Statement
+from geosolver.symbols_graph import SymbolsGraphBuilder
 from tests.fixtures import build_until_works
 
 
@@ -82,7 +88,9 @@ class TestAR:
         proof = solver.proof_state
 
         # Create an external angle table:
-        tb = geometric_tables.AngleTable("pi")
+        tb = geometric_tables.AngleTable(
+            "pi", solver.proof_state.symbols_graph.get_or_create_const_ang(180, 1)
+        )
 
         # Add bisector & ex-bisector facts into the table:
         ca, cd, cb, ce = proof.symbols_graph.names2nodes(
@@ -99,7 +107,7 @@ class TestAR:
         result = list(tb.get_all_eqs_and_why())
 
         # halfpi is represented as a tuple (1, 2)
-        halfpi = (1, 2)
+        halfpi = geometric_tables.Coef(0.5)
 
         # check that cd-ce == halfpi and this is because fact1 & fact2, not fact3
         check.equal(
@@ -128,7 +136,9 @@ class TestAR:
         )
 
         # Create an external angle table:
-        tb = geometric_tables.AngleTable("pi")
+        tb = geometric_tables.AngleTable(
+            "pi", solver.proof_state.symbols_graph.get_or_create_const_ang(180, 1)
+        )
 
         # Add the fact that there are three equal angles
         ab, bc, ca = proof.symbols_graph.names2nodes(["d(ab)", "d(bc)", "d(ac)"])
@@ -140,8 +150,8 @@ class TestAR:
         result = [(x.name, y.name, z, t) for x, y, z, t in result]
 
         # 1/3 pi is represented as a tuple angle_60
-        angle_60 = (1, 3)
-        angle_120 = (2, 3)
+        angle_60 = geometric_tables.Coef(1 / 3)
+        angle_120 = geometric_tables.Coef(2 / 3)
 
         is_clockwise = clock(a.num, b.num, c.num) > 0
 
@@ -166,6 +176,53 @@ class TestAR:
 
         # check that angles constants are created and figured out:
         check.equal(result, expected)
+
+    def test_checking_orthocenter_consequence_aux(self):
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b c = triangle; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d; f = on_tline f c b c ? para a d f c",
+            translate=False,
+        ).build()
+        success = solver.run()
+        check.is_true(success)
+
+    @pytest.mark.skip
+    def test_geometric_ratios(self):  # midpoint not added
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b = segment a b; m = midpoint m a b ? rconst a m b m 1/1",
+            translate=False,
+        ).build()
+        success = solver.run()
+        check.is_true(success)
+
+    def test_concatenating_ratios(self):
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b = segment a b; c = free c; d = rconst a b c d 2/1; e = rconst c d a e 2/1 ? rconst a b a e 4/1",
+            translate=False,
+        ).build()
+        success = solver.run()
+        check.is_true(success)
+
+    def test_lconst_eqratio_check(self):
+        solver = self.solver_builder.load_problem_from_file(
+            "problems_datasets/examples.txt", "lconst_eqratio_check", translate=False
+        ).build()
+        success = solver.run()
+        check.is_true(success)
+
+    @pytest.mark.xfail
+    def test_lconst_cong_lconst_check(self):
+        solver = self.solver_builder.load_problem_from_file(
+            "problems_datasets/examples.txt", "cong_lconst_check", translate=False
+        ).build()
+        success = solver.run()
+        check.is_true(success)
+
+    def test_rconst_lconst_check(self):
+        solver = self.solver_builder.load_problem_from_file(
+            "problems_datasets/examples.txt", "rconst_lconst_check", translate=False
+        ).build()
+        success = solver.run()
+        check.is_true(success)
 
     def test_incenter_excenter_touchpoints(self):
         """Test that AR can figure out incenter/excenter touchpoints are equidistant to midpoint."""
@@ -344,13 +401,23 @@ class TestAR:
             "incenter2 x y z i a b c",
             "i : a b c, x : i b c, y : i c a, z : i a b",
             "a b c = ncoll a b c",
-            "i : eqangle a b a i a i a c, eqangle c a c i c i c b; eqangle b c b i b i b a; x : coll x b c, perp i x b c; y : coll y c a, perp i y c a; z : coll z a b, perp i z a b; cong i x i y, cong i y i z",
+            "i : eqangle a b a i a i a c, eqangle c a c i c i c b;"
+            " eqangle b c b i b i b a;"
+            " x : coll x b c, perp i x b c;"
+            " y : coll y c a, perp i y c a;"
+            " z : coll z a b, perp i z a b; "
+            "cong i x i y, cong i y i z",
             "incenter2 a b c",
             "",
             "excenter2 x y z i a b c",
             "i : a b c, x : i b c, y : i c a, z : i a b",
             "a b c = ncoll a b c",
-            "i : eqangle a b a i a i a c, eqangle c a c i c i c b; eqangle b c b i b i b a; x : coll x b c, perp i x b c; y : coll y c a, perp i y c a; z : coll z a b, perp i z a b; cong i x i y, cong i y i z",
+            "i : eqangle a b a i a i a c, eqangle c a c i c i c b;"
+            " eqangle b c b i b i b a;"
+            " x : coll x b c, perp i x b c;"
+            " y : coll y c a, perp i y c a;"
+            " z : coll z a b, perp i z a b; "
+            "cong i x i y, cong i y i z",
             "excenter2 a b c",
             "",
         ]
@@ -366,3 +433,37 @@ class TestAR:
         )
         success = solver.run()
         check.is_true(success)
+
+    def test_lconst_from_ratio_lconst(self):
+        point_names = ["a", "b", "c", "d", "e", "f"]
+        lengths = ["2", "5"]
+
+        symbols_graph = (
+            SymbolsGraphBuilder()
+            .with_points_named(point_names)
+            .with_lengths(lengths)
+            .build()
+        )
+        a, b, c, d, e, f = symbols_graph.names2nodes(point_names)
+        l2, l5 = symbols_graph.names2nodes(lengths)
+
+        ar = AlgebraicManipulator(symbols_graph)
+
+        dependencies = [
+            Dependency(Statement(Predicate.EQRATIO, (a, b, b, c, d, e, e, f)), why=[]),
+            Dependency(Statement(Predicate.CONSTANT_LENGTH, (a, b, l2)), why=[]),
+            Dependency(Statement(Predicate.CONSTANT_LENGTH, (b, c, l5)), why=[]),
+            Dependency(Statement(Predicate.CONSTANT_LENGTH, (d, e, l2)), why=[]),
+        ]
+
+        for dependency in dependencies:
+            ar.ingest(dependency)
+
+        derivations = ar.derive_ratio_algebra()
+        check.is_true(
+            any(
+                hash(Statement(Predicate.CONSTANT_LENGTH, (f, e, l5)))
+                == hash(dep.statement)
+                for dep in derivations
+            )
+        )
