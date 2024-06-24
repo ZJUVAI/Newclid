@@ -66,6 +66,10 @@ class IntrinsicRules(Enum):
 ALL_INTRINSIC_RULES = [rule for rule in IntrinsicRules]
 
 
+class SymbolicError(Exception):
+    """A symbolic manipulation was wrong"""
+
+
 class StatementAdder:
     def __init__(
         self,
@@ -116,9 +120,17 @@ class StatementAdder:
         }
 
     def add(
-        self, statement: Statement, dep_body: DependencyBody
+        self,
+        statement: Statement,
+        dep_body: DependencyBody,
+        ensure_numerically_sound: bool = False,
     ) -> tuple[list[Dependency], list[ToCache]]:
         """Add a new predicate."""
+        if ensure_numerically_sound and not nm.check_numerical(statement):
+            raise SymbolicError(
+                f"Statement {statement} was symbolicaly added "
+                f"for reason {dep_body.reason} but is numerically false."
+            )
         piece_adder = self.PREDICATE_TO_ADDER.get(statement.predicate)
         if piece_adder is not None:
             return piece_adder(statement.args, dep_body)

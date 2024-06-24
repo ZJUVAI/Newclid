@@ -3,7 +3,8 @@ from collections import defaultdict
 from decimal import Decimal
 from fractions import Fraction
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Dict, Optional, Self, Tuple, Type, TypeVar
+from typing import TYPE_CHECKING, Callable, Dict, Optional, Tuple, Type, TypeVar
+from typing_extensions import Self
 
 
 from geosolver.ratios import simplify
