@@ -27,6 +27,9 @@ class Reason:
                 name = self.object.value
             object.__setattr__(self, "name", name)
 
+    def __repr__(self) -> str:
+        return self.name
+
     def __hash__(self) -> int:
         return hash(self.name)
 

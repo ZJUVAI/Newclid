@@ -242,9 +242,7 @@ class Proof:
 
     def _step_match_theorem(self, action: MatchAction) -> MatchFeedback:
         theorem = action.theorem
-        potential_mappings = match_one_theorem(
-            self, theorem, cache=action.cache, goal=self._goal_construction
-        )
+        potential_mappings = match_one_theorem(self, theorem, cache=action.cache)
         mappings = []
         for mapping in potential_mappings:
             dep_body, to_cache = self._resolve_mapping_dependency(theorem, mapping)

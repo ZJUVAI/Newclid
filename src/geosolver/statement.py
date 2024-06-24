@@ -36,6 +36,11 @@ class Statement:
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> tuple[list["Dependency"], list[tuple[Statement, "Dependency"]]]:
         """Add the statement as an admitted fact."""
+        if not self.check_numerical():
+            raise SymbolicError(
+                f"Statement {self} was added for reason {dep_body.reason} "
+                "but is numerically false."
+            )
         return self.predicate.add(
             self.args,
             dep_body=dep_body,

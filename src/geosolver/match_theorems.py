@@ -32,7 +32,6 @@ from geosolver.symbols_graph import SymbolsGraph, is_equal
 
 if TYPE_CHECKING:
     from geosolver.proof import Proof
-    from geosolver.defs.clause import Clause
     from geosolver.theorem import Theorem
 
 
@@ -799,15 +798,15 @@ def match_eqangle6_ncoll_cyclic(
 
 
 def try_to_map(
-    clause_enum: list[tuple["Clause", list[tuple[Point, ...]]]],
+    constructions_enum: list[tuple["Construction", list[tuple[Point, ...]]]],
     mapping: dict[str, Point],
 ) -> Generator[dict[str, Point], None, None]:
     """Recursively try to match the remaining points given current mapping."""
-    if not clause_enum:
+    if not constructions_enum:
         yield mapping
         return
 
-    clause, enum = clause_enum[0]
+    clause, enum = constructions_enum[0]
     for points in enum:
         mpcpy = dict(mapping)
 
@@ -822,7 +821,7 @@ def try_to_map(
         if fail:
             continue
 
-        for m in try_to_map(clause_enum[1:], mpcpy):
+        for m in try_to_map(constructions_enum[1:], mpcpy):
             yield m
 
 
@@ -832,33 +831,32 @@ def match_generic(
     """Match any generic rule that is not one of the above match_*() rules."""
     clause2enum = {}
 
-    clauses = []
-    numerical_checks: list[Construction] = []
-    for clause in theorem.premises:
-        if clause.name in [pred.NAME for pred in preds.NUMERICAL_PREDICATES]:
-            numerical_checks.append(clause)
+    constructions = []
+    numerical_checks: list["Construction"] = []
+    for construction in theorem.premises:
+        if construction.name in [pred.NAME for pred in preds.NUMERICAL_PREDICATES]:
+            numerical_checks.append(construction)
             continue
 
-        enum = cache(clause.name)
+        enum = cache(construction.name)
         if len(enum) == 0:
             return 0
 
-        clause2enum[clause] = enum
-        clauses.append((len(set(clause.args)), clause))
+        clause2enum[construction] = enum
+        constructions.append((len(set(construction.args)), construction))
 
-    clauses = sorted(clauses, key=lambda x: x[0], reverse=True)
-    _, clauses = zip(*clauses)
+    constructions = sorted(constructions, key=lambda x: x[0], reverse=True)
+    _, constructions = zip(*constructions)
 
-    for mapping in try_to_map([(c, clause2enum[c]) for c in clauses], {}):
+    for mapping in try_to_map([(c, clause2enum[c]) for c in constructions], {}):
         if not mapping:
             continue
 
         checks_ok = True
         for check in numerical_checks:
             args = [mapping[a] for a in check.args]
-            checks_ok = preds.NAME_TO_PREDICATE[check.name].check(
-                args, proof.symbols_graph
-            )
+            num_predicate = preds.NAME_TO_PREDICATE[check.name]
+            checks_ok = num_predicate.check(args, proof.symbols_graph)
             if not checks_ok:
                 break
         if not checks_ok:
@@ -909,7 +907,8 @@ class MatchCache:
         if cached is not None:
             return cached
 
-        result = list(preds.NAME_TO_PREDICATE[name].enumerate(self.proof.symbols_graph))
+        predicate = preds.NAME_TO_PREDICATE[name]
+        result = list(predicate.enumerate(self.proof.symbols_graph))
         self.cache[name] = result
         return result
 
@@ -921,7 +920,6 @@ def match_one_theorem(
     proof: "Proof",
     theorem: "Theorem",
     cache: Optional[MatchCache] = None,
-    goal: Optional["Clause"] = None,
     max_mappings: int = 50_000,
 ) -> list[Mapping]:
     """Match all instances of a single theorem (rule)."""
@@ -940,16 +938,3 @@ def match_one_theorem(
             break
 
     return mappings
-
-
-def match_all_theorems(
-    proof: "Proof", theorems: list["Theorem"], goal: "Clause"
-) -> dict["Theorem", dict["Theorem", dict[str, Point]]]:
-    """Match all instances of all theorems (rules)."""
-    cache = MatchCache(proof)
-    theorem2mappings = {}
-    for theorem in theorems:
-        mappings = match_one_theorem(proof, cache, theorem, goal=goal)
-        if mappings:
-            theorem2mappings[theorem] = mappings
-    return theorem2mappings
