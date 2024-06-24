@@ -1,5 +1,5 @@
 from geosolver.dependencies.caching import DependencyCache
-from geosolver.dependencies.why_graph import WhyHyperGraph
+from geosolver.dependencies.why_graph import DependencyGraph
 from geosolver.statements.adder import IntrinsicRules, StatementAdder
 from geosolver.statements.checker import StatementChecker
 from geosolver.statements.enumerator import StatementsEnumerator
@@ -14,14 +14,14 @@ class StatementsHandler:
         disabled_intrinsic_rules: list[IntrinsicRules],
     ) -> None:
         self.checker = StatementChecker(symbols_graph)
-        self.graph = WhyHyperGraph(
+        self.graph = DependencyGraph(
             symbols_graph=symbols_graph,
             statements_checker=self.checker,
             dependency_cache=dependency_cache,
         )
         self.adder = StatementAdder(
             symbols_graph=symbols_graph,
-            statements_graph=self.graph,
+            dependency_graph=self.graph,
             statements_checker=self.checker,
             dependency_cache=dependency_cache,
             disabled_intrinsic_rules=disabled_intrinsic_rules,

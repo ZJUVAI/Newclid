@@ -25,7 +25,7 @@ vis: "pyvis" = lazy_import("pyvis")
 nx: "networkx" = lazy_import("networkx")
 
 
-class WhyHyperGraph:
+class DependencyGraph:
     """Hyper graph linking statements by dependencies as hyper-edges."""
 
     def __init__(
