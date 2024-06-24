@@ -4,6 +4,8 @@ from collections import defaultdict
 from math import log
 from typing import TYPE_CHECKING, Any, Generator, Literal, Optional, TypeVar
 
+from numpy import exp
+
 from geosolver.geometry import Direction, Length, Line, Symbol, Point
 from geosolver.numerical import ATOM, NLOGATOM
 from geosolver.ratios import simplify
@@ -190,6 +192,15 @@ def _fix_width(s: Any, width: int, align: Literal["right", "left", "center"] = "
     return " " * (width - len(s)) + s
 
 
+def coef2str(x: Coef):
+    try:
+        n, d = get_quotient(x)
+        return f"{n}/{d}"
+    except InfQuotientError as _:
+        n, d = get_quotient(exp(x))
+        return f"log{n}/{d}"
+
+
 def report(eqdict: EqDict):
     print(">>>>>>>>>table begins")
     maxlv = 0
@@ -202,7 +213,7 @@ def report(eqdict: EqDict):
         for rightv, coef in eq.items():
             setv_right.add(rightv)
             maxlv = max(maxlv, len(str(rightv)))
-            maxlcoef = max(maxlcoef, len(str(coef)))
+            maxlcoef = max(maxlcoef, len(coef2str(coef)))
     listv_left = sorted(setv_left)
     listv_right = sorted(setv_right)
     for leftv in listv_left:
@@ -212,7 +223,7 @@ def report(eqdict: EqDict):
                 coef = eqdict[leftv][rightv]
                 if abs(coef) < ATOM:
                     raise ValueError
-                print(end=f"{_fix_width(coef, maxlcoef)} * {str(rightv)}")
+                print(end=f"{_fix_width(coef2str(coef), maxlcoef)} * {str(rightv)}")
                 if rightv != listv_right[-1]:
                     print(end=" + ")
             except (KeyError, ValueError) as _:
@@ -358,9 +369,14 @@ class Table:
         a/b = m/n
         """
         coef = -Coef(log(m) - log(n))
-        if not self.add_expr([(a, Coef(1)), (b, Coef(-1)), (self.const, coef)]):
+        expr = (
+            [(a, Coef(1)), (b, Coef(-1)), (self.const, coef)]
+            if b != self.one
+            else [(a, Coef(1)), (self.const, coef)]
+        )
+        if not self.add_expr(expr):
             return []
-        self.register([(a, 1), (b, -1), (self.const, coef)], dep)
+        self.register(expr, dep)
 
     def add_eq3(self, a: str, b: str, f, dep: "Dependency") -> None:
         """
@@ -406,6 +422,7 @@ class Table:
             e12 = minus(e1, e2)
             h12 = hashed(self.modulo(e12))
             h2pairs[h12].append((v1, v2))
+        print(h2pairs)
         return h2pairs
 
     def get_all_eqs_and_why(
