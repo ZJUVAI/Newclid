@@ -422,7 +422,6 @@ class Table:
             e12 = minus(e1, e2)
             h12 = hashed(self.modulo(e12))
             h2pairs[h12].append((v1, v2))
-        print(h2pairs)
         return h2pairs
 
     def get_all_eqs_and_why(
