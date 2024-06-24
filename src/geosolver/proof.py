@@ -128,7 +128,7 @@ class Proof:
         self.reasoning_engines = external_reasoning_engines
         self.statements = statements_handler
 
-        self._goal: Optional[Construction] = None
+        self._goals: list[Construction] = None
         self._resolved_mapping_deps: dict[str, tuple[DependencyBody, ToCache]] = {}
         self._problem: Optional[Problem] = None
         self._definitions: Optional[dict[str, Definition]] = None
@@ -211,17 +211,22 @@ class Proof:
                 err = e
                 continue
 
-            if not problem.goal:
+            if not problem.goals:
                 break
 
-            goal_args = proof.map_construction_args_to_objects(problem.goal)
-            goal = Statement(problem.goal.name, goal_args)
-            if check_numerical(goal):
+            all_check = True
+            for goal in problem.goals:
+                goal_args = proof.map_construction_args_to_objects(goal)
+                goal_statement = Statement(goal.name, goal_args)
+                if not check_numerical(goal_statement):
+                    all_check = False
+                    break
+            if all_check:
                 break
         else:
             raise err
 
-        proof._goal = problem.goal
+        proof._goals = problem.goals
         proof._problem = problem
         proof._definitions = definitions
         proof._init_added = added
@@ -234,9 +239,7 @@ class Proof:
 
     def _step_match_theorem(self, action: MatchAction) -> MatchFeedback:
         theorem = action.theorem
-        potential_mappings = match_one_theorem(
-            self, theorem, cache=action.cache, goal=self._goal
-        )
+        potential_mappings = match_one_theorem(self, theorem, action.cache, self._goals)
         mappings = []
         for mapping in potential_mappings:
             dep_body, to_cache = self._resolve_mapping_dependency(theorem, mapping)
@@ -319,10 +322,10 @@ class Proof:
         )
 
         conclusion_statement = Statement(theorem.conclusion.name, tuple(args))
-        add, to_cache = self.resolve_statement_dependencies(
+        added, to_cache = self.resolve_statement_dependencies(
             conclusion_statement, dep_body=dep_body
         )
-        return add, [premise_to_cache] + to_cache, True
+        return added, [premise_to_cache] + to_cache, True
 
     def _step_derive(self, action: ResolveEngineAction) -> DeriveFeedback:
         choosen_engine = self.reasoning_engines[action.engine_id]
@@ -352,7 +355,7 @@ class Proof:
         return AuxFeedback(success, added, to_cache)
 
     def _step_stop(self, action: StopAction) -> StopFeedback:
-        return StopFeedback(success=self.check_goal())
+        return StopFeedback(success=self.check_goals())
 
     def reset(self) -> ResetFeedback:
         self.cache_deps(self._init_to_cache)
@@ -417,14 +420,26 @@ class Proof:
             return True
         return self.statements.checker.check(statement)
 
-    def check_goal(self):
-        success = False
-        if self._goal is not None:
-            goal_args = self.map_construction_args_to_objects(self._goal)
-            goal_statement = Statement(self._goal.name, goal_args)
-            if self.check(goal_statement):
-                success = True
-        return success
+    def goals_as_statements(self) -> list[Statement]:
+        res = []
+        for goal in self._goals:
+            goal_args = self.map_construction_args_to_objects(goal)
+            goal_statement = Statement(goal.name, goal_args)
+            res.append(goal_statement)
+        return res
+
+    def check_construction(self, goal: Construction) -> bool:
+        goal_args = self.map_construction_args_to_objects(goal)
+        goal_statement = Statement(goal.name, goal_args)
+        return self.check(goal_statement)
+
+    def check_goals(self) -> bool:
+        if not self._goals:
+            return False
+        for goal in self._goals:
+            if not self.check_construction(goal):
+                return False
+        return True
 
     def additionally_draw(self, name: str, args: list[Point]) -> None:
         """Draw some extra line/circles for illustration purpose."""

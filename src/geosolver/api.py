@@ -53,10 +53,6 @@ class GeometricSolver:
         # rng control
         self.rnd_gen = proof_state.get_rnd_generator()
 
-    @property
-    def goal(self):
-        return self.problem.goal
-
     def load_state(self, proof_state: "Proof"):
         del self.proof_state
         self.proof_state = proof_state
@@ -183,7 +179,7 @@ class GeometricSolverBuilder:
         rnd_gen = np.random.default_rng(self.seed)
 
         if self.no_goal:
-            self.problem.goal = None
+            self.problem.goals = []
 
         proof_state = Proof.build_problem(
             problem=self.problem,

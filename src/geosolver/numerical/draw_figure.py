@@ -141,6 +141,7 @@ def _draw(
             highlight(ax, name, args, "black", color_i, color_i)
 
     if goal:
+        raise NotImplementedError
         name, args = goal
         lcolor = color1 = color2 = "red"
         highlight(ax, name, args, lcolor, color1, color2)

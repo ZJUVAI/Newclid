@@ -280,7 +280,7 @@ def test_rule_used_to_solve_in_one_step(
 
     solver_builder = (
         GeometricSolverBuilder()
-        .load_problem_from_txt(problem_txt)
+        .load_problem_from_txt(problem_txt, translate=False)
         .with_disabled_intrinsic_rules(ALL_INTRINSIC_RULES)
     )
     solver_builder.rules = [theorem]
@@ -297,7 +297,7 @@ def test_rule_used_to_solve_in_one_step(
         return
 
     setup, aux, proof_steps, refs = get_proof_steps(
-        solver.proof_state, solver.problem.goal
+        solver.proof_state, solver.problem.goals
     )
     nl_proof_step = [
         proof_step_string(step, refs, last_step=i == len(proof_steps) - 1)

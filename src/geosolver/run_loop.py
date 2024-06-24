@@ -37,7 +37,7 @@ def run_loop(
         step += 1
         total_elapsed = time.time() - t0
 
-        success = proof.check_goal()
+        success = proof.check_goals()
         if success and stop_on_goal:
             # Force StopAction on goal success
             feedback = proof.step(StopAction())

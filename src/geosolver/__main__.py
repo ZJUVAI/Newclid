@@ -111,7 +111,7 @@ def cli_arguments() -> Namespace:
         default=False,
         action="store_true",
         help="Only do the figure drawing "
-        "withut running the solving process and removing the goal.",
+        "withut running the solving process and removing the goals.",
     )
     parser.add_argument(
         "--ar-verbose",
@@ -151,13 +151,16 @@ def main():
     if just_draw:
         return
 
-    success = solver.run(max_steps=args.max_steps, timeout=args.timeout, seed=args.seed)
+    solver.run(max_steps=args.max_steps, timeout=args.timeout, seed=args.seed)
 
-    if not success:
-        logging.info(f"Failed to solved the problem.\nInfos:{solver.run_infos}")
-        return
+    for goal in solver.problem.goals:
+        if solver.proof_state.check_construction(goal):
+            logging.info(f"{goal}, Solved")
+        else:
+            logging.info(f"{goal}, Not Solved")
 
-    logging.info(f"Successfuly solved problem !\nInfos:{solver.run_infos}")
+    logging.info(f"Run infos: {solver.run_infos}")
+
     if quiet:
         return
 
