@@ -398,7 +398,7 @@ class HumanAgent(DeductiveAgent):
         ]
         res = []
         for id, (k, v) in data:
-            if str(id) in selects or "all" in selects:
+            if str(id) in selects or "all" in selects or k in selects:
                 res.append(v)
                 if pop:
                     dict_to_ask.pop(k)
