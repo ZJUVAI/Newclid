@@ -89,7 +89,7 @@ class PythagoreanFormula(ReasoningEngine):
                     values[pos] = lenght
 
             if len([value for value in values if value is not None]) != 2:
-                return
+                return []
 
             missing_index = values.index(None)
             values.remove(None)

@@ -6,6 +6,7 @@ This is a useful tool for analysis and understanding how GeoSolver behaves.
 from __future__ import annotations
 from typing import NamedTuple, Optional, TypeVar
 
+
 from geosolver.reasoning_engines.engines_interface import Derivation
 from geosolver.statements.statement import Statement
 from geosolver.theorem import Theorem
@@ -76,6 +77,7 @@ class HumanAgent(DeductiveAgent):
     def __init__(self) -> None:
         super().__init__()
         self._problem: Optional[Problem] = None
+        self._action_buffer: list[Action] = []
         self.reset()
 
     def act(self, proof: Proof, theorems: list[Theorem]) -> Action:
@@ -84,19 +86,27 @@ class HumanAgent(DeductiveAgent):
             MatchAction: self._act_match,
             ApplyTheoremAction: self._act_apply_theorem,
             ResolveEngineAction: self._act_resolve_derivations,
-            ImportDerivationAction: self._act_apply_derivation,
+            ImportDerivationAction: self._act_import_derivation,
             AuxAction: self._act_aux,
             ShowAction: self._act_show,
         }
 
-        action = None
-        while action is None:
+        while not self._action_buffer:
             choosen_action_type = self._choose_action_type()
             act_method = ACTION_TYPE_ACT[choosen_action_type]
-            action = act_method(theorems)
-            if isinstance(action, ShowAction):
-                action = self._show_figure(proof)
+            try:
+                res = act_method(theorems)
+                if isinstance(res, list):
+                    self._action_buffer.extend(res)
+                else:
+                    self._action_buffer.append(res)
+            except EOFError:
+                continue
+            if self._action_buffer and isinstance(self._action_buffer[0], ShowAction):
+                self._show_figure(proof)
+                self._action_buffer.pop(0)
 
+        action = self._action_buffer.pop(0)
         if isinstance(action, (ApplyTheoremAction, ImportDerivationAction)):
             self.level += 1
         return action
@@ -114,6 +124,7 @@ class HumanAgent(DeductiveAgent):
         self._known_engines: list[str] = []
 
         self.level = 0
+        self._action_buffer = []
 
     def _act_show(self, theorems: list[Theorem]):
         return ShowAction()
@@ -133,14 +144,16 @@ class HumanAgent(DeductiveAgent):
         return MatchAction(theorem)
 
     def _act_apply_theorem(self, theorems: list[Theorem]) -> ApplyTheoremAction:
-        choosen_mapping_str = "\nAvailable theorems mappings: \n"
-        for mapping_str in self._mappings.keys():
-            choosen_mapping_str += f" - [{mapping_str}]\n"
-        choosen_mapping_str += "Mapping you want to apply: "
-        theorem, mapping = self._ask_for_key(
-            self._mappings, choosen_mapping_str, pop=True
+        theorems_mappings = self._ask_for_enumerated_keys(
+            self._mappings,
+            "Available theorem mappings: ",
+            "Mappings you want to apply: ",
+            pop=True,
         )
-        return ApplyTheoremAction(theorem, mapping)
+        return [
+            ApplyTheoremAction(theorem, mapping)
+            for theorem, mapping in theorems_mappings
+        ]
 
     def _act_resolve_derivations(self, theorems: list[Theorem]) -> ResolveEngineAction:
         choice_str = "\nAvailable reasoning engines: \n"
@@ -155,15 +168,16 @@ class HumanAgent(DeductiveAgent):
 
         return ResolveEngineAction(engine_id=engine_id)
 
-    def _act_apply_derivation(self, theorems: list[Theorem]) -> ImportDerivationAction:
-        choose_derivation_str = "\nAvailable derivations: \n"
-        for derived_statement_str in self._derivations.keys():
-            choose_derivation_str += f" - [{derived_statement_str}]\n"
-        choose_derivation_str += "Derivation you want to apply: "
-        derivation = self._ask_for_key(
-            self._derivations, choose_derivation_str, pop=True
+    def _act_import_derivation(self, theorems: list[Theorem]) -> ImportDerivationAction:
+        derivations = self._ask_for_enumerated_keys(
+            self._derivations,
+            "Available derivations: ",
+            "Derivations you want to import: ",
+            pop=True,
         )
-        return ImportDerivationAction(derivation=derivation)
+        return [
+            ImportDerivationAction(derivation=derivation) for derivation in derivations
+        ]
 
     def _act_aux(self, theorems: list[Theorem]) -> AuxAction:
         aux_string = self._ask_input("Auxiliary string: ")
@@ -176,7 +190,7 @@ class HumanAgent(DeductiveAgent):
             MatchFeedback: self._remember_match,
             ApplyTheoremFeedback: self._remember_apply_theorem,
             DeriveFeedback: self._remember_derivations,
-            ImportDerivationFeedback: self._remember_apply_derivation,
+            ImportDerivationFeedback: self._remember_import_derivation,
             AuxFeedback: self._remember_aux,
         }
 
@@ -266,7 +280,7 @@ class HumanAgent(DeductiveAgent):
             feedback_str += f"  - [{derivation.statement}]\n"
         return feedback_str, True
 
-    def _remember_apply_derivation(
+    def _remember_import_derivation(
         self, action: ImportDerivationAction, feedback: ImportDerivationFeedback
     ) -> tuple[str, bool]:
         success = True
@@ -342,13 +356,15 @@ class HumanAgent(DeductiveAgent):
         dict_to_ask: dict[str, T],
         input_txt: str,
         not_found_txt: str = "Invalid input, try again.\n",
-        pop: int = False,
+        pop: bool = False,
     ) -> T:
         choosen_value = None
         while choosen_value is None:
             if not dict_to_ask:
                 raise ValueError("No value to ask for.")
-            choosen_input = self._ask_input(input_txt)
+            lines = input_txt.split("\n")
+            lines[-1] = "(Ctrl-Z to return to the previous choice) " + lines[-1]
+            choosen_input = self._ask_input("\n".join(lines))
             if pop:
                 choosen = dict_to_ask.pop(choosen_input, None)
             else:
@@ -360,6 +376,33 @@ class HumanAgent(DeductiveAgent):
                     not_found_txt, color=Fore.RED, additional_feedback=True
                 )
         return choosen_value
+
+    def _ask_for_enumerated_keys(
+        self,
+        dict_to_ask: dict[str, T],
+        intro: str,
+        input_txt: str,
+        pop: bool = False,
+    ) -> list[T]:
+        print(intro)
+        data = []
+        for id, (k, v) in enumerate(dict_to_ask.items()):
+            print(f"- [{id}] {k}")
+            data.append((id, (k, v)))
+        print("- [all]")
+        selects = [
+            s.strip()
+            for s in self._ask_input(
+                "Ctrl-Z to return to the previous choice " + input_txt
+            ).split(",")
+        ]
+        res = []
+        for id, (k, v) in data:
+            if str(id) in selects or "all" in selects:
+                res.append(v)
+                if pop:
+                    dict_to_ask.pop(k)
+        return res
 
     def _display_feedback(
         self,
