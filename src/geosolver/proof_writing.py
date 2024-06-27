@@ -16,8 +16,14 @@ if TYPE_CHECKING:
     from geosolver.proof import Proof
 
 
+def extend_differences(x: list, y: list):
+    for t in y:
+        if t not in x:
+            x.append(t)
+
+
 def get_proof_steps(
-    proof: "Proof", goal: "Construction", merge_trivials: bool = False
+    proof: "Proof", goals: list["Construction"], merge_trivials: bool = False
 ) -> tuple[
     list[Dependency],
     list[Dependency],
@@ -25,14 +31,27 @@ def get_proof_steps(
     dict[tuple[str, ...], int],
 ]:
     """Extract proof steps from the built DAG."""
-    setup, aux, log, setup_points = trace_back.get_logs(proof, merge_trivials)
-
+    setup = []
+    aux = []
+    log = []
+    setup_points = set()
     refs = {}
-    setup = trace_back.point_log(setup, refs, set())
-    aux = trace_back.point_log(aux, refs, setup_points)
 
-    setup = [(prems, [tuple(p)]) for p, prems in setup]
-    aux = [(prems, [tuple(p)]) for p, prems in aux]
+    for goal in proof.goals_as_statements(goals):
+        if not goal.check(proof.symbols_graph):
+            continue
+
+        _setup, _aux, _log, _setup_points = trace_back.get_logs(
+            goal, proof, merge_trivials=merge_trivials
+        )
+
+    _setup = trace_back.point_log(_setup, refs, set())
+    _aux = trace_back.point_log(_aux, refs, setup_points)
+
+    extend_differences(setup, [(prems, [tuple(p)]) for p, prems in _setup])
+    extend_differences(aux, [(prems, [tuple(p)]) for p, prems in aux])
+    extend_differences(log, _log)
+    setup_points = setup_points.union(_setup_points)
 
     return setup, aux, log, refs
 
@@ -98,7 +117,7 @@ def write_solution(
       out_file: file to write to, empty string to skip writing to file.
     """
     setup, aux, proof_steps, refs = get_proof_steps(
-        proof, problem.goal, merge_trivials=False
+        proof, problem.goals, merge_trivials=False
     )
 
     solution = "\n=========================="
@@ -149,7 +168,12 @@ def write_solution(
         reason_name = con.reason.name if con.reason else ""
         reason_pretty = r2name.get(reason_name, f"({reason_name})")
         nl = nl.replace("\u21d2", f"{reason_pretty}\u21d2 ")
-        solution += "{:03}. ".format(i + 1) + nl + "\n"
+        solution += (
+            "{:03}. ".format(i + 1)
+            + nl
+            + ("(*)" if con.statement in proof.goals_as_statements() else "")
+            + "\n"
+        )
 
     solution += "==========================\n"
     logging.info(solution)

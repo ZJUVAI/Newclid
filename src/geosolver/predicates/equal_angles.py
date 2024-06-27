@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Generator, Optional
+from typing import TYPE_CHECKING, Generator, Optional, Tuple
 
 from geosolver.combinatorics import all_8points, cross_product, permutations_pairs
 from geosolver.dependencies.dependency import Dependency, Reason
@@ -19,7 +19,7 @@ from geosolver.geometry import (
 )
 from geosolver.intrinsic_rules import IntrinsicRules
 from geosolver.numerical import close_enough
-from geosolver.numerical.geometries import LineNum, PointNum, bring_together
+from geosolver.numerical.geometries import PointNum
 from geosolver.predicates.predicate import Predicate
 
 from geosolver.statement import (
@@ -64,10 +64,10 @@ class EqAngle(Predicate):
         if dep_body:
             dep_body = dep_body.copy()
         a, b, c, d, m, n, p, q = args
-        ab, why1 = symbols_graph.get_line_thru_pair_why(a, b)
-        cd, why2 = symbols_graph.get_line_thru_pair_why(c, d)
-        mn, why3 = symbols_graph.get_line_thru_pair_why(m, n)
-        pq, why4 = symbols_graph.get_line_thru_pair_why(p, q)
+        ab, why1 = symbols_graph.get_or_create_line_thru_pair_why(a, b)
+        cd, why2 = symbols_graph.get_or_create_line_thru_pair_why(c, d)
+        mn, why3 = symbols_graph.get_or_create_line_thru_pair_why(m, n)
+        pq, why4 = symbols_graph.get_or_create_line_thru_pair_why(p, q)
 
         a, b = ab.points
         c, d = cd.points
@@ -92,10 +92,10 @@ class EqAngle(Predicate):
             if maybe_pairs is not None:
                 return maybe_pairs
 
-        symbols_graph.get_node_val(ab, dep=None)
-        symbols_graph.get_node_val(cd, dep=None)
-        symbols_graph.get_node_val(mn, dep=None)
-        symbols_graph.get_node_val(pq, dep=None)
+        symbols_graph.get_or_create_node_val(ab, deps=[])
+        symbols_graph.get_or_create_node_val(cd, deps=[])
+        symbols_graph.get_or_create_node_val(mn, deps=[])
+        symbols_graph.get_or_create_node_val(pq, deps=[])
 
         add, to_cache = [], []
 
@@ -183,10 +183,10 @@ class EqAngle(Predicate):
                 args[2 * i - 1] = y_
 
         ab_cd, cd_ab, why1 = symbols_graph.get_or_create_angle_from_lines(
-            ab, cd, dep=None
+            ab, cd, deps=[]
         )
         mn_pq, pq_mn, why2 = symbols_graph.get_or_create_angle_from_lines(
-            mn, pq, dep=None
+            mn, pq, deps=[]
         )
 
         if IntrinsicRules.EQANGLE_FROM_CONGRUENT_ANGLE not in disabled_intrinsic_rules:
@@ -235,10 +235,10 @@ class EqAngle(Predicate):
     ) -> tuple[Optional[Reason], list[Dependency]]:
         a, b, c, d, m, n, p, q = statement.args
 
-        ab, why1 = dep_graph.symbols_graph.get_line_thru_pair_why(a, b)
-        cd, why2 = dep_graph.symbols_graph.get_line_thru_pair_why(c, d)
-        mn, why3 = dep_graph.symbols_graph.get_line_thru_pair_why(m, n)
-        pq, why4 = dep_graph.symbols_graph.get_line_thru_pair_why(p, q)
+        ab, why1 = dep_graph.symbols_graph.get_or_create_line_thru_pair_why(a, b)
+        cd, why2 = dep_graph.symbols_graph.get_or_create_line_thru_pair_why(c, d)
+        mn, why3 = dep_graph.symbols_graph.get_or_create_line_thru_pair_why(m, n)
+        pq, why4 = dep_graph.symbols_graph.get_or_create_line_thru_pair_why(p, q)
 
         if ab is None or cd is None or mn is None or pq is None:
             para_points = None
@@ -392,39 +392,14 @@ class EqAngle(Predicate):
     def check_numerical(args: list[PointNum]) -> bool:
         """Check if 8 points make 2 equal angles."""
         a, b, c, d, e, f, g, h = args
-
-        ab = LineNum(a, b)
-        cd = LineNum(c, d)
-        ef = LineNum(e, f)
-        gh = LineNum(g, h)
-
-        if ab.is_parallel(cd):
-            return ef.is_parallel(gh)
-        if ef.is_parallel(gh):
-            return ab.is_parallel(cd)
-
-        a, b, c, d = bring_together(a, b, c, d)
-        e, f, g, h = bring_together(e, f, g, h)
-
-        ba = b - a
-        dc = d - c
-        fe = f - e
-        hg = h - g
-
-        sameclock = (ba.x * dc.y - ba.y * dc.x) * (fe.x * hg.y - fe.y * hg.x) > 0
-        if not sameclock:
-            ba = ba * -1.0
-
-        a1 = np.arctan2(fe.y, fe.x)
-        a2 = np.arctan2(hg.y, hg.x)
-        x = a1 - a2
-
-        a3 = np.arctan2(ba.y, ba.x)
-        a4 = np.arctan2(dc.y, dc.x)
-        y = a3 - a4
-
-        xy = (x - y) % (2 * np.pi)
-        return close_enough(xy, 0) or close_enough(xy, 2 * np.pi)
+        ab = b - a
+        cd = d - c
+        ef = f - e
+        gh = h - g
+        return close_enough(
+            (np.arctan2(ab.y, ab.x) - np.arctan2(cd.y, cd.x)) % np.pi,
+            (np.arctan2(ef.y, ef.x) - np.arctan2(gh.y, gh.x)) % np.pi,
+        )
 
     @staticmethod
     def enumerate(
@@ -574,8 +549,8 @@ def why_eqangle_directions(
             why0 = why_equal(ang12, ang34)
             if why0 is None:
                 continue
-            d1_, d2_ = ang12._d
-            d3_, d4_ = ang34._d
+            d1_, d2_ = ang12.directions
+            d3_, d4_ = ang34.directions
             why1 = bfs_backtrack(d1, [d1_], d1s)
             why2 = bfs_backtrack(d2, [d2_], d2s)
             why3 = bfs_backtrack(d3, [d3_], d3s)
@@ -633,12 +608,12 @@ def why_eqangle_directions(
 
 def all_angles(
     d1: Direction, d2: Direction
-) -> Generator[Angle, list[Direction], list[Direction]]:
-    d1s = d1.equivs_upto()
-    d2s = d2.equivs_upto()
+) -> Generator[Tuple[Angle, list[Direction], list[Direction]], None, None]:
+    d1s = d1.equivs()
+    d2s = d2.equivs()
 
     for angle in d1.rep().neighbors(Angle):
-        d1_, d2_ = angle._d
+        d1_, d2_ = angle.directions
         if d1_ in d1s and d2_ in d2s:
             yield angle, d1s, d2s
 

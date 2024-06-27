@@ -8,7 +8,7 @@ from tests.fixtures import build_until_works
 class TestConstants:
     @pytest.fixture(autouse=True)
     def setUpClass(self):
-        self.solver_builder = GeometricSolverBuilder()
+        self.solver_builder = GeometricSolverBuilder(233)
 
     def test_aconst_deg(self):
         """Should be able to prescribe and check a constant angle in degree"""
@@ -40,7 +40,8 @@ class TestConstants:
                 "c = free c; "
                 "x = aconst a b c x 63o; "
                 "y = aconst a b c y 153o "
-                "? aconst c x c y 90o"
+                "? aconst c x c y 90o",
+                translate=False,
             )
         )
         success = solver.run()
@@ -111,7 +112,6 @@ class TestConstants:
         success = solver.run()
         assert success
 
-    @pytest.mark.xfail
     def test_s_angle_deg_not_perp(self):
         """Should be able to prescribe and check a constant s_angle in degree"""
         defs = [
@@ -135,7 +135,8 @@ class TestConstants:
                 "a b = segment a b; "
                 "x = s_angle a b x 63o; "
                 "y = s_angle a b y 143o "
-                "? s_angle x b y 80o"
+                "? s_angle x b y 80o",
+                translate=False,
             )
         )
         success = solver.run()
@@ -165,7 +166,8 @@ class TestConstants:
                 "a b = segment a b; "
                 "x = s_angle a b x 7pi/20; "
                 "y = s_angle a b y 17pi/20 "
-                "? s_angle x b y 1pi/2"
+                "? s_angle x b y 1pi/2",
+                translate=False,
             )
         )
         success = solver.run()
@@ -195,7 +197,8 @@ class TestConstants:
                 "a b = segment a b; "
                 "x = s_angle a b x 63o; "
                 "y = s_angle b a y 153o "
-                "? perp b x a y"
+                "? perp b x a y",
+                translate=False,
             )
         )
         success = solver.run()
@@ -269,7 +272,8 @@ class TestConstants:
 
     def test_rconst_as_theorem_conclusion(self):
         solver = self.solver_builder.load_problem_from_txt(
-            "a b = segment a b; m = midpoint m a b ? rconst m a a b 1/2"
+            "a b = segment a b; m = midpoint m a b ? rconst m a a b 1/2",
+            translate=False,
         )
         solver.rules = [Theorem.from_txt("midp m a b => rconst m a a b 1/2")]
         success = solver.build().run()

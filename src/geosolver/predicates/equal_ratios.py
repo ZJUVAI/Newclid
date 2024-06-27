@@ -61,10 +61,10 @@ class EqRatio(Predicate):
         if dep_body:
             dep_body = dep_body.copy()
         a, b, c, d, m, n, p, q = args
-        ab = symbols_graph.get_or_create_segment(a, b, dep=None)
-        cd = symbols_graph.get_or_create_segment(c, d, dep=None)
-        mn = symbols_graph.get_or_create_segment(m, n, dep=None)
-        pq = symbols_graph.get_or_create_segment(p, q, dep=None)
+        ab = symbols_graph.get_or_create_segment(a, b, deps=[])
+        cd = symbols_graph.get_or_create_segment(c, d, deps=[])
+        mn = symbols_graph.get_or_create_segment(m, n, deps=[])
+        pq = symbols_graph.get_or_create_segment(p, q, deps=[])
 
         lines = (ab, cd, mn, pq)
         if IntrinsicRules.CONG_FROM_EQRATIO not in disabled_intrinsic_rules:
@@ -74,10 +74,10 @@ class EqRatio(Predicate):
             if add is not None:
                 return add
 
-        symbols_graph.get_node_val(ab, dep=None)
-        symbols_graph.get_node_val(cd, dep=None)
-        symbols_graph.get_node_val(mn, dep=None)
-        symbols_graph.get_node_val(pq, dep=None)
+        symbols_graph.get_or_create_node_val(ab, deps=[])
+        symbols_graph.get_or_create_node_val(cd, deps=[])
+        symbols_graph.get_or_create_node_val(mn, deps=[])
+        symbols_graph.get_or_create_node_val(pq, deps=[])
 
         add = []
         to_cache = []
@@ -164,10 +164,10 @@ class EqRatio(Predicate):
 
         add = []
         ab_cd, cd_ab, why1 = symbols_graph.get_or_create_ratio_from_segments(
-            ab, cd, dep=None
+            ab, cd, deps=[]
         )
         mn_pq, pq_mn, why2 = symbols_graph.get_or_create_ratio_from_segments(
-            mn, pq, dep=None
+            mn, pq, deps=[]
         )
 
         if (

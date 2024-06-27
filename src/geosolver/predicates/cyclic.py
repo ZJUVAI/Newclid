@@ -125,15 +125,10 @@ class Cyclic(Predicate):
         points: list[Point],
     ) -> tuple[Optional[Circle], Optional[list[Dependency]]]:
         """Why points are concyclic."""
-        for initial_circle in Cyclic._get_circles_thru_all(*points):
-            for circle in initial_circle.equivs():
-                if all([p in circle.edge_graph for p in points]):
-                    cycls = list(set(points))
-                    why = circle.why_cyclic(cycls)
-                    if why is not None:
-                        return circle, why
-
-        return None, None
+        points = list(set(points))
+        circle = Cyclic._get_circles_thru_all(*points)[0]
+        why = circle.why_circle_of(points)
+        return circle, why
 
     @staticmethod
     def _get_circles_thru_all(*points: Point) -> list[Circle]:
@@ -141,7 +136,7 @@ class Cyclic(Predicate):
         points = set(points)
         for point in points:
             for circle in point.neighbors(Circle):
-                circle2count[circle] += 1
+                circle2count[circle.rep()] += 1
         return [c for c, count in circle2count.items() if count == len(points)]
 
     @staticmethod

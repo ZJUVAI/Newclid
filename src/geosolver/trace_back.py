@@ -144,6 +144,7 @@ def recursive_traceback(
     stack = []
 
     def read(query_dep: "Dependency") -> None:
+        nonlocal log, stack, visited
         query_dep = remove_loop(query_dep)
         hashed = query_dep.statement.hash_tuple
         if hashed in visited:
@@ -153,8 +154,6 @@ def recursive_traceback(
             pred.NAME for pred in NUMERICAL_PREDICATES
         ]:
             return
-
-        nonlocal stack
 
         stack.append(hashed)
         prems: list["Dependency"] = []
@@ -191,7 +190,7 @@ def recursive_traceback(
         if not found:
             log.append((prems, [query_dep]))
 
-        stack.pop(-1)
+        stack.pop()
 
     read(query)
 
@@ -298,7 +297,7 @@ def _dep_coll_to_collx(dep: "Dependency"):
 
 
 def get_logs(
-    proof: "Proof", merge_trivials: bool
+    goal: Statement, proof: "Proof", merge_trivials: bool
 ) -> tuple[
     list["Dependency"],
     list["Dependency"],
@@ -306,7 +305,7 @@ def get_logs(
     set[Point],
 ]:
     """Given a DAG and conclusion N, return the premise, aux, proof."""
-    goal_dep = proof.dependency_graph.build_resolved_dependency(proof.goal)
+    goal_dep = proof.dependency_graph.build_resolved_dependency(goal)
     log = recursive_traceback(goal_dep)
     log, setup, aux_setup, setup_points, _ = separate_dependency_difference(
         goal_dep, log

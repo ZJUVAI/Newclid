@@ -2,10 +2,9 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Generator, Optional, Union
 from typing_extensions import Self
-
-from geosolver.geometry import Point, Ratio, Angle
 from geosolver.dependencies.dependency import Reason
 from geosolver.statement import Statement
+from geosolver.geometry import Point, Ratio, Angle
 
 
 if TYPE_CHECKING:

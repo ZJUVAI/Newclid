@@ -42,7 +42,7 @@ class Cong(Predicate):
 
         cong = Statement(Cong, [a, b, c, d])
         cong_dep = dep_body.build(dep_graph, cong)
-        symbols_graph.make_equal(ab, cd, dep=cong_dep)
+        symbols_graph.make_equal(ab, cd, [cong_dep])
 
         to_cache = [(cong, cong_dep)]
         added = []
@@ -101,8 +101,8 @@ class Cong(Predicate):
         if preds.Cyclic.check([b, c, x, y], symbols_graph):
             return [], []
 
-        ax = symbols_graph.get_or_create_segment(a, x, dep=None)
-        ay = symbols_graph.get_or_create_segment(a, y, dep=None)
+        ax = symbols_graph.get_or_create_segment(a, x, deps=[])
+        ay = symbols_graph.get_or_create_segment(a, y, deps=[])
         why = ab._val.why_equal([ax._val, ay._val])
         why += [cong_ab_ac]
 

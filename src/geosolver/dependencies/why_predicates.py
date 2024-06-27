@@ -1,5 +1,4 @@
 from __future__ import annotations
-from collections import defaultdict
 from typing import TYPE_CHECKING, Optional, TypeVar
 
 
@@ -18,36 +17,7 @@ if TYPE_CHECKING:
 def why_equal(x: Symbol, y: Symbol) -> list[Dependency]:
     if x == y:
         return []
-    if not x._val or not y._val:
-        return None
-    if x._val == y._val:
-        return []
-    return x._val.why_equal([y._val])
-
-
-def line_of_and_why(
-    points: list[Point],
-) -> tuple[Optional[Line], Optional[list[Dependency]]]:
-    """Why points are collinear."""
-    for l0 in _get_lines_thru_all(*points):
-        for line in l0.equivs():
-            if all([p in line.edge_graph for p in points]):
-                x, y = line.points
-                colls = list({x, y} | set(points))
-                why = line.why_coll(colls)
-                if why is not None:
-                    return line, why
-
-    return None, None
-
-
-def _get_lines_thru_all(*points: Point) -> list[Line]:
-    line2count = defaultdict(lambda: 0)
-    points = set(points)
-    for p in points:
-        for line_neighbor in p.neighbors(Line):
-            line2count[line_neighbor] += 1
-    return [line for line, count in line2count.items() if count == len(points)]
+    return x.why_equal([y])
 
 
 P = TypeVar("P")
@@ -87,10 +57,10 @@ def why_maybe_make_equal_pairs(
     q: Point,
     ab: Line,
     mn: Line,
-) -> list["Dependency"]:
+) -> Optional[list["Dependency"]]:
     """Make a-b:c-d==m-n:p-q in case a-b==m-n or c-d==p-q."""
     if ab != mn:
-        return
+        return None
     why = []
     eqpredicate = preds.Para if isinstance(ab, Line) else preds.Cong
     colls = [a, b, m, n]

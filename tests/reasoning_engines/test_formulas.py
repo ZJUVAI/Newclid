@@ -12,7 +12,7 @@ from geosolver.reasoning_engines.formulas import (
 )
 from geosolver.reasoning_engines.engines_interface import Derivation, ReasoningEngine
 from geosolver.statement import Statement
-from geosolver.symbols_graph import SymbolsGraphBuilder
+from geosolver.symbols_graph import SymbolsGraph
 
 
 class TestPythagorean:
@@ -23,12 +23,7 @@ class TestPythagorean:
         points_names = ["a", "b", "c"]
         lengths = ["3", "4", "5"]
 
-        self.symbols_graph = (
-            SymbolsGraphBuilder()
-            .with_points_named(points_names)
-            .with_lengths(lengths)
-            .build()
-        )
+        self.symbols_graph = SymbolsGraph()
         self.points = self.symbols_graph.names2points(points_names)
         self.lengths = self.symbols_graph.names2nodes(lengths)
 
@@ -171,12 +166,7 @@ class TestMenelaus:
         points_names = ["a", "b", "c", "d", "e", "f"]
         ratios = ["1/3", "1/2"]
 
-        self.symbols_graph = (
-            SymbolsGraphBuilder()
-            .with_points_named(points_names)
-            .with_ratios(ratios)
-            .build()
-        )
+        self.symbols_graph = SymbolsGraph()
         self.points = self.symbols_graph.names2points(points_names)
         self.ratios = self.symbols_graph.names2nodes(ratios)
 

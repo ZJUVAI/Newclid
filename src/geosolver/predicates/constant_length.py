@@ -44,13 +44,13 @@ class ConstantLength(Predicate):
         """Add new algebraic predicates of type eqratio-constant."""
         a, b, length = args
 
-        ab = symbols_graph.get_or_create_segment(a, b, dep=None)
-        l_ab = symbols_graph.get_node_val(ab, dep=None)
+        ab = symbols_graph.get_or_create_segment(a, b, deps=[])
+        l_ab = symbols_graph.get_or_create_node_val(ab, deps=[])
 
         lconst = Statement(ConstantLength, args)
 
         lconst_dep = dep_body.build(dep_graph, lconst)
-        symbols_graph.make_equal(length, l_ab, dep=lconst_dep)
+        symbols_graph.make_equal(length, l_ab, [lconst_dep])
 
         add = [lconst_dep]
         to_cache = [(lconst, lconst_dep)]

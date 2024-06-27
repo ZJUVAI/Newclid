@@ -92,24 +92,31 @@ class AlgebraicManipulator(ReasoningEngine):
                 if is_equiv(mn, pq):
                     continue
 
-                (m, n), (p, q) = mn._obj.points, pq._obj.points
+                (m, n), (p, q) = mn.obj.points, pq.obj.points
                 cong = Statement(preds.Cong, (m, n, p, q))
                 self.derive_buffer.append(Derivation(cong, dep_body))
             elif len(x) == 3:
                 mn, pq, v = x
-                (m, n) = mn._obj.points
-                num, denum = get_quotient(exp(v))
+                (m, n) = mn.obj.points
                 if pq == self.symbols_graph.get_or_create_const_rat(1, 1):
-                    new_length = self.symbols_graph.get_or_create_const_length(
-                        Decimal(num / denum)
-                    )
+                    num, denum = get_quotient(exp(v + 1))
                     self.derive_buffer.append(
                         Derivation(
-                            Statement(preds.ConstantLength, (m, n, new_length)),
+                            Statement(
+                                preds.ConstantLength,
+                                (
+                                    m,
+                                    n,
+                                    self.symbols_graph.get_or_create_const_length(
+                                        Decimal(num / denum)
+                                    ),
+                                ),
+                            ),
                             dep_body,
                         )
                     )
                     continue
+                num, denum = get_quotient(exp(v))
                 ratio, *_ = self.symbols_graph.get_or_create_const_rat(num, denum)
                 (p, q) = pq._obj.points
                 ratio1, *_ = self.symbols_graph.get_or_create_ratio_from_lengths(
@@ -148,14 +155,14 @@ class AlgebraicManipulator(ReasoningEngine):
                 if is_equiv(ab, cd):
                     continue
 
-                points = (*ab._obj.points, *cd._obj.points)
+                points = (*ab.obj.points, *cd.obj.points)
                 para = Statement(preds.Para, points)
                 self.derive_buffer.append(Derivation(para, dep))
 
             if len(eqs) == 3:
                 ef, pq, v = eqs
-                (n, d) = get_quotient(v)
-                points = (*ef._obj.points, *pq._obj.points)
+                (n, d) = get_quotient(v % 1)
+                points = (*pq.obj.points, *ef.obj.points)
                 angle, _ = self.symbols_graph.get_or_create_const_ang(n, d)
                 aconst = Statement(preds.ConstantAngle, (*points, angle))
                 self.derive_buffer.append(Derivation(aconst, dep))
@@ -175,22 +182,22 @@ class AlgebraicManipulator(ReasoningEngine):
 
     def _add_para(self, dep: "Dependency"):
         a, b, c, d = dep.statement.args
-        ab, _ = self.symbols_graph.get_line_thru_pair_why(a, b)
-        cd, _ = self.symbols_graph.get_line_thru_pair_why(c, d)
+        ab, _ = self.symbols_graph.get_or_create_line_thru_pair_why(a, b)
+        cd, _ = self.symbols_graph.get_or_create_line_thru_pair_why(c, d)
         self.atable.add_para(ab._val, cd._val, dep)
 
     def _add_perp(self, dep: "Dependency"):
         a, b, c, d = dep.statement.args
-        ab = self.symbols_graph.get_line_thru_pair(a, b)
-        cd = self.symbols_graph.get_line_thru_pair(c, d)
+        ab = self.symbols_graph.get_or_create_line_thru_pair(a, b)
+        cd = self.symbols_graph.get_or_create_line_thru_pair(c, d)
         self.atable.add_const_angle(ab.val, cd.val, 0.5, dep)
 
     def _add_eqangle(self, dep: "Dependency"):
         a, b, c, d, m, n, p, q = dep.statement.args
-        ab, _ = self.symbols_graph.get_line_thru_pair_why(a, b)
-        cd, _ = self.symbols_graph.get_line_thru_pair_why(c, d)
-        mn, _ = self.symbols_graph.get_line_thru_pair_why(m, n)
-        pq, _ = self.symbols_graph.get_line_thru_pair_why(p, q)
+        ab, _ = self.symbols_graph.get_or_create_line_thru_pair_why(a, b)
+        cd, _ = self.symbols_graph.get_or_create_line_thru_pair_why(c, d)
+        mn, _ = self.symbols_graph.get_or_create_line_thru_pair_why(m, n)
+        pq, _ = self.symbols_graph.get_or_create_line_thru_pair_why(p, q)
         ab_cd, _, _ = self.symbols_graph.get_or_create_angle_from_lines(
             ab, cd, dep=None
         )
@@ -203,16 +210,16 @@ class AlgebraicManipulator(ReasoningEngine):
 
     def _add_eqratio(self, dep: "Dependency"):
         a, b, c, d, m, n, p, q = dep.statement.args
-        ab = self.symbols_graph.get_node_val(
+        ab = self.symbols_graph.get_or_create_node_val(
             self.symbols_graph.get_or_create_segment(a, b, dep=None), dep=None
         )
-        cd = self.symbols_graph.get_node_val(
+        cd = self.symbols_graph.get_or_create_node_val(
             self.symbols_graph.get_or_create_segment(c, d, dep=None), dep=None
         )
-        pq = self.symbols_graph.get_node_val(
+        pq = self.symbols_graph.get_or_create_node_val(
             self.symbols_graph.get_or_create_segment(p, q, dep=None), dep=None
         )
-        mn = self.symbols_graph.get_node_val(
+        mn = self.symbols_graph.get_or_create_node_val(
             self.symbols_graph.get_or_create_segment(m, n, dep=None), dep=None
         )
         if (ab, cd) == (pq, mn):
@@ -223,17 +230,15 @@ class AlgebraicManipulator(ReasoningEngine):
     def _add_aconst(
         self, dep: "Dependency"
     ):  # not sure, in addr, add ab_cd as well as cd_ab
-        if len(dep.statement.args) == 3:
+        if len(dep.statement.args) == 4:  # for sangle
             a, b, c, ang = dep.statement.args
             d = b
         else:
             a, b, c, d, ang = dep.statement.args
-        ab, _ = self.symbols_graph.get_line_thru_pair_why(a, b)
-        cd, _ = self.symbols_graph.get_line_thru_pair_why(c, d)
-        ab_cd, _, _ = self.symbols_graph.get_or_create_angle_from_lines(
-            ab, cd, dep=None
-        )
-        ab, cd = ab_cd._d
+        ab, _ = self.symbols_graph.get_or_create_line_thru_pair_why(a, b)
+        cd, _ = self.symbols_graph.get_or_create_line_thru_pair_why(c, d)
+        ab_cd, _ = self.symbols_graph.get_or_create_angle_from_lines(ab, cd, [])
+        ab, cd = ab_cd.directions
         num, den = angle_to_num_den(ang)
         self.atable.add_const_angle(ab, cd, num / den, dep)
 
@@ -242,11 +247,11 @@ class AlgebraicManipulator(ReasoningEngine):
     ):  # not sure, in addr, add ab_cd as well as cd_ab
         a, b, c, d, ratio = dep.statement.args
         num, den = ratio_to_num_den(ratio)
-        ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)
-        cd = self.symbols_graph.get_or_create_segment(c, d, dep=None)
+        ab = self.symbols_graph.get_or_create_segment(a, b, [])
+        cd = self.symbols_graph.get_or_create_segment(c, d, [])
         self.rtable.add_const_ratio(
-            self.symbols_graph.get_node_val(ab, dep=None),
-            self.symbols_graph.get_node_val(cd, dep=None),
+            self.symbols_graph.get_or_create_node_val(ab, []),
+            self.symbols_graph.get_or_create_node_val(cd, []),
             num,
             den,
             dep,
@@ -255,15 +260,21 @@ class AlgebraicManipulator(ReasoningEngine):
     def _add_lconst(self, dep: "Dependency"):
         a, b, length = dep.statement.args
         length_num = Decimal(length.name)
-        ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)
-        self.rtable.add_const_length(ab.val, length_num, dep)
+        ab = self.symbols_graph.get_or_create_segment(a, b, [])
+        self.rtable.add_const_length(
+            self.symbols_graph.get_or_create_node_val(ab.val, []), length_num, dep
+        )
 
     def _add_cong(self, dep: "Dependency"):
         a, b, c, d = dep.statement.args
-        ab, _ = self.symbols_graph.get_line_thru_pair_why(a, b)
-        cd, _ = self.symbols_graph.get_line_thru_pair_why(c, d)
+        ab, _ = self.symbols_graph.get_or_create_line_thru_pair_why(a, b)
+        cd, _ = self.symbols_graph.get_or_create_line_thru_pair_why(c, d)
         self.dtable.add_cong(ab, cd, a, b, c, d, dep)
 
-        ab = self.symbols_graph.get_or_create_segment(a, b, dep=None)
-        cd = self.symbols_graph.get_or_create_segment(c, d, dep=None)
-        self.rtable.add_eq(ab.val, cd.val, dep)
+        ab = self.symbols_graph.get_or_create_segment(a, b, [])
+        cd = self.symbols_graph.get_or_create_segment(c, d, [])
+        self.rtable.add_eq(
+            self.symbols_graph.get_or_create_node_val(ab),
+            self.symbols_graph.get_or_create_node_val(cd),
+            dep,
+        )

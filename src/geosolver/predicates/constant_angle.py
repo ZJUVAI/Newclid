@@ -6,7 +6,6 @@ from geosolver.dependencies.dependency import Reason, Dependency
 
 from geosolver.dependencies.why_predicates import why_equal
 from geosolver.numerical import close_enough
-from geosolver.numerical.angles import ang_between
 from geosolver.numerical.geometries import PointNum
 from geosolver.predicates.equal_angles import all_angles
 from geosolver.predicates.predicate import Predicate
@@ -61,8 +60,10 @@ class ConstantAngle(Predicate):
         num, den = angle_to_num_den(ang)
         nd, dn = symbols_graph.get_or_create_const_ang(num, den)
 
+        add = []
+        to_cache = []
         if nd == symbols_graph.halfpi:
-            return preds.Perp.add(
+            add, to_cache = preds.Perp.add(
                 [a, b, c, d],
                 dep_body,
                 dep_graph,
@@ -70,8 +71,8 @@ class ConstantAngle(Predicate):
                 disabled_intrinsic_rules,
             )
 
-        ab, why1 = symbols_graph.get_line_thru_pair_why(a, b)
-        cd, why2 = symbols_graph.get_line_thru_pair_why(c, d)
+        ab, why1 = symbols_graph.get_or_create_line_thru_pair_why(a, b)
+        cd, why2 = symbols_graph.get_or_create_line_thru_pair_why(c, d)
 
         (a, b), (c, d) = ab.points, cd.points
         if IntrinsicRules.ACONST_FROM_LINES not in disabled_intrinsic_rules:
@@ -84,8 +85,8 @@ class ConstantAngle(Predicate):
                 extention_reason=Reason(IntrinsicRules.ACONST_FROM_LINES),
             )
 
-        symbols_graph.get_node_val(ab, dep=None)
-        symbols_graph.get_node_val(cd, dep=None)
+        symbols_graph.get_or_create_node_val(ab, [])
+        symbols_graph.get_or_create_node_val(cd, [])
 
         if ab.val == cd.val:
             raise ValueError(f"{ab.name} - {cd.name} cannot be {nd.name}")
@@ -102,7 +103,7 @@ class ConstantAngle(Predicate):
                 and IntrinsicRules.ACONST_FROM_PARA not in disabled_intrinsic_rules
             ):
                 aconst = Statement(ConstantAngle, tuple(args))
-                para = Statement(preds.Para, [x, y, x_, y_])
+                para = Statement(preds.Para, (x, y, x_, y_))
                 dep_body = dep_body.extend(
                     dep_graph,
                     aconst,
@@ -112,36 +113,31 @@ class ConstantAngle(Predicate):
             args[2 * i - 2] = x_
             args[2 * i - 1] = y_
 
-        ab_cd, cd_ab, why = symbols_graph.get_or_create_angle_from_lines(
-            ab, cd, dep=None
-        )
+        ab_cd, cd_ab = symbols_graph.get_or_create_angle_from_lines(ab, cd, [])
 
         aconst = Statement(ConstantAngle, [a, b, c, d, nd])
         if IntrinsicRules.ACONST_FROM_ANGLE not in disabled_intrinsic_rules:
             dep_body = dep_body.extend_by_why(
                 dep_graph,
                 aconst,
-                why=why,
+                why=[],
                 extention_reason=Reason(IntrinsicRules.ACONST_FROM_ANGLE),
             )
 
-        dab, dcd = ab_cd._d
-        a, b = dab._obj.points
-        c, d = dcd._obj.points
+        dab, dcd = ab_cd.directions
+        a, b = dab.obj.points
+        c, d = dcd.obj.points
 
-        ang = int(num) * 180 / int(den)
-        add = []
-        to_cache = []
         if not is_equal(ab_cd, nd):
             dep1 = dep_body.build(dep_graph, aconst)
-            symbols_graph.make_equal(ab_cd, nd, dep=dep1)
+            symbols_graph.make_equal(nd, ab_cd, [dep1])
             to_cache.append((aconst, dep1))
             add += [dep1]
 
-        aconst2 = Statement(ConstantAngle, [a, b, c, d, nd])
+        aconst2 = Statement(ConstantAngle, [c, d, a, b, dn])
         if not is_equal(cd_ab, dn):
             dep2 = dep_body.build(dep_graph, aconst2)
-            symbols_graph.make_equal(cd_ab, dn, dep=dep2)
+            symbols_graph.make_equal(cd_ab, dn, [dep2])
             to_cache.append((aconst2, dep2))
             add += [dep2]
 
@@ -204,7 +200,7 @@ class ConstantAngle(Predicate):
         if not (ab.val and cd.val):
             return False
 
-        for ang1, _, _ in all_angles(ab._val, cd._val):
+        for ang1, _, _ in all_angles(ab.val, cd.val):
             if is_equal(ang1, ang):
                 return True
         return False
@@ -213,11 +209,10 @@ class ConstantAngle(Predicate):
     def check_numerical(args: list[PointNum | Angle]) -> bool:
         a, b, c, d, angle = args
         num, den = angle_to_num_den(angle)
-        d = d + a - c
-        ang = ang_between(a, b, d)
-        if ang < 0:
-            ang += np.pi
-        return close_enough(ang, num * np.pi / den)
+        ab, cd = b - a, d - c
+        return close_enough(
+            (np.arctan2(cd.y, cd.x) - np.arctan2(ab.y, ab.x)) % np.pi, num / den * np.pi
+        )
 
     @staticmethod
     def enumerate(
@@ -268,15 +263,15 @@ class SAngle(Predicate):
                 disabled_intrinsic_rules,
             )
 
-        ab, why1 = symbols_graph.get_line_thru_pair_why(a, b)
-        bx, why2 = symbols_graph.get_line_thru_pair_why(b, c)
+        ab, why1 = symbols_graph.get_or_create_line_thru_pair_why(a, b)
+        bc, why2 = symbols_graph.get_or_create_line_thru_pair_why(b, c)
 
-        symbols_graph.get_node_val(ab, dep=None)
-        symbols_graph.get_node_val(bx, dep=None)
+        symbols_graph.get_or_create_node_val(ab, deps=[])
+        symbols_graph.get_or_create_node_val(bc, deps=[])
 
         add, to_cache = [], []
 
-        if ab.val == bx.val:
+        if ab.val == bc.val:
             return add, to_cache
 
         sangle = Statement(SAngle, (a, b, c))
@@ -290,7 +285,7 @@ class SAngle(Predicate):
 
         if IntrinsicRules.SANGLE_FROM_PARA not in disabled_intrinsic_rules:
             paras = []
-            for p, q, pq in [(a, b, ab), (b, c, bx)]:
+            for p, q, pq in [(a, b, ab), (b, c, bc)]:
                 p_, q_ = pq.val._obj.points
                 if {p, q} == {p_, q_}:
                     continue
@@ -300,31 +295,31 @@ class SAngle(Predicate):
                     dep_graph, sangle, paras, Reason(IntrinsicRules.SANGLE_FROM_PARA)
                 )
 
-        xba, abx, why = symbols_graph.get_or_create_angle_from_lines(bx, ab, dep=None)
+        abc, cba = symbols_graph.get_or_create_angle_from_lines(ab, bc, deps=[])
         if IntrinsicRules.SANGLE_FROM_ANGLE not in disabled_intrinsic_rules:
-            aconst = Statement(preds.ConstantAngle, [b, c, a, b, nd])
+            aconst = Statement(preds.ConstantAngle, [a, b, b, c, nd])
             dep_body = dep_body.extend_by_why(
                 dep_graph,
                 aconst,
-                why=why,
+                why=[],
                 extention_reason=Reason(IntrinsicRules.SANGLE_FROM_ANGLE),
             )
 
-        dab, dbx = abx._d
-        a, b = dab._obj.points
-        c, c = dbx._obj.points
+        dab, dbc = abc.directions
+        a, b = dab.obj.points
+        b, c = dbc.obj.points
 
-        if not is_equal(xba, nd):
-            aconst = Statement(SAngle, [c, c, a, b, nd])
-            dep1 = dep_body.build(dep_graph, aconst)
-            symbols_graph.make_equal(xba, nd, dep=dep1)
-            to_cache.append((aconst, dep1))
+        if not is_equal(abc, nd):
+            aconst1 = Statement(SAngle, [a, b, c, nd])
+            dep1 = dep_body.build(dep_graph, aconst1)
+            symbols_graph.make_equal(abc, nd, [dep1])
+            to_cache.append((aconst1, dep1))
             add += [dep1]
 
-        if not is_equal(abx, dn):
-            aconst2 = Statement(SAngle, [a, b, c, c, dn])
+        if not is_equal(cba, dn):
+            aconst2 = Statement(SAngle, [c, b, a, dn])
             dep2 = dep_body.build(dep_graph, aconst2)
-            symbols_graph.make_equal(abx, dn, dep=dep2)
+            symbols_graph.make_equal(cba, dn, [dep2])
             to_cache.append((aconst2, dep2))
             add += [dep2]
 
@@ -360,11 +355,7 @@ class SAngle(Predicate):
     @staticmethod
     def check_numerical(args: tuple[PointNum, PointNum, PointNum, Angle]) -> bool:
         a, b, c, angle = args
-        num, den = angle_to_num_den(angle)
-        ang = ang_between(b, c, a)
-        if ang < 0:
-            ang += np.pi
-        return close_enough(ang, num * np.pi / den)
+        return ConstantAngle.check_numerical(args=(b, a, b, c, angle))
 
     @staticmethod
     def enumerate(

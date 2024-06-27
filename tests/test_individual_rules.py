@@ -205,8 +205,8 @@ DEFINITIONAL_RULES = [  # rules not applied
         ),
         (
             "r32",
-            "cong A B P Q, cong B C Q R, cong C A R P, ncoll A B C => contri A B C P Q R",
-            "a b c = triangle a b c; p = free p; q = eqdistance q p a b; r = eqdistance r p a c, eqdistance r q c b ? contri a b c p q r",
+            "cong A B P Q, cong B C Q R, cong C A R P, ncoll A B C => contri* A B C P Q R",
+            "a b c = triangle a b c; p = free p; q = eqdistance q p a b; r = eqdistance r p a c, eqdistance r q c b ? contri* a b c p q r",
         ),
         (
             "r33",
@@ -292,7 +292,7 @@ def test_rule_used_to_solve_in_one_step(
         return
 
     setup, aux, proof_steps, refs = get_proof_steps(
-        solver.proof_state, solver.problem.goal
+        solver.proof_state, solver.problem.goals
     )
     nl_proof_step = [
         proof_step_string(step, refs, last_step=i == len(proof_steps) - 1)

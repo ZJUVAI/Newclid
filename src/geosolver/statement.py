@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Type, TypeVar
 
 from geosolver.dependencies.dependency import Reason, Dependency
 from geosolver.geometry import Symbol, Point, Angle, Ratio, Length
+from geosolver.ratios import simplify
 
 if TYPE_CHECKING:
     from geosolver.predicates.predicate import Predicate
@@ -26,7 +27,7 @@ class Statement:
 
     def translate(self, mapping: dict[str, str]) -> Statement:
         args = [mapping[a] if a in mapping else a for a in self.args]
-        return Statement(self.name, tuple(args))
+        return Statement(self.predicate, tuple(args))
 
     def add(
         self,
@@ -185,16 +186,12 @@ def hash_triangle(
 
 
 def angle_to_num_den(angle: "Angle" | str) -> tuple[int, int]:
-    name = angle
-    if not isinstance(angle, str):
-        name = angle.name
-    num, den = name.split("pi/")
-    return int(num), int(den)
+    name = angle if isinstance(angle, str) else angle.name
+    num, den = simplify(*map(int, name.split("pi/")))
+    return num % den, den
 
 
 def ratio_to_num_den(ratio: "Ratio" | str) -> tuple[int, int]:
-    name = ratio
-    if not isinstance(ratio, str):
-        name = ratio.name
+    name = ratio if isinstance(ratio, str) else ratio.name
     num, den = name.split("/")
-    return int(num), int(den)
+    return simplify(int(num), int(den))

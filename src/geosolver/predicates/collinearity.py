@@ -5,7 +5,6 @@ from typing_extensions import Self
 
 from geosolver.dependencies.dependency import Reason, Dependency
 
-from geosolver.dependencies.why_predicates import line_of_and_why
 from geosolver.numerical import ATOM
 from geosolver.numerical.geometries import LineNum, PointNum
 
@@ -19,7 +18,7 @@ from geosolver.statement import (
     hash_unordered_set_of_points,
     hashed_unordered_two_lines_points,
 )
-from geosolver.symbols_graph import SymbolsGraph
+from geosolver.symbols_graph import SymbolsGraph, line_of_and_why
 
 import geosolver.predicates as preds
 
@@ -48,8 +47,8 @@ class Coll(Predicate):
 
         all_lines: list[Line] = []
         for p1, p2 in arrangement_pairs(points):
-            all_lines.append(symbols_graph.get_line_thru_pair(p1, p2))
-        points = sum([line.neighbors(Point) for line in all_lines], [])
+            all_lines.append(symbols_graph.get_or_create_line_thru_pair(p1, p2))
+        points = sum([list(line.neighbors(Point)) for line in all_lines], [])
         points = list(set(points))
 
         existed: set[Line] = set()
@@ -99,7 +98,7 @@ class Coll(Predicate):
             coll = Statement(Coll, args)
             dep = abcd_deps.build(dep_graph, coll)
             to_cache.append((coll, dep))
-            symbols_graph.merge_into(line0, [line], dep)
+            symbols_graph.merge([line0, line], dep)
 
             if not is_coll:
                 add += [dep]

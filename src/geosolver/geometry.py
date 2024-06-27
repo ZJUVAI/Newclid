@@ -1,8 +1,7 @@
 """Implements geometric objects used in the graph representation."""
 
 from __future__ import annotations
-from fractions import Fraction
-from typing import TYPE_CHECKING, Any, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Optional, Type, TypeVar
 from typing_extensions import Self
 
 from geosolver.numerical.geometries import PointNum
@@ -31,23 +30,25 @@ class Symbol:
     d.rep = g
     d.merged_from = {a, b, c, d}
     d.equivs = {a, b, c, d, e, f, g}
+    d.members = {a, b, c, d}
 
     """
 
-    def __init__(self, name: str = "", graph: Any = None):
-        self.name = name or str(self)
-        self.graph = graph
+    def __init__(self, name: str = ""):
+        if name:
+            self.name = name
 
-        self.edge_graph: dict[Symbol, dict[Self, list["Dependency"]]] = {}
-        # Edge graph: what other nodes is connected to this node.
+        self.edge_graph: dict[Self, dict[Self, list["Dependency"]]] = {}
+        # Edge graph: what other nodes is merged to this node.
         # edge graph = {
-        #   other1: {self1: deps, self2: deps},
-        #   other2: {self2: deps, self3: deps}
+        #   u1: {v1: deps, v2: deps},
+        #   u2: {v1: deps, v2: deps}
         # }
 
-        self.merge_graph: dict[Self, dict[Self, list["Dependency"]]] = {}
+        self.merge_graph: dict[Self, list["Dependency"]] = {}
         # Merge graph: history of merges with other nodes.
-        # merge_graph = {self1: {self2: deps1, self3: deps2}}
+        # u.merge_graph = {v1: deps, v2: deps}
+        # v1.merge_graph = {u: deps}
 
         self.rep_by = None  # represented by.
         self.members = {self}
@@ -55,18 +56,8 @@ class Symbol:
         self._val: Optional[Symbol] = None
         self._obj: Optional[Symbol] = None
 
-        self.deps: list["Dependency"] = []
-
         # numerical representation.
         self.num: Optional[PointNum] = None
-        self.change = set()  # what other nodes' num rely on this node?
-
-    def set_rep(self, node: Symbol) -> None:
-        if node == self:
-            return
-        self.rep_by = node
-        node.merge_edge_graph(self.edge_graph)
-        node.members.update(self.members)
 
     def rep(self) -> Self:
         x = self
@@ -74,33 +65,23 @@ class Symbol:
             x = x.rep_by
         return x
 
-    def why_rep(self) -> list[Any]:
+    def why_rep(self) -> list[Dependency]:
         return self.why_equal([self.rep()])
 
-    def rep_and_why(self) -> tuple[Self, list["Dependency"]]:
+    def rep_and_why(self) -> tuple[Self, list[Dependency]]:
         rep = self.rep()
         return rep, self.why_equal([rep])
 
-    def neighbors(
-        self, oftype: Type[T], return_set: bool = False, do_rep: bool = True
-    ) -> list[T] | set[T]:
+    def neighbors(self, oftype: Type[T]) -> set[T]:
         """Neighbors of this node in the proof state graph."""
-        if do_rep:
-            rep = self.rep()
-        else:
-            rep = self
+        rep = self.rep()
         result = set()
 
         for n in rep.edge_graph:
-            if oftype is None or oftype and isinstance(n, oftype):
-                if do_rep:
-                    result.add(n.rep())
-                else:
-                    result.add(n)
+            if (oftype is None) or (oftype and isinstance(n, oftype)):
+                result.add(n.rep())
 
-        if return_set:
-            return result
-        return list(result)
+        return result
 
     def merge_edge_graph(
         self, new_edge_graph: dict[Symbol, dict[Symbol, list[Symbol]]]
@@ -111,38 +92,24 @@ class Symbol:
             else:
                 self.edge_graph[x] = dict(xdict)
 
-    def merge(self, nodes: list[Symbol], deps: list["Dependency"]) -> None:
-        for node in nodes:
-            self.merge_one(node, deps)
-
     def merge_one(self, node: Symbol, deps: list["Dependency"]) -> None:
-        node.rep().set_rep(self.rep())
-
-        if node in self.merge_graph:
+        selfrep = self.rep()
+        noderep = node.rep()
+        if selfrep == noderep:
             return
+        noderep.rep_by = selfrep
+        selfrep.merge_edge_graph(node.edge_graph)
+        selfrep.members.update(selfrep.members)
 
         self.merge_graph[node] = deps
         node.merge_graph[self] = deps
 
+    def merge(self, nodes: list[Symbol], deps: list["Dependency"]) -> None:
+        for node in nodes:
+            self.merge_one(node, deps)
+
     def is_val(self, node: Symbol) -> bool:
-        return (
-            isinstance(self, Line)
-            and isinstance(node, Direction)
-            or isinstance(self, Segment)
-            and isinstance(node, Length)
-            or isinstance(self, Length)
-            and isinstance(node, LengthValue)
-            or isinstance(self, Angle)
-            and isinstance(node, AngleValue)
-            or isinstance(self, Ratio)
-            and isinstance(node, RatioValue)
-        )
-
-    def set_val(self, node: Symbol) -> None:
-        self._val = node
-
-    def set_obj(self, node: Symbol) -> None:
-        self._obj = node
+        return type(self) in NODES_VALUES and isinstance(node, NODES_VALUES[type(self)])
 
     @property
     def val(self) -> Symbol:
@@ -168,11 +135,11 @@ class Symbol:
             rep.edge_graph[node] = {self: deps}
 
         if self.is_val(node):
-            self.set_val(node)
-            node.set_obj(self)
+            self._val = node
+            node._obj = self
 
     def equivs_upto(self) -> dict[Symbol, Symbol]:
-        """What are the equivalent nodes."""
+        """Return equivalent nodes upto self and their parents"""
         parent = {self: None}
         visited = set()
         queue = [self]
@@ -191,8 +158,8 @@ class Symbol:
 
         return parent
 
-    def why_equal(self, others: list[Symbol]) -> list["Dependency"]:
-        """BFS why this node is equal to other nodes."""
+    def why_equal(self, others: list[Symbol]) -> Optional[list["Dependency"]]:
+        """Why this node is equal to other nodes (BFS)."""
         others = set(others)
         found = 0
 
@@ -202,26 +169,25 @@ class Symbol:
 
         while i < len(queue):
             current = queue[i]
+            i += 1
+
             if current in others:
                 found += 1
             if found == len(others):
-                break
-
-            i += 1
+                return bfs_backtrack(self, others, parent)
 
             for neighbor in current.merge_graph:
                 if neighbor in parent:
                     continue
                 queue.append(neighbor)
                 parent[neighbor] = current
-
-        return bfs_backtrack(self, others, parent)
+        return None
 
     def why_equal_groups(
         self, groups: list[list[Symbol]]
-    ) -> tuple[list["Dependency"], list[Symbol]]:
-        """BFS for why self is equal to at least one member of each group."""
-        others = [None for _ in groups]
+    ) -> tuple[Optional[list["Dependency"]], Optional[list[Symbol]]]:
+        """Why self is equal to at least one member of each group (BFS)."""
+        others = [None] * len(groups)
         found = 0
 
         parent = {}
@@ -230,6 +196,7 @@ class Symbol:
 
         while i < len(queue):
             current = queue[i]
+            i += 1
 
             for j, grp in enumerate(groups):
                 if others[j] is None and current in grp:
@@ -237,17 +204,37 @@ class Symbol:
                     found += 1
 
             if found == len(others):
-                break
-
-            i += 1
+                return bfs_backtrack(self, others, parent), others
 
             for neighbor in current.merge_graph:
                 if neighbor in parent:
                     continue
                 queue.append(neighbor)
                 parent[neighbor] = current
+        return None, None
 
-        return bfs_backtrack(self, others, parent), others
+    def why_connected_to(self, points: list[Point]) -> Optional[list[Dependency]]:
+        """Why points are connected to form a thing of Self."""
+        rep = self.rep()
+        groups: list[list[Self]] = []
+        for p in points:
+            group = [obj for obj, dep in rep.edge_graph[p].items() if dep == []]
+            if not group:
+                return None
+            groups.append(group)
+
+        min_deps = None
+        for con in groups[0]:
+            deps, _ = con.why_equal_groups(groups[1:])
+            if deps is None:
+                continue
+
+            if min_deps is None or len(deps) < len(min_deps):
+                min_deps = deps
+
+        if min_deps is None:
+            return None
+        return min_deps
 
     def __repr__(self) -> str:
         return self.name
@@ -260,12 +247,8 @@ def bfs_backtrack(
     backtracked = {root}  # no need to backtrack further when touching this set.
     deps = []
     for node in leafs:
-        if node is None:
-            return None
         if node in backtracked:
             continue
-        if node not in parent:
-            return None
         while node not in backtracked:
             backtracked.add(node)
             dep = node.merge_graph[parent[node]]
@@ -286,47 +269,13 @@ class Point(Symbol):
 class Line(Symbol):
     """Symbol of type Line."""
 
-    points: tuple[Point, Point]
-    _val: Direction
-
-    def new_val(self) -> Direction:
-        return Direction()
-
-    def why_coll(self, points: list[Point]) -> Optional[list["Dependency"]]:
-        """Why points are connected to self."""
-
-        groups: list[list[Point]] = []
-        for p in points:
-            group = [
-                level
-                for level, dependency in self.edge_graph[p].items()
-                if dependency is None
-            ]
-            if not group:
-                return None
-            groups.append(group)
-
-        min_deps = None
-        for line in groups[0]:
-            deps, others = line.why_equal_groups(groups[1:])
-            if deps is None:
-                continue
-            for p, o in zip(points, [line] + others):
-                deps.append(self.edge_graph[p][o])
-            if min_deps is None or len(deps) < len(min_deps):
-                min_deps = deps
-
-        if min_deps is None:
-            return None
-        return [d for d in min_deps if d is not None]
+    points: set[Point]
+    _val: Optional[Direction]
 
 
 class Segment(Symbol):
-    points: tuple[Point, Point]
-    _val: Length
-
-    def new_val(self) -> Length:
-        return Length()
+    points: set[Point]
+    _val: Optional[Length]
 
 
 class Circle(Symbol):
@@ -334,93 +283,66 @@ class Circle(Symbol):
 
     points: list[Point]
 
-    def why_cyclic(self, points: list[Point]) -> list[Any]:
-        """Why points are connected to self."""
-        groups: list[list[Circle]] = []
-        for p in points:
-            group = [c for c, d in self.edge_graph[p].items() if d is None]
-            if not group:
-                return None
-            groups.append(group)
-
-        min_deps = None
-        for circle in groups[0]:
-            deps, others = circle.why_equal_groups(groups[1:])
-            if deps is None:
-                continue
-            for p, o in zip(points, [circle] + others):
-                deps.append(self.edge_graph[p][o])
-
-            if min_deps is None or len(deps) < len(min_deps):
-                min_deps = deps
-
-        if min_deps is None:
-            return None
-        return [d for d in min_deps if d is not None]
-
 
 class Angle(Symbol):
     """Symbol of type Angle."""
 
-    opposite: Optional[Angle] = None
     _d: tuple[Optional[Direction], Optional[Direction]] = (None, None)
-    _val: AngleValue
-
-    def new_val(self) -> AngleValue:
-        return AngleValue()
+    _val: Optional[AngleValue]
+    opposite: Angle = None
 
     def set_directions(self, d1: Direction, d2: Direction) -> None:
         self._d = d1, d2
 
     @property
-    def directions(self) -> tuple[Direction, Direction]:
+    def directions(self) -> tuple[Optional[Direction], Optional[Direction]]:
         d1, d2 = self._d
-        if d1 is None or d2 is None:
-            return d1, d2
+        if d1 is None:
+            return None, None
         return d1.rep(), d2.rep()
 
 
 class Ratio(Symbol):
     """Symbol of type Ratio."""
 
-    opposite: Optional[Angle] = None
     _l: tuple[Optional[Length], Optional[Length]] = (None, None)
-    _val: RatioValue
-    value: Fraction
-
-    def new_val(self) -> RatioValue:
-        return RatioValue()
+    _val: Optional[RatioValue]
+    opposite: Ratio = None
 
     def set_lengths(self, l1: Length, l2: Length) -> None:
         self._l = l1, l2
 
     @property
-    def lengths(self) -> tuple[Length, Length]:
+    def lengths(self) -> tuple[Optional[Length], Optional[Length]]:
         l1, l2 = self._l
-        if l1 is None or l2 is None:
-            return l1, l2
+        if l1 is None:
+            return None, None
         return l1.rep(), l2.rep()
 
 
 class Direction(Symbol):
-    _obj: Line
+    _obj: Optional[Line]
 
 
 class Length(Symbol):
-    _obj: Segment
-    value: float
+    _obj: Optional[Segment]
 
-
-class LengthValue(Symbol):
-    _obj: Length
+    @property
+    def value(self) -> float:
+        return float(self.name)
 
 
 class AngleValue(Symbol):
-    _obj: Angle
+    _obj: Optional[Angle]
 
 
 class RatioValue(Symbol):
-    _obj: Ratio
+    _obj: Optional[Ratio]
+
+    @property
+    def value(self) -> float:
+        n, d = self.name.split("/")
+        return int(n) / int(d)
 
 
 RANKING = {
@@ -434,5 +356,18 @@ RANKING = {
     Ratio: 7,
     AngleValue: 8,
     RatioValue: 9,
-    LengthValue: 10,
+}
+
+NODES_VALUES: dict[Type[Symbol], Type[Symbol]] = {
+    Line: Direction,
+    Segment: Length,
+    Angle: AngleValue,
+    Ratio: RatioValue,
+}
+
+NODES_VALUES_MARKERS: dict[Type[Symbol], str] = {
+    Direction: "d",
+    Length: "l",
+    AngleValue: "m",
+    RatioValue: "r",
 }

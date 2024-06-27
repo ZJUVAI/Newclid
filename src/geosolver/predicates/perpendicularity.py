@@ -48,8 +48,8 @@ class Perp(Predicate):
                 return para_from_perp
 
         a, b, c, d = args
-        ab, why1 = symbols_graph.get_line_thru_pair_why(a, b)
-        cd, why2 = symbols_graph.get_line_thru_pair_why(c, d)
+        ab, why1 = symbols_graph.get_or_create_line_thru_pair_why(a, b)
+        cd, why2 = symbols_graph.get_or_create_line_thru_pair_why(c, d)
 
         (a, b), (c, d) = ab.points, cd.points
 
@@ -61,8 +61,8 @@ class Perp(Predicate):
                 why=why1 + why2,
             )
 
-        symbols_graph.get_node_val(ab, dep=None)
-        symbols_graph.get_node_val(cd, dep=None)
+        symbols_graph.get_or_create_node_val(ab, [])
+        symbols_graph.get_or_create_node_val(cd, [])
 
         if ab.val == cd.val:
             raise ValueError(f"{ab.name} and {cd.name} Cannot be perp.")
@@ -89,14 +89,14 @@ class Perp(Predicate):
             args[2 * i - 2] = x_
             args[2 * i - 1] = y_
 
-        a12, a21, why = symbols_graph.get_or_create_angle_from_lines(ab, cd, dep=None)
+        a12, a21 = symbols_graph.get_or_create_angle_from_lines(ab, cd, deps=[])
 
         perp = Statement(Perp, [a, b, c, d])
         if IntrinsicRules.PERP_FROM_ANGLE not in disabled_intrinsic_rules:
             dep_body = dep_body.extend_by_why(
                 dep_graph,
                 perp,
-                why=why,
+                why=[],
                 extention_reason=Reason(IntrinsicRules.PERP_FROM_ANGLE),
             )
 
@@ -106,7 +106,7 @@ class Perp(Predicate):
 
         dep = dep_body.build(dep_graph, perp)
         was_already_equal = is_equal(a12, a21)
-        symbols_graph.make_equal(a12, a21, dep=dep)
+        symbols_graph.make_equal(a12, a21, [dep])
 
         eqangle = Statement(preds.EqAngle, [a, b, c, d, c, d, a, b])
         to_cache = [(perp, dep), (eqangle, dep)]
@@ -126,7 +126,7 @@ class Perp(Predicate):
         """Maybe add a new parallel predicate from perp predicate."""
         a, b, c, d = points
         halfpi = symbols_graph.aconst[(1, 2)]
-        for ang in halfpi.val.neighbors(Angle):
+        for ang in halfpi.neighbors(Angle):
             if ang == halfpi:
                 continue
             d1, d2 = ang.directions
@@ -235,9 +235,7 @@ class Perp(Predicate):
             collx = Statement(preds.Collx, [x, y, x_, y_])
             why_perp.append(dep_graph.build_resolved_dependency(collx, use_cache=False))
 
-        why_eqangle = why_eqangle_directions(
-            dep_graph, ab._val, cd._val, cd._val, ab._val
-        )
+        why_eqangle = why_eqangle_directions(dep_graph, ab.val, cd.val, cd.val, ab.val)
         a, b = ab.points
         c, d = cd.points
 

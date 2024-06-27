@@ -22,8 +22,8 @@ class PointNum:
     """Numerical point."""
 
     def __init__(self, x, y):
-        self.x = x
-        self.y = y
+        self.x = float(x)
+        self.y = float(y)
 
     def __lt__(self, other: "PointNum") -> bool:
         return (self.x, self.y) < (other.x, other.y)
@@ -37,17 +37,20 @@ class PointNum:
     def __sub__(self, p: "PointNum") -> "PointNum":
         return PointNum(self.x - p.x, self.y - p.y)
 
-    def __mul__(self, f: float) -> "PointNum":
+    def __mul__(self, f) -> "PointNum":
+        f = float(f)
         return PointNum(self.x * f, self.y * f)
 
-    def __rmul__(self, f: float) -> "PointNum":
-        return self * f
+    def __rmul__(self, f) -> "PointNum":
+        return self * float(f)
 
-    def __truediv__(self, f: float) -> "PointNum":
+    def __truediv__(self, f) -> "PointNum":
+        f = float(f)
         return PointNum(self.x / f, self.y / f)
 
-    def __floordiv__(self, f: float) -> "PointNum":
-        div = self / f  # true div
+    def __floordiv__(self, f) -> "PointNum":
+        f = float(f)
+        div = self / f
         return PointNum(int(div.x), int(div.y))
 
     def __str__(self) -> str:
@@ -92,11 +95,14 @@ class PointNum:
         dy2 = dy2 if abs(dy2) > ATOM else 0.0
         return dx * dx + dy * dy
 
-    def rotatea(self, ang: float) -> "PointNum":
+    def rotatea(self, ang) -> "PointNum":
+        ang = float(ang)
         sinb, cosb = np.sin(ang), np.cos(ang)
         return self.rotate(sinb, cosb)
 
-    def rotate(self, sinb: float, cosb: float) -> "PointNum":
+    def rotate(self, sinb, cosb) -> "PointNum":
+        sinb = float(sinb)
+        cosb = float(cosb)
         x, y = self.x, self.y
         return PointNum(x * cosb - y * sinb, x * sinb + y * cosb)
 
@@ -151,7 +157,7 @@ class LineNum:
         self,
         p1: "PointNum" = None,
         p2: "PointNum" = None,
-        coefficients: tuple[int, int, int] = None,
+        coefficients: tuple[float, float, float] = None,
     ):
         if p1 is None and p2 is None and coefficients is None:
             self.coefficients = None, None, None

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Generator, Optional
 
+
 from geosolver.dependencies.dependency import Reason, Dependency
 
 from geosolver.dependencies.why_predicates import why_equal
@@ -50,7 +51,7 @@ class MidPoint(Predicate):
     @staticmethod
     def why(
         dep_graph: "DependencyGraph", statement: "Statement"
-    ) -> tuple[Optional[Reason], list[Dependency]]:
+    ) -> tuple[Optional[Reason], Optional[list[Dependency]]]:
         m, a, b = statement.args
         ma = dep_graph.symbols_graph.get_segment(m, a)
         mb = dep_graph.symbols_graph.get_segment(m, b)

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Optional, Union
 from numpy.random import Generator
 
 from geosolver._lazy_loading import lazy_import
-from geosolver.geometry import Angle, Length, Point, Ratio
+from geosolver.geometry import Angle, Length, Point, Ratio, RatioValue
 from geosolver.numerical import close_enough
 from geosolver.numerical.angles import ang_between, ang_of
 from geosolver.numerical.distances import (
@@ -481,6 +481,7 @@ def sketch_s_angle(args: tuple[PointNum, ...], **kwargs) -> HalfLine:
 def sketch_aconst(args: tuple[PointNum, ...], **kwargs) -> HalfLine:
     a, b, c, angle = args
     num, den = angle_to_num_den(angle)
+    num %= den
     ang = num * np.pi / den
     x = c + (a - b).rotatea(ang)
     return HalfLine(c, x)
@@ -741,7 +742,7 @@ def sketch_eqratio(args: tuple[PointNum, ...], **kwargs) -> CircleNum:
 
 
 def sketch_rconst(
-    args: tuple[PointNum, PointNum, PointNum, Ratio], **kwargs
+    args: tuple[PointNum, PointNum, PointNum, RatioValue], **kwargs
 ) -> CircleNum:
     """Sketches point x such that ab/cx=r"""
     A, B, C, r = args

@@ -6,4 +6,8 @@ def _gcd(x: int, y: int) -> int:
 
 def simplify(n: int, d: int) -> tuple[int, int]:
     g = _gcd(n, d)
-    return (n // g, d // g)
+    n //= g
+    d //= g
+    if d < 0:
+        n, d = -n, -d
+    return n, d

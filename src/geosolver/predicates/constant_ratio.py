@@ -58,11 +58,11 @@ class ConstantRatio(Predicate):
                 disabled_intrinsic_rules,
             )
 
-        ab = symbols_graph.get_or_create_segment(a, b, dep=None)
-        cd = symbols_graph.get_or_create_segment(c, d, dep=None)
+        ab = symbols_graph.get_or_create_segment(a, b, deps=[])
+        cd = symbols_graph.get_or_create_segment(c, d, deps=[])
 
-        symbols_graph.get_node_val(ab, dep=None)
-        symbols_graph.get_node_val(cd, dep=None)
+        symbols_graph.get_or_create_node_val(ab, deps=[])
+        symbols_graph.get_or_create_node_val(cd, deps=[])
 
         if ab.val == cd.val:
             raise ValueError(f"{ab.name} and {cd.name} cannot be equal")
@@ -89,16 +89,14 @@ class ConstantRatio(Predicate):
             args[2 * i - 2] = x_
             args[2 * i - 1] = y_
 
-        ab_cd, cd_ab, why = symbols_graph.get_or_create_ratio_from_segments(
-            ab, cd, dep=None
-        )
+        ab_cd, cd_ab = symbols_graph.get_or_create_ratio_from_segments(ab, cd, deps=[])
 
         rconst = Statement(ConstantRatio, [a, b, c, d, nd])
         if IntrinsicRules.RCONST_FROM_RATIO not in disabled_intrinsic_rules:
             dep_body = dep_body.extend_by_why(
                 dep_graph,
                 rconst,
-                why=why,
+                why=[],
                 extention_reason=Reason(IntrinsicRules.RCONST_FROM_RATIO),
             )
 
@@ -110,14 +108,14 @@ class ConstantRatio(Predicate):
         to_cache = []
         if not is_equal(ab_cd, nd):
             dep1 = dep_body.build(dep_graph, rconst)
-            symbols_graph.make_equal(nd, ab_cd, dep=dep1)
+            symbols_graph.make_equal(nd, ab_cd, [dep1])
             to_cache.append((rconst, dep1))
             add.append(dep1)
 
         if not is_equal(cd_ab, dn):
             rconst2 = Statement(ConstantRatio, [c, d, a, b, dn])
             dep2 = dep_body.build(dep_graph, rconst2)
-            symbols_graph.make_equal(dn, cd_ab, dep=dep2)
+            symbols_graph.make_equal(dn, cd_ab, [dep2])
             to_cache.append((rconst2, dep2))
             add.append(dep2)
 

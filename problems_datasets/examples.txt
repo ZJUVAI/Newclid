@@ -134,5 +134,9 @@ pyt_test_formula_to_perp
 a = free a; b = lconst b a 4; c = lconst c a 5, lconst c b 3 ? perp a b b c
 pyt_test_perp_to_formula
 a = free a; b = lconst b a 4; c = on_tline c b a b, lconst c b 3 ? lconst a c 5
-testing_problem
-a b c = triangle a b c; o = circle o a b c; p = on_circle p o a; q = on_tline q p o p; pa = reflect pa p b c; pb = reflect pb p c a; pc = reflect pc p a b; qa = reflect qa q b c; qb = reflect qb q c a; qc = reflect qc q a b; a1 = on_line a1 pb qb, on_line a1 pc qc; b1 = on_line b1 pa qa, on_line b1 pc qc; c1 = on_line c1 pa qa, on_line c1 pb qb; o1 = circle o1 a1 b1 c1; x = on_circle x o a, on_circle x o1 a1 ? cyclic pa pb c x
+two_goals_cong_aconst
+a b = segment a b; c = on_tline c b a b, eqdistance c b a b; d = on_circum d a b c, eqdistance d c a b ? cong a b d a; aconst d a a b 1pi/2
+two_goals_perp_cong
+a b c = triangle a b c; p = s_angle c b p 45o, s_angle b c p 150o; q = s_angle a c q 30o, s_angle c a q 135o; r = s_angle b a r 15o, s_angle a b r 165o; t = eq_triangle t b r ? perp q r r p; cong q r r p
+pythagoras
+a b c = triangle a b c; o = circle o a b c; p = on_circle p o a; q = on_tline q p o p; pa = reflect pa p b c; pb = reflect pb p c a; pc = reflect pc p a b; qa = reflect qa q b c; qb = reflect qb q c a; qc = reflect qc q a b; a1 = on_line a1 pb qb, on_line a1 pc qc; b1 = on_line b1 pa qa, on_line b1 pc qc; c1 = on_line c1 pa qa, on_line c1 pb qb; o1 = circle o1 a1 b1 c1; x = on_line x o o1, on_circle x o a ? cyclic x a1 b1 c1

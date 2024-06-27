@@ -131,9 +131,8 @@ class Proof:
         self.disabled_intrinsic_rules = validate_disabled_rules(
             disabled_intrinsic_rules
         )
-        self.goal: Optional[Statement] = None
-
-        self._goal_construction: Optional[Construction] = None
+        self._goals: list[Statement] = []
+        self._goals_construction: list[Construction] = []
         self._resolved_mapping_deps: dict[
             str, tuple[DependencyBody, tuple["Statement", "Dependency"]]
         ] = {}
@@ -165,8 +164,6 @@ class Proof:
         rnd_generator: "numpy.random.Generator" = None,
     ) -> Self:
         """Build a problem into a Proof state object."""
-        proof = None
-        added = None
         logging.info(f"Building proof from problem '{problem.url}': {problem}")
 
         err = DepCheckFailError(f"Numerical check failed {max_attempts} times")
@@ -211,20 +208,22 @@ class Proof:
                 err = e
                 continue
 
-            if not problem.goal:
+            if not problem.goals:
                 break
 
-            goal_predicate = preds.NAME_TO_PREDICATE[problem.goal.name]
-            goal_args = proof.map_construction_args_to_objects(problem.goal)
-            goal = Statement(goal_predicate, goal_args)
-            if goal.check_numerical():
-                proof.goal = goal
+            all_check = True
+            for goal in proof.goals_as_statements(problem.goals):
+                if not goal.check_numerical():
+                    all_check = False
+                    break
+            if all_check:
                 break
 
         else:
             raise err
 
-        proof._goal_construction = problem.goal
+        proof._goals = proof.goals_as_statements(problem.goals)
+        proof._goals_construction = problem.goals
         proof._problem = problem
         proof._definitions = definitions
         proof._init_added = added
@@ -242,7 +241,7 @@ class Proof:
 
     def _step_match_theorem(self, action: MatchAction) -> MatchFeedback:
         theorem = action.theorem
-        potential_mappings = match_one_theorem(self, theorem, cache=action.cache)
+        potential_mappings = match_one_theorem(self, theorem, action.cache)
         mappings = []
         for mapping in potential_mappings:
             dep_body, to_cache = self._resolve_mapping_dependency(theorem, mapping)
@@ -355,7 +354,7 @@ class Proof:
         return AuxFeedback(success, added, to_cache)
 
     def _step_stop(self, action: StopAction) -> StopFeedback:
-        return StopFeedback(success=self.check_goal())
+        return StopFeedback(success=self.check_goals())
 
     def reset(self) -> ResetFeedback:
         self.cache_deps(self._init_to_cache)
@@ -379,7 +378,7 @@ class Proof:
         problem = self._problem.copy()
         for clause in problem.clauses:
             clause.nums = [
-                self.symbols_graph._name2node[pname].num for pname in clause.points
+                self.symbols_graph.name2node[pname].num for pname in clause.points
             ]
 
         proof = Proof.build_problem(
@@ -412,10 +411,21 @@ class Proof:
         for to_cache in deps_to_cache:
             self.dependency_graph.dependency_cache.add_dependency(*to_cache)
 
-    def check_goal(self) -> bool:
-        if self.goal is None:
+    def goals_as_statements(self, goals: list[Construction]) -> list[Statement]:
+        res = []
+        for goal in goals or self._goals:
+            goal_args = self.map_construction_args_to_objects(goal)
+            goal_statement = Statement(preds.NAME_TO_PREDICATE[goal.name], goal_args)
+            res.append(goal_statement)
+        return res
+
+    def check_goals(self) -> bool:
+        if not self._goals:
             return False
-        return self.goal.check(self.symbols_graph)
+        for goal in self._goals:
+            if not goal.check(self.symbols_graph):
+                return False
+        return True
 
     def additionally_draw(self, name: str, args: list[Point]) -> None:
         """Draw some extra line/circles for illustration purpose."""
@@ -557,9 +567,6 @@ class Proof:
                 args = self.map_construction_args_to_objects(n, mapping)
                 rely_on.update([a for a in args if isinstance(a, Point)])
 
-        for p in rely_on:
-            p.change.update(new_points)
-
         def range_fn() -> (
             list[Union[PointNum, LineNum, CircleNum, HalfLine, HoleCircle]]
         ):
@@ -636,7 +643,7 @@ class Proof:
             if len(pss) > 1:
                 ps = [x for x in ps if x != p]
 
-            p = self.symbols_graph._name2point[p]
+            p = self.symbols_graph.name2node[p]
             ps = self.symbols_graph.names2nodes(ps)
             rely_dict[p] = ps
 
@@ -705,8 +712,8 @@ class Proof:
 
 
 def arg_to_object(arg: str, symbols_graph: "SymbolsGraph"):
-    if arg in symbols_graph._name2point:
-        return symbols_graph.get_point(arg)
+    if arg in symbols_graph.name2node:
+        return symbols_graph.name2node[arg]
     elif "pi/" in arg or arg.endswith("o"):
         if "pi/" in arg:
             # pi fraction

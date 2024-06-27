@@ -14,7 +14,7 @@ from geosolver.dependencies.dependency_building import DependencyBody
 from geosolver.numerical.check import clock
 from geosolver.api import GeometricSolverBuilder
 from geosolver.statement import Statement
-from geosolver.symbols_graph import SymbolsGraphBuilder
+from geosolver.symbols_graph import SymbolsGraph
 from tests.fixtures import build_until_works
 
 
@@ -444,12 +444,7 @@ class TestAR:
         point_names = ["a", "b", "c", "d", "e", "f"]
         lengths = ["2", "5"]
 
-        symbols_graph = (
-            SymbolsGraphBuilder()
-            .with_points_named(point_names)
-            .with_lengths(lengths)
-            .build()
-        )
+        symbols_graph = SymbolsGraph()
         a, b, c, d, e, f = symbols_graph.names2nodes(point_names)
         l2, l5 = symbols_graph.names2nodes(lengths)
 

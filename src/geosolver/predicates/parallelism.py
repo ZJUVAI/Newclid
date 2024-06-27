@@ -38,8 +38,8 @@ class Para(Predicate):
     ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
         """Add a new statement that 4 points (2 lines) are parallel."""
         a, b, c, d = args
-        ab, why1 = symbols_graph.get_line_thru_pair_why(a, b)
-        cd, why2 = symbols_graph.get_line_thru_pair_why(c, d)
+        ab, why1 = symbols_graph.get_or_create_line_thru_pair_why(a, b)
+        cd, why2 = symbols_graph.get_or_create_line_thru_pair_why(c, d)
 
         (a, b), (c, d) = ab.points, cd.points
 

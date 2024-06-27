@@ -228,8 +228,7 @@ class BFSDDAR(DeductiveAgent):
                 else:
                     self._derivations.append(derive)
         elif isinstance(feedback, ImportDerivationFeedback):
-            new_statements = len(feedback.added) > 1
-            if new_statements:
+            if len(feedback.added) >= 1:
                 # dd is not saturated anymore
                 self._dd_agent._any_success_or_new_match_per_level[self.level] = True
         else:

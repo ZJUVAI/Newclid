@@ -30,13 +30,13 @@ def reshape(list_to_reshape: list[Any], n: int = 1) -> list[list[Any]]:
 class Problem:
     """Describe one problem to solve."""
 
-    def __init__(self, url: str, clauses: list["Clause"], goal: "Construction"):
+    def __init__(self, url: str, clauses: list["Clause"], goals: list["Construction"]):
         self.url = url
         self.clauses = clauses
-        self.goal = goal
+        self.goals = goals
 
     def copy(self) -> Problem:
-        return Problem(self.url, list(self.clauses), self.goal)
+        return Problem(self.url, list(self.clauses), list(self.goals))
 
     def translate(self) -> Problem:  # to single-char point names
         """Translate point names into alphabetical."""
@@ -46,16 +46,14 @@ class Problem:
         for clause in self.clauses:
             clauses.append(clause.translate(mapping))
 
-        goal = self.goal
-        if self.goal:
-            goal = self.goal.translate(mapping)
+        self.goals = [goal.translate(mapping) for goal in self.goals]
 
-        p = Problem(self.url, clauses, goal)
+        p = Problem(self.url, clauses, self.goals)
         return p
 
     def __str__(self) -> str:
         return "; ".join([str(c) for c in self.clauses]) + (
-            " ? " + str(self.goal) if self.goal else ""
+            " ? " + "; ".join(str(goal) for goal in self.goals) if self.goals else ""
         )
 
     @classmethod
@@ -81,14 +79,16 @@ class Problem:
             url, data = data.split("\n")
 
         if " ? " in data:
-            clauses, goal = data.split(" ? ")
-            goal = Construction.from_txt(goal)
+            clauses_str, goals_str = data.split(" ? ")
         else:
-            clauses, goal = data, None
+            clauses_str, goals_str = data, None
 
-        clauses = clauses.split("; ")
         problem = Problem(
-            url=url, clauses=[Clause.from_txt(c) for c in clauses], goal=goal
+            url=url,
+            clauses=[Clause.from_txt(c) for c in clauses_str.split("; ")],
+            goals=[Construction.from_txt(g) for g in goals_str.split("; ")]
+            if goals_str
+            else [],
         )
         if translate:
             return problem.translate()
@@ -147,8 +147,7 @@ def setup_str_from_problem(
             string.append(" ".join(gr) + " : " + " ".join(deps_str))
 
     string = "{S} " + " ; ".join([s.strip() for s in string])
-    goal = problem.goal
-    string += " ? " + pretty(goal.hash_tuple)
+    string += " ? " + "; ".join(pretty(goal.hash_tuple) for goal in problem.goals)
     return string
 
 
