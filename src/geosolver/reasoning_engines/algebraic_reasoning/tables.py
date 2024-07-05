@@ -17,11 +17,11 @@ NLOGATOM: int = 9
 
 
 class Coef(float):
-    def __hash__(self):
-        return hash(round(self, NLOGATOM))
+    def __hash__(self) -> int:
+        raise NotImplementedError
 
     def __eq__(self, other: "Coef"):  # type: ignore
-        return hash(self) == hash(other)
+        return abs(self - other) < ATOM
 
     def __ne__(self, other: "Coef") -> bool:  # type: ignore
         return not self.__eq__(other)
