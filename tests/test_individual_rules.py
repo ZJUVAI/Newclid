@@ -32,13 +32,13 @@ EXPECTED_TO_FAIL = []
         ),
         (
             "r04",
-            "eqangle6 P A P B Q A Q B, ncoll P Q A B => cyclic A B P Q",
+            "eqangle P A P B Q A Q B, ncoll P Q A B => cyclic A B P Q",
             "a = free a; b = free b; q = free q; p = eqangle3 p a b q a b ? cyclic a b p q",
         ),
         (
             "r05",
             "cyclic A B C P Q R, eqangle C A C B R P R Q => cong A B P Q",
-            "a = free a; b = free b; c = free c; p = on_circum p a b c; r = on_circum r a b c; q = on_circum q a b c, on_aline0 q c a c b r p r ? cong a b p q",
+            "a = free a; b = free b; c = free c; p = on_circum p a b c; r = on_circum r a b c; q = on_circum q a b c, on_aline q r p b c a ? cong a b p q",
         ),
         (
             "r06",
@@ -67,13 +67,13 @@ EXPECTED_TO_FAIL = []
         ),
         (
             "r11",
-            "eqratio6 d b d c a b a c, coll d b c, ncoll a b c => eqangle6 a b a d a d a c",
-            "a = free a; b = free b; c = free c; d = eqratio6 d b c a b a c, on_line d b c ? eqangle6 a b a d a d a c",
+            "eqratio d b d c a b a c, coll d b c, ncoll a b c => eqangle a b a d a d a c",
+            "a = free a; b = free b; c = free c; d = eqratio6 d b c a b a c, on_line d b c ? eqangle a b a d a d a c",
         ),
         (
             "r12",
-            "eqangle6 a b a d a d a c, coll d b c, ncoll a b c => eqratio6 d b d c a b a c",
-            "a = free a; b = free b; d = free d; c = on_line c b d, on_aline0 c a b a d a d a ? eqratio6 d b d c a b a c",
+            "eqangle a b a d a d a c, coll d b c, ncoll a b c => eqratio d b d c a b a c",
+            "a = free a; b = free b; d = free d; c = on_line c b d, on_aline c a d d a b ? eqratio d b d c a b a c",
         ),
         (
             "r13",
@@ -82,7 +82,7 @@ EXPECTED_TO_FAIL = []
         ),
         (
             "r14",
-            "eqangle6 A O A B B A B O, ncoll O A B => cong O A O B",
+            "eqangle A O A B B A B O, ncoll O A B => cong O A O B",
             "a = free a; b = free b; o = iso_triangle_vertex_angle o a b ? cong o a o b",
         ),
         (
@@ -93,7 +93,7 @@ EXPECTED_TO_FAIL = []
         (
             "r16",
             "circle O A B C, eqangle A X A B C A C B => perp O A A X",
-            "a = free a; b = free b; c = free c; o = circle o a b c; x = on_aline0 x c b c a a b a ? perp o a a x",
+            "a = free a; b = free b; c = free c; o = circle o a b c; x = on_aline x a b a c b ? perp o a a x",
         ),
         (
             "r17",
@@ -103,7 +103,7 @@ EXPECTED_TO_FAIL = []
         (
             "r18",
             "circle O A B C, coll M B C, eqangle A B A C O B O M => midp M B C",
-            "a = free a; b = free b; c = free c; o = circle o a b c; m = on_line m b c, on_aline0 m a b a c o b o ? midp m b c",
+            "a = free a; b = free b; c = free c; o = circle o a b c; m = on_line m b c, on_aline m o b c a b ? midp m b c",
         ),
         (
             "r19",
@@ -177,53 +177,53 @@ EXPECTED_TO_FAIL = []
         ),
         (
             "r33",
-            "cong A B P Q, cong B C Q R, eqangle6 B A B C Q P Q R, ncoll A B C => contri A B C P Q R",
-            "a = free a; b = free b; c = free c; q = free q; p = eqdistance p q b a; r = eqdistance r q b c, on_aline0 r b a b c q p q ? contri a b c p q r",
+            "cong A B P Q, cong B C Q R, eqangle B A B C Q P Q R, ncoll A B C => contri A B C P Q R",
+            "a = free a; b = free b; c = free c; q = free q; p = eqdistance p q b a; r = eqdistance r q b c, on_aline r q p c b a ? contri a b c p q r",
         ),
         (
             "r34",
-            "eqangle6 B A B C Q P Q R, eqangle6 C A C B R P R Q, ncoll A B C => simtri A B C P Q R",
-            "a = free a; b = free b; c = free c; q = free q; r = free r; p = on_aline0 p b c b a q r q, on_aline0 p c b c a r q r ? simtri a b c p q r",
+            "eqangle B A B C Q P Q R, eqangle C A C B R P R Q, ncoll A B C => simtri A B C P Q R",
+            "a = free a; b = free b; c = free c; q = free q; r = free r; p = on_aline p q r a b c, on_aline p r q a c b ? simtri a b c p q r",
         ),
         (
             "r35",
-            "eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C => simtrir A B C P Q R",
-            "a = free a; b = free b; c = free c; q = free q; r = free r; p = on_aline0 p b a b c q r q, on_aline0 p c a c b r q r ? simtrir a b c p q r",
+            "eqangle B A B C Q R Q P, eqangle C A C B R Q R P, ncoll A B C => simtrir A B C P Q R",
+            "a = free a; b = free b; c = free c; q = free q; r = free r; p = on_aline p q r c b a , on_aline p r q b c a ? simtrir a b c p q r",
         ),
         (
             "r36",
-            "eqangle6 B A B C Q P Q R, eqangle6 C A C B R P R Q, ncoll A B C, cong A B P Q => contri A B C P Q R",
-            "a = free a; b = free b; p = free p; q = eqdistance q p a b; r = free r; c = on_aline0 c q p q r b a b, eqangle3 c a b r p q ? contri a b c p q r",
+            "eqangle B A B C Q P Q R, eqangle C A C B R P R Q, ncoll A B C, cong A B P Q => contri A B C P Q R",
+            "a = free a; b = free b; p = free p; q = eqdistance q p a b; r = free r; c = on_aline c b a r q p, eqangle3 c a b r p q ? contri a b c p q r",
         ),
         (
             "r37",
-            "eqangle6 B A B C Q R Q P, eqangle6 C A C B R Q R P, ncoll A B C, cong A B P Q => contrir A B C P Q R",
-            "a = free a; b = free b; p = free p; q = eqdistance q p a b; r = free r; c = on_aline0 c q r q p b a b, eqangle3 c a b r q p ? contrir a b c p q r",
+            "eqangle B A B C Q R Q P, eqangle C A C B R Q R P, ncoll A B C, cong A B P Q => contrir A B C P Q R",
+            "a = free a; b = free b; p = free p; q = eqdistance q p a b; r = free r; c = on_aline c b a p q r, eqangle3 c a b r q p ? contrir a b c p q r",
         ),
         (
             "r38",
-            "eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C => simtri A B C P Q R",
+            "eqratio B A B C Q P Q R, eqratio C A C B R P R Q, ncoll A B C => simtri A B C P Q R",
             "a = free a; b = free b; c = free c; q = free q; r = free r; p = eqratio p b c b a q r q, eqratio p c b c a r q r ? simtri a b c p q r",
         ),
         (
             "r39",
-            "eqratio6 B A B C Q P Q R, eqangle6 B A B C Q P Q R, ncoll A B C => simtri A B C P Q R",
-            "a = free a; b = free b; c = free c; p = free p; q = free q; r = eqratio r b a b c q p q, on_aline0 r b a b c q p q ? simtri a b c p q r",
+            "eqratio B A B C Q P Q R, eqangle B A B C Q P Q R, ncoll A B C => simtri A B C P Q R",
+            "a = free a; b = free b; c = free c; p = free p; q = free q; r = eqratio r b a b c q p q, on_aline r q p c b a ? simtri a b c p q r",
         ),
         (
             "r40",
-            "eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C, cong A B P Q => contri* A B C P Q R",
+            "eqratio B A B C Q P Q R, eqratio C A C B R P R Q, ncoll A B C, cong A B P Q => contri* A B C P Q R",
             "a = free a; b = free b; c = free c; p = free p; q = eqdistance q p a b; r = eqratio r b a b c q p q, eqratio6 r p q c a c b ? contri* a b c p q r",
         ),
         (
             "r41",
-            "para a b c d, coll m a d, coll n b c, eqratio6 m a m d n b n c, sameside m a d n b c => para m n a b",
+            "para a b c d, coll m a d, coll n b c, eqratio m a m d n b n c, sameside m a d n b c => para m n a b",
             "a = free a; b = free b; c = free c; d = on_pline d c a b; n = on_line n b c; m = eqratio6 m a d n b n c, on_line m a d ? para m n a b",
         ),
         (
             "r42",
-            "para a b c d, coll m a d, coll n b c, para m n a b => eqratio6 m a m d n b n c",
-            "a = free a; b = free b; c = free c; d = on_pline d c a b; m = on_line m a d; n = on_line n b c, on_pline n m a b ? eqratio6 m a m d n b n c",
+            "para a b c d, coll m a d, coll n b c, para m n a b => eqratio m a m d n b n c",
+            "a = free a; b = free b; c = free c; d = on_pline d c a b; m = on_line m a d; n = on_line n b c, on_pline n m a b ? eqratio m a m d n b n c",
         ),
         (
             "r50",

@@ -9,6 +9,10 @@ if TYPE_CHECKING:
     from geosolver.statement import Statement
 
 
+class IllegalPredicate(Exception):
+    ...
+
+
 class Predicate(ABC):
     NAME: str
 
@@ -25,12 +29,13 @@ class Predicate(ABC):
 
     @classmethod
     def check(cls, statement: Statement) -> bool:
-        return statement.dep_graph.ar.check(statement.predicate, statement.args)
+        return False
 
     @classmethod
-    def add(cls, dep: Dependency):
+    def add(cls, dep: Dependency) -> None:
         """Make a dependency body into a list of dependencies
         with the given arguments."""
+        return
 
     @classmethod
     def why(cls, statement: Statement) -> Dependency:

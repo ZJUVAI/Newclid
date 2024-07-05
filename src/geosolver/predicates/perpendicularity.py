@@ -1,11 +1,10 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
-from geosolver import predicates
-from geosolver.dependency.dependency import Dependency
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import ATOM
-from geosolver.predicates.predicate import Predicate
+from geosolver.predicates.equal_angles import EqAngle
+from geosolver.predicates.predicate import IllegalPredicate, Predicate
 
 if TYPE_CHECKING:
     from geosolver.dependency.dependency import Dependency
@@ -25,6 +24,8 @@ class Perp(Predicate):
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
         a, b, c, d = args
+        if a == b or c == d:
+            raise IllegalPredicate
         a, b = sorted((a, b))
         c, d = sorted((c, d))
         if (a, b) > (c, d):
@@ -33,40 +34,21 @@ class Perp(Predicate):
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
-        a, b, c, d = statement.args
-        assert (
-            isinstance(a, Point)
-            and isinstance(b, Point)
-            and isinstance(c, Point)
-            and isinstance(d, Point)
-        )
+        args: tuple[Point, ...] = statement.args
+        a, b, c, d = args
         return abs((a.num - b.num).dot(c.num - d.num)) < ATOM
 
     @classmethod
     def check(cls, statement: Statement) -> bool:
-        a, b, c, d = statement.args
-        assert (
-            isinstance(a, Point)
-            and isinstance(b, Point)
-            and isinstance(c, Point)
-            and isinstance(d, Point)
-        )
-        return statement.dep_graph.ar.check(
-            predicates.EqAngle, (a, b, c, d, c, d, a, b)
-        )
+        args: tuple[Point, ...] = statement.args
+        a, b, c, d = args
+        return statement.with_new(EqAngle, (a, b, c, d, c, d, a, b)).check()
 
     @classmethod
     def add(cls, dep: Dependency):
-        a, b, c, d = dep.statement.args
-        assert (
-            isinstance(a, Point)
-            and isinstance(b, Point)
-            and isinstance(c, Point)
-            and isinstance(d, Point)
-        )
-        return dep.statement.dep_graph.ar.add(
-            predicates.EqAngle, (a, b, c, d, c, d, a, b), dep
-        )
+        args: tuple[Point, ...] = dep.statement.args
+        a, b, c, d = args
+        dep.with_new(dep.statement.with_new(EqAngle, (a, b, c, d, c, d, a, b))).add()
 
 
 class NPerp(Predicate):

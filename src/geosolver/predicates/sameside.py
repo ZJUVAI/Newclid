@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import ATOM
-from geosolver.predicates.predicate import Predicate
+from geosolver.predicates.predicate import IllegalPredicate, Predicate
 
 
 if TYPE_CHECKING:
@@ -26,6 +26,8 @@ class SameSide(Predicate):
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
         a, b, c, x, y, z = args
+        if len(set((a, b, c))) < 3 or len(set((x, y, z))) < 3:
+            raise IllegalPredicate
         return tuple(
             dep_graph.symbols_graph.names2points(
                 min(

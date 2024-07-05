@@ -38,11 +38,11 @@ class BFSDDAR(DeductiveAgent):
         self.theorems = theorems
         self.theorem_buffer: list[Theorem] = []
         self.application_buffer: list[Dependency] = []
-        self.applied_any = True
+        self.applied_any = 10000
 
     def act(self) -> Action:
         if self.application_buffer:
-            self.applied_any = True
+            self.applied_any = 10000
             return ApplyTheoremAction(self.application_buffer.pop())
         if self.theorem_buffer:
             return MatchAction(self.theorem_buffer.pop())

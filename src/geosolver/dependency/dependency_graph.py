@@ -23,3 +23,17 @@ class DependencyGraph:
             self.hyper_graph[dep.statement].add(dep)
         else:
             self.hyper_graph[dep.statement] = {dep}
+
+    def get_rank(self, statement: Statement, rank: dict[Statement, int]) -> int:
+        ...
+        # if statement in rank:
+        #     return rank[statement]
+        # rank[statement] = -1
+        # for dep in self.hyper_graph[statement]:
+        #     pass
+
+    def resolve(self, goals: list[Statement]) -> DependencyGraph:
+        ...
+        # rank : dict[Statement, int] = {}
+        # for goal in goals:
+        #     self.get_rank(goal)

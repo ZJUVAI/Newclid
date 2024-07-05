@@ -17,6 +17,7 @@ def write_solution(proof: "Proof", out_file: Optional[Path]) -> None:
       out_file: file to write to, empty string to skip writing to file.
     """
     solution = "\n=========================="
+    # proof_graph = proof.dep_graph.resolve(proof.goals)
     solution += "==========================\n"
     logging.info(solution)
     if out_file is not None:

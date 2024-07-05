@@ -34,7 +34,7 @@ from geosolver.agent.agents_interface import (
     StopAction,
     StopFeedback,
 )
-from geosolver.match_theorems import match_theorem, translate_sentence
+from geosolver.match_theorems import Matcher, translate_sentence
 
 from geosolver.numerical.distances import (
     PointTooCloseError,
@@ -45,7 +45,7 @@ from geosolver.numerical.distances import (
 from geosolver.numerical.sketch import sketch
 
 from geosolver.problem import Problem
-from geosolver.dependency.dependency import Dependency
+from geosolver.dependency.dependency import CONSTRUCTION, Dependency
 from geosolver._lazy_loading import lazy_import
 
 
@@ -82,6 +82,7 @@ class Proof:
             EmptyAction: self._idle,
         }
         self.rng = custom_rng or np_random.default_rng()
+        self.matcher = Matcher(self.dep_graph, self.rng)
 
     @classmethod
     def build_problem(
@@ -150,7 +151,7 @@ class Proof:
         return self._ACTION_TYPE_TO_STEP[type(action)](action)
 
     def _step_match_theorem(self, action: MatchAction) -> MatchFeedback:
-        return MatchFeedback(deps=list(match_theorem(self, action.theorem)))
+        return MatchFeedback(deps=list(self.matcher.match_theorem(action.theorem)))
 
     def _step_apply_theorem(self, action: ApplyTheoremAction) -> ApplyTheoremFeedback:
         adds = self._apply_theorem(action.dep)
@@ -211,7 +212,7 @@ class Proof:
                     statement = Statement.from_tokens(
                         translate_sentence(mapping, t), self.dep_graph
                     )
-                    adds.append(Dependency(statement, "cstr", ()))
+                    adds.append(Dependency.mk(statement, CONSTRUCTION, ()))
             for n in cdef.numerics:
                 numerics.append(tuple(mapping[a] if a in mapping else a for a in n))
 

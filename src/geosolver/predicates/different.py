@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
-from geosolver.dependency.dependency import Dependency
+from geosolver.dependency.dependency import CONSTRUCTION, Dependency
 from geosolver.dependency.symbols import Point
 from geosolver.predicates.predicate import Predicate
 
@@ -23,10 +23,9 @@ class Diff(Predicate):
 
     @classmethod
     def parse(
-        cls, args: tuple[Any, ...], dep_graph: DependencyGraph
+        cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
         p, q = sorted(args)
-        assert isinstance(p, str) and isinstance(q, str)
         return tuple(dep_graph.symbols_graph.names2points((p, q)))
 
     @classmethod
@@ -42,7 +41,7 @@ class Diff(Predicate):
 
     @classmethod
     def why(cls, statement: Statement) -> Dependency:
-        return Dependency(statement, "", ())
+        return Dependency.mk(statement, CONSTRUCTION, ())
 
     @classmethod
     def to_repr(cls, statement: Statement) -> str:

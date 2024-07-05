@@ -3,11 +3,12 @@ from typing import TYPE_CHECKING, Any
 
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
-from geosolver.predicates.predicate import Predicate
+from geosolver.predicates.predicate import IllegalPredicate, Predicate
 from geosolver.tools import reshape
 
 
 if TYPE_CHECKING:
+    from geosolver.dependency.dependency import Dependency
     from geosolver.statement import Statement
     from geosolver.dependency.dependency_graph import DependencyGraph
 
@@ -27,6 +28,8 @@ class EqRatio(Predicate):
         groups: list[tuple[str, str, str, str]] = []
         groups1: list[tuple[str, str, str, str]] = []
         for a, b, c, d in reshape(args, 4):
+            if a == b or c == d:
+                raise IllegalPredicate
             a, b = sorted((a, b))
             c, d = sorted((c, d))
             groups.append((a, b, c, d))
@@ -47,6 +50,42 @@ class EqRatio(Predicate):
             if ratio is not None and not close_enough(ratio, _ratio):
                 return False
             ratio = _ratio
+        return True
+
+    @classmethod
+    def add(cls, dep: Dependency) -> None:
+        points: tuple[Point, ...] = dep.statement.args
+        table = dep.statement.dep_graph.ar.rtable
+        i = 4
+        while i < len(points):
+            table.add_expr(
+                table.get_eq4(
+                    table.get_length(points[0], points[1]),
+                    table.get_length(points[2], points[3]),
+                    table.get_length(points[i], points[i + 1]),
+                    table.get_length(points[i + 2], points[i + 3]),
+                ),
+                dep,
+            )
+            i += 4
+
+    @classmethod
+    def check(cls, statement: Statement) -> bool:
+        points: tuple[Point, ...] = statement.args
+        table = statement.dep_graph.ar.rtable
+        i = 4
+        while i < len(points):
+            if not table.add_expr(
+                table.get_eq4(
+                    table.get_length(points[0], points[1]),
+                    table.get_length(points[2], points[3]),
+                    table.get_length(points[i], points[i + 1]),
+                    table.get_length(points[i + 2], points[i + 3]),
+                ),
+                None,
+            ):
+                return False
+            i += 4
         return True
 
     @classmethod
@@ -84,9 +123,11 @@ class EqRatio3(Predicate):
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
-        a, b, c, d, e, f = args
-        groups = ((a, b), (c, d), (e, f))
-        groups1 = ((b, a), (d, c), (f, e))
+        a, b, c, d, m, n = args
+        if len(set((a, c, m))) < 3 or len(set((b, d, n))) < 3:
+            raise IllegalPredicate
+        groups = ((a, b), (c, d), (m, n))
+        groups1 = ((b, a), (d, c), (n, m))
         return tuple(
             dep_graph.symbols_graph.names2points(sum(sorted(min(groups, groups1)), ()))
         )
@@ -109,11 +150,13 @@ class EqRatio3(Predicate):
         eqr3 = statement.with_new(EqRatio, (m, c, a, c, n, d, b, d))
         return eqr1.check() and eqr2.check() and eqr3.check()
 
-    # @classmethod
-    # def add(cls, dep: Dependency):
-    #     statement = dep.statement
-    #     a, b, c, d, m, n = statement.args
-    #     eqr1 = statement.with_new(EqRatio, (m, a, m, c, n, b, n, d))
-    #     eqr2 = statement.with_new(EqRatio, (m, a, a, c, b, n, b, d))
-    #     eqr3 = statement.with_new(EqRatio, (m, c, a, c, n, d, b, d))
-    #     return eqr1.check() and eqr2.check() and eqr3.check()
+    @classmethod
+    def add(cls, dep: Dependency):
+        statement = dep.statement
+        a, b, c, d, m, n = statement.args
+        eqr1 = statement.with_new(EqRatio, (m, a, m, c, n, b, n, d))
+        eqr2 = statement.with_new(EqRatio, (m, a, a, c, b, n, b, d))
+        eqr3 = statement.with_new(EqRatio, (m, c, a, c, n, d, b, d))
+        dep.with_new(eqr1).add()
+        dep.with_new(eqr2).add()
+        dep.with_new(eqr3).add()

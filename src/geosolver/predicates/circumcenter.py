@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any
 from geosolver.numerical import close_enough
 from geosolver.numerical.geometries import CircleNum
 from geosolver.predicates.congruence import Cong
-from geosolver.predicates.predicate import Predicate
+from geosolver.predicates.predicate import IllegalPredicate, Predicate
 
 
 if TYPE_CHECKING:
@@ -27,6 +27,8 @@ class Circumcenter(Predicate):
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
+        if len(args) <= 2 or len(args) != len(set(args)):
+            raise IllegalPredicate
         return tuple(dep_graph.symbols_graph.names2points([args[0]] + sorted(args[1:])))
 
     @classmethod

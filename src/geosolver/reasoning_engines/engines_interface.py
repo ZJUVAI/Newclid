@@ -1,27 +1,24 @@
-from abc import ABC, abstractmethod
+from abc import ABC
 from typing import TYPE_CHECKING, Any
-
-from geosolver.predicates.predicate import Predicate
 
 if TYPE_CHECKING:
     from geosolver.dependency.dependency import Dependency
+    from geosolver.statement import Statement
 
 
 class ReasoningEngine(ABC):
-    @abstractmethod
-    def ingest(self, dep: "Dependency"):
+    def ingest(self, dep: "Dependency") -> None:
         """Ingest a new dependency from the core reasoning engine."""
+        raise NotImplementedError
 
-    @abstractmethod
     def resolve(self, **kwargs: Any) -> list["Dependency"]:
         """Deduces new statements and their initialized dependencies."""
+        raise NotImplementedError
 
-    @abstractmethod
-    def check(self, predicate: type[Predicate], args: tuple[Any, ...]) -> bool:
+    def check(self, statement: "Statement") -> bool:
         """Check if the statement is true"""
+        raise NotImplementedError
 
-    @abstractmethod
-    def why(
-        self, predicate: type[Predicate], args: tuple[Any, ...]
-    ) -> list["Dependency"]:
+    def why(self, statement: "Statement") -> list["Dependency"]:
         """Why the statement is true"""
+        raise NotImplementedError

@@ -7,8 +7,8 @@ from geosolver.predicates.perpendicularity import Perp, NPerp
 from geosolver.predicates.cyclic import Cyclic
 from geosolver.predicates.circumcenter import Circumcenter
 
-from geosolver.predicates.equal_angles import EqAngle, EqAngle6
-from geosolver.predicates.equal_ratios import EqRatio, EqRatio6, EqRatio3
+from geosolver.predicates.equal_angles import EqAngle
+from geosolver.predicates.equal_ratios import EqRatio, EqRatio3
 
 from geosolver.predicates.constant_length import ConstantLength
 from geosolver.predicates.constant_ratio import ConstantRatio
@@ -39,9 +39,7 @@ SYMBOLIC_PREDICATES = (
     Cyclic,
     Circumcenter,
     EqAngle,
-    EqAngle6,
     EqRatio,
-    EqRatio6,
     EqRatio3,
     ConstantLength,
     ConstantRatio,

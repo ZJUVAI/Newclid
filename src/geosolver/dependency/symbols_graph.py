@@ -80,10 +80,6 @@ class SymbolsGraph:
     def merge(self, node0: S, nodes: list[S], dep: Dependency) -> None:
         """Merge all nodes."""
         node0._merge(nodes, dep)  # type: ignore
-        self.trim(nodes)
-
-    def trim(self, nodes: list[S]) -> None:
-        """Remove nodes out of self because they are merged."""
         for node in nodes:
             if node.rep() != node:
                 self._type2nodes[type(node)].remove(node)

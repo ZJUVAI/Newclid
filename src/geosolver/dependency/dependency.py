@@ -1,9 +1,11 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, NamedTuple, Optional
+from typing import TYPE_CHECKING, NamedTuple
 
 
 if TYPE_CHECKING:
     from geosolver.statement import Statement
+
+CONSTRUCTION = "cstr"
 
 
 class Dependency(NamedTuple):
@@ -17,11 +19,20 @@ class Dependency(NamedTuple):
     """
 
     statement: Statement
-    reason: Optional[str] = None
-    why: Optional[tuple[Statement, ...]] = None
+    reason: str
+    why: tuple[Statement, ...]
 
     def add(self):
         dep_graph = self.statement.dep_graph
-        dep_graph.ar.ingest(self)
-        self.statement.predicate.add(self)
         dep_graph.add_edge_to_hyper_graph(self)
+        self.statement.predicate.add(self)
+
+    def with_new(self, statement: Statement) -> Dependency:
+        return Dependency(statement, self.reason, self.why)
+
+    @classmethod
+    def mk(
+        cls, statement: Statement, reason: str, why: tuple[Statement, ...]
+    ) -> Dependency:
+        why = tuple(sorted(why, key=lambda x: hash(x)))
+        return Dependency(statement, reason, why)

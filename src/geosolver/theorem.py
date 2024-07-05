@@ -8,7 +8,7 @@ from geosolver.tools import atomize
 class Theorem(NamedTuple):
     """Deduction rule."""
 
-    name: str
+    descrption: str
     premises: tuple[tuple[str, ...], ...]
     conclusions: tuple[tuple[str, ...], ...]
 
@@ -27,14 +27,14 @@ class Theorem(NamedTuple):
     @classmethod
     def parse_text(cls, text: str) -> list[Theorem]:
         """Load deduction rule from a str object."""
-        name = ""
+        description = ""
         res: list[Theorem] = []
         for s in atomize(text, "\n"):
             if "=>" in s:
-                res.append(cls.from_string(s, name))
-                name = ""
+                res.append(cls.from_string(s, description))
+                description = ""
             else:
-                name = s
+                description = s
         return res
 
     @classmethod
@@ -43,7 +43,7 @@ class Theorem(NamedTuple):
         premises = atomize(premises, ",")
         conclusions = atomize(conclusions, ",")
         return Theorem(
-            name=name,
+            descrption=name,
             premises=tuple(atomize(p) for p in premises),
             conclusions=tuple(atomize(c) for c in conclusions),
         )

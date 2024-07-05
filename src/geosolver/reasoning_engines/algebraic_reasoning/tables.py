@@ -2,15 +2,15 @@
 
 import logging
 from typing import TYPE_CHECKING, Any, Literal, Optional
-from numpy import exp, log
-from geosolver.dependency.symbols import Point
-from geosolver.tools import simplify, str_to_nd
+from numpy import exp
+from geosolver.tools import simplify
 from geosolver._lazy_loading import lazy_import
 
 if TYPE_CHECKING:
     from geosolver.dependency.dependency import Dependency
     import numpy
     import scipy.optimize  # type: ignore
+    from geosolver.dependency.symbols import Point
 
 ATOM: float = 1e-9
 NLOGATOM: int = 9
@@ -308,13 +308,13 @@ class Table:
                     deps.append(dep)
         return deps
 
-    def _get_eq2(self, a: str, b: str) -> SumCV:
+    def get_eq2(self, a: str, b: str) -> SumCV:
         """
         a = b
         """
         return self.sumcv_from_list([(a, Coef(1)), (b, Coef(-1))])
 
-    def _get_eq3(self, a: str, b: str, f: Any) -> SumCV:
+    def get_eq3(self, a: str, b: str, f: Any) -> SumCV:
         """
         a - b = f * constant
         """
@@ -322,7 +322,7 @@ class Table:
             [(a, Coef(1)), (b, Coef(-1)), (self.const, -Coef(f))]
         )
 
-    def _get_eq4(self, a: str, b: str, c: str, d: str) -> SumCV:
+    def get_eq4(self, a: str, b: str, c: str, d: str) -> SumCV:
         """
         a - b = c - d
         """
@@ -338,61 +338,12 @@ class RatioTable(Table):
         super().__init__("1")
         self.one = self.const
 
-    def get_length(self, p0: Point, p1: Point) -> str:
+    @classmethod
+    def get_length(cls, p0: "Point", p1: "Point") -> str:
         if p0.name > p1.name:
             p0, p1 = p1, p0
         length = f"l({p0.name},{p1.name})"
         return length
-
-    def get_eqlengths(self, args: tuple[Point, ...]):
-        """
-        length(p0,p1) = length(p2, p3) = ... = length(p2n-2, p2n-1)
-        """
-        points: tuple[Point, ...] = args
-        assert len(points) % 2 == 0
-        res: list[SumCV] = []
-        i = 2
-        while i < len(points):
-            res.append(
-                super()._get_eq2(
-                    self.get_length(points[0], points[1]),
-                    self.get_length(points[i], points[i + 1]),
-                )
-            )
-            i += 2
-        return res
-
-    def get_eqratios(self, args: tuple[Point, ...]):
-        """
-        length(p0,p1) = length(p2, p3) = ... = length(p2n-2, p2n-1)
-        """
-        points: tuple[Point, ...] = args
-        assert len(points) % 4 == 0
-        res: list[SumCV] = []
-        i = 4
-        while i < len(points):
-            res.append(
-                super()._get_eq4(
-                    self.get_length(points[0], points[1]),
-                    self.get_length(points[2], points[3]),
-                    self.get_length(points[i], points[i + 1]),
-                    self.get_length(points[i + 2], points[i + 3]),
-                )
-            )
-            i += 4
-        return res
-
-    def get_const_ratio(self, args: tuple[Point, Point, Point, Point, str]):
-        p0, p1, p2, p3, k = args
-        l0 = self.get_length(p0, p1)
-        l1 = self.get_length(p2, p3)
-        n, d = str_to_nd(k)
-        return [super()._get_eq3(l0, l1, Coef(log(n / d)))]
-
-    def get_const_length(self, args: tuple[Point, Point, str]):
-        p0, p1, length = args
-        n, d = str_to_nd(length)
-        return [super()._get_eq3(self.get_length(p0, p1), self.one, Coef(log(n / d)))]
 
 
 class AngleTable(Table):
@@ -407,56 +358,3 @@ class AngleTable(Table):
         if self.pi in e:
             e[self.pi] = e[self.pi] % Coef(1)
         return strip(e)
-
-    def get_direction(self, p0: Point, p1: Point) -> str:
-        if p0.name > p1.name:
-            p0, p1 = p1, p0
-        direction = f"d({p0.name},{p1.name})"
-        return direction
-
-    def get_para(self, args: tuple[Point, ...]):
-        """
-        length(p0,p1) = length(p2, p3) = ... = length(p2n-2, p2n-1)
-        """
-        points = args
-        assert len(points) % 2 == 0
-        res: list[SumCV] = []
-        i = 2
-        while i < len(points):
-            res.append(
-                super()._get_eq2(
-                    self.get_direction(points[0], points[1]),
-                    self.get_direction(points[i], points[i + 1]),
-                )
-            )
-            i += 2
-        return res
-
-    def get_const_angle(self, args: tuple[Point, Point, Point, Point, str]):
-        p0, p1, p2, p3, ang = args
-        n, d = str_to_nd(ang)
-        return [
-            super()._get_eq3(
-                self.get_direction(p2, p3), self.get_direction(p0, p1), Coef(n / d)
-            )
-        ]
-
-    def get_eqangles(self, args: tuple[Point, ...]):
-        """
-        length(p0,p1) = length(p2, p3) = ... = length(p2n-2, p2n-1)
-        """
-        points = args
-        assert len(points) % 4 == 0
-        res: list[SumCV] = []
-        i = 4
-        while i < len(points):
-            res.append(
-                super()._get_eq4(
-                    self.get_direction(points[2], points[3]),
-                    self.get_direction(points[0], points[1]),
-                    self.get_direction(points[i + 2], points[i + 3]),
-                    self.get_direction(points[i], points[i + 1]),
-                )
-            )
-            i += 4
-        return res

@@ -4,6 +4,7 @@ from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.numerical.check import same_clock
 from geosolver.predicates.predicate import Predicate
+from geosolver.predicates.triangles_similar import two_triangles
 
 
 if TYPE_CHECKING:
@@ -27,16 +28,7 @@ class ContriClock(Predicate):
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
-        a, b, c, p, q, r = args
-        (a, p), (b, q), (c, r) = sorted(((a, p), (b, q), (c, r)))
-        return tuple(
-            dep_graph.symbols_graph.names2points(
-                min(
-                    (a, b, c, p, q, r),
-                    (p, q, r, a, b, c),
-                )
-            )
-        )
+        return tuple(dep_graph.symbols_graph.names2points(two_triangles(*args)))
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
@@ -66,16 +58,7 @@ class ContriReflect(Predicate):
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
-        a, b, c, p, q, r = args
-        (a, p), (b, q), (c, r) = sorted(((a, p), (b, q), (c, r)))
-        return tuple(
-            dep_graph.symbols_graph.names2points(
-                min(
-                    (a, b, c, p, q, r),
-                    (p, q, r, a, b, c),
-                )
-            )
-        )
+        return tuple(dep_graph.symbols_graph.names2points(two_triangles(*args)))
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
@@ -104,16 +87,7 @@ class ContriAny(Predicate):
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
-        a, b, c, p, q, r = args
-        (a, p), (b, q), (c, r) = sorted(((a, p), (b, q), (c, r)))
-        return tuple(
-            dep_graph.symbols_graph.names2points(
-                min(
-                    (a, b, c, p, q, r),
-                    (p, q, r, a, b, c),
-                )
-            )
-        )
+        return tuple(dep_graph.symbols_graph.names2points(two_triangles(*args)))
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:

@@ -131,13 +131,15 @@ class Line(Symbol):
         return False
 
     @classmethod
-    def make_coll(cls, points: list[Point] | tuple[Point], dep: Dependency):
+    def make_coll(
+        cls, points: list[Point] | tuple[Point], dep: Dependency
+    ) -> tuple[Line, list[Line]]:
         symbols_graph = points[0].symbols_graph
         s = set(points)
         merge: list[Line] = []
         for line in symbols_graph.nodes_of_type(Line):
             if s <= line.points:
-                return
+                return line, []
             if len(s & line.points) >= 2:
                 merge.append(line)
                 s.update(line.points)
@@ -146,6 +148,7 @@ class Line(Symbol):
         )
         line.points = s
         symbols_graph.merge(line, merge, dep)
+        return line, merge
 
 
 class Circle(Symbol):

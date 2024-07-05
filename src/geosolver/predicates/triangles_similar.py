@@ -11,6 +11,14 @@ if TYPE_CHECKING:
     from geosolver.statement import Statement
 
 
+def two_triangles(
+    a: str, b: str, c: str, p: str, q: str, r: str
+) -> tuple[str, str, str, str, str, str]:
+    (a0, p0), (b0, q0), (c0, r0) = sorted(((a, p), (b, q), (c, r)))
+    (a1, p1), (b1, q1), (c1, r1) = sorted(((p, a), (q, b), (r, c)))
+    return min((a0, b0, c0, p0, q0, r0), (p1, q1, r1, a1, b1, c1))
+
+
 class SimtriClock(Predicate):
     """simtri A B C P Q R -
 
@@ -27,16 +35,7 @@ class SimtriClock(Predicate):
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
-        a, b, c, p, q, r = args
-        (a, p), (b, q), (c, r) = sorted(((a, p), (b, q), (c, r)))
-        return tuple(
-            dep_graph.symbols_graph.names2points(
-                min(
-                    (a, b, c, p, q, r),
-                    (p, q, r, a, b, c),
-                )
-            )
-        )
+        return tuple(dep_graph.symbols_graph.names2points(two_triangles(*args)))
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
@@ -66,16 +65,7 @@ class SimtriReflect(Predicate):
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
-        a, b, c, p, q, r = args
-        (a, p), (b, q), (c, r) = sorted(((a, p), (b, q), (c, r)))
-        return tuple(
-            dep_graph.symbols_graph.names2points(
-                min(
-                    (a, b, c, p, q, r),
-                    (p, q, r, a, b, c),
-                )
-            )
-        )
+        return tuple(dep_graph.symbols_graph.names2points(two_triangles(*args)))
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
@@ -104,16 +94,7 @@ class SimtriAny(Predicate):
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
-        a, b, c, p, q, r = args
-        (a, p), (b, q), (c, r) = sorted(((a, p), (b, q), (c, r)))
-        return tuple(
-            dep_graph.symbols_graph.names2points(
-                min(
-                    (a, b, c, p, q, r),
-                    (p, q, r, a, b, c),
-                )
-            )
-        )
+        return tuple(dep_graph.symbols_graph.names2points(two_triangles(*args)))
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
