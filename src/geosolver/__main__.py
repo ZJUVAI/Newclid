@@ -7,7 +7,7 @@ from typing import Optional
 from geosolver import AGENTS_REGISTRY
 from geosolver.api import GeometricSolverBuilder
 from geosolver.configs import default_configs_path
-from geosolver.reasoning_engines import algebraic_reasoning
+from geosolver.reasoning_engines.algebraic_reasoning import algebraic_manipulator
 
 
 def cli_arguments() -> Namespace:
@@ -26,7 +26,7 @@ def cli_arguments() -> Namespace:
         type=str,
         help="Name of the agent to use."
         " Register custom agents with `geosolver.register_agent`.",
-        choices=AGENTS_REGISTRY.agents.keys(),
+        choices=AGENTS_REGISTRY.keys(),
     )
     parser.add_argument(
         "--defs",
@@ -130,16 +130,16 @@ def main():
     quiet: bool = args.quiet
     just_draw: bool = args.just_draw_figure
     seed: Optional[int] = args.seed
-    algebraic_reasoning.config["verbose"] = args.ar_verbose
+    algebraic_manipulator.config["verbose"] = args.ar_verbose
 
-    solver_builder = GeometricSolverBuilder(seed=seed, no_goal=just_draw)
+    solver_builder = GeometricSolverBuilder(seed=seed)
 
     load_problem(args.problem, args.translate, solver_builder)
 
     solver_builder.load_defs_from_file(resolve_config_path(args.defs))
     solver_builder.load_rules_from_file(resolve_config_path(args.rules))
 
-    agent = AGENTS_REGISTRY.load_agent(args.agent)
+    agent = AGENTS_REGISTRY[args.agent]
     solver_builder.with_deductive_agent(agent)
 
     solver = solver_builder.build()
@@ -147,17 +147,11 @@ def main():
 
     if not quiet:
         outpath.mkdir(parents=True, exist_ok=True)
-        solver.draw_figure(outpath / "construction_figure.png")
+        solver.draw_figure(False, outpath / "construction_figure.png")
     if just_draw:
         return
 
-    solver.run(max_steps=args.max_steps, timeout=args.timeout, seed=args.seed)
-
-    for goal in solver.problem.goals:
-        if solver.proof_state.check_construction(goal):
-            logging.info(f"{goal}, Solved")
-        else:
-            logging.info(f"{goal}, Not Solved")
+    solver.run(max_steps=args.max_steps, timeout=args.timeout)
 
     logging.info(f"Run infos: {solver.run_infos}")
 
@@ -165,7 +159,7 @@ def main():
         return
 
     solver.write_solution(outpath / "proof_steps.txt")
-    solver.draw_figure(outpath / "proof_figure.png")
+    solver.draw_figure(False, outpath / "proof_figure.png")
 
     if args.all_graphs or args.symbols_graph:
         solver.draw_symbols_graph(outpath / "symbols_graph.html")
@@ -209,7 +203,7 @@ def load_problem(
     PATH_NAME_SEPARATOR = ":"
 
     if PATH_NAME_SEPARATOR not in problem_txt_or_file:
-        solver_builder.load_problem_from_txt(problem_txt_or_file, translate)
+        solver_builder.load_problem_from_txt(problem_txt_or_file)
         return
 
     path, problem_name = problem_txt_or_file.split(PATH_NAME_SEPARATOR)

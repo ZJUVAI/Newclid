@@ -1,24 +1,16 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Generator, Optional
+from copy import copy
+from typing import TYPE_CHECKING, Any
 
-from geosolver.combinatorics import permutations_pairs
-from geosolver.dependencies.dependency import Reason, Dependency
-from geosolver.dependencies.dependency_building import DependencyBody
-
-from geosolver.dependencies.why_predicates import why_equal
+from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
-from geosolver.numerical.geometries import PointNum
 from geosolver.predicates.predicate import Predicate
-from geosolver.intrinsic_rules import IntrinsicRules
+from geosolver.tools import reshape
 
-from geosolver.geometry import Length, Point, Segment
-from geosolver.statement import Statement, hashed_unordered_two_lines_points
-from geosolver.symbols_graph import SymbolsGraph, is_equal
-
-import geosolver.predicates as preds
 
 if TYPE_CHECKING:
-    from geosolver.dependencies.why_graph import DependencyGraph
+    from geosolver.statement import Statement
+    from geosolver.dependency.dependency_graph import DependencyGraph
 
 
 class Cong(Predicate):
@@ -27,181 +19,79 @@ class Cong(Predicate):
 
     NAME = "cong"
 
-    @staticmethod
-    def add(
-        args: list[Point],
-        dep_body: "DependencyBody",
-        dep_graph: "DependencyGraph",
-        symbols_graph: SymbolsGraph,
-        disabled_intrinsic_rules: list[IntrinsicRules],
-    ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
-        """Add that two segments (4 points) are congruent."""
-        a, b, c, d = args
-        ab = symbols_graph.get_or_create_segment(a, b, None)
-        cd = symbols_graph.get_or_create_segment(c, d, None)
-
-        cong = Statement(Cong, [a, b, c, d])
-        cong_dep = dep_body.build(dep_graph, cong)
-        symbols_graph.make_equal(ab, cd, [cong_dep])
-
-        to_cache = [(cong, cong_dep)]
-        added = []
-
-        if not is_equal(ab, cd):
-            added += [cong_dep]
-
-        if IntrinsicRules.CYCLIC_FROM_CONG in disabled_intrinsic_rules or (
-            a not in [c, d] and b not in [c, d]
-        ):
-            return added, to_cache
-
-        # Make a=c if possible
-        if b in [c, d]:
-            a, b = b, a
-        if a == d:
-            c, d = d, c
-
-        cyclic_deps, cyclic_cache = Cong._maybe_add_cyclic_from_cong(
-            a, b, d, cong_dep, dep_graph, symbols_graph, disabled_intrinsic_rules
-        )
-        added += cyclic_deps
-        to_cache += cyclic_cache
-        return added, to_cache
-
-    @staticmethod
-    def _maybe_add_cyclic_from_cong(
-        a: Point,
-        b: Point,
-        c: Point,
-        cong_ab_ac: Dependency,
-        dep_graph: "DependencyGraph",
-        symbols_graph: SymbolsGraph,
-        disabled_intrinsic_rules: list[IntrinsicRules],
-    ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
-        """Maybe add a new cyclic predicate from given congruent segments."""
-        ab = symbols_graph.get_or_create_segment(a, b, None)
-
-        # all eq segs with one end being a.
-        segs = [s for s in ab.val.neighbors(Segment) if a in s.points]
-
-        # all points on circle (a, b)
-        points = []
-        for s in segs:
-            x, y = list(s.points)
-            points.append(x if y == a else y)
-
-        # for sure both b and c are in points
-        points = [p for p in points if p not in [b, c]]
-
-        if len(points) < 2:
-            return [], []
-
-        x, y = points[:2]
-
-        if preds.Cyclic.check([b, c, x, y], symbols_graph):
-            return [], []
-
-        ax = symbols_graph.get_or_create_segment(a, x, deps=[])
-        ay = symbols_graph.get_or_create_segment(a, y, deps=[])
-        why = ab._val.why_equal([ax._val, ay._val])
-        why += [cong_ab_ac]
-
-        dep_body = DependencyBody(Reason(IntrinsicRules.CYCLIC_FROM_CONG), why=why)
-        return preds.Cyclic.add(
-            [b, c, x, y], dep_body, dep_graph, symbols_graph, disabled_intrinsic_rules
-        )
-
-    @staticmethod
-    def why(
-        dep_graph: "DependencyGraph", statement: "Statement"
-    ) -> tuple[Optional[Reason], list[Dependency]]:
-        a, b, c, d = statement.args
-        ab = dep_graph.symbols_graph.get_segment(a, b)
-        cd = dep_graph.symbols_graph.get_segment(c, d)
-        return None, why_equal(ab, cd)
-
-    @staticmethod
-    def check(args: list[Point], symbols_graph: SymbolsGraph) -> bool:
-        a, b, c, d = args
-        if {a, b} == {c, d}:
-            return True
-
-        ab = symbols_graph.get_segment(a, b)
-        cd = symbols_graph.get_segment(c, d)
-        if ab is None or cd is None:
-            return False
-        return is_equal(ab, cd)
-
-    @staticmethod
-    def check_numerical(args: list[PointNum]) -> bool:
-        a, b, c, d = args
-        return close_enough(a.distance(b), c.distance(d))
-
-    @staticmethod
-    def enumerate(
-        symbols_graph: SymbolsGraph,
-    ) -> Generator[tuple[Point, ...], None, None]:
-        for lenght in symbols_graph.type2nodes[Length]:
-            for s1, s2 in permutations_pairs(lenght.neighbors(Segment)):
-                (a, b), (c, d) = s1.points, s2.points
-                for x, y in [(a, b), (b, a)]:
-                    for m, n in [(c, d), (d, c)]:
-                        yield x, y, m, n
-
-    @staticmethod
-    def pretty(args: list[str]) -> str:
-        a, b, c, d = args
-        return f"{a}{b} = {c}{d}"
+    @classmethod
+    def parse(
+        cls, args: tuple[str, ...], dep_graph: DependencyGraph
+    ) -> tuple[Any, ...]:
+        segs: list[tuple[str, str]] = []
+        assert len(args) % 2 == 0
+        for a, b in zip(args[::2], args[1::2]):
+            if a > b:
+                a, b = b, a
+            segs.append((a, b))
+        segs.sort()
+        points: list[str] = []
+        for a, b in segs:
+            points.append(a)
+            points.append(b)
+        return tuple(dep_graph.symbols_graph.names2points(points))
 
     @classmethod
-    def hash(cls, args: list[Point]) -> tuple[str, ...]:
-        return hashed_unordered_two_lines_points(cls.NAME, args)
+    def check_numerical(cls, statement: Statement) -> bool:
+        length = None
+        for a, b in reshape(list(statement.args), 2):
+            a: Point
+            b: Point
+            _length = a.num.distance2(b.num)
+            if length is not None and not close_enough(length, _length):
+                return False
+            length = _length
+        return True
+
+    @classmethod
+    def check(cls, statement: Statement) -> bool:
+        return statement.dep_graph.ar.check(statement.predicate, statement.args)
+
+    @classmethod
+    def to_repr(cls, statement: Statement) -> str:
+        args = statement.args
+        return "=".join(f"{a}{b}" for a, b in zip(args[::2], args[1::2]))
+
+    @classmethod
+    def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
+        return tuple(p.name for p in args)
 
 
 class Cong2(Predicate):
     NAME = "cong2"
 
-    def add(
-        self,
-        points: list[Point],
-        dep_body: DependencyBody,
-        dep_graph: DependencyGraph,
-        symbols_graph: SymbolsGraph,
-        disabled_intrinsic_rules: list[IntrinsicRules],
-    ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
-        m, n, a, b = points
-        add, to_cache = Cong.add(
-            [m, a, n, a], dep_body, dep_graph, symbols_graph, disabled_intrinsic_rules
-        )
-        _add, _to_cache = Cong.add(
-            [m, b, n, b], dep_body, dep_graph, symbols_graph, disabled_intrinsic_rules
-        )
-        return add + _add, to_cache + _to_cache
-
-    @staticmethod
-    def why(
-        dep_graph: DependencyGraph, statement: Statement
-    ) -> tuple[Optional[Reason], list[Dependency]]:
-        raise NotImplementedError
-
-    @staticmethod
-    def check(args: list[Point], symbols_graph: SymbolsGraph) -> bool:
-        raise NotImplementedError
-
-    @staticmethod
-    def check_numerical(args: list[PointNum]) -> bool:
-        raise NotImplementedError
-
-    @staticmethod
-    def enumerate(
-        symbols_graph: SymbolsGraph,
-    ) -> Generator[tuple[Point, ...], None, None]:
-        raise NotImplementedError
-
-    @staticmethod
-    def pretty(args: list[str]) -> str:
-        raise NotImplementedError
+    @classmethod
+    def parse(
+        cls, args: tuple[str, ...], dep_graph: DependencyGraph
+    ) -> tuple[Any, ...]:
+        m, n, a, b = args
+        m, n = sorted((m, n))
+        a, b = sorted((a, b))
+        return tuple(dep_graph.symbols_graph.names2points((m, n, a, b)))
 
     @classmethod
-    def hash(cls, args: list[Point]) -> tuple[str, ...]:
-        return Cong.hash(args)
+    def _two_cong(cls, statement: Statement) -> tuple[Statement, Statement]:
+        points: tuple[Point, Point, Point, Point] = statement.args
+        m, n, a, b = points
+        statement0 = copy(statement)
+        statement0.predicate = Cong
+        statement0.args = (m, a, n, a)
+        statement1 = copy(statement0)
+        statement1.args = (m, b, n, b)
+        return statement0, statement1
+
+    @classmethod
+    def check_numerical(cls, statement: Statement) -> bool:
+        s0, s1 = cls._two_cong(statement)
+        return s0.check_numerical() and s1.check_numerical()
+
+    @classmethod
+    def to_repr(cls, statement: Statement) -> str:
+        points: tuple[Point, Point, Point, Point] = statement.args
+        m, n, a, b = points
+        return "cong2:" + f"{a}<{m}{n}>{b}"

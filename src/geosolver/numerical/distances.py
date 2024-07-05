@@ -10,11 +10,11 @@ class PointTooFarError(Exception):
 
 
 def check_too_close_numerical(
-    newpoints: list[PointNum], points: list[PointNum], tol: int = 0.1
+    newpoints: list[PointNum], points: list[PointNum], tol: float = 0.1
 ) -> bool:
-    if not points:
+    if len(points) < 2:
         return False
-    avg = sum(points, PointNum(0.0, 0.0)) * 1.0 / len(points)
+    avg = sum(points, PointNum(0.0, 0.0)) / len(points)
     mindist = min([p.distance(avg) for p in points])
     for p0 in newpoints:
         for p1 in points:
@@ -24,11 +24,11 @@ def check_too_close_numerical(
 
 
 def check_too_far_numerical(
-    newpoints: list[PointNum], points: list[PointNum], tol: int = 4
+    newpoints: list[PointNum], points: list[PointNum], tol: float = 10.0
 ) -> bool:
     if len(points) < 2:
         return False
-    avg = sum(points, PointNum(0.0, 0.0)) * 1.0 / len(points)
+    avg = sum(points, PointNum(0.0, 0.0)) / len(points)
     maxdist = max([p.distance(avg) for p in points])
     for p in newpoints:
         if p.distance(avg) > maxdist * tol:

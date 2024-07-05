@@ -51,7 +51,7 @@ from geosolver.numerical.sketch import (
 import geosolver.numerical.sketch
 from geosolver.predicates.collinearity import Coll
 from geosolver.predicates.equal_angles import EqAngle
-from geosolver.ratios import simplify
+from geosolver.tools import simplify
 
 
 class TestNumerical:
@@ -205,7 +205,7 @@ class TestNumerical:
     def test_sketch_eqangle2(self):
         rnd_gen = np.random.default_rng()
         a, b, c = geosolver.numerical.sketch.random_points(3, rnd_gen)
-        x = sketch_eqangle2([a, b, c], rnd_gen=rnd_gen)
+        x = sketch_eqangle2([a, b, c], rng=rnd_gen)
         ang1 = ang_between(a, b, x)
         ang2 = ang_between(c, x, b)
         check.almost_equal(ang1, ang2)

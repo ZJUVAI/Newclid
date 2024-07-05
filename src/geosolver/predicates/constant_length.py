@@ -1,27 +1,16 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Generator, Optional
-from typing_extensions import Self
-
-from geosolver.dependencies.dependency import Reason, Dependency
+from typing import TYPE_CHECKING, Any
 
 
+from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
-from geosolver.numerical.geometries import PointNum
-
 from geosolver.predicates.predicate import Predicate
-from geosolver.intrinsic_rules import IntrinsicRules
-
-from geosolver.geometry import Angle, Direction, Length, Point, Ratio, Segment
-from geosolver.statement import (
-    Statement,
-    hash_unordered_set_of_points_with_value,
-)
-from geosolver.symbols_graph import SymbolsGraph, is_equal
+from geosolver.tools import parse_len, str_to_nd
 
 
 if TYPE_CHECKING:
-    from geosolver.dependencies.dependency_building import DependencyBody
-    from geosolver.dependencies.why_graph import DependencyGraph
+    from geosolver.dependency.dependency_graph import DependencyGraph
+    from geosolver.statement import Statement
 
 
 class ConstantLength(Predicate):
@@ -33,75 +22,27 @@ class ConstantLength(Predicate):
 
     NAME = "lconst"
 
-    @staticmethod
-    def add(
-        args: list[Point | Ratio],
-        dep_body: "DependencyBody",
-        dep_graph: "DependencyGraph",
-        symbols_graph: SymbolsGraph,
-        disabled_intrinsic_rules: list[IntrinsicRules],
-    ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
-        """Add new algebraic predicates of type eqratio-constant."""
+    @classmethod
+    def parse(
+        cls, args: tuple[str, ...], dep_graph: DependencyGraph
+    ) -> tuple[Any, ...]:
         a, b, length = args
-
-        ab = symbols_graph.get_or_create_segment(a, b, deps=[])
-        l_ab = symbols_graph.get_or_create_node_val(ab, deps=[])
-
-        lconst = Statement(ConstantLength, args)
-
-        lconst_dep = dep_body.build(dep_graph, lconst)
-        symbols_graph.make_equal(length, l_ab, [lconst_dep])
-
-        add = [lconst_dep]
-        to_cache = [(lconst, lconst_dep)]
-        return add, to_cache
-
-    @staticmethod
-    def why(
-        dep_graph: "DependencyGraph", statement: Statement
-    ) -> tuple[Optional[Reason], list[Dependency]]:
-        raise NotImplementedError
-
-    @staticmethod
-    def check(args: tuple[Point, Point, Length], symbols_graph: SymbolsGraph) -> bool:
-        """Check whether a length is equal to some given constant."""
-        a, b, length = args
-        ab = symbols_graph.get_segment(a, b)
-
-        if not ab or not ab.val:
-            return False
-
-        for len1, _ in all_lengths(ab):
-            if is_equal(len1, length):
-                return True
-        return False
-
-    @staticmethod
-    def check_numerical(args: tuple[PointNum, PointNum, Length]) -> bool:
-        a, b, length = args
-        ab = a.distance(b)
-        return close_enough(ab, float(length.name))
-
-    @staticmethod
-    def enumerate(
-        symbols_graph: SymbolsGraph,
-    ) -> Generator[tuple[Point, ...], None, None]:
-        raise NotImplementedError
-
-    @staticmethod
-    def pretty(args: list[str]) -> str:
-        a, b, length = args
-        return f"{a}{b} = {length}"
+        a, b = sorted((a, b))
+        return tuple(dep_graph.symbols_graph.names2points((a, b))) + (
+            parse_len(length),
+        )
 
     @classmethod
-    def hash(
-        cls: Self, args: list[Point | Ratio | Angle]
-    ) -> tuple[str | Point | Ratio | Angle]:
-        return hash_unordered_set_of_points_with_value(cls.NAME, args)
+    def check_numerical(cls, statement: Statement) -> bool:
+        args: tuple[Point, Point, str] = statement.args
+        a, b, length = args
+        n, d = str_to_nd(length)
+        return close_enough(a.num.distance(b.num), n / d)
 
-
-def all_lengths(segment: Segment) -> Generator[Angle, list[Direction], list[Direction]]:
-    equivalent_segments = segment.equivs_upto()
-    for neighbor_lenght in segment.rep().neighbors(Length):
-        if neighbor_lenght._obj in equivalent_segments:
-            yield neighbor_lenght, equivalent_segments
+    @classmethod
+    def to_repr(cls, statement: Statement) -> str:
+        a, b, length = statement.args
+        assert isinstance(a, Point)
+        assert isinstance(b, Point)
+        assert isinstance(length, str)
+        return f"len({a.name}{b.name})={length}"

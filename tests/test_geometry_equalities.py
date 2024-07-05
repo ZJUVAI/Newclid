@@ -1,7 +1,7 @@
 """Unit tests for geometry.py."""
 import pytest_check as check
 
-from geosolver.dependencies.why_predicates import why_equal
+from geosolver.dependency.why_predicates import why_equal
 from geosolver.geometry import Length, Segment
 
 

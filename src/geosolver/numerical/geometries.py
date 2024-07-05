@@ -5,25 +5,25 @@
 # we stick to geometry naming to better read the code.
 
 
-import math
-from typing import TYPE_CHECKING, Optional, Union, overload
+from typing import TYPE_CHECKING, Any, Iterable, Optional, Union, overload
 
 from numpy.random import Generator
 from geosolver._lazy_loading import lazy_import
 from geosolver.numerical import ATOM, close_enough
 
 if TYPE_CHECKING:
-    import numpy
+    import numpy as np
 
-np: "numpy" = lazy_import("numpy")
+np = lazy_import("numpy")
+ObjNum = Union["PointNum", "LineNum", "CircleNum"]
 
 
 class PointNum:
     """Numerical point."""
 
-    def __init__(self, x, y):
-        self.x = float(x)
-        self.y = float(y)
+    def __init__(self, x: Any, y: Any):
+        self.x: float = float(x)
+        self.y: float = float(y)
 
     def __lt__(self, other: "PointNum") -> bool:
         return (self.x, self.y) < (other.x, other.y)
@@ -37,18 +37,18 @@ class PointNum:
     def __sub__(self, p: "PointNum") -> "PointNum":
         return PointNum(self.x - p.x, self.y - p.y)
 
-    def __mul__(self, f) -> "PointNum":
+    def __mul__(self, f: Any) -> "PointNum":
         f = float(f)
         return PointNum(self.x * f, self.y * f)
 
-    def __rmul__(self, f) -> "PointNum":
+    def __rmul__(self, f: Any) -> "PointNum":
         return self * float(f)
 
-    def __truediv__(self, f) -> "PointNum":
+    def __truediv__(self, f: Any) -> "PointNum":
         f = float(f)
         return PointNum(self.x / f, self.y / f)
 
-    def __floordiv__(self, f) -> "PointNum":
+    def __floordiv__(self, f: Any) -> "PointNum":
         f = float(f)
         div = self / f
         return PointNum(int(div.x), int(div.y))
@@ -59,7 +59,7 @@ class PointNum:
     def __abs__(self) -> str:
         return np.sqrt(self.dot(self))
 
-    def __iter__(self) -> str:
+    def __iter__(self):
         return iter((self.x, self.y))
 
     def angle(self) -> float:
@@ -72,21 +72,13 @@ class PointNum:
         return PointNum(0.5 * (self.x + p.x), 0.5 * (self.y + p.y))
 
     def distance(self, p: Union["PointNum", "LineNum", "CircleNum"]) -> float:
+        return np.sqrt(self.distance2(p))
+
+    def distance2(self, p: Union["PointNum", "LineNum", "CircleNum"]) -> float:
         if isinstance(p, LineNum):
             return p.distance(self)
         if isinstance(p, CircleNum):
-            return abs(p.radius - self.distance(p.center))
-        dx = self.x - p.x
-        dy = self.y - p.y
-        dx2 = dx * dx
-        dy2 = dy * dy
-        dx2 = dx2 if abs(dx2) > ATOM else 0.0
-        dy2 = dy2 if abs(dy2) > ATOM else 0.0
-        return np.sqrt(dx2 + dy2)
-
-    def distance2(self, p: "PointNum") -> float:
-        if isinstance(p, LineNum):
-            return p.distance(self)
+            return (p.radius - self.distance(p.center)) ** 2
         dx = self.x - p.x
         dy = self.y - p.y
         dx2 = dx * dx
@@ -95,12 +87,12 @@ class PointNum:
         dy2 = dy2 if abs(dy2) > ATOM else 0.0
         return dx * dx + dy * dy
 
-    def rotatea(self, ang) -> "PointNum":
+    def rotatea(self, ang: Any) -> "PointNum":
         ang = float(ang)
         sinb, cosb = np.sin(ang), np.cos(ang)
         return self.rotate(sinb, cosb)
 
-    def rotate(self, sinb, cosb) -> "PointNum":
+    def rotate(self, sinb: float, cosb: float) -> "PointNum":
         sinb = float(sinb)
         cosb = float(cosb)
         x, y = self.x, self.y
@@ -112,14 +104,13 @@ class PointNum:
     def perpendicular_line(self, line: "LineNum") -> "LineNum":
         return line.perpendicular_line(self)
 
-    def foot(self, line: "LineNum") -> "PointNum":
+    def foot(self, line: Union["LineNum", "CircleNum"]) -> "PointNum":
         if isinstance(line, LineNum):
             perpendicular_line = line.perpendicular_line(self)
             return line_line_intersection(perpendicular_line, line)
-        elif isinstance(line, CircleNum):
+        else:
             c, r = line.center, line.radius
             return c + (self - c) * r / self.distance(c)
-        raise ValueError("Dropping foot to weird type {}".format(type(line)))
 
     def parallel_line(self, line: "LineNum") -> "LineNum":
         return line.parallel_line(self)
@@ -138,16 +129,16 @@ class PointNum:
     def sign(self, line: "LineNum") -> int:
         return line.sign(self)
 
-    def is_same(self, other: "PointNum") -> bool:
-        return self.distance(other) <= ATOM
+    @classmethod
+    def deduplicate(cls, points: Iterable["PointNum"]) -> list["PointNum"]:
+        res: list["PointNum"] = []
+        for p in points:
+            if all(not r.close(p) for r in res):
+                res.append(p)
+        return res
 
-
-class SegmentNum:
-    """Numerical segment."""
-
-    def __init__(self, p1: PointNum, p2: PointNum):
-        self.p1 = p1
-        self.p2 = p2
+    def intersect(self, obj: ObjNum) -> list["PointNum"]:
+        raise NotImplementedError()
 
 
 class LineNum:
@@ -155,19 +146,20 @@ class LineNum:
 
     def __init__(
         self,
-        p1: "PointNum" = None,
-        p2: "PointNum" = None,
-        coefficients: tuple[float, float, float] = None,
+        p1: Optional["PointNum"] = None,
+        p2: Optional["PointNum"] = None,
+        coefficients: Optional[tuple[float, float, float]] = None,
     ):
-        if p1 is None and p2 is None and coefficients is None:
-            self.coefficients = None, None, None
-            return
-
-        a, b, c = coefficients or (
-            p1.y - p2.y,
-            p2.x - p1.x,
-            p1.x * p2.y - p2.x * p1.y,
-        )
+        a, b, c = None, None, None
+        if coefficients:
+            a, b, c = coefficients
+        elif p1 and p2:
+            a, b, c = (
+                p1.y - p2.y,
+                p2.x - p1.x,
+                p1.x * p2.y - p2.x * p1.y,
+            )
+        assert a is not None and b is not None and c is not None
 
         # Make sure a is always positive (or always negative for that matter)
         # With a == 0, Assuming a = +epsilon > 0
@@ -185,44 +177,25 @@ class LineNum:
         a, b, _ = self.coefficients
         return LineNum(p, p + PointNum(a, b))
 
-    def greater_than(self, other: "LineNum") -> bool:
-        a, b, _ = self.coefficients
-        x, y, _ = other.coefficients
-        # b/a > y/x
-        return b * x - a * y > ATOM
-
-    def __gt__(self, other: "LineNum") -> bool:
-        return self.greater_than(other)
-
-    def __lt__(self, other: "LineNum") -> bool:
-        return other.greater_than(self)
-
     def same(self, other: "LineNum") -> bool:
         a, b, c = self.coefficients
         x, y, z = other.coefficients
         return close_enough(a * y, b * x) and close_enough(b * z, c * y)
 
-    def equal(self, other: "LineNum") -> bool:
-        a, b, _ = self.coefficients
-        x, y, _ = other.coefficients
-        # b/a == y/x
-        return close_enough(b * x, a * y)
-
-    def less_than(self, other: "LineNum") -> bool:
-        a, b, _ = self.coefficients
-        x, y, _ = other.coefficients
-        # b/a > y/x
-        return -b * x + a * y > ATOM
-
-    def intersect(self, obj: Union["LineNum", "CircleNum"]) -> tuple[PointNum, ...]:
+    def intersect(self, obj: ObjNum) -> list[PointNum]:
         if isinstance(obj, LineNum):
-            return line_line_intersection(self, obj)
-        if isinstance(obj, CircleNum):
-            return line_circle_intersection(self, obj)
+            return [line_line_intersection(self, obj)]
+        elif isinstance(obj, CircleNum):
+            res = PointNum.deduplicate(line_circle_intersection(self, obj))
+            if len(res) == 0:
+                raise InvalidIntersectError()
+            return res
+        else:
+            raise NotImplementedError()
 
     def distance(self, p: "PointNum") -> float:
-        a, b, c = self.coefficients
-        return abs(self(p.x, p.y)) / math.sqrt(a * a + b * b)
+        a, b, _ = self.coefficients
+        return abs(self(p.x, p.y)) / np.sqrt(a * a + b * b)
 
     @overload
     def __call__(self, x: PointNum) -> float:
@@ -232,7 +205,7 @@ class LineNum:
     def __call__(self, x: float, y: float) -> float:
         ...
 
-    def __call__(self, x, y=None) -> float:
+    def __call__(self, x: Any, y: Any = None) -> float:
         if isinstance(x, PointNum) and y is None:
             return self(x.x, x.y)
         a, b, c = self.coefficients
@@ -258,8 +231,10 @@ class LineNum:
         x, y, _ = other.coefficients
         return a * x + b * y
 
-    def point_at(self, x: float = None, y: float = None) -> Optional[PointNum]:
-        """Get a point on line closest to (x, y)."""
+    def point_at(
+        self, x: Optional[float] = None, y: Optional[float] = None
+    ) -> Optional[PointNum]:
+        """Infer the point on the line by its x and/or y coordinate(s)"""
         a, b, c = self.coefficients
         # ax + by + c = 0
         if x is None and y is not None:
@@ -282,14 +257,14 @@ class LineNum:
         d2 = self(p2.x, p2.y)
         if abs(d1) < ATOM or abs(d2) < ATOM:
             return None
-        return d1 * d2 < -ATOM
+        return d1 * d2 < 0
 
     def same_side(self, p1: "PointNum", p2: "PointNum") -> Optional[bool]:
         d1 = self(p1.x, p1.y)
         d2 = self(p2.x, p2.y)
         if abs(d1) < ATOM or abs(d2) < ATOM:
             return None
-        return d1 * d2 > ATOM
+        return d1 * d2 > 0
 
     def sign(self, point: "PointNum") -> int:
         s = self(point.x, point.y)
@@ -305,14 +280,13 @@ class LineNum:
         return abs(a * y - b * x) <= ATOM and abs(b * z - c * y) <= ATOM
 
     def sample_within(
-        self, points: list[PointNum], n: int = 5, rnd_gen: Generator = None
-    ) -> list[PointNum]:
+        self, points: list[PointNum], n: int = 5, custom_rng: Optional[Generator] = None
+    ) -> PointNum:
         """Sample a point within the boundary of points."""
-        center = sum(points, PointNum(0.0, 0.0)) * (1.0 / len(points))
+        center = sum(points, PointNum(0.0, 0.0)) / len(points)
         radius = max([p.distance(center) for p in points])
 
-        if rnd_gen is None:
-            rnd_gen = np.random.default_rng()
+        gen = custom_rng or np.random.default_rng()
 
         if close_enough(center.distance(self), radius):
             center = center.foot(self)
@@ -321,20 +295,14 @@ class LineNum:
         result = None
         best = -1.0
         for _ in range(n):
-            rand = rnd_gen.uniform(0.0, 1.0)
+            rand = gen.uniform(0.0, 1.0)
             x = a + (b - a) * rand
             mind = min([x.distance(p) for p in points])
             if mind > best:
                 best = mind
                 result = x
-
-        return [result]
-
-
-class AngleNum:
-    def __init__(self, l1: LineNum, l2: LineNum):
-        self.l1 = l1
-        self.l2 = l2
+        assert result
+        return result
 
 
 class CircleNum:
@@ -350,41 +318,42 @@ class CircleNum:
     ):
         if not center:
             if not (p1 and p2 and p3):
-                self.center = self.radius = self.r2 = None
-                return
-                # raise ValueError('Circle without center need p1 p2 p3')
+                raise ValueError("Circle without center need p1 p2 p3")
 
-            l12 = _perpendicular_bisector(p1, p2)
-            l23 = _perpendicular_bisector(p2, p3)
-            center = line_line_intersection(l12, l23)
+            l12 = perpendicular_bisector(p1, p2)
+            l23 = perpendicular_bisector(p2, p3)
+            self.center = line_line_intersection(l12, l23)
+        else:
+            self.center = center
 
-        self.center = center
-        self.a, self.b = center.x, center.y
+        self.a, self.b = self.center.x, self.center.y
 
         if not radius:
-            if not (p1 or p2 or p3):
-                raise ValueError("Circle needs radius or p1 or p2 or p3")
             p = p1 or p2 or p3
+            if p is None:
+                raise ValueError("Circle needs radius or p1 or p2 or p3")
             self.r2 = (self.a - p.x) ** 2 + (self.b - p.y) ** 2
-            self.radius = math.sqrt(self.r2)
+            self.radius = np.sqrt(self.r2)
         else:
             self.radius = radius
             self.r2 = radius * radius
 
-    def intersect(self, obj: Union["LineNum", "CircleNum"]) -> tuple[PointNum, ...]:
+    def intersect(self, obj: ObjNum) -> list[PointNum]:
         if isinstance(obj, LineNum):
             return obj.intersect(self)
-        if isinstance(obj, CircleNum):
-            return circle_circle_intersection(self, obj)
+        elif isinstance(obj, CircleNum):
+            return PointNum.deduplicate(
+                c for c in circle_circle_intersection(self, obj)
+            )
+        raise NotImplementedError()
 
     def sample_within(
-        self, points: list[PointNum], n: int = 5, rnd_gen: Generator = None
-    ) -> list[PointNum]:
+        self, points: list[PointNum], n: int = 5, custom_rng: Optional[Generator] = None
+    ) -> PointNum:
         """Sample a point within the boundary of points."""
         result = None
         best = -1.0
-        if rnd_gen is None:
-            rnd_gen = np.random.default_rng()
+        rnd_gen = custom_rng or np.random.default_rng()
 
         for _ in range(n):
             ang = rnd_gen.uniform(0.0, 2.0) * np.pi
@@ -394,107 +363,20 @@ class CircleNum:
                 best = mind
                 result = x
 
-        return [result]
+        assert result
+        return result
 
 
-class HalfLine(LineNum):
-    """Numerical ray."""
-
-    def __init__(self, tail: "PointNum", head: "PointNum"):
-        self.line = LineNum(tail, head)
-        self.coefficients = self.line.coefficients
-        self.tail = tail
-        self.head = head
-
-    def intersect(
-        self, obj: Union["LineNum", "HalfLine", "CircleNum", "HoleCircle"]
-    ) -> "PointNum":
-        if isinstance(obj, (HalfLine, LineNum)):
-            return line_line_intersection(self.line, obj)
-
-        exclude = [self.tail]
-        if isinstance(obj, HoleCircle):
-            exclude += [obj.hole]
-
-        a, b = line_circle_intersection(self.line, obj)
-        if any([a.close(x) for x in exclude]):
-            return b
-        if any([b.close(x) for x in exclude]):
-            return a
-
-        v = self.head - self.tail
-        va = a - self.tail
-        vb = b - self.tail
-        if v.dot(va) > ATOM:
-            return a
-        if v.dot(vb) > ATOM:
-            return b
-        raise InvalidLineIntersectError()
-
-    def sample_within(
-        self, points: list[PointNum], n: int = 5, rnd_gen: Generator = None
-    ) -> list[PointNum]:
-        center = sum(points, PointNum(0.0, 0.0)) * (1.0 / len(points))
-        radius = max([p.distance(center) for p in points])
-        if close_enough(center.distance(self.line), radius):
-            center = center.foot(self)
-        a, b = line_circle_intersection(self, CircleNum(center.foot(self), radius))
-
-        if (a - self.tail).dot(self.head - self.tail) > ATOM:
-            a, b = self.tail, a
-        else:
-            a, b = self.tail, b
-
-        result = None
-        best = -1.0
-        if rnd_gen is None:
-            rnd_gen = np.random.default_rng()
-
-        for _ in range(n):
-            x = a + (b - a) * rnd_gen.uniform(0.0, 1.0)
-            mind = min([x.distance(p) for p in points])
-            if mind > best:
-                best = mind
-                result = x
-
-        return [result]
-
-
-class HoleCircle(CircleNum):
-    """Numerical circle with a missing point."""
-
-    def __init__(self, center: "PointNum", radius: float, hole: "PointNum"):
-        super().__init__(center, radius)
-        self.hole = hole
-
-    def intersect(
-        self, obj: Union["LineNum", "HalfLine", "CircleNum", "HoleCircle"]
-    ) -> "PointNum":
-        if isinstance(obj, LineNum):
-            a, b = line_circle_intersection(obj, self)
-            if a.close(self.hole):
-                return b
-            return a
-        if isinstance(obj, HalfLine):
-            return obj.intersect(self)
-        if isinstance(obj, CircleNum):
-            a, b = circle_circle_intersection(obj, self)
-            if a.close(self.hole):
-                return b
-            return a
-        if isinstance(obj, HoleCircle):
-            a, b = circle_circle_intersection(obj, self)
-            if a.close(self.hole) or a.close(obj.hole):
-                return b
-            return a
-
-
-def _perpendicular_bisector(p1: "PointNum", p2: "PointNum") -> "LineNum":
+def perpendicular_bisector(p1: "PointNum", p2: "PointNum") -> "LineNum":
     midpoint = (p1 + p2) * 0.5
     return LineNum(midpoint, midpoint + PointNum(p2.y - p1.y, p1.x - p2.x))
 
 
-class InvalidLineIntersectError(Exception):
+class InvalidIntersectError(Exception):
+    pass
+
+
+class InvalidReduceError(Exception):
     pass
 
 
@@ -502,7 +384,7 @@ class InvalidQuadSolveError(Exception):
     pass
 
 
-def solve_quad(a: float, b: float, c: float) -> tuple[float, float]:
+def solve_quad(a: float, b: float, c: float) -> Optional[tuple[float, float]]:
     """Solve a x^2 + bx + c = 0."""
     a = 2 * a
     d = b * b - 2 * a * c
@@ -510,7 +392,7 @@ def solve_quad(a: float, b: float, c: float) -> tuple[float, float]:
         return None  # the caller should expect this result.
     if abs(d) < ATOM:
         d = 0.0
-    y = math.sqrt(d)
+    y = np.sqrt(d)
     return (-b - y) / (a + ATOM), (-b + y) / (a + ATOM)
 
 
@@ -523,7 +405,7 @@ def circle_circle_intersection(
     x0, y0, r0 = c1.a, c1.b, c1.radius
     x1, y1, r1 = c2.a, c2.b, c2.radius
 
-    d = math.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
+    d = np.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
     if abs(d) < ATOM:
         raise InvalidQuadSolveError()
 
@@ -598,7 +480,7 @@ def circle_segment_intersect(
     line = LineNum(p1, p2)
     px, py = line_circle_intersection(line, circle)
 
-    result = []
+    result: list[PointNum] = []
     if _check_between(px, p1, p2):
         result.append(px)
     if _check_between(py, p1, p2):
@@ -621,39 +503,31 @@ def line_line_intersection(line_1: LineNum, line_2: LineNum) -> PointNum:
     # a2x + b2y + c2 = 0
     d = a1 * b2 - a2 * b1
     if abs(d) < ATOM:
-        raise InvalidLineIntersectError
+        raise InvalidIntersectError
     return PointNum((c2 * b1 - c1 * b2) / d, (c1 * a2 - c2 * a1) / d)
 
 
-def bring_together(
-    a: PointNum, b: PointNum, c: PointNum, d: PointNum
-) -> tuple[PointNum, PointNum, PointNum, PointNum]:
-    ab = LineNum(a, b)
-    cd = LineNum(c, d)
-    x = line_line_intersection(ab, cd)
-    unit = CircleNum(center=x, radius=1.0)
-    y, _ = line_circle_intersection(ab, unit)
-    z, _ = line_circle_intersection(cd, unit)
-    return x, y, x, z
-
-
 def reduce(
-    objs: list[Union[PointNum, LineNum, CircleNum, HalfLine, HoleCircle]],
+    objs: list[ObjNum],
     existing_points: list[PointNum],
-    rnd_generator: Generator,
+    rng: Generator,
 ) -> list[PointNum]:
-    """Reduce intersecting objects into one point of intersections."""
+    """
+    If all PointNum, then no touch.
+    Else reduce intersecting objects into one point of intersections other than the existing points.
+    """
     if all(isinstance(o, PointNum) for o in objs):
-        return objs
-
+        return objs  # type: ignore
     elif len(objs) == 1:
-        return objs[0].sample_within(existing_points, rnd_gen=rnd_generator)
+        obj = objs[0]
+        assert not isinstance(obj, PointNum)
+        return [obj.sample_within(existing_points, custom_rng=rng)]
 
     elif len(objs) == 2:
-        a, b = objs
-        result = a.intersect(b)
-        if isinstance(result, PointNum):
-            return [result]
+        u, v = objs
+        result: list[PointNum] = u.intersect(v)
+        if len(result) == 1:
+            return result
         a, b = result
         a_close = any([a.close(x) for x in existing_points])
         if a_close:
@@ -661,7 +535,7 @@ def reduce(
         b_close = any([b.close(x) for x in existing_points])
         if b_close:
             return [a]
-        return [np.random.choice([a, b])]
+        return [rng.choice([a, b])]  # type: ignore
 
     else:
-        raise ValueError(f"Cannot reduce {objs}")
+        raise NotImplementedError()

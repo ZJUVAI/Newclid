@@ -451,7 +451,7 @@ aconst a b c r
 s_angle a b x y
 x : a b x
 a b = diff a b
-x : s_angle a b x y
+x : aconst a b b x y
 s_angle a b y
 
 lconst x a l

@@ -6,25 +6,15 @@ for independent developpement of different kinds of DeductiveAgent.
 """
 
 from __future__ import annotations
-from typing import TYPE_CHECKING, NamedTuple, Optional, Union
+from typing import TYPE_CHECKING, NamedTuple, Union
 from abc import abstractmethod
 
 
 if TYPE_CHECKING:
-    from geosolver.proof import Proof
-    from geosolver.geometry import Point
     from geosolver.theorem import Theorem
 
-    from geosolver.dependencies.dependency import Dependency
-    from geosolver.match_theorems import MatchCache
-
-    from geosolver.reasoning_engines.engines_interface import Derivation
-    from geosolver.problem import Problem
-
-    from geosolver.statement import Statement
-
-
-Mapping = dict[str, Union["Point", str]]
+    from geosolver.dependency.dependency import Dependency
+    from geosolver.definition.definition import Definition
 
 
 class ResetAction(NamedTuple):
@@ -38,15 +28,13 @@ class StopAction(NamedTuple):
 class ApplyTheoremAction(NamedTuple):
     """Apply a theorem with a given mapping of arguments."""
 
-    theorem: "Theorem"
-    mapping: Mapping
+    dep: Dependency
 
 
 class MatchAction(NamedTuple):
     """Match a theorem to fing available mapping of arguments."""
 
     theorem: "Theorem"
-    cache: Optional["MatchCache"] = None
 
 
 class ResolveEngineAction(NamedTuple):
@@ -55,16 +43,8 @@ class ResolveEngineAction(NamedTuple):
     engine_id: str
 
 
-class ImportDerivationAction(NamedTuple):
-    """Import new dependencies from a given derivation."""
-
-    derivation: "Derivation"
-
-
-class AuxAction(NamedTuple):
-    """Add an auxiliary construction."""
-
-    aux_string: str
+class EmptyAction(NamedTuple):
+    """Do nothing"""
 
 
 Action = Union[
@@ -73,18 +53,14 @@ Action = Union[
     ApplyTheoremAction,
     MatchAction,
     ResolveEngineAction,
-    ImportDerivationAction,
-    AuxAction,
+    EmptyAction,
 ]
 
 
 class ResetFeedback(NamedTuple):
     """Feedback from the initial proof state."""
 
-    problem: "Problem"
-    available_engines: list[str]
-    added: list["Dependency"]
-    to_cache: list[tuple["Statement", "Dependency"]]
+    init_added: list["Dependency"]
 
 
 class StopFeedback(NamedTuple):
@@ -96,47 +72,21 @@ class StopFeedback(NamedTuple):
 class ApplyTheoremFeedback(NamedTuple):
     """Feedback from an applied theorem to the proof."""
 
-    success: bool
     added: list["Dependency"]
-    to_cache: list[tuple["Statement", "Dependency"]]
 
 
 class MatchFeedback(NamedTuple):
     """Feedback from matching a theorem in the current proof state."""
 
-    theorem: "Theorem"
-    mappings: list[Mapping]
+    deps: list[Dependency]
 
 
-class DeriveFeedback(NamedTuple):
-    """Feedback from resolving a reasoning engine."""
-
-    derivations: list["Derivation"]
-
-
-class ImportDerivationFeedback(NamedTuple):
-    """Feedback from importing a derivation."""
-
-    added: list["Dependency"]
-    to_cache: list[tuple["Statement", "Dependency"]]
-
-
-class AuxFeedback(NamedTuple):
-    """Feedback from adding an auxiliary construction."""
-
-    success: bool
-    added: list["Dependency"]
-    to_cache: list[tuple["Statement", "Dependency"]]
+class EmptyFeedback(NamedTuple):
+    """No feedback"""
 
 
 Feedback = Union[
-    ResetFeedback,
-    StopFeedback,
-    ApplyTheoremFeedback,
-    MatchFeedback,
-    DeriveFeedback,
-    ImportDerivationFeedback,
-    AuxFeedback,
+    ResetFeedback, StopFeedback, ApplyTheoremFeedback, MatchFeedback, EmptyFeedback
 ]
 
 
@@ -144,14 +94,19 @@ class DeductiveAgent:
     """Common interface for deductive agents"""
 
     @abstractmethod
-    def act(self, proof: "Proof", theorems: list["Theorem"]) -> Action:
-        """Pict the next action to perform to update the proof state."""
-
-    @abstractmethod
-    def remember_effects(self, action: Action, feedback: Feedback):
-        """Remember the action effects."""
+    def __init__(
+        self, defs: dict[str, "Definition"], theorems: list["Theorem"]
+    ) -> None:
         pass
 
     @abstractmethod
-    def reset(self):
+    def act(self) -> Action:
+        """Pick the next action to perform to update the proof state."""
+
+    @abstractmethod
+    def remember_effects(self, action: Action, feedback: Feedback) -> None:
+        """Remember the action effects."""
+
+    @abstractmethod
+    def reset(self) -> None:
         """Resets the agent internal state."""

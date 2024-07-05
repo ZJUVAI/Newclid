@@ -26,14 +26,12 @@ class TestTraceback:
 
         solver.run()
 
-        goal_args = solver.proof_state.symbols_graph.names2nodes(
-            solver.problem.goals[0].args
-        )
+        goal_args = solver.proof.symbols_graph.names2nodes(solver.problem.goals[0].args)
 
         goal = Statement(
             predicates.NAME_TO_PREDICATE[solver.problem.goals[0].name], goal_args
         )
-        setup, aux, _, _ = get_logs(goal, solver.proof_state, merge_trivials=False)
+        setup, aux, _, _ = get_logs(goal, solver.proof, merge_trivials=False)
 
         setup = [p.statement.hash_tuple for p in setup]
         check.equal(

@@ -12,7 +12,7 @@ def main():
     logging.basicConfig(level=logging.INFO)
 
     problem_file = "problems_datasets/testing_minimal_rules.txt"
-    problems = Problem.to_dict(Problem.from_txt_file(problem_file, translate=False))
+    problems = Problem.to_dict(Problem.parse_txt_file(problem_file, translate=False))
     for problem_name in problems.keys():
         solver_builder = (
             GeometricSolverBuilder()

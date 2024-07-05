@@ -41,7 +41,6 @@ class TestConstants:
                 "x = aconst a b c x 63o; "
                 "y = aconst a b c y 153o "
                 "? aconst c x c y 90o",
-                translate=False,
             )
         )
         success = solver.run()
@@ -95,7 +94,7 @@ class TestConstants:
             "s_angle a b x y",
             "x : a b x",
             "a b = diff a b",
-            "x : s_angle a b x y",
+            "x : aconst a b b x y",
             "s_angle a b y",
             "",
         ]
@@ -106,7 +105,7 @@ class TestConstants:
                 "a b = segment a b; "
                 "x = s_angle a b x 63o; "
                 "y = s_angle a b y 153o "
-                "? s_angle x b y 90o"
+                "? aconst x b b y 90o"
             )
         )
         success = solver.run()
@@ -124,7 +123,7 @@ class TestConstants:
             "s_angle a b x y",
             "x : a b x",
             "a b = diff a b",
-            "x : s_angle a b x y",
+            "x : aconst a b b x y",
             "s_angle a b y",
             "",
         ]
@@ -135,8 +134,7 @@ class TestConstants:
                 "a b = segment a b; "
                 "x = s_angle a b x 63o; "
                 "y = s_angle a b y 143o "
-                "? s_angle x b y 80o",
-                translate=False,
+                "? aconst x b b y 80o",
             )
         )
         success = solver.run()
@@ -154,7 +152,7 @@ class TestConstants:
             "s_angle a b x y",
             "x : a b x",
             "a b = diff a b",
-            "x : s_angle a b x y",
+            "x : aconst a b b x y",
             "s_angle a b y",
             "",
         ]
@@ -166,8 +164,7 @@ class TestConstants:
                 "a b = segment a b; "
                 "x = s_angle a b x 7pi/20; "
                 "y = s_angle a b y 17pi/20 "
-                "? s_angle x b y 1pi/2",
-                translate=False,
+                "? aconst x b b y 1pi/2",
             )
         )
         success = solver.run()
@@ -185,7 +182,7 @@ class TestConstants:
             "s_angle a b x y",
             "x : a b x",
             "a b = diff a b",
-            "x : s_angle a b x y",
+            "x : aconst a b b x y",
             "s_angle a b y",
             "",
         ]
@@ -198,7 +195,6 @@ class TestConstants:
                 "x = s_angle a b x 63o; "
                 "y = s_angle b a y 153o "
                 "? perp b x a y",
-                translate=False,
             )
         )
         success = solver.run()
@@ -217,7 +213,7 @@ class TestConstants:
             "s_angle a b x y",
             "x : a b x",
             "a b = diff a b",
-            "x : s_angle a b x y",
+            "x : aconst a b b x y",
             "s_angle a b y",
             "",
         ]
@@ -257,6 +253,7 @@ class TestConstants:
             "rconst a b c r",
             "",
         ]
+
         solver = build_until_works(
             self.solver_builder.load_defs_from_txt(
                 "\n".join(defs)
@@ -273,9 +270,8 @@ class TestConstants:
     def test_rconst_as_theorem_conclusion(self):
         solver = self.solver_builder.load_problem_from_txt(
             "a b = segment a b; m = midpoint m a b ? rconst m a a b 1/2",
-            translate=False,
         )
-        solver.rules = [Theorem.from_txt("midp m a b => rconst m a a b 1/2")]
+        solver.rules = [Theorem.from_string("midp m a b => rconst m a a b 1/2")]
         success = solver.build().run()
         assert success
 

@@ -1,36 +1,34 @@
 from __future__ import annotations
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from geosolver.agent.agents_interface import ResetAction, StopAction, StopFeedback
 
 
 if TYPE_CHECKING:
     from geosolver.agent.agents_interface import DeductiveAgent
-    from geosolver.theorem import Theorem
     from geosolver.proof import Proof
 
 
 def run_loop(
     deductive_agent: "DeductiveAgent",
     proof: "Proof",
-    theorems: list["Theorem"],
     max_steps: int,
     timeout: float,
     stop_on_goal: bool,
-) -> tuple[bool, dict]:
+) -> tuple[bool, dict[str, Any]]:
     """Run DeductiveAgent until saturation or goal found."""
-    infos = {}
+    infos: dict[str, Any] = {}
     success = False
     t0 = time.time()
+    total_elapsed = 0
 
-    feedback = proof.reset()
+    feedback = proof.init()
     deductive_agent.remember_effects(ResetAction(), feedback)
 
-    done = False
     step = 0
-    while not done:
-        action = deductive_agent.act(proof, theorems)
+    while True:
+        action = deductive_agent.act()
         feedback = proof.step(action)
         deductive_agent.remember_effects(action, feedback)
 
@@ -48,7 +46,7 @@ def run_loop(
             or total_elapsed > timeout
             or step > max_steps
         ):
-            done = True
+            break
 
     infos["success"] = success
     infos["runtime"] = total_elapsed

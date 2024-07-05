@@ -12,9 +12,9 @@ def build_until_works(
         attemps += 1
         try:
             solver = builder.build()
-        except (PointTooFarError, PointTooCloseError) as err:
+        except (PointTooFarError, PointTooCloseError) as e:
             solver = None
-            err = err
+            err = e
 
     if solver is None:
         raise Exception("Failed to build after %s attempts", max_attempts) from err

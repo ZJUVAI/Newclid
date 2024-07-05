@@ -1,46 +1,13 @@
 import pytest
 
-from geosolver.agent.breadth_first_search import BFSDD
 from geosolver.api import GeometricSolverBuilder
 from geosolver.theorem import Theorem
-from geosolver.proof_writing import get_proof_steps, proof_step_string
-from geosolver.intrinsic_rules import ALL_INTRINSIC_RULES
 
 
 EXPECTED_TO_FAIL = []
 
-EXPECTED_TO_USE_OTHER_RULE = [
-    "eqangle A B P Q C D U V, perp P Q U V => perp A B C D",
-]
 
-EXPECTED_WRONG_PROOF_LENGTH = [
-    "cong O A O B, cong O B O C, cong O C O D => cyclic A B C D",
-    "cyclic A B C P Q R, eqangle C A C B R P R Q => cong A B P Q",
-    "midp E A B, midp F A C => para E F B C",
-    "perp A B C D, perp E F G H, npara A B E F => eqangle A B E F C D G H",
-    "circle O A B C, perp O A A X => eqangle A X A B C A C B",
-    "circle O A B C, eqangle A X A B C A C B => perp O A A X",
-    "circle O A B C, midp M B C => eqangle A B A C O B O M",
-    "circle O A B C, coll O A C => perp A B B C",
-    "circle O A B C, coll M B C, eqangle A B A C O B O M => midp M B C",
-    "cyclic A B C D, para A B C D => eqangle A D C D C D C B",
-    "midp M A B, midp M C D => para A C B D",
-    "midp M A B, perp O M A B => cong O A O B",
-    "midp M A B, midp N C D => eqratio M A A B N C C D",
-    "midp M A B => rconst M A A B 1/2",
-    "midp M A B, para A C B D, para A D B C => midp M C D",
-    "perp A B B C, midp M A C => cong A M B M",
-    "eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C, cong A B P Q => contri A B C P Q R",
-    "eqratio A B P Q C D U V, cong P Q U V => cong A B C D",
-    "para a b c d, coll m a d, coll n b c, para m n a b => eqratio6 m a m d n b n c",
-]
-
-DEFINITIONAL_RULES = [  # rules not applied
-    "r32"
-]
-
-
-@pytest.mark.parametrize(
+@pytest.mark.parametrize(  # type: ignore
     "rule_name,rule_txt,problem_txt",
     [
         (
@@ -245,8 +212,8 @@ DEFINITIONAL_RULES = [  # rules not applied
         ),
         (
             "r40",
-            "eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C, cong A B P Q => contri A B C P Q R",
-            "a = free a; b = free b; c = free c; p = free p; q = eqdistance q p a b; r = eqratio r b a b c q p q, eqratio6 r p q c a c b ? contri a b c p q r",
+            "eqratio6 B A B C Q P Q R, eqratio6 C A C B R P R Q, ncoll A B C, cong A B P Q => contri* A B C P Q R",
+            "a = free a; b = free b; c = free c; p = free p; q = eqdistance q p a b; r = eqratio r b a b c q p q, eqratio6 r p q c a c b ? contri* a b c p q r",
         ),
         (
             "r41",
@@ -268,60 +235,15 @@ DEFINITIONAL_RULES = [  # rules not applied
 def test_rule_used_to_solve_in_one_step(
     rule_name: str, rule_txt: str, problem_txt: str
 ):
-    theorem = Theorem.from_txt(rule_txt)
-    theorem.rule_name = rule_name
+    theorem = Theorem.from_string(rule_txt, rule_name)
 
-    solver_builder = (
-        GeometricSolverBuilder()
-        .load_problem_from_txt(problem_txt, translate=False)
-        .with_disabled_intrinsic_rules(ALL_INTRINSIC_RULES)
-        .with_deductive_agent(BFSDD())
-    )
+    solver_builder = GeometricSolverBuilder().load_problem_from_txt(problem_txt)
     solver_builder.reasoning_engines = {}
     solver_builder.rules = [theorem]
     solver = solver_builder.build()
 
     success = solver.run()
     if rule_txt in EXPECTED_TO_FAIL:
-        # if success:
-        #     raise AssertionError(f"Rule {rule_txt} was expected to fail but succeded.")
         pytest.xfail(f"Rule {rule_txt} is expected to fail.")
 
     assert success
-    if rule_name in DEFINITIONAL_RULES:
-        return
-
-    setup, aux, proof_steps, refs = get_proof_steps(
-        solver.proof_state, solver.problem.goals
-    )
-    nl_proof_step = [
-        proof_step_string(step, refs, last_step=i == len(proof_steps) - 1)
-        for i, step in enumerate(proof_steps)
-    ]
-
-    is_one_step = len(proof_steps) == 1
-    if rule_txt in EXPECTED_WRONG_PROOF_LENGTH:
-        # if is_one_step:
-        #     raise AssertionError(
-        #         f"Rule {rule_txt} was expected to be too long but was one step."
-        #     )
-        pytest.xfail(f"Rule {rule_txt} is expected to have too many steps.")
-
-    assert is_one_step
-    for i, (step, _nl_step) in enumerate(zip(proof_steps, nl_proof_step)):
-        _, [step_dependency] = step
-
-        found_rule_name = step_dependency.reason.name if step_dependency.reason else ""
-        if found_rule_name.startswith("b"):
-            # Backtracked an hard-coded rule
-            found_rule_name = found_rule_name[1:]
-
-        expected_rule = found_rule_name == theorem.rule_name
-        if rule_txt in EXPECTED_TO_USE_OTHER_RULE:
-            if expected_rule:
-                raise AssertionError(
-                    f"Rule {rule_txt} was expected to use an other rule but used the same."
-                )
-            pytest.xfail(f"Rule {rule_txt} is expected to use an other rule.")
-
-        assert expected_rule

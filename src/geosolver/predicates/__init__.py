@@ -1,4 +1,4 @@
-from geosolver.predicates.collinearity import Coll, Collx, NColl
+from geosolver.predicates.collinearity import Coll, NColl
 from geosolver.predicates.congruence import Cong, Cong2
 from geosolver.predicates.midpoint import MidPoint
 from geosolver.predicates.parallelism import Para, NPara
@@ -12,7 +12,7 @@ from geosolver.predicates.equal_ratios import EqRatio, EqRatio6, EqRatio3
 
 from geosolver.predicates.constant_length import ConstantLength
 from geosolver.predicates.constant_ratio import ConstantRatio
-from geosolver.predicates.constant_angle import ConstantAngle, SAngle
+from geosolver.predicates.constant_angle import ConstantAngle
 
 from geosolver.predicates.different import Diff
 from geosolver.predicates.sameside import SameSide
@@ -27,10 +27,10 @@ from geosolver.predicates.triangles_congruent import (
     ContriClock,
     ContriReflect,
 )
+from geosolver.predicates.predicate import Predicate as Predicate
 
 SYMBOLIC_PREDICATES = (
     Coll,
-    Collx,
     Cong,
     Cong2,
     MidPoint,
@@ -46,7 +46,6 @@ SYMBOLIC_PREDICATES = (
     ConstantLength,
     ConstantRatio,
     ConstantAngle,
-    SAngle,
     SimtriClock,
     SimtriReflect,
     SimtriAny,
@@ -66,10 +65,3 @@ NUMERICAL_PREDICATES = (
 PREDICATES = SYMBOLIC_PREDICATES + NUMERICAL_PREDICATES
 
 NAME_TO_PREDICATE = {predicate.NAME: predicate for predicate in PREDICATES}
-
-__all__ = [
-    "PREDICATES",
-    "NAME_TO_PREDICATE",
-    "SYMBOLIC_PREDICATES",
-    "NUMERICAL_PREDICATES",
-] + [predicate.__name__ for predicate in PREDICATES]

@@ -1,21 +1,14 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Generator, Optional
+from typing import TYPE_CHECKING, Any
 
-from geosolver.dependencies.dependency import Reason, Dependency
-
-from geosolver.numerical.geometries import PointNum
-
+from geosolver.dependency.dependency import Dependency
+from geosolver.dependency.symbols import Point
 from geosolver.predicates.predicate import Predicate
-from geosolver.intrinsic_rules import IntrinsicRules
-
-from geosolver.geometry import Point
-from geosolver.statement import Statement, hash_unordered_set_of_points
-from geosolver.symbols_graph import SymbolsGraph
 
 
 if TYPE_CHECKING:
-    from geosolver.dependencies.why_graph import DependencyGraph
-    from geosolver.dependencies.dependency_building import DependencyBody
+    from geosolver.dependency.dependency_graph import DependencyGraph
+    from geosolver.statement import Statement
 
 
 class Diff(Predicate):
@@ -28,41 +21,32 @@ class Diff(Predicate):
 
     NAME = "diff"
 
-    @staticmethod
-    def add(
-        args: list[Point],
-        dep_body: "DependencyBody",
-        dep_graph: "DependencyGraph",
-        symbols_graph: SymbolsGraph,
-        disabled_intrinsic_rules: list[IntrinsicRules],
-    ) -> tuple[list[Dependency], list[tuple[Statement, Dependency]]]:
-        raise NotImplementedError
-
-    @staticmethod
-    def why(
-        dep_graph: "DependencyGraph", statement: Statement
-    ) -> tuple[Optional[Reason], list[Dependency]]:
-        return None, []
-
-    @staticmethod
-    def check(args: list[Point], symbols_graph: SymbolsGraph) -> bool:
-        return Diff.check_numerical([p.num for p in args])
-
-    @staticmethod
-    def check_numerical(args: list[PointNum]) -> bool:
-        a, b = args
-        return not a.close(b)
-
-    @staticmethod
-    def enumerate(
-        symbols_graph: SymbolsGraph,
-    ) -> Generator[tuple[Point, ...], None, None]:
-        raise NotImplementedError
-
-    @staticmethod
-    def pretty(args: list[str]) -> str:
-        raise NotImplementedError
+    @classmethod
+    def parse(
+        cls, args: tuple[Any, ...], dep_graph: DependencyGraph
+    ) -> tuple[Any, ...]:
+        p, q = sorted(args)
+        assert isinstance(p, str) and isinstance(q, str)
+        return tuple(dep_graph.symbols_graph.names2points((p, q)))
 
     @classmethod
-    def hash(cls, args: list[Point]) -> tuple[str, ...]:
-        return hash_unordered_set_of_points(cls.NAME, args)
+    def check_numerical(cls, statement: Statement) -> bool:
+        p: Point
+        q: Point
+        p, q = statement.args
+        return not p.num.close(q.num)
+
+    @classmethod
+    def check(cls, statement: Statement) -> bool:
+        return cls.check_numerical(statement)
+
+    @classmethod
+    def why(cls, statement: Statement) -> Dependency:
+        return Dependency(statement, "", ())
+
+    @classmethod
+    def to_repr(cls, statement: Statement) -> str:
+        p: Point
+        q: Point
+        p, q = statement.args
+        return f"{p.name}≠{q.name}"

@@ -2,54 +2,40 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
-from typing import TYPE_CHECKING, Optional, Tuple, Type, Union
-from typing_extensions import Self
+from typing import TYPE_CHECKING, Callable, Optional, Union
 import logging
 
-from geosolver.defs.clause import Clause, Construction
-from geosolver.dependencies.why_graph import DependencyGraph
+from geosolver.definition.clause import Clause
+from geosolver.dependency.dependency_graph import DependencyGraph
+from geosolver.dependency.symbols import Point
 from geosolver.numerical.geometries import (
-    CircleNum,
-    HalfLine,
-    HoleCircle,
-    InvalidLineIntersectError,
+    InvalidIntersectError,
     InvalidQuadSolveError,
-    LineNum,
+    ObjNum,
     PointNum,
     reduce,
 )
-from geosolver.intrinsic_rules import IntrinsicRules, validate_disabled_rules
-import geosolver.predicates as preds
-from geosolver.ratios import simplify
+from geosolver.reasoning_engines.algebraic_reasoning.algebraic_manipulator import (
+    AlgebraicManipulator,
+)
 from geosolver.reasoning_engines.engines_interface import ReasoningEngine
-from geosolver.statement import Statement, angle_to_num_den, ratio_to_num_den
-from geosolver.defs.definition import Definition
-from geosolver.theorem import Theorem
+from geosolver.statement import Statement
+from geosolver.definition.definition import Definition
 from geosolver.agent.agents_interface import (
     Action,
+    EmptyAction,
+    EmptyFeedback,
     Feedback,
-    Mapping,
-    ImportDerivationAction,
-    ImportDerivationFeedback,
     ApplyTheoremAction,
     ApplyTheoremFeedback,
-    AuxAction,
-    AuxFeedback,
-    ResolveEngineAction,
-    DeriveFeedback,
     MatchAction,
     MatchFeedback,
     ResetFeedback,
     StopAction,
     StopFeedback,
 )
-from geosolver.match_theorems import match_one_theorem
+from geosolver.match_theorems import match_theorem, translate_sentence
 
-from geosolver.symbols_graph import SymbolsGraph
-from geosolver.geometry import Angle, Ratio, Circle, Point
-
-from geosolver.numerical.check import same_clock
 from geosolver.numerical.distances import (
     PointTooCloseError,
     PointTooFarError,
@@ -58,59 +44,19 @@ from geosolver.numerical.distances import (
 )
 from geosolver.numerical.sketch import sketch
 
-from geosolver.problem import CONSTRUCTION_RULE, Problem
-from geosolver.dependencies.dependency_building import DependencyBody
-from geosolver.dependencies.caching import DependencyCache
-from geosolver.dependencies.dependency import Reason, Dependency
+from geosolver.problem import Problem
+from geosolver.dependency.dependency import Dependency
 from geosolver._lazy_loading import lazy_import
 
 
 if TYPE_CHECKING:
-    import numpy.random
+    import numpy as np
 
 
-np_random: "numpy.random" = lazy_import("numpy.random")
+np_random: "np.random" = lazy_import("numpy.random")  # type: ignore
 
 
-FREE = [
-    "free",
-    "segment",
-    "r_triangle",
-    "risos",
-    "triangle",
-    "triangle12",
-    "ieq_triangle",
-    "eq_quadrangle",
-    "iso_trapezoid",
-    "eqdia_quadrangle",
-    "quadrangle",
-    "r_trapezoid",
-    "rectangle",
-    "isquare",
-    "trapezoid",
-    "pentagon",
-    "iso_triangle",
-]
-
-INTERSECT = [
-    "angle_bisector",
-    "angle_mirror",
-    "eqdistance",
-    "lc_tangent",
-    "on_aline",
-    "on_bline",
-    "on_circle",
-    "on_line",
-    "on_pline",
-    "on_tline",
-    "on_dia",
-    "s_angle",
-    "on_opline",
-    "eqangle3",
-]
-
-
-class DepCheckFailError(Exception):
+class ConstructionError(Exception):
     pass
 
 
@@ -119,89 +65,60 @@ class Proof:
 
     def __init__(
         self,
-        dependency_graph: DependencyGraph,
-        external_reasoning_engines: dict[str, ReasoningEngine],
-        symbols_graph: SymbolsGraph,
-        rnd_generator: "numpy.random.Generator" = None,
-        disabled_intrinsic_rules: Optional[list[IntrinsicRules | str]] = None,
+        problem: Problem,
+        defs: dict[str, Definition],
+        custom_rng: Optional["np.random.Generator"] = None,
     ):
-        self.dependency_graph = dependency_graph
-        self.symbols_graph = symbols_graph
-        self.reasoning_engines = external_reasoning_engines
-        self.disabled_intrinsic_rules = validate_disabled_rules(
-            disabled_intrinsic_rules
-        )
-        self._goals: list[Statement] = []
-        self._goals_construction: list[Construction] = []
-        self._resolved_mapping_deps: dict[
-            str, tuple[DependencyBody, tuple["Statement", "Dependency"]]
-        ] = {}
-        self._problem: Optional[Problem] = None
-        self._definitions: Optional[dict[str, Definition]] = None
+        self.dep_graph = DependencyGraph(AlgebraicManipulator())
+        self.symbols_graph = self.dep_graph.symbols_graph
+        self.goals: list[Statement] = []
+        self.problem: Problem = problem
+        self.defs: dict[str, Definition] = defs
         self._init_added: list[Dependency] = []
-        self._init_to_cache: list[tuple["Statement", "Dependency"]] = []
-        self._plevel: int = 0
-        self._ACTION_TYPE_TO_STEP = {
+        self._ACTION_TYPE_TO_STEP: dict[type[Action], Callable[..., Feedback]] = {
             MatchAction: self._step_match_theorem,
             ApplyTheoremAction: self._step_apply_theorem,
-            ResolveEngineAction: self._step_derive,
-            ImportDerivationAction: self._step_import_derivation,
-            AuxAction: self._step_auxiliary_construction,
             StopAction: self._step_stop,
+            EmptyAction: self._idle,
         }
-        self.rnd_gen = (
-            rnd_generator if rnd_generator is not None else np_random.default_rng()
-        )
+        self.rng = custom_rng or np_random.default_rng()
 
     @classmethod
     def build_problem(
         cls,
         problem: Problem,
-        definitions: dict[str, Definition],
-        disabled_intrinsic_rules: Optional[list[IntrinsicRules]] = None,
-        reasoning_engine: Optional[dict[str, Type[ReasoningEngine]]] = None,
+        defs: dict[str, Definition],
+        reasoning_engines: dict[str, type[ReasoningEngine]],
         max_attempts: int = 10000,
-        rnd_generator: "numpy.random.Generator" = None,
-    ) -> Self:
+        custom_rng: Optional["np.random.Generator"] = None,
+    ) -> Proof:
         """Build a problem into a Proof state object."""
         logging.info(f"Building proof from problem '{problem.url}': {problem}")
 
-        err = DepCheckFailError(f"Numerical check failed {max_attempts} times")
+        err = ConstructionError(f"Construction failed {max_attempts} times")
         for _ in range(max_attempts):
             # Search for coordinates that checks premises conditions numerically.
             try:
-                symbols_graph = SymbolsGraph()
-                dependency_cache = DependencyCache()
-                dependency_graph = DependencyGraph(symbols_graph, dependency_cache)
-
-                reasoning_engines = {}
-                for engine_name, engine_type in reasoning_engine.items():
-                    if engine_name in reasoning_engines:
-                        raise ValueError(f"Conflicting engine names for {engine_name}")
-                    reasoning_engines[engine_name] = engine_type(symbols_graph)
-
                 proof = Proof(
-                    dependency_graph=dependency_graph,
-                    external_reasoning_engines=reasoning_engines,
-                    symbols_graph=symbols_graph,
-                    rnd_generator=rnd_generator,
-                    disabled_intrinsic_rules=disabled_intrinsic_rules,
+                    problem=problem,
+                    defs=defs,
+                    custom_rng=custom_rng,
                 )
-                added = []
-                to_cache = []
-                plevel = 0
-                for clause in problem.clauses:
-                    adds, clause_to_cache, plevel = proof.add_clause(
-                        clause, plevel, definitions
-                    )
+                added: list[Dependency] = []
+                for construction in problem.constructions:
+                    adds = proof.add_construction(construction)
+                    for add in adds:
+                        if not add.statement.check_numerical():
+                            raise ConstructionError(
+                                "This is probably because the construction itself is wrong"
+                            )
+                        add.add()
                     added += adds
-                    to_cache += clause_to_cache
-                proof._plevel = plevel
 
             except (
-                InvalidLineIntersectError,
+                InvalidIntersectError,
                 InvalidQuadSolveError,
-                DepCheckFailError,
+                ConstructionError,
                 PointTooCloseError,
                 PointTooFarError,
             ) as e:
@@ -212,7 +129,10 @@ class Proof:
                 break
 
             all_check = True
-            for goal in proof.goals_as_statements(problem.goals):
+            proof.goals = [
+                Statement.from_tokens(goal, proof.dep_graph) for goal in problem.goals
+            ]
+            for goal in proof.goals:
                 if not goal.check_numerical():
                     all_check = False
                     break
@@ -222,526 +142,114 @@ class Proof:
         else:
             raise err
 
-        proof._goals = proof.goals_as_statements(problem.goals)
-        proof._goals_construction = problem.goals
-        proof._problem = problem
-        proof._definitions = definitions
         proof._init_added = added
-        proof._init_to_cache = to_cache
 
         return proof
 
     def step(self, action: Action) -> Feedback:
         return self._ACTION_TYPE_TO_STEP[type(action)](action)
 
-    def check_numerical(statement: Statement) -> bool:
-        """Check if this statement is numericaly sound."""
-        num_args = [p.num if isinstance(p, Point) else p for p in statement.args]
-        return preds.NAME_TO_PREDICATE[statement.predicate].check_numerical(num_args)
-
     def _step_match_theorem(self, action: MatchAction) -> MatchFeedback:
-        theorem = action.theorem
-        potential_mappings = match_one_theorem(self, theorem, action.cache)
-        mappings = []
-        for mapping in potential_mappings:
-            dep_body, to_cache = self._resolve_mapping_dependency(theorem, mapping)
-            if dep_body is None:
-                continue
-
-            mappings.append(mapping)
-            mapping_str = theorem_mapping_str(theorem, mapping)
-            self._resolved_mapping_deps[mapping_str] = (dep_body, to_cache)
-
-        return MatchFeedback(theorem, mappings)
-
-    def _resolve_mapping_dependency(
-        self, theorem: "Theorem", mapping: Mapping
-    ) -> tuple[Optional[DependencyBody], Optional[tuple["Statement", "Dependency"]]]:
-        fail = False
-
-        deps: list["Dependency"] = []
-        for premise in theorem.premises:
-            p_args = [mapping[a] for a in premise.args]
-            dep, fail = self._resolve_premise_dependency(theorem, premise, p_args)
-            if fail:
-                return None, None
-            if dep is None:
-                continue
-
-            to_cache = (dep.statement, dep)
-            deps.append(dep)
-
-        dep_body = DependencyBody(reason=Reason(theorem), why=deps)
-        return dep_body, to_cache
-
-    def _resolve_premise_dependency(
-        self,
-        theorem: "Theorem",
-        premise: "Construction",
-        p_args: list["Point"],
-    ) -> Tuple[Optional[Dependency], bool]:
-        if premise.name in [preds.Para.NAME, preds.Cong.NAME]:
-            a, b, c, d = p_args
-            if {a, b} == {c, d}:
-                return None, False
-
-        if theorem.name in [
-            "cong_cong_eqangle6_ncoll_contri*",
-            "eqratio6_eqangle6_ncoll_simtri*",
-        ] and premise.name in [preds.EqAngle.NAME, preds.EqAngle6.NAME]:  # SAS or RAR
-            b, a, b, c, y, x, y, z = p_args
-            if not same_clock(a.num, b.num, c.num, x.num, y.num, z.num):
-                p_args = b, a, b, c, y, z, y, x
-
-        premise_predicate = preds.NAME_TO_PREDICATE[premise.name]
-        premise_statement = Statement(premise_predicate, tuple(p_args))
-
-        dep = None
-        fail = False
-        dep = self.dependency_graph.build_resolved_dependency(premise_statement)
-        if dep.why is None:
-            fail = True
-
-        return dep, fail
+        return MatchFeedback(deps=list(match_theorem(self, action.theorem)))
 
     def _step_apply_theorem(self, action: ApplyTheoremAction) -> ApplyTheoremFeedback:
-        added, to_cache, success = self._apply_theorem(action.theorem, action.mapping)
-        for dep in added:
-            for _, external_reasoning_engine in self.reasoning_engines.items():
-                external_reasoning_engine.ingest(dep)
-        self.cache_deps(to_cache)
-        return ApplyTheoremFeedback(success, added, to_cache)
+        adds = self._apply_theorem(action.dep)
+        return ApplyTheoremFeedback(adds)
 
-    def _apply_theorem(
-        self, theorem: "Theorem", mapping: Mapping
-    ) -> Tuple[list[Dependency], list[tuple["Statement", "Dependency"]], bool]:
-        mapping_str = theorem_mapping_str(theorem, mapping)
-        dep_body, premise_to_cache = self._resolved_mapping_deps[mapping_str]
-        args = self.map_construction_args_to_objects(
-            theorem.conclusion, mapping_to_names(mapping)
-        )
-
-        conclusion_predicate = preds.NAME_TO_PREDICATE[theorem.conclusion.name]
-        conclusion_statement = Statement(conclusion_predicate, tuple(args))
-        add, to_cache = self.add_statement(conclusion_statement, dep_body)
-        return add, [premise_to_cache] + to_cache, True
-
-    def _step_derive(self, action: ResolveEngineAction) -> DeriveFeedback:
-        choosen_engine = self.reasoning_engines[action.engine_id]
-        derivations = choosen_engine.resolve()
-        return DeriveFeedback(derivations)
-
-    def _step_import_derivation(
-        self, action: ImportDerivationAction
-    ) -> ImportDerivationFeedback:
-        added, to_cache = self.add_statement(
-            action.derivation.statement, action.derivation.dep_body
-        )
-        self.cache_deps(to_cache)
-        return ImportDerivationFeedback(added, to_cache)
-
-    def _step_auxiliary_construction(self, action: AuxAction) -> AuxFeedback:
-        aux_clause = Clause.from_txt(action.aux_string)
-        added, to_cache = [], []
-        try:
-            added, to_cache, plevel = self.add_clause(
-                aux_clause, self._plevel, self._definitions
-            )
-            self._plevel = plevel
-            success = True
-        except (InvalidQuadSolveError, InvalidLineIntersectError):
-            success = False
-        return AuxFeedback(success, added, to_cache)
+    def _apply_theorem(self, dep: Dependency) -> list[Dependency]:
+        dep.add()
+        return [dep]
 
     def _step_stop(self, action: StopAction) -> StopFeedback:
         return StopFeedback(success=self.check_goals())
 
-    def reset(self) -> ResetFeedback:
-        self.cache_deps(self._init_to_cache)
-        for _, ext in self.reasoning_engines.items():
-            for add in self._init_added:
-                ext.ingest(add)
-        return ResetFeedback(
-            problem=self._problem,
-            added=self._init_added,
-            to_cache=self._init_to_cache,
-            available_engines=list(self.reasoning_engines.keys()),
-        )
+    def _idle(self, action: EmptyAction) -> EmptyFeedback:
+        return EmptyFeedback()
 
-    def copy(self):
-        """Make a blank copy of proof state."""
-        if self._problem is None:
-            raise TypeError("Could not find problem when trying to copy.")
-        if self._definitions is None:
-            raise TypeError("Could not find definitions when trying to copy.")
-
-        problem = self._problem.copy()
-        for clause in problem.clauses:
-            clause.nums = [
-                self.symbols_graph.name2node[pname].num for pname in clause.points
-            ]
-
-        proof = Proof.build_problem(
-            problem,
-            self._definitions,
-            disabled_intrinsic_rules=self.disabled_intrinsic_rules,
-            reasoning_engine=self.reasoning_engines,
-            rnd_generator=self.rnd_gen,
-        )
-        return proof
-
-    def get_rnd_generator(self):
-        return self.rnd_gen
-
-    def set_rnd_generator(self, rnd_gen: "numpy.random.Generator"):
-        del self.rnd_gen
-        self.rnd_gen = rnd_gen
-
-    def add_statement(
-        self, statement: Statement, dep_body: DependencyBody
-    ) -> Tuple[list[Dependency], list[tuple["Statement", "Dependency"]]]:
-        return statement.add(
-            dep_body,
-            self.dependency_graph,
-            self.symbols_graph,
-            self.disabled_intrinsic_rules,
-        )
-
-    def cache_deps(self, deps_to_cache: list[tuple["Statement", "Dependency"]]):
-        for to_cache in deps_to_cache:
-            self.dependency_graph.dependency_cache.add_dependency(*to_cache)
-
-    def goals_as_statements(self, goals: list[Construction]) -> list[Statement]:
-        res = []
-        for goal in goals or self._goals:
-            goal_args = self.map_construction_args_to_objects(goal)
-            goal_statement = Statement(preds.NAME_TO_PREDICATE[goal.name], goal_args)
-            res.append(goal_statement)
-        return res
+    def init(self) -> ResetFeedback:
+        return ResetFeedback(self._init_added)
 
     def check_goals(self) -> bool:
-        if not self._goals:
+        if not self.goals:
             return False
-        for goal in self._goals:
-            if not goal.check(self.symbols_graph):
+        for goal in self.goals:
+            if not goal.check():
                 return False
         return True
 
-    def additionally_draw(self, name: str, args: list[Point]) -> None:
-        """Draw some extra line/circles for illustration purpose."""
-
-        if name in [preds.Circumcenter.NAME]:
-            center, point = args[:2]
-            circle = self.symbols_graph.new_node(
-                Circle, f"({center.name},{point.name})"
-            )
-            circle.num = CircleNum(center.num, p1=point.num)
-            circle.points = center, point
-
-        if name in ["on_circle", "tangent"]:
-            center, point = args[-2:]
-            circle = self.symbols_graph.new_node(
-                Circle, f"({center.name},{point.name})"
-            )
-            circle.num = CircleNum(center.num, p1=point.num)
-            circle.points = center, point
-
-        if name in ["incenter", "excenter", "incenter2", "excenter2"]:
-            d, a, b, c = [x for x in args[-4:]]
-            a, b, c = sorted([a, b, c], key=lambda x: x.name.lower())
-            circle = self.symbols_graph.new_node(
-                Circle, f"({d.name},h.{a.name}{b.name})"
-            )
-            p = d.num.foot(LineNum(a.num, b.num))
-            circle.num = CircleNum(d.num, p1=p)
-            circle.points = d, a, b, c
-
-        if name in ["cc_tangent"]:
-            o, a, w, b = args[-4:]
-            c1 = self.symbols_graph.new_node(Circle, f"({o.name},{a.name})")
-            c1.num = CircleNum(o.num, p1=a.num)
-            c1.points = o, a
-
-            c2 = self.symbols_graph.new_node(Circle, f"({w.name},{b.name})")
-            c2.num = CircleNum(w.num, p1=b.num)
-            c2.points = w, b
-
-        if name in ["ninepoints"]:
-            a, b, c = args[-3:]
-            a, b, c = sorted([a, b, c], key=lambda x: x.name.lower())
-            circle = self.symbols_graph.new_node(
-                Circle, f"(,m.{a.name}{b.name}{c.name})"
-            )
-            p1 = (b.num + c.num) * 0.5
-            p2 = (c.num + a.num) * 0.5
-            p3 = (a.num + b.num) * 0.5
-            circle.num = CircleNum(p1=p1, p2=p2, p3=p3)
-            circle.points = (None, None, a, b, c)
-
-        if name in ["2l1c"]:
-            a, b, c, o = args[:4]
-            a, b, c = sorted([a, b, c], key=lambda x: x.name.lower())
-            circle = self.symbols_graph.new_node(
-                Circle, f"({o.name},{a.name}{b.name}{c.name})"
-            )
-            circle.num = CircleNum(p1=a.num, p2=b.num, p3=c.num)
-            circle.points = (a, b, c)
-
-    def add_clause(
-        self,
-        clause: Clause,
-        plevel: int,
-        definitions: dict[str, Definition],
-    ) -> tuple[list[Dependency], list[tuple["Statement", "Dependency"]], int]:
+    def add_construction(self, construction: Clause) -> list[Dependency]:
         """Add a new clause of construction, e.g. a new excenter."""
-        existing_points = self.symbols_graph.all_points()
-        new_points = [Point(name) for name in clause.points]
+        adds: list[Dependency] = []
+        numerics: list[tuple[str, ...]] = []
+        existing_points = self.symbols_graph.nodes_of_type(Point)
 
-        new_points_dep_points = set()
-        new_points_dep: list[DependencyBody] = []
-
-        # Step 1: check for all dependencies.
-        reason = Reason(CONSTRUCTION_RULE)
-        for clause_construction in clause.constructions:
-            cdef = definitions[clause_construction.name]
-
-            if len(cdef.construction.args) != len(clause_construction.args):
-                if len(cdef.construction.args) - len(clause_construction.args) == len(
-                    clause.points
-                ):
-                    clause_construction.args = (
-                        tuple(clause.points) + clause_construction.args
-                    )
-                else:
-                    correct_form = " ".join(
-                        cdef.points + ["=", clause_construction.name] + cdef.args
-                    )
-                    raise ValueError("Argument mismatch. " + correct_form)
-
-            mapping = dict(zip(cdef.construction.args, clause_construction.args))
-            c_name = (
-                preds.MidPoint.NAME
-                if clause_construction.name == "midpoint"
-                else clause_construction.name
-            )
-            construction = Construction(c_name, clause_construction.args)
-            deps: list[Dependency] = []
-            for construction in cdef.clause.constructions:
-                args = self.symbols_graph.names2points(
-                    [mapping[a] for a in construction.args]
+        for constr_sentence in construction.sentences:
+            cdef = self.defs[constr_sentence[0]]
+            if len(constr_sentence) == len(cdef.declare):
+                mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
+            else:
+                assert len(constr_sentence) + len(construction.points) == len(
+                    cdef.declare
                 )
-                new_points_dep_points.update(args)
-
-                construction_predicate = preds.NAME_TO_PREDICATE[construction.name]
-                statement = Statement(construction_predicate, args)
-                if not statement.check(self.symbols_graph):
-                    raise DepCheckFailError(
-                        construction.name + " " + " ".join([x.name for x in args])
-                    )
-
-                construction_body = DependencyBody(reason=reason, why=[])
-                construction_dep = construction_body.build(
-                    self.dependency_graph, statement
+                mapping = dict(
+                    zip(cdef.declare[1:], construction.points + constr_sentence[1:])
                 )
-                deps.append(construction_dep)
 
-            dep_body = DependencyBody(reason=reason, why=deps)
-            new_points_dep.append(dep_body)
+            for premise in cdef.require.sentences:
+                if len(premise) == 0:
+                    continue
+                statement = Statement.from_tokens(
+                    translate_sentence(mapping, premise), self.dep_graph
+                )
+                if not statement.check_numerical():
+                    raise ConstructionError(construction)
+
+            for bs in cdef.basics:
+                for t in bs.sentences:
+                    if len(t) == 0:
+                        continue
+                    statement = Statement.from_tokens(
+                        translate_sentence(mapping, t), self.dep_graph
+                    )
+                    adds.append(Dependency(statement, "cstr", ()))
+            for n in cdef.numerics:
+                numerics.append(tuple(mapping[a] if a in mapping else a for a in n))
+
+        new_points = self.symbols_graph.names2points(construction.points)
+        for p in new_points:
+            if p in existing_points:
+                raise Exception("The construction is illegal")
 
         # Step 2: draw.
 
-        is_total_free = (
-            len(clause.constructions) == 1 and clause.constructions[0].name in FREE
-        )
-        is_semi_free = (
-            len(clause.constructions) == 1 and clause.constructions[0].name in INTERSECT
-        )
-
-        existing_numerical_points = [p.num for p in existing_points]
-
-        rely_on: set[Point] = set()
-        for construction in clause.constructions:
-            cdef = definitions[construction.name]
-            mapping = dict(zip(cdef.construction.args, construction.args))
-            for n in cdef.numerics:
-                args = self.map_construction_args_to_objects(n, mapping)
-                rely_on.update([a for a in args if isinstance(a, Point)])
-
-        def range_fn() -> (
-            list[Union[PointNum, LineNum, CircleNum, HalfLine, HoleCircle]]
-        ):
-            to_be_intersected = []
-            for c in clause.constructions:
-                cdef = definitions[c.name]
-                mapping = dict(zip(cdef.construction.args, c.args))
-                for n in cdef.numerics:
-                    args = self.map_construction_args_to_objects(n, mapping)
-                    to_be_intersected += sketch(
-                        n.name, args, rnd_generator=self.get_rnd_generator()
-                    )
-
-            return to_be_intersected
-
         def draw_fn() -> list[PointNum]:
-            to_be_intersected = range_fn()
+            to_be_intersected: list[ObjNum] = []
+            for n in numerics:
+                args: list[Union[PointNum, str]] = []
+                for t in n[1:]:
+                    if str.isalpha(t[0]):
+                        args.append(self.symbols_graph.names2points([t])[0].num)
+                    else:
+                        args.append(t)
+                to_be_intersected += sketch(n[0], tuple(args), self.rng)
+
             return reduce(
-                to_be_intersected,
-                existing_numerical_points,
-                rnd_generator=self.get_rnd_generator(),
+                to_be_intersected, [p.num for p in existing_points], rng=self.rng
             )
 
-        nums = draw_fn()
-        for p, num, num0 in zip(new_points, nums, clause.nums):
-            p.co_change = new_points
-            if isinstance(num0, PointNum):
-                num = num0
-            elif isinstance(num0, (tuple, list)):
-                x, y = num0
-                num = PointNum(x, y)
-
+        new_numerical_points = draw_fn()
+        for p, num in zip(new_points, new_numerical_points):
             p.num = num
 
         # check two things
-        new_points_nums = [p.num for p in new_points]
-        if len(existing_numerical_points) > 0:
-            if check_too_close_numerical(
-                new_points_nums, existing_numerical_points, 0.01
-            ):
-                raise PointTooCloseError()
-            if check_too_far_numerical(new_points_nums, existing_numerical_points, 100):
-                raise PointTooFarError()
+        existing_numerical_points = [p.num for p in existing_points]
+        if check_too_close_numerical(
+            new_numerical_points, existing_numerical_points, 0.01
+        ):
+            raise PointTooCloseError()
+        if check_too_far_numerical(
+            new_numerical_points, existing_numerical_points, 100
+        ):
+            raise PointTooFarError()
 
-        # Commit: now that all conditions are passed.
-        # add these points to current graph.
-        for p in new_points:
-            self.symbols_graph.add_node(p)
-
-        for p in new_points:
-            why_point: list["Dependency"] = []
-            for d in new_points_dep:
-                why_point.extend(d.why)
-            p.why = why_point  # to generate txt logs.
-            p.group = new_points
-            p.dep_points = new_points_dep_points
-            p.dep_points.update(new_points)
-            p.plevel = plevel
-
-        # movement dependency:
-        rely_dict_0 = defaultdict(lambda: [])
-
-        for construction in clause.constructions:
-            cdef = definitions[construction.name]
-            mapping = dict(zip(cdef.construction.args, construction.args))
-            for p, ps in cdef.rely.items():
-                p = mapping[p]
-                ps = [mapping[x] for x in ps]
-                rely_dict_0[p].append(ps)
-
-        rely_dict = {}
-        for p, pss in rely_dict_0.items():
-            ps = sum(pss, [])
-            if len(pss) > 1:
-                ps = [x for x in ps if x != p]
-
-            p = self.symbols_graph.name2node[p]
-            ps = self.symbols_graph.names2nodes(ps)
-            rely_dict[p] = ps
-
-        for p in new_points:
-            p.rely_on = set(rely_dict.get(p, []))
-            for x in p.rely_on:
-                if not hasattr(x, "base_rely_on"):
-                    x.base_rely_on = set()
-            p.base_rely_on = set.union(*[x.base_rely_on for x in p.rely_on] + [set()])
-            if is_total_free or is_semi_free:
-                p.rely_on.add(p)
-                p.base_rely_on.add(p)
-
-        plevel_done = set()
-        added = []
-        to_cache = []
-        basics = []
-        # Step 3: build the basics.
-        for construction, dep_body in zip(clause.constructions, new_points_dep):
-            cdef = definitions[construction.name]
-            mapping = dict(zip(cdef.construction.args, construction.args))
-
-            # not necessary for proofing, but for visualization.
-            c_args = self.map_construction_args_to_objects(construction)
-            self.additionally_draw(construction, c_args)
-
-            for points, bs in cdef.basics:
-                if points:
-                    points = self.symbols_graph.names2nodes(
-                        [mapping[p] for p in points]
-                    )
-                    points = [p for p in points if p not in plevel_done]
-                    for p in points:
-                        p.plevel = plevel
-                    plevel_done.update(points)
-                    plevel += 1
-                else:
-                    continue
-
-                for b in bs:
-                    args = self.map_construction_args_to_objects(b, mapping)
-                    basic_predicate = preds.NAME_TO_PREDICATE[b.name]
-                    basic_statement = Statement(basic_predicate, args)
-                    adds, basic_to_cache = self.add_statement(basic_statement, dep_body)
-                    to_cache += basic_to_cache
-
-                    basics.append((basic_statement, dep_body))
-                    if adds:
-                        added += adds
-
-        assert len(plevel_done) == len(new_points)
-        for p in new_points:
-            p.basics = basics
-
-        return added, to_cache, plevel
-
-    def map_construction_args_to_objects(
-        self, construction: Construction, mapping: Optional[dict[str, str]] = None
-    ) -> list[Point | Angle | Ratio]:
-        args_objs = []
-        for arg in construction.args:
-            if mapping and arg in mapping:
-                arg = mapping[arg]
-            args_objs.append(arg_to_object(arg, self.symbols_graph))
-        return args_objs
-
-
-def arg_to_object(arg: str, symbols_graph: "SymbolsGraph"):
-    if arg in symbols_graph.name2node:
-        return symbols_graph.name2node[arg]
-    elif "pi/" in arg or arg.endswith("o"):
-        if "pi/" in arg:
-            # pi fraction
-            num, den = angle_to_num_den(arg)
-        else:
-            # degrees
-            num, den = simplify(int(arg[:-1]), 180)
-        ang, _ = symbols_graph.get_or_create_const_ang(num, den)
-        return ang
-    elif "/" in arg:
-        num, den = ratio_to_num_den(arg)
-        rat, _ = symbols_graph.get_or_create_const_rat(num, den)
-        return rat
-    return symbols_graph.get_or_create_const_length(float(arg))
-
-
-def mapping_to_names(mapping: Mapping) -> dict[str, str]:
-    mapping_names = {}
-    for arg, point_or_str in mapping.items():
-        if isinstance(point_or_str, Point):
-            mapping_names[arg] = point_or_str.name
-        else:
-            mapping_names[arg] = point_or_str
-    return mapping_names
-
-
-def theorem_mapping_str(theorem: Theorem, mapping: Mapping) -> str:
-    points_txt = " ".join(
-        [point.name for _name, point in mapping.items() if isinstance(_name, str)]
-    )
-    return f"{theorem.rule_name} {points_txt}"
+        return adds
