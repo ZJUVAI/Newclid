@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Optional, Union
+from typing import TYPE_CHECKING, Callable, Union
 import logging
 
 from geosolver.definition.clause import Clause
@@ -46,14 +46,9 @@ from geosolver.numerical.sketch import sketch
 
 from geosolver.problem import Problem
 from geosolver.dependency.dependency import CONSTRUCTION, Dependency
-from geosolver._lazy_loading import lazy_import
-
 
 if TYPE_CHECKING:
-    import numpy as np
-
-
-np_random: "np.random" = lazy_import("numpy.random")  # type: ignore
+    from numpy.random import Generator
 
 
 class ConstructionError(Exception):
@@ -67,7 +62,7 @@ class Proof:
         self,
         problem: Problem,
         defs: dict[str, Definition],
-        custom_rng: Optional["np.random.Generator"] = None,
+        rng: "Generator",
     ):
         self.dep_graph = DependencyGraph(AlgebraicManipulator())
         self.symbols_graph = self.dep_graph.symbols_graph
@@ -81,7 +76,7 @@ class Proof:
             StopAction: self._step_stop,
             EmptyAction: self._idle,
         }
-        self.rng = custom_rng or np_random.default_rng()
+        self.rng = rng
         self.matcher = Matcher(self.dep_graph, self.rng)
 
     @classmethod
@@ -91,7 +86,8 @@ class Proof:
         defs: dict[str, Definition],
         reasoning_engines: dict[str, type[ReasoningEngine]],
         max_attempts: int = 10000,
-        custom_rng: Optional["np.random.Generator"] = None,
+        *,
+        rng: "Generator",
     ) -> Proof:
         """Build a problem into a Proof state object."""
         logging.info(f"Building proof from problem '{problem.url}': {problem}")
@@ -103,7 +99,7 @@ class Proof:
                 proof = Proof(
                     problem=problem,
                     defs=defs,
-                    custom_rng=custom_rng,
+                    rng=rng,
                 )
                 added: list[Dependency] = []
                 for construction in problem.constructions:
@@ -154,8 +150,8 @@ class Proof:
         return MatchFeedback(deps=list(self.matcher.match_theorem(action.theorem)))
 
     def _step_apply_theorem(self, action: ApplyTheoremAction) -> ApplyTheoremFeedback:
-        adds = self._apply_theorem(action.dep)
-        return ApplyTheoremFeedback(adds)
+        added = self._apply_theorem(action.dep)
+        return ApplyTheoremFeedback(added)
 
     def _apply_theorem(self, dep: Dependency) -> list[Dependency]:
         dep.add()

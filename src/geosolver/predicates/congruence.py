@@ -1,15 +1,16 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
-from geosolver.dependency.dependency import Dependency
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
+from geosolver.reasoning_engines.algebraic_reasoning.tables import Ratio_Chase
 from geosolver.tools import reshape
-
+from geosolver.dependency.dependency import Dependency
 
 if TYPE_CHECKING:
-    from geosolver.dependency.dependency import Dependency
+    from geosolver.reasoning_engines.algebraic_reasoning.tables import Table
+    from geosolver.reasoning_engines.algebraic_reasoning.tables import SumCV
     from geosolver.statement import Statement
     from geosolver.dependency.dependency_graph import DependencyGraph
 
@@ -52,36 +53,39 @@ class Cong(Predicate):
         return True
 
     @classmethod
-    def add(cls, dep: Dependency) -> None:
-        points: tuple[Point, ...] = dep.statement.args
-        table = dep.statement.dep_graph.ar.rtable
+    def _prep_ar(cls, statement: Statement) -> tuple[list[SumCV], Table]:
+        points: tuple[Point, ...] = statement.args
+        table = statement.dep_graph.ar.rtable
+        eqs: list[SumCV] = []
         i = 2
         while i < len(points):
-            table.add_expr(
+            eqs.append(
                 table.get_eq2(
                     table.get_length(points[0], points[1]),
                     table.get_length(points[i], points[i + 1]),
                 ),
-                dep,
             )
             i += 2
+        return eqs, table
+
+    @classmethod
+    def add(cls, dep: Dependency) -> None:
+        eqs, table = cls._prep_ar(dep.statement)
+        for eq in eqs:
+            table.add_expr(eq, dep)
 
     @classmethod
     def check(cls, statement: Statement) -> bool:
-        points: tuple[Point, ...] = statement.args
-        table = statement.dep_graph.ar.rtable
-        i = 2
-        while i < len(points):
-            if not table.add_expr(
-                table.get_eq2(
-                    table.get_length(points[0], points[1]),
-                    table.get_length(points[i], points[i + 1]),
-                ),
-                None,
-            ):
-                return False
-            i += 2
-        return True
+        eqs, table = cls._prep_ar(statement)
+        return all(table.add_expr(eq, None) for eq in eqs)
+
+    @classmethod
+    def why(cls, statement: Statement) -> list[Dependency]:
+        eqs, table = cls._prep_ar(statement)
+        why: list[Statement] = []
+        for eq in eqs:
+            why.extend([dep.statement for dep in table.why(eq)])
+        return [Dependency.mk(statement, Ratio_Chase, tuple(why))]
 
     @classmethod
     def to_repr(cls, statement: Statement) -> str:

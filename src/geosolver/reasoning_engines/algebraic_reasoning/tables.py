@@ -4,16 +4,19 @@ import logging
 from typing import TYPE_CHECKING, Any, Literal, Optional
 from numpy import exp
 from geosolver.tools import simplify
-from geosolver._lazy_loading import lazy_import
+import numpy as np
+import scipy.optimize as opt  # type: ignore
 
 if TYPE_CHECKING:
     from geosolver.dependency.dependency import Dependency
-    import numpy
-    import scipy.optimize  # type: ignore
     from geosolver.dependency.symbols import Point
 
 ATOM: float = 1e-9
 NLOGATOM: int = 9
+
+
+Angle_Chase = "alc"
+Ratio_Chase = "rac"
 
 
 class Coef(float):
@@ -48,8 +51,6 @@ class Coef(float):
         return Coef(round(float(self), NLOGATOM) % round(float(value), NLOGATOM))
 
 
-np: "numpy" = lazy_import("numpy")  # type: ignore
-opt: "scipy.optimize" = lazy_import("scipy.optimize")  # type: ignore
 SumCV = dict[str, Coef]
 EqDict = dict[str, SumCV]
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-from geosolver.dependency.dependency import Dependency
+
+from geosolver.dependency.dependency import CONSTRUCTION, Dependency
 from geosolver.dependency.symbols import Line, Point
 from geosolver.numerical.geometries import LineNum
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
@@ -72,6 +73,10 @@ class NColl(Predicate):
     @classmethod
     def check(cls, statement: Statement) -> bool:
         return not statement.with_new(Coll, None).check_numerical()
+
+    @classmethod
+    def why(cls, statement: Statement) -> list[Dependency]:
+        return [Dependency.mk(statement, CONSTRUCTION, tuple())]
 
     @classmethod
     def to_repr(cls, statement: Statement) -> str:

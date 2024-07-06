@@ -1,5 +1,4 @@
 from __future__ import annotations
-from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from geosolver.reasoning_engines.algebraic_reasoning.tables import (
@@ -13,11 +12,6 @@ if TYPE_CHECKING:
     from geosolver.dependency.dependency import Dependency
 
 config: dict[Any, Any] = dict()
-
-
-class AlgebraicRules(Enum):
-    Angle_Chase = "alc"
-    Ratio_Chase = "rac"
 
 
 class AlgebraicManipulator(ReasoningEngine):

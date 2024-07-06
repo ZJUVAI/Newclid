@@ -9,22 +9,14 @@ from geosolver.numerical.geometries import (
     circle_circle_intersection,
     circle_segment_intersect,
 )
-from geosolver._lazy_loading import lazy_import
 from geosolver.dependency.symbols import Point, Circle, Line
-
+import numpy as np
+import matplotlib.pyplot as plt
 
 if TYPE_CHECKING:
-    import numpy as np
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
-    import matplotlib.pyplot as plt
     from geosolver.dependency.symbols_graph import SymbolsGraph
-
-np = lazy_import("numpy")
-plt = lazy_import("matplotlib.pyplot")
-colors = lazy_import("matplotlib.colors")
-patches = lazy_import("matplotlib.patches")
-transforms = lazy_import("matplotlib.transforms")
 
 
 HCOLORS = None
@@ -34,7 +26,7 @@ THEME = "dark"
 def draw_figure(
     symbols_graph: "SymbolsGraph",
     block: bool = True,
-    save_to: Optional[str | Path] = None,
+    save_to: Optional[Path] = None,
     theme: str = "dark",
 ) -> None:
     """Draw everything on the same canvas."""
@@ -166,12 +158,12 @@ def draw_point(
     else:
         color = "grey"
 
-    ax.annotate(
+    ax.annotate(  # type: ignore
         p.name,
         naming_position(ax, p, line_boundaries, circles),
         color=color,
         fontsize=15,
-    )  # type: ignore
+    )
 
 
 def naming_position(

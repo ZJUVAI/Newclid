@@ -5,12 +5,14 @@ from typing import TYPE_CHECKING, Any
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
-from geosolver.reasoning_engines.algebraic_reasoning.tables import Coef
+from geosolver.reasoning_engines.algebraic_reasoning.tables import Angle_Chase, Coef
 from geosolver.tools import nd_to_angle, str_to_nd
+from geosolver.dependency.dependency import Dependency
 
 if TYPE_CHECKING:
+    from geosolver.reasoning_engines.algebraic_reasoning.tables import Table
+    from geosolver.reasoning_engines.algebraic_reasoning.tables import SumCV
     from geosolver.dependency.dependency_graph import DependencyGraph
-    from geosolver.dependency.dependency import Dependency
     from geosolver.statement import Statement
 
 
@@ -53,37 +55,36 @@ class ConstantAngle(Predicate):
         )
 
     @classmethod
-    def add(cls, dep: Dependency) -> None:
-        args: tuple[Point, Point, Point, Point, str] = dep.statement.args
-        p0, p1, p2, p3, ang = args
-        table = dep.statement.dep_graph.ar.atable
-        symbols_graph = dep.statement.dep_graph.symbols_graph
-        n, d = str_to_nd(ang)
-
-        table.add_expr(
-            table.get_eq3(
-                symbols_graph.line_thru_pair(p2, p3).name,
-                symbols_graph.line_thru_pair(p0, p1).name,
-                Coef(n / d),
-            ),
-            dep,
-        )
-
-    @classmethod
-    def check(cls, statement: Statement) -> bool:
+    def _prep_ar(cls, statement: Statement) -> tuple[list[SumCV], Table]:
         args: tuple[Point, Point, Point, Point, str] = statement.args
         p0, p1, p2, p3, ang = args
-        if p0 == p1 or p2 == p3:
-            return False
         table = statement.dep_graph.ar.atable
         symbols_graph = statement.dep_graph.symbols_graph
         n, d = str_to_nd(ang)
 
-        return table.add_expr(
+        return [
             table.get_eq3(
                 symbols_graph.line_thru_pair(p2, p3).name,
                 symbols_graph.line_thru_pair(p0, p1).name,
                 Coef(n / d),
-            ),
-            None,
-        )
+            )
+        ], table
+
+    @classmethod
+    def add(cls, dep: Dependency) -> None:
+        eqs, table = cls._prep_ar(dep.statement)
+        for eq in eqs:
+            table.add_expr(eq, dep)
+
+    @classmethod
+    def why(cls, statement: Statement) -> list[Dependency]:
+        eqs, table = cls._prep_ar(statement)
+        why: list[Statement] = []
+        for eq in eqs:
+            why.extend([dep.statement for dep in table.why(eq)])
+        return [Dependency.mk(statement, Angle_Chase, tuple(why))]
+
+    @classmethod
+    def check(cls, statement: Statement) -> bool:
+        eqs, table = cls._prep_ar(statement)
+        return all(table.add_expr(eq, None) for eq in eqs)

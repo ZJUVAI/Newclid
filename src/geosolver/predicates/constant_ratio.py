@@ -7,10 +7,12 @@ from geosolver.dependency.dependency import Dependency
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
-from geosolver.reasoning_engines.algebraic_reasoning.tables import Coef
+from geosolver.reasoning_engines.algebraic_reasoning.tables import Coef, Ratio_Chase
 from geosolver.tools import nd_to_ratio, str_to_nd
 
 if TYPE_CHECKING:
+    from geosolver.reasoning_engines.algebraic_reasoning.tables import Table
+    from geosolver.reasoning_engines.algebraic_reasoning.tables import SumCV
     from geosolver.statement import Statement
     from geosolver.dependency.dependency_graph import DependencyGraph
 
@@ -49,24 +51,33 @@ class ConstantRatio(Predicate):
         return close_enough(a.num.distance(b.num) / c.num.distance(d.num), num / denum)
 
     @classmethod
-    def add(cls, dep: Dependency) -> None:
-        args: tuple[Point, Point, Point, Point, str] = dep.statement.args
-        p0, p1, p2, p3, k = args
-        table = dep.statement.dep_graph.ar.rtable
-        l0 = table.get_length(p0, p1)
-        l1 = table.get_length(p2, p3)
-        n, d = str_to_nd(k)
-        table.add_expr(table.get_eq3(l0, l1, Coef(log(n / d))), dep)
-
-    @classmethod
-    def check(cls, statement: Statement) -> bool:
+    def _prep_ar(cls, statement: Statement) -> tuple[list[SumCV], Table]:
         args: tuple[Point, Point, Point, Point, str] = statement.args
         p0, p1, p2, p3, k = args
         table = statement.dep_graph.ar.rtable
         l0 = table.get_length(p0, p1)
         l1 = table.get_length(p2, p3)
         n, d = str_to_nd(k)
-        return table.add_expr(table.get_eq3(l0, l1, Coef(log(n / d))), None)
+        return [table.get_eq3(l0, l1, Coef(log(n / d)))], table
+
+    @classmethod
+    def add(cls, dep: Dependency) -> None:
+        eqs, table = cls._prep_ar(dep.statement)
+        for eq in eqs:
+            table.add_expr(eq, dep)
+
+    @classmethod
+    def check(cls, statement: Statement) -> bool:
+        eqs, table = cls._prep_ar(statement)
+        return all(table.add_expr(eq, None) for eq in eqs)
+
+    @classmethod
+    def why(cls, statement: Statement) -> list[Dependency]:
+        eqs, table = cls._prep_ar(statement)
+        why: list[Statement] = []
+        for eq in eqs:
+            why.extend([dep.statement for dep in table.why(eq)])
+        return [Dependency.mk(statement, Ratio_Chase, tuple(why))]
 
     @classmethod
     def to_repr(cls, statement: Statement) -> str:

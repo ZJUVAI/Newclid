@@ -50,6 +50,15 @@ class Perp(Predicate):
         a, b, c, d = args
         dep.with_new(dep.statement.with_new(EqAngle, (a, b, c, d, c, d, a, b))).add()
 
+    @classmethod
+    def why(cls, statement: Statement) -> list[Dependency]:
+        args: tuple[Point, ...] = statement.args
+        a, b, c, d = args
+        return [
+            dep.with_new(statement)
+            for dep in statement.with_new(EqAngle, (a, b, c, d, c, d, a, b)).why()
+        ]
+
 
 class NPerp(Predicate):
     """nperp A B C D -

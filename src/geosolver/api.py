@@ -22,13 +22,10 @@ from geosolver.agent.agents_interface import DeductiveAgent
 from geosolver.run_loop import run_loop
 from geosolver.problem import Problem
 from geosolver.proof_writing import write_solution
-from geosolver._lazy_loading import lazy_import
-
+import numpy as np
 
 if TYPE_CHECKING:
-    import numpy
-
-np: "numpy" = lazy_import("numpy")  # type: ignore
+    pass
 
 
 class GeometricSolver:
@@ -89,7 +86,9 @@ class GeometricSolverBuilder:
         self.reasoning_engines: dict[str, Type[ReasoningEngine]] = {
             "AR": AlgebraicManipulator
         }
-        self.rng = np.random.default_rng(seed) if seed else np.random.default_rng()
+        self.rng = (
+            np.random.default_rng(seed) if seed else np.random.default_rng(998244353)
+        )
 
     def build(self) -> "GeometricSolver":
         if self.problem is None:
@@ -107,7 +106,7 @@ class GeometricSolverBuilder:
             problem=self.problem,
             defs=self.defs,
             reasoning_engines=self.reasoning_engines,
-            custom_rng=self.rng,
+            rng=self.rng,
         )
 
         return GeometricSolver(

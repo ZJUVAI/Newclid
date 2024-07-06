@@ -8,13 +8,12 @@
 from typing import TYPE_CHECKING, Any, Iterable, Optional, Union, overload
 
 from numpy.random import Generator
-from geosolver._lazy_loading import lazy_import
 from geosolver.numerical import ATOM, close_enough
+import numpy as np
 
 if TYPE_CHECKING:
-    import numpy as np
+    pass
 
-np = lazy_import("numpy")
 ObjNum = Union["PointNum", "LineNum", "CircleNum"]
 
 
@@ -280,13 +279,11 @@ class LineNum:
         return abs(a * y - b * x) <= ATOM and abs(b * z - c * y) <= ATOM
 
     def sample_within(
-        self, points: list[PointNum], n: int = 5, custom_rng: Optional[Generator] = None
+        self, points: list[PointNum], n: int = 5, *, rng: Generator
     ) -> PointNum:
         """Sample a point within the boundary of points."""
         center = sum(points, PointNum(0.0, 0.0)) / len(points)
         radius = max([p.distance(center) for p in points])
-
-        gen = custom_rng or np.random.default_rng()
 
         if close_enough(center.distance(self), radius):
             center = center.foot(self)
@@ -295,7 +292,7 @@ class LineNum:
         result = None
         best = -1.0
         for _ in range(n):
-            rand = gen.uniform(0.0, 1.0)
+            rand = rng.uniform(0.0, 1.0)
             x = a + (b - a) * rand
             mind = min([x.distance(p) for p in points])
             if mind > best:
@@ -348,15 +345,14 @@ class CircleNum:
         raise NotImplementedError()
 
     def sample_within(
-        self, points: list[PointNum], n: int = 5, custom_rng: Optional[Generator] = None
+        self, points: list[PointNum], n: int = 5, *, rng: Generator
     ) -> PointNum:
         """Sample a point within the boundary of points."""
         result = None
         best = -1.0
-        rnd_gen = custom_rng or np.random.default_rng()
 
         for _ in range(n):
-            ang = rnd_gen.uniform(0.0, 2.0) * np.pi
+            ang = rng.uniform(0.0, 2.0) * np.pi
             x = self.center + PointNum(np.cos(ang), np.sin(ang)) * self.radius
             mind = min([x.distance(p) for p in points])
             if mind > best:
@@ -521,7 +517,7 @@ def reduce(
     elif len(objs) == 1:
         obj = objs[0]
         assert not isinstance(obj, PointNum)
-        return [obj.sample_within(existing_points, custom_rng=rng)]
+        return [obj.sample_within(existing_points, rng=rng)]
 
     elif len(objs) == 2:
         u, v = objs

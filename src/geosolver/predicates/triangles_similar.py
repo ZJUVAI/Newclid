@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
+from geosolver.dependency.dependency import Dependency
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.numerical.check import same_clock
@@ -16,7 +17,7 @@ def two_triangles(
 ) -> tuple[str, str, str, str, str, str]:
     (a0, p0), (b0, q0), (c0, r0) = sorted(((a, p), (b, q), (c, r)))
     (a1, p1), (b1, q1), (c1, r1) = sorted(((p, a), (q, b), (r, c)))
-    return min((a0, b0, c0, p0, q0, r0), (p1, q1, r1, a1, b1, c1))
+    return min((a0, b0, c0, p0, q0, r0), (a1, b1, c1, p1, q1, r1))
 
 
 class SimtriClock(Predicate):
@@ -48,6 +49,10 @@ class SimtriClock(Predicate):
             and same_clock(a.num, b.num, c.num, p.num, q.num, r.num)
         )
 
+    @classmethod
+    def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
+        return tuple(p.name for p in args)
+
 
 class SimtriReflect(Predicate):
     """simtrir A B C P Q R -
@@ -78,6 +83,10 @@ class SimtriReflect(Predicate):
             and not same_clock(a.num, b.num, c.num, p.num, q.num, r.num)
         )
 
+    @classmethod
+    def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
+        return tuple(p.name for p in args)
+
 
 class SimtriAny(Predicate):
     """simtri* A B C P Q R -
@@ -97,6 +106,22 @@ class SimtriAny(Predicate):
         return tuple(dep_graph.symbols_graph.names2points(two_triangles(*args)))
 
     @classmethod
+    def add(cls, dep: Dependency) -> None:
+        args: tuple[Point, ...] = dep.statement.args
+        a, b, c, p, q, r = args
+        if same_clock(a.num, b.num, c.num, p.num, q.num, r.num):
+            dep.with_new(dep.statement.with_new(SimtriClock, None)).add()
+        else:
+            dep.with_new(dep.statement.with_new(SimtriReflect, None)).add()
+
+    @classmethod
+    def check(cls, statement: Statement) -> bool:
+        return (
+            statement.with_new(SimtriClock, None).check()
+            or statement.with_new(SimtriReflect, None).check()
+        )
+
+    @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
         args: tuple[Point, ...] = statement.args
         a, b, c, p, q, r = args
@@ -104,3 +129,22 @@ class SimtriAny(Predicate):
         return close_enough(
             a.num.distance(c.num) * k - p.num.distance(r.num), 0
         ) and close_enough(b.num.distance(c.num) * k - q.num.distance(r.num), 0)
+
+    @classmethod
+    def why(cls, statement: Statement) -> list[Dependency]:
+        args: tuple[Point, ...] = statement.args
+        a, b, c, p, q, r = args
+        if same_clock(a.num, b.num, c.num, p.num, q.num, r.num):
+            return [
+                dep.with_new(statement)
+                for dep in statement.with_new(SimtriClock, None).why()
+            ]
+        else:
+            return [
+                dep.with_new(statement)
+                for dep in statement.with_new(SimtriReflect, None).why()
+            ]
+
+    @classmethod
+    def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
+        return tuple(p.name for p in args)

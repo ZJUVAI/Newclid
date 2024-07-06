@@ -38,7 +38,7 @@ class Predicate(ABC):
         return
 
     @classmethod
-    def why(cls, statement: Statement) -> Dependency:
+    def why(cls, statement: Statement) -> list[Dependency]:
         """Resolve the reason and list of dependencies
         justifying why this predicate could be true."""
         raise NotImplementedError(f"{cls.NAME} why not implemented")

@@ -4,11 +4,14 @@ from typing import TYPE_CHECKING, Any
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
+from geosolver.reasoning_engines.algebraic_reasoning.tables import Ratio_Chase
 from geosolver.tools import reshape
+from geosolver.dependency.dependency import Dependency
 
 
 if TYPE_CHECKING:
-    from geosolver.dependency.dependency import Dependency
+    from geosolver.reasoning_engines.algebraic_reasoning.tables import Table
+    from geosolver.reasoning_engines.algebraic_reasoning.tables import SumCV
     from geosolver.statement import Statement
     from geosolver.dependency.dependency_graph import DependencyGraph
 
@@ -35,7 +38,9 @@ class EqRatio(Predicate):
             groups.append((a, b, c, d))
             groups1.append((c, d, a, b))
         return tuple(
-            dep_graph.symbols_graph.names2points(sum(sorted(min(groups, groups1)), ()))
+            dep_graph.symbols_graph.names2points(
+                sum(min(sorted(groups), sorted(groups1)), ())
+            )
         )
 
     @classmethod
@@ -53,40 +58,41 @@ class EqRatio(Predicate):
         return True
 
     @classmethod
-    def add(cls, dep: Dependency) -> None:
-        points: tuple[Point, ...] = dep.statement.args
-        table = dep.statement.dep_graph.ar.rtable
+    def _prep_ar(cls, statement: Statement) -> tuple[list[SumCV], Table]:
+        points: tuple[Point, ...] = statement.args
+        table = statement.dep_graph.ar.rtable
+        eqs: list[SumCV] = []
         i = 4
         while i < len(points):
-            table.add_expr(
+            eqs.append(
                 table.get_eq4(
                     table.get_length(points[0], points[1]),
                     table.get_length(points[2], points[3]),
                     table.get_length(points[i], points[i + 1]),
                     table.get_length(points[i + 2], points[i + 3]),
-                ),
-                dep,
+                )
             )
             i += 4
+        return eqs, table
+
+    @classmethod
+    def add(cls, dep: Dependency) -> None:
+        eqs, table = cls._prep_ar(dep.statement)
+        for eq in eqs:
+            table.add_expr(eq, dep)
+
+    @classmethod
+    def why(cls, statement: Statement) -> list[Dependency]:
+        eqs, table = cls._prep_ar(statement)
+        why: list[Statement] = []
+        for eq in eqs:
+            why.extend([dep.statement for dep in table.why(eq)])
+        return [Dependency.mk(statement, Ratio_Chase, tuple(why))]
 
     @classmethod
     def check(cls, statement: Statement) -> bool:
-        points: tuple[Point, ...] = statement.args
-        table = statement.dep_graph.ar.rtable
-        i = 4
-        while i < len(points):
-            if not table.add_expr(
-                table.get_eq4(
-                    table.get_length(points[0], points[1]),
-                    table.get_length(points[2], points[3]),
-                    table.get_length(points[i], points[i + 1]),
-                    table.get_length(points[i + 2], points[i + 3]),
-                ),
-                None,
-            ):
-                return False
-            i += 4
-        return True
+        eqs, table = cls._prep_ar(statement)
+        return all(table.add_expr(eq, None) for eq in eqs)
 
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
@@ -129,7 +135,9 @@ class EqRatio3(Predicate):
         groups = ((a, b), (c, d), (m, n))
         groups1 = ((b, a), (d, c), (n, m))
         return tuple(
-            dep_graph.symbols_graph.names2points(sum(sorted(min(groups, groups1)), ()))
+            dep_graph.symbols_graph.names2points(
+                sum(min(sorted(groups), sorted(groups1)), ())
+            )
         )
 
     @classmethod

@@ -10,6 +10,8 @@ from geosolver.predicates.predicate import Predicate
 from geosolver.tools import reshape
 
 if TYPE_CHECKING:
+    from geosolver.reasoning_engines.algebraic_reasoning.tables import Table
+    from geosolver.reasoning_engines.algebraic_reasoning.tables import SumCV
     from geosolver.dependency.dependency_graph import DependencyGraph
     from geosolver.dependency.dependency import Dependency
     from geosolver.statement import Statement
@@ -40,40 +42,32 @@ class Para(Predicate):
         return True
 
     @classmethod
-    def add(cls, dep: Dependency):
-        points: tuple[Point, ...] = dep.statement.args
-        table = dep.statement.dep_graph.ar.atable
-        symbols_graph = dep.statement.dep_graph.symbols_graph
-        assert len(points) % 2 == 0
-        i = 2
-        while i < len(points):
-            table.add_expr(
-                table.get_eq2(
-                    symbols_graph.line_thru_pair(points[0], points[1]).name,
-                    symbols_graph.line_thru_pair(points[i], points[i + 1]).name,
-                ),
-                dep,
-            )
-            i += 2
-
-    @classmethod
-    def check(cls, statement: Statement) -> bool:
+    def _prep_ar(cls, statement: Statement) -> tuple[list[SumCV], Table]:
         points: tuple[Point, ...] = statement.args
         table = statement.dep_graph.ar.atable
         symbols_graph = statement.dep_graph.symbols_graph
-        assert len(points) % 2 == 0
+        eqs: list[SumCV] = []
         i = 2
         while i < len(points):
-            if not table.add_expr(
+            eqs.append(
                 table.get_eq2(
                     symbols_graph.line_thru_pair(points[0], points[1]).name,
                     symbols_graph.line_thru_pair(points[i], points[i + 1]).name,
                 ),
-                None,
-            ):
-                return False
+            )
             i += 2
-        return True
+        return eqs, table
+
+    @classmethod
+    def add(cls, dep: Dependency) -> None:
+        eqs, table = cls._prep_ar(dep.statement)
+        for eq in eqs:
+            table.add_expr(eq, dep)
+
+    @classmethod
+    def check(cls, statement: Statement) -> bool:
+        eqs, table = cls._prep_ar(statement)
+        return all(table.add_expr(eq, None) for eq in eqs)
 
 
 class NPara(Predicate):

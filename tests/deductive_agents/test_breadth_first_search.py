@@ -1,3 +1,4 @@
+from pathlib import Path
 import pytest
 
 from geosolver.agent.breadth_first_search import BFSDDAR
@@ -31,20 +32,7 @@ class TestDDAR:
         success = solver.run()
         assert success
 
-    # def test_incenter_excenter_should_fail(self):
-    #     solver = self.solver_builder.load_problem_from_txt(
-    #         "a b c = triangle a b c; "
-    #         "d = incenter d a b c; "
-    #         "e = excenter e a b c "
-    #         "? perp d c c e"
-    #     ).build()
-    #     success = solver.run(timeout=1)
-    #     check.is_false(success)
-    #     check.is_false(solver.run_infos["timeout"])
-    #     check.is_false(solver.run_infos["overstep"])
-
     def test_incenter_excenter_should_succeed(self):
-        # Note that this same problem should fail with DD only
         solver = self.solver_builder.load_problem_from_txt(
             "a b c = triangle a b c; "
             "d = incenter d a b c; "
@@ -53,15 +41,6 @@ class TestDDAR:
         ).build()
         success = solver.run()
         assert success
-
-    # def test_orthocenter_should_fail(self):
-    #     solver = self.solver_builder.load_problem_from_txt(
-    #         "a b c = triangle a b c; "
-    #         "d = on_tline d b a c, on_tline d c a b "
-    #         "? perp a d b c"
-    #     ).build()
-    #     success = solver.run()
-    #     assert not success
 
     def test_orthocenter_aux_should_succeed(self):
         solver = (
@@ -84,18 +63,5 @@ class TestDDAR:
             EqAngle, ("b", "e", "e", "a", "c", "e", "e", "d"), solver.proof.dep_graph
         ).check()
         success = solver.run()
+        solver.write_solution(Path("tests_output/orthocenter_proof.txt"))
         assert success
-
-    # def test_orthocenter_should_succeed_after_reset(self):
-    #     """The solver should be reset (deductive agent and proof state)
-    #     before adding auxiliary construction or attempting a new round of DDAR"""
-    #     solver = self.solver_builder.load_problem_from_txt(
-    #         "a b c = triangle a b c; "
-    #         "d = on_tline d b a c, on_tline d c a b "
-    #         "? perp a d b c"
-    #     ).build()
-    #     success = solver.run()
-    #     check.is_false(success)
-    #     solver.add_auxiliary_construction("e = on_line e a c, on_line e b d")
-    #     success = solver.run()
-    #     check.is_true(success)

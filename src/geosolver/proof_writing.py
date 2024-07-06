@@ -16,9 +16,9 @@ def write_solution(proof: "Proof", out_file: Optional[Path]) -> None:
       problem: Containing the problem definition and theorems.
       out_file: file to write to, empty string to skip writing to file.
     """
-    solution = "\n=========================="
-    # proof_graph = proof.dep_graph.resolve(proof.goals)
-    solution += "==========================\n"
+    solution = "==========================\n"
+    solution += proof.dep_graph.proof_text(proof.goals)
+    solution += "\n=========================="
     logging.info(solution)
     if out_file is not None:
         out_file.parent.mkdir(parents=True, exist_ok=True)
