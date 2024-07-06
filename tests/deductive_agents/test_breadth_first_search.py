@@ -12,7 +12,6 @@ class TestDDAR:
     def setUpClass(self):
         self.solver_builder = GeometricSolverBuilder().with_deductive_agent(BFSDDAR)
 
-    @pytest.mark.skip()
     @pytest.mark.slow
     def test_imo_2000_p1_should_succeed(self):
         solver = (
@@ -33,7 +32,6 @@ class TestDDAR:
             .build()
         )
 
-        solver.draw_figure(True, None)
         success = solver.run()
         assert success
 

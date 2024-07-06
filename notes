@@ -1,0 +1,1 @@
+pytest --log-cli-level=INFO -k orthocenter .\tests\deductive_agents\test_breadth_first_search.py

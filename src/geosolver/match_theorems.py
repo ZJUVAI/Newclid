@@ -68,7 +68,6 @@ class Matcher:
     def match_theorem(self, theorem: "Theorem") -> Generator["Dependency", None, None]:
         if theorem not in self.cache:
             self.cache_theorem(theorem)
-        pass
         for dep in self.cache[theorem]:
             applicable = True
             assert dep.why is not None

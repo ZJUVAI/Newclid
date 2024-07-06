@@ -33,6 +33,3 @@ midp M A B, midp M C D => para A C B D
 midp M A B, para A C B D, para A D B C => midp M C D
 eqratio O A A C O B B D, coll O A C, coll O B D, ncoll A B C, sameside A O C B O D => para A B C D
 para A B A C => coll A B C
-midp M A B, midp N C D => eqratio M A A B N C C D
-eqangle A B P Q C D U V, perp P Q U V => perp A B C D
-eqratio A B P Q C D U V, cong P Q U V => cong A B C D
