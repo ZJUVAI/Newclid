@@ -7,13 +7,14 @@ from geosolver.numerical import close_enough
 from geosolver.numerical.geometries import LineNum
 from geosolver.predicates.congruence import Cong
 from geosolver.predicates.predicate import Predicate
+from geosolver.reasoning_engines.algebraic_reasoning.tables import Angle_Chase
 from geosolver.tools import reshape
+from geosolver.dependency.dependency import Dependency
 
 if TYPE_CHECKING:
     from geosolver.reasoning_engines.algebraic_reasoning.tables import Table
     from geosolver.reasoning_engines.algebraic_reasoning.tables import SumCV
     from geosolver.dependency.dependency_graph import DependencyGraph
-    from geosolver.dependency.dependency import Dependency
     from geosolver.statement import Statement
 
 
@@ -63,6 +64,14 @@ class Para(Predicate):
         eqs, table = cls._prep_ar(dep.statement)
         for eq in eqs:
             table.add_expr(eq, dep)
+
+    @classmethod
+    def why(cls, statement: Statement) -> list[Dependency]:
+        eqs, table = cls._prep_ar(statement)
+        why: list[Statement] = []
+        for eq in eqs:
+            why.extend([dep.statement for dep in table.why(eq)])
+        return [Dependency.mk(statement, Angle_Chase, tuple(why))]
 
     @classmethod
     def check(cls, statement: Statement) -> bool:

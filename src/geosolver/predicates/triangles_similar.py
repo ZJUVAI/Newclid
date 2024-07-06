@@ -4,7 +4,7 @@ from geosolver.dependency.dependency import Dependency
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.numerical.check import same_clock
-from geosolver.predicates.predicate import Predicate
+from geosolver.predicates.predicate import IllegalPredicate, Predicate
 
 
 if TYPE_CHECKING:
@@ -15,6 +15,8 @@ if TYPE_CHECKING:
 def two_triangles(
     a: str, b: str, c: str, p: str, q: str, r: str
 ) -> tuple[str, str, str, str, str, str]:
+    if a == b or a == c or b == c or p == q or p == r or q == r:
+        raise IllegalPredicate
     (a0, p0), (b0, q0), (c0, r0) = sorted(((a, p), (b, q), (c, r)))
     (a1, p1), (b1, q1), (c1, r1) = sorted(((p, a), (q, b), (r, c)))
     return min((a0, b0, c0, p0, q0, r0), (a1, b1, c1, p1, q1, r1))
