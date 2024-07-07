@@ -35,8 +35,6 @@ class Matcher:
         points = [p.name for p in self.dep_graph.symbols_graph.nodes_of_type(Point)]
         variables = theorem.variables()
         for point_list in itertools.product(points, repeat=len(variables)):
-            if point_list == ("e", "a", "d", "b", "c", "e"):
-                pass
             try:
                 mapping: dict[str, str] = {v: p for v, p in zip(variables, point_list)}
                 why: list[Statement] = []
