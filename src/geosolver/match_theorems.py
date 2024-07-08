@@ -1,7 +1,10 @@
 """Implements theorem matching functions for the Deductive Database (DD)."""
 
 import itertools
-from typing import TYPE_CHECKING, Generator
+import logging
+from pathlib import Path
+from typing import TYPE_CHECKING, Generator, Optional
+import json
 
 from geosolver.dependency.symbols import Point
 from geosolver.predicates.predicate import IllegalPredicate
@@ -24,19 +27,47 @@ def translate_sentence(
 
 class Matcher:
     def __init__(
-        self, dep_graph: "DependencyGraph", rng: "np.random.Generator"
+        self,
+        dep_graph: "DependencyGraph",
+        runtime_cache_path: Optional[Path],
+        rng: "np.random.Generator",
     ) -> None:
         self.dep_graph = dep_graph
         self.rng = rng
+        self.runtime_cache_path = runtime_cache_path
         self.cache: dict["Theorem", set[Dependency]] = {}
+        if self.runtime_cache_path is not None and not self.runtime_cache_path.exists():
+            with open(self.runtime_cache_path, "w") as f:
+                json.dump({}, f)
 
     def cache_theorem(self, theorem: "Theorem"):
+        file_cache = None
+        write = False
+        read = False
+        mappings: list[dict[str, str]] = []
+        if self.runtime_cache_path is not None:
+            with open(self.runtime_cache_path) as f:
+                file_cache = json.load(f)
+            if "matcher" not in file_cache:
+                file_cache["matcher"] = {}
+            if str(theorem) in file_cache["matcher"] is not None:
+                mappings = file_cache["matcher"][str(theorem)]
+                read = True
+            else:
+                file_cache["matcher"][str(theorem)] = mappings
+                write = True
         self.cache[theorem] = set()
         points = [p.name for p in self.dep_graph.symbols_graph.nodes_of_type(Point)]
         variables = theorem.variables()
-        for point_list in itertools.product(points, repeat=len(variables)):
+        for mapping in (
+            mappings
+            if read
+            else (
+                {v: p for v, p in zip(variables, point_list)}
+                for point_list in itertools.product(points, repeat=len(variables))
+            )
+        ):
             try:
-                mapping: dict[str, str] = {v: p for v, p in zip(variables, point_list)}
                 why: list[Statement] = []
                 reason = theorem.descrption
                 applicable = True
@@ -50,18 +81,25 @@ class Matcher:
                     why.append(s)
                 if not applicable:
                     continue
+                if write:
+                    mappings.append(mapping)
                 for conclusion in theorem.conclusions:
-                    self.cache[theorem].add(
-                        Dependency.mk(
-                            Statement.from_tokens(
-                                translate_sentence(mapping, conclusion), self.dep_graph
-                            ),
-                            reason,
-                            tuple(why),
-                        )
+                    dep = Dependency.mk(
+                        Statement.from_tokens(
+                            translate_sentence(mapping, conclusion), self.dep_graph
+                        ),
+                        reason,
+                        tuple(why),
                     )
+                    self.cache[theorem].add(dep)
             except IllegalPredicate:
                 continue
+        if self.runtime_cache_path is not None and write:
+            with open(self.runtime_cache_path, "w") as f:
+                json.dump(file_cache, f)
+        logging.info(
+            f"{theorem} matching cache : now {len(self.cache[theorem])} {read=} {write=} {len(mappings)=}"
+        )
 
     def match_theorem(self, theorem: "Theorem") -> Generator["Dependency", None, None]:
         if theorem not in self.cache:

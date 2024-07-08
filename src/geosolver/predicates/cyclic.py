@@ -42,11 +42,15 @@ class Cyclic(Predicate):
 
     @classmethod
     def check(cls, statement: Statement) -> bool:
-        return Circle.check_concyclic(statement.args)
+        return Circle.check_cyclic(statement.args)
 
     @classmethod
     def add(cls, dep: Dependency):
-        Circle.make_concyclic(dep.statement.args, dep)
+        Circle.make_cyclic(dep.statement.args, dep)
+
+    @classmethod
+    def why(cls, statement: Statement) -> Dependency:
+        return Circle.why_cyclic(statement)
 
     @classmethod
     def to_repr(cls, statement: Statement) -> str:

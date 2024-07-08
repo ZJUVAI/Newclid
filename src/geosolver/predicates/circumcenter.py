@@ -1,8 +1,10 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
+from geosolver.dependency.dependency import Dependency
 from geosolver.numerical import close_enough
 from geosolver.numerical.geometries import CircleNum
 from geosolver.predicates.congruence import Cong
+from geosolver.predicates.cyclic import Cyclic
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
 
 
@@ -50,6 +52,28 @@ class Circumcenter(Predicate):
             if not cong.check():
                 return False
         return True
+
+    @classmethod
+    def add(cls, dep: Dependency) -> None:
+        points: tuple[Point, ...] = dep.statement.args
+        o = points[0]
+        p0 = points[1]
+        for p1 in points[2:]:
+            cong = dep.with_new(dep.statement.with_new(Cong, (o, p0, o, p1)))
+            cong.add()
+        if len(points) > 4:
+            dep.with_new(dep.statement.with_new(Cyclic, points[1:])).add()
+
+    @classmethod
+    def why(cls, statement: Statement) -> Dependency:
+        points: tuple[Point, ...] = statement.args
+        o = points[0]
+        p0 = points[1]
+        return Dependency.mk(
+            statement,
+            "",
+            tuple(statement.with_new(Cong, (o, p0, o, p1)) for p1 in points[2:]),
+        )
 
     @classmethod
     def to_repr(cls, statement: Statement) -> str:

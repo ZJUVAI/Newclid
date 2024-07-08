@@ -1,6 +1,6 @@
 from __future__ import annotations
 from abc import ABC
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 
 if TYPE_CHECKING:
@@ -38,10 +38,10 @@ class Predicate(ABC):
         return
 
     @classmethod
-    def why(cls, statement: Statement) -> list[Dependency]:
+    def why(cls, statement: Statement) -> Optional[Dependency]:
         """Resolve the reason and list of dependencies
         justifying why this predicate could be true."""
-        raise NotImplementedError(f"{cls.NAME} why not implemented")
+        return None
 
     @classmethod
     def pretty(cls, statement: Statement) -> str:

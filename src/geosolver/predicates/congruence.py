@@ -80,12 +80,16 @@ class Cong(Predicate):
         return all(table.add_expr(eq, None) for eq in eqs)
 
     @classmethod
-    def why(cls, statement: Statement) -> list[Dependency]:
+    def why(cls, statement: Statement) -> Dependency:
         eqs, table = cls._prep_ar(statement)
-        why: list[Statement] = []
+        why: list[Dependency] = []
         for eq in eqs:
-            why.extend([dep.statement for dep in table.why(eq)])
-        return [Dependency.mk(statement, Ratio_Chase, tuple(why))]
+            why.extend(table.why(eq))
+        if len(why) == 1:
+            return why[0].with_new(statement)
+        return Dependency.mk(
+            statement, Ratio_Chase, tuple(dep.statement for dep in why)
+        )
 
     @classmethod
     def to_repr(cls, statement: Statement) -> str:

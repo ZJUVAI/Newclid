@@ -36,6 +36,10 @@ class Coll(Predicate):
         return Line.check_coll(statement.args)
 
     @classmethod
+    def why(cls, statement: Statement) -> Dependency:
+        return Line.why_coll(statement)
+
+    @classmethod
     def add(cls, dep: Dependency):
         rep, merged = Line.make_coll(dep.statement.args, dep)
         table = dep.statement.dep_graph.ar.atable
@@ -75,8 +79,8 @@ class NColl(Predicate):
         return not statement.with_new(Coll, None).check_numerical()
 
     @classmethod
-    def why(cls, statement: Statement) -> list[Dependency]:
-        return [Dependency.mk(statement, CONSTRUCTION, tuple())]
+    def why(cls, statement: Statement) -> Dependency:
+        return Dependency.mk(statement, CONSTRUCTION, tuple())
 
     @classmethod
     def to_repr(cls, statement: Statement) -> str:

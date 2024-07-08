@@ -37,13 +37,8 @@ class Statement:
         """Check if the statement is numerically sound."""
         return self.predicate.check_numerical(self)
 
-    def why(self) -> list[Dependency]:
-        deps = self.dep_graph.hyper_graph.get(self)
-        if deps is not None and len(deps) > 0:
-            return list(deps)
-        deps = self.predicate.why(self)
-        self.dep_graph.hyper_graph[self] = set(deps)
-        return deps
+    def why(self) -> Optional[Dependency]:
+        return self.predicate.why(self)
 
     def __repr__(self) -> str:
         return self.predicate.to_repr(self)

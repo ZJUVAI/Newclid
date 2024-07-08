@@ -4,10 +4,11 @@ from __future__ import annotations
 from abc import ABC
 from typing import TYPE_CHECKING, Optional, Self, TypeVar
 
-from geosolver.dependency.dependency import Dependency
+from geosolver.dependency.dependency import CONSTRUCTION, Dependency
 from geosolver.numerical.geometries import CircleNum, LineNum, PointNum
 
 if TYPE_CHECKING:
+    from geosolver.statement import Statement
     from geosolver.dependency.symbols_graph import SymbolsGraph
     from geosolver.dependency.dependency import Dependency
 
@@ -42,7 +43,7 @@ class Symbol(ABC):
         self.name = name
         self.symbols_graph = symbols_graph
         self.dep = dep
-        self.merge_graph: dict[Self, Dependency] = {}
+        self.fellows: list[Self] = []
         self._rep: Self = self
 
     def rep(self) -> Self:
@@ -57,8 +58,7 @@ class Symbol(ABC):
             return selfrep
         noderep._rep = selfrep
 
-        selfrep.merge_graph[noderep] = dep
-        noderep.merge_graph[selfrep] = dep
+        selfrep.fellows.append(noderep)
         return selfrep
 
     def _merge(self, nodes: list[Self], dep: Dependency) -> Self:
@@ -66,49 +66,8 @@ class Symbol(ABC):
             self._merge_one(node, dep)
         return self.rep()
 
-    def why_equiv(self, others: set[Self]) -> list[Dependency]:
-        """Why this node is equivalent to other nodes (BFS)."""
-        found = 0
-
-        parent: dict[Self, Self] = {}
-        queue: list[Self] = [self]
-        i = 0
-
-        while i < len(queue):
-            current = queue[i]
-            i += 1
-
-            if current in others:
-                found += 1
-            if found == len(others):
-                return bfs_backtrack(self, others, parent)
-
-            for neighbor in current.merge_graph:
-                if neighbor in parent:
-                    continue
-                queue.append(neighbor)
-                parent[neighbor] = current
-        raise Exception("Why resolution fails")
-
     def __repr__(self) -> str:
         return self.name
-
-
-def bfs_backtrack(root: S, leafs: set[S], parent: dict[S, S]) -> list[Dependency]:
-    """Return the path given BFS trace of parent nodes."""
-    backtracked: set[S] = {root}  # no need to backtrack further when touching this set.
-    deps: list[Dependency] = []
-    for node in leafs:
-        if node in backtracked:
-            continue
-        while node not in backtracked:
-            backtracked.add(node)
-            deps.append(node.merge_graph[parent[node]])
-            if node.dep is not None:
-                deps.append(node.dep)
-            node = parent[node]
-
-    return list(set(deps))
 
 
 class Point(Symbol):
@@ -150,6 +109,23 @@ class Line(Symbol):
         symbols_graph.merge(line, merge, dep)
         return line, merge
 
+    @classmethod
+    def why_coll(cls, statement: Statement) -> Dependency:
+        points: tuple[Point, ...] = statement.args
+        symbols_graph = points[0].symbols_graph
+        s = set(points)
+        for line in symbols_graph.nodes_of_type(Line):
+            if s <= line.points:
+                target = line
+                for _target in line.fellows:
+                    if s <= _target.points and len(_target.points) < len(target.points):
+                        target = _target
+                if target.dep:
+                    return target.dep.with_new(statement)
+                else:
+                    return Dependency.mk(statement, CONSTRUCTION, ())
+        raise Exception("why_coll failed")
+
 
 class Circle(Symbol):
     """Symbol of type Circle."""
@@ -158,7 +134,7 @@ class Circle(Symbol):
     num: CircleNum
 
     @classmethod
-    def check_concyclic(cls, points: list[Point] | tuple[Point]) -> bool:
+    def check_cyclic(cls, points: list[Point] | tuple[Point]) -> bool:
         symbols_graph = points[0].symbols_graph
         s = set(points)
         for c in symbols_graph.nodes_of_type(Circle):
@@ -167,7 +143,7 @@ class Circle(Symbol):
         return False
 
     @classmethod
-    def make_concyclic(cls, points: list[Point] | tuple[Point], dep: Dependency):
+    def make_cyclic(cls, points: list[Point] | tuple[Point], dep: Dependency):
         symbols_graph = points[0].symbols_graph
         s = set(points)
         merge: list[Circle] = []
@@ -182,3 +158,20 @@ class Circle(Symbol):
         )
         c.points = s
         symbols_graph.merge(c, merge, dep)
+
+    @classmethod
+    def why_cyclic(cls, statement: Statement) -> Dependency:
+        points: tuple[Point, ...] = statement.args
+        symbols_graph = points[0].symbols_graph
+        s = set(points)
+        for line in symbols_graph.nodes_of_type(Circle):
+            if s <= line.points:
+                target = line
+                for _target in line.fellows:
+                    if s <= _target.points and len(_target.points) < len(target.points):
+                        target = _target
+                if target.dep:
+                    return target.dep.with_new(statement)
+                else:
+                    return Dependency.mk(statement, CONSTRUCTION, ())
+        raise Exception("why_concyclic failed")

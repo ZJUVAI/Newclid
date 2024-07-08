@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
+from geosolver.dependency.dependency import Dependency
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.numerical.check import same_clock
@@ -43,6 +44,10 @@ class ContriClock(Predicate):
         )
 
     @classmethod
+    def add(cls, dep: Dependency) -> None:
+        dep.with_new(dep.statement.with_new(ContriAny, None)).add()
+
+    @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
         return tuple(p.name for p in args)
 
@@ -75,6 +80,10 @@ class ContriReflect(Predicate):
             and close_enough(b.num.distance(c.num) - q.num.distance(r.num), 0)
             and not same_clock(a.num, b.num, c.num, p.num, q.num, r.num)
         )
+
+    @classmethod
+    def add(cls, dep: Dependency) -> None:
+        dep.with_new(dep.statement.with_new(ContriAny, None)).add()
 
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:

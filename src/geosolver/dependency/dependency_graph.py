@@ -18,15 +18,6 @@ class DependencyGraph:
         self.hyper_graph: dict[Statement, set[Dependency]] = {}
         self.ar = ar
 
-    def add_edge_to_hyper_graph(self, dep: "Dependency"):
-        s = self.hyper_graph.get(dep.statement)
-        if s is None:
-            self.hyper_graph[dep.statement] = {dep}
-        else:
-            if len(s) == 0:
-                s.update(dep.statement.why())
-            s.add(dep)
-
     def _proof_text(
         self,
         statement: Statement,
@@ -39,7 +30,13 @@ class DependencyGraph:
             id[statement] = str(len(id))
         sub_proof[statement] = None
         my_proof = None
-        for dep in statement.why():
+        deps = (
+            list(self.hyper_graph[statement]) if statement in self.hyper_graph else []
+        )
+        extra_dep = statement.why()
+        if extra_dep is not None:
+            deps.append(extra_dep)
+        for dep in deps:
             cur_proof: tuple[str, ...] | None = tuple()
             for premise in dep.why:
                 t = self._proof_text(premise, id, sub_proof)
@@ -55,6 +52,7 @@ class DependencyGraph:
                     f"{', '.join(premise.pretty() + ' [' + id[premise] + ']' for premise in dep.why)} {dep.reason}=> {dep.statement.pretty()} [{id[dep.statement]}]",
                 )
         if my_proof is None:
+            del sub_proof[statement]
             return None
         sub_proof[statement] = my_proof
         return my_proof
@@ -67,7 +65,7 @@ class DependencyGraph:
             id[goal] = "g" + str(i)
             proof_of_goal = self._proof_text(goal, id, sub_proof)
             if proof_of_goal is None:
-                break
+                assert False
             for s in proof_of_goal:
                 if s not in res:
                     res.append(s)

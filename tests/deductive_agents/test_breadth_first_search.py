@@ -12,7 +12,36 @@ class TestDDAR:
     def setUpClass(self):
         self.solver_builder = GeometricSolverBuilder().with_deductive_agent(BFSDDAR)
 
-    @pytest.mark.slow
+    @pytest.mark.skip
+    def test_translated_imo_2011_p6_with_orthocenter(self):
+        solver = (
+            self.solver_builder.load_problem_from_txt(
+                "a b c = triangle a b c; "
+                "o = circle o a b c; "
+                "p = on_circle p o a; "
+                "q = on_tline q p o p; "
+                "pa = reflect pa p b c; "
+                "pb = reflect pb p c a; "
+                "pc = reflect pc p a b; "
+                "qa = reflect qa q b c; "
+                "qb = reflect qb q c a; "
+                "qc = reflect qc q a b; "
+                "a1 = on_line a1 pb qb, on_line a1 pc qc; "
+                "b1 = on_line b1 pa qa, on_line b1 pc qc; "
+                "c1 = on_line c1 pa qa, on_line c1 pb qb; "
+                "o1 = circle o1 a1 b1 c1; "
+                "x = on_circle x o a, on_circle x o1 a1; "
+                "h = orthocenter h a b c ? coll x o o1"
+            )
+            .load_rules_from_file(r"rule_sets\imo.txt")
+            .with_runtime_cache(Path("tests_output/imo2011p6cache.json"))
+            .build()
+        )
+
+        success = solver.run()
+        solver.write_solution(Path("tests_output/imo2011p6_proof.txt"))
+        assert success
+
     def test_imo_2000_p1_should_succeed(self):
         solver = (
             self.solver_builder.load_problem_from_txt(
@@ -29,10 +58,12 @@ class TestDDAR:
                 "? cong e p e q"
             )
             .load_rules_from_file(r"rule_sets\imo.txt")
+            .with_runtime_cache(Path("tests_output/imo2000p1cache.json"))
             .build()
         )
 
         success = solver.run()
+        # solver.write_solution(Path("tests_output/imo2000p1_proof.txt"))
         assert success
 
     def test_incenter_excenter_should_succeed(self):

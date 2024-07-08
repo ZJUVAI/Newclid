@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable, Union
+from pathlib import Path
+from typing import TYPE_CHECKING, Callable, Optional, Union
 import logging
 
 from geosolver.definition.clause import Clause
@@ -62,6 +63,7 @@ class Proof:
         self,
         problem: Problem,
         defs: dict[str, Definition],
+        runtime_cache_path: Optional[Path],
         rng: "Generator",
     ):
         self.dep_graph = DependencyGraph(AlgebraicManipulator())
@@ -76,8 +78,9 @@ class Proof:
             StopAction: self._step_stop,
             EmptyAction: self._idle,
         }
+        self.runtime_cache_path = runtime_cache_path
         self.rng = rng
-        self.matcher = Matcher(self.dep_graph, self.rng)
+        self.matcher = Matcher(self.dep_graph, self.runtime_cache_path, self.rng)
 
     @classmethod
     def build_problem(
@@ -85,6 +88,7 @@ class Proof:
         problem: Problem,
         defs: dict[str, Definition],
         reasoning_engines: dict[str, type[ReasoningEngine]],
+        runtime_cache_path: Optional[Path],
         max_attempts: int = 10000,
         *,
         rng: "Generator",
@@ -99,6 +103,7 @@ class Proof:
                 proof = Proof(
                     problem=problem,
                     defs=defs,
+                    runtime_cache_path=runtime_cache_path,
                     rng=rng,
                 )
                 added: list[Dependency] = []

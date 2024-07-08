@@ -40,8 +40,8 @@ class Diff(Predicate):
         return cls.check_numerical(statement)
 
     @classmethod
-    def why(cls, statement: Statement) -> list[Dependency]:
-        return [Dependency.mk(statement, CONSTRUCTION, ())]
+    def why(cls, statement: Statement) -> Dependency:
+        return Dependency.mk(statement, CONSTRUCTION, ())
 
     @classmethod
     def to_repr(cls, statement: Statement) -> str:

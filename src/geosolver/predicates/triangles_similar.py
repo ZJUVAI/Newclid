@@ -52,6 +52,10 @@ class SimtriClock(Predicate):
         )
 
     @classmethod
+    def add(cls, dep: Dependency) -> None:
+        dep.with_new(dep.statement.with_new(SimtriAny, None)).add()
+
+    @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
         return tuple(p.name for p in args)
 
@@ -84,6 +88,10 @@ class SimtriReflect(Predicate):
             and close_enough(b.num.distance(c.num) * k - q.num.distance(r.num), 0)
             and not same_clock(a.num, b.num, c.num, p.num, q.num, r.num)
         )
+
+    @classmethod
+    def add(cls, dep: Dependency) -> None:
+        dep.with_new(dep.statement.with_new(SimtriAny, None)).add()
 
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
@@ -131,21 +139,6 @@ class SimtriAny(Predicate):
         return close_enough(
             a.num.distance(c.num) * k - p.num.distance(r.num), 0
         ) and close_enough(b.num.distance(c.num) * k - q.num.distance(r.num), 0)
-
-    @classmethod
-    def why(cls, statement: Statement) -> list[Dependency]:
-        args: tuple[Point, ...] = statement.args
-        a, b, c, p, q, r = args
-        if same_clock(a.num, b.num, c.num, p.num, q.num, r.num):
-            return [
-                dep.with_new(statement)
-                for dep in statement.with_new(SimtriClock, None).why()
-            ]
-        else:
-            return [
-                dep.with_new(statement)
-                for dep in statement.with_new(SimtriReflect, None).why()
-            ]
 
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:

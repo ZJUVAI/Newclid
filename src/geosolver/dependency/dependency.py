@@ -24,7 +24,13 @@ class Dependency(NamedTuple):
 
     def add(self):
         dep_graph = self.statement.dep_graph
-        dep_graph.add_edge_to_hyper_graph(self)
+        s = dep_graph.hyper_graph.get(self.statement)
+        if s is not None and self in s:
+            return
+        if s is None:
+            dep_graph.hyper_graph[self.statement] = {self}
+        else:
+            s.add(self)
         self.statement.predicate.add(self)
 
     def with_new(self, statement: Statement) -> Dependency:
@@ -34,5 +40,5 @@ class Dependency(NamedTuple):
     def mk(
         cls, statement: Statement, reason: str, why: tuple[Statement, ...]
     ) -> Dependency:
-        why = tuple(sorted(why, key=lambda x: hash(x)))
+        why = tuple(sorted(set(why), key=lambda x: hash(x)))
         return Dependency(statement, reason, why)

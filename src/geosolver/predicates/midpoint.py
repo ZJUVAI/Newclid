@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
+from geosolver.dependency.dependency import Dependency
 from geosolver.dependency.symbols import Point
 from geosolver.predicates.collinearity import Coll
 from geosolver.predicates.congruence import Cong
@@ -42,6 +43,14 @@ class MidPoint(Predicate):
         coll = statement.with_new(Coll, (m, a, b))
         cong = statement.with_new(Cong, (m, a, m, b))
         return coll.check() and cong.check()
+
+    @classmethod
+    def why(cls, statement: Statement) -> Dependency:
+        args: tuple[Point, ...] = statement.args
+        m, a, b = args
+        coll = statement.with_new(Coll, (m, a, b))
+        cong = statement.with_new(Cong, (m, a, m, b))
+        return Dependency.mk(statement, "", (coll, cong))
 
     @classmethod
     def to_repr(cls, statement: Statement) -> str:

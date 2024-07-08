@@ -51,13 +51,12 @@ class Perp(Predicate):
         dep.with_new(dep.statement.with_new(EqAngle, (a, b, c, d, c, d, a, b))).add()
 
     @classmethod
-    def why(cls, statement: Statement) -> list[Dependency]:
+    def why(cls, statement: Statement) -> Dependency:
         args: tuple[Point, ...] = statement.args
         a, b, c, d = args
-        return [
-            dep.with_new(statement)
-            for dep in statement.with_new(EqAngle, (a, b, c, d, c, d, a, b)).why()
-        ]
+        return EqAngle.why(
+            statement.with_new(EqAngle, (a, b, c, d, c, d, a, b))
+        ).with_new(statement)
 
 
 class NPerp(Predicate):

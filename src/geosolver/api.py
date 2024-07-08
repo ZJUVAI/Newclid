@@ -83,6 +83,7 @@ class GeometricSolverBuilder:
         self.defs: Optional[dict[str, Definition]] = None
         self.rules: Optional[list[Theorem]] = None
         self.deductive_agent: Optional[type[DeductiveAgent]] = None
+        self.runtime_cache_path: Optional[Path] = None
         self.reasoning_engines: dict[str, Type[ReasoningEngine]] = {
             "AR": AlgebraicManipulator
         }
@@ -106,6 +107,7 @@ class GeometricSolverBuilder:
             problem=self.problem,
             defs=self.defs,
             reasoning_engines=self.reasoning_engines,
+            runtime_cache_path=self.runtime_cache_path,
             rng=self.rng,
         )
 
@@ -157,6 +159,10 @@ class GeometricSolverBuilder:
 
     def load_defs_from_txt(self, defs_txt: str) -> Self:
         self.defs = Definition.to_dict(Definition.parse_text(defs_txt))
+        return self
+
+    def with_runtime_cache(self, path: Path) -> Self:
+        self.runtime_cache_path = path
         return self
 
     def with_deductive_agent(self, deductive_agent: type[DeductiveAgent]) -> Self:
