@@ -1,1 +1,2 @@
 pytest --log-cli-level=INFO -k orthocenter .\tests\deductive_agents\test_breadth_first_search.py
+('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'Q', 'R', 'P'), ('ncoll', 'A', 'B', 'C') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')

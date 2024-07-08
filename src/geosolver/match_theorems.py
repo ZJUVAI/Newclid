@@ -59,6 +59,9 @@ class Matcher:
         self.cache[theorem] = set()
         points = [p.name for p in self.dep_graph.symbols_graph.nodes_of_type(Point)]
         variables = theorem.variables()
+        logging.info(
+            f"{theorem} matching cache : before {len(self.cache[theorem])=} {read=} {write=} {len(mappings)=}"
+        )
         for mapping in (
             mappings
             if read
@@ -98,12 +101,15 @@ class Matcher:
             with open(self.runtime_cache_path, "w") as f:
                 json.dump(file_cache, f)
         logging.info(
-            f"{theorem} matching cache : now {len(self.cache[theorem])} {read=} {write=} {len(mappings)=}"
+            f"{theorem} matching cache : now {len(self.cache[theorem])=} {read=} {write=} {len(mappings)=}"
         )
 
     def match_theorem(self, theorem: "Theorem") -> Generator["Dependency", None, None]:
+        logging.info("Start caching")
         if theorem not in self.cache:
             self.cache_theorem(theorem)
+        logging.info("Finish caching")
+        logging.info("Start matching")
         for dep in self.cache[theorem]:
             applicable = True
             assert dep.why is not None
@@ -112,3 +118,4 @@ class Matcher:
                     applicable = False
             if applicable:
                 yield dep
+        logging.info("Finish matching")

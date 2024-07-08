@@ -30,12 +30,12 @@ class DependencyGraph:
             id[statement] = str(len(id))
         sub_proof[statement] = None
         my_proof = None
-        deps = (
-            list(self.hyper_graph[statement]) if statement in self.hyper_graph else []
-        )
-        extra_dep = statement.why()
-        if extra_dep is not None:
-            deps.append(extra_dep)
+        deps: set[Dependency] = set()
+        if statement in self.hyper_graph:
+            deps = self.hyper_graph[statement]
+            extra_dep = statement.why()
+            if extra_dep is not None:
+                deps.add(extra_dep)
         for dep in deps:
             cur_proof: tuple[str, ...] | None = tuple()
             for premise in dep.why:

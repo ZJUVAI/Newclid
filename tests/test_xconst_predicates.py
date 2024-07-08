@@ -272,7 +272,7 @@ class TestConstants:
             "a b = segment a b; m = midpoint m a b ? rconst m a a b 1/2",
         )
         solver.rules = [Theorem.from_string("midp m a b => rconst m a a b 1/2")]
-        success = solver.build().run()
+        success = solver.load_rules_from_file(r"rule_sets\imo.txt").build().run()
         assert success
 
     def test_triangle12_in_rconst_out(self):

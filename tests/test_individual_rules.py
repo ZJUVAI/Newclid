@@ -1,7 +1,6 @@
 import pytest
 
 from geosolver.api import GeometricSolverBuilder
-from geosolver.theorem import Theorem
 
 
 EXPECTED_TO_FAIL = []
@@ -42,6 +41,7 @@ EXPECTED_TO_FAIL = []
         ),
         (
             "r06",
+            "cong M A M B, coll M A B => midp M A B\n"
             "midp E A B, midp F A C => para E F B C",
             "a = free a; b = free b; c = free c; e = midpoint e a b; f = midpoint f a c ? para e f b c",
         ),
@@ -97,6 +97,7 @@ EXPECTED_TO_FAIL = []
         ),
         (
             "r17",
+            "cong M A M B, coll M A B => midp M A B\n"
             "circle O A B C, midp M B C => eqangle A B A C O B O M",
             "a = free a; b = free b; c = free c; o = circle o a b c; m = midpoint m b c ? eqangle a b a c o b o m",
         ),
@@ -107,6 +108,7 @@ EXPECTED_TO_FAIL = []
         ),
         (
             "r19",
+            "cong M A M B, coll M A B => midp M A B\n"
             "perp A B B C, midp M A C => cong A M B M",
             "a = free a; b = free b; c = on_tline c b b a; m = midpoint m a c ? cong a m b m",
         ),
@@ -122,6 +124,7 @@ EXPECTED_TO_FAIL = []
         ),
         (
             "r22",
+            "cong M A M B, coll M A B => midp M A B\n"
             "midp M A B, perp O M A B => cong O A O B",
             "a = free a; b = free b; m = midpoint m a b; o = on_tline o m a b ? cong o a o b",
         ),
@@ -137,11 +140,13 @@ EXPECTED_TO_FAIL = []
         ),
         (
             "r25",
+            "cong M A M B, coll M A B => midp M A B\n"
             "midp M A B, midp M C D => para A C B D",
             "a = free a; b = free b; c = free c; m = midpoint m a b; d = on_line d c m, eqdistance d m c m ? para a c b d",
         ),
         (
             "r26",
+            "cong M A M B, coll M A B => midp M A B\n"
             "midp M A B, para A C B D, para A D B C => midp M C D",
             "a = free a; b = free b; c = free c; d = on_pline d b a c, on_pline d a b c; m = midpoint m a b ? midp m c d",
         ),
@@ -157,6 +162,7 @@ EXPECTED_TO_FAIL = []
         ),
         (
             "r29",
+            "cong M A M B, coll M A B => midp M A B\n"
             "midp M A B, midp N C D => eqratio M A A B N C C D",
             "a = free a; b = free b; c = free c; d = free d; m = midpoint m a b; n = midpoint n c d ? eqratio m a a b n c c d",
         ),
@@ -227,6 +233,7 @@ EXPECTED_TO_FAIL = []
         ),
         (
             "r50",
+            "cong M A M B, coll M A B => midp M A B\n"
             "midp M A B => rconst M A A B 1/2",
             "a b = segment a b; m = midpoint m a b ? rconst m a a b 1/2",
         ),
@@ -235,11 +242,11 @@ EXPECTED_TO_FAIL = []
 def test_rule_used_to_solve_in_one_step(
     rule_name: str, rule_txt: str, problem_txt: str
 ):
-    theorem = Theorem.from_string(rule_txt, rule_name)
-
-    solver_builder = GeometricSolverBuilder().load_problem_from_txt(problem_txt)
-    solver_builder.reasoning_engines = {}
-    solver_builder.rules = [theorem]
+    solver_builder = (
+        GeometricSolverBuilder()
+        .load_problem_from_txt(problem_txt)
+        .load_rules_from_txt(rule_txt)
+    )
     solver = solver_builder.build()
 
     success = solver.run()

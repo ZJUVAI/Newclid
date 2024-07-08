@@ -32,3 +32,7 @@ midp M A B, midp M C D => para A C B D
 midp M A B, para A C B D, para A D B C => midp M C D
 eqratio O A A C O B B D, coll O A C, coll O B D, ncoll A B C, sameside A O C B O D => para A B C D
 para A B A C => coll A B C
+midp M A B => rconst M A A B 1/2
+midp M A B => cong M A M B
+midp M A B => coll M A B
+cong M A M B, coll M A B => midp M A B

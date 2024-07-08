@@ -12,7 +12,7 @@ class TestDDAR:
     def setUpClass(self):
         self.solver_builder = GeometricSolverBuilder().with_deductive_agent(BFSDDAR)
 
-    @pytest.mark.skip
+    # @pytest.mark.skip
     def test_translated_imo_2011_p6_with_orthocenter(self):
         solver = (
             self.solver_builder.load_problem_from_txt(
@@ -39,7 +39,7 @@ class TestDDAR:
         )
 
         success = solver.run()
-        solver.write_solution(Path("tests_output/imo2011p6_proof.txt"))
+        # solver.write_solution(Path("tests_output/imo2011p6_proof.txt"))
         assert success
 
     def test_imo_2000_p1_should_succeed(self):
@@ -63,8 +63,8 @@ class TestDDAR:
         )
 
         success = solver.run()
-        # solver.write_solution(Path("tests_output/imo2000p1_proof.txt"))
         assert success
+        solver.write_solution(Path("tests_output/imo2000p1_proof.txt"))
 
     def test_incenter_excenter_should_succeed(self):
         solver = (
