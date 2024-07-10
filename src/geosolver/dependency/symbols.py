@@ -82,7 +82,7 @@ class Line(Symbol):
     num: LineNum
 
     @classmethod
-    def check_coll(cls, points: Union[list[Point], tuple[Point]]) -> bool:
+    def check_coll(cls, points: Union[list[Point], tuple[Point, ...]]) -> bool:
         symbols_graph = points[0].symbols_graph
         s = set(points)
         for line in symbols_graph.nodes_of_type(Line):
@@ -92,7 +92,7 @@ class Line(Symbol):
 
     @classmethod
     def make_coll(
-        cls, points: Union[list[Point], tuple[Point]], dep: Dependency
+        cls, points: Union[list[Point], tuple[Point, ...]], dep: Dependency
     ) -> tuple[Line, list[Line]]:
         symbols_graph = points[0].symbols_graph
         s = set(points)
@@ -107,6 +107,8 @@ class Line(Symbol):
             Line, f"line/{'-'.join(p.name for p in points)}/", dep
         )
         line.points = s
+        points = list(line.points)
+        line.num = LineNum(p1=points[0].num, p2=points[1].num)
         symbols_graph.merge(line, merge, dep)
         return line, merge
 
@@ -135,7 +137,7 @@ class Circle(Symbol):
     num: CircleNum
 
     @classmethod
-    def check_cyclic(cls, points: Union[list[Point], tuple[Point]]) -> bool:
+    def check_cyclic(cls, points: Union[list[Point], tuple[Point, ...]]) -> bool:
         symbols_graph = points[0].symbols_graph
         s = set(points)
         for c in symbols_graph.nodes_of_type(Circle):
@@ -144,7 +146,9 @@ class Circle(Symbol):
         return False
 
     @classmethod
-    def make_cyclic(cls, points: Union[list[Point], tuple[Point]], dep: Dependency):
+    def make_cyclic(
+        cls, points: Union[list[Point], tuple[Point, ...]], dep: Dependency
+    ):
         symbols_graph = points[0].symbols_graph
         s = set(points)
         merge: list[Circle] = []
@@ -158,6 +162,8 @@ class Circle(Symbol):
             Circle, f"circle({''.join(p.name for p in points)})", dep
         )
         c.points = s
+        points = list(c.points)
+        c.num = CircleNum(p1=points[0].num, p2=points[1].num, p3=points[2].num)
         symbols_graph.merge(c, merge, dep)
 
     @classmethod
