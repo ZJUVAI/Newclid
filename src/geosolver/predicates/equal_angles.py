@@ -102,3 +102,10 @@ class EqAngle(Predicate):
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
         return tuple(p.name for p in args)
+
+    @classmethod
+    def pretty(cls, statement: Statement) -> str:
+        args: tuple[Point, ...] = statement.args
+        return " = ".join(
+            f"∠({a.name}{b.name},{c.name}{d.name})" for a, b, c, d in reshape(args, 4)
+        )

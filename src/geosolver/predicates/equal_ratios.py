@@ -46,7 +46,7 @@ class EqRatio(Predicate):
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
         ratio = None
-        for a, b, c, d in reshape(list(statement.args), 4):
+        for a, b, c, d in reshape(statement.args, 4):
             a: Point
             b: Point
             c: Point
@@ -102,11 +102,12 @@ class EqRatio(Predicate):
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
         return tuple(p.name for p in args)
 
-
-class EqRatio6(EqRatio):
-    """eqratio AB CD EF -"""
-
-    NAME = "eqratio6"
+    @classmethod
+    def pretty(cls, statement: Statement) -> str:
+        args: tuple[Point, ...] = statement.args
+        return " = ".join(
+            f"{a.name}{b.name}:{c.name}{d.name}" for a, b, c, d in reshape(args, 4)
+        )
 
 
 class EqRatio3(Predicate):

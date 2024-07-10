@@ -58,6 +58,12 @@ class Perp(Predicate):
             statement.with_new(EqAngle, (a, b, c, d, c, d, a, b))
         ).with_new(statement)
 
+    @classmethod
+    def pretty(cls, statement: Statement) -> str:
+        args: tuple[Point, ...] = statement.args
+        a, b, c, d = args
+        return f"{a.name}{b.name} ⟂ {c.name}{d.name}"
+
 
 class NPerp(Predicate):
     """nperp A B C D -

@@ -47,7 +47,7 @@ class Coll(Predicate):
             table.add_expr(table.get_eq2(rep.name, line.name), dep)
 
     @classmethod
-    def to_repr(cls, statement: Statement) -> str:
+    def pretty(cls, statement: Statement) -> str:
         return f"coll/{''.join(repr(p) for p in statement.args)}/"
 
     @classmethod
@@ -83,5 +83,5 @@ class NColl(Predicate):
         return Dependency.mk(statement, CONSTRUCTION, tuple())
 
     @classmethod
-    def to_repr(cls, statement: Statement) -> str:
+    def pretty(cls, statement: Statement) -> str:
         return f"ncoll/{''.join(repr(p) for p in statement.args)}\\"
