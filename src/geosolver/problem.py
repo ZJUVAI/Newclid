@@ -25,7 +25,7 @@ class Problem(NamedTuple):
         )
 
     @classmethod
-    def parse_txt_file(cls, fname: str | Path):
+    def parse_txt_file(cls, fname: Path):
         with open(fname, "r") as f:
             lines = f.read().split("\n")
 

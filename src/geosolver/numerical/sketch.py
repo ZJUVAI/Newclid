@@ -1,6 +1,6 @@
 from __future__ import annotations
 from fractions import Fraction
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Union
 from numpy.random import Generator
 
 from geosolver.numerical import close_enough
@@ -21,7 +21,9 @@ if TYPE_CHECKING:
     pass
 
 
-def sketch(name: str, args: tuple[PointNum | str, ...], rng: Generator) -> list[ObjNum]:
+def sketch(
+    name: str, args: tuple[Union[PointNum, str], ...], rng: Generator
+) -> list[ObjNum]:
     fun = globals()["sketch_" + name]
     res = fun(args, rng=rng)
     if isinstance(res, list) or isinstance(res, tuple):
@@ -676,7 +678,9 @@ def sketch_rconst(
     return CircleNum(center=C, radius=length)
 
 
-def sketch_eqratio6(args: tuple[PointNum, ...], **kwargs: Any) -> CircleNum | LineNum:
+def sketch_eqratio6(
+    args: tuple[PointNum, ...], **kwargs: Any
+) -> Union[CircleNum, LineNum]:
     """Sketches a point x such that ax/cx=ef/gh"""
     A, C, E, F, G, H = args
     d_ef = E.distance(F)
@@ -704,7 +708,7 @@ def sketch_lconst(args: tuple[PointNum, str], **kwargs: Any) -> CircleNum:
 
 def sketch_rconst2(
     args: tuple[PointNum, PointNum, str], **kwargs: Any
-) -> CircleNum | LineNum:
+) -> Union[CircleNum, LineNum]:
     """Sketches point x such that ax/bx=r"""
 
     A, B, r = args

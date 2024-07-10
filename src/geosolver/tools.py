@@ -1,4 +1,4 @@
-from typing import Optional, TypeVar
+from typing import Optional, TypeVar, Union
 
 
 def _gcd(x: int, y: int) -> int:
@@ -71,7 +71,7 @@ def parse_angle(s: str):
 T = TypeVar("T")
 
 
-def reshape(to_reshape: list[T] | tuple[T, ...], n: int) -> list[tuple[T, ...]]:
+def reshape(to_reshape: Union[list[T], tuple[T, ...]], n: int) -> list[tuple[T, ...]]:
     assert len(to_reshape) % n == 0
     columns: list[list[T]] = [[] for _ in range(n)]
     for i, x in enumerate(to_reshape):

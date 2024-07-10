@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 from abc import ABC
-from typing import TYPE_CHECKING, Optional, Self, TypeVar
+from typing import TYPE_CHECKING, Optional, TypeVar, Union
+from typing_extensions import Self
 
 from geosolver.dependency.dependency import CONSTRUCTION, Dependency
 from geosolver.numerical.geometries import CircleNum, LineNum, PointNum
@@ -81,7 +82,7 @@ class Line(Symbol):
     num: LineNum
 
     @classmethod
-    def check_coll(cls, points: list[Point] | tuple[Point]) -> bool:
+    def check_coll(cls, points: Union[list[Point], tuple[Point]]) -> bool:
         symbols_graph = points[0].symbols_graph
         s = set(points)
         for line in symbols_graph.nodes_of_type(Line):
@@ -91,7 +92,7 @@ class Line(Symbol):
 
     @classmethod
     def make_coll(
-        cls, points: list[Point] | tuple[Point], dep: Dependency
+        cls, points: Union[list[Point], tuple[Point]], dep: Dependency
     ) -> tuple[Line, list[Line]]:
         symbols_graph = points[0].symbols_graph
         s = set(points)
@@ -134,7 +135,7 @@ class Circle(Symbol):
     num: CircleNum
 
     @classmethod
-    def check_cyclic(cls, points: list[Point] | tuple[Point]) -> bool:
+    def check_cyclic(cls, points: Union[list[Point], tuple[Point]]) -> bool:
         symbols_graph = points[0].symbols_graph
         s = set(points)
         for c in symbols_graph.nodes_of_type(Circle):
@@ -143,7 +144,7 @@ class Circle(Symbol):
         return False
 
     @classmethod
-    def make_cyclic(cls, points: list[Point] | tuple[Point], dep: Dependency):
+    def make_cyclic(cls, points: Union[list[Point], tuple[Point]], dep: Dependency):
         symbols_graph = points[0].symbols_graph
         s = set(points)
         merge: list[Circle] = []

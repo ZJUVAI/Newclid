@@ -20,7 +20,7 @@ class Theorem(NamedTuple):
         return f"{premises_txt} => {conclusions_txt}"
 
     @classmethod
-    def parse_txt_file(cls, fname: str | Path) -> list[Theorem]:
+    def parse_txt_file(cls, fname: Path) -> list[Theorem]:
         with open(fname, "r") as f:
             return cls.parse_text(f.read())
 

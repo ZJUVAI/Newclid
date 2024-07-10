@@ -28,7 +28,7 @@ class DependencyGraph:
         statement: Statement,
         id: dict[Statement, str],
         sub_proof: dict[Statement, Optional[tuple[str, ...]]],
-    ) -> tuple[str, ...] | None:
+    ) -> Optional[tuple[str, ...]]:
         if statement in sub_proof:
             return sub_proof[statement]
         if statement not in id:
@@ -42,7 +42,7 @@ class DependencyGraph:
             if extra_dep is not None:
                 deps.add(extra_dep)
         for dep in deps:
-            cur_proof: tuple[str, ...] | None = tuple()
+            cur_proof: Optional[tuple[str, ...]] = tuple()
             for premise in dep.why:
                 t = self._proof_text(premise, id, sub_proof)
                 if t is None:

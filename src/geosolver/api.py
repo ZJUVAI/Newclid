@@ -141,13 +141,13 @@ class GeometricSolverBuilder:
         self.rules = Theorem.parse_text(rule_txt)
         return self
 
-    def load_rules_from_file(self, rules_path: Optional[Path | str] = None) -> Self:
+    def load_rules_from_file(self, rules_path: Optional[Path] = None) -> Self:
         if rules_path is None:
             rules_path = default_rules_path()
         self.rules = Theorem.parse_txt_file(rules_path)
         return self
 
-    def load_defs_from_file(self, defs_path: Optional[Path | str] = None) -> Self:
+    def load_defs_from_file(self, defs_path: Optional[Path] = None) -> Self:
         if defs_path is None:
             defs_path = default_defs_path()
         self.defs = Definition.to_dict(Definition.parse_txt_file(defs_path))

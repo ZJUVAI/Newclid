@@ -17,7 +17,7 @@ class Definition(NamedTuple):
     numerics: list[tuple[str, ...]]
 
     @classmethod
-    def parse_txt_file(cls, fname: str | Path) -> list[Definition]:
+    def parse_txt_file(cls, fname: Path) -> list[Definition]:
         with open(fname, "r") as f:
             lines = f.read()
             return cls.parse_text(lines)
