@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, NamedTuple
 
-
 if TYPE_CHECKING:
     from geosolver.statement import Statement
 
@@ -23,6 +22,8 @@ class Dependency(NamedTuple):
     why: tuple[Statement, ...]
 
     def add(self):
+        if not self.statement.check_numerical():
+            raise Exception("Adding a statement that is numerically false")
         dep_graph = self.statement.dep_graph
         s = dep_graph.hyper_graph.get(self.statement)
         if s is not None and self in s:

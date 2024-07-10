@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from geosolver.dependency.symbols import Point
-from geosolver.numerical import ATOM
+from geosolver.numerical import close_enough
 from geosolver.predicates.equal_angles import EqAngle
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
 
@@ -36,7 +36,7 @@ class Perp(Predicate):
     def check_numerical(cls, statement: Statement) -> bool:
         args: tuple[Point, ...] = statement.args
         a, b, c, d = args
-        return abs((a.num - b.num).dot(c.num - d.num)) < ATOM
+        return close_enough(abs((a.num - b.num).dot(c.num - d.num)), 0)
 
     @classmethod
     def check(cls, statement: Statement) -> bool:

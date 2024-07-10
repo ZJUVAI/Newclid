@@ -159,6 +159,8 @@ class Proof:
         return ApplyTheoremFeedback(added)
 
     def _apply_theorem(self, dep: Dependency) -> list[Dependency]:
+        if dep.statement in dep.statement.dep_graph.hyper_graph:
+            return []
         dep.add()
         return [dep]
 

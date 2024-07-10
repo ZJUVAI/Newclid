@@ -47,7 +47,7 @@ EXPECTED_TO_FAIL = []
         ),
         (
             "r07",
-            "para A B C D, coll O A C, coll O B D => eqratio3 A B C D O O",
+            "para A B C D, coll O A C, coll O B D, ncoll O A B => eqratio3 A B C D O O",
             "a = free a; b = free b; c = free c; d = on_pline d c a b; o = on_line o a c, on_line o b d ? eqratio3 a b c d o o",
         ),
         (
@@ -177,11 +177,6 @@ EXPECTED_TO_FAIL = []
             "p = free p; q = free q; u = free u; v = eqdistance v u p q; a = free a; b = free b; c = free c; d = eqratio d p q a b u v c ? cong a b c d",
         ),
         (
-            "r32",
-            "cong A B P Q, cong B C Q R, cong C A R P, ncoll A B C => contri* A B C P Q R",
-            "a b c = triangle a b c; p = free p; q = eqdistance q p a b; r = eqdistance r p a c, eqdistance r q c b ? contri* a b c p q r",
-        ),
-        (
             "r33",
             "cong A B P Q, cong B C Q R, eqangle B A B C Q P Q R, ncoll A B C => contri A B C P Q R",
             "a = free a; b = free b; c = free c; q = free q; p = eqdistance p q b a; r = eqdistance r q b c, on_aline r q p c b a ? contri a b c p q r",
@@ -217,18 +212,13 @@ EXPECTED_TO_FAIL = []
             "a = free a; b = free b; c = free c; p = free p; q = free q; r = eqratio r b a b c q p q, on_aline r q p c b a ? simtri a b c p q r",
         ),
         (
-            "r40",
-            "eqratio B A B C Q P Q R, eqratio C A C B R P R Q, ncoll A B C, cong A B P Q => contri* A B C P Q R",
-            "a = free a; b = free b; c = free c; p = free p; q = eqdistance q p a b; r = eqratio r b a b c q p q, eqratio6 r p q c a c b ? contri* a b c p q r",
-        ),
-        (
             "r41",
             "para a b c d, coll m a d, coll n b c, eqratio m a m d n b n c, sameside m a d n b c => para m n a b",
             "a = free a; b = free b; c = free c; d = on_pline d c a b; n = on_line n b c; m = eqratio6 m a d n b n c, on_line m a d ? para m n a b",
         ),
         (
             "r42",
-            "para a b c d, coll m a d, coll n b c, para m n a b => eqratio m a m d n b n c",
+            "para a b c d, coll m a d, coll n b c, para m n a b, ncoll a b c => eqratio m a m d n b n c",
             "a = free a; b = free b; c = free c; d = on_pline d c a b; m = on_line m a d; n = on_line n b c, on_pline n m a b ? eqratio m a m d n b n c",
         ),
         (

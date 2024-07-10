@@ -15,15 +15,14 @@ from geosolver.predicates.constant_ratio import ConstantRatio
 from geosolver.predicates.constant_angle import ConstantAngle
 
 from geosolver.predicates.different import Diff
+from geosolver.predicates.sameclock import SameClock
 from geosolver.predicates.sameside import SameSide
 
 from geosolver.predicates.triangles_similar import (
-    SimtriAny,
     SimtriClock,
     SimtriReflect,
 )
 from geosolver.predicates.triangles_congruent import (
-    ContriAny,
     ContriClock,
     ContriReflect,
 )
@@ -46,10 +45,8 @@ SYMBOLIC_PREDICATES = (
     ConstantAngle,
     SimtriClock,
     SimtriReflect,
-    SimtriAny,
     ContriClock,
     ContriReflect,
-    ContriAny,
 )
 
 NUMERICAL_PREDICATES = (
@@ -58,6 +55,7 @@ NUMERICAL_PREDICATES = (
     NPara,
     NPerp,
     SameSide,
+    SameClock,
 )
 
 PREDICATES = SYMBOLIC_PREDICATES + NUMERICAL_PREDICATES

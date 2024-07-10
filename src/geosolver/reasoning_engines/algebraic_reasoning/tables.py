@@ -215,7 +215,7 @@ class Table:
         return strip(e)
 
     def sumcv_from_list(self, vc: list[tuple[str, Coef]]) -> SumCV:
-        return self.modulo(plus_all(*[{v: c} for v, c in vc]))
+        return strip(plus_all(*[{v: c} for v, c in vc]))
 
     def add_expr(self, vc: SumCV, dep: Optional["Dependency"]) -> bool:
         """
@@ -225,7 +225,7 @@ class Table:
         """
         vc = self.modulo(vc)
         if len(vc) == 0:
-            return False
+            return True if dep is None else False
         result = {}
         new_vars: list[tuple[str, Coef]] = []
 
@@ -235,18 +235,17 @@ class Table:
             else:
                 new_vars.append((v, c))
 
-        result = self.modulo(result)
+        result = strip(result)
+        moded = self.modulo(result)
         if dep is None:
-            return len(result) == 0 and len(new_vars) == 0
+            return len(moded) == 0 and len(new_vars) == 0
 
         if new_vars == []:
-            if len(result) == 0:
+            if len(moded) == 0:
                 return False
             result_recon = recon(result, self.const)
             if result_recon is None:
-                if len(result) > 0:
-                    raise Exception("Add conflicting results into AR")
-                return False
+                raise Exception("Add conflicting results into AR")
             v, e = result_recon
             self.replace(v, e)
 
@@ -264,7 +263,9 @@ class Table:
 
     def _register(self, vc: SumCV, dep: "Dependency") -> None:
         """Register a new equality vc=[(v, c), ..] with traceback dependency dep."""
-        vc = self.modulo(vc)
+        if self.const in vc:
+            del vc[self.const]
+        vc = strip(vc)
         if len(vc) == 0:
             return
 
@@ -285,16 +286,18 @@ class Table:
         self._c = np.concatenate((self._c, np.array([1.0, -1.0])))
         self.deps += [dep]
 
-    def why(self, e: SumCV) -> list["Dependency"]:
+    def why(self, vc: SumCV) -> list["Dependency"]:
         """AR traceback == MILP."""
         # why expr == 0?
         # Solve min(c^Tx) s.t. A_eq * x = b_eq, x >= 0
-        e = strip(e)
-        if not e:
+        if self.const in vc:
+            del vc[self.const]
+        vc = strip(vc)
+        if len(vc) == 0:
             return []
 
         b_eq = np.array([0] * len(self._v2i))
-        for v, c in e.items():
+        for v, c in vc.items():
             b_eq[self._v2i[v]] += c
 
         try:

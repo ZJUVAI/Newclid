@@ -18,6 +18,11 @@ class DependencyGraph:
         self.hyper_graph: dict[Statement, set[Dependency]] = {}
         self.ar = ar
 
+    def has_edge(self, dep: Dependency):
+        return (
+            dep.statement in self.hyper_graph and dep in self.hyper_graph[dep.statement]
+        )
+
     def _proof_text(
         self,
         statement: Statement,

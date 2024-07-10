@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from geosolver.dependency.dependency import CONSTRUCTION, Dependency
 from geosolver.dependency.symbols import Point
-from geosolver.numerical import ATOM
+from geosolver.numerical.check import same_clock
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
 
 
@@ -12,15 +12,10 @@ if TYPE_CHECKING:
     from geosolver.dependency.dependency import Dependency
 
 
-class SameSide(Predicate):
-    """sameside a b c x y z -
+class SameClock(Predicate):
+    """sameclock a b c x y z -"""
 
-    Represent that a is to the same side of b->c as x is to y->z.
-
-    Numerical only.
-    """
-
-    NAME = "sameside"
+    NAME = "sameclock"
 
     @classmethod
     def parse(
@@ -29,24 +24,17 @@ class SameSide(Predicate):
         a, b, c, x, y, z = args
         if len(set((a, b, c))) < 3 or len(set((x, y, z))) < 3:
             raise IllegalPredicate
+        group = min((a, b, c), (b, c, a), (c, a, b))
+        group1 = min((x, y, z), (y, z, x), (z, x, y))
         return tuple(
-            dep_graph.symbols_graph.names2points(
-                min(
-                    (a, b, c, x, y, z),
-                    (c, b, a, z, y, x),
-                    (x, y, z, a, b, c),
-                    (z, y, x, c, b, a),
-                )
-            )
+            dep_graph.symbols_graph.names2points(min(group + group1, group1 + group))
         )
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
         args: tuple[Point, ...] = statement.args
         a, b, c, x, y, z = args
-        return (a.num - b.num).dot(c.num - b.num) * (x.num - y.num).dot(
-            z.num - y.num
-        ) > ATOM
+        return same_clock(a.num, b.num, c.num, x.num, y.num, z.num)
 
     @classmethod
     def check(cls, statement: Statement) -> bool:

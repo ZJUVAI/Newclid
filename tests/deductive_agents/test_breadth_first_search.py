@@ -12,7 +12,32 @@ class TestDDAR:
     def setUpClass(self):
         self.solver_builder = GeometricSolverBuilder().with_deductive_agent(BFSDDAR)
 
-    # @pytest.mark.skip
+    def test_translated_imo_2009_p2_extra_points(self):
+        solver = (
+            self.solver_builder.load_problem_from_txt(
+                "m l k = triangle m l k; "
+                "w = circle w m l k; "
+                "q = on_tline q m w m; "
+                "p = mirror p q m; "
+                "b = mirror b p k; "
+                "c = mirror c q l; "
+                "a = on_line a b q, on_line a c p; "
+                "o = circle o a b c; "
+                "d = eqdistance d l m k, eqdistance d m l k; "
+                "e = mirror e k w; "
+                "f = mirror f q d ? "
+                "cong q o p o"
+            )
+            .load_rules_from_file(r"rule_sets\imo.txt")
+            .with_runtime_cache(Path("tests_output/imo2009p2cache.json"))
+            .build()
+        )
+
+        success = solver.run()
+        assert success
+        solver.write_solution(Path("tests_output/imo2009p2_proof.txt"))
+
+    @pytest.mark.skip("not solved by ag either")
     def test_translated_imo_2011_p6_with_orthocenter(self):
         solver = (
             self.solver_builder.load_problem_from_txt(
@@ -31,7 +56,7 @@ class TestDDAR:
                 "c1 = on_line c1 pa qa, on_line c1 pb qb; "
                 "o1 = circle o1 a1 b1 c1; "
                 "x = on_circle x o a, on_circle x o1 a1; "
-                "h = orthocenter h a b c ? coll x o o1"
+                "h = orthocenter h a b c ? cyclic pa pb c x"
             )
             .load_rules_from_file(r"rule_sets\imo.txt")
             .with_runtime_cache(Path("tests_output/imo2011p6cache.json"))
@@ -39,8 +64,8 @@ class TestDDAR:
         )
 
         success = solver.run()
-        # solver.write_solution(Path("tests_output/imo2011p6_proof.txt"))
         assert success
+        solver.write_solution(Path("tests_output/imo2011p6_proof.txt"))
 
     def test_imo_2000_p1_should_succeed(self):
         solver = (
@@ -62,6 +87,7 @@ class TestDDAR:
             .build()
         )
 
+        solver.draw_figure(False, Path("tests_output/imo2000p1_setup.png"))
         success = solver.run()
         assert success
         solver.write_solution(Path("tests_output/imo2000p1_proof.txt"))

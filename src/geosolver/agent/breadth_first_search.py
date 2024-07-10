@@ -38,22 +38,22 @@ class BFSDDAR(DeductiveAgent):
         self.theorems = theorems
         self.theorem_buffer: list[Theorem] = []
         self.application_buffer: list[Dependency] = []
-        self.applied_any = True
+        self.hope = True
 
     def act(self) -> Action:
         if self.theorem_buffer:
             theorem = self.theorem_buffer.pop()
             logging.info("matching" + str(theorem))
+            self.hope = False
             return MatchAction(theorem)
         if self.application_buffer:
-            self.applied_any = True
+            self.hope = True
             return ApplyTheoremAction(self.application_buffer.pop())
         else:
-            if not self.applied_any:
+            if not self.hope:
                 return StopAction()
             self.theorem_buffer = list(self.theorems)
             logging.info("bfsddar : reload")
-            self.applied_any = False
             return EmptyAction()
 
     def remember_effects(self, action: Action, feedback: Feedback) -> None:
@@ -64,4 +64,3 @@ class BFSDDAR(DeductiveAgent):
     def reset(self):
         self.theorem_buffer = []
         self.application_buffer = []
-        self.applied_any = True

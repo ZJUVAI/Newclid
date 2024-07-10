@@ -43,16 +43,12 @@ class GeometricSolver:
 
     def run(
         self,
-        max_steps: int = 10000,
-        timeout: float = 600.0,
         stop_on_goal: bool = True,
     ) -> bool:
         success, infos = run_loop(
             self.deductive_agent,
             self.proof,
-            max_steps=max_steps,
             stop_on_goal=stop_on_goal,
-            timeout=timeout,
         )
         self.run_infos = infos
         return success

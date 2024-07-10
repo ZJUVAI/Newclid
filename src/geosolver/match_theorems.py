@@ -50,7 +50,7 @@ class Matcher:
                 file_cache = json.load(f)
             if "matcher" not in file_cache:
                 file_cache["matcher"] = {}
-            if str(theorem) in file_cache["matcher"] is not None:
+            if str(theorem) in file_cache["matcher"]:
                 mappings = file_cache["matcher"][str(theorem)]
                 read = True
             else:
@@ -111,8 +111,9 @@ class Matcher:
         logging.info("Finish caching")
         logging.info("Start matching")
         for dep in self.cache[theorem]:
+            if self.dep_graph.has_edge(dep):
+                continue
             applicable = True
-            assert dep.why is not None
             for premise in dep.why:
                 if not premise.check():
                     applicable = False
