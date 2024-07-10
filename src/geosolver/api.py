@@ -130,7 +130,7 @@ class GeometricSolverBuilder:
 
     def del_goal(self) -> Self:
         if self.problem:
-            self.problem = Problem(self.problem.url, self.problem.constructions, ())
+            self.problem = Problem(self.problem.name, self.problem.constructions, ())
         return self
 
     def load_problem_from_txt(self, problem_txt: str) -> Self:

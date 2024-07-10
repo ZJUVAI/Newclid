@@ -55,8 +55,7 @@ def cli_arguments() -> Namespace:
         " Will override existing outputs if any.",
     )
     parser.add_argument(
-        "-q",
-        "--quiet",
+        "--clean",
         default=False,
         action="store_true",
         help="Do a quiet run without any file outputs.",
@@ -88,14 +87,14 @@ def main():
     args = cli_arguments()
     logging.basicConfig(level=args.log_level)
 
-    quiet: bool = args.quiet
+    clean: bool = args.clean
     just_draw: bool = args.just_draw_figure
     seed: Optional[int] = args.seed
     algebraic_manipulator.config["verbose"] = args.ar_verbose
 
     solver_builder = GeometricSolverBuilder(seed=seed)
 
-    load_problem(args.problem, solver_builder)
+    problem_name = load_problem(args.problem, solver_builder)
 
     solver_builder.load_defs_from_file(resolve_config_path(args.defs))
     solver_builder.load_rules_from_file(resolve_config_path(args.rules))
@@ -103,12 +102,16 @@ def main():
     agent = AGENTS_REGISTRY[args.agent]
     solver_builder.with_deductive_agent(agent)
 
-    solver = solver_builder.build()
-    outpath = resolve_output_path(args.output_folder, problem_name=solver.problem.url)
-
-    if not quiet:
+    outpath = resolve_output_path(args.output_folder, problem_name=problem_name)
+    if not clean:
         outpath.mkdir(parents=True, exist_ok=True)
+        solver_builder.with_runtime_cache(outpath / "runtime_cache.json")
+
+    solver = solver_builder.build()
+
+    if not clean:
         solver.draw_figure(False, outpath / "construction_figure.png")
+
     if just_draw:
         return
 
@@ -116,7 +119,7 @@ def main():
 
     logging.info(f"Run infos: {solver.run_infos}")
 
-    if quiet:
+    if clean:
         return
 
     if success:
@@ -152,15 +155,15 @@ def resolve_config_path(path_str: Optional[str]) -> Optional[Path]:
 def load_problem(
     problem_txt_or_file: str,
     solver_builder: GeometricSolverBuilder,
-) -> None:
+) -> str:
     PATH_NAME_SEPARATOR = ":"
 
     if PATH_NAME_SEPARATOR not in problem_txt_or_file:
-        solver_builder.load_problem_from_txt(problem_txt_or_file)
-        return
+        raise Exception("Problem name not given")
 
     path, problem_name = problem_txt_or_file.split(PATH_NAME_SEPARATOR)
     solver_builder.load_problem_from_file(Path(path), problem_name)
+    return problem_name
 
 
 if __name__ == "__main__":

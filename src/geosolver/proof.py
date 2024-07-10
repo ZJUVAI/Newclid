@@ -94,7 +94,7 @@ class Proof:
         rng: "Generator",
     ) -> Proof:
         """Build a problem into a Proof state object."""
-        logging.info(f"Building proof from problem '{problem.url}': {problem}")
+        logging.info(f"Building proof from problem '{problem.name}': {problem}")
 
         err = ConstructionError(f"Construction failed {max_attempts} times")
         for _ in range(max_attempts):

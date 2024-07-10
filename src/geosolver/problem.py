@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 class Problem(NamedTuple):
     """Describe one problem to solve."""
 
-    url: str
+    name: str
     constructions: tuple[Clause, ...]
     goals: tuple[tuple[str, ...], ...]
 
@@ -38,9 +38,9 @@ class Problem(NamedTuple):
     @classmethod
     def from_text(cls, s: str) -> Problem:
         """Load a problem from a str object."""
-        url = ""
+        name = ""
         if "\n" in s:
-            url, s = s.split("\n")
+            name, s = s.split("\n")
 
         if "?" in s:
             constructions_str, goals_str = atomize(s, "?")
@@ -48,7 +48,7 @@ class Problem(NamedTuple):
             constructions_str, goals_str = s, ""
 
         problem = Problem(
-            url=url,
+            name=name,
             constructions=tuple(Clause.parse_line(constructions_str)),
             goals=tuple(atomize(g) for g in atomize(goals_str, ";"))
             if len(goals_str) > 0
@@ -58,4 +58,4 @@ class Problem(NamedTuple):
 
     @classmethod
     def to_dict(cls, data: list[Problem]) -> dict[str, Problem]:
-        return {p.url: p for p in data}
+        return {p.name: p for p in data}
