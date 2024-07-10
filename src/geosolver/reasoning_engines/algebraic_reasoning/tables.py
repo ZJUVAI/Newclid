@@ -260,6 +260,9 @@ class Table:
             self.v2e[v] = mult(result, Coef(-1) / m)
 
         self._register(vc, dep)
+        if self.verbose:
+            logging.info(f"By {dep.pretty()} the table updates:")
+            report(self.v2e)
         return True
 
     def _register(self, vc: SumCV, dep: "Dependency") -> None:
@@ -339,8 +342,8 @@ class Table:
 class RatioTable(Table):
     """Coefficient matrix A for log(distance)."""
 
-    def __init__(self):
-        super().__init__("1")
+    def __init__(self, verbose: bool):
+        super().__init__("1", verbose)
         self.one = self.const
 
     @classmethod
@@ -354,8 +357,8 @@ class RatioTable(Table):
 class AngleTable(Table):
     """Coefficient matrix A for slope(direction)."""
 
-    def __init__(self):
-        super().__init__("pi")
+    def __init__(self, verbose: bool):
+        super().__init__("pi", verbose)
         self.pi = self.const
 
     def modulo(self, e: SumCV) -> SumCV:

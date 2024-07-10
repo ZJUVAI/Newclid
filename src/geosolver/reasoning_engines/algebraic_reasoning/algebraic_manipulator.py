@@ -16,9 +16,9 @@ config: dict[Any, Any] = dict()
 
 class AlgebraicManipulator(ReasoningEngine):
     def __init__(self) -> None:
-        self.atable = AngleTable()
-        self.rtable = RatioTable()
         self.verbose = config.get("verbose", "")
+        self.atable = AngleTable(verbose=("a" in self.verbose))
+        self.rtable = RatioTable(verbose=("r" in self.verbose))
 
     def resolve(self, **kwargs: Any) -> list[Dependency]:
         """Derive new algebraic predicates."""

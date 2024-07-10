@@ -68,8 +68,8 @@ class HumanAgent(DeductiveAgent):
             return options[n].f()
 
     def match(self) -> Action:
-        action = self.select(self.match_theorems)
-        return action
+        action = self.select(self.match_theorems, apply_none=True)
+        return action or EmptyAction()
 
     def act(self) -> Action:
         if self.apply_buffer:

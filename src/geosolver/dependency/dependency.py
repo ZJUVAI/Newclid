@@ -43,3 +43,6 @@ class Dependency(NamedTuple):
     ) -> Dependency:
         why = tuple(sorted(set(why), key=lambda x: hash(x)))
         return Dependency(statement, reason, why)
+
+    def pretty(self):
+        return f"{self.statement.pretty()} <={self.reason} {', '.join(s.pretty() for s in self.why)}"
