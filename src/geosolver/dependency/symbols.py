@@ -5,7 +5,7 @@ from abc import ABC
 from typing import TYPE_CHECKING, Optional, TypeVar, Union
 from typing_extensions import Self
 
-from geosolver.dependency.dependency import CONSTRUCTION, Dependency
+from geosolver.dependency.dependency import CONSTRUCTION
 from geosolver.numerical.geometries import CircleNum, LineNum, PointNum
 
 if TYPE_CHECKING:
