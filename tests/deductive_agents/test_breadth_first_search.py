@@ -106,6 +106,19 @@ class TestDDAR:
         success = solver.run()
         assert success
 
+    def test_orthocenter_should_exhaust(self):
+        solver = (
+            self.solver_builder.load_rules_from_file(r"rule_sets\triangles.txt")
+            .load_problem_from_txt(
+                "a b c = triangle a b c; "
+                "d = on_tline d b a c, on_tline d c a b "
+                "? perp a d b c"
+            )
+            .build()
+        )
+        success = solver.run()
+        assert not success
+
     def test_orthocenter_aux_should_succeed(self):
         solver = (
             self.solver_builder.load_rules_from_file(r"rule_sets\triangles.txt")

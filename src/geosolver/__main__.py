@@ -41,24 +41,6 @@ def cli_arguments() -> Namespace:
         help="Path to rules file. Uses default rules if unspecified.",
     )
     parser.add_argument(
-        "--translate",
-        default=False,
-        action="store_true",
-        help="Translate the problem points names to alphabetical order.",
-    )
-    parser.add_argument(
-        "--max-steps",
-        default=100000,
-        type=int,
-        help="Maximum number of solving steps before forced termination.",
-    )
-    parser.add_argument(
-        "--timeout",
-        default=6000.0,
-        type=float,
-        help="Time (in seconds) before forced termination.",
-    )
-    parser.add_argument(
         "--seed",
         default=None,
         type=int,
@@ -77,28 +59,7 @@ def cli_arguments() -> Namespace:
         "--quiet",
         default=False,
         action="store_true",
-        help="Do a quiet run without any outputs.",
-    )
-    parser.add_argument(
-        "-ag",
-        "--all-graphs",
-        default=False,
-        action="store_true",
-        help="Draw and display all available graphs of the proof state.",
-    )
-    parser.add_argument(
-        "-wg",
-        "--why-graph",
-        default=False,
-        action="store_true",
-        help="Draw and display the WhyGraph of the proof state.",
-    )
-    parser.add_argument(
-        "-sg",
-        "--symbols-graph",
-        default=False,
-        action="store_true",
-        help="Draw and display the symbols graph of the proof state.",
+        help="Do a quiet run without any file outputs.",
     )
     parser.add_argument(
         "--log-level",
@@ -134,7 +95,7 @@ def main():
 
     solver_builder = GeometricSolverBuilder(seed=seed)
 
-    load_problem(args.problem, args.translate, solver_builder)
+    load_problem(args.problem, solver_builder)
 
     solver_builder.load_defs_from_file(resolve_config_path(args.defs))
     solver_builder.load_rules_from_file(resolve_config_path(args.rules))
@@ -151,23 +112,16 @@ def main():
     if just_draw:
         return
 
-    solver.run(max_steps=args.max_steps, timeout=args.timeout)
+    success = solver.run()
 
     logging.info(f"Run infos: {solver.run_infos}")
 
     if quiet:
         return
 
-    solver.write_solution(outpath / "proof_steps.txt")
+    if success:
+        solver.write_solution(outpath / "proof_steps.txt")
     solver.draw_figure(False, outpath / "proof_figure.png")
-
-    if args.all_graphs or args.symbols_graph:
-        solver.draw_symbols_graph(outpath / "symbols_graph.html")
-    if args.all_graphs or args.why_graph:
-        import seaborn as sns
-
-        sns.color_palette()
-        solver.draw_why_graph(outpath / "why_hypergraph.html")
 
 
 def resolve_output_path(path_str: Optional[str], problem_name: str) -> Path:
@@ -197,7 +151,6 @@ def resolve_config_path(path_str: Optional[str]) -> Optional[Path]:
 
 def load_problem(
     problem_txt_or_file: str,
-    translate: bool,
     solver_builder: GeometricSolverBuilder,
 ) -> None:
     PATH_NAME_SEPARATOR = ":"
@@ -207,7 +160,7 @@ def load_problem(
         return
 
     path, problem_name = problem_txt_or_file.split(PATH_NAME_SEPARATOR)
-    solver_builder.load_problem_from_file(Path(path), problem_name, translate)
+    solver_builder.load_problem_from_file(Path(path), problem_name)
 
 
 if __name__ == "__main__":

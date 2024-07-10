@@ -193,10 +193,11 @@ def report(eqdict: EqDict):
 class Table:
     """The coefficient matrix."""
 
-    def __init__(self, const: str = "1"):
+    def __init__(self, const: str = "1", verbose: bool = False):
         self.const = const
         self.v2e: EqDict = {}  # the table {var: {vark : coefk}} var = sum coefk*vark
         self.add_free(const)
+        self.verbose = verbose
 
         # for why (linprog)
         self._c = np.zeros((0))

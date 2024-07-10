@@ -4,7 +4,7 @@ simtrirAA
 eqangle B A B C Q R Q P, eqangle C A C B R Q R P, sameclock A B C P R Q => simtrir A B C P Q R
 simtriSSS
 eqratio B A B C Q P Q R, eqratio C A C B R P R Q, sameclock A B C P Q R => simtri A B C P Q R
-simtriSSS
+simtrirSSS
 eqratio B A B C Q P Q R, eqratio C A C B R P R Q, sameclock A B C P R Q => simtrir A B C P Q R
 simtriSAS
 eqratio B A B C Q P Q R, eqangle B A B C Q P Q R, sameclock A B C P Q R => simtri A B C P Q R

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from geosolver.agent.agents_interface import (
     ApplyTheoremAction,
+    ApplyTheoremFeedback,
     DeductiveAgent,
     Action,
     EmptyAction,
@@ -43,11 +44,11 @@ class BFSDDAR(DeductiveAgent):
     def act(self) -> Action:
         if self.theorem_buffer:
             theorem = self.theorem_buffer.pop()
-            logging.info("matching" + str(theorem))
+            logging.info("bfsddar matching" + str(theorem))
             self.hope = False
             return MatchAction(theorem)
         if self.application_buffer:
-            self.hope = True
+            logging.info("bfsddar : apply")
             return ApplyTheoremAction(self.application_buffer.pop())
         else:
             if not self.hope:
@@ -58,9 +59,8 @@ class BFSDDAR(DeductiveAgent):
 
     def remember_effects(self, action: Action, feedback: Feedback) -> None:
         if isinstance(feedback, MatchFeedback):
-            logging.info("matched " + str(len(feedback.deps)))
+            logging.info("bfsddar matched " + str(len(feedback.deps)))
             self.application_buffer.extend(feedback.deps)
-
-    def reset(self):
-        self.theorem_buffer = []
-        self.application_buffer = []
+        if isinstance(feedback, ApplyTheoremFeedback):
+            if feedback.added:
+                self.hope = True

@@ -37,12 +37,6 @@ class MatchAction(NamedTuple):
     theorem: "Theorem"
 
 
-class ResolveEngineAction(NamedTuple):
-    """Resolve new derivations using a specified reasoning engine."""
-
-    engine_id: str
-
-
 class EmptyAction(NamedTuple):
     """Do nothing"""
 
@@ -52,7 +46,6 @@ Action = Union[
     StopAction,
     ApplyTheoremAction,
     MatchAction,
-    ResolveEngineAction,
     EmptyAction,
 ]
 
@@ -106,7 +99,3 @@ class DeductiveAgent:
     @abstractmethod
     def remember_effects(self, action: Action, feedback: Feedback) -> None:
         """Remember the action effects."""
-
-    @abstractmethod
-    def reset(self) -> None:
-        """Resets the agent internal state."""
