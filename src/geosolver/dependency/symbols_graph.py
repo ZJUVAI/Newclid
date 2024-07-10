@@ -94,13 +94,28 @@ class SymbolsGraph:
     def line_thru_pair(self, p1: Point, p2: Point) -> Line:
         for line in self.nodes_of_type(Line):
             if {p1, p2} <= line.points:
-                return line.rep()
+                init_line: Optional[Line] = None
+                for line1 in line.fellows:
+                    if {p1, p2} <= line1.points and (
+                        init_line is None or len(init_line.points) > len(line1.points)
+                    ):
+                        init_line = line1
+                assert init_line is not None
+                return init_line
         return self._get_new_line_thru_pair(p1, p2)
 
     def circle_thru_triplet(self, p1: Point, p2: Point, p3: Point) -> Circle:
         for c in self.nodes_of_type(Circle):
             if {p1, p2, p3} <= c.points:
-                return c.rep()
+                init_circle: Optional[Circle] = None
+                for circle1 in c.fellows:
+                    if {p1, p2} <= circle1.points and (
+                        init_circle is None
+                        or len(init_circle.points) > len(circle1.points)
+                    ):
+                        init_circle = circle1
+                assert init_circle is not None
+                return init_circle
         return self._get_new_circle_thru_triplet(p1, p2, p3)
 
     def _get_new_circle_thru_triplet(self, p1: Point, p2: Point, p3: Point) -> Circle:

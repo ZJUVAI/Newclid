@@ -44,7 +44,7 @@ class Symbol(ABC):
         self.name = name
         self.symbols_graph = symbols_graph
         self.dep = dep
-        self.fellows: list[Self] = []
+        self.fellows: list[Self] = [self]
         self._rep: Self = self
 
     def rep(self) -> Self:
@@ -59,7 +59,7 @@ class Symbol(ABC):
             return selfrep
         noderep._rep = selfrep
 
-        selfrep.fellows.append(noderep)
+        selfrep.fellows.extend(noderep.fellows)
         return selfrep
 
     def _merge(self, nodes: list[Self], dep: Dependency) -> Self:
