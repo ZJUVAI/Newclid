@@ -4,7 +4,8 @@ requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
 [project]
 name = "geosolver"
 authors = [
-    {name = "Mathis Federico", email = "mathfederico@gmail.com"}
+    {name = "Mathis Federico", email = "mathfederico@gmail.com"},
+    {name = "Tianxiang Xia", email = "xia.tianxiang00@gmail.com"}
 ]
 dynamic = ["version", "readme", "dependencies"]
 description = "Symbolic solver for geometric problems."
