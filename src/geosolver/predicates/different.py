@@ -33,7 +33,7 @@ class Diff(Predicate):
         p: Point
         q: Point
         p, q = statement.args
-        return not p.num.close(q.num)
+        return not p.num.close_enough(q.num)
 
     @classmethod
     def check(cls, statement: Statement) -> bool:

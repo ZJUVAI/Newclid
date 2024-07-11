@@ -64,8 +64,8 @@ class PointNum:
     def angle(self) -> float:
         return np.arctan2(self.y, self.x)
 
-    def close(self, point: "PointNum", tol: float = ATOM) -> bool:
-        return abs(self.x - point.x) < tol and abs(self.y - point.y) < tol
+    def close_enough(self, point: "PointNum") -> bool:
+        return close_enough(self.x, point.x) and close_enough(self.y, point.y)
 
     def midpoint(self, p: "PointNum") -> "PointNum":
         return PointNum(0.5 * (self.x + p.x), 0.5 * (self.y + p.y))
@@ -132,7 +132,7 @@ class PointNum:
     def deduplicate(cls, points: Iterable["PointNum"]) -> list["PointNum"]:
         res: list["PointNum"] = []
         for p in points:
-            if all(not r.close(p) for r in res):
+            if all(not r.close_enough(p) for r in res):
                 res.append(p)
         return res
 
@@ -525,10 +525,10 @@ def reduce(
         if len(result) == 1:
             return result
         a, b = result
-        a_close = any([a.close(x) for x in existing_points])
+        a_close = any([a.close_enough(x) for x in existing_points])
         if a_close:
             return [b]
-        b_close = any([b.close(x) for x in existing_points])
+        b_close = any([b.close_enough(x) for x in existing_points])
         if b_close:
             return [a]
         return [rng.choice([a, b])]  # type: ignore

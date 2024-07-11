@@ -46,5 +46,4 @@ def run_loop(
     infos["success"] = success
     infos["runtime"] = total_elapsed
     infos["steps"] = step
-    infos["step"] = step
     return success, infos

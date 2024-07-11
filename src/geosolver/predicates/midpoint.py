@@ -31,7 +31,7 @@ class MidPoint(Predicate):
     def check_numerical(cls, statement: Statement) -> bool:
         args: tuple[Point, ...] = statement.args
         m, a, b = args
-        return m.num.close((a.num + b.num) / 2)
+        return m.num.close_enough((a.num + b.num) / 2)
 
     # @classmethod
     # def check(cls, statement: Statement) -> bool:
@@ -50,7 +50,7 @@ class MidPoint(Predicate):
     #     return Dependency.mk(statement, "", (coll, cong))
 
     @classmethod
-    def to_repr(cls, statement: Statement) -> str:
+    def pretty(cls, statement: Statement) -> str:
         args: tuple[Point, ...] = statement.args
         m, a, b = args
         return f"{a.name}-{m.name}(mid)-{b.name}"
