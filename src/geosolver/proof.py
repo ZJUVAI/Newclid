@@ -19,7 +19,6 @@ from geosolver.numerical.geometries import (
 from geosolver.reasoning_engines.algebraic_reasoning.algebraic_manipulator import (
     AlgebraicManipulator,
 )
-from geosolver.reasoning_engines.engines_interface import ReasoningEngine
 from geosolver.statement import Statement
 from geosolver.definition.definition import Definition
 from geosolver.agent.agents_interface import (
@@ -88,7 +87,6 @@ class Proof:
         cls,
         problem: Problem,
         defs: dict[str, Definition],
-        reasoning_engines: dict[str, type[ReasoningEngine]],
         runtime_cache_path: Optional[Path],
         max_attempts: int = 10000,
         *,
