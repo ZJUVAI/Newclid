@@ -140,3 +140,13 @@ two_goals_perp_cong
 a b c = triangle a b c; p = s_angle c b p 45o, s_angle b c p 150o; q = s_angle a c q 30o, s_angle c a q 135o; r = s_angle b a r 15o, s_angle a b r 165o; t = eq_triangle t b r ? perp q r r p; cong q r r p
 pythagoras
 a b c = triangle a b c; o = circle o a b c; p = on_circle p o a; q = on_tline q p o p; pa = reflect pa p b c; pb = reflect pb p c a; pc = reflect pc p a b; qa = reflect qa q b c; qb = reflect qb q c a; qc = reflect qc q a b; a1 = on_line a1 pb qb, on_line a1 pc qc; b1 = on_line b1 pa qa, on_line b1 pc qc; c1 = on_line c1 pa qa, on_line c1 pb qb; o1 = circle o1 a1 b1 c1; x = on_line x o o1, on_circle x o a ? cyclic x a1 b1 c1
+checking_ordering_r27_oac_obd
+o c = segment o c; d = free d; a x = trisegment a x o c; b y = trisegment b y o d; a1 = mirror a1 a o; c1 = mirror c1 c o; b1 = mirror b1 b o; d1 = mirror d1 d o ? para a b c d
+checking_ordering_r27_aoc_bod
+o c = segment o c; d = free d; a x = trisegment a x o c; b y = trisegment b y o d; a1 = mirror a1 a o; c1 = mirror c1 c o; b1 = mirror b1 b o; d1 = mirror d1 d o ? para a1 b1 c d
+checking_ordering_r27_aoc_bod_eqratio
+o c = segment o c; d = free d; a x = trisegment a x o c; b y = trisegment b y o d; a1 = mirror a1 a o; c1 = mirror c1 c o; b1 = mirror b1 b o; d1 = mirror d1 d o ? eqratio o a1 a1 c o b1 b1 d
+checking_ordering_r27_aoc_bod_sameside
+o c = segment o c; d = free d; a x = trisegment a x o c; b y = trisegment b y o d; a1 = mirror a1 a o; c1 = mirror c1 c o; b1 = mirror b1 b o; d1 = mirror d1 d o ? sameside a o c b1 o d
+checking_ordering_r27_aoc_dob_sameside
+o c = segment o c; d = free d; a x = trisegment a x o c; b y = trisegment b y o d; a1 = mirror a1 a o; c1 = mirror c1 c o; b1 = mirror b1 b o; d1 = mirror d1 d o ? sameside a1 o c b o d1
