@@ -17,6 +17,10 @@ class Predicate(ABC):
     NAME: str
 
     @classmethod
+    def check_valid_args(cls, args: tuple[str, ...]) -> bool:
+        raise NotImplementedError
+
+    @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
@@ -59,3 +63,7 @@ class Predicate(ABC):
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
         raise NotImplementedError(f"{cls.NAME} to_tokens not implemented")
+
+    @classmethod
+    def to_constructive(cls, point: str, args: tuple[str, ...]) -> str:
+        raise NotImplementedError

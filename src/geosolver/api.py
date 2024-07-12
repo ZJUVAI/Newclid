@@ -72,6 +72,15 @@ class GeometricSolver:
         self.draw_symbols_graph(output_folder_path / "symbols_graph.html")
         logging.info("Written all outputs at %s", output_folder_path)
 
+    def get_setup_string(self) -> str:
+        raise NotImplementedError
+
+    def get_proof_state(self) -> str:
+        raise NotImplementedError
+
+    def get_problem_string(self) -> str:
+        raise NotImplementedError
+
 
 class GeometricSolverBuilder:
     def __init__(self, seed: Optional[int] = None) -> None:

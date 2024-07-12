@@ -9,7 +9,6 @@ from geosolver.predicates.predicate import IllegalPredicate, Predicate
 if TYPE_CHECKING:
     from geosolver.dependency.dependency_graph import DependencyGraph
     from geosolver.statement import Statement
-    from geosolver.dependency.dependency import Dependency
 
 
 class SameSide(Predicate):
@@ -44,8 +43,8 @@ class SameSide(Predicate):
     def check_numerical(cls, statement: Statement) -> bool:
         args: tuple[Point, ...] = statement.args
         a, b, c, x, y, z = args
-        return (a.num - b.num).dot(c.num - b.num) * (x.num - y.num).dot(
-            z.num - y.num
+        return (b.num - a.num).dot(c.num - a.num) * (y.num - x.num).dot(
+            z.num - x.num
         ) > ATOM
 
     @classmethod

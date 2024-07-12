@@ -28,7 +28,7 @@ class TestDDAR:
                 "f = mirror f q d ? "
                 "cong q o p o"
             )
-            .load_rules_from_file(r"rule_sets\imo.txt")
+            .load_rules_from_file(Path(r"rule_sets\imo.txt"))
             .with_runtime_cache(Path("tests_output/imo2009p2cache.json"))
             .build()
         )
@@ -58,7 +58,7 @@ class TestDDAR:
                 "x = on_circle x o a, on_circle x o1 a1; "
                 "h = orthocenter h a b c ? cyclic pa pb c x"
             )
-            .load_rules_from_file(r"rule_sets\imo.txt")
+            .load_rules_from_file(Path(r"rule_sets\imo.txt"))
             .with_runtime_cache(Path("tests_output/imo2011p6cache.json"))
             .build()
         )
@@ -82,7 +82,7 @@ class TestDDAR:
                 "q = on_line q b n, on_line q c d "
                 "? cong e p e q"
             )
-            .load_rules_from_file(r"rule_sets\imo.txt")
+            .load_rules_from_file(Path(r"rule_sets\imo.txt"))
             .with_runtime_cache(Path("tests_output/imo2000p1cache.json"))
             .build()
         )
@@ -108,7 +108,7 @@ class TestDDAR:
 
     def test_orthocenter_should_exhaust(self):
         solver = (
-            self.solver_builder.load_rules_from_file(r"rule_sets\triangles.txt")
+            self.solver_builder.load_rules_from_file(Path(r"rule_sets\triangles.txt"))
             .load_problem_from_txt(
                 "a b c = triangle a b c; "
                 "d = on_tline d b a c, on_tline d c a b "
@@ -121,7 +121,7 @@ class TestDDAR:
 
     def test_orthocenter_aux_should_succeed(self):
         solver = (
-            self.solver_builder.load_rules_from_file(r"rule_sets\triangles.txt")
+            self.solver_builder.load_rules_from_file(Path(r"rule_sets\triangles.txt"))
             .load_problem_from_txt(
                 "a b c = triangle a b c; "
                 "d = on_tline d b a c, on_tline d c a b; "
