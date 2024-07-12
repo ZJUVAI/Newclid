@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 from geosolver.dependency.dependency import Dependency
-from geosolver.dependency.dependency_graph import DependencyGraph
 from geosolver.dependency.symbols import Circle, Point
 from geosolver.numerical import close_enough
 from geosolver.numerical.geometries import CircleNum, InvalidIntersectError
@@ -53,8 +52,8 @@ class Cyclic(Predicate):
         return Circle.why_cyclic(statement)
 
     @classmethod
-    def to_repr(cls, statement: Statement) -> str:
-        return f"cyc({''.join(repr(p) for p in statement.args)})"
+    def pretty(cls, statement: Statement) -> str:
+        return f"{''.join(p.pretty_name for p in statement.args)} are cyclic"
 
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:

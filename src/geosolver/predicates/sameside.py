@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
+
 from geosolver.dependency.dependency import BY_CONSTRUCTION, Dependency
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import ATOM
@@ -58,3 +59,9 @@ class SameSide(Predicate):
     @classmethod
     def add(cls, dep: Dependency):
         return
+
+    @classmethod
+    def pretty(cls, statement: Statement) -> str:
+        args: tuple[Point, ...] = statement.args
+        a, b, c, x, y, z = args
+        return f"{a.pretty_name} is to the same side of {b.pretty_name}->{c.pretty_name} as {x.pretty_name} is to {y.pretty_name}->{z.pretty_name}"

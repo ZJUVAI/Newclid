@@ -83,3 +83,9 @@ class NPerp(Predicate):
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
         return not Perp.check_numerical(statement)
+
+    @classmethod
+    def pretty(cls, statement: Statement) -> str:
+        args: tuple[Point, ...] = statement.args
+        a, b, c, d = args
+        return f"{a.pretty_name}{b.pretty_name} ⟂̸ {c.pretty_name}{d.pretty_name}"

@@ -48,4 +48,4 @@ class Diff(Predicate):
         p: Point
         q: Point
         p, q = statement.args
-        return f"{p.name}≠{q.name}"
+        return f"{p.pretty_name} ≠ {q.pretty_name}"

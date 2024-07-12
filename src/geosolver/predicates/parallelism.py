@@ -106,11 +106,14 @@ class NPara(Predicate):
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
-        a, b, c, d = statement.args
-        assert isinstance(a, Point)
-        assert isinstance(b, Point)
-        assert isinstance(c, Point)
-        assert isinstance(d, Point)
+        args: tuple[Point, ...] = statement.args
+        a, b, c, d = args
         l1 = LineNum(a.num, b.num)
         l2 = LineNum(c.num, d.num)
         return not l1.is_parallel(l2)
+
+    @classmethod
+    def pretty(cls, statement: Statement) -> str:
+        args: tuple[Point, ...] = statement.args
+        a, b, c, d = args
+        return f"{a.pretty_name}{b.pretty_name} ∦ {c.pretty_name}{d.pretty_name}"

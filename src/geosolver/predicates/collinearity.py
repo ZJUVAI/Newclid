@@ -48,7 +48,7 @@ class Coll(Predicate):
 
     @classmethod
     def pretty(cls, statement: Statement) -> str:
-        return f"{''.join(p.pretty_name for p in statement.args)} are collinear"
+        return f"{', '.join(p.pretty_name for p in statement.args)} are collinear"
 
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
@@ -84,4 +84,4 @@ class NColl(Predicate):
 
     @classmethod
     def pretty(cls, statement: Statement) -> str:
-        return f"{''.join(p.pretty_name for p in statement.args)} are not collinear"
+        return f"{', '.join(p.pretty_name for p in statement.args)} are not collinear"

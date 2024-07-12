@@ -84,11 +84,7 @@ class ConstantRatio(Predicate):
         )
 
     @classmethod
-    def to_repr(cls, statement: Statement) -> str:
+    def pretty(cls, statement: Statement) -> str:
         args: tuple[Point, Point, Point, Point, str] = statement.args
         a, b, c, d, r = args
-        assert isinstance(a, Point)
-        assert isinstance(b, Point)
-        assert isinstance(c, Point)
-        assert isinstance(d, Point)
-        return f"{a.name}{b.name}:{c.name}{d.name}={r}"
+        return f"{a.pretty_name}{b.pretty_name}:{c.pretty_name}{d.pretty_name}={r}"

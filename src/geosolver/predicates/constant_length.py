@@ -81,9 +81,6 @@ class ConstantLength(Predicate):
         )
 
     @classmethod
-    def to_repr(cls, statement: Statement) -> str:
+    def pretty(cls, statement: Statement) -> str:
         a, b, length = statement.args
-        assert isinstance(a, Point)
-        assert isinstance(b, Point)
-        assert isinstance(length, str)
-        return f"len({a.name}{b.name})={length}"
+        return f"{a.pretty_name}{b.pretty_name} = {length}"

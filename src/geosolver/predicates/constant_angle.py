@@ -92,3 +92,9 @@ class ConstantAngle(Predicate):
     def check(cls, statement: Statement) -> bool:
         eqs, table = cls._prep_ar(statement)
         return all(table.add_expr(eq, None) for eq in eqs)
+
+    @classmethod
+    def pretty(cls, statement: Statement) -> str:
+        args: tuple[Point, Point, Point, Point, str] = statement.args
+        a, b, c, d, y = args
+        return f"∠({a.pretty_name}{b.pretty_name},{c.pretty_name}{d.pretty_name}) = {y}"
