@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-from geosolver.dependency.dependency import CONSTRUCTION
+from geosolver.dependency.dependency import CONSTRUCTION, Dependency
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import ATOM
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
@@ -9,7 +9,6 @@ from geosolver.predicates.predicate import IllegalPredicate, Predicate
 if TYPE_CHECKING:
     from geosolver.dependency.dependency_graph import DependencyGraph
     from geosolver.statement import Statement
-    from geosolver.dependency.dependency import Dependency
 
 
 class SameSide(Predicate):
