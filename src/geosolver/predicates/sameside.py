@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-from geosolver.dependency.dependency import CONSTRUCTION, Dependency
+from geosolver.dependency.dependency import CONSTRUCTION
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import ATOM
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
@@ -44,8 +44,8 @@ class SameSide(Predicate):
     def check_numerical(cls, statement: Statement) -> bool:
         args: tuple[Point, ...] = statement.args
         a, b, c, x, y, z = args
-        return (a.num - b.num).dot(c.num - b.num) * (x.num - y.num).dot(
-            z.num - y.num
+        return (b.num - a.num).dot(c.num - a.num) * (y.num - x.num).dot(
+            z.num - x.num
         ) > ATOM
 
     @classmethod
