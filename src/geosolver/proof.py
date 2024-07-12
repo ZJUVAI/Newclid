@@ -47,6 +47,7 @@ from geosolver.numerical.sketch import sketch
 
 from geosolver.problem import Problem
 from geosolver.dependency.dependency import CONSTRUCTION, Dependency
+from geosolver.tools import atomize
 
 if TYPE_CHECKING:
     from numpy.random import Generator
@@ -219,7 +220,18 @@ class Proof:
             for n in cdef.numerics:
                 numerics.append(tuple(mapping[a] if a in mapping else a for a in n))
 
-        new_points = self.symbols_graph.names2points(construction.points)
+        point_names: list[str] = []
+        fix_point_postions: list[Optional[PointNum]] = []
+        for s in construction.points:
+            if "@" in s:
+                name, pos = atomize(s, "@")
+                point_names.append(name)
+                x, y = atomize(pos, "_")
+                fix_point_postions.append(PointNum(x, y))
+            else:
+                point_names.append(s)
+                fix_point_postions.append(None)
+        new_points = self.symbols_graph.names2points(point_names)
         for p in new_points:
             if p in existing_points:
                 raise Exception("The construction is illegal")
@@ -242,8 +254,8 @@ class Proof:
             )
 
         new_numerical_points = draw_fn()
-        for p, num in zip(new_points, new_numerical_points):
-            p.num = num
+        for p, num, num0 in zip(new_points, new_numerical_points, fix_point_postions):
+            p.num = num0 or num
 
         # check two things
         existing_numerical_points = [p.num for p in existing_points]
