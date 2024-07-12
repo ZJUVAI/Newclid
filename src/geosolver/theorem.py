@@ -29,9 +29,9 @@ class Theorem(NamedTuple):
         """Load deduction rule from a str object."""
         description = ""
         res: list[Theorem] = []
-        for s in atomize(text, "\n"):
+        for i, s in enumerate(atomize(text, "\n")):
             if "=>" in s:
-                res.append(cls.from_string(s, description))
+                res.append(cls.from_string(s, description or f"rule of line {i}"))
                 description = ""
             else:
                 description = s

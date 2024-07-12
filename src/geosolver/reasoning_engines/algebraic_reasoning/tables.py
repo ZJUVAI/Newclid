@@ -15,8 +15,8 @@ ATOM: float = 1e-9
 NLOGATOM: int = 9
 
 
-Angle_Chase = "alc"
-Ratio_Chase = "rac"
+Angle_Chase = "Angle Chasing"
+Ratio_Chase = "Ratio Chasing"
 
 
 class Coef(float):

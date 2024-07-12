@@ -62,7 +62,7 @@ class Perp(Predicate):
     def pretty(cls, statement: Statement) -> str:
         args: tuple[Point, ...] = statement.args
         a, b, c, d = args
-        return f"{a.name}{b.name} ⟂ {c.name}{d.name}"
+        return f"{a.pretty_name}{b.pretty_name} ⟂ {c.pretty_name}{d.pretty_name}"
 
 
 class NPerp(Predicate):

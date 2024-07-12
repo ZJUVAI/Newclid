@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
-from geosolver.dependency.dependency import CONSTRUCTION, Dependency
+from geosolver.dependency.dependency import BY_CONSTRUCTION, Dependency
 from geosolver.dependency.symbols import Line, Point
 from geosolver.numerical.geometries import LineNum
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
@@ -48,7 +48,7 @@ class Coll(Predicate):
 
     @classmethod
     def pretty(cls, statement: Statement) -> str:
-        return f"coll/{''.join(repr(p) for p in statement.args)}/"
+        return f"{''.join(p.pretty_name for p in statement.args)} are collinear"
 
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
@@ -80,8 +80,8 @@ class NColl(Predicate):
 
     @classmethod
     def why(cls, statement: Statement) -> Dependency:
-        return Dependency.mk(statement, CONSTRUCTION, tuple())
+        return Dependency.mk(statement, BY_CONSTRUCTION, tuple())
 
     @classmethod
     def pretty(cls, statement: Statement) -> str:
-        return f"ncoll/{''.join(repr(p) for p in statement.args)}\\"
+        return f"{''.join(p.pretty_name for p in statement.args)} are not collinear"

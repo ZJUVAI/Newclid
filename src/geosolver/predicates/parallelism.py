@@ -82,6 +82,11 @@ class Para(Predicate):
         eqs, table = cls._prep_ar(statement)
         return all(table.add_expr(eq, None) for eq in eqs)
 
+    @classmethod
+    def pretty(cls, statement: Statement) -> str:
+        points: tuple[Point, ...] = statement.args
+        return "∥".join(a.pretty_name + b.pretty_name for a, b in reshape(points, 2))
+
 
 class NPara(Predicate):
     """npara A B C D -

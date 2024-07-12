@@ -33,24 +33,8 @@ class MidPoint(Predicate):
         m, a, b = args
         return m.num.close_enough((a.num + b.num) / 2)
 
-    # @classmethod
-    # def check(cls, statement: Statement) -> bool:
-    #     args: tuple[Point, ...] = statement.args
-    #     m, a, b = args
-    #     coll = statement.with_new(Coll, (m, a, b))
-    #     cong = statement.with_new(Cong, (m, a, m, b))
-    #     return coll.check() and cong.check()
-
-    # @classmethod
-    # def why(cls, statement: Statement) -> Dependency:
-    #     args: tuple[Point, ...] = statement.args
-    #     m, a, b = args
-    #     coll = statement.with_new(Coll, (m, a, b))
-    #     cong = statement.with_new(Cong, (m, a, m, b))
-    #     return Dependency.mk(statement, "", (coll, cong))
-
     @classmethod
     def pretty(cls, statement: Statement) -> str:
         args: tuple[Point, ...] = statement.args
         m, a, b = args
-        return f"{a.name}-{m.name}(mid)-{b.name}"
+        return f"{m.pretty_name} is the midpoint of {a.pretty_name}{b.pretty_name}"

@@ -106,7 +106,8 @@ class EqRatio(Predicate):
     def pretty(cls, statement: Statement) -> str:
         args: tuple[Point, ...] = statement.args
         return " = ".join(
-            f"{a.name}{b.name}:{c.name}{d.name}" for a, b, c, d in reshape(args, 4)
+            f"{a.pretty_name}{b.pretty_name}:{c.pretty_name}{d.pretty_name}"
+            for a, b, c, d in reshape(args, 4)
         )
 
 

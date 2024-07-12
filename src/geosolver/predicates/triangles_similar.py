@@ -54,6 +54,12 @@ class SimtriClock(Predicate):
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
         return tuple(p.name for p in args)
 
+    @classmethod
+    def pretty(cls, statement: Statement) -> str:
+        args: tuple[Point, ...] = statement.args
+        a, b, c, p, q, r = args
+        return f"▲{a.pretty_name}{b.pretty_name}{c.pretty_name} ≅ ▲{p.pretty_name}{q.pretty_name}{r.pretty_name}"
+
 
 class SimtriReflect(Predicate):
     """simtrir A B C P Q R -
@@ -87,3 +93,9 @@ class SimtriReflect(Predicate):
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
         return tuple(p.name for p in args)
+
+    @classmethod
+    def pretty(cls, statement: Statement) -> str:
+        args: tuple[Point, ...] = statement.args
+        a, b, c, p, q, r = args
+        return f"▲{a.pretty_name}{b.pretty_name}{c.pretty_name} ≅ ▲{p.pretty_name}{q.pretty_name}{r.pretty_name}"

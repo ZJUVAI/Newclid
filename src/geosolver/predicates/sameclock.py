@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
-from geosolver.dependency.dependency import CONSTRUCTION, Dependency
+from geosolver.dependency.dependency import BY_CONSTRUCTION
 from geosolver.dependency.symbols import Point
 from geosolver.numerical.check import same_clock
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
@@ -42,8 +42,14 @@ class SameClock(Predicate):
 
     @classmethod
     def why(cls, statement: Statement) -> Dependency:
-        return Dependency.mk(statement, CONSTRUCTION, ())
+        return Dependency.mk(statement, BY_CONSTRUCTION, ())
 
     @classmethod
     def add(cls, dep: Dependency):
         return
+
+    @classmethod
+    def pretty(cls, statement: Statement) -> str:
+        args: tuple[Point, ...] = statement.args
+        a, b, c, x, y, z = args
+        return f"{a.pretty_name}{b.pretty_name}{c.pretty_name} are sameclock to {x.pretty_name}{y.pretty_name}{z.pretty_name}"

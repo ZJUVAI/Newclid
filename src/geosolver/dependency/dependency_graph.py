@@ -54,7 +54,7 @@ class DependencyGraph:
                 my_proof is None or len(my_proof) > len(cur_proof)
             ):
                 my_proof = cur_proof + (
-                    f"{', '.join(premise.pretty() + ' [' + id[premise] + ']' for premise in dep.why)} {dep.reason}=> {dep.statement.pretty()} [{id[dep.statement]}]",
+                    f"{', '.join(premise.pretty() + ' [' + id[premise] + ']' for premise in dep.why)} ({dep.reason})=> {dep.statement.pretty()} [{id[dep.statement]}]",
                 )
         if my_proof is None:
             del sub_proof[statement]
@@ -62,7 +62,7 @@ class DependencyGraph:
         sub_proof[statement] = my_proof
         return my_proof
 
-    def proof_text(self, goals: list[Statement]) -> str:
+    def proof_lines(self, goals: list[Statement]) -> tuple[str, ...]:
         id: dict[Statement, str] = {}
         sub_proof: dict[Statement, Optional[tuple[str, ...]]] = {}
         res: list[str] = []
@@ -74,4 +74,4 @@ class DependencyGraph:
             for s in proof_of_goal:
                 if s not in res:
                     res.append(s)
-        return "\n".join(res)
+        return tuple(res)

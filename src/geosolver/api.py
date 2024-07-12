@@ -111,7 +111,6 @@ class GeometricSolverBuilder:
         proof_state = Proof.build_problem(
             problem=self.problem,
             defs=self.defs,
-            reasoning_engines=self.reasoning_engines,
             runtime_cache_path=self.runtime_cache_path,
             rng=self.rng,
         )

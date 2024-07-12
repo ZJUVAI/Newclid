@@ -5,7 +5,7 @@ from abc import ABC
 from typing import TYPE_CHECKING, Optional, TypeVar, Union
 from typing_extensions import Self
 
-from geosolver.dependency.dependency import CONSTRUCTION
+from geosolver.dependency.dependency import BY_CONSTRUCTION
 from geosolver.numerical.geometries import CircleNum, LineNum, PointNum
 
 if TYPE_CHECKING:
@@ -74,6 +74,16 @@ class Symbol(ABC):
 class Point(Symbol):
     num: PointNum
 
+    @property
+    def pretty_name(self) -> str:
+        p = self.name[0].upper()
+        for c in self.name[1:]:
+            if c.isdigit():
+                p += chr(ord("₀") + ord(c) - ord("0"))
+            else:
+                p += f"_{c}"
+        return p
+
 
 class Line(Symbol):
     """Symbol of type Line."""
@@ -126,7 +136,7 @@ class Line(Symbol):
                 if target.dep:
                     return target.dep.with_new(statement)
                 else:
-                    return Dependency.mk(statement, CONSTRUCTION, ())
+                    return Dependency.mk(statement, BY_CONSTRUCTION, ())
         raise Exception("why_coll failed")
 
 
@@ -180,5 +190,5 @@ class Circle(Symbol):
                 if target.dep:
                     return target.dep.with_new(statement)
                 else:
-                    return Dependency.mk(statement, CONSTRUCTION, ())
+                    return Dependency.mk(statement, BY_CONSTRUCTION, ())
         raise Exception("why_concyclic failed")

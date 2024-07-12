@@ -94,7 +94,9 @@ class Cong(Predicate):
     @classmethod
     def to_repr(cls, statement: Statement) -> str:
         args = statement.args
-        return "=".join(f"{a}{b}" for a, b in zip(args[::2], args[1::2]))
+        return " = ".join(
+            f"{a.pretty_name}{b.pretty_name}" for a, b in zip(args[::2], args[1::2])
+        )
 
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
@@ -140,7 +142,7 @@ class Cong2(Predicate):
         dep.with_new(c1).add()
 
     @classmethod
-    def to_repr(cls, statement: Statement) -> str:
+    def pretty(cls, statement: Statement) -> str:
         points: tuple[Point, Point, Point, Point] = statement.args
         m, n, a, b = points
-        return "cong2:" + f"{a}<{m}{n}>{b}"
+        return "cong2:" + f"{a.name}<{m.name}{n.name}>{b.name}"
