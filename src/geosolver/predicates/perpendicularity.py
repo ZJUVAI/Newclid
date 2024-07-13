@@ -59,6 +59,19 @@ class Perp(Predicate):
         ).with_new(statement)
 
     @classmethod
+    def to_constructive(cls, point: str, args: tuple[str, ...]) -> str:
+        a, b, c, d = args
+        if point in [c, d]:
+            a, b, c, d = c, d, a, b
+        if point == b:
+            a, b = b, a
+        if point == d:
+            c, d = d, c
+        if a == c and a == point:
+            return f"on_dia {a} {b} {d}"
+        return f"on_tline {a} {b} {c} {d}"
+
+    @classmethod
     def pretty(cls, statement: Statement) -> str:
         args: tuple[Point, ...] = statement.args
         a, b, c, d = args

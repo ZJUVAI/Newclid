@@ -100,6 +100,25 @@ class EqAngle(Predicate):
         )
 
     @classmethod
+    def to_constructive(cls, point: str, args: tuple[str, ...]) -> str:
+        a, b, c, d, e, f = args
+
+        if point in [d, e, f]:
+            a, b, c, d, e, f = d, e, f, a, b, c
+
+        x, b, y, c, d = b, c, e, d, f
+        if point == b:
+            a, b, c, d = b, a, d, c
+
+        if point == d and x == y:  # x p x b = x c x p
+            return f"angle_bisector {point} {b} {x} {c}"
+
+        if point == x:
+            return f"eqangle3 {x} {a} {b} {y} {c} {d}"
+
+        return f"on_aline {a} {x} {b} {c} {y} {d}"
+
+    @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
         return tuple(p.name for p in args)
 

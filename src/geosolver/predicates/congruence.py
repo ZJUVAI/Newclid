@@ -92,6 +92,23 @@ class Cong(Predicate):
         )
 
     @classmethod
+    def to_constructive(cls, point: str, args: tuple[str, ...]) -> str:
+        a, b, c, d = args
+        if point in [c, d]:
+            a, b, c, d = c, d, a, b
+        if point == b:
+            a, b = b, a
+        if point == d:
+            c, d = d, c
+        if a == c and a == point:
+            return f"on_bline {a} {b} {d}"
+        if b in [c, d]:
+            if b == d:
+                c, d = d, c
+            return f"on_circle {a} {b} {d}"
+        return f"eqdistance {a} {b} {c} {d}"
+
+    @classmethod
     def to_repr(cls, statement: Statement) -> str:
         args = statement.args
         return " = ".join(

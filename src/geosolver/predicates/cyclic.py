@@ -48,6 +48,11 @@ class Cyclic(Predicate):
         Circle.make_cyclic(dep.statement.args, dep)
 
     @classmethod
+    def to_constructive(cls, point: str, args: tuple[str, ...]) -> str:
+        a, b, c = [x for x in args if x != point]
+        return f"on_circum {point} {a} {b} {c}"
+
+    @classmethod
     def why(cls, statement: Statement) -> Dependency:
         return Circle.why_cyclic(statement)
 

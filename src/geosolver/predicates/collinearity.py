@@ -47,6 +47,15 @@ class Coll(Predicate):
             table.add_expr(table.get_eq2(rep.name, line.name), dep)
 
     @classmethod
+    def to_constructive(cls, point: str, args: tuple[str, ...]) -> str:
+        a, b, c = args
+        if point == b:
+            a, b = b, a
+        if point == c:
+            a, b, c = c, a, b
+        return f"on_line {a} {b} {c}"
+
+    @classmethod
     def pretty(cls, statement: Statement) -> str:
         return f"{', '.join(p.pretty_name for p in statement.args)} are collinear"
 
