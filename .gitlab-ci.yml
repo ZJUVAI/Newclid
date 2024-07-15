@@ -19,7 +19,7 @@ build:
     # Redirect pip to the Huawei mirror
     - pip config set global.index-url http://mirrors.tools.huawei.com/pypi/simple
     - pip config set global.trusted-host "mirrors.tools.huawei.com rnd-gitlab-eu.huawei.com pypi.org files.pythonhosted.org"
-    - pip install --use-feature=in-tree-build -e .[dev]
+    - pip install -e .[dev]
   artifacts:
     paths:
       - venv
