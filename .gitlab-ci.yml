@@ -1,19 +1,5 @@
 image: python:latest
 
-# Change pip's cache directory to be inside the project directory since we can
-# only cache local items.
-variables:
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
-
-# Pip's cache doesn't store the python packages
-# https://pip.pypa.io/en/stable/topics/caching/
-#
-# If you want to also cache the installed packages, you have to install
-# them in a virtualenv and cache it as well.
-cache:
-  paths:
-    - .cache/pip
-    - venv/
 
 before_script:
   - python --version
@@ -30,15 +16,19 @@ build:
   script:
     - python -m venv venv
     - source venv/bin/activate
-    # redirect of the Huawei mirror for pip
-    - pip config set global.index-url "http://mirrors.tools.huawei.com/pypi/simple"
+    # Redirect pip to the Huawei mirror
+    - pip config set global.index-url http://mirrors.tools.huawei.com/pypi/simple
     - pip config set global.trusted-host "mirrors.tools.huawei.com rnd-gitlab-eu.huawei.com pypi.org files.pythonhosted.org"
-
     - pip install --use-feature=in-tree-build -e .[dev]
+  artifacts:
+    paths:
+      - venv
+
 
 pytest-coverage:
     stage: test
     script:
+        - source venv/bin/activate
         - cat rule_sets/triangles.txt
         - source venv/bin/activate
         - python -m pytest -v --cov --cov-report=xml:coverage.xml --cov-report=term --cov-report=xml:coverage.xml --junitxml=report.xml tests
