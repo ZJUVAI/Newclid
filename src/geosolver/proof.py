@@ -88,7 +88,7 @@ class Proof:
         problem: Problem,
         defs: dict[str, Definition],
         runtime_cache_path: Optional[Path],
-        max_attempts: int = 10000,
+        max_attempts: int,
         *,
         rng: "Generator",
     ) -> Proof:

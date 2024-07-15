@@ -25,7 +25,7 @@ class Problem(NamedTuple):
         )
 
     @classmethod
-    def parse_txt_file(cls, fname: Path):
+    def parse_txt_file(cls, fname: Path) -> dict[str, Problem]:
         with open(fname, "r") as f:
             lines = f.read().split("\n")
 
@@ -33,7 +33,7 @@ class Problem(NamedTuple):
         data = [
             cls.from_text(url + "\n" + problem) for (url, problem) in reshape(lines, 2)
         ]
-        return data
+        return {p.name: p for p in data}
 
     @classmethod
     def from_text(cls, s: str) -> Problem:
@@ -56,6 +56,9 @@ class Problem(NamedTuple):
         )
         return problem
 
-    @classmethod
-    def to_dict(cls, data: list[Problem]) -> dict[str, Problem]:
-        return {p.name: p for p in data}
+    def with_more_construction(self, constructions: str) -> Problem:
+        return Problem(
+            name=self.name,
+            constructions=self.constructions + tuple(Clause.parse_line(constructions)),
+            goals=self.goals,
+        )

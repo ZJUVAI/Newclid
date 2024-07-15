@@ -63,7 +63,7 @@ def cli_arguments() -> Namespace:
     parser.add_argument(
         "--log-level",
         default=logging.INFO,
-        type=float,
+        type=int,
         help="Logging level.",
     )
     parser.add_argument(

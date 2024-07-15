@@ -2,19 +2,16 @@
 # !!! Do not change the external API except if you know what you are doing !!!
 
 from __future__ import annotations
+from copy import deepcopy
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, Type
+from typing import TYPE_CHECKING, Any, Optional
 from typing_extensions import Self
 
 
 from geosolver.agent.breadth_first_search import BFSDDAR
 from geosolver.definition.definition import Definition
 from geosolver.numerical.draw_figure import draw_figure
-from geosolver.reasoning_engines.algebraic_reasoning.algebraic_manipulator import (
-    AlgebraicManipulator,
-)
-from geosolver.reasoning_engines.engines_interface import ReasoningEngine
 from geosolver.theorem import Theorem
 from geosolver.proof import Proof
 from geosolver.configs import default_defs_path, default_rules_path
@@ -89,14 +86,9 @@ class GeometricSolverBuilder:
         self.rules: Optional[list[Theorem]] = None
         self.deductive_agent: Optional[type[DeductiveAgent]] = None
         self.runtime_cache_path: Optional[Path] = None
-        self.reasoning_engines: dict[str, Type[ReasoningEngine]] = {
-            "AR": AlgebraicManipulator
-        }
-        self.rng = (
-            np.random.default_rng(seed) if seed else np.random.default_rng(998244353)
-        )
+        self.seed = seed or 998244353
 
-    def build(self) -> "GeometricSolver":
+    def build(self, max_attempts: int = 10000) -> "GeometricSolver":
         if self.problem is None:
             raise ValueError("Did not load problem before building solver.")
 
@@ -112,7 +104,8 @@ class GeometricSolverBuilder:
             problem=self.problem,
             defs=self.defs,
             runtime_cache_path=self.runtime_cache_path,
-            rng=self.rng,
+            rng=np.random.default_rng(self.seed),
+            max_attempts=max_attempts,
         )
 
         return GeometricSolver(
@@ -123,18 +116,27 @@ class GeometricSolverBuilder:
         )
 
     def load_problem_from_file(
-        self, problems_path: Path, problem_name: str, translate: bool = True
+        self, problems_path: Path, problem_name: str, rename: bool = False
     ) -> Self:
         """
         `tranlate = True` by default for better LLM training
         """
-        problems = Problem.to_dict(Problem.parse_txt_file(problems_path))
+        problems = Problem.parse_txt_file(problems_path)
         if problem_name not in problems:
             raise ValueError(
                 f"Problem name `{problem_name}` not found in {list(problems.keys())}"
             )
         self.problem = problems[problem_name]
         return self
+
+    def with_additional_constructions(self, constructions: str) -> Self:
+        """
+        Does not copy the cache
+        """
+        assert self.problem is not None
+        res = deepcopy(self)
+        res.problem = self.problem.with_more_construction(constructions)
+        return res
 
     def del_goal(self) -> Self:
         if self.problem:
@@ -171,10 +173,4 @@ class GeometricSolverBuilder:
 
     def with_deductive_agent(self, deductive_agent: type[DeductiveAgent]) -> Self:
         self.deductive_agent = deductive_agent
-        return self
-
-    def with_additional_reasoning_engine(
-        self, reasoning_engine: Type[ReasoningEngine], engine_name: str
-    ) -> Self:
-        self.reasoning_engines[engine_name] = reasoning_engine
         return self
