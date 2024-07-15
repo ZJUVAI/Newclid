@@ -1,7 +1,6 @@
 import pytest
 
 from geosolver.api import GeometricSolverBuilder
-from geosolver.theorem import Theorem
 from tests.fixtures import build_until_works
 
 
@@ -270,9 +269,8 @@ class TestConstants:
     def test_rconst_as_theorem_conclusion(self):
         solver = self.solver_builder.load_problem_from_txt(
             "a b = segment a b; m = midpoint m a b ? rconst m a a b 1/2",
-        )
-        solver.rules = [Theorem.from_string("midp m a b => rconst m a a b 1/2")]
-        success = solver.load_rules_from_file(r"rule_sets\imo.txt").build().run()
+        ).build()
+        success = solver.run()
         assert success
 
     def test_triangle12_in_rconst_out(self):

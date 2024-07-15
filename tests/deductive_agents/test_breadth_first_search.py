@@ -28,7 +28,6 @@ class TestDDAR:
                 "f = mirror f q d ? "
                 "cong q o p o"
             )
-            .load_rules_from_file(Path(r"rule_sets\imo.txt"))
             .with_runtime_cache(Path("tests_output/imo2009p2cache.json"))
             .build()
         )
@@ -58,7 +57,6 @@ class TestDDAR:
                 "x = on_circle x o a, on_circle x o1 a1; "
                 "h = orthocenter h a b c ? cyclic pa pb c x"
             )
-            .load_rules_from_file(Path(r"rule_sets\imo.txt"))
             .with_runtime_cache(Path("tests_output/imo2011p6cache.json"))
             .build()
         )
@@ -82,7 +80,6 @@ class TestDDAR:
                 "q = on_line q b n, on_line q c d "
                 "? cong e p e q"
             )
-            .load_rules_from_file(Path(r"rule_sets\imo.txt"))
             .with_runtime_cache(Path("tests_output/imo2000p1cache.json"))
             .build()
         )
