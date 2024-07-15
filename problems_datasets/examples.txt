@@ -150,3 +150,5 @@ checking_ordering_r27_aoc_bod_sameside
 o c = segment o c; d = free d; a x = trisegment a x o c; b y = trisegment b y o d; a1 = mirror a1 a o; c1 = mirror c1 c o; b1 = mirror b1 b o; d1 = mirror d1 d o ? sameside a o c b1 o d
 checking_ordering_r27_aoc_dob_sameside
 o c = segment o c; d = free d; a x = trisegment a x o c; b y = trisegment b y o d; a1 = mirror a1 a o; c1 = mirror c1 c o; b1 = mirror b1 b o; d1 = mirror d1 d o ? sameside a1 o c b o d1
+translated_imo_2011_p6_with_orthocenter_and_x_reflections
+a b c = triangle a b c; o = circle o a b c; p = on_circle p o a; q = on_tline q p o p; pa = reflect pa p b c; pb = reflect pb p c a; pc = reflect pc p a b; qa = reflect qa q b c; qb = reflect qb q c a; qc = reflect qc q a b; a1 = on_line a1 pb qb, on_line a1 pc qc; b1 = on_line b1 pa qa, on_line b1 pc qc; c1 = on_line c1 pa qa, on_line c1 pb qb; o1 = circle o1 a1 b1 c1; x = on_circle x o a, on_circle x o1 a1; h = orthocenter h a b c; xa = reflect xa x b c; xb = reflect xb x a c; xc = reflect xc x a b ? coll x o o1

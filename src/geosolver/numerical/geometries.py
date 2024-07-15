@@ -237,31 +237,31 @@ class LineNum:
         a, b, c = self.coefficients
         # ax + by + c = 0
         if x is None and y is not None:
-            if abs(a) > ATOM:
+            if not close_enough(a, 0):
                 return PointNum((-c - b * y) / a, y)
             else:
                 return None
         elif x is not None and y is None:
-            if abs(b) > ATOM:
+            if not close_enough(b, 0):
                 return PointNum(x, (-c - a * x) / b)
             else:
                 return None
         elif x is not None and y is not None:
-            if abs(a * x + b * y + c) < ATOM:
+            if close_enough(a * x + b * y, -c):
                 return PointNum(x, y)
         return None
 
     def diff_side(self, p1: "PointNum", p2: "PointNum") -> Optional[bool]:
         d1 = self(p1.x, p1.y)
         d2 = self(p2.x, p2.y)
-        if abs(d1) < ATOM or abs(d2) < ATOM:
+        if close_enough(d1, 0) or close_enough(d2, 0):
             return None
         return d1 * d2 < 0
 
     def same_side(self, p1: "PointNum", p2: "PointNum") -> Optional[bool]:
         d1 = self(p1.x, p1.y)
         d2 = self(p2.x, p2.y)
-        if abs(d1) < ATOM or abs(d2) < ATOM:
+        if close_enough(d1, 0) or close_enough(d2, 0):
             return None
         return d1 * d2 > 0
 
@@ -276,7 +276,7 @@ class LineNum:
     def is_same(self, other: "LineNum") -> bool:
         a, b, c = self.coefficients
         x, y, z = other.coefficients
-        return abs(a * y - b * x) <= ATOM and abs(b * z - c * y) <= ATOM
+        return close_enough(a * y, b * x) and close_enough(b * z, c * y)
 
     def sample_within(
         self, points: list[PointNum], n: int = 5, *, rng: Generator

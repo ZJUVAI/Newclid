@@ -109,7 +109,7 @@ class Cong(Predicate):
         return f"eqdistance {a} {b} {c} {d}"
 
     @classmethod
-    def to_repr(cls, statement: Statement) -> str:
+    def pretty(cls, statement: Statement) -> str:
         args = statement.args
         return " = ".join(
             f"{a.pretty_name}{b.pretty_name}" for a, b in zip(args[::2], args[1::2])
@@ -162,4 +162,6 @@ class Cong2(Predicate):
     def pretty(cls, statement: Statement) -> str:
         points: tuple[Point, Point, Point, Point] = statement.args
         m, n, a, b = points
-        return "cong2:" + f"{a.name}<{m.name}{n.name}>{b.name}"
+        return (
+            "cong2:" + f"{a.pretty_name}<{m.pretty_name}{n.pretty_name}>{b.pretty_name}"
+        )
