@@ -38,6 +38,8 @@ class Matcher:
         self.runtime_cache_path = runtime_cache_path
         self.cache: dict["Theorem", set[Dependency]] = {}
         if self.runtime_cache_path is not None and not self.runtime_cache_path.exists():
+            os.makedirs(os.path.dirname(self.runtime_cache_path), exist_ok=True)
+            self.runtime_cache_path.touch()
             with open(self.runtime_cache_path, "w") as f:
                 json.dump({}, f)
 
@@ -47,8 +49,6 @@ class Matcher:
         read = False
         mappings: list[dict[str, str]] = []
         if self.runtime_cache_path is not None:
-            os.makedirs(os.path.dirname(self.runtime_cache_path), exist_ok=True)
-            self.runtime_cache_path.touch()
             with open(self.runtime_cache_path) as f:
                 file_cache = json.load(f)
             if "matcher" not in file_cache:
