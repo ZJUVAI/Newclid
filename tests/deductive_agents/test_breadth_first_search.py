@@ -28,13 +28,13 @@ class TestDDAR:
                 "f = mirror f q d ? "
                 "cong q o p o"
             )
-            .with_runtime_cache(Path("tests_output/imo2009p2cache.json"))
+            .with_runtime_cache(Path(r"./tests_output/imo2009p2cache.json"))
             .build()
         )
 
         success = solver.run()
         assert success
-        solver.write_solution(Path("tests_output/imo2009p2_proof.txt"))
+        solver.write_solution(Path(r"./tests_output/imo2009p2_proof.txt"))
 
     @pytest.mark.skip("not solved by ag either")
     def test_translated_imo_2011_p6_with_orthocenter(self):
@@ -57,13 +57,13 @@ class TestDDAR:
                 "x = on_circle x o a, on_circle x o1 a1; "
                 "h = orthocenter h a b c ? cyclic pa pb c x"
             )
-            .with_runtime_cache(Path("tests_output/imo2011p6cache.json"))
+            .with_runtime_cache(Path(r"./tests_output/imo2011p6cache.json"))
             .build()
         )
 
         success = solver.run()
         assert success
-        solver.write_solution(Path("tests_output/imo2011p6_proof.txt"))
+        solver.write_solution(Path(r"./tests_output/imo2011p6_proof.txt"))
 
     def test_imo_2000_p1_should_succeed(self):
         solver = (
@@ -80,14 +80,14 @@ class TestDDAR:
                 "q = on_line q b n, on_line q c d "
                 "? cong e p e q"
             )
-            .with_runtime_cache(Path("tests_output/imo2000p1cache.json"))
+            .with_runtime_cache(Path(r"./tests_output/imo2000p1cache.json"))
             .build()
         )
 
-        solver.draw_figure(False, Path("tests_output/imo2000p1_setup.png"))
+        solver.draw_figure(False, Path(r"./tests_output/imo2000p1_setup.png"))
         success = solver.run()
         assert success
-        solver.write_solution(Path("tests_output/imo2000p1_proof.txt"))
+        solver.write_solution(Path(r"./tests_output/imo2000p1_proof.txt"))
 
     def test_incenter_excenter_should_succeed(self):
         solver = (
@@ -105,7 +105,7 @@ class TestDDAR:
 
     def test_orthocenter_should_exhaust(self):
         solver = (
-            self.solver_builder.load_rules_from_file(Path(r"rule_sets\triangles.txt"))
+            self.solver_builder.load_rules_from_file(Path(r"./rule_sets/triangles.txt"))
             .load_problem_from_txt(
                 "a b c = triangle a b c; "
                 "d = on_tline d b a c, on_tline d c a b "
@@ -118,7 +118,7 @@ class TestDDAR:
 
     def test_orthocenter_aux_should_succeed(self):
         solver = (
-            self.solver_builder.load_rules_from_file(Path(r"rule_sets\triangles.txt"))
+            self.solver_builder.load_rules_from_file(Path(r"./rule_sets/triangles.txt"))
             .load_problem_from_txt(
                 "a b c = triangle a b c; "
                 "d = on_tline d b a c, on_tline d c a b; "
@@ -137,5 +137,5 @@ class TestDDAR:
             EqAngle, ("b", "e", "e", "a", "c", "e", "e", "d"), solver.proof.dep_graph
         ).check()
         success = solver.run()
-        solver.write_solution(Path("tests_output/orthocenter_proof.txt"))
+        solver.write_solution(Path(r"./tests_output/orthocenter_proof.txt"))
         assert success

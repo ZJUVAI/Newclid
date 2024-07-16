@@ -1,5 +1,15 @@
 image: python:latest
 
+# Change pip's cache directory to be inside the project directory since we can
+# only cache local items.
+variables:
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+
+
+cache:
+  paths:
+    - .cache/pip
+
 
 before_script:
   - python --version
@@ -29,7 +39,7 @@ pytest-coverage:
     stage: test
     script:
         - source venv/bin/activate
-        - python -m pytest --rootdir . -v --cov --cov-report=xml:coverage.xml --cov-report=term --cov-report=xml:coverage.xml --junitxml=report.xml tests
+        - python -m pytest -v --cov --cov-report=xml:coverage.xml --cov-report=term --cov-report=xml:coverage.xml --junitxml=report.xml tests
     coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
     artifacts:
         when: always
