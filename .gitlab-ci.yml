@@ -9,6 +9,7 @@ variables:
 cache:
   paths:
     - .cache/pip
+    - tests_output
 
 
 before_script:
