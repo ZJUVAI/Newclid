@@ -20,6 +20,9 @@ before_script:
   - echo "login gitlab-ci-token" >> ~/.netrc
   - echo "password ${CI_JOB_TOKEN}" >> ~/.netrc
 
+after_script:
+  - ls -a
+
 
 build:
   stage: build
@@ -40,7 +43,6 @@ pytest-coverage:
     script:
         - source venv/bin/activate
         - python -m pytest -v --cov --cov-report=xml:coverage.xml --cov-report=term --cov-report=xml:coverage.xml --junitxml=report.xml tests
-        - ls
     coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
     artifacts:
         when: always
