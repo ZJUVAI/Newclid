@@ -1,13 +1,10 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
-from numpy import log
-
-
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
-from geosolver.reasoning_engines.algebraic_reasoning.tables import Coef, Ratio_Chase
+from geosolver.reasoning_engines.algebraic_reasoning.tables import Ratio_Chase
 from geosolver.tools import parse_len, str_to_nd
 from geosolver.dependency.dependency import Dependency
 
@@ -49,13 +46,10 @@ class ConstantLength(Predicate):
     @classmethod
     def _prep_ar(cls, statement: Statement) -> tuple[list[SumCV], Table]:
         args: tuple[Point, Point, str] = statement.args
-        p0, p1, length = args
-        n, d = str_to_nd(length)
+        p0, p1, _ = args
         table = statement.dep_graph.ar.rtable
 
-        return [
-            table.get_eq3(table.get_length(p0, p1), table.one, Coef(log(n / d)))
-        ], table
+        return [table.get_eq1(table.get_length(p0, p1))], table
 
     @classmethod
     def add(cls, dep: Dependency) -> None:
@@ -66,7 +60,7 @@ class ConstantLength(Predicate):
     @classmethod
     def check(cls, statement: Statement) -> bool:
         eqs, table = cls._prep_ar(statement)
-        return all(table.add_expr(eq, None) for eq in eqs)
+        return all(table.expr_delta(eq) for eq in eqs)
 
     @classmethod
     def why(cls, statement: Statement) -> Dependency:
@@ -79,6 +73,10 @@ class ConstantLength(Predicate):
         return Dependency.mk(
             statement, Ratio_Chase, tuple(dep.statement for dep in why)
         )
+
+    @classmethod
+    def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
+        return (args[0].name, args[1].name, args[2])
 
     @classmethod
     def pretty(cls, statement: Statement) -> str:

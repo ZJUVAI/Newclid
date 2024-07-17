@@ -1,3 +1,4 @@
+from geosolver.predicates.Pythagoras import PythagoreanConclusions, PythagoreanPremises
 from geosolver.predicates.collinearity import Coll as Coll, NColl as NColl
 from geosolver.predicates.congruence import Cong as Cong, Cong2 as Cong2
 from geosolver.predicates.midpoint import MidPoint as MidPoint
@@ -58,6 +59,8 @@ NUMERICAL_PREDICATES = (
     SameClock,
 )
 
-PREDICATES = SYMBOLIC_PREDICATES + NUMERICAL_PREDICATES
+Integrated_PREDICATES = (PythagoreanPremises, PythagoreanConclusions)
+
+PREDICATES = SYMBOLIC_PREDICATES + NUMERICAL_PREDICATES + Integrated_PREDICATES
 
 NAME_TO_PREDICATE = {predicate.NAME: predicate for predicate in PREDICATES}

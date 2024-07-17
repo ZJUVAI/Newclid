@@ -1,7 +1,7 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
-from geosolver.dependency.dependency import BY_CONSTRUCTION, Dependency
+from geosolver.dependency.dependency import NUMERICAL_CHECK, Dependency
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import ATOM
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
@@ -54,7 +54,7 @@ class SameSide(Predicate):
 
     @classmethod
     def why(cls, statement: Statement) -> Dependency:
-        return Dependency.mk(statement, BY_CONSTRUCTION, ())
+        return Dependency.mk(statement, NUMERICAL_CHECK, ())
 
     @classmethod
     def add(cls, dep: Dependency):

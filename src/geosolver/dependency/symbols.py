@@ -5,7 +5,6 @@ from abc import ABC
 from typing import TYPE_CHECKING, Optional, TypeVar, Union
 from typing_extensions import Self
 
-from geosolver.dependency.dependency import BY_CONSTRUCTION
 from geosolver.numerical.geometries import CircleNum, LineNum, PointNum
 
 if TYPE_CHECKING:
@@ -136,7 +135,7 @@ class Line(Symbol):
                 if target.dep:
                     return target.dep.with_new(statement)
                 else:
-                    return Dependency.mk(statement, BY_CONSTRUCTION, ())
+                    assert False
         raise Exception("why_coll failed")
 
 
@@ -190,5 +189,5 @@ class Circle(Symbol):
                 if target.dep:
                     return target.dep.with_new(statement)
                 else:
-                    return Dependency.mk(statement, BY_CONSTRUCTION, ())
+                    assert False
         raise Exception("why_concyclic failed")

@@ -45,7 +45,6 @@ class BFSDDAR(DeductiveAgent):
         if self.theorem_buffer:
             theorem = self.theorem_buffer.pop()
             logging.info("bfsddar matching" + str(theorem))
-            self.hope = False
             return MatchAction(theorem)
         if self.application_buffer:
             logging.info("bfsddar : apply")
@@ -53,6 +52,7 @@ class BFSDDAR(DeductiveAgent):
         else:
             if not self.hope:
                 return StopAction()
+            self.hope = False
             self.theorem_buffer = list(self.theorems)
             logging.info("bfsddar : reload")
             return EmptyAction()

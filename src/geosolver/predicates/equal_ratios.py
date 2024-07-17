@@ -96,7 +96,7 @@ class EqRatio(Predicate):
     @classmethod
     def check(cls, statement: Statement) -> bool:
         eqs, table = cls._prep_ar(statement)
-        return all(table.add_expr(eq, None) for eq in eqs)
+        return all(table.expr_delta(eq) for eq in eqs)
 
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:

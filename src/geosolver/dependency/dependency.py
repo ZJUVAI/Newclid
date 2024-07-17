@@ -4,7 +4,8 @@ from typing import TYPE_CHECKING, NamedTuple
 if TYPE_CHECKING:
     from geosolver.statement import Statement
 
-BY_CONSTRUCTION = "Construction"
+NUMERICAL_CHECK = "Numerical Check"
+IN_PREMISES = "Premise"
 
 
 class Dependency(NamedTuple):

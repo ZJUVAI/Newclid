@@ -227,6 +227,16 @@ EXPECTED_TO_FAIL = []
             "midp M A B => rconst M A A B 1/2",
             "a b = segment a b; m = midpoint m a b ? rconst m a a b 1/2",
         ),
+        (
+            "pyt_formula_to_perp",
+            "PythagoreanPremises a b c => PythagoreanConclusions a b c",
+            "a = free a; b = lconst b a 4; c = lconst c a 5, lconst c b 3 ? perp a b b c",
+        ),
+        (
+            "pyt_test_perp_to_formula",
+            "PythagoreanPremises a b c => PythagoreanConclusions a b c",
+            "a = free a; b = lconst b a 4; c = on_tline c b a b, lconst c b 3 ? lconst a c 5",
+        ),
     ],
 )
 def test_rule_used_to_solve_in_one_step(

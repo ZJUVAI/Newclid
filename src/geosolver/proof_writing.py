@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from geosolver.dependency.symbols import Point
-from geosolver.dependency.dependency import BY_CONSTRUCTION
+from geosolver.dependency.dependency import IN_PREMISES, NUMERICAL_CHECK
 
 if TYPE_CHECKING:
     from geosolver.proof import Proof
@@ -23,15 +23,18 @@ def write_solution(proof: "Proof", out_file: Optional[Path]) -> None:
     solution += "* From problem construction:\n"
     solution += f"Points : {', '.join(p.pretty_name for p in proof.symbols_graph.nodes_of_type(Point))}\n"
     proof_lines = proof.dep_graph.proof_lines(proof.goals)
+    for line in proof_lines:
+        if IN_PREMISES in line:
+            solution += f"{line}\n"
+    for line in proof_lines:
+        if NUMERICAL_CHECK in line:
+            solution += f"{line}\n"
+    solution += "* Proof steps:\n"
     k = 0
     for line in proof_lines:
         k += 1
-        if BY_CONSTRUCTION in line:
+        if NUMERICAL_CHECK not in line and IN_PREMISES not in line:
             solution += f"{k:03d}. {line}\n"
-    solution += "* Proof steps:\n"
-    for line in proof_lines:
-        if BY_CONSTRUCTION not in line:
-            solution += line + "\n"
     solution += "\n=========================="
     logging.info(solution)
     if out_file is not None:
