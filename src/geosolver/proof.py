@@ -45,7 +45,7 @@ from geosolver.numerical.distances import (
 from geosolver.numerical.sketch import sketch
 
 from geosolver.problem import Problem
-from geosolver.dependency.dependency import BY_CONSTRUCTION, Dependency
+from geosolver.dependency.dependency import IN_PREMISES, Dependency
 from geosolver.tools import atomize
 
 if TYPE_CHECKING:
@@ -214,7 +214,7 @@ class Proof:
                     statement = Statement.from_tokens(
                         translate_sentence(mapping, t), self.dep_graph
                     )
-                    adds.append(Dependency.mk(statement, BY_CONSTRUCTION, ()))
+                    adds.append(Dependency.mk(statement, IN_PREMISES, ()))
             for n in cdef.numerics:
                 numerics.append(tuple(mapping[a] if a in mapping else a for a in n))
 
