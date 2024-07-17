@@ -1,4 +1,30 @@
-from typing import Optional, TypeVar, Union
+from typing import Any, Optional, TypeVar, Union
+
+
+class InfQuotientError(Exception):
+    pass
+
+
+# maximum denominator for a fraction.
+MAX_DENOMINATOR = 1000000
+
+# tolerance for fraction approximation
+TOL = 1e-9
+
+
+def get_quotient(v: Any) -> tuple[int, int]:
+    v = float(v)
+    n = v
+    d = 1
+    while abs(n - round(n)) > TOL:
+        d += 1
+        n += v
+        if d > MAX_DENOMINATOR:
+            e = InfQuotientError(v)
+            raise e
+
+    n = int(round(n))
+    return simplify(n, d)
 
 
 def _gcd(x: int, y: int) -> int:
@@ -58,6 +84,11 @@ def nd_to_angle(n: int, d: int):
 
 def parse_len(s: str):
     return nd_to_len(*str_to_nd(s))
+
+
+def float_to_len(f: float):
+    n, d = get_quotient(f)
+    return f"{n}/{d}"
 
 
 def parse_ratio(s: str):

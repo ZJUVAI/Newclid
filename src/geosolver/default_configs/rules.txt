@@ -44,3 +44,4 @@ midp M A B => cong M A M B
 midp M A B => coll M A B
 para a b c d, coll m a d, coll n b c, para m n a b, ncoll a b c => eqratio m a m d n b n c
 circle O A B C, cyclic A B C D => cong O A O D
+PythagoreanPremises a b c => PythagoreanConclusions a b c

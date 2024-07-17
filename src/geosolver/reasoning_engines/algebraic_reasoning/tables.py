@@ -3,9 +3,10 @@
 import logging
 from typing import TYPE_CHECKING, Any, Literal, Optional
 from numpy import exp
-from geosolver.tools import simplify
 import numpy as np
 import scipy.optimize as opt  # type: ignore
+
+from geosolver.tools import InfQuotientError, get_quotient
 
 if TYPE_CHECKING:
     from geosolver.dependency.dependency import Dependency
@@ -53,32 +54,6 @@ class Coef(float):
 
 SumCV = dict[str, Coef]
 EqDict = dict[str, SumCV]
-
-
-class InfQuotientError(Exception):
-    pass
-
-
-# maximum denominator for a fraction.
-MAX_DENOMINATOR = 1000000
-
-# tolerance for fraction approximation
-TOL = 1e-9
-
-
-def get_quotient(v: Any) -> tuple[int, int]:
-    v = float(v)
-    n = v
-    d = 1
-    while abs(n - round(n)) > TOL:
-        d += 1
-        n += v
-        if d > MAX_DENOMINATOR:
-            e = InfQuotientError(v)
-            raise e
-
-    n = int(round(n))
-    return simplify(n, d)
 
 
 def hashed(e: SumCV) -> tuple[tuple[str, Coef], ...]:
@@ -151,9 +126,14 @@ def coef2str(x: Coef):
     try:
         n, d = get_quotient(x)
         return f"{n}/{d}"
-    except InfQuotientError as _:
+    except InfQuotientError:
         n, d = get_quotient(exp(x))
         return f"log{n}/{d}"
+
+
+def exp_coef2str(x: Coef):
+    n, d = get_quotient(exp(x))
+    return f"{n}" if d == 1 else f"{n}/{d}"
 
 
 def report(eqdict: EqDict):
@@ -217,6 +197,26 @@ class Table:
 
     def sumcv_from_list(self, vc: list[tuple[str, Coef]]) -> SumCV:
         return strip(plus_all(*[{v: c} for v, c in vc]))
+
+    def expr_delta(self, vc: SumCV) -> Optional[Coef]:
+        vc = self.modulo(vc)
+        if len(vc) == 0:
+            return Coef(0)
+        result = {}
+        new_vars: list[tuple[str, Coef]] = []
+
+        for v, c in vc.items():
+            if v in self.v2e:
+                result = plus(result, mult(self.v2e[v], c))
+            else:
+                new_vars.append((v, c))
+
+        result = strip(result)
+        moded = self.modulo(result)
+        if len(new_vars) == 0:
+            return Coef(0) if len(moded) == 0 else moded[self.const]
+        else:
+            return None
 
     def add_expr(self, vc: SumCV, dep: Optional["Dependency"]) -> bool:
         """

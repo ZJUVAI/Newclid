@@ -54,7 +54,7 @@ class ConstantLength(Predicate):
         table = statement.dep_graph.ar.rtable
 
         return [
-            table.get_eq3(table.get_length(p0, p1), table.one, Coef(log(n / d)))
+            table.get_eq3(table.get_length(p0, p1), table.one, Coef(log(n / d) - 1))
         ], table
 
     @classmethod
@@ -79,6 +79,10 @@ class ConstantLength(Predicate):
         return Dependency.mk(
             statement, Ratio_Chase, tuple(dep.statement for dep in why)
         )
+
+    @classmethod
+    def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
+        return (args[0].name, args[1].name, args[2])
 
     @classmethod
     def pretty(cls, statement: Statement) -> str:

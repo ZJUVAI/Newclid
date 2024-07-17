@@ -14,6 +14,11 @@ class IllegalPredicate(Exception):
 
 
 class Predicate(ABC):
+    """
+    When the args are passed in functions other than parse and to_tokens,
+    the orders are guaranteed to be canonique.
+    """
+
     NAME: str
 
     @classmethod
@@ -28,23 +33,25 @@ class Predicate(ABC):
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
-        """Numericaly checks if the predicate is true for the given arguments."""
         raise NotImplementedError(f"{cls.NAME} check numerical not implemented")
 
     @classmethod
     def check(cls, statement: Statement) -> bool:
+        """
+        Hypothesis : the numercial test is passed
+        """
         return False
 
     @classmethod
     def add(cls, dep: Dependency) -> None:
-        """Make a dependency body into a list of dependencies
-        with the given arguments."""
         return
 
     @classmethod
     def why(cls, statement: Statement) -> Optional[Dependency]:
-        """Resolve the reason and list of dependencies
-        justifying why this predicate could be true."""
+        """
+        Hypothesis : the numercial test is passed
+        This function should only be giving one same dependency, which is the implicit dependency used in the first check success.
+        """
         return None
 
     @classmethod

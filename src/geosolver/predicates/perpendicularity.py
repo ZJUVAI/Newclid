@@ -77,6 +77,10 @@ class Perp(Predicate):
         a, b, c, d = args
         return f"{a.pretty_name}{b.pretty_name} ⟂ {c.pretty_name}{d.pretty_name}"
 
+    @classmethod
+    def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
+        return tuple(p.name for p in args)
+
 
 class NPerp(Predicate):
     """nperp A B C D -
