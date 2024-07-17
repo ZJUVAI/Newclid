@@ -45,7 +45,23 @@ Add user : `sudo adduser username`, switch user : `su - username`, add user to s
 [ref](https://3ms.huawei.com/hi/group/3942456/wiki_6984538.html)
 Didn't work for me:/
 
+## DNS settings
+
+`/etc/resolv.conf`
+
+```
+options attempts:1
+options timeout:1
+search huawei.com
+nameserver 7.182.30.38
+nameserver 7.182.30.40
+nameserver 7.221.190.197
+```
+
 ## Huawei apt source list
+
+to be put in `/etc/apt/source.list`
+
 ```
 # See http://help.ubuntu.com/community/UpgradeNotes for how to upgrade to
 # newer versions of the distribution.
@@ -96,4 +112,10 @@ deb http://mirrors.tools.huawei.com/ubuntu focal-security universe
 # deb-src http://mirrors.tools.huawei.com/ubuntu focal-security universe
 deb http://mirrors.tools.huawei.com/ubuntu focal-security multiverse
 # deb-src http://mirrors.tools.huawei.com/ubuntu focal-security multiverse
+```
+
+## Huawei pip source
+```
+pip config set global.index-url http://mirrors.tools.huawei.com/pypi/simple
+pip config set global.trusted-host "mirrors.tools.huawei.com rnd-gitlab-eu.huawei.com pypi.org files.pythonhosted.org"
 ```
