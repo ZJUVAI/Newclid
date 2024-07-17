@@ -1,12 +1,10 @@
 """Implementing Algebraic Reasoning (AR)."""
 
+from fractions import Fraction
 import logging
-from typing import TYPE_CHECKING, Any, Literal, Optional
-from numpy import exp
+from typing import TYPE_CHECKING, Any, Literal
 import numpy as np
 import scipy.optimize as opt  # type: ignore
-
-from geosolver.tools import InfQuotientError, get_quotient
 
 if TYPE_CHECKING:
     from geosolver.dependency.dependency import Dependency
@@ -20,48 +18,12 @@ Angle_Chase = "Angle Chasing"
 Ratio_Chase = "Ratio Chasing"
 
 
-class Coef(float):
-    def __hash__(self) -> int:
-        raise NotImplementedError
-
-    def __eq__(self, other: "Coef"):  # type: ignore
-        return abs(self - other) < ATOM
-
-    def __ne__(self, other: "Coef") -> bool:  # type: ignore
-        return not self.__eq__(other)
-
-    def __repr__(self) -> str:
-        return f"{self:.2f}"
-
-    def __add__(self, value: float) -> "Coef":
-        return Coef(super().__add__(value))
-
-    def __mul__(self, value: float) -> "Coef":
-        return Coef(super().__mul__(value))
-
-    def __sub__(self, value: float) -> "Coef":
-        return Coef(super().__sub__(value))
-
-    def __truediv__(self, value: float) -> "Coef":
-        return Coef(super().__truediv__(value))
-
-    def __neg__(self) -> "Coef":
-        return Coef(super().__neg__())
-
-    def __mod__(self, value: float) -> "Coef":
-        return Coef(round(float(self), NLOGATOM) % round(float(value), NLOGATOM))
-
-
-SumCV = dict[str, Coef]
+SumCV = dict[str, Fraction]
 EqDict = dict[str, SumCV]
 
 
-def hashed(e: SumCV) -> tuple[tuple[str, Coef], ...]:
-    return tuple(sorted(list(e.items())))
-
-
 def strip(e: SumCV) -> SumCV:
-    return {v: c for v, c in e.items() if c != Coef(0)}
+    return {v: c for v, c in e.items() if c != Fraction(0)}
 
 
 def plus(e1: SumCV, e2: SumCV) -> SumCV:
@@ -81,27 +43,22 @@ def plus_all(*es: SumCV) -> SumCV:
     return result
 
 
-def mult(e: SumCV, m: Coef) -> SumCV:
-    return {v: m * c for v, c in e.items()}
+def mult(e: SumCV, m: Fraction) -> SumCV:
+    return strip({v: m * c for v, c in e.items()})
 
 
 def minus(e1: SumCV, e2: SumCV) -> SumCV:
-    return plus(e1, mult(e2, Coef(-1)))
+    return plus(e1, mult(e2, Fraction(-1)))
 
 
-def recon(e: SumCV, const: str) -> Optional[tuple[str, SumCV]]:
+def recon(e: SumCV) -> tuple[str, SumCV]:
     """Reconcile one variable in the expression e=0, given const."""
     e = strip(e)
-    if len(e) == 0:
-        return None
-
     v0 = None
     for v in e:
-        if v != const:
-            v0 = v
-            break
-    if v0 is None:
-        return None
+        v0 = v
+        break
+    assert v0, "e should not be empty"
 
     c0 = e.pop(v0)
     return v0, {v: -c / c0 for v, c in e.items()}
@@ -122,20 +79,6 @@ def _fix_width(s: Any, width: int, align: Literal["right", "left", "center"] = "
     return " " * (width - len(s)) + s
 
 
-def coef2str(x: Coef):
-    try:
-        n, d = get_quotient(x)
-        return f"{n}/{d}"
-    except InfQuotientError:
-        n, d = get_quotient(exp(x))
-        return f"log{n}/{d}"
-
-
-def exp_coef2str(x: Coef):
-    n, d = get_quotient(exp(x))
-    return f"{n}" if d == 1 else f"{n}/{d}"
-
-
 def report(eqdict: EqDict):
     table_str = ">>>>>>>>>table begins\n"
     maxlv = 0
@@ -148,7 +91,7 @@ def report(eqdict: EqDict):
         for rightv, coef in eq.items():
             setv_right.add(rightv)
             maxlv = max(maxlv, len(str(rightv)))
-            maxlcoef = max(maxlcoef, len(coef2str(coef)))
+            maxlcoef = max(maxlcoef, len(str(coef)))
     listv_left = sorted(setv_left)
     listv_right = sorted(setv_right)
     for leftv in listv_left:
@@ -156,12 +99,10 @@ def report(eqdict: EqDict):
         for rightv in listv_right:
             try:
                 coef = eqdict[leftv][rightv]
-                if abs(coef) < ATOM:
-                    raise ValueError
-                table_str += f"{_fix_width(coef2str(coef), maxlcoef)} * {str(rightv)}"
+                table_str += f"{_fix_width(str(coef), maxlcoef)} * {str(rightv)}"
                 if rightv != listv_right[-1]:
                     table_str += " + "
-            except (KeyError, ValueError) as _:
+            except KeyError:
                 table_str += f"{_fix_width('', len(str(rightv))+maxlcoef+3)}"
                 if rightv != listv_right[-1]:
                     table_str += "   "
@@ -173,10 +114,8 @@ def report(eqdict: EqDict):
 class Table:
     """The coefficient matrix."""
 
-    def __init__(self, const: str = "1", verbose: bool = False):
-        self.const = const
+    def __init__(self, verbose: bool = False):
         self.v2e: EqDict = {}  # the table {var: {vark : coefk}} var = sum coefk*vark
-        self.add_free(const)
         self.verbose = verbose
 
         # for why (linprog)
@@ -186,49 +125,42 @@ class Table:
         self._mA = np.zeros((0, 0))
 
     def add_free(self, v: str) -> None:
-        self.v2e[v] = {v: Coef(1)}
+        self.v2e[v] = {v: Fraction(1)}
 
     def replace(self, v0: str, e0: SumCV) -> None:
         for v, e in list(self.v2e.items()):
             self.v2e[v] = replace(e, v0, e0)
 
-    def modulo(self, e: SumCV) -> SumCV:
-        return strip(e)
-
-    def sumcv_from_list(self, vc: list[tuple[str, Coef]]) -> SumCV:
+    def sumcv_from_list(self, vc: list[tuple[str, Fraction]]) -> SumCV:
         return strip(plus_all(*[{v: c} for v, c in vc]))
 
-    def expr_delta(self, vc: SumCV) -> Optional[Coef]:
-        vc = self.modulo(vc)
+    def expr_delta(self, vc: SumCV) -> bool:
+        """
+        There is only constant delta between vc and the system
+        """
+        vc = strip(vc)
         if len(vc) == 0:
-            return Coef(0)
+            return True
         result = {}
-        new_vars: list[tuple[str, Coef]] = []
 
         for v, c in vc.items():
             if v in self.v2e:
                 result = plus(result, mult(self.v2e[v], c))
             else:
-                new_vars.append((v, c))
+                return False
 
-        result = strip(result)
-        moded = self.modulo(result)
-        if len(new_vars) == 0:
-            return Coef(0) if len(moded) == 0 else moded[self.const]
-        else:
-            return None
+        return len(result) == 0
 
-    def add_expr(self, vc: SumCV, dep: Optional["Dependency"]) -> bool:
+    def add_expr(self, vc: SumCV, dep: "Dependency") -> bool:
         """
         Add a new equality (sum cv = 0), represented by the list of tuples vc=[(v, c), ..].
-        If dep=None, Else return True iff the equality is not wrong inside AR
-        Else return True iff the equality can already be deduced by the internal system
+        Return True iff the equality can already be deduced by the internal system
         """
-        vc = self.modulo(vc)
+        vc = strip(vc)
         if len(vc) == 0:
-            return True if dep is None else False
+            return False
         result = {}
-        new_vars: list[tuple[str, Coef]] = []
+        new_vars: list[tuple[str, Fraction]] = []
 
         for v, c in vc.items():
             if v in self.v2e:
@@ -237,27 +169,21 @@ class Table:
                 new_vars.append((v, c))
 
         result = strip(result)
-        moded = self.modulo(result)
-        if dep is None:
-            return len(moded) == 0 and len(new_vars) == 0
 
-        if new_vars == []:
-            if len(moded) == 0:
+        if len(new_vars) == 0:
+            if len(result) == 0:
                 return False
-            result_recon = recon(result, self.const)
-            if result_recon is None:
-                raise Exception("Add conflicting results into AR")
-            v, e = result_recon
+            v, e = recon(result)
             self.replace(v, e)
 
         else:
-            dependent_v: tuple[str, Coef] = new_vars[0]
+            dependent_v: tuple[str, Fraction] = new_vars[0]
             for v, m in new_vars[1:]:
                 self.add_free(v)
                 result = plus(result, {v: m})
 
             v, m = dependent_v
-            self.v2e[v] = mult(result, Coef(-1) / m)
+            self.v2e[v] = mult(result, Fraction(-1) / m)
 
         self._register(vc, dep)
         if self.verbose:
@@ -267,8 +193,6 @@ class Table:
 
     def _register(self, vc: SumCV, dep: "Dependency") -> None:
         """Register a new equality vc=[(v, c), ..] with traceback dependency dep."""
-        if self.const in vc:
-            del vc[self.const]
         vc = strip(vc)
         if len(vc) == 0:
             return
@@ -294,8 +218,6 @@ class Table:
         """AR traceback == MILP."""
         # why expr == 0?
         # Solve min(c^Tx) s.t. A_eq * x = b_eq, x >= 0
-        if self.const in vc:
-            del vc[self.const]
         vc = strip(vc)
         if len(vc) == 0:
             return []
@@ -316,35 +238,25 @@ class Table:
                     deps.append(dep)
         return deps
 
+    def get_eq1(self, a: str) -> SumCV:
+        """
+        a = constant
+        """
+        return self.sumcv_from_list([(a, Fraction(1))])
+
     def get_eq2(self, a: str, b: str) -> SumCV:
         """
-        a = b
+        a = b + constant
         """
-        return self.sumcv_from_list([(a, Coef(1)), (b, Coef(-1))])
-
-    def get_eq3(self, a: str, b: str, f: Any) -> SumCV:
-        """
-        a - b = f * constant
-        """
-        return self.sumcv_from_list(
-            [(a, Coef(1)), (b, Coef(-1)), (self.const, -Coef(f))]
-        )
+        return self.sumcv_from_list([(a, Fraction(1)), (b, Fraction(-1))])
 
     def get_eq4(self, a: str, b: str, c: str, d: str) -> SumCV:
         """
-        a - b = c - d
+        a - b = c - d + constant
         """
         return self.sumcv_from_list(
-            [(a, Coef(1)), (b, Coef(-1)), (c, Coef(-1)), (d, Coef(1))]
+            [(a, Fraction(1)), (b, Fraction(-1)), (c, Fraction(-1)), (d, Fraction(1))]
         )
-
-
-class RatioTable(Table):
-    """Coefficient matrix A for log(distance)."""
-
-    def __init__(self, verbose: bool):
-        super().__init__("1", verbose)
-        self.one = self.const
 
     @classmethod
     def get_length(cls, p0: "Point", p1: "Point") -> str:
@@ -352,17 +264,3 @@ class RatioTable(Table):
             p0, p1 = p1, p0
         length = f"l({p0.name},{p1.name})"
         return length
-
-
-class AngleTable(Table):
-    """Coefficient matrix A for slope(direction)."""
-
-    def __init__(self, verbose: bool):
-        super().__init__("pi", verbose)
-        self.pi = self.const
-
-    def modulo(self, e: SumCV) -> SumCV:
-        e = strip(e)
-        if self.pi in e:
-            e[self.pi] = e[self.pi] % Coef(1)
-        return strip(e)

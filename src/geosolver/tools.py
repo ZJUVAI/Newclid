@@ -1,5 +1,7 @@
 from typing import Any, Optional, TypeVar, Union
 
+from geosolver.numerical import close_enough
+
 
 class InfQuotientError(Exception):
     pass
@@ -8,15 +10,12 @@ class InfQuotientError(Exception):
 # maximum denominator for a fraction.
 MAX_DENOMINATOR = 1000000
 
-# tolerance for fraction approximation
-TOL = 1e-9
-
 
 def get_quotient(v: Any) -> tuple[int, int]:
     v = float(v)
     n = v
     d = 1
-    while abs(n - round(n)) > TOL:
+    while not close_enough(n, round(n)):
         d += 1
         n += v
         if d > MAX_DENOMINATOR:

@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
-from geosolver.reasoning_engines.algebraic_reasoning.tables import Angle_Chase, Coef
+from geosolver.reasoning_engines.algebraic_reasoning.tables import Angle_Chase
 from geosolver.tools import nd_to_angle, str_to_nd
 from geosolver.dependency.dependency import Dependency
 
@@ -57,16 +57,14 @@ class ConstantAngle(Predicate):
     @classmethod
     def _prep_ar(cls, statement: Statement) -> tuple[list[SumCV], Table]:
         args: tuple[Point, Point, Point, Point, str] = statement.args
-        p0, p1, p2, p3, ang = args
+        p0, p1, p2, p3, _ = args
         table = statement.dep_graph.ar.atable
         symbols_graph = statement.dep_graph.symbols_graph
-        n, d = str_to_nd(ang)
 
         return [
-            table.get_eq3(
+            table.get_eq2(
                 symbols_graph.line_thru_pair(p2, p3).name,
                 symbols_graph.line_thru_pair(p0, p1).name,
-                Coef(n / d),
             )
         ], table
 
@@ -91,7 +89,7 @@ class ConstantAngle(Predicate):
     @classmethod
     def check(cls, statement: Statement) -> bool:
         eqs, table = cls._prep_ar(statement)
-        return all(table.add_expr(eq, None) for eq in eqs)
+        return all(table.expr_delta(eq) for eq in eqs)
 
     @classmethod
     def pretty(cls, statement: Statement) -> str:

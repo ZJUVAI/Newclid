@@ -1,13 +1,11 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
-from numpy import log
-
 from geosolver.dependency.dependency import Dependency
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
-from geosolver.reasoning_engines.algebraic_reasoning.tables import Coef, Ratio_Chase
+from geosolver.reasoning_engines.algebraic_reasoning.tables import Ratio_Chase
 from geosolver.tools import nd_to_ratio, str_to_nd
 
 if TYPE_CHECKING:
@@ -53,12 +51,11 @@ class ConstantRatio(Predicate):
     @classmethod
     def _prep_ar(cls, statement: Statement) -> tuple[list[SumCV], Table]:
         args: tuple[Point, Point, Point, Point, str] = statement.args
-        p0, p1, p2, p3, k = args
+        p0, p1, p2, p3, _ = args
         table = statement.dep_graph.ar.rtable
         l0 = table.get_length(p0, p1)
         l1 = table.get_length(p2, p3)
-        n, d = str_to_nd(k)
-        return [table.get_eq3(l0, l1, Coef(log(n / d)))], table
+        return [table.get_eq2(l0, l1)], table
 
     @classmethod
     def add(cls, dep: Dependency) -> None:
@@ -69,7 +66,7 @@ class ConstantRatio(Predicate):
     @classmethod
     def check(cls, statement: Statement) -> bool:
         eqs, table = cls._prep_ar(statement)
-        return all(table.add_expr(eq, None) for eq in eqs)
+        return all(table.expr_delta(eq) for eq in eqs)
 
     @classmethod
     def why(cls, statement: Statement) -> Dependency:
