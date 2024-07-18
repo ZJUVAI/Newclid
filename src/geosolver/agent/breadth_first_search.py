@@ -1,6 +1,4 @@
-"""Classical Breadth-First Search based agents.
-
-"""
+"""Classical Breadth-First Search based agents."""
 
 from __future__ import annotations
 import logging
@@ -47,7 +45,7 @@ class BFSDDAR(DeductiveAgent):
             logging.info("bfsddar matching" + str(theorem))
             return MatchAction(theorem)
         if self.application_buffer:
-            logging.info("bfsddar : apply")
+            # logging.info("bfsddar : apply")
             return ApplyTheoremAction(self.application_buffer.pop())
         else:
             if not self.hope:
