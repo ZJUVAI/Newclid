@@ -85,7 +85,7 @@ class NColl(Predicate):
 
     @classmethod
     def check(cls, statement: Statement) -> bool:
-        return not statement.with_new(Coll, None).check_numerical()
+        return True
 
     @classmethod
     def why(cls, statement: Statement) -> Dependency:

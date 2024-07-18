@@ -113,6 +113,10 @@ class NPara(Predicate):
         return not l1.is_parallel(l2)
 
     @classmethod
+    def check(cls, statement: Statement) -> bool:
+        return True
+
+    @classmethod
     def to_constructive(cls, point: str, args: tuple[str, ...]) -> str:
         a, b, c, d = args
         if point in [c, d]:

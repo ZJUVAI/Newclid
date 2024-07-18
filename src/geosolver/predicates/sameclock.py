@@ -37,7 +37,7 @@ class SameClock(Predicate):
 
     @classmethod
     def check(cls, statement: Statement) -> bool:
-        return statement.check_numerical()
+        return True
 
     @classmethod
     def why(cls, statement: Statement) -> Dependency:

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any
 
 from geosolver.dependency.dependency import NUMERICAL_CHECK, Dependency
 from geosolver.dependency.symbols import Point
-from geosolver.numerical import close_enough
+from geosolver.numerical import sign
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
 
 
@@ -37,12 +37,13 @@ class SameSide(Predicate):
     def check_numerical(cls, statement: Statement) -> bool:
         args: tuple[Point, ...] = statement.args
         a, b, c, x, y, z = args
-        dot = (b.num - a.num).dot(c.num - a.num) * (y.num - x.num).dot(z.num - x.num)
-        return dot >= 0 or close_enough(dot, 0)
+        sa = sign((b.num - a.num).dot(c.num - a.num))
+        sz = sign((y.num - x.num).dot(z.num - x.num))
+        return sa == sz
 
     @classmethod
     def check(cls, statement: Statement) -> bool:
-        return statement.check_numerical()
+        return True
 
     @classmethod
     def why(cls, statement: Statement) -> Dependency:
@@ -73,14 +74,11 @@ class NSameSide(Predicate):
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
-        args: tuple[Point, ...] = statement.args
-        a, b, c, x, y, z = args
-        dot = (b.num - a.num).dot(c.num - a.num) * (y.num - x.num).dot(z.num - x.num)
-        return dot <= 0 or close_enough(dot, 0)
+        return not SameSide.check_numerical(statement)
 
     @classmethod
     def check(cls, statement: Statement) -> bool:
-        return statement.check_numerical()
+        return True
 
     @classmethod
     def why(cls, statement: Statement) -> Dependency:

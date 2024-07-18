@@ -37,7 +37,7 @@ class Diff(Predicate):
 
     @classmethod
     def check(cls, statement: Statement) -> bool:
-        return cls.check_numerical(statement)
+        return True
 
     @classmethod
     def why(cls, statement: Statement) -> Dependency:
