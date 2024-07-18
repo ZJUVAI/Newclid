@@ -14,6 +14,8 @@ if TYPE_CHECKING:
     from geosolver.dependency.dependency_graph import DependencyGraph
     from geosolver.statement import Statement
 
+PythagorasVerification = "Pythagoras Verification"
+
 
 class PythagoreanPremises(Predicate):
     """PythagoreanPremises a b c
@@ -70,17 +72,17 @@ class PythagoreanPremises(Predicate):
         check_ac = ac.check()
         check_bc = bc.check()
         if check_ab and check_ac and check_bc:
-            return Dependency.mk(statement, "Pythagoras", (ab, ac, bc))
+            return Dependency.mk(statement, PythagorasVerification, (ab, ac, bc))
         if perp_check and check_ac and check_bc:
             return Dependency.mk(
                 statement,
-                "Pythagoras",
+                PythagorasVerification,
                 (perp, ac, bc),
             )
         if perp_check and check_ab and check_bc:
-            return Dependency.mk(statement, "Pythagoras", (ab, perp, bc))
+            return Dependency.mk(statement, PythagorasVerification, (ab, perp, bc))
         if perp_check and check_ab and check_ac:
-            return Dependency.mk(statement, "Pythagoras", (ab, ac, perp))
+            return Dependency.mk(statement, PythagorasVerification, (ab, ac, perp))
         return None
 
 
