@@ -32,8 +32,8 @@ def write_solution(proof: "Proof", out_file: Optional[Path]) -> None:
     solution += "* Proof steps:\n"
     k = 0
     for line in proof_lines:
-        k += 1
         if NUMERICAL_CHECK not in line and IN_PREMISES not in line:
+            k += 1
             solution += f"{k:03d}. {line}\n"
     solution += "\n=========================="
     logging.info(solution)
