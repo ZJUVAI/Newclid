@@ -54,71 +54,33 @@ class PythagoreanPremises(Predicate):
         a, b, c = args
         perp = statement.with_new(Perp, (a, b, a, c))
         perp_check = perp.check()
-        table = statement.dep_graph.ar.rtable
-        eq0 = table.get_eq1(table.get_length(a, b))
-        eq1 = table.get_eq1(table.get_length(a, c))
-        eq2 = table.get_eq1(table.get_length(b, c))
-        d0 = table.expr_delta(eq0)
-        d1 = table.expr_delta(eq1)
-        d2 = table.expr_delta(eq2)
-        if d0 and d1 and d2:
+        try:
+            ab = statement.with_new(
+                ConstantLength, (a, b, float_to_len(a.num.distance(b.num)))
+            )
+            ac = statement.with_new(
+                ConstantLength, (a, c, float_to_len(a.num.distance(c.num)))
+            )
+            bc = statement.with_new(
+                ConstantLength, (b, c, float_to_len(b.num.distance(c.num)))
+            )
+        except InfQuotientError:
+            return None
+        check_ab = ab.check()
+        check_ac = ac.check()
+        check_bc = bc.check()
+        if check_ab and check_ac and check_bc:
+            return Dependency.mk(statement, "Pythagoras", (ab, ac, bc))
+        if perp_check and check_ac and check_bc:
             return Dependency.mk(
                 statement,
                 "Pythagoras",
-                (
-                    statement.with_new(
-                        ConstantLength, (a, b, float_to_len(a.num.distance(b.num)))
-                    ),
-                    statement.with_new(
-                        ConstantLength, (a, c, float_to_len(a.num.distance(c.num)))
-                    ),
-                    statement.with_new(
-                        ConstantLength, (b, c, float_to_len(b.num.distance(c.num)))
-                    ),
-                ),
+                (perp, ac, bc),
             )
-        if perp_check and d1 and d2:
-            return Dependency.mk(
-                statement,
-                "Pythagoras",
-                (
-                    perp,
-                    statement.with_new(
-                        ConstantLength, (a, c, float_to_len(a.num.distance(c.num)))
-                    ),
-                    statement.with_new(
-                        ConstantLength, (b, c, float_to_len(b.num.distance(c.num)))
-                    ),
-                ),
-            )
-        if perp_check and d0 and d2:
-            return Dependency.mk(
-                statement,
-                "Pythagoras",
-                (
-                    statement.with_new(
-                        ConstantLength, (a, b, float_to_len(a.num.distance(b.num)))
-                    ),
-                    perp,
-                    statement.with_new(
-                        ConstantLength, (b, c, float_to_len(b.num.distance(c.num)))
-                    ),
-                ),
-            )
-        if perp_check and d0 and d1:
-            return Dependency.mk(
-                statement,
-                "Pythagoras",
-                (
-                    statement.with_new(
-                        ConstantLength, (a, b, float_to_len(a.num.distance(b.num)))
-                    ),
-                    statement.with_new(
-                        ConstantLength, (a, c, float_to_len(a.num.distance(c.num)))
-                    ),
-                    perp,
-                ),
-            )
+        if perp_check and check_ab and check_bc:
+            return Dependency.mk(statement, "Pythagoras", (ab, perp, bc))
+        if perp_check and check_ab and check_ac:
+            return Dependency.mk(statement, "Pythagoras", (ab, ac, perp))
         return None
 
 
@@ -144,33 +106,27 @@ class PythagoreanConclusions(Predicate):
         perp_check = perp.check()
         if not perp_check:
             dep.with_new(perp).add()
-        table = statement.dep_graph.ar.rtable
-        eq0 = table.get_eq1(table.get_length(a, b))
-        eq1 = table.get_eq1(table.get_length(a, c))
-        eq2 = table.get_eq1(table.get_length(b, c))
-        d0 = table.expr_delta(eq0)
-        d1 = table.expr_delta(eq1)
-        d2 = table.expr_delta(eq2)
         try:
-            if not d0:
-                dep.with_new(
-                    statement.with_new(
-                        ConstantLength, (a, b, float_to_len(a.num.distance(b.num)))
-                    )
-                ).add()
-            if not d1:
-                dep.with_new(
-                    statement.with_new(
-                        ConstantLength, (a, c, float_to_len(a.num.distance(c.num)))
-                    )
-                ).add()
-            if not d2:
-                dep.with_new(
-                    statement.with_new(
-                        ConstantLength, (b, c, float_to_len(b.num.distance(c.num)))
-                    )
-                ).add()
+            ab = statement.with_new(
+                ConstantLength, (a, b, float_to_len(a.num.distance(b.num)))
+            )
+            ac = statement.with_new(
+                ConstantLength, (a, c, float_to_len(a.num.distance(c.num)))
+            )
+            bc = statement.with_new(
+                ConstantLength, (b, c, float_to_len(b.num.distance(c.num)))
+            )
         except InfQuotientError:
             logging.info(
                 "lconst result could be added, but the irrational number len cannot be represented."
             )
+            return
+        check_ab = ab.check()
+        check_ac = ac.check()
+        check_bc = bc.check()
+        if not check_ab:
+            dep.with_new(ab).add()
+        if not check_ac:
+            dep.with_new(ac).add()
+        if not check_bc:
+            dep.with_new(bc).add()
