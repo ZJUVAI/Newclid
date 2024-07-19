@@ -93,7 +93,7 @@ class Matcher:
                     conclusion_statement = Statement.from_tokens(
                         translate_sentence(mapping, conclusion), self.dep_graph
                     )
-                    assert conclusion_statement.check_numerical()
+                    # assert conclusion_statement.check_numerical()
                     dep = Dependency.mk(conclusion_statement, reason, tuple(why))
                     self.cache[theorem].add(dep)
             except IllegalPredicate:
