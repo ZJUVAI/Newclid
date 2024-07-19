@@ -55,3 +55,5 @@ midp m a b, coll m x c, midp n b c, coll n x a, midp p c a => coll x p b
 circle O A B C, cyclic A B C D => cong O A O D
 cyclic A B C D, cong O A O B, cong O C O D, npara A B C D => cong O A O C
 midp M A B => rconst M A A B 1/2
+cyclic a b c p q r, cong a b p q, sameclock c a b r p q, sameside c a b r p q => eqangle c a c b r p r q
+cyclic a b c p q r, cong a b p q, sameclock c b a r p q, nsameside c b a r p q => eqangle c a c b r q r p
