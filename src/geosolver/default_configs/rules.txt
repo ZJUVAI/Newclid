@@ -47,4 +47,4 @@ circle O A B C, cyclic A B C D => cong O A O D
 Pythagoras
 PythagoreanPremises a b c => PythagoreanConclusions a b c
 cyclic a b c p q r, cong a b p q, sameclock c a b r p q, sameside c a b r p q => eqangle c a c b r p r q
-cyclic a b c p q r, cong a b p q, sameclock c b a r p q, nsameside c a b r p q => eqangle c a c b r q r p
+cyclic a b c p q r, cong a b p q, sameclock c b a r p q, nsameside c a b r p q => eqangle c a c b r p r q

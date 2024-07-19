@@ -24,7 +24,9 @@ class Dependency(NamedTuple):
 
     def add(self):
         if not self.statement.check_numerical():
-            raise Exception("Adding a statement that is numerically false")
+            raise Exception(
+                f"Adding a statement {self.pretty()} that is numerically false"
+            )
         dep_graph = self.statement.dep_graph
         s = dep_graph.hyper_graph.get(self.statement)
         if s is not None and self in s:
