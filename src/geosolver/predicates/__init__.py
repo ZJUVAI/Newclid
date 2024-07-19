@@ -17,7 +17,7 @@ from geosolver.predicates.constant_angle import ConstantAngle as ConstantAngle
 
 from geosolver.predicates.different import Diff as Diff
 from geosolver.predicates.sameclock import SameClock as SameClock
-from geosolver.predicates.sameside import SameSide as SameSide
+from geosolver.predicates.sameside import NSameSide, SameSide as SameSide
 
 from geosolver.predicates.triangles_similar import (
     SimtriClock as SimtriClock,
@@ -56,6 +56,7 @@ NUMERICAL_PREDICATES = (
     NPara,
     NPerp,
     SameSide,
+    NSameSide,
     SameClock,
 )
 
