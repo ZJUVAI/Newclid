@@ -42,13 +42,13 @@ class GeometricSolver:
         self,
         stop_on_goal: bool = True,
     ) -> bool:
-        success, infos = run_loop(
+        infos = run_loop(
             self.deductive_agent,
             self.proof,
             stop_on_goal=stop_on_goal,
         )
         self.run_infos = infos
-        return success
+        return infos["success"]
 
     def write_solution(self, out_file: Optional[Path]):
         write_solution(self.proof, out_file)

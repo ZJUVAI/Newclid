@@ -26,13 +26,10 @@ class DependencyGraph:
     def _proof_text(
         self,
         statement: Statement,
-        id: dict[Statement, str],
-        sub_proof: dict[Statement, Optional[tuple[str, ...]]],
-    ) -> Optional[tuple[str, ...]]:
+        sub_proof: dict[Statement, Optional[tuple[Dependency, ...]]],
+    ) -> Optional[tuple[Dependency, ...]]:
         if statement in sub_proof:
             return sub_proof[statement]
-        if statement not in id:
-            id[statement] = str(len(id))
         sub_proof[statement] = None
         my_proof = None
         deps = self.hyper_graph[statement]
@@ -40,9 +37,9 @@ class DependencyGraph:
         if extra_dep is not None:
             deps.add(extra_dep)
         for dep in deps:
-            cur_proof: Optional[tuple[str, ...]] = tuple()
+            cur_proof: Optional[tuple[Dependency, ...]] = tuple()
             for premise in dep.why:
-                t = self._proof_text(premise, id, sub_proof)
+                t = self._proof_text(premise, sub_proof)
                 if t is None:
                     cur_proof = None
                     break
@@ -51,22 +48,18 @@ class DependencyGraph:
             if cur_proof is not None and (
                 my_proof is None or len(my_proof) > len(cur_proof)
             ):
-                my_proof = cur_proof + (
-                    f"{', '.join(premise.pretty() + ' [' + id[premise] + ']' for premise in dep.why)} ({dep.reason})=> {dep.statement.pretty()} [{id[dep.statement]}]",
-                )
+                my_proof = cur_proof + (dep,)
         if my_proof is None:
             del sub_proof[statement]
             return None
         sub_proof[statement] = my_proof
         return my_proof
 
-    def proof_lines(self, goals: list[Statement]) -> tuple[str, ...]:
-        id: dict[Statement, str] = {}
-        sub_proof: dict[Statement, Optional[tuple[str, ...]]] = {}
-        res: list[str] = []
-        for i, goal in enumerate(goals):
-            id[goal] = "g" + str(i)
-            proof_of_goal = self._proof_text(goal, id, sub_proof)
+    def proof_deps(self, goals: list[Statement]) -> tuple[Dependency, ...]:
+        sub_proof: dict[Statement, Optional[tuple[Dependency, ...]]] = {}
+        res: list[Dependency] = []
+        for goal in goals:
+            proof_of_goal = self._proof_text(goal, sub_proof)
             if proof_of_goal is None:
                 assert False
             for s in proof_of_goal:

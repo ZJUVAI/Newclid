@@ -14,7 +14,7 @@ def run_loop(
     deductive_agent: "DeductiveAgent",
     proof: "Proof",
     stop_on_goal: bool,
-) -> tuple[bool, dict[str, Any]]:
+) -> dict[str, Any]:
     """Run DeductiveAgent until saturation or goal found."""
     infos: dict[str, Any] = {}
     success = False
@@ -46,4 +46,9 @@ def run_loop(
     infos["success"] = success
     infos["runtime"] = total_elapsed
     infos["steps"] = step
-    return success, infos
+    for goal in proof.goals:
+        if goal.check():
+            infos[goal.pretty()] = "succeeded"
+        else:
+            infos[goal.pretty()] = "failed"
+    return infos
