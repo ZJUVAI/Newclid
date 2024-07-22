@@ -49,7 +49,7 @@ class Problem(NamedTuple):
 
         problem = Problem(
             name=name,
-            constructions=tuple(Clause.parse_line(constructions_str)),
+            constructions=Clause.parse_line(constructions_str),
             goals=tuple(atomize(g) for g in atomize(goals_str, ";"))
             if len(goals_str) > 0
             else (),
@@ -73,7 +73,7 @@ class Problem(NamedTuple):
     def with_more_construction(self, constructions: str) -> Problem:
         return Problem(
             name=self.name,
-            constructions=self.constructions + tuple(Clause.parse_line(constructions)),
+            constructions=self.constructions + Clause.parse_line(constructions),
             goals=self.goals,
         )
 

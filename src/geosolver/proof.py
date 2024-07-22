@@ -175,8 +175,6 @@ class Proof:
 
             for bs in cdef.basics:
                 for t in bs.sentences:
-                    if len(t) == 0:
-                        continue
                     statement = Statement.from_tokens(
                         translate_sentence(mapping, t), self.dep_graph
                     )

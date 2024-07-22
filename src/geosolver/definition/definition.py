@@ -13,8 +13,8 @@ class Definition(NamedTuple):
     declare: tuple[str, ...]
     rely: dict[str, tuple[str, ...]]
     require: Clause
-    basics: list[Clause]
-    numerics: list[tuple[str, ...]]
+    basics: tuple[Clause, ...]
+    numerics: tuple[tuple[str, ...], ...]
 
     @classmethod
     def parse_txt_file(cls, fname: Path) -> list[Definition]:
@@ -37,7 +37,7 @@ class Definition(NamedTuple):
             rely=_parse_rely(rely),
             require=Clause.parse_line(require)[0],
             basics=Clause.parse_line(basics),
-            numerics=[atomize(c) for c in numerics.split(",")],
+            numerics=tuple(atomize(c) for c in numerics.split(",")),
         )
 
     @classmethod

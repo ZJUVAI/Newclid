@@ -9,7 +9,7 @@ class Clause(NamedTuple):
     sentences: tuple[tuple[str, ...], ...]
 
     @classmethod
-    def parse_line(cls, s: str) -> list[Clause]:
+    def parse_line(cls, s: str) -> tuple[Clause, ...]:
         levels = atomize(s, ";")
 
         basics: list[Clause] = []
@@ -24,7 +24,7 @@ class Clause(NamedTuple):
             )
             points = tuple(points_str.strip().split())
             bs_str = bs_str.strip()
-            bs = tuple(tuple(b.strip().split()) for b in bs_str.split(","))
+            bs = tuple(atomize(b) for b in bs_str.split(",") if b.strip() != "")
             basics.append(Clause(points, bs))
 
-        return basics
+        return tuple(basics)

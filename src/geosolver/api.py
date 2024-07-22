@@ -81,23 +81,29 @@ class GeometricSolver:
 class GeometricSolverBuilder:
     def __init__(self, seed: Optional[int] = None) -> None:
         self.problem: Optional[Problem] = None
-        self.defs: Optional[dict[str, Definition]] = None
-        self.rules: Optional[list[Rule]] = None
+        self._defs: Optional[dict[str, Definition]] = None
+        self._rules: Optional[list[Rule]] = None
         self.deductive_agent: Optional[type[DeductiveAgent]] = None
         self.runtime_cache_path: Optional[Path] = None
         self.seed = seed or 998244353
 
+    @property
+    def defs(self) -> dict[str, Definition]:
+        if self._defs is None:
+            self._defs = Definition.to_dict(
+                Definition.parse_txt_file(default_defs_path())
+            )
+        return self._defs
+
+    @property
+    def rules(self) -> list[Rule]:
+        if self._rules is None:
+            self._rules = Rule.parse_txt_file(default_rules_path())
+        return self._rules
+
     def build(self, max_attempts: int = 10000) -> "GeometricSolver":
         if self.problem is None:
             raise ValueError("Did not load problem before building solver.")
-
-        if self.defs is None:
-            self.defs = Definition.to_dict(
-                Definition.parse_txt_file(default_defs_path())
-            )
-
-        if self.rules is None:
-            self.rules = Rule.parse_txt_file(default_rules_path())
 
         proof_state = Proof.build_problem(
             problem=self.problem,
@@ -132,23 +138,23 @@ class GeometricSolverBuilder:
         return self
 
     def load_rules_from_txt(self, rule_txt: str) -> Self:
-        self.rules = Rule.parse_text(rule_txt)
+        self._rules = Rule.parse_text(rule_txt)
         return self
 
     def load_rules_from_file(self, rules_path: Optional[Path] = None) -> Self:
         if rules_path is None:
             rules_path = default_rules_path()
-        self.rules = Rule.parse_txt_file(rules_path)
+        self._rules = Rule.parse_txt_file(rules_path)
         return self
 
     def load_defs_from_file(self, defs_path: Optional[Path] = None) -> Self:
         if defs_path is None:
             defs_path = default_defs_path()
-        self.defs = Definition.to_dict(Definition.parse_txt_file(defs_path))
+        self._defs = Definition.to_dict(Definition.parse_txt_file(defs_path))
         return self
 
     def load_defs_from_txt(self, defs_txt: str) -> Self:
-        self.defs = Definition.to_dict(Definition.parse_text(defs_txt))
+        self._defs = Definition.to_dict(Definition.parse_text(defs_txt))
         return self
 
     def with_runtime_cache(self, path: Path) -> Self:
