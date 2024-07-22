@@ -2,7 +2,6 @@
 # !!! Do not change the external API except if you know what you are doing !!!
 
 from __future__ import annotations
-from copy import deepcopy
 import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
@@ -116,22 +115,12 @@ class GeometricSolverBuilder:
         """
         `tranlate = True` by default for better LLM training
         """
-        problems = Problem.parse_txt_file(problems_path)
-        if problem_name not in problems:
-            raise ValueError(
-                f"Problem name `{problem_name}` not found in {list(problems.keys())}"
-            )
-        self.problem = problems[problem_name]
+        self.problem = Problem.from_file(problems_path, problem_name, rename)
         return self
 
-    def with_additional_constructions(self, constructions: str) -> Self:
-        """
-        Does not copy the cache
-        """
-        assert self.problem is not None
-        res = deepcopy(self)
-        res.problem = self.problem.with_more_construction(constructions)
-        return res
+    def load_problem(self, problem: Problem) -> Self:
+        self.problem = problem
+        return self
 
     def del_goal(self) -> Self:
         if self.problem:

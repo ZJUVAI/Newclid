@@ -56,9 +56,30 @@ class Problem(NamedTuple):
         )
         return problem
 
+    @classmethod
+    def from_file(
+        cls, problems_path: Path, problem_name: str, rename: bool = False
+    ) -> Problem:
+        """
+        `tranlate = True` by default for better LLM training
+        """
+        problems = Problem.parse_txt_file(problems_path)
+        if problem_name not in problems:
+            raise ValueError(
+                f"Problem name `{problem_name}` not found in {list(problems.keys())}"
+            )
+        return problems[problem_name]
+
     def with_more_construction(self, constructions: str) -> Problem:
         return Problem(
             name=self.name,
             constructions=self.constructions + tuple(Clause.parse_line(constructions)),
             goals=self.goals,
         )
+
+    def points(self) -> tuple[str, ...]:
+        s: set[str] = set()
+        for construction in self.constructions:
+            for p in construction.points:
+                s.add(p)
+        return tuple(s)
