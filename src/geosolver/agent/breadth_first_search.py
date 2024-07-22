@@ -5,20 +5,12 @@ import logging
 from typing import TYPE_CHECKING
 
 from geosolver.agent.agents_interface import (
-    ApplyTheoremAction,
-    ApplyTheoremFeedback,
     DeductiveAgent,
-    Action,
-    EmptyAction,
-    Feedback,
-    MatchAction,
-    MatchFeedback,
-    StopAction,
 )
+from geosolver.proof import Proof
 
 if TYPE_CHECKING:
     from geosolver.theorem import Theorem
-    from geosolver.definition.definition import Definition
     from geosolver.dependency.dependency import Dependency
 
 
@@ -30,35 +22,29 @@ class BFSDDAR(DeductiveAgent):
 
     """
 
-    def __init__(
-        self, defs: dict[str, "Definition"], theorems: list["Theorem"]
-    ) -> None:
-        self.defs = defs
+    def __init__(self, proof: Proof, theorems: list["Theorem"]) -> None:
+        self.proof = proof
         self.theorems = theorems
         self.theorem_buffer: list[Theorem] = []
         self.application_buffer: list[Dependency] = []
         self.hope = True
 
-    def act(self) -> Action:
+    def step(self) -> bool:
         if self.theorem_buffer:
             theorem = self.theorem_buffer.pop()
             logging.info("bfsddar matching" + str(theorem))
-            return MatchAction(theorem)
-        if self.application_buffer:
+            deps = self.proof.match_theorem(theorem)
+            logging.info("bfsddar matched " + str(len(deps)))
+            self.application_buffer.extend(deps)
+        elif self.application_buffer:
             # logging.info("bfsddar : apply")
-            return ApplyTheoremAction(self.application_buffer.pop())
+            dep = self.application_buffer.pop()
+            if self.proof.apply_theorem(dep):
+                self.hope = True
         else:
             if not self.hope:
-                return StopAction()
+                return False
             self.hope = False
             self.theorem_buffer = list(self.theorems)
             logging.info("bfsddar : reload")
-            return EmptyAction()
-
-    def remember_effects(self, action: Action, feedback: Feedback) -> None:
-        if isinstance(feedback, MatchFeedback):
-            logging.info("bfsddar matched " + str(len(feedback.deps)))
-            self.application_buffer.extend(feedback.deps)
-        if isinstance(feedback, ApplyTheoremFeedback):
-            if feedback.added:
-                self.hope = True
+        return True

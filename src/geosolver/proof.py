@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, Optional, Union
+from typing import TYPE_CHECKING, Optional, Union
 import logging
 
 from geosolver.definition.clause import Clause
@@ -21,19 +21,6 @@ from geosolver.reasoning_engines.algebraic_reasoning.algebraic_manipulator impor
 )
 from geosolver.statement import Statement
 from geosolver.definition.definition import Definition
-from geosolver.agent.agents_interface import (
-    Action,
-    EmptyAction,
-    EmptyFeedback,
-    Feedback,
-    ApplyTheoremAction,
-    ApplyTheoremFeedback,
-    MatchAction,
-    MatchFeedback,
-    ResetFeedback,
-    StopAction,
-    StopFeedback,
-)
 from geosolver.match_theorems import Matcher, translate_sentence
 
 from geosolver.numerical.distances import (
@@ -46,6 +33,7 @@ from geosolver.numerical.sketch import sketch
 
 from geosolver.problem import Problem
 from geosolver.dependency.dependency import IN_PREMISES, Dependency
+from geosolver.theorem import Theorem
 from geosolver.tools import atomize
 
 if TYPE_CHECKING:
@@ -72,12 +60,6 @@ class Proof:
         self.problem: Problem = problem
         self.defs: dict[str, Definition] = defs
         self._init_added: list[Dependency] = []
-        self._ACTION_TYPE_TO_STEP: dict[type[Action], Callable[..., Feedback]] = {
-            MatchAction: self._step_match_theorem,
-            ApplyTheoremAction: self._step_apply_theorem,
-            StopAction: self._step_stop,
-            EmptyAction: self._idle,
-        }
         self.runtime_cache_path = runtime_cache_path
         self.rng = rng
         self.matcher = Matcher(self.dep_graph, self.runtime_cache_path, self.rng)
@@ -147,30 +129,14 @@ class Proof:
 
         return proof
 
-    def step(self, action: Action) -> Feedback:
-        return self._ACTION_TYPE_TO_STEP[type(action)](action)
+    def match_theorem(self, theorem: Theorem) -> list[Dependency]:
+        return list(self.matcher.match_theorem(theorem))
 
-    def _step_match_theorem(self, action: MatchAction) -> MatchFeedback:
-        return MatchFeedback(deps=list(self.matcher.match_theorem(action.theorem)))
-
-    def _step_apply_theorem(self, action: ApplyTheoremAction) -> ApplyTheoremFeedback:
-        added = self._apply_theorem(action.dep)
-        return ApplyTheoremFeedback(added)
-
-    def _apply_theorem(self, dep: Dependency) -> list[Dependency]:
+    def apply_theorem(self, dep: Dependency) -> bool:
         if dep.statement in dep.statement.dep_graph.hyper_graph:
-            return []
+            return False
         dep.add()
-        return [dep]
-
-    def _step_stop(self, action: StopAction) -> StopFeedback:
-        return StopFeedback(success=self.check_goals())
-
-    def _idle(self, action: EmptyAction) -> EmptyFeedback:
-        return EmptyFeedback()
-
-    def init(self) -> ResetFeedback:
-        return ResetFeedback(self._init_added)
+        return True
 
     def check_goals(self) -> bool:
         if not self.goals:

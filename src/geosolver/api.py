@@ -29,23 +29,23 @@ class GeometricSolver:
     def __init__(
         self,
         proof: "Proof",
-        deductive_agent: DeductiveAgent,
+        theorems: list[Theorem],
+        deductive_agent: type[DeductiveAgent],
     ) -> None:
         self.proof = proof
+        self.theorems = theorems
         self.problem = proof.problem
         self.defs = proof.defs
         self.goals = proof.goals
-        self.deductive_agent = deductive_agent
+        self.deductive_agent = deductive_agent(self.proof, self.theorems)
         self.run_infos: dict[str, Any] = {}
 
     def run(
         self,
-        stop_on_goal: bool = True,
     ) -> bool:
         infos = run_loop(
             self.deductive_agent,
             self.proof,
-            stop_on_goal=stop_on_goal,
         )
         self.run_infos = infos
         return infos["success"]
@@ -108,12 +108,7 @@ class GeometricSolverBuilder:
             max_attempts=max_attempts,
         )
 
-        return GeometricSolver(
-            proof_state,
-            self.deductive_agent(self.defs, self.rules)
-            if self.deductive_agent
-            else BFSDDAR(self.defs, self.rules),
-        )
+        return GeometricSolver(proof_state, self.rules, self.deductive_agent or BFSDDAR)
 
     def load_problem_from_file(
         self, problems_path: Path, problem_name: str, rename: bool = False
