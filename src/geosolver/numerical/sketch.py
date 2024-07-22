@@ -14,7 +14,7 @@ from geosolver.numerical.geometries import (
     line_circle_intersection,
     line_line_intersection,
 )
-from geosolver.tools import str_to_nd
+from geosolver.tools import str_to_fraction
 import numpy as np
 
 if TYPE_CHECKING:
@@ -423,8 +423,8 @@ def sketch_rotatep90(args: tuple[PointNum, ...], **kwargs: Any) -> PointNum:
 
 def sketch_s_angle(args: tuple[PointNum, PointNum, str], **kwargs: Any) -> LineNum:
     a, b, angle = args
-    num, den = str_to_nd(angle)
-    ang = num * np.pi / den
+    f = str_to_fraction(angle)
+    ang = float(f) * np.pi
     x = b + (a - b).rotatea(ang)
     return LineNum(b, x)
 
@@ -433,8 +433,8 @@ def sketch_aconst(
     args: tuple[PointNum, PointNum, PointNum, str], **kwargs: Any
 ) -> LineNum:
     a, b, c, angle = args
-    num, den = str_to_nd(angle)
-    ang = num * np.pi / den
+    f = str_to_fraction(angle)
+    ang = float(f) * np.pi
     x = c + (a - b).rotatea(ang)
     return LineNum(c, x)
 
@@ -674,7 +674,7 @@ def sketch_rconst(
     """Sketches point x such that ab/cx=r"""
     A, B, C, r = args
     dab = A.distance(B)
-    length = float(dab / float(Fraction(*str_to_nd(r))))
+    length = float(dab / float(str_to_fraction(r)))
     return CircleNum(center=C, radius=length)
 
 
@@ -703,7 +703,7 @@ def sketch_lconst(args: tuple[PointNum, str], **kwargs: Any) -> CircleNum:
     """Sketches point x such that x in at lenght l of point a"""
 
     a, length = args
-    return CircleNum(center=a, radius=float(Fraction(*str_to_nd(length))))
+    return CircleNum(center=a, radius=float(str_to_fraction(length)))
 
 
 def sketch_rconst2(
@@ -712,7 +712,7 @@ def sketch_rconst2(
     """Sketches point x such that ax/bx=r"""
 
     A, B, r = args
-    ratio = float(Fraction(*str_to_nd(r)))
+    ratio = float(str_to_fraction(r))
 
     if ratio == float(Fraction(1, 1)):
         M = (A + B) * 0.5

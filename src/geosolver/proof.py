@@ -234,7 +234,7 @@ class Proof:
             if p in existing_points:
                 raise Exception("The construction is illegal")
 
-        # Step 2: draw.
+        # draw
 
         def draw_fn() -> list[PointNum]:
             to_be_intersected: list[ObjNum] = []

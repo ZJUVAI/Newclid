@@ -1,7 +1,6 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Iterable, Optional, Type, TypeVar
 
-from geosolver.tools import simplify
 import geosolver.numerical.geometries as num_geo
 from geosolver.dependency.symbols import Circle, Line, Point, Symbol
 
@@ -10,24 +9,6 @@ if TYPE_CHECKING:
 
 S = TypeVar("S", bound="Symbol")
 CircL = TypeVar("CircL", "Circle", "Line")
-
-
-def length_str(length: Any):
-    res = f"{length:.3f}"
-    while res[-1] == "0" or res[-1] == ".":
-        res = res[:-1]
-    return res
-
-
-def nd_to_angle_name(n: int, d: int) -> str:
-    n, d = simplify(n, d)
-    n %= d
-    return f"{n}pi/{d}"
-
-
-def nd_to_ratio_name(n: int, d: int) -> str:
-    n, d = simplify(n, d)
-    return f"{n}/{d}"
 
 
 class SymbolsGraph:

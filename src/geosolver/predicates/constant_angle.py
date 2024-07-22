@@ -1,4 +1,5 @@
 from __future__ import annotations
+from fractions import Fraction
 from numpy import pi
 from typing import TYPE_CHECKING, Any
 
@@ -6,7 +7,7 @@ from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
 from geosolver.reasoning_engines.algebraic_reasoning.tables import Angle_Chase
-from geosolver.tools import nd_to_angle, str_to_nd
+from geosolver.tools import fraction_to_angle, str_to_fraction
 from geosolver.dependency.dependency import Dependency
 
 if TYPE_CHECKING:
@@ -36,22 +37,18 @@ class ConstantAngle(Predicate):
             raise IllegalPredicate
         a, b = sorted((a, b))
         c, d = sorted((c, d))
-        num, denum = str_to_nd(y)
+        f = str_to_fraction(y)
         if (a, b) > (c, d):
             a, b, c, d = c, d, a, b
-            num = -num
-        return tuple(dep_graph.symbols_graph.names2points((a, b, c, d))) + (
-            nd_to_angle(num, denum),
-        )
+            f = -f
+        return tuple(dep_graph.symbols_graph.names2points((a, b, c, d))) + (f % 1,)
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
-        args: tuple[Point, Point, Point, Point, str] = statement.args
+        args: tuple[Point, Point, Point, Point, Fraction] = statement.args
         a, b, c, d, y = args
-        num, denum = str_to_nd(y)
-        angle = num / denum * pi
         return close_enough(
-            angle, ((c.num - d.num).angle() - (a.num - b.num).angle()) % pi
+            float(y) * pi, ((c.num - d.num).angle() - (a.num - b.num).angle()) % pi
         )
 
     @classmethod
@@ -93,6 +90,6 @@ class ConstantAngle(Predicate):
 
     @classmethod
     def pretty(cls, statement: Statement) -> str:
-        args: tuple[Point, Point, Point, Point, str] = statement.args
+        args: tuple[Point, Point, Point, Point, Fraction] = statement.args
         a, b, c, d, y = args
-        return f"∠({a.pretty_name}{b.pretty_name},{c.pretty_name}{d.pretty_name}) = {y}"
+        return f"∠({a.pretty_name}{b.pretty_name},{c.pretty_name}{d.pretty_name}) = {fraction_to_angle(y)}"
