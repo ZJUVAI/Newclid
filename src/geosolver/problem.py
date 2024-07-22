@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
-from geosolver.definition.clause import Clause
+from geosolver.definition.clause import Clause, translate_sentence
 from geosolver.tools import atomize, reshape
 
 if TYPE_CHECKING:
@@ -57,9 +57,7 @@ class Problem(NamedTuple):
         return problem
 
     @classmethod
-    def from_file(
-        cls, problems_path: Path, problem_name: str, rename: bool = False
-    ) -> Problem:
+    def from_file(cls, problems_path: Path, problem_name: str) -> Problem:
         """
         `tranlate = True` by default for better LLM training
         """
@@ -75,6 +73,18 @@ class Problem(NamedTuple):
             name=self.name,
             constructions=self.constructions + Clause.parse_line(constructions),
             goals=self.goals,
+        )
+
+    def renamed(self) -> Problem:
+        mp: dict[str, str] = {}
+        for construction in self.constructions:
+            for point in construction.points:
+                if point not in mp:
+                    mp[point] = chr(ord("a") + len(mp))
+        return Problem(
+            self.name,
+            tuple(construction.renamed(mp) for construction in self.constructions),
+            tuple(translate_sentence(mp, s) for s in self.goals),
         )
 
     def points(self) -> tuple[str, ...]:

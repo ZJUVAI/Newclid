@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 import logging
 
-from geosolver.definition.clause import Clause
+from geosolver.definition.clause import Clause, translate_sentence
 from geosolver.dependency.dependency_graph import DependencyGraph
 from geosolver.dependency.symbols import Point
 from geosolver.numerical.geometries import (
@@ -21,7 +21,7 @@ from geosolver.reasoning_engines.algebraic_reasoning.algebraic_manipulator impor
 )
 from geosolver.statement import Statement
 from geosolver.definition.definition import Definition
-from geosolver.match_theorems import Matcher, translate_sentence
+from geosolver.match_theorems import Matcher
 
 from geosolver.numerical.distances import (
     PointTooCloseError,

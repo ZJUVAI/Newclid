@@ -121,7 +121,9 @@ class GeometricSolverBuilder:
         """
         `tranlate = True` by default for better LLM training
         """
-        self.problem = Problem.from_file(problems_path, problem_name, rename)
+        self.problem = Problem.from_file(problems_path, problem_name)
+        if rename:
+            self.problem = self.problem.renamed()
         return self
 
     def load_problem(self, problem: Problem) -> Self:

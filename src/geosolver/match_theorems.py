@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Generator, Optional
 import json
 
+from geosolver.definition.clause import translate_sentence
 from geosolver.dependency.symbols import Point
 from geosolver.predicates.predicate import IllegalPredicate
 from geosolver.statement import Statement
@@ -16,14 +17,6 @@ if TYPE_CHECKING:
     import numpy as np
     from geosolver.rule import Rule
     from geosolver.dependency.dependency_graph import DependencyGraph
-
-
-def translate_sentence(
-    mapping: dict[str, str], sentence: tuple[str, ...]
-) -> tuple[str, ...]:
-    return (sentence[0],) + tuple(
-        mapping[a] if a in mapping else a for a in sentence[1:]
-    )
 
 
 class Matcher:

@@ -28,3 +28,17 @@ class Clause(NamedTuple):
             basics.append(Clause(points, bs))
 
         return tuple(basics)
+
+    def renamed(self, mp: dict[str, str]) -> Clause:
+        return Clause(
+            tuple(mp[p] if p in mp else p for p in self.points),
+            tuple(translate_sentence(mp, s) for s in self.sentences),
+        )
+
+
+def translate_sentence(
+    mapping: dict[str, str], sentence: tuple[str, ...]
+) -> tuple[str, ...]:
+    return (sentence[0],) + tuple(
+        mapping[a] if a in mapping else a for a in sentence[1:]
+    )
