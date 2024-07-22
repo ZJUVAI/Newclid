@@ -33,7 +33,7 @@ from geosolver.numerical.sketch import sketch
 
 from geosolver.problem import Problem
 from geosolver.dependency.dependency import IN_PREMISES, Dependency
-from geosolver.theorem import Theorem
+from geosolver.rule import Rule
 from geosolver.tools import atomize
 
 if TYPE_CHECKING:
@@ -129,10 +129,10 @@ class Proof:
 
         return proof
 
-    def match_theorem(self, theorem: Theorem) -> list[Dependency]:
+    def match_theorem(self, theorem: Rule) -> list[Dependency]:
         return list(self.matcher.match_theorem(theorem))
 
-    def apply_theorem(self, dep: Dependency) -> bool:
+    def apply_dep(self, dep: Dependency) -> bool:
         if dep.statement in dep.statement.dep_graph.hyper_graph:
             return False
         dep.add()

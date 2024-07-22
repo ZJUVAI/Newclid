@@ -5,7 +5,7 @@ from typing import NamedTuple
 from geosolver.tools import atomize
 
 
-class Theorem(NamedTuple):
+class Rule(NamedTuple):
     """Deduction rule."""
 
     descrption: str
@@ -20,15 +20,15 @@ class Theorem(NamedTuple):
         return f"{premises_txt} => {conclusions_txt}"
 
     @classmethod
-    def parse_txt_file(cls, fname: Path) -> list[Theorem]:
+    def parse_txt_file(cls, fname: Path) -> list[Rule]:
         with open(fname, "r") as f:
             return cls.parse_text(f.read())
 
     @classmethod
-    def parse_text(cls, text: str) -> list[Theorem]:
+    def parse_text(cls, text: str) -> list[Rule]:
         """Load deduction rule from a str object."""
         description = ""
-        res: list[Theorem] = []
+        res: list[Rule] = []
         for i, s in enumerate(atomize(text, "\n")):
             if "=>" in s:
                 res.append(cls.from_string(s, description or f"rule of line {i}"))
@@ -38,11 +38,11 @@ class Theorem(NamedTuple):
         return res
 
     @classmethod
-    def from_string(cls, s: str, name: str = "") -> Theorem:
+    def from_string(cls, s: str, name: str = "") -> Rule:
         premises, conclusions = atomize(s, "=>")
         premises = atomize(premises, ",")
         conclusions = atomize(conclusions, ",")
-        return Theorem(
+        return Rule(
             descrption=name,
             premises=tuple(atomize(p) for p in premises),
             conclusions=tuple(atomize(c) for c in conclusions),

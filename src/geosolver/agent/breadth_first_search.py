@@ -10,7 +10,7 @@ from geosolver.agent.agents_interface import (
 from geosolver.proof import Proof
 
 if TYPE_CHECKING:
-    from geosolver.theorem import Theorem
+    from geosolver.rule import Rule
     from geosolver.dependency.dependency import Dependency
 
 
@@ -22,16 +22,16 @@ class BFSDDAR(DeductiveAgent):
 
     """
 
-    def __init__(self, proof: Proof, theorems: list["Theorem"]) -> None:
+    def __init__(self, proof: Proof, rules: list["Rule"]) -> None:
         self.proof = proof
-        self.theorems = theorems
-        self.theorem_buffer: list[Theorem] = []
+        self.rules = rules
+        self.rule_buffer: list[Rule] = []
         self.application_buffer: list[Dependency] = []
         self.hope = True
 
     def step(self) -> bool:
-        if self.theorem_buffer:
-            theorem = self.theorem_buffer.pop()
+        if self.rule_buffer:
+            theorem = self.rule_buffer.pop()
             logging.info("bfsddar matching" + str(theorem))
             deps = self.proof.match_theorem(theorem)
             logging.info("bfsddar matched " + str(len(deps)))
@@ -39,12 +39,12 @@ class BFSDDAR(DeductiveAgent):
         elif self.application_buffer:
             # logging.info("bfsddar : apply")
             dep = self.application_buffer.pop()
-            if self.proof.apply_theorem(dep):
+            if self.proof.apply_dep(dep):
                 self.hope = True
         else:
             if not self.hope:
                 return False
             self.hope = False
-            self.theorem_buffer = list(self.theorems)
+            self.rule_buffer = list(self.rules)
             logging.info("bfsddar : reload")
         return True

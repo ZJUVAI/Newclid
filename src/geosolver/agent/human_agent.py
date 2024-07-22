@@ -9,7 +9,7 @@ from geosolver.agent.agents_interface import (
     DeductiveAgent,
 )
 from geosolver.proof import Proof
-from geosolver.theorem import Theorem
+from geosolver.rule import Rule
 
 if TYPE_CHECKING:
     ...
@@ -21,14 +21,14 @@ class NamedFunction(NamedTuple):
 
 
 class HumanAgent(DeductiveAgent):
-    def __init__(self, proof: Proof, theorems: list[Theorem]) -> None:
+    def __init__(self, proof: Proof, rules: list[Rule]) -> None:
         self.proof = proof
-        self.theorems = theorems
-        self.match_theorems = [
+        self.rules = rules
+        self.match_rules = [
             NamedFunction(
                 f"match {theorem.descrption}: {theorem}", self.fn_match(theorem)
             )
-            for theorem in theorems
+            for theorem in rules
         ]
 
     @classmethod
@@ -54,14 +54,14 @@ class HumanAgent(DeductiveAgent):
             n = int(choice)
             return options[n].f()
 
-    def fn_match(self, theorem: Theorem):
+    def fn_match(self, rule: Rule):
         def fn():
-            deps = self.proof.match_theorem(theorem)
+            deps = self.proof.match_theorem(rule)
             self.select(
                 [
                     NamedFunction(
                         f"{dep.statement.pretty()} <= {', '.join(s.pretty() for s in dep.why)}",
-                        lambda dep=dep: self.proof.apply_theorem(dep),
+                        lambda dep=dep: self.proof.apply_dep(dep),
                     )
                     for dep in deps
                 ],
@@ -72,7 +72,7 @@ class HumanAgent(DeductiveAgent):
         return fn
 
     def match(self) -> bool:
-        self.select(self.match_theorems, apply_none=True)
+        self.select(self.match_rules, apply_none=True)
         return True
 
     def step(self) -> bool:

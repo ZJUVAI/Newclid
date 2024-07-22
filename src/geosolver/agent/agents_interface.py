@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from abc import abstractmethod
 
 from geosolver.proof import Proof
-from geosolver.theorem import Theorem
+from geosolver.rule import Rule
 
 
 if TYPE_CHECKING:
@@ -21,7 +21,7 @@ class DeductiveAgent:
     """Common interface for deductive agents"""
 
     @abstractmethod
-    def __init__(self, proof: Proof, theorems: list[Theorem]) -> None:
+    def __init__(self, proof: Proof, rules: list[Rule]) -> None:
         pass
 
     @abstractmethod

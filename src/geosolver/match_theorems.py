@@ -14,7 +14,7 @@ from geosolver.dependency.dependency import Dependency
 
 if TYPE_CHECKING:
     import numpy as np
-    from geosolver.theorem import Theorem
+    from geosolver.rule import Rule
     from geosolver.dependency.dependency_graph import DependencyGraph
 
 
@@ -36,14 +36,14 @@ class Matcher:
         self.dep_graph = dep_graph
         self.rng = rng
         self.runtime_cache_path = runtime_cache_path
-        self.cache: dict["Theorem", set[Dependency]] = {}
+        self.cache: dict["Rule", set[Dependency]] = {}
         if self.runtime_cache_path is not None and not self.runtime_cache_path.exists():
             os.makedirs(os.path.dirname(self.runtime_cache_path), exist_ok=True)
             self.runtime_cache_path.touch()
             with open(self.runtime_cache_path, "w") as f:
                 json.dump({}, f)
 
-    def cache_theorem(self, theorem: "Theorem"):
+    def cache_theorem(self, theorem: "Rule"):
         file_cache = None
         write = False
         read = False
@@ -105,7 +105,7 @@ class Matcher:
             f"{theorem} matching cache : now {len(self.cache[theorem])=} {read=} {write=} {len(mappings)=}"
         )
 
-    def match_theorem(self, theorem: "Theorem") -> Generator["Dependency", None, None]:
+    def match_theorem(self, theorem: "Rule") -> Generator["Dependency", None, None]:
         logging.info("Start caching")
         if theorem not in self.cache:
             self.cache_theorem(theorem)
