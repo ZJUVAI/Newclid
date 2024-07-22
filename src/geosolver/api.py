@@ -12,7 +12,7 @@ from typing_extensions import Self
 from geosolver.agent.breadth_first_search import BFSDDAR
 from geosolver.definition.definition import Definition
 from geosolver.numerical.draw_figure import draw_figure
-from geosolver.theorem import Theorem
+from geosolver.rule import Rule
 from geosolver.proof import Proof
 from geosolver.configs import default_defs_path, default_rules_path
 from geosolver.agent.agents_interface import DeductiveAgent
@@ -29,26 +29,26 @@ class GeometricSolver:
     def __init__(
         self,
         proof: "Proof",
-        deductive_agent: DeductiveAgent,
+        theorems: list[Rule],
+        deductive_agent: type[DeductiveAgent],
     ) -> None:
         self.proof = proof
+        self.theorems = theorems
         self.problem = proof.problem
         self.defs = proof.defs
         self.goals = proof.goals
-        self.deductive_agent = deductive_agent
+        self.deductive_agent = deductive_agent(self.proof, self.theorems)
         self.run_infos: dict[str, Any] = {}
 
     def run(
         self,
-        stop_on_goal: bool = True,
     ) -> bool:
-        success, infos = run_loop(
+        infos = run_loop(
             self.deductive_agent,
             self.proof,
-            stop_on_goal=stop_on_goal,
         )
         self.run_infos = infos
-        return success
+        return infos["success"]
 
     def write_solution(self, out_file: Optional[Path]):
         write_solution(self.proof, out_file)
@@ -83,7 +83,7 @@ class GeometricSolverBuilder:
     def __init__(self, seed: Optional[int] = None) -> None:
         self.problem: Optional[Problem] = None
         self.defs: Optional[dict[str, Definition]] = None
-        self.rules: Optional[list[Theorem]] = None
+        self.rules: Optional[list[Rule]] = None
         self.deductive_agent: Optional[type[DeductiveAgent]] = None
         self.runtime_cache_path: Optional[Path] = None
         self.seed = seed or 998244353
@@ -98,7 +98,7 @@ class GeometricSolverBuilder:
             )
 
         if self.rules is None:
-            self.rules = Theorem.parse_txt_file(default_rules_path())
+            self.rules = Rule.parse_txt_file(default_rules_path())
 
         proof_state = Proof.build_problem(
             problem=self.problem,
@@ -108,12 +108,7 @@ class GeometricSolverBuilder:
             max_attempts=max_attempts,
         )
 
-        return GeometricSolver(
-            proof_state,
-            self.deductive_agent(self.defs, self.rules)
-            if self.deductive_agent
-            else BFSDDAR(self.defs, self.rules),
-        )
+        return GeometricSolver(proof_state, self.rules, self.deductive_agent or BFSDDAR)
 
     def load_problem_from_file(
         self, problems_path: Path, problem_name: str, rename: bool = False
@@ -148,13 +143,13 @@ class GeometricSolverBuilder:
         return self
 
     def load_rules_from_txt(self, rule_txt: str) -> Self:
-        self.rules = Theorem.parse_text(rule_txt)
+        self.rules = Rule.parse_text(rule_txt)
         return self
 
     def load_rules_from_file(self, rules_path: Optional[Path] = None) -> Self:
         if rules_path is None:
             rules_path = default_rules_path()
-        self.rules = Theorem.parse_txt_file(rules_path)
+        self.rules = Rule.parse_txt_file(rules_path)
         return self
 
     def load_defs_from_file(self, defs_path: Optional[Path] = None) -> Self:

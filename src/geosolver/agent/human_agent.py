@@ -6,19 +6,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Callable, NamedTuple
 
 from geosolver.agent.agents_interface import (
-    ApplyTheoremAction,
     DeductiveAgent,
-    Action,
-    EmptyAction,
-    Feedback,
-    MatchAction,
-    MatchFeedback,
-    StopAction,
 )
+from geosolver.proof import Proof
+from geosolver.rule import Rule
 
 if TYPE_CHECKING:
-    from geosolver.theorem import Theorem
-    from geosolver.definition.definition import Definition
+    ...
 
 
 class NamedFunction(NamedTuple):
@@ -27,21 +21,14 @@ class NamedFunction(NamedTuple):
 
 
 class HumanAgent(DeductiveAgent):
-    """ """
-
-    def __init__(
-        self, defs: dict[str, "Definition"], theorems: list["Theorem"]
-    ) -> None:
-        self.defs = defs
-        self.theorems = theorems
-        self.match_theorems: list[NamedFunction] = []
-        self.apply_buffer: list[ApplyTheoremAction] = []
-        self.match_theorems = [
+    def __init__(self, proof: Proof, rules: list[Rule]) -> None:
+        self.proof = proof
+        self.rules = rules
+        self.match_rules = [
             NamedFunction(
-                f"match {theorem.descrption}: {theorem}",
-                lambda theorem=theorem: MatchAction(theorem),
+                f"match {theorem.descrption}: {theorem}", self.fn_match(theorem)
             )
-            for theorem in theorems
+            for theorem in rules
         ]
 
     @classmethod
@@ -67,33 +54,32 @@ class HumanAgent(DeductiveAgent):
             n = int(choice)
             return options[n].f()
 
-    def match(self) -> Action:
-        action = self.select(self.match_theorems, apply_none=True)
-        return action or EmptyAction()
-
-    def act(self) -> Action:
-        if self.apply_buffer:
-            return self.apply_buffer.pop()
-        return self.select(
-            [
-                NamedFunction("match", self.match),
-                NamedFunction("nothing", lambda: EmptyAction()),
-                NamedFunction("stop", lambda: StopAction()),
-            ]
-        )
-
-    def remember_effects(self, action: Action, feedback: Feedback) -> None:
-        if isinstance(feedback, MatchFeedback):
+    def fn_match(self, rule: Rule):
+        def fn():
+            deps = self.proof.match_theorem(rule)
             self.select(
                 [
                     NamedFunction(
                         f"{dep.statement.pretty()} <= {', '.join(s.pretty() for s in dep.why)}",
-                        lambda dep=dep: self.apply_buffer.append(
-                            ApplyTheoremAction(dep)
-                        ),
+                        lambda dep=dep: self.proof.apply_dep(dep),
                     )
-                    for dep in feedback.deps
+                    for dep in deps
                 ],
                 apply_all=True,
                 apply_none=True,
             )
+
+        return fn
+
+    def match(self) -> bool:
+        self.select(self.match_rules, apply_none=True)
+        return True
+
+    def step(self) -> bool:
+        return self.select(
+            [
+                NamedFunction("match", self.match),
+                NamedFunction("nothing", lambda: True),
+                NamedFunction("stop", lambda: False),
+            ]
+        )

@@ -1,11 +1,12 @@
 from __future__ import annotations
+from fractions import Fraction
 from typing import TYPE_CHECKING, Any
 
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
 from geosolver.reasoning_engines.algebraic_reasoning.tables import Ratio_Chase
-from geosolver.tools import parse_len, str_to_nd
+from geosolver.tools import fraction_to_len, str_to_fraction
 from geosolver.dependency.dependency import Dependency
 
 if TYPE_CHECKING:
@@ -33,15 +34,14 @@ class ConstantLength(Predicate):
             raise IllegalPredicate
         a, b = sorted((a, b))
         return tuple(dep_graph.symbols_graph.names2points((a, b))) + (
-            parse_len(length),
+            str_to_fraction(length),
         )
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
-        args: tuple[Point, Point, str] = statement.args
+        args: tuple[Point, Point, Fraction] = statement.args
         a, b, length = args
-        n, d = str_to_nd(length)
-        return close_enough(a.num.distance(b.num), n / d)
+        return close_enough(a.num.distance(b.num), float(length))
 
     @classmethod
     def _prep_ar(cls, statement: Statement) -> tuple[list[SumCV], Table]:
@@ -76,9 +76,9 @@ class ConstantLength(Predicate):
 
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
-        return (args[0].name, args[1].name, args[2])
+        return (args[0].name, args[1].name, fraction_to_len(args[2]))
 
     @classmethod
     def pretty(cls, statement: Statement) -> str:
         a, b, length = statement.args
-        return f"{a.pretty_name}{b.pretty_name} = {length}"
+        return f"{a.pretty_name}{b.pretty_name} = {fraction_to_len(length)}"

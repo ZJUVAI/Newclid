@@ -8,7 +8,7 @@ from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.perpendicularity import Perp
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
-from geosolver.tools import InfQuotientError, float_to_len
+from geosolver.tools import InfQuotientError, get_quotient
 
 if TYPE_CHECKING:
     from geosolver.dependency.dependency_graph import DependencyGraph
@@ -58,13 +58,13 @@ class PythagoreanPremises(Predicate):
         perp_check = perp.check()
         try:
             ab = statement.with_new(
-                ConstantLength, (a, b, float_to_len(a.num.distance(b.num)))
+                ConstantLength, (a, b, get_quotient(a.num.distance(b.num)))
             )
             ac = statement.with_new(
-                ConstantLength, (a, c, float_to_len(a.num.distance(c.num)))
+                ConstantLength, (a, c, get_quotient(a.num.distance(c.num)))
             )
             bc = statement.with_new(
-                ConstantLength, (b, c, float_to_len(b.num.distance(c.num)))
+                ConstantLength, (b, c, get_quotient(b.num.distance(c.num)))
             )
         except InfQuotientError:
             return None
@@ -110,13 +110,13 @@ class PythagoreanConclusions(Predicate):
             dep.with_new(perp).add()
         try:
             ab = statement.with_new(
-                ConstantLength, (a, b, float_to_len(a.num.distance(b.num)))
+                ConstantLength, (a, b, get_quotient(a.num.distance(b.num)))
             )
             ac = statement.with_new(
-                ConstantLength, (a, c, float_to_len(a.num.distance(c.num)))
+                ConstantLength, (a, c, get_quotient(a.num.distance(c.num)))
             )
             bc = statement.with_new(
-                ConstantLength, (b, c, float_to_len(b.num.distance(c.num)))
+                ConstantLength, (b, c, get_quotient(b.num.distance(c.num)))
             )
         except InfQuotientError:
             logging.info(

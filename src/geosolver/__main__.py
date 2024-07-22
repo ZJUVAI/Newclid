@@ -115,15 +115,14 @@ def main():
     if just_draw:
         return
 
-    success = solver.run()
+    solver.run()
 
     logging.info(f"Run infos: {solver.run_infos}")
 
     if clean:
         return
 
-    if success:
-        solver.write_solution(outpath / "proof_steps.txt")
+    solver.write_solution(outpath / "proof_steps.txt")
     solver.draw_figure(False, outpath / "proof_figure.png")
 
 

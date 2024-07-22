@@ -1,4 +1,5 @@
 from __future__ import annotations
+from fractions import Fraction
 from typing import TYPE_CHECKING, Any
 
 from geosolver.dependency.dependency import Dependency
@@ -6,7 +7,7 @@ from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
 from geosolver.reasoning_engines.algebraic_reasoning.tables import Ratio_Chase
-from geosolver.tools import nd_to_ratio, str_to_nd
+from geosolver.tools import fraction_to_ratio, str_to_fraction
 
 if TYPE_CHECKING:
     from geosolver.reasoning_engines.algebraic_reasoning.tables import Table
@@ -31,22 +32,19 @@ class ConstantRatio(Predicate):
         a, b, c, d, r = args
         if a == b or c == d:
             raise IllegalPredicate
-        num, denum = str_to_nd(r)
+        f = str_to_fraction(r)
         a, b = sorted((a, b))
         c, d = sorted((c, d))
         if (a, b) > (c, d):
             a, b, c, d = c, d, a, b
-            num, denum = denum, num
-        return tuple(dep_graph.symbols_graph.names2points((a, b, c, d))) + (
-            nd_to_ratio(num, denum),
-        )
+            f = 1 / f
+        return tuple(dep_graph.symbols_graph.names2points((a, b, c, d))) + (f,)
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
-        args: tuple[Point, Point, Point, Point, str] = statement.args
+        args: tuple[Point, Point, Point, Point, Fraction] = statement.args
         a, b, c, d, r = args
-        num, denum = str_to_nd(r)
-        return close_enough(a.num.distance(b.num) / c.num.distance(d.num), num / denum)
+        return close_enough(a.num.distance(b.num) / c.num.distance(d.num), float(r))
 
     @classmethod
     def _prep_ar(cls, statement: Statement) -> tuple[list[SumCV], Table]:
@@ -82,6 +80,6 @@ class ConstantRatio(Predicate):
 
     @classmethod
     def pretty(cls, statement: Statement) -> str:
-        args: tuple[Point, Point, Point, Point, str] = statement.args
+        args: tuple[Point, Point, Point, Point, Fraction] = statement.args
         a, b, c, d, r = args
-        return f"{a.pretty_name}{b.pretty_name}:{c.pretty_name}{d.pretty_name}={r}"
+        return f"{a.pretty_name}{b.pretty_name}:{c.pretty_name}{d.pretty_name}={fraction_to_ratio(r)}"
