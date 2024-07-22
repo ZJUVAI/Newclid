@@ -87,6 +87,15 @@ class Para(Predicate):
         points: tuple[Point, ...] = statement.args
         return "∥".join(a.pretty_name + b.pretty_name for a, b in reshape(points, 2))
 
+    @classmethod
+    def to_constructive(cls, point: str, args: tuple[str, ...]) -> str:
+        a, b, c, d = args
+        if point in [c, d]:
+            a, b, c, d = c, d, a, b
+        if point == b:
+            a, b = b, a
+        return f"on_pline {a} {b} {c} {d}"
+
 
 class NPara(Predicate):
     """npara A B C D -
