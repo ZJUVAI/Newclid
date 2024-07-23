@@ -35,6 +35,9 @@ class Clause(NamedTuple):
             tuple(translate_sentence(mp, s) for s in self.sentences),
         )
 
+    def __str__(self) -> str:
+        return f"{' '.join(p for p in self.points)} = {', '.join(' '.join(s) for s in self.sentences)}"
+
 
 def translate_sentence(
     mapping: dict[str, str], sentence: tuple[str, ...]

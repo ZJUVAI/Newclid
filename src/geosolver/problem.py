@@ -21,7 +21,7 @@ class Problem(NamedTuple):
 
     def __str__(self) -> str:
         return "; ".join([str(c) for c in self.constructions]) + (
-            " ? " + "; ".join(str(goal) for goal in self.goals) if self.goals else ""
+            " ? " + "; ".join(" ".join(goal) for goal in self.goals)
         )
 
     @classmethod
