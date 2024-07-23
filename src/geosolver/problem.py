@@ -63,9 +63,8 @@ class Problem(NamedTuple):
         """
         problems = Problem.parse_txt_file(problems_path)
         if problem_name not in problems:
-            raise ValueError(
-                f"Problem name `{problem_name}` not found in {list(problems.keys())}"
-            )
+            print(problem_name, "!!", problems.keys())
+            raise ValueError(f"{problem_name} not found in {list(problems.keys())}")
         return problems[problem_name]
 
     def with_more_construction(self, constructions: str) -> Problem:
