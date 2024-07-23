@@ -8,7 +8,7 @@
 from typing import TYPE_CHECKING, Any, Iterable, Optional, Union, overload
 
 from numpy.random import Generator
-from geosolver.numerical import ATOM, close_enough
+from geosolver.numerical import close_enough, sign
 import numpy as np
 
 if TYPE_CHECKING:
@@ -23,6 +23,10 @@ class PointNum:
     def __init__(self, x: Any, y: Any):
         self.x: float = float(x)
         self.y: float = float(y)
+        if close_enough(self.x, 0):
+            self.x = 0.0
+        if close_enough(self.y, 0):
+            self.y = 0.0
 
     def __lt__(self, other: "PointNum") -> bool:
         return (self.x, self.y) < (other.x, other.y)
@@ -82,8 +86,8 @@ class PointNum:
         dy = self.y - p.y
         dx2 = dx * dx
         dy2 = dy * dy
-        dx2 = dx2 if abs(dx2) > ATOM else 0.0
-        dy2 = dy2 if abs(dy2) > ATOM else 0.0
+        dx2 = 0.0 if close_enough(dx2, 0) else dx2
+        dy2 = 0.0 if close_enough(dy2, 0) else dy2
         return dx * dx + dy * dy
 
     def rotatea(self, ang: Any) -> "PointNum":
@@ -163,8 +167,16 @@ class LineNum:
         # Make sure a is always positive (or always negative for that matter)
         # With a == 0, Assuming a = +epsilon > 0
         # Then b such that ax + by = 0 with y>0 should be negative.
-        if a < -ATOM or abs(a) < ATOM and b > ATOM:
+        sa = sign(a)
+        sb = sign(b)
+        if sa == -1 or sa == 0 and sb == 1:
             a, b, c = -a, -b, -c
+        if sa == 0:
+            a = 0.0
+        if sb == 0:
+            b = 0.0
+        if close_enough(c, 0):
+            c = 0.0
 
         self.coefficients = a, b, c
 
@@ -213,12 +225,12 @@ class LineNum:
     def is_parallel(self, other: "LineNum") -> bool:
         a, b, _ = self.coefficients
         x, y, _ = other.coefficients
-        return abs(a * y - b * x) < ATOM
+        return close_enough(a * y, b * x)
 
     def is_perp(self, other: "LineNum") -> bool:
         a, b, _ = self.coefficients
         x, y, _ = other.coefficients
-        return abs(a * x + b * y) < 5 * ATOM
+        return close_enough(a * x, -b * y)
 
     def cross(self, other: "LineNum") -> float:
         a, b, _ = self.coefficients
@@ -382,14 +394,17 @@ class InvalidQuadSolveError(Exception):
 
 def solve_quad(a: float, b: float, c: float) -> Optional[tuple[float, float]]:
     """Solve a x^2 + bx + c = 0."""
+    if close_enough(a, 0):
+        return None
     a = 2 * a
     d = b * b - 2 * a * c
-    if d < -ATOM:
+    sd = sign(d)
+    if sd == -1:
         return None  # the caller should expect this result.
-    if abs(d) < ATOM:
+    if sd == 0:
         d = 0.0
     y = np.sqrt(d)
-    return (-b - y) / (a + ATOM), (-b + y) / (a + ATOM)
+    return (-b - y) / a, (-b + y) / a
 
 
 def circle_circle_intersection(
@@ -402,17 +417,19 @@ def circle_circle_intersection(
     x1, y1, r1 = c2.a, c2.b, c2.radius
 
     d = np.sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
-    if abs(d) < ATOM:
+    if close_enough(d, 0):
         raise InvalidQuadSolveError()
 
     a = (r0**2 - r1**2 + d**2) / (2 * d)
     h = r0**2 - a**2
-    if h < -ATOM:
+    sh = sign(h)
+    if sh == -1:
         raise InvalidQuadSolveError()
-    if abs(h) < ATOM:
+    if sh == 0:
         h = 0.0
     h = np.sqrt(h)
-    d += ATOM
+    if close_enough(d, 0):
+        raise InvalidQuadSolveError
     x2 = x0 + a * (x1 - x0) / d
     y2 = y0 + a * (y1 - y0) / d
     x3 = x2 + h * (y1 - y0) / d
@@ -432,7 +449,7 @@ def line_circle_intersection(
     center = circle.center
     p, q = center.x, center.y
 
-    if abs(b) < ATOM:
+    if close_enough(b, 0):
         x = -c / a
         x_p = x - p
         x_p2 = x_p * x_p
@@ -442,7 +459,7 @@ def line_circle_intersection(
         y1, y2 = y
         return (PointNum(x, y1), PointNum(x, y2))
 
-    if abs(a) < ATOM:
+    if close_enough(a, 0):
         y = -c / b
         y_q = y - q
         y_q2 = y_q * y_q
@@ -467,7 +484,7 @@ def line_circle_intersection(
 def _check_between(a: PointNum, b: PointNum, c: PointNum) -> bool:
     """Whether a is between b & c."""
     # return (a - b).dot(c - b) > 0 and (a - c).dot(b - c) > 0
-    return (a - b).dot(c - b) > ATOM and (a - c).dot(b - c) > ATOM
+    return sign((a - b).dot(c - b)) > 0 and sign((a - c).dot(b - c)) > 0
 
 
 def circle_segment_intersect(
@@ -498,7 +515,7 @@ def line_line_intersection(line_1: LineNum, line_2: LineNum) -> PointNum:
     # a1x + b1y + c1 = 0
     # a2x + b2y + c2 = 0
     d = a1 * b2 - a2 * b1
-    if abs(d) < ATOM:
+    if close_enough(d, 0):
         raise InvalidIntersectError
     return PointNum((c2 * b1 - c1 * b2) / d, (c1 * a2 - c2 * a1) / d)
 

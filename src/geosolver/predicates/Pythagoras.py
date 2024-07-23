@@ -95,7 +95,7 @@ class PythagoreanConclusions(Predicate):
 
     @classmethod
     def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
-        return cls.preparse(args)
+        return PythagoreanPremises.preparse(args)
 
     @classmethod
     def parse(

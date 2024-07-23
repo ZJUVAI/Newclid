@@ -40,7 +40,7 @@ class Perp(Predicate):
     def check_numerical(cls, statement: Statement) -> bool:
         args: tuple[Point, ...] = statement.args
         a, b, c, d = args
-        return close_enough(abs((a.num - b.num).dot(c.num - d.num)), 0)
+        return close_enough((a.num - b.num).dot(c.num - d.num), 0)
 
     @classmethod
     def check(cls, statement: Statement) -> bool:
