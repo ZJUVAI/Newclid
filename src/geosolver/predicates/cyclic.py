@@ -39,7 +39,7 @@ class Cyclic(Predicate):
             return False
 
         return all(
-            close_enough(circle.radius, circle.center.distance(p.num))
+            close_enough(circle.radius**2, circle.center.distance2(p.num))
             for p in points[3:]
         )
 
