@@ -23,15 +23,19 @@ class SameSide(Predicate):
     NAME = "sameside"
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
         a, b, c, x, y, z = args
         if len(set((a, b, c))) < 3 or len(set((x, y, z))) < 3:
             raise IllegalPredicate
         p1 = min((a, b, c), (a, c, b))
         p2 = min((x, y, z), (x, z, y))
-        return tuple(dep_graph.symbols_graph.names2points(min(p1 + p2, p2 + p1)))
+        return min(p1 + p2, p2 + p1)
+
+    @classmethod
+    def parse(
+        cls, args: tuple[str, ...], dep_graph: DependencyGraph
+    ) -> tuple[Any, ...]:
+        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
@@ -65,6 +69,10 @@ class NSameSide(Predicate):
     """
 
     NAME = "nsameside"
+
+    @classmethod
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+        return SameSide.preparse(args)
 
     @classmethod
     def parse(

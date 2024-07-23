@@ -17,17 +17,21 @@ class SameClock(Predicate):
     NAME = "sameclock"
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
         a, b, c, x, y, z = args
         if len(set((a, b, c))) < 3 or len(set((x, y, z))) < 3:
             raise IllegalPredicate
         group = min((a, b, c), (b, c, a), (c, a, b))
+        groupr = min((a, c, b), (c, b, a), (b, a, c))
         group1 = min((x, y, z), (y, z, x), (z, x, y))
-        return tuple(
-            dep_graph.symbols_graph.names2points(min(group + group1, group1 + group))
-        )
+        group1r = min((x, z, y), (z, y, x), (y, x, z))
+        return min(group + group1, group1 + group, groupr + group1r, group1r + groupr)
+
+    @classmethod
+    def parse(
+        cls, args: tuple[str, ...], dep_graph: DependencyGraph
+    ) -> tuple[Any, ...]:
+        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:

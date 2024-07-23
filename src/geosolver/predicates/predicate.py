@@ -22,18 +22,18 @@ class Predicate(ABC):
     NAME: str
 
     @classmethod
-    def check_valid_args(cls, args: tuple[str, ...]) -> bool:
-        raise NotImplementedError
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+        raise NotImplementedError(f"{cls.NAME} preparse not implemented")
 
     @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
-        raise NotImplementedError(f"{cls.NAME} parsing not implemented")
+        raise NotImplementedError(f"{cls.NAME} parse not implemented")
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
-        raise NotImplementedError(f"{cls.NAME} check numerical not implemented")
+        raise NotImplementedError(f"{cls.NAME} check_numerical not implemented")
 
     @classmethod
     def check(cls, statement: Statement) -> bool:

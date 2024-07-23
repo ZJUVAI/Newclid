@@ -26,12 +26,16 @@ class Circumcenter(Predicate):
     NAME = "circle"
 
     @classmethod
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+        if len(args) <= 2 or len(args) != len(set(args)):
+            raise IllegalPredicate
+        return (args[0],) + tuple(sorted(args[1:]))
+
+    @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
-        if len(args) <= 2 or len(args) != len(set(args)):
-            raise IllegalPredicate
-        return tuple(dep_graph.symbols_graph.names2points([args[0]] + sorted(args[1:])))
+        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:

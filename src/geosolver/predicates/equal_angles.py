@@ -28,9 +28,7 @@ class EqAngle(Predicate):
     NAME = "eqangle"
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
         groups: list[tuple[str, str, str, str]] = []
         groups1: list[tuple[str, str, str, str]] = []
         for a, b, c, d in reshape(args, 4):
@@ -40,11 +38,13 @@ class EqAngle(Predicate):
             c, d = sorted((c, d))
             groups.append((a, b, c, d))
             groups1.append((c, d, a, b))
-        return tuple(
-            dep_graph.symbols_graph.names2points(
-                sum(min(sorted(groups), sorted(groups1)), ())
-            )
-        )
+        return sum(min(sorted(groups), sorted(groups1)), ())
+
+    @classmethod
+    def parse(
+        cls, args: tuple[str, ...], dep_graph: DependencyGraph
+    ) -> tuple[Any, ...]:
+        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:

@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any
 
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
+from geosolver.predicates.equal_angles import EqAngle
 from geosolver.predicates.predicate import IllegalPredicate, Predicate
 from geosolver.reasoning_engines.algebraic_reasoning.tables import Ratio_Chase
 from geosolver.tools import reshape
@@ -25,23 +26,14 @@ class EqRatio(Predicate):
     NAME = "eqratio"
 
     @classmethod
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+        return EqAngle.preparse(args)
+
+    @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
-        groups: list[tuple[str, str, str, str]] = []
-        groups1: list[tuple[str, str, str, str]] = []
-        for a, b, c, d in reshape(args, 4):
-            if a == b or c == d:
-                raise IllegalPredicate
-            a, b = sorted((a, b))
-            c, d = sorted((c, d))
-            groups.append((a, b, c, d))
-            groups1.append((c, d, a, b))
-        return tuple(
-            dep_graph.symbols_graph.names2points(
-                sum(min(sorted(groups), sorted(groups1)), ())
-            )
-        )
+        return EqAngle.parse(args, dep_graph)
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
@@ -132,19 +124,19 @@ class EqRatio3(Predicate):
     NAME = "eqratio3"
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
         a, b, c, d, m, n = args
         if len(set((a, c, m))) < 3 or len(set((b, d, n))) < 3:
             raise IllegalPredicate
         groups = ((a, b), (c, d), (m, n))
         groups1 = ((b, a), (d, c), (n, m))
-        return tuple(
-            dep_graph.symbols_graph.names2points(
-                sum(min(sorted(groups), sorted(groups1)), ())
-            )
-        )
+        return sum(min(sorted(groups), sorted(groups1)), ())
+
+    @classmethod
+    def parse(
+        cls, args: tuple[str, ...], dep_graph: DependencyGraph
+    ) -> tuple[Any, ...]:
+        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:

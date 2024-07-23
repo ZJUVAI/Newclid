@@ -22,9 +22,7 @@ class Cong(Predicate):
     NAME = "cong"
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
         segs: list[tuple[str, str]] = []
         if len(args) % 2 != 0:
             raise IllegalPredicate
@@ -39,7 +37,13 @@ class Cong(Predicate):
         for a, b in segs:
             points.append(a)
             points.append(b)
-        return tuple(dep_graph.symbols_graph.names2points(points))
+        return tuple(points)
+
+    @classmethod
+    def parse(
+        cls, args: tuple[str, ...], dep_graph: DependencyGraph
+    ) -> tuple[Any, ...]:
+        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
@@ -118,50 +122,3 @@ class Cong(Predicate):
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
         return tuple(p.name for p in args)
-
-
-class Cong2(Predicate):
-    NAME = "cong2"
-
-    @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
-        if len(set(args)) != 4:
-            raise IllegalPredicate
-        m, n, a, b = args
-        m, n = sorted((m, n))
-        a, b = sorted((a, b))
-        return tuple(dep_graph.symbols_graph.names2points((m, n, a, b)))
-
-    @classmethod
-    def _get_2cong(cls, statement: Statement) -> tuple[Statement, Statement]:
-        points: tuple[Point, ...] = statement.args
-        m, n, a, b = points
-        return statement.with_new(Cong, (m, a, n, a)), statement.with_new(
-            Cong, (m, b, n, b)
-        )
-
-    @classmethod
-    def check_numerical(cls, statement: Statement) -> bool:
-        c0, c1 = cls._get_2cong(statement)
-        return c0.check_numerical() and c1.check_numerical()
-
-    @classmethod
-    def check(cls, statement: Statement) -> bool:
-        c0, c1 = cls._get_2cong(statement)
-        return c0.check() and c1.check()
-
-    @classmethod
-    def add(cls, dep: Dependency) -> None:
-        c0, c1 = cls._get_2cong(dep.statement)
-        dep.with_new(c0).add()
-        dep.with_new(c1).add()
-
-    @classmethod
-    def pretty(cls, statement: Statement) -> str:
-        points: tuple[Point, Point, Point, Point] = statement.args
-        m, n, a, b = points
-        return (
-            "cong2:" + f"{a.pretty_name}<{m.pretty_name}{n.pretty_name}>{b.pretty_name}"
-        )

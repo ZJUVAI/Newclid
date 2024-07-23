@@ -20,9 +20,7 @@ class Perp(Predicate):
     NAME = "perp"
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
         a, b, c, d = args
         if a == b or c == d:
             raise IllegalPredicate
@@ -30,7 +28,13 @@ class Perp(Predicate):
         c, d = sorted((c, d))
         if (a, b) > (c, d):
             a, b, c, d = c, d, a, b
-        return tuple(dep_graph.symbols_graph.names2points((a, b, c, d)))
+        return (a, b, c, d)
+
+    @classmethod
+    def parse(
+        cls, args: tuple[str, ...], dep_graph: DependencyGraph
+    ) -> tuple[Any, ...]:
+        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
@@ -90,6 +94,10 @@ class NPerp(Predicate):
     """
 
     NAME = "nperp"
+
+    @classmethod
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+        return Perp.preparse(args)
 
     @classmethod
     def parse(

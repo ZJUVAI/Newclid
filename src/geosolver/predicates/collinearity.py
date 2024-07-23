@@ -18,12 +18,16 @@ class Coll(Predicate):
     NAME = "coll"
 
     @classmethod
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+        if len(args) <= 2 or len(args) != len(set(args)):
+            raise IllegalPredicate
+        return tuple(sorted(args))
+
+    @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
-        if len(args) <= 2 or len(args) != len(set(args)):
-            raise IllegalPredicate
-        return tuple(dep_graph.symbols_graph.names2points(sorted(args)))
+        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
@@ -72,6 +76,10 @@ class NColl(Predicate):
     """
 
     NAME = "ncoll"
+
+    @classmethod
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+        return Coll.preparse(args)
 
     @classmethod
     def parse(

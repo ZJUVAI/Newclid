@@ -29,9 +29,7 @@ class ConstantAngle(Predicate):
     NAME = "aconst"
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
         a, b, c, d, y = args
         if a == b or c == d:
             raise IllegalPredicate
@@ -41,7 +39,17 @@ class ConstantAngle(Predicate):
         if (a, b) > (c, d):
             a, b, c, d = c, d, a, b
             f = -f
-        return tuple(dep_graph.symbols_graph.names2points((a, b, c, d))) + (f % 1,)
+        f %= 1
+        return (a, b, c, d, fraction_to_angle(f))
+
+    @classmethod
+    def parse(
+        cls, args: tuple[str, ...], dep_graph: DependencyGraph
+    ) -> tuple[Any, ...]:
+        a, b, c, d, f = cls.preparse(args)
+        return tuple(dep_graph.symbols_graph.names2points((a, b, c, d))) + (
+            str_to_fraction(f),
+        )
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:

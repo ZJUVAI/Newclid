@@ -26,13 +26,18 @@ class ConstantLength(Predicate):
     NAME = "lconst"
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
         a, b, length = args
         if a == b:
             raise IllegalPredicate
         a, b = sorted((a, b))
+        return (a, b, fraction_to_len(str_to_fraction(length)))
+
+    @classmethod
+    def parse(
+        cls, args: tuple[str, ...], dep_graph: DependencyGraph
+    ) -> tuple[Any, ...]:
+        a, b, length = cls.preparse(args)
         return tuple(dep_graph.symbols_graph.names2points((a, b))) + (
             str_to_fraction(length),
         )

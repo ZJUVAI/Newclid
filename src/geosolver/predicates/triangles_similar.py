@@ -34,6 +34,10 @@ class SimtriClock(Predicate):
     NAME = "simtri"
 
     @classmethod
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+        return two_triangles(*args)
+
+    @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
@@ -72,6 +76,10 @@ class SimtriReflect(Predicate):
     """
 
     NAME = "simtrir"
+
+    @classmethod
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+        return two_triangles(*args)
 
     @classmethod
     def parse(

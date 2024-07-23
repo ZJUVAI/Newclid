@@ -25,14 +25,18 @@ class PythagoreanPremises(Predicate):
     NAME = "PythagoreanPremises"
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
         a, b, c = args
         if a == b or a == c:
             raise IllegalPredicate
         b, c = sorted((b, c))
-        return tuple(dep_graph.symbols_graph.names2points((a, b, c)))
+        return (a, b, c)
+
+    @classmethod
+    def parse(
+        cls, args: tuple[str, ...], dep_graph: DependencyGraph
+    ) -> tuple[Any, ...]:
+        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
@@ -88,6 +92,10 @@ class PythagoreanPremises(Predicate):
 
 class PythagoreanConclusions(Predicate):
     NAME = "PythagoreanConclusions"
+
+    @classmethod
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+        return cls.preparse(args)
 
     @classmethod
     def parse(

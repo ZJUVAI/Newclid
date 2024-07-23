@@ -22,11 +22,14 @@ class Diff(Predicate):
     NAME = "diff"
 
     @classmethod
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(sorted(args))
+
+    @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
-        p, q = sorted(args)
-        return tuple(dep_graph.symbols_graph.names2points((p, q)))
+        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:

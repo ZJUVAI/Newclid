@@ -26,9 +26,7 @@ class ConstantRatio(Predicate):
     NAME = "rconst"
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
         a, b, c, d, r = args
         if a == b or c == d:
             raise IllegalPredicate
@@ -38,7 +36,16 @@ class ConstantRatio(Predicate):
         if (a, b) > (c, d):
             a, b, c, d = c, d, a, b
             f = 1 / f
-        return tuple(dep_graph.symbols_graph.names2points((a, b, c, d))) + (f,)
+        return (a, b, c, d, fraction_to_ratio(f))
+
+    @classmethod
+    def parse(
+        cls, args: tuple[str, ...], dep_graph: DependencyGraph
+    ) -> tuple[Any, ...]:
+        a, b, c, d, f = cls.preparse(args)
+        return tuple(dep_graph.symbols_graph.names2points((a, b, c, d))) + (
+            str_to_fraction(f),
+        )
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:

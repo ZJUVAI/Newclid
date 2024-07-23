@@ -18,14 +18,18 @@ class MidPoint(Predicate):
     NAME = "midp"
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
         if len(set(args)) != 3:
             raise IllegalPredicate
         m, a, b = args
         a, b = sorted((a, b))
-        return tuple(dep_graph.symbols_graph.names2points((m, a, b)))
+        return (m, a, b)
+
+    @classmethod
+    def parse(
+        cls, args: tuple[str, ...], dep_graph: DependencyGraph
+    ) -> tuple[Any, ...]:
+        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:

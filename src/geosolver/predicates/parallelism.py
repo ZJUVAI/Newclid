@@ -26,6 +26,10 @@ class Para(Predicate):
     NAME = "para"
 
     @classmethod
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+        return Cong().preparse(args)
+
+    @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
@@ -108,6 +112,10 @@ class NPara(Predicate):
     NAME = "npara"
 
     @classmethod
+    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+        return Para.preparse(args)
+
+    @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
     ) -> tuple[Any, ...]:
@@ -124,15 +132,6 @@ class NPara(Predicate):
     @classmethod
     def check(cls, statement: Statement) -> bool:
         return True
-
-    @classmethod
-    def to_constructive(cls, point: str, args: tuple[str, ...]) -> str:
-        a, b, c, d = args
-        if point in [c, d]:
-            a, b, c, d = c, d, a, b
-        if point == b:
-            a, b = b, a
-        return f"on_pline {a} {b} {c} {d}"
 
     @classmethod
     def pretty(cls, statement: Statement) -> str:
