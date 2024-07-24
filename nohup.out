@@ -1,0 +1,3270 @@
+INFO:root:Building proof from problem 'translated_imo_2011_p6_sol1_extra_points': Clause(points=('a', 'b', 'c'), sentences=(('triangle', 'a', 'b', 'c'),)); Clause(points=('o',), sentences=(('circle', 'o', 'a', 'b', 'c'),)); Clause(points=('p',), sentences=(('on_circle', 'p', 'o', 'a'),)); Clause(points=('q',), sentences=(('on_tline', 'q', 'p', 'o', 'p'),)); Clause(points=('pa',), sentences=(('reflect', 'pa', 'p', 'b', 'c'),)); Clause(points=('pb',), sentences=(('reflect', 'pb', 'p', 'c', 'a'),)); Clause(points=('pc',), sentences=(('reflect', 'pc', 'p', 'a', 'b'),)); Clause(points=('qa',), sentences=(('reflect', 'qa', 'q', 'b', 'c'),)); Clause(points=('qb',), sentences=(('reflect', 'qb', 'q', 'c', 'a'),)); Clause(points=('qc',), sentences=(('reflect', 'qc', 'q', 'a', 'b'),)); Clause(points=('a1',), sentences=(('on_line', 'a1', 'pb', 'qb'), ('on_line', 'a1', 'pc', 'qc'))); Clause(points=('b1',), sentences=(('on_line', 'b1', 'pa', 'qa'), ('on_line', 'b1', 'pc', 'qc'))); Clause(points=('c1',), sentences=(('on_line', 'c1', 'pa', 'qa'), ('on_line', 'c1', 'pb', 'qb'))); Clause(points=('o1',), sentences=(('circle', 'o1', 'a1', 'b1', 'c1'),)); Clause(points=('x',), sentences=(('on_circle', 'x', 'o', 'a'), ('on_circle', 'x', 'o1', 'a1'))); Clause(points=('a2',), sentences=(('eqdistance', 'a2', 'a', 'p', 'a'), ('on_circum', 'a2', 'a', 'b', 'c'))); Clause(points=('b2',), sentences=(('eqdistance', 'b2', 'b', 'p', 'b'), ('on_circum', 'b2', 'a', 'b', 'c'))); Clause(points=('c2',), sentences=(('eqdistance', 'c2', 'c', 'p', 'c'), ('on_circum', 'c2', 'a', 'b', 'c'))); Clause(points=('i2',), sentences=(('on_line', 'i2', 'b', 'b1'), ('on_line', 'i2', 'c', 'c1'))); Clause(points=('d',), sentences=(('on_line', 'd', 'p', 'q'), ('on_line', 'd', 'b', 'c'))); Clause(points=('e',), sentences=(('on_line', 'e', 'p', 'q'), ('on_line', 'e', 'a', 'c'))); Clause(points=('f',), sentences=(('on_line', 'f', 'p', 'q'), ('on_line', 'f', 'a', 'b'))) ? ('coll', 'x', 'o', 'o1'); ('para', 'pa', 'qa', 'b2', 'c2'); ('simtri', 'a1', 'b1', 'c1', 'a2', 'b2', 'c2'); ('coll', 'pa', 'b2', 'c'); ('cyclic', 'i2', 'a', 'b', 'c'); ('coll', 'c1', 'c', 'i2'); ('coll', 'c1', 'b1', 'pa'); ('coll', 'pa', 'b', 'c2'); ('coll', 'c1', 'c2', 'x'); ('coll', 'x', 'b1', 'b2'); ('coll', 'x', 'c1', 'c2')
+INFO:root:bfsddar : reload
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'b', 'a', 'r', 'p', 'q'), ('nsameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'b', 'a', 'r', 'p', 'q'), ('nsameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q') matching cache : before len(self.cache[theorem])=0 read=False write=True len(mappings)=0
+INFO:root:('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'b', 'a', 'r', 'p', 'q'), ('nsameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q') matching cache : now len(self.cache[theorem])=2 read=False write=True len(mappings)=4
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'a', 'b', 'r', 'p', 'q'), ('sameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'a', 'b', 'r', 'p', 'q'), ('sameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=8
+INFO:root:('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'a', 'b', 'r', 'p', 'q'), ('sameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q') matching cache : now len(self.cache[theorem])=4 read=True write=False len(mappings)=8
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('PythagoreanPremises', 'a', 'b', 'c') => ('PythagoreanConclusions', 'a', 'b', 'c')
+INFO:root:Start caching
+INFO:root:('PythagoreanPremises', 'a', 'b', 'c') => ('PythagoreanConclusions', 'a', 'b', 'c') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=8
+INFO:root:('PythagoreanPremises', 'a', 'b', 'c') => ('PythagoreanConclusions', 'a', 'b', 'c') matching cache : now len(self.cache[theorem])=4 read=True write=False len(mappings)=8
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('cyclic', 'A', 'B', 'C', 'D') => ('cong', 'O', 'A', 'O', 'D')
+INFO:root:Start caching
+INFO:root:('circle', 'O', 'A', 'B', 'C'), ('cyclic', 'A', 'B', 'C', 'D') => ('cong', 'O', 'A', 'O', 'D') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=3180
+INFO:root:('circle', 'O', 'A', 'B', 'C'), ('cyclic', 'A', 'B', 'C', 'D') => ('cong', 'O', 'A', 'O', 'D') matching cache : now len(self.cache[theorem])=1587 read=True write=False len(mappings)=3180
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 9
+INFO:root:bfsddar matching('para', 'a', 'b', 'c', 'd'), ('coll', 'm', 'a', 'd'), ('coll', 'n', 'b', 'c'), ('para', 'm', 'n', 'a', 'b'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'm', 'a', 'm', 'd', 'n', 'b', 'n', 'c')
+INFO:root:Start caching
+INFO:root:('para', 'a', 'b', 'c', 'd'), ('coll', 'm', 'a', 'd'), ('coll', 'n', 'b', 'c'), ('para', 'm', 'n', 'a', 'b'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'm', 'a', 'm', 'd', 'n', 'b', 'n', 'c') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:('para', 'a', 'b', 'c', 'd'), ('coll', 'm', 'a', 'd'), ('coll', 'n', 'b', 'c'), ('para', 'm', 'n', 'a', 'b'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'm', 'a', 'm', 'd', 'n', 'b', 'n', 'c') matching cache : now len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('coll', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:('midp', 'M', 'A', 'B') => ('coll', 'M', 'A', 'B') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:('midp', 'M', 'A', 'B') => ('coll', 'M', 'A', 'B') matching cache : now len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('cong', 'M', 'A', 'M', 'B')
+INFO:root:Start caching
+INFO:root:('midp', 'M', 'A', 'B') => ('cong', 'M', 'A', 'M', 'B') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:('midp', 'M', 'A', 'B') => ('cong', 'M', 'A', 'M', 'B') matching cache : now len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('rconst', 'M', 'A', 'A', 'B', '1/2')
+INFO:root:Start caching
+INFO:root:('midp', 'M', 'A', 'B') => ('rconst', 'M', 'A', 'A', 'B', '1/2') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:('midp', 'M', 'A', 'B') => ('rconst', 'M', 'A', 'A', 'B', '1/2') matching cache : now len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'M', 'A', 'M', 'B'), ('coll', 'M', 'A', 'B') => ('midp', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:('cong', 'M', 'A', 'M', 'B'), ('coll', 'M', 'A', 'B') => ('midp', 'M', 'A', 'B') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:('cong', 'M', 'A', 'M', 'B'), ('coll', 'M', 'A', 'B') => ('midp', 'M', 'A', 'B') matching cache : now len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'N', 'C', 'D') => ('eqratio', 'M', 'A', 'A', 'B', 'N', 'C', 'C', 'D')
+INFO:root:Start caching
+INFO:root:('midp', 'M', 'A', 'B'), ('midp', 'N', 'C', 'D') => ('eqratio', 'M', 'A', 'A', 'B', 'N', 'C', 'C', 'D') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:('midp', 'M', 'A', 'B'), ('midp', 'N', 'C', 'D') => ('eqratio', 'M', 'A', 'A', 'B', 'N', 'C', 'C', 'D') matching cache : now len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'A', 'C') => ('coll', 'A', 'B', 'C')
+INFO:root:Start caching
+INFO:root:('para', 'A', 'B', 'A', 'C') => ('coll', 'A', 'B', 'C') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=908
+INFO:root:('para', 'A', 'B', 'A', 'C') => ('coll', 'A', 'B', 'C') matching cache : now len(self.cache[theorem])=178 read=True write=False len(mappings)=908
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 81
+INFO:root:bfsddar matching('eqratio', 'O', 'A', 'A', 'C', 'O', 'B', 'B', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'A', 'B', 'C'), ('sameside', 'A', 'O', 'C', 'B', 'O', 'D') => ('para', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:('eqratio', 'O', 'A', 'A', 'C', 'O', 'B', 'B', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'A', 'B', 'C'), ('sameside', 'A', 'O', 'C', 'B', 'O', 'D') => ('para', 'A', 'B', 'C', 'D') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=38
+INFO:root:('eqratio', 'O', 'A', 'A', 'C', 'O', 'B', 'B', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'A', 'B', 'C'), ('sameside', 'A', 'O', 'C', 'B', 'O', 'D') => ('para', 'A', 'B', 'C', 'D') matching cache : now len(self.cache[theorem])=38 read=True write=False len(mappings)=38
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('para', 'A', 'C', 'B', 'D'), ('para', 'A', 'D', 'B', 'C') => ('midp', 'M', 'C', 'D')
+INFO:root:Start caching
+INFO:root:('midp', 'M', 'A', 'B'), ('para', 'A', 'C', 'B', 'D'), ('para', 'A', 'D', 'B', 'C') => ('midp', 'M', 'C', 'D') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:('midp', 'M', 'A', 'B'), ('para', 'A', 'C', 'B', 'D'), ('para', 'A', 'D', 'B', 'C') => ('midp', 'M', 'C', 'D') matching cache : now len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'M', 'C', 'D') => ('para', 'A', 'C', 'B', 'D')
+INFO:root:Start caching
+INFO:root:('midp', 'M', 'A', 'B'), ('midp', 'M', 'C', 'D') => ('para', 'A', 'C', 'B', 'D') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:('midp', 'M', 'A', 'B'), ('midp', 'M', 'C', 'D') => ('para', 'A', 'C', 'B', 'D') matching cache : now len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q'), ('cyclic', 'A', 'B', 'P', 'Q') => ('perp', 'P', 'A', 'A', 'Q')
+INFO:root:Start caching
+INFO:root:('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q'), ('cyclic', 'A', 'B', 'P', 'Q') => ('perp', 'P', 'A', 'A', 'Q') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=4
+INFO:root:('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q'), ('cyclic', 'A', 'B', 'P', 'Q') => ('perp', 'P', 'A', 'A', 'Q') matching cache : now len(self.cache[theorem])=2 read=True write=False len(mappings)=4
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q') => ('perp', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q') => ('perp', 'A', 'B', 'P', 'Q') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=12966
+INFO:root:('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q') => ('perp', 'A', 'B', 'P', 'Q') matching cache : now len(self.cache[theorem])=25 read=True write=False len(mappings)=12966
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('perp', 'O', 'M', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:('midp', 'M', 'A', 'B'), ('perp', 'O', 'M', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:('midp', 'M', 'A', 'B'), ('perp', 'O', 'M', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B') matching cache : now len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'D'), ('para', 'A', 'B', 'C', 'D') => ('eqangle', 'A', 'D', 'C', 'D', 'C', 'D', 'C', 'B')
+INFO:root:Start caching
+INFO:root:('cyclic', 'A', 'B', 'C', 'D'), ('para', 'A', 'B', 'C', 'D') => ('eqangle', 'A', 'D', 'C', 'D', 'C', 'D', 'C', 'B') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=48
+INFO:root:('cyclic', 'A', 'B', 'C', 'D'), ('para', 'A', 'B', 'C', 'D') => ('eqangle', 'A', 'D', 'C', 'D', 'C', 'D', 'C', 'B') matching cache : now len(self.cache[theorem])=24 read=True write=False len(mappings)=48
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'O', 'A', 'C') => ('perp', 'A', 'B', 'B', 'C')
+INFO:root:Start caching
+INFO:root:('circle', 'O', 'A', 'B', 'C'), ('coll', 'O', 'A', 'C') => ('perp', 'A', 'B', 'B', 'C') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:('circle', 'O', 'A', 'B', 'C'), ('coll', 'O', 'A', 'C') => ('perp', 'A', 'B', 'B', 'C') matching cache : now len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('perp', 'A', 'B', 'B', 'C'), ('midp', 'M', 'A', 'C') => ('cong', 'A', 'M', 'B', 'M')
+INFO:root:Start caching
+INFO:root:('perp', 'A', 'B', 'B', 'C'), ('midp', 'M', 'A', 'C') => ('cong', 'A', 'M', 'B', 'M') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:('perp', 'A', 'B', 'B', 'C'), ('midp', 'M', 'A', 'C') => ('cong', 'A', 'M', 'B', 'M') matching cache : now len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'M', 'B', 'C'), ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M') => ('midp', 'M', 'B', 'C')
+INFO:root:Start caching
+INFO:root:('circle', 'O', 'A', 'B', 'C'), ('coll', 'M', 'B', 'C'), ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M') => ('midp', 'M', 'B', 'C') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:('circle', 'O', 'A', 'B', 'C'), ('coll', 'M', 'B', 'C'), ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M') => ('midp', 'M', 'B', 'C') matching cache : now len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('midp', 'M', 'B', 'C') => ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M')
+INFO:root:Start caching
+INFO:root:('circle', 'O', 'A', 'B', 'C'), ('midp', 'M', 'B', 'C') => ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:('circle', 'O', 'A', 'B', 'C'), ('midp', 'M', 'B', 'C') => ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M') matching cache : now len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B') => ('perp', 'O', 'A', 'A', 'X')
+INFO:root:Start caching
+INFO:root:('circle', 'O', 'A', 'B', 'C'), ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B') => ('perp', 'O', 'A', 'A', 'X') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=224
+INFO:root:('circle', 'O', 'A', 'B', 'C'), ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B') => ('perp', 'O', 'A', 'A', 'X') matching cache : now len(self.cache[theorem])=224 read=True write=False len(mappings)=224
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('perp', 'O', 'A', 'A', 'X') => ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B')
+INFO:root:Start caching
+INFO:root:('circle', 'O', 'A', 'B', 'C'), ('perp', 'O', 'A', 'A', 'X') => ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=226
+INFO:root:('circle', 'O', 'A', 'B', 'C'), ('perp', 'O', 'A', 'A', 'X') => ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B') matching cache : now len(self.cache[theorem])=226 read=True write=False len(mappings)=226
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 48
+INFO:root:bfsddar matching('eqangle', 'A', 'O', 'A', 'B', 'B', 'A', 'B', 'O'), ('ncoll', 'O', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:('eqangle', 'A', 'O', 'A', 'B', 'B', 'A', 'B', 'O'), ('ncoll', 'O', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=178
+INFO:root:('eqangle', 'A', 'O', 'A', 'B', 'B', 'A', 'B', 'O'), ('ncoll', 'O', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B') matching cache : now len(self.cache[theorem])=89 read=True write=False len(mappings)=178
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('ncoll', 'O', 'A', 'B') => ('eqangle', 'O', 'A', 'A', 'B', 'A', 'B', 'O', 'B')
+INFO:root:Start caching
+INFO:root:('cong', 'O', 'A', 'O', 'B'), ('ncoll', 'O', 'A', 'B') => ('eqangle', 'O', 'A', 'A', 'B', 'A', 'B', 'O', 'B') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=170
+INFO:root:('cong', 'O', 'A', 'O', 'B'), ('ncoll', 'O', 'A', 'B') => ('eqangle', 'O', 'A', 'A', 'B', 'A', 'B', 'O', 'B') matching cache : now len(self.cache[theorem])=85 read=True write=False len(mappings)=170
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 43
+INFO:root:bfsddar matching('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c')
+INFO:root:Start caching
+INFO:root:('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=28
+INFO:root:('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c') matching cache : now len(self.cache[theorem])=14 read=True write=False len(mappings)=28
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c')
+INFO:root:Start caching
+INFO:root:('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=12
+INFO:root:('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c') matching cache : now len(self.cache[theorem])=6 read=True write=False len(mappings)=12
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'C', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'O', 'A', 'B') => ('eqratio3', 'A', 'B', 'C', 'D', 'O', 'O')
+INFO:root:Start caching
+INFO:root:('para', 'A', 'B', 'C', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'O', 'A', 'B') => ('eqratio3', 'A', 'B', 'C', 'D', 'O', 'O') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=40
+INFO:root:('para', 'A', 'B', 'C', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'O', 'A', 'B') => ('eqratio3', 'A', 'B', 'C', 'D', 'O', 'O') matching cache : now len(self.cache[theorem])=20 read=True write=False len(mappings)=40
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'E', 'A', 'B'), ('midp', 'F', 'A', 'C') => ('para', 'E', 'F', 'B', 'C')
+INFO:root:Start caching
+INFO:root:('midp', 'E', 'A', 'B'), ('midp', 'F', 'A', 'C') => ('para', 'E', 'F', 'B', 'C') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:('midp', 'E', 'A', 'B'), ('midp', 'F', 'A', 'C') => ('para', 'E', 'F', 'B', 'C') matching cache : now len(self.cache[theorem])=0 read=True write=False len(mappings)=0
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q') => ('cong', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:('cyclic', 'A', 'B', 'C', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q') => ('cong', 'A', 'B', 'P', 'Q') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=424
+INFO:root:('cyclic', 'A', 'B', 'C', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q') => ('cong', 'A', 'B', 'P', 'Q') matching cache : now len(self.cache[theorem])=106 read=True write=False len(mappings)=424
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('cong', 'O', 'B', 'O', 'C'), ('cong', 'O', 'C', 'O', 'D') => ('cyclic', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:('cong', 'O', 'A', 'O', 'B'), ('cong', 'O', 'B', 'O', 'C'), ('cong', 'O', 'C', 'O', 'D') => ('cyclic', 'A', 'B', 'C', 'D') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=8738
+INFO:root:('cong', 'O', 'A', 'O', 'B'), ('cong', 'O', 'B', 'O', 'C'), ('cong', 'O', 'C', 'O', 'D') => ('cyclic', 'A', 'B', 'C', 'D') matching cache : now len(self.cache[theorem])=1572 read=True write=False len(mappings)=8738
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 108
+INFO:root:bfsddar matching('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B'), ('ncoll', 'P', 'Q', 'A', 'B') => ('cyclic', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B'), ('ncoll', 'P', 'Q', 'A', 'B') => ('cyclic', 'A', 'B', 'P', 'Q') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=4064
+INFO:root:('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B'), ('ncoll', 'P', 'Q', 'A', 'B') => ('cyclic', 'A', 'B', 'P', 'Q') matching cache : now len(self.cache[theorem])=1016 read=True write=False len(mappings)=4064
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'P', 'Q') => ('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B')
+INFO:root:Start caching
+INFO:root:('cyclic', 'A', 'B', 'P', 'Q') => ('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=7008
+INFO:root:('cyclic', 'A', 'B', 'P', 'Q') => ('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B') matching cache : now len(self.cache[theorem])=1752 read=True write=False len(mappings)=7008
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 90
+INFO:root:bfsddar matching('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=2046
+INFO:root:('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R') matching cache : now len(self.cache[theorem])=1110 read=True write=False len(mappings)=2046
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=13338
+INFO:root:('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R') matching cache : now len(self.cache[theorem])=12570 read=True write=False len(mappings)=13338
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=2186
+INFO:root:('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') matching cache : now len(self.cache[theorem])=1178 read=True write=False len(mappings)=2186
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 86
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=13458
+INFO:root:('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') matching cache : now len(self.cache[theorem])=12630 read=True write=False len(mappings)=13458
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 11802
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=2054
+INFO:root:('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') matching cache : now len(self.cache[theorem])=1114 read=True write=False len(mappings)=2054
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 208
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=13338
+INFO:root:('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') matching cache : now len(self.cache[theorem])=12570 read=True write=False len(mappings)=13338
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 11802
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'Q', 'R', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'Q', 'R', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=2318
+INFO:root:('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'Q', 'R', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') matching cache : now len(self.cache[theorem])=1248 read=True write=False len(mappings)=2318
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') matching cache : before len(self.cache[theorem])=0 read=True write=False len(mappings)=13534
+INFO:root:('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') matching cache : now len(self.cache[theorem])=12668 read=True write=False len(mappings)=13534
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 11802
+INFO:root:bfsddar : reload
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'b', 'a', 'r', 'p', 'q'), ('nsameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'a', 'b', 'r', 'p', 'q'), ('sameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('PythagoreanPremises', 'a', 'b', 'c') => ('PythagoreanConclusions', 'a', 'b', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('cyclic', 'A', 'B', 'C', 'D') => ('cong', 'O', 'A', 'O', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 879
+INFO:root:bfsddar matching('para', 'a', 'b', 'c', 'd'), ('coll', 'm', 'a', 'd'), ('coll', 'n', 'b', 'c'), ('para', 'm', 'n', 'a', 'b'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'm', 'a', 'm', 'd', 'n', 'b', 'n', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('coll', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('cong', 'M', 'A', 'M', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('rconst', 'M', 'A', 'A', 'B', '1/2')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'M', 'A', 'M', 'B'), ('coll', 'M', 'A', 'B') => ('midp', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'N', 'C', 'D') => ('eqratio', 'M', 'A', 'A', 'B', 'N', 'C', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'A', 'C') => ('coll', 'A', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 74
+INFO:root:bfsddar matching('eqratio', 'O', 'A', 'A', 'C', 'O', 'B', 'B', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'A', 'B', 'C'), ('sameside', 'A', 'O', 'C', 'B', 'O', 'D') => ('para', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('para', 'A', 'C', 'B', 'D'), ('para', 'A', 'D', 'B', 'C') => ('midp', 'M', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'M', 'C', 'D') => ('para', 'A', 'C', 'B', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q'), ('cyclic', 'A', 'B', 'P', 'Q') => ('perp', 'P', 'A', 'A', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q') => ('perp', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 9
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('perp', 'O', 'M', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'D'), ('para', 'A', 'B', 'C', 'D') => ('eqangle', 'A', 'D', 'C', 'D', 'C', 'D', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'O', 'A', 'C') => ('perp', 'A', 'B', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('perp', 'A', 'B', 'B', 'C'), ('midp', 'M', 'A', 'C') => ('cong', 'A', 'M', 'B', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'M', 'B', 'C'), ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M') => ('midp', 'M', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('midp', 'M', 'B', 'C') => ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B') => ('perp', 'O', 'A', 'A', 'X')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 48
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('perp', 'O', 'A', 'A', 'X') => ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 120
+INFO:root:bfsddar matching('eqangle', 'A', 'O', 'A', 'B', 'B', 'A', 'B', 'O'), ('ncoll', 'O', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 43
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('ncoll', 'O', 'A', 'B') => ('eqangle', 'O', 'A', 'A', 'B', 'A', 'B', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 18
+INFO:root:bfsddar matching('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'C', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'O', 'A', 'B') => ('eqratio3', 'A', 'B', 'C', 'D', 'O', 'O')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'E', 'A', 'B'), ('midp', 'F', 'A', 'C') => ('para', 'E', 'F', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q') => ('cong', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('cong', 'O', 'B', 'O', 'C'), ('cong', 'O', 'C', 'O', 'D') => ('cyclic', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 879
+INFO:root:bfsddar matching('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B'), ('ncoll', 'P', 'Q', 'A', 'B') => ('cyclic', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 180
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'P', 'Q') => ('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 354
+INFO:root:bfsddar matching('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 208
+INFO:root:bfsddar matching('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 11802
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 328
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 11844
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 249
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 11820
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'Q', 'R', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 352
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 9961
+INFO:root:bfsddar : reload
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'b', 'a', 'r', 'p', 'q'), ('nsameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'a', 'b', 'r', 'p', 'q'), ('sameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('PythagoreanPremises', 'a', 'b', 'c') => ('PythagoreanConclusions', 'a', 'b', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('cyclic', 'A', 'B', 'C', 'D') => ('cong', 'O', 'A', 'O', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 879
+INFO:root:bfsddar matching('para', 'a', 'b', 'c', 'd'), ('coll', 'm', 'a', 'd'), ('coll', 'n', 'b', 'c'), ('para', 'm', 'n', 'a', 'b'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'm', 'a', 'm', 'd', 'n', 'b', 'n', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('coll', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('cong', 'M', 'A', 'M', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('rconst', 'M', 'A', 'A', 'B', '1/2')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'M', 'A', 'M', 'B'), ('coll', 'M', 'A', 'B') => ('midp', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'N', 'C', 'D') => ('eqratio', 'M', 'A', 'A', 'B', 'N', 'C', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'A', 'C') => ('coll', 'A', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 91
+INFO:root:bfsddar matching('eqratio', 'O', 'A', 'A', 'C', 'O', 'B', 'B', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'A', 'B', 'C'), ('sameside', 'A', 'O', 'C', 'B', 'O', 'D') => ('para', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('para', 'A', 'C', 'B', 'D'), ('para', 'A', 'D', 'B', 'C') => ('midp', 'M', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'M', 'C', 'D') => ('para', 'A', 'C', 'B', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q'), ('cyclic', 'A', 'B', 'P', 'Q') => ('perp', 'P', 'A', 'A', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q') => ('perp', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('perp', 'O', 'M', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'D'), ('para', 'A', 'B', 'C', 'D') => ('eqangle', 'A', 'D', 'C', 'D', 'C', 'D', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'O', 'A', 'C') => ('perp', 'A', 'B', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('perp', 'A', 'B', 'B', 'C'), ('midp', 'M', 'A', 'C') => ('cong', 'A', 'M', 'B', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'M', 'B', 'C'), ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M') => ('midp', 'M', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('midp', 'M', 'B', 'C') => ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B') => ('perp', 'O', 'A', 'A', 'X')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 168
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('perp', 'O', 'A', 'A', 'X') => ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqangle', 'A', 'O', 'A', 'B', 'B', 'A', 'B', 'O'), ('ncoll', 'O', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 61
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('ncoll', 'O', 'A', 'B') => ('eqangle', 'O', 'A', 'A', 'B', 'A', 'B', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'C', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'O', 'A', 'B') => ('eqratio3', 'A', 'B', 'C', 'D', 'O', 'O')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'E', 'A', 'B'), ('midp', 'F', 'A', 'C') => ('para', 'E', 'F', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q') => ('cong', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('cong', 'O', 'B', 'O', 'C'), ('cong', 'O', 'C', 'O', 'D') => ('cyclic', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 879
+INFO:root:bfsddar matching('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B'), ('ncoll', 'P', 'Q', 'A', 'B') => ('cyclic', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 444
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'P', 'Q') => ('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 90
+INFO:root:bfsddar matching('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 586
+INFO:root:bfsddar matching('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 11964
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 376
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 11877
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 228
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 11817
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'Q', 'R', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 490
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 10048
+INFO:root:bfsddar : reload
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'b', 'a', 'r', 'p', 'q'), ('nsameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'a', 'b', 'r', 'p', 'q'), ('sameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('PythagoreanPremises', 'a', 'b', 'c') => ('PythagoreanConclusions', 'a', 'b', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('cyclic', 'A', 'B', 'C', 'D') => ('cong', 'O', 'A', 'O', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 879
+INFO:root:bfsddar matching('para', 'a', 'b', 'c', 'd'), ('coll', 'm', 'a', 'd'), ('coll', 'n', 'b', 'c'), ('para', 'm', 'n', 'a', 'b'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'm', 'a', 'm', 'd', 'n', 'b', 'n', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('coll', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('cong', 'M', 'A', 'M', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('rconst', 'M', 'A', 'A', 'B', '1/2')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'M', 'A', 'M', 'B'), ('coll', 'M', 'A', 'B') => ('midp', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'N', 'C', 'D') => ('eqratio', 'M', 'A', 'A', 'B', 'N', 'C', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'A', 'C') => ('coll', 'A', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 106
+INFO:root:bfsddar matching('eqratio', 'O', 'A', 'A', 'C', 'O', 'B', 'B', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'A', 'B', 'C'), ('sameside', 'A', 'O', 'C', 'B', 'O', 'D') => ('para', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('para', 'A', 'C', 'B', 'D'), ('para', 'A', 'D', 'B', 'C') => ('midp', 'M', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'M', 'C', 'D') => ('para', 'A', 'C', 'B', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q'), ('cyclic', 'A', 'B', 'P', 'Q') => ('perp', 'P', 'A', 'A', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q') => ('perp', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 18
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('perp', 'O', 'M', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'D'), ('para', 'A', 'B', 'C', 'D') => ('eqangle', 'A', 'D', 'C', 'D', 'C', 'D', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'O', 'A', 'C') => ('perp', 'A', 'B', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('perp', 'A', 'B', 'B', 'C'), ('midp', 'M', 'A', 'C') => ('cong', 'A', 'M', 'B', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'M', 'B', 'C'), ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M') => ('midp', 'M', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('midp', 'M', 'B', 'C') => ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B') => ('perp', 'O', 'A', 'A', 'X')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 168
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('perp', 'O', 'A', 'A', 'X') => ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqangle', 'A', 'O', 'A', 'B', 'B', 'A', 'B', 'O'), ('ncoll', 'O', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 67
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('ncoll', 'O', 'A', 'B') => ('eqangle', 'O', 'A', 'A', 'B', 'A', 'B', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'C', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'O', 'A', 'B') => ('eqratio3', 'A', 'B', 'C', 'D', 'O', 'O')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'E', 'A', 'B'), ('midp', 'F', 'A', 'C') => ('para', 'E', 'F', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q') => ('cong', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('cong', 'O', 'B', 'O', 'C'), ('cong', 'O', 'C', 'O', 'D') => ('cyclic', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 879
+INFO:root:bfsddar matching('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B'), ('ncoll', 'P', 'Q', 'A', 'B') => ('cyclic', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 474
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'P', 'Q') => ('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 90
+INFO:root:bfsddar matching('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 508
+INFO:root:bfsddar matching('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 11997
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 712
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12051
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 648
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12033
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'Q', 'R', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 754
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 10129
+INFO:root:bfsddar : reload
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'b', 'a', 'r', 'p', 'q'), ('nsameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'a', 'b', 'r', 'p', 'q'), ('sameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('PythagoreanPremises', 'a', 'b', 'c') => ('PythagoreanConclusions', 'a', 'b', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('cyclic', 'A', 'B', 'C', 'D') => ('cong', 'O', 'A', 'O', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 879
+INFO:root:bfsddar matching('para', 'a', 'b', 'c', 'd'), ('coll', 'm', 'a', 'd'), ('coll', 'n', 'b', 'c'), ('para', 'm', 'n', 'a', 'b'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'm', 'a', 'm', 'd', 'n', 'b', 'n', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('coll', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('cong', 'M', 'A', 'M', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('rconst', 'M', 'A', 'A', 'B', '1/2')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'M', 'A', 'M', 'B'), ('coll', 'M', 'A', 'B') => ('midp', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'N', 'C', 'D') => ('eqratio', 'M', 'A', 'A', 'B', 'N', 'C', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'A', 'C') => ('coll', 'A', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 112
+INFO:root:bfsddar matching('eqratio', 'O', 'A', 'A', 'C', 'O', 'B', 'B', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'A', 'B', 'C'), ('sameside', 'A', 'O', 'C', 'B', 'O', 'D') => ('para', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('para', 'A', 'C', 'B', 'D'), ('para', 'A', 'D', 'B', 'C') => ('midp', 'M', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'M', 'C', 'D') => ('para', 'A', 'C', 'B', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q'), ('cyclic', 'A', 'B', 'P', 'Q') => ('perp', 'P', 'A', 'A', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q') => ('perp', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('perp', 'O', 'M', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'D'), ('para', 'A', 'B', 'C', 'D') => ('eqangle', 'A', 'D', 'C', 'D', 'C', 'D', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'O', 'A', 'C') => ('perp', 'A', 'B', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('perp', 'A', 'B', 'B', 'C'), ('midp', 'M', 'A', 'C') => ('cong', 'A', 'M', 'B', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'M', 'B', 'C'), ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M') => ('midp', 'M', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('midp', 'M', 'B', 'C') => ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B') => ('perp', 'O', 'A', 'A', 'X')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 168
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('perp', 'O', 'A', 'A', 'X') => ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqangle', 'A', 'O', 'A', 'B', 'B', 'A', 'B', 'O'), ('ncoll', 'O', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 67
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('ncoll', 'O', 'A', 'B') => ('eqangle', 'O', 'A', 'A', 'B', 'A', 'B', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'C', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'O', 'A', 'B') => ('eqratio3', 'A', 'B', 'C', 'D', 'O', 'O')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('midp', 'E', 'A', 'B'), ('midp', 'F', 'A', 'C') => ('para', 'E', 'F', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q') => ('cong', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('cong', 'O', 'B', 'O', 'C'), ('cong', 'O', 'C', 'O', 'D') => ('cyclic', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 879
+INFO:root:bfsddar matching('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B'), ('ncoll', 'P', 'Q', 'A', 'B') => ('cyclic', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 465
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'P', 'Q') => ('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 144
+INFO:root:bfsddar matching('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 625
+INFO:root:bfsddar matching('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12051
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 742
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12099
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 684
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12087
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'Q', 'R', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 730
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 10116
+INFO:root:bfsddar : reload
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'b', 'a', 'r', 'p', 'q'), ('nsameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'a', 'b', 'r', 'p', 'q'), ('sameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('PythagoreanPremises', 'a', 'b', 'c') => ('PythagoreanConclusions', 'a', 'b', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('cyclic', 'A', 'B', 'C', 'D') => ('cong', 'O', 'A', 'O', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 879
+INFO:root:bfsddar matching('para', 'a', 'b', 'c', 'd'), ('coll', 'm', 'a', 'd'), ('coll', 'n', 'b', 'c'), ('para', 'm', 'n', 'a', 'b'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'm', 'a', 'm', 'd', 'n', 'b', 'n', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('coll', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('cong', 'M', 'A', 'M', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('rconst', 'M', 'A', 'A', 'B', '1/2')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'M', 'A', 'M', 'B'), ('coll', 'M', 'A', 'B') => ('midp', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'N', 'C', 'D') => ('eqratio', 'M', 'A', 'A', 'B', 'N', 'C', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'A', 'C') => ('coll', 'A', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 109
+INFO:root:bfsddar matching('eqratio', 'O', 'A', 'A', 'C', 'O', 'B', 'B', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'A', 'B', 'C'), ('sameside', 'A', 'O', 'C', 'B', 'O', 'D') => ('para', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('para', 'A', 'C', 'B', 'D'), ('para', 'A', 'D', 'B', 'C') => ('midp', 'M', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'M', 'C', 'D') => ('para', 'A', 'C', 'B', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q'), ('cyclic', 'A', 'B', 'P', 'Q') => ('perp', 'P', 'A', 'A', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q') => ('perp', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('perp', 'O', 'M', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'D'), ('para', 'A', 'B', 'C', 'D') => ('eqangle', 'A', 'D', 'C', 'D', 'C', 'D', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'O', 'A', 'C') => ('perp', 'A', 'B', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('perp', 'A', 'B', 'B', 'C'), ('midp', 'M', 'A', 'C') => ('cong', 'A', 'M', 'B', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'M', 'B', 'C'), ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M') => ('midp', 'M', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('midp', 'M', 'B', 'C') => ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B') => ('perp', 'O', 'A', 'A', 'X')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 168
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('perp', 'O', 'A', 'A', 'X') => ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqangle', 'A', 'O', 'A', 'B', 'B', 'A', 'B', 'O'), ('ncoll', 'O', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 67
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('ncoll', 'O', 'A', 'B') => ('eqangle', 'O', 'A', 'A', 'B', 'A', 'B', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'C', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'O', 'A', 'B') => ('eqratio3', 'A', 'B', 'C', 'D', 'O', 'O')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 3
+INFO:root:bfsddar matching('midp', 'E', 'A', 'B'), ('midp', 'F', 'A', 'C') => ('para', 'E', 'F', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q') => ('cong', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('cong', 'O', 'B', 'O', 'C'), ('cong', 'O', 'C', 'O', 'D') => ('cyclic', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 879
+INFO:root:bfsddar matching('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B'), ('ncoll', 'P', 'Q', 'A', 'B') => ('cyclic', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 501
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'P', 'Q') => ('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 120
+INFO:root:bfsddar matching('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 613
+INFO:root:bfsddar matching('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12036
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 766
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12129
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 720
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12129
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'Q', 'R', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 730
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 10122
+INFO:root:bfsddar : reload
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'b', 'a', 'r', 'p', 'q'), ('nsameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'a', 'b', 'r', 'p', 'q'), ('sameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('PythagoreanPremises', 'a', 'b', 'c') => ('PythagoreanConclusions', 'a', 'b', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('cyclic', 'A', 'B', 'C', 'D') => ('cong', 'O', 'A', 'O', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 1047
+INFO:root:bfsddar matching('para', 'a', 'b', 'c', 'd'), ('coll', 'm', 'a', 'd'), ('coll', 'n', 'b', 'c'), ('para', 'm', 'n', 'a', 'b'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'm', 'a', 'm', 'd', 'n', 'b', 'n', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('coll', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('cong', 'M', 'A', 'M', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('rconst', 'M', 'A', 'A', 'B', '1/2')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'M', 'A', 'M', 'B'), ('coll', 'M', 'A', 'B') => ('midp', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'N', 'C', 'D') => ('eqratio', 'M', 'A', 'A', 'B', 'N', 'C', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'A', 'C') => ('coll', 'A', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 109
+INFO:root:bfsddar matching('eqratio', 'O', 'A', 'A', 'C', 'O', 'B', 'B', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'A', 'B', 'C'), ('sameside', 'A', 'O', 'C', 'B', 'O', 'D') => ('para', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('para', 'A', 'C', 'B', 'D'), ('para', 'A', 'D', 'B', 'C') => ('midp', 'M', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'M', 'C', 'D') => ('para', 'A', 'C', 'B', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q'), ('cyclic', 'A', 'B', 'P', 'Q') => ('perp', 'P', 'A', 'A', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q') => ('perp', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('perp', 'O', 'M', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'D'), ('para', 'A', 'B', 'C', 'D') => ('eqangle', 'A', 'D', 'C', 'D', 'C', 'D', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'O', 'A', 'C') => ('perp', 'A', 'B', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('perp', 'A', 'B', 'B', 'C'), ('midp', 'M', 'A', 'C') => ('cong', 'A', 'M', 'B', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'M', 'B', 'C'), ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M') => ('midp', 'M', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('midp', 'M', 'B', 'C') => ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B') => ('perp', 'O', 'A', 'A', 'X')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 168
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('perp', 'O', 'A', 'A', 'X') => ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqangle', 'A', 'O', 'A', 'B', 'B', 'A', 'B', 'O'), ('ncoll', 'O', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 67
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('ncoll', 'O', 'A', 'B') => ('eqangle', 'O', 'A', 'A', 'B', 'A', 'B', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'C', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'O', 'A', 'B') => ('eqratio3', 'A', 'B', 'C', 'D', 'O', 'O')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 3
+INFO:root:bfsddar matching('midp', 'E', 'A', 'B'), ('midp', 'F', 'A', 'C') => ('para', 'E', 'F', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q') => ('cong', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('cong', 'O', 'B', 'O', 'C'), ('cong', 'O', 'C', 'O', 'D') => ('cyclic', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 879
+INFO:root:bfsddar matching('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B'), ('ncoll', 'P', 'Q', 'A', 'B') => ('cyclic', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 495
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'P', 'Q') => ('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 456
+INFO:root:bfsddar matching('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 613
+INFO:root:bfsddar matching('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12042
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 766
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12129
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 720
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12129
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'Q', 'R', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 730
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 10121
+INFO:root:bfsddar : reload
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'b', 'a', 'r', 'p', 'q'), ('nsameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'a', 'b', 'r', 'p', 'q'), ('sameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('PythagoreanPremises', 'a', 'b', 'c') => ('PythagoreanConclusions', 'a', 'b', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('cyclic', 'A', 'B', 'C', 'D') => ('cong', 'O', 'A', 'O', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 1543
+INFO:root:bfsddar matching('para', 'a', 'b', 'c', 'd'), ('coll', 'm', 'a', 'd'), ('coll', 'n', 'b', 'c'), ('para', 'm', 'n', 'a', 'b'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'm', 'a', 'm', 'd', 'n', 'b', 'n', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('coll', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('cong', 'M', 'A', 'M', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('rconst', 'M', 'A', 'A', 'B', '1/2')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'M', 'A', 'M', 'B'), ('coll', 'M', 'A', 'B') => ('midp', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'N', 'C', 'D') => ('eqratio', 'M', 'A', 'A', 'B', 'N', 'C', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'A', 'C') => ('coll', 'A', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 110
+INFO:root:bfsddar matching('eqratio', 'O', 'A', 'A', 'C', 'O', 'B', 'B', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'A', 'B', 'C'), ('sameside', 'A', 'O', 'C', 'B', 'O', 'D') => ('para', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('para', 'A', 'C', 'B', 'D'), ('para', 'A', 'D', 'B', 'C') => ('midp', 'M', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'M', 'C', 'D') => ('para', 'A', 'C', 'B', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q'), ('cyclic', 'A', 'B', 'P', 'Q') => ('perp', 'P', 'A', 'A', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q') => ('perp', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('perp', 'O', 'M', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'D'), ('para', 'A', 'B', 'C', 'D') => ('eqangle', 'A', 'D', 'C', 'D', 'C', 'D', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'O', 'A', 'C') => ('perp', 'A', 'B', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('perp', 'A', 'B', 'B', 'C'), ('midp', 'M', 'A', 'C') => ('cong', 'A', 'M', 'B', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'M', 'B', 'C'), ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M') => ('midp', 'M', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('midp', 'M', 'B', 'C') => ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B') => ('perp', 'O', 'A', 'A', 'X')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 224
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('perp', 'O', 'A', 'A', 'X') => ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 56
+INFO:root:bfsddar matching('eqangle', 'A', 'O', 'A', 'B', 'B', 'A', 'B', 'O'), ('ncoll', 'O', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 67
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('ncoll', 'O', 'A', 'B') => ('eqangle', 'O', 'A', 'A', 'B', 'A', 'B', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 14
+INFO:root:bfsddar matching('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'C', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'O', 'A', 'B') => ('eqratio3', 'A', 'B', 'C', 'D', 'O', 'O')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 3
+INFO:root:bfsddar matching('midp', 'E', 'A', 'B'), ('midp', 'F', 'A', 'C') => ('para', 'E', 'F', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q') => ('cong', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('cong', 'O', 'B', 'O', 'C'), ('cong', 'O', 'C', 'O', 'D') => ('cyclic', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 1551
+INFO:root:bfsddar matching('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B'), ('ncoll', 'P', 'Q', 'A', 'B') => ('cyclic', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 819
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'P', 'Q') => ('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 132
+INFO:root:bfsddar matching('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 613
+INFO:root:bfsddar matching('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12039
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 782
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12139
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 752
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12135
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'Q', 'R', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 730
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 10139
+INFO:root:bfsddar : reload
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'b', 'a', 'r', 'p', 'q'), ('nsameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'a', 'b', 'r', 'p', 'q'), ('sameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('PythagoreanPremises', 'a', 'b', 'c') => ('PythagoreanConclusions', 'a', 'b', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('cyclic', 'A', 'B', 'C', 'D') => ('cong', 'O', 'A', 'O', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 1543
+INFO:root:bfsddar matching('para', 'a', 'b', 'c', 'd'), ('coll', 'm', 'a', 'd'), ('coll', 'n', 'b', 'c'), ('para', 'm', 'n', 'a', 'b'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'm', 'a', 'm', 'd', 'n', 'b', 'n', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('coll', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('cong', 'M', 'A', 'M', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('rconst', 'M', 'A', 'A', 'B', '1/2')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'M', 'A', 'M', 'B'), ('coll', 'M', 'A', 'B') => ('midp', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'N', 'C', 'D') => ('eqratio', 'M', 'A', 'A', 'B', 'N', 'C', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'A', 'C') => ('coll', 'A', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 111
+INFO:root:bfsddar matching('eqratio', 'O', 'A', 'A', 'C', 'O', 'B', 'B', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'A', 'B', 'C'), ('sameside', 'A', 'O', 'C', 'B', 'O', 'D') => ('para', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('para', 'A', 'C', 'B', 'D'), ('para', 'A', 'D', 'B', 'C') => ('midp', 'M', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'M', 'C', 'D') => ('para', 'A', 'C', 'B', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q'), ('cyclic', 'A', 'B', 'P', 'Q') => ('perp', 'P', 'A', 'A', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q') => ('perp', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('perp', 'O', 'M', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'D'), ('para', 'A', 'B', 'C', 'D') => ('eqangle', 'A', 'D', 'C', 'D', 'C', 'D', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'O', 'A', 'C') => ('perp', 'A', 'B', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('perp', 'A', 'B', 'B', 'C'), ('midp', 'M', 'A', 'C') => ('cong', 'A', 'M', 'B', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'M', 'B', 'C'), ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M') => ('midp', 'M', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('midp', 'M', 'B', 'C') => ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B') => ('perp', 'O', 'A', 'A', 'X')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 224
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('perp', 'O', 'A', 'A', 'X') => ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 56
+INFO:root:bfsddar matching('eqangle', 'A', 'O', 'A', 'B', 'B', 'A', 'B', 'O'), ('ncoll', 'O', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 75
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('ncoll', 'O', 'A', 'B') => ('eqangle', 'O', 'A', 'A', 'B', 'A', 'B', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'C', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'O', 'A', 'B') => ('eqratio3', 'A', 'B', 'C', 'D', 'O', 'O')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 3
+INFO:root:bfsddar matching('midp', 'E', 'A', 'B'), ('midp', 'F', 'A', 'C') => ('para', 'E', 'F', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q') => ('cong', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('cong', 'O', 'B', 'O', 'C'), ('cong', 'O', 'C', 'O', 'D') => ('cyclic', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 1551
+INFO:root:bfsddar matching('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B'), ('ncoll', 'P', 'Q', 'A', 'B') => ('cyclic', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 819
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'P', 'Q') => ('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 132
+INFO:root:bfsddar matching('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 645
+INFO:root:bfsddar matching('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12069
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 798
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12137
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 744
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12135
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'Q', 'R', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 762
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 10148
+INFO:root:bfsddar : reload
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'b', 'a', 'r', 'p', 'q'), ('nsameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'a', 'b', 'r', 'p', 'q'), ('sameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('PythagoreanPremises', 'a', 'b', 'c') => ('PythagoreanConclusions', 'a', 'b', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('cyclic', 'A', 'B', 'C', 'D') => ('cong', 'O', 'A', 'O', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 1543
+INFO:root:bfsddar matching('para', 'a', 'b', 'c', 'd'), ('coll', 'm', 'a', 'd'), ('coll', 'n', 'b', 'c'), ('para', 'm', 'n', 'a', 'b'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'm', 'a', 'm', 'd', 'n', 'b', 'n', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('coll', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('cong', 'M', 'A', 'M', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('rconst', 'M', 'A', 'A', 'B', '1/2')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'M', 'A', 'M', 'B'), ('coll', 'M', 'A', 'B') => ('midp', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'N', 'C', 'D') => ('eqratio', 'M', 'A', 'A', 'B', 'N', 'C', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'A', 'C') => ('coll', 'A', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 111
+INFO:root:bfsddar matching('eqratio', 'O', 'A', 'A', 'C', 'O', 'B', 'B', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'A', 'B', 'C'), ('sameside', 'A', 'O', 'C', 'B', 'O', 'D') => ('para', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('para', 'A', 'C', 'B', 'D'), ('para', 'A', 'D', 'B', 'C') => ('midp', 'M', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'M', 'C', 'D') => ('para', 'A', 'C', 'B', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q'), ('cyclic', 'A', 'B', 'P', 'Q') => ('perp', 'P', 'A', 'A', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q') => ('perp', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('perp', 'O', 'M', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'D'), ('para', 'A', 'B', 'C', 'D') => ('eqangle', 'A', 'D', 'C', 'D', 'C', 'D', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'O', 'A', 'C') => ('perp', 'A', 'B', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('perp', 'A', 'B', 'B', 'C'), ('midp', 'M', 'A', 'C') => ('cong', 'A', 'M', 'B', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'M', 'B', 'C'), ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M') => ('midp', 'M', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('midp', 'M', 'B', 'C') => ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B') => ('perp', 'O', 'A', 'A', 'X')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 224
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('perp', 'O', 'A', 'A', 'X') => ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 56
+INFO:root:bfsddar matching('eqangle', 'A', 'O', 'A', 'B', 'B', 'A', 'B', 'O'), ('ncoll', 'O', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 75
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('ncoll', 'O', 'A', 'B') => ('eqangle', 'O', 'A', 'A', 'B', 'A', 'B', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'C', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'O', 'A', 'B') => ('eqratio3', 'A', 'B', 'C', 'D', 'O', 'O')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 3
+INFO:root:bfsddar matching('midp', 'E', 'A', 'B'), ('midp', 'F', 'A', 'C') => ('para', 'E', 'F', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q') => ('cong', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('cong', 'O', 'B', 'O', 'C'), ('cong', 'O', 'C', 'O', 'D') => ('cyclic', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 1551
+INFO:root:bfsddar matching('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B'), ('ncoll', 'P', 'Q', 'A', 'B') => ('cyclic', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 819
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'P', 'Q') => ('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 132
+INFO:root:bfsddar matching('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 645
+INFO:root:bfsddar matching('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12056
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 798
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12181
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 744
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12165
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'Q', 'R', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 762
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 10148
+INFO:root:bfsddar : reload
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'b', 'a', 'r', 'p', 'q'), ('nsameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'a', 'b', 'r', 'p', 'q'), ('sameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('PythagoreanPremises', 'a', 'b', 'c') => ('PythagoreanConclusions', 'a', 'b', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('cyclic', 'A', 'B', 'C', 'D') => ('cong', 'O', 'A', 'O', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 1543
+INFO:root:bfsddar matching('para', 'a', 'b', 'c', 'd'), ('coll', 'm', 'a', 'd'), ('coll', 'n', 'b', 'c'), ('para', 'm', 'n', 'a', 'b'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'm', 'a', 'm', 'd', 'n', 'b', 'n', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('coll', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('cong', 'M', 'A', 'M', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('rconst', 'M', 'A', 'A', 'B', '1/2')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'M', 'A', 'M', 'B'), ('coll', 'M', 'A', 'B') => ('midp', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'N', 'C', 'D') => ('eqratio', 'M', 'A', 'A', 'B', 'N', 'C', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'A', 'C') => ('coll', 'A', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 111
+INFO:root:bfsddar matching('eqratio', 'O', 'A', 'A', 'C', 'O', 'B', 'B', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'A', 'B', 'C'), ('sameside', 'A', 'O', 'C', 'B', 'O', 'D') => ('para', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('para', 'A', 'C', 'B', 'D'), ('para', 'A', 'D', 'B', 'C') => ('midp', 'M', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'M', 'C', 'D') => ('para', 'A', 'C', 'B', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q'), ('cyclic', 'A', 'B', 'P', 'Q') => ('perp', 'P', 'A', 'A', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q') => ('perp', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('perp', 'O', 'M', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'D'), ('para', 'A', 'B', 'C', 'D') => ('eqangle', 'A', 'D', 'C', 'D', 'C', 'D', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'O', 'A', 'C') => ('perp', 'A', 'B', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('perp', 'A', 'B', 'B', 'C'), ('midp', 'M', 'A', 'C') => ('cong', 'A', 'M', 'B', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'M', 'B', 'C'), ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M') => ('midp', 'M', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('midp', 'M', 'B', 'C') => ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B') => ('perp', 'O', 'A', 'A', 'X')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 224
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('perp', 'O', 'A', 'A', 'X') => ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 56
+INFO:root:bfsddar matching('eqangle', 'A', 'O', 'A', 'B', 'B', 'A', 'B', 'O'), ('ncoll', 'O', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 75
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('ncoll', 'O', 'A', 'B') => ('eqangle', 'O', 'A', 'A', 'B', 'A', 'B', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'C', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'O', 'A', 'B') => ('eqratio3', 'A', 'B', 'C', 'D', 'O', 'O')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 3
+INFO:root:bfsddar matching('midp', 'E', 'A', 'B'), ('midp', 'F', 'A', 'C') => ('para', 'E', 'F', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q') => ('cong', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('cong', 'O', 'B', 'O', 'C'), ('cong', 'O', 'C', 'O', 'D') => ('cyclic', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 1551
+INFO:root:bfsddar matching('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B'), ('ncoll', 'P', 'Q', 'A', 'B') => ('cyclic', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 819
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'P', 'Q') => ('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 132
+INFO:root:bfsddar matching('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 645
+INFO:root:bfsddar matching('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12110
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 798
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12172
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 744
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12165
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'Q', 'R', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 762
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 10148
+INFO:root:bfsddar : reload
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'b', 'a', 'r', 'p', 'q'), ('nsameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'a', 'b', 'c', 'p', 'q', 'r'), ('cong', 'a', 'b', 'p', 'q'), ('sameclock', 'c', 'a', 'b', 'r', 'p', 'q'), ('sameside', 'c', 'a', 'b', 'r', 'p', 'q') => ('eqangle', 'c', 'a', 'c', 'b', 'r', 'p', 'r', 'q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('PythagoreanPremises', 'a', 'b', 'c') => ('PythagoreanConclusions', 'a', 'b', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('cyclic', 'A', 'B', 'C', 'D') => ('cong', 'O', 'A', 'O', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 1543
+INFO:root:bfsddar matching('para', 'a', 'b', 'c', 'd'), ('coll', 'm', 'a', 'd'), ('coll', 'n', 'b', 'c'), ('para', 'm', 'n', 'a', 'b'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'm', 'a', 'm', 'd', 'n', 'b', 'n', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('coll', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('cong', 'M', 'A', 'M', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B') => ('rconst', 'M', 'A', 'A', 'B', '1/2')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'M', 'A', 'M', 'B'), ('coll', 'M', 'A', 'B') => ('midp', 'M', 'A', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'N', 'C', 'D') => ('eqratio', 'M', 'A', 'A', 'B', 'N', 'C', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'A', 'C') => ('coll', 'A', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 111
+INFO:root:bfsddar matching('eqratio', 'O', 'A', 'A', 'C', 'O', 'B', 'B', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'A', 'B', 'C'), ('sameside', 'A', 'O', 'C', 'B', 'O', 'D') => ('para', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('para', 'A', 'C', 'B', 'D'), ('para', 'A', 'D', 'B', 'C') => ('midp', 'M', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('midp', 'M', 'C', 'D') => ('para', 'A', 'C', 'B', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q'), ('cyclic', 'A', 'B', 'P', 'Q') => ('perp', 'P', 'A', 'A', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'A', 'P', 'B', 'P'), ('cong', 'A', 'Q', 'B', 'Q') => ('perp', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('midp', 'M', 'A', 'B'), ('perp', 'O', 'M', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'D'), ('para', 'A', 'B', 'C', 'D') => ('eqangle', 'A', 'D', 'C', 'D', 'C', 'D', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'O', 'A', 'C') => ('perp', 'A', 'B', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('perp', 'A', 'B', 'B', 'C'), ('midp', 'M', 'A', 'C') => ('cong', 'A', 'M', 'B', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('coll', 'M', 'B', 'C'), ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M') => ('midp', 'M', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('midp', 'M', 'B', 'C') => ('eqangle', 'A', 'B', 'A', 'C', 'O', 'B', 'O', 'M')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B') => ('perp', 'O', 'A', 'A', 'X')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 224
+INFO:root:bfsddar matching('circle', 'O', 'A', 'B', 'C'), ('perp', 'O', 'A', 'A', 'X') => ('eqangle', 'A', 'X', 'A', 'B', 'C', 'A', 'C', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 56
+INFO:root:bfsddar matching('eqangle', 'A', 'O', 'A', 'B', 'B', 'A', 'B', 'O'), ('ncoll', 'O', 'A', 'B') => ('cong', 'O', 'A', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 75
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('ncoll', 'O', 'A', 'B') => ('eqangle', 'O', 'A', 'A', 'B', 'A', 'B', 'O', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 6
+INFO:root:bfsddar matching('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('eqratio', 'd', 'b', 'd', 'c', 'a', 'b', 'a', 'c'), ('coll', 'd', 'b', 'c'), ('ncoll', 'a', 'b', 'c') => ('eqangle', 'a', 'b', 'a', 'd', 'a', 'd', 'a', 'c')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('para', 'A', 'B', 'C', 'D'), ('coll', 'O', 'A', 'C'), ('coll', 'O', 'B', 'D'), ('ncoll', 'O', 'A', 'B') => ('eqratio3', 'A', 'B', 'C', 'D', 'O', 'O')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 3
+INFO:root:bfsddar matching('midp', 'E', 'A', 'B'), ('midp', 'F', 'A', 'C') => ('para', 'E', 'F', 'B', 'C')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'C', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q') => ('cong', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 0
+INFO:root:bfsddar matching('cong', 'O', 'A', 'O', 'B'), ('cong', 'O', 'B', 'O', 'C'), ('cong', 'O', 'C', 'O', 'D') => ('cyclic', 'A', 'B', 'C', 'D')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 1551
+INFO:root:bfsddar matching('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B'), ('ncoll', 'P', 'Q', 'A', 'B') => ('cyclic', 'A', 'B', 'P', 'Q')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 819
+INFO:root:bfsddar matching('cyclic', 'A', 'B', 'P', 'Q') => ('eqangle', 'P', 'A', 'P', 'B', 'Q', 'A', 'Q', 'B')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 132
+INFO:root:bfsddar matching('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 645
+INFO:root:bfsddar matching('simtri', 'A', 'B', 'C', 'P', 'Q', 'R') => ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12074
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 798
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12208
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 744
+INFO:root:bfsddar matching('eqratio', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqratio', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 12219
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'R', 'Q', 'P'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'Q', 'R', 'P'), ('sameclock', 'A', 'B', 'C', 'P', 'R', 'Q') => ('simtrir', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 762
+INFO:root:bfsddar matching('eqangle', 'B', 'A', 'B', 'C', 'Q', 'P', 'Q', 'R'), ('eqangle', 'C', 'A', 'C', 'B', 'R', 'P', 'R', 'Q'), ('sameclock', 'A', 'B', 'C', 'P', 'Q', 'R') => ('simtri', 'A', 'B', 'C', 'P', 'Q', 'R')
+INFO:root:Start caching
+INFO:root:Finish caching
+INFO:root:Start matching
+INFO:root:Finish matching
+INFO:root:bfsddar matched 10202
+INFO:root:Run infos: {'runtime': 2130.888489961624, 'success': False, 'steps': 613911, 'O, O₁, X are collinear': 'failed', 'B₂C₂∥P_aQ_a': 'succeeded', '▲A₁B₁C₁ ≅ ▲A₂B₂C₂': 'succeeded', 'B₂, C, P_a are collinear': 'succeeded', 'ABCI₂ are cyclic': 'succeeded', 'C, C₁, I₂ are collinear': 'succeeded', 'B₁, C₁, P_a are collinear': 'succeeded', 'B, C₂, P_a are collinear': 'succeeded', 'C₁, C₂, X are collinear': 'failed', 'B₁, B₂, X are collinear': 'failed'}
+INFO:root:==========================
+* From problem construction:
+Points : Q, P_b, C₁, D, Q_a, B₂, A, A₁, E, B, O₁, C₂, C, O, P_a, Q_b, P_c, B₁, X, I₂, F, P, A₂, Q_c
+ (Premise)=> BO = CO [0]
+ (Premise)=> BB₂ = BP [1]
+ (Premise)=> BB₂CC₂ are cyclic [2]
+ (Premise)=> AQ = AQ_b [3]
+ (Premise)=> CP = CP_a [4]
+ (Premise)=> CP = CP_b [5]
+ (Premise)=> CQ = CQ_a [6]
+ (Premise)=> CQ = CQ_b [7]
+ (Premise)=> ∠(BC,QQ_a) = ∠(QQ_a,BC) [8]
+ (Premise)=> ∠(AC,PP_b) = ∠(PP_b,AC) [9]
+ (Premise)=> ∠(AC,QQ_b) = ∠(QQ_b,AC) [10]
+ (Premise)=> ∠(BC,PP_a) = ∠(PP_a,BC) [11]
+ (Premise)=> CC₂ = CP [12]
+ (Premise)=> AO = BO [13]
+ (Premise)=> AO = OP [14]
+ (Premise)=> A₂BCC₂ are cyclic [15]
+ (Premise)=> AP = AP_b [16]
+ (Premise)=> ∠(OP,PQ) = ∠(PQ,OP) [17]
+ (Premise)=> AA₂CC₂ are cyclic [18]
+ (Premise)=> AO = OX [19]
+ (Premise)=> AA₂BC₂ are cyclic [20]
+ (Premise)=> B₁, P_c, Q_c are collinear [21]
+ (Premise)=> A₂BB₂C₂ are cyclic [22]
+ (Premise)=> AA₂BC are cyclic [23]
+ (Premise)=> AQ = AQ_c [24]
+ (Premise)=> AP = AP_c [25]
+ (Premise)=> ∠(AB,PP_c) = ∠(PP_c,AB) [26]
+ (Premise)=> ∠(AB,QQ_c) = ∠(QQ_c,AB) [27]
+ (Premise)=> C₁, P_b, Q_b are collinear [28]
+ (Premise)=> C₁, P_a, Q_a are collinear [29]
+ (Premise)=> AA₂ = AP [30]
+ (Premise)=> AA₂BB₂ are cyclic [31]
+ (Premise)=> AB₂CC₂ are cyclic [32]
+ (Premise)=> BQ = BQ_a [33]
+ (Premise)=> BQ = BQ_c [34]
+ (Premise)=> C, C₁, I₂ are collinear [g4]
+ (Premise)=> B₁, C₁, P_a are collinear [g5]
+ (Premise)=> BP = BP_a [35]
+ (Numerical Check)=> B, C, O are not collinear [36]
+ (Numerical Check)=> B, B₂, P are not collinear [37]
+ (Numerical Check)=> A, Q, Q_b are not collinear [38]
+ (Numerical Check)=> CP_aQ_a are sameclock to CP_bQ_b [39]
+ (Numerical Check)=> C, Q, Q_b are not collinear [40]
+ (Numerical Check)=> C, Q, Q_a are not collinear [41]
+ (Numerical Check)=> C, P, P_a are not collinear [42]
+ (Numerical Check)=> C, P, P_b are not collinear [43]
+ (Numerical Check)=> C, C₂, P are not collinear [44]
+ (Numerical Check)=> C, O, P are not collinear [45]
+ (Numerical Check)=> B, O, P are not collinear [46]
+ (Numerical Check)=> A, P, P_b are not collinear [47]
+ (Numerical Check)=> AP_bQ_b are sameclock to AQP [48]
+ (Numerical Check)=> A, C, O are not collinear [49]
+ (Numerical Check)=> A, B, O are not collinear [50]
+ (Numerical Check)=> AQ_bP_b are sameclock to AQ_cP_c [51]
+ (Numerical Check)=> A, P, P_c are not collinear [52]
+ (Numerical Check)=> A, Q, Q_c are not collinear [53]
+ (Numerical Check)=> A, O, P are not collinear [54]
+ (Numerical Check)=> A, A₂, P are not collinear [55]
+ (Numerical Check)=> A₁B₁C₁ are sameclock to A₂B₂C₂ [56]
+ (Numerical Check)=> B, Q_a, Q_c are not collinear [57]
+ (Numerical Check)=> B, Q, Q_a are not collinear [58]
+ (Numerical Check)=> B, B₁, Q_a, Q_c are not collinear [59]
+ (Numerical Check)=> B, Q, Q_c are not collinear [60]
+ (Numerical Check)=> C, C₁, Q_a, Q_b are not collinear [61]
+ (Numerical Check)=> C, Q_a, Q_b are not collinear [62]
+ (Numerical Check)=> A, B, C, I₂ are not collinear [63]
+ (Numerical Check)=> C, C₂, P_a are not collinear [64]
+ (Numerical Check)=> B, P, P_a are not collinear [65]
+* Proof steps:
+000. BO = CO [0], B, C, O are not collinear [36] (rule of line 22)=> ∠(BC,BO) = ∠(CO,BC) [66]
+001. B, B₂, P are not collinear [37], BB₂ = BP [1] (rule of line 22)=> ∠(BB₂,B₂P) = ∠(B₂P,BP) [67]
+002. BB₂CC₂ are cyclic [2] (rule of line 14)=> ∠(BB₂,BC) = ∠(B₂C₂,CC₂) [68]
+003. A, Q, Q_b are not collinear [38], AQ = AQ_b [3] (rule of line 22)=> ∠(AQ,QQ_b) = ∠(QQ_b,AQ_b) [69]
+004. CP = CP_a [4], CP = CP_b [5], CQ = CQ_a [6], CQ = CQ_b [7] (Ratio Chasing)=> CP_a:CQ_a = CP_b:CQ_b [70]
+005. C, Q, Q_b are not collinear [40], CQ = CQ_b [7] (rule of line 22)=> ∠(CQ,QQ_b) = ∠(QQ_b,CQ_b) [71]
+006. CQ = CQ_a [6], C, Q, Q_a are not collinear [41] (rule of line 22)=> ∠(CQ,QQ_a) = ∠(QQ_a,CQ_a) [72]
+007. CP = CP_a [4], C, P, P_a are not collinear [42] (rule of line 22)=> ∠(CP,PP_a) = ∠(PP_a,CP_a) [73]
+008. CP = CP_b [5], C, P, P_b are not collinear [43] (rule of line 22)=> ∠(CP,PP_b) = ∠(PP_b,CP_b) [74]
+009. ∠(CQ,QQ_b) = ∠(QQ_b,CQ_b) [71], ∠(CQ,QQ_a) = ∠(QQ_a,CQ_a) [72], ∠(CP,PP_a) = ∠(PP_a,CP_a) [73], ∠(BC,QQ_a) = ∠(QQ_a,BC) [8], ∠(AC,PP_b) = ∠(PP_b,AC) [9], ∠(CP,PP_b) = ∠(PP_b,CP_b) [74], ∠(AC,QQ_b) = ∠(QQ_b,AC) [10], ∠(BC,PP_a) = ∠(PP_a,BC) [11] (Angle Chasing)=> ∠(CP_a,CQ_a) = ∠(CP_b,CQ_b) [75]
+010. CP_aQ_a are sameclock to CP_bQ_b [39], CP_a:CQ_a = CP_b:CQ_b [70], ∠(CP_a,CQ_a) = ∠(CP_b,CQ_b) [75] (simtriSAS)=> ▲CP_aQ_a ≅ ▲CP_bQ_b [76]
+011. ▲CP_aQ_a ≅ ▲CP_bQ_b [76] (rule of line 12)=> ∠(CP_a,P_aQ_a) = ∠(CP_b,P_bQ_b) [77]
+012. C, C₂, P are not collinear [44], CC₂ = CP [12] (rule of line 22)=> ∠(CC₂,C₂P) = ∠(C₂P,CP) [78]
+013. AO = BO [13], AO = OP [14], BO = CO [0] (Ratio Chasing)=> CO = OP [79]
+014. C, O, P are not collinear [45], CO = OP [79] (rule of line 22)=> ∠(CO,CP) = ∠(CP,OP) [80]
+015. A₂BCC₂ are cyclic [15] (rule of line 14)=> ∠(A₂C,BC) = ∠(A₂C₂,BC₂) [81]
+016. AO = BO [13], AO = OP [14] (Ratio Chasing)=> BO = OP [82]
+017. B, O, P are not collinear [46], BO = OP [82] (rule of line 22)=> ∠(BO,BP) = ∠(BP,OP) [83]
+018. AQ = AQ_b [3], AP = AP_b [16] (Ratio Chasing)=> AP:AQ = AP_b:AQ_b [84]
+019. A, P, P_b are not collinear [47], AP = AP_b [16] (rule of line 22)=> ∠(AP,PP_b) = ∠(PP_b,AP_b) [85]
+020. ∠(AQ,QQ_b) = ∠(QQ_b,AQ_b) [69], ∠(AP,PP_b) = ∠(PP_b,AP_b) [85], ∠(AC,PP_b) = ∠(PP_b,AC) [9], ∠(AC,QQ_b) = ∠(QQ_b,AC) [10] (Angle Chasing)=> ∠(AP,AQ) = ∠(AQ_b,AP_b) [86]
+021. AP:AQ = AP_b:AQ_b [84], ∠(AP,AQ) = ∠(AQ_b,AP_b) [86], AP_bQ_b are sameclock to AQP [48] (simtrirSAS)=> ▲APQ ≅ ▲AP_bQ_b [87]
+022. ▲APQ ≅ ▲AP_bQ_b [87] (rule of line 13)=> ∠(AQ,PQ) = ∠(P_bQ_b,AQ_b) [88]
+023. AO = BO [13], BO = CO [0] (Ratio Chasing)=> AO = CO [89]
+024. AO = CO [89], A, C, O are not collinear [49] (rule of line 22)=> ∠(AC,AO) = ∠(CO,AC) [90]
+025. AO = BO [13], A, B, O are not collinear [50] (rule of line 22)=> ∠(AB,AO) = ∠(BO,AB) [91]
+026. AA₂CC₂ are cyclic [18] (rule of line 14)=> ∠(AC,AC₂) = ∠(A₂C,A₂C₂) [92]
+027. AO = BO [13], AO = OX [19] (Ratio Chasing)=> BO = OX [93]
+028. AO = BO [13], AO = CO [89], BO = OX [93] (rule of line 16)=> BB₂C₂P are cyclic [94]
+029. BB₂C₂P are cyclic [94] (rule of line 14)=> ∠(BC₂,BP) = ∠(B₂C₂,B₂P) [95]
+030. AO = BO [13], AO = CO [89], BO = OX [93] (rule of line 16)=> ABC₂P are cyclic [96]
+031. ABC₂P are cyclic [96] (rule of line 14)=> ∠(AB,BP) = ∠(AC₂,C₂P) [97]
+032. ∠(BC,BO) = ∠(CO,BC) [66], ∠(BB₂,B₂P) = ∠(B₂P,BP) [67], ∠(BB₂,BC) = ∠(B₂C₂,CC₂) [68], ∠(AQ,QQ_b) = ∠(QQ_b,AQ_b) [69], ∠(CP_a,P_aQ_a) = ∠(CP_b,P_bQ_b) [77], ∠(CC₂,C₂P) = ∠(C₂P,CP) [78], ∠(CO,CP) = ∠(CP,OP) [80], ∠(A₂C,BC) = ∠(A₂C₂,BC₂) [81], ∠(BO,BP) = ∠(BP,OP) [83], ∠(AQ,PQ) = ∠(P_bQ_b,AQ_b) [88], ∠(CP,PP_a) = ∠(PP_a,CP_a) [73], ∠(AC,AO) = ∠(CO,AC) [90], ∠(OP,PQ) = ∠(PQ,OP) [17], ∠(AC,PP_b) = ∠(PP_b,AC) [9], ∠(AB,AO) = ∠(BO,AB) [91], ∠(AC,AC₂) = ∠(A₂C,A₂C₂) [92], ∠(BC₂,BP) = ∠(B₂C₂,B₂P) [95], ∠(CP,PP_b) = ∠(PP_b,CP_b) [74], ∠(AB,BP) = ∠(AC₂,C₂P) [97], ∠(AC,QQ_b) = ∠(QQ_b,AC) [10], ∠(BC,PP_a) = ∠(PP_a,BC) [11] (Angle Chasing)=> B₂C₂∥P_aQ_a [g0]
+033. AA₂BC₂ are cyclic [20] (rule of line 14)=> ∠(AA₂,A₂B) = ∠(AC₂,BC₂) [98]
+034. A₂BB₂C₂ are cyclic [22] (rule of line 14)=> ∠(A₂B,A₂B₂) = ∠(BC₂,B₂C₂) [99]
+035. AA₂BC are cyclic [23] (rule of line 14)=> ∠(AB,AC) = ∠(A₂B,A₂C) [100]
+036. AQ = AQ_c [24], AQ = AQ_b [3], AP = AP_b [16], AP = AP_c [25] (Ratio Chasing)=> AP_b:AQ_b = AP_c:AQ_c [101]
+037. A, P, P_c are not collinear [52], AP = AP_c [25] (rule of line 22)=> ∠(AP,PP_c) = ∠(PP_c,AP_c) [102]
+038. AQ = AQ_c [24], A, Q, Q_c are not collinear [53] (rule of line 22)=> ∠(AQ,QQ_c) = ∠(QQ_c,AQ_c) [103]
+039. ∠(AQ,QQ_b) = ∠(QQ_b,AQ_b) [69], ∠(AB,PP_c) = ∠(PP_c,AB) [26], ∠(AP,PP_b) = ∠(PP_b,AP_b) [85], ∠(AP,PP_c) = ∠(PP_c,AP_c) [102], ∠(AB,QQ_c) = ∠(QQ_c,AB) [27], ∠(AC,PP_b) = ∠(PP_b,AC) [9], ∠(AC,QQ_b) = ∠(QQ_b,AC) [10], ∠(AQ,QQ_c) = ∠(QQ_c,AQ_c) [103] (Angle Chasing)=> ∠(AP_b,AQ_b) = ∠(AP_c,AQ_c) [104]
+040. AP_b:AQ_b = AP_c:AQ_c [101], AQ_bP_b are sameclock to AQ_cP_c [51], ∠(AP_b,AQ_b) = ∠(AP_c,AQ_c) [104] (simtriSAS)=> ▲AP_bQ_b ≅ ▲AP_cQ_c [105]
+041. ▲AP_bQ_b ≅ ▲AP_cQ_c [105] (rule of line 12)=> ∠(AP_b,P_bQ_b) = ∠(AP_c,P_cQ_c) [106]
+042. AA₂CC₂ are cyclic [18] (rule of line 14)=> ∠(AA₂,A₂C) = ∠(AC₂,CC₂) [107]
+043. ∠(AA₂,A₂B) = ∠(AC₂,BC₂) [98], ∠(BB₂,B₂P) = ∠(B₂P,BP) [67], ∠(BB₂,BC) = ∠(B₂C₂,CC₂) [68], B₁, P_c, Q_c are collinear [21], ∠(A₂B,A₂B₂) = ∠(BC₂,B₂C₂) [99], ∠(AB,AC) = ∠(A₂B,A₂C) [100], ∠(AP_b,P_bQ_b) = ∠(AP_c,P_cQ_c) [106], ∠(AB,PP_c) = ∠(PP_c,AB) [26], ∠(CC₂,C₂P) = ∠(C₂P,CP) [78], ∠(AP,PP_b) = ∠(PP_b,AP_b) [85], ∠(AP,PP_c) = ∠(PP_c,AP_c) [102], ∠(CO,CP) = ∠(CP,OP) [80], ∠(A₂C,BC) = ∠(A₂C₂,BC₂) [81], ∠(BO,BP) = ∠(BP,OP) [83], ∠(AC,AO) = ∠(CO,AC) [90], ∠(AC,PP_b) = ∠(PP_b,AC) [9], ∠(AB,AO) = ∠(BO,AB) [91], ∠(AC,AC₂) = ∠(A₂C,A₂C₂) [92], ∠(BC₂,BP) = ∠(B₂C₂,B₂P) [95], ∠(AB,BP) = ∠(AC₂,C₂P) [97], C₁, P_b, Q_b are collinear [28], ∠(AA₂,A₂C) = ∠(AC₂,CC₂) [107] (Angle Chasing)=> ∠(A₁B₁,A₁C₁) = ∠(A₂B₂,A₂C₂) [108]
+044. AO = BO [13], AO = CO [89], BO = OX [93] (rule of line 16)=> AA₂BP are cyclic [109]
+045. AA₂BP are cyclic [109] (rule of line 14)=> ∠(AB,AP) = ∠(A₂B,A₂P) [110]
+046. AO = OP [14], A, O, P are not collinear [54] (rule of line 22)=> ∠(AO,AP) = ∠(AP,OP) [111]
+047. A, A₂, P are not collinear [55], AA₂ = AP [30] (rule of line 22)=> ∠(AA₂,A₂P) = ∠(A₂P,AP) [112]
+048. ∠(BC,BO) = ∠(CO,BC) [66], ∠(BB₂,B₂P) = ∠(B₂P,BP) [67], ∠(BB₂,BC) = ∠(B₂C₂,CC₂) [68], C₁, P_a, Q_a are collinear [29], ∠(AB,AC) = ∠(A₂B,A₂C) [100], ∠(AB,AP) = ∠(A₂B,A₂P) [110], ∠(CP_a,P_aQ_a) = ∠(CP_b,P_bQ_b) [77], ∠(AO,AP) = ∠(AP,OP) [111], ∠(AA₂,A₂P) = ∠(A₂P,AP) [112], ∠(A₂C,BC) = ∠(A₂C₂,BC₂) [81], ∠(BO,BP) = ∠(BP,OP) [83], ∠(CP,PP_a) = ∠(PP_a,CP_a) [73], ∠(AC,AO) = ∠(CO,AC) [90], ∠(AC,PP_b) = ∠(PP_b,AC) [9], ∠(AC,AC₂) = ∠(A₂C,A₂C₂) [92], ∠(BC₂,BP) = ∠(B₂C₂,B₂P) [95], ∠(CP,PP_b) = ∠(PP_b,CP_b) [74], C₁, P_b, Q_b are collinear [28], ∠(BC,PP_a) = ∠(PP_a,BC) [11], ∠(AA₂,A₂C) = ∠(AC₂,CC₂) [107] (Angle Chasing)=> ∠(A₁C₁,B₁C₁) = ∠(A₂C₂,B₂C₂) [113]
+049. ∠(A₁B₁,A₁C₁) = ∠(A₂B₂,A₂C₂) [108], ∠(A₁C₁,B₁C₁) = ∠(A₂C₂,B₂C₂) [113], A₁B₁C₁ are sameclock to A₂B₂C₂ [56] (simtriAA)=> ▲A₁B₁C₁ ≅ ▲A₂B₂C₂ [g1]
+050. AA₂BB₂ are cyclic [31] (rule of line 14)=> ∠(AA₂,AB₂) = ∠(A₂B,BB₂) [114]
+051. AB₂CC₂ are cyclic [32] (rule of line 14)=> ∠(AB₂,B₂C) = ∠(AC₂,CC₂) [115]
+052. ∠(AA₂,A₂B) = ∠(AC₂,BC₂) [98], ∠(AA₂,AB₂) = ∠(A₂B,BB₂) [114], ∠(BB₂,B₂P) = ∠(B₂P,BP) [67], ∠(BB₂,BC) = ∠(B₂C₂,CC₂) [68], ∠(AB,AC) = ∠(A₂B,A₂C) [100], ∠(CO,CP) = ∠(CP,OP) [80], ∠(BO,BP) = ∠(BP,OP) [83], ∠(AB₂,B₂C) = ∠(AC₂,CC₂) [115], ∠(CP,PP_a) = ∠(PP_a,CP_a) [73], ∠(AC,AO) = ∠(CO,AC) [90], ∠(AB,AO) = ∠(BO,AB) [91], ∠(BC₂,BP) = ∠(B₂C₂,B₂P) [95], ∠(BC,PP_a) = ∠(PP_a,BC) [11], ∠(AA₂,A₂C) = ∠(AC₂,CC₂) [107] (Angle Chasing)=> B₂C∥CP_a [116]
+053. B₂C∥CP_a [116] (rule of line 37)=> B₂, C, P_a are collinear [g2]
+054. BQ = BQ_a [33], BQ = BQ_c [34] (Ratio Chasing)=> BQ_a = BQ_c [117]
+055. B, Q_a, Q_c are not collinear [57], BQ_a = BQ_c [117] (rule of line 22)=> ∠(BQ_a,Q_aQ_c) = ∠(Q_aQ_c,BQ_c) [118]
+056. BQ = BQ_a [33], B, Q, Q_a are not collinear [58] (rule of line 22)=> ∠(BQ,QQ_a) = ∠(QQ_a,BQ_a) [119]
+057. BQ = BQ_c [34], B, Q, Q_c are not collinear [60] (rule of line 22)=> ∠(BQ,QQ_c) = ∠(QQ_c,BQ_c) [120]
+058. B₁, P_c, Q_c are collinear [21], ∠(AP_b,P_bQ_b) = ∠(AP_c,P_cQ_c) [106], ∠(CP_a,P_aQ_a) = ∠(CP_b,P_bQ_b) [77], ∠(AB,PP_c) = ∠(PP_c,AB) [26], ∠(AP,PP_b) = ∠(PP_b,AP_b) [85], ∠(AP,PP_c) = ∠(PP_c,AP_c) [102], ∠(AB,QQ_c) = ∠(QQ_c,AB) [27], ∠(CP,PP_a) = ∠(PP_a,CP_a) [73], ∠(BC,QQ_a) = ∠(QQ_a,BC) [8], ∠(BQ,QQ_a) = ∠(QQ_a,BQ_a) [119], ∠(CP,PP_b) = ∠(PP_b,CP_b) [74], ∠(BQ,QQ_c) = ∠(QQ_c,BQ_c) [120], ∠(BC,PP_a) = ∠(PP_a,BC) [11] (Angle Chasing)=> ∠(BQ_a,BQ_c) = ∠(B₁Q_a,B₁Q_c) [121]
+059. B, B₁, Q_a, Q_c are not collinear [59], ∠(BQ_a,BQ_c) = ∠(B₁Q_a,B₁Q_c) [121] (rule of line 15)=> BB₁Q_aQ_c are cyclic [122]
+060. BB₁Q_aQ_c are cyclic [122] (rule of line 14)=> ∠(BB₁,BQ_c) = ∠(B₁Q_a,Q_aQ_c) [123]
+061. C₁, P_a, Q_a are collinear [29], ∠(CP_a,P_aQ_a) = ∠(CP_b,P_bQ_b) [77], ∠(CQ,QQ_b) = ∠(QQ_b,CQ_b) [71], ∠(CQ,QQ_a) = ∠(QQ_a,CQ_a) [72], ∠(CP,PP_a) = ∠(PP_a,CP_a) [73], ∠(BC,QQ_a) = ∠(QQ_a,BC) [8], ∠(AC,PP_b) = ∠(PP_b,AC) [9], ∠(CP,PP_b) = ∠(PP_b,CP_b) [74], C₁, P_b, Q_b are collinear [28], ∠(AC,QQ_b) = ∠(QQ_b,AC) [10], ∠(BC,PP_a) = ∠(PP_a,BC) [11] (Angle Chasing)=> ∠(CQ_a,C₁Q_a) = ∠(CQ_b,C₁Q_b) [124]
+062. C, C₁, Q_a, Q_b are not collinear [61], ∠(CQ_a,C₁Q_a) = ∠(CQ_b,C₁Q_b) [124] (rule of line 15)=> CC₁Q_aQ_b are cyclic [125]
+063. CC₁Q_aQ_b are cyclic [125] (rule of line 14)=> ∠(CC₁,CQ_b) = ∠(C₁Q_a,Q_aQ_b) [126]
+064. CQ = CQ_a [6], CQ = CQ_b [7] (Ratio Chasing)=> CQ_a = CQ_b [127]
+065. C, Q_a, Q_b are not collinear [62], CQ_a = CQ_b [127] (rule of line 22)=> ∠(CQ_a,Q_aQ_b) = ∠(Q_aQ_b,CQ_b) [128]
+066. C₁, P_a, Q_a are collinear [29], ∠(BQ_a,Q_aQ_c) = ∠(Q_aQ_c,BQ_c) [118], ∠(CQ,QQ_b) = ∠(QQ_b,CQ_b) [71], ∠(AB,QQ_c) = ∠(QQ_c,AB) [27], ∠(CQ,QQ_a) = ∠(QQ_a,CQ_a) [72], ∠(BQ,QQ_a) = ∠(QQ_a,BQ_a) [119], ∠(BB₁,BQ_c) = ∠(B₁Q_a,Q_aQ_c) [123], ∠(CC₁,CQ_b) = ∠(C₁Q_a,Q_aQ_b) [126], ∠(BQ,QQ_c) = ∠(QQ_c,BQ_c) [120], ∠(AC,QQ_b) = ∠(QQ_b,AC) [10], ∠(CQ_a,Q_aQ_b) = ∠(Q_aQ_b,CQ_b) [128] (Angle Chasing)=> ∠(AB,AC) = ∠(BI₂,CI₂) [129]
+067. ∠(AB,AC) = ∠(BI₂,CI₂) [129], A, B, C, I₂ are not collinear [63] (rule of line 15)=> ABCI₂ are cyclic [g3]
+068. CP = CP_a [4], CC₂ = CP [12] (Ratio Chasing)=> CC₂ = CP_a [130]
+069. CC₂ = CP_a [130], C, C₂, P_a are not collinear [64] (rule of line 22)=> ∠(CC₂,C₂P_a) = ∠(C₂P_a,CP_a) [131]
+070. BP = BP_a [35], B, P, P_a are not collinear [65] (rule of line 22)=> ∠(BP,PP_a) = ∠(PP_a,BP_a) [132]
+071. ∠(CC₂,C₂P_a) = ∠(C₂P_a,CP_a) [131], ∠(AA₂,A₂B) = ∠(AC₂,BC₂) [98], ∠(BP,PP_a) = ∠(PP_a,BP_a) [132], ∠(AB,AC) = ∠(A₂B,A₂C) [100], ∠(CC₂,C₂P) = ∠(C₂P,CP) [78], ∠(A₂C,BC) = ∠(A₂C₂,BC₂) [81], ∠(CP,PP_a) = ∠(PP_a,CP_a) [73], ∠(AC,AC₂) = ∠(A₂C,A₂C₂) [92], ∠(AB,BP) = ∠(AC₂,C₂P) [97], ∠(BC,PP_a) = ∠(PP_a,BC) [11], ∠(AA₂,A₂C) = ∠(AC₂,CC₂) [107] (Angle Chasing)=> BP_a∥C₂P_a [133]
+072. BP_a∥C₂P_a [133] (rule of line 37)=> B, C₂, P_a are collinear [g6]
+
+==========================
+INFO:root:Solution written to run_results/translated_imo_2011_p6_sol1_extra_points/proof_steps.txt.
