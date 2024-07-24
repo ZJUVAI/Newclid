@@ -1,43 +1,38 @@
 import os
 from pathlib import Path
-import subprocess
 from sys import stderr
+
+from geosolver.agent.flemmard import Flemmard
+from geosolver.api import GeometricSolverBuilder
 
 
 def run_geosolver(filepath: Path):
     count = 0
 
-    # Check if the file exists
     if not os.path.exists(filepath):
         print(f"File {filepath} not found.")
         return
 
-    # Open the file and read each line
     with open(filepath, "r") as file:
         for line in file:
             count += 1
 
-            # Process only odd-numbered lines
             if count % 2 == 1:
-                problemname = line.strip()
-                command = [
-                    "geosolver",
-                    "--problem",
-                    f"{filepath}:{problemname}",
-                    "--agent",
-                    "flemmard",
-                ]
-
-                # Run the command and check for errors
+                problem_name = line.strip()
                 try:
-                    subprocess.run(command, check=True, capture_output=True, text=True)
-                except subprocess.CalledProcessError:
+                    solver = (
+                        GeometricSolverBuilder()
+                        .load_problem_from_file(problems_path, problem_name)
+                        .with_deductive_agent(Flemmard)
+                        .build()
+                    )
+                    solver.run()
+                except Exception as e:
                     print(
-                        f"Warning: geosolver crashed on problem '{problemname}'",
+                        f"Warning: solver crashed on problem '{problem_name}' : ({type(e)}) {e}",
                         file=stderr,
                     )
 
 
-if __name__ == "__main__":
-    filepath = "problems_datasets/examples.txt"
-    run_geosolver(Path(filepath))
+problems_path = Path("problems_datasets/new_benchmark_50.txt")
+run_geosolver(Path(problems_path))
