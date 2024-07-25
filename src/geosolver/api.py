@@ -65,7 +65,6 @@ class GeometricSolver:
         output_folder_path.mkdir(exist_ok=True, parents=True)
         self.write_solution(output_folder_path / "proof_steps.txt")
         self.draw_figure(False, output_folder_path / "proof_figure.png")
-        self.draw_symbols_graph(output_folder_path / "symbols_graph.html")
         logging.info("Written all outputs at %s", output_folder_path)
 
     def get_setup_string(self) -> str:
