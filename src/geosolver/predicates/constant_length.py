@@ -6,7 +6,7 @@ from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.predicate import Predicate
 from geosolver.reasoning_engines.algebraic_reasoning.tables import Ratio_Chase
-from geosolver.tools import fraction_to_len, str_to_fraction
+from geosolver.tools import fraction_to_len, get_quotient, str_to_fraction
 from geosolver.dependency.dependency import Dependency
 
 if TYPE_CHECKING:
@@ -89,4 +89,53 @@ class ConstantLength(Predicate):
     @classmethod
     def pretty(cls, statement: Statement) -> str:
         a, b, length = statement.args
+        return f"{a.pretty_name}{b.pretty_name} = {fraction_to_len(length)}"
+
+
+class LCompute(Predicate):
+    """lcompute A B"""
+
+    NAME = "lcompute"
+
+    @classmethod
+    def preparse(cls, args: tuple[str, ...]) -> Optional[tuple[str, ...]]:
+        a, b = args
+        if a == b:
+            return None
+        return tuple(sorted((a, b)))
+
+    @classmethod
+    def parse(
+        cls, args: tuple[str, ...], dep_graph: DependencyGraph
+    ) -> Optional[tuple[Any, ...]]:
+        preparse = cls.preparse(args)
+        return (
+            tuple(dep_graph.symbols_graph.names2points(preparse)) if preparse else None
+        )
+
+    @classmethod
+    def check_numerical(cls, statement: Statement) -> bool:
+        args: tuple[Point, Point] = statement.args
+        a, b = args
+        get_quotient(a.num.distance(b.num))
+        return True
+
+    @classmethod
+    def check(cls, statement: Statement) -> bool:
+        args: tuple[Point, Point] = statement.args
+        a, b = args
+        length = get_quotient(a.num.distance(b.num))
+        return statement.with_new(ConstantLength, (a, b, length)).check()
+
+    @classmethod
+    def why(cls, statement: Statement):
+        args: tuple[Point, Point] = statement.args
+        a, b = args
+        length = get_quotient(a.num.distance(b.num))
+        return statement.with_new(ConstantLength, (a, b, length)).why()
+
+    @classmethod
+    def pretty(cls, statement: Statement) -> str:
+        a, b = statement.args
+        length = get_quotient(a.num.distance(b.num))
         return f"{a.pretty_name}{b.pretty_name} = {fraction_to_len(length)}"

@@ -11,9 +11,18 @@ from geosolver.predicates.circumcenter import Circumcenter as Circumcenter
 from geosolver.predicates.equal_angles import EqAngle as EqAngle
 from geosolver.predicates.equal_ratios import EqRatio as EqRatio, EqRatio3 as EqRatio3
 
-from geosolver.predicates.constant_length import ConstantLength as ConstantLength
-from geosolver.predicates.constant_ratio import ConstantRatio as ConstantRatio
-from geosolver.predicates.constant_angle import ConstantAngle as ConstantAngle
+from geosolver.predicates.constant_length import (
+    ConstantLength as ConstantLength,
+    LCompute as LCompute,
+)
+from geosolver.predicates.constant_ratio import (
+    ConstantRatio as ConstantRatio,
+    RCompute as RCompute,
+)
+from geosolver.predicates.constant_angle import (
+    ConstantAngle as ConstantAngle,
+    ACompute as ACompute,
+)
 
 from geosolver.predicates.different import Diff as Diff
 from geosolver.predicates.sameclock import SameClock as SameClock
@@ -60,7 +69,10 @@ NUMERICAL_PREDICATES = (
 )
 
 INTEGRATED_PREDICATES = (PythagoreanPremises, PythagoreanConclusions)
+COMPUTE = (ACompute, RCompute, LCompute)
 
-PREDICATES = SYMBOLIC_PREDICATES + NUMERICAL_PREDICATES + INTEGRATED_PREDICATES
+PREDICATES = (
+    SYMBOLIC_PREDICATES + NUMERICAL_PREDICATES + INTEGRATED_PREDICATES + COMPUTE
+)
 
 NAME_TO_PREDICATE = {predicate.NAME: predicate for predicate in PREDICATES}

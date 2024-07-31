@@ -7,7 +7,7 @@ from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.predicate import Predicate
 from geosolver.reasoning_engines.algebraic_reasoning.tables import Angle_Chase
-from geosolver.tools import fraction_to_angle, str_to_fraction
+from geosolver.tools import fraction_to_angle, get_quotient, str_to_fraction
 from geosolver.dependency.dependency import Dependency
 
 if TYPE_CHECKING:
@@ -64,7 +64,7 @@ class ConstantAngle(Predicate):
 
     @classmethod
     def _prep_ar(cls, statement: Statement) -> tuple[list[SumCV], Table]:
-        args: tuple[Point, Point, Point, Point, str] = statement.args
+        args: tuple[Point, Point, Point, Point, Fraction] = statement.args
         p0, p1, p2, p3, _ = args
         table = statement.dep_graph.ar.atable
         symbols_graph = statement.dep_graph.symbols_graph
@@ -100,7 +100,71 @@ class ConstantAngle(Predicate):
         return all(table.expr_delta(eq) for eq in eqs)
 
     @classmethod
+    def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
+        a, b, c, d, y = args
+        return (a.name, b.name, c.name, d.name, fraction_to_angle(y))  # type: ignore
+
+    @classmethod
     def pretty(cls, statement: Statement) -> str:
         args: tuple[Point, Point, Point, Point, Fraction] = statement.args
         a, b, c, d, y = args
+        return f"∠({a.pretty_name}{b.pretty_name},{c.pretty_name}{d.pretty_name}) = {fraction_to_angle(y)}"
+
+
+class ACompute(Predicate):
+    """acompute AB CD"""
+
+    NAME = "acompute"
+
+    @classmethod
+    def preparse(cls, args: tuple[str, ...]) -> Optional[tuple[str, ...]]:
+        a, b, c, d = args
+        if a == b or c == d:
+            return None
+        a, b = sorted((a, b))
+        c, d = sorted((c, d))
+        if (a, b) > (c, d):
+            a, b, c, d = c, d, a, b
+        return (a, b, c, d)
+
+    @classmethod
+    def parse(
+        cls, args: tuple[str, ...], dep_graph: DependencyGraph
+    ) -> Optional[tuple[Any, ...]]:
+        preparse = cls.preparse(args)
+        if not preparse:
+            return None
+        a, b, c, d = preparse
+        return tuple(dep_graph.symbols_graph.names2points((a, b, c, d)))
+
+    @classmethod
+    def check_numerical(cls, statement: Statement) -> bool:
+        args: tuple[Point, Point, Point, Point] = statement.args
+        a, b, c, d = args
+        ang = ((c.num - d.num).angle() - (a.num - b.num).angle()) % pi
+        if close_enough(ang, pi):
+            ang = 0
+        get_quotient(ang / pi)
+        return True
+
+    @classmethod
+    def why(cls, statement: Statement):
+        args: tuple[Point, Point, Point, Point] = statement.args
+        a, b, c, d = args
+        y = get_quotient(((c.num - d.num).angle() - (a.num - b.num).angle()) % pi / pi)
+        dep = statement.with_new(ConstantAngle, (a, b, c, d, y)).why()
+        return dep.with_new(statement) if dep else None
+
+    @classmethod
+    def check(cls, statement: Statement) -> bool:
+        args: tuple[Point, Point, Point, Point] = statement.args
+        a, b, c, d = args
+        y = get_quotient(((c.num - d.num).angle() - (a.num - b.num).angle()) % pi / pi)
+        return statement.with_new(ConstantAngle, (a, b, c, d, y)).check()
+
+    @classmethod
+    def pretty(cls, statement: Statement) -> str:
+        args: tuple[Point, Point, Point, Point] = statement.args
+        a, b, c, d = args
+        y = get_quotient(((c.num - d.num).angle() - (a.num - b.num).angle()) % pi / pi)
         return f"∠({a.pretty_name}{b.pretty_name},{c.pretty_name}{d.pretty_name}) = {fraction_to_angle(y)}"

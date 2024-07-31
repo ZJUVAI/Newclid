@@ -45,6 +45,41 @@ class TestConstants:
         success = solver.run()
         assert success
 
+    def test_acompute(self):
+        defs = [
+            "segment a b",
+            "",
+            " =",
+            "a : ; b :",
+            "segment",
+            "",
+            "free a",
+            "a : a",
+            " =",
+            "a :",
+            "free",
+            "",
+            "aconst a b c x r",
+            "x : x a b c",
+            "a b c = diff a b",
+            "x : aconst a b c x r",
+            "aconst a b c r",
+            "",
+        ]
+        solver = build_until_works(
+            self.solver_builder.load_defs_from_txt(
+                "\n".join(defs)
+            ).load_problem_from_txt(
+                "a b = segment a b; "
+                "c = free c; "
+                "x = aconst a b c x 63o; "
+                "y = aconst a b c y 153o "
+                "? acompute c x c y",
+            )
+        )
+        success = solver.run()
+        assert success
+
     def test_aconst_pi_frac(self):
         """Should be able to prescribe and check a constant angle as pi fraction"""
         defs = [
@@ -273,6 +308,13 @@ class TestConstants:
         success = solver.run()
         assert success
 
+    def test_rcompute(self):
+        solver = self.solver_builder.load_problem_from_txt(
+            "a b = segment a b; m = midpoint m a b ? rcompute m a a b",
+        ).build()
+        success = solver.run()
+        assert success
+
     def test_triangle12_in_rconst_out(self):
         """Should obtain a constant ratio from triangle12"""
         defs = [
@@ -295,6 +337,14 @@ class TestConstants:
         """Should be able to prescribe a constant lenght"""
         solver = self.solver_builder.load_problem_from_txt(
             "a = free a; " "b = lconst b a 3 ? lconst b a 3"
+        ).build()
+        success = solver.run()
+        assert success
+
+    def test_lcompute(self):
+        """Should be able to prescribe a constant lenght"""
+        solver = self.solver_builder.load_problem_from_txt(
+            "a = free a; " "b = lconst b a 3 ? lcompute a b"
         ).build()
         success = solver.run()
         assert success
