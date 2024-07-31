@@ -9,13 +9,14 @@
 from importlib.metadata import metadata
 import os
 import sys
+from typing import Any
 
 sys.path.insert(0, os.path.abspath("../"))
 
 package_metadata = metadata("geosolver")
 
 project = "GeoSolver"
-copyright = "2024, Mathïs Fédérico"
+copyright = "2024, Mathïs Fédérico, Vladmir Sicca, Tianxiang Xia"
 author = package_metadata["Author-email"]
 release = package_metadata["Version"]
 
@@ -70,5 +71,5 @@ html_theme_options = {
 }
 
 
-def setup(app):
+def setup(app: Any):
     app.add_css_file("styles/custom.css")
