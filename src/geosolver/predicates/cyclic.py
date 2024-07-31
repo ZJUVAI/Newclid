@@ -4,7 +4,7 @@ from geosolver.dependency.dependency import Dependency
 from geosolver.dependency.symbols import Circle, Point
 from geosolver.numerical import close_enough
 from geosolver.numerical.geometries import CircleNum, InvalidIntersectError
-from geosolver.predicates.predicate import IllegalPredicate, Predicate
+from geosolver.predicates.predicate import Predicate
 
 
 if TYPE_CHECKING:
@@ -19,16 +19,17 @@ class Cyclic(Predicate):
     NAME = "cyclic"
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]):
         if len(args) <= 3 or len(args) != len(set(args)):
-            raise IllegalPredicate
+            return None
         return tuple(sorted(args))
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
-        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
+    def parse(cls, args: tuple[str, ...], dep_graph: DependencyGraph):
+        preparse = cls.preparse(args)
+        return (
+            tuple(dep_graph.symbols_graph.names2points(preparse)) if preparse else None
+        )
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:

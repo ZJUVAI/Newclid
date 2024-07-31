@@ -1,10 +1,10 @@
 from __future__ import annotations
 from fractions import Fraction
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
-from geosolver.predicates.predicate import IllegalPredicate, Predicate
+from geosolver.predicates.predicate import Predicate
 from geosolver.reasoning_engines.algebraic_reasoning.tables import Ratio_Chase
 from geosolver.tools import fraction_to_len, str_to_fraction
 from geosolver.dependency.dependency import Dependency
@@ -26,18 +26,21 @@ class ConstantLength(Predicate):
     NAME = "lconst"
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> Optional[tuple[str, ...]]:
         a, b, length = args
         if a == b:
-            raise IllegalPredicate
+            return None
         a, b = sorted((a, b))
         return (a, b, fraction_to_len(str_to_fraction(length)))
 
     @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
-        a, b, length = cls.preparse(args)
+    ) -> Optional[tuple[Any, ...]]:
+        preparse = cls.preparse(args)
+        if not preparse:
+            return None
+        a, b, length = preparse
         return tuple(dep_graph.symbols_graph.names2points((a, b))) + (
             str_to_fraction(length),
         )

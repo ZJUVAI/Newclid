@@ -9,7 +9,6 @@ import json
 
 from geosolver.definition.clause import translate_sentence
 from geosolver.dependency.symbols import Point
-from geosolver.predicates.predicate import IllegalPredicate
 from geosolver.statement import Statement
 from geosolver.dependency.dependency import Dependency
 
@@ -66,31 +65,33 @@ class Matcher:
                 for point_list in itertools.product(points, repeat=len(variables))
             )
         ):
-            try:
-                why: list[Statement] = []
-                reason = theorem.descrption
-                applicable = True
-                for premise in theorem.premises:
-                    s = Statement.from_tokens(
-                        translate_sentence(mapping, premise), self.dep_graph
-                    )
-                    if not s.check_numerical():
-                        applicable = False
-                        break
-                    why.append(s)
-                if not applicable:
-                    continue
-                if write:
-                    mappings.append(mapping)
-                for conclusion in theorem.conclusions:
-                    conclusion_statement = Statement.from_tokens(
-                        translate_sentence(mapping, conclusion), self.dep_graph
-                    )
-                    # assert conclusion_statement.check_numerical()
-                    dep = Dependency.mk(conclusion_statement, reason, tuple(why))
-                    self.cache[theorem].add(dep)
-            except IllegalPredicate:
+            why: list[Statement] = []
+            reason = theorem.descrption
+            applicable = True
+            for premise in theorem.premises:
+                s = Statement.from_tokens(
+                    translate_sentence(mapping, premise), self.dep_graph
+                )
+                if s is None:
+                    applicable = False
+                    break
+                if not s.check_numerical():
+                    applicable = False
+                    break
+                why.append(s)
+            if not applicable:
                 continue
+            if write:
+                mappings.append(mapping)
+            for conclusion in theorem.conclusions:
+                conclusion_statement = Statement.from_tokens(
+                    translate_sentence(mapping, conclusion), self.dep_graph
+                )
+                # assert conclusion_statement.check_numerical()
+                if conclusion_statement is None:
+                    continue
+                dep = Dependency.mk(conclusion_statement, reason, tuple(why))
+                self.cache[theorem].add(dep)
         if self.runtime_cache_path is not None and write:
             with open(self.runtime_cache_path, "w") as f:
                 json.dump(file_cache, f)

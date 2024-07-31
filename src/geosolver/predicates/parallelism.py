@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 import numpy as np
 from geosolver.dependency.symbols import Point
@@ -26,13 +26,13 @@ class Para(Predicate):
     NAME = "para"
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> Optional[tuple[str, ...]]:
         return Cong().preparse(args)
 
     @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    ) -> Optional[tuple[Any, ...]]:
         return Cong.parse(args, dep_graph)
 
     @classmethod
@@ -112,13 +112,11 @@ class NPara(Predicate):
     NAME = "npara"
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]):
         return Para.preparse(args)
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    def parse(cls, args: tuple[str, ...], dep_graph: DependencyGraph):
         return Para.parse(args, dep_graph)
 
     @classmethod

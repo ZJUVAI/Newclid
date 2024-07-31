@@ -2,6 +2,7 @@ from enum import Enum
 import logging
 from pathlib import Path
 import re
+from typing import Optional
 from zipfile import ZipFile
 from xml.etree.ElementTree import parse
 from collections import defaultdict
@@ -12,7 +13,6 @@ from geosolver.predicates.collinearity import Coll
 from geosolver.predicates.congruence import Cong
 from geosolver.predicates.midpoint import MidPoint
 from geosolver.predicates.perpendicularity import Perp
-from geosolver.predicates.predicate import IllegalPredicate
 
 from geosolver.dependency.dependency_graph import DependencyGraph
 from geosolver.statement import Statement
@@ -84,46 +84,31 @@ def load_geogebra(path: Path, dep_graph: DependencyGraph):
             ensemble[a(0)] += (output,)
             ensemble[a(1)] += (output,)
     # add premises
+    premises: list[Optional[Statement]] = []
     for k, points in ensemble.items():
         points = dedup(points)
-        try:
-            if form[k] == Form.Circle:
-                if k in aux:
-                    t = aux[k]
-                    if len(t) == 1:
-                        Dependency.mk(
-                            Statement.from_tokens(
-                                (Circumcenter.NAME, t[0]) + points, dep_graph
-                            ),
-                            IN_PREMISES,
-                            (),
-                        ).add()
-                    else:
-                        try:
-                            Dependency.mk(
-                                Statement.from_tokens(
-                                    (Circumcenter.NAME, t[0]) + points, dep_graph
-                                ),
-                                IN_PREMISES,
-                                (),
-                            ).add()
-                        except IllegalPredicate:
-                            pass
-                        Dependency.mk(
-                            Statement.from_tokens(
-                                (Cong.NAME, t[1], t[2], t[0], points[0]), dep_graph
-                            ),
-                            IN_PREMISES,
-                            (),
-                        ).add()
-            if form[k] == Form.Line:
-                Dependency.mk(
-                    Statement.from_tokens((Coll.NAME,) + points, dep_graph),
-                    IN_PREMISES,
-                    (),
-                ).add()
-        except IllegalPredicate:
-            pass
+        if form[k] == Form.Circle:
+            if k in aux:
+                t = aux[k]
+                if len(t) == 1:
+                    premises.append(
+                        Statement.from_tokens(
+                            (Circumcenter.NAME, t[0]) + points, dep_graph
+                        )
+                    )
+                else:
+                    premises.append(
+                        Statement.from_tokens(
+                            (Circumcenter.NAME, t[0]) + points, dep_graph
+                        )
+                    )
+                    premises.append(
+                        Statement.from_tokens(
+                            (Cong.NAME, t[1], t[2], t[0], points[0]), dep_graph
+                        )
+                    )
+        if form[k] == Form.Line:
+            premises.append(Statement.from_tokens((Coll.NAME,) + points, dep_graph))
 
     for command in root.iter("command"):
         command_name = command.attrib["name"]
@@ -141,8 +126,12 @@ def load_geogebra(path: Path, dep_graph: DependencyGraph):
             # PerpendicularLine(B, f)
             x, y, *_ = ensemble[a(1)]
             u, v, *_ = ensemble[output]
-            perp = Statement.from_tokens((Perp.NAME, x, y, u, v), dep_graph)
-            Dependency.mk(perp, IN_PREMISES, ()).add()
+            premises.append(Statement.from_tokens((Perp.NAME, x, y, u, v), dep_graph))
         elif command_name == "Mirror":
-            midp = Statement.from_tokens((MidPoint.NAME, a(1), a(0), output), dep_graph)
-            Dependency.mk(midp, IN_PREMISES, ()).add()
+            premises.append(
+                Statement.from_tokens((MidPoint.NAME, a(1), a(0), output), dep_graph)
+            )
+
+    for statement in premises:
+        if statement:
+            Dependency.mk(statement, IN_PREMISES, ()).add()

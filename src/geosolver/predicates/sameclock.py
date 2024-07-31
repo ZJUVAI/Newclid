@@ -1,9 +1,9 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 from geosolver.dependency.dependency import NUMERICAL_CHECK, Dependency
 from geosolver.dependency.symbols import Point
 from geosolver.numerical.check import same_clock
-from geosolver.predicates.predicate import IllegalPredicate, Predicate
+from geosolver.predicates.predicate import Predicate
 
 
 if TYPE_CHECKING:
@@ -17,10 +17,10 @@ class SameClock(Predicate):
     NAME = "sameclock"
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> Optional[tuple[str, ...]]:
         a, b, c, x, y, z = args
         if len(set((a, b, c))) < 3 or len(set((x, y, z))) < 3:
-            raise IllegalPredicate
+            return None
         group = min((a, b, c), (b, c, a), (c, a, b))
         groupr = min((a, c, b), (c, b, a), (b, a, c))
         group1 = min((x, y, z), (y, z, x), (z, x, y))
@@ -30,8 +30,11 @@ class SameClock(Predicate):
     @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
-        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
+    ) -> Optional[tuple[Any, ...]]:
+        preparse = cls.preparse(args)
+        return (
+            tuple(dep_graph.symbols_graph.names2points(preparse)) if preparse else None
+        )
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:

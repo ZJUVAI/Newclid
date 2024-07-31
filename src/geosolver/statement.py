@@ -15,11 +15,11 @@ class Statement:
     def __init__(
         self,
         predicate: type[Predicate],
-        args: tuple[str, ...],
+        args: tuple[Any, ...],
         dep_graph: DependencyGraph,
     ) -> None:
         self.predicate = predicate
-        self.args: tuple[Any, ...] = self.predicate.parse(args, dep_graph)
+        self.args: tuple[Any, ...] = args
         self.dep_graph = dep_graph
         self.why_cache: Optional[Dependency] = None
 
@@ -55,8 +55,12 @@ class Statement:
     @classmethod
     def from_tokens(
         cls, tokens: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> Statement:
-        return Statement(NAME_TO_PREDICATE[tokens[0]], tuple(tokens[1:]), dep_graph)
+    ) -> Optional[Statement]:
+        pred = NAME_TO_PREDICATE[tokens[0]]
+        parsed = pred.parse(tokens[1:], dep_graph)
+        if not parsed:
+            return None
+        return Statement(pred, parsed, dep_graph)
 
     def pretty(self) -> str:
         return self.predicate.pretty(self)
@@ -68,6 +72,8 @@ class Statement:
     ):
         predicate = new_predicate or self.predicate
         args = new_args or self.args
-        return self.from_tokens(
+        newst = self.from_tokens(
             (predicate.NAME,) + predicate.to_tokens(args), self.dep_graph
         )
+        assert newst
+        return newst

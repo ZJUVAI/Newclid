@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from geosolver.dependency.dependency import NUMERICAL_CHECK, Dependency
 from geosolver.dependency.symbols import Point
@@ -22,13 +22,11 @@ class Diff(Predicate):
     NAME = "diff"
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]):
         return tuple(sorted(args))
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    def parse(cls, args: tuple[str, ...], dep_graph: DependencyGraph):
         return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
 
     @classmethod

@@ -53,6 +53,10 @@ def cli_arguments() -> Namespace:
         type=str,
         help="Choose one or more from {a, d, r}, to print table of equations of angles (a), distances (d), ratios (r).",
     )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+    )
     args, _ = parser.parse_known_args()
     return args
 
@@ -113,11 +117,13 @@ def main():
         solver_builder.load_goal(args.goal)
 
     solver = solver_builder.build()
-    solver.draw_figure(False, outpath / "construction_figure.png")
+    if not args.quiet:
+        solver.draw_figure(False, outpath / "construction_figure.png")
     success = solver.run()
 
     logging.info(f"Run infos: {solver.run_infos}")
-    solver.write_all_outputs(outpath)
+    if not args.quiet:
+        solver.write_all_outputs(outpath)
     return success
 
 

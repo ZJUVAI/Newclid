@@ -1,8 +1,8 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from geosolver.dependency.symbols import Point
-from geosolver.predicates.predicate import IllegalPredicate, Predicate
+from geosolver.predicates.predicate import Predicate
 
 if TYPE_CHECKING:
     from geosolver.dependency.dependency_graph import DependencyGraph
@@ -18,18 +18,19 @@ class MidPoint(Predicate):
     NAME = "midp"
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]):
         if len(set(args)) != 3:
-            raise IllegalPredicate
+            return None
         m, a, b = args
         a, b = sorted((a, b))
         return (m, a, b)
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
-        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
+    def parse(cls, args: tuple[str, ...], dep_graph: DependencyGraph):
+        preparse = cls.preparse(args)
+        return (
+            tuple(dep_graph.symbols_graph.names2points(preparse)) if preparse else None
+        )
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:

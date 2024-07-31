@@ -1,10 +1,10 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from geosolver.dependency.dependency import NUMERICAL_CHECK, Dependency
 from geosolver.dependency.symbols import Line, Point
 from geosolver.numerical.geometries import LineNum
-from geosolver.predicates.predicate import IllegalPredicate, Predicate
+from geosolver.predicates.predicate import Predicate
 
 if TYPE_CHECKING:
     from geosolver.dependency.dependency_graph import DependencyGraph
@@ -18,16 +18,17 @@ class Coll(Predicate):
     NAME = "coll"
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]):
         if len(args) <= 2 or len(args) != len(set(args)):
-            raise IllegalPredicate
+            return None
         return tuple(sorted(args))
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
-        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
+    def parse(cls, args: tuple[str, ...], dep_graph: DependencyGraph):
+        preparse = cls.preparse(args)
+        return (
+            tuple(dep_graph.symbols_graph.names2points(preparse)) if preparse else None
+        )
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
@@ -78,13 +79,13 @@ class NColl(Predicate):
     NAME = "ncoll"
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> Optional[tuple[str, ...]]:
         return Coll.preparse(args)
 
     @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    ) -> Optional[tuple[Any, ...]]:
         return Coll.parse(args, dep_graph)
 
     @classmethod

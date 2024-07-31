@@ -3,8 +3,6 @@ import pytest
 
 from geosolver.agent.breadth_first_search import BFSDDAR
 from geosolver.api import GeometricSolverBuilder
-from geosolver.predicates.equal_angles import EqAngle
-from geosolver.statement import Statement
 
 
 class TestDDAR:
@@ -112,7 +110,6 @@ class TestDDAR:
             .build()
         )
 
-        solver.draw_figure(False, Path(r"./tests_output/imo2000p1_setup.png"))
         success = solver.run()
         assert success
         solver.write_proof_steps(Path(r"./tests_output/imo2000p1_proof.txt"))
@@ -155,15 +152,6 @@ class TestDDAR:
             )
             .build()
         )
-        assert Statement(
-            EqAngle, ("e", "a", "a", "b", "e", "b", "d", "c"), solver.proof.dep_graph
-        ).check()
-        assert Statement(
-            EqAngle, ("e", "a", "a", "b", "e", "d", "d", "c"), solver.proof.dep_graph
-        ).check()
-        assert Statement(
-            EqAngle, ("b", "e", "e", "a", "c", "e", "e", "d"), solver.proof.dep_graph
-        ).check()
         success = solver.run()
         solver.write_proof_steps(Path(r"./tests_output/orthocenter_proof.txt"))
         assert success

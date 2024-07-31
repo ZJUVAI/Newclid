@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from geosolver.numerical import close_enough
-from geosolver.predicates.predicate import IllegalPredicate, Predicate
+from geosolver.predicates.predicate import Predicate
 from geosolver.reasoning_engines.algebraic_reasoning.tables import Angle_Chase
 from geosolver.tools import reshape
 from geosolver.dependency.dependency import Dependency
@@ -28,12 +28,12 @@ class EqAngle(Predicate):
     NAME = "eqangle"
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]):
         groups: list[tuple[str, str, str, str]] = []
         groups1: list[tuple[str, str, str, str]] = []
         for a, b, c, d in reshape(args, 4):
             if a == b or c == d:
-                raise IllegalPredicate
+                return None
             a, b = sorted((a, b))
             c, d = sorted((c, d))
             groups.append((a, b, c, d))
@@ -41,10 +41,11 @@ class EqAngle(Predicate):
         return sum(min(sorted(groups), sorted(groups1)), ())
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
-        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
+    def parse(cls, args: tuple[str, ...], dep_graph: DependencyGraph):
+        preparse = cls.preparse(args)
+        return (
+            tuple(dep_graph.symbols_graph.names2points(preparse)) if preparse else None
+        )
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:

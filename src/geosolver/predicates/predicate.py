@@ -9,10 +9,6 @@ if TYPE_CHECKING:
     from geosolver.statement import Statement
 
 
-class IllegalPredicate(Exception):
-    ...
-
-
 class Predicate(ABC):
     """
     When the args are passed in functions other than parse and to_tokens,
@@ -22,13 +18,13 @@ class Predicate(ABC):
     NAME: str
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> Optional[tuple[str, ...]]:
         raise NotImplementedError(f"{cls.NAME} preparse not implemented")
 
     @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    ) -> Optional[tuple[Any, ...]]:
         raise NotImplementedError(f"{cls.NAME} parse not implemented")
 
     @classmethod

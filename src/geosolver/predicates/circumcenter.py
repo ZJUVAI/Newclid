@@ -1,11 +1,11 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 from geosolver.dependency.dependency import Dependency
 from geosolver.numerical import close_enough
 from geosolver.numerical.geometries import CircleNum
 from geosolver.predicates.congruence import Cong
 from geosolver.predicates.cyclic import Cyclic
-from geosolver.predicates.predicate import IllegalPredicate, Predicate
+from geosolver.predicates.predicate import Predicate
 
 
 if TYPE_CHECKING:
@@ -26,16 +26,19 @@ class Circumcenter(Predicate):
     NAME = "circle"
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> Optional[tuple[str, ...]]:
         if len(args) <= 2 or len(args) != len(set(args)):
-            raise IllegalPredicate
+            return None
         return (args[0],) + tuple(sorted(args[1:]))
 
     @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
-        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
+    ) -> Optional[tuple[Any, ...]]:
+        preparse = cls.preparse(args)
+        return (
+            tuple(dep_graph.symbols_graph.names2points(preparse)) if preparse else None
+        )
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:

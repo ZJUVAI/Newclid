@@ -1,1 +1,0 @@
-{'runtime': 0.7364621162414551, 'success': True, 'steps': 1543, 'AD ⟂ BC': 'succeeded'}

@@ -7,7 +7,7 @@ from geosolver.dependency.dependency import Dependency
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.perpendicularity import Perp
-from geosolver.predicates.predicate import IllegalPredicate, Predicate
+from geosolver.predicates.predicate import Predicate
 from geosolver.tools import InfQuotientError, get_quotient
 
 if TYPE_CHECKING:
@@ -25,18 +25,21 @@ class PythagoreanPremises(Predicate):
     NAME = "PythagoreanPremises"
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> Optional[tuple[str, ...]]:
         a, b, c = args
         if a == b or a == c:
-            raise IllegalPredicate
+            return None
         b, c = sorted((b, c))
         return (a, b, c)
 
     @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
-        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
+    ) -> Optional[tuple[Any, ...]]:
+        preparse = cls.preparse(args)
+        return (
+            tuple(dep_graph.symbols_graph.names2points(preparse)) if preparse else None
+        )
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
@@ -94,13 +97,13 @@ class PythagoreanConclusions(Predicate):
     NAME = "PythagoreanConclusions"
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> Optional[tuple[str, ...]]:
         return PythagoreanPremises.preparse(args)
 
     @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    ) -> Optional[tuple[Any, ...]]:
         return PythagoreanPremises.parse(args, dep_graph)
 
     @classmethod

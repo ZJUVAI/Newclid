@@ -1,11 +1,11 @@
 from __future__ import annotations
 from fractions import Fraction
 from numpy import pi
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
-from geosolver.predicates.predicate import IllegalPredicate, Predicate
+from geosolver.predicates.predicate import Predicate
 from geosolver.reasoning_engines.algebraic_reasoning.tables import Angle_Chase
 from geosolver.tools import fraction_to_angle, str_to_fraction
 from geosolver.dependency.dependency import Dependency
@@ -29,10 +29,10 @@ class ConstantAngle(Predicate):
     NAME = "aconst"
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]) -> Optional[tuple[str, ...]]:
         a, b, c, d, y = args
         if a == b or c == d:
-            raise IllegalPredicate
+            return None
         a, b = sorted((a, b))
         c, d = sorted((c, d))
         f = str_to_fraction(y)
@@ -45,8 +45,11 @@ class ConstantAngle(Predicate):
     @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
-        a, b, c, d, f = cls.preparse(args)
+    ) -> Optional[tuple[Any, ...]]:
+        preparse = cls.preparse(args)
+        if not preparse:
+            return None
+        a, b, c, d, f = preparse
         return tuple(dep_graph.symbols_graph.names2points((a, b, c, d))) + (
             str_to_fraction(f),
         )

@@ -1,9 +1,9 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
-from geosolver.predicates.predicate import IllegalPredicate, Predicate
+from geosolver.predicates.predicate import Predicate
 from geosolver.reasoning_engines.algebraic_reasoning.tables import Ratio_Chase
 from geosolver.tools import reshape
 from geosolver.dependency.dependency import Dependency
@@ -22,15 +22,15 @@ class Cong(Predicate):
     NAME = "cong"
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]):
         segs: list[tuple[str, str]] = []
         if len(args) % 2 != 0:
-            raise IllegalPredicate
+            return None
         for a, b in zip(args[::2], args[1::2]):
             if a > b:
                 a, b = b, a
             if a == b:
-                raise IllegalPredicate
+                return None
             segs.append((a, b))
         segs.sort()
         points: list[str] = []
@@ -42,8 +42,11 @@ class Cong(Predicate):
     @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
-        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
+    ) -> Optional[tuple[Any, ...]]:
+        preparse = cls.preparse(args)
+        return (
+            tuple(dep_graph.symbols_graph.names2points(preparse)) if preparse else None
+        )
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:

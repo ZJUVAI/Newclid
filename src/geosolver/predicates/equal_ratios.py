@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.equal_angles import EqAngle
-from geosolver.predicates.predicate import IllegalPredicate, Predicate
+from geosolver.predicates.predicate import Predicate
 from geosolver.reasoning_engines.algebraic_reasoning.tables import Ratio_Chase
 from geosolver.tools import reshape
 from geosolver.dependency.dependency import Dependency
@@ -26,13 +26,11 @@ class EqRatio(Predicate):
     NAME = "eqratio"
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]):
         return EqAngle.preparse(args)
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
+    def parse(cls, args: tuple[str, ...], dep_graph: DependencyGraph):
         return EqAngle.parse(args, dep_graph)
 
     @classmethod
@@ -124,19 +122,20 @@ class EqRatio3(Predicate):
     NAME = "eqratio3"
 
     @classmethod
-    def preparse(cls, args: tuple[str, ...]) -> tuple[str, ...]:
+    def preparse(cls, args: tuple[str, ...]):
         a, b, c, d, m, n = args
         if len(set((a, c, m))) < 3 or len(set((b, d, n))) < 3:
-            raise IllegalPredicate
+            return None
         groups = ((a, b), (c, d), (m, n))
         groups1 = ((b, a), (d, c), (n, m))
         return sum(min(sorted(groups), sorted(groups1)), ())
 
     @classmethod
-    def parse(
-        cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
-        return tuple(dep_graph.symbols_graph.names2points(cls.preparse(args)))
+    def parse(cls, args: tuple[str, ...], dep_graph: DependencyGraph):
+        preparse = cls.preparse(args)
+        return (
+            tuple(dep_graph.symbols_graph.names2points(preparse)) if preparse else None
+        )
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
