@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from geosolver.agent.agents_interface import (
     DeductiveAgent,
 )
-from geosolver.proof import Proof
+from geosolver.proof import ProofState
 
 if TYPE_CHECKING:
     from geosolver.rule import Rule
@@ -22,7 +22,7 @@ class BFSDDAR(DeductiveAgent):
 
     """
 
-    def __init__(self, proof: Proof, rules: list["Rule"]) -> None:
+    def __init__(self, proof: ProofState, rules: list["Rule"]) -> None:
         self.proof = proof
         self.rules = rules
         self.rule_buffer: list[Rule] = []

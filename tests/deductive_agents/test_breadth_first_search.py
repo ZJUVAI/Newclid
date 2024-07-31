@@ -10,7 +10,9 @@ from geosolver.statement import Statement
 class TestDDAR:
     @pytest.fixture(autouse=True)
     def setUpClass(self):
-        self.solver_builder = GeometricSolverBuilder().with_deductive_agent(BFSDDAR)
+        self.solver_builder = GeometricSolverBuilder(
+            seed=998244353
+        ).with_deductive_agent(BFSDDAR)
 
     def test_translated_obm_phase1_2016_p10(self):
         solver = (
@@ -35,7 +37,7 @@ class TestDDAR:
 
         success = solver.run()
         assert success
-        solver.write_solution(Path(r"./tests_output/imo2016p10_proof.txt"))
+        solver.write_proof_steps(Path(r"./tests_output/imo2016p10_proof.txt"))
 
     def test_translated_imo_2009_p2_extra_points(self):
         solver = (
@@ -59,7 +61,8 @@ class TestDDAR:
 
         success = solver.run()
         assert success
-        solver.write_solution(Path(r"./tests_output/imo2009p2_proof.txt"))
+        solver.write_proof_steps(Path(r"./tests_output/imo2009p2_proof.txt"))
+        solver.draw_figure(False, Path(r"./tests_output/imo2009p.png"))
 
     @pytest.mark.skip("not solved by ag either")
     def test_translated_imo_2011_p6_with_orthocenter(self):
@@ -88,7 +91,7 @@ class TestDDAR:
 
         success = solver.run()
         assert success
-        solver.write_solution(Path(r"./tests_output/imo2011p6_proof.txt"))
+        solver.write_proof_steps(Path(r"./tests_output/imo2011p6_proof.txt"))
 
     def test_imo_2000_p1_should_succeed(self):
         solver = (
@@ -112,7 +115,7 @@ class TestDDAR:
         solver.draw_figure(False, Path(r"./tests_output/imo2000p1_setup.png"))
         success = solver.run()
         assert success
-        solver.write_solution(Path(r"./tests_output/imo2000p1_proof.txt"))
+        solver.write_proof_steps(Path(r"./tests_output/imo2000p1_proof.txt"))
 
     def test_incenter_excenter_should_succeed(self):
         solver = (
@@ -162,5 +165,5 @@ class TestDDAR:
             EqAngle, ("b", "e", "e", "a", "c", "e", "e", "d"), solver.proof.dep_graph
         ).check()
         success = solver.run()
-        solver.write_solution(Path(r"./tests_output/orthocenter_proof.txt"))
+        solver.write_proof_steps(Path(r"./tests_output/orthocenter_proof.txt"))
         assert success

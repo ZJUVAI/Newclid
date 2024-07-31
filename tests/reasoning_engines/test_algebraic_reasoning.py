@@ -6,7 +6,7 @@ from tests.fixtures import build_until_works
 
 def test_ar_world_hardest_problem_vertex():
     solver = build_until_works(
-        GeometricSolverBuilder()
+        GeometricSolverBuilder(seed=998244353)
         .load_problem_from_txt(
             "a b = segment a b; "
             "o = s_angle b a o 70o, s_angle a b o 120o; "
@@ -27,7 +27,7 @@ def test_ar_world_hardest_problem_vertex():
 @pytest.mark.xfail
 def test_ar_ratio_hallucination():
     solver = build_until_works(
-        GeometricSolverBuilder()
+        GeometricSolverBuilder(seed=998244353)
         .load_problem_from_txt(
             "a b e = triangle12 a b e; c = midpoint c a e ? cong a c a b"
         )

@@ -243,7 +243,7 @@ def test_rule_used_to_solve_in_one_step(
     rule_name: str, rule_txt: str, problem_txt: str
 ):
     solver_builder = (
-        GeometricSolverBuilder()
+        GeometricSolverBuilder(seed=998244353)
         .load_problem_from_txt(problem_txt)
         .load_rules_from_txt(rule_txt)
     )

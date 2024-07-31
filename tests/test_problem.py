@@ -7,7 +7,7 @@ from geosolver.api import GeometricSolverBuilder
 class TestProblem:
     @pytest.fixture(autouse=True)
     def setUp(self):
-        self.solver_builder = GeometricSolverBuilder()
+        self.solver_builder = GeometricSolverBuilder(seed=998244353)
 
     def test_orthocenter_build(self):
         self.solver_builder.load_problem_from_txt(

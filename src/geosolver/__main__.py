@@ -1,25 +1,21 @@
 import logging
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
 from pathlib import Path
-import time
-from typing import Optional
 
 from geosolver import AGENTS_REGISTRY
 from geosolver.api import GeometricSolverBuilder
-from geosolver.configs import default_configs_path
 from geosolver.reasoning_engines.algebraic_reasoning import algebraic_manipulator
 
 
 def cli_arguments() -> Namespace:
     parser = ArgumentParser("geosolver", formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument(
-        "--problem",
+        "--problem-name",
         required=True,
         type=str,
-        help="Description of the problem to solve."
-        " Textual representation or path and name"
-        " in the format `path/to/problems.txt:name`.",
     )
+    parser.add_argument("--exp", default="exp")
+    parser.add_argument("--problems-file", default=None)
     parser.add_argument(
         "--agent",
         default="bfsddar",
@@ -30,35 +26,19 @@ def cli_arguments() -> Namespace:
     )
     parser.add_argument(
         "--defs",
-        type=str,
         default=None,
         help="Path to definition file. Uses default definitions if unspecified.",
     )
     parser.add_argument(
         "--rules",
-        type=str,
         default=None,
         help="Path to rules file. Uses default rules if unspecified.",
     )
     parser.add_argument(
         "--seed",
-        default=None,
+        default=998244353,
         type=int,
         help="Seed for random sampling",
-    )
-    parser.add_argument(
-        "-o",
-        "--output-folder",
-        default=None,
-        help="Path to the folder in which to save outputs."
-        " Defaults to 'run_results/problem_name'."
-        " Will override existing outputs if any.",
-    )
-    parser.add_argument(
-        "--clean",
-        default=False,
-        action="store_true",
-        help="Do a quiet run without any file outputs.",
     )
     parser.add_argument(
         "--log-level",
@@ -66,13 +46,7 @@ def cli_arguments() -> Namespace:
         type=int,
         help="Logging level.",
     )
-    parser.add_argument(
-        "--just-draw-figure",
-        default=False,
-        action="store_true",
-        help="Only do the figure drawing "
-        "withut running the solving process and removing the goals.",
-    )
+    parser.add_argument("--goal", default=None)
     parser.add_argument(
         "--ar-verbose",
         default="",
@@ -87,83 +61,65 @@ def main():
     args = cli_arguments()
     logging.basicConfig(level=args.log_level)
 
-    clean: bool = args.clean
-    just_draw: bool = args.just_draw_figure
-    seed: Optional[int] = args.seed
+    seed: int = args.seed
     algebraic_manipulator.config["verbose"] = args.ar_verbose
 
-    solver_builder = GeometricSolverBuilder(seed=seed)
+    solver_builder = GeometricSolverBuilder(seed)
 
-    problem_name = load_problem(args.problem, solver_builder)
+    # problem_name = load_problem(args.problem, solver_builder)
+    exppath = Path(args.exp)
+    outpath = exppath / args.problem_name
+    outpath.mkdir(parents=True, exist_ok=True)
 
-    solver_builder.load_defs_from_file(resolve_config_path(args.defs))
-    solver_builder.load_rules_from_file(resolve_config_path(args.rules))
+    solver_builder.load_defs_from_file(Path(args.defs) if args.defs else None)
+    rules = outpath / "rules.txt"
+    rules_exp = exppath / "rules.txt"
+    solver_builder.load_rules_from_file(
+        Path(args.rules)
+        if args.rules
+        else rules
+        if Path.exists(rules)
+        else rules_exp
+        if Path.exists(rules_exp)
+        else None
+    )
 
     agent = AGENTS_REGISTRY[args.agent]
     solver_builder.with_deductive_agent(agent)
 
-    outpath = resolve_output_path(args.output_folder, problem_name=problem_name)
-    if not clean:
-        outpath.mkdir(parents=True, exist_ok=True)
-        solver_builder.with_runtime_cache(outpath / "runtime_cache.json")
+    solver_builder.with_runtime_cache(outpath / "runtime_cache.json")
+
+    ggb = outpath / "geogebra-export.ggb"
+    ggb_exp = exppath / "geogebra-export.ggb"
+    if Path.exists(ggb):
+        logging.info(f"Use geogebra setting {ggb}")
+        solver_builder.load_geogebra(ggb)
+    elif ggb_exp:
+        logging.info(f"Use geogebra setting {ggb_exp}")
+        solver_builder.load_geogebra(ggb_exp)
+    elif args.problems_file:
+        logging.info(f"Use problem description in {args.problems_file}")
+        solver_builder.load_problem_from_file(args.problems_file, args.problem_name)
+    else:
+        logging.warning("No way to find the problem setting")
+        return
+
+    goals_file = outpath / "goals.txt"
+    if Path.exists(goals_file):
+        logging.info(f"Load goals in {goals_file}")
+        solver_builder.load_goals_file(goals_file)
+    if args.goal:
+        logging.info(f"Load goal : {args.goal}")
+        solver_builder.load_goal(args.goal)
 
     solver = solver_builder.build()
-
-    if not clean:
-        solver.draw_figure(False, outpath / "construction_figure.png")
-
-    if just_draw:
-        return
-
-    solver.run()
+    solver.draw_figure(False, outpath / "construction_figure.png")
+    success = solver.run()
 
     logging.info(f"Run infos: {solver.run_infos}")
-
-    if clean:
-        return
-
-    solver.write_solution(outpath / "proof_steps.txt")
-    solver.draw_figure(False, outpath / "proof_figure.png")
-
-
-def resolve_output_path(path_str: Optional[str], problem_name: str) -> Path:
-    if path_str is None:
-        if problem_name:
-            return Path("run_results") / problem_name
-        return Path("run_results") / str(time.strftime("%Y%m%d_%H%M%S"))
-    return Path(path_str)
-
-
-def resolve_config_path(path_str: Optional[str]) -> Optional[Path]:
-    if path_str is None:
-        return path_str
-
-    path = Path(path_str)
-    if path.exists():
-        return path
-
-    path = default_configs_path().joinpath(path_str)
-    if path.exists():
-        return path
-
-    raise FileNotFoundError(
-        f"Could not find file for path {path} nor under default_configs"
-    )
-
-
-def load_problem(
-    problem_txt_or_file: str,
-    solver_builder: GeometricSolverBuilder,
-) -> str:
-    PATH_NAME_SEPARATOR = ":"
-
-    if PATH_NAME_SEPARATOR not in problem_txt_or_file:
-        raise Exception("Problem name not given")
-
-    path, problem_name = problem_txt_or_file.split(PATH_NAME_SEPARATOR)
-    solver_builder.load_problem_from_file(Path(path), problem_name)
-    return problem_name
+    solver.write_all_outputs(outpath)
+    return success
 
 
 if __name__ == "__main__":
-    main()
+    exit(0 if main() else 1)

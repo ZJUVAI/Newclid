@@ -5,15 +5,19 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from geosolver.agent.agents_interface import DeductiveAgent
-    from geosolver.proof import Proof
+    from geosolver.proof import ProofState
 
 
 def run_loop(
     deductive_agent: "DeductiveAgent",
-    proof: "Proof",
+    proof: "ProofState",
 ) -> dict[str, Any]:
     """Run DeductiveAgent until saturation or goal found."""
     infos: dict[str, Any] = {}
+    for goal in proof.goals:
+        if not goal.check_numerical():
+            infos["error"] = f"{goal.pretty()} fails numerical check"
+            return infos
     success = False
     t0 = time.time()
 

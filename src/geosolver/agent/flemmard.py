@@ -9,7 +9,7 @@ from geosolver.agent.agents_interface import (
 
 if TYPE_CHECKING:
     from geosolver.rule import Rule
-    from geosolver.proof import Proof
+    from geosolver.proof import ProofState
 
 
 class Flemmard(DeductiveAgent):
@@ -20,7 +20,7 @@ class Flemmard(DeductiveAgent):
 
     """
 
-    def __init__(self, proof: "Proof", rules: list["Rule"]) -> None:
+    def __init__(self, proof: "ProofState", rules: list["Rule"]) -> None:
         ...
 
     def step(self) -> bool:

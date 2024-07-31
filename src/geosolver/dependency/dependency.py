@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from typing import TYPE_CHECKING, NamedTuple
 
 if TYPE_CHECKING:
@@ -23,9 +24,11 @@ class Dependency(NamedTuple):
     why: tuple[Statement, ...]
 
     def add(self):
+        if self.reason == IN_PREMISES:
+            logging.info(f"Adding premise: {self.statement.pretty()}")
         if not self.statement.check_numerical():
             raise Exception(
-                f"Adding a statement {self.pretty()} that is numerically false"
+                f"Adding a dependency {self.pretty()} the conclusion of which is numerically false"
             )
         dep_graph = self.statement.dep_graph
         s = dep_graph.hyper_graph.get(self.statement)

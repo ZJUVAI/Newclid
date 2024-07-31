@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     pass
 
 
-class Problem(NamedTuple):
+class ProblemJGEX(NamedTuple):
     """Describe one problem to solve."""
 
     name: str
@@ -25,7 +25,7 @@ class Problem(NamedTuple):
         )
 
     @classmethod
-    def parse_txt_file(cls, fname: Path) -> dict[str, Problem]:
+    def parse_txt_file(cls, fname: Path) -> dict[str, ProblemJGEX]:
         with open(fname, "r") as f:
             lines = f.read().split("\n")
 
@@ -36,7 +36,7 @@ class Problem(NamedTuple):
         return {p.name: p for p in data}
 
     @classmethod
-    def from_text(cls, s: str) -> Problem:
+    def from_text(cls, s: str) -> ProblemJGEX:
         """Load a problem from a str object."""
         name = ""
         if "\n" in s:
@@ -47,7 +47,7 @@ class Problem(NamedTuple):
         else:
             constructions_str, goals_str = s, ""
 
-        problem = Problem(
+        problem = ProblemJGEX(
             name=name,
             constructions=Clause.parse_line(constructions_str),
             goals=tuple(atomize(g) for g in atomize(goals_str, ";"))
@@ -57,30 +57,30 @@ class Problem(NamedTuple):
         return problem
 
     @classmethod
-    def from_file(cls, problems_path: Path, problem_name: str) -> Problem:
+    def from_file(cls, problems_path: Path, problem_name: str) -> ProblemJGEX:
         """
         `tranlate = True` by default for better LLM training
         """
-        problems = Problem.parse_txt_file(problems_path)
+        problems = ProblemJGEX.parse_txt_file(problems_path)
         if problem_name not in problems:
             print(problem_name, "!!", problems.keys())
             raise ValueError(f"{problem_name} not found in {list(problems.keys())}")
         return problems[problem_name]
 
-    def with_more_construction(self, constructions: str) -> Problem:
-        return Problem(
+    def with_more_construction(self, constructions: str) -> ProblemJGEX:
+        return ProblemJGEX(
             name=self.name,
             constructions=self.constructions + Clause.parse_line(constructions),
             goals=self.goals,
         )
 
-    def renamed(self) -> Problem:
+    def renamed(self) -> ProblemJGEX:
         mp: dict[str, str] = {}
         for construction in self.constructions:
             for point in construction.points:
                 if point not in mp:
                     mp[point] = chr(ord("a") + len(mp))
-        return Problem(
+        return ProblemJGEX(
             self.name,
             tuple(construction.renamed(mp) for construction in self.constructions),
             tuple(translate_sentence(mp, s) for s in self.goals),

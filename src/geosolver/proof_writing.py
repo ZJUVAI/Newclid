@@ -9,10 +9,10 @@ from geosolver.dependency.dependency import IN_PREMISES, NUMERICAL_CHECK, Depend
 from geosolver.statement import Statement
 
 if TYPE_CHECKING:
-    from geosolver.proof import Proof
+    from geosolver.proof import ProofState
 
 
-def write_solution(proof: "Proof", out_file: Optional[Path]) -> None:
+def write_proof_steps(proof_state: "ProofState", out_file: Optional[Path]) -> None:
     """Output the solution to out_file.
 
     Args:
@@ -22,7 +22,7 @@ def write_solution(proof: "Proof", out_file: Optional[Path]) -> None:
     """
 
     id: dict[Statement, str] = {}
-    goals = [goal for goal in proof.goals if goal.check()]
+    goals = [goal for goal in proof_state.goals if goal.check()]
     for k, goal in enumerate(goals):
         id[goal] = f"g{k}"
 
@@ -34,8 +34,8 @@ def write_solution(proof: "Proof", out_file: Optional[Path]) -> None:
 
     solution = "==========================\n"
     solution += "* From problem construction:\n"
-    solution += f"Points : {', '.join(p.pretty_name for p in proof.symbols_graph.nodes_of_type(Point))}\n"
-    proof_deps = proof.dep_graph.proof_deps(goals)
+    solution += f"Points : {', '.join(p.pretty_name for p in proof_state.symbols_graph.nodes_of_type(Point))}\n"
+    proof_deps = proof_state.dep_graph.proof_deps(goals)
     premises: list[Dependency] = []
     numercial_checked: list[Dependency] = []
     proof_steps: list[Dependency] = []
@@ -55,8 +55,9 @@ def write_solution(proof: "Proof", out_file: Optional[Path]) -> None:
         if NUMERICAL_CHECK not in line.reason and IN_PREMISES not in line:
             solution += f"{k:03d}. {rediger(line)}\n"
     solution += "\n=========================="
-    logging.info(solution)
-    if out_file is not None:
+    if out_file is None:
+        print(solution)
+    else:
         out_file.parent.mkdir(parents=True, exist_ok=True)
         with open(out_file, "w", encoding="utf-8") as f:
             f.write(solution)

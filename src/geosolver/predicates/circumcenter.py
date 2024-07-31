@@ -83,4 +83,4 @@ class Circumcenter(Predicate):
     def pretty(cls, statement: Statement) -> str:
         points: tuple[Point, ...] = statement.args
         o = points[0]
-        return f"{o.pretty_name} is the circumcenter of Circle:{''.join(p.name for p in points[1:])}"
+        return f"{o.pretty_name} is the circumcenter of the circle {''.join(p.pretty_name for p in points[1:])}"

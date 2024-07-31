@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Callable, NamedTuple
 from geosolver.agent.agents_interface import (
     DeductiveAgent,
 )
-from geosolver.proof import Proof
+from geosolver.proof import ProofState
 from geosolver.rule import Rule
 
 if TYPE_CHECKING:
@@ -21,7 +21,7 @@ class NamedFunction(NamedTuple):
 
 
 class HumanAgent(DeductiveAgent):
-    def __init__(self, proof: Proof, rules: list[Rule]) -> None:
+    def __init__(self, proof: ProofState, rules: list[Rule]) -> None:
         self.proof = proof
         self.rules = rules
         self.match_rules = [

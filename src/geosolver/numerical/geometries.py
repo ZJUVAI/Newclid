@@ -1,10 +1,3 @@
-# Some variables are there for better code reading.
-
-
-# Naming in geometry is a little different
-# we stick to geometry naming to better read the code.
-
-
 from typing import TYPE_CHECKING, Any, Iterable, Optional, Union, overload
 
 from numpy.random import Generator

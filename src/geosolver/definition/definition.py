@@ -7,7 +7,7 @@ from geosolver.problem import reshape
 from geosolver.tools import atomize
 
 
-class Definition(NamedTuple):
+class DefinitionJGEX(NamedTuple):
     """Definitions of construction statements."""
 
     declare: tuple[str, ...]
@@ -17,19 +17,19 @@ class Definition(NamedTuple):
     numerics: tuple[tuple[str, ...], ...]
 
     @classmethod
-    def parse_txt_file(cls, fname: Path) -> list[Definition]:
+    def parse_txt_file(cls, fname: Path) -> list[DefinitionJGEX]:
         with open(fname, "r") as f:
             lines = f.read()
             return cls.parse_text(lines)
 
     @classmethod
-    def parse_text(cls, text: str) -> list[Definition]:
+    def parse_text(cls, text: str) -> list[DefinitionJGEX]:
         lines = text.split("\n")
         data = [cls.from_str("\n".join(group)) for group in reshape(lines, 6)]
         return data
 
     @classmethod
-    def from_str(cls, s: str) -> Definition:
+    def from_str(cls, s: str) -> DefinitionJGEX:
         """Load the definition from a str object."""
         declare, rely, require, basics, numerics = s.split("\n")[:5]
         return cls(
@@ -41,7 +41,7 @@ class Definition(NamedTuple):
         )
 
     @classmethod
-    def to_dict(cls, defs: list[Definition]) -> dict[str, Definition]:
+    def to_dict(cls, defs: list[DefinitionJGEX]) -> dict[str, DefinitionJGEX]:
         return {d.declare[0]: d for d in defs}
 
 
