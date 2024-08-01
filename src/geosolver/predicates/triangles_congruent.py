@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.numerical.check import same_clock
@@ -25,10 +25,15 @@ class ContriClock(Predicate):
     NAME = "contri"
 
     @classmethod
+    def preparse(cls, args: tuple[str, ...]) -> Optional[tuple[str, ...]]:
+        return two_triangles(*args)
+
+    @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
-        return tuple(dep_graph.symbols_graph.names2points(two_triangles(*args)))
+    ) -> Optional[tuple[Any, ...]]:
+        twot = two_triangles(*args)
+        return tuple(dep_graph.symbols_graph.names2points(twot)) if twot else None
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
@@ -59,10 +64,15 @@ class ContriReflect(Predicate):
     NAME = "contrir"
 
     @classmethod
+    def preparse(cls, args: tuple[str, ...]) -> Optional[tuple[str, ...]]:
+        return two_triangles(*args)
+
+    @classmethod
     def parse(
         cls, args: tuple[str, ...], dep_graph: DependencyGraph
-    ) -> tuple[Any, ...]:
-        return tuple(dep_graph.symbols_graph.names2points(two_triangles(*args)))
+    ) -> Optional[tuple[Any, ...]]:
+        twot = two_triangles(*args)
+        return tuple(dep_graph.symbols_graph.names2points(twot)) if twot else None
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:

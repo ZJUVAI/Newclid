@@ -3,6 +3,8 @@ import pytest
 
 from geosolver.agent.breadth_first_search import BFSDDAR
 from geosolver.api import GeometricSolverBuilder
+from geosolver.predicates.equal_angles import EqAngle
+from geosolver.statement import Statement
 
 
 class TestDDAR:
@@ -148,10 +150,28 @@ class TestDDAR:
                 "a b c = triangle a b c; "
                 "d = on_tline d b a c, on_tline d c a b; "
                 "e = on_line e a c, on_line e b d "
-                "? perp a d b c"
+                # "? perp a d b c"
+                # "? eqangle a d d e b c c e"
+                # "? simtri a d e b c e"
+                # "? eqratio a e d e b e c e"
+                # "? eqangle a b a e c d d e"
+                # "? eqangle a e b e d e c e"
+                "? simtri a b e d c e"
             )
             .build()
         )
+        assert Statement.from_tokens(
+            (EqAngle.NAME, "e", "a", "a", "b", "e", "b", "d", "c"),
+            solver.proof.dep_graph,
+        ).check()  # type: ignore
+        assert Statement.from_tokens(
+            (EqAngle.NAME, "e", "a", "a", "b", "e", "d", "d", "c"),
+            solver.proof.dep_graph,
+        ).check()  # type: ignore
+        assert Statement.from_tokens(
+            (EqAngle.NAME, "b", "e", "e", "a", "c", "e", "e", "d"),
+            solver.proof.dep_graph,
+        ).check()  # type: ignore
         success = solver.run()
-        solver.write_proof_steps(Path(r"./tests_output/orthocenter_proof.txt"))
         assert success
+        # solver.write_proof_steps(Path(r"./tests_output/orthocenter_proof.txt"))
