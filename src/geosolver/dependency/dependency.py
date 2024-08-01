@@ -31,13 +31,9 @@ class Dependency(NamedTuple):
                 f"Adding a dependency {self.pretty()} the conclusion of which is numerically false"
             )
         dep_graph = self.statement.dep_graph
-        s = dep_graph.hyper_graph.get(self.statement)
-        if s is not None and self in s:
+        if self.statement in dep_graph.hyper_graph:
             return
-        if s is None:
-            dep_graph.hyper_graph[self.statement] = {self}
-        else:
-            s.add(self)
+        dep_graph.hyper_graph[self.statement] = self
         self.statement.predicate.add(self)
 
     def with_new(self, statement: Statement) -> Dependency:

@@ -21,7 +21,6 @@ class Statement:
         self.predicate = predicate
         self.args: tuple[Any, ...] = args
         self.dep_graph = dep_graph
-        self.why_cache: Optional[Dependency] = None
 
     def check(self) -> bool:
         """Symbolically check if the statement is currently considered True."""
@@ -30,9 +29,7 @@ class Statement:
         if not self.predicate.check_numerical(self):
             return False
         if self.predicate.check(self):
-            why = self.predicate.why(self)
-            assert why
-            self.dep_graph.hyper_graph[self] = {why}
+            self.why()
             return True
         return False
 
@@ -41,9 +38,13 @@ class Statement:
         return self.predicate.check_numerical(self)
 
     def why(self) -> Optional[Dependency]:
-        if self.why_cache is None:
-            self.why_cache = self.predicate.why(self)
-        return self.why_cache
+        res = self.dep_graph.hyper_graph.get(self)
+        if res is not None:
+            return res
+        res = self.predicate.why(self)
+        if res is not None:
+            self.dep_graph.hyper_graph[self] = res
+        return res
 
     def __repr__(self) -> str:
         return self.predicate.to_repr(self)

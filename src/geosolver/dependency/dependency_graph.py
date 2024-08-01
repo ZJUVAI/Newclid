@@ -15,7 +15,7 @@ class DependencyGraph:
 
     def __init__(self, ar: "AlgebraicManipulator") -> None:
         self.symbols_graph = SymbolsGraph()
-        self.hyper_graph: dict[Statement, set[Dependency]] = {}
+        self.hyper_graph: dict[Statement, Dependency] = {}
         self.ar = ar
 
     def has_edge(self, dep: Dependency):
@@ -31,25 +31,17 @@ class DependencyGraph:
         if statement in sub_proof:
             return sub_proof[statement]
         sub_proof[statement] = None
-        my_proof = None
-        for dep in self.hyper_graph[statement]:
-            cur_proof: Optional[tuple[Dependency, ...]] = tuple()
-            for premise in dep.why:
-                t = self._proof_text(premise, sub_proof)
-                if t is None:
-                    cur_proof = None
-                    break
-                else:
-                    cur_proof += t
-            if cur_proof is not None and (
-                my_proof is None or len(my_proof) > len(cur_proof)
-            ):
-                my_proof = cur_proof + (dep,)
-        if my_proof is None:
-            del sub_proof[statement]
-            return None
-        sub_proof[statement] = my_proof
-        return my_proof
+        dep = self.hyper_graph[statement]
+        cur_proof: Optional[tuple[Dependency, ...]] = tuple()
+        for premise in dep.why:
+            t = self._proof_text(premise, sub_proof)
+            if t is None:
+                cur_proof = None
+                break
+            else:
+                cur_proof += t
+        sub_proof[statement] = cur_proof
+        return cur_proof
 
     def proof_deps(self, goals: list[Statement]) -> tuple[Dependency, ...]:
         sub_proof: dict[Statement, Optional[tuple[Dependency, ...]]] = {}
