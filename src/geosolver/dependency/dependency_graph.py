@@ -32,11 +32,7 @@ class DependencyGraph:
             return sub_proof[statement]
         sub_proof[statement] = None
         my_proof = None
-        deps = self.hyper_graph[statement]
-        extra_dep = statement.why()
-        if extra_dep is not None:
-            deps.add(extra_dep)
-        for dep in deps:
+        for dep in self.hyper_graph[statement]:
             cur_proof: Optional[tuple[Dependency, ...]] = tuple()
             for premise in dep.why:
                 t = self._proof_text(premise, sub_proof)

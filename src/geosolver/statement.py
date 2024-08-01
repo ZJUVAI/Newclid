@@ -30,7 +30,9 @@ class Statement:
         if not self.predicate.check_numerical(self):
             return False
         if self.predicate.check(self):
-            self.dep_graph.hyper_graph[self] = set()
+            why = self.predicate.why(self)
+            assert why
+            self.dep_graph.hyper_graph[self] = {why}
             return True
         return False
 
