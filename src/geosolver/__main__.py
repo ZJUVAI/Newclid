@@ -98,7 +98,7 @@ def main():
     if Path.exists(ggb):
         logging.info(f"Use geogebra setting {ggb}")
         solver_builder.load_geogebra(ggb)
-    elif ggb_exp:
+    elif Path.exists(ggb_exp):
         logging.info(f"Use geogebra setting {ggb_exp}")
         solver_builder.load_geogebra(ggb_exp)
     elif args.problems_file:

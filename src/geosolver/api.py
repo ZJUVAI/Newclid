@@ -178,7 +178,9 @@ class GeometricSolverBuilder:
         return self
 
     def load_goal(self, goal: str) -> Self:
-        self.goals.append(Statement.from_tokens(atomize(goal), self.dep_graph))
+        goal_statement = Statement.from_tokens(atomize(goal), self.dep_graph)
+        assert goal_statement, "goal must parse"
+        self.goals.append(goal_statement)
         return self
 
     def load_goals_file(self, path: Path) -> Self:
