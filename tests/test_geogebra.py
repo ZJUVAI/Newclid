@@ -10,7 +10,7 @@ def test_orthocenter():
         "orthocenter",
         "--exp",
         "tests-exp",
-        "--quiet",
+        # "--quiet",
     ]
     assert main()
 
@@ -22,6 +22,6 @@ def test_imo2009p2():
         "imo2009p2",
         "--exp",
         "tests-exp",
-        "--quiet",
+        # "--quiet",
     ]
     assert main()

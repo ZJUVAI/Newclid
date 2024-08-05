@@ -11,6 +11,13 @@ class InfQuotientError(Exception):
 # maximum denominator for a fraction.
 MAX_DENOMINATOR = 1000000
 
+T = TypeVar("T")
+
+
+def notNone(x: Optional[T]) -> T:
+    assert x is not None
+    return x
+
 
 def get_quotient(v: Any) -> Fraction:
     v = float(v)
@@ -64,9 +71,6 @@ def fraction_to_ratio(f: Fraction):
 def fraction_to_angle(f: Fraction):
     n, d = f.numerator, f.denominator
     return f"{n%d}pi/{d}"
-
-
-T = TypeVar("T")
 
 
 def reshape(to_reshape: Union[list[T], tuple[T, ...]], n: int) -> list[tuple[T, ...]]:

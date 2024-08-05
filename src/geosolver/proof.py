@@ -34,7 +34,7 @@ from geosolver.numerical.sketch import sketch
 from geosolver.problem import ProblemJGEX
 from geosolver.dependency.dependency import IN_PREMISES, Dependency
 from geosolver.rule import Rule
-from geosolver.tools import atomize
+from geosolver.tools import atomize, notNone
 
 if TYPE_CHECKING:
     from numpy.random import Generator
@@ -85,16 +85,20 @@ class ProofState:
             for premise in cdef.require.sentences:
                 if len(premise) == 0:
                     continue
-                statement = Statement.from_tokens(
-                    translate_sentence(mapping, premise), proof.dep_graph
+                statement = notNone(
+                    Statement.from_tokens(
+                        translate_sentence(mapping, premise), proof.dep_graph
+                    )
                 )
                 if not statement.check_numerical():
                     raise ConstructionError(construction)
 
             for bs in cdef.basics:
                 for t in bs.sentences:
-                    statement = Statement.from_tokens(
-                        translate_sentence(mapping, t), proof.dep_graph
+                    statement = notNone(
+                        Statement.from_tokens(
+                            translate_sentence(mapping, t), proof.dep_graph
+                        )
                     )
                     adds.append(Dependency.mk(statement, IN_PREMISES, ()))
             for n in cdef.numerics:
@@ -199,7 +203,7 @@ class ProofState:
 
             all_check = True
             proof.goals = [
-                Statement.from_tokens(goal, proof.dep_graph)
+                notNone(Statement.from_tokens(goal, proof.dep_graph))
                 for goal in problemJGEX.goals
             ]
             for goal in proof.goals:

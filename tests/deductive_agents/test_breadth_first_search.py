@@ -150,12 +150,6 @@ class TestDDAR:
                 "a b c = triangle a b c; "
                 "d = on_tline d b a c, on_tline d c a b; "
                 "e = on_line e a c, on_line e b d "
-                # "? perp a d b c"
-                # "? eqangle a d d e b c c e"
-                # "? simtri a d e b c e"
-                # "? eqratio a e d e b e c e"
-                # "? eqangle a b a e c d d e"
-                # "? eqangle a e b e d e c e"
                 "? simtri a b e d c e"
             )
             .build()
