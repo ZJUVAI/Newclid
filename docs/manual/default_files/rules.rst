@@ -36,7 +36,7 @@ r01 : Definition of circle
      - Formal Statement
      - Description
    * - |r01|
-     - :math:`|OA|=|OB|=|OC|=|OD|\implies ABCD\text{ in a circle}`
+     - :math:`|OA|=|OB|=|OC|=|OD|\implies ABCD\text{ on a circle}`
      - Four points A, B, C, D equidistant from a center O all lie on a same circle. (One side of the definition of a circle.)
 
 .. |r01| image:: ../../_static/Images/rules/r01.png
@@ -53,7 +53,7 @@ r02 : eqangle2para
      - Description
    * - |r02|
      - :math:`\angle (AB \times PQ)=\angle (CD \times PQ)\implies AB \parallel CD`
-     - 
+     - If two lines AB and CD define the same angle with respect to a fixed transverse line PQ, they are parallel.
 
 .. |r02| image:: ../../_static/Images/rules/r02.png
     :width: 100%
@@ -68,8 +68,8 @@ r03 : cyclic2eqangle
      - Formal Statement
      - Description
    * - |r03|
-     - :math:`ABPQ\text{ in a circle}\implies \angle (PA\times PB)=\angle (QA\times QB)`
-     - 
+     - :math:`ABPQ\text{ on a circle}\implies \angle (PA\times PB)=\angle (QA\times QB)`
+     - Two angles with the vertices P, Q on a circle that determine the same arc AB on that same circle are congruent.
 
 .. |r03| image:: ../../_static/Images/rules/r03.png
     :width: 100%
@@ -84,8 +84,8 @@ r04 : eqangle2cyclic
      - Formal Statement
      - Description
    * - |r04|
-     - :math:`\angle (PA\times PB)=\angle (QA\times QB) \implies ABPQ\text{ in a circle}`
-     - 
+     - :math:`\angle (PA\times PB)=\angle (QA\times QB) \implies ABPQ\text{ on a circle}`
+     - Reverse direction of r03: If P, Q are vertices of congruent angles, and A and B are the intersections of the legs of the angles with vertices P and Q, there is a circle through A, B, P, and Q.
 
 .. |r04| image:: ../../_static/Images/rules/r04.png
     :width: 100%
@@ -100,8 +100,8 @@ r05 : eqangle_on_circle2cong
      - Formal Statement
      - Description
    * - |r05|
-     - :math:`\begin{cases}ABCPQR\text{ in a circle}\\ \angle (CA\times CB)=\angle (RP\times RQ)\end{cases}\implies |AB|=|PQ|`
-     - 
+     - :math:`\begin{cases}ABCPQR\text{ on a circle}\\ \angle (CA\times CB)=\angle (RP\times RQ)\end{cases}\implies |AB|=|PQ|`
+     - From r03, two congruent angles on a circle determine arcs on that circle of the same length. This rule says that arcs of the same length determine chords of the same length on the same circle.
 
 .. |r05| image:: ../../_static/Images/rules/r05.png
     :width: 100%
@@ -117,7 +117,7 @@ r06 : Base of half triangle
      - Description
    * - |r06|
      - :math:`\begin{cases}E\text{ midpoint of } AB\\ F\text{ midpoint of }AC\end{cases} \implies EF \parallel BC`
-     - 
+     - The line connecting the midpoints of two sides of a triangle is parallel to the third side of the same triangle. (This is a special instance of Thales' Theorem with "midpoint" predicates).
 
 .. |r06| image:: ../../_static/Images/rules/r06.png
     :width: 100%
@@ -133,7 +133,7 @@ r07 : para2eqratio3
      - Description
    * - |r07|
      - :math:`\begin{cases}AB\parallel CD\\ OAC \text{ collinear}\\ OBD\text{ collinear}\end{cases}\implies \begin{cases}\frac{OA}{OC}=\frac{OB}{OD}\\ \frac{AO}{AC}=\frac{BO}{BD}\\ \frac{OC}{AC}=\frac{OD}{BD}\end{cases}`
-     - 
+     - This is an instance of Thales's theorem, saying that two parallel lines AB and CD cut by two intersecting transverse lines AC and BD, will determine a collection of proportional segments.
 
 .. |r07| image:: ../../_static/Images/rules/r07.png
     :width: 100%
@@ -165,7 +165,7 @@ r09 : Sum of angles of a triangle
      - Description
    * - |r09|
      - :math:`\begin{cases}\angle (AB\times CD)=\angle (MN\times PQ)\\ \angle (CD\times EF)=\angle (PQ\times RU)\end{cases}\implies \angle(AB\times EF)=\angle(MN\times RU)`
-     - 
+     - This rule says that if two triangles have two pairs of congruent angles, the third pair of angles will be congruent as well. It is a non-numerical version of the statement that the angles of a triangle always add to a given constant.
 
 .. |r09| image:: ../../_static/Images/rules/r09.png
     :width: 100%
@@ -226,7 +226,7 @@ r13 : Isosceles triangle equal angles
      - Description
    * - |r13|
      - :math:`|OA|=|OB| \implies \angle (OA\times AB) = \angle (AB\times OB)`
-     - 
+     - The theorem says that the base angles of an isosceles triangle are congruent.
 
 .. |r13| image:: ../../_static/Images/rules/r13.png
     :width: 100%
@@ -242,7 +242,7 @@ r14 : Equal base angles imply isosceles
      - Description
    * - |r14|
      - :math:`\angle (AO\times AB) = \angle (BA\times BO) \implies |OA|=|OB|`
-     - 
+     - This is the reverse direction of r13, saying that if the base angles of a triangle are congruent, the triangle is isosceles.
 
 .. |r14| image:: ../../_static/Images/rules/r14.png
     :width: 100%
@@ -311,8 +311,8 @@ r18 : eqangle2midp
 .. |r18| image:: ../../_static/Images/rules/r18.png
     :width: 100%
 
-r19 : right_triangle_midp2cong
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r19 : Hypothenuse is diameter
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -322,13 +322,13 @@ r19 : right_triangle_midp2cong
      - Description
    * - |r19|
      - :math:`\begin{cases}AB\perp BC \\ M\text{ midpoint of}AC\end{cases} \implies |AM|=|BM|`
-     - 
+     - This rule says that the hypothenuse of a right triangle is a diameter of its circumcircle, or that the midpoint of the hypothenuse is the circumcenter of the right triangle.
 
 .. |r19| image:: ../../_static/Images/rules/r19.png
     :width: 100%
 
-r20 : circle2perp
-^^^^^^^^^^^^^^^^^
+r20 : Diameter is hypotenuse
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -338,7 +338,7 @@ r20 : circle2perp
      - Description
    * - |r20|
      - :math:`\begin{cases}O \text{ center of the circle } ABC \\ OAC\text{ collinear} \end{cases}\implies AB \perp BC`
-     - 
+     - This theorem is the reverse direction of r19. It says that if two points are the edges of the diameter of a circle, and at the same time are vertices of an inscribed triangle, the triangle has a right angle at the third vertex.
 
 .. |r20| image:: ../../_static/Images/rules/r20.png
     :width: 100%
@@ -353,14 +353,14 @@ r21 : cyclic_para2eqangle
      - Formal Statement
      - Description
    * - |r21|
-     - :math:`\begin{cases}ABCD\text{ in a circle} \\ AB \parallel CD\end{cases} \implies \angle (AD\times CD) = \angle (CD\times CB)`
+     - :math:`\begin{cases}ABCD\text{ on a circle} \\ AB \parallel CD\end{cases} \implies \angle (AD\times CD) = \angle (CD\times CB)`
      - 
 
 .. |r21| image:: ../../_static/Images/rules/r21.png
     :width: 100%
 
-r22 : midp_perp2cong
-^^^^^^^^^^^^^^^^^^^^
+r22 : Bisector Construction
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -370,13 +370,13 @@ r22 : midp_perp2cong
      - Description
    * - |r22|
      - :math:`\begin{cases}M \text{ midpoint of }AB \\ OM\perp AB \end{cases} \implies |OA|=|OB|`
-     - 
+     - This rule says that the perpendicular line through the midpoint of the segment is the perpendicular bisector of the segment (the locus of all equidistant points to the vertices of the segment).
 
 .. |r22| image:: ../../_static/Images/rules/r22.png
     :width: 100%
 
-r23 : cong2perp
-^^^^^^^^^^^^^^^
+r23 : Bisector is perpendicular
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -386,7 +386,7 @@ r23 : cong2perp
      - Description
    * - |r23|
      - :math:`|AP|=|BP| \wedge |AQ|=|BQ| \implies AB\perp PQ`
-     - 
+     - This rule is the reverse direction of r22. It says that the locus of the points that are equidistant to the two vertices of a segment AB is a straight line perpendicular to AB.
 
 .. |r23| image:: ../../_static/Images/rules/r23.png
     :width: 100%
@@ -401,7 +401,7 @@ r24 : cong_cyclic2perp
      - Formal Statement
      - Description
    * - |r24|
-     - :math:`\begin{cases}|AP|=|BP| \\ |AQ|=|BQ| \\ ABPQ\text{ in a circle}\end{cases} \implies PA\perp AQ`
+     - :math:`\begin{cases}|AP|=|BP| \\ |AQ|=|BQ| \\ ABPQ\text{ on a circle}\end{cases} \implies PA\perp AQ`
      - 
 
 .. |r24| image:: ../../_static/Images/rules/r24.png
@@ -593,7 +593,7 @@ r36 : eqangle_cong2contri
      - Formal Statement
      - Description
    * - |r36|
-     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QP\times QR) \\ \angle (CA\times CB) = \angle (RP\times RQ)\\ |AB| = |PQ| \\ |BC| = |QR| \\ ABC\text{ non-collinear}\\ |AP| = |QB| \end{cases}\implies \Delta ABC\cong \Delta PQR`
+     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QP\times QR) \\ \angle (CA\times CB) = \angle (RP\times RQ)\\ |AB| = |PQ| \\ ABC\text{ non-collinear} \end{cases}\implies \Delta ABC\cong \Delta PQR`
      - 
 
 .. |r36| image:: ../../_static/Images/rules/r36.png
@@ -609,7 +609,7 @@ r37 : eqangle_cong2contri
      - Formal Statement
      - Description
    * - |r37|
-     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QP\times QR) \\ \angle (CA\times CB) = \angle (RP\times RQ)\\ |AB| = |PQ| \\ |BC| = |QR| \\ ABC\text{ non-collinear}\\|AP| = |QB| \end{cases}\implies \Delta ABC\cong^2 \Delta PQR`
+     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QP\times QR) \\ \angle (CA\times CB) = \angle (RP\times RQ)\\ |AB| = |PQ| \\ ABC\text{ non-collinear} \end{cases}\implies \Delta ABC\cong^2 \Delta PQR`
      - 
 
 .. |r37| image:: ../../_static/Images/rules/r37.png
@@ -721,17 +721,10 @@ r44 : Pappus's theorem
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{coll}(A, B, C) \wedge \text{coll}(P, Q, R) \wedge \text{coll}(X, A, Q)`
-       :math:`\wedge \text{coll}(X, P, B) \wedge \text{coll}(Y, A, R) \wedge \text{coll}(Y, P, C)`
-       :math:`\wedge \text{coll}(Z, B, R) \wedge \text{coll}(Z, C, Q)`
-       :math:`\implies \text{coll}(X, Y, Z)`
+     - Formal Statement
      - Description
    * - |r44|
-     -
-       .. code-block :: text
-
-         coll A B C, coll P Q R, coll X A Q, coll X P B, coll Y A R, coll Y P C, coll Z B R, coll Z C Q
-         => coll X Y Z
+     - :math:`\begin{cases}ABC\text{ collinear} \\ PQR\text{ collinear} \\ XAQ\text{ collinear}\\ XPB\text{ collinear} \\ YAR\text{ collinear} \\ YPC\text{ collinear}\\ ZBR\text{ collinear} \\ ZCQ\text{ collinear}\end{cases}\implies XYZ\text{ collinear}`
      -
 
 .. |r44| image:: ../../_static/Images/rules/r44.png
@@ -744,17 +737,10 @@ r45 : Simson line theorem
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{cyclic}(A, B, C, P) \wedge \text{coll}(A, L, C) \wedge \text{perp}(P, L, A, C)`
-       :math:`\wedge \text{coll}(M, B, C) \wedge \text{perp}(P, M, B, C)`
-       :math:`\wedge \text{coll}(N, A, B) \wedge \text{perp}(P, N, A, B)`
-       :math:`\implies \text{coll}(L, M, N)`
+     - Formal Statement
      - Description
    * - |r45|
-     -
-       .. code-block :: text
-
-         cyclic A B C P, coll A L C, perp P L A C, coll M B C, perp P M B C, coll N A B, perp P N A B
-         => coll L M N
+     - :math:`\begin{cases} ABCP\text{ on a circle} \\ ALC\text{ collinear} \\ PL\perp AC\\ \text{coll}(M, B, C) \\ PM\perp BC\\ NAB\text{ collinear} \\ PN\perp AB\end{cases}\implies LMN\text{ collinear}`
      - 
 
 .. |r45| image:: ../../_static/Images/rules/r45.png
@@ -767,16 +753,10 @@ r46 : Incenter theorem
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{eqangle}(A, B, A, X, A, X, A, C) \wedge \text{eqangle}(B, A, B, X, B, X, B, C)`
-       :math:`\wedge \text{ncoll}(A, B, C)`
-       :math:`\implies \text{eqangle}(C, B, C, X, C, X, C, A)`
+     - Formal Statement
      - Description
    * - |r46|
-     -
-       .. code-block :: text
-
-         eqangle A B A X A X A C, eqangle B A B X B X B C, ncoll A B C
-         => eqangle C B C X C X C A
+     - :math:`\begin{cases}\angle(AB\times AX)=\angle (AX\times AC) \\ \angle(BA\times BX)=\angle (BX\times BC)\\ ABC\text{ non-collinear}\end{cases}\implies \angle (CB\times CX)=\angle (CX\times CA)`
      - 
 
 .. |r46| image:: ../../_static/Images/rules/r46.png
@@ -789,18 +769,10 @@ r47 : Circumcenter theorem
    :header-rows: 1
 
    * - Figure
-     - Formal Description
+     - Formal Statement
      - Description
    * - |r47|
-     -
-       :math:`\text{midp}(m, a, b) \wedge \text{perp}(x, m, a, b) \wedge \text{midp}(n, b, c)`
-       :math:`\wedge \text{perp}(x, n, b, c) \wedge \text{midp}(p, c, a)`
-       :math:`\implies \text{perp}(x, p, c, a)`
-
-       .. code-block :: text
-
-         midp m a b, perp x m a b, midp n b c, perp x n b c, midp p c a
-         => perp x p c a
+     - :math:`\begin{cases}M\text{ midpoint of }AB \\ XM\perp AB \\ N\text{ midpoint of }BC\\ XN\perp BC \\ P\text{ midpoint of }CA\end{cases}\implies XP\perp CA`
      - 
 
 .. |r47| image:: ../../_static/Images/rules/r47.png
@@ -813,39 +785,56 @@ r48 : Centroid theorem
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{midp}(m, a, b) \wedge \text{coll}(m, x, c)`
-       :math:`\wedge \text{midp}(n, b, c) \wedge \text{coll}(n, x, c)`
-       :math:`\wedge \text{midp}(p, c, a)`
-       :math:`\implies \text{coll}(x, p, b)`
+     - Formal Statement
      - Description
    * - |r48|
-     -
-       .. code-block :: text
-
-         midp m a b, coll m x c, midp n b c, coll n x c, midp p c a
-         => coll x p b
+     - :math:`\begin{cases}M\text{ midpoint of }AB \\ MXC\text{ collinear}\\ N\text{ midpoint of }BC \\ NXC\text{ collinear}\\ P\text{ midpoint of }CA\end{cases}\implies XPB\text{ collinear}`
      - 
 
 .. |r48| image:: ../../_static/Images/rules/r48.png
     :width: 100%
 
-r49 : Recognize center of cyclic
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r49 : Recognize center of cyclic (circle)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
 
    * - Figure
-     - :math:`\text{circle}(O, A, B, C) \wedge \text{cyclic}(A, B, C, D)`
-       :math:`\implies \text{cong}(O, A, O, D)`
+     - Formal Statement
      - Description
    * - |r49|
-     -
-       .. code-block :: text
-
-         circle O A B C, cyclic A B C D
-         => cong O A O D
+     - :math:`\begin{cases}O\text{ center of the circle }ABC \\ABCD\text{ on a circle}\end{cases}\implies OA= OD`
      - 
 
 .. |r49| image:: ../../_static/Images/rules/r49.png
     :width: 100%
+
+r50 : Recognize center of cyclic (cong)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r50|
+     - :math:`\begin{cases}ABCD\text{ on a circle}\\ OA=OB\\ OC=OD\\ AB\not\parallel CD\end{cases}\implies OA=OC`
+     - 
+
+.. |r50| image:: ../../_static/Images/rules/r50.png
+    :width: 100%
+
+r51 : Midpoint splits in two
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - (Feeds algebraic module)
+     - :math:`M\text{ midpoint of AB}\implies \frac{MA}{AB}=\frac{1}{2}`
+     - This rule converts a symbolic statement (M is the midpoint of AB) into an algebraic one (the ratio between AM and AB is 1/2). This allows AR to process information from midpoints.
