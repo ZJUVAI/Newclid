@@ -8,7 +8,7 @@ def test_orthocenter():
         "geosolver",
         "--problem-name",
         "orthocenter",
-        "--exp",
+        "--env",
         "tests-exp",
         "--quiet",
     ]
@@ -20,7 +20,7 @@ def test_imo2009p2():
         "geosolver",
         "--problem-name",
         "imo2009p2",
-        "--exp",
+        "--env",
         "tests-exp",
         "--quiet",
     ]

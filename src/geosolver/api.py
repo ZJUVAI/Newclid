@@ -134,7 +134,7 @@ class GeometricSolverBuilder:
         self.problemJGEX = problem
         return self
 
-    def del_goal(self) -> Self:
+    def del_goals(self) -> Self:
         if self.problemJGEX:
             self.problemJGEX = ProblemJGEX(
                 self.problemJGEX.name, self.problemJGEX.constructions, ()

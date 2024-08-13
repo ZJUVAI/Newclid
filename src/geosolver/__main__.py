@@ -1,5 +1,6 @@
 import logging
 from argparse import ArgumentDefaultsHelpFormatter, ArgumentParser, Namespace
+import os
 from pathlib import Path
 
 from geosolver import AGENTS_REGISTRY
@@ -7,32 +8,36 @@ from geosolver.api import GeometricSolverBuilder
 from geosolver.reasoning_engines.algebraic_reasoning import algebraic_manipulator
 
 
+def find_ggb_files(directory: Path):
+    for entry in os.listdir(directory):
+        if entry.endswith(".ggb"):
+            yield entry
+
+
 def cli_arguments() -> Namespace:
     parser = ArgumentParser("geosolver", formatter_class=ArgumentDefaultsHelpFormatter)
     parser.add_argument(
         "--problem-name",
         required=True,
-        type=str,
     )
-    parser.add_argument("--exp", default="exp")
+    parser.add_argument("--env", default="exp", help="The environment folder")
+    parser.add_argument("--ggb", default=None, help="Geogebra export file")
     parser.add_argument("--problems-file", default=None)
     parser.add_argument(
         "--agent",
         default="bfsddar",
-        type=str,
-        help="Name of the agent to use."
-        " Register custom agents with `geosolver.register_agent`.",
+        help="Name of the agent to use",
         choices=AGENTS_REGISTRY.keys(),
     )
     parser.add_argument(
         "--defs",
         default=None,
-        help="Path to definition file. Uses default definitions if unspecified.",
+        help="Path to definition file if no definition file is found in the environment",
     )
     parser.add_argument(
         "--rules",
         default=None,
-        help="Path to rules file. Uses default rules if unspecified.",
+        help="Path to rules file if no definition file is found in the environment",
     )
     parser.add_argument(
         "--seed",
@@ -44,18 +49,18 @@ def cli_arguments() -> Namespace:
         "--log-level",
         default=logging.INFO,
         type=int,
-        help="Logging level.",
+        help="Logging level c.f. https://docs.python.org/3/library/logging.html#logging-levels",
     )
-    parser.add_argument("--goal", default=None)
     parser.add_argument(
         "--ar-verbose",
-        default="",
-        type=str,
+        default=None,
         help="Choose one or more from {a, d, r}, to print table of equations of angles (a), distances (d), ratios (r).",
     )
+    parser.add_argument("--quiet", action="store_true", help="Do not output any files")
     parser.add_argument(
-        "--quiet",
+        "--exhaust",
         action="store_true",
+        help="Run until the agent exhausts its actions",
     )
     args, _ = parser.parse_known_args()
     return args
@@ -66,64 +71,73 @@ def main():
     logging.basicConfig(level=args.log_level)
 
     seed: int = args.seed
-    algebraic_manipulator.config["verbose"] = args.ar_verbose
+    algebraic_manipulator.config["verbose"] = (
+        args.ar_verbose if args.ar_verbose is not None else ""
+    )
 
     solver_builder = GeometricSolverBuilder(seed)
 
     # problem_name = load_problem(args.problem, solver_builder)
-    exppath = Path(args.exp)
-    outpath = exppath / args.problem_name
-    outpath.mkdir(parents=True, exist_ok=True)
+    envpath = Path(args.env)
+    problem_path = envpath / args.problem_name
+    problem_path.mkdir(parents=True, exist_ok=True)
 
     solver_builder.load_defs_from_file(Path(args.defs) if args.defs else None)
-    rules = outpath / "rules.txt"
-    rules_exp = exppath / "rules.txt"
+    rules = problem_path / "rules.txt"
+    rules_env = envpath / "rules.txt"
     solver_builder.load_rules_from_file(
-        Path(args.rules)
-        if args.rules
-        else rules
+        rules
         if Path.exists(rules)
-        else rules_exp
-        if Path.exists(rules_exp)
+        else rules_env
+        if Path.exists(rules_env)
+        else Path(args.rules)
+        if args.rules
         else None
     )
 
+    if args.agent not in AGENTS_REGISTRY:
+        raise ValueError("Agent not found")
     agent = AGENTS_REGISTRY[args.agent]
     solver_builder.with_deductive_agent(agent)
 
-    solver_builder.with_runtime_cache(outpath / "runtime_cache.json")
+    solver_builder.with_runtime_cache(problem_path / "runtime_cache.json")
 
-    ggb = outpath / "geogebra-export.ggb"
-    ggb_exp = exppath / "geogebra-export.ggb"
-    if Path.exists(ggb):
-        logging.info(f"Use geogebra setting {ggb}")
-        solver_builder.load_geogebra(ggb)
-    elif Path.exists(ggb_exp):
-        logging.info(f"Use geogebra setting {ggb_exp}")
-        solver_builder.load_geogebra(ggb_exp)
+    ggb_files0 = list(find_ggb_files(problem_path)) + ([args.ggb] if args.ggb else [])
+    ggb_files1 = list(find_ggb_files(envpath))
+    if len(ggb_files0) >= 2 or len(ggb_files1) >= 2:
+        raise Exception("Environment illegal: ambigious ggb setting")
+    if (ggb_files0 or ggb_files1) and args.problems_file:
+        raise Exception("Ambigious problem source: ggb and jgex")
+    if ggb_files0:
+        logging.info(f"Use geogebra setting {problem_path / ggb_files0[0]}")
+        solver_builder.load_geogebra(problem_path / ggb_files0[0])
+    elif ggb_files1:
+        logging.info(f"Use geogebra setting {problem_path / ggb_files1[0]}")
+        solver_builder.load_geogebra(problem_path / ggb_files1[0])
     elif args.problems_file:
         logging.info(f"Use problem description in {args.problems_file}")
         solver_builder.load_problem_from_file(args.problems_file, args.problem_name)
     else:
-        logging.warning("No way to find the problem setting")
-        return
+        raise Exception("No way to find the problem setting")
 
-    goals_file = outpath / "goals.txt"
+    goals_file = problem_path / "goals.txt"
     if Path.exists(goals_file):
         logging.info(f"Load goals in {goals_file}")
         solver_builder.load_goals_file(goals_file)
-    if args.goal:
-        logging.info(f"Load goal : {args.goal}")
-        solver_builder.load_goal(args.goal)
+
+    if len(solver_builder.goals) == 0 and not args.exhaust:
+        raise Exception("Not with option exhaust and there is no goal!")
+    if args.exhaust:
+        solver_builder.del_goals()
 
     solver = solver_builder.build()
     if not args.quiet:
-        solver.draw_figure(False, outpath / "construction_figure.png")
+        solver.draw_figure(False, problem_path / "construction_figure.png")
     success = solver.run()
 
     logging.info(f"Run infos: {solver.run_infos}")
     if not args.quiet:
-        solver.write_all_outputs(outpath)
+        solver.write_all_outputs(problem_path)
     return success
 
 
