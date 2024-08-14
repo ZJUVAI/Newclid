@@ -139,6 +139,7 @@ class GeometricSolverBuilder:
             self.problemJGEX = ProblemJGEX(
                 self.problemJGEX.name, self.problemJGEX.constructions, ()
             )
+        self.goals = []
         return self
 
     def load_problem_from_txt(self, problem_txt: str) -> Self:
