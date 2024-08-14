@@ -264,9 +264,43 @@ incenter2 x y z i a b c
 .. |incenter2| image:: ../../_static/Images/defs/incenter2.png
     :width: 100%
 
-- **excenter x a b c:** From three non-collinear points a, b, c, adds x the excenter of triangle abc in a way that the corresponding excircle is externally tangent to side bc. Symbolically, it works exactly as the incenter construction because the angle constructions in DD do not differentiate the two bisectors of an angle crossing.
+excenter x a b c
+^^^^^^^^^^^^^^^^
 
-- **excenter2 x y z i a b c:** From three non-collinear points a, b, c, adds i, the excenter of the triangle abc in a way that the corresponding excircle is externally tangent to side bc. It also adds x, y, and z, the tangent points of the incircle with the lines containing sides bc, ac, and ab, respectively. Symbolically, it works exactly as the incenter construction because the angle constructions in DD do not differentiate the two bisectors of an angle crossing.
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |excenter|
+     - From three non-collinear points a, b, c, adds x the excenter of triangle abc in a way that the corresponding excircle is externally tangent to side bc. Symbolically, it works exactly as the incenter construction because the angle constructions in DD do not differentiate the two bisectors of an angle crossing.
+     - :math:`\begin{cases}\widehat{bax}=\widehat{xac}\\ \widehat{acx}=\widehat{xcb}\\ \widehat{cbx}=\widehat{xba}\end{cases}` (eqangle a b a x a x a c, eqangle c a c x c x c b, eqangle b c b x b x b a)
+     - Point
+
+.. |excenter| image:: ../../_static/Images/defs/excenter.png
+    :width: 100%
+
+excenter2 x y z i a b c
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |excenter2|
+     - From three non-collinear points a, b, c, adds i, the excenter of the triangle abc in a way that the corresponding excircle is externally tangent to side bc. It also adds x, y, and z, the tangent points of the incircle with the lines containing sides bc, ac, and ab, respectively. Symbolically, it works exactly as the incenter construction because the angle constructions in DD do not differentiate the two bisectors of an angle crossing.
+     - :math:`\begin{cases}\widehat{bax}=\widehat{xac}\\ \widehat{acx}=\widehat{xcb}\\ \widehat{cbx}=\widehat{xba}\\ x,b,c\ collinear\\ ix\perp bc\\ y,c,a\ collinear\\ iy\perp ca\\ z,a,b\ collinear\\ iz\perp ab\\ ix=iy, iy=iz\end{cases}`  (eqangle a b a i a i a c, eqangle c a c i c i c b, eqangle b c b i b i b a, coll x b c, perp i x b c, coll y c a, perp i y c a, coll z a b, perp i z a b, cong i x i y, cong i y i z)
+     - Points
+
+.. |excenter2| image:: ../../_static/Images/defs/excenter2.png
+    :width: 100%
 
 - **centroid x y z i a b c:** 
 
