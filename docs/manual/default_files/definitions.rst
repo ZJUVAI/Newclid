@@ -395,4 +395,4 @@ New Definitions
 
 - **s_angle a b x y:**
 
-- **lconst x a y:** (Still a placeholder, not working). From a point a, builds x with an integer distance y from a to x. Adds the statement that the distance from a to x is y. Construction returns a circle that can be subjected to intersections. This definition was created as an entry point to add the manipulation of lengths to DDAR.
+- **lconst x a y:** From a point a, builds x with an integer distance y from a to x. Adds the statement that the distance from a to x is y. Construction returns a circle that can be subjected to intersections. This definition was created as an entry point to add the manipulation of lengths to DDAR.
