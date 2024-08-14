@@ -22,7 +22,11 @@ def cli_arguments() -> Namespace:
     )
     parser.add_argument("--env", default="exp", help="The environment folder")
     parser.add_argument("--ggb", default=None, help="Geogebra export file")
-    parser.add_argument("--problems-file", default=None)
+    parser.add_argument(
+        "--problems-file",
+        default=None,
+        help="File containing problems including the current one",
+    )
     parser.add_argument(
         "--agent",
         default="bfsddar",
@@ -125,7 +129,9 @@ def main():
         logging.info(f"Load goals in {goals_file}")
         solver_builder.load_goals_file(goals_file)
 
-    if len(solver_builder.goals) == 0 and not args.exhaust:
+    if (
+        len(solver_builder.goals) == 0 and solver_builder.problemJGEX is None
+    ) and not args.exhaust:
         raise Exception("Not with option exhaust and there is no goal!")
     if args.exhaust:
         solver_builder.del_goals()
