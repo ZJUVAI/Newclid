@@ -22,5 +22,6 @@ def test_run_problems_file():
         "orthocenter_aux",
         "--problems-file",
         r"problems_datasets\examples.txt",
+        "--quiet",
     ]
     assert main()
