@@ -10,7 +10,7 @@ from geosolver.definition.definition import DefinitionJGEX
 from geosolver.dependency.dependency_graph import DependencyGraph
 from geosolver.load_geogebra import load_geogebra
 from geosolver.numerical.draw_figure import draw_figure
-from geosolver.reasoning_engines.algebraic_reasoning.algebraic_manipulator import (
+from geosolver.algebraic_reasoning.algebraic_manipulator import (
     AlgebraicManipulator,
 )
 from geosolver.rule import Rule

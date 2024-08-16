@@ -5,14 +5,14 @@ from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.equal_angles import EqAngle
 from geosolver.predicates.predicate import Predicate
-from geosolver.reasoning_engines.algebraic_reasoning.tables import Ratio_Chase
+from geosolver.algebraic_reasoning.tables import Ratio_Chase
 from geosolver.tools import reshape
 from geosolver.dependency.dependency import Dependency
 
 
 if TYPE_CHECKING:
-    from geosolver.reasoning_engines.algebraic_reasoning.tables import Table
-    from geosolver.reasoning_engines.algebraic_reasoning.tables import SumCV
+    from geosolver.algebraic_reasoning.tables import Table
+    from geosolver.algebraic_reasoning.tables import SumCV
     from geosolver.statement import Statement
     from geosolver.dependency.dependency_graph import DependencyGraph
 

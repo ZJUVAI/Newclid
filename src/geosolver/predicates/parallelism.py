@@ -7,13 +7,13 @@ from geosolver.numerical import close_enough
 from geosolver.numerical.geometries import LineNum
 from geosolver.predicates.congruence import Cong
 from geosolver.predicates.predicate import Predicate
-from geosolver.reasoning_engines.algebraic_reasoning.tables import Angle_Chase
+from geosolver.algebraic_reasoning.tables import Angle_Chase
 from geosolver.tools import reshape
 from geosolver.dependency.dependency import Dependency
 
 if TYPE_CHECKING:
-    from geosolver.reasoning_engines.algebraic_reasoning.tables import Table
-    from geosolver.reasoning_engines.algebraic_reasoning.tables import SumCV
+    from geosolver.algebraic_reasoning.tables import Table
+    from geosolver.algebraic_reasoning.tables import SumCV
     from geosolver.dependency.dependency_graph import DependencyGraph
     from geosolver.statement import Statement
 

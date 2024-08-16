@@ -5,7 +5,7 @@ from pathlib import Path
 
 from geosolver import AGENTS_REGISTRY
 from geosolver.api import GeometricSolverBuilder
-from geosolver.reasoning_engines.algebraic_reasoning import algebraic_manipulator
+from geosolver.algebraic_reasoning import algebraic_manipulator
 
 
 def find_ggb_files(directory: Path):

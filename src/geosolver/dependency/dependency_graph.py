@@ -5,7 +5,7 @@ from geosolver.dependency.symbols_graph import SymbolsGraph
 if TYPE_CHECKING:
     from geosolver.dependency.dependency import Dependency
     from geosolver.statement import Statement
-    from geosolver.reasoning_engines.algebraic_reasoning.algebraic_manipulator import (
+    from geosolver.algebraic_reasoning.algebraic_manipulator import (
         AlgebraicManipulator,
     )
 

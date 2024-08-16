@@ -16,7 +16,7 @@ from geosolver.numerical.geometries import (
     PointNum,
     reduce,
 )
-from geosolver.reasoning_engines.algebraic_reasoning.algebraic_manipulator import (
+from geosolver.algebraic_reasoning.algebraic_manipulator import (
     AlgebraicManipulator,
 )
 from geosolver.statement import Statement
