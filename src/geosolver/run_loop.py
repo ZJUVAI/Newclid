@@ -35,7 +35,7 @@ def run_loop(
     infos["steps"] = step
     for goal in proof.goals:
         if goal.check():
-            infos[goal.pretty()] = "succeeded"
+            infos[goal.pretty() + " succeeded"] = True
         else:
-            infos[goal.pretty()] = "failed"
+            infos[goal.pretty() + " succeeded"] = False
     return infos

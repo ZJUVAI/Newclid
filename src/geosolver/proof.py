@@ -11,6 +11,7 @@ from geosolver.dependency.dependency_graph import DependencyGraph
 from geosolver.dependency.symbols import Point
 from geosolver.numerical.geometries import (
     InvalidIntersectError,
+    InvalidReduceError,
     ObjNum,
     PointNum,
     reduce,
@@ -142,8 +143,6 @@ class ProofState:
 
         # check two things
         existing_numerical_points = [p.num for p in existing_points]
-        if point_names == ["c"]:
-            pass
         if check_too_close_numerical(new_numerical_point, existing_numerical_points):
             raise PointTooCloseError()
         if check_too_far_numerical(new_numerical_point, existing_numerical_points):
@@ -187,6 +186,7 @@ class ProofState:
 
             except (
                 InvalidIntersectError,
+                InvalidReduceError,
                 ConstructionError,
                 PointTooCloseError,
                 PointTooFarError,
@@ -211,7 +211,7 @@ class ProofState:
                 break
 
         else:
-            raise err
+            raise Exception(f"Build failed too many times, last error: {repr(err)}")
 
         return proof
 

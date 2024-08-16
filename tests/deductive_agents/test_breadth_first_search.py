@@ -53,11 +53,8 @@ class TestDDAR:
                 "d = eqdistance d l m k, eqdistance d m l k; "
                 "e = mirror e k w; "
                 "f = mirror f q d ? "
-                # "sameclock d l m k l m; cong q o p o"
-                "sameclock d l m k m l; cong q o p o"
-                # "coll q d f; perp l k l e; perp q f o d"
-                # "eqratio d m l m k l l m; sameclock d l m k l m; eqratio d l d m k m k l; simtrir d l m k m l"
-                # "simtrir d l m k m l"
+                "sameclock d l m k l m; cong q o p o"
+                # "sameclock d l m k m l; para b q k m; eqangle l m d l l m k m; eqangle a b a o b o a b; para c f d l; para c p l m; eqangle a c a o c o a c; eqangle b q b o c o c f"
             )
             .with_runtime_cache(Path(r"./tests_output/imo2009p2cache.json"))
             .build()
@@ -65,7 +62,7 @@ class TestDDAR:
         solver.draw_figure(False, Path(r"./tests_output/imo2009p2beforesolver.png"))
 
         success = solver.run()
-        assert success
+        assert success, str(solver.run_infos)
         solver.write_proof_steps(Path(r"./tests_output/imo2009p2_proof.txt"))
         solver.draw_figure(False, Path(r"./tests_output/imo2009p2.png"))
 
