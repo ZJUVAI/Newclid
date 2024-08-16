@@ -53,16 +53,21 @@ class TestDDAR:
                 "d = eqdistance d l m k, eqdistance d m l k; "
                 "e = mirror e k w; "
                 "f = mirror f q d ? "
-                "cong q o p o"
+                # "sameclock d l m k l m; cong q o p o"
+                "sameclock d l m k m l; cong q o p o"
+                # "coll q d f; perp l k l e; perp q f o d"
+                # "eqratio d m l m k l l m; sameclock d l m k l m; eqratio d l d m k m k l; simtrir d l m k m l"
+                # "simtrir d l m k m l"
             )
             .with_runtime_cache(Path(r"./tests_output/imo2009p2cache.json"))
             .build()
         )
+        solver.draw_figure(False, Path(r"./tests_output/imo2009p2beforesolver.png"))
 
         success = solver.run()
         assert success
         solver.write_proof_steps(Path(r"./tests_output/imo2009p2_proof.txt"))
-        solver.draw_figure(False, Path(r"./tests_output/imo2009p.png"))
+        solver.draw_figure(False, Path(r"./tests_output/imo2009p2.png"))
 
     @pytest.mark.skip("not solved by ag either")
     def test_translated_imo_2011_p6_with_orthocenter(self):

@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from geosolver.numerical.angles import ang_of
 from geosolver.numerical.geometries import (
     CircleNum,
-    InvalidQuadSolveError,
+    InvalidIntersectError,
     PointNum,
     circle_circle_intersection,
     circle_segment_intersect,
@@ -180,13 +180,13 @@ def naming_position(
     for p1, p2 in line_boundaries:
         try:
             avoid.extend(circle_segment_intersect(c, p1, p2))
-        except InvalidQuadSolveError:
-            continue
+        except InvalidIntersectError:
+            pass
     for x in circles:
         try:
             avoid.extend(circle_circle_intersection(c, x.num))
-        except InvalidQuadSolveError:
-            continue
+        except InvalidIntersectError:
+            pass
 
     if not avoid:
         return p.num.x + 0.01, p.num.y + 0.01

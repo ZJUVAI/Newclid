@@ -11,7 +11,6 @@ from geosolver.dependency.dependency_graph import DependencyGraph
 from geosolver.dependency.symbols import Point
 from geosolver.numerical.geometries import (
     InvalidIntersectError,
-    InvalidQuadSolveError,
     ObjNum,
     PointNum,
     reduce,
@@ -122,7 +121,7 @@ class ProofState:
 
         # draw
 
-        def draw_fn() -> list[PointNum]:
+        def draw_fn() -> tuple[PointNum, ...]:
             to_be_intersected: list[ObjNum] = []
             for n in numerics:
                 args: list[Union[PointNum, str]] = []
@@ -137,19 +136,17 @@ class ProofState:
                 to_be_intersected, [p.num for p in existing_points], rng=proof.rng
             )
 
-        new_numerical_points = draw_fn()
-        for p, num, num0 in zip(new_points, new_numerical_points, fix_point_postions):
+        new_numerical_point = draw_fn()
+        for p, num, num0 in zip(new_points, new_numerical_point, fix_point_postions):
             p.num = num0 or num
 
         # check two things
         existing_numerical_points = [p.num for p in existing_points]
-        if check_too_close_numerical(
-            new_numerical_points, existing_numerical_points, 0.01
-        ):
+        if point_names == ["c"]:
+            pass
+        if check_too_close_numerical(new_numerical_point, existing_numerical_points):
             raise PointTooCloseError()
-        if check_too_far_numerical(
-            new_numerical_points, existing_numerical_points, 100
-        ):
+        if check_too_far_numerical(new_numerical_point, existing_numerical_points):
             raise PointTooFarError()
 
         return adds
@@ -190,10 +187,10 @@ class ProofState:
 
             except (
                 InvalidIntersectError,
-                InvalidQuadSolveError,
                 ConstructionError,
                 PointTooCloseError,
                 PointTooFarError,
+                ValueError,
             ) as e:
                 err = e
                 continue

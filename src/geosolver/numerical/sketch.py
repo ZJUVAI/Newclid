@@ -67,7 +67,7 @@ def sketch_acircle(args: tuple[PointNum, ...], **kwargs: Any) -> CircleNum:
     a, b, c, d, f = args
     de = sketch_aline((c, a, b, f, d))
     fe = sketch_aline((a, c, b, d, f))
-    e = line_line_intersection(de, fe)
+    (e,) = line_line_intersection(de, fe)
     return CircleNum(p1=d, p2=e, p3=f)
 
 
@@ -116,7 +116,7 @@ def sketch_dia(args: tuple[PointNum, PointNum], **kwargs: Any) -> CircleNum:
 
 def sketch_tangent(
     args: tuple[PointNum, PointNum, PointNum], **kwargs: Any
-) -> tuple[PointNum, PointNum]:
+) -> tuple[PointNum, ...]:
     a, o, b = args
     dia = sketch_dia((a, o))
     return circle_circle_intersection(CircleNum(o, p1=b), dia)
@@ -253,7 +253,7 @@ def sketch_eqangle2(args: tuple[PointNum, ...], rng: Generator) -> PointNum:
 
     e = b + (c - b) * (be / bc)
     y = b + (a - b) * (be / length)
-    return line_line_intersection(LineNum(c, y), LineNum(a, e))
+    return line_line_intersection(LineNum(c, y), LineNum(a, e))[0]
 
 
 def sketch_eqangle3(args: tuple[PointNum, ...], **kwargs: Any) -> CircleNum:
@@ -532,8 +532,8 @@ def sketch_trisect(
     y = b + PointNum(np.cos(angy), np.sin(angy))
 
     ac = LineNum(a, c)
-    x = line_line_intersection(LineNum(b, x), ac)
-    y = line_line_intersection(LineNum(b, y), ac)
+    (x,) = line_line_intersection(LineNum(b, x), ac)
+    (y,) = line_line_intersection(LineNum(b, y), ac)
 
     if swap == 1:
         return y, x
@@ -558,7 +558,7 @@ def sketch_ieq_triangle(
     a = PointNum(0.0, 0.0)
     b = PointNum(1.0, 0.0)
 
-    c, _ = CircleNum(a, p1=b).intersect(CircleNum(b, p1=a))
+    c, _ = circle_circle_intersection(CircleNum(a, p1=b), (CircleNum(b, p1=a)))
     a, b, c = random_rfss(a, b, c, rng=rng)
     return a, b, c
 
@@ -567,7 +567,7 @@ def sketch_incenter2(args: tuple[PointNum, ...], **kwargs: Any) -> tuple[PointNu
     a, b, c = args
     l1 = sketch_bisect((b, a, c))
     l2 = sketch_bisect((a, b, c))
-    i = line_line_intersection(l1, l2)
+    (i,) = line_line_intersection(l1, l2)
     x = i.foot(LineNum(b, c))
     y = i.foot(LineNum(c, a))
     z = i.foot(LineNum(a, b))
@@ -578,7 +578,7 @@ def sketch_excenter2(args: tuple[PointNum, ...], **kwargs: Any) -> tuple[PointNu
     a, b, c = args
     l1 = sketch_bisect((b, a, c))
     l2 = sketch_exbisect((a, b, c))
-    i = line_line_intersection(l1, l2)
+    (i,) = line_line_intersection(l1, l2)
     x = i.foot(LineNum(b, c))
     y = i.foot(LineNum(c, a))
     z = i.foot(LineNum(a, b))
@@ -590,7 +590,7 @@ def sketch_centroid(args: tuple[PointNum, ...], **kwargs: Any) -> tuple[PointNum
     x = (b + c) * 0.5
     y = (c + a) * 0.5
     z = (a + b) * 0.5
-    i = line_line_intersection(LineNum(a, x), LineNum(b, y))
+    (i,) = line_line_intersection(LineNum(a, x), LineNum(b, y))
     return x, y, z, i
 
 
@@ -621,7 +621,7 @@ def sketch_2l1c(args: tuple[PointNum, ...], **kwargs: Any) -> tuple[PointNum, ..
 
     df = d.perpendicular_line(LineNum(p, d))
     ef = e.perpendicular_line(LineNum(p, e))
-    f = line_line_intersection(df, ef)
+    (f,) = line_line_intersection(df, ef)
 
     g, g_ = line_circle_intersection(LineNum(c, f), circle)
     if bc.same_side(g_, a):
@@ -630,7 +630,7 @@ def sketch_2l1c(args: tuple[PointNum, ...], **kwargs: Any) -> tuple[PointNum, ..
     b_ = c + (b - c) / b.distance(c)
     a_ = c + (a - c) / a.distance(c)
     m = (a_ + b_) * 0.5
-    x = line_line_intersection(LineNum(c, m), LineNum(p, g))
+    (x,) = line_line_intersection(LineNum(c, m), LineNum(p, g))
     return x.foot(ac), x.foot(bc), g, x
 
 
@@ -642,7 +642,7 @@ def sketch_3peq(args: tuple[PointNum, ...], rng: Generator) -> tuple[PointNum, .
 
     z_ = z * 2 - c
     ca_parallel_line = z_.parallel_line(ca)
-    x = line_line_intersection(ca_parallel_line, ab)
+    (x,) = line_line_intersection(ca_parallel_line, ab)
     y = z * 2 - x
     return x, y, z
 

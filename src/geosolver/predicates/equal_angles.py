@@ -31,6 +31,8 @@ class EqAngle(Predicate):
     def preparse(cls, args: tuple[str, ...]):
         groups: list[tuple[str, str, str, str]] = []
         groups1: list[tuple[str, str, str, str]] = []
+        if len(args) % 4:
+            return None
         for a, b, c, d in reshape(args, 4):
             if a == b or c == d:
                 return None

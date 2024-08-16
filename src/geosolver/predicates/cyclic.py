@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any
 from geosolver.dependency.dependency import Dependency
 from geosolver.dependency.symbols import Circle, Point
 from geosolver.numerical import close_enough
-from geosolver.numerical.geometries import CircleNum, InvalidIntersectError
+from geosolver.numerical.geometries import CircleNum
 from geosolver.predicates.predicate import Predicate
 
 
@@ -36,7 +36,7 @@ class Cyclic(Predicate):
         points: tuple[Point, ...] = statement.args
         try:
             circle = CircleNum(p1=points[0].num, p2=points[1].num, p3=points[2].num)
-        except InvalidIntersectError:
+        except ValueError:
             return False
 
         return all(
