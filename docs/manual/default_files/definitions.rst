@@ -264,23 +264,142 @@ incenter2 x y z i a b c
 .. |incenter2| image:: ../../_static/Images/defs/incenter2.png
     :width: 100%
 
-- **excenter x a b c:** From three non-collinear points a, b, c, adds x the excenter of triangle abc in a way that the corresponding excircle is externally tangent to side bc. Symbolically, it works exactly as the incenter construction because the angle constructions in DD do not differentiate the two bisectors of an angle crossing.
+excenter x a b c
+^^^^^^^^^^^^^^^^
 
-- **excenter2 x y z i a b c:** From three non-collinear points a, b, c, adds i, the excenter of the triangle abc in a way that the corresponding excircle is externally tangent to side bc. It also adds x, y, and z, the tangent points of the incircle with the lines containing sides bc, ac, and ab, respectively. Symbolically, it works exactly as the incenter construction because the angle constructions in DD do not differentiate the two bisectors of an angle crossing.
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |excenter|
+     - From three non-collinear points a, b, c, adds x the excenter of triangle abc in a way that the corresponding excircle is externally tangent to side bc. Symbolically, it works exactly as the incenter construction because the angle constructions in DD do not differentiate the two bisectors of an angle crossing.
+     - :math:`\begin{cases}\widehat{bax}=\widehat{xac}\\ \widehat{acx}=\widehat{xcb}\\ \widehat{cbx}=\widehat{xba}\end{cases}` (eqangle a b a x a x a c, eqangle c a c x c x c b, eqangle b c b x b x b a)
+     - Point
+
+.. |excenter| image:: ../../_static/Images/defs/excenter.png
+    :width: 100%
+
+excenter2 x y z i a b c
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |excenter2|
+     - From three non-collinear points a, b, c, adds i, the excenter of the triangle abc in a way that the corresponding excircle is externally tangent to side bc. It also adds x, y, and z, the tangent points of the incircle with the lines containing sides bc, ac, and ab, respectively. Symbolically, it works exactly as the incenter construction because the angle constructions in DD do not differentiate the two bisectors of an angle crossing.
+     - :math:`\begin{cases}\widehat{bax}=\widehat{xac}\\ \widehat{acx}=\widehat{xcb}\\ \widehat{cbx}=\widehat{xba}\\ x,b,c\ collinear\\ ix\perp bc\\ y,c,a\ collinear\\ iy\perp ca\\ z,a,b\ collinear\\ iz\perp ab\\ ix=iy, iy=iz\end{cases}`  (eqangle a b a i a i a c, eqangle c a c i c i c b, eqangle b c b i b i b a, coll x b c, perp i x b c, coll y c a, perp i y c a, coll z a b, perp i z a b, cong i x i y, cong i y i z)
+     - Points
+
+.. |excenter2| image:: ../../_static/Images/defs/excenter2.png
+    :width: 100%
 
 - **centroid x y z i a b c:** 
 
 - **ninepoints x y z i a b c:** 
 
-- **intersection_cc x o w a:** From three non-colinear points, o, w, and a, adds x, the other intersection of the circle of center o through a and the circle of center w through a. Adds the two congruence statements oa=ox and wa=wx corresponding to x being in the circle of center o through and in the circle of center w through a, respectively.
+intersection_cc x o w a
+^^^^^^^^^^^^^^^^^^^^^^^
 
-- **intersection_lc x a o b:** From three points, a, o, and b, b different from both a and o, such that bo is not perpendicular to ba (to avoid the situation of a line tangent to a circle at b), adds point x, the second intersection of line ab with the circle of center o going through b. Adds the statements of the colinearity between a, b, and x, and the congruence statement ob=ox, that guarantees that x is in the circle of center o and going through b.
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
 
-- **intersection_ll x a b c d:** From four points a, b, c, d, such that lines ab and cd are not parallel and such that they do are not all collinear, build point x on the intersection of lines ab and cd. Adds the statements that x, a, and b are collinear and that x, c, and d are collinear.
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |intersection_cc|
+     - From three non-colinear points, o, w, and a, adds x, the other intersection of the circle of center o through a and the circle of center w through a.
+     - :math:`\begin{cases}oa=ox\\ wa=wx\end{cases}`  (cong o a o x, cong w a w x)
+     - Point
 
-- **intersection_lp x a b c m n:** From five points a, b, c, m, and n, such that lines ab and mn are not parallel, and that c is neither on line ab nor on line mn, build x, the intersection of line ab with the line through c that is parallel to mn. Adds the statements that x, a, and b are collinear and that lines cx and mn are parallel.
+.. |intersection_cc| image:: ../../_static/Images/defs/intersection_cc.png
+    :width: 100%
 
-- **intersection_lt x a b c d e:** From five points a, b, c, d, and e, such that lines ab and de are not perpendicular and c is not on line ab, build x, the intersection of line ab and the line through c perpendicular to de. Adds the statements that x, a, and b are collinear and that lines cx and de are perpendicular.
+intersection_lc x a o b
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |intersection_lc|
+     - From three points, a, o, and b, b different from both a and o, such that bo is not perpendicular to ba (to avoid the situation of a line tangent to a circle at b), adds point x, the second intersection of line ab with the circle of center o going through b.
+     - :math:`\begin{cases}x, a, b\ collinear\\ ob=ox\end{cases}`  (coll x a b, cong o b o x)
+     - Point
+
+.. |intersection_lc| image:: ../../_static/Images/defs/intersection_lc.png
+    :width: 100%
+
+intersection_ll x a b c d
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |intersection_ll|
+     - From four points a, b, c, d, such that lines ab and cd are not parallel and such that they do are not all collinear, build point x on the intersection of lines ab and cd.
+     - :math:`\begin{cases}x, a, b\ collinear\\ x, c, d\ collinear\end{cases}`  (coll x a b, coll x c d)
+     - Point
+
+.. |intersection_ll| image:: ../../_static/Images/defs/intersection_ll.png
+    :width: 100%
+
+intersection_lp x a b c m n
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |intersection_lp|
+     - From five points a, b, c, m, and n, such that lines ab and mn are not parallel, and that c is neither on line ab nor on line mn, builds x, the intersection of line ab with the line through c that is parallel to mn.
+     - :math:`\begin{cases}x, a, b\ collinear\\ cx\parallel mn\end{cases}`  (coll x a b, para c x m n)
+     - Point
+
+.. |intersection_lp| image:: ../../_static/Images/defs/intersection_lp.png
+    :width: 100%
+
+intersection_lt x a b c d e
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |intersection_lt|
+     - From five points a, b, c, d, and e, such that lines ab and de are not perpendicular and c is not on line ab, build x, the intersection of line ab and the line through c perpendicular to de.
+     - :math:`\begin{cases}x, a, b\ collinear\\ cx\perp de\end{cases}`  (coll x a b, perp x c d e)
+     - Point
+
+.. |intersection_lt| image:: ../../_static/Images/defs/intersection_lt.png
+    :width: 100%
 
 - **intersection_pp x a b c d e f:** From six points, a, b, c, d, e, f, such that a and d are different and that lines bc and ef are not parallel, builds point x in the intersection of the line through a parallel to bc and the line through d parallel to ef. Adds the statements that xa and bc are parallel and that xd and ef are parallel.
 
@@ -395,4 +514,4 @@ New Definitions
 
 - **s_angle a b x y:**
 
-- **lconst x a y:** (Still a placeholder, not working). From a point a, builds x with an integer distance y from a to x. Adds the statement that the distance from a to x is y. Construction returns a circle that can be subjected to intersections. This definition was created as an entry point to add the manipulation of lengths to DDAR.
+- **lconst x a y:** From a point a, builds x with an integer distance y from a to x. Adds the statement that the distance from a to x is y. Construction returns a circle that can be subjected to intersections. This definition was created as an entry point to add the manipulation of lengths to DDAR.
