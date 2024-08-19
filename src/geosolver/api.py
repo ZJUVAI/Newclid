@@ -56,7 +56,7 @@ class GeometricSolver:
         write_proof_steps(self.proof, out_file)
 
     def draw_figure(self, block: bool, out_file: Optional[Path]):
-        draw_figure(self.proof.symbols_graph, block, out_file)
+        draw_figure(self.proof.dep_graph, block, out_file)
 
     def write_run_infos(self, out_file: Optional[Path]):
         if out_file is None:

@@ -5,6 +5,7 @@ from geosolver.predicates import NAME_TO_PREDICATE
 from geosolver.dependency.dependency import Dependency
 
 if TYPE_CHECKING:
+    from matplotlib.axes import Axes
     from geosolver.predicates.predicate import Predicate
     from geosolver.dependency.dependency_graph import DependencyGraph
 
@@ -80,3 +81,6 @@ class Statement:
         )
         assert newst
         return newst
+
+    def draw(self, ax: "Axes"):
+        self.predicate.draw(ax, self.args, self.dep_graph)

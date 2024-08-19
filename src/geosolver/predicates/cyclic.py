@@ -1,10 +1,15 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
+
 from geosolver.dependency.dependency import Dependency
 from geosolver.dependency.symbols import Circle, Point
 from geosolver.numerical import close_enough
+from geosolver.numerical.draw_figure import draw_circle
 from geosolver.numerical.geometries import CircleNum
 from geosolver.predicates.predicate import Predicate
+from matplotlib.axes import Axes
+
+from geosolver.tools import notNone
 
 
 if TYPE_CHECKING:
@@ -68,3 +73,8 @@ class Cyclic(Predicate):
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
         return tuple(p.name for p in args)
+
+    @classmethod
+    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph):
+        symbols_graph = dep_graph.symbols_graph
+        draw_circle(ax, notNone(symbols_graph.container_of(set(args), Circle)))

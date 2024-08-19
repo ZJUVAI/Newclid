@@ -1,10 +1,13 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional
 
+from matplotlib.axes import Axes
 from geosolver.dependency.dependency import NUMERICAL_CHECK, Dependency
 from geosolver.dependency.symbols import Line, Point
+from geosolver.numerical.draw_figure import draw_line
 from geosolver.numerical.geometries import LineNum
 from geosolver.predicates.predicate import Predicate
+from geosolver.tools import notNone
 
 if TYPE_CHECKING:
     from geosolver.dependency.dependency_graph import DependencyGraph
@@ -68,10 +71,15 @@ class Coll(Predicate):
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
         return tuple(p.name for p in args)
 
+    @classmethod
+    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph):
+        symbols_graph = dep_graph.symbols_graph
+        draw_line(ax, notNone(symbols_graph.container_of(set(args), Line)))
+
 
 class NColl(Predicate):
     """ncoll A B C ... -
-    Represent that any of the 3 (or more) points is not aligned with the others.
+    Represent that any of the 3 (or mo}re) points is not aligned with the others.
 
     Numerical only.
     """

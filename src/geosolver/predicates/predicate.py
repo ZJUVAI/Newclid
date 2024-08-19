@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 
 if TYPE_CHECKING:
+    from matplotlib.axes import Axes
     from geosolver.dependency.dependency import Dependency
     from geosolver.dependency.dependency_graph import DependencyGraph
     from geosolver.statement import Statement
@@ -70,3 +71,7 @@ class Predicate(ABC):
     @classmethod
     def to_constructive(cls, point: str, args: tuple[str, ...]) -> str:
         raise NotImplementedError
+
+    @classmethod
+    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph):
+        ...

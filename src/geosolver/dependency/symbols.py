@@ -136,10 +136,8 @@ class Line(Symbol):
                 for _target in line.fellows:
                     if s <= _target.points and len(_target.points) < len(target.points):
                         target = _target
-                if target.dep:
-                    return target.dep.with_new(statement)
-                else:
-                    assert False
+                assert target.dep
+                return target.dep.with_new(statement)
         raise Exception("why_coll failed")
 
 

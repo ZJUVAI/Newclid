@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING, Iterable, Optional, Type, TypeVar
+from typing import TYPE_CHECKING, Collection, Optional, Type, TypeVar
 
 from geosolver.algebraic_reasoning.tables import Table
 import geosolver.numerical.geometries as num_geo
@@ -25,7 +25,7 @@ class SymbolsGraph:
         return list(self._type2nodes[t])  # type: ignore
 
     def names2points(
-        self, pnames: Iterable[str], create_new_point: bool = True
+        self, pnames: Collection[str], create_new_point: bool = True
     ) -> list[Point]:
         """Return Point objects given names."""
         result: list[Point] = []
@@ -40,6 +40,12 @@ class SymbolsGraph:
             result.append(obj)
 
         return result
+
+    def container_of(self, pnames: set[Point], t: Type[CircL]) -> Optional[CircL]:
+        for container in self.nodes_of_type(t):
+            if pnames <= container.points:
+                return container
+        return None
 
     def new_node(
         self, oftype: Type[S], name: str, dep: Optional[Dependency] = None
