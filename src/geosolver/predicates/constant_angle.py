@@ -71,8 +71,8 @@ class ConstantAngle(Predicate):
 
         return [
             table.get_eq2(
-                symbols_graph.line_thru_pair(p2, p3).name,
-                symbols_graph.line_thru_pair(p0, p1).name,
+                symbols_graph.line_thru_pair(p2, p3, table).name,
+                symbols_graph.line_thru_pair(p0, p1, table).name,
             )
         ], table
 

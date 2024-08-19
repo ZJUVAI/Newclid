@@ -70,10 +70,12 @@ class EqAngle(Predicate):
         while i < len(points):
             eqs.append(
                 table.get_eq4(
-                    symbols_graph.line_thru_pair(points[2], points[3]).name,
-                    symbols_graph.line_thru_pair(points[0], points[1]).name,
-                    symbols_graph.line_thru_pair(points[i + 2], points[i + 3]).name,
-                    symbols_graph.line_thru_pair(points[i], points[i + 1]).name,
+                    symbols_graph.line_thru_pair(points[2], points[3], table).name,
+                    symbols_graph.line_thru_pair(points[0], points[1], table).name,
+                    symbols_graph.line_thru_pair(
+                        points[i + 2], points[i + 3], table
+                    ).name,
+                    symbols_graph.line_thru_pair(points[i], points[i + 1], table).name,
                 )
             )
             i += 4

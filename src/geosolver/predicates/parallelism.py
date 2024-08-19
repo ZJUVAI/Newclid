@@ -56,8 +56,8 @@ class Para(Predicate):
         while i < len(points):
             eqs.append(
                 table.get_eq2(
-                    symbols_graph.line_thru_pair(points[0], points[1]).name,
-                    symbols_graph.line_thru_pair(points[i], points[i + 1]).name,
+                    symbols_graph.line_thru_pair(points[0], points[1], table).name,
+                    symbols_graph.line_thru_pair(points[i], points[i + 1], table).name,
                 ),
             )
             i += 2
