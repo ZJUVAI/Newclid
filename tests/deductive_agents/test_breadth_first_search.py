@@ -54,8 +54,9 @@ class TestDDAR:
                 "e = mirror e k w; "
                 "f = mirror f q d ? "
                 "sameclock d l m k l m; cong q o p o"
+                # "sameclock d l m k l m; acompute l d c o; acompute q b b o"
                 # "sameclock d l m k l m; eqangle l d c o q b b o"
-                # "sameclock d l m k m m; eqangle l d c o q b b o"
+                # "sameclock d l m k m l; eqangle l d c o q b b o"
                 # "sameclock d l m k m l; para b q k m; eqangle l m d l l m k m; eqangle a b a o b o a b; para c f d l; para c p l m; eqangle a c a o c o a c; eqangle b q b o c o c f"
             )
             .with_runtime_cache(Path(r"./tests_output/imo2009p2cache.json"))
