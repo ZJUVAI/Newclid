@@ -14,7 +14,7 @@ CircL = TypeVar("CircL", "Circle", "Line")
 
 class SymbolsGraph:
     def __init__(self) -> None:
-        self._type2nodes: dict[Type[Symbol], list[Symbol]] = {
+        self.type2nodes: dict[Type[Symbol], list[Symbol]] = {
             Point: list(),
             Line: list(),
             Circle: list(),
@@ -22,7 +22,7 @@ class SymbolsGraph:
         self.name2node: dict[str, Symbol] = {}
 
     def nodes_of_type(self, t: Type[S]) -> list[S]:
-        return list(self._type2nodes[t])  # type: ignore
+        return list(self.type2nodes[t])  # type: ignore
 
     def names2points(
         self, pnames: Iterable[str], create_new_point: bool = True
@@ -47,16 +47,9 @@ class SymbolsGraph:
         if name in self.name2node:
             raise ValueError(f"Node {name} already present")
         node = oftype(name, self, dep)
-        self._type2nodes[type(node)].append(node)
+        self.type2nodes[type(node)].append(node)
         self.name2node[node.name] = node
         return node
-
-    def merge(self, node0: S, nodes: list[S], dep: Dependency) -> None:
-        """Merge all nodes."""
-        node0._merge(nodes, dep)  # type: ignore
-        for node in nodes:
-            if node.rep() != node:
-                self._type2nodes[type(node)].remove(node)
 
     def _get_new_line_thru_pair(self, p1: Point, p2: Point) -> Line:
         name = p1.name + p2.name

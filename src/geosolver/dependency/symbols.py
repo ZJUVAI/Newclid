@@ -61,10 +61,14 @@ class Symbol(ABC):
         selfrep.fellows.extend(noderep.fellows)
         return selfrep
 
-    def _merge(self, nodes: list[Self], dep: Dependency) -> Self:
+    def merge(self, nodes: list[Self], dep: Dependency) -> None:
+        """Merge all nodes."""
         for node in nodes:
             self._merge_one(node, dep)
-        return self.rep()
+        reg = self.symbols_graph.nodes_of_type(type(self))
+        for node in nodes + [self]:
+            if node.rep() != node:
+                reg.remove(node)
 
     def __repr__(self) -> str:
         return self.name
@@ -118,7 +122,7 @@ class Line(Symbol):
         line.points = s
         points = list(line.points)
         line.num = LineNum(p1=points[0].num, p2=points[1].num)
-        symbols_graph.merge(line, merge, dep)
+        line.merge(merge, dep)
         return line, merge
 
     @classmethod
@@ -173,7 +177,7 @@ class Circle(Symbol):
         c.points = s
         points = list(c.points)
         c.num = CircleNum(p1=points[0].num, p2=points[1].num, p3=points[2].num)
-        symbols_graph.merge(c, merge, dep)
+        c.merge(merge, dep)
 
     @classmethod
     def why_cyclic(cls, statement: Statement) -> Dependency:
