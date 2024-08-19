@@ -249,6 +249,14 @@ class LineNum(FormNum):
         assert result
         return result
 
+    def angle(self) -> float:
+        if nearly_zero(self.coefficients[1]):
+            return np.pi / 2
+        res: Any = (self.point_at(x=1) - self.point_at(x=0)).angle() % np.pi  # type: ignore
+        if close_enough(res, np.pi):
+            return 0.0
+        return res
+
 
 class CircleNum(FormNum):
     """Numerical circle."""

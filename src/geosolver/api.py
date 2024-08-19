@@ -56,7 +56,7 @@ class GeometricSolver:
         write_proof_steps(self.proof, out_file)
 
     def draw_figure(self, block: bool, out_file: Optional[Path]):
-        draw_figure(self.proof.dep_graph, block, out_file)
+        draw_figure(self.proof, block, out_file)
 
     def write_run_infos(self, out_file: Optional[Path]):
         if out_file is None:
@@ -69,7 +69,7 @@ class GeometricSolver:
         out_folder_path.mkdir(exist_ok=True, parents=True)
         self.write_run_infos(out_folder_path / "run_infos.txt")
         self.write_proof_steps(out_folder_path / "proof_steps.txt")
-        self.draw_figure(False, out_folder_path / "proof_figure.png")
+        self.draw_figure(False, out_folder_path / "proof_figure.svg")
         logging.info("Written all outputs at %s", out_folder_path)
 
 

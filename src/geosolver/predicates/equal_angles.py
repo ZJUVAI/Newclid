@@ -1,9 +1,12 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
+from matplotlib.axes import Axes
 import numpy as np
 
+from geosolver.dependency.symbols import Line
 from geosolver.numerical import close_enough
+from geosolver.numerical.draw_figure import draw_angle, draw_line
 from geosolver.predicates.predicate import Predicate
 from geosolver.algebraic_reasoning.tables import Angle_Chase
 from geosolver.tools import reshape
@@ -134,3 +137,17 @@ class EqAngle(Predicate):
             f"∠({a.pretty_name}{b.pretty_name},{c.pretty_name}{d.pretty_name})"
             for a, b, c, d in reshape(args, 4)
         )
+
+    @classmethod
+    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph):
+        color = np.random.rand(3)
+        r = np.random.random()
+        width = r * 0.1
+        symbols_graph = dep_graph.symbols_graph
+        for i in range(0, len(args), 4):
+            line0 = symbols_graph.container_of({args[i], args[i + 1]}, Line)
+            line1 = symbols_graph.container_of({args[i + 2], args[i + 3]}, Line)
+            assert line0 and line1
+            draw_angle(ax, line0, line1, color=color, alpha=0.5, width=width, r=r)
+            draw_line(ax, line0, ls=":")
+            draw_line(ax, line1, ls=":")

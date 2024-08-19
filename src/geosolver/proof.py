@@ -9,6 +9,7 @@ import logging
 from geosolver.definition.clause import Clause, translate_sentence
 from geosolver.dependency.dependency_graph import DependencyGraph
 from geosolver.dependency.symbols import Point
+from geosolver.numerical.draw_figure import init_figure
 from geosolver.numerical.geometries import (
     InvalidIntersectError,
     InvalidReduceError,
@@ -60,6 +61,7 @@ class ProofState:
         self.runtime_cache_path = runtime_cache_path
         self.rng = rng
         self.matcher = Matcher(self.dep_graph, self.runtime_cache_path, self.rng)
+        self.fig = init_figure()
 
     @classmethod
     def add_construction(

@@ -1,8 +1,11 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional
 
-from geosolver.dependency.symbols import Point
+from matplotlib.axes import Axes
+
+from geosolver.dependency.symbols import Line, Point
 from geosolver.numerical import close_enough
+from geosolver.numerical.draw_figure import draw_rectangle
 from geosolver.predicates.equal_angles import EqAngle
 from geosolver.predicates.predicate import Predicate
 
@@ -87,6 +90,15 @@ class Perp(Predicate):
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
         return tuple(p.name for p in args)
+
+    @classmethod
+    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph):
+        symbols_graph = dep_graph.symbols_graph
+        line0 = symbols_graph.container_of({args[0], args[1]}, Line)
+        line1 = symbols_graph.container_of({args[2], args[3]}, Line)
+        draw_rectangle(
+            ax, line0, line1, fill=False, color="yellow", width=0.3, height=0.3
+        )  # type: ignore
 
 
 class NPerp(Predicate):
