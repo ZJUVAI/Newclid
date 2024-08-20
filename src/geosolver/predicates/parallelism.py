@@ -129,8 +129,8 @@ class Para(Predicate):
                 ax,
                 points[i].num + d + p,
                 points[i + 1].num + d - p,
-                color=PALETTE[ax.para_color],
-            )  # type: ignore
+                color=PALETTE[ax.para_color],  # type: ignore
+            )
 
 
 class NPara(Predicate):
