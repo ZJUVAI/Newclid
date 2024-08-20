@@ -102,8 +102,6 @@ class EqAngle(Predicate):
         why: list[Dependency] = []
         for eq in eqs:
             why.extend(table.why(eq))
-        if len(why) == 1:
-            return why[0].with_new(statement)
         return Dependency.mk(
             statement, Angle_Chase, tuple(dep.statement for dep in why)
         )
@@ -162,11 +160,11 @@ class EqAngle(Predicate):
             "#aaffc3",
             "#808000",
             "#ffd8b1",
-            "#000075",
+            "#0000cd",
             "#808080",
             "#ffffff",
         ]
-        setattr(ax, "angle_color", (getattr(ax, "angle_color", 0) - 1) % len(palette))
+        setattr(ax, "angle_color", (getattr(ax, "angle_color", 0) + 1) % len(palette))
         color = palette[ax.angle_color]  # type: ignore
         r = rng.random()
         width = r * 0.1

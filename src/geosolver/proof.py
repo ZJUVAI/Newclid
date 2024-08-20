@@ -152,7 +152,7 @@ class ProofState:
         if check_too_far_numerical(new_numerical_point, existing_numerical_points):
             raise PointTooFarError()
 
-        # draw some specific figures
+        # draw some specific figures (to be refactored, if there are multiple branches)
         if construction.sentences[0][0] == "triangle":
             (ax,) = self.fig.axes
             triangle = patches.Polygon(

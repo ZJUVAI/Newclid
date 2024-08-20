@@ -4,14 +4,16 @@ from typing import TYPE_CHECKING, Any, Optional
 from matplotlib.axes import Axes
 
 from geosolver.dependency.symbols import Line, Point
-from geosolver.numerical import close_enough
-from geosolver.numerical.draw_figure import draw_rectangle
+from geosolver.numerical import nearly_zero
+from geosolver.numerical.draw_figure import draw_line, draw_rectangle
 from geosolver.predicates.equal_angles import EqAngle
 from geosolver.predicates.predicate import Predicate
 from geosolver.tools import notNone
 from numpy.random import Generator
 
 if TYPE_CHECKING:
+    from geosolver.algebraic_reasoning.tables import Table
+    from geosolver.algebraic_reasoning.tables import SumCV
     from geosolver.dependency.dependency import Dependency
     from geosolver.dependency.dependency_graph import DependencyGraph
     from geosolver.statement import Statement
@@ -48,19 +50,30 @@ class Perp(Predicate):
     def check_numerical(cls, statement: Statement) -> bool:
         args: tuple[Point, ...] = statement.args
         a, b, c, d = args
-        return close_enough((a.num - b.num).dot(c.num - d.num), 0)
+        return nearly_zero((a.num - b.num).dot(c.num - d.num))
+
+    @classmethod
+    def _prep_ar(cls, statement: Statement) -> tuple[list[SumCV], Table]:
+        points: tuple[Point, ...] = statement.args
+        table = statement.dep_graph.ar.atable
+        symbols_graph = statement.dep_graph.symbols_graph
+        return [
+            table.get_eq2(
+                symbols_graph.line_thru_pair(points[2], points[3], table).name,
+                symbols_graph.line_thru_pair(points[0], points[1], table).name,
+            )
+        ], table
+
+    @classmethod
+    def add(cls, dep: Dependency) -> None:
+        eqs, table = cls._prep_ar(dep.statement)
+        for eq in eqs:
+            table.add_expr(eq, dep)
 
     @classmethod
     def check(cls, statement: Statement) -> bool:
-        args: tuple[Point, ...] = statement.args
-        a, b, c, d = args
-        return statement.with_new(EqAngle, (a, b, c, d, c, d, a, b)).check()
-
-    @classmethod
-    def add(cls, dep: Dependency):
-        args: tuple[Point, ...] = dep.statement.args
-        a, b, c, d = args
-        dep.with_new(dep.statement.with_new(EqAngle, (a, b, c, d, c, d, a, b))).add()
+        eqs, table = cls._prep_ar(statement)
+        return all(table.expr_delta(eq) for eq in eqs)
 
     @classmethod
     def why(cls, statement: Statement) -> Dependency:
@@ -98,17 +111,19 @@ class Perp(Predicate):
         cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
     ):
         symbols_graph = dep_graph.symbols_graph
-        line0 = symbols_graph.container_of({args[0], args[1]}, Line)
-        line1 = symbols_graph.container_of({args[2], args[3]}, Line)
+        line0 = notNone(symbols_graph.container_of({args[0], args[1]}, Line))
+        line1 = notNone(symbols_graph.container_of({args[2], args[3]}, Line))
         draw_rectangle(
             ax,
-            notNone(line0),
-            notNone(line1),
+            line0,
+            line1,
             fill=False,
             color="yellow",
             width=0.3,
             height=0.3,
         )
+        draw_line(ax, line0)
+        draw_line(ax, line1)
 
 
 class NPerp(Predicate):

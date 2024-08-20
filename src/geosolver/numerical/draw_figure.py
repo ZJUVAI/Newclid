@@ -60,6 +60,8 @@ def draw_figure(
         ymin = min([p.num.y for p in points])
         ymax = max([p.num.y for p in points])
         plt.margins((xmax - xmin) * 0.1, (ymax - ymin) * 0.1)
+        # ax.set_xlim(xmin - (xmax - xmin) * 0.1, xmax + (xmax - xmin) * 0.1)
+        # ax.set_ylim(ymin - (ymax - ymin) * 0.1, ymax + (ymax - ymin) * 0.1)
 
     if save_to is not None:
         fig.savefig(save_to)  # type: ignore
@@ -102,9 +104,14 @@ def draw_line(ax: "Axes", line: Line, **args: Any):
     fill_missing(args, {"color": "white", "lw": 0.4, "alpha": 0.9})
 
     points: list[PointNum] = [p.num for p in line.points]
-    p1, p2 = points[:2]
+    p0, p1 = points[:2]
+    ax.axline((p0.x, p0.y), (p1.x, p1.y), **args)  # type: ignore
 
-    ax.axline((p1.x, p1.y), (p2.x, p2.y), **args)  # type: ignore
+
+def draw_segment(ax: "Axes", p0: Point, p1: Point, **args: Any):
+    fill_missing(args, {"color": "white", "lw": 0.4, "alpha": 0.9})
+
+    ax.plot((p0.num.x, p1.num.x), (p0.num.y, p1.num.y), **args)  # type: ignore
 
 
 def draw_angle(ax: "Axes", line0: Line, line1: Line, **args: Any):
@@ -140,5 +147,5 @@ def draw_point(
     ax.scatter(p.num.x, p.num.y, **args_point)  # type: ignore
     fill_missing(args_name, {"color": "lime", "fontsize": 10})
     ax.annotate(  # type: ignore
-        p.name, (p.num.x, p.num.y), **args_name
+        p.pretty_name, (p.num.x, p.num.y), **args_name
     )

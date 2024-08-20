@@ -52,15 +52,13 @@ class Para(Predicate):
         table = statement.dep_graph.ar.atable
         symbols_graph = statement.dep_graph.symbols_graph
         eqs: list[SumCV] = []
-        i = 2
-        while i < len(points):
+        for i in range(2, len(points), 2):
             eqs.append(
                 table.get_eq2(
                     symbols_graph.line_thru_pair(points[0], points[1], table).name,
                     symbols_graph.line_thru_pair(points[i], points[i + 1], table).name,
                 ),
             )
-            i += 2
         return eqs, table
 
     @classmethod
@@ -75,8 +73,6 @@ class Para(Predicate):
         why: list[Dependency] = []
         for eq in eqs:
             why.extend(table.why(eq))
-        if len(why) == 1:
-            return why[0].with_new(statement)
         return Dependency.mk(
             statement, Angle_Chase, tuple(dep.statement for dep in why)
         )

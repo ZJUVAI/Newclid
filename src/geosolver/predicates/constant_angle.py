@@ -88,8 +88,6 @@ class ConstantAngle(Predicate):
         why: list[Dependency] = []
         for eq in eqs:
             why.extend(table.why(eq))
-        if len(why) == 1:
-            return why[0].with_new(statement)
         return Dependency.mk(
             statement, Angle_Chase, tuple(dep.statement for dep in why)
         )

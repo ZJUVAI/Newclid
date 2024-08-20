@@ -77,7 +77,12 @@ class Coll(Predicate):
         cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
     ):
         symbols_graph = dep_graph.symbols_graph
-        draw_line(ax, notNone(symbols_graph.container_of(set(args), Line)), alpha=1.0)
+        draw_line(
+            ax,
+            notNone(symbols_graph.container_of(set(args), Line)),
+            alpha=1.0,
+            ls="dashed",
+        )
 
 
 class NColl(Predicate):

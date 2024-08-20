@@ -1,8 +1,12 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional
+
+from matplotlib.axes import Axes
+from matplotlib.pylab import Generator
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.numerical.check import same_clock
+from geosolver.numerical.draw_figure import draw_segment
 from geosolver.predicates.predicate import Predicate
 
 
@@ -65,6 +69,17 @@ class SimtriClock(Predicate):
         a, b, c, p, q, r = args
         return f"▲{a.pretty_name}{b.pretty_name}{c.pretty_name} ≅ ▲{p.pretty_name}{q.pretty_name}{r.pretty_name}"
 
+    @classmethod
+    def draw(
+        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
+    ):
+        draw_segment(ax, args[0], args[1], ls="dashed")
+        draw_segment(ax, args[1], args[2], ls="dashed")
+        draw_segment(ax, args[0], args[2], ls="dashed")
+        draw_segment(ax, args[0 + 3], args[1 + 3], ls="dashed")
+        draw_segment(ax, args[1 + 3], args[2 + 3], ls="dashed")
+        draw_segment(ax, args[0 + 3], args[2 + 3], ls="dashed")
+
 
 class SimtriReflect(Predicate):
     """simtrir A B C P Q R -
@@ -109,3 +124,13 @@ class SimtriReflect(Predicate):
         args: tuple[Point, ...] = statement.args
         a, b, c, p, q, r = args
         return f"▲{a.pretty_name}{b.pretty_name}{c.pretty_name} ≅ ▲{p.pretty_name}{q.pretty_name}{r.pretty_name}"
+
+    @classmethod
+    def draw(
+        cls,
+        ax: Axes,
+        args: tuple[Any, ...],
+        dep_graph: "DependencyGraph",
+        rng: Generator,
+    ):
+        SimtriClock.draw(ax, args, dep_graph, rng)

@@ -1,8 +1,12 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional
 
+from matplotlib.axes import Axes
+from matplotlib.pylab import Generator
+
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
+from geosolver.numerical.draw_figure import draw_segment
 from geosolver.predicates.predicate import Predicate
 from geosolver.algebraic_reasoning.tables import Ratio_Chase
 from geosolver.tools import reshape
@@ -92,8 +96,6 @@ class Cong(Predicate):
         why: list[Dependency] = []
         for eq in eqs:
             why.extend(table.why(eq))
-        if len(why) == 1:
-            return why[0].with_new(statement)
         return Dependency.mk(
             statement, Ratio_Chase, tuple(dep.statement for dep in why)
         )
@@ -125,3 +127,14 @@ class Cong(Predicate):
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
         return tuple(p.name for p in args)
+
+    @classmethod
+    def draw(
+        cls,
+        ax: Axes,
+        args: tuple[Any, ...],
+        dep_graph: "DependencyGraph",
+        rng: Generator,
+    ):
+        for i in range(0, len(args), 2):
+            draw_segment(ax, args[i], args[i + 1], ls="solid")
