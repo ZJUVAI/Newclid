@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from geosolver.predicates import NAME_TO_PREDICATE
 from geosolver.dependency.dependency import Dependency
+from numpy.random import Generator
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
@@ -82,5 +83,5 @@ class Statement:
         assert newst
         return newst
 
-    def draw(self, ax: "Axes"):
-        self.predicate.draw(ax, self.args, self.dep_graph)
+    def draw(self, ax: "Axes", rng: Generator):
+        self.predicate.draw(ax, self.args, self.dep_graph, rng)

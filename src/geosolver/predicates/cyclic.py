@@ -8,6 +8,7 @@ from geosolver.numerical.draw_figure import draw_circle
 from geosolver.numerical.geometries import CircleNum
 from geosolver.predicates.predicate import Predicate
 from matplotlib.axes import Axes
+from numpy.random import Generator
 
 from geosolver.tools import notNone
 
@@ -75,6 +76,8 @@ class Cyclic(Predicate):
         return tuple(p.name for p in args)
 
     @classmethod
-    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph):
+    def draw(
+        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
+    ):
         symbols_graph = dep_graph.symbols_graph
         draw_circle(ax, notNone(symbols_graph.container_of(set(args), Circle)))

@@ -1,6 +1,7 @@
 from __future__ import annotations
 from abc import ABC
 from typing import TYPE_CHECKING, Any, Optional
+from numpy.random import Generator
 
 
 if TYPE_CHECKING:
@@ -73,5 +74,7 @@ class Predicate(ABC):
         raise NotImplementedError
 
     @classmethod
-    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph):
+    def draw(
+        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
+    ):
         ...

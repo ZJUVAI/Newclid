@@ -13,6 +13,7 @@ from geosolver.dependency.symbols import Point, Circle, Line
 import matplotlib.pyplot as plt
 import matplotlib
 import matplotlib.patches as patches
+from numpy.random import Generator
 
 matplotlib.use("svg")
 
@@ -33,9 +34,7 @@ def init_figure() -> "Figure":
 
 
 def draw_figure(
-    proof: "ProofState",
-    block: bool = True,
-    save_to: Optional[Path] = None,
+    proof: "ProofState", *, save_to: Optional[Path] = None, rng: Generator
 ) -> None:
     """Draw everything on the same canvas."""
     symbols_graph = proof.symbols_graph
@@ -50,9 +49,10 @@ def draw_figure(
             ax,
             points,
             [dep.statement for dep in proof.dep_graph.proof_deps(proof.goals)],
+            rng,
         )
     else:
-        _draw(ax, points, proof.dep_graph.hyper_graph.keys())
+        _draw(ax, points, proof.dep_graph.hyper_graph.keys(), rng)
 
     if points:
         xmin = min([p.num.x for p in points])
@@ -64,15 +64,13 @@ def draw_figure(
     if save_to is not None:
         fig.savefig(save_to)  # type: ignore
 
-    plt.show(block=block)  # type: ignore
-    if block or save_to is not None:
-        plt.close(fig)
 
-
-def _draw(ax: "Axes", points: list[Point], statements: Collection["Statement"]):
+def _draw(
+    ax: "Axes", points: list[Point], statements: Collection["Statement"], rng: Generator
+):
     """Draw everything."""
     for statement in statements:
-        statement.draw(ax)
+        statement.draw(ax, rng)
     for p in points:
         draw_point(ax, p)
 
@@ -101,7 +99,7 @@ def draw_circle(ax: "Axes", c: Circle, **args: Any) -> None:
 
 def draw_line(ax: "Axes", line: Line, **args: Any):
     """Draw a line. Return the two extremities"""
-    fill_missing(args, {"color": "white", "lw": 0.4, "alpha": 0.8})
+    fill_missing(args, {"color": "white", "lw": 0.4, "alpha": 0.9})
 
     points: list[PointNum] = [p.num for p in line.points]
     p1, p2 = points[:2]
@@ -119,14 +117,14 @@ def draw_angle(ax: "Axes", line0: Line, line1: Line, **args: Any):
     wedge = patches.Wedge(
         (o.x, o.y), theta1=ang0 / np.pi * 180, theta2=ang1 / np.pi * 180, **args
     )
-    ax.add_artist(wedge)
+    ax.add_patch(wedge)
 
 
 def draw_rectangle(ax: "Axes", line0: Line, line1: Line, **args: Any):
     (o,) = intersect(line0.num, line1.num)
     ang0 = min(line0.num.angle(), line1.num.angle())
     rectangle = patches.Rectangle((o.x, o.y), angle=ang0 / np.pi * 180, **args)
-    ax.add_artist(rectangle)
+    ax.add_patch(rectangle)
 
 
 def draw_point(
@@ -140,7 +138,7 @@ def draw_point(
     args_name = args_name or {}
     fill_missing(args_point, {"color": "white", "s": 5.0})
     ax.scatter(p.num.x, p.num.y, **args_point)  # type: ignore
-    fill_missing(args_name, {"color": "green", "fontsize": 10})
+    fill_missing(args_name, {"color": "lime", "fontsize": 10})
     ax.annotate(  # type: ignore
         p.name, (p.num.x, p.num.y), **args_name
     )

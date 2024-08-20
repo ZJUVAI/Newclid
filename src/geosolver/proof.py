@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
 import logging
 
+from matplotlib import patches
+
 from geosolver.definition.clause import Clause, translate_sentence
 from geosolver.dependency.dependency_graph import DependencyGraph
 from geosolver.dependency.symbols import Point
@@ -50,10 +52,12 @@ class ProofState:
 
     def __init__(
         self,
+        *,
         rng: "Generator",
         dep_graph: Optional[DependencyGraph] = None,
         runtime_cache_path: Optional[Path] = None,
         goals: Optional[list[Statement]] = None,
+        defs: dict[str, DefinitionJGEX],
     ):
         self.dep_graph = dep_graph or DependencyGraph(AlgebraicManipulator())
         self.symbols_graph = self.dep_graph.symbols_graph
@@ -62,18 +66,16 @@ class ProofState:
         self.rng = rng
         self.matcher = Matcher(self.dep_graph, self.runtime_cache_path, self.rng)
         self.fig = init_figure()
+        self.defs = defs
 
-    @classmethod
-    def add_construction(
-        cls, proof: ProofState, construction: Clause, defs: dict[str, DefinitionJGEX]
-    ) -> list[Dependency]:
+    def add_construction(self, construction: Clause) -> list[Dependency]:
         """Add a new clause of construction, e.g. a new excenter."""
         adds: list[Dependency] = []
         numerics: list[tuple[str, ...]] = []
-        existing_points = proof.symbols_graph.nodes_of_type(Point)
+        existing_points = self.symbols_graph.nodes_of_type(Point)
 
         for constr_sentence in construction.sentences:
-            cdef = defs[constr_sentence[0]]
+            cdef = self.defs[constr_sentence[0]]
             if len(constr_sentence) == len(cdef.declare):
                 mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
             else:
@@ -89,7 +91,7 @@ class ProofState:
                     continue
                 statement = notNone(
                     Statement.from_tokens(
-                        translate_sentence(mapping, premise), proof.dep_graph
+                        translate_sentence(mapping, premise), self.dep_graph
                     )
                 )
                 if not statement.check_numerical():
@@ -99,7 +101,7 @@ class ProofState:
                 for t in bs.sentences:
                     statement = notNone(
                         Statement.from_tokens(
-                            translate_sentence(mapping, t), proof.dep_graph
+                            translate_sentence(mapping, t), self.dep_graph
                         )
                     )
                     adds.append(Dependency.mk(statement, IN_PREMISES, ()))
@@ -117,7 +119,7 @@ class ProofState:
             else:
                 point_names.append(s)
                 fix_point_postions.append(None)
-        new_points = proof.symbols_graph.names2points(point_names)
+        new_points = self.symbols_graph.names2points(point_names)
         for p in new_points:
             if p in existing_points:
                 raise Exception("The construction is illegal")
@@ -130,13 +132,13 @@ class ProofState:
                 args: list[Union[PointNum, str]] = []
                 for t in n[1:]:
                     if str.isalpha(t[0]):
-                        args.append(proof.symbols_graph.names2points([t])[0].num)
+                        args.append(self.symbols_graph.names2points([t])[0].num)
                     else:
                         args.append(t)
-                to_be_intersected += sketch(n[0], tuple(args), proof.rng)
+                to_be_intersected += sketch(n[0], tuple(args), self.rng)
 
             return reduce(
-                to_be_intersected, [p.num for p in existing_points], rng=proof.rng
+                to_be_intersected, [p.num for p in existing_points], rng=self.rng
             )
 
         new_numerical_point = draw_fn()
@@ -150,6 +152,18 @@ class ProofState:
         if check_too_far_numerical(new_numerical_point, existing_numerical_points):
             raise PointTooFarError()
 
+        # draw some specific figures
+        if construction.sentences[0][0] == "triangle":
+            (ax,) = self.fig.axes
+            triangle = patches.Polygon(
+                (
+                    (new_points[0].num.x, new_points[0].num.y),
+                    (new_points[1].num.x, new_points[1].num.y),
+                    (new_points[2].num.x, new_points[2].num.y),
+                ),
+                closed=True,
+            )
+            ax.add_artist(triangle)
         return adds
 
     @classmethod
@@ -172,12 +186,11 @@ class ProofState:
             # Search for coordinates that checks premises conditions numerically.
             try:
                 proof = ProofState(
-                    rng=rng,
-                    runtime_cache_path=runtime_cache_path,
+                    rng=rng, runtime_cache_path=runtime_cache_path, defs=defsJGEX
                 )
                 added: list[Dependency] = []
                 for construction in problemJGEX.constructions:
-                    adds = cls.add_construction(proof, construction, defsJGEX)
+                    adds = proof.add_construction(construction)
                     for add in adds:
                         if not add.statement.check_numerical():
                             raise ConstructionError(

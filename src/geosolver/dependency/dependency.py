@@ -43,7 +43,7 @@ class Dependency(NamedTuple):
     def mk(
         cls, statement: Statement, reason: str, why: tuple[Statement, ...]
     ) -> Dependency:
-        why = tuple(sorted(set(why), key=lambda x: hash(x)))
+        why = tuple(sorted(set(why), key=lambda x: repr(x)))
         return Dependency(statement, reason, why)
 
     def pretty(self):

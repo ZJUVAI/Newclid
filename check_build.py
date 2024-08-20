@@ -21,7 +21,7 @@ def run_geosolver(filepath: Path):
                 problem_name = line.strip()
                 try:
                     solver = (
-                        GeometricSolverBuilder()
+                        GeometricSolverBuilder(8)
                         .load_problem_from_file(problems_path, problem_name)
                         .with_deductive_agent(Flemmard)
                         .build()

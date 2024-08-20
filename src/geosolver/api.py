@@ -39,6 +39,7 @@ class GeometricSolver:
         self.proof = proof
         self.theorems = theorems
         self.goals = proof.goals
+        self.rng = proof.rng
         self.deductive_agent = deductive_agent(self.proof, self.theorems)
         self.run_infos: dict[str, Any] = {}
 
@@ -55,8 +56,8 @@ class GeometricSolver:
     def write_proof_steps(self, out_file: Optional[Path]):
         write_proof_steps(self.proof, out_file)
 
-    def draw_figure(self, block: bool, out_file: Optional[Path]):
-        draw_figure(self.proof, block, out_file)
+    def draw_figure(self, *, out_file: Optional[Path]):
+        draw_figure(self.proof, save_to=out_file, rng=self.rng)
 
     def write_run_infos(self, out_file: Optional[Path]):
         if out_file is None:
@@ -69,7 +70,7 @@ class GeometricSolver:
         out_folder_path.mkdir(exist_ok=True, parents=True)
         self.write_run_infos(out_folder_path / "run_infos.txt")
         self.write_proof_steps(out_folder_path / "proof_steps.txt")
-        self.draw_figure(False, out_folder_path / "proof_figure.svg")
+        self.draw_figure(out_file=out_folder_path / "proof_figure.svg")
         logging.info("Written all outputs at %s", out_folder_path)
 
 
@@ -111,10 +112,11 @@ class GeometricSolverBuilder:
         else:
             logging.info("Use dep_graph to build the proof state")
             proof_state = ProofState(
-                np.random.default_rng(self.seed),
-                self.dep_graph,
-                self.runtime_cache_path,
-                self.goals,
+                rng=np.random.default_rng(self.seed),
+                dep_graph=self.dep_graph,
+                runtime_cache_path=self.runtime_cache_path,
+                goals=self.goals,
+                defs=self.defs,
             )
 
         return GeometricSolver(proof_state, self.rules, self.deductive_agent or BFSDDAR)

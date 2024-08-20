@@ -62,12 +62,12 @@ class TestDDAR:
             .with_runtime_cache(Path(r"./tests_output/imo2009p2cache.json"))
             .build()
         )
-        solver.draw_figure(False, Path(r"./tests_output/imo2009p2beforesolver.svg"))
+        solver.draw_figure(out_file=Path(r"./tests_output/imo2009p2beforesolver.svg"))
 
         success = solver.run()
         assert success, str(solver.run_infos)
         solver.write_proof_steps(Path(r"./tests_output/imo2009p2_proof.txt"))
-        solver.draw_figure(False, Path(r"./tests_output/imo2009p2.svg"))
+        solver.draw_figure(out_file=Path(r"./tests_output/imo2009p2.svg"))
 
     @pytest.mark.skip("not solved by ag either")
     def test_translated_imo_2011_p6_with_orthocenter(self):

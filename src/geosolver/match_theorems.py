@@ -28,7 +28,7 @@ class Matcher:
         self.dep_graph = dep_graph
         self.rng = rng
         self.runtime_cache_path = runtime_cache_path
-        self.cache: dict["Rule", set[Dependency]] = {}
+        self.cache: dict["Rule", tuple[Dependency, ...]] = {}
         if self.runtime_cache_path is not None and not self.runtime_cache_path.exists():
             os.makedirs(os.path.dirname(self.runtime_cache_path), exist_ok=True)
             self.runtime_cache_path.touch()
@@ -51,7 +51,8 @@ class Matcher:
             else:
                 file_cache["matcher"][str(theorem)] = mappings
                 write = True
-        self.cache[theorem] = set()
+        res: set[Dependency] = set()
+        self.cache[theorem] = ()
         points = [p.name for p in self.dep_graph.symbols_graph.nodes_of_type(Point)]
         variables = theorem.variables()
         logging.info(
@@ -91,7 +92,10 @@ class Matcher:
                 if conclusion_statement is None:
                     continue
                 dep = Dependency.mk(conclusion_statement, reason, tuple(why))
-                self.cache[theorem].add(dep)
+                res.add(dep)
+        self.cache[theorem] = tuple(
+            sorted(res, key=lambda x: repr(x))
+        )  # to maintain determinism
         if self.runtime_cache_path is not None and write:
             with open(self.runtime_cache_path, "w") as f:
                 json.dump(file_cache, f)
@@ -106,7 +110,7 @@ class Matcher:
         logging.info("Finish caching")
         logging.info("Start matching")
         for dep in self.cache[theorem]:
-            if self.dep_graph.has_edge(dep):
+            if dep.statement in dep.statement.dep_graph.hyper_graph:
                 continue
             applicable = True
             for premise in dep.why:

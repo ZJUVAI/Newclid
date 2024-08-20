@@ -11,6 +11,7 @@ from geosolver.predicates.predicate import Predicate
 from geosolver.algebraic_reasoning.tables import Angle_Chase
 from geosolver.tools import reshape
 from geosolver.dependency.dependency import Dependency
+from numpy.random import Generator
 
 if TYPE_CHECKING:
     from geosolver.algebraic_reasoning.tables import Table
@@ -139,9 +140,11 @@ class EqAngle(Predicate):
         )
 
     @classmethod
-    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph):
-        color = np.random.rand(3)
-        r = np.random.random()
+    def draw(
+        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
+    ):
+        color = rng.random(3)
+        r = rng.random()
         width = r * 0.1
         symbols_graph = dep_graph.symbols_graph
         for i in range(0, len(args), 4):

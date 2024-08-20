@@ -8,6 +8,7 @@ from geosolver.numerical.draw_figure import draw_line
 from geosolver.numerical.geometries import LineNum
 from geosolver.predicates.predicate import Predicate
 from geosolver.tools import notNone
+from numpy.random import Generator
 
 if TYPE_CHECKING:
     from geosolver.dependency.dependency_graph import DependencyGraph
@@ -72,9 +73,11 @@ class Coll(Predicate):
         return tuple(p.name for p in args)
 
     @classmethod
-    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph):
+    def draw(
+        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
+    ):
         symbols_graph = dep_graph.symbols_graph
-        draw_line(ax, notNone(symbols_graph.container_of(set(args), Line)))
+        draw_line(ax, notNone(symbols_graph.container_of(set(args), Line)), alpha=1.0)
 
 
 class NColl(Predicate):

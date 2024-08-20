@@ -8,6 +8,8 @@ from geosolver.numerical import close_enough
 from geosolver.numerical.draw_figure import draw_rectangle
 from geosolver.predicates.equal_angles import EqAngle
 from geosolver.predicates.predicate import Predicate
+from geosolver.tools import notNone
+from numpy.random import Generator
 
 if TYPE_CHECKING:
     from geosolver.dependency.dependency import Dependency
@@ -92,13 +94,21 @@ class Perp(Predicate):
         return tuple(p.name for p in args)
 
     @classmethod
-    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph):
+    def draw(
+        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
+    ):
         symbols_graph = dep_graph.symbols_graph
         line0 = symbols_graph.container_of({args[0], args[1]}, Line)
         line1 = symbols_graph.container_of({args[2], args[3]}, Line)
         draw_rectangle(
-            ax, line0, line1, fill=False, color="yellow", width=0.3, height=0.3
-        )  # type: ignore
+            ax,
+            notNone(line0),
+            notNone(line1),
+            fill=False,
+            color="yellow",
+            width=0.3,
+            height=0.3,
+        )
 
 
 class NPerp(Predicate):
