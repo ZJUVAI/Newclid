@@ -68,8 +68,14 @@ class ProofState:
         self.fig = init_figure()
         self.defs = defs
 
+    def new_cache(self, runtime_cache_path: Optional[Path] = None):
+        self.runtime_cache_path = runtime_cache_path
+        self.matcher = Matcher(self.dep_graph, self.runtime_cache_path, self.rng)
+
     def add_construction(self, construction: Clause) -> list[Dependency]:
         """Add a new clause of construction, e.g. a new excenter."""
+        self.new_cache(None)
+
         adds: list[Dependency] = []
         numerics: list[tuple[str, ...]] = []
         existing_points = self.symbols_graph.nodes_of_type(Point)
@@ -125,7 +131,6 @@ class ProofState:
                 raise Exception("The construction is illegal")
 
         # draw
-
         def draw_fn() -> tuple[PointNum, ...]:
             to_be_intersected: list[ObjNum] = []
             for n in numerics:
@@ -185,9 +190,7 @@ class ProofState:
         for _ in range(max_attempts):
             # Search for coordinates that checks premises conditions numerically.
             try:
-                proof = ProofState(
-                    rng=rng, runtime_cache_path=runtime_cache_path, defs=defsJGEX
-                )
+                proof = ProofState(rng=rng, defs=defsJGEX)
                 added: list[Dependency] = []
                 for construction in problemJGEX.constructions:
                     adds = proof.add_construction(construction)
@@ -198,6 +201,7 @@ class ProofState:
                             )
                         add.add()
                     added += adds
+                proof.new_cache(runtime_cache_path)
 
             except (
                 InvalidIntersectError,
