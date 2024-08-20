@@ -6,7 +6,7 @@ import numpy as np
 
 from geosolver.dependency.symbols import Line
 from geosolver.numerical import close_enough
-from geosolver.numerical.draw_figure import draw_angle, draw_line
+from geosolver.numerical.draw_figure import PALETTE, draw_angle, draw_line
 from geosolver.predicates.predicate import Predicate
 from geosolver.algebraic_reasoning.tables import Angle_Chase
 from geosolver.tools import reshape
@@ -141,31 +141,8 @@ class EqAngle(Predicate):
     def draw(
         cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
     ):
-        palette = [
-            "#e6194b",
-            "#3cb44b",
-            "#ffe119",
-            "#4363d8",
-            "#f58231",
-            "#911eb4",
-            "#46f0f0",
-            "#f032e6",
-            "#bcf60c",
-            "#fabebe",
-            "#008080",
-            "#e6beff",
-            "#9a6324",
-            "#fffac8",
-            "#800000",
-            "#aaffc3",
-            "#808000",
-            "#ffd8b1",
-            "#0000cd",
-            "#808080",
-            "#ffffff",
-        ]
-        setattr(ax, "angle_color", (getattr(ax, "angle_color", 0) + 1) % len(palette))
-        color = palette[ax.angle_color]  # type: ignore
+        setattr(ax, "angle_color", (getattr(ax, "angle_color", 0) + 1) % len(PALETTE))
+        color = PALETTE[ax.angle_color]  # type: ignore
         r = rng.random()
         width = r * 0.1
         symbols_graph = dep_graph.symbols_graph

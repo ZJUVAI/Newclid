@@ -1,9 +1,12 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional
 
+from matplotlib.axes import Axes
+from matplotlib.pylab import Generator
 import numpy as np
 from geosolver.dependency.symbols import Point
 from geosolver.numerical import close_enough
+from geosolver.numerical.draw_figure import PALETTE, draw_segment, draw_segment_num
 from geosolver.numerical.geometries import LineNum
 from geosolver.predicates.congruence import Cong
 from geosolver.predicates.predicate import Predicate
@@ -95,6 +98,39 @@ class Para(Predicate):
         if point == b:
             a, b = b, a
         return f"on_pline {a} {b} {c} {d}"
+
+    @classmethod
+    def draw(
+        cls,
+        ax: Axes,
+        args: tuple[Any, ...],
+        dep_graph: "DependencyGraph",
+        rng: Generator,
+    ):
+        setattr(ax, "para_color", (getattr(ax, "angle_color", 0) + 1) % len(PALETTE))
+        points: tuple[Point, ...] = args
+        seglen = 100
+        for i in range(0, len(points), 2):
+            draw_segment(ax, points[i], points[i + 1], ls="dashed")
+            seglen = min(seglen, points[i].num.distance(points[i + 1].num))
+        seglen /= 3.0
+        for i in range(0, len(points), 2):
+            d = points[i + 1].num - points[i].num
+            d = d / abs(d)
+            d = d.rot90()
+            if d.x < 0.0:
+                d = -0.03 * d
+            else:
+                d = 0.03 * d
+            p = points[i + 1].num - points[i].num
+            p = p / abs(p)
+            p = p * (points[i].num.distance(points[i + 1].num) - seglen) * 0.5
+            draw_segment_num(
+                ax,
+                points[i].num + d + p,
+                points[i + 1].num + d - p,
+                color=PALETTE[ax.para_color],
+            )  # type: ignore
 
 
 class NPara(Predicate):

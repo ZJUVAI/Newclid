@@ -23,6 +23,30 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from matplotlib.figure import Figure
 
+PALETTE = [
+    "#e6194b",
+    "#3cb44b",
+    "#ffe119",
+    "#4363d8",
+    "#f58231",
+    "#911eb4",
+    "#46f0f0",
+    "#f032e6",
+    "#bcf60c",
+    "#fabebe",
+    "#008080",
+    "#e6beff",
+    "#9a6324",
+    "#fffac8",
+    "#800000",
+    "#aaffc3",
+    "#808000",
+    "#ffd8b1",
+    "#0000cd",
+    "#808080",
+    "#ffffff",
+]
+
 
 def init_figure() -> "Figure":
     imsize = 512 / 100
@@ -110,8 +134,12 @@ def draw_line(ax: "Axes", line: Line, **args: Any):
 
 def draw_segment(ax: "Axes", p0: Point, p1: Point, **args: Any):
     fill_missing(args, {"color": "white", "lw": 0.4, "alpha": 0.9})
-
     ax.plot((p0.num.x, p1.num.x), (p0.num.y, p1.num.y), **args)  # type: ignore
+
+
+def draw_segment_num(ax: "Axes", p0: PointNum, p1: PointNum, **args: Any):
+    fill_missing(args, {"color": "white", "lw": 0.4, "alpha": 0.9})
+    ax.plot((p0.x, p1.x), (p0.y, p1.y), **args)  # type: ignore
 
 
 def draw_angle(ax: "Axes", line0: Line, line1: Line, **args: Any):
