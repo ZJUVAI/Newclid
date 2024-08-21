@@ -15,7 +15,7 @@ cache:
 before_script:
   - python --version
   # install git for scm_toolkit versionning
-  - apt-get -qq update && apt-get -qq install -y git python3-tk
+  - apt-get -qq update && apt-get -qq install -y git
   # provide credentials to pip to access repositories on the Huawei GitLab
   - echo "machine rnd-gitlab-eu.huawei.com" > ~/.netrc
   - echo "login gitlab-ci-token" >> ~/.netrc

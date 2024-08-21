@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 from io import BytesIO
-import tkinter as tk
 from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Optional
 from PIL import Image, ImageTk
 
@@ -20,6 +19,11 @@ from numpy.random import Generator
 
 from geosolver.statement import Statement
 from geosolver.tools import atomize
+
+try:
+    import tkinter as tk
+except ImportError:
+    pass
 
 if TYPE_CHECKING:
     ...
@@ -92,7 +96,7 @@ class HumanAgent(DeductiveAgent):
         draw_figure(self.proof, save_to=png_stream, rng=self.rng, format="png")
 
         png_stream.seek(0)
-        root = tk.Tk()
+        root = tk.Tk()  # type: ignore
 
         photo = ImageTk.PhotoImage(Image.open(png_stream))  # type: ignore
         label = tk.Label(root, image=photo)  # type: ignore
