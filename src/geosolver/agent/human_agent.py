@@ -72,7 +72,7 @@ class HumanAgent(DeductiveAgent):
             self.select(
                 [
                     NamedFunction(
-                        f"{dep.statement.pretty()} <= {', '.join(s.pretty() for s in dep.why)}",
+                        f"{', '.join(s.pretty() for s in dep.why)} => {dep.statement.pretty()}",
                         lambda dep=dep: self.proof.apply_dep(dep),
                     )
                     for dep in deps
