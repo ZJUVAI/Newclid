@@ -295,6 +295,7 @@ def test_rule_used_to_solve_in_one_step(
 
     assert success
     if "r" == rule_name[0]:
+        Path("individual_rules_out").mkdir(exist_ok=True)
         solver.draw_figure(out_file=Path("individual_rules_out") / (rule_name + ".svg"))
         solver.write_proof_steps(
             out_file=Path("individual_rules_out") / (rule_name + "_proof.txt")
