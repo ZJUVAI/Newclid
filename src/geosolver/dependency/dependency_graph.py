@@ -1,5 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
+from geosolver.dependency.dependency import IN_PREMISES
 from geosolver.dependency.symbols_graph import SymbolsGraph
 
 if TYPE_CHECKING:
@@ -22,6 +23,16 @@ class DependencyGraph:
         return (
             dep.statement in self.hyper_graph and dep in self.hyper_graph[dep.statement]
         )
+
+    def checked(self):
+        return list(self.hyper_graph.keys())
+
+    def premises(self):
+        res: list[Dependency] = []
+        for _, dep in self.hyper_graph.items():
+            if dep.reason == IN_PREMISES:
+                res.append(dep)
+        return res
 
     def _proof_text(
         self,

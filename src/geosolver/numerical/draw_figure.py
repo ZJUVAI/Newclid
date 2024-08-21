@@ -80,7 +80,7 @@ def draw_figure(
             rng,
         )
     else:
-        _draw(ax, points, proof.dep_graph.hyper_graph.keys(), rng)
+        _draw(ax, points, proof.dep_graph.checked(), rng)
 
     if points:
         xmin = min([p.num.x for p in points])

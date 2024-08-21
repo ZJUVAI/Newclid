@@ -134,6 +134,9 @@ class HumanAgent(DeductiveAgent):
         return True
 
     def step(self) -> bool:
+        print("Premises:")
+        for dep in self.proof.dep_graph.premises():
+            print(f"{dep.statement.pretty()}")
         if self.bfsddar:
             res = self.bfsddar.step()
             if not res:
@@ -146,7 +149,7 @@ class HumanAgent(DeductiveAgent):
                     NamedFunction("graphics", self.show_graphics),
                     NamedFunction("construction", self.add_construction),
                     NamedFunction("exhaust with bfsddar", self.exhaust_with_bfsddar),
-                    NamedFunction("check", self.check),
+                    NamedFunction("check statement", self.check),
                     NamedFunction("check goals", self.check_goals),
                     NamedFunction("nothing", lambda: True),
                     NamedFunction("stop", lambda: False),
