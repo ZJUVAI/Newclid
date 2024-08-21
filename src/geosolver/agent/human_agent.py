@@ -134,16 +134,16 @@ class HumanAgent(DeductiveAgent):
         return True
 
     def step(self) -> bool:
-        print("Premises:")
-        for dep in self.proof.dep_graph.premises():
-            print(f"{dep.statement.pretty()}")
+        res = True
         if self.bfsddar:
             res = self.bfsddar.step()
             if not res:
                 self.bfsddar = None
-            return True
         else:
-            if not self.select(
+            print("Premises:")
+            for dep in self.proof.dep_graph.premises():
+                print(f"{dep.statement.pretty()}")
+            res = self.select(
                 [
                     NamedFunction("match", self.match),
                     NamedFunction("graphics", self.show_graphics),
@@ -154,8 +154,10 @@ class HumanAgent(DeductiveAgent):
                     NamedFunction("nothing", lambda: True),
                     NamedFunction("stop", lambda: False),
                 ]
-            ):
+            )
+            if not res:
                 for goal in self.proof.goals:
                     print(f"{goal.pretty()} proven? {goal.check()}")
-                return False
-            return True
+        if self.proof.check_goals():
+            print("All the goals are proven")
+        return res
