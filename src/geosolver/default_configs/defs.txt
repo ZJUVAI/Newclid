@@ -163,7 +163,7 @@ tline a a o
 midpoint x a b
 x : a b
 a b = diff a b
-x : coll x a b, cong x a x b
+x : midp x a b
 midp a b
 
 mirror x a b
