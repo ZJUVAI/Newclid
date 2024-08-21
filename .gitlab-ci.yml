@@ -10,6 +10,7 @@ cache:
   paths:
     - .cache/pip
     - tests_output
+    - venv
 
 
 before_script:
