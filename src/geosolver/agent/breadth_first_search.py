@@ -8,6 +8,7 @@ from geosolver.agent.agents_interface import (
     DeductiveAgent,
 )
 from geosolver.proof import ProofState
+from numpy.random import Generator
 
 if TYPE_CHECKING:
     from geosolver.rule import Rule
@@ -22,14 +23,17 @@ class BFSDDAR(DeductiveAgent):
 
     """
 
-    def __init__(self, proof: ProofState, rules: list["Rule"]) -> None:
+    def __init__(self, proof: ProofState, rules: list["Rule"], rng: Generator) -> None:
         self.proof = proof
         self.rules = rules
+        self.rng = rng
         self.rule_buffer: list[Rule] = []
         self.application_buffer: list[Dependency] = []
         self.hope = True
 
     def step(self) -> bool:
+        if self.proof.check_goals():
+            return False
         if self.rule_buffer:
             theorem = self.rule_buffer.pop()
             logging.info("bfsddar matching" + str(theorem))

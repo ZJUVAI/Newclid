@@ -1,6 +1,7 @@
 from copy import deepcopy
+from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Collection, Optional
+from typing import TYPE_CHECKING, Any, Collection, Optional, Union
 
 import numpy as np
 
@@ -58,14 +59,17 @@ def init_figure() -> "Figure":
 
 
 def draw_figure(
-    proof: "ProofState", *, save_to: Optional[Path] = None, rng: Generator
+    proof: "ProofState",
+    *,
+    save_to: Optional[Union[Path, BytesIO]] = None,
+    rng: Generator,
+    format: str = "svg",
 ) -> None:
     """Draw everything on the same canvas."""
     symbols_graph = proof.symbols_graph
     points: list[Point] = symbols_graph.nodes_of_type(Point)
     plt.close()
     fig = deepcopy(proof.fig)
-    # fig = init_figure()
     (ax,) = fig.axes
 
     if proof.check_goals():
@@ -88,7 +92,7 @@ def draw_figure(
         # ax.set_ylim(ymin - (ymax - ymin) * 0.1, ymax + (ymax - ymin) * 0.1)
 
     if save_to is not None:
-        fig.savefig(save_to)  # type: ignore
+        fig.savefig(save_to, format=format)  # type: ignore
 
 
 def _draw(

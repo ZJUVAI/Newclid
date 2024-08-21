@@ -1,5 +1,7 @@
 orthocenter
-a b c = triangle; h = on_tline b a c, on_tline c a b ? perp a h b c
+a b c = triangle; h = on_tline h b a c, on_tline h c a b ? perp a h b c
+orthocenter_aux_bis
+a b c = triangle; h = on_tline h b a c, on_tline h c a b; d = on_line d a c, on_line d b h ? perp a h b c
 orthocenter_aux
 a b c = triangle; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d ? perp a d b c
 incenter_excenter

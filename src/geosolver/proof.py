@@ -62,9 +62,11 @@ class ProofState:
         self.dep_graph = dep_graph or DependencyGraph(AlgebraicManipulator())
         self.symbols_graph = self.dep_graph.symbols_graph
         self.goals: list[Statement] = goals or []
-        self.runtime_cache_path = runtime_cache_path
         self.rng = rng
+
+        self.runtime_cache_path = runtime_cache_path
         self.matcher = Matcher(self.dep_graph, self.runtime_cache_path, self.rng)
+
         self.fig = init_figure()
         self.defs = defs
 
@@ -72,7 +74,7 @@ class ProofState:
         self.runtime_cache_path = runtime_cache_path
         self.matcher = Matcher(self.dep_graph, self.runtime_cache_path, self.rng)
 
-    def add_construction(self, construction: Clause) -> list[Dependency]:
+    def add_construction(self, construction: Clause):
         """Add a new clause of construction, e.g. a new excenter."""
         self.new_cache(None)
 
@@ -169,7 +171,12 @@ class ProofState:
                 closed=True,
             )
             ax.add_artist(triangle)
-        return adds
+        for add in adds:
+            if not add.statement.check_numerical():
+                raise ConstructionError(
+                    "This is probably because the construction itself is wrong"
+                )
+            add.add()
 
     @classmethod
     def build_problemJGEX(
@@ -191,16 +198,8 @@ class ProofState:
             # Search for coordinates that checks premises conditions numerically.
             try:
                 proof = ProofState(rng=rng, defs=defsJGEX)
-                added: list[Dependency] = []
                 for construction in problemJGEX.constructions:
-                    adds = proof.add_construction(construction)
-                    for add in adds:
-                        if not add.statement.check_numerical():
-                            raise ConstructionError(
-                                "This is probably because the construction itself is wrong"
-                            )
-                        add.add()
-                    added += adds
+                    proof.add_construction(construction)
                 proof.new_cache(runtime_cache_path)
 
             except (

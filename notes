@@ -2,3 +2,5 @@ pytest --log-cli-level=INFO -k orthocenter .\tests\deductive_agents\test_breadth
 nohup sudo -b bash myrun.sh
 PythagoreanTheorem
 PythagoreanPremises a b c => PythagoreanConclusions a b c
+
+geosolver --problem-name orthocenter --problems-file .\problems_datasets\examples.txt --agent human_agent --log-level 30

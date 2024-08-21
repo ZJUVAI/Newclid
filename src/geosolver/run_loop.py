@@ -18,20 +18,16 @@ def run_loop(
         if not goal.check_numerical():
             infos["error"] = f"{goal.pretty()} fails numerical check"
             return infos
-    success = False
     t0 = time.time()
 
     step = 0
-    running: bool = True
+    running = True
     while running:
         running = deductive_agent.step()
         step += 1
-        success = proof.check_goals()
-        if success:
-            running = False
 
     infos["runtime"] = time.time() - t0
-    infos["success"] = success
+    infos["success"] = proof.check_goals()
     infos["steps"] = step
     for goal in proof.goals:
         if goal.check():

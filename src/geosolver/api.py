@@ -40,7 +40,7 @@ class GeometricSolver:
         self.theorems = theorems
         self.goals = proof.goals
         self.rng = proof.rng
-        self.deductive_agent = deductive_agent(self.proof, self.theorems)
+        self.deductive_agent = deductive_agent(self.proof, self.theorems, self.rng)
         self.run_infos: dict[str, Any] = {}
 
     def run(

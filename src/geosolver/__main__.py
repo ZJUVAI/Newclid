@@ -138,7 +138,7 @@ def main():
 
     solver = solver_builder.build()
     if not args.quiet:
-        solver.draw_figure(False, problem_path / "construction_figure.png")
+        solver.draw_figure(out_file=problem_path / "construction_figure.png")
     success = solver.run()
 
     logging.info(f"Run infos: {solver.run_infos}")
