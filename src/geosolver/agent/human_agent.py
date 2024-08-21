@@ -5,7 +5,6 @@
 from __future__ import annotations
 from io import BytesIO
 from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Optional
-from PIL import Image, ImageTk
 
 from geosolver.agent.agents_interface import (
     DeductiveAgent,
@@ -22,7 +21,8 @@ from geosolver.tools import atomize
 
 try:
     import tkinter as tk
-except ImportError:
+    from PIL import Image, ImageTk  # type: ignore
+except Exception:
     pass
 
 if TYPE_CHECKING:
