@@ -40,22 +40,22 @@ build:
       - venv
 
 
-pytest-coverage:
-    stage: test
-    script:
-        - source venv/bin/activate
-        - python -m pytest -v --cov --cov-report=xml:coverage.xml --cov-report=term --cov-report=xml:coverage.xml --junitxml=report.xml tests
-    coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
-    artifacts:
-        when: always
-        paths:
-        - tests_output/
-        reports:
-          coverage_report:
-            coverage_format: cobertura
-            path: coverage.xml
-          junit: report.xml
-        expire_in: 2 weeks
+# pytest-coverage:
+#     stage: test
+#     script:
+#         - source venv/bin/activate
+#         - python -m pytest -v --cov --cov-report=xml:coverage.xml --cov-report=term --cov-report=xml:coverage.xml --junitxml=report.xml tests
+#     coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+#     artifacts:
+#         when: always
+#         paths:
+#         - tests_output/
+#         reports:
+#           coverage_report:
+#             coverage_format: cobertura
+#             path: coverage.xml
+#           junit: report.xml
+#         expire_in: 2 weeks
 
 
 pages:
@@ -63,11 +63,11 @@ pages:
   script:
     - source venv/bin/activate
     - pip install -e .[doc]
-    - sphinx-build -b html ./docs ./public
+    - sphinx-build -b html ./docs ./docs/_build/html
   artifacts:
     paths:
       # The folder that contains the files to be exposed at the Page URL
-      - public
+      - ./docs/_build/html
   rules:
     # This ensures that only pushes to the default branch will trigger
     # a pages deploy
