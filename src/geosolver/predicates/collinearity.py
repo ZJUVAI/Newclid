@@ -2,8 +2,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional
 
 from matplotlib.axes import Axes
-from geosolver.dependency.dependency import NUMERICAL_CHECK, Dependency
-from geosolver.dependency.symbols import Line, Point
+from geosolver.dependencies.dependency import NUMERICAL_CHECK, Dependency
+from geosolver.dependencies.symbols import Line, Point
 from geosolver.numerical.draw_figure import draw_line
 from geosolver.numerical.geometries import LineNum
 from geosolver.predicates.predicate import Predicate
@@ -11,7 +11,7 @@ from geosolver.tools import notNone
 from numpy.random import Generator
 
 if TYPE_CHECKING:
-    from geosolver.dependency.dependency_graph import DependencyGraph
+    from geosolver.dependencies.dependency_graph import DependencyGraph
     from geosolver.statement import Statement
 
 

@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from matplotlib.axes import Axes
 
-from geosolver.dependency.symbols import Line, Point
+from geosolver.dependencies.symbols import Line, Point
 from geosolver.numerical import nearly_zero
 from geosolver.numerical.draw_figure import draw_line, draw_rectangle
 from geosolver.predicates.equal_angles import EqAngle
@@ -14,8 +14,8 @@ from numpy.random import Generator
 if TYPE_CHECKING:
     from geosolver.algebraic_reasoning.tables import Table
     from geosolver.algebraic_reasoning.tables import SumCV
-    from geosolver.dependency.dependency import Dependency
-    from geosolver.dependency.dependency_graph import DependencyGraph
+    from geosolver.dependencies.dependency import Dependency
+    from geosolver.dependencies.dependency_graph import DependencyGraph
     from geosolver.statement import Statement
 
 

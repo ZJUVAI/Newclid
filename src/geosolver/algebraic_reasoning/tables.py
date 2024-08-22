@@ -7,8 +7,8 @@ import numpy as np
 import scipy.optimize as opt  # type: ignore
 
 if TYPE_CHECKING:
-    from geosolver.dependency.dependency import Dependency
-    from geosolver.dependency.symbols import Point
+    from geosolver.dependencies.dependency import Dependency
+    from geosolver.dependencies.symbols import Point
 
 ATOM: float = 1e-9
 NLOGATOM: int = 9

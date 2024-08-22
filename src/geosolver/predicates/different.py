@@ -1,13 +1,13 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 
-from geosolver.dependency.dependency import NUMERICAL_CHECK, Dependency
-from geosolver.dependency.symbols import Point
+from geosolver.dependencies.dependency import NUMERICAL_CHECK, Dependency
+from geosolver.dependencies.symbols import Point
 from geosolver.predicates.predicate import Predicate
 
 
 if TYPE_CHECKING:
-    from geosolver.dependency.dependency_graph import DependencyGraph
+    from geosolver.dependencies.dependency_graph import DependencyGraph
     from geosolver.statement import Statement
 
 

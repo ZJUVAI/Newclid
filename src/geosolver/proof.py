@@ -8,9 +8,9 @@ import logging
 
 from matplotlib import patches
 
-from geosolver.definition.clause import Clause, translate_sentence
-from geosolver.dependency.dependency_graph import DependencyGraph
-from geosolver.dependency.symbols import Point
+from geosolver.formulations.clause import Clause, translate_sentence
+from geosolver.dependencies.dependency_graph import DependencyGraph
+from geosolver.dependencies.symbols import Point
 from geosolver.numerical.draw_figure import init_figure
 from geosolver.numerical.geometries import (
     InvalidIntersectError,
@@ -23,7 +23,7 @@ from geosolver.algebraic_reasoning.algebraic_manipulator import (
     AlgebraicManipulator,
 )
 from geosolver.statement import Statement
-from geosolver.definition.definition import DefinitionJGEX
+from geosolver.formulations.definition import DefinitionJGEX
 from geosolver.match_theorems import Matcher
 
 from geosolver.numerical.distances import (
@@ -34,9 +34,9 @@ from geosolver.numerical.distances import (
 )
 from geosolver.numerical.sketch import sketch
 
-from geosolver.problem import ProblemJGEX
-from geosolver.dependency.dependency import IN_PREMISES, Dependency
-from geosolver.rule import Rule
+from geosolver.formulations.problem import ProblemJGEX
+from geosolver.dependencies.dependency import IN_PREMISES, Dependency
+from geosolver.formulations.rule import Rule
 from geosolver.tools import atomize, notNone
 
 if TYPE_CHECKING:

@@ -1,8 +1,8 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
-from geosolver.dependency.dependency import Dependency
-from geosolver.dependency.symbols import Circle, Point
+from geosolver.dependencies.dependency import Dependency
+from geosolver.dependencies.symbols import Circle, Point
 from geosolver.numerical import close_enough
 from geosolver.numerical.draw_figure import draw_circle
 from geosolver.numerical.geometries import CircleNum
@@ -14,7 +14,7 @@ from geosolver.tools import notNone
 
 
 if TYPE_CHECKING:
-    from geosolver.dependency.dependency_graph import DependencyGraph
+    from geosolver.dependencies.dependency_graph import DependencyGraph
     from geosolver.statement import Statement
 
 

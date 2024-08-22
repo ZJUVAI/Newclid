@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional
-from geosolver.dependency.symbols import Point
+from geosolver.dependencies.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.numerical.check import same_clock
 from geosolver.predicates.predicate import Predicate
@@ -8,7 +8,7 @@ from geosolver.predicates.triangles_similar import two_triangles
 
 
 if TYPE_CHECKING:
-    from geosolver.dependency.dependency_graph import DependencyGraph
+    from geosolver.dependencies.dependency_graph import DependencyGraph
     from geosolver.statement import Statement
 
 

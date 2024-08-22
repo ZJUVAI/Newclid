@@ -10,7 +10,7 @@ from geosolver.numerical.geometries import (
     PointNum,
     intersect,
 )
-from geosolver.dependency.symbols import Point, Circle, Line
+from geosolver.dependencies.symbols import Point, Circle, Line
 import matplotlib.pyplot as plt
 import matplotlib
 import matplotlib.patches as patches

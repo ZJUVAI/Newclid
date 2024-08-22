@@ -6,19 +6,19 @@ from typing_extensions import Self
 
 
 from geosolver.agent.breadth_first_search import BFSDDAR
-from geosolver.definition.definition import DefinitionJGEX
-from geosolver.dependency.dependency_graph import DependencyGraph
+from geosolver.formulations.definition import DefinitionJGEX
+from geosolver.dependencies.dependency_graph import DependencyGraph
 from geosolver.load_geogebra import load_geogebra
 from geosolver.numerical.draw_figure import draw_figure
 from geosolver.algebraic_reasoning.algebraic_manipulator import (
     AlgebraicManipulator,
 )
-from geosolver.rule import Rule
+from geosolver.formulations.rule import Rule
 from geosolver.proof import ProofState
 from geosolver.configs import default_defs_path, default_rules_path
 from geosolver.agent.agents_interface import DeductiveAgent
 from geosolver.run_loop import run_loop
-from geosolver.problem import ProblemJGEX
+from geosolver.formulations.problem import ProblemJGEX
 from geosolver.proof_writing import write_proof_steps
 import numpy as np
 

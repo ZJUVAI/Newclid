@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+import shutil
+import subprocess
 
 
 def rename_modules(filepath: Path):
@@ -20,11 +22,37 @@ def rename_modules(filepath: Path):
         file.writelines(lines)
 
 
+def run_command(cmd: str):
+    process = subprocess.Popen(
+        cmd.split(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        shell=True,
+    )
+    for line in process.stdout:  # type: ignore
+        print(line, end="")
+
+    process.wait()
+
+    for line in process.stderr:  # type: ignore
+        print(line, end="")
+    return process.returncode
+
+
 if __name__ == "__main__":
-    path = Path(__file__).parent / "source"
+    docsfolder = Path("./docs")
+    projfolder = Path(".")
+    try:
+        shutil.rmtree(docsfolder / "source")
+    except FileNotFoundError:
+        pass
+    os.mkdir(docsfolder / "source")
+    run_command(
+        f"sphinx-apidoc -M -e -f -o {docsfolder / 'source'} {projfolder / 'src' / 'geosolver'} --implicit-namespaces --ext-autodoc"
+    )
+    os.remove(docsfolder / "source" / "modules.rst")
 
-    os.remove(path / "modules.rst")
-
-    for folderpath, folders, files in os.walk(path):
+    for folderpath, folders, files in os.walk(docsfolder / "source"):
         for filename in [file for file in files if file.endswith(".rst")]:
             rename_modules(Path(folderpath) / filename)

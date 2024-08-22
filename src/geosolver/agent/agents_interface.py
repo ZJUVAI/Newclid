@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from abc import ABC, abstractmethod
 
 from geosolver.proof import ProofState
-from geosolver.rule import Rule
+from geosolver.formulations.rule import Rule
 from numpy.random import Generator
 
 

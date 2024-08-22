@@ -2,13 +2,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional
 
 from geosolver.predicates import NAME_TO_PREDICATE
-from geosolver.dependency.dependency import Dependency
+from geosolver.dependencies.dependency import Dependency
 from numpy.random import Generator
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from geosolver.predicates.predicate import Predicate
-    from geosolver.dependency.dependency_graph import DependencyGraph
+    from geosolver.dependencies.dependency_graph import DependencyGraph
 
 
 class Statement:

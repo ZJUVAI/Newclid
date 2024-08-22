@@ -2,8 +2,8 @@ from __future__ import annotations
 from fractions import Fraction
 from typing import TYPE_CHECKING, Any
 
-from geosolver.dependency.dependency import Dependency
-from geosolver.dependency.symbols import Point
+from geosolver.dependencies.dependency import Dependency
+from geosolver.dependencies.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.constant_angle import ACompute
 from geosolver.predicates.predicate import Predicate
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from geosolver.algebraic_reasoning.tables import Table
     from geosolver.algebraic_reasoning.tables import SumCV
     from geosolver.statement import Statement
-    from geosolver.dependency.dependency_graph import DependencyGraph
+    from geosolver.dependencies.dependency_graph import DependencyGraph
 
 
 class ConstantRatio(Predicate):

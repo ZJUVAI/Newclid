@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING, Any, Optional
 
 from matplotlib.axes import Axes
 from matplotlib.pylab import Generator
-from geosolver.dependency.symbols import Point
+from geosolver.dependencies.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.numerical.check import same_clock
 from geosolver.numerical.draw_figure import draw_segment
@@ -11,7 +11,7 @@ from geosolver.predicates.predicate import Predicate
 
 
 if TYPE_CHECKING:
-    from geosolver.dependency.dependency_graph import DependencyGraph
+    from geosolver.dependencies.dependency_graph import DependencyGraph
     from geosolver.statement import Statement
 
 

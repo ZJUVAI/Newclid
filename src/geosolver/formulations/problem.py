@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple
 
-from geosolver.definition.clause import Clause, translate_sentence
+from geosolver.formulations.clause import Clause, translate_sentence
 from geosolver.tools import atomize, reshape
 
 if TYPE_CHECKING:

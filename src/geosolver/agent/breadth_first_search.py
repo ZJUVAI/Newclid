@@ -11,8 +11,8 @@ from geosolver.proof import ProofState
 from numpy.random import Generator
 
 if TYPE_CHECKING:
-    from geosolver.rule import Rule
-    from geosolver.dependency.dependency import Dependency
+    from geosolver.formulations.rule import Rule
+    from geosolver.dependencies.dependency import Dependency
 
 
 class BFSDDAR(DeductiveAgent):

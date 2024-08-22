@@ -7,15 +7,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Generator, Optional
 import json
 
-from geosolver.definition.clause import translate_sentence
-from geosolver.dependency.symbols import Point
+from geosolver.formulations.clause import translate_sentence
+from geosolver.dependencies.symbols import Point
 from geosolver.statement import Statement
-from geosolver.dependency.dependency import Dependency
+from geosolver.dependencies.dependency import Dependency
 
 if TYPE_CHECKING:
     import numpy as np
-    from geosolver.rule import Rule
-    from geosolver.dependency.dependency_graph import DependencyGraph
+    from geosolver.formulations.rule import Rule
+    from geosolver.dependencies.dependency_graph import DependencyGraph
 
 
 class Matcher:

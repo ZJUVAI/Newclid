@@ -1,10 +1,10 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
-from geosolver.dependency.dependency import IN_PREMISES
-from geosolver.dependency.symbols_graph import SymbolsGraph
+from geosolver.dependencies.dependency import IN_PREMISES
+from geosolver.dependencies.symbols_graph import SymbolsGraph
 
 if TYPE_CHECKING:
-    from geosolver.dependency.dependency import Dependency
+    from geosolver.dependencies.dependency import Dependency
     from geosolver.statement import Statement
     from geosolver.algebraic_reasoning.algebraic_manipulator import (
         AlgebraicManipulator,

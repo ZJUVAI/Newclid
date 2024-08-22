@@ -4,8 +4,8 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
-from geosolver.dependency.symbols import Point
-from geosolver.dependency.dependency import IN_PREMISES, NUMERICAL_CHECK, Dependency
+from geosolver.dependencies.symbols import Point
+from geosolver.dependencies.dependency import IN_PREMISES, NUMERICAL_CHECK, Dependency
 from geosolver.statement import Statement
 
 if TYPE_CHECKING:

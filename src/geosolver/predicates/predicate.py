@@ -6,8 +6,8 @@ from numpy.random import Generator
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
-    from geosolver.dependency.dependency import Dependency
-    from geosolver.dependency.dependency_graph import DependencyGraph
+    from geosolver.dependencies.dependency import Dependency
+    from geosolver.dependencies.dependency_graph import DependencyGraph
     from geosolver.statement import Statement
 
 

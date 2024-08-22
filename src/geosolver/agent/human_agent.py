@@ -10,10 +10,10 @@ from geosolver.agent.agents_interface import (
     DeductiveAgent,
 )
 from geosolver.agent.breadth_first_search import BFSDDAR
-from geosolver.definition.clause import Clause
+from geosolver.formulations.clause import Clause
 from geosolver.numerical.draw_figure import draw_figure
 from geosolver.proof import ProofState
-from geosolver.rule import Rule
+from geosolver.formulations.rule import Rule
 from numpy.random import Generator
 
 from geosolver.statement import Statement

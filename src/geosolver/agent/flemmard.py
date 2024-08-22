@@ -8,7 +8,7 @@ from geosolver.agent.agents_interface import (
 )
 
 if TYPE_CHECKING:
-    from geosolver.rule import Rule
+    from geosolver.formulations.rule import Rule
     from geosolver.proof import ProofState
 
 

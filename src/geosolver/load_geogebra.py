@@ -6,7 +6,7 @@ from typing import Optional
 from zipfile import ZipFile
 from xml.etree.ElementTree import parse
 from collections import defaultdict
-from geosolver.dependency.dependency import IN_PREMISES, Dependency
+from geosolver.dependencies.dependency import IN_PREMISES, Dependency
 from geosolver.numerical.geometries import PointNum
 from geosolver.predicates.circumcenter import Circumcenter
 from geosolver.predicates.collinearity import Coll
@@ -14,7 +14,7 @@ from geosolver.predicates.congruence import Cong
 from geosolver.predicates.midpoint import MidPoint
 from geosolver.predicates.perpendicularity import Perp
 
-from geosolver.dependency.dependency_graph import DependencyGraph
+from geosolver.dependencies.dependency_graph import DependencyGraph
 from geosolver.statement import Statement
 
 

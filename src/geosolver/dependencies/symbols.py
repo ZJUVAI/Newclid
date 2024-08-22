@@ -9,14 +9,15 @@ from geosolver.numerical.geometries import CircleNum, LineNum, PointNum
 
 if TYPE_CHECKING:
     from geosolver.statement import Statement
-    from geosolver.dependency.symbols_graph import SymbolsGraph
-    from geosolver.dependency.dependency import Dependency
+    from geosolver.dependencies.symbols_graph import SymbolsGraph
+    from geosolver.dependencies.dependency import Dependency
 
 S = TypeVar("S", bound="Symbol")
 
 
 class Symbol(ABC):
-    r"""Symbol in the symbols graph.
+    r"""
+    Symbol in the symbols graph.
 
     Can be Point, Line, Circle, etc.
 
@@ -24,6 +25,7 @@ class Symbol(ABC):
     other nodes if they are (found out to be) equivalent
 
     ::
+
         a -> b -
                 \
             c -> d -> e -> f -> g

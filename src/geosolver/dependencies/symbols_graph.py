@@ -3,10 +3,10 @@ from typing import TYPE_CHECKING, Collection, Optional, Type, TypeVar
 
 from geosolver.algebraic_reasoning.tables import Table
 import geosolver.numerical.geometries as num_geo
-from geosolver.dependency.symbols import Circle, Line, Point, Symbol
+from geosolver.dependencies.symbols import Circle, Line, Point, Symbol
 
 if TYPE_CHECKING:
-    from geosolver.dependency.dependency import Dependency
+    from geosolver.dependencies.dependency import Dependency
 
 S = TypeVar("S", bound="Symbol")
 CircL = TypeVar("CircL", "Circle", "Line")

@@ -2,17 +2,17 @@ from __future__ import annotations
 from fractions import Fraction
 from typing import TYPE_CHECKING, Any, Optional
 
-from geosolver.dependency.symbols import Point
+from geosolver.dependencies.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.predicate import Predicate
 from geosolver.algebraic_reasoning.tables import Ratio_Chase
 from geosolver.tools import fraction_to_len, get_quotient, str_to_fraction
-from geosolver.dependency.dependency import Dependency
+from geosolver.dependencies.dependency import Dependency
 
 if TYPE_CHECKING:
     from geosolver.algebraic_reasoning.tables import Table
     from geosolver.algebraic_reasoning.tables import SumCV
-    from geosolver.dependency.dependency_graph import DependencyGraph
+    from geosolver.dependencies.dependency_graph import DependencyGraph
     from geosolver.statement import Statement
 
 

@@ -59,13 +59,12 @@ pytest-coverage:
 
 
 pages:
-  stage: deploy
+  stage: deploy-doc
   script:
     - source venv/bin/activate
     - pip install -e .[doc]
-    - sphinx-apidoc -M -e -f --implicit-namespaces -o docs/source/ src/geosolver
     - python docs/reformat.py
-    - sphinx-build -b html ./docs public
+    - sphinx-build -b html ./docs ./public
   artifacts:
     paths:
       # The folder that contains the files to be exposed at the Page URL

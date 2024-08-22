@@ -4,21 +4,21 @@ from typing import TYPE_CHECKING, Any
 from matplotlib.axes import Axes
 import numpy as np
 
-from geosolver.dependency.symbols import Line
+from geosolver.dependencies.symbols import Line
 from geosolver.numerical import close_enough
 from geosolver.numerical.draw_figure import PALETTE, draw_angle, draw_line
 from geosolver.predicates.predicate import Predicate
 from geosolver.algebraic_reasoning.tables import Angle_Chase
 from geosolver.tools import reshape
-from geosolver.dependency.dependency import Dependency
+from geosolver.dependencies.dependency import Dependency
 from numpy.random import Generator
 
 if TYPE_CHECKING:
     from geosolver.algebraic_reasoning.tables import Table
     from geosolver.algebraic_reasoning.tables import SumCV
-    from geosolver.dependency.dependency_graph import DependencyGraph
+    from geosolver.dependencies.dependency_graph import DependencyGraph
     from geosolver.statement import Statement
-    from geosolver.dependency.symbols import Point
+    from geosolver.dependencies.symbols import Point
 
 
 class EqAngle(Predicate):

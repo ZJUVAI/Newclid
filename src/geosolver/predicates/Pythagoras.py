@@ -3,15 +3,15 @@ import logging
 from typing import TYPE_CHECKING, Any, Optional
 
 from geosolver.predicates.constant_length import ConstantLength
-from geosolver.dependency.dependency import Dependency
-from geosolver.dependency.symbols import Point
+from geosolver.dependencies.dependency import Dependency
+from geosolver.dependencies.symbols import Point
 from geosolver.numerical import close_enough
 from geosolver.predicates.perpendicularity import Perp
 from geosolver.predicates.predicate import Predicate
 from geosolver.tools import InfQuotientError, get_quotient
 
 if TYPE_CHECKING:
-    from geosolver.dependency.dependency_graph import DependencyGraph
+    from geosolver.dependencies.dependency_graph import DependencyGraph
     from geosolver.statement import Statement
 
 PythagorasVerification = "Pythagoras Verification"
