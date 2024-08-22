@@ -7,15 +7,14 @@ An extension of the geometric solver introduced in the Nature 2024 paper:
 <https://www.nature.com/articles/s41586-023-06747-5>`_.
 
 
-.. image:: ../docs/_static/AlphaGeometryMainPicture.svg
-  :alt: Where a geometric problem is fed to a solver (DDAR)
-        and helped by an LLM to build auxiliary constructions.
+.. image:: ../docs/_static/images/overview.drawio.svg
+  :alt: overview diagram
 
 
-AlphaGeometry can be seen as an extension of GeoSolver equipped with a language model 
-that proposes new auxiliary constructions if a problem gets stuck. 
+AlphaGeometry can be seen as an extension of GeoSolver equipped with a language model
+that proposes new auxiliary constructions if a problem gets stuck.
 
-Currently new auxiliary constructions can only be added in Geosolver as human suggested 
+Currently new auxiliary constructions can only be added in Geosolver as human suggested
 constructions if the HumanAgent is used instead of BFSDDAR (default).
 
 
@@ -36,7 +35,7 @@ From source
 .. code:: bash
 
   git clone git+https://rnd-gitlab-eu.huawei.com/Noahs-Ark/libraries/geosolver
-  pip install -e . 
+  pip install -e .
 
 
 Quickstart
@@ -60,7 +59,7 @@ See other command line interface options with:
 
 .. code:: bash
 
-  geosolver --help 
+  geosolver --help
 
 For more complex applications, use the python interface.
 Below is a minimal example to load a specific problem,
@@ -91,14 +90,14 @@ then uses the built solver to solve it:
     print(f"Run infos {solver.run_infos}")
 
 
-Some more advanced examples of script using the python interface 
+Some more advanced examples of script using the python interface
 are displayed in the folder ``examples`` or used in ``tests``.
 
 
 Documentation
 -------------
 
-See `the online documentation 
+See `the online documentation
 <https://ddar-noahs-ark-libraries-d1a330533fb77a761c85bd7785b7974dd32b06.rnd-gitlab-eu.huawei.com/>`_
 for more detailed informations about geosolver.
 

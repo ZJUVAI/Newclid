@@ -25,7 +25,7 @@ angle_bisector x a b c
      - :math:`\widehat{abx}=\widehat{xbc}` (eqangle b a b x b x b c).
      - Line
 
-.. |angle_bisector| image:: ../../_static/Images/defs/angle_bisector.png
+.. |angle_bisector| image:: ../../_static/images/defs/angle_bisector.png
     :width: 100%
 
 
@@ -41,15 +41,15 @@ angle_mirror x a b c
      - Added Statements
      - Construction
    * - |angle_mirror|
-     - From non-collinear points a, b, c, creates x on the opposite side of bc with respect to a in a way that angle abx doubles angle abc. 
+     - From non-collinear points a, b, c, creates x on the opposite side of bc with respect to a in a way that angle abx doubles angle abc.
      - :math:`\widehat{abc}=\widehat{cbx}` (eqangle b a b c b c b x).
      - Ray
 
-.. |angle_mirror| image:: ../../_static/Images/defs/angle_mirror.png
+.. |angle_mirror| image:: ../../_static/images/defs/angle_mirror.png
     :width: 100%
 
 
-circle x a b c 
+circle x a b c
 ^^^^^^^^^^^^^^
 
 .. list-table::
@@ -61,11 +61,11 @@ circle x a b c
      - Added Statements
      - Construction
    * - |circle|
-     - From non-collinear points a, b, c, creates x the center of the circle through a, b, c. 
+     - From non-collinear points a, b, c, creates x the center of the circle through a, b, c.
      - :math:`xa=xb \wedge xb=xc`  (cong x a x b, cong x b x c)
      - Point
 
-.. |circle| image:: ../../_static/Images/defs/circle.png
+.. |circle| image:: ../../_static/images/defs/circle.png
     :width: 100%
 
 
@@ -90,7 +90,7 @@ eq_quadrangle a b c d
      - :math:`ad=bc`  (cong d a b c)
      - Points
 
-.. |eq_quadrangle| image:: ../../_static/Images/defs/eq_quadrangle.png
+.. |eq_quadrangle| image:: ../../_static/images/defs/eq_quadrangle.png
     :width: 100%
 
 iso_trapezoid a b c d
@@ -109,7 +109,7 @@ iso_trapezoid a b c d
      - :math:`ab//cd \wedge ad=bc`  (para d c a b, cong d a b c)
      - Points
 
-.. |iso_trapezoid| image:: ../../_static/Images/defs/iso_trapezoid.png
+.. |iso_trapezoid| image:: ../../_static/images/defs/iso_trapezoid.png
     :width: 100%
 
 eq_triangle x b c
@@ -128,7 +128,7 @@ eq_triangle x b c
      - :math:`\begin{cases}xb=bx \wedge bc=cx \\ \widehat{xbc} = \widehat{bcx} \wedge \widehat{cxb} = \widehat{xbc}\end{cases}`  (cong x b b c, cong b c c x; eqangle b x b c c b c x, eqangle x c x b b x b c)
      - Point
 
-.. |eq_triangle| image:: ../../_static/Images/defs/eq_triangle.png
+.. |eq_triangle| image:: ../../_static/images/defs/eq_triangle.png
     :width: 100%
 
 eqangle2 x a b c
@@ -147,7 +147,7 @@ eqangle2 x a b c
      - :math:`\widehat{bax} = \widehat{xcb}`  (eqangle a b a x c x c b)
      - Point (Locus could be hyperbola.)
 
-.. |eqangle2| image:: ../../_static/Images/defs/eqangle2.png
+.. |eqangle2| image:: ../../_static/images/defs/eqangle2.png
     :width: 100%
 
 eqdia_quadrangle a b c d
@@ -166,7 +166,7 @@ eqdia_quadrangle a b c d
      - :math:`bd=ac`  (cong d b a c)
      - Points
 
-.. |eqdia_quadrangle| image:: ../../_static/Images/defs/eqdia_quadrangle.png
+.. |eqdia_quadrangle| image:: ../../_static/images/defs/eqdia_quadrangle.png
     :width: 100%
 
 eqdistance x a b c
@@ -185,7 +185,7 @@ eqdistance x a b c
      - :math:`ax=bc`  (cong x a b c)
      - Circle
 
-.. |eqdistance| image:: ../../_static/Images/defs/eqdistance.png
+.. |eqdistance| image:: ../../_static/images/defs/eqdistance.png
     :width: 100%
 
 foot x a b c
@@ -204,7 +204,7 @@ foot x a b c
      - :math:`\begin{cases}x,b,c\ collinear\\ ax\perp bc\end{cases}`  (coll x b c, perp x a b c)
      - Point
 
-.. |foot| image:: ../../_static/Images/defs/foot.png
+.. |foot| image:: ../../_static/images/defs/foot.png
     :width: 100%
 
 free a
@@ -223,7 +223,7 @@ free a
      - No statement added
      - Point
 
-.. |free| image:: ../../_static/Images/defs/free.png
+.. |free| image:: ../../_static/images/defs/free.png
     :width: 100%
 
 incenter x a b c
@@ -242,7 +242,7 @@ incenter x a b c
      - :math:`\begin{cases}\widehat{bax}=\widehat{xac}\\ \widehat{acx}=\widehat{xcb}\\ \widehat{cbx}=\widehat{xba}\end{cases}`  (eqangle a b a x a x a c, eqangle c a c x c x c b, eqangle b c b x b x b a)
      - Point
 
-.. |incenter| image:: ../../_static/Images/defs/incenter.png
+.. |incenter| image:: ../../_static/images/defs/incenter.png
     :width: 100%
 
 incenter2 x y z i a b c
@@ -261,7 +261,7 @@ incenter2 x y z i a b c
      - :math:`\begin{cases}\widehat{bax}=\widehat{xac}\\ \widehat{acx}=\widehat{xcb}\\ \widehat{cbx}=\widehat{xba}\\ x,b,c\ collinear\\ ix\perp bc\\ y,c,a\ collinear\\ iy\perp ca\\ z,a,b\ collinear\\ iz\perp ab\\ ix=iy, iy=iz\end{cases}`  (eqangle a b a i a i a c, eqangle c a c i c i c b, eqangle b c b i b i b a, coll x b c, perp i x b c, coll y c a, perp i y c a, coll z a b, perp i z a b, cong i x i y, cong i y i z)
      - Points
 
-.. |incenter2| image:: ../../_static/Images/defs/incenter2.png
+.. |incenter2| image:: ../../_static/images/defs/incenter2.png
     :width: 100%
 
 excenter x a b c
@@ -280,7 +280,7 @@ excenter x a b c
      - :math:`\begin{cases}\widehat{bax}=\widehat{xac}\\ \widehat{acx}=\widehat{xcb}\\ \widehat{cbx}=\widehat{xba}\end{cases}` (eqangle a b a x a x a c, eqangle c a c x c x c b, eqangle b c b x b x b a)
      - Point
 
-.. |excenter| image:: ../../_static/Images/defs/excenter.png
+.. |excenter| image:: ../../_static/images/defs/excenter.png
     :width: 100%
 
 excenter2 x y z i a b c
@@ -299,12 +299,12 @@ excenter2 x y z i a b c
      - :math:`\begin{cases}\widehat{bax}=\widehat{xac}\\ \widehat{acx}=\widehat{xcb}\\ \widehat{cbx}=\widehat{xba}\\ x,b,c\ collinear\\ ix\perp bc\\ y,c,a\ collinear\\ iy\perp ca\\ z,a,b\ collinear\\ iz\perp ab\\ ix=iy, iy=iz\end{cases}`  (eqangle a b a i a i a c, eqangle c a c i c i c b, eqangle b c b i b i b a, coll x b c, perp i x b c, coll y c a, perp i y c a, coll z a b, perp i z a b, cong i x i y, cong i y i z)
      - Points
 
-.. |excenter2| image:: ../../_static/Images/defs/excenter2.png
+.. |excenter2| image:: ../../_static/images/defs/excenter2.png
     :width: 100%
 
-- **centroid x y z i a b c:** 
+- **centroid x y z i a b c:**
 
-- **ninepoints x y z i a b c:** 
+- **ninepoints x y z i a b c:**
 
 intersection_cc x o w a
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -322,7 +322,7 @@ intersection_cc x o w a
      - :math:`\begin{cases}oa=ox\\ wa=wx\end{cases}`  (cong o a o x, cong w a w x)
      - Point
 
-.. |intersection_cc| image:: ../../_static/Images/defs/intersection_cc.png
+.. |intersection_cc| image:: ../../_static/images/defs/intersection_cc.png
     :width: 100%
 
 intersection_lc x a o b
@@ -341,7 +341,7 @@ intersection_lc x a o b
      - :math:`\begin{cases}x, a, b\ collinear\\ ob=ox\end{cases}`  (coll x a b, cong o b o x)
      - Point
 
-.. |intersection_lc| image:: ../../_static/Images/defs/intersection_lc.png
+.. |intersection_lc| image:: ../../_static/images/defs/intersection_lc.png
     :width: 100%
 
 intersection_ll x a b c d
@@ -360,7 +360,7 @@ intersection_ll x a b c d
      - :math:`\begin{cases}x, a, b\ collinear\\ x, c, d\ collinear\end{cases}`  (coll x a b, coll x c d)
      - Point
 
-.. |intersection_ll| image:: ../../_static/Images/defs/intersection_ll.png
+.. |intersection_ll| image:: ../../_static/images/defs/intersection_ll.png
     :width: 100%
 
 intersection_lp x a b c m n
@@ -379,7 +379,7 @@ intersection_lp x a b c m n
      - :math:`\begin{cases}x, a, b\ collinear\\ cx\parallel mn\end{cases}`  (coll x a b, para c x m n)
      - Point
 
-.. |intersection_lp| image:: ../../_static/Images/defs/intersection_lp.png
+.. |intersection_lp| image:: ../../_static/images/defs/intersection_lp.png
     :width: 100%
 
 intersection_lt x a b c d e
@@ -398,7 +398,7 @@ intersection_lt x a b c d e
      - :math:`\begin{cases}x, a, b\ collinear\\ cx\perp de\end{cases}`  (coll x a b, perp x c d e)
      - Point
 
-.. |intersection_lt| image:: ../../_static/Images/defs/intersection_lt.png
+.. |intersection_lt| image:: ../../_static/images/defs/intersection_lt.png
     :width: 100%
 
 - **intersection_pp x a b c d e f:** From six points, a, b, c, d, e, f, such that a and d are different and that lines bc and ef are not parallel, builds point x in the intersection of the line through a parallel to bc and the line through d parallel to ef. Adds the statements that xa and bc are parallel and that xd and ef are parallel.
@@ -467,7 +467,7 @@ intersection_lt x a b c d e
 
 - **3peq x y z a b c:**
 
-- **trisect x y a b c:** 
+- **trisect x y a b c:**
 
 - **trisegment x y a b:** Given two different points a, b, builds x, y the two points trisecting the segment ab. Adds the collinearity statements saying x is in the segment ab, and the one saying y is in the segment ab, as well as the two congruent statements associated to the trisection: ax=xy and xy=yb.
 
@@ -479,7 +479,7 @@ intersection_lt x a b c d e
 
 - **cc_tangent x y z i o a w b:** From four points o, a, w, b, such that o is neither a nor w, and such that w and b are distinct, builds x, y, z, i on a pair of lines xy and zi that are simultaneously tangent to both the circle of center o through a and the circle of center w through b. x and z are the tangent points on the circle centered at o through a, and y and i are the tangent points on the circle centered at w through b. Adds the congruency statements ox=oa and oz=oa (saying x, z are in the circle of center o through a) and wy=wb and wi=wb (saying y, i are in the circle of center w through b), as well as the perpendicularity statements related to the tangents: yx is perpendicular to ox (because xy is tangent to the circle centered at o at point x), yx is perpendicular to wy (because xy is tangent to the circle centered at w at point y), zi is perpendicular to zo (because zi is tangent to the circle centered at o at point z), and zi is perpendicular to wi (because zi is tangent to the circle centered at w at point i).
 
-.. figure:: ../../_static/Images/defs/cc_tangent.png
+.. figure:: ../../_static/images/defs/cc_tangent.png
     :width: 400
     :align: center
 

@@ -15,7 +15,7 @@ class Dependency(NamedTuple):
     It links a statement to a list of statements that justify it
     and their own dependencies.
 
-    .. image:: ../_static/Images/dependency_building/dependency_structure.svg
+    .. image:: ../_static/images/dependency_building/dependency_structure.svg
 
     """
 
