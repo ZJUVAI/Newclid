@@ -24,7 +24,7 @@ def rename_modules(filepath: Path):
 
 def run_command(cmd: str):
     process = subprocess.Popen(
-        cmd.split(),
+        list(cmd.split()),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
@@ -48,6 +48,9 @@ if __name__ == "__main__":
     except FileNotFoundError:
         pass
     os.mkdir(docsfolder / "source")
+    print(
+        f"sphinx-apidoc -M -e -f --implicit-namespaces -o {docsfolder / 'source'} {projfolder / 'src' / 'geosolver'}"
+    )
     run_command(
         f"sphinx-apidoc -M -e -f --implicit-namespaces -o {docsfolder / 'source'} {projfolder / 'src' / 'geosolver'}"
     )
