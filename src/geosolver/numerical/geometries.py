@@ -364,7 +364,7 @@ def circle_circle_intersection(c1: CircleNum, c2: CircleNum) -> tuple[PointNum, 
     d = (x1 - x0) ** 2 + (y1 - y0) ** 2
     if nearly_zero(d):
         raise InvalidIntersectError
-    d = np.sqrt(d)
+    d: float = np.sqrt(d)
 
     if not (r0 + r1 >= d and abs(r0 - r1) <= d):
         return ()
@@ -375,7 +375,7 @@ def circle_circle_intersection(c1: CircleNum, c2: CircleNum) -> tuple[PointNum, 
     qiu = biu.rot90()
     p = c1.center + a * biu
     if nearly_zero(h):
-        return p
+        return (p,)
     qiu = np.sqrt(h) * qiu
     return (p + qiu, p - qiu)
 
