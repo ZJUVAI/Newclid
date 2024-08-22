@@ -1,0 +1,7 @@
+Constant length
+===============
+
+.. automodule:: geosolver.predicates.constant_length
+   :members:
+   :undoc-members:
+   :show-inheritance:

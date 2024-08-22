@@ -64,9 +64,6 @@ run.log
 # Local scripts
 benchmark.py
 
-# Docs autobuilt
-docs/source
-
 tests_output
 exp/
 

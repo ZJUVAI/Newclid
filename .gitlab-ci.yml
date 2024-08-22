@@ -63,7 +63,6 @@ pages:
   script:
     - source venv/bin/activate
     - pip install -e .[doc]
-    - python docs/reformat.py
     - sphinx-build -b html ./docs ./public
   artifacts:
     paths:

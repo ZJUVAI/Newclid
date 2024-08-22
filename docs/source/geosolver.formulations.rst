@@ -1,0 +1,16 @@
+Formulations
+============
+
+.. automodule:: geosolver.formulations
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+.. toctree::
+   :maxdepth: 4
+
+   geosolver.formulations.clause
+   geosolver.formulations.definition
+   geosolver.formulations.problem
+   geosolver.formulations.rule
