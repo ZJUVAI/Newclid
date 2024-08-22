@@ -49,7 +49,7 @@ if __name__ == "__main__":
         pass
     os.mkdir(docsfolder / "source")
     run_command(
-        f"sphinx-apidoc -M -e -f -o {docsfolder / 'source'} {projfolder / 'src' / 'geosolver'} --implicit-namespaces --ext-autodoc"
+        f"sphinx-apidoc -M -e -f --implicit-namespaces -o {docsfolder / 'source'} {projfolder / 'src' / 'geosolver'}"
     )
     os.remove(docsfolder / "source" / "modules.rst")
 
