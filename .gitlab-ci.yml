@@ -59,7 +59,7 @@ pytest-coverage:
 
 
 pages:
-  stage: deploy-doc
+  stage: deploy
   script:
     - source venv/bin/activate
     - pip install -e .[doc]
