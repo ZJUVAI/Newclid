@@ -65,10 +65,12 @@ pages:
     - pip install -e .[doc]
     - sphinx-build -b html ./docs ./docs/_build/html
     - cp ./docs/_build/html/ ./public
+  publish:
+    - ./docs/_build/html
   artifacts:
     paths:
       # The folder that contains the files to be exposed at the Page URL
-      - ./public
+      - ./docs/_build/html
   rules:
     # This ensures that only pushes to the default branch will trigger
     # a pages deploy
