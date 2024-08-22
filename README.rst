@@ -7,7 +7,7 @@ An extension of the geometric solver introduced in the Nature 2024 paper:
 <https://www.nature.com/articles/s41586-023-06747-5>`_.
 
 
-.. image:: ./docs/_static/overview.drawio.svg
+.. image:: ../docs/_static/overview.drawio.svg
   :alt: overview diagram
 
 
