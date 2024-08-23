@@ -60,10 +60,6 @@ build:
 
 pages:
   stage: deploy
-  script:
-    - source venv/bin/activate
-    - pip install -e .[doc]
-    - python docs/reformat.py
   publish: ./docs/_build/html
   artifacts:
     paths:

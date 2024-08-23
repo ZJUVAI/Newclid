@@ -1,0 +1,7 @@
+Match theorems
+==============
+
+.. automodule:: geosolver.match_theorems
+   :members:
+   :undoc-members:
+   :show-inheritance:

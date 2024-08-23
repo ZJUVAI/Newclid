@@ -49,9 +49,6 @@ run_results/
 # TODO
 TODO.md
 
-# builds
-**/_build
-
 # Swap files
 **/*.nfs*c*
 

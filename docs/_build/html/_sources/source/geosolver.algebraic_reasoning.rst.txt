@@ -1,0 +1,14 @@
+Algebraic reasoning
+===================
+
+.. automodule:: geosolver.algebraic_reasoning
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+
+.. toctree::
+   :maxdepth: 4
+
+   geosolver.algebraic_reasoning.algebraic_manipulator
+   geosolver.algebraic_reasoning.tables
