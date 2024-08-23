@@ -40,7 +40,7 @@ class GeometricSolver:
         self.theorems = theorems
         self.goals = proof.goals
         self.rng = proof.rng
-        self.deductive_agent = deductive_agent(self.proof, self.theorems, self.rng)
+        self.deductive_agent = deductive_agent(self.proof, self.theorems)
         self.run_infos: dict[str, Any] = {}
 
     def run(
@@ -66,7 +66,9 @@ class GeometricSolver:
             with open(out_file, "w", encoding="utf-8") as f:
                 print(self.run_infos, file=f)
 
-    def write_all_outputs(self, out_folder_path: Path):
+    def write_all_outputs(self, out_folder_path: Optional[Path] = None):
+        out_folder_path = out_folder_path or self.proof.problem_path
+        assert out_folder_path
         out_folder_path.mkdir(exist_ok=True, parents=True)
         self.write_run_infos(out_folder_path / "run_infos.txt")
         self.write_proof_steps(out_folder_path / "proof_steps.txt")
@@ -82,8 +84,8 @@ class GeometricSolverBuilder:
         self.goals: list[Statement] = []
         self.dep_graph = DependencyGraph(AlgebraicManipulator())
         self.deductive_agent: Optional[type[DeductiveAgent]] = None
-        self.runtime_cache_path: Optional[Path] = None
         self.seed = seed or 998244353
+        self.problem_path: Optional[Path] = None
 
     @property
     def defs(self) -> dict[str, DefinitionJGEX]:
@@ -105,7 +107,7 @@ class GeometricSolverBuilder:
             proof_state = ProofState.build_problemJGEX(
                 problemJGEX=self.problemJGEX,
                 defsJGEX=self.defs,
-                runtime_cache_path=self.runtime_cache_path,
+                problem_path=self.problem_path,
                 rng=np.random.default_rng(self.seed),
                 max_attempts=max_attempts,
             )
@@ -114,7 +116,7 @@ class GeometricSolverBuilder:
             proof_state = ProofState(
                 rng=np.random.default_rng(self.seed),
                 dep_graph=self.dep_graph,
-                runtime_cache_path=self.runtime_cache_path,
+                problem_path=self.problem_path,
                 goals=self.goals,
                 defs=self.defs,
             )
@@ -168,10 +170,6 @@ class GeometricSolverBuilder:
         self._defs = DefinitionJGEX.to_dict(DefinitionJGEX.parse_text(defs_txt))
         return self
 
-    def with_runtime_cache(self, path: Path) -> Self:
-        self.runtime_cache_path = path
-        return self
-
     def with_deductive_agent(self, deductive_agent: type[DeductiveAgent]) -> Self:
         self.deductive_agent = deductive_agent
         return self
@@ -190,4 +188,8 @@ class GeometricSolverBuilder:
         for goal in atomize(path.read_text(), "\n"):
             if goal:
                 self.load_goal(goal)
+        return self
+
+    def with_problem_path(self, path: Path) -> Self:
+        self.problem_path = path
         return self

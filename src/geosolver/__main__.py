@@ -104,8 +104,6 @@ def main():
     agent = AGENTS_REGISTRY[args.agent]
     solver_builder.with_deductive_agent(agent)
 
-    solver_builder.with_runtime_cache(problem_path / "runtime_cache.json")
-
     ggb_files0 = list(find_ggb_files(problem_path)) + ([args.ggb] if args.ggb else [])
     ggb_files1 = list(find_ggb_files(envpath))
     if len(ggb_files0) >= 2 or len(ggb_files1) >= 2:
@@ -135,6 +133,8 @@ def main():
         raise Exception("Not with option exhaust and there is no goal!")
     if args.exhaust:
         solver_builder.del_goals()
+
+    solver_builder.with_problem_path(problem_path)
 
     solver = solver_builder.build()
     if not args.quiet:

@@ -37,7 +37,7 @@ from geosolver.numerical.sketch import sketch
 from geosolver.formulations.problem import ProblemJGEX
 from geosolver.dependencies.dependency import IN_PREMISES, Dependency
 from geosolver.formulations.rule import Rule
-from geosolver.tools import atomize, notNone
+from geosolver.tools import atomize, notNone, runtime_cache_path
 
 if TYPE_CHECKING:
     from numpy.random import Generator
@@ -55,7 +55,7 @@ class ProofState:
         *,
         rng: "Generator",
         dep_graph: Optional[DependencyGraph] = None,
-        runtime_cache_path: Optional[Path] = None,
+        problem_path: Optional[Path] = None,
         goals: Optional[list[Statement]] = None,
         defs: dict[str, DefinitionJGEX],
     ):
@@ -64,20 +64,15 @@ class ProofState:
         self.goals: list[Statement] = goals or []
         self.rng = rng
 
-        self.runtime_cache_path = runtime_cache_path
-        self.matcher = Matcher(self.dep_graph, self.runtime_cache_path, self.rng)
+        self.problem_path = problem_path
+        self.runtime_cache = runtime_cache_path(self.problem_path)
+        self.matcher = Matcher(self.dep_graph, self.runtime_cache, self.rng)
 
         self.fig = init_figure()
         self.defs = defs
 
-    def new_cache(self, runtime_cache_path: Optional[Path] = None):
-        self.runtime_cache_path = runtime_cache_path
-        self.matcher = Matcher(self.dep_graph, self.runtime_cache_path, self.rng)
-
     def add_construction(self, construction: Clause):
         """Add a new clause of construction, e.g. a new excenter."""
-        self.new_cache(None)
-
         adds: list[Dependency] = []
         numerics: list[tuple[str, ...]] = []
         existing_points = self.symbols_graph.nodes_of_type(Point)
@@ -178,12 +173,14 @@ class ProofState:
                 )
             add.add()
 
+        self.matcher.update()
+
     @classmethod
     def build_problemJGEX(
         cls,
         problemJGEX: ProblemJGEX,
         defsJGEX: dict[str, DefinitionJGEX],
-        runtime_cache_path: Optional[Path],
+        problem_path: Optional[Path],
         max_attempts: int,
         *,
         rng: "Generator",
@@ -200,7 +197,9 @@ class ProofState:
                 proof = ProofState(rng=rng, defs=defsJGEX)
                 for construction in problemJGEX.constructions:
                     proof.add_construction(construction)
-                proof.new_cache(runtime_cache_path)
+                if problem_path:
+                    proof.problem_path = problem_path
+                    proof.matcher.update(runtime_cache_path(problem_path))
 
             except (
                 InvalidIntersectError,

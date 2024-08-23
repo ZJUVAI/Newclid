@@ -11,7 +11,6 @@ from abc import ABC, abstractmethod
 
 from geosolver.proof import ProofState
 from geosolver.formulations.rule import Rule
-from numpy.random import Generator
 
 
 if TYPE_CHECKING:
@@ -22,7 +21,7 @@ class DeductiveAgent(ABC):
     """Common interface for deductive agents"""
 
     @abstractmethod
-    def __init__(self, proof: ProofState, rules: list[Rule], rng: Generator) -> None:
+    def __init__(self, proof: ProofState, rules: list[Rule]):
         pass
 
     @abstractmethod

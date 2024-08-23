@@ -1,5 +1,7 @@
 from fractions import Fraction
+from pathlib import Path
 from typing import Any, Optional, TypeVar, Union
+from pyvis.network import Network  # type: ignore
 
 from geosolver.numerical import close_enough
 
@@ -79,3 +81,13 @@ def reshape(to_reshape: Union[list[T], tuple[T, ...]], n: int) -> list[tuple[T, 
     for i, x in enumerate(to_reshape):
         columns[i % n].append(x)
     return [tuple(columns[k][i] for k in range(n)) for i in range(len(columns[0]))]
+
+
+def add_edge(net: Network, u: Any, v: Any):
+    net.add_node(u)  # type: ignore
+    net.add_node(v)  # type: ignore
+    net.add_edge(u, v)  # type: ignore
+
+
+def runtime_cache_path(problem_path: Optional[Path]):
+    return problem_path / "runtime_cache.json" if problem_path else None

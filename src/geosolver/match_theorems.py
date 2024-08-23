@@ -27,13 +27,18 @@ class Matcher:
     ) -> None:
         self.dep_graph = dep_graph
         self.rng = rng
-        self.runtime_cache_path = runtime_cache_path
+        self.runtime_cache_path: Optional[Path] = None
+        self.update(runtime_cache_path)
         self.cache: dict["Rule", tuple[Dependency, ...]] = {}
+
+    def update(self, runtime_cache_path: Optional[Path] = None):
+        self.runtime_cache_path = runtime_cache_path
         if self.runtime_cache_path is not None and not self.runtime_cache_path.exists():
             os.makedirs(os.path.dirname(self.runtime_cache_path), exist_ok=True)
             self.runtime_cache_path.touch()
             with open(self.runtime_cache_path, "w") as f:
                 json.dump({}, f)
+        self.cache = {}
 
     def cache_theorem(self, theorem: "Rule"):
         file_cache = None

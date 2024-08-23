@@ -14,7 +14,6 @@ from geosolver.formulations.clause import Clause
 from geosolver.numerical.draw_figure import draw_figure
 from geosolver.proof import ProofState
 from geosolver.formulations.rule import Rule
-from numpy.random import Generator
 
 from geosolver.statement import Statement
 from geosolver.tools import atomize
@@ -35,10 +34,9 @@ class NamedFunction(NamedTuple):
 
 
 class HumanAgent(DeductiveAgent):
-    def __init__(self, proof: ProofState, rules: list[Rule], rng: Generator) -> None:
+    def __init__(self, proof: ProofState, rules: list[Rule]):
         self.proof = proof
         self.rules = rules
-        self.rng = rng
         self.match_rules = [
             NamedFunction(
                 f"match {theorem.descrption}: {theorem}", self.fn_match(theorem)
@@ -93,7 +91,7 @@ class HumanAgent(DeductiveAgent):
 
     def show_graphics(self) -> bool:
         png_stream = BytesIO()
-        draw_figure(self.proof, save_to=png_stream, rng=self.rng, format="png")
+        draw_figure(self.proof, save_to=png_stream, rng=self.proof.rng, format="png")
 
         png_stream.seek(0)
         root = tk.Tk()  # type: ignore
@@ -112,7 +110,7 @@ class HumanAgent(DeductiveAgent):
         return True
 
     def exhaust_with_bfsddar(self) -> bool:
-        self.bfsddar = BFSDDAR(self.proof, self.rules, self.rng)
+        self.bfsddar = BFSDDAR(self.proof, self.rules)
         return True
 
     def check(self) -> bool:

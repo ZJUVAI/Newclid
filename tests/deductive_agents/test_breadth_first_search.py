@@ -31,13 +31,13 @@ class TestDDAR:
                 "t = on_line t b d, on_line t a x; "
                 "u = on_line u b d, on_line u a y ? lconst r s 1"
             )
-            .with_runtime_cache(Path(r"./tests_output/imo2016p10cache.json"))
+            .with_problem_path(Path(r"./tests_output/imo2016p10"))
             .build()
         )
 
         success = solver.run()
         assert success
-        solver.write_proof_steps(Path(r"./tests_output/imo2016p10_proof.txt"))
+        solver.write_all_outputs()
 
     def test_translated_imo_2009_p2_extra_points(self):
         solver = (
@@ -59,7 +59,7 @@ class TestDDAR:
                 # "sameclock d l m k m l; eqangle l d c o q b b o"
                 # "sameclock d l m k m l; para b q k m; eqangle l m d l l m k m; eqangle a b a o b o a b; para c f d l; para c p l m; eqangle a c a o c o a c; eqangle b q b o c o c f"
             )
-            .with_runtime_cache(Path(r"./tests_output/imo2009p2cache.json"))
+            .with_problem_path(Path(r"./tests_output/imo2009p2"))
             .build()
         )
         solver.draw_figure(out_file=Path(r"./tests_output/imo2009p2beforesolver.svg"))
@@ -90,7 +90,7 @@ class TestDDAR:
                 "x = on_circle x o a, on_circle x o1 a1; "
                 "h = orthocenter h a b c ? cyclic pa pb c x"
             )
-            .with_runtime_cache(Path(r"./tests_output/imo2011p6cache.json"))
+            .with_problem_path(Path(r"./tests_output/imo2011p6"))
             .build()
         )
 
@@ -113,13 +113,13 @@ class TestDDAR:
                 "q = on_line q b n, on_line q c d "
                 "? cong e p e q"
             )
-            .with_runtime_cache(Path(r"./tests_output/imo2000p1cache.json"))
+            .with_problem_path(Path(r"./tests_output/imo2000p1"))
             .build()
         )
 
         success = solver.run()
         assert success
-        solver.write_proof_steps(Path(r"./tests_output/imo2000p1_proof.txt"))
+        solver.write_all_outputs()
 
     def test_incenter_excenter_should_succeed(self):
         solver = (
