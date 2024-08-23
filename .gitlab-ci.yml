@@ -61,6 +61,7 @@ build:
 pages:
   stage: deploy
   publish: ./docs/_build/html
+  script:
   artifacts:
     paths:
       # The folder that contains the files to be exposed at the Page URL
