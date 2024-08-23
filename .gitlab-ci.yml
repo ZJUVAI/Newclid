@@ -63,6 +63,8 @@ pages:
   publish: ./docs/_build/html
   script:
     - source venv/bin/activate
+    - pip install -e .[doc]
+    - python docs/reformat.py
   artifacts:
     paths:
       # The folder that contains the files to be exposed at the Page URL
