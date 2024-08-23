@@ -65,6 +65,7 @@ class DependencyGraph:
     def save_pyvis(self, path: Path):
         net = Network("1080px", directed=True)
         for _, dep in self.hyper_graph.items():
+            net.add_node(dep.statement.pretty())  # type: ignore
             for premise in dep.why:
                 add_edge(net, premise.pretty(), dep.statement.pretty())
         net.show(str(path), notebook=False)  # type: ignore
