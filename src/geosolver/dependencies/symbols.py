@@ -142,6 +142,10 @@ class Line(Symbol):
                 return target.dep.with_new(statement)
         raise Exception("why_coll failed")
 
+    @property
+    def pretty_name(self) -> str:
+        return "Line(" + "-".join(p.pretty_name for p in self.points) + ")"
+
 
 class Circle(Symbol):
     """Symbol of type Circle."""
@@ -195,3 +199,7 @@ class Circle(Symbol):
                 else:
                     assert False
         raise Exception("why_concyclic failed")
+
+    @property
+    def pretty_name(self) -> str:
+        return "Circle(" + "-".join(p.pretty_name for p in self.points) + ")"

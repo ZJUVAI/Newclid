@@ -1,7 +1,11 @@
 from __future__ import annotations
+from pathlib import Path
 from typing import TYPE_CHECKING
 from geosolver.dependencies.dependency import IN_PREMISES
 from geosolver.dependencies.symbols_graph import SymbolsGraph
+from pyvis.network import Network  # type: ignore
+
+from geosolver.tools import add_edge  # type: ignore
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
@@ -57,3 +61,10 @@ class DependencyGraph:
                 if s not in res:
                     res.append(s)
         return tuple(res)
+
+    def save_pyvis(self, path: Path):
+        net = Network("1080px", directed=True)
+        for _, dep in self.hyper_graph.items():
+            for premise in dep.why:
+                add_edge(net, premise.pretty(), dep.statement.pretty())
+        net.show(str(path), notebook=False)  # type: ignore

@@ -3,9 +3,10 @@
 """
 
 from __future__ import annotations
-from io import BytesIO
+import os
 from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Optional
 
+from geosolver import webapp
 from geosolver.agent.agents_interface import (
     DeductiveAgent,
 )
@@ -16,13 +17,7 @@ from geosolver.proof import ProofState
 from geosolver.formulations.rule import Rule
 
 from geosolver.statement import Statement
-from geosolver.tools import atomize
-
-try:
-    import tkinter as tk
-    from PIL import Image, ImageTk  # type: ignore
-except Exception:
-    pass
+from geosolver.tools import atomize, start_static_server
 
 if TYPE_CHECKING:
     ...
@@ -44,6 +39,20 @@ class HumanAgent(DeductiveAgent):
             for theorem in rules
         ]
         self.bfsddar: Optional[BFSDDAR] = None
+        assert self.proof.problem_path
+        self.server = self.proof.problem_path / "html"
+        os.makedirs(self.server, exist_ok=True)
+        with open(self.server / "index.html", "w") as f:
+            f.write(webapp.human_agent_index)
+        self.pull_to_server()
+        start_static_server(self.server)
+
+    def pull_to_server(self):
+        draw_figure(
+            self.proof, save_to=self.server / "geometry.svg", rng=self.proof.rng
+        )
+        self.proof.symbols_graph.save_pyvis(self.server / "symbols_graph.html")
+        self.proof.dep_graph.save_pyvis(self.server / "dependency_graph.html")
 
     @classmethod
     def select(
@@ -89,18 +98,8 @@ class HumanAgent(DeductiveAgent):
         self.select(self.match_rules, apply_none=True)
         return True
 
-    def show_graphics(self) -> bool:
-        png_stream = BytesIO()
-        draw_figure(self.proof, save_to=png_stream, rng=self.proof.rng, format="png")
-
-        png_stream.seek(0)
-        root = tk.Tk()  # type: ignore
-
-        photo = ImageTk.PhotoImage(Image.open(png_stream))  # type: ignore
-        label = tk.Label(root, image=photo)  # type: ignore
-        label.pack()
-
-        root.mainloop()
+    def update_server(self) -> bool:
+        self.pull_to_server()
         return True
 
     def add_construction(self) -> bool:
@@ -138,8 +137,7 @@ class HumanAgent(DeductiveAgent):
     def step(self) -> bool:
         res = True
         if self.bfsddar:
-            res = self.bfsddar.step()
-            if not res:
+            if not self.bfsddar.step():
                 self.bfsddar = None
         else:
             print("Premises:")
@@ -148,7 +146,7 @@ class HumanAgent(DeductiveAgent):
             res = self.select(
                 [
                     NamedFunction("match", self.match),
-                    NamedFunction("graphics", self.show_graphics),
+                    NamedFunction("update server", self.update_server),
                     NamedFunction("construction", self.add_construction),
                     NamedFunction("exhaust with bfsddar", self.exhaust_with_bfsddar),
                     NamedFunction("check statement", self.check),

@@ -1,6 +1,6 @@
 from __future__ import annotations
+from pathlib import Path
 from typing import TYPE_CHECKING, Collection, Optional, Type, TypeVar
-import webbrowser
 
 from geosolver.algebraic_reasoning.tables import Table
 import geosolver.numerical.geometries as num_geo
@@ -80,14 +80,12 @@ class SymbolsGraph:
                 return res
         return self._get_new_line_thru_pair(p1, p2)
 
-    def display(self):
-        net = Network("1080px")
+    def save_pyvis(self, path: Path):
+        net = Network("1080px", directed=True)
         for line in self.nodes_of_type(Line):
             for p in line.points:
-                add_edge(net, line.name, p.pretty_name)
+                add_edge(net, p.pretty_name, line.pretty_name)
         for circle in self.nodes_of_type(Circle):
             for p in circle.points:
-                add_edge(net, circle.name, p.pretty_name)
-        net.show_buttons("physics")  # type: ignore
-        net.show("/tmp/simbols_graph_html1237.html", notebook=False)  # type: ignore
-        webbrowser.open("/tmp/simbols_graph_html1237.html")
+                add_edge(net, p.pretty_name, circle.pretty_name)
+        net.show(str(path), notebook=False)  # type: ignore
