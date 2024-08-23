@@ -1,3 +1,4 @@
+from pathlib import Path
 import pytest
 
 from geosolver.agent.breadth_first_search import BFSDDAR
@@ -27,4 +28,4 @@ class TestDDAR:
             "t = on_line t b d, on_line t a x; "
             "u = on_line u b d, on_line u a y ? lconst r s 1"
         ).build()
-        solver.proof.symbols_graph.display()
+        solver.proof.symbols_graph.save_pyvis(Path("tests_output/obm.html"))

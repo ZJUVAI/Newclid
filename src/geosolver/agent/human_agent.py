@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Optional
 
 from geosolver import webapp
@@ -39,20 +40,23 @@ class HumanAgent(DeductiveAgent):
             for theorem in rules
         ]
         self.bfsddar: Optional[BFSDDAR] = None
-        assert self.proof.problem_path
-        self.server = self.proof.problem_path / "html"
-        os.makedirs(self.server, exist_ok=True)
-        with open(self.server / "index.html", "w") as f:
-            f.write(webapp.human_agent_index)
-        self.pull_to_server()
-        start_static_server(self.server)
+        self.server: Optional[Path] = None
 
     def pull_to_server(self):
-        draw_figure(
-            self.proof, save_to=self.server / "geometry.svg", rng=self.proof.rng
-        )
-        self.proof.symbols_graph.save_pyvis(self.server / "symbols_graph.html")
-        self.proof.dep_graph.save_pyvis(self.server / "dependency_graph.html")
+        assert self.proof.problem_path
+        if not self.server:
+            self.server = self.proof.problem_path / "html"
+            os.makedirs(self.server, exist_ok=True)
+            with open(self.server / "index.html", "w") as f:
+                f.write(webapp.human_agent_index)
+            self.pull_to_server()
+            start_static_server(self.server)
+        else:
+            draw_figure(
+                self.proof, save_to=self.server / "geometry.svg", rng=self.proof.rng
+            )
+            self.proof.symbols_graph.save_pyvis(self.server / "symbols_graph.html")
+            self.proof.dep_graph.save_pyvis(self.server / "dependency_graph.html")
 
     @classmethod
     def select(
