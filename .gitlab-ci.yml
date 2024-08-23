@@ -61,6 +61,8 @@ build:
 pages:
   stage: deploy
   publish: ./docs/_build/html
+  script:
+    - source venv/bin/activate
   artifacts:
     paths:
       # The folder that contains the files to be exposed at the Page URL
