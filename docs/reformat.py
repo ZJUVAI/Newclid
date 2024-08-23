@@ -23,20 +23,20 @@ def rename_modules(filepath: Path):
 
 
 def run_command(cmd: str):
+    print(f"run command: {cmd}")
     process = subprocess.Popen(
-        list(cmd.split()),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
+        args=cmd,
+        stdout=1,
+        stderr=2,
         shell=True,
     )
-    for line in process.stdout:  # type: ignore
-        print(line, end="")
+    # for line in process.stdout:  # type: ignore
+    #     print(line, end="")
 
     process.wait()
 
-    for line in process.stderr:  # type: ignore
-        print(line, end="")
+    # for line in process.stderr:  # type: ignore
+    #     print(line, end="")
     return process.returncode
 
 
@@ -48,14 +48,14 @@ if __name__ == "__main__":
     except FileNotFoundError:
         pass
     os.mkdir(docsfolder / "source")
-    print(
-        f"sphinx-apidoc -M -e -f --implicit-namespaces -o {docsfolder / 'source'} {projfolder / 'src' / 'geosolver'}"
-    )
     run_command(
         f"sphinx-apidoc -M -e -f --implicit-namespaces -o {docsfolder / 'source'} {projfolder / 'src' / 'geosolver'}"
     )
+    run_command(f"ls {docsfolder / 'source'}")
     os.remove(docsfolder / "source" / "modules.rst")
 
     for folderpath, folders, files in os.walk(docsfolder / "source"):
         for filename in [file for file in files if file.endswith(".rst")]:
             rename_modules(Path(folderpath) / filename)
+
+    run_command(f"sphinx-build -b html {docsfolder} {docsfolder / '_build' / 'html'}")

@@ -1,0 +1,21 @@
+{
+    "name": "Python Dev Container",
+    "dockerFile": "../Dockerfile",
+    "context": ".",
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "python.pythonPath": "/venv/bin/python"
+            },
+            "extensions": [
+                "ms-python.python",
+                "ms-python.vscode-pylance"
+            ]
+        }
+    },
+    "mounts": [
+        "source=${localWorkspaceFolder},target=/workspace,type=bind"
+    ],
+    "remoteUser": "root",
+    "workspaceFolder": "/workspace"
+}
