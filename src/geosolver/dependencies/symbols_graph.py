@@ -86,9 +86,17 @@ class SymbolsGraph:
         circlecolor = "green"
         pointcolor = "#97c2fc"
         for line in self.nodes_of_type(Line):
-            net.add_node(line.pretty_name, color=linecolor, title=line.dep.reason)  # type: ignore
+            net.add_node(
+                line.pretty_name,
+                color=linecolor,
+                title=line.dep.reason if line.dep else "",
+            )  # type: ignore
         for circle in self.nodes_of_type(Circle):
-            net.add_node(circle.pretty_name, color=circlecolor, title=line.dep.reason)  # type: ignore
+            net.add_node(
+                circle.pretty_name,
+                color=circlecolor,
+                title=circle.dep.reason if circle.dep else "",
+            )  # type: ignore
         for point in self.nodes_of_type(Point):
             net.add_node(point.pretty_name, color=pointcolor)  # type: ignore
         for line in self.nodes_of_type(Line):

@@ -64,8 +64,12 @@ class DependencyGraph:
         return tuple(res)
 
     def save_pyvis(self, *, path: Path, stars: Collection[Statement] = []):
+        if stars:
+            deps = self.proof_deps(list(stars))
+        else:
+            deps = tuple(dep for _, dep in self.hyper_graph.items())
         net = Network("1080px", directed=True)
-        for _, dep in self.hyper_graph.items():
+        for dep in deps:
             if boring_statement(dep.statement):
                 continue
             shape = "dot"
@@ -76,7 +80,7 @@ class DependencyGraph:
             net.add_node(  # type: ignore
                 dep.statement.pretty(), title=f"{dep.reason}", shape=shape, color=color
             )
-        for _, dep in self.hyper_graph.items():
+        for dep in deps:
             if boring_statement(dep.statement):
                 continue
             for premise in dep.why:
