@@ -41,14 +41,9 @@ and each step will use sub-components of the :green:`Proof State` that represent
 
 The main sub-components of the :green:`Proof State` are listed here:
 
-- :ref:`Symbols Graph` stores all symbols (Points, Lines, Circles, Angles, ...)
+- :ref:`Dependency Graph` stores all discovered statements and their dependencies (why are they true).
+- :ref:`Symbols Graph` stores all symbols (points, lines, circles)
   and their potential equalities.
-- :ref:`Adder` is used to apply different dependency deductions
-  respectively to the :ref:`Predicates` of the added statement.
-- :ref:`Checker` and :ref:`Enumerator` are used for :ref:`Match theorems`.
-- :ref:`Reasoning Engines` like :ref:`Algebraic Manipulator` and :ref:`Formulas`
-  allow for more powerful statements deductions than simple rule-based applications.
-- :ref:`Why Graph` stores all discovered statements and their dependency (why are they true).
 - :ref:`Trace Back` uses the :ref:`Dependencies` to build and print the final proof.
 
 
@@ -56,9 +51,9 @@ The main sub-components of the :green:`Proof State` are listed here:
 How is a Problem Built
 ----------------------
 
-With given problem (as text or from a file),
-geosolver will load the definitions (default to src/default_configs/defs.txt)
-and the rules to be used (default to src/default_configs/rules.txt).
+With given problem in JGEX,
+GeoSolver will load the definitions (default to :code:`src/default_configs/defs.txt`)
+and the rules to be used (default to :code:`src/default_configs/rules.txt`).
 
 Next, the builder will construct the problem itself.
 This means compiling the information of the problem in two directions:
@@ -82,6 +77,12 @@ This serves two purposes:
    This will be attempted a fixed number of times (max_attempts) before the program decides that the goal is not reacheable,
    on the assumption that the probability of a failure at random is low.
 
+
+With given problem in Geogebra, GeoSolver uses then the definitions of Geogebra, translates the symbolic construction to premises and symbols graph elements and gets the numerical coordinates from the :code:`.ggb` file.
+
+Usage of the numerical coordinates:
+- numerical predicates
+- graphics
 
 
 Writing the Proof

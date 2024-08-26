@@ -4,6 +4,7 @@
    :maxdepth: 2
    :caption: Contents:
 
+   manual/algo
    manual/overview
    manual/python_interface
    manual/adding_problems
