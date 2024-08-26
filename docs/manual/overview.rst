@@ -5,34 +5,14 @@ Overview
 .. role:: orange
 .. role:: green
 
-Here is an overview of the main components of GeoSolver:
-
-.. raw:: html
-
-   <object data="../_static/images/overview.svg" type="image/svg+xml"></object>
-
-
-
-Deductive Agent
----------------
-
-
-One can choose to run the problems either using an automatic agent
-(default is :ref:`Breadth first search`, the original from AlphaGeometry work),
-or a manually guided helper (:ref:`Human agent`).
-
-The :orange:`Deductive Agent` will interact with the proof state through the :ref:`Agents interface`.
-Given a :red:`Feedback` from the proof and its internal state,
-the agent outputs an :red:`Action` that will update the proof state.
-
-After each interaction, the  :orange:`Deductive Agent` will remember it
-and update its internal state for future actions.
-
-More detailed information on the deductive agents is available at :ref:`Agent`.
+.. image:: ../_static/images/overview.drawio.svg
+  :alt: overview diagram
 
 
 Proof State
 -----------
+
+implementation: :class:`geosolver.proof.ProofState`
 
 The :green:`Proof State` is the main body of GeoSolver,
 it allows to build a proof step by step.
@@ -45,8 +25,13 @@ The main sub-components of the :green:`Proof State` are listed here:
 - :ref:`Symbols Graph` stores all symbols (points, lines, circles)
   and their potential equalities.
 - :ref:`Trace Back` uses the :ref:`Dependencies` to build and print the final proof.
+- Construction
 
 
+Deductive Agent
+---------------
+
+There is a :ref:`Run Loop` that is making the :ref:`Agent` manipluating the proof state and gathering statistics.
 
 How is a Problem Built
 ----------------------
@@ -84,9 +69,18 @@ Usage of the numerical coordinates:
 - numerical predicates
 - graphics
 
+Problem Solving
+---------------
+
+The agent has access to the proof state object. It can thus make observations on it (e.g. rules matching, graphics, ...) and apply dependencies to modify the proof state for it to reach the goals.
+
+Matching and Caching
+^^^^^^^^^^^^^^^^^^^^
+
+c.f. awd
 
 Writing the Proof
-------------------
+-----------------
 
 Once the goal statement is check symbolically by the solver,
 in general it will have covered a wide graph of statements that do not necessarily contribute to the proof.
@@ -105,7 +99,7 @@ Translating to natural language
 
 After the traceback structures the proof,
 the predicates are translated into (pseudo) natural language by a script
-(see :ref:`Proof writing` and :ref:`Pretty`).
+(see :ref:`Proof writing` and the :code:`pretty` function for each predicate).
 
 The written proof constains the hypothesis ("From theorem premises"),
 which are the points effectively present in the goal,
