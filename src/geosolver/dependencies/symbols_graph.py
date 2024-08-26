@@ -25,7 +25,7 @@ class SymbolsGraph:
         self.name2node: dict[str, Symbol] = {}
 
     def nodes_of_type(self, t: Type[S]) -> list[S]:
-        return list(self._type2nodes[t])  # type: ignore
+        return self._type2nodes[t]  # type: ignore
 
     def names2points(
         self, pnames: Collection[str], create_new_point: bool = True
@@ -76,7 +76,7 @@ class SymbolsGraph:
                 res = self._get_new_line_thru_pair(p1, p2)
                 assert line.dep
                 table.add_expr(table.get_eq2(res.name, line.name), line.dep)
-                line.fellows.append(res)
+                line.merge([res])
                 return res
         return self._get_new_line_thru_pair(p1, p2)
 

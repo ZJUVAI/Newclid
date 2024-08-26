@@ -67,7 +67,7 @@ def draw_figure(
 ) -> None:
     """Draw everything on the same canvas."""
     symbols_graph = proof.symbols_graph
-    points: list[Point] = symbols_graph.nodes_of_type(Point)
+    points: list[Point] = list(symbols_graph.nodes_of_type(Point))
     plt.close()
     fig = deepcopy(proof.fig)
     (ax,) = fig.axes
