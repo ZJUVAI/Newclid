@@ -1,3 +1,9 @@
+import os
+from pathlib import Path
+from geosolver.numerical.draw_figure import draw_figure
+from geosolver.proof import ProofState
+
+
 human_agent_index: str = r"""
 <!DOCTYPE html>
 <html lang="en">
@@ -43,3 +49,14 @@ human_agent_index: str = r"""
 </body>
 </html>
 """
+
+
+def pull_to_server(proof: ProofState, *, server_path: Path):
+    os.makedirs(server_path, exist_ok=True)
+    with open(server_path / "index.html", "w") as f:
+        f.write(human_agent_index)
+    draw_figure(proof, save_to=server_path / "geometry.svg", rng=proof.rng)
+    proof.symbols_graph.save_pyvis(server_path / "symbols_graph.html")
+    proof.dep_graph.save_pyvis(
+        path=server_path / "dependency_graph.html", stars=proof.goals
+    )

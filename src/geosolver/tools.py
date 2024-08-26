@@ -1,9 +1,12 @@
 from fractions import Fraction
 from pathlib import Path
-from typing import Any, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union
 from pyvis.network import Network  # type: ignore
 
 from geosolver.numerical import close_enough
+
+if TYPE_CHECKING:
+    from geosolver.statement import Statement
 
 
 class InfQuotientError(Exception):
@@ -95,3 +98,17 @@ def runtime_cache_path(problem_path: Optional[Path]):
 
 def run_static_server(directory_to_serve: Path):
     print(f"command to run the server: python -m http.server -d {directory_to_serve}")
+
+
+def boring_statement(statement: "Statement"):
+    s = statement.pretty()
+    if "=" in s:
+        a, b = atomize(s, "=")
+        return a == b
+    if "≅" in s:
+        a, b = atomize(s, "≅")
+        return a == b
+    if "are sameclock to" in s:
+        a, b = atomize(s, "are sameclock to")
+        return a == b
+    return False
