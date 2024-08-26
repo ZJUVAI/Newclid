@@ -9,13 +9,12 @@ def rename_modules(filepath: Path):
         lines = file.readlines()
 
     module_name = lines[0].split(".")[-1].split(" ")[0]
-    lines[0] = module_name.replace("\\_", " ").capitalize() + "\n"
+    lines[0] = " ".join(t.capitalize() for t in module_name.split(r"\_")) + "\n"
     lines[1] = "=" * (len(lines[0]) - 1) + "\n"
 
     for header in ["Subpackages\n", "Submodules\n"]:
         if header in lines:
             submodule_line = lines.index(header)
-            lines.pop(submodule_line)
             lines.pop(submodule_line)
 
     with open(filepath, "w") as file:
