@@ -57,6 +57,9 @@ def pull_to_server(proof: ProofState, *, server_path: Path):
         f.write(human_agent_index)
     draw_figure(proof, save_to=server_path / "geometry.svg", rng=proof.rng)
     proof.symbols_graph.save_pyvis(server_path / "symbols_graph.html")
-    proof.dep_graph.save_pyvis(
-        path=server_path / "dependency_graph.html", stars=proof.goals
-    )
+    if proof.check_goals():
+        proof.dep_graph.save_pyvis(
+            path=server_path / "dependency_graph.html", stars=proof.goals
+        )
+    else:
+        proof.dep_graph.save_pyvis(path=server_path / "dependency_graph.html")
