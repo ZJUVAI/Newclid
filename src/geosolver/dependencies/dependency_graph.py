@@ -73,9 +73,9 @@ class DependencyGraph:
             if dep.statement in stars:
                 shape = "star"
                 color = "gold"
-            net.add_node(
+            net.add_node(  # type: ignore
                 dep.statement.pretty(), title=f"{dep.reason}", shape=shape, color=color
-            )  # type: ignore
+            )
         for _, dep in self.hyper_graph.items():
             if boring_statement(dep.statement):
                 continue

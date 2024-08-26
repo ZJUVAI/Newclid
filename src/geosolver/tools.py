@@ -103,8 +103,8 @@ def run_static_server(directory_to_serve: Path):
 def boring_statement(statement: "Statement"):
     s = statement.pretty()
     if "=" in s:
-        a, b = atomize(s, "=")
-        return a == b
+        splited = atomize(s, "=")
+        return all(t == splited[0] for t in splited)
     if "≅" in s:
         a, b = atomize(s, "≅")
         return a == b

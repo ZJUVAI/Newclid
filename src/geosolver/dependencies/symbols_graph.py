@@ -82,6 +82,15 @@ class SymbolsGraph:
 
     def save_pyvis(self, path: Path):
         net = Network("1080px", directed=True)
+        linecolor = "red"
+        circlecolor = "green"
+        pointcolor = "#97c2fc"
+        for line in self.nodes_of_type(Line):
+            net.add_node(line.pretty_name, color=linecolor, title=line.dep.reason)  # type: ignore
+        for circle in self.nodes_of_type(Circle):
+            net.add_node(circle.pretty_name, color=circlecolor, title=line.dep.reason)  # type: ignore
+        for point in self.nodes_of_type(Point):
+            net.add_node(point.pretty_name, color=pointcolor)  # type: ignore
         for line in self.nodes_of_type(Line):
             for p in line.points:
                 add_edge(net, p.pretty_name, line.pretty_name)
