@@ -1,6 +1,5 @@
 from fractions import Fraction
 from pathlib import Path
-import subprocess
 from typing import Any, Optional, TypeVar, Union
 from pyvis.network import Network  # type: ignore
 
@@ -94,10 +93,5 @@ def runtime_cache_path(problem_path: Optional[Path]):
     return problem_path / "runtime_cache.json" if problem_path else None
 
 
-def start_static_server(directory_to_serve: Path):
-    subprocess.Popen(
-        args=f"python -m http.server -d {directory_to_serve}",
-        stdout=1,
-        stderr=2,
-        shell=True,
-    )
+def run_static_server(directory_to_serve: Path):
+    print(f"command to run the server: python -m http.server -d {directory_to_serve}")

@@ -18,7 +18,7 @@ from geosolver.proof import ProofState
 from geosolver.formulations.rule import Rule
 
 from geosolver.statement import Statement
-from geosolver.tools import atomize, start_static_server
+from geosolver.tools import atomize, run_static_server
 
 if TYPE_CHECKING:
     ...
@@ -50,7 +50,7 @@ class HumanAgent(DeductiveAgent):
             with open(self.server / "index.html", "w") as f:
                 f.write(webapp.human_agent_index)
             self.pull_to_server()
-            start_static_server(self.server)
+            run_static_server(self.server)
         else:
             draw_figure(
                 self.proof, save_to=self.server / "geometry.svg", rng=self.proof.rng
