@@ -25,7 +25,7 @@ class SymbolsGraph:
         self.name2node: dict[str, Symbol] = {}
 
     def nodes_of_type(self, t: Type[S]) -> list[S]:
-        return list(self._type2nodes[t])  # type: ignore
+        return self._type2nodes[t]  # type: ignore
 
     def names2points(
         self, pnames: Collection[str], create_new_point: bool = True
@@ -76,12 +76,29 @@ class SymbolsGraph:
                 res = self._get_new_line_thru_pair(p1, p2)
                 assert line.dep
                 table.add_expr(table.get_eq2(res.name, line.name), line.dep)
-                line.fellows.append(res)
+                line.merge([res])
                 return res
         return self._get_new_line_thru_pair(p1, p2)
 
     def save_pyvis(self, path: Path):
         net = Network("1080px", directed=True)
+        linecolor = "red"
+        circlecolor = "green"
+        pointcolor = "#97c2fc"
+        for line in self.nodes_of_type(Line):
+            net.add_node(
+                line.pretty_name,
+                color=linecolor,
+                title=line.dep.reason if line.dep else "",
+            )  # type: ignore
+        for circle in self.nodes_of_type(Circle):
+            net.add_node(
+                circle.pretty_name,
+                color=circlecolor,
+                title=circle.dep.reason if circle.dep else "",
+            )  # type: ignore
+        for point in self.nodes_of_type(Point):
+            net.add_node(point.pretty_name, color=pointcolor)  # type: ignore
         for line in self.nodes_of_type(Line):
             for p in line.points:
                 add_edge(net, p.pretty_name, line.pretty_name)

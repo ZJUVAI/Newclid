@@ -1,11 +1,12 @@
 from __future__ import annotations
+import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Collection
 from geosolver.dependencies.dependency import IN_PREMISES
 from geosolver.dependencies.symbols_graph import SymbolsGraph
 from pyvis.network import Network  # type: ignore
 
-from geosolver.tools import add_edge  # type: ignore
+from geosolver.tools import add_edge, boring_statement  # type: ignore
 
 if TYPE_CHECKING:
     from geosolver.dependencies.dependency import Dependency
@@ -62,10 +63,38 @@ class DependencyGraph:
                     res.append(s)
         return tuple(res)
 
-    def save_pyvis(self, path: Path):
+    def save_pyvis(self, *, path: Path, stars: Collection[Statement] = []):
+        if stars:
+            deps = self.proof_deps(list(stars))
+        else:
+            deps = tuple(dep for _, dep in self.hyper_graph.items())
         net = Network("1080px", directed=True)
-        for _, dep in self.hyper_graph.items():
-            net.add_node(dep.statement.pretty())  # type: ignore
+        for dep in deps:
+            if boring_statement(dep.statement):
+                continue
+            shape = "dot"
+            color = "#97c2fc"
+            if dep.statement in stars:
+                shape = "star"
+                color = "gold"
+            net.add_node(  # type: ignore
+                dep.statement.pretty(), title=f"{dep.reason}", shape=shape, color=color
+            )
+        for dep in deps:
+            if boring_statement(dep.statement):
+                continue
             for premise in dep.why:
-                add_edge(net, premise.pretty(), dep.statement.pretty())
+                add_edge(net, premise.pretty(), dep.statement.pretty())  # type: ignore
+        s = json.dumps(
+            {
+                "layout": {
+                    "hierarchical": {
+                        "enabled": True,
+                        "direction": "LR",
+                        "sortMethod": "directed",
+                    },
+                }
+            }
+        )
+        net.set_options(s)  # type: ignore
         net.show(str(path), notebook=False)  # type: ignore

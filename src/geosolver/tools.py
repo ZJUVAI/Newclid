@@ -1,10 +1,12 @@
 from fractions import Fraction
 from pathlib import Path
-import subprocess
-from typing import Any, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union
 from pyvis.network import Network  # type: ignore
 
 from geosolver.numerical import close_enough
+
+if TYPE_CHECKING:
+    from geosolver.statement import Statement
 
 
 class InfQuotientError(Exception):
@@ -94,10 +96,19 @@ def runtime_cache_path(problem_path: Optional[Path]):
     return problem_path / "runtime_cache.json" if problem_path else None
 
 
-def start_static_server(directory_to_serve: Path):
-    subprocess.Popen(
-        args=f"python -m http.server -d {directory_to_serve}",
-        stdout=1,
-        stderr=2,
-        shell=True,
-    )
+def run_static_server(directory_to_serve: Path):
+    print(f"command to run the server: python -m http.server -d {directory_to_serve}")
+
+
+def boring_statement(statement: "Statement"):
+    s = statement.pretty()
+    if "=" in s:
+        splited = atomize(s, "=")
+        return all(t == splited[0] for t in splited)
+    if "≅" in s:
+        a, b = atomize(s, "≅")
+        return a == b
+    if "are sameclock to" in s:
+        a, b = atomize(s, "are sameclock to")
+        return a == b
+    return False

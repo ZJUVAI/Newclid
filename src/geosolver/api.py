@@ -24,6 +24,7 @@ import numpy as np
 
 from geosolver.statement import Statement
 from geosolver.tools import atomize
+from geosolver.webapp import pull_to_server
 
 if TYPE_CHECKING:
     pass
@@ -73,6 +74,7 @@ class GeometricSolver:
         self.write_run_infos(out_folder_path / "run_infos.txt")
         self.write_proof_steps(out_folder_path / "proof_steps.txt")
         self.draw_figure(out_file=out_folder_path / "proof_figure.svg")
+        pull_to_server(self.proof, server_path=out_folder_path / "html")
         logging.info("Written all outputs at %s", out_folder_path)
 
 

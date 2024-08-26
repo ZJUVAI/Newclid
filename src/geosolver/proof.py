@@ -75,7 +75,7 @@ class ProofState:
         """Add a new clause of construction, e.g. a new excenter."""
         adds: list[Dependency] = []
         numerics: list[tuple[str, ...]] = []
-        existing_points = self.symbols_graph.nodes_of_type(Point)
+        existing_points = list(self.symbols_graph.nodes_of_type(Point))
 
         for constr_sentence in construction.sentences:
             cdef = self.defs[constr_sentence[0]]

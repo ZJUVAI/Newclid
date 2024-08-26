@@ -3,7 +3,6 @@
 """
 
 from __future__ import annotations
-import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Optional
 
@@ -13,12 +12,11 @@ from geosolver.agent.agents_interface import (
 )
 from geosolver.agent.breadth_first_search import BFSDDAR
 from geosolver.formulations.clause import Clause
-from geosolver.numerical.draw_figure import draw_figure
 from geosolver.proof import ProofState
 from geosolver.formulations.rule import Rule
 
 from geosolver.statement import Statement
-from geosolver.tools import atomize, start_static_server
+from geosolver.tools import atomize, run_static_server
 
 if TYPE_CHECKING:
     ...
@@ -46,17 +44,10 @@ class HumanAgent(DeductiveAgent):
         assert self.proof.problem_path
         if not self.server:
             self.server = self.proof.problem_path / "html"
-            os.makedirs(self.server, exist_ok=True)
-            with open(self.server / "index.html", "w") as f:
-                f.write(webapp.human_agent_index)
             self.pull_to_server()
-            start_static_server(self.server)
+            run_static_server(self.server)
         else:
-            draw_figure(
-                self.proof, save_to=self.server / "geometry.svg", rng=self.proof.rng
-            )
-            self.proof.symbols_graph.save_pyvis(self.server / "symbols_graph.html")
-            self.proof.dep_graph.save_pyvis(self.server / "dependency_graph.html")
+            webapp.pull_to_server(self.proof, server_path=self.server)
 
     @classmethod
     def select(

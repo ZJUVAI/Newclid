@@ -1,7 +1,0 @@
-Run loop
-========
-
-.. automodule:: geosolver.run_loop
-   :members:
-   :undoc-members:
-   :show-inheritance:

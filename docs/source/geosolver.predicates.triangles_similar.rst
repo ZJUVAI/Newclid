@@ -1,7 +1,0 @@
-Triangles similar
-=================
-
-.. automodule:: geosolver.predicates.triangles_similar
-   :members:
-   :undoc-members:
-   :show-inheritance:
