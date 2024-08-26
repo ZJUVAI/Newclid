@@ -18,7 +18,7 @@ class BFSDDAR(DeductiveAgent):
     """Apply Deductive Derivation to exhaustion by Breadth-First Search.
 
     BFSDD will match and apply all available rules level by level
-    until reaching a fixpoint we call exaustion.
+    until reaching a fixpoint we call exhaustion.
 
     """
 

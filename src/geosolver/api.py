@@ -127,7 +127,7 @@ class GeometricSolverBuilder:
         self, problems_path: Path, problem_name: str, rename: bool = False
     ) -> Self:
         """
-        `tranlate = True` for better LLM training
+        `translate = True` for better LLM training
         """
         self.problemJGEX = ProblemJGEX.from_file(problems_path, problem_name)
         if rename:
