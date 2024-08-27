@@ -22,6 +22,5 @@ def test_imo2009p2():
         "imo2009p2",
         "--env",
         "tests-exp",
-        "--quiet",
     ]
     assert main()
