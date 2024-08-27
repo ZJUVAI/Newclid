@@ -134,7 +134,8 @@ def main():
     if args.exhaust:
         solver_builder.del_goals()
 
-    solver_builder.with_problem_path(problem_path)
+    if not args.quiet:
+        solver_builder.with_problem_path(problem_path)
 
     solver = solver_builder.build()
     if not args.quiet:

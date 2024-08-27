@@ -69,3 +69,6 @@ _build
 
 # Documentation
 docs/source
+
+profiling_exp
+profiling_opt

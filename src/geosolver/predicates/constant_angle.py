@@ -121,8 +121,6 @@ class ACompute(Predicate):
             return None
         a, b = sorted((a, b))
         c, d = sorted((c, d))
-        if (a, b) > (c, d):
-            a, b, c, d = c, d, a, b
         return (a, b, c, d)
 
     @classmethod

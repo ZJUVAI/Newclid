@@ -1,0 +1,127 @@
+<html>
+    <head>
+        <meta charset="utf-8">
+        
+            <script src="lib/bindings/utils.js"></script>
+            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/dist/vis-network.min.css" integrity="sha512-WgxfT5LWjfszlPHXRmBWHkV2eceiWTOBvrKCNbdgDYTHrT2AeLCGbF4sZlZw3UMN3WtL0tGUoIAKsu8mllg/XA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+            <script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.2/dist/vis-network.min.js" integrity="sha512-LnvoEWDFrqGHlHmDD2101OrLcbsfkrzoSpvtSQtxK3RMnRV0eOkhhBN2dXHKRrUU8p2DGRTk35n4O8nWSVe1mQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+            
+        
+<center>
+<h1></h1>
+</center>
+
+<!-- <link rel="stylesheet" href="../node_modules/vis/dist/vis.min.css" type="text/css" />
+<script type="text/javascript" src="../node_modules/vis/dist/vis.js"> </script>-->
+        <link
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/css/bootstrap.min.css"
+          rel="stylesheet"
+          integrity="sha384-eOJMYsd53ii+scO/bJGFsiCZc+5NDVN2yr8+0RDqr0Ql0h+rP48ckxlpbzKgwra6"
+          crossorigin="anonymous"
+        />
+        <script
+          src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta3/dist/js/bootstrap.bundle.min.js"
+          integrity="sha384-JEW9xMcG8R+pH31jmWH6WWP0WintQrMb4s7ZOdauHnUtxwoG2vI5DkLtS3qm9Ekf"
+          crossorigin="anonymous"
+        ></script>
+
+
+        <center>
+          <h1></h1>
+        </center>
+        <style type="text/css">
+
+             #mynetwork {
+                 width: 100%;
+                 height: 1080px;
+                 background-color: #ffffff;
+                 border: 1px solid lightgray;
+                 position: relative;
+                 float: left;
+             }
+
+             
+
+             
+
+             
+        </style>
+    </head>
+
+
+    <body>
+        <div class="card" style="width: 100%">
+            
+            
+            <div id="mynetwork" class="card-body"></div>
+        </div>
+
+        
+        
+
+        <script type="text/javascript">
+
+              // initialize global variables.
+              var edges;
+              var nodes;
+              var allNodes;
+              var allEdges;
+              var nodeColors;
+              var originalNodes;
+              var network;
+              var container;
+              var options, data;
+              var filter = {
+                  item : '',
+                  property : '',
+                  value : []
+              };
+
+              
+
+              
+
+              // This method is responsible for drawing the graph, returns the drawn network
+              function drawGraph() {
+                  var container = document.getElementById('mynetwork');
+
+                  
+
+                  // parsing and collecting nodes and edges from the python
+                  nodes = new vis.DataSet([{"color": "#97c2fc", "id": "M is the midpoint of PQ", "label": "M is the midpoint of PQ", "shape": "dot", "title": "Premise"}, {"color": "#97c2fc", "id": "D is the midpoint of FQ", "label": "D is the midpoint of FQ", "shape": "dot", "title": "Premise"}, {"color": "#97c2fc", "id": "D, F, Q are collinear", "label": "D, F, Q are collinear", "shape": "dot", "title": "rule of line 44"}, {"color": "#97c2fc", "id": "M, P, Q are collinear", "label": "M, P, Q are collinear", "shape": "dot", "title": "rule of line 44"}, {"color": "#97c2fc", "id": "DL = KM", "label": "DL = KM", "shape": "dot", "title": "Premise"}, {"color": "#97c2fc", "id": "A, B, Q are collinear", "label": "A, B, Q are collinear", "shape": "dot", "title": "Premise"}, {"color": "#97c2fc", "id": "A, C, P are collinear", "label": "A, C, P are collinear", "shape": "dot", "title": "Premise"}, {"color": "#97c2fc", "id": "AO = BO", "label": "AO = BO", "shape": "dot", "title": "Premise"}, {"color": "#97c2fc", "id": "A, B, O are not collinear", "label": "A, B, O are not collinear", "shape": "dot", "title": "Numerical Check"}, {"color": "#97c2fc", "id": "\u2220(AB,AO) = \u2220(BO,AB)", "label": "\u2220(AB,AO) = \u2220(BO,AB)", "shape": "dot", "title": "rule of line 23"}, {"color": "#97c2fc", "id": "AO = CO", "label": "AO = CO", "shape": "dot", "title": "Premise"}, {"color": "#97c2fc", "id": "A, C, O are not collinear", "label": "A, C, O are not collinear", "shape": "dot", "title": "Numerical Check"}, {"color": "#97c2fc", "id": "\u2220(AC,AO) = \u2220(CO,AC)", "label": "\u2220(AC,AO) = \u2220(CO,AC)", "shape": "dot", "title": "rule of line 23"}, {"color": "#97c2fc", "id": "DL:LM = KM:LM", "label": "DL:LM = KM:LM", "shape": "dot", "title": "Ratio Chasing"}, {"color": "#97c2fc", "id": "DM = KL", "label": "DM = KL", "shape": "dot", "title": "Premise"}, {"color": "#97c2fc", "id": "DM:LM = KL:LM", "label": "DM:LM = KL:LM", "shape": "dot", "title": "Ratio Chasing"}, {"color": "#97c2fc", "id": "DLM are sameclock to KLM", "label": "DLM are sameclock to KLM", "shape": "dot", "title": "Numerical Check"}, {"color": "#97c2fc", "id": "\u25b2DLM \u2245 \u25b2KML", "label": "\u25b2DLM \u2245 \u25b2KML", "shape": "dot", "title": "simtrirSSS"}, {"color": "#97c2fc", "id": "\u2220(DL,LM) = \u2220(LM,KM)", "label": "\u2220(DL,LM) = \u2220(LM,KM)", "shape": "dot", "title": "rule of line 13"}, {"color": "#97c2fc", "id": "K is the midpoint of BP", "label": "K is the midpoint of BP", "shape": "dot", "title": "Premise"}, {"color": "#97c2fc", "id": "BQ\u2225KM", "label": "BQ\u2225KM", "shape": "dot", "title": "rule of line 19"}, {"color": "#97c2fc", "id": "L is the midpoint of CQ", "label": "L is the midpoint of CQ", "shape": "dot", "title": "Premise"}, {"color": "#97c2fc", "id": "CF\u2225DL", "label": "CF\u2225DL", "shape": "dot", "title": "rule of line 19"}, {"color": "#97c2fc", "id": "CP\u2225LM", "label": "CP\u2225LM", "shape": "dot", "title": "rule of line 19"}, {"color": "#97c2fc", "id": "\u2220(BO,BQ) = \u2220(CO,CF)", "label": "\u2220(BO,BQ) = \u2220(CO,CF)", "shape": "dot", "title": "Angle Chasing"}, {"color": "#97c2fc", "id": "B, K, P are collinear", "label": "B, K, P are collinear", "shape": "dot", "title": "rule of line 44"}, {"color": "#97c2fc", "id": "\u2220(BP,PQ) = \u2220(KP,MP)", "label": "\u2220(BP,PQ) = \u2220(KP,MP)", "shape": "dot", "title": "Angle Chasing"}, {"color": "#97c2fc", "id": "\u2220(BQ,PQ) = \u2220(KM,MP)", "label": "\u2220(BQ,PQ) = \u2220(KM,MP)", "shape": "dot", "title": "Angle Chasing"}, {"color": "#97c2fc", "id": "BPQ are sameclock to KPM", "label": "BPQ are sameclock to KPM", "shape": "dot", "title": "Numerical Check"}, {"color": "#97c2fc", "id": "\u25b2BPQ \u2245 \u25b2KPM", "label": "\u25b2BPQ \u2245 \u25b2KPM", "shape": "dot", "title": "simtriAA"}, {"color": "#97c2fc", "id": "BQ:PQ = KM:MP", "label": "BQ:PQ = KM:MP", "shape": "dot", "title": "rule of line 12"}, {"color": "#97c2fc", "id": "\u2220(CF,FQ) = \u2220(DL,DQ)", "label": "\u2220(CF,FQ) = \u2220(DL,DQ)", "shape": "dot", "title": "Angle Chasing"}, {"color": "#97c2fc", "id": "C, L, Q are collinear", "label": "C, L, Q are collinear", "shape": "dot", "title": "rule of line 44"}, {"color": "#97c2fc", "id": "\u2220(CQ,FQ) = \u2220(LQ,DQ)", "label": "\u2220(CQ,FQ) = \u2220(LQ,DQ)", "shape": "dot", "title": "Angle Chasing"}, {"color": "#97c2fc", "id": "CFQ are sameclock to DQL", "label": "CFQ are sameclock to DQL", "shape": "dot", "title": "Numerical Check"}, {"color": "#97c2fc", "id": "\u25b2CFQ \u2245 \u25b2LDQ", "label": "\u25b2CFQ \u2245 \u25b2LDQ", "shape": "dot", "title": "simtriAA"}, {"color": "#97c2fc", "id": "CF:FQ = DL:DQ", "label": "CF:FQ = DL:DQ", "shape": "dot", "title": "rule of line 12"}, {"color": "#97c2fc", "id": "DQ:FQ = MQ:PQ", "label": "DQ:FQ = MQ:PQ", "shape": "dot", "title": "rule of line 39"}, {"color": "#97c2fc", "id": "MP:PQ = MQ:PQ", "label": "MP:PQ = MQ:PQ", "shape": "dot", "title": "rule of line 39"}, {"color": "#97c2fc", "id": "BO:BQ = CO:CF", "label": "BO:BQ = CO:CF", "shape": "dot", "title": "Ratio Chasing"}, {"color": "#97c2fc", "id": "BOQ are sameclock to COF", "label": "BOQ are sameclock to COF", "shape": "dot", "title": "Numerical Check"}, {"color": "#97c2fc", "id": "\u25b2BOQ \u2245 \u25b2COF", "label": "\u25b2BOQ \u2245 \u25b2COF", "shape": "dot", "title": "simtriSAS"}, {"color": "#97c2fc", "id": "BQ:OQ = CF:FO", "label": "BQ:OQ = CF:FO", "shape": "dot", "title": "rule of line 12"}, {"color": "#97c2fc", "id": "DF:FQ = MQ:PQ", "label": "DF:FQ = MQ:PQ", "shape": "dot", "title": "rule of line 39"}, {"color": "#97c2fc", "id": "DF:DQ = FO:OQ", "label": "DF:DQ = FO:OQ", "shape": "dot", "title": "Ratio Chasing"}, {"color": "#97c2fc", "id": "F, O, Q are not collinear", "label": "F, O, Q are not collinear", "shape": "dot", "title": "Numerical Check"}, {"color": "#97c2fc", "id": "\u2220(DO,FO) = \u2220(OQ,DO)", "label": "\u2220(DO,FO) = \u2220(OQ,DO)", "shape": "dot", "title": "rule of line 21"}, {"color": "#97c2fc", "id": "\u2220(BQ,OQ) = \u2220(CF,FO)", "label": "\u2220(BQ,OQ) = \u2220(CF,FO)", "shape": "dot", "title": "rule of line 12"}, {"color": "#97c2fc", "id": "\u2220(DM,LM) = \u2220(LM,KL)", "label": "\u2220(DM,LM) = \u2220(LM,KL)", "shape": "dot", "title": "rule of line 13"}, {"color": "#97c2fc", "id": "KW = LW", "label": "KW = LW", "shape": "dot", "title": "Premise"}, {"color": "#97c2fc", "id": "K, L, W are not collinear", "label": "K, L, W are not collinear", "shape": "dot", "title": "Numerical Check"}, {"color": "#97c2fc", "id": "\u2220(KL,KW) = \u2220(LW,KL)", "label": "\u2220(KL,KW) = \u2220(LW,KL)", "shape": "dot", "title": "rule of line 23"}, {"color": "#97c2fc", "id": "KW = MW", "label": "KW = MW", "shape": "dot", "title": "Premise"}, {"color": "#97c2fc", "id": "K, M, W are not collinear", "label": "K, M, W are not collinear", "shape": "dot", "title": "Numerical Check"}, {"color": "#97c2fc", "id": "\u2220(KM,KW) = \u2220(MW,KM)", "label": "\u2220(KM,KW) = \u2220(MW,KM)", "shape": "dot", "title": "rule of line 23"}, {"color": "#97c2fc", "id": "LW = MW", "label": "LW = MW", "shape": "dot", "title": "Ratio Chasing"}, {"color": "#97c2fc", "id": "L, M, W are not collinear", "label": "L, M, W are not collinear", "shape": "dot", "title": "Numerical Check"}, {"color": "#97c2fc", "id": "\u2220(LM,LW) = \u2220(MW,LM)", "label": "\u2220(LM,LW) = \u2220(MW,LM)", "shape": "dot", "title": "rule of line 23"}, {"color": "#97c2fc", "id": "MQ \u27c2 MW", "label": "MQ \u27c2 MW", "shape": "dot", "title": "Premise"}, {"color": "#97c2fc", "id": "\u2220(DM,MQ) = \u2220(DO,OQ)", "label": "\u2220(DM,MQ) = \u2220(DO,OQ)", "shape": "dot", "title": "Angle Chasing"}, {"color": "#97c2fc", "id": "D, M, O, Q are not collinear", "label": "D, M, O, Q are not collinear", "shape": "dot", "title": "Numerical Check"}, {"color": "#97c2fc", "id": "DMOQ are cyclic", "label": "DMOQ are cyclic", "shape": "dot", "title": "rule of line 15"}, {"color": "#97c2fc", "id": "\u2220(DO,MO) = \u2220(DQ,MQ)", "label": "\u2220(DO,MO) = \u2220(DQ,MQ)", "shape": "dot", "title": "rule of line 14"}, {"color": "#97c2fc", "id": "FO = OQ", "label": "FO = OQ", "shape": "dot", "title": "Ratio Chasing"}, {"color": "#97c2fc", "id": "\u2220(FO,FQ) = \u2220(FQ,OQ)", "label": "\u2220(FO,FQ) = \u2220(FQ,OQ)", "shape": "dot", "title": "rule of line 23"}, {"color": "#97c2fc", "id": "MO \u27c2 PQ", "label": "MO \u27c2 PQ", "shape": "dot", "title": "Angle Chasing"}, {"color": "gold", "id": "OP = OQ", "label": "OP = OQ", "shape": "star", "title": "rule of line 32"}]);
+                  edges = new vis.DataSet([{"arrows": "to", "from": "D is the midpoint of FQ", "to": "D, F, Q are collinear"}, {"arrows": "to", "from": "M is the midpoint of PQ", "to": "M, P, Q are collinear"}, {"arrows": "to", "from": "AO = BO", "to": "\u2220(AB,AO) = \u2220(BO,AB)"}, {"arrows": "to", "from": "A, B, O are not collinear", "to": "\u2220(AB,AO) = \u2220(BO,AB)"}, {"arrows": "to", "from": "AO = CO", "to": "\u2220(AC,AO) = \u2220(CO,AC)"}, {"arrows": "to", "from": "A, C, O are not collinear", "to": "\u2220(AC,AO) = \u2220(CO,AC)"}, {"arrows": "to", "from": "DL = KM", "to": "DL:LM = KM:LM"}, {"arrows": "to", "from": "DM = KL", "to": "DM:LM = KL:LM"}, {"arrows": "to", "from": "DL:LM = KM:LM", "to": "\u25b2DLM \u2245 \u25b2KML"}, {"arrows": "to", "from": "DM:LM = KL:LM", "to": "\u25b2DLM \u2245 \u25b2KML"}, {"arrows": "to", "from": "DLM are sameclock to KLM", "to": "\u25b2DLM \u2245 \u25b2KML"}, {"arrows": "to", "from": "\u25b2DLM \u2245 \u25b2KML", "to": "\u2220(DL,LM) = \u2220(LM,KM)"}, {"arrows": "to", "from": "K is the midpoint of BP", "to": "BQ\u2225KM"}, {"arrows": "to", "from": "M is the midpoint of PQ", "to": "BQ\u2225KM"}, {"arrows": "to", "from": "D is the midpoint of FQ", "to": "CF\u2225DL"}, {"arrows": "to", "from": "L is the midpoint of CQ", "to": "CF\u2225DL"}, {"arrows": "to", "from": "L is the midpoint of CQ", "to": "CP\u2225LM"}, {"arrows": "to", "from": "M is the midpoint of PQ", "to": "CP\u2225LM"}, {"arrows": "to", "from": "A, B, Q are collinear", "to": "\u2220(BO,BQ) = \u2220(CO,CF)"}, {"arrows": "to", "from": "A, C, P are collinear", "to": "\u2220(BO,BQ) = \u2220(CO,CF)"}, {"arrows": "to", "from": "\u2220(AB,AO) = \u2220(BO,AB)", "to": "\u2220(BO,BQ) = \u2220(CO,CF)"}, {"arrows": "to", "from": "\u2220(AC,AO) = \u2220(CO,AC)", "to": "\u2220(BO,BQ) = \u2220(CO,CF)"}, {"arrows": "to", "from": "\u2220(DL,LM) = \u2220(LM,KM)", "to": "\u2220(BO,BQ) = \u2220(CO,CF)"}, {"arrows": "to", "from": "BQ\u2225KM", "to": "\u2220(BO,BQ) = \u2220(CO,CF)"}, {"arrows": "to", "from": "CF\u2225DL", "to": "\u2220(BO,BQ) = \u2220(CO,CF)"}, {"arrows": "to", "from": "CP\u2225LM", "to": "\u2220(BO,BQ) = \u2220(CO,CF)"}, {"arrows": "to", "from": "K is the midpoint of BP", "to": "B, K, P are collinear"}, {"arrows": "to", "from": "B, K, P are collinear", "to": "\u2220(BP,PQ) = \u2220(KP,MP)"}, {"arrows": "to", "from": "M, P, Q are collinear", "to": "\u2220(BP,PQ) = \u2220(KP,MP)"}, {"arrows": "to", "from": "M, P, Q are collinear", "to": "\u2220(BQ,PQ) = \u2220(KM,MP)"}, {"arrows": "to", "from": "BQ\u2225KM", "to": "\u2220(BQ,PQ) = \u2220(KM,MP)"}, {"arrows": "to", "from": "\u2220(BP,PQ) = \u2220(KP,MP)", "to": "\u25b2BPQ \u2245 \u25b2KPM"}, {"arrows": "to", "from": "\u2220(BQ,PQ) = \u2220(KM,MP)", "to": "\u25b2BPQ \u2245 \u25b2KPM"}, {"arrows": "to", "from": "BPQ are sameclock to KPM", "to": "\u25b2BPQ \u2245 \u25b2KPM"}, {"arrows": "to", "from": "\u25b2BPQ \u2245 \u25b2KPM", "to": "BQ:PQ = KM:MP"}, {"arrows": "to", "from": "D, F, Q are collinear", "to": "\u2220(CF,FQ) = \u2220(DL,DQ)"}, {"arrows": "to", "from": "CF\u2225DL", "to": "\u2220(CF,FQ) = \u2220(DL,DQ)"}, {"arrows": "to", "from": "L is the midpoint of CQ", "to": "C, L, Q are collinear"}, {"arrows": "to", "from": "C, L, Q are collinear", "to": "\u2220(CQ,FQ) = \u2220(LQ,DQ)"}, {"arrows": "to", "from": "D, F, Q are collinear", "to": "\u2220(CQ,FQ) = \u2220(LQ,DQ)"}, {"arrows": "to", "from": "\u2220(CF,FQ) = \u2220(DL,DQ)", "to": "\u25b2CFQ \u2245 \u25b2LDQ"}, {"arrows": "to", "from": "\u2220(CQ,FQ) = \u2220(LQ,DQ)", "to": "\u25b2CFQ \u2245 \u25b2LDQ"}, {"arrows": "to", "from": "CFQ are sameclock to DQL", "to": "\u25b2CFQ \u2245 \u25b2LDQ"}, {"arrows": "to", "from": "\u25b2CFQ \u2245 \u25b2LDQ", "to": "CF:FQ = DL:DQ"}, {"arrows": "to", "from": "D is the midpoint of FQ", "to": "DQ:FQ = MQ:PQ"}, {"arrows": "to", "from": "M is the midpoint of PQ", "to": "DQ:FQ = MQ:PQ"}, {"arrows": "to", "from": "M is the midpoint of PQ", "to": "MP:PQ = MQ:PQ"}, {"arrows": "to", "from": "AO = BO", "to": "BO:BQ = CO:CF"}, {"arrows": "to", "from": "AO = CO", "to": "BO:BQ = CO:CF"}, {"arrows": "to", "from": "DL = KM", "to": "BO:BQ = CO:CF"}, {"arrows": "to", "from": "BQ:PQ = KM:MP", "to": "BO:BQ = CO:CF"}, {"arrows": "to", "from": "CF:FQ = DL:DQ", "to": "BO:BQ = CO:CF"}, {"arrows": "to", "from": "DQ:FQ = MQ:PQ", "to": "BO:BQ = CO:CF"}, {"arrows": "to", "from": "MP:PQ = MQ:PQ", "to": "BO:BQ = CO:CF"}, {"arrows": "to", "from": "\u2220(BO,BQ) = \u2220(CO,CF)", "to": "\u25b2BOQ \u2245 \u25b2COF"}, {"arrows": "to", "from": "BO:BQ = CO:CF", "to": "\u25b2BOQ \u2245 \u25b2COF"}, {"arrows": "to", "from": "BOQ are sameclock to COF", "to": "\u25b2BOQ \u2245 \u25b2COF"}, {"arrows": "to", "from": "\u25b2BOQ \u2245 \u25b2COF", "to": "BQ:OQ = CF:FO"}, {"arrows": "to", "from": "D is the midpoint of FQ", "to": "DF:FQ = MQ:PQ"}, {"arrows": "to", "from": "M is the midpoint of PQ", "to": "DF:FQ = MQ:PQ"}, {"arrows": "to", "from": "DL = KM", "to": "DF:DQ = FO:OQ"}, {"arrows": "to", "from": "BQ:OQ = CF:FO", "to": "DF:DQ = FO:OQ"}, {"arrows": "to", "from": "BQ:PQ = KM:MP", "to": "DF:DQ = FO:OQ"}, {"arrows": "to", "from": "CF:FQ = DL:DQ", "to": "DF:DQ = FO:OQ"}, {"arrows": "to", "from": "DF:FQ = MQ:PQ", "to": "DF:DQ = FO:OQ"}, {"arrows": "to", "from": "MP:PQ = MQ:PQ", "to": "DF:DQ = FO:OQ"}, {"arrows": "to", "from": "D, F, Q are collinear", "to": "\u2220(DO,FO) = \u2220(OQ,DO)"}, {"arrows": "to", "from": "DF:DQ = FO:OQ", "to": "\u2220(DO,FO) = \u2220(OQ,DO)"}, {"arrows": "to", "from": "F, O, Q are not collinear", "to": "\u2220(DO,FO) = \u2220(OQ,DO)"}, {"arrows": "to", "from": "\u25b2BOQ \u2245 \u25b2COF", "to": "\u2220(BQ,OQ) = \u2220(CF,FO)"}, {"arrows": "to", "from": "\u25b2DLM \u2245 \u25b2KML", "to": "\u2220(DM,LM) = \u2220(LM,KL)"}, {"arrows": "to", "from": "KW = LW", "to": "\u2220(KL,KW) = \u2220(LW,KL)"}, {"arrows": "to", "from": "K, L, W are not collinear", "to": "\u2220(KL,KW) = \u2220(LW,KL)"}, {"arrows": "to", "from": "KW = MW", "to": "\u2220(KM,KW) = \u2220(MW,KM)"}, {"arrows": "to", "from": "K, M, W are not collinear", "to": "\u2220(KM,KW) = \u2220(MW,KM)"}, {"arrows": "to", "from": "KW = LW", "to": "LW = MW"}, {"arrows": "to", "from": "KW = MW", "to": "LW = MW"}, {"arrows": "to", "from": "LW = MW", "to": "\u2220(LM,LW) = \u2220(MW,LM)"}, {"arrows": "to", "from": "L, M, W are not collinear", "to": "\u2220(LM,LW) = \u2220(MW,LM)"}, {"arrows": "to", "from": "\u2220(BQ,OQ) = \u2220(CF,FO)", "to": "\u2220(DM,MQ) = \u2220(DO,OQ)"}, {"arrows": "to", "from": "\u2220(DL,LM) = \u2220(LM,KM)", "to": "\u2220(DM,MQ) = \u2220(DO,OQ)"}, {"arrows": "to", "from": "\u2220(DM,LM) = \u2220(LM,KL)", "to": "\u2220(DM,MQ) = \u2220(DO,OQ)"}, {"arrows": "to", "from": "\u2220(DO,FO) = \u2220(OQ,DO)", "to": "\u2220(DM,MQ) = \u2220(DO,OQ)"}, {"arrows": "to", "from": "\u2220(KL,KW) = \u2220(LW,KL)", "to": "\u2220(DM,MQ) = \u2220(DO,OQ)"}, {"arrows": "to", "from": "\u2220(KM,KW) = \u2220(MW,KM)", "to": "\u2220(DM,MQ) = \u2220(DO,OQ)"}, {"arrows": "to", "from": "\u2220(LM,LW) = \u2220(MW,LM)", "to": "\u2220(DM,MQ) = \u2220(DO,OQ)"}, {"arrows": "to", "from": "BQ\u2225KM", "to": "\u2220(DM,MQ) = \u2220(DO,OQ)"}, {"arrows": "to", "from": "CF\u2225DL", "to": "\u2220(DM,MQ) = \u2220(DO,OQ)"}, {"arrows": "to", "from": "MQ \u27c2 MW", "to": "\u2220(DM,MQ) = \u2220(DO,OQ)"}, {"arrows": "to", "from": "\u2220(DM,MQ) = \u2220(DO,OQ)", "to": "DMOQ are cyclic"}, {"arrows": "to", "from": "D, M, O, Q are not collinear", "to": "DMOQ are cyclic"}, {"arrows": "to", "from": "DMOQ are cyclic", "to": "\u2220(DO,MO) = \u2220(DQ,MQ)"}, {"arrows": "to", "from": "DL = KM", "to": "FO = OQ"}, {"arrows": "to", "from": "BQ:OQ = CF:FO", "to": "FO = OQ"}, {"arrows": "to", "from": "BQ:PQ = KM:MP", "to": "FO = OQ"}, {"arrows": "to", "from": "CF:FQ = DL:DQ", "to": "FO = OQ"}, {"arrows": "to", "from": "DQ:FQ = MQ:PQ", "to": "FO = OQ"}, {"arrows": "to", "from": "MP:PQ = MQ:PQ", "to": "FO = OQ"}, {"arrows": "to", "from": "FO = OQ", "to": "\u2220(FO,FQ) = \u2220(FQ,OQ)"}, {"arrows": "to", "from": "F, O, Q are not collinear", "to": "\u2220(FO,FQ) = \u2220(FQ,OQ)"}, {"arrows": "to", "from": "D, F, Q are collinear", "to": "MO \u27c2 PQ"}, {"arrows": "to", "from": "M, P, Q are collinear", "to": "MO \u27c2 PQ"}, {"arrows": "to", "from": "\u2220(DO,FO) = \u2220(OQ,DO)", "to": "MO \u27c2 PQ"}, {"arrows": "to", "from": "\u2220(DO,MO) = \u2220(DQ,MQ)", "to": "MO \u27c2 PQ"}, {"arrows": "to", "from": "\u2220(FO,FQ) = \u2220(FQ,OQ)", "to": "MO \u27c2 PQ"}, {"arrows": "to", "from": "M is the midpoint of PQ", "to": "OP = OQ"}, {"arrows": "to", "from": "MO \u27c2 PQ", "to": "OP = OQ"}]);
+
+                  nodeColors = {};
+                  allNodes = nodes.get({ returnType: "Object" });
+                  for (nodeId in allNodes) {
+                    nodeColors[nodeId] = allNodes[nodeId].color;
+                  }
+                  allEdges = edges.get({ returnType: "Object" });
+                  // adding nodes and edges to the graph
+                  data = {nodes: nodes, edges: edges};
+
+                  var options = {"layout": {"hierarchical": {"enabled": true, "direction": "LR", "sortMethod": "directed"}}};
+
+                  
+
+
+                  
+
+                  network = new vis.Network(container, data, options);
+
+                  
+
+                  
+
+                  
+
+
+                  
+
+                  return network;
+
+              }
+              drawGraph();
+        </script>
+    </body>
+</html>
