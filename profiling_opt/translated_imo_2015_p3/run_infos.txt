@@ -1,0 +1,1 @@
+{'runtime': 701.2251396179199, 'success': False, 'steps': 1796, 'K, O₁, O₂ are collinear succeeded': False}

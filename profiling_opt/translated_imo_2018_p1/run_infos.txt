@@ -1,0 +1,1 @@
+{'runtime': 101.49884843826294, 'success': False, 'steps': 707, 'DE∥FG succeeded': False}
