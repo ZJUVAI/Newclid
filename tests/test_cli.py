@@ -9,7 +9,6 @@ def test_exhaust():
         "imo2009p2",
         "--env",
         "tests-exp",
-        "--quiet",
         "--exhaust",
     ]
     assert not main()

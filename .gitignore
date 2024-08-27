@@ -72,3 +72,8 @@ docs/source
 
 profiling_exp
 profiling_opt
+
+tests-exp/*
+!tests-exp/*.ggb
+!tests-exp/*.ggb
+!tests-exp/runtime_cache.json
