@@ -160,3 +160,5 @@ translated_inmo_1995_p1
 a b = segment a b; c = s_angle b a c 30o; h = orthocenter h a b c; m = midpoint m b c; t = eqdistance t m m h, on_line t h m ? rconst a t b c 2/1; perp h a b c
 doesntbuild_imo_2020_sl_g7
 a b c = triangle a b c; o = circle a b c; p = on_circle p o a; ma = midpoint b c; mb = midpoint a c; mc = midpoint a b; d = reflect d p a ma; e = reflect e p b mb; f = reflect f p c mc; x = on_bline x a d, on_bline x b e; y = on_bline y c f, on_bline y b e; z = on_bline z c f, on_bline z a d ? cyclic w x y z
+acompute_test
+a = free a; b = lconst b a 3; c = eq_triangle c a b ? acompute a b b c; acompute b c a b
