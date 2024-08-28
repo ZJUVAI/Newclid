@@ -11,18 +11,14 @@ from geosolver.numerical.geometries import (
     intersect,
 )
 from geosolver.dependencies.symbols import Point, Circle, Line
-import matplotlib.pyplot as plt
-import matplotlib
 import matplotlib.patches as patches
 from numpy.random import Generator
-
-matplotlib.use("svg")
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
 if TYPE_CHECKING:
     from geosolver.proof import ProofState
     from geosolver.statement import Statement
-    from matplotlib.axes import Axes
-    from matplotlib.figure import Figure
 
 PALETTE = [
     "#e6194b",
@@ -51,7 +47,8 @@ PALETTE = [
 
 def init_figure() -> "Figure":
     imsize = 512 / 100
-    fig, ax = plt.subplots(figsize=(imsize, imsize))  # type: ignore
+    fig = Figure(figsize=(imsize, imsize))
+    ax = fig.add_subplot(111)  # type: ignore
     fig.subplots_adjust(left=0, right=1, top=1, bottom=0, wspace=0, hspace=0)
     ax.set_facecolor((0.0, 0.0, 0.0))
     ax.set_aspect("equal", adjustable="datalim")
@@ -68,7 +65,6 @@ def draw_figure(
     """Draw everything on the same canvas."""
     symbols_graph = proof.symbols_graph
     points: list[Point] = list(symbols_graph.nodes_of_type(Point))
-    plt.close()
     fig = deepcopy(proof.fig)
     (ax,) = fig.axes
 
@@ -87,7 +83,7 @@ def draw_figure(
         xmax = max([p.num.x for p in points])
         ymin = min([p.num.y for p in points])
         ymax = max([p.num.y for p in points])
-        plt.margins((xmax - xmin) * 0.1, (ymax - ymin) * 0.1)
+        ax.margins((xmax - xmin) * 0.1, (ymax - ymin) * 0.1)
         # ax.set_xlim(xmin - (xmax - xmin) * 0.1, xmax + (xmax - xmin) * 0.1)
         # ax.set_ylim(ymin - (ymax - ymin) * 0.1, ymax + (ymax - ymin) * 0.1)
 
@@ -121,7 +117,7 @@ def draw_circle(ax: "Axes", c: Circle, **args: Any) -> None:
         },
     )
     ax.add_patch(
-        plt.Circle(  # type: ignore
+        patches.Circle(  # type: ignore
             (c.num.center.x, c.num.center.y), c.num.radius, **args
         )
     )
