@@ -86,23 +86,26 @@ class SymbolsGraph:
         circlecolor = "green"
         pointcolor = "#97c2fc"
         for line in self.nodes_of_type(Line):
-            net.add_node(
+            net.add_node(  # type: ignore
                 line.pretty_name,
                 color=linecolor,
                 title=line.dep.reason if line.dep else "",
-            )  # type: ignore
+                size=10,
+            )
         for circle in self.nodes_of_type(Circle):
-            net.add_node(
+            net.add_node(  # type: ignore
                 circle.pretty_name,
                 color=circlecolor,
                 title=circle.dep.reason if circle.dep else "",
-            )  # type: ignore
+                size=10,
+            )
         for point in self.nodes_of_type(Point):
-            net.add_node(point.pretty_name, color=pointcolor)  # type: ignore
+            net.add_node(point.pretty_name, color=pointcolor, size=10)  # type: ignore
         for line in self.nodes_of_type(Line):
             for p in line.points:
                 add_edge(net, p.pretty_name, line.pretty_name)
         for circle in self.nodes_of_type(Circle):
             for p in circle.points:
                 add_edge(net, p.pretty_name, circle.pretty_name)
+        net.show_buttons(filter_=["physics", "layout"])  # type: ignore
         net.show(str(path), notebook=False)  # type: ignore

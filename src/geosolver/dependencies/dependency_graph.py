@@ -1,5 +1,4 @@
 from __future__ import annotations
-import json
 from pathlib import Path
 from typing import TYPE_CHECKING, Collection
 from geosolver.dependencies.dependency import IN_PREMISES
@@ -78,23 +77,23 @@ class DependencyGraph:
                 shape = "star"
                 color = "gold"
             net.add_node(  # type: ignore
-                dep.statement.pretty(), title=f"{dep.reason}", shape=shape, color=color
+                dep.statement.pretty(),
+                title=f"{dep.reason}",
+                shape=shape,
+                color=color,
+                size=10,
             )
         for dep in deps:
             if boring_statement(dep.statement):
                 continue
             for premise in dep.why:
                 add_edge(net, premise.pretty(), dep.statement.pretty())  # type: ignore
-        s = json.dumps(
-            {
-                "layout": {
-                    "hierarchical": {
-                        "enabled": True,
-                        "direction": "LR",
-                        "sortMethod": "directed",
-                    },
-                }
-            }
-        )
-        net.set_options(s)  # type: ignore
+        net.options.layout = {  # type: ignore
+            "hierarchical": {
+                "enabled": True,
+                "direction": "LR",
+                "sortMethod": "directed",
+            },
+        }
+        net.show_buttons(filter_=["physics", "layout"])  # type: ignore
         net.show(str(path), notebook=False)  # type: ignore
