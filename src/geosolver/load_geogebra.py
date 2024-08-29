@@ -11,6 +11,7 @@ from geosolver.numerical.geometries import PointNum
 from geosolver.predicates.circumcenter import Circumcenter
 from geosolver.predicates.collinearity import Coll
 from geosolver.predicates.congruence import Cong
+from geosolver.predicates.cyclic import Cyclic
 from geosolver.predicates.midpoint import MidPoint
 from geosolver.predicates.perpendicularity import Perp
 
@@ -42,8 +43,11 @@ def load_geogebra(path: Path, dep_graph: DependencyGraph):
             p.num = PointNum(x / z, y / z)
             logging.info(f"Find coordinates of {p} ({p.num})")
     # associating points with forms
+    # points in a form
     ensemble: dict[str, tuple[str, ...]] = defaultdict(lambda: ())
+    # which form is it
     form: dict[str, Form] = {}
+    # auxilliary data
     aux: dict[str, tuple[str, ...]] = {}
     for command in root.iter("command"):
         command_name = command.attrib["name"]
@@ -53,6 +57,9 @@ def load_geogebra(path: Path, dep_graph: DependencyGraph):
             input_len += 1
 
         def a(k: int):
+            """
+            get the k-th attribute
+            """
             return input.attrib["a" + str(k)]
 
         output = list(command.iter("output"))[0].attrib["a0"]
@@ -107,6 +114,7 @@ def load_geogebra(path: Path, dep_graph: DependencyGraph):
                             (Cong.NAME, t[1], t[2], t[0], points[0]), dep_graph
                         )
                     )
+            premises.append(Statement.from_tokens((Cyclic.NAME,) + points, dep_graph))
         if form[k] == Form.Line:
             premises.append(Statement.from_tokens((Coll.NAME,) + points, dep_graph))
 

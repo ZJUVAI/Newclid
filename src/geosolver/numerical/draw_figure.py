@@ -78,15 +78,6 @@ def draw_figure(
     else:
         _draw(ax, points, proof.dep_graph.checked(), rng)
 
-    if points:
-        xmin = min([p.num.x for p in points])
-        xmax = max([p.num.x for p in points])
-        ymin = min([p.num.y for p in points])
-        ymax = max([p.num.y for p in points])
-        ax.margins((xmax - xmin) * 0.1, (ymax - ymin) * 0.1)
-        # ax.set_xlim(xmin - (xmax - xmin) * 0.1, xmax + (xmax - xmin) * 0.1)
-        # ax.set_ylim(ymin - (ymax - ymin) * 0.1, ymax + (ymax - ymin) * 0.1)
-
     if save_to is not None:
         fig.savefig(save_to, format=format)  # type: ignore
 
