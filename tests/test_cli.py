@@ -14,6 +14,19 @@ def test_exhaust():
     assert not main()
 
 
+def test_imo2009p2():
+    sys.argv = [
+        "geosolver",
+        "--problem-name",
+        "imo2009p2",
+        "--env",
+        "tests-exp",
+        "--seed",
+        "123",
+    ]
+    assert main()
+
+
 def test_run_problems_file():
     sys.argv = [
         "geosolver",
