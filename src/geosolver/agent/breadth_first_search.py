@@ -40,7 +40,7 @@ class BFSDDAR(DeductiveAgent):
             self.application_buffer.extend(deps)
         elif self.application_buffer:
             dep = self.application_buffer.pop()
-            logging.info(f"bfsddar : apply {dep}")
+            # logging.info(f"bfsddar : apply {dep}")
             if self.proof.apply_dep(dep):
                 self.hope = True
         else:

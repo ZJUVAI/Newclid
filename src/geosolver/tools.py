@@ -1,6 +1,6 @@
 from fractions import Fraction
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, TypeVar, Union
+from typing import TYPE_CHECKING, Any, Generator, Optional, Sequence, TypeVar
 from pyvis.network import Network  # type: ignore
 
 from geosolver.numerical import close_enough
@@ -78,12 +78,9 @@ def fraction_to_angle(f: Fraction):
     return f"{n%d}pi/{d}"
 
 
-def reshape(to_reshape: Union[list[T], tuple[T, ...]], n: int) -> list[tuple[T, ...]]:
-    assert len(to_reshape) % n == 0
-    columns: list[list[T]] = [[] for _ in range(n)]
-    for i, x in enumerate(to_reshape):
-        columns[i % n].append(x)
-    return [tuple(columns[k][i] for k in range(n)) for i in range(len(columns[0]))]
+def reshape(to_reshape: Sequence[T], n: int) -> Generator[tuple[T, ...], None, None]:
+    for i in range(0, len(to_reshape), n):
+        yield tuple(to_reshape[i + k] for k in range(n))
 
 
 def add_edge(net: Network, u: Any, v: Any):
