@@ -25,7 +25,7 @@ class SameSide(Predicate):
     @classmethod
     def preparse(cls, args: tuple[str, ...]):
         a, b, c, x, y, z = args
-        if len(set((a, b, c))) < 3 or len(set((x, y, z))) < 3:
+        if a == b or b == c or a == c or x == y or y == z or x == z:
             return None
         p1 = min((a, b, c), (a, c, b))
         p2 = min((x, y, z), (x, z, y))

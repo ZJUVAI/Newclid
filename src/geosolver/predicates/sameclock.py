@@ -19,7 +19,7 @@ class SameClock(Predicate):
     @classmethod
     def preparse(cls, args: tuple[str, ...]) -> Optional[tuple[str, ...]]:
         a, b, c, x, y, z = args
-        if len(set((a, b, c))) < 3 or len(set((x, y, z))) < 3:
+        if a == b or b == c or a == c or x == y or y == z or x == z:
             return None
         group = min((a, b, c), (b, c, a), (c, a, b))
         groupr = min((a, c, b), (c, b, a), (b, a, c))
