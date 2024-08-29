@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import TYPE_CHECKING, Collection
+from typing import TYPE_CHECKING, Collection, Optional
 from geosolver.dependencies.dependency import IN_PREMISES
 from geosolver.dependencies.symbols_graph import SymbolsGraph
 from pyvis.network import Network  # type: ignore
@@ -22,6 +22,8 @@ class DependencyGraph:
         self.symbols_graph = SymbolsGraph()
         self.hyper_graph: dict[Statement, Dependency] = {}
         self.ar = ar
+        self.check_numerical: dict[Statement, bool] = {}
+        self.token_statement: dict[tuple[str, ...], Optional[Statement]] = {}
 
     def has_edge(self, dep: Dependency):
         return (
