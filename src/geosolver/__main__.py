@@ -51,7 +51,7 @@ def cli_arguments() -> Namespace:
     )
     parser.add_argument(
         "--log-level",
-        default=logging.INFO,
+        default=logging.WARNING,
         type=int,
         help="Logging level c.f. https://docs.python.org/3/library/logging.html#logging-levels",
     )
