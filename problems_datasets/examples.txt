@@ -162,3 +162,5 @@ doesntbuild_imo_2020_sl_g7
 a b c = triangle a b c; o = circle a b c; p = on_circle p o a; ma = midpoint b c; mb = midpoint a c; mc = midpoint a b; d = reflect d p a ma; e = reflect e p b mb; f = reflect f p c mc; x = on_bline x a d, on_bline x b e; y = on_bline y c f, on_bline y b e; z = on_bline z c f, on_bline z a d ? cyclic w x y z
 acompute_test
 a = free a; b = lconst b a 3; c = eq_triangle c a b ? acompute a b b c; acompute b c a b
+translated_imo_2009_sl_g3_excenters
+a b c = triangle a b c; x y z i = incenter2 x y z i a b c; g = on_line g b y, on_line g c z; r = parallelogram b c y r; s = parallelogram z b c s; m n p j = excenter2 m n p j a b c ? cong g r g s
