@@ -183,8 +183,8 @@ r10 : Ratio cancellation
      - :math:`\frac{AB}{CD} = \frac{MN}{PQ} \wedge \frac{CD}{EF} = \frac{PQ}{RU} \implies \frac{AB}{EF} = \frac{MN}{RU}`
      - This is a simple algebraic fact: if you multiply the two equalities from the hypothesis together, there will be a cancellation of numerators and denominators giving you the consequence.
 
-r11 : eqratio2angle_bisector
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r11 : Bisector theorem I
+^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -194,13 +194,13 @@ r11 : eqratio2angle_bisector
      - Description
    * - |r11|
      - :math:`\begin{cases}\frac{DB}{DC} = \frac{AB}{AC} \\DBC\text{ collinear} \end{cases}\implies \angle (AB\times AD)=\angle(AD\times AC)`
-     -
+     - One direction of the bisector theorem: if a line through a vertex of a triangle cuts the opposite side into two segments that are in proportion as the neighboring sides of the triangle, the line bisects the angle at the vertex it cuts.
 
 .. |r11| image:: ../../_static/images/rules/r11.png
     :width: 100%
 
-r12 : Bisector theorem
-^^^^^^^^^^^^^^^^^^^^^^
+r12 : Bisector theorem II
+^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -210,7 +210,7 @@ r12 : Bisector theorem
      - Description
    * - |r12|
      - :math:`\begin{cases}\angle (AB\times AD) = \angle (AD\times AC) \\ DBC\text{ collinear}\end{cases} \implies \frac{DB}{DC} = \frac{AB}{AC}`
-     -
+     - Opposite direction of the bisector theorem: the internal bisector of a vertex of a triangle divides the opposite side into two segments that are in proportion to the neighboring sides of the triangle.
 
 .. |r12| image:: ../../_static/images/rules/r12.png
     :width: 100%
@@ -407,8 +407,8 @@ r24 : cong_cyclic2perp
 .. |r24| image:: ../../_static/images/rules/r24.png
     :width: 100%
 
-r25 : midp2para
-^^^^^^^^^^^^^^^
+r25 : Diagonals of parallelogram I
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -418,13 +418,13 @@ r25 : midp2para
      - Description
    * - |r25|
      - :math:`\begin{cases}M\text{ midpoint of }AB \\M \text{ midpoint of }CD\end{cases} \implies AC \parallel BD`
-     -
+     - If two segments intersect at their common midpoint, the vertices of the segments are the vertices of a parallelogram.
 
 .. |r25| image:: ../../_static/images/rules/r25.png
     :width: 100%
 
-r26 : Diagonals of parallelogram
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r26 : Diagonals of parallelogram II
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -434,7 +434,7 @@ r26 : Diagonals of parallelogram
      - Description
    * - |r26|
      - :math:`\begin{cases}M \text{ midpoint of }AB \\ AC \parallel BD \\ AD \parallel BC \end{cases}\implies M \text{ midpoint of }CD`
-     -
+     - The other direction of the previous rule, it says the diagonals of a parallelogram meet at their common midpoint.
 
 .. |r26| image:: ../../_static/images/rules/r26.png
     :width: 100%
@@ -455,8 +455,8 @@ r27 : eqratio_sameside2para
 .. |r27| image:: ../../_static/images/rules/r27.png
     :width: 100%
 
-r28 : para2coll
-^^^^^^^^^^^^^^^
+r28 : Overlapping parallels
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -466,13 +466,13 @@ r28 : para2coll
      - Description
    * - |r28|
      - :math:`AB \parallel AC \implies ABC\text{ collinear}`
-     -
+     - This rule encompasses the fact that two intersecting parallel lines are actually the same.
 
 .. |r28| image:: ../../_static/images/rules/r28.png
     :width: 100%
 
-r29 : midp2eqratio
-^^^^^^^^^^^^^^^^^^
+r29 : Midpoint is an eqratio
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -482,7 +482,7 @@ r29 : midp2eqratio
      - Description
    * - |r29|
      - :math:`\begin{cases} M \text{ midpoint of }AB \\ N\text{ midpoint of } CD \end{cases}\implies \frac{MA}{AB} = \frac{NC}{CD}`
-     -
+     - This rule exists to help the solver process the fact that is obvious to humans: midpoints split segments in the same ratio (1:2).
 
 .. |r29| image:: ../../_static/images/rules/r29.png
     :width: 100%
@@ -709,7 +709,7 @@ r43 : Orthocenter theorem
      - Description
    * - |r43|
      - :math:`AB\perp CD \wedge AC\perp BD\implies AD\perp BC`
-     -
+     - This rule says that the three heights of a triangle meet at a single point (the orthocenter).
 
 .. |r43| image:: ../../_static/images/rules/r43.png
     :width: 100%
@@ -725,13 +725,13 @@ r44 : Pappus's theorem
      - Description
    * - |r44|
      - :math:`\begin{cases}ABC\text{ collinear} \\ PQR\text{ collinear} \\ XAQ\text{ collinear}\\ XPB\text{ collinear} \\ YAR\text{ collinear} \\ YPC\text{ collinear}\\ ZBR\text{ collinear} \\ ZCQ\text{ collinear}\end{cases}\implies XYZ\text{ collinear}`
-     -
+     - This rule is Pappus's hexagon theorem.
 
 .. |r44| image:: ../../_static/images/rules/r44.png
     :width: 100%
 
-r45 : Simson line theorem
-^^^^^^^^^^^^^^^^^^^^^^^^^
+r45 : Simson's line theorem
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -740,8 +740,8 @@ r45 : Simson line theorem
      - Formal Statement
      - Description
    * - |r45|
-     - :math:`\begin{cases} ABCP\text{ on a circle} \\ ALC\text{ collinear} \\ PL\perp AC\\ \text{coll}(M, B, C) \\ PM\perp BC\\ NAB\text{ collinear} \\ PN\perp AB\end{cases}\implies LMN\text{ collinear}`
-     -
+     - :math:`\begin{cases} ABCP\text{ on a circle} \\ ALC\text{ collinear} \\ PL\perp AC\\ MBC\text{ collinear} \\ PM\perp BC\\ NAB\text{ collinear} \\ PN\perp AB\end{cases}\implies LMN\text{ collinear}`
+     - This rule is Simson's line theorem: The orthogonal projections of a point on the circumcircle of a triangle onto its three sides lie on a same line (Simson's line).
 
 .. |r45| image:: ../../_static/images/rules/r45.png
     :width: 100%
@@ -757,7 +757,7 @@ r46 : Incenter theorem
      - Description
    * - |r46|
      - :math:`\begin{cases}\angle(AB\times AX)=\angle (AX\times AC) \\ \angle(BA\times BX)=\angle (BX\times BC)\\ ABC\text{ non-collinear}\end{cases}\implies \angle (CB\times CX)=\angle (CX\times CA)`
-     -
+     - The three bisectors of a triangle meet at a single point (the incenter).
 
 .. |r46| image:: ../../_static/images/rules/r46.png
     :width: 100%
@@ -773,7 +773,7 @@ r47 : Circumcenter theorem
      - Description
    * - |r47|
      - :math:`\begin{cases}M\text{ midpoint of }AB \\ XM\perp AB \\ N\text{ midpoint of }BC\\ XN\perp BC \\ P\text{ midpoint of }CA\end{cases}\implies XP\perp CA`
-     -
+     - The three perpendicular bisectors of the sides of a triangle meet at a single point (the circumcenter).
 
 .. |r47| image:: ../../_static/images/rules/r47.png
     :width: 100%
@@ -789,7 +789,7 @@ r48 : Centroid theorem
      - Description
    * - |r48|
      - :math:`\begin{cases}M\text{ midpoint of }AB \\ MXC\text{ collinear}\\ N\text{ midpoint of }BC \\ NXC\text{ collinear}\\ P\text{ midpoint of }CA\end{cases}\implies XPB\text{ collinear}`
-     -
+     - The three medians of a triangle meet at a single point (the centroid).
 
 .. |r48| image:: ../../_static/images/rules/r48.png
     :width: 100%
@@ -805,7 +805,7 @@ r49 : Recognize center of cyclic (circle)
      - Description
    * - |r49|
      - :math:`\begin{cases}O\text{ center of the circle }ABC \\ABCD\text{ on a circle}\end{cases}\implies OA= OD`
-     -
+     - This rule gives an information that is immediate for humans, but previously undetected to the solver: if three points lie on a circle with a known center, and there is a fourth point on that circle, the distance of the center of the circle to this fourth point is the same as to other points in a circle.
 
 .. |r49| image:: ../../_static/images/rules/r49.png
     :width: 100%
@@ -821,7 +821,7 @@ r50 : Recognize center of cyclic (cong)
      - Description
    * - |r50|
      - :math:`\begin{cases}ABCD\text{ on a circle}\\ OA=OB\\ OC=OD\\ AB\not\parallel CD\end{cases}\implies OA=OC`
-     -
+     - The intersection of the bisectors of two segments of points that lie on a circle is the center of the circle (if the bisectors do not overlap).
 
 .. |r50| image:: ../../_static/images/rules/r50.png
     :width: 100%
@@ -837,4 +837,4 @@ r51 : Midpoint splits in two
      - Description
    * - (Feeds algebraic module)
      - :math:`M\text{ midpoint of AB}\implies \frac{MA}{AB}=\frac{1}{2}`
-     - This rule converts a symbolic statement (M is the midpoint of AB) into an algebraic one (the ratio between AM and AB is 1/2). This allows AR to process information from midpoints.
+     - This rule converts a symbolic statement (M is the midpoint of AB) into an algebraic one (the ratio between AM and AB is 1:2). This allows AR to process information from midpoints.
