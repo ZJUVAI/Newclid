@@ -401,19 +401,138 @@ intersection_lt x a b c d e
 .. |intersection_lt| image:: ../../_static/images/defs/intersection_lt.png
     :width: 100%
 
-- **intersection_pp x a b c d e f:** From six points, a, b, c, d, e, f, such that a and d are different and that lines bc and ef are not parallel, builds point x in the intersection of the line through a parallel to bc and the line through d parallel to ef. Adds the statements that xa and bc are parallel and that xd and ef are parallel.
+intersection_pp x a b c d e f
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-- **intersection_tt x a b c d e f:** From six points, a, b, c, d, e, f, such that a and d are different and lines bc and ef are not parallel, build point x in the intersection of the line through a perpendicular to bc and the line through d perpendicular to ef. Adds the statements that xa and bc are perpendicular and that xd and ef are perpendicular.
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
 
-- **iso_triangle a b c:** From nothing, creates the three vertices a, b, c of an isosceles triangle with ab=ac. It adds BOTH the congruence statement for ab=ac and for the congruence of angle abc and angle acb. (Compare to iso_triangle0, iso_triangle_vertex, and iso_triangle_vertext_angle below).
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |intersection_pp|
+     - From six points, a, b, c, d, e, f, such that a and d are different and that lines bc and ef are not parallel, builds point x in the intersection of the line through a parallel to bc and the line through d parallel to ef.
+     - :math:`\begin{cases}xa\parallel bc\\ xd\parallel ef\end{cases}`  (para x a b c, para x d e f)
+     - Point
 
-- **lc_tangent x a o:** From two different points a, o, builds x, a point on the line perpendicular to ao through a (the line tangent to the circle of center o through a, with tangent point a). Adds the perpendicularity statement saying ax is perpendicular to ao. Construction returns a line, so can be subjected to intersections. It is equivalent to on_tline x a a o (see on_tline below).
+.. |intersection_pp| image:: ../../_static/images/defs/intersection_pp.png
+    :width: 100%
 
-- **midpoint x a b:** From a pair of points a, b, that are different, builds m, the midpoint of a and b. Adds the statements that m, a, and b are collinear and that am=bm.
+intersection_tt x a b c d e f
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-- **mirror x a b:** From two points a, b that are different, builds x, the reflection of point a with respect to point b (so that b is the midpoint of ax). Adds the statements that a, b, and x are collinear and that ba=bx.
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
 
-- **nsquare x a b:** Given two distinct points a, b, builds x such that the triangle xab is an isosceles right triangle. Adds the congruence statement that ax=ab and the perpendicularity statement saying ax is perpendicular to ab.
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |intersection_tt|
+     - From six points, a, b, c, d, e, f, such that a and d are different and lines bc and ef are not parallel, build point x in the intersection of the line through a perpendicular to bc and the line through d perpendicular to ef.
+     - :math:`\begin{cases}xa\perp bc\\ xd\perp ef\end{cases}`  (perp x a b c, perp x d e f)
+     - Point
+
+.. |intersection_tt| image:: ../../_static/images/defs/intersection_tt.png
+    :width: 100%
+
+iso_triangle a b c
+^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |iso_triangle|
+     - From nothing, creates the three vertices a, b, c of an isosceles triangle with ab=ac. (Compare to iso_triangle0, iso_triangle_vertex, and iso_triangle_vertext_angle below).
+     - :math:`\begin{cases}ab= ac\\ \widehat{abc}=\widehat{bca}\end{cases}`  (cong a b a c, eqangle b a b c c b c a)
+     - Points
+
+.. |iso_triangle| image:: ../../_static/images/defs/iso_triangle.png
+    :width: 100%
+
+lc_tangent x a o
+^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |lc_tangent|
+     - From two different points a, o, builds x, a point on the line perpendicular to ao through a (the line tangent to the circle of center o through a, with tangent point a). It is equivalent to on_tline x a a o (see on_tline below).
+     - :math:`ax \perp ao`  (perp a x a o)
+     - Line
+
+.. |lc_tangent| image:: ../../_static/images/defs/lc_tangent.png
+    :width: 100%
+
+midpoint x a b
+^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |midpoint|
+     - From a pair of points a, b, that are different, builds x, the midpoint of a and b.
+     - :math:`x\text{ midpoint of }ab`  (midp x a b)
+     - Point
+
+.. |midpoint| image:: ../../_static/images/defs/midpoint.png
+    :width: 100%
+
+mirror x a b
+^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |mirror|
+     - From two points a, b that are different, builds x, the reflection of point a with respect to point b (so that b is the midpoint of ax).
+     - :math:`\begin{cases}x, a, b\text{ collinear}\\ ba=bx\end{cases}`  (coll x a b, cong b a b x)
+     - Point
+
+.. |mirror| image:: ../../_static/images/defs/mirror.png
+    :width: 100%
+
+nsquare x a b
+^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |nsquare|
+     - Given two distinct points a, b, builds x such that the triangle xab is an isosceles right triangle.
+     - :math:`\begin{cases}xa=ab\\ xa\perp ab\end{cases}`  (cong x a a b, perp x a a b)
+     - Point
+
+.. |nsquare| image:: ../../_static/images/defs/nsquare.png
+    :width: 100%
 
 - **on_aline x a b c d e:**
 
@@ -477,19 +596,64 @@ intersection_lt x a b c d e
 
 - **on_opline x a b:** From a pair of different points a, b, builds x, a point on the line ab such that a is NOT between x and b. Adds the statement that a, b, and x are collinear. Construction returns a half-line, so can be subjected to intersections.
 
-- **cc_tangent x y z i o a w b:** From four points o, a, w, b, such that o is neither a nor w, and such that w and b are distinct, builds x, y, z, i on a pair of lines xy and zi that are simultaneously tangent to both the circle of center o through a and the circle of center w through b. x and z are the tangent points on the circle centered at o through a, and y and i are the tangent points on the circle centered at w through b. Adds the congruency statements ox=oa and oz=oa (saying x, z are in the circle of center o through a) and wy=wb and wi=wb (saying y, i are in the circle of center w through b), as well as the perpendicularity statements related to the tangents: yx is perpendicular to ox (because xy is tangent to the circle centered at o at point x), yx is perpendicular to wy (because xy is tangent to the circle centered at w at point y), zi is perpendicular to zo (because zi is tangent to the circle centered at o at point z), and zi is perpendicular to wi (because zi is tangent to the circle centered at w at point i).
+cc_tangent x y z i o a w b
+^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. figure:: ../../_static/images/defs/cc_tangent.png
-    :width: 400
-    :align: center
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
 
-    cc_tangent x y z i o a w b
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |cc_tangent|
+     - From four points o, a, w, b, such that o is neither a nor w, and such that w and b are distinct, builds x, y, z, i on a pair of lines xy and zi that are simultaneously tangent to both the circle of center o through a and the circle of center w through b. x and z are the tangent points on the circle centered at o through a, and y and i are the tangent points on the circle centered at w through b.
+     - :math:`\begin{cases}ox=oa\\ wy=wb\\ ox\perp xy\\ wy\perp yx\\oz=oa\\wi=wb\\oz\perp zi\\wi\perp iz\end{cases}`  (cong o x o a, cong w y w b, perp x o x y, perp y w y x, cong o z o a, cong w i w b, perp z o z i, perp i w i z)
+     - Points
+
+.. |cc_tangent| image:: ../../_static/images/defs/cc_tangent.png
+    :width: 100%
 
 - **eqangle3 x a b d e f:**
 
-- **tangent x y a o b:** From three different points a, b, c, builds x and y, the points of tangency of the two lines through a tangent to the circle of center o through b. Adds the congruence statements ox=ob and oy=ob (corresponding to the fact that x and y are on the circle of center o through b), and the perpendicularity statements saying xa is perpendicular to ox, and that ay is perpendicular to oy (explicitating that the lines touch the circle at points of tangency).
+tangent x y a o b
+^^^^^^^^^^^^^^^^^
 
-- **on_circum x a b c:** From three non-collinear points a, b, and c, builds x a point on the circle through a, b, and c. Adds the statement that four points a, b, c, and x are concyclic.
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |tangent|
+     - From three different points a, b, c, builds x and y, the points of tangency of the two lines through a tangent to the circle of center o through b.
+     - :math:`\begin{cases}ox=ob\\ ax\perp ox\\ oy=ob\\ ay\perp yo\end{cases}`  (cong o x o b, perp a x o x, cong o y o b, perp a y o y)
+     - Points
+
+.. |tangent| image:: ../../_static/images/defs/tangent.png
+    :width: 100%
+
+on_circum x a b c
+^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |on_circum|
+     - From three non-collinear points a, b, and c, builds x a point on the circle through a, b, and c.
+     - :math:`\begin{cases}x, a, b, c\text{ concyclic}\end{cases}`  (cyclic a b c x)
+     - Point
+
+.. |on_circum| image:: ../../_static/images/defs/on_circum.png
+    :width: 100%
 
 New Definitions
 ---------------
