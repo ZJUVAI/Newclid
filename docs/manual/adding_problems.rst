@@ -37,7 +37,7 @@ Once definitions are set up, problems can be written as such:
 
 
 `triangle`, `on_tline` and `on_line` would be definitions specified for example in defs.txt.
-`perp` is a predicate used for GeoSolver's statements (See their list at :ref:`Predicates`).
+`perp` is a predicate used for Newclid's statements (See their list at :ref:`Predicates`).
 
 This problem could be read in natural language as:
     - `a b c = triangle` : Let a, b and c three points in a triangle.
@@ -60,14 +60,14 @@ although more tools are available for the definition of the problem.
 This translation may involve changing the order of terms presented, 
 or even reversing a construction altogether.
 
-Still, some problems may not be written into the GeoSolver for being overdetermined,
+Still, some problems may not be written into the Newclid for being overdetermined,
 or may demand the offering of extra information to the solver, such as extra points,
 with respect to its original statement.
 
 To evaluate if such modifications preserve the nature of the original problem 
 is a matter of considering which facts/predicates are offered to the solver 
 as hypothesis and exercising judgement. Sometimes there is no clear-cut way to decide if a problem was modified 
-or simply translated into the GeoSolver.
+or simply translated into Newclid.
 
 When giving a problem to the solver, the problem, definitions to be used, 
 and set of rules to be assumed in the derivation can be given in dedicated .txt files 

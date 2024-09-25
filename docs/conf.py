@@ -15,7 +15,7 @@ sys.path.insert(0, os.path.abspath("../"))
 
 package_metadata = metadata("geosolver")
 
-project = "GeoSolver"
+project = "Newclid"
 copyright = "2024, Mathïs Fédérico, Vladmir Sicca, Tianxiang Xia"
 author = package_metadata["Author-email"]
 release = package_metadata["Version"]

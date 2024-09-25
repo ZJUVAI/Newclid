@@ -14,7 +14,7 @@ Proof State
 
 implementation: :class:`geosolver.proof.ProofState`
 
-The :green:`Proof State` is the main body of GeoSolver,
+The :green:`Proof State` is the main body of Newclid,
 it allows to build a proof step by step.
 Each :red:`Action` type will trigger a different kind of step (apply, match, aux, ...),
 and each step will use sub-components of the :green:`Proof State` that represent its internal state.
@@ -37,7 +37,7 @@ How is a Problem Built
 ----------------------
 
 With given problem in JGEX,
-GeoSolver will load the definitions (default to :code:`src/default_configs/defs.txt`)
+Newclid will load the definitions (default to :code:`src/default_configs/defs.txt`)
 and the rules to be used (default to :code:`src/default_configs/rules.txt`).
 
 Next, the builder will construct the problem itself.
@@ -63,7 +63,7 @@ This serves two purposes:
    on the assumption that the probability of a failure at random is low.
 
 
-With given problem in Geogebra, GeoSolver uses then the definitions of Geogebra, translates the symbolic construction to premises and symbols graph elements and gets the numerical coordinates from the :code:`.ggb` file.
+With given problem in Geogebra, Newclid uses then the definitions of Geogebra, translates the symbolic construction to premises and symbols graph elements and gets the numerical coordinates from the :code:`.ggb` file.
 
 Usage of the numerical coordinates:
 - numerical predicates

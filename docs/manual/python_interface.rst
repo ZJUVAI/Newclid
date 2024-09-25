@@ -1,7 +1,7 @@
 Python interface
 ----------------
 
-GeoSolver's interface is made of two main elements.
+Newclid's interface is made of two main elements.
 
 First :class:`geosolver.GeometricSolver` that contains all high level logic for the
 solver to run and write outputs.
