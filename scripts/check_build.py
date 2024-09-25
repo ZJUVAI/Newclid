@@ -2,7 +2,9 @@ import os
 from pathlib import Path
 from sys import stderr
 
-from geosolver.agent.flemmard import Flemmard
+from geosolver.agent.breadth_first_search import BFSDDAR
+
+# from geosolver.agent.flemmard import Flemmard
 from geosolver.api import GeometricSolverBuilder
 
 
@@ -23,10 +25,12 @@ def run_geosolver(filepath: Path):
                     solver = (
                         GeometricSolverBuilder(8)
                         .load_problem_from_file(problems_path, problem_name)
-                        .with_deductive_agent(Flemmard)
+                        .with_deductive_agent(BFSDDAR)
                         .build()
                     )
                     solver.run()
+                    if solver.run():
+                        print(f"Solved {problem_name} succesfully.")
                 except Exception as e:
                     print(
                         f"Warning: solver crashed on problem '{problem_name}' : ({type(e)}) {e}",
@@ -34,5 +38,5 @@ def run_geosolver(filepath: Path):
                     )
 
 
-problems_path = Path("problems_datasets/new_benchmark_50.txt")
+problems_path = Path("problems_datasets/examples.txt")
 run_geosolver(Path(problems_path))
