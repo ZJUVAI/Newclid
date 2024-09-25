@@ -9,6 +9,7 @@
    manual/adding_problems
    manual/adding_rules
    manual/default_files/index
+   manual/problem_databases/index
    manual/algo
    source/geosolver
 

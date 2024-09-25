@@ -1,0 +1,6 @@
+imo_ag_30
+=========
+
+This is the original benchmark of problems from IMO exams from 2000 to 2022 referenced in the original AlphaGeometry success of 25/30 problem in olympiad geometry problems, and has not been modified. Names of problems are of the form "translated_imo_YEAR_pNUMBER", where YEAR corresponds to the year of the exam containing the problem and NUMBER being the problem number in that exam. The translations to the formal language were made by the authors of the original paper.
+
+The problems actually correspond to 28 original IMO problems, as problems 2002_p2 and 2008_p1 were split into two problems each to account for multiple goals in their original formulations, a capability that was not present in the original software. The list contains all IMO geometry problems from the time range that seem to be in the scope of the formal language, with the exceptions of 2005_p1, 2007_p2, and 2013_p3. Those were possibly left out on the account of being overdetermined, a situation not well processed by the engine's builder.
