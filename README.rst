@@ -1,4 +1,4 @@
-GeoSolver: Symbolic solver for Geometric problems
+Newclid: Symbolic solver for Geometric problems
 =================================================
 
 An extension of the geometric solver introduced in the Nature 2024 paper:
@@ -6,10 +6,10 @@ An extension of the geometric solver introduced in the Nature 2024 paper:
 <https://www.nature.com/articles/s41586-023-06747-5>`_.
 
 
-AlphaGeometry can be seen as an extension of GeoSolver equipped with a language model
+AlphaGeometry can be seen as an extension of Newclid equipped with a language model
 that proposes new auxiliary constructions if a problem gets stuck.
 
-Currently new auxiliary constructions can only be added in Geosolver as human suggested
+Currently new auxiliary constructions can only be added in Newclid as human suggested
 constructions if the HumanAgent is used instead of BFSDDAR (default).
 
 Installation
