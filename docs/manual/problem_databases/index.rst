@@ -8,3 +8,4 @@ In the development of this project, a couple of databases of problems have been 
    :caption: Contents:
 
    imo_ag_30
+   new_benchmark_50
