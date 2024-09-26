@@ -150,12 +150,8 @@ checking_ordering_r27_aoc_bod_sameside
 o c = segment o c; d = free d; a x = trisegment a x o c; b y = trisegment b y o d; a1 = mirror a1 a o; c1 = mirror c1 c o; b1 = mirror b1 b o; d1 = mirror d1 d o ? sameside a o c b1 o d
 checking_ordering_r27_aoc_dob_sameside
 o c = segment o c; d = free d; a x = trisegment a x o c; b y = trisegment b y o d; a1 = mirror a1 a o; c1 = mirror c1 c o; b1 = mirror b1 b o; d1 = mirror d1 d o ? sameside a1 o c b o d1
-translated_imo_2011_p6_with_orthocenter_and_x_reflections
-a b c = triangle a b c; o = circle o a b c; p = on_circle p o a; q = on_tline q p o p; pa = reflect pa p b c; pb = reflect pb p c a; pc = reflect pc p a b; qa = reflect qa q b c; qb = reflect qb q c a; qc = reflect qc q a b; a1 = on_line a1 pb qb, on_line a1 pc qc; b1 = on_line b1 pa qa, on_line b1 pc qc; c1 = on_line c1 pa qa, on_line c1 pb qb; o1 = circle o1 a1 b1 c1; x = on_circle x o a, on_circle x o1 a1; h = orthocenter h a b c; xa = reflect xa x b c; xb = reflect xb x a c; xc = reflect xc x a b ? coll x o o1
 translated_obm_phase1_2016_p10
 o = free o; a = lconst a o 1; b = s_angle a o b 60o, on_circle b o a; c = s_angle b o c 60o, on_circle c o a; d = s_angle c o d 60o, on_circle d o a; e = s_angle d o e 60o, on_circle e o a; f = s_angle e o f 60o, on_circle f o a; x = s_angle a o x 90o, on_circle x o a; y = s_angle d o y 90o, on_circle y o a; r = on_line r b f, on_line r a x; s = on_line s b f, on_line s a y; t = on_line t b d, on_line t a x; u = on_line u b d, on_line u a y ? lconst r s 1
-testing_problem
-a b c = triangle a b c; p = on_circum p a b c; q = eqdistance q p a b, on_circum q a b c; r = on_circum r a b c ? eqangle c a c b r p r q
 translated_inmo_1995_p1
 a b = segment a b; c = s_angle b a c 30o; h = orthocenter h a b c; m = midpoint m b c; t = eqdistance t m m h, on_line t h m ? rconst a t b c 2/1; perp h a b c
 doesntbuild_imo_2020_sl_g7
@@ -205,4 +201,4 @@ a b c = triangle; i = incenter i a b c; a1 = circle a1 i b c; b1 = circle b1 i c
 euler_simplified
 a b c = triangle a b c; h = orthocenter a b c; g1 g2 g3 g = centroid g1 g2 g3 g a b c; o = circle a b c ? coll h g o
 testing_problem
-a b = segment a b; c = free c; d = on_circum d c a b; o = circle o a b c; e = eqdistance e o d o; f = on_circum f e d c ? cyclic a b c d e f
+a b c = triangle a b c; p = on_circum p a b c; q = eqdistance q p a b, on_circum q a b c; r = on_circum r a b c ? eqangle c a c b r p r q
