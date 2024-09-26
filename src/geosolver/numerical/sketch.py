@@ -48,7 +48,7 @@ def sketch_aline(args: tuple[PointNum, ...], **kwargs: Any) -> LineNum:
 
 
 def sketch_aline0(args: tuple[PointNum, ...], **kwargs: Any) -> LineNum:
-    """Sketch the construction aline."""
+    """Sketch the construction aline0."""
     A, B, C, D, E, F, G = args
     ab = A - B
     cd = C - D
