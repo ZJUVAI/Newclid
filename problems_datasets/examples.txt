@@ -51,7 +51,7 @@ b c = segment b c; a = eq_triangle a b c ? aconst a b a c 1pi/3
 angles_double_eq_triangle
 b c = segment b c; a = eq_triangle a b c; d = eqdistance d a a b, eqdistance d b b c ? aconst d a a b 2pi/3
 suplementary_angles
-a b = segment a b; c = s_angle a b c 30o ? aconst b a b c 5pi/6
+a b = segment a b; c = s_angle a b c 30o ? aconst b c b a 5pi/6
 square_side
 a b = segment a b; c = on_tline c b a b, eqdistance c b a b; d = on_circum d a b c, eqdistance d c a b ? cong a b d a
 square_angle
@@ -59,7 +59,7 @@ a b = segment a b; c = on_tline c b a b, eqdistance c b a b; d = on_circum d a b
 regular_pentagon_side
 a b = segment a b; c = s_angle a b c 108o, eqdistance c b a b; d = on_circum d a b c, eqdistance d c b c; e = on_circum e b c d, eqdistance e d c d ? cong e a a b
 regular_pentagon_angle
-a b = segment a b; c = s_angle a b c 108o, eqdistance c b a b; d = on_circum d a b c, eqdistance d c b c; e = on_circum e b c d, eqdistance e d c d ? aconst a b e a 3pi/5
+a b = segment a b; c = s_angle a b c 108o, eqdistance c b a b; d = on_circum d a b c, eqdistance d c b c; e = on_circum e b c d, eqdistance e d c d ? aconst a e b a 3pi/5
 regular_hexagon_side
 o a = segment o a; b = eqdistance b a o a, eqdistance b o o a; c = on_circle c o a, eqdistance c b a b; d = on_circum d a b c, eqdistance d c b c; e = on_circum e b c d, eqdistance e d c d; f = on_circum f e d c, eqdistance f e e d ? cong a b f a
 regular_hexagon_angle
@@ -67,11 +67,11 @@ o a = segment o a; b = eqdistance b a o a, eqdistance b o o a; c = on_circle c o
 regular_triangle_side
 a b = segment a b; c = s_angle a b c 60o, eqdistance c b a b ? cong a c a b
 worlds_hardest_easy_geometry_problem1
-a b = segment a b; o = s_angle b a o 70o, s_angle a b o 120o; c = s_angle o a c 10o, s_angle o b c 160o; d = on_line d o b, on_line d c a; e = on_line e o a, on_line e c b ? aconst a e d e 1pi/9
+a b = segment a b; o = s_angle b a o 70o, s_angle a b o 120o; c = s_angle o a c 10o, s_angle o b c 160o; d = on_line d o b, on_line d c a; e = on_line e o a, on_line e c b ? aconst d e a e 1pi/9
 worlds_hardest_easy_geometry_problem1_with_construction
-a b = segment a b; o = s_angle b a o 70o, s_angle a b o 120o; c = s_angle o a c 10o, s_angle o b c 160o; d = on_line d o b, on_line d c a; e = on_line e o a, on_line e c b; f = on_pline f d a b, on_line f b c; g = on_line g f a, on_line g d b ? aconst c b c a 1pi/9
+a b = segment a b; o = s_angle b a o 70o, s_angle a b o 120o; c = s_angle o a c 10o, s_angle o b c 160o; d = on_line d o b, on_line d c a; e = on_line e o a, on_line e c b; f = on_pline f d a b, on_line f b c; g = on_line g f a, on_line g d b ? aconst c a c b 1pi/9
 worlds_hardest_easy_geometry_problem2
-a b = segment a b; o = s_angle b a o 60o, s_angle a b o 130o; c = s_angle o a c 20o, s_angle o b c 150o; d = on_line d o b, on_line d c a; e = on_line e o a, on_line e c b ? aconst a e d e 1pi/6
+a b = segment a b; o = s_angle b a o 60o, s_angle a b o 130o; c = s_angle o a c 20o, s_angle o b c 150o; d = on_line d o b, on_line d c a; e = on_line e o a, on_line e c b ? aconst d e a e 1pi/6
 geometric_ratios
 a b = segment a b; m = midpoint m a b; n = midpoint n m a ? rconst a m b m 1/1
 concatenating_ratios
@@ -85,9 +85,9 @@ a b c = triangle a b c; d = midpoint d a c; e = angle_bisector e b a c, on_line 
 test_get_two_intersections
 a b = segment a b; c = eqdistance c a a b, eqdistance c b a b; d = eqdistance d a a b, eqdistance d b a b ? perp c d a b
 ar_two_triangles_angle_chasing
-a b = segment a b; c = s_angle a b c 150o, s_angle b a c 30o; d = s_angle c a d 20o, on_line d c b ? aconst b c a d 5pi/9
+a b = segment a b; c = s_angle a b c 150o, s_angle b a c 30o; d = s_angle c a d 20o, on_line d c b ? aconst a d b c 5pi/9
 ar_three_triangles_angle_chasing
-a b = segment a b; c = s_angle a b c 150o, s_angle b a c 30o; d = s_angle c a d 20o, on_line d c b; e = s_angle d a e 20o, on_line e c b ? aconst b c a e 4pi/9
+a b = segment a b; c = s_angle a b c 150o, s_angle b a c 30o; d = s_angle c a d 20o, on_line d c b; e = s_angle d a e 20o, on_line e c b ? aconst a e b c 4pi/9
 cong2_problem
 p = free p; q = free q; u = free u; v = eqdistance v u p q; a = free a; b = free b; c = free c; d = eqratio d p q a b u v c ? cong a b c d
 point_on_circle_eqdistant_from_center
@@ -201,4 +201,4 @@ a b c = triangle; i = incenter i a b c; a1 = circle a1 i b c; b1 = circle b1 i c
 euler_simplified
 a b c = triangle a b c; h = orthocenter a b c; g1 g2 g3 g = centroid g1 g2 g3 g a b c; o = circle a b c ? coll h g o
 testing_problem
-a b c = triangle a b c; p = on_circum p a b c; q = eqdistance q p a b, on_circum q a b c; r = on_circum r a b c ? eqangle c a c b r p r q
+a o x = triangle a o x; c = eqdistance c o o a; b = angle_mirror b a o x; u = intersection_ll u a o o x ? cong o c o a
