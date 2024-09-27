@@ -24,16 +24,21 @@ A more detailed crackdown of the problems is shown in the table below.
       - One of the original problems. It is the orthocenter problem with the auxiliary point needed for a pure DDAR solution prescribed.
       - Yes
       - Yes
+    * - incenter_excenter
+      - Given a triangle ABC, with incenter D and excenter E, center of a circle externally tangent to the side BC, the lines CD and CE are perpendicular.
+      - One of the original problems.
+      - 
+      - Yes
     * - euler
+      - In a triangle ABC with orthocenter H, centroid G, and circumcenter O, the points H, G, and O are collinear.
+      - One of the original problems.
       - 
-      - 
-      - 
-      - 
+      - Yes
     * - pappus
       - 
-      - 
-      - 
-      - 
+      - A straight application of Pappus hexagon's theorem. It was created to first check if the engine could originally prove this theorem (it could not), and then to see if we could add Pappus theorem as a rule.
+      - No
+      - No
     * - orthocenter_aux_bis
       - 
       - 
@@ -41,14 +46,14 @@ A more detailed crackdown of the problems is shown in the table below.
       - 
     * - orthocenter_consequence
       - 
-      - 
-      - 
-      - 
+      - A trivial consequence of the result of the orthocenter problem, created to test the dependency graph and see how it changes when a new rule (the orthocenter theorem) was added, the first one to be successfully added. It still lacks the auxiliary point needed for a simple DDAR/Newclid solution, but it can be solved with the assistance of the LLM.
+      - No
+      - No
     * - orthocenter_consequence_aux
       - 
-      - 
-      - 
-      - 
+      - The previous orthocenter_consequence problem, but now with the auxiliary point necessary for a pure DDAR solution prescribed.
+      - Yes
+      - Yes
     * - imo_2004_p1
       - 
       - 
@@ -61,9 +66,9 @@ A more detailed crackdown of the problems is shown in the table below.
       - 
     * - not_always_good
       - 
+      - A smaller version of the problem imo_2004_p1_generalized, for faster testing, that is not true for all choices of the free point O. It revealed that the building routine for problems will check the goal, erase the construction in case it is not met, and try new random attributions until finding a good one. This could result into an infinite loop, so we introduced a limit to the number of trials.
       - 
-      - 
-      - 
+      - Yes
     * - r29_only
       - 
       - 
@@ -220,10 +225,10 @@ A more detailed crackdown of the problems is shown in the table below.
       - 
       - 
     * - test_get_two_intersections
+      - Given a segment AB, if C and D are the two intersections of the circle of center A and radius AB and of the circle of center B and radius AB, AB is perpendicular to CD.
+      - This problem was created to check the behavior of the builder when two points were prescribed with the same description (the two intersections of a pair of circles). It shows the choice of intersections will be made at random, but without points overlapping, and this procedure only checks the numerical structure, it doesn't matter if two points are symbolically the same.
       - 
-      - 
-      - 
-      - 
+      - Yes
     * - ar_two_triangles_angle_chasing
       - 
       - 
@@ -516,6 +521,6 @@ A more detailed crackdown of the problems is shown in the table below.
       - 
     * - testing_problem
       - 
-      - 
+      - The specific content of this problem is not relevant. It was created as a placeholder to make quick tests on the engine, without the need to change the problem name on the scripts and, later, the commands. This cannot be done as easily since the implementation of the caching mechanism.
       - 
       - 
