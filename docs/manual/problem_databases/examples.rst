@@ -39,11 +39,6 @@ A more detailed crackdown of the problems is shown in the table below.
       - A straight application of Pappus hexagon's theorem. It was created to first check if the engine could originally prove this theorem (it could not), and then to see if we could add Pappus theorem as a rule.
       - No
       - No
-    * - orthocenter_aux_bis
-      - 
-      - 
-      - 
-      - 
     * - orthocenter_consequence
       - 
       - A trivial consequence of the result of the orthocenter problem, created to test the dependency graph and see how it changes when a new rule (the orthocenter theorem) was added, the first one to be successfully added. It still lacks the auxiliary point needed for a simple DDAR/Newclid solution, but it can be solved with the assistance of the LLM.
