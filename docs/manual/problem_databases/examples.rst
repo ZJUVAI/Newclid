@@ -51,17 +51,17 @@ A more detailed crackdown of the problems is shown in the table below.
       - Yes
     * - imo_2004_p1
       - 
-      - 
-      - 
-      - 
+      - The statement of problem 1 from the IMO 2004 exam, added the auxiliary points prescribed by the LLM as mentioned in the original paper. This problem was brought to the examples so we had a "bigger" problem to test the engine against, with more complexity. This problem is also discussed in the original paper as one that could be generalized by AlphaGeometry.
+      - Yes
+      - Yes
     * - imo_2004_p1_generalized
       - 
+      - This is the statement of imo_2004_p1 with the generalization of point O as proposed in the original AlphaGeometry paper. This generalization should allow for the solution to be found only in a fraction of the sample space allowed for O, and to investigate this phenomenon better we created the simpler not_always_good problem below.
       - 
-      - 
-      - 
+      - Yes
     * - not_always_good
       - 
-      - A smaller version of the problem imo_2004_p1_generalized, for faster testing, that is not true for all choices of the free point O. It revealed that the building routine for problems will check the goal, erase the construction in case it is not met, and try new random attributions until finding a good one. This could result into an infinite loop, so we introduced a limit to the number of trials.
+      - A smaller version of the problem imo_2004_p1_generalized, for faster testing, that is not true for all choices of the free point O. It revealed that the building routine for problems will check the goal, erase the construction in case it is not met, and try new random attributions until finding a good one. This could result in an infinite loop, so we introduced a limit to the number of trials.
       - 
       - Yes
     * - r29_only
@@ -116,39 +116,39 @@ A more detailed crackdown of the problems is shown in the table below.
       - 
     * - angles_in_triangle
       - 
-      - 
-      - 
-      - 
+      - This is part of a series of problems created to check the capabilites of the original AlphaGeometry engine when it came to angle chasing. It is supposed to check if it can find the third angle of a triangle given the other two, but the goal had to ask for a 90o angle because that could be stated as a perp statement, the software originally could not treat aconst or s_angle as full predicates.
+      - Yes
+      - Yes
     * - testing_aline0
-      - 
-      - 
-      - 
-      - 
+      - (Verification problem) Given points A, B, C, D, E, F, G, if H is built in a way that the angle between EF and GH is equal to the angle between AB and CD, than we have the equality of the angles between AB and CD and between EF and GH.
+      - This problem was created to check the definition on_aline0 we introduced was working properly.
+      - No
+      - Yes
     * - testing_iso_triangle_vertex_angle
       - 
-      - 
-      - 
-      - 
+      - This problem was created to check the definition iso_triangle_vertex_angle we introduced was working properly.
+      - No
+      - Yes
     * - angles_eq_triangle
-      - 
-      - 
-      - 
-      - 
+      - An internal angle of an equilateral triangle is 60o.
+      - This is part of a sequence of problems created to check the capabilities of the original AlphaGeometry engine when it came to angle chasing. The fact that it could solve this problem, for example, showed its ability to recognize (even indirectly) that the sum of the angles of a triangle was 180o and to actually use the system to find the numerical value of an angle it didn't know before. The question could not be posed on the original AlphaGeometry, though, as aconst did not have full capabilities as a predicate.
+      - No
+      - Yes
     * - angles_double_eq_triangle
       - 
-      - 
-      - 
-      - 
+      - This problem was meant to check if the algebra module could somehow sum the values of two adjacent angles even if it had to find their values by itself, knowing it could find each value due to the solution of the angles_eq_triangle problem. The question could not be posed to the original AlphaGeometry, as aconst did not have full capabilities as a predicate.
+      - No
+      - Yes
     * - suplementary_angles
-      - 
-      - 
-      - 
-      - 
+      - If an angle between two lines is 30o, the other angle between the same lines is 150o.
+      - This problem was meant to check in a very straightforward way if the algebra engine could find the value of the angle supplementary to a given one (it actually generated both angles in the symbols graph at instantiation). The question could not be posed to the original AlphaGeometry, as aconst did not have full capabilities as a predicate.
+      - No
+      - Yes
     * - square_side
       - 
+      - This is part of a series of problems trying to investigate the capacity of the engine to develop an extended reasoning made of small steps, namely to prove that the first and last sides provided in a construction of a polygon are congruent. The solution for a square is too simple to need a complex line of reasoning.
       - 
-      - 
-      - 
+      - Yes
     * - square_angle
       - 
       - 
@@ -206,19 +206,19 @@ A more detailed crackdown of the problems is shown in the table below.
       - 
     * - ar_example_paper_angle_chasing
       - 
+      - This problem was given in the original AlphaGeometry paper in Extended Data Table 2 as an example of the functioning of angle chasing as done by AR. The actual proof provided by DDAR diverged a little from the one presented in the paper, but it could still solve the problem.
       - 
-      - 
-      - 
+      - Yes
     * - ar_example_paper_distance_chasing
       - 
-      - 
-      - 
-      - 
+      - This problem was given in the original AlphaGeometry paper in Extended Data Table 2 as an example of the functioning of distance chasing as done by AR. When examining the code we found no evidence that the procedure described in the paper could be done, and running the problem with DDAR revealed the engine could not actually solve the problem given.
+      - No
+      - Yes
     * - ar_example_paper_ratio_chasing
       - 
+      - This problem was given in the original AlphaGeometry paper in Extended Data Table 2 as an example of the functioning of angle chasing as done by AR. The actual proof provided by DDAR does not look like the one presented in the paper, but it could still solve the problem.
       - 
-      - 
-      - 
+      - Yes
     * - test_get_two_intersections
       - Given a segment AB, if C and D are the two intersections of the circle of center A and radius AB and of the circle of center B and radius AB, AB is perpendicular to CD.
       - This problem was created to check the behavior of the builder when two points were prescribed with the same description (the two intersections of a pair of circles). It shows the choice of intersections will be made at random, but without points overlapping, and this procedure only checks the numerical structure, it doesn't matter if two points are symbolically the same.
