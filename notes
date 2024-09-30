@@ -4,4 +4,4 @@ PythagoreanTheorem
 PythagoreanPremises a b c => PythagoreanConclusions a b c
 
 geosolver --problem-name orthocenter --problems-file ./problems_datasets/examples.txt --agent human_agent --log-level 30
-geosolver --problem-name orthocenter_aux_bis --problems-file ./problems_datasets/examples.txt --log-level 30
+geosolver --problem-name orthocenter_aux --problems-file ./problems_datasets/examples.txt --log-level 30
