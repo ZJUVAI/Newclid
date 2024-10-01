@@ -151,39 +151,39 @@ A more detailed crackdown of the problems is shown in the table below.
       - Yes
     * - square_angle
       - 
+      - This is part of a series of problems trying to investigate the capacity of the engine to develop an extended reasoning made of small steps, namely to prove that the first and last angles provided in a construction of a polygon are congruent. The solution for a square is too simple to need a complex line of reasoning.
       - 
-      - 
-      - 
+      - Yes
     * - regular_pentagon_side
       - 
+      - This is part of a series of problems trying to investigate the capacity of the engine to develop an extended reasoning made of small steps, namely to prove that the first and last sides provided in a construction of a polygon are congruent. The solution for a pentagon can be done, but it starts to take a long time. Also, following the proof pictures throughout the reasoning one can see that information is actually being gathered from the starting angle ABC and moves towards the last one EAB.
       - 
-      - 
-      - 
+      - Yes
     * - regular_pentagon_angle
       - 
+      - This is part of a series of problems trying to investigate the capacity of the engine to develop an extended reasoning made of small steps, namely to prove that the first and last angles provided in a construction of a polygon are congruent. The solution for a pentagon can be done, but it takes very long. Also, following the proof pictures throughout the reasoning one can see that information is actually being gathered from the starting angle ABC and moves towards the last one EAB.
       - 
-      - 
-      - 
+      - Yes
     * - regular_hexagon_side
       - 
+      - This is part of a series of problems trying to investigate the capacity of the engine to develop an extended reasoning made of small steps, namely to prove that the first and last sides provided in a construction of a polygon are congruent. The original engine could not find all the equilateral triangles in an hexagon at first, and this problem showed the lack of knowledge of the engine when it came to circles, which led to the insertion of rule r49.
       - 
-      - 
-      - 
+      - Yes
     * - regular_hexagon_angle
       - 
-      - 
-      - 
-      - 
+      - This is part of a series of problems trying to investigate the capacity of the engine to develop an extended reasoning made of small steps, namely to prove that the first and last angle provided in a construction of a polygon are congruent. This problem was long enough to timeout the initial engine, although we could guide a solution with the human agent in less than 80 steps, proving the inefficiency of the breadth-first search algorithm. The time was made manageable with the introduction of the caching mechanism and our new engine can solve it automatically as well.
+      - No
+      - Yes
     * - regular_triangle_side
       - 
+      - This is part of a series of problems trying to investigate the capacity of the engine to develop an extended reasoning made of small steps, namely to prove that the first and last sides provided in a construction of a polygon are congruent. The case of the regular triangle is very easy for the engine, and was added for completion.
       - 
-      - 
-      - 
+      - Yes
     * - worlds_hardest_easy_geometry_problem1
       - 
       - 
       - 
-      - 
+      - No
     * - worlds_hardest_easy_geometry_problem1_with_construction
       - 
       - 
@@ -193,7 +193,7 @@ A more detailed crackdown of the problems is shown in the table below.
       - 
       - 
       - 
-      - 
+      - No
     * - geometric_ratios
       - 
       - 
@@ -268,7 +268,7 @@ A more detailed crackdown of the problems is shown in the table below.
       - 
       - 
       - 
-      - 
+      - No
     * - checking_rconst2
       - 
       - 
@@ -276,54 +276,54 @@ A more detailed crackdown of the problems is shown in the table below.
       - 
     * - menelaus_test
       - 
-      - 
-      - 
-      - 
+      - This problem was created to check the functioning of an external module that could apply Menelaus' Theorem. It was meant to check if it could solve the equation for the third ratio, given the other two, under Menelaus's conditions. The module was discontinued and the problem can no longer be solved.
+      - No
+      - No
     * - menelaus_frac1_test
       - 
-      - 
-      - 
-      - 
+      - This problem was created to check the functioning of an external module that could apply Menelaus' Theorem. It was meant to check if it could get the eqratio claim from Menelaus's conditions being met with one of the ratios in the equation being equal to one. The module was discontinued and the problem can no longer be solved.
+      - No
+      - No
     * - menelaus_crossed_cong_test
       - 
-      - 
-      - 
-      - 
+      - This problem was created to check the functioning of an external module that could apply Menelaus' Theorem. It was meant to check if it could get the eqratio claim from Menelaus's conditions being met with two segments involved in different ratios of the equation being congruent. The module was discontinued and the problem can no longer be solved.
+      - No
+      - No
     * - frac1_cong
       - 
+      - This very straightforward problem was made to test the capacity of the AR module to get the congruence statement between segments forming a ratio of one. It proved successful.
       - 
-      - 
-      - 
+      - Yes
     * - eqratio_lconst_check
       - 
-      - 
-      - 
-      - 
+      - This is part of a series of problems created at the implementation of the lconst predicate, to check if it was sufficiently well-connected to the AR module to get basic results. Here, that given an eqratio equation with three of the segments having prescribed lengths, that it could get the length of the fourth segment.
+      - No
+      - Yes
     * - cong_lconst_check
       - 
-      - 
-      - 
-      - 
+      - This is part of a series of problems created at the implementation of the lconst predicate, to check if it was sufficiently well-connected to the AR module to get basic results. Here, that given a prescribed length and a congruence statement, it could get the length of the congruent segment.
+      - No
+      - Yes
     * - lconst_cong_check
       - 
-      - 
-      - 
-      - 
+      - This is part of a series of problems created at the implementation of the lconst predicate, to check if it was sufficiently well-connected to the AR module to get basic results. Here, that given two segments with the same prescribed length, it could detect that they were congruent.
+      - No
+      - Yes
     * - lconst_eqratio_check
       - 
-      - 
-      - 
-      - 
+      - This is part of a series of problems created at the implementation of the lconst predicate, to check if it was sufficiently well-connected to the AR module to get basic results. Here, that given four segments with prescribed lengths in a way that forms an equality of ratios, the engine could detect the eqratio statement.
+      - No
+      - Yes
     * - rconst_lconst_check
       - 
-      - 
-      - 
-      - 
+      - This is part of a series of problems created at the implementation of the lconst predicate, to check if it was sufficiently well-connected to the AR module to get basic results. Here, that given a segment and the value of the ratio between it and a second segment, it could solve the equation for the length of the second segment.
+      - No
+      - Yes
     * - lconst_rconst_check
       - 
-      - 
-      - 
-      - 
+      - This is part of a series of problems created at the implementation of the lconst predicate, to check if it was sufficiently well-connected to the AR module to get basic results. Here, that given two segments with prescribed lengths, it could get the ratio between them.
+      - No
+      - Yes
     * - r50_vs_square_cyclic
       - 
       - 
@@ -346,14 +346,14 @@ A more detailed crackdown of the problems is shown in the table below.
       - 
     * - pyt_test_formula_to_perp
       - 
-      - 
-      - 
-      - 
+      - This problem was created to test the functioning of Pythagoras theorem at implementation. It checks that if Pythagoras's formula is satisfied for a triangle, then the triangle has a right angle (perp statement).
+      - No
+      - Yes
     * - pyt_test_perp_to_formula
       - 
-      - 
-      - 
-      - 
+      - This problem was created to test the functioning of Pythagoras theorem at implementation. It checks that if we have a right angle (perp statement), and two lengths of sides of a triangle, then we can find the length of the third side.
+      - No
+      - Yes
     * - two_goals_cong_aconst
       - 
       - 
