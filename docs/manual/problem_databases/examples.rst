@@ -66,14 +66,14 @@ A more detailed crackdown of the problems is shown in the table below.
       - Yes
     * - rule_r29_not_found_disguise
       - 
-      - 
-      - 
-      - 
+      - This was the first problem created to find single applications of rules. It tried to be something that would be solved by a single application of rule r29, but the original engine did not even use the rule, resorting to AR and implicit rules instead. This problem proved that trying to predict the engine's proofs was to be a very hard task, if possible at all. A second trial was made with rule_29_not_found_explicit below, using a notation closer to the one in the statement of r29 itself.
+      - Yes
+      - Yes
     * - rule_r29_not_found_explicit
       - 
-      - 
-      - 
-      - 
+      - This was a second trial to build a single application of rule r29. Differently from rule_29_not_found_disguise, this problem tries to replicate the setting and notation of the rule statement exactly, with two independent segments AB and CD and their midpoints only. The solution found by the original engine did use rule r29, but also other steps involving non-stated rules.
+      - Yes
+      - Yes
     * - find_r22
       - 
       - This problem was created to be a one-shot test for rule r22, in the sense that the solution should be a single application of the rule. When ran, it ended up revealing a hidden process: originally the definition of midpoint would not give a midp predicate, so the first step of the proof was actually re-deducing that M was the midpoint of AB.
@@ -81,14 +81,14 @@ A more detailed crackdown of the problems is shown in the table below.
       - Yes
     * - two_paths_problem_aux
       - 
+      - This problem and the one below were created as problems that could get their solution from two different reasoning paths, hoping this could be reflected in the version of the dependency graph we had running at the time. The auxiliary point when compared to two_paths_problem below reinforces the possibility of the problem having two possible solutions.
       - 
-      - 
-      - 
+      - Yes
     * - two_paths_problem
       - 
+      - This problem was created as a problem that could get their solution from two different reasoning paths, hoping this could be reflected in the version of the dependency graph we had running at the time.
       - 
-      - 
-      - 
+      - Yes
     * - b23_may_need_BUILT_IN_FNS
       - 
       - 
