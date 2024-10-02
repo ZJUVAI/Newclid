@@ -81,9 +81,9 @@ A more detailed crackdown of the problems is shown in the table below.
       - 
     * - find_r22
       - 
-      - 
-      - 
-      - 
+      - This problem was created to be a one-shot test for rule r22, in the sense that the solution should be a single application of the rule. When ran, it ended up revealing a hidden process: originally the definition of midpoint would not give a midp predicate, so the first step of the proof was actually re-deducing that M was the midpoint of AB.
+      - Yes
+      - Yes
     * - two_paths_problem_aux
       - 
       - 
