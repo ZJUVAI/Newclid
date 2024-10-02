@@ -64,11 +64,6 @@ A more detailed crackdown of the problems is shown in the table below.
       - A smaller version of the problem imo_2004_p1_generalized, for faster testing, that is not true for all choices of the free point O. It revealed that the building routine for problems will check the goal, erase the construction in case it is not met, and try new random attributions until finding a good one. This could result in an infinite loop, so we introduced a limit to the number of trials.
       - 
       - Yes
-    * - r29_only
-      - 
-      - 
-      - 
-      - 
     * - rule_r29_not_found_disguise
       - 
       - 
