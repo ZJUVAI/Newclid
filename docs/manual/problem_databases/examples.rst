@@ -81,7 +81,7 @@ A more detailed crackdown of the problems is shown in the table below.
       - Yes
     * - two_paths_problem_aux
       - 
-      - This problem and the one below were created as problems that could get their solution from two different reasoning paths, hoping this could be reflected in the version of the dependency graph we had running at the time. The auxiliary point when compared to two_paths_problem below reinforces the possibility of the problem having two possible solutions.
+      - This problem and the one below were created as problems that could get their solution from two different reasoning paths, hoping this could be reflected in the version of the dependency graph we had running at the time. The auxiliary point when compared to two_paths_problem below reinforces the possibility of the problem having two possible solutions. Indeed, the superfluous point changes the proof written.
       - 
       - Yes
     * - two_paths_problem
@@ -91,24 +91,24 @@ A more detailed crackdown of the problems is shown in the table below.
       - Yes
     * - b23_may_need_BUILT_IN_FNS
       - 
+      - The original engine had special matching functions for a subset of the rules, listed in a list called BUILT_In_FNS. We wanted to know if those functions were strictly necessary for the working of the engine, so we tried running problems with the access to that list enabled and disabled. This problem suggested that r10 needed the special function to be used.
       - 
-      - 
-      - 
+      - Yes
     * - ratio_chase_incorrect_on_step_one
       - 
+      - This problem was found trying to come up with the problem forcing_ratio below. The proof produced had a mistake, due to a wrongly defined function in the AR module. We later found out that this bug had been recognized as a bug in the public alphageometry repository on GitHub.
       - 
-      - 
-      - 
+      - Yes
     * - forcing_ratio
       - 
+      - This problem was created to check if the original rconst predicate was functional. Its only ocurrence was in the definition triangle12, it was unstable and it could not be used as a goal.
       - 
-      - 
-      - 
+      - Yes
     * - check_r00
       - 
+      - This problem was created as a initial step of a systematic attempt to check one-shot functioning of all the original 43 rules from alphageometry. Later, this would become the testing_minimal_rules.txt problem file. This problem specifically showed that the original engine defaulted to replacing r00 by intrinsic rules.
       - 
-      - 
-      - 
+      - Yes
     * - angles_in_triangle
       - 
       - This is part of a series of problems created to check the capabilites of the original AlphaGeometry engine when it came to angle chasing. It is supposed to check if it can find the third angle of a triangle given the other two, but the goal had to ask for a 90o angle because that could be stated as a perp statement, the software originally could not treat aconst or s_angle as full predicates.
@@ -176,29 +176,29 @@ A more detailed crackdown of the problems is shown in the table below.
       - Yes
     * - worlds_hardest_easy_geometry_problem1
       - 
-      - 
-      - 
+      - In checking the ability of the engine to perform angle chasing, we implemented the "world's hardest easy geometry problems", proposed by Keith Enevoldsen. The questions could not be posed to the original engine due to the malfunction of the aconst predicate, but even the new engine is incapable of solving the problems without auxiliary points.
+      - No
       - No
     * - worlds_hardest_easy_geometry_problem1_with_construction
       - 
-      - 
-      - 
-      - 
+      - In checking the ability of the engine to perform angle chasing, we implemented the "world's hardest easy geometry problems", proposed by Keith Enevoldsen. The questions could not be posed to the original engine due to the malfunction of the aconst predicate. The new engine can solve the first problem with an auxiliary point provided by a human.
+      - No
+      - Yes
     * - worlds_hardest_easy_geometry_problem2
       - 
-      - 
+      - In checking the ability of the engine to perform angle chasing, we implemented the "world's hardest easy geometry problems", proposed by Keith Enevoldsen. The questions could not be posed to the original engine due to the malfunction of the aconst predicate, but even the new engine is incapable of solving the problems without auxiliary points.
       - 
       - No
     * - geometric_ratios
       - 
+      - This problem was created to check the effectiveness of ratio chase with the recently fixed rconst predicate, when it should be obtained from purely geometric constructions (midpoint).
       - 
-      - 
-      - 
+      - Yes
     * - concatenating_ratios
       - 
+      - This problem was created to check the effecticeness of ratio chase with the recently fixed rconst predicate, with a statement that involves prescribing ratios with rconst itself.
       - 
-      - 
-      - 
+      - Yes
     * - ar_example_paper_angle_chasing
       - 
       - This problem was given in the original AlphaGeometry paper in Extended Data Table 2 as an example of the functioning of angle chasing as done by AR. The actual proof provided by DDAR diverged a little from the one presented in the paper, but it could still solve the problem.
@@ -221,34 +221,34 @@ A more detailed crackdown of the problems is shown in the table below.
       - Yes
     * - ar_two_triangles_angle_chasing
       - 
+      - This problem was created to check the effectiveness of angle chasing across two adjacent triangles, using arbitraty prescription of angles (s_angle). Compare to angles_double_eq_triangle for a more rigid version of the problem.
       - 
-      - 
-      - 
+      - Yes
     * - ar_three_triangles_angle_chasing
       - 
+      - This problem was created to check the effectiveness of angle chasing across three neighboring triangles, using arbitrary prescription of angles (s_angle).
       - 
-      - 
-      - 
+      - Yes
     * - cong2_problem
       - 
+      - This problem was created as an attempt to investigate the functioning of the then existing cong2 predicate, that seemed related to the functioning of the AR module.
       - 
-      - 
-      - 
+      - Yes
     * - point_on_circle_eqdistant_from_center
-      - 
-      - 
-      - 
-      - 
+      - Given a triangle ABC (three points), D a point added that is concyclic to ABC, and O the circumcenter of ABC, the distance from D to O is the same as the distance from A to O.
+      - This problem was created as a straightforward test for the need of r49. Namely it verified that the original engine could not prove that by adding a point to a circle, its distance to the center would be the same as the distance from any of the other points to the center.
+      - No
+      - Yes
     * - minimal_example_2l1c
       - 
+      - This problem was created to figure out, and get a picture, of what was constructed in the obscure definition 2l1c.
       - 
-      - 
-      - 
+      - Yes
     * - midpoint_splits_in_two
-      - 
-      - 
-      - 
-      - 
+      - If M is the midpoint of AB, it splits AB in a ratio of 1:2.
+      - This problem was created to check if the definition of midpoint was communicating with the AR module to get the fact that the midpoint splits the segment in half. The original engine could not get this fact (even after the fixing of rconst as a predicate), and it prompted the addition of rule r51.
+      - No
+      - Yes
     * - central_angle_vs_internal_angle
       - 
       - 
