@@ -582,6 +582,25 @@ nsquare x a b
 
 - **2l1c x y z i a b c o:**
 
+2l1c x y z i a b c o
+^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |2l1c|
+     - Given three points o, a, b, with b in the center through a of center o, and c a point not in the line ab, build i, the center of a circle tangent to the circle centered at o through a, to the line ac and to the line bc. It also builds the tangency points x to ac, y to bc and z to the circle of center o through a.
+     - :math:`\begin{cases}x, a, c\text{ collinear}\\y, b, c\text{ collinear}\\ i, o, z\text{ collinear}\\ oa=oz\\ ix=iy\\ iy=iz\\ ix\perp ac\\ iy\perp bc\end{cases}`  (coll x a c, coll y b c, coll i o z, cong o a o z, cong i y i z, perp i x a c, perp i y b c)
+     - Points
+
+.. |2l1c| image:: ../../_static/images/defs/2l1c.png
+    :width: 100%
+
 - **e5128 x y a b c d:**
 
 - **3peq x y z a b c:**
