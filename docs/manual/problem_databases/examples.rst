@@ -266,9 +266,9 @@ A more detailed crackdown of the problems is shown in the table below.
       - No
     * - checking_rconst2
       - 
-      - 
-      - 
-      - 
+      - This problem was created as a straightforward check for the working of the recently created definition rconst2.
+      - No
+      - Yes
     * - menelaus_test
       - 
       - This problem was created to check the functioning of an external module that could apply Menelaus' Theorem. It was meant to check if it could solve the equation for the third ratio, given the other two, under Menelaus's conditions. The module was discontinued and the problem can no longer be solved.
@@ -321,24 +321,24 @@ A more detailed crackdown of the problems is shown in the table below.
       - Yes
     * - r50_vs_square_cyclic
       - 
+      - Our first implementation of r50 overlooked the problem that if the opposite sides of a cyclic quadrilateral are parallel, their respective perpendicular bisectors overlap, so they can't be used to find the center of the circumcircle. We ruled the degenerate case out in the statement of r50, and created a series of problems to verify that we still could find the center of the circumcircle in the degenerate case through other rules. This problem checks that the engine knows that a square built through right angles is indeed a cyclic quadrilateral. It is a middle step towards r50_vs_square_center below.
       - 
-      - 
-      - 
+      - Yes
     * - r50_vs_square_center
       - 
+      - The second problem in the series checking if we can circumvent r50 in the degenerate case (see r50_vs_square_cyclic). It checks that the engine can recognize the center of a square built through right angles, checking a vertex of the initial segment used for the construction of the square.
       - 
-      - 
-      - 
+      - Yes
     * - r50_vs_square
       - 
-      - 
+      - The third problem in the series checking if we can circumvent r50 in the degenerate case (see r50_vs_square_cyclic). It checks that the engine can recognize the center of a square built through right angles, checking the last vertex built in the square.
       - 
       - 
     * - r50_vs_trapezoid
       - 
+      - The third problem in the series checking if we can circumvent r50 in the degenerate case (see r50_vs_square_cyclic). It checks that the engine can recognize the center of a generic cyclic trapezoid. The auxiliary point E is used to define the center O of the circle in a way that avoids giving extra information to the engine.
       - 
-      - 
-      - 
+      - Yes
     * - pyt_test_formula_to_perp
       - 
       - This problem was created to test the functioning of Pythagoras theorem at implementation. It checks that if Pythagoras's formula is satisfied for a triangle, then the triangle has a right angle (perp statement).
@@ -351,14 +351,14 @@ A more detailed crackdown of the problems is shown in the table below.
       - Yes
     * - two_goals_cong_aconst
       - 
+      - This problem was created to check the new functionality we implemented to have multiple goals for a single problem.
       - 
-      - 
-      - 
+      - Yes
     * - two_goals_perp_cong
       - 
+      - This problem was created to check the new functionality we implemented to have multiple goals for a single problem.
       - 
-      - 
-      - 
+      - Yes
     * - checking_ordering_r27_oac_obd
       - 
       - 
@@ -386,14 +386,14 @@ A more detailed crackdown of the problems is shown in the table below.
       - 
     * - translated_obm_phase1_2016_p10
       - 
-      - 
-      - 
-      - 
+      - This is a complete olympiad problem that could not be stated in the original AlphaGeometry. It served as a full test that the new predicates did communicate well with the overall engine, and new problems could be solved.
+      - No
+      - Yes
     * - translated_inmo_1995_p1
       - 
-      - 
-      - 
-      - 
+      - This is a complete olympiad problem that could not be stated in the original AlphaGeometry, and one that uses the fact that multiple goals are now a possibility. Still, even though the problem can be stated, it could not be solved by the new engine, at least not without the prescription of additional points.
+      - No
+      - No
     * - doesntbuild_imo_2020_sl_g7
       - 
       - 
@@ -401,9 +401,9 @@ A more detailed crackdown of the problems is shown in the table below.
       - 
     * - acompute_test
       - 
-      - 
-      - 
-      - 
+      - This problem was created to test the recently implemented acompute predicate, that not only proves that the angle asked has a given value, but also finds the value of said angle, if available in the proof state, first.
+      - No
+      - Yes
     * - translated_imo_2009_sl_g3_excenters
       - 
       - 
@@ -411,14 +411,14 @@ A more detailed crackdown of the problems is shown in the table below.
       - 
     * - tangents_to_circle
       - 
+      - This problem was created to check if the engine could detect the simple fact that the two segments from the two tangents from an external point to the tangency points on a circle are congruent. This time, the fact could be proved without any problem.
       - 
-      - 
-      - 
+      - Yes
     * - ninepoints
       - 
+      - This problem was part of the general investigations of the capabilities of the engine to deal with triangles, and showed it can prove the concyclicity of the midpoints of the sides of a triangle and its heights.
       - 
-      - 
-      - 
+      - Yes
     * - finding_mutual_circles
       - 
       - 
