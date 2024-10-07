@@ -186,14 +186,6 @@ imo_2009_p2_angle_chase_verification
 m l k = triangle m l k; w = circle w m l k; q = on_tline q m w m; p = mirror p q m; b = mirror b p k; c = mirror c q l; a = on_line a b q, on_line a c p; o = circle o a b c; d = eqdistance d l m k, eqdistance d m l k ? eqangle l d c o q b b o
 translated_imo_2019_p2_with_extra_points_paper
 a b c = triangle; a1 = on_line b c; b1 = on_line a c; p = on_line a a1; q = on_line b b1, on_pline p a b; p1 = on_line p b1, eqangle3 p c a b c; q1 = on_line q a1, eqangle3 c q b c a; o = circle o a b c; a2 = on_circle a2 o a, on_line a2 a a1; b2 = on_circle b2 o b, on_line b2 b b1 ? cyclic p q p1 q1
-translated_imo_2018_p1
-a b c = triangle a b c; o = circle o a b c; d = on_line d a b; e = on_line e a c, on_circle e a d; f = on_bline f b d, on_circle f o a; g = on_bline g e c, on_circle g o a ? para d e f g
-translated_imo_2012_p5
-c a b = r_triangle c a b; d = foot d c a b; x = on_line x c d; k = on_line k a x, on_circle k b c; l = on_line l b x, on_circle l a c; m = on_line m a l, on_line m b k ? cong m k m l
-translated_imo_2004_p1
-a b c = triangle a b c; o = midpoint o b c; m = on_circle m o b, on_line m a b; n = on_circle n o b, on_line n a c; r = angle_bisector r b a c, angle_bisector r m o n; o1 = circle o1 b m r; o2 = circle o2 c n r; p = on_circle p o1 r, on_circle p o2 r ? coll p b c
-translated_usamo_1988_p4
-a b c = triangle; i = incenter i a b c; a1 = circle a1 i b c; b1 = circle b1 i c a; c1 = circle c1 i a b; o = circle o a b c ? circle o a1 b1 c1
 euler_simplified
 a b c = triangle a b c; h = orthocenter a b c; g1 g2 g3 g = centroid g1 g2 g3 g a b c; o = circle a b c ? coll h g o
 testing_problem
