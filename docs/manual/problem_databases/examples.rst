@@ -431,22 +431,22 @@ A more detailed crackdown of the problems is shown in the table below.
       - 
     * - miquel_theorem
       - 
-      - This is part of a series of problems created to examine the capability of the engine to apply Miquel's theorem, which was part of the study of problem 6 from 2011. This specific problem asks if the engine knows the theorem in it most basic form: that the three circles through points on the sides of the triangles and the corresponding vertices intersect at a single point. The engine could apply all variations of Miquel's theorem we tried.
+      - This is part of a series of problems created to examine the capability of the engine to apply Miquel's theorem, which was part of the study of IMO problem 6 from 2011. This specific problem asks if the engine knows the theorem in it most basic form: that the three circles through points on the sides of the triangles and the corresponding vertices intersect at a single point. The engine could apply all variations of Miquel's theorem we tried.
       - 
       - Yes
     * - miquel_theorem_angles
       - 
-      - This is part of a series of problems created to examine the capability of the engine to apply Miquel's theorem, which was part of the study of problem 6 from 2011. This specific problem asks if the engine can use the angle property of the theorem. The engine could apply all variations of Miquel's theorem we tried.
+      - This is part of a series of problems created to examine the capability of the engine to apply Miquel's theorem, which was part of the study of IMO problem 6 from 2011. This specific problem asks if the engine can use the angle property of the theorem. The engine could apply all variations of Miquel's theorem we tried.
       - 
       - Yes
     * - miquel_quadrangle_theorem1
       - 
-      - This is part of a series of problems created to examine the capability of the engine to apply Miquel's theorem, which was part of the study of problem 6 from 2011. This specific problem checks a first part of the multiple circles intersecting in the version of the theorem for quadrangles, see miquel_quadrangle_theorem2 below for the second part of the same theorem. The engine could apply all variations of Miquel's theorem we tried.
+      - This is part of a series of problems created to examine the capability of the engine to apply Miquel's theorem, which was part of the study of IMO problem 6 from 2011. This specific problem checks a first part of the multiple circles intersecting in the version of the theorem for quadrangles, see miquel_quadrangle_theorem2 below for the second part of the same theorem. The engine could apply all variations of Miquel's theorem we tried.
       - 
       - Yes
     * - miquel_quadrangle_theorem2
       - 
-      - This is part of a series of problems created to examine the capability of the engine to apply Miquel's theorem, which was part of the study of problem 6 from 2011. This specific problem checks a first part of the multiple circles intersecting in the version of the theorem for quadrangles, see miquel_quadrangle_theorem1 above for the second part of the same theorem. The engine could apply all variations of Miquel's theorem we tried.
+      - This is part of a series of problems created to examine the capability of the engine to apply Miquel's theorem, which was part of the study of IMO problem 6 from 2011. This specific problem checks a first part of the multiple circles intersecting in the version of the theorem for quadrangles, see miquel_quadrangle_theorem1 above for the second part of the same theorem. The engine could apply all variations of Miquel's theorem we tried.
       - 
       - Yes
     * - two_perps_at_point_are_collinear
@@ -456,32 +456,32 @@ A more detailed crackdown of the problems is shown in the table below.
       - Yes
     * - miquel_theorem_circumcenter_implies_line
       - 
-      - This is part of a series of problems created to examine the capability of the engine to apply Miquel's theorem, which was part of the study of problem 6 from 2011. This specific problem checks that the engine can show that if the intersection of the circles lies on the circumcenter of the triangle, the points on the sides of the triangle are collinear. See miquel_theorem_line_implies_circumcenter below for the other direction of this theorem. The engine could apply all variations of Miquel's theorem we tried.
+      - This is part of a series of problems created to examine the capability of the engine to apply Miquel's theorem, which was part of the study of IMO problem 6 from 2011. This specific problem checks that the engine can show that if the intersection of the circles lies on the circumcenter of the triangle, the points on the sides of the triangle are collinear. See miquel_theorem_line_implies_circumcenter below for the other direction of this theorem. The engine could apply all variations of Miquel's theorem we tried.
       - 
       - Yes
     * - miquel_theorem_line_implies_circumcenter
       - 
-      - This is part of a series of problems created to examine the capability of the engine to apply Miquel's theorem, which was part of the study of problem 6 from 2011. This specific problem checks that the engine can show that if the points on the sides of the triangle are collinear, Miquel's point lies on the circumcenter of the triangle. See miquel_theorem_circumcenter_implies_line above for the other direction of this theorem. The engine could apply all variations of Miquel's theorem we tried.
+      - This is part of a series of problems created to examine the capability of the engine to apply Miquel's theorem, which was part of the study of IMO problem 6 from 2011. This specific problem checks that the engine can show that if the points on the sides of the triangle are collinear, Miquel's point lies on the circumcenter of the triangle. See miquel_theorem_circumcenter_implies_line above for the other direction of this theorem. The engine could apply all variations of Miquel's theorem we tried.
       - 
       - Yes
     * - pre_reflection_of_points_is_on_circumcenter_of_mirrors
       - 
+      - This problem was part of the study of IMO problem 6 from 2011. In it, we were investigating the possibility of reversing the construction of the problem, that is, start from the points that could be involved in Miquel's theorem on a line, and from the reflected triangle, and try to recover the initial triangle and Miquel's instersection point on the circumcenter of the recovered triangle. This specific result was available for the engine, but this path of investigation did not bring any fruits to the larger search for a solution of the problem.
       - 
-      - 
-      - 
+      - Yes
     * - centers_of_miquels_circles_are_concyclic
       - 
-      - This is part of a series of problems created to examine the capability of the engine to apply Miquel's theorem, which was part of the study of problem 6 from 2011. This specific problem checks the less intuitive fact that the centers of Miquel's circles, the circumcenter of the triangle and Miquel's point, when it lies on the circumcircle (see miquel_theorem_line_implies_circumcenter above) are concyclic. The engine could apply all variations of Miquel's theorem we tried.
+      - This is part of a series of problems created to examine the capability of the engine to apply Miquel's theorem, which was part of the study of IMO problem 6 from 2011. This specific problem checks the less intuitive fact that the centers of Miquel's circles, the circumcenter of the triangle and Miquel's point, when it lies on the circumcircle (see miquel_theorem_line_implies_circumcenter above) are concyclic. The engine could apply all variations of Miquel's theorem we tried.
       - 
       - Yes
     * - imo_2009_p2_angle_chase_verification
       - 
+      - This problem was created specifically to verify the validity of step 15 of the proof of P2 in the 2009 IMO problem provided in the supplementary material of the original AlphaGometry paper. The step depends on the choice of point D by the engine, but the fact that the building of the problem checks the goal guarantees that the proper choice will be made.
       - 
-      - 
-      - 
+      - Yes
     * - translated_imo_2019_p2_with_extra_points_paper
       - 
-      - This problem was created specifically to verify the validity of step 15 of the proof of P2 in the 2009 IMO problem provided in the supplementary material of the original AlphaGometry paper. The step depends on the choice of point D by the engine, but the fact that the building of the problem checks the goal guarantees that the proper choice will be made.
+      - This is a translation of problem 2 of the 2019 IMO paper with the extra points suggested by a human as described in the original AlphaGeometry paper in the Extended Data Figure 4.
       - 
       - Yes
     * - euler_simplified
