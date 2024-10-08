@@ -251,18 +251,18 @@ A more detailed crackdown of the problems is shown in the table below.
       - Yes
     * - central_angle_vs_internal_angle
       - 
+      - This example is the first of a series of three examples designed to check if the engine could operate with some basic theorems involving angles on a circle. This specific problem checked if it could prove that, if both determine the same arc, the central angle is twice the angle with vertex lying on the circle. The theorem is also true in the reverse direction, investigated below at double_angle_implies_central_angle and at double_angle_implies_central_angle_2.
       - 
-      - 
-      - 
+      - Yes
     * - double_angle_implies_central_angle
       - 
-      - 
-      - 
-      - 
+      - This example is the second of a series of three examples designed to check if the engine could operate with some basic theorems involving angles on a circle. This specific problem checked if it could prove that, if two angles have the same vertex and one doubles the other one, they are the central and internal angle of a circle. Here, one corner of the angles and the vertex of the smaller angle are in the same circle, and the question is if the second corner of the arc will also be in the circle (compare to double_angle_implies_central_angle_2 below). The theorem is also true in the reverse direction, investigated above at central_angle_vs_internal_angle.
+      - No
+      - No
     * - double_angle_implies_central_angle_2
       - 
-      - 
-      - 
+      - This example is the third of a series of three examples designed to check if the engine could operate with some basic theorems involving angles on a circle. This specific problem checked if it could prove that, if two angles have the same vertex and one doubles the other one, they are the central and internal angle of a circle. Here, the points on the arc are established in a circle and the question is if the vertex of the smaller angle is in the same circle (compare to double_angle_implies_central_angle above). The theorem is also true in the reverse direction, investigated above at central_angle_vs_internal_angle.
+      - No
       - No
     * - checking_rconst2
       - 
@@ -406,9 +406,9 @@ A more detailed crackdown of the problems is shown in the table below.
       - Yes
     * - translated_imo_2009_sl_g3_excenters
       - 
-      - 
-      - 
-      - 
+      - This was an attempt to find auxiliary points to problem G3 of the IMO 2009 shortlist. The attempt did not prove fruitful.
+      - No
+      - No
     * - tangents_to_circle
       - 
       - This problem was created to check if the engine could detect the simple fact that the two segments from the two tangents from an external point to the tangency points on a circle are congruent. This time, the fact could be proved without any problem.
@@ -421,14 +421,14 @@ A more detailed crackdown of the problems is shown in the table below.
       - Yes
     * - finding_mutual_circles
       - 
+      - This problem was created to check if the engine could understand that building the circumcenter of a triangle and then creating points on the circle centered at the circumcenter with the circumradius would add point to the circumcircle of the triangle still. It used rule r49 to be able to tie both circles up.
       - 
-      - 
-      - 
+      - Yes
     * - finding_center_giving_cyclic
       - 
-      - 
-      - 
-      - 
+      - This problem was meant to check if the engine could understand that the intersection of the perpendicular bisectors of two chords on a circle is the center of the circle. The failure of the original engine in doing that prompted the addition of rule r51.
+      - No
+      - Yes
     * - miquel_theorem
       - 
       - This is part of a series of problems created to examine the capability of the engine to apply Miquel's theorem, which was part of the study of IMO problem 6 from 2011. This specific problem asks if the engine knows the theorem in it most basic form: that the three circles through points on the sides of the triangles and the corresponding vertices intersect at a single point. The engine could apply all variations of Miquel's theorem we tried.
