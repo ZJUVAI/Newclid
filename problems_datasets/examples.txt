@@ -95,7 +95,7 @@ a b = segment a b; m = midpoint m a b ? rconst a m a b 1/2
 central_angle_vs_internal_angle
 a o = segment a o; b = eqdistance b o a o; c = eqdistance c o a o; x = angle_bisector x a o b ? eqangle o a o x c a c b
 double_angle_implies_central_angle
-a o x = triangle a o x; c = eqdistance c o o a; b = angle_mirror b a o x, on_aline0 b a o o x a c c ? cong o b o a
+a o x = triangle a o x; c = eqdistance c o o a; y = angle_mirror y a o x; b = on_aline b c a a o y, on_line b o y ? cong o b o a
 double_angle_implies_central_angle_2
 a o = segment a o; b = eqdistance b o o a; x = angle_bisector x a o b; c = eqangle3 c a b o a x ? cong o c o a
 checking_rconst2
