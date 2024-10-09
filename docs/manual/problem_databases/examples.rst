@@ -333,7 +333,7 @@ A more detailed crackdown of the problems is shown in the table below.
       - 
       - The third problem in the series checking if we can circumvent r50 in the degenerate case (see r50_vs_square_cyclic). It checks that the engine can recognize the center of a square built through right angles, checking the last vertex built in the square.
       - 
-      - 
+      - Yes
     * - r50_vs_trapezoid
       - 
       - The third problem in the series checking if we can circumvent r50 in the degenerate case (see r50_vs_square_cyclic). It checks that the engine can recognize the center of a generic cyclic trapezoid. The auxiliary point E is used to define the center O of the circle in a way that avoids giving extra information to the engine.
