@@ -361,29 +361,29 @@ A more detailed crackdown of the problems is shown in the table below.
       - Yes
     * - checking_ordering_r27_oac_obd
       - 
+      - This problem is part of a series created to examine the functioning of the original sameside predicate through rule r27 (before the consolidation of the sameside and nsameside predicates). Here, the points are created in a way that O-A-C are alligned in that order, just as as O-B-D are aligned on that order (in a different line). The construction interfered with the proof, making it longer than a single application of rule r27.
       - 
-      - 
-      - 
+      - Yes
     * - checking_ordering_r27_aoc_bod
       - 
+      - This problem is part of a series created to examine the functioning of the original sameside predicate through rule r27 (before the consolidation of the sameside and nsameside predicates). Here, the points are created in a way that A-O-C are alligned in that order, just as as B-O-D are aligned on that order (in a different line). The construction interfered with the proof, making it longer than a single application of rule r27.
       - 
-      - 
-      - 
+      - Yes
     * - checking_ordering_r27_aoc_bod_eqratio
       - 
+      - This problem is part of a series created to examine the functioning of the original sameside predicate through rule r27 (before the consolidation of the sameside and nsameside predicates). Here, the points are created in a way that A-O-C are alligned in that order, just as as B-O-D are aligned on that order (in a different line). In this proof, we also check the behavior of the eqratio3 predicate, which assumes the same configurations as rule r27.
       - 
-      - 
-      - 
+      - Yes
     * - checking_ordering_r27_aoc_bod_sameside
       - 
-      - 
-      - 
-      - 
+      - This problem is part of a series created to examine the functioning of the original sameside predicate through rule r27 (before the consolidation of the sameside and nsameside predicates). Here, the points are created in a way that A-O-C are alligned in that order, just as as B-O-D are aligned on that order (in a different line). In this proof, we finally check the behavior of the sameside predicate directly, in a situation where B1-O-D is true but A-O-C is not (we have O-A-C), so we correctly have an unsolved problem.
+      - No
+      - No
     * - checking_ordering_r27_aoc_dob_sameside
       - 
+      - This problem is part of a series created to examine the functioning of the original sameside predicate through rule r27 (before the consolidation of the sameside and nsameside predicates). Here, the points are created in a way that A-O-C are alligned in that order, just as as B-O-D are aligned on that order (in a different line). In this proof, we finally check the behavior of the sameside predicate directly, in a situation where B1-O-D and A1-O-C are satisfied.
       - 
-      - 
-      - 
+      - Yes
     * - translated_obm_phase1_2016_p10
       - 
       - This is a complete olympiad problem that could not be stated in the original AlphaGeometry. It served as a full test that the new predicates did communicate well with the overall engine, and new problems could be solved.
