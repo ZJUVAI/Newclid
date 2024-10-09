@@ -394,11 +394,6 @@ A more detailed crackdown of the problems is shown in the table below.
       - This is a complete olympiad problem that could not be stated in the original AlphaGeometry, and one that uses the fact that multiple goals are now a possibility. Still, even though the problem can be stated, it could not be solved by the new engine, at least not without the prescription of additional points.
       - No
       - No
-    * - doesntbuild_imo_2020_sl_g7
-      - 
-      - 
-      - 
-      - 
     * - acompute_test
       - 
       - This problem was created to test the recently implemented acompute predicate, that not only proves that the angle asked has a given value, but also finds the value of said angle, if available in the proof state, first.
