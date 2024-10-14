@@ -536,25 +536,178 @@ nsquare x a b
 
 - **on_aline x a b c d e:**
 
-- **on_bline x a b:**
+on_bline x a b
+^^^^^^^^^^^^^^
 
-- **on_circle x o a:** From two distinct points o, a, builds x a point on the circle of center o through a. Adds the congruence statement saying ox=oa. Construction returns a circle, so can be subjected to intersections. Equivalent to eqdistance x a a o (see eqdistance above).
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
 
-- **on_line x a b:** From tow distinct point a, b, builds x another point on the line ab. Adds the collinearity statement saying a, b, c are on the same line. Construction returns a line, so can be subject to intersections.
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |on_bline|
+     - Given two distinct points a, b, builds x a point on the perpendicular bisector of the segment ab.
+     - :math:`\begin{cases}xa=xb\\ \widehat{xab}= \widehat{abx}\end{cases}`  (cong x a x b, eqangle a x a b b a b x)
+     - Line
 
-- **on_pline x a b c:** From three non-colinear points a, b, c, with b different from c, builds x on the line parallel to bc through a. Adds the parallel statement saying xa is parallel to bc. Construction returns a line, so can be subjected to intersections. (Compare to the simpler on_pline0 below).
+.. |on_bline| image:: ../../_static/images/defs/on_bline.png
+    :width: 100%
 
-- **on_tline x a b c:** From three points a, b, c, with b different from c, builds x on the line through a perpendicular to bc. Adds the perpendicularity statement saying xa is perpendicular to bc. Construction returns a line, so can be subjected to intersections.
+on_circle x o a
+^^^^^^^^^^^^^^^
 
-- **orthocenter x a b c:** From three non-collinear points a, b, and c, builds x the orthocenter of the triangle abc. Adds the three perpendicularity statement corresponding to the fact that x is in the intersection of the heights of the triangle, that is, that ax is perpendicular to bc, that bx is perpendicular to ac and that cx is perpendicular to ab.
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
 
-- **parallelogram a b c x:** From three non-collinear points a, b, and c, builds x such that abcx is a parallelogram. Adds the parallel statements that ab//cx and ax//bc, as well as the congruence statements ab=cx and ax=bc.
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |on_circle|
+     - From two distinct points o, a, builds x a point on the circle of center o through a. Equivalent to eqdistance x a a o (see :ref:`eqdistance x a b c` above).
+     - :math:`\begin{cases}ox=oa\end{cases}`  (cong o x o a)
+     - Circle
 
-- **pentagon a b c d e:** From nothing, creates five points a, b, c, d, e. The coordinates are a random conformal deformation (isometry combined with scaling) of a random inscribed convex pentagon.
+.. |on_circle| image:: ../../_static/images/defs/on_circle.png
+    :width: 100%
+
+on_line x a b
+^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |on_line|
+     - From two distinct point a, b, builds x another point on the line ab.
+     - :math:`\begin{cases}x, a, b\text{ collinear}\end{cases}`  (coll x a b)
+     - Line
+
+.. |on_line| image:: ../../_static/images/defs/on_line.png
+    :width: 100%
+
+on_pline x a b c
+^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |on_pline|
+     - From three non-colinear points a, b, c, with b different from c, builds x on the line parallel to bc through a. (Compare to the simpler :ref:`on_pline0 x a b c` below).
+     - :math:`\begin{cases}xa\parallel bc\end{cases}`  (para x a b c)
+     - Line
+
+.. |on_pline| image:: ../../_static/images/defs/on_pline.png
+    :width: 100%
+
+on_tline x a b c
+^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |on_tline|
+     - From three points a, b, c, with b different from c, builds x on the line through a perpendicular to bc.
+     - :math:`\begin{cases}xa\perp bc\end{cases}`  (perp x a b c)
+     - Line
+
+.. |on_tline| image:: ../../_static/images/defs/on_tline.png
+    :width: 100%
+
+orthocenter x a b c
+^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |orthocenter|
+     - From three non-collinear points a, b, and c, builds x the orthocenter of the triangle abc.
+     - :math:`\begin{cases}xa\perp bc\\ xb\perp ac\\ xb\perp ab\end{cases}`  (perp x a b c, perp x b c a; perp x c a b)
+     - Point
+
+.. |orthocenter| image:: ../../_static/images/defs/orthocenter.png
+    :width: 100%
+
+parallelogram a b c x
+^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |parallelogram|
+     - From three non-collinear points a, b, and c, builds x such that abcx is a parallelogram.
+     - :math:`\begin{cases}ab\parallel cx\\ ax\parallel bc\\ ab=cx\\ ax=bc\end{cases}`  (para a b c x, para a x b c; cong a b c x, cong a x b c)
+     - Point
+
+.. |parallelogram| image:: ../../_static/images/defs/parallelogram.png
+    :width: 100%
+
+pentagon a b c d e
+^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |pentagon|
+     - From nothing, creates five points a, b, c, d, e. The coordinates are a random conformal deformation (isometry combined with scaling) of a random inscribed convex pentagon.
+     - No statement added
+     - Points
+
+.. |pentagon| image:: ../../_static/images/defs/pentagon.png
+    :width: 100%
 
 - **psquare x a b:**
 
-- **quadrangle a b c d:** From nothing, creates four points, a, b, c, d which are vertices of a random convex quadrilateral.
+quadrangle a b c d
+^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |quadrangle|
+     - From nothing, creates four points, a, b, c, d which are vertices of a random convex quadrilateral.
+     - No statement added
+     - Points
+
+.. |quadrangle| image:: ../../_static/images/defs/quadrangle.png
+    :width: 100%
 
 - **r_trapezoid a b c d:**
 
@@ -562,25 +715,125 @@ nsquare x a b
 
 - **rectangle a b c d:**
 
-- **reflect x a b c:** From three non-collinear points a, b, c, in particular with b different from c, builds x the reflection of a by the line bc. Adds the congruence statements for the reflection saying ab=xb and ac=xc, as well as the perpendiculatity statement saying ax is perpendicular to bc.
+reflect x a b c
+^^^^^^^^^^^^^^^
 
-- **risos a b c:** From nothing, builds a, b, c such that the triangle abc is an isosceles right triangle with a right angle at a. Adds the congruence statement ab=ac, the perpendicular statement saying ab is perpendicular ac, and also the statement refering to the congruence of the base angles, that is, that angle abc is congruent to angle bca.
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
 
-- **segment a b:** From nothing, adds two points a, b, with random coordinates.
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |reflect|
+     - From three non-collinear points a, b, c, in particular with b different from c, builds x the reflection of a by the line bc.
+     - :math:`\begin{cases}ab=bx\\ ac=cx\\ bc\perp ax\end{cases}`  (cong b a b x, cong c a c x; perp b c a x)
+     - Point
 
-- **shift x b c d:** From three points b, c, d, with b different from d (presents the building of two points with the same coordinates), build x, the translation of b by the vector from d to c. Adds the (natural) congruence statement bx=cd and the (less natural) condition for the parallelogram xc=bd.
+.. |reflect| image:: ../../_static/images/defs/reflect.png
+    :width: 100%
+
+risos a b c
+^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |risos|
+     - From nothing, builds a, b, c such that the triangle abc is an isosceles right triangle with a right angle at a.
+     - :math:`\begin{cases}ab\perp ac\\ ab=ac\\ \widehat{abc}=\widehat{bca}\end{cases}`  (perp a b a c, cong a b a c; eqangle b a b c c b c a)
+     - Points
+
+.. |risos| image:: ../../_static/images/defs/risos.png
+    :width: 100%
+
+segment a b
+^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |segment|
+     - From nothing, adds two points a, b, with random coordinates.
+     - No statement added
+     - Points
+
+.. |segment| image:: ../../_static/images/defs/segment.png
+    :width: 100%
+
+shift x b c d
+^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |shift|
+     - From three points b, c, d, with b different from d (prevents the building of two points with the same coordinates), build x, the translation of b by the vector from d to c.
+     - :math:`\begin{cases}bx=cd\\ cx=bd\end{cases}`  (cong x b c d, cong x c b d)
+     - Point
+
+.. |shift| image:: ../../_static/images/defs/shift.png
+    :width: 100%
 
 - **square a b x y:**
 
 - **isquare a b c d:**
 
-- **trapezoid a b c d:** From nothing, creates four vertices of a trapezoid abcd, with ab parallel to cd. Adds the parallel statement saying ab=cd.
+trapezoid a b c d
+^^^^^^^^^^^^^^^^^
 
-- **triangle a b c:** From nothing, creates three points a, b, and c, with random coordinates.
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |trapezoid|
+     - From nothing, creates four vertices of a trapezoid abcd, with ab parallel to cd.
+     - :math:`\begin{cases}ab\parallel cd\end{cases}`  (para a b c d)
+     - Points
+
+.. |trapezoid| image:: ../../_static/images/defs/trapezoid.png
+    :width: 100%
+
+triangle a b c
+^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |triangle|
+     - From nothing, creates three points a, b, and c, with random coordinates.
+     - No statement added
+     - Points
+
+.. |triangle| image:: ../../_static/images/defs/triangle.png
+    :width: 100%
 
 - **triangle12 a b c:**
-
-- **2l1c x y z i a b c o:**
 
 2l1c x y z i a b c o
 ^^^^^^^^^^^^^^^^^^^^
@@ -607,7 +860,24 @@ nsquare x a b
 
 - **trisect x y a b c:**
 
-- **trisegment x y a b:** Given two different points a, b, builds x, y the two points trisecting the segment ab. Adds the collinearity statements saying x is in the segment ab, and the one saying y is in the segment ab, as well as the two congruent statements associated to the trisection: ax=xy and xy=yb.
+trisegment x y a b
+^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |trisegment|
+     - Given two different points a, b, builds x, y the two points trisecting the segment ab.
+     - :math:`\begin{cases}x, a, b\text{ collinear}\\y, a, b\text{ collinear}\\ ax=xy\\ xy=yb\end{cases}`  (coll x a b, coll y a b, cong x a x y, cong y x y b)
+     - Points
+
+.. |trisegment| image:: ../../_static/images/defs/trisegment.png
+    :width: 100%
 
 - **on_dia x a b:** Given two different points a, b, builds x a point such that the triangle axb is a right triangle with a right angle at x. Adds the perpendicularity statement saying ax is perpendicular to bx. Construction returns a circle, so it can be subjected to intersections.
 
@@ -677,7 +947,21 @@ on_circum x a b c
 New Definitions
 ---------------
 
-- **on_pline0 x a b c:** From three points a, b, c, with b different from c, builds x on the line parallel to bc through a. Adds the parallel statement saying xa is parallel to bc. Construction returns a line, so can be subjected to intersections. (Compare to on_pline above). This definition was created to allow for the addition of a parallel statement on overlapping lines, by dismissing the restriction of a, b, c being non-collinear, without which r28 would be a rule that could not occur.
+on_pline0 x a b c
+^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |on_pline|
+     - From three points a, b, c, with b different from c, builds x on the line parallel to bc through a. (Compare to :ref:`on_pline x a b c` above). This definition was created to allow for the addition of a parallel statement on overlapping lines, by dismissing the restriction of a, b, c being non-collinear, without which r28 would be a rule that could not occur.
+     - :math:`\begin{cases}xa\parallel bc\end{cases}`  (para x a b c)
+     - Line
 
 - **iso_triangle0 a b c:**
 
@@ -697,4 +981,21 @@ New Definitions
 
 - **s_angle a b x y:**
 
-- **lconst x a y:** From a point a, builds x with an integer distance y from a to x. Adds the statement that the distance from a to x is y. Construction returns a circle that can be subjected to intersections. This definition was created as an entry point to add the manipulation of lengths to DDAR.
+lconst x a l
+^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |lconst|
+     - From a point a, builds x with an integer distance l from a to x. This definition was created as an entry point to add the manipulation of lengths to DDAR.
+     - :math:`\begin{cases}x, a, b, c\text{ concyclic}\end{cases}`  (lconst x a l)
+     - Circle
+
+.. |lconst| image:: ../../_static/images/defs/lconst.png
+    :width: 100%
