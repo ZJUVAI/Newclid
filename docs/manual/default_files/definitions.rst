@@ -302,9 +302,43 @@ excenter2 x y z i a b c
 .. |excenter2| image:: ../../_static/images/defs/excenter2.png
     :width: 100%
 
-- **centroid x y z i a b c:**
+centroid x y z i a b c
+^^^^^^^^^^^^^^^^^^^^^^
 
-- **ninepoints x y z i a b c:**
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |centroid|
+     - From three non-collinear points a, b, c, adds i, the centroid of the triangle. It also adds x, y, and z, the midpoints of sides bc, ac, and ab, respectively.
+     - :math:`\begin{cases}x,b,c\ collinear\\ bx=xc\\ y,c,a\ collinear\\ cy=ya\\ z,a,b\ collinear\\ az=zb\\ a,i,x\ collinear\\b,i,y\ collinear\\c,i,z\ collinear\end{cases}`  (coll x b c, cong x b x c, coll y c a, cong y c y a, coll z a b, cong z a z b, coll a x i, coll b y i, coll c z i)
+     - Points
+
+.. |centroid| image:: ../../_static/images/defs/centroid.png
+    :width: 100%
+
+ninepoints x y z i a b c
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |ninepoints|
+     - From three non-collinear points a, b, c, adds x, y, and z, the midpoints of sides bc, ac, and ab, respectively. It also adds i, the center of the circle going through x, y, and z, which is also the nine points circle of the triangle abc.
+     - :math:`\begin{cases}x,b,c\ collinear\\ bx=xc\\ y,c,a\ collinear\\ cy=ya\\ z,a,b\ collinear\\ az=zb\\ xi=iy\\ yi=iz\end{cases}`  (coll x b c, cong x b x c, coll y c a, cong y c y a, coll z a b, cong z a z b, cong i x i y, cong i y i z)
+     - Points
+
+.. |ninepoints| image:: ../../_static/images/defs/ninepoints.png
+    :width: 100%
 
 intersection_cc x o w a
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -688,7 +722,24 @@ pentagon a b c d e
 .. |pentagon| image:: ../../_static/images/defs/pentagon.png
     :width: 100%
 
-- **psquare x a b:**
+psquare x a b
+^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |psquare|
+     - From two points a, b that are distinct, builds x the image of b under a rotation of 90 degrees around a.
+     - :math:`\begin{cases}ax=ab\\ ax\perp ab\end{cases}`  (cong x a a b, perp x a a b)
+     - Point
+
+.. |psquare| image:: ../../_static/images/defs/psquare.png
+    :width: 100%
 
 quadrangle a b c d
 ^^^^^^^^^^^^^^^^^^
@@ -709,11 +760,62 @@ quadrangle a b c d
 .. |quadrangle| image:: ../../_static/images/defs/quadrangle.png
     :width: 100%
 
-- **r_trapezoid a b c d:**
+r_trapezoid a b c d
+^^^^^^^^^^^^^^^^^^^
 
-- **r_triangle a b c:**
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
 
-- **rectangle a b c d:**
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |r_trapezoid|
+     - From nothing, creates a, b, c, d, the four vertices of a trapezoid with parallel sides ab and cd, and a right angle at a.
+     - :math:`\begin{cases}ab\parallel cd\\ ab\perp ad\end{cases}`  (para a b c d, perp a b a d)
+     - Points
+
+.. |r_trapezoid| image:: ../../_static/images/defs/r_trapezoid.png
+    :width: 100%
+
+r_triangle a b c
+^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |r_triangle|
+     - From nothing, creates a, b, c the vertices of a right triangle with a right angle at a.
+     - :math:`\begin{cases}ab\perp ac\end{cases}`  (perp a b a c)
+     - Points
+
+.. |r_triangle| image:: ../../_static/images/defs/r_triangle.png
+    :width: 100%
+
+rectangle a b c d
+^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |rectangle|
+     - From nothing, creates a, b, c, d the four vertices rectangle abcd.
+     - :math:`\begin{cases}ab\perp bc\\ ab\parallel cd\\ ad\parallel bc\\ba\perp ad\\ ab=cd\\ ad=bc\\ ac=bd\end{cases}`  (perp a b b c, para a b c d, para a d b c, perp a b a d, cong a b c d, cong a d b c, cong a c b d)
+     - Points
+
+.. |rectangle| image:: ../../_static/images/defs/rectangle.png
+    :width: 100%
 
 reflect x a b c
 ^^^^^^^^^^^^^^^
@@ -791,9 +893,43 @@ shift x b c d
 .. |shift| image:: ../../_static/images/defs/shift.png
     :width: 100%
 
-- **square a b x y:**
+square a b x y
+^^^^^^^^^^^^^^
 
-- **isquare a b c d:**
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |square|
+     - From two points a, b, with a different from b, builds x, y, the other two vertices of a square with side ab.
+     - :math:`\begin{cases}ab\perp bx\\ ab=bx\\ ab\parallel xy\\ ay\parallel bx\\ ay\perp yx\\ bx=xy\\ xy=ya\\ ax\perp by\\ ax=by\end{cases}`  (perp a b b x, cong a b b x, para a b x y, para a y b x, perp a y y x, cong b x x y, cong x y y a, perp a x b y, cong a x b y)
+     - Points
+
+.. |square| image:: ../../_static/images/defs/square.png
+    :width: 100%
+
+isquare a b c d
+^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |isquare|
+     - From nothing, creates the four vertices of a square abcd.
+     - :math:`\begin{cases}ab\perp bc\\ ab=bc\\ ab\parallel cd\\ ad\parallel bc\\ ad\perp dc\\ bc=cd\\ cd=da\\ ac\perp bd\\ ac=bd\end{cases}`  (perp a b b c, cong a b b c, para a b c d, para a d b c, perp a d d c, cong b c c d, cong c d d a, perp a c b d, cong a c b d)
+     - Points
+
+.. |isquare| image:: ../../_static/images/defs/isquare.png
+    :width: 100%
 
 trapezoid a b c d
 ^^^^^^^^^^^^^^^^^
@@ -833,7 +969,24 @@ triangle a b c
 .. |triangle| image:: ../../_static/images/defs/triangle.png
     :width: 100%
 
-- **triangle12 a b c:**
+triangle12 a b c
+^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |triangle12|
+     - From nothing, builds the three vertices a, b, c of a triangle such that the proportion ab:ac is 1:2.
+     - :math:`\begin{cases}\frac{ab}{ac}=\frac{1}{2}\end{cases}`  (rconst a b a c 1/2)
+     - Points
+
+.. |triangle12| image:: ../../_static/images/defs/triangle12.png
+    :width: 100%
 
 2l1c x y z i a b c o
 ^^^^^^^^^^^^^^^^^^^^
@@ -858,7 +1011,24 @@ triangle a b c
 
 - **3peq x y z a b c:**
 
-- **trisect x y a b c:**
+trisect x y a b c
+^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |trisect|
+     - From three non-collinear point a, b, c, builds x, y, the points on segment ac that trisect the angle abc.
+     - :math:`\begin{cases}x, a, c\text{ collinear}\\y, a, c\text{ collinear}\\ \widehat{abx}=\widehat{xby}\\ \widehat{xby}=\widehat{ybc}\end{cases}`  (coll x a c, coll y a c, eqangle b a b x b x b y, eqangle b x b y b y b c)
+     - Points
+
+.. |trisect| image:: ../../_static/images/defs/trisect.png
+    :width: 100%
 
 trisegment x y a b
 ^^^^^^^^^^^^^^^^^^
@@ -879,9 +1049,43 @@ trisegment x y a b
 .. |trisegment| image:: ../../_static/images/defs/trisegment.png
     :width: 100%
 
-- **on_dia x a b:** Given two different points a, b, builds x a point such that the triangle axb is a right triangle with a right angle at x. Adds the perpendicularity statement saying ax is perpendicular to bx. Construction returns a circle, so it can be subjected to intersections.
+on_dia x a b
+^^^^^^^^^^^^
 
-- **ieq_triangle a b c:**
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |on_dia|
+     - Given two different points a, b, builds x a point such that the triangle axb is a right triangle with a right angle at x.
+     - :math:`\begin{cases}xa\perp xb\end{cases}`  (perp x a x b)
+     - Circle
+
+.. |on_dia| image:: ../../_static/images/defs/on_dia.png
+    :width: 100%
+
+ieq_triangle a b c
+^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |ieq_triangle|
+     - From nothing, creates the three vertices of an equilateral triangle abc.
+     - :math:`\begin{cases}ab=bc\\ bc=ca\\ \widehat{bac}=\widehat{acb}\\ \widehat{acb}=\widehat{cba}\end{cases}`  (cong a b b c, cong b c c a, eqangle a b a c c a c b, eqangle c a c b b c b a)
+     - Points
+
+.. |ieq_triangle| image:: ../../_static/images/defs/ieq_triangle.png
+    :width: 100%
 
 - **on_opline x a b:** From a pair of different points a, b, builds x, a point on the line ab such that a is NOT between x and b. Adds the statement that a, b, and x are collinear. Construction returns a half-line, so can be subjected to intersections.
 
@@ -971,11 +1175,47 @@ on_pline0 x a b c
 
 - **on_aline0 x a b c d e f g:**
 
-- **eqratio x a b c d e f g:** From seven points a, b, c, d, e, f, g, builds x, a point such that ab/cd=ef/gx. Adds the ratio equality statement corresponding to ab/cd=ef/gx. Construction returns a circle, that can be subjected to intersection. This definition was created to allow for the explicit prescription of eqratio statements on problems.
+eqratio x a b c d e f g
+^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |eqratio|
+     - From seven points a, b, c, d, e, f, g, builds x, a point such that ab/cd=ef/gx. This definition was created to allow for the explicit prescription of eqratio statements on problems.
+     - :math:`\begin{cases}\frac{ab}{cd}=\frac{ef}{gx}\end{cases}`  (eqratio a b c d e f g x)
+     - Circle
+
+.. |eqratio| image:: ../../_static/images/defs/eqratio.png
+    :width: 100%
 
 - **eqratio6 x a c e f g h:** From six points a, c, e, f, g, h, builds x,  a point such that ax/cx=ef/gh. Adds the ratio equality statement corresponding to ax/cx=ef/gh. Construction returns a line if ef/gh=1, and a circle otherwise, and can be subjected to intersection in any case. This definition was created to allow a common case for prescription of eqratio statements, when the new point shows up twice in the ratio equality (particularly common when subdividing a segment).
 
-- **rconst a b c x r:** Given three points a, b, c such that a is different from b, and a fraction r, builds x a point such that ab/cx=r. r should be entered as a fraction m/n, m, n two integers separated by "/". Adds the statement corresponding exactly to ab/cx=r. The construction returns a circle, so can be subjected to intersections. This definition was created to allow for the prescription of pairs of segments satisfying a given constant ratio.
+rconst a b c x r
+^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |rconst|
+     - Given three points a, b, c such that a is different from b, and a fraction r, builds x a point such that ab/cx=r. r should be entered as a fraction m/n, m, n two integers separated by "/". This definition was created to allow for the prescription of pairs of segments satisfying a given constant ratio.
+     - :math:`\begin{cases}\frac{ab}{cx}=r=\frac{m}{n}\end{cases}`  (rconst a b c x r)
+     - Circle
+
+.. |rconst| image:: ../../_static/images/defs/rconst.png
+    :width: 100%
+
+- **rconst2 x a b r:**
 
 - **aconst a b c x r:**
 
