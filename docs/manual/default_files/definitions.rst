@@ -485,7 +485,7 @@ iso_triangle a b c
      - Added Statements
      - Construction
    * - |iso_triangle|
-     - From nothing, creates the three vertices a, b, c of an isosceles triangle with ab=ac. (Compare to iso_triangle0, iso_triangle_vertex, and iso_triangle_vertext_angle below).
+     - From nothing, creates the three vertices a, b, c of an isosceles triangle with ab=ac. (Compare to :ref:`iso_triangle0 a b c` below).
      - :math:`\begin{cases}ab= ac\\ \widehat{abc}=\widehat{bca}\end{cases}`  (cong a b a c, eqangle b a b c c b c a)
      - Points
 
@@ -582,7 +582,7 @@ on_bline x a b
      - Added Statements
      - Construction
    * - |on_bline|
-     - Given two distinct points a, b, builds x a point on the perpendicular bisector of the segment ab.
+     - Given two distinct points a, b, builds x a point on the perpendicular bisector of the segment ab. (Compare to :ref:`iso_triangle_vertex x b c` and to :ref:`iso_triangle_vertex_angle x b c` below).
      - :math:`\begin{cases}xa=xb\\ \widehat{xab}= \widehat{abx}\end{cases}`  (cong x a x b, eqangle a x a b b a b x)
      - Line
 
@@ -602,7 +602,7 @@ on_circle x o a
      - Construction
    * - |on_circle|
      - From two distinct points o, a, builds x a point on the circle of center o through a. Equivalent to eqdistance x a a o (see :ref:`eqdistance x a b c` above).
-     - :math:`\begin{cases}ox=oa\end{cases}`  (cong o x o a)
+     - :math:`ox=oa`  (cong o x o a)
      - Circle
 
 .. |on_circle| image:: ../../_static/images/defs/on_circle.png
@@ -621,7 +621,7 @@ on_line x a b
      - Construction
    * - |on_line|
      - From two distinct point a, b, builds x another point on the line ab.
-     - :math:`\begin{cases}x, a, b\text{ collinear}\end{cases}`  (coll x a b)
+     - :math:`x, a, b\text{ collinear}`  (coll x a b)
      - Line
 
 .. |on_line| image:: ../../_static/images/defs/on_line.png
@@ -640,7 +640,7 @@ on_pline x a b c
      - Construction
    * - |on_pline|
      - From three non-colinear points a, b, c, with b different from c, builds x on the line parallel to bc through a. (Compare to the simpler :ref:`on_pline0 x a b c` below).
-     - :math:`\begin{cases}xa\parallel bc\end{cases}`  (para x a b c)
+     - :math:`xa\parallel bc`  (para x a b c)
      - Line
 
 .. |on_pline| image:: ../../_static/images/defs/on_pline.png
@@ -659,7 +659,7 @@ on_tline x a b c
      - Construction
    * - |on_tline|
      - From three points a, b, c, with b different from c, builds x on the line through a perpendicular to bc.
-     - :math:`\begin{cases}xa\perp bc\end{cases}`  (perp x a b c)
+     - :math:`xa\perp bc`  (perp x a b c)
      - Line
 
 .. |on_tline| image:: ../../_static/images/defs/on_tline.png
@@ -792,7 +792,7 @@ r_triangle a b c
      - Construction
    * - |r_triangle|
      - From nothing, creates a, b, c the vertices of a right triangle with a right angle at a.
-     - :math:`\begin{cases}ab\perp ac\end{cases}`  (perp a b a c)
+     - :math:`ab\perp ac`  (perp a b a c)
      - Points
 
 .. |r_triangle| image:: ../../_static/images/defs/r_triangle.png
@@ -944,7 +944,7 @@ trapezoid a b c d
      - Construction
    * - |trapezoid|
      - From nothing, creates four vertices of a trapezoid abcd, with ab parallel to cd.
-     - :math:`\begin{cases}ab\parallel cd\end{cases}`  (para a b c d)
+     - :math:`ab\parallel cd`  (para a b c d)
      - Points
 
 .. |trapezoid| image:: ../../_static/images/defs/trapezoid.png
@@ -982,7 +982,7 @@ triangle12 a b c
      - Construction
    * - |triangle12|
      - From nothing, builds the three vertices a, b, c of a triangle such that the proportion ab:ac is 1:2.
-     - :math:`\begin{cases}\frac{ab}{ac}=\frac{1}{2}\end{cases}`  (rconst a b a c 1/2)
+     - :math:`\frac{ab}{ac}=\frac{1}{2}`  (rconst a b a c 1/2)
      - Points
 
 .. |triangle12| image:: ../../_static/images/defs/triangle12.png
@@ -1000,16 +1000,50 @@ triangle12 a b c
      - Added Statements
      - Construction
    * - |2l1c|
-     - Given three points o, a, b, with b in the center through a of center o, and c a point not in the line ab, build i, the center of a circle tangent to the circle centered at o through a, to the line ac and to the line bc. It also builds the tangency points x to ac, y to bc and z to the circle of center o through a.
+     - Given three points o, a, b, with b in the center through a of center o, and c a point not in the line ab, builds i, the center of a circle tangent to the circle centered at o through a, to the line ac and to the line bc. It also builds the tangency points x to ac, y to bc and z to the circle of center o through a.
      - :math:`\begin{cases}x, a, c\text{ collinear}\\y, b, c\text{ collinear}\\ i, o, z\text{ collinear}\\ oa=oz\\ ix=iy\\ iy=iz\\ ix\perp ac\\ iy\perp bc\end{cases}`  (coll x a c, coll y b c, coll i o z, cong o a o z, cong i y i z, perp i x a c, perp i y b c)
      - Points
 
 .. |2l1c| image:: ../../_static/images/defs/2l1c.png
     :width: 100%
 
-- **e5128 x y a b c d:**
+e5128 x y a b c d
+^^^^^^^^^^^^^^^^^
 
-- **3peq x y z a b c:**
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |e5128|
+     - Given four points a, b, c, d, with bc=cd and bc perpendicular to ba, builds y the midpoint of ab and x the intersection of line dy and the circle centered at c through b. It transfers the angle bad to axy in a specific way, and was created specifically for problem complete_015_7_Book_00EE_06_E051-28.gex in the :ref:`jgex_ag_231` problem database, for which we do not have the original statement.
+     - :math:`\begin{cases}bc=cx\\ y,a,b\ collinear\\ x,y,d\ collinear\\ \widehat{bad}=\widehat{axy}\end{cases}`  (cong c b c x, coll y a b, coll x y d, eqangle a b a d x a x y)
+     - Points
+
+.. |e5128| image:: ../../_static/images/defs/e5128.png
+    :width: 100%
+
+3peq x y z a b c
+^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |3peq|
+     - Given three non-collinear points a, b, c, builds points x on the extended side ab, y in the extended side ac, and z on the extended side bc of triangle abc in a way that z is the midpoint of xy. It was created specifically for problem complete_010_Other_Auxiliary_ye_aux_think.gex in the :ref:`jgex_ag_231` problem database, for which we do not have the original statement.
+     - :math:`\begin{cases}z,b,c\ collinear\\ x,a,b\ collinear\\ y,a,c\ collinear\\ x,y,z\ collinear\\ xz=yz\end{cases}`  (coll z b c, coll x a b, coll y a c, coll x y z, cong z x z y)
+     - Points
+
+.. |3peq| image:: ../../_static/images/defs/3peq.png
+    :width: 100%
 
 trisect x y a b c
 ^^^^^^^^^^^^^^^^^
@@ -1062,7 +1096,7 @@ on_dia x a b
      - Construction
    * - |on_dia|
      - Given two different points a, b, builds x a point such that the triangle axb is a right triangle with a right angle at x.
-     - :math:`\begin{cases}xa\perp xb\end{cases}`  (perp x a x b)
+     - :math:`xa\perp xb`  (perp x a x b)
      - Circle
 
 .. |on_dia| image:: ../../_static/images/defs/on_dia.png
@@ -1142,7 +1176,7 @@ on_circum x a b c
      - Construction
    * - |on_circum|
      - From three non-collinear points a, b, and c, builds x a point on the circle through a, b, and c.
-     - :math:`\begin{cases}x, a, b, c\text{ concyclic}\end{cases}`  (cyclic a b c x)
+     - :math:`x, a, b, c\text{ concyclic}`  (cyclic a b c x)
      - Point
 
 .. |on_circum| image:: ../../_static/images/defs/on_circum.png
@@ -1164,14 +1198,65 @@ on_pline0 x a b c
      - Construction
    * - |on_pline|
      - From three points a, b, c, with b different from c, builds x on the line parallel to bc through a. (Compare to :ref:`on_pline x a b c` above). This definition was created to allow for the addition of a parallel statement on overlapping lines, by dismissing the restriction of a, b, c being non-collinear, without which r28 would be a rule that could not occur.
-     - :math:`\begin{cases}xa\parallel bc\end{cases}`  (para x a b c)
+     - :math:`xa\parallel bc`  (para x a b c)
      - Line
 
-- **iso_triangle0 a b c:**
+iso_triangle0 a b c
+^^^^^^^^^^^^^^^^^^^
 
-- **iso_triangle_vertex x b c:**
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
 
-- **iso_triangle_vertex_angle x b c:**
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |iso_triangle0|
+     - From nothing, creates the three vertices a, b, c of an isosceles triangle with ab=ac. It was created as a simplified version of :ref:`iso_triangle a b c` above, without adding the statement about the equality of base angles, which should come from rule r13.
+     - :math:`ab= ac`  (cong a b a c)
+     - Points
+
+.. |iso_triangle0| image:: ../../_static/images/defs/iso_triangle0.png
+    :width: 100%
+
+iso_triangle_vertex x b c
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |iso_triangle_vertex|
+     - From two points b, c that are distinct, builds a, the vertex of an isosceles triangle with base bc. It was created for explicitly creating isosceles triangles from a given base, but it is also a simplified version of :ref:`on_bline x a b` above, without adding the statement about the equality of base angles, which should come from rule r13. There is also a definition adding only the statement about the equality of the angles below (see :ref:`iso_triangle_vertex_angle x b c`).
+     - :math:`xb = xc`  (cong x b x c)
+     - Line
+
+.. |iso_triangle_vertex| image:: ../../_static/images/defs/iso_triangle_vertex.png
+    :width: 100%
+
+iso_triangle_vertex_angle x b c
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |iso_triangle_vertex_angle|
+     - From two points b, c that are distinct, builds a, the vertex of an isosceles triangle with base bc. It was created for explicitly creating isosceles triangles from a given base, but it is also a simplified version of :ref:`on_bline x a b` above, only adding the statement about the equality of base angles. The segment congruence statement in the on_bline definition should come from rule r14. Compare also to :ref:`iso_triangle_vertex x b c` above.
+     - :math:`\widehat{xbc}=\widehat{bcx}`  (eqangle x b b c b c x c)
+     - Line
+
+.. |iso_triangle_vertex_angle| image:: ../../_static/images/defs/iso_triangle_vertex_angle.png
+    :width: 100%
 
 - **on_aline0 x a b c d e f g:**
 
@@ -1188,13 +1273,30 @@ eqratio x a b c d e f g
      - Construction
    * - |eqratio|
      - From seven points a, b, c, d, e, f, g, builds x, a point such that ab/cd=ef/gx. This definition was created to allow for the explicit prescription of eqratio statements on problems.
-     - :math:`\begin{cases}\frac{ab}{cd}=\frac{ef}{gx}\end{cases}`  (eqratio a b c d e f g x)
+     - :math:`\frac{ab}{cd}=\frac{ef}{gx}`  (eqratio a b c d e f g x)
      - Circle
 
 .. |eqratio| image:: ../../_static/images/defs/eqratio.png
     :width: 100%
 
-- **eqratio6 x a c e f g h:** From six points a, c, e, f, g, h, builds x,  a point such that ax/cx=ef/gh. Adds the ratio equality statement corresponding to ax/cx=ef/gh. Construction returns a line if ef/gh=1, and a circle otherwise, and can be subjected to intersection in any case. This definition was created to allow a common case for prescription of eqratio statements, when the new point shows up twice in the ratio equality (particularly common when subdividing a segment).
+eqratio6 x a c e f g h
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |eqratio6|
+     - From six points a, c, e, f, g, h, builds x,  a point such that ax/cx=ef/gh. This definition was created to allow a common case for prescription of eqratio statements, when the new point shows up twice in the ratio equality (particularly common when subdividing a segment).
+     - :math:`\frac{ax}{cx}=\frac{ef}{gh}`  (eqratio a x c x e f g h)
+     - Line if ef=gh, Circle otherwise
+
+.. |eqratio6| image:: ../../_static/images/defs/eqratio6.png
+    :width: 100%
 
 rconst a b c x r
 ^^^^^^^^^^^^^^^^
@@ -1209,17 +1311,68 @@ rconst a b c x r
      - Construction
    * - |rconst|
      - Given three points a, b, c such that a is different from b, and a fraction r, builds x a point such that ab/cx=r. r should be entered as a fraction m/n, m, n two integers separated by "/". This definition was created to allow for the prescription of pairs of segments satisfying a given constant ratio.
-     - :math:`\begin{cases}\frac{ab}{cx}=r=\frac{m}{n}\end{cases}`  (rconst a b c x r)
+     - :math:`\frac{ab}{cx}=r=\frac{m}{n}`  (rconst a b c x r)
      - Circle
 
 .. |rconst| image:: ../../_static/images/defs/rconst.png
     :width: 100%
 
-- **rconst2 x a b r:**
+rconst2 x a b r
+^^^^^^^^^^^^^^^
 
-- **aconst a b c x r:**
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
 
-- **s_angle a b x y:**
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |rconst2|
+     - Given two points a, b that are distinct, and a fraction r, builds x a point such that ax/bx=r. r should be entered as a fraction m/n, m, n two integers separated by "/". This definition was created to cover a different case of prescription of segments satisfying a constant ratio, in this case when the new point connects the segment which ratio we are taking. It is typically used to split a given segment into two pieces with the given ratio.
+     - :math:`\frac{ax}{bx}=r=\frac{m}{n}`  (rconst x a x b r)
+     - Line if r=1/1, Circle otherwise
+
+.. |rconst2| image:: ../../_static/images/defs/rconst2.png
+    :width: 100%
+
+aconst a b c x r
+^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |aconst|
+     - Given three points a, b, c, with a, b distinct, and an angle r, builds x a point such that the angle from line ab to line cx taken in the conterclockwise direction is r. r should be entered either as a fraction in radians in the form mpi/n, m, n two integers separated by "pi/", or in degrees in the from Ro, R an integer followed by the letter "o". This definition was created to allow for the insertion of a prescribed angle between two lines without fixing the intersection of the lines. It was necessary for the effectivity of the aconst predicate.
+     - :math:`\angle (ab\times cx)=r`  (aconst a b c x r)
+     - Line
+
+.. |aconst| image:: ../../_static/images/defs/aconst.png
+    :width: 100%
+
+s_angle a b x y
+^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |s_angle|
+     - Given two points a, b that are distinct, and an angle y, builds x a point such that the angle from line ab to line bx taken in the conterclockwise direction is y. y should be entered either as a fraction in radians in the form mpi/n, m, n two integers separated by "pi/", or in degrees in the from Ro, R an integer followed by the letter "o". This definition was created to allow for the insertion of a prescribed angle between two lines with a fixed vertex. It is a modification of the previous s_angle definition in accordance to the aconst predicate.
+     - :math:`\widehat{abx}=y`  (aconst a b b x y)
+     - Line
+
+.. |s_angle| image:: ../../_static/images/defs/s_angle.png
+    :width: 100%
 
 lconst x a l
 ^^^^^^^^^^^^
@@ -1234,7 +1387,7 @@ lconst x a l
      - Construction
    * - |lconst|
      - From a point a, builds x with an integer distance l from a to x. This definition was created as an entry point to add the manipulation of lengths to DDAR.
-     - :math:`\begin{cases}x, a, b, c\text{ concyclic}\end{cases}`  (lconst x a l)
+     - :math:`x, a, b, c\text{ concyclic}`  (lconst x a l)
      - Circle
 
 .. |lconst| image:: ../../_static/images/defs/lconst.png
