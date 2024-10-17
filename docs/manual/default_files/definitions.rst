@@ -41,7 +41,7 @@ angle_mirror x a b c
      - Added Statements
      - Construction
    * - |angle_mirror|
-     - From non-collinear points a, b, c, creates x on the opposite side of bc with respect to a in a way that angle abx doubles angle abc.
+     - From non-collinear points a, b, c, creates x on the opposite side of bc with respect to a in a way that angle abx doubles angle abc. (Compare to :ref:`on_aline0 x a b c d e f g` below.)
      - :math:`\widehat{abc}=\widehat{cbx}` (eqangle b a b c b c b x).
      - Ray
 
@@ -568,7 +568,24 @@ nsquare x a b
 .. |nsquare| image:: ../../_static/images/defs/nsquare.png
     :width: 100%
 
-- **on_aline x a b c d e:**
+on_aline x a b c d e
+^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |on_aline|
+     - From five points a, b, c, d, e, such that c, d, e are non-collinear, adds point x in a way that the angle bax is the same as the angle edc (up to a rotation and a translation). It transfers the angle measure between lines with the vertices specified (compare to :ref:`on_aline0 x a b c d e f g` below).
+     - :math:`\widehat{xab}= \widehat{cde}`  (eqangle a x a b d c d e)
+     - Line
+
+.. |on_aline| image:: ../../_static/images/defs/on_aline.png
+    :width: 100%
 
 on_bline x a b
 ^^^^^^^^^^^^^^
@@ -1142,7 +1159,24 @@ cc_tangent x y z i o a w b
 .. |cc_tangent| image:: ../../_static/images/defs/cc_tangent.png
     :width: 100%
 
-- **eqangle3 x a b d e f:**
+eqangle3 x a b d e f
+^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |eqangle3|
+     - From five points a, b, d, e, f disposed in a way that a is distinct from b and d, e, f form a non-degenerate triangle, builds x the vertex of an angle in such a way that the angles axb and edf are the same (up to a rotation and a translation).
+     - :math:`\widehat{axb}=\widehat{edf}`  (eqangle x a x b d e d f)
+     - Circle
+
+.. |eqangle3| image:: ../../_static/images/defs/eqangle3.png
+    :width: 100%
 
 tangent x y a o b
 ^^^^^^^^^^^^^^^^^
@@ -1258,7 +1292,24 @@ iso_triangle_vertex_angle x b c
 .. |iso_triangle_vertex_angle| image:: ../../_static/images/defs/iso_triangle_vertex_angle.png
     :width: 100%
 
-- **on_aline0 x a b c d e f g:**
+on_aline0 x a b c d e f g
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. list-table::
+   :widths: 50 25 23 2
+   :header-rows: 1
+
+   * - Figure
+     - Description
+     - Added Statements
+     - Construction
+   * - |on_aline0|
+     - From seven points a, b, c, d, e, f, g, with the constraint that a, b, c, and d do not lie all on the same line, build x such that the angle formed at the intersection of lines ef and gx is the same (up to a rotation and a translation) to the angle formed at the intersection between lines ab and cd. This definition was created as a base general case for the creation of congruent angles. Indeed, :ref:`angle_mirror x a b c` is equivalent to on_aline0 x b a b c b c b, and :ref:`on_aline x a b c d e` is equivalent to on_aline0 x d e d c a b a.
+     - :math:`\angle (ab\times cd)=\angle (ef\times gx)`  (eqangle a b c d e f g x)
+     - Line
+
+.. |on_aline0| image:: ../../_static/images/defs/on_aline0.png
+    :width: 100%
 
 eqratio x a b c d e f g
 ^^^^^^^^^^^^^^^^^^^^^^^
