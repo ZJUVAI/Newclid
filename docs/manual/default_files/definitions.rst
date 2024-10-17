@@ -1138,8 +1138,6 @@ ieq_triangle a b c
 .. |ieq_triangle| image:: ../../_static/images/defs/ieq_triangle.png
     :width: 100%
 
-- **on_opline x a b:** From a pair of different points a, b, builds x, a point on the line ab such that a is NOT between x and b. Adds the statement that a, b, and x are collinear. Construction returns a half-line, so can be subjected to intersections.
-
 cc_tangent x y z i o a w b
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 

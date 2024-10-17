@@ -548,10 +548,6 @@ def sketch_trisegment(
     return x, y
 
 
-def sketch_on_opline(args: tuple[PointNum, ...], **kwargs: Any) -> LineNum:
-    raise NotImplementedError()
-
-
 def sketch_ieq_triangle(
     args: tuple[PointNum, ...], rng: Generator
 ) -> tuple[PointNum, ...]:
