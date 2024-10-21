@@ -21,7 +21,7 @@ c = free c; d = free d; p = free p; q = free q; a = free a; b = free b; m = free
 r10
 a = free a; b = free b; c = free c; d = free d; m = free m; n = free n; p = free p; q = eqratio q a b c d m n p; e = free e; f = free f; r = free r; u = eqratio u c d e f p q r ? eqratio a b e f m n r u
 r11
-a = free a; b = free b; c = free c; d = eqratio6 d b c a b a c, on_line d b c ? eqangle6 a b a d a d a c
+a = free a; b = free b; c = free c; d = eqratio6 d b c a b a c, on_line d b c ? eqangle a b a d a d a c
 r12
 a = free a; b = free b; d = free d; c = on_line c b d, on_aline0 c a b a d a d a ? eqratio6 d b d c a b a c
 r13
