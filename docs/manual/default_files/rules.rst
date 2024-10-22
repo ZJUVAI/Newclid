@@ -11,7 +11,7 @@ Legacy rules
 r00 : Perpendiculars give parallel
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
-   :widths: 50 25 25
+   :widths: 30 45 25
    :header-rows: 1
 
    * - Figure
@@ -84,7 +84,7 @@ r04 : eqangle2cyclic
      - Formal Statement
      - Description
    * - |r04|
-     - :math:`\angle (PA\times PB)=\angle (QA\times QB) \implies ABPQ\text{ on a circle}`
+     - :math:`\begin{cases}\angle (PA\times PB)=\angle (QA\times QB)\\ ABPQ\text{ non-collinear} \end{cases}\implies ABPQ\text{ on a circle}`
      - Reverse direction of r03: If P, Q are vertices of congruent angles, and A and B are the intersections of the legs of the angles with vertices P and Q, there is a circle through A, B, P, and Q.
 
 .. |r04| image:: ../../_static/images/rules/r04.png
@@ -132,7 +132,7 @@ r07 : para2eqratio3
      - Formal Statement
      - Description
    * - |r07|
-     - :math:`\begin{cases}AB\parallel CD\\ OAC \text{ collinear}\\ OBD\text{ collinear}\end{cases}\implies \begin{cases}\frac{OA}{OC}=\frac{OB}{OD}\\ \frac{AO}{AC}=\frac{BO}{BD}\\ \frac{OC}{AC}=\frac{OD}{BD}\end{cases}`
+     - :math:`\begin{cases}AB\parallel CD\\ OAC \text{ collinear}\\ OBD\text{ collinear}\\ OAB\text{ non-collinear}\end{cases}\implies \begin{cases}\frac{OA}{OC}=\frac{OB}{OD}\\ \frac{AO}{AC}=\frac{BO}{BD}\\ \frac{OC}{AC}=\frac{OD}{BD}\end{cases}`
      - This is an instance of Thales's theorem, saying that two parallel lines AB and CD cut by two intersecting transverse lines AC and BD, will determine a collection of proportional segments.
 
 .. |r07| image:: ../../_static/images/rules/r07.png
@@ -193,7 +193,7 @@ r11 : Bisector theorem I
      - Formal Statement
      - Description
    * - |r11|
-     - :math:`\begin{cases}\frac{DB}{DC} = \frac{AB}{AC} \\DBC\text{ collinear} \end{cases}\implies \angle (AB\times AD)=\angle(AD\times AC)`
+     - :math:`\begin{cases}\frac{DB}{DC} = \frac{AB}{AC} \\DBC\text{ collinear}\\ ABC\text{ non-collinear} \end{cases}\implies \angle (AB\times AD)=\angle(AD\times AC)`
      - One direction of the bisector theorem: if a line through a vertex of a triangle cuts the opposite side into two segments that are in proportion as the neighboring sides of the triangle, the line bisects the angle at the vertex it cuts.
 
 .. |r11| image:: ../../_static/images/rules/r11.png
@@ -209,7 +209,7 @@ r12 : Bisector theorem II
      - Formal Statement
      - Description
    * - |r12|
-     - :math:`\begin{cases}\angle (AB\times AD) = \angle (AD\times AC) \\ DBC\text{ collinear}\end{cases} \implies \frac{DB}{DC} = \frac{AB}{AC}`
+     - :math:`\begin{cases}\angle (AB\times AD) = \angle (AD\times AC) \\ DBC\text{ collinear}\\ ABC\text{ non-collinear}\end{cases} \implies \frac{DB}{DC} = \frac{AB}{AC}`
      - Opposite direction of the bisector theorem: the internal bisector of a vertex of a triangle divides the opposite side into two segments that are in proportion to the neighboring sides of the triangle.
 
 .. |r12| image:: ../../_static/images/rules/r12.png
@@ -225,7 +225,7 @@ r13 : Isosceles triangle equal angles
      - Formal Statement
      - Description
    * - |r13|
-     - :math:`|OA|=|OB| \implies \angle (OA\times AB) = \angle (AB\times OB)`
+     - :math:`\begin{cases}|OA|=|OB|\\ OAB\text{ non-collinear} \end{cases}\implies \angle (OA\times AB) = \angle (AB\times OB)`
      - The theorem says that the base angles of an isosceles triangle are congruent.
 
 .. |r13| image:: ../../_static/images/rules/r13.png
@@ -241,7 +241,7 @@ r14 : Equal base angles imply isosceles
      - Formal Statement
      - Description
    * - |r14|
-     - :math:`\angle (AO\times AB) = \angle (BA\times BO) \implies |OA|=|OB|`
+     - :math:`\begin{cases}\angle (AO\times AB) = \angle (BA\times BO)\\ OAB\text{ non-collinear}\end{cases} \implies |OA|=|OB|`
      - This is the reverse direction of r13, saying that if the base angles of a triangle are congruent, the triangle is isosceles.
 
 .. |r14| image:: ../../_static/images/rules/r14.png
@@ -433,7 +433,7 @@ r26 : Diagonals of parallelogram II
      - Formal Statement
      - Description
    * - |r26|
-     - :math:`\begin{cases}M \text{ midpoint of }AB \\ AC \parallel BD \\ AD \parallel BC \end{cases}\implies M \text{ midpoint of }CD`
+     - :math:`\begin{cases}M \text{ midpoint of }AB \\ AC \parallel BD \\ AD \parallel BC\\ ABD\text{ non-collinear} \end{cases}\implies M \text{ midpoint of }CD`
      - The other direction of the previous rule, it says the diagonals of a parallelogram meet at their common midpoint.
 
 .. |r26| image:: ../../_static/images/rules/r26.png
@@ -449,7 +449,7 @@ r27 : eqratio_sameside2para
      - Formal Statement
      - Description
    * - |r27|
-     - :math:`\begin{cases}\frac{OA}{AC}=\frac{OB}{BD}\\ OAC\text{ collinear}\\OBD\text{ collinear}\\ OAC\text{ has the same orientation as }BOD\implies AB\parallel CD\end{cases}\implies AB\parallel CD`
+     - :math:`\begin{cases}\frac{OA}{AC}=\frac{OB}{BD}\\ OAC\text{ collinear}\\OBD\text{ collinear}\\ ABC \text{ non-collinear}\\ A\text{ to the same side of }O\to C\text{ as }B\text{ to }O\to D\end{cases}\implies AB\parallel CD`
      -
 
 .. |r27| image:: ../../_static/images/rules/r27.png
@@ -561,7 +561,7 @@ r34 : eqangle2simtri
      - Formal Statement
      - Description
    * - |r34|
-     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QP\times QR) \\ \angle (CA\times CB) = \angle (RP\times RQ)\end{cases}\implies \Delta ABC\sim \Delta PQR`
+     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QP\times QR) \\ \angle (CA\times CB) = \angle (RP\times RQ)\\ \Delta ABC\text{ has the same orientation as }\Delta PQR\end{cases}\implies \Delta ABC\sim \Delta PQR`
      -
 
 .. |r34| image:: ../../_static/images/rules/r34.png
@@ -577,8 +577,8 @@ r35 : eqangle2simtri2
      - Formal Statement
      - Description
    * - |r35|
-     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QR\times QP) \\ \angle (CA\times CB) = \angle (RQ\times RP)\end{cases}\implies \Delta ABC\sim^2 \Delta PQR`
-     -
+     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QR\times QP) \\ \angle (CA\times CB) = \angle (RQ\times RP)\\ \Delta ABC\text{ has the same orientation as }\Delta PRQ\end{cases}\implies \Delta ABC\sim^r \Delta PQR`
+     - 
 
 .. |r35| image:: ../../_static/images/rules/r35.png
     :width: 100%
@@ -673,7 +673,7 @@ r41 : para2eqratio
      - Formal Statement
      - Description
    * - |r41|
-     - :math:`\begin{cases}AB\parallel CD \\ MAD\text{ collinear} \\ NBC \text{ collinear} \\ \frac{MA}{MD}=\frac{NB}{NC}\\ MAD \text{ has the same orientation as }NBC \end{cases}\implies MN\parallel A B`
+     - :math:`\begin{cases}AB\parallel CD \\ MAD\text{ collinear} \\ NBC \text{ collinear} \\ \frac{MA}{MD}=\frac{NB}{NC}\\ M\text{ to the same side of } A\to D\text{ as }N\text{ to }B\to C \end{cases}\implies MN\parallel A B`
      -
 
 .. |r41| image:: ../../_static/images/rules/r41.png
@@ -689,7 +689,7 @@ r42 : eqratio62para
      - Formal Statement
      - Description
    * - |r42|
-     - :math:`\begin{cases}AB\parallel CD \\ MAD\text{ collinear} \\ NBC\text{ collinear}\end{cases}\implies \frac{MA}{MD}=\frac{NB}{NC}`
+     - :math:`\begin{cases}AB\parallel CD \\ MAD\text{ collinear} \\ NBC\text{ collinear}\\ MN\parallel AB\\ ABC\text{ non-collinear}\end{cases}\implies \frac{MA}{MD}=\frac{NB}{NC}`
      -
 
 .. |r42| image:: ../../_static/images/rules/r42.png
