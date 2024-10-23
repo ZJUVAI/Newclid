@@ -3,7 +3,7 @@ Rules
 
 Rules are the deduction rules that allow, from a given set of true facts, the derivation of new ones. Each rule asks for a collection of arguments, demanded by its premise predicates, that has to be "matched". Next, the rule is "applied", at which point the corresponding predicate is added to the proof state.
 
-As a standard, rules are labelled in order (r00 to r49), but some rules have more specific names, for readability. The naming shows in the proof step, as the reason a proof step is true.
+As a standard, rules are labelled in order (r00 to r51), but some rules have more specific names, for readability. The naming shows in the proof step, as the reason a proof step is true.
 
 Legacy rules
 ------------
@@ -19,7 +19,7 @@ r00 : Perpendiculars give parallel
      - Description
    * - |r00|
      - :math:`\begin{cases}AB \perp CD\\ CD \perp EF \\ABE \text{ non-collinear}\end{cases} \implies AB \parallel EF`
-     - Two lines AB, EF, that are orthogonal to a same line CD are parallel to one another.
+     - Two lines AB, EF, that are orthogonal to a same line CD are parallel to one another. **This rule is not in the final rules.txt file because it is covered by AR.**
 
 .. |r00| image:: ../../_static/images/rules/r00.png
     :width: 100%
@@ -53,7 +53,7 @@ r02 : eqangle2para
      - Description
    * - |r02|
      - :math:`\angle (AB \times PQ)=\angle (CD \times PQ)\implies AB \parallel CD`
-     - If two lines AB and CD define the same angle with respect to a fixed transverse line PQ, they are parallel.
+     - If two lines AB and CD define the same angle with respect to a fixed transverse line PQ, they are parallel. **This rule is not in the final rules.txt file because it is covered by AR.**
 
 .. |r02| image:: ../../_static/images/rules/r02.png
     :width: 100%
@@ -149,7 +149,7 @@ r08 : perp_perp2eqangle
      - Description
    * - |r08|
      - :math:`AB \perp CD \wedge EF \perp GH \implies \angle (AB\times EF) = \angle (CD\times GH)`
-     -
+     - This rule says that if two right triangles share an acute angle, the third angles of both triangles are congruent, as a consequence of the theorem for the sum of angles of a triangle being :math:`180^\circ`. **This rule is not in the final rules.txt file because it is covered by AR.**
 
 .. |r08| image:: ../../_static/images/rules/r08.png
     :width: 100%
@@ -165,7 +165,7 @@ r09 : Sum of angles of a triangle
      - Description
    * - |r09|
      - :math:`\begin{cases}\angle (AB\times CD)=\angle (MN\times PQ)\\ \angle (CD\times EF)=\angle (PQ\times RU)\end{cases}\implies \angle(AB\times EF)=\angle(MN\times RU)`
-     - This rule says that if two triangles have two pairs of congruent angles, the third pair of angles will be congruent as well. It is a non-numerical version of the statement that the angles of a triangle always add to a given constant.
+     - This rule says that if two triangles have two pairs of congruent angles, the third pair of angles will be congruent as well. It is a non-numerical version of the statement that the angles of a triangle always add to a given constant. **This rule is not in the final rules.txt file because it is covered by AR.**
 
 .. |r09| image:: ../../_static/images/rules/r09.png
     :width: 100%
@@ -181,7 +181,7 @@ r10 : Ratio cancellation
      - Description
    * - (Just a multiplication)
      - :math:`\frac{AB}{CD} = \frac{MN}{PQ} \wedge \frac{CD}{EF} = \frac{PQ}{RU} \implies \frac{AB}{EF} = \frac{MN}{RU}`
-     - This is a simple algebraic fact: if you multiply the two equalities from the hypothesis together, there will be a cancellation of numerators and denominators giving you the consequence.
+     - This is a simple algebraic fact: if you multiply the two equalities from the hypothesis together, there will be a cancellation of numerators and denominators giving you the consequence. **This rule is not in the final rules.txt file because it is covered by AR.**
 
 r11 : Bisector theorem I
 ^^^^^^^^^^^^^^^^^^^^^^^^
@@ -498,7 +498,7 @@ r30 : eqangle_perp2perp
      - Description
    * - |r30|
      - :math:`\begin{cases}\angle (AB\times PQ)=\angle (CD\times UV) \\ PQ\perp UV \end{cases}\implies AB\perp CD`
-     -
+     - This rule is the reverse direction of rule r08 (as can be seen by renaming Q->E, P->F, U->H, and V->G), and it is also a consequence of two triangles sharing a same vertex. **This rule is not in the final rules.txt file because it is covered by AR.**
 
 .. |r30| image:: ../../_static/images/rules/r30.png
     :width: 100%
@@ -514,7 +514,7 @@ r31 : eqratio_cong2cong
      - Description
    * - |r31|
      - :math:`\frac{AB}{PQ} = \frac{CD}{UV} \wedge |PQ| = |UV| \implies |AB| = |CD|`
-     -
+     - This rule simply eliminates equal denominators in an equality of ratios. **This rule is not in the final rules.txt file because it is covered by AR.**
 
 .. |r31| image:: ../../_static/images/rules/r06.png
     :width: 100%
@@ -530,7 +530,7 @@ r32 : cong_cong2contri
      - Description
    * - |r32|
      - :math:`\begin{cases}|AB| = |PQ| \\ |BC| = |QR| \\ |CA| = |RP|\end{cases}\implies \Delta ABC\cong^\ast \Delta PQR`
-     -
+     - 
 
 .. |r32| image:: ../../_static/images/rules/r32.png
     :width: 100%

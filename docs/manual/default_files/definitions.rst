@@ -3,9 +3,11 @@ Definitions
 
 Definitions are the basic building blocks for the statement of problems. Each definition works as a function, demanding a certain collection of arguments, in order to create new points, and add corresponding predicates to the proof state (see details in :ref:`Adding new problems`).
 
-The definitions available in the defs.txt file are the following (definitions in section :ref:`New Definitions` were added by us and are available in new_defs.txt):
+Constructions that are not points directly can be subject to intersection, otherwise they generate point coordinates through a random choice.
 
-Constructions that are not points directly should be subject to intersection.
+The definitions available in the defs.txt file are listed below. The definitions in section :ref:`New Definitions` were added by us.
+
+The original AlphaGeometry also had definitions "on_aline2" and "cc_tangent0", which were not functional, and "on_opline", which depended on the half-line class, which was eliminated. We also renamed the previous "eq_trapezoid" definition to "iso_trapezoid".
 
 Legacy definitions
 ------------------
@@ -523,7 +525,7 @@ midpoint x a b
      - Added Statements
      - Construction
    * - |midpoint|
-     - From a pair of points a, b, that are different, builds x, the midpoint of a and b.
+     - From a pair of points a, b, that are different, builds x, the midpoint of a and b. **The original version of AlphaGeometry did not return midpoint as a predicate, resulting in solutions where a midpoint construction would have to be recovered as a predicate during the proof. We fixed that.**
      - :math:`x\text{ midpoint of }ab`  (midp x a b)
      - Point
 
@@ -998,7 +1000,7 @@ triangle12 a b c
      - Added Statements
      - Construction
    * - |triangle12|
-     - From nothing, builds the three vertices a, b, c of a triangle such that the proportion ab:ac is 1:2.
+     - From nothing, builds the three vertices a, b, c of a triangle such that the proportion ab:ac is 1:2. **The current statement of this definition was changed with respect to the original one to adapt to the new formulation of the rconst predicate.**
      - :math:`\frac{ab}{ac}=\frac{1}{2}`  (rconst a b a c 1/2)
      - Points
 
@@ -1036,7 +1038,7 @@ e5128 x y a b c d
      - Added Statements
      - Construction
    * - |e5128|
-     - Given four points a, b, c, d, with bc=cd and bc perpendicular to ba, builds y the midpoint of ab and x the intersection of line dy and the circle centered at c through b. It transfers the angle bad to axy in a specific way, and was created specifically for problem complete_015_7_Book_00EE_06_E051-28.gex in the :ref:`jgex_ag_231` problem database, for which we do not have the original statement.
+     - Given four points a, b, c, d, with bc=cd and bc perpendicular to ba, builds y the midpoint of ab and x the intersection of line dy and the circle centered at c through b. It transfers the angle bad to axy in a specific way. **It was created specifically for problem complete_015_7_Book_00EE_06_E051-28.gex in the** :ref:`jgex_ag_231` **problem database, for which we do not have the original statement.**
      - :math:`\begin{cases}bc=cx\\ y,a,b\ collinear\\ x,y,d\ collinear\\ \widehat{bad}=\widehat{axy}\end{cases}`  (cong c b c x, coll y a b, coll x y d, eqangle a b a d x a x y)
      - Points
 
@@ -1055,7 +1057,7 @@ e5128 x y a b c d
      - Added Statements
      - Construction
    * - |3peq|
-     - Given three non-collinear points a, b, c, builds points x on the extended side ab, y in the extended side ac, and z on the extended side bc of triangle abc in a way that z is the midpoint of xy. It was created specifically for problem complete_010_Other_Auxiliary_ye_aux_think.gex in the :ref:`jgex_ag_231` problem database, for which we do not have the original statement.
+     - Given three non-collinear points a, b, c, builds points x on the extended side ab, y in the extended side ac, and z on the extended side bc of triangle abc in a way that z is the midpoint of xy. **It was created specifically for problem complete_010_Other_Auxiliary_ye_aux_think.gex in the** :ref:`jgex_ag_231` **problem database, for which we do not have the original statement.**
      - :math:`\begin{cases}z,b,c\ collinear\\ x,a,b\ collinear\\ y,a,c\ collinear\\ x,y,z\ collinear\\ xz=yz\end{cases}`  (coll z b c, coll x a b, coll y a c, coll x y z, cong z x z y)
      - Points
 
@@ -1229,7 +1231,7 @@ on_pline0 x a b c
      - Added Statements
      - Construction
    * - |on_pline|
-     - From three points a, b, c, with b different from c, builds x on the line parallel to bc through a. (Compare to :ref:`on_pline x a b c` above). This definition was created to allow for the addition of a parallel statement on overlapping lines, by dismissing the restriction of a, b, c being non-collinear, without which r28 would be a rule that could not occur.
+     - From three points a, b, c, with b different from c, builds x on the line parallel to bc through a. (Compare to :ref:`on_pline x a b c` above). **This definition was created to allow for the addition of a parallel statement on overlapping lines, by dismissing the restriction of a, b, c being non-collinear, without which r28 would be a rule that could not occur.**
      - :math:`xa\parallel bc`  (para x a b c)
      - Line
 
@@ -1245,7 +1247,7 @@ iso_triangle0 a b c
      - Added Statements
      - Construction
    * - |iso_triangle0|
-     - From nothing, creates the three vertices a, b, c of an isosceles triangle with ab=ac. It was created as a simplified version of :ref:`iso_triangle a b c` above, without adding the statement about the equality of base angles, which should come from rule r13.
+     - From nothing, creates the three vertices a, b, c of an isosceles triangle with ab=ac. **It was created as a simplified version of** :ref:`iso_triangle a b c` **above, without adding the statement about the equality of base angles, which should come from rule r13.**
      - :math:`ab= ac`  (cong a b a c)
      - Points
 
@@ -1264,7 +1266,7 @@ iso_triangle_vertex x b c
      - Added Statements
      - Construction
    * - |iso_triangle_vertex|
-     - From two points b, c that are distinct, builds a, the vertex of an isosceles triangle with base bc. It was created for explicitly creating isosceles triangles from a given base, but it is also a simplified version of :ref:`on_bline x a b` above, without adding the statement about the equality of base angles, which should come from rule r13. There is also a definition adding only the statement about the equality of the angles below (see :ref:`iso_triangle_vertex_angle x b c`).
+     - From two points b, c that are distinct, builds a, the vertex of an isosceles triangle with base bc. **It was created for explicitly creating isosceles triangles from a given base, but it is also a simplified version of** :ref:`on_bline x a b` **above, without adding the statement about the equality of base angles, which should come from rule r13. There is also a definition adding only the statement about the equality of the angles below (see** :ref:`iso_triangle_vertex_angle x b c` **).**
      - :math:`xb = xc`  (cong x b x c)
      - Line
 
@@ -1283,7 +1285,7 @@ iso_triangle_vertex_angle x b c
      - Added Statements
      - Construction
    * - |iso_triangle_vertex_angle|
-     - From two points b, c that are distinct, builds a, the vertex of an isosceles triangle with base bc. It was created for explicitly creating isosceles triangles from a given base, but it is also a simplified version of :ref:`on_bline x a b` above, only adding the statement about the equality of base angles. The segment congruence statement in the on_bline definition should come from rule r14. Compare also to :ref:`iso_triangle_vertex x b c` above.
+     - From two points b, c that are distinct, builds a, the vertex of an isosceles triangle with base bc. **It was created for explicitly creating isosceles triangles from a given base, but it is also a simplified version of** :ref:`on_bline x a b` **above, only adding the statement about the equality of base angles. The segment congruence statement in the on_bline definition should come from rule r14. Compare also to** :ref:`iso_triangle_vertex x b c` **above.**
      - :math:`\widehat{xbc}=\widehat{bcx}`  (eqangle x b b c b c x c)
      - Line
 
@@ -1302,7 +1304,7 @@ on_aline0 x a b c d e f g
      - Added Statements
      - Construction
    * - |on_aline0|
-     - From seven points a, b, c, d, e, f, g, with the constraint that a, b, c, and d do not lie all on the same line, build x such that the angle formed at the intersection of lines ef and gx is the same (up to a rotation and a translation) to the angle formed at the intersection between lines ab and cd. This definition was created as a base general case for the creation of congruent angles. Indeed, :ref:`angle_mirror x a b c` is equivalent to on_aline0 x b a b c b c b, and :ref:`on_aline x a b c d e` is equivalent to on_aline0 x d e d c a b a.
+     - From seven points a, b, c, d, e, f, g, with the constraint that a, b, c, and d do not lie all on the same line, build x such that the angle formed at the intersection of lines ef and gx is the same (up to a rotation and a translation) to the angle formed at the intersection between lines ab and cd. **This definition was created as a base general case for the creation of congruent angles. Indeed,** :ref:`angle_mirror x a b c` **is equivalent to on_aline0 x b a b c b c b, and** :ref:`on_aline x a b c d e` **is equivalent to on_aline0 x d e d c a b a.**
      - :math:`\angle (ab\times cd)=\angle (ef\times gx)`  (eqangle a b c d e f g x)
      - Line
 
@@ -1321,7 +1323,7 @@ eqratio x a b c d e f g
      - Added Statements
      - Construction
    * - |eqratio|
-     - From seven points a, b, c, d, e, f, g, builds x, a point such that ab/cd=ef/gx. This definition was created to allow for the explicit prescription of eqratio statements on problems.
+     - From seven points a, b, c, d, e, f, g, builds x, a point such that ab/cd=ef/gx. **This definition was created to allow for the explicit prescription of eqratio statements on problems.**
      - :math:`\frac{ab}{cd}=\frac{ef}{gx}`  (eqratio a b c d e f g x)
      - Circle
 
@@ -1340,7 +1342,7 @@ eqratio6 x a c e f g h
      - Added Statements
      - Construction
    * - |eqratio6|
-     - From six points a, c, e, f, g, h, builds x,  a point such that ax/cx=ef/gh. This definition was created to allow a common case for prescription of eqratio statements, when the new point shows up twice in the ratio equality (particularly common when subdividing a segment).
+     - From six points a, c, e, f, g, h, builds x,  a point such that ax/cx=ef/gh. **This definition was created to allow a common case for prescription of eqratio statements, when the new point shows up twice in the ratio equality (particularly common when subdividing a segment).**
      - :math:`\frac{ax}{cx}=\frac{ef}{gh}`  (eqratio a x c x e f g h)
      - Line if ef=gh, Circle otherwise
 
@@ -1359,7 +1361,7 @@ rconst a b c x r
      - Added Statements
      - Construction
    * - |rconst|
-     - Given three points a, b, c such that a is different from b, and a fraction r, builds x a point such that ab/cx=r. r should be entered as a fraction m/n, m, n two integers separated by "/". This definition was created to allow for the prescription of pairs of segments satisfying a given constant ratio.
+     - Given three points a, b, c such that a is different from b, and a fraction r, builds x a point such that ab/cx=r. r should be entered as a fraction m/n, m, n two integers separated by "/". **This definition was created to allow for the prescription of pairs of segments satisfying a given constant ratio.**
      - :math:`\frac{ab}{cx}=r=\frac{m}{n}`  (rconst a b c x r)
      - Circle
 
@@ -1378,7 +1380,7 @@ rconst2 x a b r
      - Added Statements
      - Construction
    * - |rconst2|
-     - Given two points a, b that are distinct, and a fraction r, builds x a point such that ax/bx=r. r should be entered as a fraction m/n, m, n two integers separated by "/". This definition was created to cover a different case of prescription of segments satisfying a constant ratio, in this case when the new point connects the segment which ratio we are taking. It is typically used to split a given segment into two pieces with the given ratio.
+     - Given two points a, b that are distinct, and a fraction r, builds x a point such that ax/bx=r. r should be entered as a fraction m/n, m, n two integers separated by "/". **This definition was created to cover a different case of prescription of segments satisfying a constant ratio, in this case when the new point connects the segment which ratio we are taking. It is typically used to split a given segment into two pieces with the given ratio.**
      - :math:`\frac{ax}{bx}=r=\frac{m}{n}`  (rconst x a x b r)
      - Line if r=1/1, Circle otherwise
 
@@ -1397,7 +1399,7 @@ aconst a b c x r
      - Added Statements
      - Construction
    * - |aconst|
-     - Given three points a, b, c, with a, b distinct, and an angle r, builds x a point such that the angle from line ab to line cx taken in the conterclockwise direction is r. r should be entered either as a fraction in radians in the form mpi/n, m, n two integers separated by "pi/", or in degrees in the from Ro, R an integer followed by the letter "o". This definition was created to allow for the insertion of a prescribed angle between two lines without fixing the intersection of the lines. It was necessary for the effectivity of the aconst predicate.
+     - Given three points a, b, c, with a, b distinct, and an angle r, builds x a point such that the angle from line ab to line cx taken in the conterclockwise direction is r. r should be entered either as a fraction in radians in the form mpi/n, m, n two integers separated by "pi/", or in degrees in the from Ro, R an integer followed by the letter "o". **This definition was created to allow for the insertion of a prescribed angle between two lines without fixing the intersection of the lines. It was necessary for the effectivity of the aconst predicate.**
      - :math:`\angle (ab\times cx)=r`  (aconst a b c x r)
      - Line
 
@@ -1416,7 +1418,7 @@ s_angle a b x y
      - Added Statements
      - Construction
    * - |s_angle|
-     - Given two points a, b that are distinct, and an angle y, builds x a point such that the angle from line ab to line bx taken in the conterclockwise direction is y. y should be entered either as a fraction in radians in the form mpi/n, m, n two integers separated by "pi/", or in degrees in the from Ro, R an integer followed by the letter "o". This definition was created to allow for the insertion of a prescribed angle between two lines with a fixed vertex. It is a modification of the previous s_angle definition in accordance to the aconst predicate.
+     - Given two points a, b that are distinct, and an angle y, builds x a point such that the angle from line ab to line bx taken in the conterclockwise direction is y. y should be entered either as a fraction in radians in the form mpi/n, m, n two integers separated by "pi/", or in degrees in the from Ro, R an integer followed by the letter "o". **This definition was created to allow for the insertion of a prescribed angle between two lines with a fixed vertex. It is a modification of the previous s_angle definition in accordance to the aconst predicate.**
      - :math:`\widehat{abx}=y`  (aconst a b b x y)
      - Line
 
@@ -1435,7 +1437,7 @@ lconst x a l
      - Added Statements
      - Construction
    * - |lconst|
-     - From a point a, builds x with an integer distance l from a to x. This definition was created as an entry point to add the manipulation of lengths to DDAR.
+     - From a point a, builds x with an integer distance l from a to x. **This definition was created as an entry point to add the manipulation of lengths to DDAR.**
      - :math:`x, a, b, c\text{ concyclic}`  (lconst x a l)
      - Circle
 
