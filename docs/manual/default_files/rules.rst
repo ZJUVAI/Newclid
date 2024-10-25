@@ -3,7 +3,13 @@ Rules
 
 Rules are the deduction rules that allow, from a given set of true facts, the derivation of new ones. Each rule asks for a collection of arguments, demanded by its premise predicates, that has to be "matched". Next, the rule is "applied", at which point the corresponding predicate is added to the proof state.
 
-As a standard, rules are labelled in order (r00 to r51), but some rules have more specific names, for readability. The naming shows in the proof step, as the reason a proof step is true.
+Rules are labelled in order (r00 to r63) to keep consistency through sources (documentation. papers, code), and a more specific name, for readability. The naming shows in the proof step, as the reason a proof step is true.
+
+Through development, different combinations of rules have been tried, and some have been abandoned, typically for efficiency considerations. r00 through r42 are the ones from the original AlphaGeometry paper, while our standard rules are in the rules.txt file in the codebase.
+
+The default_configs folder also contains the file unabridged_rules.txt, with all the rules that have been tried, abandoned or not, and empty_rules.txt, a blank txt file that can be used for testing the intrinsic working of the engine.
+
+From the original rules, our version of rules.txt contains changes in the statements of r07, r26, r34, r35, and r42 if compared to the original AlphaGeometry work.
 
 Legacy rules
 ------------
@@ -42,8 +48,8 @@ r01 : Definition of circle
 .. |r01| image:: ../../_static/images/rules/r01.png
     :width: 100%
 
-r02 : eqangle2para
-^^^^^^^^^^^^^^^^^^
+r02 : Parallel from inclination
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -58,8 +64,8 @@ r02 : eqangle2para
 .. |r02| image:: ../../_static/images/rules/r02.png
     :width: 100%
 
-r03 : cyclic2eqangle
-^^^^^^^^^^^^^^^^^^^^
+r03 : Arc determines internal angles
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -74,8 +80,8 @@ r03 : cyclic2eqangle
 .. |r03| image:: ../../_static/images/rules/r03.png
     :width: 100%
 
-r04 : eqangle2cyclic
-^^^^^^^^^^^^^^^^^^^^
+r04 : Congruent angles are in a circle
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -90,8 +96,8 @@ r04 : eqangle2cyclic
 .. |r04| image:: ../../_static/images/rules/r04.png
     :width: 100%
 
-r05 : eqangle_on_circle2cong
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r05 : Same arc same chord
+^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -122,8 +128,8 @@ r06 : Base of half triangle
 .. |r06| image:: ../../_static/images/rules/r06.png
     :width: 100%
 
-r07 : para2eqratio3
-^^^^^^^^^^^^^^^^^^^
+r07 : Thales Theorem I
+^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -133,13 +139,13 @@ r07 : para2eqratio3
      - Description
    * - |r07|
      - :math:`\begin{cases}AB\parallel CD\\ OAC \text{ collinear}\\ OBD\text{ collinear}\\ OAB\text{ non-collinear}\end{cases}\implies \begin{cases}\frac{OA}{OC}=\frac{OB}{OD}\\ \frac{AO}{AC}=\frac{BO}{BD}\\ \frac{OC}{AC}=\frac{OD}{BD}\end{cases}`
-     - This is an instance of Thales's theorem, saying that two parallel lines AB and CD cut by two intersecting transverse lines AC and BD, will determine a collection of proportional segments.
+     - This is an instance of Thales's theorem, saying that two parallel lines AB and CD cut by two intersecting transverse lines AC and BD, will determine a collection of proportional segments. **The original statement of this rule did not have the non-degeneracy condition ncoll O A B as a hypothesis.**
 
 .. |r07| image:: ../../_static/images/rules/r07.png
     :width: 100%
 
-r08 : perp_perp2eqangle
-^^^^^^^^^^^^^^^^^^^^^^^
+r08 : Right triangles common angle
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -247,8 +253,8 @@ r14 : Equal base angles imply isosceles
 .. |r14| image:: ../../_static/images/rules/r14.png
     :width: 100%
 
-r15 : circle_perp2eqangle
-^^^^^^^^^^^^^^^^^^^^^^^^^
+r15 : Arc determines internal angles (tangent)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -258,13 +264,13 @@ r15 : circle_perp2eqangle
      - Description
    * - |r15|
      - :math:`\begin{cases} O\text{ center of circle }ABC \\ OA \perp AX\end{cases} \implies \angle (AX\times AB) = \angle (CA\times CB)`
-     -
+     - This rule corresponds to r03 in the case the arc is determined by a tangent line. An internal angle determining that same arc will be congruent to the angle determining that arc with one leg being the tangent line at the vertex of the arc.
 
 .. |r15| image:: ../../_static/images/rules/r15.png
     :width: 100%
 
-r16 : circle_eqangle2perp
-^^^^^^^^^^^^^^^^^^^^^^^^^
+r16 : Same arc giving tangent
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -274,7 +280,7 @@ r16 : circle_eqangle2perp
      - Description
    * - |r16|
      - :math:`\begin{cases} O\text{ center of circle }ABC \\ \angle (AX\times AB)=\angle(CA\times CB)\end{cases} \implies OA\perp AX`
-     -
+     - Reverse direction of r15: if two angles with vertices on a circle see the same arc, but one vertex is also an extremal point of the arc, a leg of the angle through this extremal point is the tangent to the circle at that same point.
 
 .. |r16| image:: ../../_static/images/rules/r16.png
     :width: 100%
@@ -434,7 +440,7 @@ r26 : Diagonals of parallelogram II
      - Description
    * - |r26|
      - :math:`\begin{cases}M \text{ midpoint of }AB \\ AC \parallel BD \\ AD \parallel BC\\ ABD\text{ non-collinear} \end{cases}\implies M \text{ midpoint of }CD`
-     - The other direction of the previous rule, it says the diagonals of a parallelogram meet at their common midpoint.
+     - The other direction of the previous rule, it says the diagonals of a parallelogram meet at their common midpoint. **The original statement of this rule did not have the non-degeneracy condition ncoll A B D as a hypothesis.**
 
 .. |r26| image:: ../../_static/images/rules/r26.png
     :width: 100%
@@ -551,8 +557,8 @@ r33 : cong_eqangle2contri
 .. |r33| image:: ../../_static/images/rules/r33.png
     :width: 100%
 
-r34 : eqangle2simtri
-^^^^^^^^^^^^^^^^^^^^
+r34 : AA Similarity of triangles (direct)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -562,13 +568,13 @@ r34 : eqangle2simtri
      - Description
    * - |r34|
      - :math:`\begin{cases}\angle (BA\times BC) = \angle (QP\times QR) \\ \angle (CA\times CB) = \angle (RP\times RQ)\\ \Delta ABC\text{ has the same orientation as }\Delta PQR\end{cases}\implies \Delta ABC\sim \Delta PQR`
-     -
+     - This is a similarity condition for a pair of triangles: that of two pairs of congruent angles between the triangles (angle-angle similarity). This rule covers the case of direct similarity, that is, both triangles have the same orientation of vertices. **The original statement of this rule did not have the orientation check sameclock A B C P Q R as an explicit hypothesis, it was done in the background.**
 
 .. |r34| image:: ../../_static/images/rules/r34.png
     :width: 100%
 
-r35 : eqangle2simtri2
-^^^^^^^^^^^^^^^^^^^^^
+r35 : AA Similarity of triangles (reverse)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -578,7 +584,8 @@ r35 : eqangle2simtri2
      - Description
    * - |r35|
      - :math:`\begin{cases}\angle (BA\times BC) = \angle (QR\times QP) \\ \angle (CA\times CB) = \angle (RQ\times RP)\\ \Delta ABC\text{ has the same orientation as }\Delta PRQ\end{cases}\implies \Delta ABC\sim^r \Delta PQR`
-     - 
+     - This is a similarity condition for a pair of triangles: that of two pairs of congruent angles between the triangles (angle-angle similarity). This rule covers the case of reverse similarity, that is, the triangles have reversed orientation for the vertices. **The original statement of this rule did not have the orientation check sameclock A B C P R Q as an explicit hypothesis, it was done in the background.**
+
 
 .. |r35| image:: ../../_static/images/rules/r35.png
     :width: 100%
@@ -690,7 +697,7 @@ r42 : eqratio62para
      - Description
    * - |r42|
      - :math:`\begin{cases}AB\parallel CD \\ MAD\text{ collinear} \\ NBC\text{ collinear}\\ MN\parallel AB\\ ABC\text{ non-collinear}\end{cases}\implies \frac{MA}{MD}=\frac{NB}{NC}`
-     -
+     - This is a generic version of Thales theorem: if three parallel lines are cut by two other lines, there is a corresponding pair of proportional segments determined by the intersection points. It is the other direction of the theorem in rule r41. **The original version of this rule did not contain the non-degeneracy condition ncoll a b c as a hypothesis.**
 
 .. |r42| image:: ../../_static/images/rules/r42.png
     :width: 100%
