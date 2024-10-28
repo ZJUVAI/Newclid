@@ -34,31 +34,31 @@ r13 Isosceles triangle equal angles
 cong O A O B, ncoll O A B => eqangle O A A B A B O B
 r14 Equal base angles imply isosceles
 eqangle A O A B B A B O, ncoll O A B => cong O A O B
-r15 Arc determines internal angles (tangent)
+r15 Arc determines inscribed angles (tangent)
 circle O A B C, perp O A A X => eqangle A X A B C A C B
 r16 Same arc giving tangent
 circle O A B C, eqangle A X A B C A C B => perp O A A X
-r17
+r17 Central angle vs inscribed angle I
 circle O A B C, midp M B C => eqangle A B A C O B O M
-r18
+r18 Central angle vs inscribed angle II
 circle O A B C, coll M B C, eqangle A B A C O B O M => midp M B C
 r19 Hypothenuse is diameter
 perp A B B C, midp M A C => cong A M B M
 r20 Diameter is hypotenuse
 circle O A B C, coll O A C => perp A B B C
-r21
+r21 Cyclic trapezoid
 cyclic A B C D, para A B C D => eqangle A D C D C D C B
 r22 Bisector Construction
 midp M A B, perp O M A B => cong O A O B
 r23 Bisector is perpendicular
 cong A P B P, cong A Q B Q => perp A B P Q
-r24
+r24 Cyclic kite
 cong A P B P, cong A Q B Q, cyclic A B P Q => perp P A A Q
 r25 Diagonals of parallelogram I
 midp M A B, midp M C D => para A C B D
 r26 Diagonals of parallelogram II
 midp M A B, para A C B D, para A D B C, ncoll A B D => midp M C D
-r27
+r27 Thales theorem II
 eqratio O A A C O B B D, coll O A C, coll O B D, ncoll A B C, sameside A O C B O D => para A B C D
 r28 Overlapping parallels
 para A B A C => coll A B C
