@@ -144,8 +144,8 @@ r07 : Thales Theorem I
 .. |r07| image:: ../../_static/images/rules/r07.png
     :width: 100%
 
-r08 : Right triangles common angle
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r08 : Right triangles common angle I
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -253,8 +253,8 @@ r14 : Equal base angles imply isosceles
 .. |r14| image:: ../../_static/images/rules/r14.png
     :width: 100%
 
-r15 : Arc determines internal angles (tangent)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r15 : Arc determines inscribed angles (tangent)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -264,7 +264,7 @@ r15 : Arc determines internal angles (tangent)
      - Description
    * - |r15|
      - :math:`\begin{cases} O\text{ center of circle }ABC \\ OA \perp AX\end{cases} \implies \angle (AX\times AB) = \angle (CA\times CB)`
-     - This rule corresponds to r03 in the case the arc is determined by a tangent line. An internal angle determining that same arc will be congruent to the angle determining that arc with one leg being the tangent line at the vertex of the arc.
+     - This rule corresponds to r03 in the case the arc is determined by a tangent line. An inscribed angle determining that same arc will be congruent to the angle determining that arc with one leg being the tangent line at the vertex of the arc.
 
 .. |r15| image:: ../../_static/images/rules/r15.png
     :width: 100%
@@ -285,8 +285,8 @@ r16 : Same arc giving tangent
 .. |r16| image:: ../../_static/images/rules/r16.png
     :width: 100%
 
-r17 : circle_midp2eqangle
-^^^^^^^^^^^^^^^^^^^^^^^^^
+r17 : Central angle vs inscribed angle I
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -296,13 +296,13 @@ r17 : circle_midp2eqangle
      - Description
    * - |r17|
      - :math:`\begin{cases} O\text{ center of circle }ABC \\ M\text{ midpoint of }BC\end{cases} \implies \angle(AB\times AC)=\angle(OB\times OM)`
-     -
+     - This rule implies that the central angle doubles the inscribed angle when both determine the same arc in a circle. It mentions "bisects the chord" as an hypotheis instead of "halves the angle" because midpoint of a segment is a predicate, while bisector of an angle is not.
 
 .. |r17| image:: ../../_static/images/rules/r17.png
     :width: 100%
 
-r18 : eqangle2midp
-^^^^^^^^^^^^^^^^^^
+r18 : Central angle vs inscribed angle II
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -312,7 +312,7 @@ r18 : eqangle2midp
      - Description
    * - |r18|
      - :math:`\begin{cases} O\text{ center of circle }ABC \\ MBC\text{ collinear}\\ \angle(AB\times AC)=\angle(OB\times OM)\end{cases} \implies M\text{ midpoint of }BC`
-     -
+     - This is the other direction of rule r17. It also has a statement about the bisection of a chord in the circle. Specifically, it says that if a central angle has the same measure as a given inscribed angle on a circle, it will cut the chord corresponding to that angle in half.
 
 .. |r18| image:: ../../_static/images/rules/r18.png
     :width: 100%
@@ -349,8 +349,8 @@ r20 : Diameter is hypotenuse
 .. |r20| image:: ../../_static/images/rules/r20.png
     :width: 100%
 
-r21 : cyclic_para2eqangle
-^^^^^^^^^^^^^^^^^^^^^^^^^
+r21 : Cyclic trapezoid
+^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -360,7 +360,7 @@ r21 : cyclic_para2eqangle
      - Description
    * - |r21|
      - :math:`\begin{cases}ABCD\text{ on a circle} \\ AB \parallel CD\end{cases} \implies \angle (AD\times CD) = \angle (CD\times CB)`
-     -
+     - This rule says that a cyclic trapezoid is isosceles (refering specifically to the congruence of the angles on a base).
 
 .. |r21| image:: ../../_static/images/rules/r21.png
     :width: 100%
@@ -397,8 +397,8 @@ r23 : Bisector is perpendicular
 .. |r23| image:: ../../_static/images/rules/r23.png
     :width: 100%
 
-r24 : cong_cyclic2perp
-^^^^^^^^^^^^^^^^^^^^^^
+r24 : Cyclic kite
+^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -408,7 +408,7 @@ r24 : cong_cyclic2perp
      - Description
    * - |r24|
      - :math:`\begin{cases}|AP|=|BP| \\ |AQ|=|BQ| \\ ABPQ\text{ on a circle}\end{cases} \implies PA\perp AQ`
-     -
+     - This theorem says that a cyclic kite is always formed by two symmetric right triangles.
 
 .. |r24| image:: ../../_static/images/rules/r24.png
     :width: 100%
@@ -445,8 +445,8 @@ r26 : Diagonals of parallelogram II
 .. |r26| image:: ../../_static/images/rules/r26.png
     :width: 100%
 
-r27 : eqratio_sameside2para
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r27 : Thales theorem II
+^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -456,7 +456,7 @@ r27 : eqratio_sameside2para
      - Description
    * - |r27|
      - :math:`\begin{cases}\frac{OA}{AC}=\frac{OB}{BD}\\ OAC\text{ collinear}\\OBD\text{ collinear}\\ ABC \text{ non-collinear}\\ A\text{ to the same side of }O\to C\text{ as }B\text{ to }O\to D\end{cases}\implies AB\parallel CD`
-     -
+     - This is another instance of Thales theorem, one saying that if two points C and D split to legs of a triangle on the same ratio, the line CD will be parallel to the base of the triangle.
 
 .. |r27| image:: ../../_static/images/rules/r27.png
     :width: 100%
@@ -493,8 +493,8 @@ r29 : Midpoint is an eqratio
 .. |r29| image:: ../../_static/images/rules/r29.png
     :width: 100%
 
-r30 : eqangle_perp2perp
-^^^^^^^^^^^^^^^^^^^^^^^
+r30 : Right triangles common angle II
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -509,8 +509,8 @@ r30 : eqangle_perp2perp
 .. |r30| image:: ../../_static/images/rules/r30.png
     :width: 100%
 
-r31 : eqratio_cong2cong
-^^^^^^^^^^^^^^^^^^^^^^^
+r31 : Denominator cancelling
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -525,8 +525,8 @@ r31 : eqratio_cong2cong
 .. |r31| image:: ../../_static/images/rules/r06.png
     :width: 100%
 
-r32 : cong_cong2contri
-^^^^^^^^^^^^^^^^^^^^^^
+r32 : SSS Triangle congruence
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -536,13 +536,13 @@ r32 : cong_cong2contri
      - Description
    * - |r32|
      - :math:`\begin{cases}|AB| = |PQ| \\ |BC| = |QR| \\ |CA| = |RP|\end{cases}\implies \Delta ABC\cong^\ast \Delta PQR`
-     - 
+     - This rule covers the congruence case for two triangles when both have corresponding equal sides. The * in the congruence sign denotes the matching function checks both for triangles that have the same vertex orientation and a different one.
 
 .. |r32| image:: ../../_static/images/rules/r32.png
     :width: 100%
 
-r33 : cong_eqangle2contri
-^^^^^^^^^^^^^^^^^^^^^^^^^
+r33 : SAS Triangle congruence
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -552,7 +552,7 @@ r33 : cong_eqangle2contri
      - Description
    * - |r33|
      - :math:`\begin{cases}|AB| = |PQ| \\ |BC| = |QR| \\ \angle (BA\times BC) = \angle (QP\times QR)\end{cases}\implies \Delta ABC\cong^\ast\Delta PQR`
-     -
+     - This rule covers the congruence case for two triangles when both have two corresponding equal sides and an equal angle between them. The * in the congruence sign denotes the matching function checks both for triangles that have the same vertex orientation and a different one.
 
 .. |r33| image:: ../../_static/images/rules/r33.png
     :width: 100%
@@ -590,8 +590,8 @@ r35 : AA Similarity of triangles (reverse)
 .. |r35| image:: ../../_static/images/rules/r35.png
     :width: 100%
 
-r36 : eqangle_cong2contri
-^^^^^^^^^^^^^^^^^^^^^^^^^
+r36 : ASA Congruence of triangles (direct)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -601,13 +601,13 @@ r36 : eqangle_cong2contri
      - Description
    * - |r36|
      - :math:`\begin{cases}\angle (BA\times BC) = \angle (QP\times QR) \\ \angle (CA\times CB) = \angle (RP\times RQ)\\ |AB| = |PQ| \\ ABC\text{ non-collinear} \end{cases}\implies \Delta ABC\cong \Delta PQR`
-     -
+     - This rule covers the congruence case for two triangles when both have two corresponding equal angles and an equal side. This rule covers the case of direct congruence, that is, both triangles have the same orientation of vertices.
 
 .. |r36| image:: ../../_static/images/rules/r36.png
     :width: 100%
 
-r37 : eqangle_cong2contri
-^^^^^^^^^^^^^^^^^^^^^^^^^
+r37 : ASA Congruence of triangles (reverse)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -616,14 +616,14 @@ r37 : eqangle_cong2contri
      - Formal Statement
      - Description
    * - |r37|
-     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QP\times QR) \\ \angle (CA\times CB) = \angle (RP\times RQ)\\ |AB| = |PQ| \\ ABC\text{ non-collinear} \end{cases}\implies \Delta ABC\cong^2 \Delta PQR`
-     -
+     - :math:`\begin{cases}\angle (BA\times BC) = \angle (QP\times QR) \\ \angle (CA\times CB) = \angle (RP\times RQ)\\ |AB| = |PQ| \\ ABC\text{ non-collinear} \end{cases}\implies \Delta ABC\cong^r \Delta PQR`
+     - This rule covers the congruence case for two triangles when both have two corresponding equal angles and an equal side. This rule covers the case of reverse congruence, that is, both triangles have the opposite orientation for the vertices.
 
 .. |r37| image:: ../../_static/images/rules/r37.png
     :width: 100%
 
-r38 : eqratio_eqangle2simtri
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r38 : SSS Triangle similarity (original)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -633,7 +633,7 @@ r38 : eqratio_eqangle2simtri
      - Description
    * - |r38|
      - :math:`\begin{cases}\frac{BA}{BC} = \frac{QP}{QR} \\ \frac{CA}{CB} = \frac{RP}{RQ}\\ ABC\text{ non-collinear} \end{cases}\implies \Delta ABC\sim^\ast \Delta PQR`
-     -
+     - This rule covers the similarity case for two triangles when both have corresponding equal sides. The * in the similarity sign denotes the matching function checks both for triangles that have the same vertex orientation and a different one. **This rule has been replaced by rules r60 and r61 to prevent hiding the orientation checking inside the matching funtion.**
 
 .. |r38| image:: ../../_static/images/rules/r38.png
     :width: 100%
