@@ -633,13 +633,13 @@ r38 : SSS Triangle similarity (original)
      - Description
    * - |r38|
      - :math:`\begin{cases}\frac{BA}{BC} = \frac{QP}{QR} \\ \frac{CA}{CB} = \frac{RP}{RQ}\\ ABC\text{ non-collinear} \end{cases}\implies \Delta ABC\sim^\ast \Delta PQR`
-     - This rule covers the similarity case for two triangles when both have corresponding equal sides. The * in the similarity sign denotes the matching function checks both for triangles that have the same vertex orientation and a different one. **This rule has been replaced by rules r60 and r61 to prevent hiding the orientation checking inside the matching funtion.**
+     - This rule covers the similarity case for two triangles when both have corresponding proportional sides. The * in the similarity sign denotes the matching function checks both for triangles that have the same vertex orientation and a different one. **This rule has been replaced by rules r60 and r61 to prevent hiding the orientation checking inside the matching funtion.**
 
 .. |r38| image:: ../../_static/images/rules/r38.png
     :width: 100%
 
-r39 : eqratio_eqangle2simtri
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r39 : SAS Triangle similarity (original)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -649,13 +649,13 @@ r39 : eqratio_eqangle2simtri
      - Description
    * - |r39|
      - :math:`\begin{cases}\frac{BA}{BC} = \frac{QP}{QR} \\ \angle (BA\times BC)\rangle = \angle (QP\times QR)\\ ABC\text{ non-collinear}\end{cases} \implies \Delta ABC\sim^\ast \Delta PQR`
-     -
+     - This rule covers the similarity case for two triangles when both have a corresponding pair of proportional sides, with an equal angle between them. The * in the similarity sign denotes the matching function checks both for triangles that have the same vertex orientation and a different one. **This rule has been replaced by rules r62 and r63 to prevent hiding the orientation checking inside the matching funtion.**
 
 .. |r39| image:: ../../_static/images/rules/r39.png
     :width: 100%
 
-r40 : eqratio_eqratio_cong2contri
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+r40 : Similarity without scaling
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -664,14 +664,14 @@ r40 : eqratio_eqratio_cong2contri
      - Formal Statement
      - Description
    * - |r40|
-     - :math:`\begin{cases}\frac{BA}{BC} = \frac{QP}{QR} \\ \frac{CA}{CB} = \frac{RP}{RQ}\\ ABC\text{ non-collinear} \\ |AB| = |PQ|\end{cases}\implies ABC\cong^\ast PQR`
-     -
+     - :math:`\begin{cases}\frac{BA}{BC} = \frac{QP}{QR} \\ \frac{CA}{CB} = \frac{RP}{RQ}\\ ABC\text{ non-collinear} \\ |AB| = |PQ|\end{cases}\implies \Delta ABC\cong^\ast \Delta PQR`
+     - This rule encompasses the fact that if the ratio of similarity of two similar triangles is one (they have corresponding congruent sides), the triangles are congruent.
 
 .. |r40| image:: ../../_static/images/rules/r40.png
     :width: 100%
 
-r41 : para2eqratio
-^^^^^^^^^^^^^^^^^^
+r41 : Thales theorem III
+^^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -681,13 +681,13 @@ r41 : para2eqratio
      - Description
    * - |r41|
      - :math:`\begin{cases}AB\parallel CD \\ MAD\text{ collinear} \\ NBC \text{ collinear} \\ \frac{MA}{MD}=\frac{NB}{NC}\\ M\text{ to the same side of } A\to D\text{ as }N\text{ to }B\to C \end{cases}\implies MN\parallel A B`
-     -
+     - This is still another instance of Thales theorem, one that saying that if two transverse lines cross three lines, two of which are parallel, with proportional pairs of segments in the proper configuration, the third line crossed is also parallel to the other two.
 
 .. |r41| image:: ../../_static/images/rules/r41.png
     :width: 100%
 
-r42 : eqratio62para
-^^^^^^^^^^^^^^^^^^^
+r42 : Thales theorem IV
+^^^^^^^^^^^^^^^^^^^^^^^
 .. list-table::
    :widths: 50 25 25
    :header-rows: 1
@@ -697,7 +697,7 @@ r42 : eqratio62para
      - Description
    * - |r42|
      - :math:`\begin{cases}AB\parallel CD \\ MAD\text{ collinear} \\ NBC\text{ collinear}\\ MN\parallel AB\\ ABC\text{ non-collinear}\end{cases}\implies \frac{MA}{MD}=\frac{NB}{NC}`
-     - This is a generic version of Thales theorem: if three parallel lines are cut by two other lines, there is a corresponding pair of proportional segments determined by the intersection points. It is the other direction of the theorem in rule r41. **The original version of this rule did not contain the non-degeneracy condition ncoll a b c as a hypothesis.**
+     - This is probably the most common version of Thales theorem: if three parallel lines are cut by two other lines, there is a corresponding pair of proportional segments determined by the intersection points. It is the other direction of the theorem in rule r41. **The original version of this rule did not contain the non-degeneracy condition ncoll a b c as a hypothesis.**
 
 .. |r42| image:: ../../_static/images/rules/r42.png
     :width: 100%
@@ -845,3 +845,195 @@ r51 : Midpoint splits in two
    * - (Feeds algebraic module)
      - :math:`M\text{ midpoint of AB}\implies \frac{MA}{AB}=\frac{1}{2}`
      - This rule converts a symbolic statement (M is the midpoint of AB) into an algebraic one (the ratio between AM and AB is 1:2). This allows AR to process information from midpoints.
+
+r52 : Properties of similar triangles (Direct)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r52|
+     - :math:`\Delta ABC\sim \Delta PQR\implies \begin{cases}\angle(BA\times BC)=\angle(QP\times QR)\\ \frac{BA}{BC}=\frac{QP}{QR}\end{cases}`
+     - This rule was created to explicitate the definition of what a similar triangle is, by going from the pure statement that two triangles are similar to spilling out the corresponding statements about the proportion of the lengths of the sides and the equivalence of angles on both triangles. This rule covers the case where the vertices of both triangles have the same orientation, and is the reverse direction of rule r62.
+
+.. |r52| image:: ../../_static/images/rules/r52.png
+    :width: 100%
+
+r53 : Properties of similar triangles (Reverse)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r53|
+     - :math:`\Delta ABC\sim^r \Delta PQR\implies \begin{cases}\angle(BA\times BC)=\angle(QR\times QP)\\ \frac{BA}{BC}=\frac{QP}{QR}\end{cases}`
+     - This rule was created to explicitate the definition of what a similar triangle is, by going from the pure statement that two triangles are similar to spilling out the corresponding statements about the proportion of the lengths of the sides and the equivalence of angles on both triangles. This rule covers the case where the vertices of both triangles have the opposite orientation, and is the reverse direction of rule r63.
+
+.. |r53| image:: ../../_static/images/rules/r53.png
+    :width: 100%
+
+r54 : Definition of midpoint
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r54|
+     - :math:`\begin{cases}MA=MB\\ MAB\text{ collinear}\end{cases}\implies M\text{ midpoint of AB}`
+     - This rule was created to detect midpoints by their defining axiomatic properties. It solidifies midp as a predicate.
+
+.. |r54| image:: ../../_static/images/rules/r54.png
+    :width: 100%
+
+r55 : Properties of midpoint (cong)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r55|
+     - :math:`M\text{ midpoint of }AB\implies MA=MB`
+     - This rule extracts from the midp predicate the property that the midpoint is equidistant from the extremes of the segment. **This was done previously inside the definition of a midpoint. Our change makes this implication explicit.**
+
+.. |r55| image:: ../../_static/images/rules/r55.png
+    :width: 100%
+
+r56 : Properties of midpoint (coll)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r56|
+     - :math:`M\text{ midpoint of }AB\implies MAB\text{ collinear}`
+     - This rule extracts symbolically from the midp predicate the property that the midpoint is on the line of the segment. **This was done previously inside the definition of a midpoint. Our change makes this implication explicit.**
+
+.. |r56| image:: ../../_static/images/rules/r56.png
+    :width: 100%
+
+r57 : Pythagoras theorem
+^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r57|
+     - :math:`\begin{array}{c}\Delta ABC\text{ is a right triangle with hypotenuse }BC\\ \Downarrow\\\text{ Missing information from Pythagoras theorem}\end{array}`
+     - This rule behaves differently from the others, as both directions of Pythagoras theorem are checked at the same time. If we have a right triangle ABC, it will verify what conditions are already in the proof state. If the proof state symbolically knows the three lengths of the sides, and they satisfy that the sum of the squares of the lengths of the legs is equal to the square of the hypothenuse, it will add the proper orthogonal relation to the proof state. If the proof state has a perpendicular statement and two lengths of sides of the correspoding right triangle, it will add the lconst predicate corresponding to the missing length. The operation does not solve the algebra, it verifies if enough information exists and if that is the case it numerically gets the missing side when using the famous formula.
+
+.. |r57| image:: ../../_static/images/rules/r57.png
+    :width: 100%
+
+r58 : Same chord same arc I
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r58|
+     - :math:`\begin{cases}ABCPQR\text{ on a circle}\\ AB=PQ\\ \Delta CAB\text{ has the same orientation as }\Delta RPQ\\ C\text{ to the same side of }A\to B\text{ as }R\text{ to }P\to Q\end{cases}\implies \angle(CA\times CB)=\angle(RP\times RQ)`
+     - This is one of the rules that gives the opposite direction of r05, giving conditions for inscribed angles on a circle defining chords of the same length to have the same measure. It has to consider two different configurations to account for complications of using full angles. The other configuration is given in r59.
+
+.. |r58| image:: ../../_static/images/rules/r58.png
+    :width: 100%
+
+r59 : Same chord same arc II
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r59|
+     - :math:`\begin{cases}ABCPQR\text{ on a circle}\\ AB=PQ\\ \Delta CBA\text{ has the same orientation as }\Delta RPQ\\ C\text{ not to the same side of }A\to B\text{ as }R\text{ to }P\to Q\end{cases}\implies \angle(CA\times CB)=\angle(RP\times RQ)`
+     - This is one of the rules that gives the opposite direction of r05, giving conditions for inscribed angles on a circle defining chords of the same length to have the same measure. It has to consider two different configurations to account for complications of using full angles. The other configuration is given in r58.
+
+.. |r59| image:: ../../_static/images/rules/r59.png
+    :width: 100%
+
+r60 : SSS Similarity of triangles (Direct)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r60|
+     - :math:`\begin{cases}\frac{BA}{BC}=\frac{QP}{QR}\\ \frac{CA}{CB}=\frac{RP}{RQ}\\ \Delta ABC\text{ has the same orientation as }\Delta PQR\end{cases}\implies \Delta ABC\sim \Delta PQR`
+     - This rule covers the similarity case for two triangles when both have corresponding proportional sides and have the same orientation. **This rule, together with r61, replaces the original r38.**
+
+.. |r60| image:: ../../_static/images/rules/r60.png
+    :width: 100%
+
+r61 : SSS Similarity of triangles (Reverse)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r61|
+     - :math:`\begin{cases}\frac{BA}{BC}=\frac{QP}{QR}\\ \frac{CA}{CB}=\frac{RP}{RQ}\\ \Delta ABC\text{ has the same orientation as }\Delta PRQ\end{cases}\implies \Delta ABC\sim^r \Delta PQR`
+     - This rule covers the similarity case for two triangles when both have corresponding proportional sides and have opposite orientations. **This rule, together with r60, replaces the original r38.**
+
+.. |r61| image:: ../../_static/images/rules/r61.png
+    :width: 100%
+
+r62 : SAS Similarity of triangles (Direct)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r62|
+     - :math:`\begin{cases}\frac{BA}{BC}=\frac{QP}{QR}\\ \angle (BA\times BC)=\angle (QP\times QR)\\ \Delta ABC\text{ has the same orientation as }\Delta PQR\end{cases}\implies \Delta ABC\sim \Delta PQR`
+     - This rule covers the similarity case for two triangles when both have a corresponding pair of proportional sides, with an equal angle between them, and have the same orientation. **This rule, together with r63, replaces the original r39.**
+
+.. |r62| image:: ../../_static/images/rules/r62.png
+    :width: 100%
+
+r63 : SAS Similarity of triangles (Reverse)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r63|
+     - :math:`\begin{cases}\frac{BA}{BC}=\frac{QP}{QR}\\ \angle (BA\times BC)=\angle (QR\times QP)\\ \Delta ABC\text{ has the same orientation as }\Delta PRQ\end{cases}\implies \Delta ABC\sim^r \Delta PQR`
+     - This rule covers the similarity case for two triangles when both have a corresponding pair of proportional sides, with an equal angle between them, and have opposite orientations. **This rule, together with r62, replaces the original r39.**
+
+.. |r63| image:: ../../_static/images/rules/r63.png
+    :width: 100%
