@@ -62,14 +62,6 @@ r30
 eqangle A B P Q C D U V, perp P Q U V => perp A B C D
 r31
 eqratio A B P Q C D U V, cong P Q U V => cong A B C D
-r64
-cong A B P Q, cong B C Q R, cong C A R P, ncoll A B C, sameclock A B C P Q R => contri A B C P Q R
-r65
-cong A B P Q, cong B C Q R, cong C A R P, ncoll A B C, sameclock A B C P R Q => contrir A B C P Q R
-r66
-cong A B P Q, cong B C Q R, eqangle B A B C Q P Q R, ncoll A B C, sameclock A B C P Q R => contri A B C P Q R
-r67
-cong A B P Q, cong B C Q R, eqangle B A B C Q P Q R, ncoll A B C, sameclock A B C P R Q => contrir A B C P Q R
 r34
 eqangle B A B C Q P Q R, eqangle C A C B R P R Q, ncoll A B C, sameclock A B C P Q R => simtri A B C P Q R
 r35
@@ -78,18 +70,6 @@ r36
 eqangle B A B C Q P Q R, eqangle C A C B R P R Q, ncoll A B C, cong A B P Q, sameclock A B C P Q R => contri A B C P Q R
 r37
 eqangle B A B C Q R Q P, eqangle C A C B R Q R P, ncoll A B C, cong A B P Q, sameclock A B C P R Q => contrir A B C P Q R
-r60
-eqratio B A B C Q P Q R, eqratio C A C B R P R Q, ncoll A B C, sameclock A B C P Q R => simtri A B C P Q R
-r61
-eqratio B A B C Q P Q R, eqratio C A C B R P R Q, ncoll A B C, sameclock A B C P R Q => simtrir A B C P Q R
-r62
-eqratio B A B C Q P Q R, eqangle B A B C Q P Q R, ncoll A B C, sameclock A B C P Q R => simtri A B C P Q R
-r63
-eqratio B A B C Q P Q R, eqangle B A B C Q P Q R, ncoll A B C, sameclock A B C P R Q => simtrir A B C P Q R
-r68
-eqratio B A B C Q P Q R, eqratio C A C B R P R Q, ncoll A B C, cong A B P Q, sameclock A B C P Q R => contri A B C P Q R
-r69
-eqratio B A B C Q P Q R, eqratio C A C B R P R Q, ncoll A B C, cong A B P Q, sameclock A B C P R Q => contrir A B C P Q R
 r41
 para a b c d, coll m a d, coll n b c, eqratio m a m d n b n c, sameside m a d n b c => para m n a b
 r42
@@ -112,7 +92,39 @@ r50
 cyclic A B C D, cong O A O B, cong O C O D, npara A B C D => cong O A O C
 r51
 midp M A B => rconst M A A B 1/2
+r52
+simtri A B C P Q R => eqangle B A B C Q P Q R, eqratio B A B C Q P Q R
+r53
+simtrir A B C P Q R => eqangle B A B C Q R Q P, eqratio B A B C Q P Q R
+r54
+cong M A M B, coll M A B => midp M A B
+r55
+midp M A B => cong M A M B
+r56
+midp M A B => coll M A B
+r57
+PythagoreanPremises a b c => PythagoreanConclusions a b c
 r58
 cyclic a b c p q r, cong a b p q, sameclock c a b r p q, sameside c a b r p q => eqangle c a c b r p r q
 r59
 cyclic a b c p q r, cong a b p q, sameclock c b a r p q, nsameside c b a r p q => eqangle c a c b r q r p
+r60
+eqratio B A B C Q P Q R, eqratio C A C B R P R Q, ncoll A B C, sameclock A B C P Q R => simtri A B C P Q R
+r61
+eqratio B A B C Q P Q R, eqratio C A C B R P R Q, ncoll A B C, sameclock A B C P R Q => simtrir A B C P Q R
+r62
+eqratio B A B C Q P Q R, eqangle B A B C Q P Q R, ncoll A B C, sameclock A B C P Q R => simtri A B C P Q R
+r63
+eqratio B A B C Q P Q R, eqangle B A B C Q P Q R, ncoll A B C, sameclock A B C P R Q => simtrir A B C P Q R
+r64
+cong A B P Q, cong B C Q R, cong C A R P, ncoll A B C, sameclock A B C P Q R => contri A B C P Q R
+r65
+cong A B P Q, cong B C Q R, cong C A R P, ncoll A B C, sameclock A B C P R Q => contrir A B C P Q R
+r66
+cong A B P Q, cong B C Q R, eqangle B A B C Q P Q R, ncoll A B C, sameclock A B C P Q R => contri A B C P Q R
+r67
+cong A B P Q, cong B C Q R, eqangle B A B C Q P Q R, ncoll A B C, sameclock A B C P R Q => contrir A B C P Q R
+r68
+eqratio B A B C Q P Q R, eqratio C A C B R P R Q, ncoll A B C, cong A B P Q, sameclock A B C P Q R => contri A B C P Q R
+r69
+eqratio B A B C Q P Q R, eqratio C A C B R P R Q, ncoll A B C, cong A B P Q, sameclock A B C P R Q => contrir A B C P Q R
