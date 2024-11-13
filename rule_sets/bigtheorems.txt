@@ -1,6 +1,0 @@
-simsons
-cyclic a b c p, coll a l c, perp p l a c, coll m b c, perp p m b c, coll n a b, perp p n a b => coll l m n
-centroid
-midp m a b, coll m x c, midp n b c, coll n x a, midp p c a => coll x p b
-pappus
-coll a b c, coll p q r, coll x a q, coll x p b, coll y a r, coll y p c, coll z b r, coll z c q => coll x y z
