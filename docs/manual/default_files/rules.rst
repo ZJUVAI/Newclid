@@ -536,7 +536,7 @@ r32 : SSS Triangle congruence
      - Description
    * - |r32|
      - :math:`\begin{cases}|AB| = |PQ| \\ |BC| = |QR| \\ |CA| = |RP|\end{cases}\implies \Delta ABC\cong^\ast \Delta PQR`
-     - This rule covers the congruence case for two triangles when both have corresponding equal sides. The * in the congruence sign denotes the matching function checks both for triangles that have the same vertex orientation and a different one.
+     - This rule covers the congruence case for two triangles when both have corresponding equal sides. The * in the congruence sign denotes the matching function checks both for triangles that have the same vertex orientation and a different one. **This rule has been replaced by rules r64 and r65 to prevent hiding the orientation checking inside the matching funtion.**
 
 .. |r32| image:: ../../_static/images/rules/r32.png
     :width: 100%
@@ -552,7 +552,7 @@ r33 : SAS Triangle congruence
      - Description
    * - |r33|
      - :math:`\begin{cases}|AB| = |PQ| \\ |BC| = |QR| \\ \angle (BA\times BC) = \angle (QP\times QR)\end{cases}\implies \Delta ABC\cong^\ast\Delta PQR`
-     - This rule covers the congruence case for two triangles when both have two corresponding equal sides and an equal angle between them. The * in the congruence sign denotes the matching function checks both for triangles that have the same vertex orientation and a different one.
+     - This rule covers the congruence case for two triangles when both have two corresponding equal sides and an equal angle between them. The * in the congruence sign denotes the matching function checks both for triangles that have the same vertex orientation and a different one. **This rule has been replaced by rules r66 and r67 to prevent hiding the orientation checking inside the matching funtion.**
 
 .. |r33| image:: ../../_static/images/rules/r33.png
     :width: 100%
@@ -665,7 +665,7 @@ r40 : Similarity without scaling
      - Description
    * - |r40|
      - :math:`\begin{cases}\frac{BA}{BC} = \frac{QP}{QR} \\ \frac{CA}{CB} = \frac{RP}{RQ}\\ ABC\text{ non-collinear} \\ |AB| = |PQ|\end{cases}\implies \Delta ABC\cong^\ast \Delta PQR`
-     - This rule encompasses the fact that if the ratio of similarity of two similar triangles is one (they have corresponding congruent sides), the triangles are congruent.
+     - This rule encompasses the fact that if the ratio of similarity of two similar triangles is one (they have corresponding congruent sides), the triangles are congruent. **This rule has been replaced by rules r68 and r69 to prevent hiding the orientation checking inside the matching funtion.**
 
 .. |r40| image:: ../../_static/images/rules/r40.png
     :width: 100%
@@ -1036,4 +1036,100 @@ r63 : SAS Similarity of triangles (Reverse)
      - This rule covers the similarity case for two triangles when both have a corresponding pair of proportional sides, with an equal angle between them, and have opposite orientations. **This rule, together with r62, replaces the original r39.**
 
 .. |r63| image:: ../../_static/images/rules/r63.png
+    :width: 100%
+
+r64 : SSS Congruence of triangles (Direct)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r64|
+     - :math:`\begin{cases}AB=PQ\\ BC=QR\\ AC=RP\\ ABC\text{ non-collinear}\\ \Delta ABC\text{ has the same orientation as }\Delta PQR\end{cases}\implies \Delta ABC\cong \Delta PQR`
+     - This rule covers the congruence case for two triangles when both have corresponding equal sides, and have the same orientation. **This rule, together with r65, replaces the original r32.**
+
+.. |r64| image:: ../../_static/images/rules/r64.png
+    :width: 100%
+
+r65 : SSS Congruence of triangles (Reverse)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r65|
+     - :math:`\begin{cases}AB=PQ\\ BC=QR\\ AC=RP\\ ABC\text{ non-collinear}\\ \Delta ABC\text{ has the same orientation as }\Delta PRQ\end{cases}\implies \Delta ABC\cong^r \Delta PQR`
+     - This rule covers the congruence case for two triangles when both have corresponding equal sides, and have opposite orientations. **This rule, together with r64, replaces the original r32.**
+
+.. |r65| image:: ../../_static/images/rules/r65.png
+    :width: 100%
+
+r66 : SAS Congruence of triangles (Direct)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r66|
+     - :math:`\begin{cases}AB=PQ\\ BC=QR\\ \angle (BA\times BC)=\angle (QP\times QR)\\ ABC\text{ non-collinear}\\ \Delta ABC\text{ has the same orientation as }\Delta PQR\end{cases}\implies \Delta ABC\cong \Delta PQR`
+     - This rule covers the congruence case for two triangles when both have a pair of corresponding equal sides, and a congruent angle between them, and have the same orientation. **This rule, together with r67, replaces the original r33.**
+
+.. |r66| image:: ../../_static/images/rules/r66.png
+    :width: 100%
+
+r67 : SAS Congruence of triangles (Reverse)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r67|
+     - :math:`\begin{cases}AB=PQ\\ BC=QR\\ \angle (BA\times BC)=\angle (QP\times QR)\\ ABC\text{ non-collinear}\\ \Delta ABC\text{ has the same orientation as }\Delta PRQ\end{cases}\implies \Delta ABC\cong^r \Delta PQR`
+     - This rule covers the congruence case for two triangles when both have a pair of corresponding equal sides, and a congruent angle between them, and have opposite orientations. **This rule, together with r66, replaces the original r33.**
+
+.. |r67| image:: ../../_static/images/rules/r67.png
+    :width: 100%
+
+r68 : Similarity without scaling (Direct)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r68|
+     - :math:`\begin{cases}\frac{AB}{BC}=\frac{PQ}{QR}\\ \frac{AC}{BC}=\frac{PR}{QR}\\ ABC\text{ non-collinear}\\ AB=PQ\\ \Delta ABC\text{ has the same orientation as }\Delta PQR\end{cases}\implies \Delta ABC\cong \Delta PQR`
+     - This rule encompasses the fact that if the ratio of similarity of two similar triangles is one (they have corresponding congruent sides), the triangles are congruent. It considers the case when triangles have the same orientation. **This rule, together with r69, replaces the original r40.**
+
+.. |r68| image:: ../../_static/images/rules/r68.png
+    :width: 100%
+
+r69 : Similarity without scaling (Reverse)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. list-table::
+   :widths: 50 25 25
+   :header-rows: 1
+
+   * - Figure
+     - Formal Statement
+     - Description
+   * - |r69|
+     - :math:`\begin{cases}\frac{AB}{BC}=\frac{PQ}{QR}\\ \frac{AC}{BC}=\frac{PR}{QR}\\ ABC\text{ non-collinear}\\ AB=PQ\\ \Delta ABC\text{ has the same orientation as }\Delta PRQ\end{cases}\implies \Delta ABC\cong^r \Delta PQR`
+     - This rule encompasses the fact that if the ratio of similarity of two similar triangles is one (they have corresponding congruent sides), the triangles are congruent. It considers the case when triangles have opposite orientation. **This rule, together with r68, replaces the original r40.**
+
+.. |r69| image:: ../../_static/images/rules/r69.png
     :width: 100%
