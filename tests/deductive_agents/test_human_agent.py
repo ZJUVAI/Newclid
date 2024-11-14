@@ -1,8 +1,8 @@
 import io
 from pathlib import Path
 import sys
-from geosolver.agent.human_agent import HumanAgent
-from geosolver.api import GeometricSolverBuilder
+from newclid.agent.human_agent import HumanAgent
+from newclid.api import GeometricSolverBuilder
 import pytest
 
 

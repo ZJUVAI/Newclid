@@ -38,8 +38,8 @@ for problem in problems:
     os.system(f"mkdir -p profiling_exp/{problem}")
     os.system(f"mkdir -p profiling_opt/{problem}")
     os.system(
-        f"python -m cProfile -o profiling_exp/{problem}/profile.prof -s cumulative -m geosolver --problem-name {problem} --problems-file problems_datasets/imo_ag_30.txt --env profiling_exp"
+        f"python -m cProfile -o profiling_exp/{problem}/profile.prof -s cumulative -m newclid --problem-name {problem} --problems-file problems_datasets/imo_ag_30.txt --env profiling_exp"
     )
     os.system(
-        f"python -m cProfile -o profiling_opt/{problem}/profile.prof -s cumulative -m geosolver --problem-name {problem} --problems-file problems_datasets/imo_ag_30.txt --env profiling_opt"
+        f"python -m cProfile -o profiling_opt/{problem}/profile.prof -s cumulative -m newclid --problem-name {problem} --problems-file problems_datasets/imo_ag_30.txt --env profiling_opt"
     )

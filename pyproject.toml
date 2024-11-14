@@ -2,7 +2,7 @@
 requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
 
 [project]
-name = "geosolver"
+name = "newclid"
 authors = [
     {name = "Mathis Federico", email = "mathfederico@gmail.com"},
     {name = "Vladmir Sicca", email = "vsiccag@gmail.com"},
@@ -30,7 +30,7 @@ doc = ['numpy', 'sphinx-autoapi', 'autoapi', 'sphinx_rtd_theme', 'sphinx-autodoc
 license-files = ['LICEN[CS]E*', 'COPYING*', 'NOTICE*', 'AUTHORS*']
 
 [project.scripts]
-geosolver = "geosolver.__main__:main"
+newclid = "newclid.__main__:main"
 
 [tool.setuptools.dynamic]
 readme = { file = ["README.md"] }
