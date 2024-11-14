@@ -1,6 +1,26 @@
 Newclid: A User-Friendly Replacement for AlphaGeometry with Agentic Support
 =================================================
 
+.. image:: https://badge.fury.io/py/newclid.svg
+  :alt: Fury - PyPi stable version
+  :target: https://badge.fury.io/py/newclid
+
+.. image:: https://static.pepy.tech/badge/newclid
+  :alt: PePy - Downloads
+  :target: https://pepy.tech/project/newclid
+
+.. image:: https://static.pepy.tech/badge/newclid/week
+  :alt: PePy - Downloads per week
+  :target: https://pepy.tech/project/newclid
+
+.. image:: https://github.com/LMCRC/Newclid/actions/workflows/python-tests.yml/badge.svg
+  :alt: Python tests
+  :target: https://github.com/LMCRC/Newclid/actions/workflows/python-tests.yml
+
+.. image:: https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v1.json
+  :alt: CodeStyle - Ruff
+  :target: https://github.com/charliermarsh/ruff
+
 
 Installation
 ------------
