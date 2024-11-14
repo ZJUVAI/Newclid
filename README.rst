@@ -82,8 +82,7 @@ are displayed in the folder ``examples`` or used in ``tests``.
 Documentation
 -------------
 
-See `the online documentation
-<https://ddar-noahs-ark-libraries-d1a330533fb77a761c85bd7785b7974dd32b06.rnd-gitlab-eu.huawei.com/>`_
+See `the online documentation<https://lmcrc.github.io/Newclid/>`_
 for more detailed informations about Newclid.
 
 
