@@ -28,6 +28,7 @@ pyvenv.cfg
 bin/
 share/
 venv/
+.venv/
 
 # Models
 ag_ckpt_vocab/
