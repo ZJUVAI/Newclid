@@ -30,14 +30,14 @@ To simply solve a problem using Newclid, use the command line:
 
 .. code:: bash
 
-  geosolver --problem path/to/problem:problem_name
+  geosolver --problem-name problem_name --problems-file path/to/problem
 
 
 For example:
 
 .. code:: bash
 
-  geosolver --problem problems_datasets/examples.txt:orthocenter_consequence_aux
+  geosolver --problem-name orthocenter_consequence_aux --problems-file ./problems_datasets/examples.txt
 
 
 See other command line interface options with:
