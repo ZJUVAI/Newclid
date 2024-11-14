@@ -143,7 +143,7 @@ If you found Newclid useful, please cite us as:
 .. code:: bibtex
 
   @Article{Newclid2024Sicca,
-    author  = {Sicca, Vladmit and Xia, Tianxiang and F\'ed\'erico, Math\"is and Gorinski, Philip John and Frieder, Simon and Jui, Shangling},
+    author  = {Sicca, Vladmir and Xia, Tianxiang and F\'ed\'erico, Math\"is and Gorinski, Philip John and Frieder, Simon and Jui, Shangling},
     journal = {arXiv preprint},
     title   = {Newclid: A User-Friendly Replacement for AlphaGeometry with Agentic Support},
     year    = {2024}
