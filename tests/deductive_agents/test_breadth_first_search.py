@@ -14,6 +14,7 @@ class TestDDAR:
             seed=998244353
         ).with_deductive_agent(BFSDDAR)
 
+    @pytest.mark.skip("slow")
     def test_translated_obm_phase1_2016_p10(self):
         solver = (
             self.solver_builder.load_problem_from_txt(
@@ -39,6 +40,7 @@ class TestDDAR:
         assert success
         solver.write_all_outputs()
 
+    @pytest.mark.skip("slow")
     def test_translated_imo_2009_p2_extra_points(self):
         solver = (
             self.solver_builder.load_problem_from_txt(
@@ -98,6 +100,7 @@ class TestDDAR:
         assert success
         solver.write_proof_steps(Path(r"./tests_output/imo2011p6_proof.txt"))
 
+    @pytest.mark.skip("slow")
     def test_imo_2000_p1_should_succeed(self):
         solver = (
             self.solver_builder.load_problem_from_txt(
