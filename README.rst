@@ -82,7 +82,7 @@ are displayed in the folder ``examples`` or used in ``tests``.
 Documentation
 -------------
 
-See `the online documentation<https://lmcrc.github.io/Newclid/>`_
+See `the online documentation <https://lmcrc.github.io/Newclid/>`_
 for more detailed informations about Newclid.
 
 
