@@ -26,7 +26,7 @@ From source
 Quickstart
 ----------
 
-To simply solve a problem using geosolver, use the command line:
+To simply solve a problem using Newclid, use the command line:
 
 .. code:: bash
 
@@ -46,7 +46,7 @@ See other command line interface options with:
 
   geosolver --help
 
-For more complex applications, use the python interface.
+For more complex applications, use the Python interface.
 Below is a minimal example to load a specific problem,
 then uses the built solver to solve it:
 
@@ -75,7 +75,7 @@ then uses the built solver to solve it:
     print(f"Run infos {solver.run_infos}")
 
 
-Some more advanced examples of script using the python interface
+Some more advanced examples of script using the Python interface
 are displayed in the folder ``examples`` or used in ``tests``.
 
 
@@ -84,7 +84,7 @@ Documentation
 
 See `the online documentation
 <https://ddar-noahs-ark-libraries-d1a330533fb77a761c85bd7785b7974dd32b06.rnd-gitlab-eu.huawei.com/>`_
-for more detailed informations about geosolver.
+for more detailed informations about Newclid.
 
 
 Contributing
@@ -134,7 +134,7 @@ Contributing
 About Newclid
 -------------------
 
-Newclid is a successor to AlphaGeometry, the geometric solver introduced in the Nature 2024 paper:
+Newclid is a successor to AlphaGeometry, introduced in this early 2024 Nature paper:
 `Solving Olympiad Geometry without Human Demonstrations
 <https://www.nature.com/articles/s41586-023-06747-5>`_. whose original codebase can be found `here <https://github.com/google-deepmind/alphageometry>`_.
 
@@ -142,7 +142,7 @@ If you found Newclid useful, please cite us as:
 
 .. code:: bibtex
 
-  @Article{Newclid2024Sicca,
+  @article{newclid2024sicca,
     author  = {Sicca, Vladmir and Xia, Tianxiang and F\'ed\'erico, Math\"is and Gorinski, Philip John and Frieder, Simon and Jui, Shangling},
     journal = {arXiv preprint},
     title   = {Newclid: A User-Friendly Replacement for AlphaGeometry with Agentic Support},
