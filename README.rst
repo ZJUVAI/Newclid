@@ -1,16 +1,6 @@
 Newclid: Symbolic solver for Geometric problems
 =================================================
 
-An extension of the geometric solver introduced in the Nature 2024 paper:
-`Solving Olympiad Geometry without Human Demonstrations
-<https://www.nature.com/articles/s41586-023-06747-5>`_.
-
-
-AlphaGeometry can be seen as an extension of Newclid equipped with a language model
-that proposes new auxiliary constructions if a problem gets stuck.
-
-Currently new auxiliary constructions can only be added in Newclid as human suggested
-constructions if the HumanAgent is used instead of BFSDDAR (default).
 
 Installation
 ------------
@@ -20,7 +10,7 @@ Using pip
 
 .. code:: bash
 
-  pip install git+https://rnd-gitlab-eu.huawei.com/Noahs-Ark/libraries/geosolver
+  pip install git+https://github.com/LMCRC/Newclid.git
 
 
 From source
@@ -28,7 +18,8 @@ From source
 
 .. code:: bash
 
-  git clone git+https://rnd-gitlab-eu.huawei.com/Noahs-Ark/libraries/geosolver
+  git clone https://github.com/LMCRC/Newclid.git
+  cd Newclid
   pip install -e .
 
 
@@ -103,8 +94,8 @@ Contributing
 
 .. code:: bash
 
-  git clone git+https://rnd-gitlab-eu.huawei.com/Noahs-Ark/libraries/ddar
-  cd path/to/repo
+  git clone https://github.com/LMCRC/Newclid.git
+  cd Newclid
 
 2. (Optional) Create a virtual environment, for example with venv:
 
@@ -142,6 +133,10 @@ Contributing
 
 About AlphaGeometry
 -------------------
+
+Newclid is a fork of AlphaGeometry, the geometric solver introduced in the Nature 2024 paper:
+`Solving Olympiad Geometry without Human Demonstrations
+<https://www.nature.com/articles/s41586-023-06747-5>`_.
 
 See `original repository <https://github.com/google-deepmind/alphageometry>`_.
 
