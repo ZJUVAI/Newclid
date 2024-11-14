@@ -1,2 +1,2 @@
-graft geosolver/default_configs
+graft newclid/default_configs
 py.typed

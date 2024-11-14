@@ -1,6 +1,6 @@
 import pytest
 
-from geosolver.api import GeometricSolverBuilder
+from newclid.api import GeometricSolverBuilder
 from tests.fixtures import build_until_works
 
 
