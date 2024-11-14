@@ -30,21 +30,21 @@ To simply solve a problem using Newclid, use the command line:
 
 .. code:: bash
 
-  geosolver --problem-name problem_name --problems-file path/to/problem
+  newclid --problem-name problem_name --problems-file path/to/problem
 
 
 For example:
 
 .. code:: bash
 
-  geosolver --problem-name orthocenter_consequence_aux --problems-file ./problems_datasets/examples.txt
+  newclid --problem-name orthocenter_consequence_aux --problems-file ./problems_datasets/examples.txt
 
 
 See other command line interface options with:
 
 .. code:: bash
 
-  geosolver --help
+  newclid --help
 
 For more complex applications, use the Python interface.
 Below is a minimal example to load a specific problem,
@@ -52,7 +52,7 @@ then uses the built solver to solve it:
 
 .. code:: python
 
-    from geosolver import GeometricSolverBuilder, GeometricSolver
+    from newclid import GeometricSolverBuilder, GeometricSolver
 
     solver_builder = GeometricSolverBuilder()
     solver_builder.load_problem_from_txt(

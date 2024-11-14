@@ -2,13 +2,13 @@ import os
 from pathlib import Path
 from sys import stderr
 
-from geosolver.agent.breadth_first_search import BFSDDAR
+from newclid.agent.breadth_first_search import BFSDDAR
 
-# from geosolver.agent.flemmard import Flemmard
-from geosolver.api import GeometricSolverBuilder
+# from newclid.agent.flemmard import Flemmard
+from newclid.api import GeometricSolverBuilder
 
 
-def run_geosolver(filepath: Path):
+def run_newclid(filepath: Path):
     count = 0
 
     if not os.path.exists(filepath):
@@ -39,4 +39,4 @@ def run_geosolver(filepath: Path):
 
 
 problems_path = Path("problems_datasets/examples.txt")
-run_geosolver(Path(problems_path))
+run_newclid(Path(problems_path))

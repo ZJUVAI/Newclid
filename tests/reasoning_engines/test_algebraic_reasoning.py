@@ -1,6 +1,6 @@
 import pytest
-from geosolver.agent.breadth_first_search import BFSDDAR
-from geosolver.api import GeometricSolverBuilder
+from newclid.agent.breadth_first_search import BFSDDAR
+from newclid.api import GeometricSolverBuilder
 from tests.fixtures import build_until_works
 
 

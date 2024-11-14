@@ -11,7 +11,7 @@
    manual/default_files/index
    manual/problem_databases/index
    manual/algo
-   source/geosolver
+   source/newclid
 
 Indices and tables
 ==================

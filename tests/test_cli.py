@@ -1,10 +1,10 @@
 import sys
-from geosolver.__main__ import main
+from newclid.__main__ import main
 
 
 def test_exhaust():
     sys.argv = [
-        "geosolver",
+        "newclid",
         "--problem-name",
         "imo2009p2",
         "--env",
@@ -16,7 +16,7 @@ def test_exhaust():
 
 def test_imo2009p2():
     sys.argv = [
-        "geosolver",
+        "newclid",
         "--problem-name",
         "imo2009p2",
         "--env",
@@ -29,7 +29,7 @@ def test_imo2009p2():
 
 def test_run_problems_file():
     sys.argv = [
-        "geosolver",
+        "newclid",
         "--problem-name",
         "orthocenter_aux",
         "--problems-file",

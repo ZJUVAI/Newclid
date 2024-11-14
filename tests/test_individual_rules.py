@@ -1,7 +1,7 @@
 from pathlib import Path
 import pytest
 
-from geosolver.api import GeometricSolverBuilder
+from newclid.api import GeometricSolverBuilder
 
 
 @pytest.mark.parametrize(  # type: ignore

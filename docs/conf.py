@@ -13,7 +13,7 @@ from typing import Any
 
 sys.path.insert(0, os.path.abspath("../"))
 
-package_metadata = metadata("geosolver")
+package_metadata = metadata("newclid")
 
 project = "Newclid"
 copyright = "2024, Mathïs Fédérico, Vladmir Sicca, Tianxiang Xia"

@@ -1,10 +1,10 @@
 from pathlib import Path
 import pytest
 
-from geosolver.agent.breadth_first_search import BFSDDAR
-from geosolver.api import GeometricSolverBuilder
-from geosolver.predicates.equal_angles import EqAngle
-from geosolver.statement import Statement
+from newclid.agent.breadth_first_search import BFSDDAR
+from newclid.api import GeometricSolverBuilder
+from newclid.predicates.equal_angles import EqAngle
+from newclid.statement import Statement
 
 
 class TestDDAR:
