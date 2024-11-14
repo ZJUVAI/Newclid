@@ -131,23 +131,22 @@ Contributing
   pytest tests
 
 
-About AlphaGeometry
+About Newclid
 -------------------
 
-Newclid is a fork of AlphaGeometry, the geometric solver introduced in the Nature 2024 paper:
+Newclid is a successor to AlphaGeometry, the geometric solver introduced in the Nature 2024 paper:
 `Solving Olympiad Geometry without Human Demonstrations
-<https://www.nature.com/articles/s41586-023-06747-5>`_.
+<https://www.nature.com/articles/s41586-023-06747-5>`_. whose original codebase can be found `here <https://github.com/google-deepmind/alphageometry>`_.
 
-See `original repository <https://github.com/google-deepmind/alphageometry>`_.
+If you found Newclid useful, please cite us as:
 
 .. code:: bibtex
 
-  @Article{AlphaGeometryTrinh2024,
-    author  = {Trinh, Trieu and Wu, Yuhuai and Le, Quoc and He, He and Luong, Thang},
-    journal = {Nature},
-    title   = {Solving Olympiad Geometry without Human Demonstrations},
-    year    = {2024},
-    doi     = {10.1038/s41586-023-06747-5}
+  @Article{Newclid2024Sicca,
+    author  = {Sicca, Vladmit and Xia, Tianxiang and F\'ed\'erico, Math\"is and Gorinski, Philip John and Frieder, Simon and Jui, Shangling},
+    journal = {arXiv preprint},
+    title   = {Newclid: A User-Friendly Replacement for AlphaGeometry with Agentic Support},
+    year    = {2024}
   }
 
 
