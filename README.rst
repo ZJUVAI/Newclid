@@ -1,4 +1,4 @@
-Newclid: Symbolic solver for Geometric problems
+Newclid: A User-Friendly Replacement for AlphaGeometry with Agentic Support
 =================================================
 
 
