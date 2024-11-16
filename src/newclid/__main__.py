@@ -70,7 +70,7 @@ def cli_arguments() -> Namespace:
     return args
 
 
-def main():
+def main() -> None:
     args = cli_arguments()
     logging.basicConfig(level=args.log_level)
 
@@ -140,12 +140,11 @@ def main():
     solver = solver_builder.build()
     if not args.quiet:
         solver.draw_figure(out_file=problem_path / "construction_figure.svg")
-    success = solver.run()
+    solver.run()
 
     logging.info(f"Run infos: {solver.run_infos}")
     if not args.quiet:
         solver.write_all_outputs(problem_path)
-    return success
 
 
 if __name__ == "__main__":
