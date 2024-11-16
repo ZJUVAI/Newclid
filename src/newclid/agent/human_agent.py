@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, NamedTuple, Optional
+from typing import Any, Callable, NamedTuple, Optional
 
 from newclid import webapp
 from newclid.agent.agents_interface import (
@@ -15,9 +15,6 @@ from newclid.formulations.rule import Rule
 
 from newclid.statement import Statement
 from newclid.tools import atomize, run_static_server
-
-if TYPE_CHECKING:
-    ...
 
 
 class NamedFunction(NamedTuple):
@@ -37,6 +34,34 @@ class HumanAgent(DeductiveAgent):
         ]
         self.bfsddar: Optional[BFSDDAR] = None
         self.server: Optional[Path] = None
+
+    def step(self) -> bool:
+        res = True
+        if self.bfsddar:
+            if not self.bfsddar.step():
+                self.bfsddar = None
+        else:
+            print("Premises:")
+            for dep in self.proof.dep_graph.premises():
+                print(f"{dep.statement.pretty()}")
+            res = self.select(
+                [
+                    NamedFunction("match", self.match),
+                    NamedFunction("update server", self.update_server),
+                    NamedFunction("construction", self.add_construction),
+                    NamedFunction("exhaust with bfsddar", self.exhaust_with_bfsddar),
+                    NamedFunction("check statement", self.check),
+                    NamedFunction("check goals", self.check_goals),
+                    NamedFunction("nothing", lambda: True),
+                    NamedFunction("stop", lambda: False),
+                ]
+            )
+            if not res:
+                for goal in self.proof.goals:
+                    print(f"{goal.pretty()} proven? {goal.check()}")
+        if self.proof.check_goals():
+            print("All the goals are proven")
+        return res
 
     def pull_to_server(self):
         assert self.proof.problem_path
@@ -126,31 +151,3 @@ class HumanAgent(DeductiveAgent):
             )
         self.select(selects, apply_all=True, apply_none=True)
         return True
-
-    def step(self) -> bool:
-        res = True
-        if self.bfsddar:
-            if not self.bfsddar.step():
-                self.bfsddar = None
-        else:
-            print("Premises:")
-            for dep in self.proof.dep_graph.premises():
-                print(f"{dep.statement.pretty()}")
-            res = self.select(
-                [
-                    NamedFunction("match", self.match),
-                    NamedFunction("update server", self.update_server),
-                    NamedFunction("construction", self.add_construction),
-                    NamedFunction("exhaust with bfsddar", self.exhaust_with_bfsddar),
-                    NamedFunction("check statement", self.check),
-                    NamedFunction("check goals", self.check_goals),
-                    NamedFunction("nothing", lambda: True),
-                    NamedFunction("stop", lambda: False),
-                ]
-            )
-            if not res:
-                for goal in self.proof.goals:
-                    print(f"{goal.pretty()} proven? {goal.check()}")
-        if self.proof.check_goals():
-            print("All the goals are proven")
-        return res

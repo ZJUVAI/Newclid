@@ -1,7 +1,7 @@
 from __future__ import annotations
 import logging
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import Any, Optional
 from typing_extensions import Self
 
 
@@ -25,9 +25,6 @@ import numpy as np
 from newclid.statement import Statement
 from newclid.tools import atomize
 from newclid.webapp import pull_to_server
-
-if TYPE_CHECKING:
-    pass
 
 
 class GeometricSolver:

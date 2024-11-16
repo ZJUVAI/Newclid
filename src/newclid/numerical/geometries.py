@@ -1,12 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Iterable, Optional, Sequence, Union
+from typing import Any, Iterable, Optional, Sequence, Union
 
 from numpy.random import Generator
 from newclid.numerical import close_enough, nearly_zero, sign
 import numpy as np
 
-if TYPE_CHECKING:
-    pass
 
 ObjNum = Union["PointNum", "LineNum", "CircleNum"]
 
