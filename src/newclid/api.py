@@ -47,10 +47,7 @@ class GeometricSolver:
     def run(
         self,
     ) -> bool:
-        infos = run_loop(
-            self.deductive_agent,
-            self.proof,
-        )
+        infos = run_loop(self.deductive_agent, self.proof)
         self.run_infos = infos
         return infos["success"]
 
