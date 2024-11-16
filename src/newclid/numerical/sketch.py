@@ -1,6 +1,6 @@
 from __future__ import annotations
 from fractions import Fraction
-from typing import TYPE_CHECKING, Any, Union
+from typing import Any, Union
 from numpy.random import Generator
 
 from newclid.numerical import close_enough
@@ -16,9 +16,6 @@ from newclid.numerical.geometries import (
 )
 from newclid.tools import str_to_fraction
 import numpy as np
-
-if TYPE_CHECKING:
-    pass
 
 
 def sketch(
