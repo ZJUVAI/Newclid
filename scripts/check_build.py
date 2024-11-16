@@ -3,8 +3,6 @@ from pathlib import Path
 from sys import stderr
 
 from newclid.agent.breadth_first_search import BFSDDAR
-
-# from newclid.agent.flemmard import Flemmard
 from newclid.api import GeometricSolverBuilder
 
 

@@ -37,12 +37,11 @@ class Statement:
 
     def check_numerical(self) -> bool:
         """Check if the statement is numerically sound."""
-        try:
+        if self in self.dep_graph.check_numerical:
             return self.dep_graph.check_numerical[self]
-        except KeyError:
-            res = self.predicate.check_numerical(self)
-            self.dep_graph.check_numerical[self] = res
-            return res
+        res = self.predicate.check_numerical(self)
+        self.dep_graph.check_numerical[self] = res
+        return res
 
     def why(self) -> Optional[Dependency]:
         res = self.dep_graph.hyper_graph.get(self)
@@ -66,17 +65,17 @@ class Statement:
     def from_tokens(
         cls, tokens: tuple[str, ...], dep_graph: DependencyGraph
     ) -> Optional[Statement]:
-        try:
+        if tokens in dep_graph.token_statement:
             return dep_graph.token_statement[tokens]
-        except KeyError:
-            pred = NAME_TO_PREDICATE[tokens[0]]
-            parsed = pred.parse(tokens[1:], dep_graph)
-            if not parsed:
-                dep_graph.token_statement[tokens] = None
-                return None
-            s = Statement(pred, parsed, dep_graph)
-            dep_graph.token_statement[tokens] = s
-            return s
+
+        pred = NAME_TO_PREDICATE[tokens[0]]
+        parsed = pred.parse(tokens[1:], dep_graph)
+        if not parsed:
+            dep_graph.token_statement[tokens] = None
+            return None
+        s = Statement(pred, parsed, dep_graph)
+        dep_graph.token_statement[tokens] = s
+        return s
 
     def pretty(self) -> str:
         return self.predicate.pretty(self)
