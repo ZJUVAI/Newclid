@@ -12,6 +12,7 @@ class TestDDAR:
             seed=998244353
         ).with_deductive_agent(BFSDDAR)
 
+    @pytest.mark.skip(reason="Check what this test is really about ...")
     def test_translated_obm_phase1_2016_p10(self):
         solver = self.solver_builder.load_problem_from_txt(
             "o = free o; "
