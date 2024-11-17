@@ -70,7 +70,7 @@ class ConstantAngle(Predicate):
         symbols_graph = statement.dep_graph.symbols_graph
 
         return [
-            table.get_eq2(
+            table.get_equal_elements_up_to(
                 symbols_graph.line_thru_pair(p2, p3, table).name,
                 symbols_graph.line_thru_pair(p0, p1, table).name,
             )

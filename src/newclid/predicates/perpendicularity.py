@@ -58,7 +58,7 @@ class Perp(Predicate):
         table = statement.dep_graph.ar.atable
         symbols_graph = statement.dep_graph.symbols_graph
         return [
-            table.get_eq2(
+            table.get_equal_elements_up_to(
                 symbols_graph.line_thru_pair(points[2], points[3], table).name,
                 symbols_graph.line_thru_pair(points[0], points[1], table).name,
             )
