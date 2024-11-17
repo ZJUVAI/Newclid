@@ -16,11 +16,7 @@ class DeductiveAgent(ABC):
     """Common interface for deductive agents"""
 
     @abstractmethod
-    def __init__(self, proof: ProofState, rules: list[Rule]):
-        pass
-
-    @abstractmethod
-    def step(self) -> bool:
+    def step(self, proof: ProofState, rules: list[Rule]) -> bool:
         """Perform a single reasoning step on the given proof with given rules, and return if the agent is exausted.
 
         Returns:
