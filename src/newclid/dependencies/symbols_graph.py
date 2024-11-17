@@ -75,7 +75,10 @@ class SymbolsGraph:
                         return line1
                 res = self._get_new_line_thru_pair(p1, p2)
                 assert line.dep
-                table.add_expr(table.get_eq2(res.name, line.name), line.dep)
+                table.add_expr(
+                    table.get_equal_elements_up_to(res.name, line.name),
+                    line.dep,
+                )
                 line.merge([res])
                 return res
         return self._get_new_line_thru_pair(p1, p2)

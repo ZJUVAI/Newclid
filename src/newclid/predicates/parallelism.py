@@ -52,17 +52,21 @@ class Para(Predicate):
     @classmethod
     def _prep_ar(cls, statement: Statement) -> tuple[list[SumCV], Table]:
         points: tuple[Point, ...] = statement.args
-        table = statement.dep_graph.ar.atable
+        angle_table = statement.dep_graph.ar.atable
         symbols_graph = statement.dep_graph.symbols_graph
         eqs: list[SumCV] = []
         for i in range(2, len(points), 2):
             eqs.append(
-                table.get_eq2(
-                    symbols_graph.line_thru_pair(points[0], points[1], table).name,
-                    symbols_graph.line_thru_pair(points[i], points[i + 1], table).name,
+                angle_table.get_equal_elements_up_to(
+                    symbols_graph.line_thru_pair(
+                        points[0], points[1], angle_table
+                    ).name,
+                    symbols_graph.line_thru_pair(
+                        points[i], points[i + 1], angle_table
+                    ).name,
                 ),
             )
-        return eqs, table
+        return eqs, angle_table
 
     @classmethod
     def add(cls, dep: Dependency) -> None:
