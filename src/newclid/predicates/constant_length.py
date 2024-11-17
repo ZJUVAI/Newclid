@@ -57,7 +57,7 @@ class ConstantLength(Predicate):
         p0, p1, _ = args
         table = statement.dep_graph.ar.rtable
 
-        return [table.get_eq1(table.get_length(p0, p1))], table
+        return [table.get_equal_elements(table.get_length(p0, p1))], table
 
     @classmethod
     def add(cls, dep: Dependency) -> None:

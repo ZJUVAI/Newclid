@@ -71,7 +71,7 @@ class Cong(Predicate):
         i = 2
         while i < len(points):
             eqs.append(
-                table.get_eq2(
+                table.get_equal_elements_up_to(
                     table.get_length(points[0], points[1]),
                     table.get_length(points[i], points[i + 1]),
                 ),
