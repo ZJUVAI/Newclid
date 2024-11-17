@@ -11,10 +11,10 @@ class TestHumanAgent:
     def setUpClass(self):
         self.solver_builder = GeometricSolverBuilder(
             seed=998244353
-        ).with_deductive_agent(HumanAgent)
+        ).with_deductive_agent(HumanAgent())
 
     def test_graphics(self):
-        sys.stdin = io.StringIO("1\n5\nall\n7\n")
+        sys.stdin = io.StringIO("1\n5\nall\n6\n")
         solver = (
             self.solver_builder.load_problem_from_txt(
                 "a b c = triangle;"
@@ -27,7 +27,7 @@ class TestHumanAgent:
         solver.run()
 
     def test_add_construction(self):
-        sys.stdin = io.StringIO("2\nd = on_line d a c, on_line d b h\n3\n7\n")
+        sys.stdin = io.StringIO("2\nd = on_line d a c, on_line d b h\n3\n6\n")
         solver = self.solver_builder.load_problem_from_txt(
             "a b c = triangle;"
             "h = on_tline h b a c, on_tline h c a b ? "
