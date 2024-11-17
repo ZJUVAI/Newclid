@@ -1,4 +1,4 @@
-from newclid.predicates.Pythagoras import PythagoreanConclusions, PythagoreanPremises
+from newclid.predicates.pythagoras import PythagoreanConclusions, PythagoreanPremises
 from newclid.predicates.collinearity import Coll as Coll, NColl as NColl
 from newclid.predicates.congruence import Cong as Cong
 from newclid.predicates.midpoint import MidPoint as MidPoint
