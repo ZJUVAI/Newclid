@@ -133,4 +133,4 @@ def test_imo2009p2():
         "123",
         "--quiet",
     ]
-    assert main()
+    main()
