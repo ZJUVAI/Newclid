@@ -1,7 +1,7 @@
 from pathlib import Path
 import pytest
 
-from newclid.agent.breadth_first_search import BFSDDAR
+from newclid.agent.ddarn import DDARN
 from newclid.api import GeometricSolverBuilder
 
 
@@ -10,7 +10,7 @@ class TestDDAR:
     def setUpClass(self):
         self.solver_builder = GeometricSolverBuilder(
             seed=998244353
-        ).with_deductive_agent(BFSDDAR)
+        ).with_deductive_agent(DDARN)
 
     @pytest.mark.skip(reason="Check what this test is really about ...")
     def test_translated_obm_phase1_2016_p10(self):

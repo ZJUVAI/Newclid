@@ -1,5 +1,5 @@
 import pytest
-from newclid.agent.breadth_first_search import BFSDDAR
+from newclid.agent.ddarn import DDARN
 from newclid.api import GeometricSolverBuilder
 from tests.fixtures import build_until_works
 
@@ -17,7 +17,7 @@ def test_ar_world_hardest_problem_vertex():
             "g = on_line g f a, on_line g d b "
             "? aconst c a c b 1pi/9"
         )
-        .with_deductive_agent(BFSDDAR)
+        .with_deductive_agent(DDARN())
     )
 
     success = solver.run()
@@ -31,7 +31,7 @@ def test_ar_ratio_hallucination():
         .load_problem_from_txt(
             "a b e = triangle12 a b e; c = midpoint c a e ? cong a c a b"
         )
-        .with_deductive_agent(BFSDDAR)
+        .with_deductive_agent(DDARN())
     )
 
     success = solver.run()

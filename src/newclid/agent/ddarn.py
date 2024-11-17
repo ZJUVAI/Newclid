@@ -14,39 +14,37 @@ if TYPE_CHECKING:
     from newclid.dependencies.dependency import Dependency
 
 
-class BFSDDAR(DeductiveAgent):
+class DDARN(DeductiveAgent):
     """Apply Deductive Derivation to exhaustion by Breadth-First Search.
 
-    BFSDD will match and apply all available rules level by level
+    DDARN will match and apply all available rules level by level
     until reaching a fixpoint we call exhaustion.
 
     """
 
-    def __init__(self, proof: ProofState, rules: list["Rule"]):
-        self.proof = proof
-        self.rules = rules
+    def __init__(self):
         self.rule_buffer: list[Rule] = []
         self.application_buffer: list[Dependency] = []
-        self.hope = True
+        self.any_new_statement_has_been_added = True
 
-    def step(self) -> bool:
-        if self.proof.check_goals():
+    def step(self, proof: ProofState, rules: list[Rule]) -> bool:
+        if proof.check_goals():
             return False
         if self.rule_buffer:
             theorem = self.rule_buffer.pop()
-            logging.info("bfsddar matching" + str(theorem))
-            deps = self.proof.match_theorem(theorem)
-            logging.info("bfsddar matched " + str(len(deps)))
+            logging.info("ddarn matching" + str(theorem))
+            deps = proof.match_theorem(theorem)
+            logging.info("ddarn matched " + str(len(deps)))
             self.application_buffer.extend(deps)
         elif self.application_buffer:
             dep = self.application_buffer.pop()
-            # logging.info(f"bfsddar : apply {dep}")
-            if self.proof.apply_dep(dep):
-                self.hope = True
+            # logging.info(f"ddarn : apply {dep}")
+            if proof.apply_dep(dep):
+                self.any_new_statement_has_been_added = True
         else:
-            if not self.hope:
+            if not self.any_new_statement_has_been_added:
                 return False
-            self.hope = False
-            self.rule_buffer = list(self.rules)
-            logging.info("bfsddar : reload")
+            self.any_new_statement_has_been_added = False
+            self.rule_buffer = list(rules)
+            logging.info("ddarn : reload")
         return True
