@@ -238,19 +238,19 @@ class Table:
                     deps.append(dep)
         return deps
 
-    def get_eq1(self, a: str) -> SumCV:
+    def get_equal_elements(self, a: str) -> SumCV:
         """
         a = constant
         """
         return self.sumcv_from_list([(a, Fraction(1))])
 
-    def get_eq2(self, a: str, b: str) -> SumCV:
+    def get_equal_elements_up_to(self, a: str, b: str) -> SumCV:
         """
         a = b + constant
         """
         return self.sumcv_from_list([(a, Fraction(1)), (b, Fraction(-1))])
 
-    def get_eq4(self, a: str, b: str, c: str, d: str) -> SumCV:
+    def get_equal_difference_up_to(self, a: str, b: str, c: str, d: str) -> SumCV:
         """
         a - b = c - d + constant
         """

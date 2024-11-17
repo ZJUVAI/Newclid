@@ -53,7 +53,7 @@ class Coll(Predicate):
         rep, merged = Line.make_coll(dep.statement.args, dep)
         table = dep.statement.dep_graph.ar.atable
         for line in merged:
-            table.add_expr(table.get_eq2(rep.name, line.name), dep)
+            table.add_expr(table.get_equal_elements_up_to(rep.name, line.name), dep)
 
     @classmethod
     def to_constructive(cls, point: str, args: tuple[str, ...]) -> str:
