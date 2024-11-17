@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from sys import stderr
 
-from newclid.agent.breadth_first_search import BFSDDAR
+from newclid.agent.ddarn import DDARN
 from newclid.api import GeometricSolverBuilder
 
 
@@ -23,7 +23,7 @@ def run_newclid(filepath: Path):
                     solver = (
                         GeometricSolverBuilder(8)
                         .load_problem_from_file(problems_path, problem_name)
-                        .with_deductive_agent(BFSDDAR)
+                        .with_deductive_agent(DDARN())
                         .build()
                     )
                     solver.run()

@@ -5,7 +5,7 @@ from typing import Any, Optional
 from typing_extensions import Self
 
 
-from newclid.agent.breadth_first_search import BFSDDAR
+from newclid.agent.ddarn import DDARN
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.load_geogebra import load_geogebra
@@ -29,22 +29,17 @@ from newclid.webapp import pull_to_server
 
 class GeometricSolver:
     def __init__(
-        self,
-        proof: "ProofState",
-        theorems: list[Rule],
-        deductive_agent: type[DeductiveAgent],
+        self, proof: "ProofState", rules: list[Rule], deductive_agent: DeductiveAgent
     ) -> None:
         self.proof = proof
-        self.theorems = theorems
+        self.rules = rules
         self.goals = proof.goals
         self.rng = proof.rng
-        self.deductive_agent = deductive_agent(self.proof, self.theorems)
+        self.deductive_agent = deductive_agent
         self.run_infos: dict[str, Any] = {}
 
-    def run(
-        self,
-    ) -> bool:
-        infos = run_loop(self.deductive_agent, self.proof)
+    def run(self) -> bool:
+        infos = run_loop(self.deductive_agent, proof=self.proof, rules=self.rules)
         self.run_infos = infos
         return infos["success"]
 
@@ -79,7 +74,7 @@ class GeometricSolverBuilder:
         self._rules: Optional[list[Rule]] = None
         self.goals: list[Statement] = []
         self.dep_graph = DependencyGraph(AlgebraicManipulator())
-        self.deductive_agent: Optional[type[DeductiveAgent]] = None
+        self.deductive_agent: Optional[DeductiveAgent] = None
         self.seed = seed or 998244353
         self.problem_path: Optional[Path] = None
 
@@ -116,8 +111,10 @@ class GeometricSolverBuilder:
                 goals=self.goals,
                 defs=self.defs,
             )
+        if self.deductive_agent is None:
+            self.deductive_agent = DDARN()
 
-        return GeometricSolver(proof_state, self.rules, self.deductive_agent or BFSDDAR)
+        return GeometricSolver(proof_state, self.rules, self.deductive_agent)
 
     def load_problem_from_file(
         self, problems_path: Path, problem_name: str, rename: bool = False
@@ -166,7 +163,7 @@ class GeometricSolverBuilder:
         self._defs = DefinitionJGEX.to_dict(DefinitionJGEX.parse_text(defs_txt))
         return self
 
-    def with_deductive_agent(self, deductive_agent: type[DeductiveAgent]) -> Self:
+    def with_deductive_agent(self, deductive_agent: DeductiveAgent) -> Self:
         self.deductive_agent = deductive_agent
         return self
 
