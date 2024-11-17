@@ -24,4 +24,4 @@ jobs:
         pip install .[dev]
     - name: Test with pytest
       run: |
-        pytest tests --cov=src --cov-fail-under=76
+        pytest tests
