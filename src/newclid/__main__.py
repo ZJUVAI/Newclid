@@ -29,7 +29,7 @@ def cli_arguments() -> Namespace:
     )
     parser.add_argument(
         "--agent",
-        default="bfsddar",
+        default="ddarn",
         help="Name of the agent to use",
         choices=AGENTS_REGISTRY.keys(),
     )
@@ -102,7 +102,7 @@ def main() -> None:
     if args.agent not in AGENTS_REGISTRY:
         raise ValueError("Agent not found")
     agent = AGENTS_REGISTRY[args.agent]
-    solver_builder.with_deductive_agent(agent)
+    solver_builder.with_deductive_agent(agent())
 
     ggb_files0 = list(find_ggb_files(problem_path)) + ([args.ggb] if args.ggb else [])
     ggb_files1 = list(find_ggb_files(envpath))

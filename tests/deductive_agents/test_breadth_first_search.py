@@ -1,6 +1,6 @@
 import pytest
 
-from newclid.agent.breadth_first_search import BFSDDAR
+from newclid.agent.ddarn import DDARN
 from newclid.api import GeometricSolverBuilder
 from newclid.predicates.equal_angles import EqAngle
 from newclid.statement import Statement
@@ -11,7 +11,7 @@ class TestDDAR:
     def setUpClass(self):
         self.solver_builder = GeometricSolverBuilder(
             seed=998244353
-        ).with_deductive_agent(BFSDDAR)
+        ).with_deductive_agent(DDARN())
 
     def test_incenter_excenter_should_succeed(self):
         solver = (
