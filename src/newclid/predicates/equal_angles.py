@@ -73,7 +73,7 @@ class EqAngle(Predicate):
         i = 4
         while i < len(points):
             eqs.append(
-                table.get_eq4(
+                table.get_equal_difference_up_to(
                     symbols_graph.line_thru_pair(points[2], points[3], table).name,
                     symbols_graph.line_thru_pair(points[0], points[1], table).name,
                     symbols_graph.line_thru_pair(

@@ -55,7 +55,7 @@ class EqRatio(Predicate):
         i = 4
         while i < len(points):
             eqs.append(
-                table.get_eq4(
+                table.get_equal_difference_up_to(
                     table.get_length(points[0], points[1]),
                     table.get_length(points[2], points[3]),
                     table.get_length(points[i], points[i + 1]),

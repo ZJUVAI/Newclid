@@ -62,7 +62,7 @@ class ConstantRatio(Predicate):
         table = statement.dep_graph.ar.rtable
         l0 = table.get_length(p0, p1)
         l1 = table.get_length(p2, p3)
-        return [table.get_eq2(l0, l1)], table
+        return [table.get_equal_elements_up_to(l0, l1)], table
 
     @classmethod
     def add(cls, dep: Dependency) -> None:
