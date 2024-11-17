@@ -3,7 +3,7 @@ import sys
 import pytest
 
 from newclid.__main__ import main
-from newclid.agent.breadth_first_search import BFSDDAR
+from newclid.agent.ddarn import DDARN
 from newclid.api import GeometricSolverBuilder
 
 
@@ -12,7 +12,7 @@ class TestDDAR:
     def setUpClass(self):
         self.solver_builder = GeometricSolverBuilder(
             seed=998244353
-        ).with_deductive_agent(BFSDDAR)
+        ).with_deductive_agent(DDARN())
 
     def test_translated_obm_phase1_2016_p10(self):
         solver = (

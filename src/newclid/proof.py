@@ -236,8 +236,10 @@ class ProofState:
         return list(self.matcher.match_theorem(theorem))
 
     def apply_dep(self, dep: Dependency) -> bool:
-        """
-        It depends on the agent to add correct dependencies; the dependencies returned by the match are correct.
+        """Add the dependency to the proof dependency graph.
+
+        Returns:
+            True if the statment is a new one, false otherwise.
         """
         if dep.statement in dep.statement.dep_graph.hyper_graph:
             return False

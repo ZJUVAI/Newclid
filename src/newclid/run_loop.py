@@ -2,6 +2,8 @@ from __future__ import annotations
 import time
 from typing import TYPE_CHECKING, Any
 
+from newclid.formulations.rule import Rule
+
 
 if TYPE_CHECKING:
     from newclid.agent.agents_interface import DeductiveAgent
@@ -9,8 +11,7 @@ if TYPE_CHECKING:
 
 
 def run_loop(
-    deductive_agent: "DeductiveAgent",
-    proof: "ProofState",
+    deductive_agent: "DeductiveAgent", proof: "ProofState", rules: list[Rule]
 ) -> dict[str, Any]:
     """Run DeductiveAgent until saturation or goal found."""
     infos: dict[str, Any] = {}
@@ -23,7 +24,7 @@ def run_loop(
     step = 0
     running = True
     while running:
-        running = deductive_agent.step()
+        running = deductive_agent.step(proof=proof, rules=rules)
         step += 1
 
     infos["runtime"] = time.time() - t0
