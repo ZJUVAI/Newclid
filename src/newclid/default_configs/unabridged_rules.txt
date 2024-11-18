@@ -76,9 +76,9 @@ r42 Thales theorem IV
 para a b c d, coll m a d, coll n b c, para m n a b => eqratio m a m d n b n c
 r43 Orthocenter theorem
 perp a b c d, perp a c b d => perp a d b c
-r44 Pappus’s theorem
+r44 Pappus's theorem
 coll a b c, coll p q r, coll x a q, coll x p b, coll y a r, coll y p c, coll z b r, coll z c q => coll x y z
-r45 Simson’s line theorem
+r45 Simson's line theorem
 cyclic a b c p, coll a l c, perp p l a c, coll m b c, perp p m b c, coll n a b, perp p n a b => coll l m n
 r46 Incenter theorem
 eqangle a b a x a x a c, eqangle b a b x b x b c, ncoll a b c => eqangle c b c x c x c a
