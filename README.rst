@@ -13,6 +13,8 @@ Newclid: A User-Friendly Replacement for AlphaGeometry with Agentic Support
   :alt: PePy - Downloads per week
   :target: https://pepy.tech/project/newclid
 
+:raw-html:`<br />`
+
 .. image:: https://app.codacy.com/project/badge/Grade/93afee3e7ee8464fb70f20fa9b5bf95e
   :target: https://app.codacy.com/gh/LMCRC/Newclid/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade
 
@@ -180,3 +182,7 @@ under the terms of the Creative Commons Attribution 4.0
 International (CC BY 4.0) license.
 You can find details at:
 https://creativecommons.org/licenses/by/4.0/legalcode
+
+
+.. role:: raw-html(raw)
+    :format: html
