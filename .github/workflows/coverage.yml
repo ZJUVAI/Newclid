@@ -23,5 +23,5 @@ jobs:
       env:
         CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
       with:
-        project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+        project-token: ${{ CODACY_PROJECT_TOKEN }}
         coverage-reports: coverage.xml
