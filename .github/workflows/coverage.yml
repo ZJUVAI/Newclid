@@ -20,8 +20,6 @@ jobs:
         pytest --cov=src --cov-fail-under=76 --cov-report=xml tests
     - name: Codacy Coverage Reporter
       uses: codacy/codacy-coverage-reporter-action@v1.3.0
-      env:
-        CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
       with:
-        project-token: ${{ CODACY_PROJECT_TOKEN }}
+        project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
         coverage-reports: coverage.xml
