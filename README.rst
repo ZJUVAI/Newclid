@@ -16,6 +16,9 @@ Newclid: A User-Friendly Replacement for AlphaGeometry with Agentic Support
 .. image:: https://app.codacy.com/project/badge/Grade/93afee3e7ee8464fb70f20fa9b5bf95e
   :target: https://app.codacy.com/gh/LMCRC/Newclid/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade
 
+.. image:: https://app.codacy.com/project/badge/Coverage/93afee3e7ee8464fb70f20fa9b5bf95e
+  :target: https://app.codacy.com/gh/LMCRC/Newclid/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage
+
 .. image:: https://github.com/LMCRC/Newclid/actions/workflows/tests-3.9-3.12_.yml/badge.svg
   :alt: Tests 3.9-3.12
   :target: https://github.com/LMCRC/Newclid/actions/workflows/tests-3.9-3.12_.yml
