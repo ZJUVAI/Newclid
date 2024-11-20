@@ -5,13 +5,21 @@ Newclid: A User-Friendly Replacement for AlphaGeometry with Agentic Support
   :alt: Fury - PyPi stable version
   :target: https://badge.fury.io/py/newclid
 
-.. .. image:: https://static.pepy.tech/badge/newclid
-..   :alt: PePy - Downloads
-..   :target: https://pepy.tech/project/newclid
+.. image:: https://static.pepy.tech/badge/newclid
+  :alt: PePy - Downloads
+  :target: https://pepy.tech/project/newclid
 
-.. .. image:: https://static.pepy.tech/badge/newclid/week
-..   :alt: PePy - Downloads per week
-..   :target: https://pepy.tech/project/newclid
+.. image:: https://static.pepy.tech/badge/newclid/week
+  :alt: PePy - Downloads per week
+  :target: https://pepy.tech/project/newclid
+
+
+
+.. image:: https://app.codacy.com/project/badge/Grade/93afee3e7ee8464fb70f20fa9b5bf95e
+  :target: https://app.codacy.com/gh/LMCRC/Newclid/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade
+
+.. image:: https://app.codacy.com/project/badge/Coverage/93afee3e7ee8464fb70f20fa9b5bf95e    
+  :target: https://app.codacy.com/gh/LMCRC/Newclid/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage
 
 .. image:: https://github.com/LMCRC/Newclid/actions/workflows/tests-3.9-3.12_.yml/badge.svg
   :alt: Tests 3.9-3.12
@@ -174,3 +182,4 @@ under the terms of the Creative Commons Attribution 4.0
 International (CC BY 4.0) license.
 You can find details at:
 https://creativecommons.org/licenses/by/4.0/legalcode
+
