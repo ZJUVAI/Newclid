@@ -15,6 +15,8 @@ class DefinitionJGEX(NamedTuple):
     require: Clause
     basics: tuple[Clause, ...]
     numerics: tuple[tuple[str, ...], ...]
+    points: tuple[str, ...]
+    args: tuple[str, ...]
 
     @classmethod
     def parse_txt_file(cls, fname: Path) -> list[DefinitionJGEX]:
@@ -32,12 +34,33 @@ class DefinitionJGEX(NamedTuple):
     def from_str(cls, s: str) -> DefinitionJGEX:
         """Load the definition from a str object."""
         declare, rely, require, basics, numerics = s.split("\n")[:5]
+        declare=atomize(declare)
+        rely=_parse_rely(rely)
+        require=Clause.parse_line(require)[0]
+        basics=Clause.parse_line(basics)
+        numerics=tuple(atomize(c) for c in numerics.split(","))
+
+        points = []
+        args = []
+
+        set_of_args = set()
+        for num in numerics:
+            set_of_args.update(num[1:])
+        
+        for p in declare[1:]:
+            if p in set_of_args:
+                args.append(p)
+            else:
+                points.append(p)
+
         return cls(
-            declare=atomize(declare),
-            rely=_parse_rely(rely),
-            require=Clause.parse_line(require)[0],
-            basics=Clause.parse_line(basics),
-            numerics=tuple(atomize(c) for c in numerics.split(",")),
+            declare=declare,
+            rely=rely,
+            require=require,
+            basics=basics,
+            numerics=numerics,
+            points=tuple(points),
+            args=tuple(args),
         )
 
     @classmethod
