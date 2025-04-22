@@ -108,6 +108,7 @@ class ProofState:
                         )
                     )
                     adds.append(Dependency.mk(statement, IN_PREMISES, ()))
+                    # adds.append(Dependency.mk(statement, IN_PREMISES, (), str(construction)))
             for n in cdef.numerics:
                 numerics.append(tuple(mapping[a] if a in mapping else a for a in n))
 
@@ -126,6 +127,7 @@ class ProofState:
         for p in new_points:
             if p in existing_points:
                 raise Exception("The construction is illegal")
+            p.clause = construction
 
         # draw
         def draw_fn() -> tuple[PointNum, ...]:
@@ -172,6 +174,37 @@ class ProofState:
                     "This is probably because the construction itself is wrong"
                 )
             add.add()
+
+        # add rely for new points
+        rely_dict: dict[str, list[str]] = {}
+        for constr_sentence in construction.sentences:
+            cdef = self.defs[constr_sentence[0]]
+            if len(constr_sentence) == len(cdef.declare):
+                mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
+            else:
+                assert len(constr_sentence) + len(construction.points) == len(
+                    cdef.declare
+                )
+                mapping = dict(
+                    zip(cdef.declare[1:], construction.points + constr_sentence[1:])
+                )
+            for point, relys in cdef.rely.items():
+                point = mapping[point]
+                relys = [mapping[p] for p in relys]
+                if point not in rely_dict:
+                    rely_dict[point] = []
+                rely_dict[point].extend(relys)
+
+        for point in new_points:
+            if point.name in rely_dict:
+                relys = set(rely_dict[point.name])
+                point.rely_on = self.symbols_graph.names2points(relys)
+            else:
+                point.rely_on = []
+                # print(f"Rely on {point.name}: ", end='')
+                # for rely in point.rely_on:
+                #     print(f"{rely.name} ", end='')
+                # print()
 
         self.matcher.update()
 
