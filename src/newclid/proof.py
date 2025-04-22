@@ -198,9 +198,9 @@ class ProofState:
         for point in new_points:
             if point.name in rely_dict:
                 relys = set(rely_dict[point.name])
-                point.rely_on = self.symbols_graph.names2points(relys)
+                point.rely_on = set(self.symbols_graph.names2points(relys))
             else:
-                point.rely_on = []
+                point.rely_on = set()
                 # print(f"Rely on {point.name}: ", end='')
                 # for rely in point.rely_on:
                 #     print(f"{rely.name} ", end='')
