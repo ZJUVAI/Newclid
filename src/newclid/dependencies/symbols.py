@@ -80,7 +80,7 @@ class Symbol(ABC):
 class Point(Symbol):
     num: PointNum
     clause: Clause
-    rely_on: list[Point]
+    rely_on: set[Point]
 
     @property
     def pretty_name(self) -> str:
