@@ -5,6 +5,7 @@ from abc import ABC
 from typing import TYPE_CHECKING, Optional, TypeVar, Union
 from typing_extensions import Self
 
+from newclid.formulations.clause import Clause
 from newclid.numerical.geometries import CircleNum, LineNum, PointNum
 
 if TYPE_CHECKING:
@@ -78,6 +79,8 @@ class Symbol(ABC):
 
 class Point(Symbol):
     num: PointNum
+    clause: Clause
+    rely_on: list[Point]
 
     @property
     def pretty_name(self) -> str:
