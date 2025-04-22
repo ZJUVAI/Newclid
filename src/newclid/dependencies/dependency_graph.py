@@ -1,7 +1,8 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Collection, Optional
-from newclid.dependencies.dependency import IN_PREMISES
+from newclid.dependencies.dependency import IN_PREMISES, NUMERICAL_CHECK
+from newclid.dependencies.symbols import Point
 from newclid.dependencies.symbols_graph import SymbolsGraph
 from pyvis.network import Network  # type: ignore
 
@@ -63,6 +64,74 @@ class DependencyGraph:
                 if s not in res:
                     res.append(s)
         return tuple(res)
+    
+    def get_proof_steps(
+            self,
+            goals: list[Statement]
+    ) -> tuple[
+        set[Point],
+        list[Dependency],
+        list[Dependency],
+        set[Point],
+        list[Dependency],
+        list[Dependency],
+        list[Dependency],
+    ]:
+        proof_deps = self.proof_deps(goals)
+
+        points: set[Point] = set()
+        for goal in goals:
+            points.update(goal.args)
+        queue: list[Point] = list(points)
+        i = 0
+        while i < len(queue):
+            q = queue[i]
+            i += 1
+            assert isinstance(q, Point)
+            for p in q.rely_on:
+                if p not in points:
+                    points.add(p)
+                    queue.append(p)
+        
+        premises: list[Dependency] = []
+        numercial_checked_premises: list[Dependency] = []
+        aux_points: set[Point] = set()
+        aux: list[Dependency] = []
+        numercial_checked_aux: list[Dependency] = []
+        proof_steps: list[Dependency] = []
+
+        for line in proof_deps:
+            is_aux = any([p not in points for p in line.statement.args if isinstance(p, Point)])
+            if IN_PREMISES == line.reason:
+                if is_aux:
+                    aux.append(line)
+                    aux_points.update(
+                        [p for p in line.statement.args if isinstance(p, Point)
+                        and p not in points]
+                    )
+                else:
+                    premises.append(line)
+            elif NUMERICAL_CHECK == line.reason:
+                if is_aux:
+                    numercial_checked_aux.append(line)
+                    aux_points.update(
+                        [p for p in line.statement.args if isinstance(p, Point)
+                        and p not in points]
+                    )
+                else:
+                    numercial_checked_premises.append(line)
+            else:
+                proof_steps.append(line)
+        
+        return (
+            points,
+            premises,
+            numercial_checked_premises,
+            aux_points,
+            aux,
+            numercial_checked_aux,
+            proof_steps,
+        )
 
     def save_pyvis(self, *, path: Path, stars: Collection[Statement] = []):
         if stars:
