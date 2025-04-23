@@ -41,6 +41,13 @@ class DependencyGraph:
                 res.append(dep)
         return res
 
+    def conclusions(self):
+        res: list[Statement] = []
+        for statement, dep in self.hyper_graph.items():
+            if dep.reason != IN_PREMISES:
+                res.append(statement)
+        return res
+
     def _proof_text(
         self,
         statement: Statement,
@@ -64,10 +71,9 @@ class DependencyGraph:
                 if s not in res:
                     res.append(s)
         return tuple(res)
-    
+
     def get_proof_steps(
-            self,
-            goals: list[Statement]
+        self, goals: list[Statement]
     ) -> tuple[
         set[Point],
         list[Dependency],
@@ -92,7 +98,7 @@ class DependencyGraph:
                 if p not in points:
                     points.add(p)
                     queue.append(p)
-        
+
         premises: list[Dependency] = []
         numercial_checked_premises: list[Dependency] = []
         aux_points: set[Point] = set()
@@ -101,13 +107,18 @@ class DependencyGraph:
         proof_steps: list[Dependency] = []
 
         for line in proof_deps:
-            is_aux = any([p not in points for p in line.statement.args if isinstance(p, Point)])
+            is_aux = any(
+                [p not in points for p in line.statement.args if isinstance(p, Point)]
+            )
             if IN_PREMISES == line.reason:
                 if is_aux:
                     aux.append(line)
                     aux_points.update(
-                        [p for p in line.statement.args if isinstance(p, Point)
-                        and p not in points]
+                        [
+                            p
+                            for p in line.statement.args
+                            if isinstance(p, Point) and p not in points
+                        ]
                     )
                 else:
                     premises.append(line)
@@ -115,14 +126,17 @@ class DependencyGraph:
                 if is_aux:
                     numercial_checked_aux.append(line)
                     aux_points.update(
-                        [p for p in line.statement.args if isinstance(p, Point)
-                        and p not in points]
+                        [
+                            p
+                            for p in line.statement.args
+                            if isinstance(p, Point) and p not in points
+                        ]
                     )
                 else:
                     numercial_checked_premises.append(line)
             else:
                 proof_steps.append(line)
-        
+
         return (
             points,
             premises,
@@ -136,10 +150,7 @@ class DependencyGraph:
     def get_essential_clauses(
         self,
         goals: list[Statement],
-    ) -> tuple[
-        set[str],
-        set[str]
-    ]:
+    ) -> tuple[set[str], set[str]]:
         essential_clauses: set[str] = set()
         essential_clauses_aux: set[str] = set()
 
