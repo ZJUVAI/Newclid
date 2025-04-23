@@ -4,7 +4,7 @@ from newclid.generate.clause_generation import CompoundClauseGen
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.generate.shave import find_essential_clauses
 from tests.fixtures import build_until_works
-from newclid.proof_writing import get_proof_steps
+from newclid.proof_writing import return_proof_steps
 
 import multiprocessing
 import logging
@@ -107,8 +107,6 @@ def run(args):
     goals = solver.proof.dep_graph.conclusions()
     formatted_goals = [format_statement(goal) for goal in goals]
     for goal in formatted_goals:
-        print("================")
-        print("goal: ", goal)
         fl_problem = fl_statement + " ? " + str(goal)
         solver_builder.load_problem_from_txt(fl_problem)
         try:
@@ -121,7 +119,6 @@ def run(args):
         if success is False:
             logging.info(f"Connot shave the problem {fl_problem}")
             continue
-        print(f"Success: {success}")
         main_clauses, else_clauses = solver.proof.dep_graph.get_essential_clauses(
             solver.goals
         )
@@ -131,9 +128,7 @@ def run(args):
         )
 
         n_clauses = len(main_clauses) + len(essential_aux_clauses)
-        nl_solution = get_proof_steps(solver.proof)
-
-        print(1234)
+        nl_solution = return_proof_steps(solver.proof)
 
         generated_data.append(
             {

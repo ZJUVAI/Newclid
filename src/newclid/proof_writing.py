@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from newclid.proof import ProofState
 
 
-def get_proof_steps(proof_state: "ProofState") -> list[Dependency]:
+def return_proof_steps(proof_state: "ProofState") -> list[Dependency]:
     id: dict[Statement, str] = {}
     goals = [goal for goal in proof_state.goals if goal.check()]
     for k, goal in enumerate(goals):
