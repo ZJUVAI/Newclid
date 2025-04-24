@@ -15,12 +15,13 @@ from newclid.proof_writing import return_proof_steps
 from newclid.formulations.problem import ProblemJGEX
 
 class GeometryGenerator:
-    def __init__(self, max_clauses=5, search_depth=5, n_threads=1, output_dir="dataset", min_dep_num=10):
+    def __init__(self, max_clauses=5, search_depth=5, n_threads=1, output_dir="dataset", min_dep_num=10, min_clauses_num=6):
         self.max_clauses = max_clauses
         self.search_depth = search_depth
         self.n_threads = n_threads
         self.output_dir = output_dir
         self.min_dep_num = min_dep_num
+        self.min_clauses_num = min_clauses_num
 
         self.clauses_generator = CompoundClauseGen(
             max_comma_sep_clause=2,
@@ -126,7 +127,7 @@ class GeometryGenerator:
                 logging.info(f"Naive Goal Error: {goal}")
                 continue
             try:
-                if(len(solver.proof.dep_graph.get_proof_steps([goal])) < self.min_dep_num):
+                if len(solver.proof.dep_graph.get_proof_steps([goal])) < self.min_dep_num:
                     logging.debug(f"Naive proof: {goal}")
                     continue
             except Exception as e:
@@ -137,6 +138,9 @@ class GeometryGenerator:
             # fl_problem
             essential_clauses, essential_aux_clauses = solver.proof.dep_graph.get_essential_clauses([goal])
             n_clauses = len(essential_clauses) + len(essential_aux_clauses)
+            if n_clauses < self.min_clauses_num:
+                logging.debug(f"Naive clauses: {goal}")
+                continue
             statements = []
             for clause in solver_builder.problemJGEX.constructions:
                 if str(clause) in essential_clauses or str(clause) in essential_aux_clauses:
@@ -185,6 +189,7 @@ def main():
     parser = argparse.ArgumentParser(description="Create problem fl - nl dataset")
     parser.add_argument("--max_clauses", required=True, type=int, default=5)
     parser.add_argument("--min_dep_num", required=False, type=int, default=10)
+    parser.add_argument("--min_clauses_num", required=False, type=int, default=6)
     parser.add_argument(
         "--search_depth",
         required=True,
@@ -209,6 +214,7 @@ def main():
         n_threads=args.n_threads,
         output_dir=args.dir,
         min_dep_num=args.min_dep_num,
+        min_clauses_num=args.min_clauses_num,
     )
     
     # Collect problems using the generator
