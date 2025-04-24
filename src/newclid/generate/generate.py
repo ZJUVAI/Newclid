@@ -15,11 +15,12 @@ from newclid.proof_writing import return_proof_steps
 from newclid.formulations.problem import ProblemJGEX
 
 class GeometryGenerator:
-    def __init__(self, max_clauses=5, search_depth=5, n_threads=1, output_dir="dataset"):
+    def __init__(self, max_clauses=5, search_depth=5, n_threads=1, output_dir="dataset", min_dep_num=10):
         self.max_clauses = max_clauses
         self.search_depth = search_depth
         self.n_threads = n_threads
         self.output_dir = output_dir
+        self.min_dep_num = min_dep_num
 
         self.clauses_generator = CompoundClauseGen(
             max_comma_sep_clause=2,
@@ -73,6 +74,29 @@ class GeometryGenerator:
 
         return len(all_data)
 
+    def is_naive_goal(self, goal):
+        predicate = goal.predicate
+        args = goal.args
+        if args[-1] == '':
+            args = args[:-1]
+        # case1: cong AB = AB, para AB ∥∥ AB, rconst AB:AB=1, aconst ∠AB AB=0
+        if predicate == 'cong' or predicate == 'para' or predicate == 'rconst' or predicate == 'aconst':
+            left = {args[0], args[1]}
+            right = {args[2], args[3]}
+            if left == right:
+                return True
+        elif predicate == 'eqratio':
+            #case2: eqratio AB/CD = DC/BA, eqangle ∠AB CD = ∠DC/BA
+            seg_1 = {args[0], args[1]}
+            seg_2 = {args[2], args[3]}
+            seg_3 = {args[4], args[5]}
+            seg_4 = {args[6], args[7]}
+            if seg_1 == seg_3 and seg_2 == seg_4:
+                return True
+            if seg_1 == seg_4 and seg_2 == seg_3:
+                return True
+        return False
+
     def process_single_problem(self, args: tuple) -> list:
         """Process a single geometry problem."""
         pid, fl_statement, search_depth = args
@@ -94,6 +118,22 @@ class GeometryGenerator:
 
         generated_data = []
         for goal in goals:
+            try:
+                if self.is_naive_goal(goal):
+                    logging.info(f"Naive goal: {goal}")
+                    continue
+            except Exception as e:
+                logging.info(f"Naive Goal Error: {goal}")
+                continue
+            try:
+                if(len(solver.proof.dep_graph.get_proof_steps([goal])) < self.min_dep_num):
+                    logging.debug(f"Naive proof: {goal}")
+                    continue
+            except Exception as e:
+                logging.info(f"Naive proof Error: {goal}")
+                continue
+                # connot detect proof of the goal
+                # rconst[b,c,c,e,Fraction(2, 1),]
             # fl_problem
             essential_clauses, essential_aux_clauses = solver.proof.dep_graph.get_essential_clauses([goal])
             n_clauses = len(essential_clauses) + len(essential_aux_clauses)
@@ -116,7 +156,6 @@ class GeometryGenerator:
                 "fl_problem_renamed": str(renamed_problem),
                 "dsl_problem_renamed": "",
             })
-
         return generated_data
 
     def generate_problems(self) -> Iterator[Dict[str, Any]]:
@@ -145,6 +184,7 @@ class GeometryGenerator:
 def main():
     parser = argparse.ArgumentParser(description="Create problem fl - nl dataset")
     parser.add_argument("--max_clauses", required=True, type=int, default=5)
+    parser.add_argument("--min_dep_num", required=False, type=int, default=10)
     parser.add_argument(
         "--search_depth",
         required=True,
@@ -168,6 +208,7 @@ def main():
         search_depth=args.search_depth,
         n_threads=args.n_threads,
         output_dir=args.dir,
+        min_dep_num=args.min_dep_num,
     )
     
     # Collect problems using the generator
@@ -175,7 +216,8 @@ def main():
     start_time = time.time()
     for problem in generator.generate_problems():
         all_data.append(problem)
-        logging.info(
+        print(all_data)
+        logging.debug(
             f"Generated {len(all_data)} samples in {time.time() - start_time:.1f}s "
             f"({(time.time() - start_time)/len(all_data):.1f}s/sample)"
         )
@@ -184,7 +226,7 @@ def main():
     
     # Write the collected data
     generator.write_data(all_data)
-    logging.info(f"Generated {len(all_data)} problems successfully")
+    logging.debug(f"Generated {len(all_data)} problems successfully")
 
 
 if __name__ == "__main__":
