@@ -25,7 +25,7 @@ class Dependency(NamedTuple):
 
     def add(self):
         if self.reason == IN_PREMISES:
-            logging.info(f"Adding premise: {self.statement.pretty()}")
+            logging.debug(f"Adding premise: {self.statement.pretty()}")
         if not self.statement.check_numerical():
             raise Exception(
                 f"Adding a dependency {self.pretty()} the conclusion of which is numerically false"

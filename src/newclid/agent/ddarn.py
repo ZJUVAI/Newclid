@@ -32,9 +32,9 @@ class DDARN(DeductiveAgent):
             return False
         if self.rule_buffer:
             theorem = self.rule_buffer.pop()
-            logging.info("ddarn matching" + str(theorem))
+            logging.debug("ddarn matching" + str(theorem))
             deps = proof.match_theorem(theorem)
-            logging.info("ddarn matched " + str(len(deps)))
+            logging.debug("ddarn matched " + str(len(deps)))
             self.application_buffer.extend(deps)
         elif self.application_buffer:
             dep = self.application_buffer.pop()
@@ -46,5 +46,5 @@ class DDARN(DeductiveAgent):
                 return False
             self.any_new_statement_has_been_added = False
             self.rule_buffer = list(rules)
-            logging.info("ddarn : reload")
+            logging.debug("ddarn : reload")
         return True
