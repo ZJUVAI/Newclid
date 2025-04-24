@@ -228,10 +228,11 @@ class ClauseGenerator:
 
 
 class CompoundClauseGen:
-    def __init__(self, definitions, max_comma_sep_clause, max_single_clause, max_sets, seed, shuffle_var_names=False):
+    def __init__(self, max_comma_sep_clause, max_single_clause, max_sets, seed, shuffle_var_names=False):
         self.max_comma_sep_clause = max_comma_sep_clause
         self.max_single_clause = max_single_clause
         self.max_sets = max_sets
+        definitions = DefinitionJGEX.to_dict(DefinitionJGEX.parse_txt_file(default_defs_path()))
         self.cg_comma_sep = ClauseGenerator(definitions, INTERSECT, is_comma_sep=True, seed=seed,
                                             shuffle_var_names=shuffle_var_names)
         constructions_excluding_sketch = [key for key in definitions.keys() if key not in NO_SKETCH]
@@ -276,11 +277,7 @@ class CompoundClauseGen:
 if __name__ == "__main__":
     random.seed(3)
 
-    # Load definitions
-    definitions = DefinitionJGEX.to_dict(
-                DefinitionJGEX.parse_txt_file(default_defs_path())
-            )
-    cc_gen = CompoundClauseGen(definitions, 2, 3, 2, 42)
+    cc_gen = CompoundClauseGen(2, 3, 2, 42)
 
     for j in range(5):
         clause_text = cc_gen.generate_clauses()
