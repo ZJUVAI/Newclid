@@ -27,9 +27,10 @@ class DDARN(DeductiveAgent):
         self.application_buffer: list[Dependency] = []
         self.any_new_statement_has_been_added = True
 
-    def step(self, proof: ProofState, rules: list[Rule]) -> bool:
+    def step(self, proof: ProofState, rules: list[Rule]) -> tuple[bool, bool]:
+        reload = False
         if proof.check_goals():
-            return False
+            return False, reload
         if self.rule_buffer:
             theorem = self.rule_buffer.pop()
             logging.debug("ddarn matching" + str(theorem))
@@ -43,8 +44,9 @@ class DDARN(DeductiveAgent):
                 self.any_new_statement_has_been_added = True
         else:
             if not self.any_new_statement_has_been_added:
-                return False
+                return False, reload
             self.any_new_statement_has_been_added = False
             self.rule_buffer = list(rules)
+            reload = True
             logging.debug("ddarn : reload")
-        return True
+        return True, reload

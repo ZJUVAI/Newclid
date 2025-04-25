@@ -1,5 +1,6 @@
 from __future__ import annotations
 import time
+import logging
 from typing import TYPE_CHECKING, Any
 
 from newclid.formulations.rule import Rule
@@ -11,7 +12,7 @@ if TYPE_CHECKING:
 
 
 def run_loop(
-    deductive_agent: "DeductiveAgent", proof: "ProofState", rules: list[Rule]
+    deductive_agent: "DeductiveAgent", proof: "ProofState", rules: list[Rule], max_level: int = 1000
 ) -> dict[str, Any]:
     """Run DeductiveAgent until saturation or goal found."""
     infos: dict[str, Any] = {}
@@ -22,10 +23,15 @@ def run_loop(
     t0 = time.time()
 
     step = 0
+    current_level = 0
     running = True
-    while running:
-        running = deductive_agent.step(proof=proof, rules=rules)
+    reload = False
+    while running and current_level <= max_level:
+        running, reload = deductive_agent.step(proof=proof, rules=rules)
         step += 1
+        current_level += 1 if reload else 0
+        if reload and running and current_level <= max_level:
+            logging.info("DDAR running at level " + str(current_level))
 
     infos["runtime"] = time.time() - t0
     infos["success"] = proof.check_goals()
