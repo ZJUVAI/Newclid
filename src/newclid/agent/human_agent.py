@@ -54,7 +54,7 @@ class HumanAgent(DeductiveAgent):
         n = int(choice)
         return options[n]
 
-    def step(self, proof: ProofState, rules: list[Rule]) -> bool:
+    def step(self, proof: ProofState, rules: list[Rule]) -> tuple[bool, bool]:
         exausted = False
         match_rules = [
             NamedFunction(
@@ -90,7 +90,7 @@ class HumanAgent(DeductiveAgent):
                 allow_none=True,
             )
             if selected is None:
-                return not exausted
+                return not exausted, False
             selected.function()
             if selected.name == "stop":
                 exausted = True
@@ -99,7 +99,7 @@ class HumanAgent(DeductiveAgent):
         else:
             for goal in proof.goals:
                 print(f"{goal.pretty()} proven? {goal.check()}")
-        return not exausted
+        return not exausted, False
 
     def match(self, match_rules: list[NamedFunction]) -> None:
         selected = self.select(match_rules, allow_none=True)
