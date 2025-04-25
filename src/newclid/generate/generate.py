@@ -14,7 +14,7 @@ from newclid.generate.clause_generation import CompoundClauseGen
 from newclid.proof_writing import return_proof_steps
 from newclid.formulations.problem import ProblemJGEX
 
-class GeometryGenerator:
+class GeometryGenerator: 
     def __init__(self, max_clauses=5, search_depth=5, n_threads=1, output_dir="dataset", min_dep_num=10, min_clauses_num=6):
         self.max_clauses = max_clauses
         self.search_depth = search_depth
@@ -114,7 +114,7 @@ class GeometryGenerator:
             logging.info(f"Error: {e}")
             return []
             
-        solver.run()
+        solver.run(max_level=self.search_depth)
         goals = solver.proof.dep_graph.conclusions()
 
         generated_data = []
