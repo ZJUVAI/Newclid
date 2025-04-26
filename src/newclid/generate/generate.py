@@ -6,22 +6,29 @@ import csv
 import random
 import time
 from typing import Iterator, Dict, Any
+from pathlib import Path
+import itertools
 
 from newclid.agent.ddarn import DDARN
 from newclid.api import GeometricSolverBuilder
 from newclid.configs import default_defs_path, default_rules_path
+from newclid.dependencies.symbols import Point
+from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.generate.clause_generation import CompoundClauseGen
 from newclid.proof_writing import return_proof_steps
+from newclid.statement import Statement
 from newclid.formulations.problem import ProblemJGEX
+from newclid.formulations.rule import Rule
 
 class GeometryGenerator: 
-    def __init__(self, max_clauses=5, search_depth=5, n_threads=1, output_dir="dataset", min_dep_num=10, min_clauses_num=6):
+    def __init__(self, max_clauses=5, search_depth=5, n_threads=1, output_dir="dataset", min_dep_num=10, min_clauses_num=3):
         self.max_clauses = max_clauses
         self.search_depth = search_depth
         self.n_threads = n_threads
         self.output_dir = output_dir
         self.min_dep_num = min_dep_num
         self.min_clauses_num = min_clauses_num
+        self.predicates = self.load_predicates()
 
         self.clauses_generator = CompoundClauseGen(
             max_comma_sep_clause=2,
@@ -30,6 +37,19 @@ class GeometryGenerator:
             seed=0,
             shuffle_var_names=False,
         )
+
+    def load_predicates(self, rule_path: Path = default_rules_path()) -> set[tuple[str, int]]:
+        predicates: set[tuple[str, int]] = set()
+        rules = list(Rule.parse_txt_file(rule_path))
+
+        for theorem in rules:
+            for conclusion in theorem.conclusions:
+                if conclusion[0] in ['PythagoreanConclusions', 'rconst', 'aconst']:
+                    continue
+                new_predicate = (conclusion[0], len(conclusion) - 1)
+                predicates.add(new_predicate)
+
+        return predicates
 
     def write_data(self, all_data: list) -> int:
         """Write all generated data to output files."""
@@ -98,6 +118,15 @@ class GeometryGenerator:
                 return True
         return False
 
+    def all_possible_goals(self, points: list[str], dep_graph: DependencyGraph) -> list[Statement]:
+        goals: list[Statement] = []
+        for name, num_args in self.predicates:
+            for point_list in itertools.product(points, repeat=num_args):
+                goal = Statement.from_tokens(tuple([name] + list(point_list)), dep_graph)
+                if goal:
+                    goals.append(goal)
+        return goals
+
     def process_single_problem(self, args: tuple) -> list:
         """Process a single geometry problem."""
         pid, fl_statement, search_depth = args
@@ -107,18 +136,26 @@ class GeometryGenerator:
         solver_builder.load_rules_from_file(default_rules_path())
         solver_builder.with_deductive_agent(DDARN())
         solver_builder.load_problem_from_txt(fl_statement)
+
+        if len(solver_builder.problemJGEX.constructions) < self.min_clauses_num:
+            logging.info(f"Too few clauses: {len(solver_builder.problemJGEX.constructions)}")
+            return []
         
         try:
             solver = solver_builder.build(max_attempts=100)
         except Exception as e:
             logging.info(f"Error: {e}")
             return []
-            
+        
         solver.run(max_level=self.search_depth)
-        goals = solver.proof.dep_graph.conclusions()
+        points = [p.name for p in solver.proof.dep_graph.symbols_graph.nodes_of_type(Point)]
+        goals = self.all_possible_goals(points, solver.proof.dep_graph) + solver.proof.dep_graph.conclusions()
+        goals = list(set(goals))
 
         generated_data = []
         for goal in goals:
+            if not goal.check():
+                continue
             try:
                 if self.is_naive_goal(goal):
                     logging.info(f"Naive goal: {goal}")
@@ -128,7 +165,7 @@ class GeometryGenerator:
                 continue
             try:
                 if len(solver.proof.dep_graph.get_proof_steps([goal])) < self.min_dep_num:
-                    logging.debug(f"Naive proof: {goal}")
+                    logging.info(f"Naive proof: {goal}")
                     continue
             except Exception as e:
                 logging.info(f"Naive proof Error: {goal}")
@@ -152,6 +189,7 @@ class GeometryGenerator:
             # rename problem
             renamed_problem = ProblemJGEX.from_text(fl_problem).renamed()
             # output
+            logging.info(f"fl_problem: {fl_problem}")
             generated_data.append({
                 "n_clauses": n_clauses,
                 "fl_problem": fl_problem,
@@ -187,7 +225,7 @@ class GeometryGenerator:
 
 def main():
     parser = argparse.ArgumentParser(description="Create problem fl - nl dataset")
-    parser.add_argument("--max_clauses", required=True, type=int, default=5)
+    parser.add_argument("--max_clauses", required=True, type=int, default=10)
     parser.add_argument("--min_dep_num", required=False, type=int, default=10)
     parser.add_argument("--min_clauses_num", required=False, type=int, default=6)
     parser.add_argument(

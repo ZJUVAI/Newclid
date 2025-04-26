@@ -4,7 +4,7 @@
 # export PYTHONPATH=$PYTHONPATH:$MELIAD_PATH
 
 # start_time=$(date +%s)
-python generate.py --max_clauses=1 --search_depth=4 --n_threads=1 --n_samples=1 --log_level=info --min_dep_num=10 --min_clauses_num=6
+python generate.py --max_clauses=5 --search_depth=4 --n_threads=1 --n_samples=1 --log_level=info --min_dep_num=3 --min_clauses_num=2
 # python analyze.py 
 # end_time=$(date +%s)
 # execution_time=$((end_time - start_time))
