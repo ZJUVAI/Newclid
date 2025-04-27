@@ -39,7 +39,7 @@ class DDARN(DeductiveAgent):
             self.application_buffer.extend(deps)
         elif self.application_buffer:
             dep = self.application_buffer.pop()
-            # logging.info(f"ddarn : apply {dep}")
+            logging.debug(f"ddarn : apply {dep}")
             if proof.apply_dep(dep):
                 self.any_new_statement_has_been_added = True
         else:
