@@ -219,9 +219,6 @@ class ProofState:
         rng: "Generator",
     ) -> ProofState:
         """Build a problem into a Proof state object."""
-        logging.info(
-            f"Building proof state from problem '{problemJGEX.name}': {problemJGEX}"
-        )
 
         err = ConstructionError(f"Construction failed {max_attempts} times")
         for _ in range(max_attempts):
