@@ -23,12 +23,13 @@ class Statement:
         self.predicate = predicate
         self.args: tuple[Any, ...] = args
         self.dep_graph = dep_graph
+        self._hash = None
 
     def check(self) -> bool:
         """Symbolically check if the statement is currently considered True."""
         if self in self.dep_graph.hyper_graph:
             return True
-        if not self.predicate.check_numerical(self):
+        if not self.check_numerical():
             return False
         if self.predicate.check(self):
             self.why()
@@ -56,7 +57,9 @@ class Statement:
         return self.predicate.to_repr(self)
 
     def __hash__(self) -> int:
-        return hash(repr(self))
+        if self._hash is None:
+            self._hash = hash(repr(self))
+        return self._hash
 
     def __eq__(self, obj: object) -> bool:
         return isinstance(obj, Statement) and hash(self) == hash(obj)
