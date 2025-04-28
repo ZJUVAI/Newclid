@@ -109,11 +109,8 @@ class Matcher:
         )
 
     def match_theorem(self, theorem: "Rule") -> Generator["Dependency", None, None]:
-        logging.debug("Start caching")
         if theorem not in self.cache:
             self.cache_theorem(theorem)
-        logging.debug("Finish caching")
-        logging.debug("Start matching")
         for dep in self.cache[theorem]:
             if dep.statement in dep.statement.dep_graph.hyper_graph:
                 continue
@@ -123,4 +120,3 @@ class Matcher:
                     applicable = False
             if applicable:
                 yield dep
-        logging.debug("Finish matching")

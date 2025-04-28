@@ -65,10 +65,17 @@ class Statement:
     def from_tokens(
         cls, tokens: tuple[str, ...], dep_graph: DependencyGraph
     ) -> Optional[Statement]:
+        # preparse, reorder args
+        pred = NAME_TO_PREDICATE[tokens[0]]
+        preparsed = pred.preparse(tokens[1:])
+        if not preparsed:
+            return None
+        tokens = (tokens[0],) + preparsed
+
         if tokens in dep_graph.token_statement:
             return dep_graph.token_statement[tokens]
 
-        pred = NAME_TO_PREDICATE[tokens[0]]
+        # pred = NAME_TO_PREDICATE[tokens[0]]
         parsed = pred.parse(tokens[1:], dep_graph)
         if not parsed:
             dep_graph.token_statement[tokens] = None
