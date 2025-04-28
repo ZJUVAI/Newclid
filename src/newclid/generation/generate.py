@@ -55,13 +55,14 @@ class GeometryGenerator:
         return predicates
     
     def all_possible_goals(self, points: list[str], dep_graph: DependencyGraph) -> set[Statement]:
-        goals: set[Statement] = set()
+        goals: list[Statement] = list()
         for name, num_args in self.predicates:
             for point_list in itertools.product(points, repeat=num_args):
                 tokens = tuple([name] + list(point_list))
-                goal = Statement.from_tokens(tokens, dep_graph)
-                if goal: 
-                    goals.add(goal)
+                if self.goal_filter(name, point_list):
+                    goal = Statement.from_tokens(tokens, dep_graph)
+                    if goal and goal.check(): 
+                        goals.append(goal)
         return goals
 
     def clauses_num_filter(self, problemJGEX: ProblemJGEX) -> bool:
@@ -85,18 +86,18 @@ class GeometryGenerator:
             logging.warning(f"error in get_proof_steps {goal}: {e}. Why?")
             return False
     
-    def goal_filter(self, goal):
-        predicate = goal.predicate.NAME
-        args = goal.args
+    def goal_filter(self, name, args):
+        # predicate = goal.predicate.NAME
+        # args = goal.args
         if args[-1] == '':
             args = args[:-1]
         # case: cong AB = AB, para AB ∥∥ AB, rconst AB:AB=1, aconst ∠AB AB=0
-        if predicate == 'cong' or predicate == 'para': # or predicate == 'rconst' or predicate == 'aconst':
+        if name == 'cong' or name == 'para': # or predicate == 'rconst' or predicate == 'aconst':
             left = {args[0], args[1]}
             right = {args[2], args[3]}
             if left == right:
                 return False
-        elif predicate == 'eqratio':
+        elif name == 'eqratio':
             seg_1 = {args[0], args[1]}
             seg_2 = {args[2], args[3]}
             seg_3 = {args[4], args[5]}
@@ -109,7 +110,7 @@ class GeometryGenerator:
             # AB/AB = CD/EF => cong CD = EF
             if seg_1 == seg_2 or seg_3 == seg_4: 
                 return False
-        elif predicate == 'eqangle':
+        elif name == 'eqangle':
             #case: eqangle ∠AB CD = ∠DC/BA
             seg_1 = {args[0], args[1]}
             seg_2 = {args[2], args[3]}
@@ -121,13 +122,13 @@ class GeometryGenerator:
                 return False
             if seg_1 == seg_2 or seg_3 == seg_4:
                 return False
-        elif predicate == 'simtri':
+        elif name == 'simtri':
             #case: simtri △ABC ≅ △ABC
             tri_1 = {args[0], args[1], args[2]}
             tri_2 = {args[3], args[4], args[5]}
             if tri_1 == tri_2:
                 return False
-        elif predicate == 'aconst' or predicate == 'rconst':
+        elif name == 'aconst' or name == 'rconst':
             # AG1 do not support aconst and rconst
             return False
         return True
@@ -397,8 +398,8 @@ class GeometryGenerator:
 
     def process_single_problem(self, args: tuple) -> list:
         """Process a single geometry problem."""
-        pid, fl_statement = args  
-        
+        pid, fl_statement = args
+    
         solver_builder = GeometricSolverBuilder(seed=998244353)
         solver_builder.with_deductive_agent(DDARN())
         solver_builder.load_problem_from_txt(fl_statement)
@@ -411,10 +412,12 @@ class GeometryGenerator:
         except Exception as e:
             logging.info(f"Error: {e}")
             return []
+        import time
         solver.run(max_level=self.search_depth)
         points = [p.name for p in solver.proof.dep_graph.symbols_graph.nodes_of_type(Point)]
-        possible_goals = list(self.all_possible_goals(points, solver.proof.dep_graph) | set(solver.proof.dep_graph.conclusions()))
-        possible_goals = [goal for goal in possible_goals if (goal.check() and self.goal_filter(goal))]
+        possible_goals = self.all_possible_goals(points, solver.proof.dep_graph)
+        possible_goals += [goal for goal in solver.proof.dep_graph.conclusions() if self.goal_filter(goal.predicate.NAME, goal.args)]
+        possible_goals = list(set(possible_goals))
 
         generated_data = []
         for goal in possible_goals:
