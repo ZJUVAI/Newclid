@@ -422,8 +422,8 @@ class GeometryGenerator:
             return []
         solver.run(max_level=self.search_depth)
         points = [p.name for p in solver.proof.dep_graph.symbols_graph.nodes_of_type(Point)]
-        # possible_goals = list(self.all_possible_goals(points, solver.proof.dep_graph) | set(solver.proof.dep_graph.conclusions()))
-        possible_goals = list(set(solver.proof.dep_graph.conclusions()))
+        possible_goals = list(self.all_possible_goals(points, solver.proof.dep_graph) | set(solver.proof.dep_graph.conclusions()))
+        # possible_goals = list(set(solver.proof.dep_graph.conclusions()))
 
         generated_data = []
         for goal in possible_goals:
@@ -551,11 +551,7 @@ def main():
     parser.add_argument("--n_threads", required=False, type=int, default=1)
     parser.add_argument("--n_samples", required=False, type=int, default=5)
     parser.add_argument("--dir", default="dataset")
-    parser.add_argument(
-        "--log_level", 
-        default="warning", 
-        choices=["debug", "info", "warning", "error"],
-    )
+    parser.add_argument("--log_level", default="warning", choices=["debug", "info", "warning", "error"])
     args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, args.log_level.upper()))
@@ -570,20 +566,20 @@ def main():
     )
     
     # Collect problems using the generator
-    all_data = []
+    data = []
     start_time = time.time()
     for problem in generator.generate_problems():
-        all_data.append(problem)
-        logging.debug(
-            f"Generated {len(all_data)} samples in {time.time() - start_time:.1f}s "
-            f"({(time.time() - start_time)/len(all_data):.1f}s/sample)"
+        data.append(problem)
+        logging.info(
+            f"Generated {len(data)} samples in {time.time() - start_time:.1f}s "
+            f"({(time.time() - start_time)/len(data):.1f}s/sample)"
         )
-        if len(all_data) >= args.n_samples:
+        if len(data) >= args.n_samples:
             break
     
     # Write the collected data
-    generator.write_data(all_data)
-    logging.debug(f"Generated {len(all_data)} problems successfully")
+    generator.write_data(data)
+    logging.info(f"Generated {len(data)} problems successfully")
 
 
 if __name__ == "__main__":
