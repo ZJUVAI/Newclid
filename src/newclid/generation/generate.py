@@ -59,12 +59,9 @@ class GeometryGenerator:
         for name, num_args in self.predicates:
             for point_list in itertools.product(points, repeat=num_args):
                 tokens = tuple([name] + list(point_list))
-                pred = NAME_TO_PREDICATE[tokens[0]]
-                parsed = pred.parse(tokens[1:], dep_graph)
-                if parsed:
-                    goal = Statement(pred, parsed, dep_graph)
-                    if goal and goal.check():
-                        goals.add(goal)
+                goal = Statement.from_tokens(tokens, dep_graph)
+                if goal: 
+                    goals.add(goal)
         return goals
 
     def clauses_num_filter(self, problemJGEX: ProblemJGEX) -> bool:
@@ -76,15 +73,7 @@ class GeometryGenerator:
     
     def proof_filter(self, solver: GeometricSolver, goal: Statement) -> bool:
         try:
-            (
-                points,
-                premises,
-                numercial_checked_premises,
-                aux_points,
-                aux,
-            numercial_checked_aux,
-            proof_steps,
-            ) = solver.proof.dep_graph.get_proof_steps([goal])
+            _, _, _, _, _, _, proof_steps, = solver.proof.dep_graph.get_proof_steps([goal])
             if len(proof_steps) < self.min_proof_steps:
                 logging.debug(f"Naive proof: {goal}")
                 return False
@@ -102,7 +91,7 @@ class GeometryGenerator:
         if args[-1] == '':
             args = args[:-1]
         # case: cong AB = AB, para AB ∥∥ AB, rconst AB:AB=1, aconst ∠AB AB=0
-        if predicate == 'cong' or predicate == 'para':# or predicate == 'rconst' or predicate == 'aconst':
+        if predicate == 'cong' or predicate == 'para': # or predicate == 'rconst' or predicate == 'aconst':
             left = {args[0], args[1]}
             right = {args[2], args[3]}
             if left == right:
@@ -130,13 +119,15 @@ class GeometryGenerator:
                 return False
             if seg_1 == seg_4 and seg_2 == seg_3:
                 return False
+            if seg_1 == seg_2 or seg_3 == seg_4:
+                return False
         elif predicate == 'simtri':
             #case: simtri △ABC ≅ △ABC
             tri_1 = {args[0], args[1], args[2]}
             tri_2 = {args[3], args[4], args[5]}
             if tri_1 == tri_2:
                 return False
-        elif predicate == 'aconst' or 'rconst':
+        elif predicate == 'aconst' or predicate == 'rconst':
             # AG1 do not support aconst and rconst
             return False
         return True
@@ -406,7 +397,7 @@ class GeometryGenerator:
 
     def process_single_problem(self, args: tuple) -> list:
         """Process a single geometry problem."""
-        pid, fl_statement = args
+        pid, fl_statement = args  
         
         solver_builder = GeometricSolverBuilder(seed=998244353)
         solver_builder.with_deductive_agent(DDARN())
@@ -423,15 +414,11 @@ class GeometryGenerator:
         solver.run(max_level=self.search_depth)
         points = [p.name for p in solver.proof.dep_graph.symbols_graph.nodes_of_type(Point)]
         possible_goals = list(self.all_possible_goals(points, solver.proof.dep_graph) | set(solver.proof.dep_graph.conclusions()))
-        # possible_goals = list(set(solver.proof.dep_graph.conclusions()))
+        possible_goals = [goal for goal in possible_goals if (goal.check() and self.goal_filter(goal))]
 
         generated_data = []
         for goal in possible_goals:
             # filter
-            if not goal.check():
-                continue
-            if not self.goal_filter(goal):
-                continue
             if not self.proof_filter(solver, goal):
                 continue
             
