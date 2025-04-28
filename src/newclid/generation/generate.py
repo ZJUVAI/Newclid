@@ -70,39 +70,43 @@ class GeometryGenerator:
     def clauses_num_filter(self, problemJGEX: ProblemJGEX) -> bool:
         if len(problemJGEX.constructions) < self.min_clauses_num:
             logging.debug(f"Too few clauses: {len(problemJGEX.constructions)}")
-            return True
-        else:
             return False
+        else:
+            return True
     
-    def naive_proof_filter(self, solver: GeometricSolver, goal: Statement) -> bool:
-        (
-            points,
-            premises,
-            numercial_checked_premises,
-            aux_points,
-            aux,
+    def proof_filter(self, solver: GeometricSolver, goal: Statement) -> bool:
+        try:
+            (
+                points,
+                premises,
+                numercial_checked_premises,
+                aux_points,
+                aux,
             numercial_checked_aux,
             proof_steps,
-        ) = solver.proof.dep_graph.get_proof_steps([goal])
-        if len(proof_steps) < self.min_proof_steps:
-            logging.debug(f"Naive proof: {goal}")
-            return True
-        else:
+            ) = solver.proof.dep_graph.get_proof_steps([goal])
+            if len(proof_steps) < self.min_proof_steps:
+                logging.debug(f"Naive proof: {goal}")
+                return False
+            else:
+                return True
+                # connot detect proof of the goal
+                # rconst[b,c,c,e,Fraction(2, 1),]
+        except Exception as e:
+            logging.warning(f"error in get_proof_steps {goal}: {e}. Why?")
             return False
-            # connot detect proof of the goal
-            # rconst[b,c,c,e,Fraction(2, 1),]
     
-    def naive_goal_filter(self, goal):
+    def goal_filter(self, goal):
         predicate = goal.predicate.NAME
         args = goal.args
         if args[-1] == '':
             args = args[:-1]
         # case: cong AB = AB, para AB ∥∥ AB, rconst AB:AB=1, aconst ∠AB AB=0
-        if predicate == 'cong' or predicate == 'para' or predicate == 'rconst' or predicate == 'aconst':
+        if predicate == 'cong' or predicate == 'para':# or predicate == 'rconst' or predicate == 'aconst':
             left = {args[0], args[1]}
             right = {args[2], args[3]}
             if left == right:
-                return True
+                return False
         elif predicate == 'eqratio':
             seg_1 = {args[0], args[1]}
             seg_2 = {args[2], args[3]}
@@ -110,12 +114,12 @@ class GeometryGenerator:
             seg_4 = {args[6], args[7]}
             #case: eqratio AB/CD = DC/BA
             if seg_1 == seg_3 and seg_2 == seg_4:
-                return True
+                return False
             if seg_1 == seg_4 and seg_2 == seg_3:
-                return True
+                return False
             # AB/AB = CD/EF => cong CD = EF
             if seg_1 == seg_2 or seg_3 == seg_4: 
-                return True
+                return False
         elif predicate == 'eqangle':
             #case: eqangle ∠AB CD = ∠DC/BA
             seg_1 = {args[0], args[1]}
@@ -123,16 +127,19 @@ class GeometryGenerator:
             seg_3 = {args[4], args[5]}
             seg_4 = {args[6], args[7]}
             if seg_1 == seg_3 and seg_2 == seg_4:
-                return True
+                return False
             if seg_1 == seg_4 and seg_2 == seg_3:
-                return True
+                return False
         elif predicate == 'simtri':
             #case: simtri △ABC ≅ △ABC
             tri_1 = {args[0], args[1], args[2]}
             tri_2 = {args[3], args[4], args[5]}
             if tri_1 == tri_2:
-                return True
-        return False
+                return False
+        elif predicate == 'aconst' or 'rconst':
+            # AG1 do not support aconst and rconst
+            return False
+        return True
 
     def dsl(self, problem: ProblemJGEX, aux_points: list[str]) -> str:
         MAP_SYMBOL = {
@@ -296,7 +303,7 @@ class GeometryGenerator:
             if name == 'para':
                 if len(args) == 2:  # this is algebraic derivation.
                     ab, cd = args  # ab = 'd( ... )'
-                return f'P {ab} {cd}'
+                    return f'P {ab} {cd}'
                 a, b, c, d = args
                 return f'P {a} {b} {c} {d}'
             if name in ['simtri2', 'simtri', 'simtri*']:
@@ -336,12 +343,11 @@ class GeometryGenerator:
                         group[p] = points
                     for b in bs:
                         if b[0] == 'rconst' and constr_sentence[0] == 'triangle12':
-                            args = [mapping[a] for a in b[1:][:-2]]
+                            args = [mapping[a] for a in b[1:][:-1]]
                             args.append(0.5)
                         else:
                             args = [mapping[a] for a in b[1:]]
                         name = b[0]
-                        args = [mapping[a] for a in b[1:]]
                         if b[0] in ['s_angle', 'aconst']:
                             x, y, z, v = args
                             name = 'aconst'
@@ -371,6 +377,7 @@ class GeometryGenerator:
                     deps_str.append(dep_str)
                 
                 data_tmp[' '.join(gr)] = deps_str
+
         data = '{S} '
         ref = 0
         string_premise = []
@@ -405,7 +412,7 @@ class GeometryGenerator:
         solver_builder.with_deductive_agent(DDARN())
         solver_builder.load_problem_from_txt(fl_statement)
 
-        if self.clauses_num_filter(solver_builder.problemJGEX):
+        if not self.clauses_num_filter(solver_builder.problemJGEX):
             return []
         
         try:
@@ -415,14 +422,17 @@ class GeometryGenerator:
             return []
         solver.run(max_level=self.search_depth)
         points = [p.name for p in solver.proof.dep_graph.symbols_graph.nodes_of_type(Point)]
-        possible_goals = list(self.all_possible_goals(points, solver.proof.dep_graph) | set(solver.proof.dep_graph.conclusions()))
+        # possible_goals = list(self.all_possible_goals(points, solver.proof.dep_graph) | set(solver.proof.dep_graph.conclusions()))
+        possible_goals = list(set(solver.proof.dep_graph.conclusions()))
 
         generated_data = []
         for goal in possible_goals:
             # filter
-            if self.naive_goal_filter(goal):
+            if not goal.check():
                 continue
-            if self.naive_proof_filter(solver, goal):
+            if not self.goal_filter(goal):
+                continue
+            if not self.proof_filter(solver, goal):
                 continue
             
             # fl_problem
@@ -450,7 +460,8 @@ class GeometryGenerator:
                 for point in construction.points:
                     if point not in mp:
                         mp[point] = chr(ord("a") + len(mp))
-            aux_points = [mp[p] for p in aux_points]
+            if len(aux_points) > 0:
+                aux_points = [mp[p] for p in aux_points]
             dsl_problem = self.dsl(renamed_problem, aux_points)
 
             # output
