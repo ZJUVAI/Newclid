@@ -9,6 +9,7 @@ from typing import Iterator, Dict, Any
 from pathlib import Path
 import itertools
 from collections import defaultdict
+import numpy as np
 
 from newclid.agent.ddarn import DDARN
 from newclid.api import GeometricSolverBuilder, GeometricSolver
@@ -22,6 +23,7 @@ from newclid.formulations.rule import Rule
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.formulations.problem import ProblemJGEX
 from newclid.predicates import NAME_TO_PREDICATE
+from newclid.numerical import close_enough
 
 class GeometryGenerator: 
     def __init__(self, max_clauses=5, search_depth=5, n_threads=1, output_dir="dataset", min_proof_steps=5, min_clauses_num=3):
@@ -49,12 +51,14 @@ class GeometryGenerator:
             for conclusion in theorem.conclusions:
                 if conclusion[0] in ['PythagoreanConclusions', 'rconst', 'aconst', 'eqratio3']:
                     continue
+                if conclusion[0] in ['eqangle', 'eqratio']:
+                    continue
                 new_predicate = (conclusion[0], len(conclusion) - 1)
                 predicates.add(new_predicate)
 
         return predicates
     
-    def all_possible_goals(self, points: list[str], dep_graph: DependencyGraph) -> set[Statement]:
+    def all_possible_goals(self, points: list[str], dep_graph: DependencyGraph) -> list[Statement]:
         goals: list[Statement] = list()
         for name, num_args in self.predicates:
             for point_list in itertools.product(points, repeat=num_args):
@@ -65,6 +69,49 @@ class GeometryGenerator:
                         goals.append(goal)
         return goals
 
+    def numuerical_checked_goals(self, points: list[Point], dep_graph: DependencyGraph) -> list[Statement]:
+        goals: list[Statement] = list()
+        angles: list[tuple[float, str, str, str, str]] = list()
+        ratios: list[tuple[float, str, str, str, str]] = list()
+
+        for (i, a) in enumerate(points):
+            for b in points[i + 1:]: 
+                angle1 = (a.num - b.num).angle()
+                dis = a.num.distance(b.num)
+                for (k, c) in enumerate(points):
+                    for d in points[k + 1:]: 
+                        if a.name == c.name and b.name == d.name:
+                            continue
+                        angle = ((c.num - d.num).angle() - angle1) % np.pi
+                        ratio = dis / c.num.distance(d.num)
+                        angles.append((angle, a.name, b.name, c.name, d.name))
+                        ratios.append((ratio, a.name, b.name, c.name, d.name))
+                        ratios.append((1 / ratio, c.name, d.name, a.name, b.name))
+        
+        angles.sort(key=lambda x: x[0])
+        ratios.sort(key=lambda x: x[0])
+        for (i, A) in enumerate(angles):
+            for B in angles[i + 1:]:
+                if not close_enough(A[0], B[0]):
+                    break
+                if self.goal_filter('eqangle', A[1:] + B[1:]):
+                    tokens = tuple(['eqangle'] + list(A[1:] + B[1:]))
+                    goal = Statement.from_tokens(tokens, dep_graph)
+                    if goal and goal.check():
+                        goals.append(goal)
+
+        for (i, A) in enumerate(ratios):
+            for B in ratios[i + 1:]:
+                if not close_enough(A[0], B[0]):
+                    break
+                if self.goal_filter('eqratio', A[1:] + B[1:]):
+                    tokens = tuple(['eqratio'] + list(A[1:] + B[1:]))
+                    goal = Statement.from_tokens(tokens, dep_graph)
+                    if goal and goal.check():
+                        goals.append(goal)
+                
+        return goals
+                
     def clauses_num_filter(self, problemJGEX: ProblemJGEX) -> bool:
         if len(problemJGEX.constructions) < self.min_clauses_num:
             logging.debug(f"Too few clauses: {len(problemJGEX.constructions)}")
@@ -412,12 +459,20 @@ class GeometryGenerator:
         except Exception as e:
             logging.info(f"Error: {e}")
             return []
-        import time
+        
+        t = time.time()
         solver.run(max_level=self.search_depth)
-        points = [p.name for p in solver.proof.dep_graph.symbols_graph.nodes_of_type(Point)]
-        possible_goals = self.all_possible_goals(points, solver.proof.dep_graph)
+        logging.info(f"ddar time: {time.time() - t:.2f}s")
+
+        t = time.time()
+        points = solver.proof.dep_graph.symbols_graph.nodes_of_type(Point)
+        points_name = [p.name for p in points]
+        possible_goals = self.all_possible_goals(points_name, solver.proof.dep_graph)
+        numerical_checked_goals = self.numuerical_checked_goals(points,solver.proof.dep_graph)
+        possible_goals += numerical_checked_goals
         possible_goals += [goal for goal in solver.proof.dep_graph.conclusions() if self.goal_filter(goal.predicate.NAME, goal.args)]
         possible_goals = list(set(possible_goals))
+        logging.info(f"check goals time: {time.time() - t:.2f}s")
 
         generated_data = []
         for goal in possible_goals:
