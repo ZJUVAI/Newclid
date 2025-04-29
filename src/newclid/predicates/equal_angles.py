@@ -40,29 +40,33 @@ class EqAngle(Predicate):
         if c > d: c, d = d, c
         if e > f: e, f = f, e
         if g > h: g, h = h, g
-        if (a, b, c, d) < (e, f, g, h):
-            groups1 = [(a, b, c, d), (e, f, g, h)]
+        g1a = (a, b, c, d)
+        g1b = (e, f, g, h)
+        g2a = (c, d, a, b)
+        g2b = (g, h, e, f)
+        if g1a <= g1b:
+            groups1 = g1a + g1b
         else:
-            groups1 = [(e, f, g, h), (a, b, c, d)]
-        if (c, d, a, b) < (g, h, e, f):
-            groups2 = [(c, d, a, b), (g, h, e, f)]
+            groups1 = g1b + g1a
+        if g2a <= g2b:
+            groups2 = g2a + g2b
         else:
-            groups2 = [(g, h, e, f), (c, d, a, b)]
-        return sum(min(groups1, groups2), ())
+            groups2 = g2b + g2a
+        return groups1 if groups1 <= groups2 else groups2
     
-        # groups: list[tuple[str, str, str, str]] = []
-        # groups1: list[tuple[str, str, str, str]] = []
-        # if len(args) % 4:
-        #     return None
-        # for a, b, c, d in reshape(args, 4):
-        #     if a == b or c == d:
-        #         return None
-        #     a, b = sorted((a, b))
-        #     c, d = sorted((c, d))
-        #     groups.append((a, b, c, d))
-        #     groups1.append((c, d, a, b))
-        # assert data == sum(min(sorted(groups), sorted(groups1)), ())
-        # return sum(min(sorted(groups), sorted(groups1)), ())
+        groups: list[tuple[str, str, str, str]] = []
+        groups1: list[tuple[str, str, str, str]] = []
+        if len(args) % 4:
+            return None
+        for a, b, c, d in reshape(args, 4):
+            if a == b or c == d:
+                return None
+            a, b = sorted((a, b))
+            c, d = sorted((c, d))
+            groups.append((a, b, c, d))
+            groups1.append((c, d, a, b))
+        assert data == sum(min(sorted(groups), sorted(groups1)), ())
+        return sum(min(sorted(groups), sorted(groups1)), ())
 
     @classmethod
     def parse(cls, args: tuple[str, ...], dep_graph: DependencyGraph):
