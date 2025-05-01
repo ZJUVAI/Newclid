@@ -42,8 +42,7 @@ class GeometryGenerator:
             shuffle_var_names=False,
         ) 
     
-    def all_possible_goals_by_goals(self, points: list[str], dep_graph: DependencyGraph) -> list[Statement]:
-        goals: list[Statement] = list()
+    def all_possible_goals_by_goals(self, dep_graph: DependencyGraph):
         def load_predicates(rule_path: Path = default_rules_path()) -> set[tuple[str, int]]:
             predicates: set[tuple[str, int]] = set()
             rules = list(Rule.parse_txt_file(rule_path))
@@ -59,20 +58,16 @@ class GeometryGenerator:
             return predicates
         
         predicates = load_predicates()
-
-        points_name = [p.name for p in points]
+        points_name = [p.name for p in dep_graph.symbols_graph.nodes_of_type(Point)]
         for name, num_args in predicates:
             for point_list in itertools.product(points_name, repeat=num_args):
                 tokens = tuple([name] + list(point_list))
                 if self.goal_filter(name, point_list):
                     goal = Statement.from_tokens(tokens, dep_graph)
-                    if goal and goal.check(): 
-                        goals.append(goal)
-
-        self.numuerical_checked_goals(points, dep_graph)
+                    if goal: goal.check()
     
-    def numuerical_checked_goals(self, points: list[Point], dep_graph: DependencyGraph) -> list[Statement]:
-        goals: list[Statement] = list()
+    def get_numerical_checked_eqangle_and_eqratio(self, dep_graph: DependencyGraph) -> tuple[list[Statement], list[Statement]]:
+        points = dep_graph.symbols_graph.nodes_of_type(Point)
         angles: list[tuple[float, str, str, str, str]] = list()
         ratios: list[tuple[float, str, str, str, str]] = list()
 
@@ -99,8 +94,7 @@ class GeometryGenerator:
                 if self.goal_filter('eqangle', A[1:] + B[1:]):
                     tokens = tuple(['eqangle'] + list(A[1:] + B[1:]))
                     goal = Statement.from_tokens(tokens, dep_graph)
-                    if goal and goal.check():
-                        goals.append(goal)
+                    if goal: goal.check()
 
         for (i, A) in enumerate(ratios):
             for B in ratios[i + 1:]:
@@ -109,10 +103,7 @@ class GeometryGenerator:
                 if self.goal_filter('eqratio', A[1:] + B[1:]):
                     tokens = tuple(['eqratio'] + list(A[1:] + B[1:]))
                     goal = Statement.from_tokens(tokens, dep_graph)
-                    if goal and goal.check():
-                        goals.append(goal)
-                
-        return goals
+                    if goal: goal.check()
 
     def all_possible_goals_by_ar(self, dep_graph: DependencyGraph) -> list[Statement]:
         def goal_from_tokens(tokens):
@@ -121,24 +112,24 @@ class GeometryGenerator:
                 if goal and goal.check():
                     return [goal]
             return []
+            
         ar = dep_graph.ar
-        possibel_goals_test = []
 
         e2v, e2v_pairs2, e2v_pairs4 = ar.atable.possible_pairs()
         for e in e2v_pairs2.keys():
             for v1, v2 in e2v_pairs2[e]:
-                possibel_goals_test += goal_from_tokens(tuple(['para'] + list(v1 + v2)))
-                possibel_goals_test += goal_from_tokens(tuple(['perp'] + list(v1 + v2)))
+                goal_from_tokens(tuple(['para'] + list(v1 + v2)))
+                goal_from_tokens(tuple(['perp'] + list(v1 + v2)))
         for v1, v2, v3, v4 in e2v_pairs4:
-            possibel_goals_test += goal_from_tokens(tuple(['eqangle'] + list(v1 + v2 + v3 + v4)))
+            goal_from_tokens(tuple(['eqangle'] + list(v1 + v2 + v3 + v4)))
 
         e2v, e2v_pairs2, e2v_pairs4 = ar.rtable.possible_pairs()
         for e in e2v_pairs2.keys():
             for v1, v2 in e2v_pairs2[e]:
-                possibel_goals_test += goal_from_tokens(tuple(['cong'] + v1[2:-1].split(',') + v2[2:-1].split(',')))
+                goal_from_tokens(tuple(['cong'] + v1[2:-1].split(',') + v2[2:-1].split(',')))
         for v1, v2, v3, v4 in e2v_pairs4:
             tokens = tuple(['eqratio'] + list(v1[2:-1].split(',') + v2[2:-1].split(',') + v3[2:-1].split(',') + v4[2:-1].split(',')))
-            possibel_goals_test += goal_from_tokens(tokens)
+            goal_from_tokens(tokens)
 
     def clauses_num_filter(self, problemJGEX: ProblemJGEX) -> bool:
         if len(problemJGEX.constructions) < self.min_clauses_num:
@@ -492,12 +483,12 @@ class GeometryGenerator:
         logging.info(f"ddar time: {time.time() - t:.2f}s")
 
         t = time.time()
-        points = solver.proof.dep_graph.symbols_graph.nodes_of_type(Point)
-        possible_goals = self.all_possible_goals_by_goals(points, solver.proof.dep_graph)
-
+        self.all_possible_goals_by_goals(solver.proof.dep_graph)
+        self.get_numerical_checked_eqangle_and_eqratio(solver.proof.dep_graph)
+        # self.all_possible_goals_by_ar(solver.proof.dep_graph)
         possible_goals = [goal for goal in solver.proof.dep_graph.conclusions() if self.goal_filter(goal.predicate.NAME, goal.args)]
-        possible_goals = list(set(possible_goals))
         logging.info(f"check goals time: {time.time() - t:.2f}s")
+        logging.info(f"{len(possible_goals)=}")
 
         generated_data = []
         for goal in possible_goals:
