@@ -78,7 +78,6 @@ def _fix_width(s: Any, width: int, align: Literal["right", "left", "center"] = "
     s = str(s)
     return " " * (width - len(s)) + s
 
-
 def report(eqdict: EqDict):
     table_str = ">>>>>>>>>table begins\n"
     maxlv = 0
@@ -123,6 +122,64 @@ class Table:
         self._v2i: dict[str, int] = {}  # v -> index of row in A.
         self.deps: list[Dependency] = []  # equal number of columns.
         self._mA = np.zeros((0, 0))
+
+    def possible_pairs(self):
+        def e2str(e: SumCV) -> str:
+            return ",".join([f"{v}:{c}" for v, c in e.items()])
+            
+        e2v = {}
+        for v, e in self.v2e.items():
+            e_str = e2str(e)
+            if not v.startswith('line'):
+                if e2str(e) not in e2v:
+                    e2v[e_str] = []
+                e2v[e_str].append(v)
+        for v, e in self.v2e.items():
+            e_str = e2str(e)
+            if v.startswith('line'):
+                vars = v[5:-1].split('-')
+                for i, v1 in enumerate(vars[:-1]):
+                    for v2 in vars[i + 1 :]:
+                        if e2str(e) not in e2v:
+                            e2v[e_str] = []
+                        if v1+v2 not in e2v[e_str]:
+                            e2v[e_str].append(v1+v2)
+        for e in e2v.keys():
+            e2v[e] = sorted(e2v[e])
+
+        e2v_pairs2 = {}
+        for e in e2v.keys():
+            e2v_pairs2[e] = []
+            for i, v1 in enumerate(e2v[e][:-1]):
+                for v2 in e2v[e][i + 1:]:
+                    e2v_pairs2[e].append((v1, v2))
+
+        e2v_pairs4 = []
+        for i, e1 in enumerate(e2v.keys()):
+            for j, e2 in enumerate(e2v.keys()):
+                if i == j:
+                    for m, (v1, v2) in enumerate(e2v_pairs2[e1][:-1]):
+                        for v3, v4 in e2v_pairs2[e2][m + 1:]:
+                            e2v_pairs4.append((v1, v2, v3, v4))
+                            e2v_pairs4.append((v1, v2, v4, v3))
+                            e2v_pairs4.append((v2, v1, v3, v4))
+                            e2v_pairs4.append((v2, v1, v4, v3))
+                if i < j:
+                    for v1, v2 in e2v_pairs2[e1]:
+                        for v3, v4 in e2v_pairs2[e2]:
+                            e2v_pairs4.append((v1, v3, v2, v3))
+                            e2v_pairs4.append((v1, v4, v2, v4))
+                            e2v_pairs4.append((v1, v3, v1, v4))
+                            e2v_pairs4.append((v2, v3, v2, v4))
+
+                            e2v_pairs4.append((v1, v3, v2, v4))
+                            e2v_pairs4.append((v1, v4, v2, v3))
+
+                            e2v_pairs4.append((v1, v2, v3, v4))
+                            e2v_pairs4.append((v1, v2, v4, v3))
+                            e2v_pairs4.append((v2, v1, v3, v4))
+                            e2v_pairs4.append((v2, v1, v4, v3))
+        return e2v, e2v_pairs2, e2v_pairs4
 
     def add_free(self, v: str) -> None:
         self.v2e[v] = {v: Fraction(1)}

@@ -33,7 +33,6 @@ class GeometryGenerator:
         self.output_dir = output_dir
         self.min_proof_steps = min_proof_steps
         self.min_clauses_num = min_clauses_num
-        self.predicates = self.load_predicates()
 
         self.clauses_generator = CompoundClauseGen(
             max_comma_sep_clause=2,
@@ -41,34 +40,37 @@ class GeometryGenerator:
             max_sets=self.max_clauses,
             seed=0,
             shuffle_var_names=False,
-        )
-
-    def load_predicates(self, rule_path: Path = default_rules_path()) -> set[tuple[str, int]]:
-        predicates: set[tuple[str, int]] = set()
-        rules = list(Rule.parse_txt_file(rule_path))
-
-        for theorem in rules:
-            for conclusion in theorem.conclusions:
-                if conclusion[0] in ['PythagoreanConclusions', 'rconst', 'aconst', 'eqratio3']:
-                    continue
-                if conclusion[0] in ['eqangle', 'eqratio']:
-                    continue
-                new_predicate = (conclusion[0], len(conclusion) - 1)
-                predicates.add(new_predicate)
-
-        return predicates
+        ) 
     
-    def all_possible_goals(self, points: list[str], dep_graph: DependencyGraph) -> list[Statement]:
+    def all_possible_goals_by_goals(self, points: list[str], dep_graph: DependencyGraph) -> list[Statement]:
         goals: list[Statement] = list()
-        for name, num_args in self.predicates:
-            for point_list in itertools.product(points, repeat=num_args):
+        def load_predicates(rule_path: Path = default_rules_path()) -> set[tuple[str, int]]:
+            predicates: set[tuple[str, int]] = set()
+            rules = list(Rule.parse_txt_file(rule_path))
+
+            for theorem in rules:
+                for conclusion in theorem.conclusions:
+                    if conclusion[0] in ['PythagoreanConclusions', 'rconst', 'aconst', 'eqratio3']:
+                        continue
+                    if conclusion[0] in ['eqangle', 'eqratio']:
+                        continue
+                    new_predicate = (conclusion[0], len(conclusion) - 1)
+                    predicates.add(new_predicate)
+            return predicates
+        
+        predicates = load_predicates()
+
+        points_name = [p.name for p in points]
+        for name, num_args in predicates:
+            for point_list in itertools.product(points_name, repeat=num_args):
                 tokens = tuple([name] + list(point_list))
                 if self.goal_filter(name, point_list):
                     goal = Statement.from_tokens(tokens, dep_graph)
                     if goal and goal.check(): 
                         goals.append(goal)
-        return goals
 
+        self.numuerical_checked_goals(points, dep_graph)
+    
     def numuerical_checked_goals(self, points: list[Point], dep_graph: DependencyGraph) -> list[Statement]:
         goals: list[Statement] = list()
         angles: list[tuple[float, str, str, str, str]] = list()
@@ -111,7 +113,33 @@ class GeometryGenerator:
                         goals.append(goal)
                 
         return goals
-                
+
+    def all_possible_goals_by_ar(self, dep_graph: DependencyGraph) -> list[Statement]:
+        def goal_from_tokens(tokens):
+            if self.goal_filter(tokens[0], tokens[1:]):
+                goal = Statement.from_tokens(tokens, dep_graph)
+                if goal and goal.check():
+                    return [goal]
+            return []
+        ar = dep_graph.ar
+        possibel_goals_test = []
+
+        e2v, e2v_pairs2, e2v_pairs4 = ar.atable.possible_pairs()
+        for e in e2v_pairs2.keys():
+            for v1, v2 in e2v_pairs2[e]:
+                possibel_goals_test += goal_from_tokens(tuple(['para'] + list(v1 + v2)))
+                possibel_goals_test += goal_from_tokens(tuple(['perp'] + list(v1 + v2)))
+        for v1, v2, v3, v4 in e2v_pairs4:
+            possibel_goals_test += goal_from_tokens(tuple(['eqangle'] + list(v1 + v2 + v3 + v4)))
+
+        e2v, e2v_pairs2, e2v_pairs4 = ar.rtable.possible_pairs()
+        for e in e2v_pairs2.keys():
+            for v1, v2 in e2v_pairs2[e]:
+                possibel_goals_test += goal_from_tokens(tuple(['cong'] + v1[2:-1].split(',') + v2[2:-1].split(',')))
+        for v1, v2, v3, v4 in e2v_pairs4:
+            tokens = tuple(['eqratio'] + list(v1[2:-1].split(',') + v2[2:-1].split(',') + v3[2:-1].split(',') + v4[2:-1].split(',')))
+            possibel_goals_test += goal_from_tokens(tokens)
+
     def clauses_num_filter(self, problemJGEX: ProblemJGEX) -> bool:
         if len(problemJGEX.constructions) < self.min_clauses_num:
             logging.debug(f"Too few clauses: {len(problemJGEX.constructions)}")
@@ -132,19 +160,20 @@ class GeometryGenerator:
         except Exception as e:
             logging.warning(f"error in get_proof_steps {goal}: {e}. Why?")
             return False
-    
+        
     def goal_filter(self, name, args):
-        # predicate = goal.predicate.NAME
-        # args = goal.args
         if args[-1] == '':
             args = args[:-1]
+        # AG1 do not support aconst and rconst
+        if name == 'aconst' or name == 'rconst':
+            return False
         # case: cong AB = AB, para AB ∥∥ AB, rconst AB:AB=1, aconst ∠AB AB=0
         if name == 'cong' or name == 'para': # or predicate == 'rconst' or predicate == 'aconst':
             left = {args[0], args[1]}
             right = {args[2], args[3]}
             if left == right:
                 return False
-        elif name == 'eqratio':
+        if name == 'eqratio':
             seg_1 = {args[0], args[1]}
             seg_2 = {args[2], args[3]}
             seg_3 = {args[4], args[5]}
@@ -157,7 +186,7 @@ class GeometryGenerator:
             # AB/AB = CD/EF => cong CD = EF
             if seg_1 == seg_2 or seg_3 == seg_4: 
                 return False
-        elif name == 'eqangle':
+        if name == 'eqangle':
             #case: eqangle ∠AB CD = ∠DC/BA
             seg_1 = {args[0], args[1]}
             seg_2 = {args[2], args[3]}
@@ -169,15 +198,13 @@ class GeometryGenerator:
                 return False
             if seg_1 == seg_2 or seg_3 == seg_4:
                 return False
-        elif name == 'simtri':
+        if name == 'simtri':
             #case: simtri △ABC ≅ △ABC
             tri_1 = {args[0], args[1], args[2]}
             tri_2 = {args[3], args[4], args[5]}
             if tri_1 == tri_2:
                 return False
-        elif name == 'aconst' or name == 'rconst':
-            # AG1 do not support aconst and rconst
-            return False
+        
         return True
 
     def dsl(self, problem: ProblemJGEX, aux_points: list[str]) -> str:
@@ -446,7 +473,7 @@ class GeometryGenerator:
     def process_single_problem(self, args: tuple) -> list:
         """Process a single geometry problem."""
         pid, fl_statement = args
-    
+          
         solver_builder = GeometricSolverBuilder(seed=998244353)
         solver_builder.with_deductive_agent(DDARN())
         solver_builder.load_problem_from_txt(fl_statement)
@@ -466,11 +493,9 @@ class GeometryGenerator:
 
         t = time.time()
         points = solver.proof.dep_graph.symbols_graph.nodes_of_type(Point)
-        points_name = [p.name for p in points]
-        possible_goals = self.all_possible_goals(points_name, solver.proof.dep_graph)
-        numerical_checked_goals = self.numuerical_checked_goals(points,solver.proof.dep_graph)
-        possible_goals += numerical_checked_goals
-        possible_goals += [goal for goal in solver.proof.dep_graph.conclusions() if self.goal_filter(goal.predicate.NAME, goal.args)]
+        possible_goals = self.all_possible_goals_by_goals(points, solver.proof.dep_graph)
+
+        possible_goals = [goal for goal in solver.proof.dep_graph.conclusions() if self.goal_filter(goal.predicate.NAME, goal.args)]
         possible_goals = list(set(possible_goals))
         logging.info(f"check goals time: {time.time() - t:.2f}s")
 
@@ -589,14 +614,14 @@ class GeometryGenerator:
 
 def main():
     parser = argparse.ArgumentParser(description="Create problem fl - nl dataset")
-    parser.add_argument("--max_clauses", required=True, type=int, default=10)
-    parser.add_argument("--search_depth", required=True, type=int)
+    parser.add_argument("--max_clauses", required=False, type=int, default=10)
+    parser.add_argument("--search_depth", required=False, type=int, default=1000)
     parser.add_argument("--min_proof_steps", required=False, type=int, default=3)
     parser.add_argument("--min_clauses_num", required=False, type=int, default=2)
     parser.add_argument("--n_threads", required=False, type=int, default=1)
     parser.add_argument("--n_samples", required=False, type=int, default=5)
-    parser.add_argument("--dir", default="dataset")
-    parser.add_argument("--log_level", default="warning", choices=["debug", "info", "warning", "error"])
+    parser.add_argument("--dir", required=False, default="dataset")
+    parser.add_argument("--log_level", required=False, default="info", choices=["debug", "info", "warning", "error"])
     args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, args.log_level.upper()))
