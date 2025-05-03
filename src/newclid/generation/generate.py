@@ -504,13 +504,12 @@ class GeometryGenerator:
         logging.info(f"ddar time: {time.time() - t:.2f}s")
 
         t = time.time()
-        self.all_possible_goals_by_goals(solver.proof.dep_graph)
-        self.get_numerical_checked_eqangle_and_eqratio(solver.proof.dep_graph)
-        # self.all_possible_goals_by_ar(solver.proof.dep_graph)
+        # self.all_possible_goals_by_goals(solver.proof.dep_graph)
+        # self.get_numerical_checked_eqangle_and_eqratio(solver.proof.dep_graph)
+        self.all_possible_goals_by_ar(solver.proof.dep_graph)
         possible_goals = [goal for goal in solver.proof.dep_graph.conclusions() if self.goal_filter(goal.predicate.NAME, goal.args)]
         logging.info(f"check goals time: {time.time() - t:.2f}s")
         logging.info(f"{len(possible_goals)=}")
-        possible_goals.sort(key=lambda x: str(x))
 
         t = time.time()
         generated_data = []
