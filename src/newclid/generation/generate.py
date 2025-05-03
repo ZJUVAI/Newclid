@@ -10,6 +10,7 @@ from pathlib import Path
 import itertools
 from collections import defaultdict
 import numpy as np
+import signal
 
 from newclid.agent.ddarn import DDARN
 from newclid.api import GeometricSolverBuilder, GeometricSolver
@@ -25,14 +26,20 @@ from newclid.formulations.problem import ProblemJGEX
 from newclid.predicates import NAME_TO_PREDICATE
 from newclid.numerical import close_enough
 
+def handler(signum, frame):
+    raise TimeoutError("Function execution timed out")
+
+signal.signal(signal.SIGALRM, handler)
+
 class GeometryGenerator: 
-    def __init__(self, max_clauses=5, search_depth=5, n_threads=1, output_dir="dataset", min_proof_steps=5, min_clauses_num=3):
+    def __init__(self, max_clauses=5, search_depth=5, n_threads=1, output_dir="dataset", min_proof_steps=5, min_clauses_num=3, n_samples=100):
         self.max_clauses = max_clauses
         self.search_depth = search_depth
         self.n_threads = n_threads
         self.output_dir = output_dir
         self.min_proof_steps = min_proof_steps
         self.min_clauses_num = min_clauses_num
+        self.n_samples = n_samples
 
         self.clauses_generator = CompoundClauseGen(
             max_comma_sep_clause=2,
@@ -405,7 +412,7 @@ class GeometryGenerator:
                         else:
                             args = [mapping[a] for a in b[1:]]
                         name = b[0]
-                        if b[0] in ['s_angle', 'aconst']:
+                        if b[0] == 's_angle':
                             x, y, z, v = args
                             name = 'aconst'
                             v = int(v)
@@ -413,7 +420,15 @@ class GeometryGenerator:
                                 v = -v
                                 x, z = z, x
                             m, n = simplify(int(v), 180)
-                            args = [y, z, y, x, f'{m}pi/{n}']
+                            args = [x, y, y, z, f'{m}pi/{n}']
+                        if b[0] == 'aconst':
+                            x, y, z, zz, v = args
+                            v = int(v)
+                            if v < 0:
+                                v = -v
+                                z, zz = zz, z
+                            m, n = simplify(int(v), 180)
+                            args = [x, y, z, zz, f'{m}pi/{n}']
 
                         p2deps[points].append(hashed_txt(name, args))
 
@@ -479,7 +494,13 @@ class GeometryGenerator:
             return []
         
         t = time.time()
-        solver.run(max_level=self.search_depth)
+        try:
+            signal.alarm(600) # Set alarm
+            solver.run(max_level=self.search_depth)
+            signal.alarm(0) # Disable the alarm
+        except Exception as e:
+            logging.info("Problem couldn't be solved in reasonable time.")
+            return []
         logging.info(f"ddar time: {time.time() - t:.2f}s")
 
         t = time.time()
@@ -489,7 +510,9 @@ class GeometryGenerator:
         possible_goals = [goal for goal in solver.proof.dep_graph.conclusions() if self.goal_filter(goal.predicate.NAME, goal.args)]
         logging.info(f"check goals time: {time.time() - t:.2f}s")
         logging.info(f"{len(possible_goals)=}")
+        possible_goals.sort(key=lambda x: str(x))
 
+        t = time.time()
         generated_data = []
         for goal in possible_goals:
             # filter
@@ -510,20 +533,24 @@ class GeometryGenerator:
 
             # rename problem
             renamed_problem = ProblemJGEX.from_text(fl_problem).renamed()
-            if self.clauses_num_filter(renamed_problem):
+            if not self.clauses_num_filter(renamed_problem):
                 continue
             n_clauses = len(renamed_problem.constructions)
 
             # dsl
-            _, _, _, aux_points, _, _, _ = solver.proof.dep_graph.get_proof_steps([goal])
-            mp: dict[str, str] = {}
-            for construction in renamed_problem.constructions:
-                for point in construction.points:
-                    if point not in mp:
-                        mp[point] = chr(ord("a") + len(mp))
-            if len(aux_points) > 0:
-                aux_points = [mp[p] for p in aux_points]
-            dsl_problem = self.dsl(renamed_problem, aux_points)
+            try:
+                _, _, _, aux_points, _, _, _ = solver.proof.dep_graph.get_proof_steps([goal])
+                mp: dict[str, str] = {}
+                for construction in renamed_problem.constructions:
+                    for point in construction.points:
+                        if point not in mp:
+                            mp[point] = chr(ord("a") + len(mp))
+                if len(aux_points) > 0:
+                    aux_points = [mp[p.name] for p in aux_points]
+                dsl_problem = self.dsl(renamed_problem, aux_points)
+            except Exception as e:
+                logging.warning(f"error in dsl with {fl_statement} and {goal}: {e}. Why?")
+                continue
 
             # output
             generated_data.append({
@@ -534,29 +561,49 @@ class GeometryGenerator:
                 "fl_problem_renamed": str(renamed_problem),
                 "dsl_problem_renamed": dsl_problem,
             })
+        logging.info(f"problem essential_clauses search time: {time.time() - t:.2f}s")
         return generated_data
 
-    def generate_problems(self) -> Iterator[Dict[str, Any]]:
+    def generate_problems(self):# -> Iterator[Dict[str, Any]]:
         """Generate geometry problems one at a time using a generator."""
-        task_generator = (
-            (i, self.clauses_generator.generate_clauses()) 
-            for i in range(10**9)
-        )
+        def task_generator():
+            for i in range(10**9):
+                clauses = self.clauses_generator.generate_clauses()
+                yield (i, clauses)
+
+        data = []
+        start_time = time.time()
 
         if self.n_threads == 1:
-            task_iterator = iter(task_generator)
+            task_iterator = task_generator()
             while True:
                 result = self.process_single_problem(next(task_iterator))
                 if result:
-                    for problem in result:
-                        yield problem
-
+                    data += result
+                    logging.info(
+                        f"Generated {len(data)} samples ({len(result)} new) in {time.time() - start_time:.1f}s "
+                        f"({(time.time() - start_time)/len(data):.1f}s/sample)")
+                if len(data) >= self.n_samples:
+                    break
         else:
-            with multiprocessing.Pool(self.n_threads) as pool:
-                for result in pool.imap_unordered(self.process_single_problem, task_generator):
-                    if result:
-                        for problem in result:
-                            yield problem
+            try:
+                with multiprocessing.Pool(self.n_threads) as pool:
+                    for result in pool.imap_unordered(self.process_single_problem, task_generator()):
+                        if result:
+                            data += result
+                            logging.info(
+                                f"Generated {len(data)} samples ({len(result)} new) in {time.time() - start_time:.1f}s "
+                                f"({(time.time() - start_time)/len(data):.1f}s/sample)")
+                        if len(data) >= self.n_samples:
+                            pool.terminate() 
+                            break
+                pool.close()
+                pool.join()
+            except Exception as e:
+                logging.error(f"multiprocessing Pool error: {e}")
+        
+        self.write_data(data)
+        logging.info(f"Generated {len(data)} problems successfully")
 
     def write_data(self, all_data: list) -> int:
         """Write all generated data to output files."""
@@ -607,10 +654,10 @@ def main():
     parser = argparse.ArgumentParser(description="Create problem fl - nl dataset")
     parser.add_argument("--max_clauses", required=False, type=int, default=10)
     parser.add_argument("--search_depth", required=False, type=int, default=1000)
-    parser.add_argument("--min_proof_steps", required=False, type=int, default=3)
+    parser.add_argument("--min_proof_steps", required=False, type=int, default=2)
     parser.add_argument("--min_clauses_num", required=False, type=int, default=2)
     parser.add_argument("--n_threads", required=False, type=int, default=1)
-    parser.add_argument("--n_samples", required=False, type=int, default=5)
+    parser.add_argument("--n_samples", required=False, type=int, default=100)
     parser.add_argument("--dir", required=False, default="dataset")
     parser.add_argument("--log_level", required=False, default="info", choices=["debug", "info", "warning", "error"])
     args = parser.parse_args()
@@ -624,24 +671,10 @@ def main():
         output_dir=args.dir,
         min_proof_steps=args.min_proof_steps,
         min_clauses_num=args.min_clauses_num,
+        n_samples=args.n_samples,
     )
     
-    # Collect problems using the generator
-    data = []
-    start_time = time.time()
-    for problem in generator.generate_problems():
-        data.append(problem)
-        logging.info(
-            f"Generated {len(data)} samples in {time.time() - start_time:.1f}s "
-            f"({(time.time() - start_time)/len(data):.1f}s/sample)"
-        )
-        if len(data) >= args.n_samples:
-            break
-    
-    # Write the collected data
-    generator.write_data(data)
-    logging.info(f"Generated {len(data)} problems successfully")
-
+    generator.generate_problems()
 
 if __name__ == "__main__":
     main()
