@@ -499,14 +499,14 @@ class GeometryGenerator:
             solver.run(max_level=self.search_depth)
             signal.alarm(0) # Disable the alarm
         except Exception as e:
-            logging.info("Problem couldn't be solved in reasonable time.")
+            logging.info(f"Problem couldn't be solved. {e}.")
             return []
         logging.info(f"ddar time: {time.time() - t:.2f}s")
 
         t = time.time()
-        # self.all_possible_goals_by_goals(solver.proof.dep_graph)
-        # self.get_numerical_checked_eqangle_and_eqratio(solver.proof.dep_graph)
-        self.all_possible_goals_by_ar(solver.proof.dep_graph)
+        self.all_possible_goals_by_goals(solver.proof.dep_graph)
+        self.get_numerical_checked_eqangle_and_eqratio(solver.proof.dep_graph)
+        # self.all_possible_goals_by_ar(solver.proof.dep_graph)
         possible_goals = [goal for goal in solver.proof.dep_graph.conclusions() if self.goal_filter(goal.predicate.NAME, goal.args)]
         logging.info(f"check goals time: {time.time() - t:.2f}s")
         logging.info(f"{len(possible_goals)=}")
