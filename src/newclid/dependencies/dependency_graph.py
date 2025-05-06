@@ -60,9 +60,11 @@ class DependencyGraph:
         self.numerical_checked_eqangle: list[Statement] = []
         self.numerical_checked_eqratio: list[Statement] = []
 
+    def obtain_numerical_checked_eqangle_and_eqratio(self):
+        self.numerical_checked_eqangle, self.numerical_checked_eqratio = self.get_numerical_checked_eqangle_and_eqratio()
+
     def get_numerical_checked_eqangle_and_eqratio(self) -> tuple[list[Statement], list[Statement]]:
         points = self.symbols_graph.nodes_of_type(Point)
-        goals: list[Statement] = list()
         angles: list[tuple[float, str, str, str, str]] = list()
         ratios: list[tuple[float, str, str, str, str]] = list()
 
@@ -71,9 +73,7 @@ class DependencyGraph:
                 angle1 = (a.num - b.num).angle()
                 dis = a.num.distance(b.num)
                 for (k, c) in enumerate(points):
-                    for d in points[k + 1:]: 
-                        if a.name == c.name and b.name == d.name:
-                            continue
+                    for d in points[k + 1:]:
                         angle = ((c.num - d.num).angle() - angle1) % np.pi
                         ratio = dis / c.num.distance(d.num)
                         angles.append((angle, a.name, b.name, c.name, d.name))
@@ -89,7 +89,7 @@ class DependencyGraph:
                 if goal_filter('eqangle', A[1:] + B[1:]):
                     tokens = tuple(['eqangle'] + list(A[1:] + B[1:]))
                     goal = Statement.from_tokens(tokens, self)
-                    if goal and goal.check():
+                    if goal:
                         self.numerical_checked_eqangle.append(goal)
 
         for (i, A) in enumerate(ratios):
@@ -99,13 +99,10 @@ class DependencyGraph:
                 if goal_filter('eqratio', A[1:] + B[1:]):
                     tokens = tuple(['eqratio'] + list(A[1:] + B[1:]))
                     goal = Statement.from_tokens(tokens, self)
-                    if goal and goal.check():
+                    if goal:
                         self.numerical_checked_eqratio.append(goal)
-
-        self.numerical_checked_eqangle = list(set(self.numerical_checked_eqangle))
-        self.numerical_checked_eqratio = list(set(self.numerical_checked_eqratio))
                 
-        return self.numerical_checked_eqangle.copy(), self.numerical_checked_eqratio.copy()
+        return list(set(self.numerical_checked_eqangle)), list(set(self.numerical_checked_eqratio))
 
     def has_edge(self, dep: Dependency):
         return (

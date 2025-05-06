@@ -202,7 +202,9 @@ class GeometryGenerator:
             tri_2 = {args[3], args[4], args[5]}
             if tri_1 == tri_2:
                 return False
-        
+        if name == 'sameclock':
+            return False
+
         return True
 
     def dsl(self, problem: ProblemJGEX, aux_points: list[str]) -> str:

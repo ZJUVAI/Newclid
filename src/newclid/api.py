@@ -114,6 +114,7 @@ class GeometricSolverBuilder:
         if self.deductive_agent is None:
             self.deductive_agent = DDARN()
 
+        proof_state.dep_graph.obtain_numerical_checked_eqangle_and_eqratio()
         return GeometricSolver(proof_state, self.rules, self.deductive_agent)
 
     def load_problem_from_file(
