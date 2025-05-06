@@ -39,12 +39,70 @@ class Matcher:
             with open(self.runtime_cache_path, "w") as f:
                 json.dump({}, f)
         self.cache = {}
-
+        
+    def apply_theorem(self, theorem: "Rule", mapping: dict[str, str]) -> Optional[set[Dependency]]:
+        res: set[Dependency] = set()
+        why: list[Statement] = []
+        reason = theorem.descrption
+        applicable = True
+        for premise in theorem.premises:
+            s = Statement.from_tokens(
+                translate_sentence(mapping, premise), self.dep_graph
+            )
+            if s is None:
+                applicable = False
+                break
+            if not s.check_numerical():
+                applicable = False
+                break
+            why.append(s)
+        if not applicable:
+            return None
+        for conclusion in theorem.conclusions:
+            conclusion_statement = Statement.from_tokens(
+                translate_sentence(mapping, conclusion), self.dep_graph
+            )
+            # assert conclusion_statement.check_numerical()
+            if conclusion_statement is None:
+                continue
+            dep = Dependency.mk(conclusion_statement, reason, tuple(why))
+            res.add(dep)
+        return res
+    
+    def rearrange(self, args: list[str]) -> set[tuple[str]]:
+        assert len(args) == 8
+        permutations = set()
+        for i in range(64):
+            perm = args.copy()
+            for j in range(4):
+                if (i >> j) & 1:
+                    perm[2 * j], perm[2 * j + 1] = perm[2 * j + 1], perm[2 * j]
+            if (i >> 4) & 1:
+                perm[0], perm[1], perm[2], perm[3] = perm[2], perm[3], perm[0], perm[1]
+                perm[4], perm[5], perm[6], perm[7] = perm[6], perm[7], perm[4], perm[5]
+            if (i >> 5) & 1:
+                perm[0], perm[1], perm[4], perm[5] = perm[4], perm[5], perm[0], perm[1]
+                perm[2], perm[3], perm[6], perm[7] = perm[6], perm[7], perm[2], perm[3]
+            permutations.add(tuple(perm))
+        return permutations
+    
     def cache_theorem(self, theorem: "Rule"):
         file_cache = None
         write = False
         read = False
         mappings: list[dict[str, str]] = []
+        eq_premise = None
+        statement_list = None
+        for premise in theorem.premises:
+            if premise[0] == "eqangle":
+                eq_premise = premise
+                statement_list = self.dep_graph.numerical_checked_eqangle
+                break
+            if premise[0] == "eqratio":
+                eq_premise = premise
+                statement_list = self.dep_graph.numerical_checked_eqratio
+                break
+
         if self.runtime_cache_path is not None:
             with open(self.runtime_cache_path) as f:
                 file_cache = json.load(f)
@@ -63,41 +121,54 @@ class Matcher:
         logging.debug(
             f"{theorem} matching cache : before {len(self.cache[theorem])=} {read=} {write=} {len(mappings)=}"
         )
-        for mapping in (
-            mappings
-            if read
-            else (
-                {v: p for v, p in zip(variables, point_list)}
-                for point_list in itertools.product(points, repeat=len(variables))
-            )
-        ):
-            why: list[Statement] = []
-            reason = theorem.descrption
-            applicable = True
-            for premise in theorem.premises:
-                s = Statement.from_tokens(
-                    translate_sentence(mapping, premise), self.dep_graph
+        if read:
+            for mapping in mappings:
+                new_conclusions = self.apply_theorem(theorem, mapping)
+                if new_conclusions:
+                    res.update(new_conclusions)
+        elif eq_premise:
+            variables_in_premise = set()
+            for arg in eq_premise[1:]:
+                variables_in_premise.add(arg)
+            variables_not_in_premise= list(set(variables) - variables_in_premise)
+            for statement in statement_list:
+                args_permutation = self.rearrange([p.name for p in statement.args])
+                for args in args_permutation:
+                    mapping = {}
+                    flag = True
+                    for v, p in zip(eq_premise[1:], args):
+                        if v not in mapping:
+                            mapping[v] = p
+                        elif mapping[v] != p:
+                            flag = False
+                            break
+                    if not flag:
+                        continue
+                    
+                    for extra_mapping in (
+                        {v: p for v, p in zip(variables_not_in_premise, point_list)} 
+                        for point_list in itertools.product(points, repeat=len(variables_not_in_premise))
+                    ):
+                        mapping.update(extra_mapping)
+                        # logging.info(f"{theorem} mapping {mapping=}")
+                        new_conclusions = self.apply_theorem(theorem, mapping)
+                        if new_conclusions:
+                            res.update(new_conclusions)
+                            if write:
+                                mappings.append(mapping)
+        else:
+            for mapping in (
+                (
+                    {v: p for v, p in zip(variables, point_list)}
+                    for point_list in itertools.product(points, repeat=len(variables))
                 )
-                if s is None:
-                    applicable = False
-                    break
-                if not s.check_numerical():
-                    applicable = False
-                    break
-                why.append(s)
-            if not applicable:
-                continue
-            if write:
-                mappings.append(mapping)
-            for conclusion in theorem.conclusions:
-                conclusion_statement = Statement.from_tokens(
-                    translate_sentence(mapping, conclusion), self.dep_graph
-                )
-                # assert conclusion_statement.check_numerical()
-                if conclusion_statement is None:
-                    continue
-                dep = Dependency.mk(conclusion_statement, reason, tuple(why))
-                res.add(dep)
+            ):
+                new_conclusions = self.apply_theorem(theorem, mapping)
+                if new_conclusions:
+                    res.update(new_conclusions)
+                    if write:
+                        mappings.append(mapping)
+
         self.cache[theorem] = tuple(
             sorted(res, key=lambda x: repr(x))
         )  # to maintain determinism
