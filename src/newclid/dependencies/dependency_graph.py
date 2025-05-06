@@ -174,7 +174,8 @@ class DependencyGraph:
         while i < len(queue):
             q = queue[i]
             i += 1
-            assert isinstance(q, Point)
+            if not isinstance(q, Point):
+                continue
             for p in q.rely_on:
                 if p not in points:
                     points.add(p)

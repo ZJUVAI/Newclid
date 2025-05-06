@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Optional
 
 from newclid.dependencies.dependency import IN_PREMISES, NUMERICAL_CHECK, Dependency
 from newclid.statement import Statement
+from newclid.dependencies.symbols import Point
 
 if TYPE_CHECKING:
     from newclid.proof import ProofState
@@ -126,7 +127,7 @@ def write_proof_steps(proof_state: "ProofState", out_file: Optional[Path]) -> No
         numercial_checked_aux,
         proof_steps,
     ) = proof_state.dep_graph.get_proof_steps(goals)
-    points = sorted([p.pretty_name for p in points])
+    points = sorted([p.pretty_name for p in points if isinstance(p, Point)])
     aux_points = sorted([p.pretty_name for p in aux_points])
 
     solution = "==========================\n"
