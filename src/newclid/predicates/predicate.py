@@ -64,6 +64,12 @@ class Predicate(ABC):
             res += repr(a) + ","
         res += "]"
         return res
+    @classmethod
+    def to_str(cls, statement: Statement) -> str:
+        res = cls.NAME
+        for a in statement.args:
+            res += " " + a.name
+        return res
 
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
