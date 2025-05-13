@@ -533,7 +533,8 @@ class GeometryGenerator:
             nl_solution = return_proof_steps(solver.proof)
 
             # rename problem
-            renamed_problem = ProblemJGEX.from_text(fl_problem).renamed()
+            fl_problem = ProblemJGEX.from_text(fl_problem)
+            renamed_problem = fl_problem.renamed()
             if not self.clauses_num_filter(renamed_problem):
                 continue
             n_clauses = len(renamed_problem.constructions)
@@ -542,7 +543,7 @@ class GeometryGenerator:
             try:
                 _, _, _, aux_points, _, _, _ = solver.proof.dep_graph.get_proof_steps([goal])
                 mp: dict[str, str] = {}
-                for construction in renamed_problem.constructions:
+                for construction in fl_problem.constructions:
                     for point in construction.points:
                         if point not in mp:
                             mp[point] = chr(ord("a") + len(mp))
