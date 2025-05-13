@@ -52,6 +52,9 @@ class Statement:
         if res is not None:
             self.dep_graph.hyper_graph[self] = res
         return res
+    
+    def to_str(self) -> str:
+        return self.predicate.to_str(self)
 
     def __repr__(self) -> str:
         return self.predicate.to_repr(self)
