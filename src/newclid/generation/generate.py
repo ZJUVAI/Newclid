@@ -119,6 +119,15 @@ class GeometryGenerator:
                 if goal and goal.check():
                     return [goal]
             return []
+        
+        points_name = sorted([p.name for p in dep_graph.symbols_graph.nodes_of_type(Point)])
+        for i, p in enumerate(points_name):
+            for q in points_name[i + 1:]:
+                ar = dep_graph.ar
+                if (p + q) not in ar.atable.v2e:
+                    ar.atable.add_free(p + q)
+                if f"l({p},{q})" not in ar.rtable.v2e:
+                    ar.rtable.add_free(f"l({p},{q})")
             
         ar = dep_graph.ar
 
