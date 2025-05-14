@@ -11,14 +11,13 @@ from newclid.dependencies.symbols import Point
 if TYPE_CHECKING:
     from newclid.proof import ProofState
 
-def get_structured_proof(proof_state: "ProofState") -> list[Dependency]:
-    id: dict[Statement, str] = {}
-    goals = [goal for goal in proof_state.goals if goal.check()]
+def get_structured_proof(proof_state: "ProofState", id: dict[Statement, str]) -> list[Dependency]:
     def rediger(dep: Dependency) -> str:
         for statement in (dep.statement,) + dep.why:
             if statement not in id:
                 id[statement] = f"{len(id):03d}"
         return f"{', '.join(premise.to_str() + ' [' + id[premise] + ']' for premise in dep.why)} ({dep.reason})=> {dep.statement.to_str()} [{id[dep.statement]}]"
+    goals = [goal for goal in proof_state.goals if goal.check()]
     (
         points,
         premises,

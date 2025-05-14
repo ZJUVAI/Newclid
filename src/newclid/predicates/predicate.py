@@ -2,7 +2,7 @@ from __future__ import annotations
 from abc import ABC
 from typing import TYPE_CHECKING, Any, Optional
 from numpy.random import Generator
-
+from fractions import Fraction
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
@@ -68,7 +68,10 @@ class Predicate(ABC):
     def to_str(cls, statement: Statement) -> str:
         res = cls.NAME
         for a in statement.args:
-            res += " " + a.name
+            if isinstance(a, Fraction):
+                res += " " + str(float(a))
+            else:
+                res += " " + repr(a)
         return res
 
     @classmethod
