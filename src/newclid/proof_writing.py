@@ -11,6 +11,46 @@ from newclid.dependencies.symbols import Point
 if TYPE_CHECKING:
     from newclid.proof import ProofState
 
+def get_structured_proof(proof_state: "ProofState") -> list[Dependency]:
+    id: dict[Statement, str] = {}
+    goals = [goal for goal in proof_state.goals if goal.check()]
+    def rediger(dep: Dependency) -> str:
+        for statement in (dep.statement,) + dep.why:
+            if statement not in id:
+                id[statement] = f"{len(id):03d}"
+        return f"{', '.join(premise.to_str() + ' [' + id[premise] + ']' for premise in dep.why)} ({dep.reason})=> {dep.statement.to_str()} [{id[dep.statement]}]"
+    (
+        points,
+        premises,
+        numercial_checked_premises,
+        aux_points,
+        aux,
+        numercial_checked_aux,
+        proof_steps,
+    ) = proof_state.dep_graph.get_proof_steps(goals)
+    points = sorted([p.pretty_name for p in points])
+    aux_points = sorted([p.pretty_name for p in aux_points])
+
+    solution = "<premises>\n"
+    for line in premises:
+        solution += rediger(line) + "\n"
+    for line in numercial_checked_premises:
+        solution += rediger(line) + "\n"
+
+    for line in aux:
+        solution += rediger(line) + "\n"
+    for line in numercial_checked_aux:
+        solution += rediger(line) + "\n"
+    solution += "</premises>\n"
+
+    solution += "<proof>\n"
+    for k, line in enumerate(proof_steps):
+        if NUMERICAL_CHECK not in line.reason and IN_PREMISES not in line:
+            solution += f"{rediger(line)}\n"
+    solution += "</proof>\n"
+
+    return solution
+
 
 def return_proof_steps(proof_state: "ProofState") -> list[Dependency]:
     id: dict[Statement, str] = {}
