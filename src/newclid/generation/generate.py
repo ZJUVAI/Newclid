@@ -23,8 +23,10 @@ from newclid.statement import Statement
 from newclid.formulations.rule import Rule
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.formulations.problem import ProblemJGEX
+from newclid.formulations.clause import translate_sentence
 from newclid.predicates import NAME_TO_PREDICATE
 from newclid.numerical import close_enough
+from newclid.proof import ProofState
 
 def handler(signum, frame):
     raise TimeoutError("Function execution timed out")
@@ -478,79 +480,9 @@ class GeometryGenerator:
             data += ' ;'
         return data
     
-    def dsl2(self, problem: ProblemJGEX, aux_points: list[str]) -> str:
-        def _gcd(x: int, y: int) -> int:
-            while y:
-                x, y = y, x % y
-            return x
-        def simplify(n: int, d: int) -> tuple[int, int]:
-            """given fraction n/d, simplify to smallest possible integers"""
-            g = _gcd(n, d)
-            return (n // g, d // g)
-        def hashed_txt(name: str, args: list[str]) -> tuple[str, ...]:
-            """Return a tuple unique to name and args up to arg permutation equivariant."""
-
-            if name in ['const', 'aconst', 'rconst']:
-                a, b, c, d, y = args
-                a, b = sorted([a, b])
-                c, d = sorted([c, d])
-                return name, a, b, c, d, y
-
-            if name in ['npara', 'nperp', 'para', 'cong', 'perp', 'collx']:
-                a, b, c, d = args
-
-                a, b = sorted([a, b])
-                c, d = sorted([c, d])
-                (a, b), (c, d) = sorted([(a, b), (c, d)])
-
-                return (name, a, b, c, d)
-
-            if name in ['midp', 'midpoint']:
-                a, b, c = args
-                b, c = sorted([b, c])
-                return (name, a, b, c)
-
-            if name in ['coll', 'cyclic', 'ncoll', 'diff', 'triangle']:
-                return (name,) + tuple(sorted(list(set(args))))
-
-            if name == 'circle':
-                x, a, b, c = args
-                return (name, x) + tuple(sorted([a, b, c]))
-
-            if name in ['eqangle', 'eqratio', 'eqangle6', 'eqratio6']:
-                a, b, c, d, e, f, g, h = args
-                a, b = sorted([a, b])
-                c, d = sorted([c, d])
-                e, f = sorted([e, f])
-                g, h = sorted([g, h])
-                if tuple(sorted([a, b, e, f])) > tuple(sorted([c, d, g, h])):
-                    a, b, e, f, c, d, g, h = c, d, g, h, a, b, e, f
-                if (a, b, c, d) > (e, f, g, h):
-                    a, b, c, d, e, f, g, h = e, f, g, h, a, b, c, d
-
-                if name == 'eqangle6':
-                    name = 'eqangle'
-                if name == 'eqratio6':
-                    name = 'eqratio'
-                return (name,) + (a, b, c, d, e, f, g, h)
-
-            if name in ['contri', 'simtri', 'simtri2', 'contri2', 'contri*', 'simtri*']:
-                a, b, c, x, y, z = args
-                (a, x), (b, y), (c, z) = sorted([(a, x), (b, y), (c, z)], key=sorted)
-                (a, b, c), (x, y, z) = sorted([(a, b, c), (x, y, z)], key=sorted)
-                return (name, a, b, c, x, y, z)
-
-            if name in ['eqratio3']:
-                a, b, c, d, o, o = args  # pylint: disable=redeclared-assigned-name
-                (a, c), (b, d) = sorted([(a, c), (b, d)], key=sorted)
-                (a, b), (c, d) = sorted([(a, b), (c, d)], key=sorted)
-                return (name, a, b, c, d, o, o)
-
-            if name in ['sameside', 's_angle']:
-                return (name,) + tuple(args)
-
-            raise ValueError(f"invalid construction name '{name}' to hash.")
-
+    def llm_solution(self, problem: ProblemJGEX, aux_points: list[str], proof_state: ProofState) -> str:
+        dep_idx: dict[Statement, str] = {}
+        
         defs = DefinitionJGEX.to_dict(DefinitionJGEX.parse_txt_file(default_defs_path()))
         
         data_tmp = defaultdict(list)
@@ -569,31 +501,10 @@ class GeometryGenerator:
                     for p in points:
                         group[p] = points
                     for b in bs:
-                        if b[0] == 'rconst' and constr_sentence[0] == 'triangle12':
-                            args = [mapping[a] for a in b[1:][:-1]]
-                            args.append(0.5)
-                        else:
-                            args = [mapping[a] for a in b[1:]]
-                        name = b[0]
-                        if b[0] == 's_angle':
-                            x, y, z, v = args
-                            name = 'aconst'
-                            v = int(v)
-                            if v < 0:
-                                v = -v
-                                x, z = z, x
-                            m, n = simplify(int(v), 180)
-                            args = [x, y, y, z, f'{m}pi/{n}']
-                        if b[0] == 'aconst':
-                            x, y, z, zz, v = args
-                            v = int(v)
-                            if v < 0:
-                                v = -v
-                                z, zz = zz, z
-                            m, n = simplify(int(v), 180)
-                            args = [x, y, z, zz, f'{m}pi/{n}']
-
-                        p2deps[points].append(hashed_txt(name, args))
+                        statement = Statement.from_tokens(translate_sentence(mapping, b), proof_state.dep_graph)
+                        if statement not in dep_idx:
+                            dep_idx[statement] = f"{len(dep_idx):03d}"
+                        p2deps[points].append(statement)
 
             points = construction.points
             while points:
@@ -603,22 +514,14 @@ class GeometryGenerator:
 
                 deps_str = []
                 for dep in p2deps[gr]:
-                    dep_str = ' '.join(dep)
-                    if dep[0] == 'aconst':
-                        m, n = map(int, dep[-1].split('pi/'))
-                        mn = f'{m}. pi / {n}.'
-                        dep_str = ' '.join(dep_str.split()[:-1] + [mn])
-                    deps_str.append(dep_str)
-                
+                    deps_str.append(dep.to_str() + f' [{dep_idx[dep]}]')
                 data_tmp[' '.join(gr)] = deps_str
 
+        # <problem> </problem>
         data = '<problem> '
-        ref = 0
         string_premise = []
         for k, v in data_tmp.items():
             if not all(p in aux_points for p in k.split(' ')):
-                v = [s + ' [{:03}]'.format(ref+i) for i, s in enumerate(v)]
-                ref += len(v)
                 string_premise.append(k + ' : ' + ' '.join(v))
         data += ' ; '.join([s.strip() for s in string_premise]) + ' ? '
         data += '; '.join([
@@ -626,16 +529,20 @@ class GeometryGenerator:
             for goal in problem.goals
             ])
         data += '</problem>\n'
+        
+        # <aux> </aux>
         string_aux = []
         for k, v in data_tmp.items():
             if all(p in aux_points for p in k.split(' ')):
-                v = [s + ' [{:03}]'.format(ref+i) for i, s in enumerate(v)]
-                ref += len(v)
                 string_aux.append(k + ' : ' + ' '.join(v))
         if len(string_aux) > 0:
             data += '<aux>'
             data += ' ; '.join([s.strip() for s in string_aux])
             data += '</aux>\n'
+
+         # <proof> </proof>
+        proof = get_structured_proof(proof_state, dep_idx)
+        data += proof
         return data
 
     def process_single_problem(self, args: tuple) -> list:
@@ -676,53 +583,40 @@ class GeometryGenerator:
         t = time.time()
         generated_data = []
         for goal in possible_goals:
-            # filter
-            if not self.proof_filter(solver, goal):
-                continue
-            
-            # fl_problem
+            # essential fl_problem
             essential_clauses, essential_aux_clauses = solver.proof.dep_graph.get_essential_clauses([goal])
             statements = []
             for clause in solver_builder.problemJGEX.constructions:
                 if str(clause) in essential_clauses or str(clause) in essential_aux_clauses:
                     statements.append(str(clause))
             fl_problem = '; '.join(statements) + ' ? ' + goal.predicate.NAME + ' ' + ' '.join([arg.name for arg in goal.args])
-            
-            # nl_solution
-            solver.proof.goals = [goal]
-            nl_solution = return_proof_steps(solver.proof)
-
-            # rename problem
             fl_problem = ProblemJGEX.from_text(fl_problem)
-            renamed_problem = fl_problem.renamed()
-            if not self.clauses_num_filter(renamed_problem):
+
+            # cluases num filter
+            n_clauses = len(essential_clauses | essential_aux_clauses)
+            if n_clauses < self.min_clauses_num:
+                logging.debug(f"Too few clauses: {len(essential_clauses | essential_aux_clauses)}")
                 continue
-            n_clauses = len(renamed_problem.constructions)
 
-            # dsl
-            _, _, _, aux_points, _, _, _ = solver.proof.dep_graph.get_proof_steps([goal])
-            mp: dict[str, str] = {}
-            for construction in fl_problem.constructions:
-                for point in construction.points:
-                    if point not in mp:
-                        mp[point] = chr(ord("a") + len(mp))
-            aux_points_renamed = [mp[p.name] for p in aux_points]
-            dsl_problem = self.dsl(renamed_problem, aux_points_renamed)
-
-            #llm
+            # get and filter proof
+            _, _, _, aux_points, _, _, proof_steps, = solver.proof.dep_graph.get_proof_steps([goal])
+            n_proof_steps = len(proof_steps)
+            if n_proof_steps < self.min_proof_steps:
+                logging.debug(f"Naive proof with length {n_proof_steps}")
+                continue
+            
+            # solution
+            solver.proof.goals = [goal]
             aux_points = [p.name for p in aux_points]
-            llm = self.dsl2(fl_problem, aux_points)
-            llm += get_structured_proof(solver.proof)
+            llm_solution = self.llm_solution(fl_problem, aux_points, solver.proof)
 
             # output
             generated_data.append({
                 "n_clauses": n_clauses,
                 "fl_problem": fl_problem,
                 "nl_problem": "",
-                "nl_solution": nl_solution,
-                "fl_problem_renamed": str(renamed_problem),
-                "dsl_problem_renamed": dsl_problem,
-                "llm": llm,
+                "n_proof_steps": n_proof_steps,
+                "llm_solution": llm_solution,
             })
         logging.info(f"problem essential_clauses search time: {time.time() - t:.2f}s")
         return generated_data
@@ -766,7 +660,7 @@ class GeometryGenerator:
                 logging.error(f"multiprocessing Pool error: {e}")
         
         self.write_data(data)
-        logging.info(f"Generated {len(data)} problems successfully")
+        logging.info(f"Generated {len(data)} samples successfully")
 
     def write_data(self, all_data: list) -> int:
         """Write all generated data to output files."""
@@ -779,10 +673,11 @@ class GeometryGenerator:
                 "n_clauses",
                 "fl_problem",
                 "nl_problem",
-                "nl_solution",
-                "fl_problem_renamed",
-                "dsl_problem_renamed",
-                "llm",
+                # "nl_solution",
+                "n_proof_steps",
+                # "fl_problem_renamed",
+                # "dsl_problem_renamed",
+                "llm_solution",
             ]
             writer = csv.DictWriter(
                 csvfile, fieldnames=field_names, quoting=csv.QUOTE_MINIMAL, quotechar='"'
@@ -792,24 +687,6 @@ class GeometryGenerator:
             for i, row in enumerate(all_data):
                 row["id"] = i
                 writer.writerow(row)
-
-        # Write to pr.txt
-        with open(
-            os.path.join(self.output_dir, f"geometry_depth{self.search_depth}_pr.txt"), 
-            "w", 
-            encoding="utf-8"
-        ) as out_f:
-            for i, row in enumerate(all_data):
-                out_f.write(f"{i}\n{row['fl_problem_renamed']}\n")
-
-        # Write to dsl.txt
-        with open(
-            os.path.join(self.output_dir, f"geometry_depth{self.search_depth}_dsl.txt"),
-            "w",
-            encoding="utf-8",
-        ) as out_f:
-            for row in all_data:
-                out_f.write(row["dsl_problem_renamed"] + "\n")
 
         return len(all_data)
 
