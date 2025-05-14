@@ -125,14 +125,16 @@ class Table:
 
     def possible_pairs(self):
         def e2str(e: SumCV) -> str:
-            return ",".join([f"{v}:{c}" for v, c in e.items()])
+            return ",".join(sorted([f"{v}:{c}" for v, c in e.items()]))
             
         e2v = {}
+        all_e = []
         for v, e in self.v2e.items():
             e_str = e2str(e)
             if not v.startswith('line'):
                 if e2str(e) not in e2v:
                     e2v[e_str] = []
+                    all_e.append(e)
                 e2v[e_str].append(v)
         for v, e in self.v2e.items():
             e_str = e2str(e)
@@ -148,37 +150,35 @@ class Table:
             e2v[e] = sorted(e2v[e])
 
         e2v_pairs2 = {}
+        diffe2v_pairs2 = {'0': []}
         for e in e2v.keys():
             e2v_pairs2[e] = []
             for i, v1 in enumerate(e2v[e][:-1]):
                 for v2 in e2v[e][i + 1:]:
                     e2v_pairs2[e].append((v1, v2))
+            diffe2v_pairs2['0'].extend(e2v_pairs2[e])
+
+        for i, e1 in enumerate(all_e):
+            for j, e2 in enumerate(all_e):
+                if i == j:
+                    continue
+                diff = e2str(minus(e1, e2))
+                if diff not in diffe2v_pairs2:
+                    diffe2v_pairs2[diff] = []
+                for v1 in e2v[e2str(e1)]:
+                    for v2 in e2v[e2str(e2)]:
+                        if v1 != v2:
+                            diffe2v_pairs2[diff].append((v1, v2))
 
         e2v_pairs4 = []
-        for i, e1 in enumerate(e2v.keys()):
-            for j, e2 in enumerate(e2v.keys()):
-                if i == j:
-                    for m, (v1, v2) in enumerate(e2v_pairs2[e1][:-1]):
-                        for v3, v4 in e2v_pairs2[e2][m + 1:]:
-                            e2v_pairs4.append((v1, v2, v3, v4))
-                            e2v_pairs4.append((v1, v2, v4, v3))
-                            e2v_pairs4.append((v2, v1, v3, v4))
-                            e2v_pairs4.append((v2, v1, v4, v3))
-                if i < j:
-                    for v1, v2 in e2v_pairs2[e1]:
-                        for v3, v4 in e2v_pairs2[e2]:
-                            e2v_pairs4.append((v1, v3, v2, v3))
-                            e2v_pairs4.append((v1, v4, v2, v4))
-                            e2v_pairs4.append((v1, v3, v1, v4))
-                            e2v_pairs4.append((v2, v3, v2, v4))
-
-                            e2v_pairs4.append((v1, v3, v2, v4))
-                            e2v_pairs4.append((v1, v4, v2, v3))
-
-                            e2v_pairs4.append((v1, v2, v3, v4))
-                            e2v_pairs4.append((v1, v2, v4, v3))
-                            e2v_pairs4.append((v2, v1, v3, v4))
-                            e2v_pairs4.append((v2, v1, v4, v3))
+        for e in diffe2v_pairs2.keys():
+            diffe2v_pairs2[e] = sorted(diffe2v_pairs2[e])
+            for i, (v1, v2) in enumerate(diffe2v_pairs2[e][:-1]):
+                for v3, v4 in diffe2v_pairs2[e][i + 1:]:
+                    e2v_pairs4.append((v1, v2, v3, v4))
+                    if e == '0':
+                        e2v_pairs4.append((v1, v2, v4, v3))
+                        
         return e2v, e2v_pairs2, e2v_pairs4
 
     def add_free(self, v: str) -> None:
