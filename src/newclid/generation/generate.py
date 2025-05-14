@@ -169,7 +169,7 @@ class GeometryGenerator:
         except Exception as e:
             logging.warning(f"error in get_proof_steps {goal}: {e}. Why?")
             return False
-        
+
     def goal_filter(self, name, args):
         if args[-1] == '':
             args = args[:-1]
@@ -217,278 +217,7 @@ class GeometryGenerator:
             return False
 
         return True
-
-    def dsl(self, problem: ProblemJGEX, aux_points: list[str]) -> str:
-        MAP_SYMBOL = {
-                'T': 'perp',
-                'P': 'para',
-                'D': 'cong',
-                'S': 'simtri',
-                'I': 'circle',
-                'M': 'midp',
-                'O': 'cyclic',
-                'C': 'coll',
-                '^': 'eqangle',
-                '/': 'eqratio',
-                '%': 'eqratio',
-                '=': 'contri',
-                'X': 'collx',
-                'A': 'acompute',
-                'R': 'rcompute',
-                'Q': 'fixc',
-                'E': 'fixl',
-                'V': 'fixb',
-                'H': 'fixt',
-                'Z': 'fixp',
-                'Y': 'ind',
-            }
-        def _gcd(x: int, y: int) -> int:
-            while y:
-                x, y = y, x % y
-            return x
-        def simplify(n: int, d: int) -> tuple[int, int]:
-            """given fraction n/d, simplify to smallest possible integers"""
-            g = _gcd(n, d)
-            return (n // g, d // g)
-        def hashed_txt(name: str, args: list[str]) -> tuple[str, ...]:
-            """Return a tuple unique to name and args up to arg permutation equivariant."""
-
-            if name in ['const', 'aconst', 'rconst']:
-                a, b, c, d, y = args
-                a, b = sorted([a, b])
-                c, d = sorted([c, d])
-                return name, a, b, c, d, y
-
-            if name in ['npara', 'nperp', 'para', 'cong', 'perp', 'collx']:
-                a, b, c, d = args
-
-                a, b = sorted([a, b])
-                c, d = sorted([c, d])
-                (a, b), (c, d) = sorted([(a, b), (c, d)])
-
-                return (name, a, b, c, d)
-
-            if name in ['midp', 'midpoint']:
-                a, b, c = args
-                b, c = sorted([b, c])
-                return (name, a, b, c)
-
-            if name in ['coll', 'cyclic', 'ncoll', 'diff', 'triangle']:
-                return (name,) + tuple(sorted(list(set(args))))
-
-            if name == 'circle':
-                x, a, b, c = args
-                return (name, x) + tuple(sorted([a, b, c]))
-
-            if name in ['eqangle', 'eqratio', 'eqangle6', 'eqratio6']:
-                a, b, c, d, e, f, g, h = args
-                a, b = sorted([a, b])
-                c, d = sorted([c, d])
-                e, f = sorted([e, f])
-                g, h = sorted([g, h])
-                if tuple(sorted([a, b, e, f])) > tuple(sorted([c, d, g, h])):
-                    a, b, e, f, c, d, g, h = c, d, g, h, a, b, e, f
-                if (a, b, c, d) > (e, f, g, h):
-                    a, b, c, d, e, f, g, h = e, f, g, h, a, b, c, d
-
-                if name == 'eqangle6':
-                    name = 'eqangle'
-                if name == 'eqratio6':
-                    name = 'eqratio'
-                return (name,) + (a, b, c, d, e, f, g, h)
-
-            if name in ['contri', 'simtri', 'simtri2', 'contri2', 'contri*', 'simtri*']:
-                a, b, c, x, y, z = args
-                (a, x), (b, y), (c, z) = sorted([(a, x), (b, y), (c, z)], key=sorted)
-                (a, b, c), (x, y, z) = sorted([(a, b, c), (x, y, z)], key=sorted)
-                return (name, a, b, c, x, y, z)
-
-            if name in ['eqratio3']:
-                a, b, c, d, o, o = args  # pylint: disable=redeclared-assigned-name
-                (a, c), (b, d) = sorted([(a, c), (b, d)], key=sorted)
-                (a, b), (c, d) = sorted([(a, b), (c, d)], key=sorted)
-                return (name, a, b, c, d, o, o)
-
-            if name in ['sameside', 's_angle']:
-                return (name,) + tuple(args)
-
-            raise ValueError(f"invalid construction name '{name}' to hash.")
-        def pretty2a(a: str, b: str, c: str, d: str) -> str:
-            if b in (c, d):
-                a, b = b, a
-            if a == d:
-                c, d = d, c
-            return f'{a} {b} {c} {d}'
-        def pretty2r(a: str, b: str, c: str, d: str) -> str:
-            if b in (c, d):
-                a, b = b, a
-            if a == d:
-                c, d = d, c
-            return f'{a} {b} {c} {d}'
-        def pretty(txt: str) -> str:
-            """Pretty formating a predicate string.
-            
-            e.g.
-            >>> pretty('acompute Y a b c')
-            """
-            if isinstance(txt, str):
-                txt = txt.split(' ')
-            name, *args = txt
-            if name == 'ind':
-                return 'Y ' + ' '.join(args)
-            if name in ['fixc', 'fixl', 'fixb', 'fixt', 'fixp']:
-                return map_symbol_inv(name) + ' ' + ' '.join(args)
-            if name == 'acompute':
-                a, b, c, d = args
-                return 'A ' + ' '.join(args)
-            if name == 'rcompute':
-                a, b, c, d = args
-                return 'R ' + ' '.join(args)
-            if name == 'aconst':
-                a, b, c, d, y = args
-                return f'^ {pretty2a(a, b, c, d)} {y}'
-            if name == 'rconst':
-                a, b, c, d, y = args
-                return f'/ {pretty2r(a, b, c, d)} {y}'
-            if name == 'coll':
-                return 'C ' + ' '.join(args)
-            if name == 'collx':
-                return 'X ' + ' '.join(args)
-            if name == 'cyclic':
-                return 'O ' + ' '.join(args)
-            if name in ['midp', 'midpoint']:
-                x, a, b = args
-                return f'M {x} {a} {b}'
-            if name == 'eqangle':
-                a, b, c, d, e, f, g, h = args
-                return f'^ {pretty2a(a, b, c, d)} {pretty2a(e, f, g, h)}'
-            if name == 'eqratio':
-                a, b, c, d, e, f, g, h = args
-                return f'/ {pretty2r(a, b, c, d)} {pretty2r(e, f, g, h)}'
-            if name == 'eqratio3':
-                a, b, c, d, o, o = args  # pylint: disable=redeclared-assigned-name
-                return f'S {o} {a} {b} {o} {c} {d}'
-            if name == 'cong':
-                a, b, c, d = args
-                return f'D {a} {b} {c} {d}'
-            if name == 'perp':
-                if len(args) == 2:  # this is algebraic derivation.
-                    ab, cd = args  # ab = 'd( ... )'
-                    return f'T {ab} {cd}'
-                a, b, c, d = args
-                return f'T {a} {b} {c} {d}'
-            if name == 'para':
-                if len(args) == 2:  # this is algebraic derivation.
-                    ab, cd = args  # ab = 'd( ... )'
-                    return f'P {ab} {cd}'
-                a, b, c, d = args
-                return f'P {a} {b} {c} {d}'
-            if name in ['simtri2', 'simtri', 'simtri*']:
-                a, b, c, x, y, z = args
-                return f'S {a} {b} {c} {x} {y} {z}'
-            if name in ['contri2', 'contri', 'contri*']:
-                a, b, c, x, y, z = args
-                return f'= {a} {b} {c} {x} {y} {z}'
-            if name == 'circle':
-                o, a, b, c = args
-                return f'I {o} {a} {b} {c}'
-            if name == 'foot':
-                a, b, c, d = args
-                return f'F {a} {b} {c} {d}'
-            return ' '.join(txt)
-        def map_symbol_inv(c: str) -> str:
-            return {v: k for k, v in MAP_SYMBOL.items()}[c]
-        
-        defs = DefinitionJGEX.to_dict(DefinitionJGEX.parse_txt_file(default_defs_path()))
-        
-        # string = []
-        # points_premise = set()
-        data_tmp = defaultdict(list)
-        for construction in problem.constructions:
-            group = {}
-            p2deps = defaultdict(list)
-            for constr_sentence in construction.sentences:
-                cdef = defs[constr_sentence[0]]
-                if len(constr_sentence) == len(cdef.declare):
-                    mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
-                else:
-                    assert len(constr_sentence) + len(construction.points) == len(cdef.declare)
-                    mapping = dict(zip(cdef.declare[1:], construction.points + constr_sentence[1:]))
-                for points, bs in cdef.basics:
-                    points = tuple([mapping[x] for x in points])
-                    for p in points:
-                        group[p] = points
-                    for b in bs:
-                        if b[0] == 'rconst' and constr_sentence[0] == 'triangle12':
-                            args = [mapping[a] for a in b[1:][:-1]]
-                            args.append(0.5)
-                        else:
-                            args = [mapping[a] for a in b[1:]]
-                        name = b[0]
-                        if b[0] == 's_angle':
-                            x, y, z, v = args
-                            name = 'aconst'
-                            v = int(v)
-                            if v < 0:
-                                v = -v
-                                x, z = z, x
-                            m, n = simplify(int(v), 180)
-                            args = [x, y, y, z, f'{m}pi/{n}']
-                        if b[0] == 'aconst':
-                            x, y, z, zz, v = args
-                            v = int(v)
-                            if v < 0:
-                                v = -v
-                                z, zz = zz, z
-                            m, n = simplify(int(v), 180)
-                            args = [x, y, z, zz, f'{m}pi/{n}']
-
-                        p2deps[points].append(hashed_txt(name, args))
-
-            points = construction.points
-            while points:
-                p = points[0]
-                gr = group[p]
-                points = [x for x in points if x not in gr]
-
-                deps_str = []
-                for dep in p2deps[gr]:
-                    dep_str = pretty(dep)
-
-                    if dep[0] == 'aconst':
-                        m, n = map(int, dep[-1].split('pi/'))
-                        mn = f'{m}. pi / {n}.'
-                        dep_str = ' '.join(dep_str.split()[:-1] + [mn])
-                    deps_str.append(dep_str)
-                
-                data_tmp[' '.join(gr)] = deps_str
-
-        data = '{S} '
-        ref = 0
-        string_premise = []
-        for k, v in data_tmp.items():
-            if not all(p in aux_points for p in k.split(' ')):
-                v = [s + ' {:02}'.format(ref+i) for i, s in enumerate(v)]
-                ref += len(v)
-                string_premise.append(k + ' : ' + ' '.join(v))
-        data += ' ; '.join([s.strip() for s in string_premise]) + ' ? '
-        data += '; '.join([
-            pretty(goal[0] + ' ' + ' '.join(goal[1:]))  
-            for goal in problem.goals
-            ])
-
-        string_aux = []
-        for k, v in data_tmp.items():
-            if all(p in aux_points for p in k.split(' ')):
-                v = [s + ' {:02}'.format(ref+i) for i, s in enumerate(v)]
-                ref += len(v)
-                string_aux.append(k + ' : ' + ' '.join(v))
-        if len(string_aux) > 0:
-            data += ' {F1} x00 '
-            data += ' ; '.join([s.strip() for s in string_aux])
-            data += ' ;'
-        return data
-    
+ 
     def llm_solution(self, problem: ProblemJGEX, aux_points: list[str], proof_state: ProofState) -> str:
         dep_idx: dict[Statement, str] = {}
         
@@ -557,7 +286,7 @@ class GeometryGenerator:
     def process_single_problem(self, args: tuple) -> list:
         """Process a single geometry problem."""
         pid, fl_statement = args
-
+        
         solver_builder = GeometricSolverBuilder(seed=998244353)
         solver_builder.with_deductive_agent(DDARN())
         solver_builder.load_problem_from_txt(fl_statement)
@@ -582,9 +311,9 @@ class GeometryGenerator:
         logging.info(f"ddar time: {time.time() - t:.2f}s")
 
         t = time.time()
-        self.all_possible_goals_by_goals(solver.proof.dep_graph)
-        self.get_numerical_checked_eqangle_and_eqratio(solver.proof.dep_graph)
-        # self.all_possible_goals_by_ar(solver.proof.dep_graph)
+        # self.all_possible_goals_by_goals(solver.proof.dep_graph)
+        # self.get_numerical_checked_eqangle_and_eqratio(solver.proof.dep_graph)
+        self.all_possible_goals_by_ar(solver.proof.dep_graph)
         possible_goals = [goal for goal in solver.proof.dep_graph.conclusions() if self.goal_filter(goal.predicate.NAME, goal.args)]
         logging.info(f"check goals time: {time.time() - t:.2f}s")
         logging.info(f"{len(possible_goals)=}")
