@@ -256,30 +256,38 @@ class GeometryGenerator:
                 data_tmp[' '.join(gr)] = deps_str
 
         # <problem> </problem>
-        data = '<problem> '
+        data = '\n<problem>\n'
         string_premise = []
         for k, v in data_tmp.items():
             if not all(p in aux_points for p in k.split(' ')):
-                string_premise.append(k + ' : ' + ' '.join(v))
-        data += ' ; '.join([s.strip() for s in string_premise]) + ' ? '
-        data += '; '.join([
+                string_premise.append(k + ': ' + ' '.join(v))
+        data += ';'.join([s.strip() for s in string_premise]) + ' ? '
+        data += ';'.join([
             (goal[0] + ' ' + ' '.join(goal[1:])) 
             for goal in problem.goals
             ])
-        data += '</problem>\n'
+        data += '\n</problem>\n'
         
         # <aux> </aux>
         string_aux = []
         for k, v in data_tmp.items():
             if all(p in aux_points for p in k.split(' ')):
-                string_aux.append(k + ' : ' + ' '.join(v))
+                string_aux.append(k + ': ' + ' '.join(v))
         if len(string_aux) > 0:
-            data += '<aux>'
-            data += ' ; '.join([s.strip() for s in string_aux])
-            data += '</aux>\n'
+            data += '<aux>\n'
+            data += '\n'.join([s.strip() for s in string_aux])
+            data += '\n</aux>\n'
 
-         # <proof> </proof>
-        proof = get_structured_proof(proof_state, dep_idx)
+        # get analysis and proof
+        analysis, numerical_check, proof = get_structured_proof(proof_state, dep_idx)
+        
+        # <analysis> </analysis>
+        data += analysis
+
+        # <numerical_check> </numerical_check>
+        data += numerical_check        
+        
+        # <proof> </proof>
         data += proof
         return data
 
