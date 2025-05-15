@@ -16,7 +16,12 @@ def get_structured_proof(proof_state: "ProofState", id: dict[Statement, str]) ->
         for statement in (dep.statement,) + dep.why:
             if statement not in id:
                 id[statement] = f"{len(id):03d}"
-        return f"{', '.join(premise.to_str() + ' [' + id[premise] + ']' for premise in dep.why)} ({dep.reason})=> {dep.statement.to_str()} [{id[dep.statement]}]"
+        return f"{' '.join(premise.to_str() + ' [' + id[premise] + ']' for premise in dep.why)} ({dep.reason})=> {dep.statement.to_str()} [{id[dep.statement]}]"
+    def pure_predicate(dep: Dependency) -> str:
+        for statement in (dep.statement,) + dep.why:
+            if statement not in id:
+                id[statement] = f"{len(id):03d}"
+        return f"{dep.statement.to_str()} [{id[dep.statement]}]"
     goals = [goal for goal in proof_state.goals if goal.check()]
     (
         points,
@@ -30,25 +35,38 @@ def get_structured_proof(proof_state: "ProofState", id: dict[Statement, str]) ->
     points = sorted([p.pretty_name for p in points])
     aux_points = sorted([p.pretty_name for p in aux_points])
 
-    solution = "<premises>\n"
+    analysis = "<analysis>\n"
     for line in premises:
-        solution += rediger(line) + "\n"
+        if line.statement not in id:
+            id[line.statement] = f"{len(id):03d}"
+    sorted_premises = sorted(premises, key=lambda line: id[line.statement])
+    for line in sorted_premises:
+        analysis += pure_predicate(line) + "\n"
+    analysis += "</analysis>\n"
+
+    numerical_check = ""
     for line in numercial_checked_premises:
-        solution += rediger(line) + "\n"
-
-    for line in aux:
-        solution += rediger(line) + "\n"
+        if line.statement not in id:
+            id[line.statement] = f"{len(id):03d}"
+    sorted_numercial_checked_premises = sorted(numercial_checked_premises, key=lambda line: id[line.statement])
+    for line in sorted_numercial_checked_premises:
+        numerical_check += pure_predicate(line) + "\n"
     for line in numercial_checked_aux:
-        solution += rediger(line) + "\n"
-    solution += "</premises>\n"
+        if line.statement not in id:
+            id[line.statement] = f"{len(id):03d}"
+    sorted_numercial_checked_aux = sorted(numercial_checked_aux, key=lambda line: id[line.statement])
+    for line in sorted_numercial_checked_aux:
+        numerical_check += pure_predicate(line) + "\n"
+    if len(numerical_check) > 0:
+        numerical_check = "<numerical_check>\n" + numerical_check + "</numerical_check>\n"
 
-    solution += "<proof>\n"
+    proof = "<proof>\n"
     for k, line in enumerate(proof_steps):
         if NUMERICAL_CHECK not in line.reason and IN_PREMISES not in line:
-            solution += f"{rediger(line)}\n"
-    solution += "</proof>\n"
+            proof += f"{rediger(line)}\n"
+    proof += "</proof>\n"
 
-    return solution
+    return analysis, numerical_check, proof
 
 
 def return_proof_steps(proof_state: "ProofState") -> list[Dependency]:
