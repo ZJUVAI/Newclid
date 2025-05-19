@@ -256,11 +256,12 @@ class GeometryGenerator:
         string_premise = []
         for k, v in data_tmp.items():
             if not all(p in aux_points for p in k.split(' ')):
-                string_premise.append(k + ': ')
+                tmp_string = k + ': '
                 for dep in v:
                     if dep not in dep_idx:
                         dep_idx[dep] = f"{len(dep_idx):03d}"
-                    string_premise.append(dep.to_str() + f' [{dep_idx[dep]}] ')
+                    tmp_string += dep.to_str() + f' [{dep_idx[dep]}] '
+                string_premise.append(tmp_string)
         data += ';'.join([s.strip() for s in string_premise]) + ' ? '
         data += ';'.join([
             (goal[0] + ' ' + ' '.join(goal[1:])) 
@@ -272,11 +273,12 @@ class GeometryGenerator:
         string_aux = []
         for k, v in data_tmp.items():
             if all(p in aux_points for p in k.split(' ')):
-                string_aux.append(k + ': ')
+                tmp_string = k + ': '
                 for dep in v:
                     if dep not in dep_idx:
                         dep_idx[dep] = f"{len(dep_idx):03d}"
-                    string_aux.append(dep.to_str() + f' [{dep_idx[dep]}] ')
+                    tmp_string += dep.to_str() + f' [{dep_idx[dep]}] '
+                string_aux.append(tmp_string)
         if len(string_aux) > 0:
             data += '<aux>\n'
             data += '\n'.join([s.strip() for s in string_aux])
