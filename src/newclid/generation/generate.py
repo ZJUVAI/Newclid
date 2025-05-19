@@ -220,7 +220,6 @@ class GeometryGenerator:
  
     def llm_solution(self, problem: ProblemJGEX, aux_points: list[str], proof_state: ProofState) -> str:
         dep_idx: dict[Statement, str] = {}
-        
         defs = DefinitionJGEX.to_dict(DefinitionJGEX.parse_txt_file(default_defs_path()))
         
         data_tmp = defaultdict(list)
@@ -240,8 +239,6 @@ class GeometryGenerator:
                         group[p] = points
                     for b in bs:
                         statement = Statement.from_tokens(translate_sentence(mapping, b), proof_state.dep_graph)
-                        if statement not in dep_idx:
-                            dep_idx[statement] = f"{len(dep_idx):03d}"
                         p2deps[points].append(statement)
 
             points = construction.points
@@ -250,29 +247,36 @@ class GeometryGenerator:
                 gr = group[p]
                 points = [x for x in points if x not in gr]
 
-                deps_str = []
+                deps = []
                 for dep in p2deps[gr]:
-                    deps_str.append(dep.to_str() + f' [{dep_idx[dep]}]')
-                data_tmp[' '.join(gr)] = deps_str
-
+                    deps.append(dep)
+                data_tmp[' '.join(gr)] = deps
         # <problem> </problem>
         data = '\n<problem>\n'
         string_premise = []
         for k, v in data_tmp.items():
             if not all(p in aux_points for p in k.split(' ')):
-                string_premise.append(k + ': ' + ' '.join(v))
+                string_premise.append(k + ': ')
+                for dep in v:
+                    if dep not in dep_idx:
+                        dep_idx[dep] = f"{len(dep_idx):03d}"
+                    string_premise.append(dep.to_str() + f' [{dep_idx[dep]}] ')
         data += ';'.join([s.strip() for s in string_premise]) + ' ? '
         data += ';'.join([
             (goal[0] + ' ' + ' '.join(goal[1:])) 
             for goal in problem.goals
             ])
         data += '\n</problem>\n'
-        
+
         # <aux> </aux>
         string_aux = []
         for k, v in data_tmp.items():
             if all(p in aux_points for p in k.split(' ')):
-                string_aux.append(k + ': ' + ' '.join(v))
+                string_aux.append(k + ': ')
+                for dep in v:
+                    if dep not in dep_idx:
+                        dep_idx[dep] = f"{len(dep_idx):03d}"
+                    string_aux.append(dep.to_str() + f' [{dep_idx[dep]}] ')
         if len(string_aux) > 0:
             data += '<aux>\n'
             data += '\n'.join([s.strip() for s in string_aux])
