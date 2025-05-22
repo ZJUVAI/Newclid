@@ -214,7 +214,7 @@ class GeometryGenerator:
             if tri_1 == tri_2:
                 return False
         if name == 'sameclock':
-            return False
+            return False\
 
         return True
  
@@ -297,6 +297,54 @@ class GeometryGenerator:
         data += proof
         return data
 
+    def llm_nat_solution(self, problem: ProblemJGEX, aux_points: list[str], proof_state: ProofState) -> str:
+        defs = DefinitionJGEX.to_dict(DefinitionJGEX.parse_txt_file(default_defs_path()))
+        data_tmp = defaultdict(list)
+        for construction in problem.constructions:
+            group = {}
+            p2deps = defaultdict(list)
+            for constr_sentence in construction.sentences:
+                cdef = defs[constr_sentence[0]]
+                if len(constr_sentence) == len(cdef.declare):
+                    mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
+                else:
+                    assert len(constr_sentence) + len(construction.points) == len(cdef.declare)
+                    mapping = dict(zip(cdef.declare[1:], construction.points + constr_sentence[1:]))
+                for points, bs in cdef.basics:
+                    points = tuple([mapping[x] for x in points])
+                    for p in points:
+                        group[p] = points
+                    for b in bs:
+                        statement = Statement.from_tokens(translate_sentence(mapping, b), proof_state.dep_graph)
+                        p2deps[points].append(statement)
+            points = construction.points
+            while points:
+                p = points[0]
+                gr = group[p]
+                points = [x for x in points if x not in gr]
+                data_tmp[' '.join(gr)] = p2deps[gr]
+
+        # <problem_nl> </problem_nl>
+        data = '* Problem\n'
+        string_premise_nl = []
+        for k, v in data_tmp.items():
+            if not all(p in aux_points for p in k.split(' ')):
+                tmp_string_nl = ' '.join(dep.pretty() for dep in v)
+                if tmp_string_nl.strip():
+                    string_premise_nl.append(tmp_string_nl)
+        data += '; '.join([s.strip() for s in string_premise_nl]) + ' ? '
+
+        goal_statements = [
+            Statement.from_tokens(goal, proof_state.dep_graph)
+            for goal in problem.goals
+            if Statement.from_tokens(goal, proof_state.dep_graph)
+        ]
+        data += '; '.join([goal.pretty() for goal in goal_statements])
+        data += '\n'
+
+        data += return_proof_steps(proof_state)
+        return data
+
     def process_single_problem(self, args: tuple) -> list:
         """Process a single geometry problem."""
         pid, fl_statement = args
@@ -361,6 +409,7 @@ class GeometryGenerator:
             solver.proof.goals = [goal]
             aux_points = [p.name for p in aux_points]
             llm_solution = self.llm_solution(fl_problem, aux_points, solver.proof)
+            llm_nat_solution = self.llm_nat_solution(fl_problem, aux_points, solver.proof)
 
             # output
             generated_data.append({
@@ -369,6 +418,7 @@ class GeometryGenerator:
                 "nl_problem": "",
                 "n_proof_steps": n_proof_steps,
                 "llm_solution": llm_solution,
+                "llm_nat_solution": llm_nat_solution,
             })
         logging.info(f"problem essential_clauses search time: {time.time() - t:.2f}s")
         return generated_data
@@ -418,8 +468,11 @@ class GeometryGenerator:
         """Write all generated data to output files."""
         filename = os.path.join(self.output_dir, f"geometry_depth{self.search_depth}_raw.csv")
         os.makedirs(os.path.dirname(filename), exist_ok=True)
+        
+        nl_filename = os.path.join(self.output_dir, f"geometry_depth{self.search_depth}_nl.txt")
 
-        with open(filename, "w", newline="", encoding="utf-8") as csvfile:
+        with open(filename, "w", newline="", encoding="utf-8") as csvfile, \
+            open(nl_filename, "w", encoding="utf-8") as nlf:
             field_names = [
                 "id",
                 "n_clauses",
@@ -430,6 +483,7 @@ class GeometryGenerator:
                 # "fl_problem_renamed",
                 # "dsl_problem_renamed",
                 "llm_solution",
+                # "llm_nat_solution",
             ]
             writer = csv.DictWriter(
                 csvfile, fieldnames=field_names, quoting=csv.QUOTE_MINIMAL, quotechar='"'
@@ -438,6 +492,13 @@ class GeometryGenerator:
 
             for i, row in enumerate(all_data):
                 row["id"] = i
+                if "llm_nat_solution" in row:
+                    nlf.write(f"=== Sample {i} ===\n")
+                    nlf.write(row["llm_nat_solution"])
+                    nlf.write("\n\n")
+                    # 写入csv前去除llm_nat_solution字段
+                    row = dict(row)
+                    row.pop("llm_nat_solution", None)
                 writer.writerow(row)
 
         return len(all_data)
