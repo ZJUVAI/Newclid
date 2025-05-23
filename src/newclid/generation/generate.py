@@ -262,7 +262,7 @@ class GeometryGenerator:
                         dep_idx[dep] = f"{len(dep_idx):03d}"
                     tmp_string += dep.to_str() + f' [{dep_idx[dep]}] '
                 string_premise.append(tmp_string)
-        data += ';'.join([s.strip() for s in string_premise]) + ' ? '
+        data += '; '.join([s.strip() for s in string_premise]) + ' ? '
         data += ';'.join([
             (goal[0] + ' ' + ' '.join(goal[1:])) 
             for goal in problem.goals
