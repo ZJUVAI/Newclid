@@ -214,7 +214,7 @@ class GeometryGenerator:
             if tri_1 == tri_2:
                 return False
         if name == 'sameclock':
-            return False\
+            return False
 
         return True
  
