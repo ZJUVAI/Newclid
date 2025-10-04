@@ -1,6 +1,6 @@
 # GenesisGeo: Reproduction of AlphaGeometry
 
-[📊 Dataset](https://huggingface.co/datasets/ZJUVAI/GenesisGeo) • [🤖 Model](https://huggingface.co/ZJUVAI/GenesisGeo)  • [📃Paper]()
+[📊 Dataset](https://huggingface.co/datasets/ZJUVAI/GenesisGeo) • [🤖 Model](https://huggingface.co/ZJUVAI/GenesisGeo)  • [📃Paper](https://arxiv.org/abs/2509.21896)
 
 We present **GenesisGeo**, a reproduction of [AlphaGeometry](https://www.nature.com/articles/s41586-023-06747-5). Based on the [Newclid](https://arxiv.org/abs/2411.11938) framework, we implement the **synthetic data generation** pipeline, accelerate DDARN by 120×, and instantiate a neuro-symbolic prover using a Qwen3-0.6B-Base model fine-tuned solely on our synthetic data as its language model. This prover **proves 24 of 30 theorems in the IMO-AG-30 benchmark**, closely approaching the 25 of 30 result reported by the original AG system and confirming the fidelity and efficacy of our reproduction.
 
@@ -38,6 +38,23 @@ GenesisGeo proves 24 of the 30 theorems, closely matching the original AlphaGeom
 ![alt text](imgs/IMO-AG-30_performance.png)
 
 ---
+
+## Installation
+
+```bash
+git clone https://github.com/ZJUVAI/GenesisGeo.git
+cd GenesisGeo
+pip install -e .
+```
+
+**Compile Python extensions**
+
+```bash
+cd src/newclid
+c++ -O3 -Wall -shared -std=c++14 -march=native -funroll-loops -flto `python3 -m pybind11 --includes` matchinC.cpp -o matchinC`python3-config --extension-suffix` -fPIC
+cd dependencies
+c++ -O3 -Wall -shared -std=c++14 -march=native -funroll-loops -flto `python3 -m pybind11 --includes` geometry.cpp -o geometry`python3-config --extension-suffix` -fPIC
+```
 
 ## Data Generation
 
@@ -83,6 +100,18 @@ bash scripts/train_eval.sh
 ```
 
 Note: Before running the evaluation, you need to modify the `checkpoints` array in the script to include the actual checkpoint directories (e.g., "checkpoint-10000"). The training part will run automatically, and after training is complete, the script will evaluate the model on the specified datasets with different decoding configurations.
+
+### Run Evaluation with Our Open-Source Models
+
+```bash
+# single model
+python scripts/evaluation.py --problems_path problems_datasets/imo_ag_
+30.txt --model_path ZJUVAI/GenesisGeo --max_workers 80 --decoding_size 32 --beam_size 512 --search_depth 4 
+
+# ensemble of two models
+python scripts/evaluation.py --problems_path problems_datasets/imo_ag_
+30.txt --model_path ZJUVAI/GenesisGeo-250915a ZJUVAI/GenesisGeo-250915b  --max_workers 80 --decoding_size 32 --beam_size 512 --search_depth 4
+```
 
 ---
 
