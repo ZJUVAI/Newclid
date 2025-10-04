@@ -29,167 +29,7 @@ from newclid.generation.output_summary import Summary, get_first_predicate
 from newclid.proof import ProofState
 from newclid.proof_writing import get_structured_proof, write_proof_steps
 from newclid.statement import Statement
-
-class GeometryGoalFilter:
-    def goal_valid_check(self, tokens, dep_graph):
-        name = tokens[0]
-        args = tokens[1:]
-        if args[-1] == '':
-            args = args[:-1]
-        # AG1 do not support aconst and rconst
-        if name in ('aconst', 'rconst'):  # rconst AB:AB=1, aconst ∠AB AB=0
-            if name == 'rconst' and args[-1] == '1':
-                return False
-        # case: cong AB = AB,
-        if name == 'cong':
-            left = {args[0], args[1]}
-            right = {args[2], args[3]}
-            if left == right:
-                return False
-        # para AB ∥ AB, AB ∥ AC
-        if name == 'para':
-            if len({args[0], args[1], args[2], args[3]}) < 4:
-                return False
-        if name == 'eqratio':
-            seg_1, seg_2, seg_3, seg_4 = {args[0], args[1]}, {
-                args[2], args[3]}, {args[4], args[5]}, {args[6], args[7]}
-            # case: eqratio AB/CD = AB/CD
-            # case: eqratio AB/CD = CD/AB => cong AB = CD
-            # case: eqratio AB/AB = CD/EF => cong CD = EF
-            if seg_1 == seg_2 or seg_1 == seg_3 or seg_3 == seg_4 or seg_2 == seg_4:
-                return False
-            # case: exist two segments with the same length
-            sm1 = Statement.from_tokens(['cong'] + list(args[:4]), dep_graph)
-            sm2 = Statement.from_tokens(
-                ['cong'] + list(args[0:2])+list(args[4:6]), dep_graph)
-            if sm1.check() or sm2.check():
-                return False
-        if name == 'eqangle':
-            seg_1, seg_2, seg_3, seg_4 = {args[0], args[1]}, {
-                args[2], args[3]}, {args[4], args[5]}, {args[6], args[7]}
-            # case: eqangle ∠(AB,CD) = ∠(AB,CD)
-            # case: eqangle ∠(AB,CD) = ∠(CD,AB) => perp AB⊥CD
-            # case: eqangle ∠(AB,AB) = ∠(CD,EF) => para CD∥EF
-            if seg_1 == seg_2 or seg_1 == seg_3 or seg_3 == seg_4 or seg_2 == seg_4:
-                return False
-            # case: two parallels or perp
-            parallel_sets = [
-                [args[0], args[1], args[2], args[3]],
-                [args[0], args[1], args[4], args[5]],
-                [args[0], args[1], args[6], args[7]],
-                [args[4], args[5], args[6], args[7]],
-                [args[2], args[3], args[4], args[5]],
-                [args[2], args[3], args[6], args[7]]
-            ]
-            for arg_set in parallel_sets:
-                sm = Statement.from_tokens(['para'] + arg_set, dep_graph)
-                if sm.check():
-                    return False
-            sm = Statement.from_tokens(['perp'] + list(args[:4]), dep_graph)
-            if sm.check():
-                return False
-            # case: simtri
-            a1_args = list(set(args[:4]))
-            a2_args = list(set(args[4:]))
-            if len(a1_args) == 3 and len(a2_args) == 3:
-                simtri_sets = [
-                    [*a1_args, *a2_args],
-                    [*a1_args, a2_args[0], a2_args[2], a2_args[1]],
-                    [*a1_args, a2_args[1], a2_args[0], a2_args[2]],
-                    [*a1_args, a2_args[1], a2_args[2], a2_args[0]],
-                    [*a1_args, a2_args[2], a2_args[0], a2_args[1]],
-                    [*a1_args, a2_args[2], a2_args[1], a2_args[0]]
-                ]
-                for simtri_set in simtri_sets:
-                    sm = Statement.from_tokens(
-                        ['simtri']+simtri_set, dep_graph)
-                    if sm.check():
-                        return False
-                for simtri_set in simtri_sets:
-                    sm = Statement.from_tokens(
-                        ['simtrir']+simtri_set, dep_graph)
-                    if sm.check():
-                        return False
-        if name in ('simtri', 'simtrir', 'contri', 'contrir'):
-            # case: simtri △ABC ≅ △ABC
-            tri_1 = {args[0], args[1], args[2]}
-            tri_2 = {args[3], args[4], args[5]}
-            if tri_1 == tri_2:
-                return False
-        if name == 'sameclock':
-            return False
-
-        return True
-
-    def goal_filter(self, possible_goals, dep_graph):
-        """filter the equivalent eq goals"""
-
-        def check_equivalence(p1, p2, token_type):
-            args1 = [arg.name for arg in p1.args]
-            args2 = [arg.name for arg in p2.args]
-            statements = [
-                Statement.from_tokens(
-                    [token_type, args1[i], args1[i + 1], args2[i], args2[i + 1]], dep_graph)
-                for i in range(0, len(args1), 2)
-            ]
-            return all(sm.check() for sm in statements)
-
-        def remove_duplicates(goals, equivalence_fn, token_type):
-            unique_goals = []
-            for goal in goals:
-                if not any(equivalence_fn(existing_goal, goal, token_type) for existing_goal in unique_goals):
-                    unique_goals.append(goal)
-            return unique_goals
-
-        eqangle_goals = [
-            goal for goal in possible_goals 
-            if goal.predicate.NAME == 'eqangle'
-        ]
-        eqratio_goals = [
-            goal for goal in possible_goals 
-            if goal.predicate.NAME == 'eqratio'
-        ]
-        other_goals = [
-            goal for goal in possible_goals 
-            if goal.predicate.NAME not in ('eqangle', 'eqratio')
-        ]
-
-        eqangle_goals = remove_duplicates(eqangle_goals, check_equivalence, 'para')
-        eqratio_goals = remove_duplicates(eqratio_goals, check_equivalence, 'cong')
-
-        return other_goals + eqangle_goals + eqratio_goals
-
-    def aux_predicates_valid_check(self, llm_output: str) -> bool:
-
-        def is_valid(statement: str, valid_predicates: set) -> bool:
-            prefix_match = re.match(r"(x00 \w+)\s*:\s*(.*)", statement)
-            if prefix_match:
-                # coll a c e [002] coll b d e [003]
-                rest = prefix_match.group(2)
-                segments = re.split(r"\s*\[\d+\]", rest)
-                # 'coll a c e' , 'coll b d e'
-                segments = [seg.strip() for seg in segments if seg.strip()]
-                for segment in segments:
-                    parts = segment.split()
-                    if parts and parts[0] not in valid_predicates:
-                        logging.debug(
-                            f"Invalid auxiliary predicate: {parts[0]}")
-                        return False
-            return True
-
-        # <aux> x00 c : perp k n n s [024] cong k n n s [025]; x00 h : ; x00 i : ; x00 j : perp h i h j [009] cong h i h j [010] ; </aux> <proof> cong a k c k [002] r19 [000] [001] ; cong b k c k [003] r19 [000] [001] ; cong a k b k [004] a00 [002] [003] ; </proof>
-        valid_aux_predicates = {'perp', 'para',
-                                'cong', 'coll', 'eqangle', 'cyclic', 'midp'}
-        aux_match = re.match(r"<aux>\s*(.*)\s*</aux>", llm_output)
-        # c : perp a c b c [001] ; c : perp a c b c [001] ;
-        if aux_match:
-            aux_content = aux_match.group(1)
-            for content_item in aux_content.split(';'):
-                content_item = content_item.strip()
-                if content_item:
-                    if not is_valid(content_item, valid_aux_predicates):
-                        return False
-        return True
+from newclid.generation.goal_filter import GeometryGoalFilter
 
 class GeometryGenerator:
     def __init__(self, n_clauses=5, n_threads=1, output_dir="dataset", min_proof_steps=5, min_clauses_num=3, n_samples=100, timeout=3600, filteration_rate=0.6):
@@ -204,7 +44,7 @@ class GeometryGenerator:
         self.path_prefix = os.path.join(
             self.output_dir, f"geometry_clauses{self.n_clauses}_samples{millify(self.n_samples)}")
         self.write_buffer = []
-        self.writer_hash = set()
+        self.hashed_problems = set()
         self.filter = GeometryGoalFilter()
         self.defs = DefinitionJGEX.to_dict(DefinitionJGEX.parse_txt_file(default_defs_path()))
         self.clauses_generator = CompoundClauseGen(seed=int(time.time())+os.getpid(), defs=self.defs)
@@ -214,11 +54,10 @@ class GeometryGenerator:
             return re.findall(r'[a-z][\d]*', s)
 
         def goal_from_tokens(tokens):
-            if self.filter.goal_valid_check(tokens, dep_graph):
+            if self.filter.naive_goal_filter(tokens[0], tokens[1:], dep_graph):
                 goal = Statement.from_tokens(tokens, dep_graph)
-                if goal and goal.check():
-                    return [goal]
-            return []
+                if goal:
+                    goal.check()
 
         points_name = sorted(
             [p.name for p in dep_graph.symbols_graph.nodes_of_type(Point)])
@@ -239,28 +78,26 @@ class GeometryGenerator:
                     v1, v2 = extract_points(v1), extract_points(v2)
                     goal_from_tokens(tuple(['para'] + list(v1 + v2)))
                     goal_from_tokens(tuple(['perp'] + list(v1 + v2)))
+                    goal_from_tokens(tuple(['acompute'] + list(v1 + v2)))
                 except Exception as e:
-                    logging.warning(
-                        f"Error in goal_from_tokens: {e} para/perp for {v1}, {v2}")
+                    logging.warning(f"Error in goal_from_tokens: {e} para/perp for {v1}, {v2}")
                     continue
         for v1, v2, v3, v4 in e2v_pairs4:
             try:
                 v1, v2, v3, v4 = extract_points(v1), extract_points(v2), extract_points(v3), extract_points(v4)
                 goal_from_tokens(tuple(['eqangle'] + list(v1 + v2 + v3 + v4)))
             except Exception as e:
-                logging.warning(
-                    f"Error in goal_from_tokens: {e} for eqangle {v1}, {v2}, {v3}, {v4}")
+                logging.warning(f"Error in goal_from_tokens: {e} for eqangle {v1}, {v2}, {v3}, {v4}")
                 continue
 
         e2v, e2v_pairs2, e2v_pairs4 = ar.rtable.possible_pairs()
         for e in e2v_pairs2.keys():
             for v1, v2 in e2v_pairs2[e]:
                 try:
-                    goal_from_tokens(
-                        tuple(['cong'] + v1[2:-1].split(',') + v2[2:-1].split(',')))
+                    goal_from_tokens(tuple(['cong'] + v1[2:-1].split(',') + v2[2:-1].split(',')))
+                    goal_from_tokens(tuple(['rcompute'] + v1[2:-1].split(',') + v2[2:-1].split(',')))
                 except Exception as e:
-                    logging.warning(
-                        f"Error in goal_from_tokens: {e} cong for {v1}, {v2}")
+                    logging.warning(f"Error in goal_from_tokens: {e} cong for {v1}, {v2}")
                     continue
         for v1, v2, v3, v4 in e2v_pairs4:
             try:
@@ -268,8 +105,7 @@ class GeometryGenerator:
                                v2[2:-1].split(',') + v3[2:-1].split(',') + v4[2:-1].split(',')))
                 goal_from_tokens(tokens)
             except Exception as e:
-                logging.warning(
-                    f"Error in goal_from_tokens: {e} for eqratio {v1}, {v2}, {v3}, {v4}")
+                logging.warning(f"Error in goal_from_tokens: {e} for eqratio {v1}, {v2}, {v3}, {v4}")
                 continue
     
     def _get_apha_geo_solver_var(self, va_idx):
@@ -279,8 +115,14 @@ class GeometryGenerator:
         return f"{letter_part}{number_part - 1}" if number_part else letter_part
 
     def _statement2str_with_mapping(self, statement: Statement, mp):
-        res = [statement.predicate.NAME] + [mp[arg.name]
-                                            if isinstance(arg, Point) else str(arg) for arg in statement.args]
+        statement_args_str = statement.to_str().split(' ')[1:]
+        res = []
+        for arg, arg_str in zip(statement.args, statement_args_str):
+            if isinstance(arg, Point):
+                res.append(mp[arg_str])
+            else: # isinstance(a, Fraction)
+                res.append(arg_str)
+        res = [statement.predicate.NAME] + res #[mp[arg.name] if isinstance(arg, Point) else str(arg) for arg in statement.args]
         return " ".join(res)
 
     def _get_all_premise(self, problem, proof_state):
@@ -549,10 +391,7 @@ class GeometryGenerator:
         """Generate possible goals"""
         t = time.time()
         self.all_possible_goals_by_ar(solver.proof.dep_graph)
-        possible_goals = [
-            goal for goal in solver.proof.dep_graph.conclusions()
-            if self.filter.goal_valid_check(goal.to_str().split(" "), solver.proof.dep_graph)
-        ]
+        possible_goals = [goal for goal in solver.proof.dep_graph.conclusions()]
         possible_goals = self.filter.goal_filter(possible_goals, solver.proof.dep_graph)
         checkgoals_runtime = time.time() - t
         return possible_goals, checkgoals_runtime
@@ -722,6 +561,16 @@ class GeometryGenerator:
             traceback.print_exc()
             return [], {}
     
+    def problem_hash_filter(self, data: list, key: str) -> list[str]:
+        """Check if the input has already been written to the output file."""
+        filtered_data = []
+        for d in data:
+            key_hash = hash(d[key])
+            if key_hash not in self.hashed_problems:
+                self.hashed_problems.add(key_hash)
+                filtered_data.append(d)
+        return filtered_data
+    
     def write_data(self, all_data: list, force: bool = False):
         """Append a single JSON object to a .jsonl file."""
         self.write_buffer.extend(all_data)
@@ -763,6 +612,7 @@ class GeometryGenerator:
         
         if not ray.is_initialized():
             ray.init(
+                # local_mode=True,
                 ignore_reinit_error=True, 
                 num_cpus=self.n_threads
             )
@@ -775,12 +625,7 @@ class GeometryGenerator:
         pending_tasks = {}
         while all_data_len < self.n_samples:
             done, _ = ray.wait(list(pending_tasks.keys()), num_returns=1, timeout=10)
-            now = time.time()
-            for task, s_time in list(pending_tasks.items()):
-                if now - s_time > self.timeout:
-                    print(f"⚠️ Task {task} timeout. Canceling")
-                    ray.cancel(task, force=True)
-                    del pending_tasks[task]
+            
             if done:
                 try:         
                     result = ray.get(done[0])
@@ -789,7 +634,8 @@ class GeometryGenerator:
                     print(f"⚠️ Task {task} Error. {e}")
                     data, summary = [], {}
                 del pending_tasks[done[0]]
-            
+                
+                data = self.problem_hash_filter(data, 'llm_input_renamed')
                 if data:
                     self.write_data(data)
                     all_data_len += len(data)
@@ -801,6 +647,12 @@ class GeometryGenerator:
                         f"Speed: {all_data_len / (elapsed_time):2.0f} samples/s. "
                         f"ETA: {timedelta(seconds=int(self.n_samples/all_data_len*(elapsed_time)-elapsed_time))}"
                     )
+            now = time.time()
+            for task, s_time in list(pending_tasks.items()):
+                if now - s_time > self.timeout:
+                    print(f"⚠️ Task {task} timeout. Canceling")
+                    ray.cancel(task, force=True)
+                    del pending_tasks[task]
 
             while len(pending_tasks) < max_pending:
                 pending_tasks[ray_process_single_problem.remote(next(task_iterator))] = time.time()
@@ -825,7 +677,7 @@ def main():
     parser.add_argument("--min_clauses_num", required=False, type=int, default=2)
     parser.add_argument("--n_threads", required=False, type=int, default=1)
     parser.add_argument("--n_samples", required=False, type=int, default=1000)
-    parser.add_argument("--dir", required=False, default="datasets")
+    parser.add_argument("--dir", required=False, default="./datasets")
     parser.add_argument("--log_level", required=False, default="info", choices=["debug", "info", "warning", "error"])
     parser.add_argument("--timeout", required=False, type=int, default=3600)
     parser.add_argument("--filteration_rate", required=False, type=float, default=0.6)
