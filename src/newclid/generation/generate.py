@@ -24,11 +24,10 @@ from newclid.dependencies.symbols import Point
 from newclid.formulations.clause import translate_sentence
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.formulations.problem import ProblemJGEX
+from newclid.statement import Statement
+from newclid.proof import ProofState
 from newclid.generation.clause_generation import CompoundClauseGen
 from newclid.generation.output_summary import Summary, get_first_predicate
-from newclid.proof import ProofState
-from newclid.proof_writing import get_structured_proof, write_proof_steps
-from newclid.statement import Statement
 from newclid.generation.goal_filter import GeometryGoalFilter
 
 class GeometryGenerator:

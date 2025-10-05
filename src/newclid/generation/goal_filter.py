@@ -87,10 +87,10 @@ class GeometryGoalFilter:
                 return False
             
         # case: angles with accurate degree
-        # sm1 = Statement.from_tokens(['perp'] + list(args[:4]), dep_graph)
-        # sm2 = Statement.from_tokens(['perp'] + list(args[4:]), dep_graph)
-        # if sm1.check() or sm2.check():
-        #     return False
+        sm1 = Statement.from_tokens(['perp'] + list(args[:4]), dep_graph)
+        sm2 = Statement.from_tokens(['perp'] + list(args[4:]), dep_graph)
+        if sm1.check() or sm2.check():
+            return False
         for arg_set in parallel_sets:
             sm = Statement.from_tokens(['acompute'] + arg_set, dep_graph)
             if sm and sm.check():
@@ -145,7 +145,7 @@ class GeometryGoalFilter:
         sm4 = Statement.from_tokens(['cong'] + [args[2], args[3], args[6], args[7]], dep_graph)
         if sm1.check() or sm2.check() or sm3.check() or sm4.check():
             return False
-        for ratio in ('1/2', '1/1', '2/1'):
+        for ratio in ('1/1', '1/2', '2/1'):
             sm1 = Statement.from_tokens(['rconst'] + [args[0], args[1], args[2], args[3]] + [ratio], dep_graph)
             sm2 = Statement.from_tokens(['rconst'] + [args[0], args[1], args[4], args[5]] + [ratio], dep_graph)
             if sm1.check() or sm2.check():
@@ -155,7 +155,6 @@ class GeometryGoalFilter:
     def _naive_rconst_filter(self, args, dep_graph):
         if args[-1] == '1/1':
             return False
-        # print(args)
         return True
 
     def _naive_aconst_filter(self, args, dep_graph):
