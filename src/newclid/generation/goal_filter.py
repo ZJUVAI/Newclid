@@ -60,8 +60,9 @@ class GeometryGoalFilter:
         seg_3 = {args[4], args[5]}
         seg_4 = {args[6], args[7]}
 
+        # TODO
         # case: eqangle ∠(AB,AB) = ∠(CD,EF) => para CD∥EF
-        if seg_1 == seg_2 or seg_2 == seg_4:
+        if seg_1 == seg_2 or seg_3 == seg_4 or seg_1 == seg_3 or seg_1 == seg_4 or seg_2 == seg_3 or seg_2 == seg_4:
             return False
         
         # case: eqangle ∠(AB,CD) = ∠(AB,CD)
@@ -145,7 +146,7 @@ class GeometryGoalFilter:
         sm4 = Statement.from_tokens(['cong'] + [args[2], args[3], args[6], args[7]], dep_graph)
         if sm1.check() or sm2.check() or sm3.check() or sm4.check():
             return False
-        for ratio in ('1/1', '1/2', '2/1'):
+        for ratio in ('1/1',):
             sm1 = Statement.from_tokens(['rconst'] + [args[0], args[1], args[2], args[3]] + [ratio], dep_graph)
             sm2 = Statement.from_tokens(['rconst'] + [args[0], args[1], args[4], args[5]] + [ratio], dep_graph)
             if sm1.check() or sm2.check():
