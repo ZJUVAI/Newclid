@@ -24,12 +24,12 @@ class GeometryGoalFilter:
         elif goal_name == 'acompute':
             return True
         elif goal_name == 'aconst':
-            return False
+            # return False
             return self._naive_aconst_filter(goal_args, dep_graph)
         elif goal_name == 'rcompute':
             return True
         elif goal_name == 'rconst':
-            return False
+            # return False
             return self._naive_rconst_filter(goal_args, dep_graph)
         return False
     def _naive_cong_filter(self, args, dep_graph):
@@ -73,7 +73,7 @@ class GeometryGoalFilter:
         if seg_1 == seg_4 and seg_2 == seg_3:
             return False
         
-        # case: two parallels
+        # case: angles with accurate degree
         parallel_sets = [
             [args[0], args[1], args[2], args[3]],
             [args[0], args[1], args[4], args[5]],
@@ -83,40 +83,38 @@ class GeometryGoalFilter:
             [args[4], args[5], args[6], args[7]],
         ]
         for arg_set in parallel_sets:
-            sm = Statement.from_tokens(['para'] + arg_set, dep_graph)
-            if sm and sm.check():
-                return False
-            
-        # case: angles with accurate degree
-        sm1 = Statement.from_tokens(['perp'] + list(args[:4]), dep_graph)
-        sm2 = Statement.from_tokens(['perp'] + list(args[4:]), dep_graph)
-        if sm1.check() or sm2.check():
-            return False
-        for arg_set in parallel_sets:
             sm = Statement.from_tokens(['acompute'] + arg_set, dep_graph)
             if sm and sm.check():
                 return False
+        for arg_set in parallel_sets:
+            sm = Statement.from_tokens(['para'] + arg_set, dep_graph)
+            if sm.check():
+                return False
+        for arg_set in parallel_sets:    
+            sm = Statement.from_tokens(['perp'] + arg_set, dep_graph)
+            if sm.check():
+                return False       
         
         # case: simtri
-        a1_args = list(set(args[:4]))
-        a2_args = list(set(args[4:]))
-        if len(a1_args) == 3 and len(a2_args) == 3:
-            simtri_sets = [
-                [*a1_args, *a2_args],
-                [*a1_args, a2_args[0], a2_args[2], a2_args[1]],
-                [*a1_args, a2_args[1], a2_args[0], a2_args[2]],
-                [*a1_args, a2_args[1], a2_args[2], a2_args[0]],
-                [*a1_args, a2_args[2], a2_args[0], a2_args[1]],
-                [*a1_args, a2_args[2], a2_args[1], a2_args[0]]
-            ]
-            for simtri_set in simtri_sets:
-                sm = Statement.from_tokens(['simtri']+simtri_set, dep_graph)
-                if sm.check():
-                    return False
-            for simtri_set in simtri_sets:
-                sm = Statement.from_tokens(['simtrir']+simtri_set, dep_graph)
-                if sm.check():
-                    return False
+        # a1_args = list(set(args[:4]))
+        # a2_args = list(set(args[4:]))
+        # if len(a1_args) == 3 and len(a2_args) == 3:
+        #     simtri_sets = [
+        #         [*a1_args, *a2_args],
+        #         [*a1_args, a2_args[0], a2_args[2], a2_args[1]],
+        #         [*a1_args, a2_args[1], a2_args[0], a2_args[2]],
+        #         [*a1_args, a2_args[1], a2_args[2], a2_args[0]],
+        #         [*a1_args, a2_args[2], a2_args[0], a2_args[1]],
+        #         [*a1_args, a2_args[2], a2_args[1], a2_args[0]]
+        #     ]
+        #     for simtri_set in simtri_sets:
+        #         sm = Statement.from_tokens(['simtri']+simtri_set, dep_graph)
+        #         if sm.check():
+        #             return False
+        #     for simtri_set in simtri_sets:
+        #         sm = Statement.from_tokens(['simtrir']+simtri_set, dep_graph)
+        #         if sm.check():
+        #             return False
         return True
 
     def _naive_eqratio_filter(self, args, dep_graph):
@@ -140,17 +138,24 @@ class GeometryGoalFilter:
             return False
         
         # two segments with the same length
-        sm1 = Statement.from_tokens(['cong'] + [args[0], args[1], args[2], args[3]], dep_graph)
-        sm2 = Statement.from_tokens(['cong'] + [args[4], args[5], args[6], args[7]], dep_graph)
-        sm3 = Statement.from_tokens(['cong'] + [args[0], args[1], args[4], args[5]], dep_graph)
-        sm4 = Statement.from_tokens(['cong'] + [args[2], args[3], args[6], args[7]], dep_graph)
-        if sm1.check() or sm2.check() or sm3.check() or sm4.check():
-            return False
-        for ratio in ('1/1',):
-            sm1 = Statement.from_tokens(['rconst'] + [args[0], args[1], args[2], args[3]] + [ratio], dep_graph)
-            sm2 = Statement.from_tokens(['rconst'] + [args[0], args[1], args[4], args[5]] + [ratio], dep_graph)
-            if sm1.check() or sm2.check():
+        sets = [
+            [args[0], args[1], args[2], args[3]],
+            [args[0], args[1], args[4], args[5]],
+            [args[2], args[3], args[6], args[7]],
+            [args[4], args[5], args[6], args[7]],
+        ]
+        for arg_set in sets:
+            sm = Statement.from_tokens(['cong'] + arg_set, dep_graph)
+            if sm.check():
                 return False
+            for ratio in ('1/1',):
+                sm = Statement.from_tokens(['rconst'] + arg_set + [ratio], dep_graph)
+                if sm.check():
+                    return False
+            # sm = Statement.from_tokens(['rcompute'] + arg_set, dep_graph)
+            # if sm.check():
+            #     return False
+            
         return True
 
     def _naive_rconst_filter(self, args, dep_graph):
@@ -159,7 +164,7 @@ class GeometryGoalFilter:
         return True
 
     def _naive_aconst_filter(self, args, dep_graph):
-        if args[-1] in ('0pi/1', '1pi/2', '1pi/1', '1pi/3', '2pi/3'):
+        if args[-1] in ('0pi/1', '1pi/2', '1pi/1', '1pi/3', '2pi/3', '1pi/4', '3pi/4'):
             return False
         return True
 
@@ -210,7 +215,24 @@ class GeometryGoalFilter:
                     goal_groups.append([goal])
             
             return goal_groups
+        
+        def check_equivalence(p1, p2, token_type):
+            args1 = [arg.name for arg in p1.args]
+            args2 = [arg.name for arg in p2.args]
+            statements = [
+                Statement.from_tokens(
+                    [token_type, args1[i], args1[i + 1], args2[i], args2[i + 1]], dep_graph)
+                for i in range(0, len(args1), 2)
+            ]
+            return all(sm.check() for sm in statements)
 
+        def remove_duplicates(goals, equivalence_fn, token_type):
+            unique_goals = []
+            for goal in goals:
+                if not any(equivalence_fn(existing_goal, goal, token_type) for existing_goal in unique_goals):
+                    unique_goals.append(goal)
+            return unique_goals
+        
         filtered_goals = []
         for goal in possible_goals:
             parts = goal.to_str().split(" ")
@@ -244,6 +266,9 @@ class GeometryGoalFilter:
 
         eqratio_goals_groups = group_equivalent_predicates(eqratio_goals, 'eqratio')
         eqratio_goals = [random.choice(group) for group in eqratio_goals_groups]
+
+        # eqangle_goals = remove_duplicates(eqangle_goals, check_equivalence, 'para')
+        # eqratio_goals = remove_duplicates(eqratio_goals, check_equivalence, 'cong')
         
         return eqangle_goals + eqratio_goals + other_goals
 
