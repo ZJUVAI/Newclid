@@ -157,7 +157,7 @@ class Table:
             for i, v1 in enumerate(e2v[e][:-1]):
                 for v2 in e2v[e][i + 1:]:
                     e2v_pairs2[e].append((v1, v2))
-            diffe2v_pairs2['0'].extend(e2v_pairs2[e])
+            # diffe2v_pairs2['0'].extend(e2v_pairs2[e])
 
         for i, e1 in enumerate(all_e):
             for j, e2 in enumerate(all_e):
@@ -165,20 +165,22 @@ class Table:
                     continue
                 diff = e2str(minus(e1, e2))
                 if diff not in diffe2v_pairs2:
-                    diffe2v_pairs2[diff] = []
+                    diffe2v_pairs2[diff] = set()
                 for v1 in e2v[e2str(e1)]:
                     for v2 in e2v[e2str(e2)]:
                         if v1 != v2:
-                            diffe2v_pairs2[diff].append((v1, v2))
+                            diffe2v_pairs2[diff].add((v1, v2))
 
-        e2v_pairs4 = []
+        e2v_pairs4 = set()
         for e in diffe2v_pairs2.keys():
-            diffe2v_pairs2[e] = sorted(diffe2v_pairs2[e])
+            diffe2v_pairs2[e] = list(diffe2v_pairs2[e])
             for i, (v1, v2) in enumerate(diffe2v_pairs2[e][:-1]):
                 for v3, v4 in diffe2v_pairs2[e][i + 1:]:
-                    e2v_pairs4.append((v1, v2, v3, v4))
-                    if e == '0':
-                        e2v_pairs4.append((v1, v2, v4, v3))
+                    if v1 == v3 or v1 == v4 or v2 == v3 or v2 == v4:
+                        continue
+                    e2v_pairs4.add((v1, v2, v3, v4))
+                    # if e == '0':
+                    #     e2v_pairs4.append((v1, v2, v4, v3))
                         
         return e2v, e2v_pairs2, e2v_pairs4
 
