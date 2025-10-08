@@ -24,13 +24,15 @@ class GeometryGoalFilter:
         elif goal_name == 'acompute':
             return True
         elif goal_name == 'aconst':
-            # return False
             return self._naive_aconst_filter(goal_args, dep_graph)
         elif goal_name == 'rcompute':
             return True
         elif goal_name == 'rconst':
-            # return False
             return self._naive_rconst_filter(goal_args, dep_graph)
+        elif goal_name == 'simtri' or goal_name == 'simtrir':
+            return self._naive_simtri_filter(goal_args, dep_graph)
+        elif goal_name == 'contri' or goal_name == 'contrir':
+            return self._naive_contri_filter(goal_args, dep_graph)
         return False
     def _naive_cong_filter(self, args, dep_graph):
         # case: cong AB = AB,
@@ -46,8 +48,22 @@ class GeometryGoalFilter:
             return False
         return True
     
-    def _naive_simtri_contri_filter(self, args, dep_graph):
+    def _naive_simtri_filter(self, args, dep_graph):
         # case: simtri △ABC ≅ △ABC
+        tri_1 = {args[0], args[1], args[2]}
+        tri_2 = {args[3], args[4], args[5]}
+        if tri_1 == tri_2:
+            return False
+        sm = Statement.from_tokens(['contri']+args, dep_graph)
+        if sm.check():
+            return False
+        sm = Statement.from_tokens(['contrir']+args, dep_graph)
+        if sm.check():
+            return False
+        return True
+    
+    def _naive_contri_filter(self, args, dep_graph):
+        # case: contri △ABC ≅ △ABC
         tri_1 = {args[0], args[1], args[2]}
         tri_2 = {args[3], args[4], args[5]}
         if tri_1 == tri_2:
@@ -96,25 +112,25 @@ class GeometryGoalFilter:
                 return False       
         
         # case: simtri
-        # a1_args = list(set(args[:4]))
-        # a2_args = list(set(args[4:]))
-        # if len(a1_args) == 3 and len(a2_args) == 3:
-        #     simtri_sets = [
-        #         [*a1_args, *a2_args],
-        #         [*a1_args, a2_args[0], a2_args[2], a2_args[1]],
-        #         [*a1_args, a2_args[1], a2_args[0], a2_args[2]],
-        #         [*a1_args, a2_args[1], a2_args[2], a2_args[0]],
-        #         [*a1_args, a2_args[2], a2_args[0], a2_args[1]],
-        #         [*a1_args, a2_args[2], a2_args[1], a2_args[0]]
-        #     ]
-        #     for simtri_set in simtri_sets:
-        #         sm = Statement.from_tokens(['simtri']+simtri_set, dep_graph)
-        #         if sm.check():
-        #             return False
-        #     for simtri_set in simtri_sets:
-        #         sm = Statement.from_tokens(['simtrir']+simtri_set, dep_graph)
-        #         if sm.check():
-        #             return False
+        a1_args = list(set(args[:4]))
+        a2_args = list(set(args[4:]))
+        if len(a1_args) == 3 and len(a2_args) == 3:
+            simtri_sets = [
+                [*a1_args, *a2_args],
+                [*a1_args, a2_args[0], a2_args[2], a2_args[1]],
+                [*a1_args, a2_args[1], a2_args[0], a2_args[2]],
+                [*a1_args, a2_args[1], a2_args[2], a2_args[0]],
+                [*a1_args, a2_args[2], a2_args[0], a2_args[1]],
+                [*a1_args, a2_args[2], a2_args[1], a2_args[0]]
+            ]
+            for simtri_set in simtri_sets:
+                sm = Statement.from_tokens(['simtri']+simtri_set, dep_graph)
+                if sm.check():
+                    return False
+            for simtri_set in simtri_sets:
+                sm = Statement.from_tokens(['simtrir']+simtri_set, dep_graph)
+                if sm.check():
+                    return False
         return True
 
     def _naive_eqratio_filter(self, args, dep_graph):
@@ -254,7 +270,7 @@ class GeometryGoalFilter:
             goal for goal in possible_goals 
             if goal.predicate.NAME not in (
                 'eqangle', 'eqratio', 'eqratio3',
-                'simtri', 'contri', 'simtrir', 'contrir',
+                # 'simtri', 'contri', 'simtrir', 'contrir',
                 'ncoll', 'midp',
                 'acompute', 'rcompute',
                 'sameside', 'sameclock',
