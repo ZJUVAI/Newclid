@@ -76,9 +76,13 @@ class GeometryGoalFilter:
         seg_3 = {args[4], args[5]}
         seg_4 = {args[6], args[7]}
 
-        # TODO
+        a1_args = list(set(args[:4]))
+        a2_args = list(set(args[4:]))
+        if not (len(a1_args) == 3 and len(a2_args)) == 3:
+            return False
+
         # case: eqangle ∠(AB,AB) = ∠(CD,EF) => para CD∥EF
-        if seg_1 == seg_2 or seg_3 == seg_4 or seg_1 == seg_3 or seg_1 == seg_4 or seg_2 == seg_3 or seg_2 == seg_4:
+        if seg_1 == seg_2 or seg_3 == seg_4:
             return False
         
         # case: eqangle ∠(AB,CD) = ∠(AB,CD)
@@ -164,13 +168,13 @@ class GeometryGoalFilter:
             sm = Statement.from_tokens(['cong'] + arg_set, dep_graph)
             if sm.check():
                 return False
-            for ratio in ('1/1',):
-                sm = Statement.from_tokens(['rconst'] + arg_set + [ratio], dep_graph)
-                if sm.check():
-                    return False
-            # sm = Statement.from_tokens(['rcompute'] + arg_set, dep_graph)
-            # if sm.check():
-            #     return False
+            # for ratio in ('1/1',):
+            #     sm = Statement.from_tokens(['rconst'] + arg_set + [ratio], dep_graph)
+            #     if sm.check():
+            #         return False
+            sm = Statement.from_tokens(['rcompute'] + arg_set, dep_graph)
+            if sm.check():
+                return False
             
         return True
 
@@ -277,11 +281,11 @@ class GeometryGoalFilter:
             )
         ]
 
-        eqangle_goals_groups = group_equivalent_predicates(eqangle_goals, 'eqangle')
-        eqangle_goals = [random.choice(group) for group in eqangle_goals_groups]
+        # eqangle_goals_groups = group_equivalent_predicates(eqangle_goals, 'eqangle')
+        # eqangle_goals = [random.choice(group) for group in eqangle_goals_groups]
 
-        eqratio_goals_groups = group_equivalent_predicates(eqratio_goals, 'eqratio')
-        eqratio_goals = [random.choice(group) for group in eqratio_goals_groups]
+        # eqratio_goals_groups = group_equivalent_predicates(eqratio_goals, 'eqratio')
+        # eqratio_goals = [random.choice(group) for group in eqratio_goals_groups]
 
         # eqangle_goals = remove_duplicates(eqangle_goals, check_equivalence, 'para')
         # eqratio_goals = remove_duplicates(eqratio_goals, check_equivalence, 'cong')
