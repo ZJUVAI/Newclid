@@ -37,7 +37,10 @@ class Coll(Predicate):
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
         points: tuple[Point, ...] = tuple(statement.args)
-        line = LineNum(points[0].num, points[1].num)
+        try:
+            line = LineNum(points[0].num, points[1].num)
+        except Exception as e:
+            return False
         return all(line.point_at(p.num.x, p.num.y) is not None for p in points[2:])
 
     @classmethod

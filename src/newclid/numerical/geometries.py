@@ -132,7 +132,7 @@ class LineNum(FormNum):
         elif p1 and p2:
             if p1.close_enough(p2):
                 raise ValueError(
-                    "Not able to determine the line by two points two close"
+                    "Unable to determine the line by two points too close"
                 )
             a, b, c = (
                 p1.y - p2.y,
