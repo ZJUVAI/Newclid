@@ -72,7 +72,10 @@ class Perp(Predicate):
 
     @classmethod
     def check(cls, statement: Statement) -> bool:
-        eqs, table = cls._prep_ar(statement)
+        try:
+            eqs, table = cls._prep_ar(statement)
+        except Exception as e:
+            return False
         return all(table.expr_delta(eq) for eq in eqs)
 
     @classmethod
