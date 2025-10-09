@@ -251,7 +251,7 @@ class Matcher:
                 s = Statement.from_tokens(
                         translate_sentence(mapping, premise), self.dep_graph
                     )
-                if s is None:
+                if s is None or not s.check_numerical():
                     flag = True
                     break
                 why.append(s)
@@ -342,7 +342,7 @@ class Matcher:
                 s = Statement.from_tokens(
                         translate_sentence(mapping, premise), self.dep_graph
                     )
-                if s is None:
+                if s is None or not s.check_numerical():
                     flag = True
                     break
                 why.append(s)
