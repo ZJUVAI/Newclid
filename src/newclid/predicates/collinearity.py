@@ -45,7 +45,11 @@ class Coll(Predicate):
 
     @classmethod
     def check(cls, statement: Statement) -> bool:
-        return Line.check_coll(statement.args)
+        try:
+            return Line.check_coll(statement.args)
+        except Exception as e:
+            return False
+        
 
     @classmethod
     def why(cls, statement: Statement) -> Dependency:
