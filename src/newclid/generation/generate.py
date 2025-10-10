@@ -515,6 +515,139 @@ class GeometryGenerator:
             "llm_output_renamed": llm_renamed['llm_output'],
         }
     
+    def _find_minimal_aux_clauses_new(self, solver, solver_builder, goals_str, essential_clauses, essential_clauses_aux):
+        """Find minimal auxiliary clause set"""
+        # Iterate through all possible subsets to find the minimal necessary auxiliary clause set
+        # Search through subsets from size 0 to len-1 (excluding full set)
+        results = []
+        all_constructions = [str(cons) for cons in solver_builder.problemJGEX.constructions]
+        for r in range(len(essential_clauses_aux)):
+            for aux_subset in itertools.combinations(essential_clauses_aux, r):
+                if len(goals_str) == 0:
+                    continue
+                aux_subset_set = set(aux_subset)
+                statements_test = []
+                for clause in all_constructions:
+                    clause_str = str(clause)
+                    if clause_str in essential_clauses or clause_str in aux_subset_set:
+                        statements_test.append(clause_str)
+                fl_problem_test = '; '.join(statements_test) + ' ? ' + '; '.join(goals_str)
+
+                solver_builder_test = GeometricSolverBuilder()
+                solver_builder_test.with_deductive_agent(DDARN())
+                solver_builder_test.load_problem_from_txt(fl_problem_test)
+                try:
+                    solver_test = solver_builder_test.build(max_attempts=100)
+                except Exception as e:
+                    logging.debug(f"Error: {e}")
+                    continue
+                solver_test.run(timeout=self.timeout)
+                for goal in solver_test.goals:
+                    # if found new solutions
+                    if goal.check():
+                        goals_str.remove(goal.to_str())
+                        # loop to shave
+                        _solver = solver_test
+                        _solver_builder = solver_builder_test
+                        last_essential_clauses_len = float('inf')
+                        last_essential_clauses_aux_len = float('inf')
+                        while True:
+                            points, _, _, aux_points, _, _, proof_steps = _solver.proof.dep_graph.get_proof_steps([goal])
+                            _essential_clauses = set()
+                            _essential_clauses_aux = set()
+                            for p in points:
+                                _essential_clauses.add(str(p.clause))
+                            for p in aux_points:
+                                if str(p.clause) not in essential_clauses:
+                                    _essential_clauses_aux.add(str(p.clause))
+                            # for p in aux_points:
+                            #     _essential_clauses_aux.add(str(p.clause))
+                            # for p in points:
+                            #     if str(p.clause) not in _essential_clauses_aux:
+                            #         _essential_clauses.add(str(p.clause))
+                            if last_essential_clauses_len == len(_essential_clauses) and last_essential_clauses_aux_len == len(_essential_clauses_aux):
+                                break
+                            last_essential_clauses_len = len(_essential_clauses)
+                            last_essential_clauses_aux_len = len(_essential_clauses_aux)
+                            res = self._find_minimal_aux_clauses_new(
+                                _solver,
+                                _solver_builder,
+                                [goal.to_str()],
+                                _essential_clauses,
+                                _essential_clauses_aux
+                            )
+                            _solver = res[0]['solver']
+                            _solver_builder = res[0]['solver_builder']
+                        results.extend(res)
+
+        # goals requiring full aux set or the aux set is emptye
+        for goal_str in goals_str:
+            goal = Statement.from_tokens(goal_str.split(" "), solver.proof.dep_graph)
+            problem_new = str(solver_builder.problemJGEX).split(' ? ')[0] + ' ? ' + goal_str
+            problem_new = ProblemJGEX.from_text(problem_new)
+            results.append({
+                "aux_clauses": set(),
+                "solver": solver,
+                "solver_builder": solver_builder,
+                "problem": problem_new,
+                "goal": goal
+            })
+        return results
+    
+    def _process_goals_with_same_statement(self, goals, solver, solver_builder, essential_clauses, essential_clauses_aux):
+        """Process a single goal"""
+
+        results = []
+
+        res_list = self._find_minimal_aux_clauses_new(
+            solver,
+            solver_builder,
+            [goal.to_str() for goal in goals],
+            essential_clauses,
+            essential_clauses_aux
+        )
+
+        for res in res_list:
+            problem_new = res['problem']
+            goal_new = res['goal']
+            solver_new = res['solver']
+            solver_new.proof.goals = [goal_new]
+            essential_clauses_aux = res['aux_clauses']
+
+            # filter clauses
+            n_clauses = len(essential_clauses | essential_clauses_aux)
+            if n_clauses < self.min_clauses_num:
+                logging.debug(f"Too few clauses: {n_clauses}")
+                continue
+
+            # get new proof
+            points, _, _, aux_points, _, _, proof_steps = solver_new.proof.dep_graph.get_proof_steps([goal_new])
+
+            # filter proof
+            n_proof_steps = len(proof_steps)
+            if n_proof_steps < self.min_proof_steps:
+                logging.debug(f"Naive proof with length {n_proof_steps}")
+                continue
+                
+            # llm data generation
+            aux_points = [p.name for p in aux_points]
+            llm_renamed = self.llm_solution_renamed(problem_new, aux_points, solver_new.proof)
+
+            if len(aux_points) > 0 and not self.filter.aux_predicates_valid_check(llm_renamed['llm_output']):
+                continue
+
+            results.append({
+                # "fl_statement_src": fl_statement,
+                "n_clauses": n_clauses,
+                "fl_problem": str(problem_new),
+                "nl_problem": "",
+                "n_proof_steps": n_proof_steps,
+                # "nl_solution": nl_solution,
+                "llm_input_renamed": llm_renamed['llm_input'],
+                "llm_output_renamed": llm_renamed['llm_output'],
+            })
+        return results
+    
     def process_single_problem(self, args: tuple) -> tuple[list, dict]:
         """Process a single geometry problem."""
         try:
@@ -533,17 +666,63 @@ class GeometryGenerator:
             possible_goals, checkgoals_runtime = self._generate_possible_goals(solver)
 
             # Process each goal
-            generated_data = []
-            for goal in possible_goals:
-                data = self._process_single_goal(goal, solver, solver_builder)
-                if data:
-                    generated_data.append(data)
+            # process_goal_time0 = time.time()
+            # generated_data0 = []
+            # for goal in possible_goals:
+            #     data = self._process_single_goal(goal, solver, solver_builder)
+            #     if data:
+            #         generated_data0.append(data)
+            # process_goal_time0 = time.time() - process_goal_time0
 
+            # Process goals
+            # first, group goals by problem key 
+            eq_cluase_goals = dict()
+            for goal in possible_goals:
+                # find essential_clauses
+                points, _, _, aux_points, _, _, proof_steps = solver.proof.dep_graph.get_proof_steps([goal])
+                essential_clauses = set()
+                essential_clauses_aux = set()
+                for p in points:
+                    essential_clauses.add(str(p.clause))
+                for p in aux_points:
+                    if str(p.clause) not in essential_clauses:
+                        essential_clauses_aux.add(str(p.clause))
+                # for p in aux_points:
+                #     essential_clauses_aux.add(str(p.clause))
+                # for p in points:
+                #     if str(p.clause) not in essential_clauses_aux:
+                #         essential_clauses.add(str(p.clause))
+                # set problem key for goals with same statement
+                all_constructions = [str(cons) for cons in solver_builder.problemJGEX.constructions]
+                problem = []
+                for clause in all_constructions:
+                    clause_str = str(clause)
+                    if clause_str in essential_clauses:
+                        problem.append(clause_str)
+                problem.append('$$')
+                for clause in all_constructions:
+                    clause_str = str(clause)
+                    if clause_str in essential_clauses_aux:
+                        problem.append(clause_str)
+                problem = '; '.join(problem)
+                eq_cluase_goals.setdefault(problem, []).append((goal, essential_clauses, essential_clauses_aux))
+            # then, process goal groups      
+            process_goal_time = time.time()
+            generated_data = []
+            for k, goal_list in eq_cluase_goals.items():
+                goals = [goal[0] for goal in goal_list]
+                essential_clauses = goal_list[0][1]
+                essential_clauses_aux = goal_list[0][2]
+                data = self._process_goals_with_same_statement(goals, solver, solver_builder, essential_clauses, essential_clauses_aux)
+                generated_data.extend(data)
+            process_goal_time = time.time() - process_goal_time
+                 
             # Create summary (created directly in main function, no need for separate function)
             summary = {
                 'total_time': time.time() - start_time,
                 'runtime': solver.run_infos['runtime'],
                 'checkgoals_runtime': checkgoals_runtime,
+                'process_goal_runtime': process_goal_time,
                 'n_samples': len(generated_data),
                 'goals': [re.search(r'\?\s*(\w+)', d['fl_problem']).group(1) for d in generated_data],
                 'first_predicate': [get_first_predicate(d['fl_problem']) for d in generated_data],
@@ -594,14 +773,7 @@ class GeometryGenerator:
                 signal.signal(signal.SIGALRM, handler)
                 signal.alarm(10)
                 try:
-                    clauses = self.clauses_generator.generate(
-                        self.n_clauses
-                        # np.clip(
-                        #     np.random.binomial(n=self.n_clauses * 2, p=0.5), 
-                        #     max(1, self.n_clauses - 10), 
-                        #     self.n_clauses + 10
-                        # )
-                    )
+                    clauses = self.clauses_generator.generate(self.n_clauses)
                 except TimeoutError:
                     continue
                 signal.alarm(0)
@@ -628,12 +800,8 @@ class GeometryGenerator:
             done, _ = ray.wait(list(pending_tasks.keys()), num_returns=1, timeout=10)
             
             if done:
-                try:         
-                    result = ray.get(done[0])
-                    data, summary = result
-                except Exception as e:
-                    print(f"⚠️ Task {task} Error. {e}")
-                    data, summary = [], {}
+                result = ray.get(done[0])
+                data, summary = result
                 del pending_tasks[done[0]]
                 
                 all_data_len_raw += len(data)
@@ -645,8 +813,11 @@ class GeometryGenerator:
                     elapsed_time = time.time() - start_time
                     logging.info(
                         f"{millify(all_data_len)}/{millify(self.n_samples)} (+{len(data):3d}) in {elapsed_time:5.0f}s | "
-                        f"Total: {summary['total_time']:3.0f}s DDAR: {summary['runtime']:2.0f}s Check: {summary['checkgoals_runtime']:2.0f}s | "
-                        f"Speed: {all_data_len/elapsed_time:3.0f} samp/s, Speed(raw): {all_data_len_raw/elapsed_time:3.0f} samp/s | "
+                        f"Total: {summary['total_time']:3.0f}s = "
+                        f"DDAR: {summary['runtime']:2.0f} + "
+                        f"Chk: {summary['checkgoals_runtime']:2.0f} + "
+                        f"Proc: {summary['process_goal_runtime']:3.0f} | "
+                        f"Speed (raw): {all_data_len/elapsed_time:3.0f} ({all_data_len_raw/elapsed_time:3.0f}) samp/s | "
                         f"ETA: {timedelta(seconds=int(self.n_samples/all_data_len*elapsed_time - elapsed_time))}"
                     )
             now = time.time()
