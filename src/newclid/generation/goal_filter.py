@@ -116,25 +116,25 @@ class GeometryGoalFilter:
                 return False       
         
         # case: simtri
-        a1_args = list(set(args[:4]))
-        a2_args = list(set(args[4:]))
-        if len(a1_args) == 3 and len(a2_args) == 3:
-            simtri_sets = [
-                [*a1_args, *a2_args],
-                [*a1_args, a2_args[0], a2_args[2], a2_args[1]],
-                [*a1_args, a2_args[1], a2_args[0], a2_args[2]],
-                [*a1_args, a2_args[1], a2_args[2], a2_args[0]],
-                [*a1_args, a2_args[2], a2_args[0], a2_args[1]],
-                [*a1_args, a2_args[2], a2_args[1], a2_args[0]]
-            ]
-            for simtri_set in simtri_sets:
-                sm = Statement.from_tokens(['simtri']+simtri_set, dep_graph)
-                if sm.check():
-                    return False
-            for simtri_set in simtri_sets:
-                sm = Statement.from_tokens(['simtrir']+simtri_set, dep_graph)
-                if sm.check():
-                    return False
+        # a1_args = list(set(args[:4]))
+        # a2_args = list(set(args[4:]))
+        # if len(a1_args) == 3 and len(a2_args) == 3:
+        #     simtri_sets = [
+        #         [*a1_args, *a2_args],
+        #         [*a1_args, a2_args[0], a2_args[2], a2_args[1]],
+        #         [*a1_args, a2_args[1], a2_args[0], a2_args[2]],
+        #         [*a1_args, a2_args[1], a2_args[2], a2_args[0]],
+        #         [*a1_args, a2_args[2], a2_args[0], a2_args[1]],
+        #         [*a1_args, a2_args[2], a2_args[1], a2_args[0]]
+        #     ]
+        #     for simtri_set in simtri_sets:
+        #         sm = Statement.from_tokens(['simtri']+simtri_set, dep_graph)
+        #         if sm.check():
+        #             return False
+        #     for simtri_set in simtri_sets:
+        #         sm = Statement.from_tokens(['simtrir']+simtri_set, dep_graph)
+        #         if sm.check():
+        #             return False
         return True
 
     def _naive_eqratio_filter(self, args, dep_graph):
@@ -168,10 +168,10 @@ class GeometryGoalFilter:
             sm = Statement.from_tokens(['cong'] + arg_set, dep_graph)
             if sm.check():
                 return False
-            # for ratio in ('1/1',):
-            #     sm = Statement.from_tokens(['rconst'] + arg_set + [ratio], dep_graph)
-            #     if sm.check():
-            #         return False
+            for ratio in ('1/1',):
+                sm = Statement.from_tokens(['rconst'] + arg_set + [ratio], dep_graph)
+                if sm.check():
+                    return False
             sm = Statement.from_tokens(['rcompute'] + arg_set, dep_graph)
             if sm.check():
                 return False

@@ -98,14 +98,14 @@ class GeometryGenerator:
                 except Exception as e:
                     logging.warning(f"Error in goal_from_tokens: {e} cong for {v1}, {v2}")
                     continue
-        for v1, v2, v3, v4 in e2v_pairs4:
-            try:
-                tokens = tuple(['eqratio'] + list(v1[2:-1].split(',') +
-                               v2[2:-1].split(',') + v3[2:-1].split(',') + v4[2:-1].split(',')))
-                goal_from_tokens(tokens)
-            except Exception as e:
-                logging.warning(f"Error in goal_from_tokens: {e} for eqratio {v1}, {v2}, {v3}, {v4}")
-                continue
+        # for v1, v2, v3, v4 in e2v_pairs4:
+        #     try:
+        #         tokens = tuple(['eqratio'] + list(v1[2:-1].split(',') +
+        #                        v2[2:-1].split(',') + v3[2:-1].split(',') + v4[2:-1].split(',')))
+        #         goal_from_tokens(tokens)
+        #     except Exception as e:
+        #         logging.warning(f"Error in goal_from_tokens: {e} for eqratio {v1}, {v2}, {v3}, {v4}")
+        #         continue
     
     def _get_apha_geo_solver_var(self, va_idx):
         """Generate a point name using letters and numbers"""
@@ -595,11 +595,12 @@ class GeometryGenerator:
                 signal.alarm(10)
                 try:
                     clauses = self.clauses_generator.generate(
-                        np.clip(
-                            np.random.binomial(n=self.n_clauses * 2, p=0.5), 
-                            max(1, self.n_clauses - 10), 
-                            self.n_clauses + 10
-                        )
+                        self.n_clauses
+                        # np.clip(
+                        #     np.random.binomial(n=self.n_clauses * 2, p=0.5), 
+                        #     max(1, self.n_clauses - 10), 
+                        #     self.n_clauses + 10
+                        # )
                     )
                 except TimeoutError:
                     continue
@@ -621,6 +622,7 @@ class GeometryGenerator:
         
         start_time = time.time()
         all_data_len = 0
+        all_data_len_raw = 0
         pending_tasks = {}
         while all_data_len < self.n_samples:
             done, _ = ray.wait(list(pending_tasks.keys()), num_returns=1, timeout=10)
@@ -634,6 +636,7 @@ class GeometryGenerator:
                     data, summary = [], {}
                 del pending_tasks[done[0]]
                 
+                all_data_len_raw += len(data)
                 data = self.problem_hash_filter(data, 'llm_input_renamed')
                 if data:
                     self.write_data(data)
@@ -641,10 +644,10 @@ class GeometryGenerator:
                     summary_reporter.add(summary)
                     elapsed_time = time.time() - start_time
                     logging.info(
-                        f"Progress: [{all_data_len}/{self.n_samples}] ({len(data):4d} new) in {elapsed_time:.0f}s. "
-                        f"Total: {summary['total_time']:2.0f}s. DDAR: {summary['runtime']:3.0f}s. Checkgoals: {summary['checkgoals_runtime']:2.0f}s. "
-                        f"Speed: {all_data_len / (elapsed_time):2.0f} samples/s. "
-                        f"ETA: {timedelta(seconds=int(self.n_samples/all_data_len*(elapsed_time)-elapsed_time))}"
+                        f"{millify(all_data_len)}/{millify(self.n_samples)} (+{len(data):3d}) in {elapsed_time:5.0f}s | "
+                        f"Total: {summary['total_time']:3.0f}s DDAR: {summary['runtime']:2.0f}s Check: {summary['checkgoals_runtime']:2.0f}s | "
+                        f"Speed: {all_data_len/elapsed_time:3.0f} samp/s, Speed(raw): {all_data_len_raw/elapsed_time:3.0f} samp/s | "
+                        f"ETA: {timedelta(seconds=int(self.n_samples/all_data_len*elapsed_time - elapsed_time))}"
                     )
             now = time.time()
             for task, s_time in list(pending_tasks.items()):
