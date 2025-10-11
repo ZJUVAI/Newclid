@@ -14,7 +14,7 @@ from newclid.formulations.definition import DefinitionJGEX
 from newclid.generation.clause_generation import CompoundClauseGen
 from newclid.generation.summary import Summary, get_first_predicate
 from newclid.generation.goal_filter import GeometryGoalFilter
-from newclid.generation.goal_worker import GeometryProblemWorker
+from newclid.generation.problem_worker import GeometryProblemWorker
 
 class TimeoutError(Exception):
     pass
