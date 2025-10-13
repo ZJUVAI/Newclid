@@ -72,12 +72,8 @@ class GeometryGenerator:
     def generate(self):
         def task_generator():
             for i in range(10**9):
-                try:
-                    with time_limit(10):
-                        clauses = self.clauses_generator.generate(self.n_clauses)
-                except TimeoutError:
-                    continue
-                yield i, clauses, self.timeout
+                seed = int(time.time() * 1000) + i  # 唯一种子 = 时间戳 + 任务ID
+                yield i, seed, self.n_clauses, self.timeout
         
         if not ray.is_initialized():
             ray.init(
@@ -123,7 +119,8 @@ class GeometryGenerator:
                     del pending_tasks[task]
 
             while len(pending_tasks) < max_pending:
-                pending_tasks[GeometryProblemWorker.ray_process_single_problem.remote(next(task_iterator))] = time.time()
+                task_args = next(task_iterator)
+                pending_tasks[GeometryProblemWorker.ray_process_single_problem.remote(task_args)] = time.time()
 
         # Cancel any remaining tasks
         for task in pending_tasks.keys():

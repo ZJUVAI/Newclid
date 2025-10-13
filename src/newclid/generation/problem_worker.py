@@ -3,8 +3,26 @@ import re
 import itertools
 import string
 import time
+import signal
+from contextlib import contextmanager
 from collections import defaultdict
 import ray
+
+from newclid.generation.clause_generation import CompoundClauseGen
+
+class TimeoutError(Exception):
+    pass
+
+@contextmanager
+def time_limit(seconds):
+    def handler(signum, frame):
+        raise TimeoutError("Timed out")
+    signal.signal(signal.SIGALRM, handler)
+    signal.alarm(seconds)
+    try:
+        yield
+    finally:
+        signal.alarm(0)
 
 from newclid.agent.ddarn import DDARN
 from newclid.api import GeometricSolver, GeometricSolverBuilder
@@ -35,11 +53,19 @@ class GeometryProblemWorker:
 
     @staticmethod
     def _process_single_problem(args: tuple) -> tuple[list, dict]:
-        """Process a single geometry problem."""
+        """Process a single geometry problem with unique seed."""
         try:
-            pid, fl_statement, timeout = args
+            pid, seed, n_clauses, timeout = args
             start_time = time.time()
-
+            
+            # geneate fl_statement
+            clauses_generator = CompoundClauseGen(seed=seed)
+            try:
+                with time_limit(10):
+                    fl_statement = clauses_generator.generate(n_clauses)
+            except TimeoutError:
+                return [], {}
+            
             # Build solver
             solver, solver_builder = GeometryProblemWorker._build_solver(fl_statement)
             if not solver:
