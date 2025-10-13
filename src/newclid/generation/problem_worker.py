@@ -49,7 +49,14 @@ class GeometryProblemWorker:
 
     @ray.remote(num_cpus=1, max_retries=0)
     def ray_process_single_problem(args):
-        return GeometryProblemWorker._process_single_problem(args)
+        try:
+            return GeometryProblemWorker._process_single_problem(args)
+        except MemoryError as e:
+            logging.error(f"⚠️ Worker OOM killed: {e}")
+            return [], {'error': 'oom'}
+        except Exception as e:
+            logging.error(f"Worker error: {e}")
+            return [], {'error': str(e)}
 
     @staticmethod
     def _process_single_problem(args: tuple) -> tuple[list, dict]:
