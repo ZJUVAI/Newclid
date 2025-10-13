@@ -93,25 +93,36 @@ class GeometryGenerator:
             done, _ = ray.wait(list(pending_tasks.keys()), num_returns=1, timeout=10)
             
             if done:
-                data, summary = ray.get(done[0])
-                del pending_tasks[done[0]]
+                task_id = done[0]
+                task_success = True
+                try:
+                    data, summary = ray.get(task_id)
+                    
+                    if 'error' in summary:
+                        task_success = False
+                except Exception as e:
+                    logging.error(f"Task failed: {e}")
+                    task_success = False
                 
-                all_data_len_raw += len(data)
-                data = self.problem_hash_filter(data, 'llm_input_renamed')
-                if data:
-                    self.write_data(data)
-                    all_data_len += len(data)
-                    summary_reporter.add(summary)
-                    elapsed_time = time.time() - start_time
-                    logging.info(
-                        f"{millify(all_data_len)}/{millify(self.n_samples)} (+{len(data):3d}) in {elapsed_time:5.0f}s | "
-                        f"Total: {summary['total_time']:3.0f}s = "
-                        f"DDAR: {summary['runtime']:2.0f} + "
-                        f"Chk: {summary['checkgoals_runtime']:2.0f} + "
-                        f"Proc: {summary['process_goal_runtime']:3.0f} | "
-                        f"Speed (raw): {all_data_len/elapsed_time:3.0f} ({all_data_len_raw/elapsed_time:3.0f}) samp/s | "
-                        f"ETA: {timedelta(seconds=int(self.n_samples/all_data_len*elapsed_time - elapsed_time))}"
-                    )
+                del pending_tasks[task_id]
+                
+                if task_success:
+                    all_data_len_raw += len(data)
+                    data = self.problem_hash_filter(data, 'llm_input_renamed')
+                    if data:
+                        self.write_data(data)
+                        all_data_len += len(data)
+                        summary_reporter.add(summary)
+                        elapsed_time = time.time() - start_time
+                        logging.info(
+                            f"{millify(all_data_len)}/{millify(self.n_samples)} (+{len(data):3d}) in {elapsed_time:5.0f}s | "
+                            f"Total: {summary['total_time']:3.0f}s = "
+                            f"DDAR: {summary['runtime']:2.0f} + "
+                            f"Chk: {summary['checkgoals_runtime']:2.0f} + "
+                            f"Proc: {summary['process_goal_runtime']:3.0f} | "
+                            f"Speed (raw): {all_data_len/elapsed_time:3.0f} ({all_data_len_raw/elapsed_time:3.0f}) samp/s | "
+                            f"ETA: {timedelta(seconds=int(self.n_samples/all_data_len*elapsed_time - elapsed_time))}"
+                        )
             for task, s_time in list(pending_tasks.items()):
                 if time.time() - s_time > self.timeout:
                     print(f"⚠️ Task {task} timeout. Canceling")
