@@ -52,6 +52,7 @@ swift sft \
 datasets=(
     "dev_jgex.txt" 
     "dev_imo.txt"
+    "imo_102_requires_aux.txt"
 )
 
 # Decoding configurations (decoding_size beam_size)
