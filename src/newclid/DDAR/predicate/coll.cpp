@@ -71,7 +71,7 @@ bool Coll::is_between() const
 {
     // 判断三点是否共线
     double cross = (_b.y() - _a.y()) * (_c.x() - _a.x()) - (_b.x() - _a.x()) * (_c.y() - _a.y());
-    if (fabs(cross) > 1e-9)  // 不共线
+    if (fabs(cross) > 1e-9) // 不共线
         return false;
 
     // 判断b是否在a和c之间（不包含端点）

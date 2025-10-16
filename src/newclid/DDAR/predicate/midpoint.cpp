@@ -12,7 +12,7 @@ Midp::Midp(const vector<statement_arg> &args) : _left(args[0].point), _middle(ar
 
 string Midp::name() const
 {
-    return "midpoint";
+    return "midp";
 }
 
 vector<Point> Midp::points() const

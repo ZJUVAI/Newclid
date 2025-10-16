@@ -22,3 +22,13 @@ string Statement::to_string() const
     }
     return res;
 }
+
+vector<string> Statement::to_tokens() const
+{
+    vector<string> tokens = {name()};
+    for (const auto &pt : points())
+    {
+        tokens.push_back(pt.name());
+    }
+    return tokens;
+}

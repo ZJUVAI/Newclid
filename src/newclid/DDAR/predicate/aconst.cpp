@@ -58,3 +58,14 @@ Equation<Slope> *AConst::as_equation_slope() const
 {
     return new Equation<Slope>(Equation<Slope>::sub_eq_const(_angle.right_side(), _angle.left_side(), _rhs));
 }
+
+vector<string> AConst::to_tokens() const
+{
+    vector<string> tokens = {"aconst"};
+    for (const auto &pt : points())
+    {
+        tokens.push_back(pt.name());
+    }
+    tokens.push_back(_rhs.to_string() + "pi");
+    return tokens;
+}

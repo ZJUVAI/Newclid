@@ -44,6 +44,8 @@ public:
 
     std::string to_string() const override;
 
+    std::vector<std::string> to_tokens() const;
+
 private:
     Dist _left;
     Dist _right;

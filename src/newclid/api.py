@@ -28,6 +28,7 @@ from newclid.statement import Statement
 from newclid.tools import atomize
 from newclid.webapp import pull_to_server
 from newclid.numerical.geometries import PointNum
+from newclid.dependencies.dependency import Dependency
 from newclid.DDAR.build import DDAR
 
 
@@ -43,10 +44,11 @@ class GeometricSolver:
         self.run_infos: dict[str, Any] = {}
 
     def run(self, timeout: int = 3600) -> bool:
-        infos = self.deductive_agent.run(proof=self.proof, rules=self.rules, timeout=timeout)
+        infos = self.deductive_agent.run(
+            proof=self.proof, rules=self.rules, timeout=timeout)
         self.run_infos = infos
         return infos["success"]
-        
+
         # infos = run_loop(self.deductive_agent, proof=self.proof, rules=self.rules, timeout=timeout)
         # self.run_infos = infos
         # return infos["success"]
@@ -102,7 +104,8 @@ class GeometricSolverBuilder:
 
     def build(self, max_attempts: int = 10000) -> "GeometricSolver":
         if self.problemJGEX:
-            logging.debug(f"Use problemJGEX {self.problemJGEX} to build the proof state")
+            logging.debug(
+                f"Use problemJGEX {self.problemJGEX} to build the proof state")
             proof_state = ProofState.build_problemJGEX(
                 problemJGEX=self.problemJGEX,
                 defsJGEX=self.defs,
@@ -121,7 +124,7 @@ class GeometricSolverBuilder:
             )
         if self.deductive_agent is None:
             self.deductive_agent = DDARN()
-        
+
         if isinstance(self.deductive_agent, LMAgent):
             self.deductive_agent.problemJGEX = self.problemJGEX
 
@@ -168,11 +171,13 @@ class GeometricSolverBuilder:
     def load_defs_from_file(self, defs_path: Optional[Path] = None) -> Self:
         if defs_path is None:
             defs_path = default_defs_path()
-        self._defs = DefinitionJGEX.to_dict(DefinitionJGEX.parse_txt_file(defs_path))
+        self._defs = DefinitionJGEX.to_dict(
+            DefinitionJGEX.parse_txt_file(defs_path))
         return self
 
     def load_defs_from_txt(self, defs_txt: str) -> Self:
-        self._defs = DefinitionJGEX.to_dict(DefinitionJGEX.parse_text(defs_txt))
+        self._defs = DefinitionJGEX.to_dict(
+            DefinitionJGEX.parse_text(defs_txt))
         return self
 
     def with_deductive_agent(self, deductive_agent: DeductiveAgent) -> Self:
@@ -261,13 +266,28 @@ class CSolver:
         :return: bool 表示是否成功求解。
         """
         print(f"[CSolver] Running DDAR for problem {self.problem_name} ...")
-        DDAR.run_ddar(self.problem_name, self.points, self.premises, self.goals)
+        solved, dep_graph = DDAR.run_ddar(
+            self.problem_name, self.points, self.premises, self.goals)
 
-        print(f"[CSolver] Running geometric solver ...")
-        solved = self.solver.run()
+        for stmt, deps, reason in dep_graph:
+            conclusion = Statement.from_tokens(
+                stmt, self.solver.proof.dep_graph)
+            why = []
+            for dep in deps:
+                premise = Statement.from_tokens(
+                    dep, self.solver.proof.dep_graph)
+                why.append(premise)
+            dep = Dependency.mk(conclusion, reason, tuple(why))
+            self.solver.proof.dep_graph.hyper_graph[conclusion] = dep
+
+        print(self.solver.proof.check_goals())
+
+        # print(f"[CSolver] Running geometric solver ...")
+        # solved = self.solver.run()
 
         if solved:
-            print(f"[CSolver] Problem {self.problem_name} solved successfully ✅")
+            print(
+                f"[CSolver] Problem {self.problem_name} solved successfully ✅")
             if save_path:
                 out_path = Path(save_path)
                 self.solver.write_proof_steps(out_path)

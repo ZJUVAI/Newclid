@@ -43,6 +43,8 @@ public:
 
     virtual std::string to_string() const;
 
+    virtual std::vector<std::string> to_tokens() const;
+
     virtual Equation<Dist> *as_equation_dist() const { return nullptr; }
 
     virtual Equation<Slope> *as_equation_slope() const { return nullptr; }

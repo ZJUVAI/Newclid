@@ -15,10 +15,12 @@
 namespace py = pybind11;
 using namespace std;
 
-using DepGraph = map<string, pair<vector<string>, string>>;
+using StatementTokens = vector<string>;
+using DepGraph = vector<tuple<StatementTokens, vector<StatementTokens>, string>>;
 
-extern "C" {
-    bool run_ddar(string name, vector<tuple<string, double, double>> points, vector<pair<string, vector<string>>> premises, vector<pair<string, vector<string>>> goals)
+extern "C"
+{
+    pair<bool, DepGraph> run_ddar(string name, vector<tuple<string, double, double>> points, vector<pair<string, vector<string>>> premises, vector<pair<string, vector<string>>> goals)
     {
         Problem problem;
         problem.load_from_data(name, points, premises, goals);
@@ -53,28 +55,9 @@ extern "C" {
             cout << "Not solved!" << endl;
         }
 
-        // DepGraph dep_graph = solver.dependency_graph();
+        DepGraph dep_graph = solver.dependency_graph();
 
-        // int count = 0;
-        // for (const auto &[key, value] : dep_graph)
-        // {
-        //     count++;
-        //     if (value.second.substr(0, 9) == "Numerical" || value.second.substr(0, 10) == "Assumption")
-        //     {
-        //         continue;
-        //     }
-        //     cout << "[" << count << "]" << endl;
-        //     cout << "Statement: " << key << endl;
-        //     cout << "  Reason: " << value.second << endl;
-        //     cout << "  Dependencies: ";
-        //     for (const auto &dep : value.first)
-        //     {
-        //         cout << dep << "; ";
-        //     }
-        //     cout << endl;
-        // }
-
-        return solver.is_solved();
+        return make_pair(solver.is_solved(), dep_graph);
     }
 }
 
