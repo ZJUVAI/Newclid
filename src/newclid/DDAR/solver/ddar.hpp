@@ -72,7 +72,7 @@ public:
 
     void add_established_equations(Proof *pf);
 
-    std::map<std::string, std::pair<std::vector<std::string>, std::string>> dependency_graph() const;
+    std::vector<std::tuple<std::vector<std::string>, std::vector<std::vector<std::string>>, std::string>> dependency_graph() const;
 
     template <typename VarT>
     std::pair<Rational, ReducedEquation<VarT> *> insert_equation(const std::unique_ptr<Statement> &pf);

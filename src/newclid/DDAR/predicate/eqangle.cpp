@@ -196,3 +196,17 @@ bool EqAngle::operator>=(const EqAngle &other) const
 {
     return !(*this < other);
 }
+
+vector<string> EqAngle::to_tokens() const
+{
+    vector<string> tokens = {"eqangle"};
+    tokens.push_back(_left.left().name());
+    tokens.push_back(_left.vertex().name());
+    tokens.push_back(_left.vertex().name());
+    tokens.push_back(_left.right().name());
+    tokens.push_back(_right.left().name());
+    tokens.push_back(_right.vertex().name());
+    tokens.push_back(_right.vertex().name());
+    tokens.push_back(_right.right().name());
+    return tokens;
+}

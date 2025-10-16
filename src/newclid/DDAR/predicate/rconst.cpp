@@ -71,3 +71,14 @@ string RConst::to_string() const
     res += " " + _ratio.to_string();
     return res;
 }
+
+vector<string> RConst::to_tokens() const
+{
+    vector<string> res = {"rconst"};
+    for (const auto &pt : points())
+    {
+        res.push_back(pt.name());
+    }
+    res.push_back(_ratio.to_string());
+    return res;
+}

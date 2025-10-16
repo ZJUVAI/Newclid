@@ -159,9 +159,9 @@ Proof *DDARSolver::insert_statement(const unique_ptr<Statement> &p)
     return it->second;
 }
 
-map<string, pair<vector<string>, string>> DDARSolver::dependency_graph() const
+vector<tuple<vector<string>, vector<vector<string>>, string>> DDARSolver::dependency_graph() const
 {
-    map<string, pair<vector<string>, string>> res;
+    vector<tuple<vector<string>, vector<vector<string>>, string>> res;
 
     for (const auto &pf : _checked_statements)
     {
@@ -170,12 +170,12 @@ map<string, pair<vector<string>, string>> DDARSolver::dependency_graph() const
             cout << "?????" << endl;
             continue;
         }
-        vector<string> deps;
+        vector<vector<string>> deps;
         for (const auto &dep : pf->get_dependencies())
         {
-            deps.push_back(dep->statement()->normalize()->to_string());
+            deps.push_back(dep->statement()->normalize()->to_tokens());
         }
-        res[pf->statement()->normalize()->to_string()] = {deps, pf->reason()};
+        res.push_back({pf->statement()->normalize()->to_tokens(), deps, pf->reason()});
     }
 
     return res;
