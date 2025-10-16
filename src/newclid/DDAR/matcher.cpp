@@ -1,0 +1,554 @@
+#include "matcher.hpp"
+#include "numerical.hpp"
+#include "theorem.hpp"
+#include "problem.hpp"
+#include "type/dist.hpp"
+#include "predicate/congruent_triangles.hpp"
+#include <algorithm>
+#include <tuple>
+#include <vector>
+
+using namespace std;
+
+Matcher::Matcher(Problem *prob) : _problem(prob)
+{
+    match_similar_triangles();
+    match_between();
+    match_equal_angles();
+    match_circles();
+    match_orthocenters();
+}
+
+vector<tuple<double, double, Triangle>> Matcher::all_triangles()
+{
+    vector<tuple<double, double, Triangle>> res;
+    const size_t num_pts = _problem->num_points();
+    res.reserve(num_pts * (num_pts - 1) * (num_pts - 2) / 6);
+    for (const auto &pt_a : _problem->points())
+    {
+        for (const auto &pt_b : _problem->points())
+        {
+            if (pt_a.is_close(pt_b))
+            {
+                continue;
+            }
+            for (const auto &pt_c : _problem->points())
+            {
+                if (Coll(pt_a, pt_b, pt_c).check_equations())
+                {
+                    continue;
+                }
+                double const ab = Dist(pt_a, pt_b).to_double();
+                double const ac = Dist(pt_a, pt_c).to_double();
+                double const bc = Dist(pt_b, pt_c).to_double();
+                if (ab > (1 + REL_TOL) * bc || bc > (1 + REL_TOL) * ac)
+                {
+                    continue;
+                }
+                res.emplace_back(ab / ac,
+                                 ab / bc,
+                                 Triangle(pt_a, pt_b, pt_c));
+            }
+        }
+    }
+    return res;
+}
+
+void Matcher::on_similar_triangles(const SimilarTriangles &simtri)
+{
+    for (const auto &rotated : simtri.cyclic_rotations())
+    {
+        insert_theorem(Theorem::similar_triangles_of_sas(rotated));
+    }
+
+    insert_theorem(Theorem::similar_triangles_properties(simtri));
+    insert_theorem(Theorem::similar_triangles_of_aa(simtri));
+    insert_theorem(Theorem::similar_triangles_of_sss(simtri));
+
+    CongruentTriangles const congtri(simtri.left(), simtri.right(), simtri.sameclock());
+    if (congtri.check_numerically())
+    {
+        for (const auto &rotated : congtri.cyclic_rotations())
+        {
+            insert_theorem(Theorem::congruent_triangles_of_cong(rotated));
+            insert_theorem(Theorem::congruent_triangles_properties(rotated));
+        }
+    }
+}
+
+void Matcher::match_similar_triangles()
+{
+    using item_type = tuple<double, double, Triangle>;
+    vector<item_type> triangles = all_triangles();
+
+    if (triangles.empty())
+    {
+        return;
+    }
+
+    sort(triangles.begin(), triangles.end(),
+         [](const item_type &a, const item_type &b)
+         {
+             if (!Numerical::close_enough(get<0>(a), get<0>(b)))
+             {
+                 return get<0>(a) < get<0>(b);
+             }
+             else
+             {
+                 return get<1>(a) < get<1>(b);
+             }
+         });
+
+    vector<item_type> bucket;
+    bucket.push_back(triangles[0]);
+
+    for (size_t i = 1; i < triangles.size(); i++)
+    {
+        const auto &prev = bucket.back();
+        const auto &curr = triangles[i];
+        if (Numerical::close_enough(get<0>(prev), get<0>(curr)) &&
+            Numerical::close_enough(get<1>(prev), get<1>(curr)))
+        {
+            bucket.push_back(curr);
+        }
+        else
+        {
+            if (bucket.size() > 1)
+            {
+                size_t n = bucket.size();
+                for (size_t left = 0; left < n; left++)
+                {
+                    double area_left = get<2>(bucket[left]).area();
+                    for (size_t right = left + 1; right < n; right++)
+                    {
+                        double area_right = get<2>(bucket[right]).area();
+                        bool sameclock = (area_left > 0) == (area_right > 0);
+                        on_similar_triangles({get<2>(bucket[left]), get<2>(bucket[right]), sameclock});
+                    }
+                }
+            }
+            bucket.clear();
+            bucket.push_back(curr);
+        }
+    }
+
+    if (bucket.size() > 1)
+    {
+        size_t n = bucket.size();
+        for (size_t left = 0; left < n; left++)
+        {
+            double area_left = get<2>(bucket[left]).area();
+            for (size_t right = left + 1; right < n; right++)
+            {
+                double area_right = get<2>(bucket[right]).area();
+                bool sameclock = (area_left > 0) == (area_right > 0);
+                on_similar_triangles({get<2>(bucket[left]), get<2>(bucket[right]), sameclock});
+            }
+        }
+    }
+}
+
+vector<tuple<double, Coll>> Matcher::all_betweens()
+{
+    vector<tuple<double, Coll>> res;
+    const size_t num_pts = _problem->num_points();
+    res.reserve(num_pts * (num_pts - 1) / 2);
+    for (const auto &right : _problem->points())
+    {
+        for (const auto &left : _problem->points())
+        {
+            for (const auto &middle : _problem->points())
+            {
+                if (left.is_close(middle) || middle.is_close(right))
+                {
+                    continue;
+                }
+                Coll const pred(left, middle, right);
+                if (!pred.is_between())
+                {
+                    continue;
+                }
+                double const dist_left = Dist(left, middle).to_double();
+                double const dist_right = Dist(middle, right).to_double();
+                if (dist_left <= (1 + REL_TOL) * dist_right)
+                {
+                    res.emplace_back(dist_left / (dist_left + dist_right), pred);
+                }
+            }
+        }
+    }
+    return res;
+}
+
+void Matcher::on_between(const Coll &coll)
+{
+    for (const auto &rotated : coll.cyclic_rotations())
+    {
+        insert_theorem(Theorem::coll_of_para(rotated));
+        insert_theorem(Theorem::para_of_coll(rotated));
+    }
+}
+
+void Matcher::on_midpoint(const Midp &midp)
+{
+    insert_theorem(Theorem::midpoint_ratio_dist(midp));
+    insert_theorem(Theorem::midpoint_of_coll_cong(midp));
+    insert_theorem(Theorem::coll_cong_of_midpoint(midp));
+}
+
+void Matcher::on_eqratio(const Coll &left, const Coll &right)
+{
+    auto l = left.cyclic_rotations();
+    auto r = right.cyclic_rotations();
+    insert_theorem(Theorem::eqratio_of_coll(l[0], r[0]));
+    insert_theorem(Theorem::eqratio_of_coll(l[1], r[1]));
+    insert_theorem(Theorem::eqratio_of_coll(l[2], r[2]));
+
+    if(left.a() == right.a())
+    {
+        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(left, right));
+        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.a(), left.c(), left.b()), Coll(right.a(), right.c(), right.b())));
+        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(left, right));
+        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.a(), left.c(), left.b()), Coll(right.a(), right.c(), right.b())));
+    }
+    else if(left.b() == right.b())
+    {
+        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.b(), left.a(), left.c()), Coll(right.b(), right.a(), right.c())));
+        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.b(), left.c(), left.a()), Coll(right.b(), right.c(), right.a())));
+        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.b(), left.a(), left.c()), Coll(right.b(), right.a(), right.c())));
+        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.b(), left.c(), left.a()), Coll(right.b(), right.c(), right.a())));
+    }
+    else if(left.c() == right.c())
+    {
+        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.c(), left.a(), left.b()), Coll(right.c(), right.a(), right.b())));
+        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.c(), left.b(), left.a()), Coll(right.c(), right.b(), right.a())));
+        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.c(), left.a(), left.b()), Coll(right.c(), right.a(), right.b())));
+        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.c(), left.b(), left.a()), Coll(right.c(), right.b(), right.a())));
+    }
+
+    Thales const thales(left, right);
+    if (!thales.check_numerically())
+    {
+        return;
+    }
+    for (const auto &rotated : thales.permutations())
+    {
+        insert_theorem(Theorem::thales_para_of_eqratio(rotated));
+    }
+    insert_theorem(Theorem::thales_eqratio_of_para(thales));
+}
+
+void Matcher::match_between()
+{
+    using item_type = tuple<double, Coll>;
+    vector<item_type> betweens = all_betweens();
+
+    if (betweens.empty())
+    {
+        return;
+    }
+
+    sort(betweens.begin(), betweens.end(),
+         [](const item_type &a, const item_type &b)
+         {
+             return get<0>(a) < get<0>(b);
+         });
+
+    for (size_t i = 0; i < betweens.size(); i++)
+    {
+        const auto &curr = betweens[i];
+        on_between(get<1>(curr));
+        if (Numerical::close_enough(get<0>(curr), 0.5))
+        {
+            auto base = get<1>(curr);
+            on_midpoint(Midp(base.a(), base.b(), base.c()));
+        }
+    }
+
+    vector<item_type> bucket;
+    bucket.push_back(betweens[0]);
+
+    for (size_t i = 1; i < betweens.size(); i++)
+    {
+        const auto &prev = bucket.back();
+        const auto &curr = betweens[i];
+        if (Numerical::close_enough(get<0>(prev), get<0>(curr)))
+        {
+            bucket.push_back(curr);
+        }
+        else
+        {
+            if (bucket.size() > 1)
+            {
+                for (size_t left = 0; left < bucket.size(); left++)
+                {
+                    for (size_t right = left + 1; right < bucket.size(); right++)
+                    {
+                        on_eqratio(get<1>(bucket[left]), get<1>(bucket[right]));
+                    }
+                }
+            }
+            bucket.clear();
+            bucket.push_back(curr);
+        }
+    }
+
+    if (bucket.size() > 1)
+    {
+        for (size_t left = 0; left < bucket.size(); left++)
+        {
+            for (size_t right = left + 1; right < bucket.size(); right++)
+            {
+                on_eqratio(get<1>(bucket[left]), get<1>(bucket[right]));
+            }
+        }
+    }
+}
+
+vector<tuple<double, Angle>> Matcher::all_angles()
+{
+    vector<tuple<double, Angle>> res;
+    const size_t num_pts = _problem->num_points();
+    res.reserve(num_pts * (num_pts - 1) / 2);
+    for (const auto &left : _problem->points())
+    {
+        for (const auto &vertex : _problem->points())
+        {
+            for (const auto &right : _problem->points())
+            {
+                if (!Coll(left, vertex, right).check_numerically())
+                {
+                    Angle const ang(left, vertex, right);
+                    res.emplace_back(ang.angle(), ang);
+                }
+            }
+        }
+    }
+    return res;
+}
+
+void Matcher::on_cyclic(const Cyclic &cyclic)
+{
+    for (const auto &rotated : cyclic.permutation())
+    {
+        insert_theorem(Theorem::cyclic_of_equal_angles(rotated));
+    }
+    insert_theorem(Theorem::cyclic_properties(cyclic));
+}
+
+void Matcher::on_bisector(const Point &pt, const Angle &ang)
+{
+    insert_theorem(Theorem::triangle_bisector_of_eqratio(pt, ang));
+    insert_theorem(Theorem::triangle_bisector_of_equal_angles(pt, ang));
+    insert_theorem(Theorem::incenter(pt, ang));
+}
+
+void Matcher::on_eqangle(const Angle &left, const Angle &right)
+{
+    // ∠ABD = ∠ACD
+    if (left.left() == right.left() && left.right() == right.right() && left.left() < left.right() && left.vertex() < left.left() && right.vertex() < right.left())
+    {
+        on_cyclic({left.vertex(), right.vertex(), left.left(), left.right()});
+    }
+
+    // ∠ABC = ∠CBD, A ≠ D
+    if (left.vertex() == right.vertex())
+    {
+        if (left.right() == right.left() && left.left() < right.right())
+        {
+            on_bisector(left.right(), {left.left(), left.vertex(), right.right()});
+        }
+        else if (left.left() == right.right() && right.left() < left.right())
+        {
+            on_bisector(left.left(), {right.left(), left.vertex(), left.right()});
+        }
+    }
+}
+
+void Matcher::match_equal_angles()
+{
+    using item_type = tuple<double, Angle>;
+    vector<item_type> angles = all_angles();
+
+    if (angles.empty())
+    {
+        return;
+    }
+
+    sort(angles.begin(), angles.end(),
+         [](const item_type &a, const item_type &b)
+         {
+             return get<0>(a) < get<0>(b);
+         });
+
+    vector<item_type> bucket;
+    bucket.push_back(angles[0]);
+    for (size_t i = 1; i < angles.size(); i++)
+    {
+        const auto &prev = bucket.back();
+        const auto &curr = angles[i];
+        if (Numerical::close_enough(get<0>(prev), get<0>(curr)))
+        {
+            bucket.push_back(curr);
+        }
+        else
+        {
+            if (bucket.size() > 1)
+            {
+                for (size_t left = 0; left < bucket.size(); left++)
+                {
+                    for (size_t right = left + 1; right < bucket.size(); right++)
+                    {
+                        on_eqangle(get<1>(bucket[left]), get<1>(bucket[right]));
+                    }
+                }
+            }
+            bucket.clear();
+            bucket.push_back(curr);
+        }
+    }
+
+    if (bucket.size() > 1)
+    {
+        for (size_t left = 0; left < bucket.size(); left++)
+        {
+            for (size_t right = left + 1; right < bucket.size(); right++)
+            {
+                on_eqangle(get<1>(bucket[left]), get<1>(bucket[right]));
+            }
+        }
+    }
+}
+
+void Matcher::on_circumcenter(const CircumCenter &circumcenter)
+{
+    insert_theorem(Theorem::cong_of_circumcenter(circumcenter));
+    insert_theorem(Theorem::circumcenter_of_cong(circumcenter));
+}
+
+void Matcher::on_quadrangle_circumcenter(const Point &center, const Cyclic &cyc)
+{
+    insert_theorem(Theorem::cong_of_circumcenter_of_cyclic({center, Triangle(cyc.a(), cyc.b(), cyc.c())}, cyc.d()));
+    insert_theorem(Theorem::cong_of_circumcenter_of_cyclic({center, Triangle(cyc.b(), cyc.c(), cyc.d())}, cyc.a()));
+    insert_theorem(Theorem::cong_of_circumcenter_of_cyclic({center, Triangle(cyc.c(), cyc.d(), cyc.a())}, cyc.b()));
+    insert_theorem(Theorem::cong_of_circumcenter_of_cyclic({center, Triangle(cyc.d(), cyc.a(), cyc.b())}, cyc.c()));
+    insert_theorem(Theorem::center_of_cyclic_of_cong_of_cong(cyc, center));
+    insert_theorem(Theorem::center_of_cyclic_of_cong_of_cong(Cyclic(cyc.a(), cyc.c(), cyc.b(), cyc.d()), center));
+    insert_theorem(Theorem::center_of_cyclic_of_cong_of_cong(Cyclic(cyc.a(), cyc.d(), cyc.b(), cyc.c()), center));
+}
+
+void Matcher::on_circle(const Point &center, const vector<pair<double, Point>> &points)
+{
+    size_t const size = points.size();
+    for (size_t pt_a = 0; pt_a < size; pt_a++)
+    {
+        for (size_t pt_b = pt_a + 1; pt_b < size; pt_b++)
+        {
+            for (size_t pt_c = pt_b + 1; pt_c < size; pt_c++)
+            {
+                on_circumcenter(CircumCenter(center, Triangle(points[pt_a].second, points[pt_b].second, points[pt_c].second)));
+                for (size_t pt_d = pt_c + 1; pt_d < size; pt_d++)
+                {
+                    on_quadrangle_circumcenter(center, {points[pt_a].second, points[pt_b].second, points[pt_c].second, points[pt_d].second});
+                }
+            }
+        }
+    }
+    for(size_t pt_a = 0; pt_a < size; pt_a++)
+    {
+        for (size_t pt_b = pt_a + 1; pt_b < size; pt_b++)
+        {
+            if (Coll(points[pt_a].second, points[pt_b].second, center).check_numerically())
+            {
+                for(size_t pt_c = 0; pt_c < size; pt_c++)
+                {
+                    if(pt_c != pt_a && pt_c != pt_b)
+                    {
+                        insert_theorem(Theorem::hypotenuse_is_diameter(Midp(points[pt_a].second, center, points[pt_b].second), points[pt_c].second));
+                    }
+                }
+            }
+        }
+    }
+}
+
+void Matcher::match_circles()
+{
+    using item_type = pair<double, Point>;
+    const size_t num_pts = _problem->num_points();
+    for (const Point &center : _problem->points())
+    {
+
+        vector<item_type> pts;
+        pts.reserve(num_pts - 1);
+        for (const Point &pt : _problem->points())
+        {
+            if (!center.is_close(pt))
+            {
+                pts.emplace_back(Dist(center, pt).to_double(), pt);
+            }
+        }
+
+        sort(pts.begin(), pts.end(), [](const item_type &a, const item_type &b)
+             { return a.first < b.first; });
+
+        vector<item_type> bucket;
+        bucket.push_back(pts[0]);
+        for (size_t i = 1; i < pts.size(); i++)
+        {
+            const auto &prev = bucket.back();
+            const auto &curr = pts[i];
+            if (Numerical::close_enough(prev.first, curr.first))
+            {
+                bucket.push_back(curr);
+            }
+            else
+            {
+                if (bucket.size() > 1)
+                {
+                    on_circle(center, bucket);
+                }
+                bucket.clear();
+                bucket.push_back(curr);
+            }
+        }
+
+        if (bucket.size() > 1)
+        {
+            on_circle(center, bucket);
+        }
+    }
+}
+
+void Matcher::match_orthocenters()
+{
+    for (const auto &pt_d : _problem->points())
+    {
+        for (const auto &pt_c : _problem->points())
+        {
+            for (const auto &pt_b : _problem->points())
+            {
+                for (const auto &pt_a : _problem->points())
+                {
+                    OrthoCenter const ortho(pt_d, Triangle(pt_a, pt_b, pt_c));
+                    if (ortho.check_numerically())
+                    {
+                        for (const auto &rotated : ortho.cyclic_rotations())
+                        {
+                            insert_theorem(Theorem::orthocenter(rotated));
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+void Matcher::insert_theorem(const Theorem &thm)
+{
+    if (!thm.check_numerically())
+    {
+        return;
+    }
+    _theorems.push_back(thm.normalize());
+}
