@@ -1,8 +1,9 @@
 from __future__ import annotations
 import logging
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, List, Tuple
 from typing_extensions import Self
+from fractions import Fraction
 
 
 from newclid.agent.ddarn import DDARN
@@ -26,6 +27,8 @@ import numpy as np
 from newclid.statement import Statement
 from newclid.tools import atomize
 from newclid.webapp import pull_to_server
+from newclid.numerical.geometries import PointNum
+from newclid.DDAR.build import DDAR
 
 
 class GeometricSolver:
@@ -195,3 +198,94 @@ class GeometricSolverBuilder:
     def with_problem_path(self, path: Path) -> Self:
         self.problem_path = path
         return self
+
+
+class CSolver:
+    def __init__(self, problem: str, problem_name: str = "anonymity", seed: int = 123):
+        self.problem = problem
+        self.problem_name = problem_name
+        self.seed = seed
+
+        # 构建 solver
+        self.solver = (
+            GeometricSolverBuilder(self.seed)
+            .load_problem_from_txt(self.problem)
+            .build()
+        )
+
+        # 提取信息
+        self.points: List[Tuple[str, Any, Any]] = []
+        self.premises: List[Tuple[str, List[str]]] = []
+        self.goals: List[Tuple[str, List[str]]] = []
+
+        self._extract_points()
+        self._extract_premises()
+        self._extract_goals()
+
+    # -------------------- 内部方法 -------------------- #
+    def _extract_points(self):
+        """提取几何点"""
+        for name, point in self.solver.proof.symbols_graph.name2node.items():
+            if isinstance(point.num, PointNum):
+                self.points.append((name, point.num.x, point.num.y))
+
+    def _extract_premises(self):
+        """提取前提"""
+        for stmt in self.solver.proof.dep_graph.hyper_graph:
+            predicate = stmt.predicate.NAME
+            args = []
+            for pt in stmt.args:
+                if isinstance(pt, Fraction):
+                    args.append(str(pt))
+                else:
+                    args.append(pt.name)
+            self.premises.append((predicate, args))
+
+    def _extract_goals(self):
+        """提取目标"""
+        for stmt in self.solver.proof.goals:
+            predicate = stmt.predicate.NAME
+            args = []
+            for pt in stmt.args:
+                if isinstance(pt, Fraction):
+                    args.append(str(pt))
+                else:
+                    args.append(pt.name)
+            self.goals.append((predicate, args))
+
+    # -------------------- 核心方法 -------------------- #
+    def run(self, save_path: str | Path | None = None) -> bool:
+        """
+        运行 DDAR 并执行求解。
+        :param save_path: 可选，保存证明步骤的路径。
+        :return: bool 表示是否成功求解。
+        """
+        print(f"[CSolver] Running DDAR for problem {self.problem_name} ...")
+        DDAR.run_ddar(self.problem_name, self.points, self.premises, self.goals)
+
+        print(f"[CSolver] Running geometric solver ...")
+        solved = self.solver.run()
+
+        if solved:
+            print(f"[CSolver] Problem {self.problem_name} solved successfully ✅")
+            if save_path:
+                out_path = Path(save_path)
+                self.solver.write_proof_steps(out_path)
+                print(f"[CSolver] Proof steps written to {out_path}")
+        else:
+            print(f"[CSolver] Problem {self.problem_name} failed to solve ❌")
+
+        return solved
+
+    # -------------------- 辅助输出 -------------------- #
+    def print_info(self):
+        """打印提取的几何点、前提与目标"""
+        print("\n[Points]")
+        for p in self.points:
+            print(p)
+        print("\n[Premises]")
+        for pr in self.premises:
+            print(pr)
+        print("\n[Goals]")
+        for g in self.goals:
+            print(g)
