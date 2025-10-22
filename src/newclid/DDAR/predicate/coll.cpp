@@ -123,3 +123,8 @@ Equation<Slope> *Coll::as_equation_slope() const
 {
     return new Equation<Slope>(Equation<Slope>::sub_eq_const(Slope(_a, _b), Slope(_a, _c), Rational(0)));
 }
+
+Coll Coll::reverse() const
+{
+    return {_c, _b, _a};
+}
