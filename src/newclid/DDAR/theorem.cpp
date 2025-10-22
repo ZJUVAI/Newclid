@@ -9,6 +9,7 @@
 #include "predicate/ncoll.hpp"
 #include "predicate/npara.hpp"
 #include "predicate/orthocenter.hpp"
+#include "predicate/pappus.hpp"
 #include "predicate/para.hpp"
 #include "predicate/perp.hpp"
 #include "predicate/rconst.hpp"
@@ -263,6 +264,21 @@ Theorem Theorem::orthocenter(const OrthoCenter &p)
     return theorem;
 }
 
+Theorem Theorem::pappus(const Pappus &p)
+{
+    Theorem theorem("Pappus theorem", "r44");
+    theorem.add_hypothesis(p.coll_ab().clone());
+    theorem.add_hypothesis(p.coll_ba().clone());
+    theorem.add_hypothesis(p.coll_bc().clone());
+    theorem.add_hypothesis(p.coll_cb().clone());
+    theorem.add_hypothesis(p.coll_ca().clone());
+    theorem.add_hypothesis(p.coll_ac().clone());
+    theorem.add_hypothesis(p.left().clone());
+    theorem.add_hypothesis(p.right().clone());
+    theorem.add_conclusion(p.middle().clone());
+    return theorem;
+}
+
 Theorem Theorem::incenter(const Point &point, const Angle &angle)
 {
     Theorem theorem("Incenter theorem", "r46");
@@ -384,7 +400,7 @@ Theorem Theorem::circumcenter_of_cong(const CircumCenter &p)
 
 Theorem Theorem::congruent_triangles_of_cong(const CongruentTriangles &p)
 {
-    Theorem theorem("Congruent triangles from similarity triangles", p.sameclock() ? "r101" : "r102"); 
+    Theorem theorem("Congruent triangles from similarity triangles", p.sameclock() ? "r101" : "r102");
     theorem.add_hypothesis(make_unique<SimilarTriangles>(SimilarTriangles(p.left(), p.right(), p.sameclock())));
     theorem.add_hypothesis(p.cong_ab().clone());
     theorem.add_conclusion(p.clone());
@@ -393,7 +409,7 @@ Theorem Theorem::congruent_triangles_of_cong(const CongruentTriangles &p)
 
 Theorem Theorem::congruent_triangles_properties(const CongruentTriangles &p)
 {
-    Theorem theorem("Properties of congruent triangles", p.sameclock() ? "r103" : "r104"); 
+    Theorem theorem("Properties of congruent triangles", p.sameclock() ? "r103" : "r104");
     theorem.add_hypothesis(p.clone());
     theorem.add_conclusion(p.cong_ab().clone());
     theorem.add_conclusion(p.cong_ac().clone());

@@ -59,6 +59,8 @@ public:
     bool operator<(const Coll &other) const;
 
     Equation<Slope> *as_equation_slope() const override;
+
+    Coll reverse() const;
 };
 
 #endif // COLL_HPP

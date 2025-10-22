@@ -35,6 +35,8 @@ private:
 
     void on_similar_triangles(const SimilarTriangles &simtri);
 
+    void on_pappus(const Pappus &pappus);
+
     void on_between(const Coll &coll);
 
     void on_midpoint(const Midp &midp);

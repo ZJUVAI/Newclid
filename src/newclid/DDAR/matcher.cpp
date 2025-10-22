@@ -180,6 +180,14 @@ vector<tuple<double, Coll>> Matcher::all_betweens()
     return res;
 }
 
+void Matcher::on_pappus(const Pappus &pappus)
+{
+    for (const auto &rotated : pappus.permutations())
+    {
+        insert_theorem(Theorem::pappus(rotated));
+    }
+}
+
 void Matcher::on_between(const Coll &coll)
 {
     for (const auto &rotated : coll.cyclic_rotations())
@@ -204,21 +212,21 @@ void Matcher::on_eqratio(const Coll &left, const Coll &right)
     insert_theorem(Theorem::eqratio_of_coll(l[1], r[1]));
     insert_theorem(Theorem::eqratio_of_coll(l[2], r[2]));
 
-    if(left.a() == right.a())
+    if (left.a() == right.a())
     {
         insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(left, right));
         insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.a(), left.c(), left.b()), Coll(right.a(), right.c(), right.b())));
         insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(left, right));
         insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.a(), left.c(), left.b()), Coll(right.a(), right.c(), right.b())));
     }
-    else if(left.b() == right.b())
+    else if (left.b() == right.b())
     {
         insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.b(), left.a(), left.c()), Coll(right.b(), right.a(), right.c())));
         insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.b(), left.c(), left.a()), Coll(right.b(), right.c(), right.a())));
         insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.b(), left.a(), left.c()), Coll(right.b(), right.a(), right.c())));
         insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.b(), left.c(), left.a()), Coll(right.b(), right.c(), right.a())));
     }
-    else if(left.c() == right.c())
+    else if (left.c() == right.c())
     {
         insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.c(), left.a(), left.b()), Coll(right.c(), right.a(), right.b())));
         insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.c(), left.b(), left.a()), Coll(right.c(), right.b(), right.a())));
@@ -242,6 +250,62 @@ void Matcher::match_between()
 {
     using item_type = tuple<double, Coll>;
     vector<item_type> betweens = all_betweens();
+
+    for (size_t i = 0; i < betweens.size(); i++)
+    {
+        for (size_t j = i + 1; j < betweens.size(); j++)
+        {
+            for (size_t k = j + 1; k < betweens.size(); k++)
+            {
+                Coll left1 = get<1>(betweens[i]);
+                Coll middle1 = get<1>(betweens[j]);
+                Coll right1 = get<1>(betweens[k]);
+                Coll left2 = left1.reverse();
+                Coll middle2 = middle1.reverse();
+                Coll right2 = right1.reverse();
+                Pappus p1(left1, middle1, right1);
+                Pappus p2(left1, middle1, right2);
+                Pappus p3(left1, middle2, right1);
+                Pappus p4(left1, middle2, right2);
+                Pappus p5(left2, middle1, right1);
+                Pappus p6(left2, middle1, right2);
+                Pappus p7(left2, middle2, right1);
+                Pappus p8(left2, middle2, right2);
+                if (p1.check_numerically())
+                {
+                    on_pappus(p1);
+                }
+                if (p2.check_numerically())
+                {
+                    on_pappus(p2);
+                }
+                if (p3.check_numerically())
+                {
+                    on_pappus(p3);
+                }
+                if (p4.check_numerically())
+                {
+                    on_pappus(p4);
+                }
+                if (p5.check_numerically())
+                {
+                    on_pappus(p5);
+                }
+                if (p6.check_numerically())
+                {
+                    on_pappus(p6);
+                }
+                if (p7.check_numerically())
+                {
+                    on_pappus(p7);
+                }
+                if (p8.check_numerically())
+                {
+                    on_pappus(p8);
+                }
+            }
+        }
+    }
 
     if (betweens.empty())
     {
@@ -454,15 +518,15 @@ void Matcher::on_circle(const Point &center, const vector<pair<double, Point>> &
             }
         }
     }
-    for(size_t pt_a = 0; pt_a < size; pt_a++)
+    for (size_t pt_a = 0; pt_a < size; pt_a++)
     {
         for (size_t pt_b = pt_a + 1; pt_b < size; pt_b++)
         {
             if (Coll(points[pt_a].second, points[pt_b].second, center).check_numerically())
             {
-                for(size_t pt_c = 0; pt_c < size; pt_c++)
+                for (size_t pt_c = 0; pt_c < size; pt_c++)
                 {
-                    if(pt_c != pt_a && pt_c != pt_b)
+                    if (pt_c != pt_a && pt_c != pt_b)
                     {
                         insert_theorem(Theorem::hypotenuse_is_diameter(Midp(points[pt_a].second, center, points[pt_b].second), points[pt_c].second));
                     }

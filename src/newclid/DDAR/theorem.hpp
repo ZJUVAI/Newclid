@@ -7,6 +7,7 @@
 #include "predicate/midpoint.hpp"
 #include "predicate/ncoll.hpp"
 #include "predicate/orthocenter.hpp"
+#include "predicate/pappus.hpp"
 #include "predicate/similar_triangles.hpp"
 #include "predicate/congruent_triangles.hpp"
 #include "predicate/statement.hpp"
@@ -80,7 +81,8 @@ public:
     // r43
     static Theorem orthocenter(const OrthoCenter &p);
 
-    // TODO: r44
+    // r44
+    static Theorem pappus(const Pappus &p);
 
     // r46
     static Theorem incenter(const Point &point, const Angle &angle);

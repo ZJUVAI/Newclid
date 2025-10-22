@@ -282,9 +282,6 @@ class CSolver:
 
         print(self.solver.proof.check_goals())
 
-        # print(f"[CSolver] Running geometric solver ...")
-        # solved = self.solver.run()
-
         if solved:
             print(
                 f"[CSolver] Problem {self.problem_name} solved successfully ✅")
