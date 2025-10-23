@@ -130,12 +130,12 @@ class GeometryProblemWorker:
                 'runtime': solver.run_infos['runtime'],
                 'checkgoals_runtime': checkgoals_runtime,
                 'process_goal_runtime': process_goal_time,
-                'n_samples': len(generated_data),
-                'goals': [re.search(r'\?\s*(\w+)', d['fl_problem']).group(1) for d in generated_data],
-                'first_predicate': [get_first_predicate(d['fl_problem']) for d in generated_data],
-                'n_clauses': [d['n_clauses'] for d in generated_data],
-                'n_proof_steps': [d['n_proof_steps'] for d in generated_data],
-                'n_filtered_samples': 0,  # This value is always 0 in the original code
+                'n_samples_raw': len(generated_data),
+                'goals_raw': [re.search(r'\?\s*(\w+)', d['fl_problem']).group(1) for d in generated_data],
+                'first_predicate_raw': [get_first_predicate(d['fl_problem']) for d in generated_data],
+                'n_clauses_raw': [d['n_clauses'] for d in generated_data],
+                'n_proof_steps_raw': [d['n_proof_steps'] for d in generated_data],
+                'n_filtered_samples': 0,  # This value will be updated in generate.py
             }
 
             return generated_data, summary

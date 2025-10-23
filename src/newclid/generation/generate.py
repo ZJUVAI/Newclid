@@ -5,6 +5,7 @@ import json
 import time
 from datetime import timedelta
 import ray
+import re
 from millify import millify
 import signal
 from contextlib import contextmanager
@@ -110,8 +111,14 @@ class GeometryGenerator:
                     all_data_len_raw += len(data)
                     data = self.problem_hash_filter(data, 'llm_input_renamed')
                     if data:
+                        summary['n_samples'] = len(data)
+                        summary['n_filtered_samples'] = summary['n_samples_raw'] - summary['n_samples']
+                        summary['goals'] = [re.search(r'\?\s*(\w+)', d['fl_problem']).group(1) for d in data]
+                        summary['first_predicate'] = [get_first_predicate(d['fl_problem']) for d in data]
+                        summary['n_clauses'] = [d['n_clauses'] for d in data]
+                        summary['n_proof_steps'] = [d['n_proof_steps'] for d in data]
                         self.write_data(data)
-                        all_data_len += len(data)
+                        all_data_len += summary['n_samples']
                         summary_reporter.add(summary)
                         elapsed_time = time.time() - start_time
                         logging.info(
