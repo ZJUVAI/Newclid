@@ -1,4 +1,5 @@
 from __future__ import annotations
+import logging
 from typing import TYPE_CHECKING, Any, Optional
 
 from newclid.predicates import NAME_TO_PREDICATE
@@ -116,4 +117,7 @@ class Statement:
         return newst
 
     def draw(self, ax: "Axes", rng: Generator):
-        self.predicate.draw(ax, self.args, self.dep_graph, rng)
+        try:
+            self.predicate.draw(ax, self.args, self.dep_graph, rng)
+        except Exception as e:
+            logging.warning(f"Failed to draw statement {self}: {e}")
