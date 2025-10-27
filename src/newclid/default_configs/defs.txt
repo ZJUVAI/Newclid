@@ -453,3 +453,9 @@ a : x a
  =
 x : lconst x a l
 lconst a l
+
+between_bound x a b
+x : x a b
+a b = diff a b
+x : coll x a b
+line a b
