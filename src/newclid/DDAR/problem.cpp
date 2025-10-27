@@ -165,23 +165,23 @@ void Problem::load_from_file(const string &filename)
 }
 
 void Problem::load_from_data(const string name, vector<tuple<string, double, double>> points, vector<pair<string, vector<string>>> premises, vector<pair<string, vector<string>>> goals)
-{ 
+{
     this->clear();
 
     this->set_name(name);
 
-    for(auto &p : points)
+    for (auto &p : points)
     {
         this->add_point(get<0>(p), get<1>(p), get<2>(p));
     }
 
-    for(auto &p : premises)
+    for (auto &p : premises)
     {
         auto s = create_statement(p.first, p.second);
         this->add_hypothesis(move(s));
     }
 
-    for(auto &p : goals)
+    for (auto &p : goals)
     {
         auto s = create_statement(p.first, p.second);
         this->add_goal(move(s));
@@ -194,7 +194,7 @@ unique_ptr<Statement> Problem::create_statement(const string &type, const vector
 {
     if (type == "aconst")
     {
-        if(args.size() == 4)
+        if (args.size() == 4)
         {
             Point p1 = this->find_point(args[0]);
             Point p2 = this->find_point(args[1]);
@@ -204,7 +204,7 @@ unique_ptr<Statement> Problem::create_statement(const string &type, const vector
             Rational a = Rational(p, q);
             return make_unique<AConst>(Angle(p1, p2, p3), a);
         }
-        else if(args.size() == 5)
+        else if (args.size() == 5)
         {
             Point p1 = this->find_point(args[0]);
             Point p2 = this->find_point(args[1]);
@@ -217,7 +217,7 @@ unique_ptr<Statement> Problem::create_statement(const string &type, const vector
         }
         throw runtime_error("Invalid number of arguments for " + type);
     }
-    else if (type == "circumcenter")
+    else if (type == "circle")
     {
         if (args.size() != 4)
         {
@@ -296,13 +296,13 @@ unique_ptr<Statement> Problem::create_statement(const string &type, const vector
     {
         if (args.size() == 6)
         {
-        Point p1 = this->find_point(args[0]);
-        Point p2 = this->find_point(args[1]);
-        Point p3 = this->find_point(args[2]);
-        Point p4 = this->find_point(args[3]);
-        Point p5 = this->find_point(args[4]);
-        Point p6 = this->find_point(args[5]);
-        return make_unique<EqAngle>(Angle(p1, p2, p3), Angle(p4, p5, p6));
+            Point p1 = this->find_point(args[0]);
+            Point p2 = this->find_point(args[1]);
+            Point p3 = this->find_point(args[2]);
+            Point p4 = this->find_point(args[3]);
+            Point p5 = this->find_point(args[4]);
+            Point p6 = this->find_point(args[5]);
+            return make_unique<EqAngle>(Angle(p1, p2, p3), Angle(p4, p5, p6));
         }
         else if (args.size() == 8)
         {
