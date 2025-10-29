@@ -391,8 +391,18 @@ unique_ptr<Statement> Problem::create_statement(const string &type, const vector
         Point p2 = this->find_point(args[1]);
         Point p3 = this->find_point(args[2]);
         Point p4 = this->find_point(args[3]);
-        long long p = stoll(args[4].substr(0, args[4].find('/')));
-        long long q = stoll(args[4].substr(args[4].find('/') + 1));
+        size_t slash_pos = args[4].find('/');
+        long long p = 0, q = 0;
+        if (slash_pos != string::npos)
+        {
+            p = stoll(args[4].substr(0, slash_pos));
+            q = stoll(args[4].substr(slash_pos + 1));
+        }
+        else
+        {
+            p = stoll(args[4]);
+            q = 1;
+        }
         Rational a = Rational(p, q);
         return make_unique<RConst>(Dist(p1, p2), Dist(p3, p4), a);
     }
