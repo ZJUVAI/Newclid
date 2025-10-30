@@ -77,7 +77,7 @@ class SymbolsGraph:
                 fellows = list(line.fellows)
                 fellows.sort(key=lambda x: len(x.points))
                 for line1 in fellows:
-                    if {p1, p2} < line1.points:
+                    if {p1, p2} < line1.points and p1 in line1.dep.statement.args and p2 in line1.dep.statement.args:
                         if not line1.dep:
                             raise ValueError("Dependency missing")
                         table.add_expr(
