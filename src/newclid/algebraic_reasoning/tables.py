@@ -232,6 +232,10 @@ class Table:
 
         if len(new_vars) == 0:
             if len(result) == 0:
+                self._register(vc, dep)
+                if self.verbose:
+                    logging.info(f"By {dep.pretty()} the table updates:")
+                    report(self.v2e)
                 return False
             v, e = recon(result)
             self.replace(v, e)
@@ -271,7 +275,7 @@ class Table:
             new_column[self._v2i[v], 1] -= c
 
         self._mA = np.concatenate((self._mA, new_column), 1)
-        self._c = np.concatenate((self._c, np.array([1.0, -1.0])))
+        self._c = np.concatenate((self._c, np.array([1.0, 1.0])))
         self.deps += [dep]
 
     def why(self, vc: SumCV) -> list["Dependency"]:
