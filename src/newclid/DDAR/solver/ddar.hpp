@@ -45,6 +45,10 @@ private:
 
     eqns_map_type<DistLog> _distlog_equations;
 
+    std::vector<std::tuple<double, Angle>> _angles;
+
+    std::vector<std::tuple<double, Coll>> _ratios;
+
 public:
     bool run_level(const Point &max_pt);
 

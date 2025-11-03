@@ -17,6 +17,10 @@ private:
 
     std::vector<Theorem> _theorems;
 
+    std::vector<std::tuple<double, Angle>> _angles;
+
+    std::vector<std::tuple<double, Coll>> _ratios;
+
     void match_similar_triangles();
 
     void match_between();
@@ -61,6 +65,10 @@ public:
     Matcher(Problem *prob);
 
     const std::vector<Theorem> &theorems() const { return _theorems; }
+
+    const std::vector<std::tuple<double, Angle>> &angles() const { return _angles; }
+
+    const std::vector<std::tuple<double, Coll>> &ratios() const { return _ratios; }
 };
 
 #endif // MATCHER_HPP

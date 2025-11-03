@@ -20,7 +20,7 @@ using DepGraph = vector<tuple<StatementTokens, vector<StatementTokens>, string>>
 
 extern "C"
 {
-    pair<bool, DepGraph> run_ddar(string name, vector<tuple<string, double, double>> points, vector<pair<string, vector<string>>> premises, vector<pair<string, vector<string>>> goals)
+    pair<bool, DepGraph> run_ddar(string name, vector<tuple<string, double, double>> points, vector<pair<string, vector<string>>> premises, vector<pair<string, vector<string>>> goals, int max_level = 500)
     {
         Problem problem;
         problem.load_from_data(name, points, premises, goals);
@@ -40,20 +40,20 @@ extern "C"
         //     cout << "goal " << stmt->to_string() << endl;
         // }
 
-        cout << "------------------------------------------------------------" << endl;
-        cout << "Problem: " << name << endl;
+        // cout << "------------------------------------------------------------" << endl;
+        // cout << "Problem: " << name << endl;
 
         DDARSolver solver(&problem);
-        solver.run(100);
+        solver.run(max_level);
 
-        if (solver.is_solved())
-        {
-            cout << "Solved!" << endl;
-        }
-        else
-        {
-            cout << "Not solved!" << endl;
-        }
+        // if (solver.is_solved())
+        // {
+        //     cout << "Solved!" << endl;
+        // }
+        // else
+        // {
+        //     cout << "Not solved!" << endl;
+        // }
 
         DepGraph dep_graph = solver.dependency_graph();
 
