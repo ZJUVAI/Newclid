@@ -8,32 +8,36 @@
 #include <string>
 #include <iostream>
 #include <type_traits>
+#include <cmath>
 
 using namespace std;
 
 DDARSolver::DDARSolver(Problem *problem) : _problem(problem)
 {
-    cout << "添加前提条件" << endl;
+    // cout << "添加前提条件" << endl;
     for (const auto &hyp : problem->hypotheses())
     {
         this->insert_statement(hyp->normalize())->prove_by_assumption();
-        cout << hyp->to_string() << "已添加" << endl;
+        // cout << hyp->to_string() << "已添加" << endl;
     }
 
-    cout << "匹配定理" << endl;
+    // cout << "匹配定理" << endl;
     Matcher matcher(problem);
     for (const auto &thm : matcher.theorems())
     {
         insert_application(thm.clone());
     }
 
+    this->_angles = matcher.angles();
+    this->_ratios = matcher.ratios();
+
     if (!problem->goals().empty())
     {
-        cout << "添加目标" << endl;
+        // cout << "添加目标" << endl;
         for (const auto &goal : problem->goals())
         {
             _goals.push_back(this->insert_statement(goal));
-            cout << goal->to_string() << "已添加" << endl;
+            // cout << goal->to_string() << "已添加" << endl;
         }
     }
 }
@@ -41,7 +45,7 @@ DDARSolver::DDARSolver(Problem *problem) : _problem(problem)
 bool DDARSolver::run_level(const Point &max_pt)
 {
     size_t num_stmts = _checked_statements.size();
-    cout << "开始第" << _level << "层, 初始有" << num_stmts << "个结论" << endl;
+    // cout << "开始第" << _level << "层, 初始有" << num_stmts << "个结论" << endl;
     // for (auto const &pf : _checked_statements)
     // {
     //     cout << pf->statement()->to_string() << "已证明" << endl;
@@ -73,8 +77,8 @@ bool DDARSolver::run_level(const Point &max_pt)
         _solved = res;
     }
 
-    cout << "新证明" << _checked_statements.size() - num_stmts << "个结论, "
-         << "总计" << _checked_statements.size() << "个结论" << endl;
+    // cout << "新证明" << _checked_statements.size() - num_stmts << "个结论, "
+    //      << "总计" << _checked_statements.size() << "个结论" << endl;
 
     ++_level;
     return num_stmts < _checked_statements.size();
@@ -94,6 +98,22 @@ bool DDARSolver::run(size_t max_levels)
                 }
             }
         }
+
+        cout << "运行ar,补充结论" << endl;
+        for (const auto &[val, ang]: _angles)
+        {
+        //     if (Numerical::close_enough(val, 0.0))
+        //     {
+        //         Proof *pf = insert_statement(make_unique<Para>(Para(Slope(ang.left(), ang.vertex()), Slope(ang.right(), ang.vertex()))));
+        //         pf->ar();
+        //     }
+        //     else if(Numerical::close_enough(val, M_PI / 2))
+        //     {
+        //         Proof *pf = insert_statement(make_unique<Perp>(Perp(Slope(ang.vertex(), ang.left()), Slope(ang.vertex(), ang.right()))));
+        //         pf->ar();
+        //     }
+        }
+
         _solved = true;
     }
     else
@@ -103,12 +123,12 @@ bool DDARSolver::run(size_t max_levels)
         {
             if (!run_level(max_pt))
             {
-                cout << "没有新结论, 提前结束" << endl;
+                // cout << "没有新结论, 提前结束" << endl;
                 break;
             }
             if (_solved)
             {
-                cout << "目标已证明, 提前结束" << endl;
+                // cout << "目标已证明, 提前结束" << endl;
                 break;
             }
         }

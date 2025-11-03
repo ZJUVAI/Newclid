@@ -31,6 +31,8 @@ from newclid.numerical.geometries import PointNum
 from newclid.dependencies.dependency import Dependency
 from newclid.DDAR.build import DDAR
 
+import time
+
 
 class GeometricSolver:
     def __init__(
@@ -206,17 +208,20 @@ class GeometricSolverBuilder:
 
 
 class CSolver:
-    def __init__(self, problem: str, problem_name: str = "anonymity", seed: int = 123):
+    def __init__(self, problem: str, problem_name: str = "anonymity", seed: int = 123, solver: GeometricSolver = None):
         self.problem = problem
         self.problem_name = problem_name
         self.seed = seed
 
         # 构建 solver
-        self.solver = (
-            GeometricSolverBuilder(self.seed)
-            .load_problem_from_txt(self.problem)
-            .build()
-        )
+        if solver is None:
+            self.solver = (
+                GeometricSolverBuilder(self.seed)
+                .load_problem_from_txt(self.problem)
+                .build()
+            )
+        else:
+            self.solver = solver
 
         # 提取信息
         self.points: List[Tuple[str, Any, Any]] = []
@@ -259,32 +264,42 @@ class CSolver:
             self.goals.append((predicate, args))
 
     # -------------------- 核心方法 -------------------- #
-    def run(self, save_path: str | Path | None = None) -> bool:
+    def run(self, max_level: int = 500, save_path: str | Path | None = None) -> bool:
         """
         运行 DDAR 并执行求解。
         :param save_path: 可选，保存证明步骤的路径。
         :return: bool 表示是否成功求解。
         """
-        print(f"[CSolver] Running DDAR for problem {self.problem_name} ...")
+        # print(f"[CSolver] Running DDAR for problem {self.problem_name} ...")
+        t0 = time.time()
         solved, dep_graph = DDAR.run_ddar(
-            self.problem_name, self.points, self.premises, self.goals)
+            self.problem_name, self.points, self.premises, self.goals, max_level)
 
         for stmt, deps, reason in dep_graph:
             conclusion = Statement.from_tokens(
                 stmt, self.solver.proof.dep_graph)
             why = []
+            flag = True
             for dep in deps:
                 premise = Statement.from_tokens(
                     dep, self.solver.proof.dep_graph)
+                if premise == conclusion:
+                    flag = False
+                    break
                 why.append(premise)
+            if not flag:
+                continue
             dep = Dependency.mk(conclusion, reason, tuple(why))
             self.solver.proof.dep_graph.hyper_graph[conclusion] = dep
 
-        print(self.solver.proof.check_goals())
+        self.solver.run_infos['success'] = solved
+        self.solver.run_infos['runtime'] = time.time() - t0
+
+        # print(self.solver.proof.check_goals())
 
         if solved:
-            print(
-                f"[CSolver] Problem {self.problem_name} solved successfully ✅")
+            # print(
+            # f"[CSolver] Problem {self.problem_name} solved successfully ✅")
             if save_path:
                 out_path = Path(save_path)
                 self.solver.write_proof_steps(out_path)

@@ -318,6 +318,8 @@ void Matcher::match_between()
              return get<0>(a) < get<0>(b);
          });
 
+    this->_ratios = betweens;
+
     for (size_t i = 0; i < betweens.size(); i++)
     {
         const auto &curr = betweens[i];
@@ -444,6 +446,8 @@ void Matcher::match_equal_angles()
          {
              return get<0>(a) < get<0>(b);
          });
+
+    this->_angles = angles;
 
     vector<item_type> bucket;
     bucket.push_back(angles[0]);

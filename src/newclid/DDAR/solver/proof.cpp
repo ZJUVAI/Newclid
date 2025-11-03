@@ -114,19 +114,19 @@ string Proof::reason() const
     switch (_state)
     {
     case ProofState::NOT_PROVED:
-        return "未证明";
+        return "Not Proved";
     case ProofState::PROVED_BY_ASSUMPTION:
-        return "Assumption";
+        return "Premise";
     case ProofState::PROVED_NUMERICALLY:
         return "Numerical Check";
     case ProofState::PROVED_BY_THEOREM:
-        return _solver->applications()[_theoremId].theorem().name();
+        return _solver->applications()[_theoremId].theorem().rule();
     case ProofState::PROVED_AR_DIST:
-        return "ar for Dist";
+        return "AR For Dist";
     case ProofState::PROVED_AR_SLOPE:
-        return "ar for Slope";
+        return "AR For Slope";
     case ProofState::PROVED_AR_DISTLOG:
-        return "ar for DistLog";
+        return "AR For DistLog";
     default:
         return "Unknown";
     }

@@ -62,10 +62,10 @@ Equation<Slope> *AConst::as_equation_slope() const
 vector<string> AConst::to_tokens() const
 {
     vector<string> tokens = {"aconst"};
-    for (const auto &pt : points())
-    {
-        tokens.push_back(pt.name());
-    }
-    tokens.push_back(_rhs.to_string() + "pi");
+    tokens.push_back(_angle.left().name());
+    tokens.push_back(_angle.vertex().name());
+    tokens.push_back(_angle.vertex().name());
+    tokens.push_back(_angle.right().name());
+    tokens.push_back(std::to_string(_rhs.numerator()) + "pi/" + std::to_string(_rhs.denominator()));
     return tokens;
 }
