@@ -60,3 +60,5 @@ r57 Pythagoras theorem
 PythagoreanPremises a b c => PythagoreanConclusions a b c
 r44 Pappus's theorem
 coll a b c, coll x p b, coll x a q, coll p q r, coll y a r, coll y p c, coll z b r, coll z c q => coll x y z
+r82 Parallel from collinear
+coll A B C, diff A B, diff A C, diff B C => para A B A C

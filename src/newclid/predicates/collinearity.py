@@ -56,16 +56,8 @@ class Coll(Predicate):
         return Line.why_coll(statement)
 
     @classmethod
-    def add(cls, dep: Dependency):
-        rep, merged = Line.make_coll(dep.statement.args, dep)
-        table = dep.statement.dep_graph.ar.atable
-        for line in merged:
-            table.add_expr(table.get_equal_elements_up_to(rep.name, line.name), dep)
-            for line1 in line.fellows:
-                if len(line1.points) == 2 and line1.points <= rep.points:
-                    table.add_expr(
-                        table.get_equal_elements_up_to(rep.name, line1.name), dep
-                    )
+    def add(cls, dep: Dependency): 
+        Line.make_coll(dep.statement.args, dep)
 
     @classmethod
     def to_constructive(cls, point: str, args: tuple[str, ...]) -> str:

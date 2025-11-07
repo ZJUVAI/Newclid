@@ -444,7 +444,7 @@ bool check_numerical(std::string type, const std::vector<Point> &points)
     }
     else
     {
-        std::cout << type << std::endl;
+        // std::cout << type << std::endl;
         return true;
     }
     return false;

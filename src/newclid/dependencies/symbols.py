@@ -137,29 +137,13 @@ class Line(Symbol):
         s = set(points)
         for line in symbols_graph.nodes_of_type(Line):
             if s <= line.points:
-                fellows = list(line.fellows)
-                fellows.sort(key=lambda x: len(x.points))
-                why = []
-                lines = []
-                for fellow in fellows:
-                    if len(fellow.points) < 3:
-                        continue
-                    why.append(fellow.dep.statement)
-                    current_points = set(fellow.points)
-                    while True:
-                        merged = False
-                        for line in lines:
-                            if not line <= current_points and len(line & current_points) >= 2:
-                                current_points |= line
-                                merged = True
-                        if not merged:
-                            break
-                    if s <= current_points:
-                        break
-                    lines = [line for line in lines if not line <= current_points]
-                    lines.append(current_points)
-                return Dependency.mk(statement, "Same Line", why)
-                # return Dependency.mk(statement, "Same Line", [])
+                target_line = line
+                for fellow in line.fellows:
+                    if s <= fellow.points and len(fellow.points) < len(target_line.points):
+                        target_line = fellow
+                if not target_line.dep:
+                    raise ValueError("No dependency found for the target line.")
+                return target_line.dep.with_new(statement)
         raise Exception("why_coll failed")
 
     @property

@@ -74,16 +74,6 @@ class SymbolsGraph:
                     if {p1, p2} == line1.points:
                         return line1
                 res = self._get_new_line_thru_pair(p1, p2)
-                fellows = list(line.fellows)
-                fellows.sort(key=lambda x: len(x.points))
-                for line1 in fellows:
-                    if {p1, p2} < line1.points and p1 in line1.dep.statement.args and p2 in line1.dep.statement.args:
-                        if not line1.dep:
-                            raise ValueError("Dependency missing")
-                        table.add_expr(
-                            table.get_equal_elements_up_to(res.name, line1.name),
-                            line1.dep,
-                        )
                 line.merge([res])
                 return res
         return self._get_new_line_thru_pair(p1, p2)
