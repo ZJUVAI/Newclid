@@ -44,47 +44,47 @@ void LinearSystem<VarT>::reduce_next(LinearCombinationType &e)
 template <typename VarT>
 void LinearSystem<VarT>::add_reduced_equation(Proof *pf)
 {
-    auto eq = pf->reduced_equation<VarT>();
-    if (!eq)
+    auto eqs = pf->reduced_equation<VarT>();
+
+    for (auto &eq : eqs)
     {
-        return;
-    }
-
-    if (eq->is_solved())
-    {
-        return;
-    }
-
-    IndexType const n(_equations.size(), this);
-    _equations.push_back(make_pair(eq->original_equation(), pf));
-
-    LinearCombinationType lc(LinearCombination<IndexType>(n), eq->original_equation());
-
-    lc -= eq->linear_combination();
-
-    assert(lc.rhs() == eq->remainder());
-    assert(!lc.rhs().lhs().empty());
-
-    auto [v, c] = *(lc.rhs().lhs().begin());
-
-    assert(!_echelon_form.contains(v));
-
-    lc *= Rational(1) / c;
-    reduce_next(lc);
-    if (!_echelon_form.insert(make_pair(v, lc)).second)
-    {
-        throw runtime_error("Trying to insert a non-reduced equation");
-    }
-
-    auto it = _pivot_by_next.find(v);
-    if (it != _pivot_by_next.end())
-    {
-        for (const auto &pivot : it->second)
+        eq->reduce();
+        if (eq->is_solved())
         {
-            auto it_pivot = _echelon_form.find(pivot);
-            reduce_next(it_pivot->second);
+            continue;
         }
-        _pivot_by_next.erase(it);
+
+        IndexType const n(_equations.size(), this);
+        _equations.push_back(make_pair(eq->original_equation(), pf));
+
+        LinearCombinationType lc(LinearCombination<IndexType>(n), eq->original_equation());
+
+        lc -= eq->linear_combination();
+
+        assert(lc.rhs() == eq->remainder());
+        assert(!lc.rhs().lhs().empty());
+
+        auto [v, c] = *(lc.rhs().lhs().begin());
+
+        assert(!_echelon_form.contains(v));
+
+        lc *= Rational(1) / c;
+        reduce_next(lc);
+        if (!_echelon_form.insert(make_pair(v, lc)).second)
+        {
+            throw runtime_error("Trying to insert a non-reduced equation");
+        }
+
+        auto it = _pivot_by_next.find(v);
+        if (it != _pivot_by_next.end())
+        {
+            for (const auto &pivot : it->second)
+            {
+                auto it_pivot = _echelon_form.find(pivot);
+                reduce_next(it_pivot->second);
+            }
+            _pivot_by_next.erase(it);
+        }
     }
 }
 
@@ -123,6 +123,6 @@ void LinearSystem<VarT>::clear_new_found_variables()
     _found_variables.clear();
 }
 
-template class LinearSystem<Dist>;
 template class LinearSystem<Slope>;
 template class LinearSystem<DistLog>;
+template class LinearSystem<Product>;

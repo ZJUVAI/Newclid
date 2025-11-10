@@ -32,9 +32,9 @@ public:
 
     std::vector<statement_arg> args() const override;
 
-    Equation<Dist> *as_equation_dist() const override;
+    std::vector<Equation<DistLog> *> as_equation_distlog() const override;
 
-    Equation<DistLog> *as_equation_distlog() const override;
+    std::vector<Equation<Product> *> as_equation_product() const override;
 
     const Dist &left() const { return _left; }
 

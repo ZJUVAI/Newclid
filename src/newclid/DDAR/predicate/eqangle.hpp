@@ -39,7 +39,7 @@ public:
 
     const Angle &right() const { return _right; }
 
-    Equation<Slope> *as_equation_slope() const override;
+    std::vector<Equation<Slope> *> as_equation_slope() const override;
 
     bool numerical_only() const { return false; }
 

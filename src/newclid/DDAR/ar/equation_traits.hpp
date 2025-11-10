@@ -6,6 +6,7 @@
 #include "type/round.hpp"
 #include "type/slope.hpp"
 #include "type/distlog.hpp"
+#include "type/product.hpp"
 
 template <typename VarT>
 class EquationIndex;
@@ -17,14 +18,6 @@ template <typename VarT>
 struct EquationTraits
 {
     using VarType = VarT;
-};
-
-template <>
-struct EquationTraits<Dist>
-{
-    using EvaluationType = double;
-    using RHSType = Rational;
-    static EvaluationType eval_term(const Rational &c, const Dist &v);
 };
 
 template <>
@@ -41,6 +34,14 @@ struct EquationTraits<DistLog>
     using EvaluationType = double;
     using RHSType = Rational;
     static EvaluationType eval_term(const Rational &c, const DistLog &v);
+};
+
+template <>
+struct EquationTraits<Product>
+{
+    using EvaluationType = double;
+    using RHSType = Rational;
+    static EvaluationType eval_term(const Rational &c, const Product &v);
 };
 
 template <>

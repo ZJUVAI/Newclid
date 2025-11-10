@@ -188,6 +188,7 @@ Theorem Theorem::hypotenuse_is_diameter(const Midp &p, const Point &pt)
     theorem.add_hypothesis(make_unique<Perp>(Perp(Slope(p.left(), pt), Slope(p.right(), pt))));
     theorem.add_hypothesis(p.clone());
     theorem.add_conclusion(make_unique<Cong>(Cong(Dist(p.left(), p.middle()), Dist(pt, p.middle()))));
+    theorem.add_conclusion(make_unique<Cong>(Cong(Dist(p.right(), p.middle()), Dist(pt, p.middle()))));
     return theorem;
 }
 
@@ -426,6 +427,15 @@ Theorem Theorem::eqratio_of_coll(const Coll &left, const Coll &right)
     theorem.add_hypothesis(right.clone());
     theorem.add_conclusion(make_unique<EqRatio>(EqRatio(Dist(left.a(), left.b()), Dist(left.b(), left.c()), Dist(right.a(), right.b()), Dist(right.b(), right.c()))));
     theorem.add_conclusion(make_unique<EqRatio>(EqRatio(Dist(left.a(), left.c()), Dist(left.b(), left.c()), Dist(right.a(), right.c()), Dist(right.b(), right.c()))));
+    return theorem;
+}
+
+Theorem Theorem::definition_of_secant(const Secant &sec)
+{
+    Theorem theorem("Definition of secant", "r106");
+    theorem.add_hypothesis(sec.coll_pab().clone());
+    theorem.add_hypothesis(sec.cong_ab().clone());
+    theorem.add_conclusion(sec.clone());
     return theorem;
 }
 

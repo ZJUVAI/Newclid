@@ -12,6 +12,7 @@
 #include "predicate/congruent_triangles.hpp"
 #include "predicate/statement.hpp"
 #include "predicate/thales.hpp"
+#include "predicate/secant.hpp"
 #include "type/angle.hpp"
 #include <vector>
 
@@ -131,6 +132,9 @@ public:
 
     // r105
     static Theorem eqratio_of_coll(const Coll &left, const Coll &right);
+
+    // r106
+    static Theorem definition_of_secant(const Secant &sec);
 
 private:
     std::string _name;

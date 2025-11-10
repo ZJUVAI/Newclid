@@ -2,6 +2,7 @@
 #include "ar/linear_system.hpp"
 #include "ar/equation.hpp"
 #include "type/distlog.hpp"
+#include "type/product.hpp"
 
 using namespace std;
 
@@ -12,5 +13,5 @@ const Equation<VarT> &EquationIndex<VarT>::equation() const
 }
 
 template class EquationIndex<Slope>;
-template class EquationIndex<Dist>;
 template class EquationIndex<DistLog>;
+template class EquationIndex<Product>;

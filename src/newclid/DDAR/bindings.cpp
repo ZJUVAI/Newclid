@@ -8,6 +8,9 @@
 #include <map>
 #include <vector>
 #include <chrono>
+#include <tuple>
+#include <string>
+#include <sstream>
 #include <unordered_set>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -17,6 +20,18 @@ using namespace std;
 
 using StatementTokens = vector<string>;
 using DepGraph = vector<tuple<StatementTokens, vector<StatementTokens>, string>>;
+
+std::string join(const StatementTokens &tokens)
+{
+    std::ostringstream oss;
+    for (size_t i = 0; i < tokens.size(); ++i)
+    {
+        if (i != 0)
+            oss << " "; // 添加空格分隔符
+        oss << tokens[i];
+    }
+    return oss.str();
+}
 
 extern "C"
 {
@@ -56,6 +71,31 @@ extern "C"
         // }
 
         DepGraph dep_graph = solver.dependency_graph();
+
+        // for (const auto &tupleElem : dep_graph)
+        // {
+        //     const StatementTokens &tokens = std::get<0>(tupleElem);
+        //     const std::vector<StatementTokens> &dependencies = std::get<1>(tupleElem);
+        //     const std::string &reason = std::get<2>(tupleElem);
+
+        //     if (reason == "Numerical Check")
+        //     {
+        //         continue;
+        //     }
+
+        //     std::cout << "Statement: " << join(tokens) << "\n";
+
+        //     std::cout << "Dependencies: \n";
+        //     for (const auto &dep : dependencies)
+        //     {
+        //         std::cout << "  - " << join(dep) << "\n";
+        //     }
+
+        //     std::cout << "Reason: " << reason << "\n";
+        //     std::cout << "---------------------------------------\n";
+        // }
+
+        // solver.print_equations();
 
         return make_pair(solver.is_solved(), dep_graph);
     }

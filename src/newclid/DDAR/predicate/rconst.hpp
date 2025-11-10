@@ -36,9 +36,9 @@ public:
 
     std::ostream &print(std::ostream &os) const override;
 
-    Equation<Dist> *as_equation_dist() const override;
+    std::vector<Equation<DistLog> *> as_equation_distlog() const override;
 
-    Equation<DistLog> *as_equation_distlog() const override;
+    std::vector<Equation<Product> *> as_equation_product() const override;
 
     bool numerical_only() const { return false; }
 

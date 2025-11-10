@@ -17,9 +17,7 @@ private:
 
     std::vector<Theorem> _theorems;
 
-    std::vector<std::tuple<double, Angle>> _angles;
-
-    std::vector<std::tuple<double, Coll>> _ratios;
+    std::vector<std::unique_ptr<Statement>> _stmts;
 
     void match_similar_triangles();
 
@@ -30,6 +28,8 @@ private:
     void match_circles();
 
     void match_orthocenters();
+
+    void match_perps_paras();
 
     std::vector<std::tuple<double, double, Triangle>> all_triangles();
 
@@ -66,9 +66,7 @@ public:
 
     const std::vector<Theorem> &theorems() const { return _theorems; }
 
-    const std::vector<std::tuple<double, Angle>> &angles() const { return _angles; }
-
-    const std::vector<std::tuple<double, Coll>> &ratios() const { return _ratios; }
+    const std::vector<std::unique_ptr<Statement>> &stmts() const { return _stmts; }
 };
 
 #endif // MATCHER_HPP

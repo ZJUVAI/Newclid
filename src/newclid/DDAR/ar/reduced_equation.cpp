@@ -40,6 +40,6 @@ bool ReducedEquation<VarT>::is_solved() const
     return _remainder.is_empty();
 }
 
-template class ReducedEquation<Dist>;
 template class ReducedEquation<Slope>;
 template class ReducedEquation<DistLog>;
+template class ReducedEquation<Product>;

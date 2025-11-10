@@ -343,7 +343,7 @@ unique_ptr<Statement> Problem::create_statement(const string &type, const vector
         Point p1 = this->find_point(args[0]);
         Point p2 = this->find_point(args[1]);
         Point p3 = this->find_point(args[2]);
-        return make_unique<Midp>(p2, p1, p3);
+        return make_unique<Midp>(p1, p2, p3);
     }
     else if (type == "orthocenter")
     {

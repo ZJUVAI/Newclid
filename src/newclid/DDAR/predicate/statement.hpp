@@ -45,11 +45,16 @@ public:
 
     virtual std::vector<std::string> to_tokens() const;
 
-    virtual Equation<Dist> *as_equation_dist() const { return nullptr; }
+    virtual std::vector<Equation<Slope> *> as_equation_slope() const { return {}; }
 
-    virtual Equation<Slope> *as_equation_slope() const { return nullptr; }
+    virtual std::vector<Equation<DistLog> *> as_equation_distlog() const { return {}; }
 
-    virtual Equation<DistLog> *as_equation_distlog() const { return nullptr; }
+    virtual std::vector<Equation<Product> *> as_equation_product() const { return {}; }
+
+    virtual bool operator==(const Statement &other) const
+    {
+        return this->normalize()->to_string() == other.normalize()->to_string();
+    }
 };
 
 std::ostream &operator<<(std::ostream &out, const Statement &stmt);

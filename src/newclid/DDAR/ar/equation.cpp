@@ -108,14 +108,14 @@ namespace std
     }
 }
 
-template class Equation<Dist>;
 template class Equation<Slope>;
 template class Equation<DistLog>;
+template class Equation<Product>;
 
-template class Equation<EquationIndex<Dist>>;
 template class Equation<EquationIndex<Slope>>;
 template class Equation<EquationIndex<DistLog>>;
+template class Equation<EquationIndex<Product>>;
 
-template class hash<Equation<Dist>>;
 template class hash<Equation<Slope>>;
 template class hash<Equation<DistLog>>;
+template class hash<Equation<Product>>;

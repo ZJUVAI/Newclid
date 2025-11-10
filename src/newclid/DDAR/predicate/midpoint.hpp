@@ -5,16 +5,17 @@
 #include "predicate/cong.hpp"
 #include "predicate/coll.hpp"
 #include "type/point.hpp"
+#include "type/product.hpp"
 
 class Midp : public Statement
 {
 private:
-    Point _left;
     Point _middle;
+    Point _left;
     Point _right;
 
 public:
-    Midp(Point left, Point middle, Point right);
+    Midp(Point middle, Point left, Point right);
 
     Midp(const std::vector<statement_arg> &args);
 
