@@ -6,9 +6,9 @@
 
 using namespace std;
 
-Midp::Midp(Point left, Point middle, Point right) : _left(left), _middle(middle), _right(right) {}
+Midp::Midp(Point middle, Point left, Point right) : _middle(middle), _left(left), _right(right) {}
 
-Midp::Midp(const vector<statement_arg> &args) : _left(args[0].point), _middle(args[1].point), _right(args[2].point) {}
+Midp::Midp(const vector<statement_arg> &args) : _middle(args[0].point), _left(args[1].point), _right(args[2].point) {}
 
 string Midp::name() const
 {
@@ -17,7 +17,7 @@ string Midp::name() const
 
 vector<Point> Midp::points() const
 {
-    return {_left, _middle, _right};
+    return {_middle, _left, _right};
 }
 
 unique_ptr<Statement> Midp::normalize() const

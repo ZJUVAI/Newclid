@@ -75,7 +75,12 @@ ostream &EqRatio::print(ostream &os) const
     return os << _left_up << ":" << _left_down << " = " << _right_up << ":" << _right_down;
 }
 
-Equation<DistLog> *EqRatio::as_equation_distlog() const
+vector<Equation<DistLog> *> EqRatio::as_equation_distlog() const
 {
-    return new Equation<DistLog>(Equation<DistLog>::sub_eq_sub(DistLog(_left_up), DistLog(_left_down), DistLog(_right_up), DistLog(_right_down)));
+    return {new Equation<DistLog>(Equation<DistLog>::sub_eq_sub(DistLog(_left_up), DistLog(_left_down), DistLog(_right_up), DistLog(_right_down)))};
+}
+
+vector<Equation<Product> *> EqRatio::as_equation_product() const
+{
+    return {new Equation<Product>(LinearCombination<Product>(vector<Dist>{_left_up, _right_down}) - LinearCombination<Product>(vector<Dist>{_left_down, _right_up}) == Rational((long long)0))};
 }

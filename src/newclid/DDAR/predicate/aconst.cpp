@@ -54,9 +54,9 @@ ostream &AConst::print(std::ostream &out) const
     return out << _angle << " = " << _rhs << "π";
 }
 
-Equation<Slope> *AConst::as_equation_slope() const
+vector<Equation<Slope> *> AConst::as_equation_slope() const
 {
-    return new Equation<Slope>(Equation<Slope>::sub_eq_const(_angle.right_side(), _angle.left_side(), _rhs));
+    return {new Equation<Slope>(Equation<Slope>::sub_eq_const(_angle.right_side(), _angle.left_side(), _rhs))};
 }
 
 vector<string> AConst::to_tokens() const

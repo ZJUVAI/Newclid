@@ -14,9 +14,9 @@ using namespace std;
 Proof::Proof(DDARSolver *solver, std::unique_ptr<Statement> &&p)
     : _solver(solver),
       _statement(move(p)),
-      _dist_eqn(_solver->insert_equation<Dist>(_statement)),
       _slope_eqn(_solver->insert_equation<Slope>(_statement)),
-      _distlog_eqn(_solver->insert_equation<DistLog>(_statement))
+      _distlog_eqn(_solver->insert_equation<DistLog>(_statement)),
+      _product_eqn(_solver->insert_equation<Product>(_statement))
 {
 }
 
@@ -45,32 +45,32 @@ void Proof::ar()
         return;
     }
 
-    if (_dist_eqn.second != nullptr)
+    for (const auto &[coeff, req] : _slope_eqn)
     {
-        _dist_eqn.second->reduce();
-        if (_dist_eqn.second->is_solved())
-        {
-            set_proved(ProofState::PROVED_AR_DIST);
-            return;
-        }
-    }
-
-    if (_slope_eqn.second != nullptr)
-    {
-        _slope_eqn.second->reduce();
-        if (_slope_eqn.second->is_solved())
+        req->reduce();
+        if (req->is_solved())
         {
             set_proved(ProofState::PROVED_AR_SLOPE);
             return;
         }
     }
 
-    if (_distlog_eqn.second != nullptr)
+    for (const auto &[coeff, req] : _distlog_eqn)
     {
-        _distlog_eqn.second->reduce();
-        if (_distlog_eqn.second->is_solved())
+        req->reduce();
+        if (req->is_solved())
         {
             set_proved(ProofState::PROVED_AR_DISTLOG);
+            return;
+        }
+    }
+
+    for (const auto &[coeff, req] : _product_eqn)
+    {
+        req->reduce();
+        if (req->is_solved())
+        {
+            set_proved(ProofState::PROVED_AR_PRODUCT);
             return;
         }
     }
@@ -99,12 +99,36 @@ vector<Proof *> Proof::get_dependencies() const
         return {};
     case ProofState::PROVED_BY_THEOREM:
         return _solver->applications()[_theoremId].hypotheses();
-    case ProofState::PROVED_AR_DIST:
-        return _dist_eqn.second->statement_dependencies();
     case ProofState::PROVED_AR_SLOPE:
-        return _slope_eqn.second->statement_dependencies();
+        for (const auto &[coeff, req] : _slope_eqn)
+        {
+            vector<Proof *> deps = req->statement_dependencies();
+            if (!deps.empty() && !(deps[0]->statement() == _statement))
+            {
+                return deps;
+            }
+        }
+        return {};
     case ProofState::PROVED_AR_DISTLOG:
-        return _distlog_eqn.second->statement_dependencies();
+        for (const auto &[coeff, req] : _distlog_eqn)
+        {
+            vector<Proof *> deps = req->statement_dependencies();
+            if (!deps.empty() && !(deps[0]->statement() == _statement))
+            {
+                return deps;
+            }
+        }
+        return {};
+    case ProofState::PROVED_AR_PRODUCT:
+        for (const auto &[coeff, req] : _product_eqn)
+        {
+            vector<Proof *> deps = req->statement_dependencies();
+            if (!deps.empty() && !(deps[0]->statement() == _statement))
+            {
+                return deps;
+            }
+        }
+        return {};
     }
     return {};
 }
@@ -121,12 +145,12 @@ string Proof::reason() const
         return "Numerical Check";
     case ProofState::PROVED_BY_THEOREM:
         return _solver->applications()[_theoremId].theorem().rule();
-    case ProofState::PROVED_AR_DIST:
-        return "AR For Dist";
     case ProofState::PROVED_AR_SLOPE:
         return "AR For Slope";
     case ProofState::PROVED_AR_DISTLOG:
         return "AR For DistLog";
+    case ProofState::PROVED_AR_PRODUCT:
+        return "AR For Product";
     default:
         return "Unknown";
     }
@@ -160,19 +184,19 @@ void Proof::set_proved(ProofState state)
 
     assert(_statement->check_numerically());
 
-    if (_dist_eqn.second != nullptr)
+    for (const auto &[coeff, req] : _slope_eqn)
     {
-        _dist_eqn.second->reduce();
+        req->reduce();
     }
 
-    if (_slope_eqn.second != nullptr)
+    for (const auto &[coeff, req] : _distlog_eqn)
     {
-        _slope_eqn.second->reduce();
+        req->reduce();
     }
 
-    if (_distlog_eqn.second != nullptr)
+    for (const auto &[coeff, req] : _product_eqn)
     {
-        _distlog_eqn.second->reduce();
+        req->reduce();
     }
 
     _solver->add_established_equations(this);

@@ -26,28 +26,26 @@ private:
 
     std::vector<Proof *> _goals;
 
+    std::vector<Proof *> _ars;
+
     std::vector<const Proof *> _checked_statements;
 
     bool _solved{false};
-
-    LinearSystem<Dist> _dist_system;
 
     LinearSystem<Slope> _slope_system;
 
     LinearSystem<DistLog> _distlog_system;
 
+    LinearSystem<Product> _product_system;
+
     template <typename VarT>
     using eqns_map_type = std::unordered_map<Equation<VarT>, ReducedEquation<VarT>>;
-
-    eqns_map_type<Dist> _dist_equations;
 
     eqns_map_type<Slope> _slope_equations;
 
     eqns_map_type<DistLog> _distlog_equations;
 
-    std::vector<std::tuple<double, Angle>> _angles;
-
-    std::vector<std::tuple<double, Coll>> _ratios;
+    eqns_map_type<Product> _product_equations;
 
 public:
     bool run_level(const Point &max_pt);
@@ -76,10 +74,12 @@ public:
 
     void add_established_equations(Proof *pf);
 
+    void print_equations() const;
+
     std::vector<std::tuple<std::vector<std::string>, std::vector<std::vector<std::string>>, std::string>> dependency_graph() const;
 
     template <typename VarT>
-    std::pair<Rational, ReducedEquation<VarT> *> insert_equation(const std::unique_ptr<Statement> &pf);
+    std::vector<std::pair<Rational, ReducedEquation<VarT> *>> insert_equation(const std::unique_ptr<Statement> &pf);
 };
 
 #endif // DDAR_HPP

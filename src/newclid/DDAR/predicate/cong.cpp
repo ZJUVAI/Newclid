@@ -1,6 +1,7 @@
 #include "predicate/cong.hpp"
 #include "type/dist.hpp"
 #include "type/rational.hpp"
+#include "type/product.hpp"
 #include "ar/linear_combination.hpp"
 #include "ar/equation.hpp"
 #include <iostream>
@@ -48,12 +49,12 @@ ostream &Cong::print(ostream &os) const
     return os << _left << " = " << _right;
 }
 
-Equation<Dist> *Cong::as_equation_dist() const
+vector<Equation<DistLog> *> Cong::as_equation_distlog() const
 {
-    return new Equation<Dist>(LinearCombination<Dist>(_left) - LinearCombination<Dist>(_right) == Rational((long long)0));
+    return {new Equation<DistLog>(LinearCombination<DistLog>(_left) - LinearCombination<DistLog>(_right) == Rational((long long)0))};
 }
 
-Equation<DistLog> *Cong::as_equation_distlog() const
+vector<Equation<Product> *> Cong::as_equation_product() const
 {
-    return new Equation<DistLog>(LinearCombination<DistLog>(_left) - LinearCombination<DistLog>(_right) == Rational((long long)0));
+    return {new Equation<Product>(LinearCombination<Product>(_left) - LinearCombination<Product>(_right) == Rational((long long)0))};
 }

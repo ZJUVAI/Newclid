@@ -442,12 +442,84 @@ bool check_numerical(std::string type, const std::vector<Point> &points)
         Point df = std::make_pair(f.first-d.first,f.second-d.second);
         return sign(dot(ab,ac)) != sign(dot(de,df)); 
     }
+    else if(type == "midp")
+    {
+        if(points.size() != 3)
+        {
+            return false;
+        }
+        Point m = points[0];
+        Point l = points[1];
+        Point r = points[2];
+        Point m1 = std::make_pair((l.first + r.first) / 2, (l.second + r.second) / 2);
+        return close_enough(m, m1);
+    }
+    else if (type == "rconst")
+    {
+        if(points.size() != 5)
+        {
+            return false;
+        }
+        Point a = points[0];
+        Point b = points[1];
+        Point c = points[2];
+        Point d = points[3];
+        double rat = ratio(a, b, c, d);
+        return close_enough(rat, points[4].first);
+    }
+    else if (type == "aconst")
+    {
+        if(points.size() != 5)
+        {
+            return false;
+        }
+        Point a = points[0];
+        Point b = points[1];
+        Point c = points[2];
+        Point d = points[3];
+        double ang = angle4p(a, b, c, d);
+        return close_enough(ang, points[4].first);
+    }
     else
     {
         std::cout << type << std::endl;
         return true;
     }
     return false;
+}
+
+double parseFraction(const std::string& input) {
+    size_t slashPos = input.find('/');
+    if (slashPos == std::string::npos) {
+        throw std::invalid_argument("Input must contain '/'");
+    }
+
+    std::string numeratorStr = input.substr(0, slashPos);
+    std::string denominatorStr = input.substr(slashPos + 1);
+
+    double numerator = 0.0;
+    double denominator = 0.0;
+
+    // 检查分子是否含有 "pi"
+    size_t piPos = numeratorStr.find("pi");
+    if (piPos != std::string::npos) {
+        std::string numberPart = numeratorStr.substr(0, piPos);
+        if (numberPart.empty()) {
+            numerator = M_PI;
+        } else {
+            numerator = std::stod(numberPart) * M_PI;
+        }
+    } else {
+        numerator = std::stod(numeratorStr);
+    }
+
+    denominator = std::stod(denominatorStr);
+
+    if (denominator == 0) {
+        throw std::invalid_argument("Denominator cannot be zero");
+    }
+
+    return numerator / denominator;
 }
 
 void check_submapping(const size_t index, const std::vector<std::vector<std::string>> &theorem, const std::vector<Point> &points, std::vector<std::vector<std::unordered_map<std::string, int>>> &mappings, std::vector<std::unordered_map<std::string, int>> &results, std::unordered_map<std::string, int> &current_mapping)
@@ -472,6 +544,11 @@ void check_submapping(const size_t index, const std::vector<std::vector<std::str
         std::vector<Point> mapped_points;
         for (size_t i = 1; i < premise.size(); ++i)
         {
+            if (i == premise.size() - 1 && (type == "aconst" || type == "rconst"))
+            {
+                mapped_points.push_back(std::make_pair(parseFraction(premise[i]), 0));
+                break;
+            }
             mapped_points.push_back(points[new_mapping[premise[i]]]);
         }
         if (check_numerical(type, mapped_points))
@@ -485,6 +562,11 @@ void check_submapping(const size_t index, const std::vector<std::vector<std::str
         std::vector<Point> mapped_points;
         for (size_t i = 1; i < premise.size(); ++i)
         {
+            if (i == premise.size() - 1 && (type == "aconst" || type == "rconst"))
+            {
+                mapped_points.push_back(std::make_pair(parseFraction(premise[i]), 0));
+                break;
+            }
             mapped_points.push_back(points[current_mapping[premise[i]]]);
         }
         if (check_numerical(type, mapped_points))

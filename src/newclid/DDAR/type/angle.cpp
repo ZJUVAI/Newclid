@@ -1,5 +1,6 @@
 #include "type/angle.hpp"
 #include "type/point.hpp"
+#include "predicate/coll.hpp"
 
 #include <iostream>
 #include <vector>
@@ -17,13 +18,13 @@ Angle::Angle(Point left_pt, Point vertex_pt, Point right_pt)
 
 Angle::Angle(Point p1, Point p2, Point p3, Point p4) : _left_pt(p1), _vertex_pt(p2), _right_pt(p3)
 {
-    if(p1 == p3)
+    if (p1 == p3)
     {
         _left_pt = p2;
         _right_pt = p4;
         _vertex_pt = p1;
     }
-    else if(p1 == p4)
+    else if (p1 == p4)
     {
         _left_pt = p2;
         _right_pt = p3;
@@ -49,7 +50,7 @@ Angle::Angle(Point p1, Point p2, Point p3, Point p4) : _left_pt(p1), _vertex_pt(
 
 bool Angle::check_nondegen() const
 {
-    return !_vertex_pt.is_close(_left_pt) && !_vertex_pt.is_close(_right_pt);
+    return !_vertex_pt.is_close(_left_pt) && !_vertex_pt.is_close(_right_pt) && !Coll(_left_pt, _vertex_pt, _right_pt).check_numerically();
 }
 
 Slope Angle::left_side() const

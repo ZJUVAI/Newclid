@@ -21,13 +21,13 @@ template <typename VarT>
 LinearCombination<VarT>::LinearCombination(const VarType &var)
     : LinearCombination(var, 1) {}
 
-template class LinearCombination<Dist>;
 template class LinearCombination<Slope>;
 template class LinearCombination<DistLog>;
+template class LinearCombination<Product>;
 
-template class LinearCombination<EquationIndex<Dist>>;
 template class LinearCombination<EquationIndex<Slope>>;
 template class LinearCombination<EquationIndex<DistLog>>;
+template class LinearCombination<EquationIndex<Product>>;
 
 template <typename VarT>
 int LinearCombination<VarT>::common_denominator() const

@@ -2,6 +2,7 @@
 #define SLOPE_HPP
 
 #include "type/point.hpp"
+#include "type/dist.hpp"
 #include <vector>
 
 #define M_PI 3.14159265358979323846
@@ -34,6 +35,8 @@ public:
     double angle() const;
 
     Slope normalize() const;
+
+    Dist dist() const;
 };
 
 std::ostream &operator<<(std::ostream &os, const Slope &slope_angle);

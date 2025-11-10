@@ -3,6 +3,7 @@
 
 #include "predicate/statement.hpp"
 #include "predicate/eqratio.hpp"
+#include "type/product.hpp"
 #include "typedef.hpp"
 
 class Coll : public Statement
@@ -58,7 +59,9 @@ public:
 
     bool operator<(const Coll &other) const;
 
-    Equation<Slope> *as_equation_slope() const override;
+    std::vector<Equation<Slope> *> as_equation_slope() const override;
+
+    std::vector<Equation<Product> *> as_equation_product() const override;
 
     Coll reverse() const;
 };

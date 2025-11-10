@@ -3,6 +3,7 @@
 
 #include "predicate/statement.hpp"
 #include "type/slope.hpp"
+#include "type/product.hpp"
 #include "ar/equation.hpp"
 #include "typedef.hpp"
 
@@ -35,9 +36,14 @@ public:
 
     std::ostream &print(std::ostream &os) const override;
 
-    Equation<Slope> *as_equation_slope() const override;
+    std::vector<Equation<Slope> *> as_equation_slope() const override;
 
-    bool numerical_only() const { return false; }
+    std::vector<Equation<Product> *> as_equation_product() const override;
+
+    bool numerical_only() const
+    {
+        return false;
+    }
 };
 
 #endif // PERP_HPP

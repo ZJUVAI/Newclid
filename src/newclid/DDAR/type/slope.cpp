@@ -67,5 +67,10 @@ Slope Slope::normalize() const
     {
         return Slope(_right, _left);
     }
-    return *this; 
+    return *this;
+}
+
+Dist Slope::dist() const
+{
+    return Dist(_left, _right);
 }

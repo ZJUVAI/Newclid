@@ -119,9 +119,26 @@ bool Coll::operator<(const Coll &other) const
     return _a < other._a;
 }
 
-Equation<Slope> *Coll::as_equation_slope() const
+vector<Equation<Slope> *> Coll::as_equation_slope() const
 {
-    return new Equation<Slope>(Equation<Slope>::sub_eq_const(Slope(_a, _b), Slope(_a, _c), Rational(0)));
+    return {new Equation<Slope>(Equation<Slope>::sub_eq_const(Slope(_a, _b), Slope(_a, _c), Rational(0))),
+            new Equation<Slope>(Equation<Slope>::sub_eq_const(Slope(_a, _c), Slope(_b, _c), Rational(0)))};
+}
+
+vector<Equation<Product> *> Coll::as_equation_product() const
+{
+    LinearCombination<Product> ab(Product(Dist(_a, _b)));
+    LinearCombination<Product> bc(Product(Dist(_b, _c)));
+    LinearCombination<Product> ac(Product(Dist(_a, _c)));
+    if ((_a.x() > _b.x() && _a.x() < _c.x()) || (_a.x() < _b.x() && _a.x() > _c.x()))
+    {
+        return {new Equation<Product>(ab + ac - bc == Rational((long long)0))};
+    }
+    else if ((_b.x() > _a.x() && _b.x() < _c.x()) || (_b.x() < _a.x() && _b.x() > _c.x()))
+    {
+        return {new Equation<Product>(ab + bc - ac == Rational((long long)0))};
+    }
+    return {new Equation<Product>(bc + ac - ab == Rational((long long)0))};
 }
 
 Coll Coll::reverse() const

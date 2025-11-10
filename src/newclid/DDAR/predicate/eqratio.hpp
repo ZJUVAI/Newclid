@@ -42,7 +42,9 @@ public:
 
     bool numerical_only() const { return false; }
 
-    Equation<DistLog> *as_equation_distlog() const override;
+    std::vector<Equation<DistLog> *> as_equation_distlog() const override;
+
+    std::vector<Equation<Product> *> as_equation_product() const override;
 };
 
 #endif // EQRATIO_HPP

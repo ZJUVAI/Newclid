@@ -51,14 +51,14 @@ ostream &RConst::print(ostream &os) const
     return os << _left << ":" << _right << " = " << _ratio;
 }
 
-Equation<Dist> *RConst::as_equation_dist() const
+vector<Equation<DistLog> *> RConst::as_equation_distlog() const
 {
-    return new Equation<Dist>(LinearCombination<Dist>(_left) - LinearCombination<Dist>(_right, _ratio) == Rational((long long)0));
+    return {new Equation<DistLog>(LinearCombination<DistLog>(_left) - LinearCombination<DistLog>(_right) == Rational(log(_ratio.to_double())))};
 }
 
-Equation<DistLog> *RConst::as_equation_distlog() const
+vector<Equation<Product> *> RConst::as_equation_product() const
 {
-    return new Equation<DistLog>(LinearCombination<DistLog>(_left) - LinearCombination<DistLog>(_right) == Rational(log(_ratio.to_double())));
+    return {new Equation<Product>(LinearCombination<Product>(_left) - LinearCombination<Product>(_right, _ratio) == Rational((long long)0))};
 }
 
 string RConst::to_string() const

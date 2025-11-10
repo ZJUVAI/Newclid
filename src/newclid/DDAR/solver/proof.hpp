@@ -15,9 +15,9 @@ enum class ProofState : uint8_t
     NOT_PROVED,
     PROVED_BY_ASSUMPTION,
     PROVED_NUMERICALLY,
-    PROVED_AR_DIST,
     PROVED_AR_SLOPE,
     PROVED_AR_DISTLOG,
+    PROVED_AR_PRODUCT,
     PROVED_BY_THEOREM,
 };
 
@@ -58,41 +58,70 @@ public:
     const DDARSolver *solver() const { return _solver; }
 
     template <typename VarT>
-    const ReducedEquation<VarT> *reduced_equation() const
+    std::vector<ReducedEquation<VarT> *> reduced_equation() const
     {
-        if constexpr (std::is_same_v<VarT, Dist>)
+        if constexpr (std::is_same_v<VarT, Slope>)
         {
-            return _dist_eqn.second;
-        }
-        else if constexpr (std::is_same_v<VarT, Slope>)
-        {
-            return _slope_eqn.second;
+            std::vector<ReducedEquation<Slope> *> result;
+            for (const auto &pair : _slope_eqn)
+            {
+                result.push_back(pair.second);
+            }
+            return result;
         }
         else if constexpr (std::is_same_v<VarT, DistLog>)
         {
-            return _distlog_eqn.second;
+            std::vector<ReducedEquation<DistLog> *> result;
+            for (const auto &pair : _distlog_eqn)
+            {
+                result.push_back(pair.second);
+            }
+            return result;
+        }
+        else if constexpr (std::is_same_v<VarT, Product>)
+        {
+            std::vector<ReducedEquation<Product> *> result;
+            for (const auto &pair : _product_eqn)
+            {
+                result.push_back(pair.second);
+            }
+            return result;
         }
         else
         {
             throw std::runtime_error("Invalid variable type");
         }
-        return nullptr;
     }
 
     template <typename VarT>
-    const Rational &equation_coeff() const
+    const std::vector<Rational> &equation_coeff() const
     {
-        if constexpr (std::is_same_v<VarT, Dist>)
+        if constexpr (std::is_same_v<VarT, Slope>)
         {
-            return _dist_eqn.first;
-        }
-        else if constexpr (std::is_same_v<VarT, Slope>)
-        {
-            return _slope_eqn.first;
+            std::vector<Rational> result;
+            for (const auto &pair : _slope_eqn)
+            {
+                result.push_back(pair.first);
+            }
+            return result;
         }
         else if constexpr (std::is_same_v<VarT, DistLog>)
         {
-            return _distlog_eqn.first;
+            std::vector<Rational> result;
+            for (const auto &pair : _distlog_eqn)
+            {
+                result.push_back(pair.first);
+            }
+            return result;
+        }
+        else if constexpr (std::is_same_v<VarT, Product>)
+        {
+            std::vector<Rational> result;
+            for (const auto &pair : _product_eqn)
+            {
+                result.push_back(pair.first);
+            }
+            return result;
         }
         else
         {
@@ -106,9 +135,9 @@ private:
     size_t _theoremId;
     ProofState _state{ProofState::NOT_PROVED};
     std::set<Point> _point_dependencies;
-    std::pair<Rational, ReducedEquation<Dist> *> _dist_eqn;
-    std::pair<Rational, ReducedEquation<Slope> *> _slope_eqn;
-    std::pair<Rational, ReducedEquation<DistLog> *> _distlog_eqn;
+    std::vector<std::pair<Rational, ReducedEquation<Slope> *>> _slope_eqn;
+    std::vector<std::pair<Rational, ReducedEquation<DistLog> *>> _distlog_eqn;
+    std::vector<std::pair<Rational, ReducedEquation<Product> *>> _product_eqn;
 };
 
 #endif // PROOF_HPP

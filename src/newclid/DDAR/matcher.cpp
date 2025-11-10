@@ -3,7 +3,9 @@
 #include "theorem.hpp"
 #include "problem.hpp"
 #include "type/dist.hpp"
+#include "type/angle.hpp"
 #include "predicate/congruent_triangles.hpp"
+#include "predicate/secant.hpp"
 #include <algorithm>
 #include <tuple>
 #include <vector>
@@ -17,6 +19,7 @@ Matcher::Matcher(Problem *prob) : _problem(prob)
     match_equal_angles();
     match_circles();
     match_orthocenters();
+    match_perps_paras();
 }
 
 vector<tuple<double, double, Triangle>> Matcher::all_triangles()
@@ -318,8 +321,6 @@ void Matcher::match_between()
              return get<0>(a) < get<0>(b);
          });
 
-    this->_ratios = betweens;
-
     for (size_t i = 0; i < betweens.size(); i++)
     {
         const auto &curr = betweens[i];
@@ -327,7 +328,7 @@ void Matcher::match_between()
         if (Numerical::close_enough(get<0>(curr), 0.5))
         {
             auto base = get<1>(curr);
-            on_midpoint(Midp(base.a(), base.b(), base.c()));
+            on_midpoint(Midp(base.b(), base.a(), base.c()));
         }
     }
 
@@ -382,9 +383,9 @@ vector<tuple<double, Angle>> Matcher::all_angles()
         {
             for (const auto &right : _problem->points())
             {
-                if (!Coll(left, vertex, right).check_numerically())
+                Angle const ang(left, vertex, right);
+                if (ang.check_nondegen())
                 {
-                    Angle const ang(left, vertex, right);
                     res.emplace_back(ang.angle(), ang);
                 }
             }
@@ -411,6 +412,7 @@ void Matcher::on_bisector(const Point &pt, const Angle &ang)
 
 void Matcher::on_eqangle(const Angle &left, const Angle &right)
 {
+    _stmts.push_back(make_unique<EqAngle>(left, right));
     // ∠ABD = ∠ACD
     if (left.left() == right.left() && left.right() == right.right() && left.left() < left.right() && left.vertex() < left.left() && right.vertex() < right.left())
     {
@@ -446,8 +448,6 @@ void Matcher::match_equal_angles()
          {
              return get<0>(a) < get<0>(b);
          });
-
-    this->_angles = angles;
 
     vector<item_type> bucket;
     bucket.push_back(angles[0]);
@@ -512,6 +512,16 @@ void Matcher::on_circle(const Point &center, const vector<pair<double, Point>> &
     {
         for (size_t pt_b = pt_a + 1; pt_b < size; pt_b++)
         {
+            if (Coll(points[pt_a].second, points[pt_b].second, center).check_numerically())
+            {
+                for (size_t pt_c = 0; pt_c < size; pt_c++)
+                {
+                    if (pt_c != pt_a && pt_c != pt_b)
+                    {
+                        insert_theorem(Theorem::hypotenuse_is_diameter(Midp(center, points[pt_a].second, points[pt_b].second), points[pt_c].second));
+                    }
+                }
+            }
             for (size_t pt_c = pt_b + 1; pt_c < size; pt_c++)
             {
                 on_circumcenter(CircumCenter(center, Triangle(points[pt_a].second, points[pt_b].second, points[pt_c].second)));
@@ -520,22 +530,14 @@ void Matcher::on_circle(const Point &center, const vector<pair<double, Point>> &
                     on_quadrangle_circumcenter(center, {points[pt_a].second, points[pt_b].second, points[pt_c].second, points[pt_d].second});
                 }
             }
-        }
-    }
-    for (size_t pt_a = 0; pt_a < size; pt_a++)
-    {
-        for (size_t pt_b = pt_a + 1; pt_b < size; pt_b++)
-        {
-            if (Coll(points[pt_a].second, points[pt_b].second, center).check_numerically())
-            {
-                for (size_t pt_c = 0; pt_c < size; pt_c++)
-                {
-                    if (pt_c != pt_a && pt_c != pt_b)
-                    {
-                        insert_theorem(Theorem::hypotenuse_is_diameter(Midp(points[pt_a].second, center, points[pt_b].second), points[pt_c].second));
-                    }
-                }
-            }
+            // for (auto const &pt : _problem->points())
+            // {
+            //     auto sec = Secant(center, points[pt_a].second, points[pt_b].second, pt);
+            //     if (sec.check_numerically())
+            //     {
+            //         insert_theorem(Theorem::definition_of_secant(sec));
+            //     }
+            // }
         }
     }
 }
@@ -546,7 +548,6 @@ void Matcher::match_circles()
     const size_t num_pts = _problem->num_points();
     for (const Point &center : _problem->points())
     {
-
         vector<item_type> pts;
         pts.reserve(num_pts - 1);
         for (const Point &pt : _problem->points())
@@ -607,6 +608,45 @@ void Matcher::match_orthocenters()
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+void Matcher::match_perps_paras()
+{
+    using item_type = pair<double, Slope>;
+    vector<item_type> slopes;
+    const size_t num_pt = _problem->num_points();
+    slopes.reserve(num_pt * (num_pt - 1) / 2);
+
+    for (size_t pt_a = 0; pt_a < num_pt; pt_a++)
+    {
+        for (size_t pt_b = pt_a + 1; pt_b < num_pt; pt_b++)
+        {
+            Slope slope(_problem->point(pt_a), _problem->point(pt_b));
+            slopes.emplace_back(slope.angle(), slope);
+        }
+    }
+
+    sort(slopes.begin(), slopes.end(), [](const item_type &a, const item_type &b)
+         { return a.first < b.first; });
+
+    for (size_t i = 0; i < slopes.size(); ++i)
+    {
+        for (size_t j = i + 1; j < slopes.size(); ++j)
+        {
+            const auto &l = slopes[i];
+            const auto &r = slopes[j];
+
+            if (Numerical::close_enough(l.first, r.first))
+            {
+                _stmts.push_back(std::make_unique<Para>(l.second, r.second));
+            }
+
+            if (Numerical::close_enough(r.first - l.first, M_PI / 2.0))
+            {
+                _stmts.push_back(std::make_unique<Perp>(l.second, r.second));
             }
         }
     }
