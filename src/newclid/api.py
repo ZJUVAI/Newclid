@@ -304,8 +304,6 @@ class CSolver:
                 out_path = Path(save_path)
                 self.solver.write_proof_steps(out_path)
                 print(f"[CSolver] Proof steps written to {out_path}")
-        else:
-            print(f"[CSolver] Problem {self.problem_name} failed to solve ❌")
 
         return solved
 
