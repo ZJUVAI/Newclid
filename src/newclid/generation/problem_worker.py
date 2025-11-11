@@ -76,11 +76,6 @@ class GeometryProblemWorker:
             except TimeoutError:
                 return [], {}
 
-            # fl_statement, _ = args
-            # start_time = time.time()
-            # seed = 42
-            # max_level = 500
-
             # Build solver
             solver, solver_builder = GeometryProblemWorker._build_solver(
                 fl_statement)
@@ -101,8 +96,6 @@ class GeometryProblemWorker:
             # first, group goals by problem key
             eq_predicates_goals = dict()
             for goal in possible_goals:
-                if goal.to_str() == 'coll c d p':
-                    pass
                 # find essential_clauses
                 points, premises, _, aux_points, aux, _, _ = solver.proof.dep_graph.get_proof_steps([
                                                                                                      goal])
@@ -246,14 +239,9 @@ class GeometryProblemWorker:
         if len(goals_str) == 0:
             return []
         results = []
-        for goal_str in goals_str:
-            if goal_str == 'coll c d p':
-                pass
         print(len(premises), len(aux)) 
         for r in range(len(aux)):
             for aux_subset in itertools.combinations(aux, r):
-                if repr(premises[0]) == 'coll[a,f,k,]':
-                    pass
                 solver_builder_test = GeometricSolverBuilder()
                 solver_builder_test.with_deductive_agent(DDARN())
                 proof_state = ProofState.build_predicates(
@@ -281,8 +269,6 @@ class GeometryProblemWorker:
                         last_aux_len = float('inf')
                         count = 0
                         while True:
-                            if goal.to_str() == 'eqangle b f f k j k j n':
-                                pass
                             _, _premises, _, aux_points, _aux, _, _ = _solver.proof.dep_graph.get_proof_steps([
                                                                                                                   goal])
                             if last_premises_len == len(_premises) and last_aux_len == len(_aux):
@@ -335,9 +321,6 @@ class GeometryProblemWorker:
             goal_new = res['goal']
             solver_new = res['solver']
             solver_new.proof.goals = [goal_new]
-
-            if goal_new.to_str() == 'coll c d p':
-                pass
 
             # get new proof
             points, premises, _, aux_points, aux, _, proof_steps = solver_new.proof.dep_graph.get_proof_steps([
