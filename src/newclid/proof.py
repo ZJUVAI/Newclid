@@ -106,7 +106,7 @@ class ProofState:
                         Statement.from_tokens(
                             translate_sentence(mapping, t), self.dep_graph
                         )
-                    )
+                    ) 
                     adds.append(Dependency.mk(statement, IN_PREMISES, ()))
             for n in cdef.numerics:
                 numerics.append(tuple(mapping[a] if a in mapping else a for a in n))
@@ -186,9 +186,10 @@ class ProofState:
             if len(constr_sentence) == len(cdef.declare):
                 mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
             else:
-                assert len(constr_sentence) + len(construction.points) == len(
+                if len(constr_sentence) + len(construction.points) != len(
                     cdef.declare
-                )
+                ):
+                    raise ValueError("Construction definition length mismatch.")
                 mapping = dict(
                     zip(cdef.declare[1:], construction.points + constr_sentence[1:])
                 )
@@ -205,10 +206,6 @@ class ProofState:
                 point.rely_on = set(self.symbols_graph.names2points(relys))
             else:
                 point.rely_on = set()
-                # print(f"Rely on {point.name}: ", end='')
-                # for rely in point.rely_on:
-                #     print(f"{rely.name} ", end='')
-                # print()
 
         self.matcher.update()
 
@@ -265,6 +262,55 @@ class ProofState:
             raise Exception(f"Build failed too many times, last error: {repr(err)}")
 
         return proof
+    
+    @classmethod
+    def build_predicates(
+        cls,
+        predicates: list[Statement],
+        defsJGEX: dict[str, DefinitionJGEX],
+        goals_str: list[str] | None = None,
+        *,
+        rng: "Generator",
+    ) -> ProofState:
+        """Build a proof state from given predicates and points."""
+        proof = ProofState(rng=rng, defs=defsJGEX)
+        adds: list[Dependency] = []
+
+        old_points = predicates[0].dep_graph.symbols_graph.nodes_of_type(Point)
+        for old_point in old_points:
+            proof.symbols_graph.new_node(Point, old_point.name)
+
+        for statement in predicates:
+            new_statement = notNone(
+                Statement.from_tokens(
+                    (statement.predicate.NAME,) + tuple([p.name for p in statement.args]),
+                    proof.dep_graph
+                )
+            )
+            adds.append(Dependency.mk(new_statement, IN_PREMISES, ()))
+
+        new_points = proof.symbols_graph.names2points([p.name for p in old_points])
+        for p_old, p_new in zip(old_points, new_points):
+            p_new.num = p_old.num
+            p_new.rely_on = set(proof.symbols_graph.names2points([p.name for p in p_old.rely_on]))
+        
+        for add in adds:
+            if not add.statement.check_numerical():
+                raise ValueError(
+                    "Numerical check failed when building from predicates."
+                )
+            add.add()
+
+        proof.matcher.update()
+
+        if goals_str:
+            proof.goals = [
+                notNone(Statement.from_tokens(goal_str.split(), proof.dep_graph))
+                for goal_str in goals_str
+            ]
+
+        return proof
+            
 
     def match_theorem(self, theorem: Rule) -> list[Dependency]:
         return list(self.matcher.match_theorem(theorem))
