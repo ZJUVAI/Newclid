@@ -239,7 +239,6 @@ class GeometryProblemWorker:
         if len(goals_str) == 0:
             return []
         results = []
-        print(len(premises), len(aux)) 
         for r in range(len(aux)):
             for aux_subset in itertools.combinations(aux, r):
                 solver_builder_test = GeometricSolverBuilder()
