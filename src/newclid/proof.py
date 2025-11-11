@@ -283,7 +283,7 @@ class ProofState:
         for statement in predicates:
             new_statement = notNone(
                 Statement.from_tokens(
-                    (statement.predicate.NAME,) + tuple([p.name for p in statement.args]),
+                    tuple(statement.to_str().split()),
                     proof.dep_graph
                 )
             )
