@@ -26,7 +26,7 @@ unique_ptr<Statement> Midp::normalize() const
     {
         return clone();
     }
-    return make_unique<Midp>(_right, _middle, _left);
+    return make_unique<Midp>(_middle, _right, _left);
 }
 
 bool Midp::check_nondegen() const
