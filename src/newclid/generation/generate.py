@@ -80,7 +80,7 @@ class GeometryGenerator:
     def generate(self):
         def task_generator():
             for i in range(10**9):
-                seed = int(time.time() * 1000) + i  # 唯一种子 = 时间戳 + 任务ID
+                seed = 42 + i  # 唯一种子 = 时间戳 + 任务ID
                 yield i, seed, self.n_clauses, self.max_level
 
         if not ray.is_initialized():
@@ -126,7 +126,7 @@ class GeometryGenerator:
                             re.search(r'\?\s*(\w+)', d['fl_problem']).group(1) for d in data]
                         summary['first_predicate'] = [
                             get_first_predicate(d['fl_problem']) for d in data]
-                        summary['n_clauses'] = [d['n_clauses'] for d in data]
+                        summary['n_premises'] = [d['n_premises'] for d in data]
                         summary['n_proof_steps'] = [d['n_proof_steps']
                                                     for d in data]
                         self.write_data(data)
