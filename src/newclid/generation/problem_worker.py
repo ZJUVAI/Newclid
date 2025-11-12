@@ -236,8 +236,6 @@ class GeometryProblemWorker:
         """Find minimal auxiliary clause set"""
         # Iterate through all possible subsets to find the minimal necessary auxiliary clause set
         # Search through subsets from size 0 to len-1 (excluding full set)
-        if len(goals_str) == 0:
-            return []
         results = []
         for r in range(len(aux)):
             for aux_subset in itertools.combinations(aux, r):
@@ -259,30 +257,13 @@ class GeometryProblemWorker:
                     # if found new solutions
                     if goal.check():
                         goals_str.remove(goal.to_str())
-                        # loop to shave
-                        _solver = solver_test
-                        last_premises_len = float('inf')
-                        last_aux_len = float('inf')
-                        count = 0
-                        while True:
-                            _, _premises, _, _, _aux, _, _ = _solver.proof.dep_graph.get_proof_steps([
-                                                                                                                  goal])
-                            if last_premises_len == len(_premises) and last_aux_len == len(_aux):
-                                break
-                            count += 1
-                            if count > 1:
-                                print("Warning!!!: excessive shaving iterations")
-                            last_premises_len = len(_premises)
-                            last_aux_len = len(_aux)
-                            res = GeometryProblemWorker._find_minimal_aux_clauses_new(
-                                _solver,
-                                solver_builder,
-                                [goal.to_str()],
-                                [dep.statement for dep in _premises],
-                                [dep.statement for dep in _aux]
-                            )
-                            _solver = res[0]['solver']
-                        results.extend(res)
+                        results.append({
+                            "solver": solver_test,
+                            "goal": goal
+                        })
+                        
+                if len(goals_str) == 0:
+                    break
 
         # goals requiring full aux set or the aux set is empty
         for goal_str in goals_str:
@@ -317,7 +298,7 @@ class GeometryProblemWorker:
             solver_new.proof.goals = [goal_new]
 
             # get new proof
-            points, premises, _, aux_points, aux, _, proof_steps = solver_new.proof.dep_graph.get_proof_steps([
+            _, premises, _, aux_points, aux, _, proof_steps = solver_new.proof.dep_graph.get_proof_steps([
                                                                                                      goal_new])
             all_premises = [dep.statement for dep in premises + aux]
             n_premises = len(all_premises)

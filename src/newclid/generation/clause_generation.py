@@ -168,14 +168,14 @@ class CompoundClauseGen:
             if len(res) == 0: 
                 new_clause = self.get_clause_with_n_constructions(BASIC, 1)
             # step 2: add clause with basic (free) 
-            elif clause_set < max_basic_clause:
-                new_clause = self.get_clause_with_n_constructions(BASIC_FREE, 1)
+            # elif clause_set < max_basic_clause:
+            #     new_clause = self.get_clause_with_n_constructions(BASIC_FREE, 1)
             # step 3: add cluase with single constructions or two constructions
             else:
                 if random.random() < 0.5:
                     new_clause = self.get_clause_with_n_constructions(INTERSECT, 2)
                 else:
-                    new_clause = self.get_clause_with_n_constructions(OTHER+INTERSECT, 1)
+                    new_clause = self.get_clause_with_n_constructions(OTHER+INTERSECT+BASIC_FREE, 1)
             if new_clause:
                 res.append(new_clause)
         return "; ".join(res)
