@@ -65,6 +65,7 @@ public:
     size_t push_established_statement(const Proof *pf);
 
     DDARSolver(Problem *problem);
+    ~DDARSolver();
 
     void advance_theorem(size_t index);
 
