@@ -19,7 +19,7 @@ Matcher::Matcher(Problem *prob) : _problem(prob)
     match_equal_angles();
     match_circles();
     match_orthocenters();
-    match_perps_paras();
+    // match_perps_paras();
 }
 
 vector<tuple<double, double, Triangle>> Matcher::all_triangles()
@@ -412,7 +412,7 @@ void Matcher::on_bisector(const Point &pt, const Angle &ang)
 
 void Matcher::on_eqangle(const Angle &left, const Angle &right)
 {
-    _stmts.push_back(make_unique<EqAngle>(left, right));
+    // _stmts.push_back(make_unique<EqAngle>(left, right));
     // ∠ABD = ∠ACD
     if (left.left() == right.left() && left.right() == right.right() && left.left() < left.right() && left.vertex() < left.left() && right.vertex() < right.left())
     {
