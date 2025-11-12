@@ -290,8 +290,8 @@ class CSolver:
             if not flag:
                 continue
             dep = Dependency.mk(conclusion, reason, tuple(why))
-            dep.add()
-            # self.solver.proof.dep_graph.hyper_graph[conclusion] = dep
+            # dep.add()
+            self.solver.proof.dep_graph.hyper_graph[conclusion] = dep
 
         self.solver.run_infos['success'] = solved
         self.solver.run_infos['runtime'] = time.time() - t0
