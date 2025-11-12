@@ -241,18 +241,16 @@ class GeometryProblemWorker:
         results = []
         for r in range(len(aux)):
             for aux_subset in itertools.combinations(aux, r):
-                solver_builder_test = GeometricSolverBuilder()
-                solver_builder_test.with_deductive_agent(DDARN())
                 proof_state = ProofState.build_predicates(
                     predicates=premises + list(aux_subset),
-                    defsJGEX=solver_builder_test.defs,
+                    defsJGEX=solver_builder.defs,
                     goals_str=goals_str,
-                    rng=np.random.default_rng(solver_builder_test.seed)
+                    rng=np.random.default_rng(solver_builder.seed)
                 )
                 solver_test = GeometricSolver(
                     proof_state,
-                    solver_builder_test.rules,
-                    solver_builder_test.deductive_agent
+                    solver_builder.rules,
+                    DDARN()
                 )
                 csolver_test = CSolver(
                     problem='', solver=solver_test)
@@ -263,12 +261,11 @@ class GeometryProblemWorker:
                         goals_str.remove(goal.to_str())
                         # loop to shave
                         _solver = solver_test
-                        _solver_builder = solver_builder_test
                         last_premises_len = float('inf')
                         last_aux_len = float('inf')
                         count = 0
                         while True:
-                            _, _premises, _, aux_points, _aux, _, _ = _solver.proof.dep_graph.get_proof_steps([
+                            _, _premises, _, _, _aux, _, _ = _solver.proof.dep_graph.get_proof_steps([
                                                                                                                   goal])
                             if last_premises_len == len(_premises) and last_aux_len == len(_aux):
                                 break
@@ -279,13 +276,12 @@ class GeometryProblemWorker:
                             last_aux_len = len(_aux)
                             res = GeometryProblemWorker._find_minimal_aux_clauses_new(
                                 _solver,
-                                _solver_builder,
+                                solver_builder,
                                 [goal.to_str()],
                                 [dep.statement for dep in _premises],
                                 [dep.statement for dep in _aux]
                             )
                             _solver = res[0]['solver']
-                            _solver_builder = res[0]['solver_builder']
                         results.extend(res)
 
         # goals requiring full aux set or the aux set is empty
@@ -297,7 +293,6 @@ class GeometryProblemWorker:
             # problem_new = ProblemJGEX.from_text(problem_new)
             results.append({
                 "solver": solver,
-                "solver_builder": solver_builder,
                 "goal": goal
             })
         return results
