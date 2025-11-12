@@ -157,7 +157,7 @@ class GeometryProblemWorker:
     def _generate_possible_goals(solver):
         """Generate possible goals"""
         t = time.time()
-        GeometryProblemWorker.all_possible_goals_by_ar(solver.proof.dep_graph)
+        # GeometryProblemWorker.all_possible_goals_by_ar(solver.proof.dep_graph)
         possible_goals = [
             goal for goal in solver.proof.dep_graph.conclusions()]
         possible_goals = GeometryProblemWorker.filter.goal_filter(
@@ -195,8 +195,7 @@ class GeometryProblemWorker:
                     v1, v2 = extract_points(v1), extract_points(v2)
                     goal_from_tokens(tuple(['para'] + list(v1 + v2)))
                     goal_from_tokens(tuple(['perp'] + list(v1 + v2)))
-                    if len(set(v1 + v2)) == 3:
-                        goal_from_tokens(tuple(['acompute'] + list(v1 + v2)))
+                    goal_from_tokens(tuple(['acompute'] + list(v1 + v2)))
                 except Exception as e:
                     logging.warning(
                         f"Error in goal_from_tokens: {e} para/perp for {v1}, {v2}")
@@ -205,8 +204,7 @@ class GeometryProblemWorker:
             try:
                 v1, v2, v3, v4 = extract_points(v1), extract_points(
                     v2), extract_points(v3), extract_points(v4)
-                if len(set(v1 + v2)) == 3 and len(set(v3 + v4)) == 3:
-                    goal_from_tokens(tuple(['eqangle'] + list(v1 + v2 + v3 + v4)))
+                goal_from_tokens(tuple(['eqangle'] + list(v1 + v2 + v3 + v4)))
             except Exception as e:
                 logging.warning(
                     f"Error in goal_from_tokens: {e} for eqangle {v1}, {v2}, {v3}, {v4}")
