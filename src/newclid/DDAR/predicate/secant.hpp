@@ -49,7 +49,7 @@ public:
 
     Coll coll_pab() const;
 
-    std::vector<Equation<Product> *> as_equation_product() const override;
+    std::vector<std::unique_ptr<Equation<Product>>> as_equation_product() const override;
 
     bool numerical_only() const override { return false; }
 

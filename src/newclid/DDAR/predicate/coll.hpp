@@ -59,9 +59,9 @@ public:
 
     bool operator<(const Coll &other) const;
 
-    std::vector<Equation<Slope> *> as_equation_slope() const override;
+    std::vector<std::unique_ptr<Equation<Slope>>> as_equation_slope() const override;
 
-    std::vector<Equation<Product> *> as_equation_product() const override;
+    std::vector<std::unique_ptr<Equation<Product>>> as_equation_product() const override;
 
     Coll reverse() const;
 };

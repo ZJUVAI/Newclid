@@ -54,9 +54,11 @@ ostream &AConst::print(std::ostream &out) const
     return out << _angle << " = " << _rhs << "π";
 }
 
-vector<Equation<Slope> *> AConst::as_equation_slope() const
+vector<unique_ptr<Equation<Slope>>> AConst::as_equation_slope() const
 {
-    return {new Equation<Slope>(Equation<Slope>::sub_eq_const(_angle.right_side(), _angle.left_side(), _rhs))};
+    vector<unique_ptr<Equation<Slope>>> result;
+    result.push_back(make_unique<Equation<Slope>>(Equation<Slope>::sub_eq_const(_angle.right_side(), _angle.left_side(), _rhs)));
+    return result;
 }
 
 vector<string> AConst::to_tokens() const

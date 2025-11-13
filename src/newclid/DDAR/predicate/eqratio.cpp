@@ -75,12 +75,16 @@ ostream &EqRatio::print(ostream &os) const
     return os << _left_up << ":" << _left_down << " = " << _right_up << ":" << _right_down;
 }
 
-vector<Equation<DistLog> *> EqRatio::as_equation_distlog() const
+vector<unique_ptr<Equation<DistLog>>> EqRatio::as_equation_distlog() const
 {
-    return {new Equation<DistLog>(Equation<DistLog>::sub_eq_sub(DistLog(_left_up), DistLog(_left_down), DistLog(_right_up), DistLog(_right_down)))};
+    vector<unique_ptr<Equation<DistLog>>> result;
+    result.push_back(make_unique<Equation<DistLog>>(Equation<DistLog>::sub_eq_sub(DistLog(_left_up), DistLog(_left_down), DistLog(_right_up), DistLog(_right_down))));
+    return result;
 }
 
-vector<Equation<Product> *> EqRatio::as_equation_product() const
+vector<unique_ptr<Equation<Product>>> EqRatio::as_equation_product() const
 {
-    return {new Equation<Product>(LinearCombination<Product>(vector<Dist>{_left_up, _right_down}) - LinearCombination<Product>(vector<Dist>{_left_down, _right_up}) == Rational((long long)0))};
+    vector<unique_ptr<Equation<Product>>> result;
+    result.push_back(make_unique<Equation<Product>>(LinearCombination<Product>(vector<Dist>{_left_up, _right_down}) - LinearCombination<Product>(vector<Dist>{_left_down, _right_up}) == Rational((long long)0)));
+    return result;
 }

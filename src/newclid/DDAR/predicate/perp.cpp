@@ -50,39 +50,42 @@ ostream &Perp::print(ostream &os) const
     return os << _left.left() << _left.right() << " ⟂  " << _right.left() << _right.right();
 }
 
-vector<Equation<Slope> *> Perp::as_equation_slope() const
+vector<unique_ptr<Equation<Slope>>> Perp::as_equation_slope() const
 {
-    return {new Equation<Slope>(Equation<Slope>::sub_eq_const(_left, _right, Rational(0.5)))};
+    vector<unique_ptr<Equation<Slope>>> result;
+    result.push_back(make_unique<Equation<Slope>>(Equation<Slope>::sub_eq_const(_left, _right, Rational(0.5))));
+    return result;
 }
 
-vector<Equation<Product> *> Perp::as_equation_product() const
+vector<unique_ptr<Equation<Product>>> Perp::as_equation_product() const
 {
     LinearCombination<Product> l(Product(vector<Dist>{_left.dist(), _left.dist()}));
     LinearCombination<Product> r(Product(vector<Dist>{_right.dist(), _right.dist()}));
 
+    vector<unique_ptr<Equation<Product>>> result;
     if (_left.left() == _right.left())
     {
         Dist x = Dist(_left.left(), _right.left());
         LinearCombination<Product> h(Product(vector<Dist>{x, x}));
-        return {new Equation<Product>(l + r - h == Rational(0))};
+        result.push_back(make_unique<Equation<Product>>(l + r - h == Rational(0)));
     }
     else if (_left.left() == _right.right())
     {
         Dist x = Dist(_left.left(), _right.right());
         LinearCombination<Product> h(Product(vector<Dist>{x, x}));
-        return {new Equation<Product>(l + r - h == Rational(0))};
+        result.push_back(make_unique<Equation<Product>>(l + r - h == Rational(0)));
     }
     else if (_left.right() == _right.left())
     {
         Dist x = Dist(_left.right(), _right.left());
         LinearCombination<Product> h(Product(vector<Dist>{x, x}));
-        return {new Equation<Product>(l + r - h == Rational(0))};
+        result.push_back(make_unique<Equation<Product>>(l + r - h == Rational(0)));
     }
     else if (_left.right() == _right.right())
     {
         Dist x = Dist(_left.right(), _right.right());
         LinearCombination<Product> h(Product(vector<Dist>{x, x}));
-        return {new Equation<Product>(l + r - h == Rational(0))};
+        result.push_back(make_unique<Equation<Product>>(l + r - h == Rational(0)));
     }
-    return {};
+    return result;
 }

@@ -160,9 +160,11 @@ vector<EqAngle> EqAngle::permutations() const
     return res;
 }
 
-vector<Equation<Slope> *> EqAngle::as_equation_slope() const
+vector<unique_ptr<Equation<Slope>>> EqAngle::as_equation_slope() const
 {
-    return {new Equation<Slope>(Equation<Slope>::sub_eq_sub(_left.left_side(), _left.right_side(), _right.left_side(), _right.right_side()))};
+    vector<unique_ptr<Equation<Slope>>> result;
+    result.push_back(make_unique<Equation<Slope>>(Equation<Slope>::sub_eq_sub(_left.left_side(), _left.right_side(), _right.left_side(), _right.right_side())));
+    return result;
 }
 
 bool EqAngle::operator==(const EqAngle &other) const

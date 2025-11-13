@@ -279,7 +279,7 @@ class CSolver:
             self.goals.append((predicate, args))
 
     # -------------------- 核心方法 -------------------- #
-    def run(self, max_level: int = 500, save_path: str | Path | None = None, use_subprocess: bool = True) -> bool:
+    def run(self, max_level: int = 500, save_path: str | Path | None = None, use_subprocess: bool = False) -> bool:
         """
         运行 DDAR 并执行求解。
         :param max_level: 最大推理层数
