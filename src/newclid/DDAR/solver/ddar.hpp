@@ -4,14 +4,14 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <memory>
 #include "problem.hpp"
 #include "ar/linear_system.hpp"
 #include "ar/reduced_equation.hpp"
 #include "typedef.hpp"
 #include "theorem.hpp"
 #include "solver/application.hpp"
-
-class Proof;
+#include "solver/proof.hpp"
 
 class DDARSolver
 {
@@ -22,7 +22,7 @@ private:
 
     std::vector<Application> _applications;
 
-    std::map<std::string, Proof *> _statement_proofs;
+    std::map<std::string, std::unique_ptr<Proof>> _statement_proofs;
 
     std::vector<Proof *> _goals;
 
@@ -65,7 +65,6 @@ public:
     size_t push_established_statement(const Proof *pf);
 
     DDARSolver(Problem *problem);
-    ~DDARSolver();
 
     void advance_theorem(size_t index);
 

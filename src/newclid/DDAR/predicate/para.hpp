@@ -33,7 +33,7 @@ public:
 
     std::ostream &print(std::ostream &os) const override;
 
-    std::vector<Equation<Slope> *> as_equation_slope() const override;
+    std::vector<std::unique_ptr<Equation<Slope>>> as_equation_slope() const override;
 
     bool numerical_only() const { return false; }
 };

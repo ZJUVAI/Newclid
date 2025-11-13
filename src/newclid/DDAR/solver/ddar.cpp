@@ -44,22 +44,6 @@ DDARSolver::DDARSolver(Problem *problem) : _problem(problem)
     // }
 }
 
-DDARSolver::~DDARSolver()
-{
-    // Release all dynamically allocated Proof objects
-    for (auto &[key, proof] : _statement_proofs)
-    {
-        delete proof;
-    }
-    _statement_proofs.clear();
-    
-    // Clear other containers
-    _checked_statements.clear();
-    _applications.clear();
-    _goals.clear();
-    _ars.clear();
-}
-
 bool DDARSolver::run_level(const Point &max_pt)
 {
     size_t num_stmts = _checked_statements.size();
@@ -194,12 +178,12 @@ Proof *DDARSolver::insert_statement(const unique_ptr<Statement> &p)
 {
     auto val = p->normalize();
     auto key = val->to_string();
-    auto [it, success] = _statement_proofs.insert({key, new Proof(this, std::move(val))});
+    auto [it, success] = _statement_proofs.insert({key, std::make_unique<Proof>(this, std::move(val))});
     if (success)
     {
         it->second->initial();
     }
-    return it->second;
+    return it->second.get();
 }
 
 vector<tuple<vector<string>, vector<vector<string>>, string>> DDARSolver::dependency_graph() const

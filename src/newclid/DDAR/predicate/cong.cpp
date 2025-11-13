@@ -49,12 +49,16 @@ ostream &Cong::print(ostream &os) const
     return os << _left << " = " << _right;
 }
 
-vector<Equation<DistLog> *> Cong::as_equation_distlog() const
+vector<unique_ptr<Equation<DistLog>>> Cong::as_equation_distlog() const
 {
-    return {new Equation<DistLog>(LinearCombination<DistLog>(_left) - LinearCombination<DistLog>(_right) == Rational((long long)0))};
+    vector<unique_ptr<Equation<DistLog>>> result;
+    result.push_back(make_unique<Equation<DistLog>>(LinearCombination<DistLog>(_left) - LinearCombination<DistLog>(_right) == Rational((long long)0)));
+    return result;
 }
 
-vector<Equation<Product> *> Cong::as_equation_product() const
+vector<unique_ptr<Equation<Product>>> Cong::as_equation_product() const
 {
-    return {new Equation<Product>(LinearCombination<Product>(_left) - LinearCombination<Product>(_right) == Rational((long long)0))};
+    vector<unique_ptr<Equation<Product>>> result;
+    result.push_back(make_unique<Equation<Product>>(LinearCombination<Product>(_left) - LinearCombination<Product>(_right) == Rational((long long)0)));
+    return result;
 }
