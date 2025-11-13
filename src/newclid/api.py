@@ -36,13 +36,13 @@ import multiprocessing as mp
 
 
 # Worker function for subprocess isolation (must be at module level for pickling)
-def _run_ddar_in_subprocess(problem_name, points, premises, goals, max_level, flag, result_queue):
+def _run_ddar_in_subprocess(problem_name, points, premises, goals, max_level, result_queue):
     """Worker function to run DDAR in a subprocess to isolate memory leaks.
     
     This function runs in a separate process and puts the result in a queue.
     """
     try:
-        solved, dep_graph = DDAR.run_ddar(problem_name, points, premises, goals, max_level, flag)
+        solved, dep_graph = DDAR.run_ddar(problem_name, points, premises, goals, max_level)
         result_queue.put({"success": True, "solved": solved, "dep_graph": dep_graph})
     except Exception as e:
         import traceback
