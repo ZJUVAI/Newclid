@@ -200,7 +200,7 @@ Theorem Theorem::thales_para_of_eqratio_with_common_point(const Coll &left, cons
     theorem.add_hypothesis(right.clone());
     theorem.add_hypothesis(make_unique<NColl>(NColl(left.b(), left.c(), right.b())));
     theorem.add_hypothesis(make_unique<SameSide>(SameSide(left.a(), left.b(), left.c(), right.a(), right.b(), right.c())));
-    theorem.add_conclusion(make_unique<Para>(Para(Slope(left.b(), left.c()), Slope(right.b(), right.c()))));
+    theorem.add_conclusion(make_unique<Para>(Para(Slope(left.b(), right.b()), Slope(left.c(), right.c()))));
     return theorem;
 }
 
