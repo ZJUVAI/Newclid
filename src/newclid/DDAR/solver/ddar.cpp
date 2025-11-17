@@ -171,6 +171,11 @@ void DDARSolver::advance_theorem(size_t index)
 
 void DDARSolver::insert_application(Theorem thm)
 {
+    if (!thm.check_numerically())
+    {
+        cout << thm.name() << endl;
+        throw runtime_error("Wrong theorem!!");
+    }
     _applications.emplace_back(this, move(thm));
 }
 
