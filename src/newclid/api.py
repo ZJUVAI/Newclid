@@ -38,15 +38,18 @@ import multiprocessing as mp
 # Worker function for subprocess isolation (must be at module level for pickling)
 def _run_ddar_in_subprocess(problem_name, points, premises, goals, max_level, result_queue):
     """Worker function to run DDAR in a subprocess to isolate memory leaks.
-    
+
     This function runs in a separate process and puts the result in a queue.
     """
     try:
-        solved, dep_graph = DDAR.run_ddar(problem_name, points, premises, goals, max_level)
-        result_queue.put({"success": True, "solved": solved, "dep_graph": dep_graph})
+        solved, dep_graph = DDAR.run_ddar(
+            problem_name, points, premises, goals, max_level)
+        result_queue.put(
+            {"success": True, "solved": solved, "dep_graph": dep_graph})
     except Exception as e:
         import traceback
-        result_queue.put({"success": False, "error": str(e), "traceback": traceback.format_exc()})
+        result_queue.put({"success": False, "error": str(e),
+                         "traceback": traceback.format_exc()})
 
 
 class GeometricSolver:
@@ -288,25 +291,26 @@ class CSolver:
         :return: bool 表示是否成功求解。
         """
         t0 = time.time()
-        
+
         if use_subprocess:
             # 使用子进程运行 DDAR 以隔离内存泄漏
             ctx = mp.get_context("spawn")
             result_queue = ctx.Queue()
-            
+
             p = ctx.Process(
                 target=_run_ddar_in_subprocess,
-                args=(self.problem_name, self.points, self.premises, self.goals, max_level, result_queue)
+                args=(self.problem_name, self.points, self.premises,
+                      self.goals, max_level, result_queue)
             )
             p.start()
             result = result_queue.get()
             p.join()
-            
+
             if not result["success"]:
                 print(f"[CSolver] Error in subprocess: {result['error']}")
                 print(result.get("traceback", ""))
                 return False
-            
+
             solved = result["solved"]
             dep_graph = result["dep_graph"]
         else:
@@ -346,6 +350,9 @@ class CSolver:
                 print(f"[CSolver] Proof steps written to {out_path}")
 
         return solved
+
+    def possible_goals(self) -> List[str]:
+        return DDAR.get_possible_goals(self.problem_name, self.points, self.premises)
 
     # -------------------- 辅助输出 -------------------- #
     def print_info(self):
