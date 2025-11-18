@@ -282,41 +282,17 @@ class CSolver:
             self.goals.append((predicate, args))
 
     # -------------------- 核心方法 -------------------- #
-    def run(self, max_level: int = 500, save_path: str | Path | None = None, use_subprocess: bool = False) -> bool:
+    def run(self, max_level: int = 500, save_path: str | Path | None = None) -> bool:
         """
         运行 DDAR 并执行求解。
         :param max_level: 最大推理层数
         :param save_path: 可选，保存证明步骤的路径。
-        :param use_subprocess: 是否在子进程中运行 DDAR 以隔离内存泄漏
         :return: bool 表示是否成功求解。
         """
         t0 = time.time()
 
-        if use_subprocess:
-            # 使用子进程运行 DDAR 以隔离内存泄漏
-            ctx = mp.get_context("spawn")
-            result_queue = ctx.Queue()
-
-            p = ctx.Process(
-                target=_run_ddar_in_subprocess,
-                args=(self.problem_name, self.points, self.premises,
-                      self.goals, max_level, result_queue)
-            )
-            p.start()
-            result = result_queue.get()
-            p.join()
-
-            if not result["success"]:
-                print(f"[CSolver] Error in subprocess: {result['error']}")
-                print(result.get("traceback", ""))
-                return False
-
-            solved = result["solved"]
-            dep_graph = result["dep_graph"]
-        else:
-            # 直接在当前进程运行（会有内存泄漏）
-            solved, dep_graph = DDAR.run_ddar(
-                self.problem_name, self.points, self.premises, self.goals, max_level)
+        solved, dep_graph = DDAR.run_ddar(
+            self.problem_name, self.points, self.premises, self.goals, max_level)
 
         for stmt, deps, reason in dep_graph:
             conclusion = Statement.from_tokens(
