@@ -358,7 +358,7 @@ class LMAgent(DeductiveAgent):
             string_premise.append(tmp_string)
         data_problem += ' ; '.join([s.strip() for s in string_premise]) + ' ? '
         data_problem += ' ; '.join([
-            (goal[0] + ' ' + ' '.join(goal[1:])) 
+            Statement.from_tokens(goal, dep_graph).to_str()
             for goal in problem.goals
             ])
         data_problem += ' </problem>'
