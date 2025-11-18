@@ -99,9 +99,41 @@ extern "C"
 
         return make_pair(solver.is_solved(), dep_graph);
     }
+
+    vector<string> get_possible_goals(string name, vector<tuple<string, double, double>> points, vector<pair<string, vector<string>>> premises)
+    {
+        Problem problem;
+        problem.load_from_data(name, points, premises, {});
+
+        DDARSolver solver(&problem);
+        solver.run(500);
+
+        vector<string> possible_goals;
+
+        for (const auto &app : solver.applications())
+        {
+            if (app.state() != ApplicationState::PENDING)
+            {
+                continue;
+            }
+            for (const auto &c : app.conclusions())
+            {
+                if (c->statement()->name() == "secant")
+                {
+                    continue;
+                }
+                possible_goals.push_back(c->statement()->to_string());
+            }
+        }
+        std::sort(possible_goals.begin(), possible_goals.end());
+        auto it = std::unique(possible_goals.begin(), possible_goals.end());
+        possible_goals.erase(it, possible_goals.end());
+        return possible_goals;
+    }
 }
 
 PYBIND11_MODULE(DDAR, m)
 {
     m.def("run_ddar", &run_ddar, "Run DDAR with given problem");
+    m.def("get_possible_goals", &get_possible_goals, "Get all possible goals for a given problem");
 }
