@@ -2,9 +2,9 @@ from copy import deepcopy
 from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Collection, Optional, Union
+from adjustText import adjust_text
 
 import numpy as np
-
 
 from newclid.numerical.geometries import (
     PointNum,
@@ -88,8 +88,10 @@ def _draw(
     """Draw everything."""
     for statement in statements:
         statement.draw(ax, rng)
+    point_names = []
     for p in points:
-        draw_point(ax, p)
+        point_names.append(draw_point(ax, p))
+    adjust_text(point_names, ax=ax)
 
 
 def fill_missing(d0: dict[Any, Any], d1: dict[Any, Any]):
@@ -133,15 +135,23 @@ def draw_segment_num(ax: "Axes", p0: PointNum, p1: PointNum, **args: Any):
     ax.plot((p0.x, p1.x), (p0.y, p1.y), **args)  # type: ignore
 
 
-def draw_angle(ax: "Axes", line0: Line, line1: Line, **args: Any):
-    (o,) = intersect(line0.num, line1.num)
-    ang0, ang1 = line0.num.angle(), line1.num.angle()
-    if ang0 > ang1:
-        ang0, ang1 = ang1, ang0
-    if ang0 - ang1 + np.pi < ang1 - ang0:
-        ang0, ang1 = ang1 - np.pi, ang0
+def draw_angle(ax: "Axes", point0: Point, point1: Point, point2: Point, **args: Any):
+    draw_segment(ax, point0, point1)
+    draw_segment(ax, point0, point2)
+    dir1, dir2 = point1.num - point0.num, point2.num - point0.num
+    if dir1.x * dir2.y - dir1.y * dir2.x < 0:
+        dir1, dir2 = dir2, dir1
+    if dir1.x * dir2.x + dir1.y * dir2.y >= 0:
+        ang1 = np.arctan2(dir1.y, dir1.x)
+        ang2 = np.arctan2(dir2.y, dir2.x)
+    else:
+        len2 = np.sqrt(dir2.x**2 + dir2.y**2)
+        o = point0.num - dir2 / len2 * 0.2
+        draw_segment_num(ax, point0.num, o, ls="dashed")
+        ang1 = np.arctan2(-dir2.y, -dir2.x)
+        ang2 = np.arctan2(dir1.y, dir1.x)
     wedge = patches.Wedge(
-        (o.x, o.y), theta1=ang0 / np.pi * 180, theta2=ang1 / np.pi * 180, **args
+        (point0.num.x, point0.num.y), theta1=ang1 / np.pi * 180, theta2=ang2 / np.pi * 180, **args
     )
     ax.add_patch(wedge)
 
@@ -158,13 +168,13 @@ def draw_point(
     p: Point,
     args_point: Optional[dict[Any, Any]] = None,
     args_name: Optional[dict[Any, Any]] = None,
-) -> None:
+):
     """draw a point."""
     args_point = args_point or {}
     args_name = args_name or {}
     fill_missing(args_point, {"color": "white", "s": 5.0})
     ax.scatter(p.num.x, p.num.y, **args_point)  # type: ignore
     fill_missing(args_name, {"color": "lime", "fontsize": 10})
-    ax.annotate(  # type: ignore
+    return ax.annotate(  # type: ignore
         p.pretty_name, (p.num.x, p.num.y), **args_name
     )

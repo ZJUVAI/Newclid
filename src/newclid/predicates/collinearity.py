@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from matplotlib.axes import Axes
 from newclid.dependencies.dependency import NUMERICAL_CHECK, Dependency
 from newclid.dependencies.symbols import Line, Point
-from newclid.numerical.draw_figure import draw_line
+from newclid.numerical.draw_figure import draw_line, draw_segment
 from newclid.numerical.geometries import LineNum
 from newclid.predicates.predicate import Predicate
 from newclid.tools import notNone
@@ -83,13 +83,8 @@ class Coll(Predicate):
     def draw(
         cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
     ):
-        symbols_graph = dep_graph.symbols_graph
-        draw_line(
-            ax,
-            notNone(symbols_graph.container_of(set(args), Line)),
-            alpha=1.0,
-            ls="dashed",
-        )
+        for k in range(len(args) - 1):
+            draw_segment(ax, args[k], args[k + 1])
 
 
 class NColl(Predicate):

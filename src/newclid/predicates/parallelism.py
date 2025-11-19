@@ -76,6 +76,8 @@ class Para(Predicate):
 
     @classmethod
     def why(cls, statement: Statement) -> Dependency:
+        if repr(statement) == 'para[h,m,l,m,]':
+            flag = True
         eqs, table = cls._prep_ar(statement)
         why: list[Dependency] = []
         for eq in eqs:
@@ -111,7 +113,7 @@ class Para(Predicate):
         dep_graph: "DependencyGraph",
         rng: Generator,
     ):
-        setattr(ax, "para_color", (getattr(ax, "angle_color", 0) + 1) % len(PALETTE))
+        setattr(ax, "para_color", (getattr(ax, "para_color", 0) + 1) % len(PALETTE))
         points: tuple[Point, ...] = args
         seglen = 100
         for i in range(0, len(points), 2):
