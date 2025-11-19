@@ -3,7 +3,8 @@ import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import time
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, List, Tuple
+from fractions import Fraction
 import re
 from collections import defaultdict
 import heapq
@@ -28,10 +29,12 @@ from newclid.predicates.equal_angles import EqAngle
 from newclid.predicates.equal_ratios import EqRatio
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulator
+from newclid.dependencies.dependency import Dependency
+from newclid.numerical.geometries import PointNum
+from newclid.DDAR.build import DDAR
 
 if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
-    from newclid.dependencies.dependency import Dependency
 
 class LMAgent(DeductiveAgent):
     def __init__(self, model_path: list[str], decoding_size: int, beam_size: int, search_depth: int):
@@ -69,6 +72,7 @@ class LMAgent(DeductiveAgent):
             add_generation_prompt=True,
         )
         # text = query
+        text += "<think>\n\n</think>\n\n"
         model_prompt_inputs = tokenizer([text], return_tensors="pt")
         text += response_prefix
         model_inputs = tokenizer([text], return_tensors="pt").to('cuda')
@@ -115,7 +119,7 @@ class LMAgent(DeductiveAgent):
             if not goal.check_numerical():
                 return infos(False, f"{goal.pretty()} fails numerical check")
         # Run ddar
-        base_proof = LMAgent.run_ddar(proof, rules, t0, timeout)
+        base_proof = LMAgent.run_ddar_c(proof, rules, t0, timeout)
         # if proofed by ddar, return
         if base_proof.check_goals():
             return infos(True)
@@ -394,6 +398,60 @@ class LMAgent(DeductiveAgent):
             # TODO: add step later..
             # step += 1
         return proof
+    
+    def _extract_points(proof: ProofState):
+        points: List[Tuple[str, Any, Any]] = []
+        for name, point in proof.symbols_graph.name2node.items():
+            if isinstance(point.num, PointNum):
+                points.append((name, point.num.x, point.num.y))
+        return points
+
+    def _extract_premises(proof: ProofState):
+        premises: List[Tuple[str, List[str]]] = []
+        for stmt in proof.dep_graph.hyper_graph:
+            predicate = stmt.predicate.NAME
+            args = []
+            for pt in stmt.args:
+                if isinstance(pt, Fraction):
+                    args.append(str(pt))
+                else:
+                    args.append(pt.name)
+            premises.append((predicate, args))
+        return premises
+
+    def _extract_goals(proof: ProofState):
+        goals: List[Tuple[str, List[str]]] = []
+        for stmt in proof.goals:
+            predicate = stmt.predicate.NAME
+            args = []
+            for pt in stmt.args:
+                if isinstance(pt, Fraction):
+                    args.append(str(pt))
+                else:
+                    args.append(pt.name)
+            goals.append((predicate, args))
+        return goals
+    
+    @staticmethod
+    def run_ddar_c(proof: "ProofState", rules: list[Rule], start_time: int, timeout: int = 3600): 
+        points = LMAgent._extract_points(proof)
+        premises = LMAgent._extract_premises(proof)
+        goals = LMAgent._extract_goals(proof)
+        
+        _, dep_graph = DDAR.run_ddar("", points, premises, goals, 500)
+
+        for stmt, deps, reason in dep_graph:
+            conclusion = Statement.from_tokens(
+                stmt, proof.dep_graph)
+            why = []
+            for dep in deps:
+                premise = Statement.from_tokens(
+                    dep, proof.dep_graph)
+                why.append(premise)
+            dep = Dependency.mk(conclusion, reason, tuple(why))
+            proof.dep_graph.hyper_graph[conclusion] = dep
+
+        return proof   
 
 
 @ray.remote(num_cpus=1)
@@ -412,7 +470,7 @@ def run_ddar_remote(problem, proof, aux, rules: list[Rule], start_time: int, tim
         except Exception:
             return
     try:
-        proof = LMAgent.run_ddar(proof, rules, start_time, timeout)
+        proof = LMAgent.run_ddar_c(proof, rules, start_time, timeout)
     except Exception:
         return
     return proof
