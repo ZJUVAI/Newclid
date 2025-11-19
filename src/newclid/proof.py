@@ -11,7 +11,7 @@ from matplotlib import patches
 from newclid.formulations.clause import Clause, translate_sentence
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.dependencies.symbols import Point
-from newclid.numerical.draw_figure import init_figure
+from newclid.numerical.draw_figure import init_figure, draw_segment
 from newclid.numerical.geometries import (
     InvalidIntersectError,
     InvalidReduceError,
@@ -163,15 +163,9 @@ class ProofState:
         # draw some specific figures (to be refactored, if there are multiple branches)
         if construction.sentences[0][0] == "triangle":
             (ax,) = self.fig.axes
-            triangle = patches.Polygon(
-                (
-                    (new_points[0].num.x, new_points[0].num.y),
-                    (new_points[1].num.x, new_points[1].num.y),
-                    (new_points[2].num.x, new_points[2].num.y),
-                ),
-                closed=True,
-            )
-            ax.add_artist(triangle)
+            draw_segment(ax, new_points[0], new_points[1])
+            draw_segment(ax, new_points[1], new_points[2])
+            draw_segment(ax, new_points[2], new_points[0])
         for add in adds:
             if not add.statement.check_numerical():
                 raise ConstructionError(

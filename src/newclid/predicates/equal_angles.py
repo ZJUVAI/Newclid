@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any
 
 from matplotlib.axes import Axes
 import numpy as np
+import logging
 
 from newclid.dependencies.symbols import Line
 from newclid.numerical import close_enough
@@ -174,13 +175,15 @@ class EqAngle(Predicate):
     ):
         setattr(ax, "angle_color", (getattr(ax, "angle_color", 0) + 1) % len(PALETTE))
         color = PALETTE[ax.angle_color]  # type: ignore
-        r = rng.random()
-        width = r * 0.1
-        symbols_graph = dep_graph.symbols_graph
         for i in range(0, len(args), 4):
-            line0 = symbols_graph.container_of({args[i], args[i + 1]}, Line)
-            line1 = symbols_graph.container_of({args[i + 2], args[i + 3]}, Line)
-            assert line0 and line1
-            draw_angle(ax, line0, line1, color=color, alpha=0.5, width=width, r=r)
-            draw_line(ax, line0, ls=":")
-            draw_line(ax, line1, ls=":")
+            if len(set(args[i:i+4])) > 3:
+                logging.warning(f"Cannot draw angle with more than 3 distinct points: {args[i:i+4]}")
+            if args[i] == args[i + 2] or args[i] == args[i + 3]:
+                point0 = args[i]
+            else:
+                point0 = args[i + 1]
+            point1 = args[i + 1] if point0 == args[i] else args[i]
+            point2 = args[i + 3] if point0 == args[i + 2] else args[i + 2]   
+            r = rng.random() * 0.1 + 0.1
+            width = r * 0.1  
+            draw_angle(ax, point0, point1, point2, color=color, alpha=0.5, width=width, r=r)

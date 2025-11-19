@@ -2,14 +2,17 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional
 
 from matplotlib.axes import Axes
+import matplotlib.patches as patches
+import numpy as np
 
 from newclid.dependencies.symbols import Line, Point
 from newclid.numerical import nearly_zero
-from newclid.numerical.draw_figure import draw_line, draw_rectangle
+from newclid.numerical.draw_figure import draw_line, draw_rectangle, draw_segment, draw_segment_num
 from newclid.predicates.equal_angles import EqAngle
 from newclid.predicates.predicate import Predicate
 from newclid.tools import notNone
 from numpy.random import Generator
+from newclid.numerical.geometries import intersect
 
 if TYPE_CHECKING:
     from newclid.algebraic_reasoning.tables import Table
@@ -116,17 +119,25 @@ class Perp(Predicate):
         symbols_graph = dep_graph.symbols_graph
         line0 = notNone(symbols_graph.container_of({args[0], args[1]}, Line))
         line1 = notNone(symbols_graph.container_of({args[2], args[3]}, Line))
-        draw_rectangle(
-            ax,
-            line0,
-            line1,
+        (o,) = intersect(line0.num, line1.num)
+        dir1 = args[0].num - o if not o.close_enough(args[0].num) else args[1].num - o
+        dir2 = args[2].num - o if not o.close_enough(args[2].num) else args[3].num - o
+        if dir1.x * dir2.y - dir1.y * dir2.x < 0:
+            dir1, dir2 = dir2, dir1
+        ang = np.arctan2(dir1.y, dir1.x)
+        rectangle = patches.Rectangle(
+            (o.x, o.y),
+            angle=ang / np.pi * 180,
             fill=False,
             color="yellow",
-            width=0.3,
-            height=0.3,
+            width=0.05,
+            height=0.05,
         )
-        draw_line(ax, line0)
-        draw_line(ax, line1)
+        ax.add_patch(rectangle)
+        draw_segment_num(ax, o, args[0].num)
+        draw_segment_num(ax, o, args[1].num)
+        draw_segment_num(ax, o, args[2].num)
+        draw_segment_num(ax, o, args[3].num)
 
 
 class NPerp(Predicate):
