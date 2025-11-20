@@ -82,6 +82,7 @@ class GeometryProblemWorker:
             if not solver:
                 return [], {}
 
+            n_clauses = len(fl_statement.split(';'))
             csolver = CSolver(fl_statement, seed=seed, solver=solver)
             # print(f"problem: {fl_statement}")
 
@@ -114,7 +115,7 @@ class GeometryProblemWorker:
                 premises = goal_list[0][1]
                 aux = goal_list[0][2]
                 data = GeometryProblemWorker._process_goals_with_same_statement(
-                    goals, solver, solver_builder, premises, aux)
+                    goals, solver, solver_builder, premises, aux, n_clauses)
                 generated_data.extend(data)
             process_goal_time = time.time() - process_goal_time
 
@@ -279,7 +280,7 @@ class GeometryProblemWorker:
         return results
 
     @staticmethod
-    def _process_goals_with_same_statement(goals, solver, solver_builder, premises, aux):
+    def _process_goals_with_same_statement(goals, solver, solver_builder, premises, aux, n_clauses):
         """Process a single goal"""
 
         results = []
@@ -317,6 +318,7 @@ class GeometryProblemWorker:
                 continue
 
             results.append({
+                "n_clauses": n_clauses,
                 "n_premises": n_premises,
                 "fl_problem": str(solver_builder.problemJGEX) + goal_new.to_str(),
                 "nl_problem": "",
