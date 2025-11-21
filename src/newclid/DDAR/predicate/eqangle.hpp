@@ -56,6 +56,8 @@ public:
     bool operator>=(const EqAngle &other) const;
 
     std::vector<std::string> to_tokens() const;
+
+    std::string to_string() const override;
 };
 
 #endif // EQANGLE_HPP

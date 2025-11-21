@@ -103,8 +103,13 @@ class LMAgent(DeductiveAgent):
             infos["runtime"] = time.time() - t0
             infos["success"] = is_success
             infos["steps"] = step
+            infos["problem"] = ""
             if error_msg:
-                infos["error"] = error_msg
+                if is_success:
+                    infos["problem"] = error_msg[0]
+                    infos["proof"] = error_msg[1]
+                else:
+                    infos["error"] = error_msg
             return infos
         
         t0 = time.time()
@@ -118,7 +123,7 @@ class LMAgent(DeductiveAgent):
         base_proof = LMAgent.run_ddar(proof, rules, t0, timeout)
         # if proofed by ddar, return
         if base_proof.check_goals():
-            return infos(True)
+            return infos(True, [str(self.problemJGEX), base_proof])
         # else seek help from llm
         else:
             rules_ref = ray.put(rules)
@@ -167,10 +172,11 @@ class LMAgent(DeductiveAgent):
                             if res is None:
                                 continue
                             elif res.check_goals():
+                                new_problem, prev_score, score = future_info[f]
                                 for task in running_futures:
                                     ray.cancel(task, force=True)
                                 ray.shutdown()
-                                return infos(True, str(new_problem))
+                                return infos(True, [str(new_problem), res])
                             elif depth < self.search_depth -1:
                                 new_problem, prev_score, score = future_info[f]
                                 new_queue.add(node=(new_problem, res), val=prev_score+score)
@@ -186,7 +192,7 @@ class LMAgent(DeductiveAgent):
                                 for task in running_futures:
                                     ray.cancel(task, force=True)
                                 ray.shutdown()
-                                return infos(True, str(new_problem))
+                                return infos(True, [str(new_problem), res])
                             elif depth < self.search_depth -1:
                                 new_problem, prev_score, score = future_info[f]
                                 new_queue.add(node=(new_problem, res), val=prev_score+score)

@@ -328,7 +328,15 @@ class CSolver:
         return solved
 
     def possible_goals(self) -> List[str]:
-        return DDAR.get_possible_goals(self.problem_name, self.points, self.premises)
+        ret = []
+        tmp_goals = DDAR.get_possible_goals(self.problem_name, self.points, self.premises)
+        while len(tmp_goals) != 0:
+            ret.append(tmp_goals[0])
+            predicate = tmp_goals[0].split()[0]
+            args = tmp_goals[0].split()[1:]
+            self.premises.append((predicate, args))
+            tmp_goals = DDAR.get_possible_goals(self.problem_name, self.points, self.premises)
+        return ret
 
     # -------------------- 辅助输出 -------------------- #
     def print_info(self):

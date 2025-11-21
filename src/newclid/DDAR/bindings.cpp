@@ -122,7 +122,8 @@ extern "C"
                 {
                     continue;
                 }
-                possible_goals.push_back(c->statement()->to_string());
+                if(!c->is_proved())
+                    possible_goals.push_back(c->statement()->to_string());
             }
         }
         std::sort(possible_goals.begin(), possible_goals.end());

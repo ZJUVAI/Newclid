@@ -212,3 +212,17 @@ vector<string> EqAngle::to_tokens() const
     tokens.push_back(_right.right().name());
     return tokens;
 }
+
+string EqAngle::to_string() const
+{
+    string res = name();
+    res += " " + _left.left().name();
+    res += " " + _left.vertex().name();
+    res += " " + _left.vertex().name();
+    res += " " + _left.right().name();
+    res += " " + _right.left().name();
+    res += " " + _right.vertex().name();
+    res += " " + _right.vertex().name();
+    res += " " + _right.right().name();
+    return res;
+}
