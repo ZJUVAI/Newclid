@@ -32,9 +32,7 @@ public:
 
     std::vector<statement_arg> args() const override;
 
-    std::vector<std::unique_ptr<Equation<DistLog>>> as_equation_distlog() const override;
-
-    std::vector<std::unique_ptr<Equation<Product>>> as_equation_product() const override;
+    std::vector<std::unique_ptr<Equation>> as_equation() const override;
 
     const Dist &left() const { return _left; }
 

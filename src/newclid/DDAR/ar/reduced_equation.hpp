@@ -4,45 +4,31 @@
 #include "ar/equation.hpp"
 #include "ar/linear_system.hpp"
 
-template <typename VarT>
 class ReducedEquation final
 {
-public:
-    using EquationType = Equation<VarT>;
-    using LinearCombinationType = typename LinearSystem<VarT>::LinearCombinationType;
-    using VarType = VarT;
-
 private:
-    const EquationType _original_equation;
-    const LinearSystem<VarT> *_system;
-    LinearCombinationType _linear_combination;
-    EquationType _remainder;
+    Equation _original_equation;
+    LinearSystem *_system;
+    Equation _remainder;
 
 public:
-    explicit ReducedEquation(const EquationType &equation, const LinearSystem<VarT> *system);
+    explicit ReducedEquation(Equation &equation, LinearSystem *system);
 
-    const EquationType &original_equation() const { return _original_equation; }
+    const Equation &original_equation() const { return _original_equation; }
 
-    const LinearSystem<VarT> *linear_system() const { return _system; }
+    const LinearSystem *linear_system() const { return _system; }
 
-    const LinearCombinationType &linear_combination() const { return _linear_combination; }
-
-    const EquationType &remainder() const { return _remainder; }
-
-    void reduce();
+    const Equation &remainder() const { return _remainder; }
 
     bool is_solved() const;
 
-    auto statement_dependencies() const
-    {
-        std::vector<Proof *> dependencies;
-        std::transform(_linear_combination.lhs().begin(), _linear_combination.lhs().end(), std::back_inserter(dependencies),
-                       [this](const auto &term)
-                       {
-                           return _system->pair_at(term.first).second;
-                       });
-        return dependencies;
-    }
+    bool substitute_variable(Term var, const Equation &e);
+
+    void reduce();
+
+    void set_index(size_t index, const LinearSystem *system);
+
+    std::vector<Proof *> statement_dependencies() const;
 };
 
 #endif // REDUCED_EQUATION_HPP

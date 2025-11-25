@@ -1,30 +1,25 @@
 #ifndef EQUATION_HPP
 #define EQUATION_HPP
 
-#include "ar/linear_combination.hpp"
-#include "ar/equation_traits.hpp"
+#include <vector>
+#include <iostream>
+#include "ar/term.hpp"
 #include "ar/equation_index.hpp"
 
-template <typename VarT>
+class LinearSystem;
+
 class Equation final
 {
-public:
-    using VarType = VarT;
-    using LinearCombinationType = LinearCombination<VarT>;
-    using RHSType = typename EquationTraits<VarType>::RHSType;
-
 private:
-    LinearCombinationType _lhs;
-    RHSType _rhs;
+    std::vector<Term> _terms;
+    std::vector<std::pair<double, EquationIndex>> _combination;
 
 public:
-    Equation() = default;
+    Equation() : _terms(), _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))}) {}
 
-    Equation(LinearCombinationType lhs, RHSType rhs);
+    Equation(std::vector<Term> terms);
 
-    const LinearCombinationType &lhs() const { return _lhs; }
-
-    const RHSType &rhs() const { return _rhs; }
+    Equation(const Term &term) : _terms({term}), _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))}) {}
 
     Equation &operator+=(const Equation &other);
     Equation operator+(const Equation &other) const;
@@ -35,76 +30,50 @@ public:
     Equation &operator*=(const Rational &multiplier);
     Equation operator*(const Rational &multiplier) const;
 
+    Equation &operator*=(const Term &multiplier);
+    Equation operator*(const Term &multiplier) const;
+
     Equation operator-() const;
 
-    std::pair<Rational, Equation> normalize() const;
+    bool empty() const;
+    bool linear() const;
+    bool check_numerically() const;
 
-    bool check_numerically() const
-    {
-        // return lhs().evaluate() == RHSType(_rhs);
-        return true;
-    }
+    void normalize();
+    void reduction();
 
-    bool operator==(const Equation &other) const
-    {
-        return _lhs == other._lhs && _rhs == other._rhs;
-    }
+    std::vector<Term>::const_iterator begin() const;
+    std::vector<Term>::const_iterator end() const;
 
-    bool operator!=(const Equation &other) const
-    {
-        return !(*this == other);
-    }
+    const std::vector<Term> &terms() const { return _terms; }
+    const std::vector<std::pair<double, EquationIndex>> &combination() const { return _combination; }
 
-    bool operator<(const Equation &other) const
-    {
-        return _lhs < other._lhs ||
-               (_lhs == other._lhs && _rhs < other._rhs);
-    }
+    void set_index(int n, LinearSystem *system);
 
-    bool operator>(const Equation &other) const
-    {
-        return _lhs > other._lhs ||
-               (_lhs == other._lhs && _rhs > other._rhs);
-    }
+    bool operator<(const Equation &other) const { return _terms < other._terms; }
 
-    bool operator<=(const Equation &other) const
-    {
-        return !(*this > other);
-    }
-
-    bool operator>=(const Equation &other) const
-    {
-        return !(*this < other);
-    }
-
-    bool is_empty() const;
-
-    static Equation sub_eq_const(const VarT &a, const VarT &b, const RHSType &rhs = {});
-    static Equation sub_eq_sub(const VarT &a, const VarT &b, const VarT &c, const VarT &d, const RHSType &rhs = {});
+    bool operator==(const Equation &other) const { return _terms == other._terms; }
 };
 
-template <typename VarT>
-std::ostream &operator<<(std::ostream &os, const Equation<VarT> &eq)
-{
-    os << eq.lhs() << " = " << eq.rhs();
-    return os;
-}
-
-template <typename VarT>
-Equation<VarT> operator==(const LinearCombination<VarT> &lhs, const typename EquationTraits<VarT>::RHSType &rhs)
-{
-    return Equation<VarT>(lhs, rhs);
-}
-
-template <typename VarT>
-bool eq_numerically(const Equation<VarT> &left, const Equation<VarT> &right);
+std::ostream &operator<<(std::ostream &os, const Equation &eq);
 
 namespace std
 {
-    template <typename VarT>
-    struct hash<Equation<VarT>>
+    template <>
+    struct hash<Equation>
     {
-        size_t operator()(const Equation<VarT> &eq) const;
+        size_t operator()(const Equation &eq) const noexcept
+        {
+            size_t seed = 0;
+            std::hash<Term> term_hash;
+
+            for (const auto &t : eq.terms())
+            {
+                seed ^= term_hash(t) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+            }
+
+            return seed;
+        }
     };
 }
 
