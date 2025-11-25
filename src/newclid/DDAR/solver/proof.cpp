@@ -14,9 +14,7 @@ using namespace std;
 Proof::Proof(DDARSolver *solver, std::unique_ptr<Statement> &&p)
     : _solver(solver),
       _statement(move(p)),
-      _slope_eqn(_solver->insert_equation<Slope>(_statement)),
-      _distlog_eqn(_solver->insert_equation<DistLog>(_statement)),
-      _product_eqn(_solver->insert_equation<Product>(_statement))
+      _eqn(_solver->insert_equation(_statement))
 {
 }
 
@@ -45,32 +43,12 @@ void Proof::ar()
         return;
     }
 
-    for (const auto &[coeff, req] : _slope_eqn)
+    for (const auto &req : _eqn)
     {
         req->reduce();
         if (req->is_solved())
         {
-            set_proved(ProofState::PROVED_AR_SLOPE);
-            return;
-        }
-    }
-
-    for (const auto &[coeff, req] : _distlog_eqn)
-    {
-        req->reduce();
-        if (req->is_solved())
-        {
-            set_proved(ProofState::PROVED_AR_DISTLOG);
-            return;
-        }
-    }
-
-    for (const auto &[coeff, req] : _product_eqn)
-    {
-        req->reduce();
-        if (req->is_solved())
-        {
-            set_proved(ProofState::PROVED_AR_PRODUCT);
+            set_proved(ProofState::PROVED_AR);
             return;
         }
     }
@@ -89,6 +67,16 @@ const unique_ptr<Statement> &Proof::statement() const
     return _statement;
 }
 
+void Proof::print_equations() const
+{
+    cout << "Proof Equations for statement: " << _statement->to_string() << endl;
+    for (const auto &eq : _eqn)
+    {
+        cout << "Original Equation: " << eq->original_equation() << endl;
+        cout << "Reduced Equation: " << eq->remainder() << endl;
+    }
+}
+
 vector<Proof *> Proof::get_dependencies() const
 {
     switch (_state)
@@ -99,35 +87,20 @@ vector<Proof *> Proof::get_dependencies() const
         return {};
     case ProofState::PROVED_BY_THEOREM:
         return _solver->applications()[_theoremId].hypotheses();
-    case ProofState::PROVED_AR_SLOPE:
-        for (const auto &[coeff, req] : _slope_eqn)
+    case ProofState::PROVED_AR:
+        for (const auto req : _eqn)
         {
+            if (!req->is_solved())
+            {
+                continue;
+            }
             vector<Proof *> deps = req->statement_dependencies();
             if (!deps.empty() && !(deps[0]->statement() == _statement))
             {
                 return deps;
             }
         }
-        return {};
-    case ProofState::PROVED_AR_DISTLOG:
-        for (const auto &[coeff, req] : _distlog_eqn)
-        {
-            vector<Proof *> deps = req->statement_dependencies();
-            if (!deps.empty() && !(deps[0]->statement() == _statement))
-            {
-                return deps;
-            }
-        }
-        return {};
-    case ProofState::PROVED_AR_PRODUCT:
-        for (const auto &[coeff, req] : _product_eqn)
-        {
-            vector<Proof *> deps = req->statement_dependencies();
-            if (!deps.empty() && !(deps[0]->statement() == _statement))
-            {
-                return deps;
-            }
-        }
+
         return {};
     }
     return {};
@@ -145,12 +118,8 @@ string Proof::reason() const
         return "Numerical Check";
     case ProofState::PROVED_BY_THEOREM:
         return _solver->applications()[_theoremId].theorem().rule();
-    case ProofState::PROVED_AR_SLOPE:
-        return "AR For Slope";
-    case ProofState::PROVED_AR_DISTLOG:
-        return "AR For DistLog";
-    case ProofState::PROVED_AR_PRODUCT:
-        return "AR For Product";
+    case ProofState::PROVED_AR:
+        return "AR";
     default:
         return "Unknown";
     }
@@ -184,17 +153,7 @@ void Proof::set_proved(ProofState state)
 
     assert(_statement->check_numerically());
 
-    for (const auto &[coeff, req] : _slope_eqn)
-    {
-        req->reduce();
-    }
-
-    for (const auto &[coeff, req] : _distlog_eqn)
-    {
-        req->reduce();
-    }
-
-    for (const auto &[coeff, req] : _product_eqn)
+    for (const auto req : _eqn)
     {
         req->reduce();
     }

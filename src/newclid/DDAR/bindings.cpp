@@ -118,7 +118,7 @@ extern "C"
             }
             for (const auto &c : app.conclusions())
             {
-                if (c->statement()->name() == "secant")
+                if (c->statement()->name() == "secant" || c->is_proved())
                 {
                     continue;
                 }

@@ -39,7 +39,7 @@ public:
 
     const Angle &right() const { return _right; }
 
-    std::vector<std::unique_ptr<Equation<Slope>>> as_equation_slope() const override;
+    std::vector<std::unique_ptr<Equation>> as_equation() const override;
 
     bool numerical_only() const { return false; }
 
@@ -54,6 +54,8 @@ public:
     bool operator>(const EqAngle &other) const;
 
     bool operator>=(const EqAngle &other) const;
+
+    std::string to_string() const override;
 
     std::vector<std::string> to_tokens() const;
 };

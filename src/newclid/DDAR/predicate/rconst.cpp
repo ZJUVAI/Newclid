@@ -51,17 +51,10 @@ ostream &RConst::print(ostream &os) const
     return os << _left << ":" << _right << " = " << _ratio;
 }
 
-vector<unique_ptr<Equation<DistLog>>> RConst::as_equation_distlog() const
+vector<unique_ptr<Equation>> RConst::as_equation() const
 {
-    vector<unique_ptr<Equation<DistLog>>> result;
-    result.push_back(make_unique<Equation<DistLog>>(LinearCombination<DistLog>(_left) - LinearCombination<DistLog>(_right) == Rational(log(_ratio.to_double()))));
-    return result;
-}
-
-vector<unique_ptr<Equation<Product>>> RConst::as_equation_product() const
-{
-    vector<unique_ptr<Equation<Product>>> result;
-    result.push_back(make_unique<Equation<Product>>(LinearCombination<Product>(_left) - LinearCombination<Product>(_right, _ratio) == Rational((long long)0)));
+    vector<unique_ptr<Equation>> result;
+    result.push_back(make_unique<Equation>(Equation({Term(_left), -Term(_right, _ratio)})));
     return result;
 }
 

@@ -337,6 +337,7 @@ Theorem Theorem::similar_triangles_properties(const SimilarTriangles &p)
     theorem.add_hypothesis(p.clone());
     theorem.add_conclusion(p.eqratio_abbc().clone());
     theorem.add_conclusion(p.eqratio_abac().clone());
+    theorem.add_conclusion(p.eqratio_bcac().clone());
     theorem.add_conclusion(p.eqangle_abc().clone());
     theorem.add_conclusion(p.eqangle_bca().clone());
     return theorem;

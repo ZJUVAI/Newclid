@@ -1,17 +1,10 @@
 #include "ar/equation_index.hpp"
 #include "ar/linear_system.hpp"
 #include "ar/equation.hpp"
-#include "type/distlog.hpp"
-#include "type/product.hpp"
 
 using namespace std;
 
-template <typename VarT>
-const Equation<VarT> &EquationIndex<VarT>::equation() const
+const Equation &EquationIndex::equation() const
 {
-    return _system->at(*this);
+    return _system->at(_index);
 }
-
-template class EquationIndex<Slope>;
-template class EquationIndex<DistLog>;
-template class EquationIndex<Product>;

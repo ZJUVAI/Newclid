@@ -75,16 +75,10 @@ ostream &EqRatio::print(ostream &os) const
     return os << _left_up << ":" << _left_down << " = " << _right_up << ":" << _right_down;
 }
 
-vector<unique_ptr<Equation<DistLog>>> EqRatio::as_equation_distlog() const
+vector<unique_ptr<Equation>> EqRatio::as_equation() const
 {
-    vector<unique_ptr<Equation<DistLog>>> result;
-    result.push_back(make_unique<Equation<DistLog>>(Equation<DistLog>::sub_eq_sub(DistLog(_left_up), DistLog(_left_down), DistLog(_right_up), DistLog(_right_down))));
-    return result;
-}
-
-vector<unique_ptr<Equation<Product>>> EqRatio::as_equation_product() const
-{
-    vector<unique_ptr<Equation<Product>>> result;
-    result.push_back(make_unique<Equation<Product>>(LinearCombination<Product>(vector<Dist>{_left_up, _right_down}) - LinearCombination<Product>(vector<Dist>{_left_down, _right_up}) == Rational((long long)0)));
+    vector<unique_ptr<Equation>> result;
+    result.push_back(make_unique<Equation>(Equation({Term({_left_up, _right_down}), -Term({_left_down, _right_up})})));
+    result.push_back(make_unique<Equation>(Equation({Term(DistLog(_left_up)), Term(DistLog(_right_down)), -Term(DistLog(_left_down)), -Term(DistLog(_right_up))})));
     return result;
 }

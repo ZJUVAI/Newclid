@@ -160,10 +160,10 @@ vector<EqAngle> EqAngle::permutations() const
     return res;
 }
 
-vector<unique_ptr<Equation<Slope>>> EqAngle::as_equation_slope() const
+vector<unique_ptr<Equation>> EqAngle::as_equation() const
 {
-    vector<unique_ptr<Equation<Slope>>> result;
-    result.push_back(make_unique<Equation<Slope>>(Equation<Slope>::sub_eq_sub(_left.left_side(), _left.right_side(), _right.left_side(), _right.right_side())));
+    vector<unique_ptr<Equation>> result;
+    result.push_back(make_unique<Equation>(Equation({Term(_left.left_side()), -Term(_left.right_side()), -Term(_right.left_side()), Term(_right.right_side())})));
     return result;
 }
 
@@ -197,6 +197,20 @@ bool EqAngle::operator>(const EqAngle &other) const
 bool EqAngle::operator>=(const EqAngle &other) const
 {
     return !(*this < other);
+}
+
+string EqAngle::to_string() const
+{
+    string res = name();
+    res += " " + _left.left().name();
+    res += " " + _left.vertex().name();
+    res += " " + _left.vertex().name();
+    res += " " + _left.right().name();
+    res += " " + _right.left().name();
+    res += " " + _right.vertex().name();
+    res += " " + _right.vertex().name();
+    res += " " + _right.right().name();
+    return res;
 }
 
 vector<string> EqAngle::to_tokens() const

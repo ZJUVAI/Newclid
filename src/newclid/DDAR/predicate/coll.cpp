@@ -119,31 +119,25 @@ bool Coll::operator<(const Coll &other) const
     return _a < other._a;
 }
 
-vector<unique_ptr<Equation<Slope>>> Coll::as_equation_slope() const
+vector<unique_ptr<Equation>> Coll::as_equation() const
 {
-    vector<unique_ptr<Equation<Slope>>> result;
-    result.push_back(make_unique<Equation<Slope>>(Equation<Slope>::sub_eq_const(Slope(_a, _b), Slope(_a, _c), Rational(0))));
-    result.push_back(make_unique<Equation<Slope>>(Equation<Slope>::sub_eq_const(Slope(_a, _c), Slope(_b, _c), Rational(0))));
-    return result;
-}
-
-vector<unique_ptr<Equation<Product>>> Coll::as_equation_product() const
-{
-    LinearCombination<Product> ab(Product(Dist(_a, _b)));
-    LinearCombination<Product> bc(Product(Dist(_b, _c)));
-    LinearCombination<Product> ac(Product(Dist(_a, _c)));
-    vector<unique_ptr<Equation<Product>>> result;
+    vector<unique_ptr<Equation>> result;
+    result.push_back(make_unique<Equation>(Equation({Term(Slope(_a, _b)), -Term(Slope(_a, _c))})));
+    result.push_back(make_unique<Equation>(Equation({Term(Slope(_a, _c)), -Term(Slope(_b, _c))})));
+    Term ab(Dist(_a, _b));
+    Term bc(Dist(_b, _c));
+    Term ac(Dist(_a, _c));
     if ((_a.x() > _b.x() && _a.x() < _c.x()) || (_a.x() < _b.x() && _a.x() > _c.x()))
     {
-        result.push_back(make_unique<Equation<Product>>(ab + ac - bc == Rational((long long)0)));
+        result.push_back(make_unique<Equation>(Equation({ab, ac, -bc})));
     }
     else if ((_b.x() > _a.x() && _b.x() < _c.x()) || (_b.x() < _a.x() && _b.x() > _c.x()))
     {
-        result.push_back(make_unique<Equation<Product>>(ab + bc - ac == Rational((long long)0)));
+        result.push_back(make_unique<Equation>(Equation({ab, bc, -ac})));
     }
     else
     {
-        result.push_back(make_unique<Equation<Product>>(bc + ac - ab == Rational((long long)0)));
+        result.push_back(make_unique<Equation>(Equation({bc, ac, -ab})));
     }
     return result;
 }

@@ -45,11 +45,7 @@ public:
 
     virtual std::vector<std::string> to_tokens() const;
 
-    virtual std::vector<std::unique_ptr<Equation<Slope>>> as_equation_slope() const { return {}; }
-
-    virtual std::vector<std::unique_ptr<Equation<DistLog>>> as_equation_distlog() const { return {}; }
-
-    virtual std::vector<std::unique_ptr<Equation<Product>>> as_equation_product() const { return {}; }
+    virtual std::vector<std::unique_ptr<Equation>> as_equation() const { return {}; }
 
     virtual bool operator==(const Statement &other) const
     {

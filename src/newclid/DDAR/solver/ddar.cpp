@@ -141,12 +141,7 @@ bool DDARSolver::run(size_t max_levels)
         }
     }
 
-    // for (const auto &[eqn, reqn] : _slope_equations)
-    // {
-    //     cout << "Equation: " << eqn << endl;
-    //     cout << "Reduced Equation: " << reqn.remainder() << endl;
-    //     cout << endl;
-    // }
+    // _system.print_equations();
 
     return _solved;
 }
@@ -202,12 +197,33 @@ vector<tuple<vector<string>, vector<vector<string>>, string>> DDARSolver::depend
             cout << "?????" << endl;
             continue;
         }
+        // if (pf->state() == ProofState::PROVED_AR)
+        // {
+        //     pf->print_equations();
+        // }
+        if (pf->statement()->name() == "secant")
+        {
+            continue;
+        }
         vector<vector<string>> deps;
+        bool flag = false;
         for (const auto &dep : pf->get_dependencies())
         {
-            deps.push_back(dep->statement()->normalize()->to_tokens());
+            if (dep->statement()->name() == "secant")
+            {
+                flag = true;
+                auto sub_pf = _statement_proofs.at(dep->statement()->to_string()).get();
+                for (const auto &sub_dep : sub_pf->get_dependencies())
+                {
+                    deps.push_back(sub_dep->statement()->normalize()->to_tokens());
+                }
+            }
+            else
+            {
+                deps.push_back(dep->statement()->normalize()->to_tokens());
+            }
         }
-        res.push_back({pf->statement()->normalize()->to_tokens(), deps, pf->reason()});
+        res.push_back({pf->statement()->normalize()->to_tokens(), deps, pf->reason() + (flag ? " (via secant)" : "")});
     }
 
     return res;
@@ -227,30 +243,11 @@ size_t DDARSolver::push_established_statement(const Proof *pf)
 
 void DDARSolver::print_equations() const
 {
-    cout << "Slope equations:" << endl;
-    for (const auto &[eqn, red_eqn] : _slope_equations)
+    cout << "Equations:" << endl;
+    for (const auto &[eqn, red_eqn] : _equations)
     {
         cout << "Equation: " << eqn << endl;
         cout << "Reduced Equation: " << red_eqn.remainder() << endl;
-        cout << "Linear Combination: " << red_eqn.linear_combination() << endl;
-        cout << endl;
-    }
-
-    cout << "Product equations:" << endl;
-    for (const auto &[eqn, red_eqn] : _product_equations)
-    {
-        cout << "Equation: " << eqn << endl;
-        cout << "Reduced Equation: " << red_eqn.remainder() << endl;
-        cout << "Linear Combination: " << red_eqn.linear_combination() << endl;
-        cout << endl;
-    }
-
-    cout << "Distlog equations:" << endl;
-    for (const auto &[eqn, red_eqn] : _distlog_equations)
-    {
-        cout << "Equation: " << eqn << endl;
-        cout << "Reduced Equation: " << red_eqn.remainder() << endl;
-        cout << "Linear Combination: " << red_eqn.linear_combination() << endl;
         cout << endl;
     }
 }
@@ -269,74 +266,31 @@ bool DDARSolver::establish_statement(Proof *pf, size_t thm_id)
     return true;
 }
 
-template <typename VarT>
-vector<pair<Rational, ReducedEquation<VarT> *>> DDARSolver::insert_equation(const unique_ptr<Statement> &pf)
+vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement> &pf)
 {
-    if constexpr (is_same_v<VarT, Slope>)
+    auto eqn_ptrs = pf->as_equation();
+    if (eqn_ptrs.empty())
     {
-        auto eqn_ptrs = pf->as_equation_slope();
-        if (eqn_ptrs.empty())
-        {
-            return {};
-        }
+        return {};
+    }
 
-        vector<pair<Rational, ReducedEquation<VarT> *>> res;
-        for (const auto &eqn_ptr : eqn_ptrs)
-        {
-            LinearSystem<Slope> *sys = &_slope_system;
-            eqns_map_type<Slope> *eqns = &_slope_equations;
-            auto const [coeff, eqn] = eqn_ptr->normalize();
-            auto red_eq = ReducedEquation(eqn, sys);
-            res.push_back(make_pair(coeff, &(eqns->insert({eqn, red_eq}).first->second)));
-        }
-        return res;
-    }
-    else if constexpr (is_same_v<VarT, DistLog>)
+    vector<ReducedEquation *> res;
+    for (const auto &eqn_ptr : eqn_ptrs)
     {
-        auto eqn_ptrs = pf->as_equation_distlog();
-        if (eqn_ptrs.empty())
+        LinearSystem *sys = &_system;
+        eqns_map_type *eqns = &_equations;
+        if (!eqn_ptr->empty())
         {
-            return {};
-        }
-        vector<pair<Rational, ReducedEquation<VarT> *>> res;
-        for (const auto &eqn_ptr : eqn_ptrs)
-        {
-            LinearSystem<DistLog> *sys = &_distlog_system;
-            eqns_map_type<DistLog> *eqns = &_distlog_equations;
-            auto const [coeff, eqn] = eqn_ptr->normalize();
+            Rational coeff = Rational(1) / eqn_ptr->begin()->coeff();
+            Equation eqn = *eqn_ptr * coeff;
             auto red_eq = ReducedEquation(eqn, sys);
-            res.push_back(make_pair(coeff, &(eqns->insert({eqn, red_eq}).first->second)));
+            res.push_back(&(eqns->insert({eqn, red_eq}).first->second));
         }
-        return res;
     }
-    else if constexpr (is_same_v<VarT, Product>)
-    {
-        auto eqn_ptrs = pf->as_equation_product();
-        if (eqn_ptrs.empty())
-        {
-            return {};
-        }
-        vector<pair<Rational, ReducedEquation<VarT> *>> res;
-        for (const auto &eqn_ptr : eqn_ptrs)
-        {
-            LinearSystem<Product> *sys = &_product_system;
-            eqns_map_type<Product> *eqns = &_product_equations;
-            auto const [coeff, eqn] = eqn_ptr->normalize();
-            auto red_eq = ReducedEquation(eqn, sys);
-            res.push_back(make_pair(coeff, &(eqns->insert({eqn, red_eq}).first->second)));
-        }
-        return res;
-    }
-    return {};
+    return res;
 }
-
-template vector<pair<Rational, ReducedEquation<Slope> *>> DDARSolver::insert_equation(const unique_ptr<Statement> &pf);
-template vector<pair<Rational, ReducedEquation<DistLog> *>> DDARSolver::insert_equation(const unique_ptr<Statement> &pf);
-template vector<pair<Rational, ReducedEquation<Product> *>> DDARSolver::insert_equation(const unique_ptr<Statement> &pf);
 
 void DDARSolver::add_established_equations(Proof *pf)
 {
-    _slope_system.add_reduced_equation(pf);
-    _distlog_system.add_reduced_equation(pf);
-    _product_system.add_reduced_equation(pf);
+    _system.add_reduced_equation(pf);
 }

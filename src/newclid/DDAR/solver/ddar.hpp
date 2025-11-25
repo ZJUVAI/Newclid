@@ -32,20 +32,11 @@ private:
 
     bool _solved{false};
 
-    LinearSystem<Slope> _slope_system;
+    LinearSystem _system;
 
-    LinearSystem<DistLog> _distlog_system;
+    using eqns_map_type = std::unordered_map<Equation, ReducedEquation>;
 
-    LinearSystem<Product> _product_system;
-
-    template <typename VarT>
-    using eqns_map_type = std::unordered_map<Equation<VarT>, ReducedEquation<VarT>>;
-
-    eqns_map_type<Slope> _slope_equations;
-
-    eqns_map_type<DistLog> _distlog_equations;
-
-    eqns_map_type<Product> _product_equations;
+    eqns_map_type _equations;
 
 public:
     bool run_level(const Point &max_pt);
@@ -78,8 +69,7 @@ public:
 
     std::vector<std::tuple<std::vector<std::string>, std::vector<std::vector<std::string>>, std::string>> dependency_graph() const;
 
-    template <typename VarT>
-    std::vector<std::pair<Rational, ReducedEquation<VarT> *>> insert_equation(const std::unique_ptr<Statement> &pf);
+    std::vector<ReducedEquation *> insert_equation(const std::unique_ptr<Statement> &pf);
 };
 
 #endif // DDAR_HPP
