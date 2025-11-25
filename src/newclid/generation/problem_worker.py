@@ -400,6 +400,7 @@ class GeometryProblemWorker:
             return {
                 "llm_input": data_problem,
                 "llm_output": data_aux + numerical_check + proof,
+                "rename_map": mp
             }
 
         except Exception as e:

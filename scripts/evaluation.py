@@ -12,7 +12,7 @@ from newclid.formulations.problem import ProblemJGEX
 from newclid.generation.problem_worker import GeometryProblemWorker
 
 
-@ray.remote(num_cpus=0, num_gpus=1)
+@ray.remote(num_cpus=1, num_gpus=1)
 def ray_solve_problem(args):
     """
     Process a single problem and return whether it was solved successfully along with the time taken.
@@ -21,14 +21,15 @@ def ray_solve_problem(args):
     start_time = time.time()
     try:
         builder = GeometricSolverBuilder().load_problem_from_file(problems_path, problem_name, rename=True).with_deductive_agent(LMAgent(model_path, decoding_size=decoding_size,beam_size=beam_size, search_depth=search_depth))
-        solver = builder.build()
+        solver = builder.build(max_attempts=10)
         is_solved = solver.run(timeout=timeout)
-        llm_renamed = None
+        problem_info = None
         if is_solved:
             problem = ProblemJGEX.from_text(solver.run_infos["problem"])
-            llm_renamed = GeometryProblemWorker.llm_solution_renamed(problem, solver.run_infos["proof"])
+            renamed = GeometryProblemWorker.llm_solution_renamed(problem, solver.run_infos["proof"])
+            problem_info = {"problem": str(builder.problemJGEX), "augmented_problem": str(problem), "llm_renamed_input": renamed["llm_input"], "llm_renamed_output": renamed["llm_output"], "rename_map": str(renamed["rename_map"])}
         elapsed_time = time.time() - start_time
-        return (pid, problem_name, is_solved, elapsed_time, llm_renamed) 
+        return (pid, problem_name, is_solved, elapsed_time, problem_info) 
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -72,49 +73,58 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
             problem_names.append(lines[i].strip())
 
     print(f"Total problems to solve: {len(problem_names)}")
-
-    # Multi-threaded execution using Ray with limited concurrent tasks
-    # Initialize Ray with specified number of CPUs
-    if not ray.is_initialized():
+    solve_batch = 50
+    first_write = True
+    for batch_start in range(0, len(problem_names), solve_batch):
+        batch_problems = problem_names[batch_start: batch_start + solve_batch]
+        
+        # Multi-threaded execution using Ray with limited concurrent tasks
+        # Initialize Ray with specified number of CPUs
         ray.init(
             # local_mode=True,
             # include_dashboard=True, dashboard_host="0.0.0.0", dashboard_port=8265,
-            ignore_reinit_error=True, num_cpus=num_cpus
+            ignore_reinit_error=True, num_cpus=num_cpus,
+            _temp_dir="/c23474/home/math/dzt/ray_tmp",
+            include_dashboard=False,
         )
 
-    total_time = 0 
-    start_time = time.time()
-    all_tasks_info = []
-    pending_tasks = []
-    success_proofs = []
-    
-    # Submit all tasks
-    for i, problem_name in enumerate(problem_names):
-        task = ray_solve_problem.remote((i, problem_name, filepath, modelpath, decoding_size, beam_size, search_depth, timeout))
-        all_tasks_info.append((problem_name, "Pending", 0))
-        pending_tasks.append(task)
-    
-    # Process tasks as they complete
-    with Live(refresh_per_second=1) as live:
-        while pending_tasks:
-            # Wait for at least one task to complete
-            done_tasks, pending_tasks = ray.wait(pending_tasks, num_returns=1, timeout=5)
-            # Process completed tasks
-            for task in done_tasks:
-                pid, problem_name, is_solved, elapsed_time, llm_renamed = ray.get(task)
-                all_tasks_info[pid] = (problem_name, "Success" if is_solved else "Failed", elapsed_time)
-                total_time += elapsed_time
-                if is_solved:
-                    success_proofs.append((problem_name, llm_renamed))
-                    
-            live.update(render_table(all_tasks_info, start_time, True))
-        live.update(render_table(all_tasks_info, start_time, False))
-    ray.shutdown()
-    with open(success_proofs_path, "w", encoding="utf-8") as f:
-        import json
-        json.dump(success_proofs, f, ensure_ascii=False, indent=2)
-    print(f"wrote success proofs at {success_proofs_path}")
-            
+        total_time = 0 
+        start_time = time.time()
+        all_tasks_info = []
+        pending_tasks = []
+        success_proofs = []
+        
+        # Submit all tasks
+        for i, problem_name in enumerate(batch_problems):
+            task = ray_solve_problem.remote((i, problem_name, filepath, modelpath, decoding_size, beam_size, search_depth, timeout))
+            all_tasks_info.append((problem_name, "Pending", 0))
+            pending_tasks.append(task)
+        
+        # Process tasks as they complete
+        with Live(refresh_per_second=1) as live:
+            while pending_tasks:
+                # Wait for at least one task to complete
+                done_tasks, pending_tasks = ray.wait(pending_tasks, num_returns=1, timeout=5)
+                # Process completed tasks
+                for task in done_tasks:
+                    pid, problem_name, is_solved, elapsed_time, problem_info = ray.get(task)
+                    all_tasks_info[pid] = (problem_name, "Success" if is_solved else "Failed", elapsed_time)
+                    total_time += elapsed_time
+                    if is_solved:
+                        success_proofs.append((problem_name, problem_info))
+                        
+                live.update(render_table(all_tasks_info, start_time, True))
+            live.update(render_table(all_tasks_info, start_time, False))
+        ray.shutdown()
+        write_mode = "a"
+        if first_write:
+            first_write = False
+            write_mode = "w"
+        with open(success_proofs_path, write_mode, encoding="utf-8") as f:
+            import json
+            json.dump(success_proofs, f, ensure_ascii=False, indent=2)
+        print(f"wrote success proofs / {solve_batch} problems at {success_proofs_path}")
+    print(f"wrote ALL success proofs at {success_proofs_path}")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Newclid evaluation with configurable paths.")

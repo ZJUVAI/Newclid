@@ -9,7 +9,8 @@ model_dir="/c23474/home/wangzi/myNewclid/models/sft4"
 
 # PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' \
 # NPROC_PER_NODE=8 \
-CUDA_VISIBLE_DEVICES=0 \
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6 \
+# CUDA_VISIBLE_DEVICES=0 \
 # swift sft \
 #     --model Qwen/Qwen3-0.6B-Base \
 #     --dataset datasets/0901/geometry_clauses25-30_all_filtered2.jsonl \
@@ -52,13 +53,16 @@ CUDA_VISIBLE_DEVICES=0 \
 datasets=(
     # "dev_imo.txt"
     # "dev_jgex.txt"
-    "configuration_clauses5_samples15k_problems.txt"
+    # "configuration_clauses5_samples15k_problems.txt"
+    "configuration_clauses5_samples15k_problems_full.txt"
+    # "configuration_clauses5_samples15k_problems_1.txt"
+    # "config_50.txt"
 )
 
 # Decoding configurations (decoding_size beam_size)
 configs=(
-    # "8 64"
-    "32 512"
+    "8 64"
+    # "32 512"
 )
 
 # Checkpoint options - modify this list as needed
@@ -84,7 +88,7 @@ for checkpoint in "${checkpoints[@]}"; do
             read -r decoding_size beam_size <<< "$config"
             
             # Build complete command
-            cmd="python scripts/evaluation.py --problems_path benchmarks/$dataset --model_path $model_dir/$checkpoint --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth 4 --success_proofs_path datasets/success_proofs/$dataset.json"
+            cmd="python scripts/evaluation.py --problems_path benchmarks/$dataset --model_path $model_dir/$checkpoint --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth 2 --success_proofs_path datasets/success_proofs/$dataset.json"
             
             # Print current command to execute
             echo "Executing command:"
