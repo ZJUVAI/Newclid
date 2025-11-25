@@ -52,9 +52,9 @@ ostream &Para::print(ostream &os) const
     return os << _left.left() << _left.right() << " ∥ " << _right.left() << _right.right();
 }
 
-vector<unique_ptr<Equation<Slope>>> Para::as_equation_slope() const
+vector<unique_ptr<Equation>> Para::as_equation() const
 {
-    vector<unique_ptr<Equation<Slope>>> result;
-    result.push_back(make_unique<Equation<Slope>>(Equation<Slope>::sub_eq_const(_left, _right, Rational((long long)0))));
+    vector<unique_ptr<Equation>> result;
+    result.push_back(make_unique<Equation>(Equation({Term(_left), -Term(_right)})));
     return result;
 }

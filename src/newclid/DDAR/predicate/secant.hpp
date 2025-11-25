@@ -49,21 +49,9 @@ public:
 
     Coll coll_pab() const;
 
-    std::vector<std::unique_ptr<Equation<Product>>> as_equation_product() const override;
+    std::vector<std::unique_ptr<Equation>> as_equation() const override;
 
     bool numerical_only() const override { return false; }
-
-    bool operator==(const Secant &other) const;
-
-    bool operator!=(const Secant &other) const;
-
-    bool operator<(const Secant &other) const;
-
-    bool operator>(const Secant &other) const;
-
-    bool operator<=(const Secant &other) const;
-
-    bool operator>=(const Secant &other) const;
 };
 
 #endif // SECANT_HPP

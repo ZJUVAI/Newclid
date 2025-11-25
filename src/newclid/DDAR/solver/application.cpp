@@ -11,7 +11,6 @@ Application::Application(DDARSolver *solver, Theorem &&theorem) : _theorem(move(
     {
         _hypotheses.push_back(solver->insert_statement(stmt));
     }
-
     for (const auto &stmt : _theorem.conclusions())
     {
         _conclusions.push_back(solver->insert_statement(stmt));
@@ -22,20 +21,6 @@ void Application::advance_proof()
 {
     if (_state != ApplicationState::PENDING)
     {
-        return;
-    }
-
-    bool conclusion_proved = true;
-
-    for (auto *pf : _conclusions)
-    {
-        pf->ar();
-        conclusion_proved &= pf->is_proved();
-    }
-
-    if (conclusion_proved)
-    {
-        _state = ApplicationState::DISCARDED;
         return;
     }
 
@@ -54,6 +39,21 @@ void Application::advance_proof()
     if (hypotheses_proved)
     {
         _state = ApplicationState::PROVED;
+        return;
+    }
+
+    bool conclusion_proved = true;
+
+    for (auto *pf : _conclusions)
+    {
+        pf->ar();
+        conclusion_proved &= pf->is_proved();
+    }
+
+    if (conclusion_proved)
+    {
+        _state = ApplicationState::DISCARDED;
+        return;
     }
 }
 

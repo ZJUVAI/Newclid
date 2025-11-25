@@ -69,3 +69,25 @@ Coll Secant::coll_pab() const
 {
     return Coll(_p, _a, _b);
 }
+
+vector<unique_ptr<Equation>> Secant::as_equation() const
+{
+    vector<unique_ptr<Equation>> result;
+
+    Term pab({Dist(_p, _a), Dist(_p, _b)});
+    Term oa2({Dist(_o, _a), Dist(_o, _a)});
+    Term ob2({Dist(_o, _b), Dist(_o, _b)});
+    Term op2({Dist(_o, _p), Dist(_o, _p)});
+    if (Coll(_a, _p, _b).is_between())
+    {
+        result.push_back(make_unique<Equation>(Equation({oa2, -op2, -pab})));
+        result.push_back(make_unique<Equation>(Equation({ob2, -op2, -pab})));
+    }
+    else
+    {
+        result.push_back(make_unique<Equation>(Equation({oa2, -op2, pab})));
+        result.push_back(make_unique<Equation>(Equation({ob2, -op2, pab})));
+    }
+
+    return result;
+}

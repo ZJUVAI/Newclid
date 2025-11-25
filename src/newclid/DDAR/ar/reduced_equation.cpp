@@ -5,41 +5,83 @@
 
 using namespace std;
 
-template <typename VarT>
-ReducedEquation<VarT>::ReducedEquation(const EquationType &equation, const LinearSystem<VarT> *system)
-    : _original_equation(equation),
-      _system(system),
-      _linear_combination(),
-      _remainder(equation)
+ReducedEquation::ReducedEquation(Equation &equation, LinearSystem *system) : _original_equation(equation),
+                                                                             _system(system),
+                                                                             _remainder(equation)
 {
 }
 
-template <typename VarT>
-void ReducedEquation<VarT>::reduce()
+void ReducedEquation::set_index(size_t index, const LinearSystem *system)
 {
-    while (!_remainder.lhs().empty())
+    _remainder.set_index(index, const_cast<LinearSystem *>(system));
+    // _original_equation.set_index(index, const_cast<LinearSystem *>(system));
+}
+
+void ReducedEquation::reduce()
+{
+    if (_remainder.empty())
     {
-        auto &[var, coeff] = *_remainder.lhs().begin();
-        auto echelon_itr = _system->echelon_form().find(var);
-        if (echelon_itr != _system->echelon_form().end())
+        return;
+    }
+
+    bool changed = true;
+    while (changed)
+    {
+        changed = false;
+        for (const auto &[term, eq] : _system->solved_variables())
         {
-            const LinearCombinationType pivot = echelon_itr->second;
-            _linear_combination += pivot * coeff;
-            _remainder -= pivot.rhs() * coeff;
+            changed |= substitute_variable(term, eq);
+        }
+    }
+
+    while (!_remainder.empty())
+    {
+        auto &term = *_remainder.begin();
+        auto itr = _system->solved_terms().find(term);
+        if (itr != _system->solved_terms().end())
+        {
+            _remainder -= itr->second * term.coeff();
         }
         else
         {
             break;
         }
     }
+    _remainder.reduction();
 }
 
-template <typename VarT>
-bool ReducedEquation<VarT>::is_solved() const
+bool ReducedEquation::is_solved() const
 {
-    return _remainder.is_empty();
+    return _remainder.empty();
 }
 
-template class ReducedEquation<Slope>;
-template class ReducedEquation<DistLog>;
-template class ReducedEquation<Product>;
+bool ReducedEquation::substitute_variable(Term var, const Equation &e)
+{
+    bool changed = false;
+    Equation new_equation = _remainder;
+    for (auto &term : _remainder.terms())
+    {
+        if (term.contain(var))
+        {
+            new_equation -= e * (term / var);
+            changed = true;
+        }
+    }
+    new_equation.reduction();
+    _remainder = new_equation;
+    return changed;
+}
+
+vector<Proof *> ReducedEquation::statement_dependencies() const
+{
+    std::set<Proof *> res;
+    for (const auto &[t, index] : _remainder.combination())
+    {
+        if (!index.is_valid())
+        {
+            continue;
+        }
+        res.insert(_system->pair_at(index.index()).second);
+    }
+    return vector<Proof *>(res.begin(), res.end());
+}

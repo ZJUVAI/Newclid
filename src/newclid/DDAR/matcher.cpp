@@ -202,9 +202,9 @@ void Matcher::on_between(const Coll &coll)
 
 void Matcher::on_midpoint(const Midp &midp)
 {
-    insert_theorem(Theorem::midpoint_ratio_dist(midp));
-    insert_theorem(Theorem::midpoint_of_coll_cong(midp));
     insert_theorem(Theorem::coll_cong_of_midpoint(midp));
+    insert_theorem(Theorem::midpoint_of_coll_cong(midp));
+    insert_theorem(Theorem::midpoint_ratio_dist(midp));
 }
 
 void Matcher::on_eqratio(const Coll &left, const Coll &right)
@@ -399,8 +399,8 @@ void Matcher::on_cyclic(const Cyclic &cyclic)
     for (const auto &rotated : cyclic.permutation())
     {
         insert_theorem(Theorem::cyclic_of_equal_angles(rotated));
+        insert_theorem(Theorem::cyclic_properties(cyclic));
     }
-    insert_theorem(Theorem::cyclic_properties(cyclic));
 }
 
 void Matcher::on_bisector(const Point &pt, const Angle &ang)
@@ -530,14 +530,14 @@ void Matcher::on_circle(const Point &center, const vector<pair<double, Point>> &
                     on_quadrangle_circumcenter(center, {points[pt_a].second, points[pt_b].second, points[pt_c].second, points[pt_d].second});
                 }
             }
-            // for (auto const &pt : _problem->points())
-            // {
-            //     auto sec = Secant(center, points[pt_a].second, points[pt_b].second, pt);
-            //     if (sec.check_numerically())
-            //     {
-            //         insert_theorem(Theorem::definition_of_secant(sec));
-            //     }
-            // }
+            for (auto const &pt : _problem->points())
+            {
+                auto sec = Secant(center, points[pt_a].second, points[pt_b].second, pt);
+                if (sec.check_numerically())
+                {
+                    insert_theorem(Theorem::definition_of_secant(sec));
+                }
+            }
         }
     }
 }
