@@ -62,6 +62,11 @@ unique_ptr<Statement> EqRatio::normalize() const
         swap(c, d);
     }
 
+    if (a == b && c > d)
+    {
+        swap(c, d);
+    }
+
     if (b > c)
     {
         swap(b, c);

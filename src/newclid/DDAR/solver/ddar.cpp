@@ -62,26 +62,6 @@ bool DDARSolver::run_level(const Point &max_pt)
         }
     }
 
-    // for (auto it = _ars.begin(); it != _ars.end();)
-    // {
-    //     if (!(*it)->is_proved())
-    //     {
-    //         (*it)->ar();
-    //         if (!(*it)->is_proved())
-    //         {
-    //             ++it;
-    //         }
-    //         else
-    //         {
-    //             it = _ars.erase(it);
-    //         }
-    //     }
-    //     else
-    //     {
-    //         it = _ars.erase(it);
-    //     }
-    // }
-
     if (!_problem->goals().empty())
     {
         bool res = true;

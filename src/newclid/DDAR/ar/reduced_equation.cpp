@@ -58,16 +58,23 @@ bool ReducedEquation::is_solved() const
 bool ReducedEquation::substitute_variable(Term var, const Equation &e)
 {
     bool changed = false;
+    bool flag = true;
     Equation new_equation = _remainder;
-    for (auto &term : _remainder.terms())
+    while (flag)
     {
-        if (term.contain(var))
+        flag = false;
+        for (auto &term : new_equation.terms())
         {
-            new_equation -= e * (term / var);
-            changed = true;
+            if (term.contain(var))
+            {
+                new_equation -= e * (term / var);
+                changed = true;
+                flag = true;
+                break;
+            }
         }
+        new_equation.reduction();
     }
-    new_equation.reduction();
     _remainder = new_equation;
     return changed;
 }
