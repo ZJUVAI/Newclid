@@ -69,6 +69,7 @@ private:
     ProofState _state{ProofState::NOT_PROVED};
     std::set<Point> _point_dependencies;
     std::vector<ReducedEquation *> _eqn;
+    ReducedEquation *_dep;
 };
 
 #endif // PROOF_HPP
