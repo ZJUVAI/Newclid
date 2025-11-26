@@ -14,7 +14,8 @@ using namespace std;
 Proof::Proof(DDARSolver *solver, std::unique_ptr<Statement> &&p)
     : _solver(solver),
       _statement(move(p)),
-      _eqn(_solver->insert_equation(_statement))
+      _eqn(_solver->insert_equation(_statement)),
+      _dep(nullptr)
 {
 }
 
@@ -48,6 +49,7 @@ void Proof::ar()
         req->reduce();
         if (req->is_solved())
         {
+            _dep = req;
             set_proved(ProofState::PROVED_AR);
             return;
         }
@@ -88,20 +90,8 @@ vector<Proof *> Proof::get_dependencies() const
     case ProofState::PROVED_BY_THEOREM:
         return _solver->applications()[_theoremId].hypotheses();
     case ProofState::PROVED_AR:
-        for (const auto req : _eqn)
-        {
-            if (!req->is_solved())
-            {
-                continue;
-            }
-            vector<Proof *> deps = req->statement_dependencies();
-            if (!deps.empty() && !(deps[0]->statement() == _statement))
-            {
-                return deps;
-            }
-        }
-
-        return {};
+        vector<Proof *> deps = _dep->statement_dependencies();
+        return deps;
     }
     return {};
 }
