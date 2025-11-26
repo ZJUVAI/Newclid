@@ -76,6 +76,7 @@ class ProofState:
         adds: list[Dependency] = []
         numerics: list[tuple[str, ...]] = []
         existing_points = list(self.symbols_graph.nodes_of_type(Point))
+        existing_point_names = list(p.name for p in existing_points)
 
         for constr_sentence in construction.sentences:
             cdef = self.defs[constr_sentence[0]]
@@ -88,6 +89,9 @@ class ProofState:
                 mapping = dict(
                     zip(cdef.declare[1:], construction.points + constr_sentence[1:])
                 )
+            for point in cdef.points:
+                if mapping[point] in existing_point_names:
+                    raise Exception(f"The new point {mapping[point]} is already used. existing points: {existing_point_names}. construction: {construction}")
 
             for premise in cdef.require.sentences:
                 if len(premise) == 0:
