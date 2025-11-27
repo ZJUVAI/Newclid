@@ -111,23 +111,39 @@ def extract_llm_renamed_proof(info: Dict[str, Any]) -> str:
     return inp + " " + out
 
 
-def extract_raw_rule(llm_input: str) -> str:
-    """Extract raw_rule from llm_renamed_input.
+def _normalize_predicate(expr: str) -> tuple[str, str]:
+    """Normalize a predicate expression into (name, args_str).
 
-    raw_rule = 'prem1, prem2, ... => conclusion'
+    - Removes extra spaces and trailing separators.
+    - Keeps order of arguments but strips redundant whitespace.
+    """
+    s = expr.strip().rstrip(" ;")
+    # predicate name is the first token; rest are args
+    parts = s.split()
+    if not parts:
+        return "", ""
+    name = parts[0]
+    args = " ".join(parts[1:]).strip()
+    return name, args
+
+
+def extract_raw_rule(llm_input: str) -> str:
+    """Extract and normalize raw_rule from llm_renamed_input.
+
+    - Parses premises from the left of '?', matching patterns with trailing [id].
+    - Strips index brackets and normalizes whitespace and separators.
+    - Sorts premises by predicate name for deterministic ordering.
+    - Extracts single conclusion before '[' and normalizes.
+    Returns formatted string: 'prem1, prem2, ... => conclusion'.
     """
     if not llm_input:
         return ""
 
-    # Extract content inside <problem> ... </problem>
     start_tag = "<problem>"
     end_tag = "</problem>"
     start_idx = llm_input.find(start_tag)
     end_idx = llm_input.rfind(end_tag)
-    if start_idx == -1 or end_idx == -1 or end_idx <= start_idx:
-        inner = llm_input
-    else:
-        inner = llm_input[start_idx + len(start_tag): end_idx]
+    inner = llm_input[start_idx + len(start_tag): end_idx] if (start_idx != -1 and end_idx != -1 and end_idx > start_idx) else llm_input
 
     if "?" not in inner:
         return ""
@@ -136,27 +152,57 @@ def extract_raw_rule(llm_input: str) -> str:
     left = left.strip()
     right = right.strip()
 
-    # 1) premises: all 'predicate ... [id]' on the left
-    prem_predicates: list[str] = []
+    # premises
+    prem_pairs: list[tuple[str, str]] = []
     for m in PREM_WITH_IDX_RE.finditer(left):
         expr = m.group(1).strip()
-        if expr:
-            prem_predicates.append(expr)
+        if not expr:
+            continue
+        name, args = _normalize_predicate(expr)
+        if not name:
+            continue
+        prem_pairs.append((name, args))
 
-    # 2) conclusion: first segment before '[' (single-goal assumption)
+    # conclusion: strip trailing bracketed indices and separators
     idx_bracket = right.find("[")
-    if idx_bracket != -1:
-        conclusion_raw = right[:idx_bracket].strip()
-    else:
-        conclusion_raw = right.strip()
+    conclusion_raw = (right[:idx_bracket] if idx_bracket != -1 else right).strip().rstrip(" ;")
+    concl_name, concl_args = _normalize_predicate(conclusion_raw)
 
-    # strip trailing separators like ';'
-    conclusion_raw = conclusion_raw.rstrip(" ;")
-
-    if not prem_predicates or not conclusion_raw:
+    if not prem_pairs or not concl_name:
         return ""
 
-    return ", ".join(prem_predicates) + " => " + conclusion_raw
+    # sort premises by predicate name
+    prem_pairs.sort(key=lambda x: x[0])
+    prem_strs = [f"{name} {args}".strip() for name, args in prem_pairs]
+    conclusion_str = f"{concl_name} {concl_args}".strip()
+
+    seened_alphabet = set()
+    current_char = 'a'
+    norm_rule_map = {}
+    normalized_prems = []
+    for prem in prem_strs:
+        args = prem.split()[1:]  # skip predicate name
+        for char in args:
+            if char not in seened_alphabet:
+                seened_alphabet.add(char)
+                norm_rule_map[char] = current_char
+                current_char = chr(ord(current_char) + 1)
+        prem = prem.split()[0] + " " + " ".join(
+            norm_rule_map[arg] for arg in args
+        )
+        normalized_prems.append(prem) # 存入新列表
+    concl_args = conclusion_str.split()[1:]  # skip predicate name
+    for char in concl_args:
+        if char not in seened_alphabet:
+            seened_alphabet.add(char)
+            norm_rule_map[char] = current_char
+            current_char = chr(ord(current_char) + 1)
+    normalized_conclusion_str = conclusion_str.split()[0] + " " + " ".join(
+        norm_rule_map[arg] for arg in concl_args
+    )
+
+    raw_rule = ", ".join(normalized_prems) + " => " + normalized_conclusion_str
+    return raw_rule, norm_rule_map
 
 
 def default_output_path(proof_info_path: str) -> str:
@@ -188,6 +234,8 @@ def combine(proof_info_path: str, config_info_path: str, output_path: str | None
     num_written = 0
 
     with open(output_path, "w", encoding="utf-8") as out_f:
+        # rule-level deduplication set
+        seen_rules: set[str] = set()
         for entry in proof_entries:
             num_total += 1
             if not isinstance(entry, (list, tuple)) or len(entry) != 2:
@@ -214,9 +262,18 @@ def combine(proof_info_path: str, config_info_path: str, output_path: str | None
             augmented_problem = info.get("augmented_problem", problem)
             aux_construction = extract_aux_construction(problem, augmented_problem)
 
+            if aux_construction == "":
+                continue
+
             llm_renamed_input = info.get("llm_renamed_input", "")
             llm_renamed_proof = extract_llm_renamed_proof(info)
-            raw_rule = extract_raw_rule(llm_renamed_input)
+            raw_rule, norm_rule_map = extract_raw_rule(llm_renamed_input)
+
+            # skip writing if raw_rule already seen (dedup by normalized content)
+            if raw_rule:
+                if raw_rule in seen_rules:
+                    continue
+                seen_rules.add(raw_rule)
 
             out_obj = {
                 "id": pid,
@@ -226,6 +283,7 @@ def combine(proof_info_path: str, config_info_path: str, output_path: str | None
                 "llm_renamed_proof": llm_renamed_proof,
                 "raw_rule": raw_rule,
                 "rename_map": info.get("rename_map", {}),
+                "norm_rule_map": norm_rule_map,
             }
             out_f.write(json.dumps(out_obj, ensure_ascii=False))
             out_f.write("\n")

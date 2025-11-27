@@ -32,7 +32,7 @@ date: 1119
     - [x] 我希望为evaluation过程中添加结果的保存功能，目前的猜想是对lm.py文件中添加证明结果的输出过程，将解题的结果写入指定内容，这部分内容我之前在run_batch.py这个脚本中实现过，我希望你参考两个文件的内容，帮我指定合适的计划
 
 date: 1124
-- [ ] 我现在需要对datasets/success_proofs目录下的结果与configuration进行组合，得到若干条完整的题目-结果的证明轨迹，为此我需要你帮我设计一个python脚本文件prooftrace_combine.py，他会输入一个proof_info文件和一个configuration_info文件，proof_info是一个json文件，它的单个条目是如下格式：
+- [x] 我现在需要对datasets/success_proofs目录下的结果与configuration进行组合，得到若干条完整的题目-结果的证明轨迹，为此我需要你帮我设计一个python脚本文件prooftrace_combine.py，他会输入一个proof_info文件和一个configuration_info文件，proof_info是一个json文件，它的单个条目是如下格式：
     [
     "16_0",
     {
@@ -50,6 +50,9 @@ date: 1124
     3. aux_construction: proof_info中augmented_problem与problem的差异部分(即新增的辅助构造)
     4. llm_renamed_proof: proof_info中的llm_renamed_input字段和llm_renamed_output字段合成的proof
     5. raw_rule: proof_info中llm_renamed_input字段中，每个[0id]前面的predicate（比如"para a b c d", "cong a d b c"）用", "连接，与" ? " 后面的结论predicate组成的结构，用" => "连接，比如上面的例子中，得到的raw_rule就应该是"para a b c d, cong a d b c => cong a c b d"
+
+date: 1127  
+  - [x] 我希望对proof_trace的结果进行去重，规则是先根据predicate的名称排序，格式化raw_rule部分的内容后进行去重，我希望通过更新proof_combine.py的代码来实现这个功能，在extract_raw_rule这个函数中进行修改
 
 - [ ] 通过numerical_check后用GenesisGeo测试所有goal，如果此步有无法求解的goal也整理出来作为下一步的输入
 - [ ] 借助GenesisGeo V1求解题目，结合上一个任务跑通数据生成流程。

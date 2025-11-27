@@ -84,7 +84,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
             # local_mode=True,
             # include_dashboard=True, dashboard_host="0.0.0.0", dashboard_port=8265,
             ignore_reinit_error=True, num_cpus=num_cpus,
-            _temp_dir="/c23474/home/math/dzt/ray_tmp",
+            _temp_dir="/c23474/home/duzhengtong/ray_tmp",
             include_dashboard=False,
         )
 
