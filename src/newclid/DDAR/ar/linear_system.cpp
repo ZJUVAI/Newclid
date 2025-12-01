@@ -12,6 +12,7 @@ using namespace std;
 
 void LinearSystem::reduce_next(Equation &e)
 {
+    e.normalize();
     while (true)
     {
         const auto &it_begin = e.begin();
