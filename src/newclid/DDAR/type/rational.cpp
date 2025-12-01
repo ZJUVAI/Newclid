@@ -12,11 +12,59 @@ void Rational::normalize()
     {
         throw runtime_error("Denominator cannot be zero");
     }
+
+    const double tolerance = 0.001;
+
+    if (std::abs(_num) > 500 && std::abs(_den) > 500)
+    {
+        long long larger = std::max(std::abs(_num), std::abs(_den));
+        long long smaller = std::min(std::abs(_num), std::abs(_den));
+
+        long long remainder = larger % smaller;
+        if (remainder <= tolerance * larger)
+        {
+            if (_num * _den > 0)
+            {
+                if (std::abs(_num) < std::abs(_den))
+                {
+                    _num = smaller;
+                    _den = larger - remainder;
+                }
+                else
+                {
+                    _num = larger - remainder;
+                    _den = smaller;
+                }
+            }
+            else
+            {
+                if (std::abs(_num) < std::abs(_den))
+                {
+                    _num = -smaller;
+                    _den = larger - remainder;
+                }
+                else
+                {
+                    _num = -(larger - remainder);
+                    _den = smaller;
+                }
+            }
+        }
+    }
+
+    if (abs(_num) == 1 && abs(_den) > 2000)
+    {
+        _num = 0;
+        _den = 1;
+        return;
+    }
+
     if (_den < 0)
     {
         _den = -_den;
         _num = -_num;
     }
+
     long long g = gcd(_num, _den);
     if (g != 0)
     {
@@ -161,6 +209,8 @@ string Rational::to_string() const
 
 long long gcd(long long a, long long b)
 {
+    a = abs(a);
+    b = abs(b);
     while (b != 0)
     {
         long long t = b;
