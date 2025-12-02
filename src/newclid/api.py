@@ -226,10 +226,12 @@ class GeometricSolverBuilder:
 
 
 class CSolver:
-    def __init__(self, problem: str, problem_name: str = "anonymity", seed: int = 123, solver: GeometricSolver = None):
+    def __init__(self, problem: str, problem_name: str = "anonymity", seed: int = 123, solver: GeometricSolver = None, using_log: bool = False, using_exp: bool = False):
         self.problem = problem
         self.problem_name = problem_name
         self.seed = seed
+        self.log_enabled = using_log
+        self.exp_enabled = using_exp
 
         # 构建 solver
         if solver is None:
@@ -292,7 +294,7 @@ class CSolver:
         t0 = time.time()
 
         solved, dep_graph = DDAR.run_ddar(
-            self.problem_name, self.points, self.premises, self.goals, max_level)
+            self.problem_name, self.points, self.premises, self.goals, max_level, self.log_enabled, self.exp_enabled)
 
         for stmt, deps, reason in dep_graph:
             conclusion = Statement.from_tokens(
@@ -323,7 +325,7 @@ class CSolver:
             if save_path:
                 out_path = Path(save_path)
                 self.solver.write_proof_steps(out_path)
-                print(f"[CSolver] Proof steps written to {out_path}")
+                # print(f"[CSolver] Proof steps written to {out_path}")
 
         return solved
 

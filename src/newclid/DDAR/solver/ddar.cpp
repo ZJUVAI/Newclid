@@ -12,7 +12,7 @@
 
 using namespace std;
 
-DDARSolver::DDARSolver(Problem *problem) : _problem(problem)
+DDARSolver::DDARSolver(Problem *problem, bool log_enabled, bool exp_enabled) : _problem(problem), _log_enabled(log_enabled), _exp_enabled(exp_enabled)
 {
     // cout << "添加前提条件" << endl;
     for (const auto &hyp : problem->hypotheses())
@@ -181,29 +181,13 @@ vector<tuple<vector<string>, vector<vector<string>>, string>> DDARSolver::depend
         // {
         //     pf->print_equations();
         // }
-        if (pf->statement()->name() == "secant")
-        {
-            continue;
-        }
         vector<vector<string>> deps;
-        bool flag = false;
+        // bool flag = false;
         for (const auto &dep : pf->get_dependencies())
         {
-            if (dep->statement()->name() == "secant")
-            {
-                flag = true;
-                auto sub_pf = _statement_proofs.at(dep->statement()->to_string()).get();
-                for (const auto &sub_dep : sub_pf->get_dependencies())
-                {
-                    deps.push_back(sub_dep->statement()->normalize()->to_tokens());
-                }
-            }
-            else
-            {
-                deps.push_back(dep->statement()->normalize()->to_tokens());
-            }
+            deps.push_back(dep->statement()->normalize()->to_tokens());
         }
-        res.push_back({pf->statement()->normalize()->to_tokens(), deps, pf->reason() + (flag ? " (via secant)" : "")});
+        res.push_back({pf->statement()->normalize()->to_tokens(), deps, pf->reason()});
     }
 
     return res;
@@ -248,7 +232,7 @@ bool DDARSolver::establish_statement(Proof *pf, size_t thm_id)
 
 vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement> &pf)
 {
-    auto eqn_ptrs = pf->as_equation();
+    auto eqn_ptrs = pf->as_equation(_log_enabled, _exp_enabled);
     if (eqn_ptrs.empty())
     {
         return {};

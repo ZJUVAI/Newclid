@@ -42,7 +42,7 @@ public:
 
     bool numerical_only() const { return false; }
 
-    std::vector<std::unique_ptr<Equation>> as_equation() const override;
+    std::vector<std::unique_ptr<Equation>> as_equation(bool log, bool exp) const override;
 };
 
 #endif // EQRATIO_HPP

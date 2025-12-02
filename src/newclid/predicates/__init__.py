@@ -27,6 +27,7 @@ from newclid.predicates.constant_angle import (
 from newclid.predicates.different import Diff as Diff
 from newclid.predicates.sameclock import SameClock as SameClock
 from newclid.predicates.sameside import NSameSide as NSameSide, SameSide as SameSide
+from newclid.predicates.secant import Secant
 
 from newclid.predicates.triangles_similar import (
     SimtriClock as SimtriClock,
@@ -56,6 +57,7 @@ SYMBOLIC_PREDICATES = (
     SimtriReflect,
     ContriClock,
     ContriReflect,
+    Secant,
 )
 
 NUMERICAL_PREDICATES = (

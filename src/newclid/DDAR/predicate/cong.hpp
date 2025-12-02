@@ -32,7 +32,7 @@ public:
 
     std::vector<statement_arg> args() const override;
 
-    std::vector<std::unique_ptr<Equation>> as_equation() const override;
+    std::vector<std::unique_ptr<Equation>> as_equation(bool log, bool exp) const override;
 
     const Dist &left() const { return _left; }
 
