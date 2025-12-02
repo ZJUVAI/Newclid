@@ -70,9 +70,13 @@ Coll Secant::coll_pab() const
     return Coll(_p, _a, _b);
 }
 
-vector<unique_ptr<Equation>> Secant::as_equation() const
+vector<unique_ptr<Equation>> Secant::as_equation(bool log, bool exp) const
 {
     vector<unique_ptr<Equation>> result;
+    if (!exp)
+    {
+        return result;
+    }
 
     Term pab({Dist(_p, _a), Dist(_p, _b)});
     Term oa2({Dist(_o, _a), Dist(_o, _a)});

@@ -59,7 +59,7 @@ public:
 
     bool operator<(const Coll &other) const;
 
-    std::vector<std::unique_ptr<Equation>> as_equation() const override;
+    std::vector<std::unique_ptr<Equation>> as_equation(bool log, bool exp) const override;
 
     Coll reverse() const;
 };

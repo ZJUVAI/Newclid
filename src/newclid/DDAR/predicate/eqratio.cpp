@@ -80,10 +80,16 @@ ostream &EqRatio::print(ostream &os) const
     return os << _left_up << ":" << _left_down << " = " << _right_up << ":" << _right_down;
 }
 
-vector<unique_ptr<Equation>> EqRatio::as_equation() const
+vector<unique_ptr<Equation>> EqRatio::as_equation(bool log, bool exp) const
 {
     vector<unique_ptr<Equation>> result;
-    result.push_back(make_unique<Equation>(Equation({Term({_left_up, _right_down}), -Term({_left_down, _right_up})})));
-    result.push_back(make_unique<Equation>(Equation({Term(DistLog(_left_up)), Term(DistLog(_right_down)), -Term(DistLog(_left_down)), -Term(DistLog(_right_up))})));
+    if (exp)
+    {
+        result.push_back(make_unique<Equation>(Equation({Term({_left_up, _right_down}), -Term({_left_down, _right_up})})));
+    }
+    if (log)
+    {
+        result.push_back(make_unique<Equation>(Equation({Term(DistLog(_left_up)), Term(DistLog(_right_down)), -Term(DistLog(_left_down)), -Term(DistLog(_right_up))})));
+    }
     return result;
 }
