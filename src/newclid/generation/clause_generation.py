@@ -155,11 +155,15 @@ class CompoundClauseGen:
         self.point_generator = None
         self.symbols_graph = None
         self.dep_graph = None
+        self.point_level: dict[str, int] = None
+        self.point_rely: dict[str, set[str]] = None
 
     def generate(self, length = 0):
         self.point_generator = PointGenerator()
         self.dep_graph = DependencyGraph(AlgebraicManipulator())
         self.symbols_graph = self.dep_graph.symbols_graph
+        self.point_level = {}
+        self.point_rely = {}
 
         max_basic_clause = int(0.15 * length)
         res = []
@@ -178,6 +182,7 @@ class CompoundClauseGen:
                     new_clause = self.get_clause_with_n_constructions(OTHER+INTERSECT+BASIC_FREE, 1)
             if new_clause:
                 res.append(new_clause)
+        res = self.prune_clauses(res)
         return "; ".join(res)
 
     def get_clause_with_n_constructions(self, construction_candidates, n: int):
@@ -187,11 +192,15 @@ class CompoundClauseGen:
             # samples constructions
             constructions = []
             numerics = []
+            max_level = -1
+            rely_points = set()
             try:
                 if n == 1:
                     new_points, construction, numeric = self.choose_construction(construction_candidates)
                     constructions.append(construction)
                     numerics += numeric
+                    max_level = max([max_level] + [self.point_level.get(p, -1) for p in construction.split()[1:]])
+                    rely_points.update([p for p in construction.split()[1:] if p in self.point_rely])
                 else:
                     # multiple n_constructions shares the same new points. Only support one new point
                     new_points = self.point_generator.prefetch_points(1)
@@ -199,6 +208,8 @@ class CompoundClauseGen:
                         _, construction, numeric = self.choose_construction(construction_candidates, new_points)
                         constructions.append(construction)
                         numerics += numeric
+                        max_level = max([max_level] + [self.point_level.get(p, -1) for p in construction.split()[1:]])
+                        rely_points.update([p for p in construction.split()[1:] if p in self.point_rely])
                 # check numerics by drawing diagram
                 self.draw_diagram(new_points, numerics)
             except Exception as e:
@@ -213,6 +224,8 @@ class CompoundClauseGen:
             for p in new_points:
                 p_num = self.symbols_graph.names2points([p])[0]
                 new_points_str.append(f'{p}@{p_num.num.x}_{p_num.num.y}')
+                self.point_level[p] = max_level + 1
+                self.point_rely[p] = rely_points
             return ' '.join(new_points_str) + " = " + ', '.join(constructions)
     
     def draw_diagram(self, new_points, numerics,):
@@ -318,11 +331,26 @@ class CompoundClauseGen:
     def construction_text(self, construction_def, mapping):
         text = f"{construction_def.declare[0]} {' '.join([mapping[p] for p in construction_def.declare[1:]])}"
         return text
+    
+    def prune_clauses(self, clauses: list[str]) -> list[str]:
+        """Prune clauses to preserve only the deepest clause chain"""
+        max_level = max(self.point_level.values())
+        useful_points = [random.choice([p for p, l in self.point_level.items() if l == max_level])]
+        for p in useful_points:
+            for q in self.point_rely[p]:
+                if q not in useful_points:
+                    useful_points.append(q)
+        pruned_clauses = []
+        for clause in clauses:
+            clause_points = clause.split('=')[0].strip().split()
+            if any(p.split('@')[0] in useful_points for p in clause_points):
+                pruned_clauses.append(clause)
+        return pruned_clauses
 
 
 if __name__ == "__main__":
     cc_gen = CompoundClauseGen(42)
-    clause_text = cc_gen.generate(50)
+    clause_text = cc_gen.generate(15)
     clause_text = cc_gen.generate(50)
     clause_text = cc_gen.generate(50)
     print(clause_text)
