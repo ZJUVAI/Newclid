@@ -35,7 +35,19 @@ def time_limit(seconds):
 
 
 class GeometryGenerator:
-    def __init__(self, n_clauses=5, n_threads=1, output_dir="dataset", min_proof_steps=5, min_clauses_num=3, n_samples=100, timeout=3600, max_level=500):
+    def __init__(
+            self,
+            n_clauses=5,
+            n_threads=1,
+            output_dir="dataset",
+            min_proof_steps=5,
+            min_clauses_num=3,
+            n_samples=100,
+            timeout=3600,
+            max_level=500,
+            img=False,
+            aux_only=False
+        ):
         self.n_clauses = n_clauses
         self.min_proof_steps = min_proof_steps
         self.min_clauses_num = min_clauses_num
@@ -53,6 +65,8 @@ class GeometryGenerator:
             DefinitionJGEX.parse_txt_file(default_defs_path()))
         self.clauses_generator = CompoundClauseGen(
             seed=int(time.time())+os.getpid(), defs=self.defs)
+        self.img = img
+        self.aux_only = aux_only
 
     def problem_hash_filter(self, data: list, key: str) -> list[str]:
         """Check if the input has already been written to the output file."""
@@ -81,7 +95,7 @@ class GeometryGenerator:
         def task_generator():
             for i in range(10**9):
                 seed = 42 + i  # 唯一种子 = 时间戳 + 任务ID
-                yield i, seed, self.n_clauses, self.max_level
+                yield i, seed, self.n_clauses, self.max_level, self.aux_only
 
         if not ray.is_initialized():
             ray.init(
@@ -182,6 +196,10 @@ def main():
                         choices=["debug", "info", "warning", "error"])
     parser.add_argument("--timeout", required=False, type=int, default=3600)
     parser.add_argument("--max_level", required=False, type=int, default=500)
+    parser.add_argument("--img", required=False, type=bool, default=False,
+                        help="Whether to save images of the generated problems.")
+    parser.add_argument("--aux_only", required=False, type=bool, default=False,
+                        help="Whether to save only data with aux.")
     args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, args.log_level.upper()))
@@ -194,7 +212,9 @@ def main():
         min_clauses_num=args.min_clauses_num,
         n_samples=args.n_samples,
         timeout=args.timeout,
-        max_level=args.max_level
+        max_level=args.max_level,
+        img=args.img,
+        aux_only=args.aux_only
     )
 
     generator.generate()
