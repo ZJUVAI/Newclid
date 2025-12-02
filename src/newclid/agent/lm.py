@@ -444,7 +444,7 @@ class LMAgent(DeductiveAgent):
         premises = LMAgent._extract_premises(proof)
         goals = LMAgent._extract_goals(proof)
         
-        _, dep_graph = DDAR.run_ddar("", points, premises, goals, 500)
+        _, dep_graph = DDAR.run_ddar("", points, premises, goals, 500, True, True)
 
         for stmt, deps, reason in dep_graph:
             conclusion = Statement.from_tokens(
