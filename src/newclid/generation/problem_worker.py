@@ -65,7 +65,7 @@ class GeometryProblemWorker:
     def _process_single_problem(args: tuple) -> tuple[list, dict]:
         """Process a single geometry problem with unique seed."""
         try:
-            pid, seed, n_clauses, max_level = args
+            pid, seed, n_clauses, max_level, aux_only = args
             start_time = time.time()
 
             # geneate fl_statement
@@ -100,6 +100,8 @@ class GeometryProblemWorker:
                 # find essential_clauses
                 points, premises, _, aux_points, aux, _, _ = solver.proof.dep_graph.get_proof_steps([
                                                                                                      goal])
+                if aux_only and len(aux) == 0:
+                    continue
                 premises = [dep.statement for dep in premises]
                 aux = [dep.statement for dep in aux]
                 predicates = sorted([statement.to_str() for statement in premises + aux])
@@ -115,7 +117,7 @@ class GeometryProblemWorker:
                 premises = goal_list[0][1]
                 aux = goal_list[0][2]
                 data = GeometryProblemWorker._process_goals_with_same_statement(
-                    goals, solver, solver_builder, premises, aux, n_clauses)
+                    goals, solver, solver_builder, premises, aux, n_clauses, aux_only)
                 generated_data.extend(data)
             process_goal_time = time.time() - process_goal_time
 
@@ -233,7 +235,7 @@ class GeometryProblemWorker:
         #         continue
 
     @staticmethod
-    def _find_minimal_aux_clauses_new(solver, solver_builder, goals_str, premises, aux):
+    def _find_minimal_aux_clauses_new(solver, solver_builder, goals_str, premises, aux, aux_only):
         """Find minimal auxiliary clause set"""
         # Iterate through all possible subsets to find the minimal necessary auxiliary clause set
         # Search through subsets from size 0 to len-1 (excluding full set)
@@ -258,6 +260,8 @@ class GeometryProblemWorker:
                     # if found new solutions
                     if goal.check():
                         goals_str.remove(goal.to_str())
+                        if aux_only and r == 0:
+                            continue
                         results.append({
                             "solver": solver_test,
                             "goal": goal
@@ -280,7 +284,7 @@ class GeometryProblemWorker:
         return results
 
     @staticmethod
-    def _process_goals_with_same_statement(goals, solver, solver_builder, premises, aux, n_clauses):
+    def _process_goals_with_same_statement(goals, solver, solver_builder, premises, aux, n_clauses, aux_only):
         """Process a single goal"""
 
         results = []
@@ -290,7 +294,8 @@ class GeometryProblemWorker:
             solver_builder,
             [goal.to_str() for goal in goals],
             premises,
-            aux
+            aux,
+            aux_only
         )
 
         for res in res_list:
@@ -301,6 +306,8 @@ class GeometryProblemWorker:
             # get new proof
             _, premises, _, aux_points, aux, _, proof_steps = solver_new.proof.dep_graph.get_proof_steps([
                                                                                                      goal_new])
+            if aux_only and len(aux) == 0:
+                logging.warning("aux_only == True but still generate result with no aux.")
             all_premises = [dep.statement for dep in premises + aux]
             n_premises = len(all_premises)
 
