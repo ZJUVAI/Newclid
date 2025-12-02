@@ -119,7 +119,7 @@ bool Coll::operator<(const Coll &other) const
     return _a < other._a;
 }
 
-vector<unique_ptr<Equation>> Coll::as_equation() const
+vector<unique_ptr<Equation>> Coll::as_equation(bool log, bool exp) const
 {
     vector<unique_ptr<Equation>> result;
     result.push_back(make_unique<Equation>(Equation({Term(Slope(_a, _b)), -Term(Slope(_a, _c))})));

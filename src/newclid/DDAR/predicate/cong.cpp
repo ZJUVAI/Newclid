@@ -48,11 +48,14 @@ ostream &Cong::print(ostream &os) const
     return os << _left << " = " << _right;
 }
 
-vector<unique_ptr<Equation>> Cong::as_equation() const
+vector<unique_ptr<Equation>> Cong::as_equation(bool log, bool exp) const
 {
     vector<unique_ptr<Equation>> result;
     result.push_back(make_unique<Equation>(Equation({Term(_left), -Term(_right)})));
-    result.push_back(make_unique<Equation>(Equation({Term(DistLog(_left)), -Term(DistLog(_right))})));
+    if (log)
+    {
+        result.push_back(make_unique<Equation>(Equation({Term(DistLog(_left)), -Term(DistLog(_right))})));
+    }
     Slope slope_left(_left.left(), _left.right());
     Slope slope_right(_right.left(), _right.right());
     if (Numerical::close_enough(slope_left.angle(), slope_right.angle()))

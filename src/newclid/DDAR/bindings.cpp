@@ -35,7 +35,7 @@ std::string join(const StatementTokens &tokens)
 
 extern "C"
 {
-    pair<bool, DepGraph> run_ddar(string name, vector<tuple<string, double, double>> points, vector<pair<string, vector<string>>> premises, vector<pair<string, vector<string>>> goals, int max_level = 500)
+    pair<bool, DepGraph> run_ddar(string name, vector<tuple<string, double, double>> points, vector<pair<string, vector<string>>> premises, vector<pair<string, vector<string>>> goals, int max_level = 500, bool log_enabled = false, bool exp_enabled = false)
     {
         Problem problem;
         problem.load_from_data(name, points, premises, goals);
@@ -58,7 +58,7 @@ extern "C"
         // cout << "------------------------------------------------------------" << endl;
         // cout << "Problem: " << name << endl;
 
-        DDARSolver solver(&problem);
+        DDARSolver solver(&problem, log_enabled, exp_enabled);
         solver.run(max_level);
 
         // if (solver.is_solved())

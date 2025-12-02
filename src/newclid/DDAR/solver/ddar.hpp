@@ -32,6 +32,9 @@ private:
 
     bool _solved{false};
 
+    bool _log_enabled;
+    bool _exp_enabled;
+
     LinearSystem _system;
 
     using eqns_map_type = std::unordered_map<Equation, ReducedEquation>;
@@ -55,7 +58,7 @@ public:
 
     size_t push_established_statement(const Proof *pf);
 
-    DDARSolver(Problem *problem);
+    DDARSolver(Problem *problem, bool log_enabled = false, bool exp_enabled = false);
 
     void advance_theorem(size_t index);
 
