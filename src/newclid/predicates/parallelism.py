@@ -124,10 +124,18 @@ class Para(Predicate):
             d = points[i + 1].num - points[i].num
             d = d / abs(d)
             d = d.rot90()
+            # Calculate offset based on figure size
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()
+            fig_width = xlim[1] - xlim[0]
+            fig_height = ylim[1] - ylim[0]
+            fig_size = min(fig_width, fig_height)
+            offset_factor = 0.3 * fig_size / 10.0  # Scale with figure size
+            
             if d.x < 0.0:
-                d = -0.03 * d
+                d = -offset_factor * d
             else:
-                d = 0.03 * d
+                d = offset_factor * d
             p = points[i + 1].num - points[i].num
             p = p / abs(p)
             p = p * (points[i].num.distance(points[i + 1].num) - seglen) * 0.5

@@ -1,6 +1,8 @@
 from __future__ import annotations
 from fractions import Fraction
 from typing import TYPE_CHECKING, Any
+from numpy.random import Generator
+from matplotlib.axes import Axes
 
 from newclid.dependencies.dependency import Dependency
 from newclid.dependencies.symbols import Point
@@ -9,13 +11,13 @@ from newclid.predicates.constant_angle import ACompute
 from newclid.predicates.predicate import Predicate
 from newclid.algebraic_reasoning.tables import Ratio_Chase
 from newclid.tools import fraction_to_ratio, get_quotient, str_to_fraction
+from newclid.numerical.draw_figure import draw_segment
 
 if TYPE_CHECKING:
     from newclid.algebraic_reasoning.tables import Table
     from newclid.algebraic_reasoning.tables import SumCV
     from newclid.statement import Statement
     from newclid.dependencies.dependency_graph import DependencyGraph
-
 
 class ConstantRatio(Predicate):
     """rconst A B C D r -
@@ -95,6 +97,11 @@ class ConstantRatio(Predicate):
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
         a, b, c, d, r = args
         return (a.name, b.name, c.name, d.name, fraction_to_ratio(r))  # type: ignore
+    
+    @classmethod
+    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator):
+        draw_segment(ax, args[0], args[1])
+        draw_segment(ax, args[2], args[3])
 
 
 class RCompute(Predicate):

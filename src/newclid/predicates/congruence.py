@@ -135,11 +135,15 @@ class Cong(Predicate):
         args: tuple[Any, ...],
         dep_graph: "DependencyGraph",
         rng: Generator,
+        segment_parent: Optional[dict[tuple[str, str], tuple[str, str]]] = None,
+        segment_colors: Optional[dict[tuple[str, str], int]] = None,
     ):
         # Union-Find operations within draw function
         graph = dep_graph.symbols_graph
-        segment_parent = graph.segment_parent
-        segment_colors = graph.segment_colors
+        if segment_parent is None:
+            segment_parent = graph.segment_parent
+        if segment_colors is None:
+            segment_colors = graph.segment_colors
         
         def find_root(segment: tuple[str, str]) -> tuple[str, str]:
             """Find root with path compression"""
@@ -203,9 +207,16 @@ class Cong(Predicate):
             direction = direction / abs(direction)
             perpendicular = direction.rot90()
             
-            # Set slash parameters
-            slash_length = 0.012
-            slash_gap = 0.005
+            # Get current axis limits to determine figure size
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()
+            figure_width = xlim[1] - xlim[0]
+            figure_height = ylim[1] - ylim[0]
+            figure_size = max(figure_width, figure_height)
+            
+            # Set slash parameters proportional to figure size
+            slash_length = figure_size * 0.015  # 1.5% of figure size
+            slash_gap = figure_size * 0.006     # 0.6% of figure size
             
             # Calculate slash positions
             slash1_start = mid - direction * slash_gap - perpendicular * slash_length

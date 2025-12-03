@@ -11,6 +11,7 @@ from newclid.numerical.geometries import (
     intersect,
 )
 from newclid.dependencies.symbols import Point, Circle, Line
+from newclid.numerical.geometries import CircleNum
 import matplotlib.patches as patches
 from numpy.random import Generator
 from matplotlib.axes import Axes
@@ -93,6 +94,47 @@ def _draw(
         point_names.append(draw_point(ax, p))
     adjust_text(point_names, ax=ax)
 
+def draw_with_mapping(
+    ax: "Axes",
+    points: list[Point],
+    statements: Collection["Statement"],
+    goal: "Statement",
+    rng: Generator,
+    mapping: dict[str, str],
+):
+    """Draw everything with point mapping."""
+    point_names = []
+    for p in points:
+        mapped_p = Point(name=mapping[p.name], symbols_graph=None, dep=None)
+        mapped_p.num = p.num
+        point_names.append(draw_point(ax, mapped_p))
+
+    segment_parent: dict[tuple[str, str], tuple[str, str]] = {}
+    segment_colors: dict[tuple[str, str], int] = {}
+    for statement in statements:
+        if statement.predicate.NAME == 'cong':
+            statement.predicate.draw(
+                ax,
+                statement.args,
+                statement.dep_graph,
+                rng,
+                segment_parent,
+                segment_colors,
+            )
+        else:
+            statement.draw(ax, rng)
+
+    if goal.to_str() == 'para e v n u':
+        pass
+
+    if goal.predicate.NAME == 'cong':
+        draw_segment(ax, goal.args[0], goal.args[1])
+        draw_segment(ax, goal.args[2], goal.args[3])
+    else:
+        goal.draw(ax, rng)
+
+    adjust_text(point_names, ax=ax)
+
 
 def fill_missing(d0: dict[Any, Any], d1: dict[Any, Any]):
     for k in d1.keys():
@@ -115,6 +157,20 @@ def draw_circle(ax: "Axes", c: Circle, **args: Any) -> None:
         )
     )
 
+def draw_circle_num(ax: "Axes", c: CircleNum, **args: Any) -> None:
+    fill_missing(
+        args,
+        {
+            "color": "cyan",
+            "fill": False,
+            "lw": 0.8,
+        },
+    )
+    ax.add_patch(
+        patches.Circle(  # type: ignore
+            (c.center.x, c.center.y), c.radius, **args
+        )
+    )
 
 def draw_line(ax: "Axes", line: Line, **args: Any):
     """Draw a line. Return the two extremities"""

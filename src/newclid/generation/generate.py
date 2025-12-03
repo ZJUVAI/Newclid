@@ -1,5 +1,6 @@
 import logging
 import os
+import shutil
 import argparse
 import json
 import time
@@ -9,6 +10,8 @@ import re
 from millify import millify
 import signal
 from contextlib import contextmanager
+import matplotlib.pyplot as plt
+from copy import deepcopy
 
 from newclid.configs import default_defs_path
 from newclid.formulations.definition import DefinitionJGEX
@@ -46,7 +49,8 @@ class GeometryGenerator:
             timeout=3600,
             max_level=500,
             img=False,
-            aux_only=False
+            aux_only=False,
+            clear=False,
         ):
         self.n_clauses = n_clauses
         self.min_proof_steps = min_proof_steps
@@ -67,6 +71,8 @@ class GeometryGenerator:
             seed=int(time.time())+os.getpid(), defs=self.defs)
         self.img = img
         self.aux_only = aux_only
+        self.clear = clear
+        self.data_count = 0
 
     def problem_hash_filter(self, data: list, key: str) -> list[str]:
         """Check if the input has already been written to the output file."""
@@ -83,19 +89,38 @@ class GeometryGenerator:
         self.write_buffer.extend(all_data)
         if len(self.write_buffer) > 10000 or force:
             filename = self.path_prefix + ".jsonl"
+            imgs_dir = os.path.join(self.output_dir, "imgs")
             os.makedirs(os.path.dirname(filename), exist_ok=True)
+            os.makedirs(imgs_dir, exist_ok=True)
             with open(filename, 'a', encoding='utf-8') as f:
                 for data_item in self.write_buffer:
+                    self.data_count += 1
                     data_item['fl_problem'] = ''
-                    json.dump(data_item, f, ensure_ascii=False)
+                    if self.img:
+                        fig = deepcopy(data_item.pop('fig'))
+                        fig.savefig(
+                            os.path.join(imgs_dir, f"{self.data_count}.svg"),
+                            format='svg'
+                        )
+                        plt.close(fig)
+                    result_data = {'id': self.data_count, **data_item}
+                    json.dump(result_data, f, ensure_ascii=False)
                     f.write('\n')
             self.write_buffer.clear()
 
     def generate(self):
+        if self.clear:
+            filename = self.path_prefix + ".jsonl"
+            imgs_dir = os.path.join(self.output_dir, "imgs")
+            if os.path.exists(filename):
+                os.remove(filename)
+            if os.path.exists(imgs_dir):
+                shutil.rmtree(imgs_dir)
+
         def task_generator():
             for i in range(10**9):
                 seed = 42 + i  # 唯一种子 = 时间戳 + 任务ID
-                yield i, seed, self.n_clauses, self.max_level, self.aux_only
+                yield i, seed, self.n_clauses, self.max_level, self.img, self.aux_only
 
         if not ray.is_initialized():
             ray.init(
@@ -200,6 +225,8 @@ def main():
                         help="Whether to save images of the generated problems.")
     parser.add_argument("--aux_only", required=False, type=bool, default=False,
                         help="Whether to save only data with aux.")
+    parser.add_argument("--clear", required=False, type=bool, default=False,
+                        help="Whether to clear old dataset files.")
     args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, args.log_level.upper()))
@@ -214,7 +241,8 @@ def main():
         timeout=args.timeout,
         max_level=args.max_level,
         img=args.img,
-        aux_only=args.aux_only
+        aux_only=args.aux_only,
+        clear=args.clear,
     )
 
     generator.generate()

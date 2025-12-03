@@ -165,11 +165,11 @@ class ProofState:
             raise PointTooFarError()
 
         # draw some specific figures (to be refactored, if there are multiple branches)
-        if construction.sentences[0][0] == "triangle":
-            (ax,) = self.fig.axes
-            draw_segment(ax, new_points[0], new_points[1])
-            draw_segment(ax, new_points[1], new_points[2])
-            draw_segment(ax, new_points[2], new_points[0])
+        # if construction.sentences[0][0] == "triangle":
+        #     (ax,) = self.fig.axes
+        #     draw_segment(ax, new_points[0], new_points[1])
+        #     draw_segment(ax, new_points[1], new_points[2])
+        #     draw_segment(ax, new_points[2], new_points[0])
         for add in adds:
             if not add.statement.check_numerical():
                 raise ConstructionError(
