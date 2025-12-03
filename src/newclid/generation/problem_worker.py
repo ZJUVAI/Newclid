@@ -83,7 +83,7 @@ class GeometryProblemWorker:
                 return [], {}
 
             n_clauses = len(fl_statement.split(';'))
-            csolver = CSolver(fl_statement, seed=seed, solver=solver)
+            csolver = CSolver(fl_statement, seed=seed, solver=solver, using_log=True)
             # print(f"problem: {fl_statement}")
 
             # Run solver
