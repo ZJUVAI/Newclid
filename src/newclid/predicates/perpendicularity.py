@@ -13,6 +13,7 @@ from newclid.predicates.predicate import Predicate
 from newclid.tools import notNone
 from numpy.random import Generator
 from newclid.numerical.geometries import intersect
+from newclid.numerical.geometries import LineNum
 
 if TYPE_CHECKING:
     from newclid.algebraic_reasoning.tables import Table
@@ -116,22 +117,31 @@ class Perp(Predicate):
     def draw(
         cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
     ):
-        symbols_graph = dep_graph.symbols_graph
-        line0 = notNone(symbols_graph.container_of({args[0], args[1]}, Line))
-        line1 = notNone(symbols_graph.container_of({args[2], args[3]}, Line))
-        (o,) = intersect(line0.num, line1.num)
+        line0_num = LineNum(p1=args[0].num, p2=args[1].num)
+        line1_num = LineNum(p1=args[2].num, p2=args[3].num)
+        (o,) = intersect(line0_num, line1_num)
         dir1 = args[0].num - o if not o.close_enough(args[0].num) else args[1].num - o
         dir2 = args[2].num - o if not o.close_enough(args[2].num) else args[3].num - o
         if dir1.x * dir2.y - dir1.y * dir2.x < 0:
             dir1, dir2 = dir2, dir1
+        # Get current axis limits to determine figure size
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        figure_width = xlim[1] - xlim[0]
+        figure_height = ylim[1] - ylim[0]
+        figure_size = max(figure_width, figure_height)
+        
+        # Set rectangle size proportional to figure size
+        rectangle_size = figure_size * 0.03  # 3% of figure size
+        
         ang = np.arctan2(dir1.y, dir1.x)
         rectangle = patches.Rectangle(
             (o.x, o.y),
             angle=ang / np.pi * 180,
             fill=False,
             color="yellow",
-            width=0.05,
-            height=0.05,
+            width=rectangle_size,
+            height=rectangle_size,
         )
         ax.add_patch(rectangle)
         draw_segment_num(ax, o, args[0].num)

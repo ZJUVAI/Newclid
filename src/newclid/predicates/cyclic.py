@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Any
 from newclid.dependencies.dependency import Dependency
 from newclid.dependencies.symbols import Circle, Point
 from newclid.numerical import close_enough
-from newclid.numerical.draw_figure import draw_circle
+from newclid.numerical.draw_figure import draw_circle, draw_circle_num
 from newclid.numerical.geometries import CircleNum
 from newclid.predicates.predicate import Predicate
 from matplotlib.axes import Axes
@@ -79,5 +79,9 @@ class Cyclic(Predicate):
     def draw(
         cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
     ):
-        symbols_graph = dep_graph.symbols_graph
-        draw_circle(ax, notNone(symbols_graph.container_of(set(args), Circle)))
+        c_num = CircleNum(
+            p1=args[0].num,
+            p2=args[1].num,
+            p3=args[2].num,
+        )
+        draw_circle_num(ax, c_num)

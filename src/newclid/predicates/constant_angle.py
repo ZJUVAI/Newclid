@@ -1,7 +1,9 @@
 from __future__ import annotations
 from fractions import Fraction
 from numpy import pi
+from numpy.random import Generator
 from typing import TYPE_CHECKING, Any, Optional
+from matplotlib.axes import Axes
 
 from newclid.dependencies.symbols import Point
 from newclid.numerical import close_enough
@@ -9,6 +11,7 @@ from newclid.predicates.predicate import Predicate
 from newclid.algebraic_reasoning.tables import Angle_Chase
 from newclid.tools import fraction_to_angle, get_quotient, str_to_fraction
 from newclid.dependencies.dependency import Dependency
+from newclid.numerical.draw_figure import draw_segment
 
 if TYPE_CHECKING:
     from newclid.algebraic_reasoning.tables import Table
@@ -107,6 +110,11 @@ class ConstantAngle(Predicate):
         args: tuple[Point, Point, Point, Point, Fraction] = statement.args
         a, b, c, d, y = args
         return f"∠({a.pretty_name}{b.pretty_name},{c.pretty_name}{d.pretty_name}) = {fraction_to_angle(y)}"
+        
+    @classmethod
+    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator):
+        draw_segment(ax, args[0], args[1])
+        draw_segment(ax, args[2], args[3])
 
 
 class ACompute(Predicate):

@@ -11,6 +11,7 @@ from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.dependencies.dependency import Dependency, IN_PREMISES, NUMERICAL_CHECK
 from newclid.configs import default_defs_path
 from newclid.api import GeometricSolver, GeometricSolverBuilder, CSolver
+from newclid.numerical.draw_figure import draw_with_mapping
 import logging
 import re
 import itertools
@@ -21,6 +22,7 @@ from contextlib import contextmanager
 from collections import defaultdict
 import ray
 import numpy as np
+from copy import deepcopy
 
 from newclid.generation.clause_generation import CompoundClauseGen
 
@@ -65,7 +67,7 @@ class GeometryProblemWorker:
     def _process_single_problem(args: tuple) -> tuple[list, dict]:
         """Process a single geometry problem with unique seed."""
         try:
-            pid, seed, n_clauses, max_level, aux_only = args
+            pid, seed, n_clauses, max_level, img, aux_only = args
             start_time = time.time()
 
             # geneate fl_statement
@@ -117,7 +119,7 @@ class GeometryProblemWorker:
                 premises = goal_list[0][1]
                 aux = goal_list[0][2]
                 data = GeometryProblemWorker._process_goals_with_same_statement(
-                    goals, solver, solver_builder, premises, aux, n_clauses, aux_only)
+                    goals, solver, solver_builder, premises, aux, n_clauses, img, aux_only)
                 generated_data.extend(data)
             process_goal_time = time.time() - process_goal_time
 
@@ -284,7 +286,7 @@ class GeometryProblemWorker:
         return results
 
     @staticmethod
-    def _process_goals_with_same_statement(goals, solver, solver_builder, premises, aux, n_clauses, aux_only):
+    def _process_goals_with_same_statement(goals, solver, solver_builder, premises, aux, n_clauses, img, aux_only):
         """Process a single goal"""
 
         results = []
@@ -304,7 +306,7 @@ class GeometryProblemWorker:
             solver_new.proof.goals = [goal_new]
 
             # get new proof
-            _, premises, _, aux_points, aux, _, proof_steps = solver_new.proof.dep_graph.get_proof_steps([
+            points, premises, _, aux_points, aux, _, proof_steps = solver_new.proof.dep_graph.get_proof_steps([
                                                                                                      goal_new])
             if aux_only and len(aux) == 0:
                 logging.warning("aux_only == True but still generate result with no aux.")
@@ -318,13 +320,13 @@ class GeometryProblemWorker:
             #     continue
 
             # llm data generation
-            llm_renamed = GeometryProblemWorker.llm_solution_renamed(
+            llm_renamed, mapping = GeometryProblemWorker.llm_solution_renamed(
                 solver_builder.problemJGEX, solver_new.proof)
 
             if len(aux_points) > 0 and not GeometryProblemWorker.filter.aux_predicates_valid_check(llm_renamed['llm_output']):
                 continue
-
-            results.append({
+            
+            result = {
                 "n_clauses": n_clauses,
                 "n_premises": n_premises,
                 "fl_problem": str(solver_builder.problemJGEX) + goal_new.to_str(),
@@ -332,7 +334,23 @@ class GeometryProblemWorker:
                 "n_proof_steps": n_proof_steps,
                 "llm_input_renamed": llm_renamed['llm_input'],
                 "llm_output_renamed": llm_renamed['llm_output'],
-            })
+            }
+
+            if img:
+                fig = deepcopy(solver_new.proof.fig)
+                draw_with_mapping(
+                    fig.axes[0],
+                    solver_new.proof.symbols_graph.names2points(
+                        list(set(mapping.keys()) & set([p.name for p in points]))
+                    ),
+                    [premise.statement for premise in premises],
+                    goal_new,
+                    np.random.default_rng(solver_builder.seed),
+                    mapping,
+                )
+                result["fig"] = fig
+
+            results.append(result)
         return results
 
     @staticmethod
@@ -409,7 +427,7 @@ class GeometryProblemWorker:
             return {
                 "llm_input": data_problem,
                 "llm_output": data_aux + numerical_check + proof,
-            }
+            }, mp
 
         except Exception as e:
             import traceback
