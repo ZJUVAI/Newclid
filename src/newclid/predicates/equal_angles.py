@@ -175,9 +175,12 @@ class EqAngle(Predicate):
     ):
         setattr(ax, "angle_color", (getattr(ax, "angle_color", 0) + 1) % len(PALETTE))
         color = PALETTE[ax.angle_color]  # type: ignore
+        if len(set(args[0:4])) > 3 or len(set(args[4:8])) > 3:
+            ori_args = list(args)
+            args = tuple(ori_args[0:2] + ori_args[4:6] + ori_args[2:4] + ori_args[6:8])
+        if len(set(args[0:4])) > 3 or len(set(args[4:8])) > 3:
+            logging.error(f"Cannot draw angle with more than 3 distinct points: {args[0:4]}, {args[4:8]}")
         for i in range(0, len(args), 4):
-            if len(set(args[i:i+4])) > 3:
-                logging.warning(f"Cannot draw angle with more than 3 distinct points: {args[i:i+4]}")
             if args[i] == args[i + 2] or args[i] == args[i + 3]:
                 point0 = args[i]
             else:
