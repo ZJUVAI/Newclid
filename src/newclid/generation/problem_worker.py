@@ -504,14 +504,18 @@ class GeometryProblemWorker:
         for k, v in all_premise.items():
             kps = k.split(' ')
             if any(p in essential_points for p in kps):
-                for dep in v:
-                    if dep in essential_premises:
-                        for arg in dep.args:
-                            if isinstance(arg, Point) and arg.name not in mp:
-                                mp[arg.name] = GeometryProblemWorker._get_apha_geo_solver_var(
-                                    len(mp))
+                # for dep in v:
+                #     if dep in essential_premises:
+                #         for arg in dep.args:
+                #             if isinstance(arg, Point) and arg.name not in mp:
+                #                 mp[arg.name] = GeometryProblemWorker._get_apha_geo_solver_var(
+                #                     len(mp))
+                # for p in kps:
+                #     if p not in mp:
+                #         mp[p] = GeometryProblemWorker._get_apha_geo_solver_var(
+                #             len(mp))
                 for p in kps:
-                    if p not in mp:
+                    if p not in mp and p in essential_points:
                         mp[p] = GeometryProblemWorker._get_apha_geo_solver_var(
                             len(mp))
 
@@ -519,7 +523,8 @@ class GeometryProblemWorker:
             ps = k.split(' ')
             if any(p in essential_aux_points for p in ps):
                 for p in ps:
-                    if p not in mp:
+                    # if p not in mp:
+                    if p not in mp and p in essential_aux_points:
                         mp[p] = GeometryProblemWorker._get_apha_geo_solver_var(
                             len(mp))
         return mp
@@ -540,11 +545,12 @@ class GeometryProblemWorker:
                         tmp_string += dep_str_renamed + \
                             f' [{dep_idx[dep_str_renamed]}] '
                 if tmp_string == "":
-                    # if this premise is useless, free all points in it
+                    # if this premise is useless, free all useful points in it
                     for p in k.split(' '):
-                        string_premise.append(mp[p] + " : ")
+                        if p in mp:
+                            string_premise.append(mp[p] + " : ")
                 else:
-                    k_renamed = " ".join(mp[p] for p in k.split(' '))
+                    k_renamed = " ".join(mp[p] for p in k.split(' ') if p in mp)
                     tmp_string = k_renamed + ' : ' + tmp_string
                     string_premise.append(tmp_string)
         data_problem = '<problem> '
@@ -562,8 +568,8 @@ class GeometryProblemWorker:
         data_aux = ''
         string_aux = []
         for k, v in all_premise.items():
-            if all(p in essential_aux_points for p in k.split(' ')):
-                k_renamed = " ".join(mp[p] for p in k.split(' '))
+            if any(p in essential_aux_points for p in k.split(' ')):
+                k_renamed = " ".join(mp[p] for p in k.split(' ') if p in mp)
                 tmp_string = 'x00 ' + k_renamed + ' : '
                 for dep in v:
                     if dep in essential_premises:  # free points withou useful premises
