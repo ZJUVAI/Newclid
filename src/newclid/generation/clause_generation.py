@@ -252,7 +252,19 @@ class CompoundClauseGen:
         depend_points = construction_text.split()[1:]
         return set(p for p in depend_points if p in self.point_rely)
 
-    def generate(self, length = 0):
+    def generate(self, length=0, add_auxiliary=True, prune=True, remove_coords=False):
+        """
+        Generate geometric clauses.
+        
+        Args:
+            length: Number of clause sets to generate
+            add_auxiliary: Whether to add auxiliary points (e.g., midpoint, orthocenter) for triangles
+            prune: Whether to prune clauses to preserve only the deepest clause chain
+            remove_coords: Whether to remove coordinate information from the final output
+            
+        Returns:
+            A string of generated clauses separated by semicolons
+        """
         self.point_generator = PointGenerator()
         self.dep_graph = DependencyGraph(AlgebraicManipulator())
         self.symbols_graph = self.dep_graph.symbols_graph
@@ -278,11 +290,23 @@ class CompoundClauseGen:
             if new_clause:
                 res.append(new_clause)
                 # Add auxiliary points if needed
-                self._add_auxiliary_points_if_needed(new_clause, res[0], res)
+                if add_auxiliary:
+                    self._add_auxiliary_points_if_needed(new_clause, res[0], res)
             if new_clause2:
-                res.append(new_clause2)        
-        res = self.prune_clauses(res)
-        return "; ".join(res)
+                res.append(new_clause2)
+        
+        # Prune clauses if requested
+        if prune:
+            res = self.prune_clauses(res)
+        
+        # Join clauses
+        output = "; ".join(res)
+        
+        # Remove coordinate information if requested
+        if remove_coords:
+            output = re.sub(r'([a-z][0-9]*)@[^\s;]+', r'\1', output)
+        
+        return output
 
     def get_clause_with_n_constructions(self, construction_candidates, n: int):
         try_count = 0
@@ -683,10 +707,9 @@ if __name__ == "__main__":
     #     cc_gen = CompoundClauseGen(i)
     #     clause_text = cc_gen.generate(50)
     #     print(f'{time.time() - s_time:.2f}s')
-    for _ in range(100):
-        clause_text = cc_gen.generate(50)
-        cleaned_str, sorted_depths, max_depth = process_geometric_string(clause_text)
-        print(f'Max Depth: {max_depth}, Points: {len(sorted_depths)}')
-        print(f'Clauses: {clause_text}')
-        print(f'Cleaned_str: {cleaned_str}\n')
-
+    # for _ in range(100):
+    #     clause_text = cc_gen.generate(50)
+    #     cleaned_str, sorted_depths, max_depth = process_geometric_string(clause_text)
+    #     print(f'Max Depth: {max_depth}, Points: {len(sorted_depths)}')
+    #     print(f'Clauses: {clause_text}')
+    #     print(f'Cleaned_str: {cleaned_str}\n')
