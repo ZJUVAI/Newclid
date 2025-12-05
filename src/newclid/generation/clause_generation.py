@@ -78,13 +78,15 @@ INTERSECT = [
 
 OTHER = [
     'circle',
-    # 'circumcenter',
+    'circumcenter',
     'eq_triangle',
     'eqangle2',
     'foot',
-    'incenter',
+    # 'incenter',
     'incenter2',
-    'excenter',
+    'incenter2',
+    # 'excenter',
+    'excenter2',
     'excenter2',
     'centroid',
     'ninepoints',
@@ -97,16 +99,16 @@ OTHER = [
     'intersection_tt',
     'midpoint',
     'mirror',
-    # 'nsquare',
+    'nsquare',
     'orthocenter',
     'parallelogram',
-    # 'psquare',
+    'psquare',
     'reflect',
-    # 'shift',
+    'shift',
     'square',
-    # '2l1c',
-    # 'e5128',
-    # '3peq',
+    '2l1c',
+    'e5128',
+    '3peq',
     'trisect',
     'trisegment',
     'cc_tangent',
@@ -168,6 +170,7 @@ class CompoundClauseGen:
         max_basic_clause = int(0.15 * length)
         res = []
         for clause_set in range(length):
+            new_clause2 = None
             # step 1: add clause with basic 
             if len(res) == 0: 
                 new_clause = self.get_clause_with_n_constructions(BASIC, 1)
@@ -177,11 +180,39 @@ class CompoundClauseGen:
             # step 3: add cluase with single constructions or two constructions
             else:
                 if random.random() < 0.5:
-                    new_clause = self.get_clause_with_n_constructions(INTERSECT, 2)
+                    new_clause, new_clause2 = self.get_clause_with_n_constructions(INTERSECT, 2)
+                    # print(new_clause, new_clause2)
+                    # import pdb; pdb.set_trace()
                 else:
                     new_clause = self.get_clause_with_n_constructions(OTHER+INTERSECT+BASIC_FREE, 1)
             if new_clause:
                 res.append(new_clause)
+                if res[0].split("=")[1].strip().split(" ")[0] in ['triangle', 'triangle12', 'r_triangle', 'iso_triangle', 'ieq_triangle']:
+                    new_consts = re.findall(r'(?:=|,)\s*([A-Za-z_][A-Za-z0-9_]*)', new_clause)
+                    for new_const in new_consts:
+                        if new_const == 'midpoint':
+                            new_clause_ = self.get_clause_with_n_constructions2(['midpoint'], ['a', 'b'])
+                            if new_clause_: res.append(new_clause_)
+                            new_clause_ = self.get_clause_with_n_constructions2(['midpoint'], ['b', 'c'])
+                            if new_clause_: res.append(new_clause_)
+                            new_clause_ = self.get_clause_with_n_constructions2(['midpoint'], ['a', 'c'])
+                            if new_clause_: res.append(new_clause_)
+                        if new_const == 'orthocenter':
+                            new_clause_ = self.get_clause_with_n_constructions2(['orthocenter'], ['a', 'b', 'c'])
+                            if new_clause_: res.append(new_clause_)
+                            new_clause_ = self.get_clause_with_n_constructions2(['foot'], ['a', 'b', 'c'])
+                            if new_clause_: res.append(new_clause_)
+                            new_clause = self.get_clause_with_n_constructions2(['foot'], ['b', 'a', 'c'])
+                            if new_clause_: res.append(new_clause_)
+                            new_clause_ = self.get_clause_with_n_constructions2(['foot'], ['c', 'a', 'b'])
+                            if new_clause_: res.append(new_clause_)
+                        if new_const in ['circle', 'incenter2', 'excenter2']:
+                            new_clause_ = self.get_clause_with_n_constructions2([new_const], ['a', 'b', 'c'])
+                            if new_clause_: res.append(new_clause_)
+                #         # print(res)
+                #         # import pdb; pdb.set_trace()
+            if new_clause2:
+                res.append(new_clause2)        
         res = self.prune_clauses(res)
         return "; ".join(res)
 
@@ -194,6 +225,11 @@ class CompoundClauseGen:
             numerics = []
             max_level = -1
             rely_points = set()
+
+            constructions2 = []
+            numerics2 = []
+            max_level = -1
+            rely_points2 = set()
             try:
                 if n == 1:
                     new_points, construction, numeric = self.choose_construction(construction_candidates)
@@ -201,15 +237,94 @@ class CompoundClauseGen:
                     numerics += numeric
                     max_level = max([max_level] + [self.point_level.get(p, -1) for p in construction.split()[1:]])
                     rely_points.update([p for p in construction.split()[1:] if p in self.point_rely])
+                    # check numerics by drawing diagram
+                    self.draw_diagram(new_points, numerics)
+
+                    self.point_generator.define_points(new_points)
+                    # output clause str. add xy for new points to accelerate building
+                    new_points_str=[]
+                    for p in new_points:
+                        p_num = self.symbols_graph.names2points([p])[0]
+                        new_points_str.append(f'{p}@{p_num.num.x}_{p_num.num.y}')
+                        self.point_level[p] = max_level + 1
+                        self.point_rely[p] = rely_points
+                    return ' '.join(new_points_str) + " = " + ', '.join(constructions)
                 else:
                     # multiple n_constructions shares the same new points. Only support one new point
-                    new_points = self.point_generator.prefetch_points(1)
+                    new_points = self.point_generator.prefetch_points(2)
                     for _ in range(n):
-                        _, construction, numeric = self.choose_construction(construction_candidates, new_points)
+                        resA, resB = self.choose_construction3(construction_candidates, new_points)
+                        
+                        _, construction, numeric = resA
                         constructions.append(construction)
                         numerics += numeric
                         max_level = max([max_level] + [self.point_level.get(p, -1) for p in construction.split()[1:]])
                         rely_points.update([p for p in construction.split()[1:] if p in self.point_rely])
+                        
+
+                        _, construction, numeric = resB
+                        constructions2.append(construction)
+                        numerics2 += numeric
+                        # max_level = max([max_level] + [self.point_level.get(p, -1) for p in construction.split()[1:]])
+                        rely_points2.update([p for p in construction.split()[1:] if p in self.point_rely])
+                    # check numerics by drawing diagram
+                    self.draw_diagram(new_points[0:1], numerics)
+                    self.point_generator.define_points(new_points[0:1])
+                    new_points_str=[]
+                    for p in new_points[0:1]:
+                        p_num = self.symbols_graph.names2points([p])[0]
+                        new_points_str.append(f'{p}@{p_num.num.x}_{p_num.num.y}')
+                        self.point_level[p] = max_level + 1
+                        self.point_rely[p] = rely_points
+                    res1 = ' '.join(new_points_str) + " = " + ', '.join(constructions)
+
+
+                    try:
+                        # check numerics by drawing diagram
+                        self.draw_diagram(new_points[1:2], numerics)
+                        self.point_generator.define_points(new_points[1:2])
+                    except Exception as e:
+                        return res1, None
+                    new_points_str=[]
+                    for p in new_points[1:2]:
+                        p_num = self.symbols_graph.names2points([p])[0]
+                        new_points_str.append(f'{p}@{p_num.num.x}_{p_num.num.y}')
+                        self.point_level[p] = max_level + 1
+                        self.point_rely[p] = rely_points2
+                    res2 =  ' '.join(new_points_str) + " = " + ', '.join(constructions2)
+
+                    # import pdb; pdb.set_trace()
+                    return res1, res2
+                
+
+                
+            except Exception as e:
+                # print(f"Exception type: {type(e).__name__}, message: {e}")
+                # import traceback
+                # traceback.print_exc()
+                continue
+        
+        if n == 1:
+            return None
+        if n == 2:
+            return None, None
+            
+    def get_clause_with_n_constructions2(self, construction_candidates, rpoints):
+        try_count = 0
+        while try_count < 10:
+            try_count += 1
+            # samples constructions
+            constructions = []
+            numerics = []
+            max_level = -1
+            rely_points = set()
+            try:
+                new_points, construction, numeric = self.choose_construction2(construction_candidates, rpoints)
+                # import pdb; pdb.set_trace()
+                constructions.append(construction)
+                numerics += numeric
+                max_level = max([max_level] + [self.point_level.get(p, -1) for p in construction.split()[1:]])
+                rely_points.update([p for p in construction.split()[1:] if p in self.point_rely])
                 # check numerics by drawing diagram
                 self.draw_diagram(new_points, numerics)
             except Exception as e:
@@ -227,6 +342,51 @@ class CompoundClauseGen:
                 self.point_level[p] = max_level + 1
                 self.point_rely[p] = rely_points
             return ' '.join(new_points_str) + " = " + ', '.join(constructions)
+    def choose_construction2(self, construction_candidates, rely_points, new_points = None):
+        random_construction_candidates = construction_candidates.copy()
+        self.rng.shuffle(random_construction_candidates)
+        for construction in random_construction_candidates:
+            construction_def = self.defs[construction]
+
+            # create new point if new_points is None
+            if not new_points:
+                new_points = self.point_generator.prefetch_points(len(construction_def.points))
+
+            # check number of points
+            if len(construction_def.points) != len(new_points):
+                continue
+            if len(construction_def.args) > len(rely_points):
+                continue
+
+            # create mapping
+            mapping = self.map_points(construction_def, rely_points, new_points)
+
+            # check construction requirements
+            try:
+                for premise in construction_def.require.sentences:
+                    if len(premise) == 0:
+                        continue
+                    statement = Statement.from_tokens(translate_sentence(mapping, premise), self.dep_graph)
+                    if statement is None or not statement.check_numerical():
+                        raise ConstructionError("Requirement check_numerical failed. " + str(construction))
+            except Exception as e:
+                continue
+            try:
+                for bs in construction_def.basics:
+                    for t in bs.sentences:
+                        statement = Statement.from_tokens(translate_sentence(mapping, t), self.dep_graph)
+            except Exception as e:
+                logging.warning(f"Error processing construction {construction}: {e}")
+                continue
+
+            # output numerics for draw check
+            numerics = []
+            for n in construction_def.numerics:
+                numerics.append(tuple(mapping[a] if a in mapping else a for a in n))
+
+            return new_points, self.construction_text(construction_def, mapping), numerics
+        
+        raise ConstructionError("No valid construction found.")
     
     def draw_diagram(self, new_points, numerics,):
         def draw_fn() -> tuple[PointNum, ...]:
@@ -310,6 +470,90 @@ class CompoundClauseGen:
             return new_points, self.construction_text(construction_def, mapping), numerics
         
         raise ConstructionError("No valid construction found.")
+    
+    def choose_construction3(self, construction_candidates, new_points = None):
+        random_construction_candidates = construction_candidates.copy()
+        self.rng.shuffle(random_construction_candidates)
+        for construction in random_construction_candidates:
+            construction_def = self.defs[construction]
+
+            # create new point if new_points is None
+            if not new_points:
+                new_points = self.point_generator.prefetch_points(len(construction_def.points))
+
+            # check number of points
+            if len(construction_def.points) != len(new_points[0:1]):
+                continue
+            if len(construction_def.args) > len(self.point_generator.defined_points):
+                continue
+            
+
+            # create mapping
+            mappingA = self.map_points(construction_def, self.point_generator.defined_points, new_points[0:1])
+            
+
+            # check construction requirements
+            try:
+                for premise in construction_def.require.sentences:
+                    if len(premise) == 0:
+                        continue
+                    statement = Statement.from_tokens(translate_sentence(mappingA, premise), self.dep_graph)
+                    if statement is None or not statement.check_numerical():
+                        raise ConstructionError("Requirement check_numerical failed. " + str(construction))
+            except Exception as e:
+                continue
+            try:
+                for bs in construction_def.basics:
+                    for t in bs.sentences:
+                        statement = Statement.from_tokens(translate_sentence(mappingA, t), self.dep_graph)
+            except Exception as e:
+                logging.warning(f"Error processing construction {construction}: {e}")
+                continue
+
+            # output numerics for draw check
+            numerics = []
+            for n in construction_def.numerics:
+                numerics.append(tuple(mappingA[a] if a in mappingA else a for a in n))
+            resA = [new_points[0:1], self.construction_text(construction_def, mappingA), numerics]
+            
+            #------------------
+            # mappingB = self.map_points(construction_def, self.point_generator.defined_points, new_points[1:2])
+            old, new = new_points  # old = 'f', new = 'g'
+            for k, v in mappingA.items():
+                if v == old:
+                    mappingA[k] = new
+                    break   # 只替换第一个
+            mappingB = mappingA
+            # import pdb; pdb.set_trace()
+            # check construction requirements
+            try:
+                for premise in construction_def.require.sentences:
+                    if len(premise) == 0:
+                        continue
+                    statement = Statement.from_tokens(translate_sentence(mappingB, premise), self.dep_graph)
+                    if statement is None or not statement.check_numerical():
+                        raise ConstructionError("Requirement check_numerical failed. " + str(construction))
+            except Exception as e:
+                continue
+            try:
+                for bs in construction_def.basics:
+                    for t in bs.sentences:
+                        statement = Statement.from_tokens(translate_sentence(mappingB, t), self.dep_graph)
+            except Exception as e:
+                logging.warning(f"Error processing construction {construction}: {e}")
+                continue
+
+            # output numerics for draw check
+            numerics = []
+            for n in construction_def.numerics:
+                numerics.append(tuple(mappingB[a] if a in mappingB else a for a in n))
+            resB = [new_points[1:2], self.construction_text(construction_def, mappingB), numerics]
+
+
+            return resA, resB
+            
+        
+        raise ConstructionError("No valid construction found.")
         
     
     def map_points(self, construction_def, defined_points, new_points):
@@ -347,9 +591,61 @@ class CompoundClauseGen:
                 pruned_clauses.append(clause)
         return pruned_clauses
 
+import re
+from collections import defaultdict
+def process_geometric_string(input_str):
+    # 步骤1: 移除所有点定义中的坐标部分
+    cleaned_str = re.sub(r'([a-z][0-9]*)@[^\s;]+', r'\1', input_str)
+    # 步骤2: 计算每个点的深度
+    depth_map = defaultdict(int)
+    statements = [stmt.strip() for stmt in cleaned_str.split(';') if stmt.strip()]
+    for stmt in statements:
+        if not stmt or '=' not in stmt:
+            continue
+        lhs, rhs = [part.strip() for part in stmt.split('=', 1)]
+        current_points = [p.strip() for p in lhs.split() if p.strip()]
+        # 提取所有依赖点（右侧出现的所有小写字母）
+        dependencies = set()
+        conditions = [cond.strip() for cond in rhs.split(',') if cond.strip()]
+        for cond in conditions:
+            tokens = re.findall(r'\b[a-z][0-9]*\b', cond)
+            for token in tokens:
+                if token not in current_points:
+                    dependencies.add(token)
+        # 计算当前点的深度
+        for point in current_points:
+            if rhs.startswith('free') or not dependencies:
+                depth_map[point] = 1
+            else:
+                max_dep_depth = 0
+                for dep in dependencies:
+                    if dep in depth_map and depth_map[dep] > max_dep_depth:
+                        max_dep_depth = depth_map[dep]
+                depth_map[point] = max_dep_depth + 1
+    # 按字母顺序排序深度结果
+    sorted_depths = dict(sorted(depth_map.items()))
+    # 计算最大深度
+    max_depth = max(sorted_depths.values()) if sorted_depths else 0
+    return cleaned_str, sorted_depths, max_depth
 
 if __name__ == "__main__":
     cc_gen = CompoundClauseGen(42)
+    count=1000
+    sum = 0
+    for i in range(count):
+        clause_text = cc_gen.generate(15)
+        cleaned_str, sorted_depths, max_depth = process_geometric_string(clause_text)
+        sum += len(sorted_depths)
+    print(sum/count)
+
+    sum = 0
+    for i in range(count):
+        clause_text = cc_gen.generate(30)
+        cleaned_str, sorted_depths, max_depth = process_geometric_string(clause_text)
+        sum += len(sorted_depths)
+    print(sum/count)
+
+    import pdb; pdb.set_trace()
     clause_text = cc_gen.generate(15)
     clause_text = cc_gen.generate(50)
     clause_text = cc_gen.generate(50)
