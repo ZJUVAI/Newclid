@@ -317,6 +317,7 @@ class GeometryProblemWorker:
                                                                                                      goal_new])
             if aux_only and len(aux) == 0:
                 logging.warning("aux_only == True but still generate result with no aux.")
+                continue
             all_premises = [dep.statement for dep in premises + aux]
             n_premises = len(all_premises)
 
