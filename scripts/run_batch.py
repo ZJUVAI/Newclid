@@ -15,34 +15,33 @@ from typing import Optional
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, ".."))                 # .../Newclid
 SRC_DIR = os.path.normpath(os.path.join(REPO_DIR, "src"))                   # .../Newclid/src
-OUTPUTS_DIR = os.path.join(REPO_DIR, "datasets")
+OUTPUTS_DIR = os.path.join(REPO_DIR, "outputs")
  
 # 确保可以 import newclid.*
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
 # 直接使用底层工具函数
-from newclid.solver_utils import solve_problems_batch  # type: ignore
+from newclid.data_discovery.solver_utils import solve_problems_batch  # type: ignore
 
 
 # 集中超参（每项均附注释说明用途）
 CONFIG = {
-    "problems_file": os.path.join(REPO_DIR, "benchmarks", "all_problems.txt"),
-    # "problems_file": os.path.join(REPO_DIR, "problems_datasets", "all_problems_selected.txt"),  # rules_basic_augment的题目集
-    # "problems_file": os.path.join(REPO_DIR, "problems_datasets", "all_problems_unsolved.txt"),  # rules_basic_augment的题目集
+    # "problems_file": os.path.join(REPO_DIR, "problems_datasets", "all_problems_unsolved_rules.txt"),  # 待求解问题文件（两行一题的 jgex-231/AG 集合）
+    "problems_file": os.path.join(REPO_DIR, "problems_datasets", "all_problems_unsolved.txt"),  # 待求解问题文件（两行一题的 jgex-231/AG 集合）
 
     "max_attempts": 100,               # 构建状态的最大尝试次数
     "timeout": 3600,                     # 单题求解超时时间（秒）
     "limit": None,                     # 仅求解前 N 题；None 表示不限制
-    "workers": 20,                      # 并行工作数；1 为串行，大于 1 则启用并行
+    "workers": 80,                      # 并行工作数；1 为串行，大于 1 则启用并行
     "backend": "process",            # 并行后端："process"（推荐）或 "thread"
-    "rules_file": os.path.join(REPO_DIR, "src", "newclid", "default_configs", "rules_try.txt"), 
-    # "rules_file": os.path.join(REPO_DIR, "src", "newclid", "default_configs", "rules.txt"), 
+    "rules_file": os.path.join(REPO_DIR, "src", "newclid", "default_configs", "rules_basic_augment.txt"),  # 自定义规则文件路径
+    # "rules_file": os.path.join(REPO_DIR, "src", "newclid", "default_configs", "rules_augment.txt"),  # 自定义规则文件路径
 }
 
 
-def _write_results_json(src_problems: str, stats: dict) -> str:
-    base = os.path.splitext(os.path.basename(src_problems))[0]
+def _write_results_json(staged_problems: str, stats: dict) -> str:
+    base = os.path.splitext(os.path.basename(staged_problems))[0]
     out_json = os.path.join(OUTPUTS_DIR, f"{base}.results.json")
     with open(out_json, "w", encoding="utf-8") as f:
         import json
@@ -78,22 +77,22 @@ def main(_: Optional[list[str]] = None) -> None:
     # 准备输出目录与题目文件副本（确保结果写入 outputs 下）
     os.makedirs(OUTPUTS_DIR, exist_ok=True)
     src_problems = os.path.abspath(CONFIG.get("problems_file"))
-    # staged_problems = os.path.join(OUTPUTS_DIR, os.path.basename(src_problems))
-    # try:
-    #     shutil.copyfile(src_problems, staged_problems)
-    # except Exception as e:
-    #     raise RuntimeError(f"无法复制题目文件到 outputs: {e}")
+    staged_problems = os.path.join(OUTPUTS_DIR, os.path.basename(src_problems))
+    try:
+        shutil.copyfile(src_problems, staged_problems)
+    except Exception as e:
+        raise RuntimeError(f"无法复制题目文件到 outputs: {e}")
 
     # 审计打印（便于确认本次运行的关键超参）
     print("[run-batch] problems_file(src)=", src_problems)
-    # print("[run-batch] problems_file(run)=", staged_problems)
+    print("[run-batch] problems_file(run)=", staged_problems)
     print("[run-batch] outputs_dir         =", OUTPUTS_DIR)
     print("[run-batch] workers/backend/max_attempts/timeout/limit =",
           CONFIG["workers"], CONFIG["backend"], CONFIG["max_attempts"], CONFIG["timeout"], CONFIG["limit"]) 
 
     # 直接调用批量求解并落盘
     stats = solve_problems_batch(
-        problems_file=src_problems,
+        problems_file=staged_problems,
         rules_file=CONFIG["rules_file"],
         max_attempts=int(CONFIG["max_attempts"]),
         timeout_sec=int(CONFIG["timeout"]),
@@ -101,7 +100,7 @@ def main(_: Optional[list[str]] = None) -> None:
         workers=int(CONFIG["workers"]) if CONFIG.get("workers") else 1,
         backend=str(CONFIG["backend"]) if CONFIG.get("backend") else "process",
     )
-    out_json = _write_results_json(src_problems, stats)
+    out_json = _write_results_json(staged_problems, stats)
     print("[run-batch] wrote results:", out_json)
     _print_summary(stats)
 
