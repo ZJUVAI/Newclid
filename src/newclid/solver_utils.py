@@ -181,7 +181,7 @@ def solve_single_problem(
             try:
                 problem = solver_builder.problemJGEX
                 proof = solver.run_infos["proof"]
-                renamed = GeometryProblemWorker.llm_solution_renamed(problem, proof)
+                renamed, _ = GeometryProblemWorker.llm_solution_renamed(problem, proof)
                 proof_obj = str(renamed["llm_input"]) + str(renamed["llm_output"])
             except Exception as e:
                 print(f"警告: 生成结构化 proof 失败: {e}")

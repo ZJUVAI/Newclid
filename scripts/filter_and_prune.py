@@ -16,8 +16,8 @@ import sys
 from pathlib import Path
 
 # ------------------ 默认配置（可通过命令行位置参数覆盖输入/输出根目录） ------------------
-INPUT_JSON = "/c23474/home/math/dzt/Newclid/outputs/geometry_clauses9_samples20k_aux.jsonl"
-OUTPUT_DIR = "/c23474/home/math/dzt/Newclid/outputs/proof_graphs"
+INPUT_JSON = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/geometry_clauses5_samples20k.jsonl"
+OUTPUT_DIR = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/proof_graphs"
 
 # 绘图与运行参数
 LABEL_MODE = "legend"

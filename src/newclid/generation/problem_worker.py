@@ -395,7 +395,7 @@ class GeometryProblemWorker:
         return f"{conclusion_str} [{dep_idx[conclusion_str]}] {rule_id} {premise_ids}".strip()
 
     @staticmethod
-    def llm_solution_renamed(problem: ProblemJGEX, proof_state: ProofState) -> dict:
+    def llm_solution_renamed(problem: ProblemJGEX, proof_state: ProofState):
         """Refactored main method to generate LLM solution with renamed points"""
         try:
             # Initialize data
@@ -436,7 +436,7 @@ class GeometryProblemWorker:
                 "llm_input": data_problem,
                 "llm_output": data_aux + numerical_check + proof,
                 "rename_map": mp
-            }
+            }, mp
 
         except Exception as e:
             import traceback
