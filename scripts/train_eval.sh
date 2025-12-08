@@ -54,8 +54,11 @@ datasets=(
     # "dev_imo.txt"
     # "dev_jgex.txt"
     # "configuration_clauses5_samples15k_problems.txt"
-    "configuration_clauses5_samples15k_problems_full.txt"
-    # "configuration_clauses5_samples15k_problems_1.txt"
+    # "configuration_clauses6_samples1M_problems.txt"
+    # "configuration_clauses5_samples15k_problems_full.txt"
+    # "configuration_clauses6_samples1M_problems_filtered.txt"
+    # "filtered_problems.txt"
+    "tmp_problems.txt"
     # "config_50.txt"
 )
 
@@ -88,7 +91,7 @@ for checkpoint in "${checkpoints[@]}"; do
             read -r decoding_size beam_size <<< "$config"
             
             # Build complete command
-            cmd="python scripts/evaluation.py --problems_path benchmarks/$dataset --model_path $model_dir/$checkpoint --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth 2 --success_proofs_path datasets/success_proofs/$dataset.json"
+            cmd="python scripts/evaluation.py --problems_path benchmarks/$dataset --model_path $model_dir/$checkpoint --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth 2 --success_proofs_path datasets/success_proofs/$dataset.jsonl"
             
             # Print current command to execute
             echo "Executing command:"

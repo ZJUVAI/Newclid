@@ -177,17 +177,20 @@ def solve_single_problem(
         success = solver.run(timeout=timeout_sec)
         # 将 proof 转为可序列化的结构化文本，避免 JSON 序列化失败
         proof_obj = None
-        if success and getattr(solver, 'proof', None) is not None:
+        if success:
             try:
-                renamed = GeometryProblemWorker.llm_solution_renamed(solver_builder.problemJGEX, solver.run_infos["proof"])
-                proof_obj = renamed["llm_input"] + renamed["llm_output"]
+                problem = solver_builder.problemJGEX
+                proof = solver.run_infos["proof"]
+                renamed = GeometryProblemWorker.llm_solution_renamed(problem, proof)
+                proof_obj = str(renamed["llm_input"]) + str(renamed["llm_output"])
             except Exception as e:
+                print(f"警告: 生成结构化 proof 失败: {e}")
                 proof_obj = None
 
         res = {
             "success": success,
             "proof": proof_obj,
-            "run_info": solver.run_infos,
+            # "run_info": solver.run_infos,
             "error": None,
         }
         res["point_lines"] = point_lines

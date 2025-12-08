@@ -21,7 +21,7 @@ def ray_solve_problem(args):
     start_time = time.time()
     try:
         builder = GeometricSolverBuilder().load_problem_from_file(problems_path, problem_name, rename=True).with_deductive_agent(LMAgent(model_path, decoding_size=decoding_size,beam_size=beam_size, search_depth=search_depth))
-        solver = builder.build(max_attempts=10)
+        solver = builder.build(max_attempts=3)
         is_solved = solver.run(timeout=timeout)
         problem_info = None
         if is_solved:
@@ -62,6 +62,10 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
     Main function, read the file and execute tasks using Ray.
     """
     
+    # 设置硬性超时时间（秒），例如 600 秒
+    # 建议比单题 timeout 略长一点，或者根据 batch 大小估算
+    BATCH_HARD_TIMEOUT = 600
+    
     # Read all problem names 
     if not os.path.exists(filepath):
         print(f"File {filepath} not found.")
@@ -94,6 +98,8 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
         pending_tasks = []
         success_proofs = []
         
+        task_map = {}
+        
         # Submit all tasks
         for i, problem_name in enumerate(batch_problems):
             task = ray_solve_problem.remote((i, problem_name, filepath, modelpath, decoding_size, beam_size, search_depth, timeout))
@@ -103,7 +109,26 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
         # Process tasks as they complete
         with Live(refresh_per_second=1) as live:
             while pending_tasks:
+                current_time = time.time()
+                if current_time - start_time > BATCH_HARD_TIMEOUT:
+                    # 超过限制，强制结束剩余任务
+                    for remaining_task in pending_tasks:
+                        ray.cancel(remaining_task) # 强制杀死 Ray worker
+                        
+                        # 更新 UI 状态为 Timeout
+                        idx = task_map[remaining_task]
+                        problem_name = all_tasks_info[idx][0]
+                        all_tasks_info[idx] = (problem_name, "Timeout", BATCH_HARD_TIMEOUT)
+                    
+                    # 清空 pending_tasks 以退出 while 循环
+                    pending_tasks = []
+                    # 强制刷新一下表格显示 Timeout 状态
+                    live.update(render_table(all_tasks_info, start_time, True))
+                    print(f"\n[Warning] Batch timeout reached ({BATCH_HARD_TIMEOUT}s). Cancelled {len(pending_tasks)} tasks.")
+                    break                # Wait for at least one task to complete
+                
                 # Wait for at least one task to complete
+                timeout=1 # 稍微改小一点，以便更灵敏地响应总超时检查
                 done_tasks, pending_tasks = ray.wait(pending_tasks, num_returns=1, timeout=5)
                 # Process completed tasks
                 for task in done_tasks:
@@ -122,7 +147,9 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
             write_mode = "w"
         with open(success_proofs_path, write_mode, encoding="utf-8") as f:
             import json
-            json.dump(success_proofs, f, ensure_ascii=False, indent=2)
+            for item in success_proofs:
+                json_line = json.dumps(item, ensure_ascii=False)
+                f.write(json_line + "\n")
         print(f"wrote success proofs / {solve_batch} problems at {success_proofs_path}")
     print(f"wrote ALL success proofs at {success_proofs_path}")
 

@@ -54,5 +54,8 @@ date: 1124
 date: 1127  
   - [x] 我希望对proof_trace的结果进行去重，规则是先根据predicate的名称排序，格式化raw_rule部分的内容后进行去重，我希望通过更新proof_combine.py的代码来实现这个功能，在extract_raw_rule这个函数中进行修改
 
+date: 1201
+  - [ ] 我现在有一套生成证明轨迹的代码，接口是scripts/scout_main.py，我需要你检查我的仓库中src/newclid/proof_scout/这个仓库，然后检查其中的逻辑，然后解题的接口现在是从scripts/train_eval.sh脚本调用进入的，我要你在理解我的代码思路之后，检查出里面的所有需要修改的地方，列出来并且提出修改建议，我会在一次修改后再由你来检查。
+
 - [ ] 通过numerical_check后用GenesisGeo测试所有goal，如果此步有无法求解的goal也整理出来作为下一步的输入
 - [ ] 借助GenesisGeo V1求解题目，结合上一个任务跑通数据生成流程。

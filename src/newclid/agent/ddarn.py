@@ -49,6 +49,7 @@ class DDARN(DeductiveAgent):
         for goal in proof.goals:
             if goal.check():
                 infos[goal.pretty() + " succeeded"] = True
+                infos["proof"] = proof
             else:
                 infos[goal.pretty() + " succeeded"] = False
         return infos
