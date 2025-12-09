@@ -82,6 +82,12 @@ class GeometryProblemWorker:
                     )
             except TimeoutError:
                 return [], {}
+            # fl_statement, _ = args
+            # seed=42
+            # max_level=500
+            # img = True
+            # aux_only = False
+            # start_time = time.time()
 
             # Build solver
             solver, solver_builder = GeometryProblemWorker._build_solver(
@@ -263,7 +269,7 @@ class GeometryProblemWorker:
                     DDARN()
                 )
                 csolver_test = CSolver(
-                    problem='', solver=solver_test)
+                    problem='', solver=solver_test, using_log=True)
                 csolver_test.run()
                 for goal in solver_test.goals:
                     # if found new solutions
