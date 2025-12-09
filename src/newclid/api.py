@@ -247,16 +247,17 @@ class CSolver:
         self.points: List[Tuple[str, Any, Any]] = []
         self.premises: List[Tuple[str, List[str]]] = []
         self.goals: List[Tuple[str, List[str]]] = []
+        self.useful_points: List[str] = []
 
-        self._extract_points()
         self._extract_premises()
         self._extract_goals()
+        self._extract_points()
 
     # -------------------- 内部方法 -------------------- #
     def _extract_points(self):
         """提取几何点"""
         for name, point in self.solver.proof.symbols_graph.name2node.items():
-            if isinstance(point.num, PointNum):
+            if isinstance(point.num, PointNum) and name in self.useful_points:
                 self.points.append((name, point.num.x, point.num.y))
 
     def _extract_premises(self):
@@ -269,6 +270,8 @@ class CSolver:
                     args.append(str(pt))
                 else:
                     args.append(pt.name)
+                    if pt.name not in self.useful_points:
+                        self.useful_points.append(pt.name)
             self.premises.append((predicate, args))
 
     def _extract_goals(self):
@@ -281,6 +284,8 @@ class CSolver:
                     args.append(str(pt))
                 else:
                     args.append(pt.name)
+                    if pt.name not in self.useful_points:
+                        self.useful_points.append(pt.name)
             self.goals.append((predicate, args))
 
     # -------------------- 核心方法 -------------------- #
