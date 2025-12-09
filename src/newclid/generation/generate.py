@@ -51,6 +51,9 @@ class GeometryGenerator:
             img=False,
             aux_only=False,
             clear=False,
+            add_auxiliary=True,
+            prune=True,
+            remove_coords=False,
         ):
         self.n_clauses = n_clauses
         self.min_proof_steps = min_proof_steps
@@ -72,6 +75,9 @@ class GeometryGenerator:
         self.img = img
         self.aux_only = aux_only
         self.clear = clear
+        self.add_auxiliary = add_auxiliary
+        self.prune = prune
+        self.remove_coords = remove_coords
         self.data_count = 0
 
     def problem_hash_filter(self, data: list, key: str) -> list[str]:
@@ -103,7 +109,9 @@ class GeometryGenerator:
                             format='svg'
                         )
                         plt.close(fig)
-                    result_data = {'id': self.data_count, **data_item}
+                        result_data = {'image_path': f"imgs_png/{self.data_count}.png", **data_item}
+                    else:
+                        result_data = data_item
                     json.dump(result_data, f, ensure_ascii=False)
                     f.write('\n')
             self.write_buffer.clear()
@@ -120,7 +128,7 @@ class GeometryGenerator:
         def task_generator():
             for i in range(10**9):
                 seed = 42 + i  # 唯一种子 = 时间戳 + 任务ID
-                yield i, seed, self.n_clauses, self.max_level, self.img, self.aux_only
+                yield i, seed, self.n_clauses, self.max_level, self.img, self.aux_only, self.add_auxiliary, self.prune, self.remove_coords
 
         if not ray.is_initialized():
             ray.init(
@@ -227,6 +235,12 @@ def main():
                         help="Whether to save only data with aux.")
     parser.add_argument("--clear", required=False, type=bool, default=False,
                         help="Whether to clear old dataset files.")
+    parser.add_argument("--add_auxiliary", required=False, type=bool, default=True,
+                        help="Whether to add auxiliary points (e.g., midpoint, orthocenter) for triangles.")
+    parser.add_argument("--prune", required=False, type=bool, default=True,
+                        help="Whether to prune clauses to preserve only the deepest clause chain.")
+    parser.add_argument("--remove_coords", required=False, type=bool, default=False,
+                        help="Whether to remove coordinate information from the final clause output.")
     args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, args.log_level.upper()))
@@ -243,6 +257,9 @@ def main():
         img=args.img,
         aux_only=args.aux_only,
         clear=args.clear,
+        add_auxiliary=args.add_auxiliary,
+        prune=args.prune,
+        remove_coords=args.remove_coords,
     )
 
     generator.generate()

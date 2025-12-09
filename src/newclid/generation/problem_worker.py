@@ -67,20 +67,33 @@ class GeometryProblemWorker:
     def _process_single_problem(args: tuple) -> tuple[list, dict]:
         """Process a single geometry problem with unique seed."""
         try:
-            pid, seed, n_clauses, max_level, img, aux_only = args
+            pid, seed, n_clauses, max_level, img, aux_only, add_auxiliary, prune, remove_coords = args
             start_time = time.time()
 
             # geneate fl_statement
             clauses_generator = CompoundClauseGen(seed=seed)
             try:
                 with time_limit(10):
-                    fl_statement = clauses_generator.generate(n_clauses)
+                    fl_statement = clauses_generator.generate(
+                        length=n_clauses,
+                        add_auxiliary=add_auxiliary,
+                        prune=prune,
+                        remove_coords=remove_coords,
+                    )
             except TimeoutError:
                 return [], {}
+            # fl_statement, _ = args
+            # seed=42
+            # max_level=500
+            # img = True
+            # aux_only = False
+            # start_time = time.time()
 
             # Build solver
             solver, solver_builder = GeometryProblemWorker._build_solver(
-                fl_statement)
+                fl_statement,
+                max_attempts=10 if remove_coords else 1,
+            )
             if not solver:
                 return [], {}
 
@@ -146,13 +159,13 @@ class GeometryProblemWorker:
             return [], {}
 
     @staticmethod
-    def _build_solver(fl_statement):
+    def _build_solver(fl_statement, max_attempts=1):
         """Build geometric solver"""
         solver_builder = GeometricSolverBuilder(seed=998244353)
         solver_builder.with_deductive_agent(DDARN())
         solver_builder.load_problem_from_txt(fl_statement)
         try:
-            solver = solver_builder.build(max_attempts=1)
+            solver = solver_builder.build(max_attempts=max_attempts)
             return solver, solver_builder
         except Exception as e:
             logging.info(f"Error: {e}")
@@ -256,7 +269,7 @@ class GeometryProblemWorker:
                     DDARN()
                 )
                 csolver_test = CSolver(
-                    problem='', solver=solver_test)
+                    problem='', solver=solver_test, using_log=True)
                 csolver_test.run()
                 for goal in solver_test.goals:
                     # if found new solutions
@@ -310,6 +323,7 @@ class GeometryProblemWorker:
                                                                                                      goal_new])
             if aux_only and len(aux) == 0:
                 logging.warning("aux_only == True but still generate result with no aux.")
+                continue
             all_premises = [dep.statement for dep in premises + aux]
             n_premises = len(all_premises)
 
