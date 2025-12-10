@@ -101,7 +101,7 @@ class GeometryGenerator:
             with open(filename, 'a', encoding='utf-8') as f:
                 for data_item in self.write_buffer:
                     self.data_count += 1
-                    # data_item['fl_problem'] = ''
+                    data_item['fl_problem'] = ''
                     if self.img:
                         fig = deepcopy(data_item.pop('fig'))
                         fig.savefig(
@@ -109,7 +109,9 @@ class GeometryGenerator:
                             format='svg'
                         )
                         plt.close(fig)
-                    result_data = {'id': self.data_count, **data_item}
+                        result_data = {'image_path': f"imgs_png/{self.data_count}.png", **data_item}
+                    else:
+                        result_data = data_item
                     json.dump(result_data, f, ensure_ascii=False)
                     f.write('\n')
             self.write_buffer.clear()
