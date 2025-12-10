@@ -62,7 +62,7 @@ private:
     void insert_theorem(const Theorem &thm);
 
 public:
-    Matcher(Problem *prob);
+    Matcher(Problem *prob, bool ar = false);
 
     const std::vector<Theorem> &theorems() const { return _theorems; }
 

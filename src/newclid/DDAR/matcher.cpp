@@ -9,17 +9,21 @@
 #include <algorithm>
 #include <tuple>
 #include <vector>
+#include <set>
 
 using namespace std;
 
-Matcher::Matcher(Problem *prob) : _problem(prob)
+Matcher::Matcher(Problem *prob, bool ar) : _problem(prob)
 {
     match_similar_triangles();
     match_between();
     match_equal_angles();
     match_circles();
     match_orthocenters();
-    // match_perps_paras();
+    if (ar)
+    {
+        match_perps_paras();
+    }
 }
 
 vector<tuple<double, double, Triangle>> Matcher::all_triangles()
@@ -641,7 +645,22 @@ void Matcher::match_perps_paras()
 
             if (Numerical::close_enough(l.first, r.first))
             {
-                _stmts.push_back(std::make_unique<Para>(l.second, r.second));
+                std::vector<Point> right_points = r.second.points();
+                std::vector<Point> points = l.second.points();
+                points.insert(points.end(), right_points.begin(), right_points.end());
+                std::set<Point> s_points(points.begin(), points.end());
+                if (s_points.size() == 3)
+                {
+                    auto it = s_points.begin();
+                    Point p1 = *it++;
+                    Point p2 = *it++;
+                    Point p3 = *it;
+                    _stmts.push_back(std::make_unique<Coll>(p1, p2, p3));
+                }
+                else
+                {
+                    _stmts.push_back(std::make_unique<Para>(l.second, r.second));
+                }
             }
 
             if (Numerical::close_enough(r.first - l.first, M_PI / 2.0))
