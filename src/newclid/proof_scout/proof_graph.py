@@ -27,7 +27,8 @@ class ProofGraph:
         
         # 映射: problem_id -> {local_id -> node_id}
         # 注意：虽然你的数据是单题，但保留 problem_id 结构有助于兼容性
-        self.fact_id_map: Dict[str, Dict[str, str]] = {} 
+        self.problem_id: Optional[str] = None
+        self.fact_id_map: Dict[str, str] = {} 
         self.aux_points: Set[str] = set()
         
         self.verbose = verbose
@@ -49,7 +50,7 @@ class ProofGraph:
             "llm_output_renamed": "<numerical_check>...</numerical_check><aux>...</aux> <proof>...</proof>"
         }
         """
-        problem_id = str(data.get("problem_id", "unknown"))
+        self.problem_id = str(data.get("problem_id", "unknown"))
         input_str = data.get("llm_input_renamed", "")
         output_str = data.get("llm_output_renamed", "")
 
@@ -66,12 +67,14 @@ class ProofGraph:
 
         # 3. 解析初始事实 (Premises) - Layer 0
         # 这里包括 problem 定义和 aux 定义中的事实
-        self._parse_facts_batch(problem_id, problem_text)
-        self._parse_facts_batch(problem_id, aux_text)
-        self._parse_facts_batch(problem_id, num_check_text)
+        self._parse_facts_batch(problem_text)
+        self._parse_facts_batch(aux_text)
+        self._parse_facts_batch(num_check_text)
 
         # 4. 解析证明步骤 (Proof Steps) - Layer > 0
-        self._parse_proof_steps(problem_id, proof_text)
+        self._parse_proof_steps(proof_text)
+        
+        self.build_adjacency()
 
     # ---------------------------------------------------------
     # 解析辅助逻辑
@@ -97,7 +100,7 @@ class ProofGraph:
                 points.add(tokens[1])
         return points
 
-    def _parse_facts_batch(self, pid: str, text: str):
+    def _parse_facts_batch(self, text: str):
         """
         批量解析文本中的事实子句。
         使用 finditer 全局扫描，只提取符合 "pred args [id]" 格式的内容。
@@ -126,9 +129,9 @@ class ProofGraph:
             if not args:
                 continue
 
-            self._add_fact_node(pid, local_id, pred, args, layer=0)
+            self._add_fact_node(local_id, pred, args, layer=0)
 
-    def _parse_proof_steps(self, pid: str, text: str):
+    def _parse_proof_steps(self, text: str):
         """解析证明步骤"""
         if not text:
             return
@@ -144,7 +147,7 @@ class ProofGraph:
             parsed = self._parse_single_step_str(seg)
             if parsed:
                 concl_pred, concl_args, concl_id, rule_code, premise_ids = parsed
-                self._add_rule_step(pid, step_idx, rule_code, premise_ids, concl_pred, concl_args, concl_id)
+                self._add_rule_step(step_idx, rule_code, premise_ids, concl_pred, concl_args, concl_id)
                 step_idx += 1
 
     def _parse_single_step_str(self, line: str):
@@ -177,18 +180,16 @@ class ProofGraph:
     # 图构建逻辑 (节点与边)
     # ---------------------------------------------------------
 
-    def _add_fact_node(self, pid: str, local_id: str, label: str, args: List[str], layer: int) -> str:
+    def _add_fact_node(self, local_id: str, label: str, args: List[str], layer: int) -> str:
         """添加事实节点"""
-        node_id = f"F:{pid}:{local_id}"
+        node_id = f"F:{self.problem_id}:{local_id}"
         
         # 如果已存在，直接返回 (去重)
         if node_id in self.nodes:
             return node_id
             
         # 注册 ID 映射
-        if pid not in self.fact_id_map:
-            self.fact_id_map[pid] = {}
-        self.fact_id_map[pid][local_id] = node_id
+        self.fact_id_map[local_id] = node_id
         
         # 判断是否包含辅助点
         is_aux = any(arg in self.aux_points for arg in args)
@@ -204,7 +205,7 @@ class ProofGraph:
         }
         return node_id
 
-    def _add_rule_step(self, pid: str, step_idx: int, rule_code: str, premise_local_ids: List[str], 
+    def _add_rule_step(self, step_idx: int, rule_code: str, premise_local_ids: List[str], 
                        concl_pred: str, concl_args: List[str], concl_local_id: str):
         """添加规则节点及连接边"""
         
@@ -214,8 +215,8 @@ class ProofGraph:
         has_aux_premise = False
         
         for lid in premise_local_ids:
-            if pid in self.fact_id_map and lid in self.fact_id_map[pid]:
-                nid = self.fact_id_map[pid][lid]
+            if lid in self.fact_id_map:
+                nid = self.fact_id_map[lid]
                 premise_node_ids.append(nid)
                 node_data = self.nodes[nid]
                 max_premise_layer = max(max_premise_layer, node_data["layer"])
@@ -226,7 +227,7 @@ class ProofGraph:
 
         # 规则节点的层数 = 前提最大层数 + 1
         rule_layer = max_premise_layer + 1
-        rule_node_id = f"R:{pid}:{step_idx}:{rule_code}"
+        rule_node_id = f"R:{self.problem_id}:{step_idx}:{rule_code}"
         
         # 规则节点是否辅助：如果前提有辅助点，或者生成的结论将有辅助点(下面判断)，则视为辅助逻辑的一部分
         # 这里主要看输入是否污染
@@ -248,7 +249,7 @@ class ProofGraph:
         # 2. 添加/获取结论节点
         # 结论节点的层数 = 规则层数 + 1
         concl_layer = rule_layer + 1
-        concl_node_id = self._add_fact_node(pid, concl_local_id, concl_pred, concl_args, concl_layer)
+        concl_node_id = self._add_fact_node(concl_local_id, concl_pred, concl_args, concl_layer)
         
         # 添加边: Rule -> Conclusion
         self.edges.append((rule_node_id, concl_node_id))
@@ -285,6 +286,152 @@ class ProofGraph:
             "max_depth": self.get_max_depth(),
             "aux_points": list(self.aux_points)
         }
+        
+    def build_adjacency(self):
+        """
+        构建邻接表以加速图遍历。
+        在 build_from_json 后必须调用，或者将其放入 build_from_json 的末尾。
+        """
+        self._adj_in: Dict[str, List[str]] = {nid: [] for nid in self.nodes}
+        self._adj_out: Dict[str, List[str]] = {nid: [] for nid in self.nodes}
+        
+        for u, v in self.edges:
+            if u in self._adj_out and v in self._adj_in:
+                self._adj_out[u].append(v)
+                self._adj_in[v].append(u)
+
+    def get_predecessors(self, node_id: str) -> List[str]:
+        """获取直接前驱节点ID列表"""
+        return self._adj_in.get(node_id, [])
+
+    def get_successors(self, node_id: str) -> List[str]:
+        """获取直接后继节点ID列表"""
+        return self._adj_out.get(node_id, [])
+
+    def get_ancestors(self, start_node_id: str) -> Set[str]:
+        """
+        获取指定节点的所有上游节点（祖先），不包含自身。
+        使用 BFS/DFS 反向遍历。
+        """
+        ancestors = set()
+        queue = [start_node_id]
+        visited = {start_node_id}
+        
+        while queue:
+            curr = queue.pop(0)
+            preds = self.get_predecessors(curr)
+            for p in preds:
+                if p not in visited:
+                    visited.add(p)
+                    ancestors.add(p)
+                    queue.append(p)
+        
+        return ancestors
+
+    def create_subgraph(self, node_ids: Set[str]) -> 'ProofGraph':
+        """
+        根据节点 ID 集合构建并返回一个新的 ProofGraph 子图对象。
+        子图只包含 node_ids 中的节点，以及连接这些节点的内部边。
+        继承原图的元数据（如 ID 映射和辅助点信息）。
+        
+        Args:
+            node_ids: 包含在新子图中的节点 ID 集合。
+            
+        Returns:
+            一个新的 ProofGraph 实例，代表导出的子图。
+        """
+        new_pg = ProofGraph(verbose=False) # 创建新的图实例
+        
+        # 1. 复制元数据
+        new_pg.copy_meta_data(self)
+        
+        # 2. 提取节点
+        sub_nodes = {}
+        for nid in node_ids:
+            if nid in self.nodes:
+                # 注意：我们复制节点数据，确保不修改原图的节点属性
+                sub_nodes[nid] = self.nodes[nid].copy()
+                
+        new_pg.nodes = sub_nodes
+        
+        # 3. 提取边 (仅提取起点和终点都在集合中的内部边)
+        sub_edges = []
+        for u, v in self.edges:
+            if u in node_ids and v in node_ids:
+                sub_edges.append((u, v))
+                
+        new_pg.edges = sub_edges
+        
+        # 4. 构建邻接表 (对于子图是必需的，以备后续操作)
+        new_pg.build_adjacency()
+                
+        return new_pg
+    
+    # ---------------------------------------------------------
+    # 可视化/调试接口
+    # ---------------------------------------------------------
+
+    def print_graph(self):
+        """
+        以文本形式打印图结构，按层级显示节点信息。
+        显示格式：[ID] (Aux: T/F) Label Args/Premises
+        """
+        if not self.nodes:
+            print("Graph is empty.")
+            return
+
+        # 1. 打印头部统计信息
+        stats = self.get_stats()
+        pid = self.problem_id if self.problem_id else "Unknown"
+        print("=" * 60)
+        print(f"Proof Graph Structure (Problem ID: {pid})")
+        print(f"Stats: Nodes={stats['total_nodes']}, Edges={stats['total_edges']}, "
+              f"MaxDepth={stats['max_depth']}, AuxPoints={stats['aux_points']}")
+        print("=" * 60)
+
+        # 2. 按层级分组节点
+        layers = {}
+        for nid, node in self.nodes.items():
+            lvl = node.get("layer", 0)
+            if lvl not in layers:
+                layers[lvl] = []
+            layers[lvl].append(node)
+
+        # 3. 按层级顺序输出
+        sorted_layers = sorted(layers.keys())
+        for lvl in sorted_layers:
+            print(f"\n--- Layer {lvl} ---")
+            # 在同一层内，先打印 Fact 再打印 Rule (通常同一层只有一种，但为了兼容混合层)
+            # 或者按 ID 排序
+            nodes_in_layer = sorted(layers[lvl], key=lambda x: x['id'])
+            
+            for node in nodes_in_layer:
+                nid = node['id']
+                ntype = node['type']
+                is_aux = "TRUE" if node['is_aux'] else "False"
+                label = node['label']
+                
+                if ntype == 'fact':
+                    # Fact 格式: [ID] (Aux) pred arg1 arg2 ...
+                    args_str = " ".join(node.get('args', []))
+                    print(f"[{nid}] (Aux:{is_aux}) FACT: {label} {args_str}")
+                
+                elif ntype == 'rule':
+                    # Rule 格式: [ID] (Aux) rule_name <- [PremiseIDs]
+                    premises = node.get('premises', [])
+                    # 尝试简化 premise ID 显示，只显示 local part 或者简短 hash
+                    premise_str = ", ".join([p.split(":")[-1] for p in premises])
+                    print(f"[{nid}] (Aux:{is_aux}) RULE: {label} <- [{premise_str}]")
+
+        print("\n" + "=" * 60 + "\n")
+        
+    def copy_meta_data(self, other_pg: 'ProofGraph'):
+        """
+        将另一个 ProofGraph 实例的元数据（非节点/边数据）复制到当前实例。
+        用于构建子图时继承原图的辅助信息。
+        """
+        self.fact_id_map = other_pg.fact_id_map.copy()
+        self.aux_points = other_pg.aux_points.copy()
 
 # 使用示例
 if __name__ == "__main__":
