@@ -36,6 +36,8 @@ public:
     std::vector<std::unique_ptr<Equation>> as_equation(bool log, bool exp) const override;
 
     bool numerical_only() const { return false; }
+
+    bool trivial() const { return _left == _right; }
 };
 
 #endif // PARA_HPP

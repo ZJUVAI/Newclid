@@ -52,6 +52,8 @@ public:
     std::vector<std::unique_ptr<Equation>> as_equation(bool log, bool exp) const override;
 
     bool numerical_only() const override { return false; }
+
+    bool trivial() const override { return false; }
 };
 
 #endif // SECANT_HPP

@@ -43,6 +43,8 @@ public:
 
     bool numerical_only() const { return false; }
 
+    bool trivial() const { return _left == _right || (_left.left_side() == _left.right_side() && _right.left_side() == _right.right_side()); }
+
     bool operator<(const EqAngle &other) const;
 
     bool operator==(const EqAngle &other) const;
