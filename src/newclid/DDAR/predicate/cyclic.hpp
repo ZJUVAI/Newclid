@@ -4,6 +4,7 @@
 #include "predicate/statement.hpp"
 #include "predicate/eqangle.hpp"
 #include "type/point.hpp"
+#include <set>
 
 class Cyclic : public Statement
 {
@@ -51,6 +52,12 @@ public:
     std::ostream &print(std::ostream &os) const override;
 
     bool numerical_only() const { return false; }
+
+    bool trivial() const
+    {
+        std::set<Point> s = {_a, _b, _c, _d};
+        return s.size() <= 3;
+    }
 };
 
 #endif // CYCLIC_HPP

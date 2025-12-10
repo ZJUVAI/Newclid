@@ -48,6 +48,8 @@ public:
 
     bool numerical_only() const { return false; }
 
+    bool trivial() const { return false; }
+
     bool operator==(const Thales &other) const;
 
     bool operator!=(const Thales &other) const;

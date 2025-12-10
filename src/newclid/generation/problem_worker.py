@@ -113,7 +113,7 @@ class GeometryProblemWorker:
             eq_predicates_goals = dict()
             for goal in possible_goals:
                 # find essential_clauses
-                points, premises, _, aux_points, aux, _, _ = solver.proof.dep_graph.get_proof_steps([
+                points, premises, _, _, aux_points, aux, _, _, _ = solver.proof.dep_graph.get_proof_steps([
                                                                                                      goal])
                 if aux_only and len(aux) == 0:
                     continue
@@ -319,7 +319,7 @@ class GeometryProblemWorker:
             solver_new.proof.goals = [goal_new]
 
             # get new proof
-            points, premises, _, aux_points, aux, _, proof_steps = solver_new.proof.dep_graph.get_proof_steps([
+            points, premises, _, _, aux_points, aux, _, _, proof_steps = solver_new.proof.dep_graph.get_proof_steps([
                                                                                                      goal_new])
             if aux_only and len(aux) == 0:
                 logging.warning("aux_only == True but still generate result with no aux.")
@@ -411,9 +411,11 @@ class GeometryProblemWorker:
                 points,
                 premises,
                 numercial_checked_premises,
+                trivial_premises,
                 aux_points_list,
                 aux,
                 numercial_checked_aux,
+                trivial_aux,
                 proof_steps,
             ) = proof_state.dep_graph.get_proof_steps(goals)
 
@@ -434,6 +436,8 @@ class GeometryProblemWorker:
                 mp, dep_idx, essential_aux_points, essential_premises, all_premises)
             numerical_check = GeometryProblemWorker._generate_numerical_check_section(
                 mp, dep_idx, numercial_checked_premises, numercial_checked_aux)
+            trivial_check = GeometryProblemWorker._generate_trivial_section(
+                mp, dep_idx, trivial_premises, trivial_aux)
             proof = GeometryProblemWorker._generate_proof_section(
                 mp, dep_idx, proof_steps)
 
@@ -657,6 +661,45 @@ class GeometryProblemWorker:
         else:
             numerical_check = ""
         return numerical_check
+    
+    @staticmethod
+    def _generate_trivial_section(mp, dep_idx, trivial_premises, trivial_aux):
+        """Generate numerical check section"""
+        instance = GeometryProblemWorker()
+        trivial_items = []
+        # trivial_premises
+        for line in trivial_premises:
+            statemtn_str = instance._statement2str_with_mapping(
+                line.statement, mp)
+            if statemtn_str not in dep_idx:
+                dep_idx[statemtn_str] = f"{len(dep_idx):03d}"
+        sorted_trivial_premises = sorted(
+            trivial_premises, key=lambda line: dep_idx[instance._statement2str_with_mapping(line.statement, mp)])
+        for line in sorted_trivial_premises:
+            statemtn_str = instance._statement2str_with_mapping(
+                line.statement, mp)
+            trivial_items.append(
+                f"{statemtn_str} [{dep_idx[statemtn_str]}]")
+        # trivial_premises
+        for line in trivial_aux:
+            statemtn_str = instance._statement2str_with_mapping(
+                line.statement, mp)
+            if statemtn_str not in dep_idx:
+                dep_idx[statemtn_str] = f"{len(dep_idx):03d}"
+        sorted_trivial_aux = sorted(
+            trivial_aux, key=lambda line: dep_idx[instance._statement2str_with_mapping(line.statement, mp)])
+        for line in sorted_trivial_aux:
+            statemtn_str = instance._statement2str_with_mapping(
+                line.statement, mp)
+            trivial_items.append(
+                f"{statemtn_str} [{dep_idx[statemtn_str]}]")
+        if len(trivial_items) > 0:
+            trivial = "<trivial> " + \
+                " ; ".join(trivial_items) + \
+                " ; </trivial> "
+        else:
+            trivial = ""
+        return trivial
 
     @staticmethod
     def _generate_proof_section(mp, dep_idx, proof_steps):
