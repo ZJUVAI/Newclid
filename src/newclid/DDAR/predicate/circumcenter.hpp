@@ -44,6 +44,8 @@ public:
 
     bool numerical_only() const { return false; }
 
+    bool trivial() const { return false; }
+
     std::unique_ptr<Statement> normalize() const override;
 
 private:

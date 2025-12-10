@@ -15,6 +15,7 @@ enum class ProofState : uint8_t
     NOT_PROVED,
     PROVED_BY_ASSUMPTION,
     PROVED_NUMERICALLY,
+    PROVED_TRIVIAL,
     PROVED_AR,
     PROVED_BY_THEOREM,
 };

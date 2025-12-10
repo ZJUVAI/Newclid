@@ -7,6 +7,7 @@ if TYPE_CHECKING:
 
 NUMERICAL_CHECK = "Numerical Check"
 IN_PREMISES = "Premise"
+TRIVIAL = "Trivial"
 
 
 class Dependency(NamedTuple):

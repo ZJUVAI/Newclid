@@ -36,6 +36,8 @@ public:
     const Point &c() const { return _c; }
 
     bool numerical_only() const { return true; }
+
+    bool trivial() const { return false; }
 };
 
 #endif // NCOLL_HPP

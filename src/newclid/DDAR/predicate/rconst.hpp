@@ -40,6 +40,8 @@ public:
 
     bool numerical_only() const { return false; }
 
+    bool trivial() const { return _left == _right && _ratio == Rational(1); }
+
     std::string to_string() const override;
 
     std::vector<std::string> to_tokens() const;
