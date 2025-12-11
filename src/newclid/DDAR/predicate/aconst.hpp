@@ -39,6 +39,8 @@ public:
 
     bool numerical_only() const { return false; }
 
+    bool trivial() const { return false; }
+
     std::vector<std::string> to_tokens() const;
 
     ~AConst() override = default;

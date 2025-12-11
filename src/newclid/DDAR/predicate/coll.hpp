@@ -5,6 +5,7 @@
 #include "predicate/eqratio.hpp"
 #include "type/product.hpp"
 #include "typedef.hpp"
+#include <set>
 
 class Coll : public Statement
 {
@@ -54,6 +55,12 @@ public:
     std::ostream &print(std::ostream &os) const override;
 
     bool numerical_only() const { return false; }
+
+    bool trivial() const
+    {
+        std::set<Point> s = {_a, _b, _c};
+        return s.size() <= 2;
+    }
 
     bool operator==(const Coll &other) const;
 

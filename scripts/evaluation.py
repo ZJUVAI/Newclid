@@ -3,6 +3,7 @@ from pathlib import Path
 import time
 import argparse 
 import ray
+import csv
 from rich.live import Live
 from rich.table import Table
 
@@ -104,6 +105,42 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
             live.update(render_table(all_tasks_info, start_time, True))
         live.update(render_table(all_tasks_info, start_time, False))
     ray.shutdown()
+    
+    # Generate CSV filename based on problems_path and model_path
+    problems_name = filepath.stem  # Get the file name without extension
+    # Get the deepest folder name from modelpath (assuming it's a list, take the first if not empty)
+    model_name = "default"
+    if modelpath:
+        # If modelpath is a list, take the first element
+        first_model_path = modelpath[0] if isinstance(modelpath, list) else modelpath
+        # Get the deepest folder name
+        # model_name = Path(first_model_path).name
+        # Change to use second deepest folder name + deepest folder name
+        path_obj = Path(first_model_path)
+        deepest_folder = path_obj.name
+        parent_folder = path_obj.parent.name
+        model_name = f"{parent_folder}_{deepest_folder}" if parent_folder else deepest_folder
+    
+    # Create CSV filename with parameters
+    csv_filename = f"eval_{problems_name}_{model_name}_d{decoding_size}_b{beam_size}_s{search_depth}.csv"
+    
+    # Ensure results directory exists
+    results_dir = Path("results")
+    results_dir.mkdir(exist_ok=True)
+    csv_filepath = results_dir / csv_filename
+    
+    # Write results to CSV file
+    with open(csv_filepath, 'w', newline='', encoding='utf-8') as csvfile:
+        writer = csv.writer(csvfile)
+        # Write header
+        writer.writerow(['Problem Name', 'Solved', 'Time (s)'])  # Column 1: problem name, Column 2: solved status, Column 3: time taken
+        # Write data
+        for problem_name, status, elapsed_time in all_tasks_info:
+            solved = "√" if status == "Success" else "x"  # Mark √ if solved, x if not
+            time_str = f"{elapsed_time:.2f}" if status != "Pending" else ""  # Show time for processed problems, leave empty for pending
+            writer.writerow([problem_name, solved, time_str])
+    
+    print(f"Results saved to {csv_filepath}")
             
 
 if __name__ == "__main__":

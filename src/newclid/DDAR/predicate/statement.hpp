@@ -37,9 +37,9 @@ public:
 
     virtual std::ostream &print(std::ostream &out) const = 0;
 
-    // virtual std::string to_string() const = 0;
-
     virtual bool numerical_only() const = 0;
+
+    virtual bool trivial() const = 0;
 
     virtual std::string to_string() const;
 

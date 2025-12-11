@@ -50,6 +50,8 @@ public:
     std::ostream &print(std::ostream &os) const override;
 
     bool numerical_only() const { return true; }
+
+    bool trivial() const { return false; }
 };
 
 #endif // SAMESIDE_HPP
