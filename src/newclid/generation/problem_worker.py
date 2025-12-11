@@ -98,7 +98,8 @@ class GeometryProblemWorker:
                 return [], {}
 
             n_clauses = len(fl_statement.split(';'))
-            csolver = CSolver(fl_statement, seed=seed, solver=solver, using_log=True)
+            csolver = CSolver(fl_statement, seed=seed,
+                              solver=solver, using_log=True)
             # print(f"problem: {fl_statement}")
 
             # Run solver
@@ -114,15 +115,19 @@ class GeometryProblemWorker:
             for goal in possible_goals:
                 # find essential_clauses
                 points, premises, _, _, aux_points, aux, _, _, _ = solver.proof.dep_graph.get_proof_steps([
-                                                                                                     goal])
+                    goal])
                 if aux_only and len(aux) == 0:
                     continue
                 premises = [dep.statement for dep in premises]
                 aux = [dep.statement for dep in aux]
-                predicates = sorted([statement.to_str() for statement in premises + aux])
+                predicates = sorted([statement.to_str()
+                                    for statement in premises + aux])
                 predicates = '; '.join(sorted([statement.to_str() for statement in premises])) + \
-                    ' $$ ' + '; '.join(sorted([statement.to_str() for statement in aux]))
-                eq_predicates_goals.setdefault(predicates, []).append((goal, premises, aux))
+                    ' $$ ' + \
+                    '; '.join(sorted([statement.to_str()
+                              for statement in aux]))
+                eq_predicates_goals.setdefault(
+                    predicates, []).append((goal, premises, aux))
 
             # then, process goal groups
             process_goal_time = time.time()
@@ -281,9 +286,11 @@ class GeometryProblemWorker:
                             "solver": solver_test,
                             "goal": goal
                         })
-                        
+
                 if len(goals_str) == 0:
                     break
+            if len(goals_str) == 0:
+                break
 
         # goals requiring full aux set or the aux set is empty
         for goal_str in goals_str:
@@ -320,9 +327,10 @@ class GeometryProblemWorker:
 
             # get new proof
             points, premises, _, _, aux_points, aux, _, _, proof_steps = solver_new.proof.dep_graph.get_proof_steps([
-                                                                                                     goal_new])
+                goal_new])
             if aux_only and len(aux) == 0:
-                logging.warning("aux_only == True but still generate result with no aux.")
+                logging.warning(
+                    "aux_only == True but still generate result with no aux.")
                 continue
             all_premises = [dep.statement for dep in premises + aux]
             n_premises = len(all_premises)
@@ -339,7 +347,7 @@ class GeometryProblemWorker:
 
             if len(aux_points) > 0 and not GeometryProblemWorker.filter.aux_predicates_valid_check(llm_renamed['llm_output']):
                 continue
-            
+
             result = {
                 "n_clauses": n_clauses,
                 "n_premises": n_premises,
@@ -355,7 +363,8 @@ class GeometryProblemWorker:
                 draw_with_mapping(
                     fig.axes[0],
                     solver_new.proof.symbols_graph.names2points(
-                        list(set(mapping.keys()) & set([p.name for p in points]))
+                        list(set(mapping.keys()) & set(
+                            [p.name for p in points]))
                     ),
                     [premise.statement for premise in premises],
                     goal_new,
@@ -586,7 +595,8 @@ class GeometryProblemWorker:
                         if p in mp:
                             string_premise.append(mp[p] + " : ")
                 else:
-                    k_renamed = " ".join(mp[p] for p in k.split(' ') if p in mp)
+                    k_renamed = " ".join(mp[p]
+                                         for p in k.split(' ') if p in mp)
                     tmp_string = k_renamed + ' : ' + tmp_string
                     string_premise.append(tmp_string)
         data_problem = '<problem> '
@@ -660,7 +670,7 @@ class GeometryProblemWorker:
         else:
             numerical_check = ""
         return numerical_check
-    
+
     @staticmethod
     def _generate_trivial_section(mp, dep_idx, trivial_premises, trivial_aux):
         """Generate numerical check section"""
