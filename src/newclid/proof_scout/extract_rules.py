@@ -33,9 +33,9 @@ def stage_extract_subgraphs(input_file: str, intermediate_file: str):
             try:
                 data = json.loads(line)
                 pg = ProofGraph(verbose=False)
-                pg.build_from_json(data)
                 pg.problem_id = str(input_idx)
                 input_idx += 1
+                pg.build_from_json(data)
                 
                 # 剪枝提取
                 sub_entries = pruner.prune_and_extract(pg)

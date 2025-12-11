@@ -50,13 +50,15 @@ class ProofGraph:
             "llm_output_renamed": "<numerical_check>...</numerical_check><aux>...</aux> <proof>...</proof>"
         }
         """
-        self.problem_id = str(data.get("id", "unknown"))
+        if self.problem_id is None:
+            self.problem_id = str(data.get("id", "unknown"))
         input_str = data.get("llm_input_renamed", "")
         output_str = data.get("llm_output_renamed", "")
 
         # 1. 提取各个部分的文本内容
         problem_text = self._extract_tag_content(input_str, "problem") or input_str
         num_check_text = self._extract_tag_content(output_str, "numerical_check")
+        tvl_check_text = self._extract_tag_content(output_str, "trivial")
         aux_text = self._extract_tag_content(output_str, "aux")
         proof_text = self._extract_tag_content(output_str, "proof")
 
@@ -68,8 +70,9 @@ class ProofGraph:
         # 3. 解析初始事实 (Premises) - Layer 0
         # 这里包括 problem 定义和 aux 定义中的事实
         self._parse_facts_batch(problem_text)
-        self._parse_facts_batch(aux_text)
         self._parse_facts_batch(num_check_text)
+        self._parse_facts_batch(tvl_check_text)
+        self._parse_facts_batch(aux_text)
 
         # 4. 解析证明步骤 (Proof Steps) - Layer > 0
         self._parse_proof_steps(proof_text)

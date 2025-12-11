@@ -453,7 +453,7 @@ class GeometryProblemWorker:
             # Assemble result
             return {
                 "llm_input": data_problem,
-                "llm_output": data_aux + numerical_check + proof,
+                "llm_output": data_aux + numerical_check + trivial_check + proof,
                 "rename_map": mp
             }, mp
 
