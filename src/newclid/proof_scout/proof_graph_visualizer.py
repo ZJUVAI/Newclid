@@ -2,7 +2,8 @@ import networkx as nx
 from networkx.drawing.nx_agraph import to_agraph
 import os
 
-from proof_graph import ProofGraph 
+from proof_graph import ProofGraph
+from proof_graph_pruner import GraphPruner
 
 class ProofGraphVisualizer:
     """
@@ -168,25 +169,29 @@ if __name__ == "__main__":
     from proof_graph import ProofGraph 
 
     sample_data = {
-        "problem_id": 8, 
+        "id": 8, 
         "llm_input_renamed": "<problem> a : ; b : ; c : ; d : coll b c d [000] cong b d c d [001] ; e : coll a c e [002] cong a e c e [003] ? simtri a b c e d c </problem>", 
         "llm_output_renamed": "<aux> x00 f : coll a b f [004] cong a f b f [005] ; </aux> <numerical_check> sameclock a b c c e d [006] ; </numerical_check> <proof> eqangle a c b c c e c d [007] AR [002] [000] ; eqratio a f a e b f c e [008] AR [005] [003] ; eqratio a b a c a f a e [009] r105 [004] [002] [008] ; eqratio a f b f b d c d [010] AR [005] [001] ; eqratio a b a f b c b d [011] r105 [004] [000] [010] ; eqratio a c b c c e c d [012] AR [003] [001] [009] [011] ; simtri a b c e d c [013] r62 [007] [012] [006] ; </proof>"
     }
 
-    # 1. 构建 PG 对象
+    # 渲染完整证明图
     pg = ProofGraph(verbose=False)
     pg.build_from_json(sample_data)
-    # build_adjacency 在 visualizer 内部也会调用，这里显式调用也没问题
     pg.build_adjacency()
-    
-    # 2. 初始化可视化器
-    visualizer = ProofGraphVisualizer(pg)
-    
-    # 3. 构建内部结构
+    visualizer = ProofGraphVisualizer(pg)    
     visualizer.build_graphviz_structure()
-    
-    # 4. 渲染输出
-    output_file = "proof_graph_rendered.png"
-    # 支持输出 png, pdf, svg 等格式
+    output_file = "full_graph_test.png"
     visualizer.render(output_file)
     
+    pruner = GraphPruner(verbose=True)
+    
+    # 提取子图进行渲染测试
+    sub_graphs = pruner.prune_and_extract(pg)
+    for i, sub in enumerate(sub_graphs):
+        print(f"Subgraph {i+1}: Target {sub.get('target_node_id')}, Nodes: {sub.get('node_count')}, Isolated: {sub.get('is_isolated')}")
+    
+    for sub in sub_graphs:
+        sub_visualizer = ProofGraphVisualizer(sub["subgraph_object"])
+        sub_visualizer.build_graphviz_structure()
+        sub_output_file = f"subgraph_{sub.get('target_node_id')}_test.png"
+        sub_visualizer.render(sub_output_file)

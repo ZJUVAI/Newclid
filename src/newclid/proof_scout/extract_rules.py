@@ -2,10 +2,9 @@ import json
 import string
 import pathlib
 import os
-import hashlib
-import logging
+import re
 from tqdm import tqdm  # 如果没有安装 tqdm，可以注释掉相关行
-from typing import Set, Dict, List
+from typing import Set
 
 # 引入类
 from proof_graph import ProofGraph
@@ -129,6 +128,19 @@ def normalize_rules_file(input_path: str, output_path: str):
             return alphabet[index]
         else:
             return f"{alphabet[index % 26]}{index // 26}"
+        
+    # 判断一个 token 是否应视为常量（不参与重命名）
+    # 约定：
+    # 1) 任何包含 '/' 的 token（如 1/2, pi/2, 1pi/2 等）视为常量；
+    # 2) 纯数字或浮点数（如 2, -3.5）也视为常量。
+    def is_constant_token(tok: str) -> bool:
+        if "/" in tok:
+            return True
+        try:
+            float(tok)
+            return True
+        except ValueError:
+            return False
 
     print(f"Normalizing rules from {input_path} to {output_path}...")
     
@@ -172,8 +184,8 @@ def normalize_rules_file(input_path: str, output_path: str):
 
             # 2. 对前提进行排序
             # 排序是为了去重的一致性：确保 "A, B => C" 和 "B, A => C" 被处理成相同的规范形式
-            # 排序键：谓词名称 -> 参数数量 -> 原始参数字符串
-            parsed_premises.sort(key=lambda x: (x[0], len(x[1]), " ".join(x[1])))
+            # 排序键：谓词名称
+            parsed_premises.sort(key=lambda x: (x[0]))
             
             # 3. 变量重命名 (Renaming)
             rename_map = {}
@@ -183,6 +195,9 @@ def normalize_rules_file(input_path: str, output_path: str):
                 nonlocal next_var_idx
                 new_args = []
                 for arg in args:
+                    if is_constant_token(arg):
+                        new_args.append(arg)
+                        continue
                     if arg not in rename_map:
                         rename_map[arg] = get_canonical_name(next_var_idx)
                         next_var_idx += 1

@@ -461,9 +461,25 @@ class ProofGraph:
         for nid, node in self.nodes.items():
             if node["type"] != "fact":
                 continue
+            
+            if node["is_aux"] == True:
+                continue
                 
             # 入度为0 -> 前提
-            if not self._adj_in.get(nid) and node["is_aux"] == False:
+            if not self._adj_in.get(nid):
+                # 过滤trivial节点
+                if node["label"] == "cong":
+                    args = node["args"]
+                    if args[0] == args[2] and args[1] == args[3]:
+                        continue
+                elif node["label"] == "eqangle":
+                    args = node["args"]
+                    if args[0] == args[2] and args[1] == args[3] and args[4] == args[6] and args[5] == args[7]:
+                        continue
+                elif node["label"] == "sameclock":
+                    args = node["args"]
+                    if args[0] == args[3] and args[1] == args[4] and args[2] == args[5]:
+                        continue
                 inputs.append(node)
             
             # 出度为0 -> 结论
