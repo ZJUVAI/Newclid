@@ -35,6 +35,11 @@ void Proof::initial()
         }
         throw runtime_error("尝试添加错误的仅数值检验命题");
     }
+    if (_statement->trivial())
+    {
+        set_proved(ProofState::PROVED_TRIVIAL);
+        return;
+    }
 }
 
 void Proof::ar()
@@ -85,6 +90,7 @@ vector<Proof *> Proof::get_dependencies() const
     {
     case ProofState::PROVED_BY_ASSUMPTION:
     case ProofState::PROVED_NUMERICALLY:
+    case ProofState::PROVED_TRIVIAL:
     case ProofState::NOT_PROVED:
         return {};
     case ProofState::PROVED_BY_THEOREM:
@@ -106,6 +112,8 @@ string Proof::reason() const
         return "Premise";
     case ProofState::PROVED_NUMERICALLY:
         return "Numerical Check";
+    case ProofState::PROVED_TRIVIAL:
+        return "Trivial";
     case ProofState::PROVED_BY_THEOREM:
         return _solver->applications()[_theoremId].theorem().rule();
     case ProofState::PROVED_AR:

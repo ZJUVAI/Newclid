@@ -42,6 +42,8 @@ public:
 
     bool numerical_only() const { return false; }
 
+    bool trivial() const { return (_left_up == _left_down && _right_up == _right_down) || (_left_up == _right_up && _left_down == _right_down); }
+
     std::vector<std::unique_ptr<Equation>> as_equation(bool log, bool exp) const override;
 };
 

@@ -64,6 +64,8 @@ public:
 
     bool numerical_only() const { return false; }
 
+    bool trivial() const { return _left == _right; }
+
     bool operator==(const SimilarTriangles &other) const;
 
     bool operator!=(const SimilarTriangles &other) const;

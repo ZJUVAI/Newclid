@@ -41,6 +41,8 @@ public:
     std::ostream &print(std::ostream &os) const override;
 
     bool numerical_only() const { return false; }
+
+    bool trivial() const { return _left == _right; }
 };
 
 #endif // CONG_HPP

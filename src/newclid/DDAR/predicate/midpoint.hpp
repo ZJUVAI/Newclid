@@ -46,6 +46,8 @@ public:
     const Point &middle() const { return _middle; }
 
     bool numerical_only() const { return false; }
+
+    bool trivial() const { return _left == _right && _left == _middle; }
 };
 
 #endif // MIDPOINT_HPP

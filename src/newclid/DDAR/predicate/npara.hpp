@@ -30,6 +30,8 @@ public:
 
     bool numerical_only() const { return true; }
 
+    bool trivial() const { return false; }
+
 private:
     Slope _left;
     Slope _right;
