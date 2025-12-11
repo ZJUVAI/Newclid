@@ -518,7 +518,7 @@ class ProofGraph:
                 continue
                 
             # 入度为0 -> 前提
-            if not self._adj_in.get(nid):
+            if not self._adj_in.get(nid) and node["is_aux"] == False:
                 inputs.append(node)
             
             # 出度为0 -> 结论

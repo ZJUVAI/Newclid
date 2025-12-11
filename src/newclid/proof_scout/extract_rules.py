@@ -1,5 +1,6 @@
 import json
 import string
+import pathlib
 import os
 import hashlib
 import logging
@@ -9,13 +10,20 @@ from typing import Set, Dict, List
 # 引入类
 from proof_graph import ProofGraph
 from proof_graph_pruner import GraphPruner
+from proof_graph_visualizer import ProofGraphVisualizer
 
 # 配置路径
-RAW_INPUT = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/geometry_clauses5_samples100.jsonl"  # 输入文件名
-INTERMEDIATE = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/c5s10k_intermediate.jsonl"  # 中间文件名
-RULE_OUTPUT = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/c5s10k_rules.txt" # 输出文件名
+
+FILE_PROFIX = "clauses5_samples10k"  # 文件前缀标识符
+FILE_PROFIX_SHORT = FILE_PROFIX.replace("clauses", "c").replace("_samples", "s")
+
+RAW_INPUT = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/{FILE_PROFIX}.jsonl"  # 输入文件名
+INTERMEDIATE = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/{FILE_PROFIX_SHORT}_intermediate.jsonl"  # 中间文件名
+RULE_OUTPUT = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/{FILE_PROFIX_SHORT}_rules.txt" # 输出文件名
 ENABLE_RULE_NORMALIZATION = True
-NORM_RULE_OUTPUT = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/c5s10k_rules_norm.txt" # 输出文件名
+NORM_RULE_OUTPUT = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/{FILE_PROFIX_SHORT}_rules_norm.txt" # 输出文件名
+RENDER_SUBGRAPHS = True  # 是否渲染提取出的子图用于调试
+RENDER_DIR = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/proof_graphs/{FILE_PROFIX_SHORT}/"  # 渲染输出目录
 
 def stage_extract_subgraphs(input_file: str, intermediate_file: str):
     pruner = GraphPruner(verbose=False)
@@ -87,8 +95,15 @@ def stage_deduplicate_and_export(intermediate_file: str, rules_output_file: str)
             dedup_count += 1
             
             # 3. 渲染 (这里调用 print_graph 模拟渲染，你可以替换为 draw_graph 等实际渲染函数)
-            # print(f"Rendering unique rule: {sig}")
-            # pg.print_graph()  # 或者 pg.render_to_file(...)
+            if RENDER_SUBGRAPHS:
+                render_path = os.path.join(RENDER_DIR, f"rule_norm_pid{pg.problem_id}.png")
+                pathlib.Path(RENDER_DIR).mkdir(parents=True, exist_ok=True)
+                visualizer = ProofGraphVisualizer(pg)
+                
+                # 3. 构建内部结构
+                visualizer.build_graphviz_structure()
+                visualizer.render(render_path)    
+                
             
             # 4. 导出规则文本
             # 复用之前写的 export_to_rule_format
