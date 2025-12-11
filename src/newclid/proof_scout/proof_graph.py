@@ -542,6 +542,119 @@ class ProofGraph:
         
         return result
 
+    # ---------------------------------------------------------
+    # 序列化接口 (导出为可重构的 JSON 字典) - 支持 Aux 保留
+    # ---------------------------------------------------------
+    def to_json_data(self) -> Dict[str, Any]:
+        """
+        将当前图对象序列化为符合 build_from_json 输入要求的字典。
+        包含对辅助点(Aux points)的显式声明，确保重建图时能保留 is_aux 属性。
+        """
+        if not hasattr(self, "_adj_in"):
+            self.build_adjacency()
+
+        problem_facts = []
+        proof_steps = []
+        
+        # 1. 收集当前子图中出现的所有点名 (Arguments)
+        active_points = set()
+        for node in self.nodes.values():
+            if "args" in node:
+                active_points.update(node["args"])
+
+        # 2. 识别哪些是辅助点
+        # 只要当前子图用到了某个辅助点，就必须在 XML header 中声明它
+        active_aux_points = active_points.intersection(self.aux_points)
+        
+        # 构造 <aux> 声明块
+        # 格式必须满足 _parse_aux_points 的正则: x00 name : ... ;
+        # 我们生成一个哑元声明 (dummy declaration)，只为了注册点名
+        aux_declarations = []
+        for p in active_aux_points:
+            aux_declarations.append(f"x00 {p} :")
+        
+        aux_xml = ""
+        if aux_declarations:
+            aux_xml = "<aux> " + " ; ".join(aux_declarations) + " ; </aux>"
+
+        # 3. 分离事实 (Problem) 和 步骤 (Proof)
+        rules = [n for n in self.nodes.values() if n["type"] == "rule"]
+        # 按层级排序确保拓扑序
+        rules.sort(key=lambda x: (x["layer"], x["id"]))
+
+        derived_fact_ids = set()
+
+        for rule in rules:
+            successors = self.get_successors(rule["id"])
+            if successors:
+                concl_id = successors[0]
+                derived_fact_ids.add(concl_id)
+                concl_node = self.nodes[concl_id]
+                
+                premise_ids = []
+                for p_id in self.get_predecessors(rule["id"]):
+                    if p_id in self.nodes:
+                        premise_ids.append(self.nodes[p_id]["local_id"])
+                
+                args_str = " ".join(concl_node["args"])
+                premises_str = " ".join([f"[{pid}]" for pid in premise_ids])
+                
+                step_str = f"{concl_node['label']} {args_str} [{concl_node['local_id']}] {rule['label']} {premises_str}"
+                proof_steps.append(step_str)
+
+        all_facts = [n for n in self.nodes.values() if n["type"] == "fact"]
+        for fact in all_facts:
+            if fact["id"] not in derived_fact_ids:
+                # 这是一个输入前提
+                args_str = " ".join(fact["args"])
+                fact_str = f"{fact['label']} {args_str} [{fact['local_id']}]"
+                problem_facts.append(fact_str)
+
+        # 4. 组装
+        problem_xml = "<problem> " + " ; ".join(problem_facts) + " </problem>" if problem_facts else "<problem></problem>"
+        proof_xml = "<proof> " + " ; ".join(proof_steps) + " ; </proof>" if proof_steps else "<proof></proof>"
+        
+        # 将 aux_xml 拼接到 output 中 (因为通常 parser 从 output 读取 aux)
+        return {
+            "id": self.problem_id,
+            "llm_input_renamed": problem_xml,
+            "llm_output_renamed": aux_xml + " " + proof_xml,
+            "node_count": len(self.nodes),
+            "is_subgraph": True
+        }
+    
+    
+    
+    def get_rule_signature(self) -> str:
+        """
+        计算规则的签名用于去重。
+        签名格式示例: "sorted_inputs(cong, coll) -> output(para)"
+        这样可以忽略参数具体的变量名（如 a b c vs x y z），只关注逻辑结构。
+        如果你需要区分参数位置（比如 coll a b c 和 coll a c b），
+        目前的谓词级去重可能不够，需要加上 args 的相对位置 pattern。
+        
+        这里实现：基于谓词(Predicates)的去重。
+        """
+        self.build_adjacency()
+        
+        input_preds = []
+        output_pred = "null"
+        
+        for nid, node in self.nodes.items():
+            if node["type"] == "fact":
+                # 入度为0 -> 输入
+                if not self._adj_in.get(nid):
+                    input_preds.append(node['label'])
+                # 出度为0 -> 输出
+                if not self._adj_out.get(nid):
+                    output_pred = node['label']
+        
+        # 对输入谓词排序，保证顺序无关性 (例如 A,B => C 和 B,A => C 视为相同)
+        input_preds.sort()
+        
+        signature = f"{','.join(input_preds)} -> {output_pred}"
+        return signature
+
 # 使用示例
 if __name__ == "__main__":
     # 使用你提供的示例数据进行测试
