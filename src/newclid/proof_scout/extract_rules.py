@@ -11,16 +11,16 @@ from proof_graph import ProofGraph
 from proof_graph_pruner import GraphPruner
 
 # 配置路径
-RAW_INPUT = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/geometry_clauses5_samples10k.jsonl"  # 输入文件名
-INTERMEDIATE = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/tmp_intermediate.txt"  # 中间文件名
-RULE_OUTPUT = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/tmp_test.txt" # 输出文件名
+RAW_INPUT = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/geometry_clauses5_samples100.jsonl"  # 输入文件名
+INTERMEDIATE = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/c5s10k_intermediate.jsonl"  # 中间文件名
+RULE_OUTPUT = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/c5s10k_rules.txt" # 输出文件名
 ENABLE_RULE_NORMALIZATION = True
-NORM_RULE_OUTPUT = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/tmp_test_norm.txt" # 输出文件名
+NORM_RULE_OUTPUT = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/c5s10k_rules_norm.txt" # 输出文件名
 
 def stage_extract_subgraphs(input_file: str, intermediate_file: str):
-    
     pruner = GraphPruner(verbose=False)
     count = 0
+    input_idx = 0
     
     with open(input_file, 'r', encoding='utf-8') as f_in, \
          open(intermediate_file, 'w', encoding='utf-8') as f_out:
@@ -34,6 +34,8 @@ def stage_extract_subgraphs(input_file: str, intermediate_file: str):
                 data = json.loads(line)
                 pg = ProofGraph(verbose=False)
                 pg.build_from_json(data)
+                pg.problem_id = str(input_idx)
+                input_idx += 1
                 
                 # 剪枝提取
                 sub_entries = pruner.prune_and_extract(pg)
@@ -51,7 +53,6 @@ def stage_extract_subgraphs(input_file: str, intermediate_file: str):
                 print(f"Error processing line: {e}")
 
 def stage_deduplicate_and_export(intermediate_file: str, rules_output_file: str):
-    
     unique_signatures: Set[str] = set()
     dedup_count = 0
     total_read = 0
