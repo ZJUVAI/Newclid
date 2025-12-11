@@ -1,6 +1,6 @@
 import logging
 from typing import List, Set, Dict, Any, Tuple
-from newclid.proof_scout.proof_graph import ProofGraph
+from proof_graph import ProofGraph
 
 class GraphPruner:
     """
@@ -174,3 +174,4 @@ if __name__ == "__main__":
     
     for sub in sub_graphs:
         sub["subgraph_object"].print_graph()
+        print(sub["subgraph_object"].export_to_rule_format())
