@@ -14,15 +14,15 @@ from proof_graph_visualizer import ProofGraphVisualizer
 
 # 配置路径
 
-FILE_PROFIX = "clauses5_samples10k"  # 文件前缀标识符
-FILE_PROFIX_SHORT = FILE_PROFIX.replace("clauses", "c").replace("_samples", "s")
+FILE_PROFIX = "geometry_clauses5_samples10k"  # 文件前缀标识符
+FILE_PROFIX_SHORT = FILE_PROFIX.replace("geometry_clauses", "c").replace("_samples", "s")
 
 RAW_INPUT = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/{FILE_PROFIX}.jsonl"  # 输入文件名
 INTERMEDIATE = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/{FILE_PROFIX_SHORT}_intermediate.jsonl"  # 中间文件名
 RULE_OUTPUT = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/{FILE_PROFIX_SHORT}_rules.txt" # 输出文件名
 ENABLE_RULE_NORMALIZATION = True
 NORM_RULE_OUTPUT = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/{FILE_PROFIX_SHORT}_rules_norm.txt" # 输出文件名
-RENDER_SUBGRAPHS = True  # 是否渲染提取出的子图用于调试
+RENDER_SUBGRAPHS = False  # 是否渲染提取出的子图用于调试
 RENDER_DIR = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/proof_graphs/{FILE_PROFIX_SHORT}/"  # 渲染输出目录
 
 def stage_extract_subgraphs(input_file: str, intermediate_file: str):

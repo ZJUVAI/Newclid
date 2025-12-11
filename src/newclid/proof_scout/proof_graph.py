@@ -439,61 +439,6 @@ class ProofGraph:
     # ---------------------------------------------------------
     # 新增：规则导出接口
     # ---------------------------------------------------------
-    
-    def export_to_rule_format(self) -> str:
-        """
-        将当前图导出为规则格式字符串。
-        格式：
-        第一行：problem_id
-        第二行：前提1, 前提2 ... => 结论
-        
-        前提：所有入度为0的事实节点 (Fact)
-        结论：唯一的出度为0的事实节点 (Fact)
-        """
-        # 确保邻接表已构建
-        if not hasattr(self, "_adj_in") or not hasattr(self, "_adj_out"):
-            self.build_adjacency()
-
-        inputs = []
-        conclusion = None
-        
-        # 遍历所有节点寻找起点（前提）和终点（结论）
-        # 注意：只关心 Fact 类型的节点，Rule 节点是中间过程
-        for nid, node in self.nodes.items():
-            if node["type"] != "fact":
-                continue
-                
-            # 入度为0 -> 前提
-            if not self._adj_in.get(nid):
-                inputs.append(node)
-            
-            # 出度为0 -> 结论
-            if not self._adj_out.get(nid):
-                # 理论上子图应该只有一个结论，如果有多个，最后一个会覆盖（或者可以加报错）
-                conclusion = node
-
-        # 格式化辅助函数
-        def fmt_node(n):
-            # 拼接 谓词 + 参数列表，例如: "cong a b c d"
-            return f"{n['label']} {' '.join(n['args'])}"
-
-        # 1. 构建前提字符串 (排序以保证确定性，例如按 local_id 或 label)
-        # 这里按 local_id 排序可以保证相对稳定的顺序
-        inputs.sort(key=lambda x: x.get('local_id', x['id']))
-        inputs_str = ", ".join([fmt_node(n) for n in inputs])
-
-        # 2. 构建结论字符串
-        conclusion_str = fmt_node(conclusion) if conclusion else "null"
-
-        # 3. 组合最终输出
-        # problem_id 在 create_subgraph 时已经被修改为带 sub 后缀的形式
-        result = f"{self.problem_id}\n{inputs_str} => {conclusion_str}"
-        
-        return result
-
-    # ---------------------------------------------------------
-    # 新增：规则导出接口
-    # ---------------------------------------------------------
     def export_to_rule_format(self) -> str:
         """
         将当前图导出为规则格式字符串。
