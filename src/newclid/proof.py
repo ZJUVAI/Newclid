@@ -159,8 +159,8 @@ class ProofState:
 
         # check two things
         existing_numerical_points = [p.num for p in existing_points]
-        if check_too_close_numerical(new_numerical_point, existing_numerical_points):
-            raise PointTooCloseError()
+        # if check_too_close_numerical(new_numerical_point, existing_numerical_points):
+        #     raise PointTooCloseError()
         if check_too_far_numerical(new_numerical_point, existing_numerical_points):
             raise PointTooFarError()
 
