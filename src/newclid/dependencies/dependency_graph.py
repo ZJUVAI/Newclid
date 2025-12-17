@@ -1,6 +1,6 @@
 from __future__ import annotations
 from pathlib import Path
-from typing import TYPE_CHECKING, Collection, Optional
+from typing import TYPE_CHECKING, Collection, Optional, Set
 import numpy as np
 from newclid.dependencies.dependency import IN_PREMISES, NUMERICAL_CHECK, TRIVIAL
 from newclid.dependencies.symbols import Point
@@ -9,6 +9,7 @@ from pyvis.network import Network  # type: ignore
 from newclid.statement import Statement
 from newclid.predicates import NAME_TO_PREDICATE
 from . import geometry
+from collections import deque
 
 from newclid.tools import add_edge, boring_statement  # type: ignore
 
@@ -19,13 +20,14 @@ if TYPE_CHECKING:
         AlgebraicManipulator,
     )
 
+
 def goal_filter(name: str, args: tuple[str]) -> bool:
     if name == 'eqratio' or name == 'eqangle':
         seg_1 = {args[0], args[1]}
         seg_2 = {args[2], args[3]}
         seg_3 = {args[4], args[5]}
         seg_4 = {args[6], args[7]}
-        #case: eqratio AB/CD = DC/BA
+        # case: eqratio AB/CD = DC/BA
         if seg_1 == seg_3 and seg_2 == seg_4:
             return False
         if seg_1 == seg_4 and seg_2 == seg_3:
@@ -36,6 +38,7 @@ def goal_filter(name: str, args: tuple[str]) -> bool:
     else:
         raise ValueError(f"Unknown goal type: {name}")
     return True
+
 
 class DependencyGraph:
     """Hyper graph linking statements by dependencies as hyper-edges."""
@@ -67,44 +70,33 @@ class DependencyGraph:
 
         midpoints = geometry.findmidp(point_coords, ratio_ids)
         for midp in midpoints:
-            tokens = (points[midp[0]].name, points[midp[1]].name, points[midp[2]].name)
+            tokens = (points[midp[0]].name,
+                      points[midp[1]].name, points[midp[2]].name)
             self.numerical_checked_midp.append(tokens)
 
         eqratios = geometry.findeq(point_coords, ratio_ids)
         for eqratio in eqratios:
             self.numerical_checked_eqratio.append(eqratio)
-        
+
         simtris, simtrirs = geometry.findsimitri(point_coords, eqratios)
         for simtri in simtris:
-            tokens = (points[simtri[0]].name, points[simtri[1]].name, points[simtri[2]].name, points[simtri[3]].name, points[simtri[4]].name, points[simtri[5]].name)
-            self.numerical_checked_simtri.append(tokens)   
+            tokens = (points[simtri[0]].name, points[simtri[1]].name, points[simtri[2]].name,
+                      points[simtri[3]].name, points[simtri[4]].name, points[simtri[5]].name)
+            self.numerical_checked_simtri.append(tokens)
         for simtrir in simtrirs:
-            tokens = (points[simtrir[0]].name, points[simtrir[1]].name, points[simtrir[2]].name, points[simtrir[3]].name, points[simtrir[4]].name, points[simtrir[5]].name)
+            tokens = (points[simtrir[0]].name, points[simtrir[1]].name, points[simtrir[2]].name,
+                      points[simtrir[3]].name, points[simtrir[4]].name, points[simtrir[5]].name)
             self.numerical_checked_simtrir.append(tokens)
 
-        # congs = geometry.findcong(point_coords, ratio_ids)
-        # for cong in congs:
-        #     tokens = (points[cong[0]].name, points[cong[1]].name, points[cong[2]].name, points[cong[3]].name)
-        #     self.numerical_checked_cong.append(tokens)
-
-        # perps = geometry.findperp(point_coords, angle_ids)
-        # for perp in perps:
-        #     tokens = (points[perp[0]].name, points[perp[1]].name, points[perp[2]].name, points[perp[3]].name)
-        #     self.numerical_checked_perp.append(tokens)
-
-        # paras = geometry.findpara(point_coords, angle_ids)
-        # for para in paras:
-        #     tokens = (points[para[0]].name, points[para[1]].name, points[para[2]].name, points[para[3]].name)
-        #     self.numerical_checked_para.append(tokens)
-                        
-        self.numerical_checked_eqangle = list(set(self.numerical_checked_eqangle))
-        self.numerical_checked_eqratio = list(set(self.numerical_checked_eqratio))
+        self.numerical_checked_eqangle = list(
+            set(self.numerical_checked_eqangle))
+        self.numerical_checked_eqratio = list(
+            set(self.numerical_checked_eqratio))
         self.numerical_checked_midp = list(set(self.numerical_checked_midp))
-        self.numerical_checked_simtri = list(set(self.numerical_checked_simtri))
-        self.numerical_checked_simtrir = list(set(self.numerical_checked_simtrir))
-        # self.numerical_checked_cong = list(set(self.numerical_checked_cong))
-        # self.numerical_checked_para = list(set(self.numerical_checked_para))
-        # self.numerical_checked_perp = list(set(self.numerical_checked_perp))
+        self.numerical_checked_simtri = list(
+            set(self.numerical_checked_simtri))
+        self.numerical_checked_simtrir = list(
+            set(self.numerical_checked_simtrir))
 
     def has_edge(self, dep: Dependency):
         return (
@@ -144,11 +136,13 @@ class DependencyGraph:
 
     def proof_deps(self, goals: list[Statement]) -> tuple[Dependency, ...]:
         sub_proof: dict[Statement, tuple[Dependency, ...]] = {}
+        seen: set[Dependency] = set()
         res: list[Dependency] = []
         for goal in goals:
             proof_of_goal = self._proof_text(goal, sub_proof)
             for s in proof_of_goal:
-                if s not in res:
+                if s not in seen:
+                    seen.add(s)
                     res.append(s)
         return tuple(res)
 
@@ -167,84 +161,100 @@ class DependencyGraph:
     ]:
         proof_deps = self.proof_deps(goals)
 
-        points: set[Point] = set()
+        points: Set[Point] = set()
+        queue = deque()
+
         for goal in goals:
-            points.update([p for p in goal.args if isinstance(p, Point)])
-        queue: list[Point] = list(points)
-        i = 0
-        while i < len(queue):
-            q = queue[i]
-            i += 1
-            if not isinstance(q, Point):
-                continue
+            for arg in goal.args:
+                if isinstance(arg, Point):
+                    if arg not in points:
+                        points.add(arg)
+                        queue.append(arg)
+
+        while queue:
+            q = queue.popleft()
             for p in q.rely_on:
                 if p not in points:
                     points.add(p)
                     queue.append(p)
 
         premises: list[Dependency] = []
-        numercial_checked_premises: list[Dependency] = []
+        numerical_checked_premises: list[Dependency] = []
         trivial_premises: list[Dependency] = []
         aux_points: set[Point] = set()
+
         aux: list[Dependency] = []
-        numercial_checked_aux: list[Dependency] = []
+        numerical_checked_aux: list[Dependency] = []
         trivial_aux: list[Dependency] = []
         proof_steps: list[Dependency] = []
 
         for line in proof_deps:
-            is_aux = any(
-                [p not in points for p in line.statement.args if isinstance(p, Point)]
-            )
-            if IN_PREMISES == line.reason:
-                if is_aux:
-                    aux.append(line)
-                    aux_points.update(
-                        [
-                            p
-                            for p in line.statement.args
-                            if isinstance(p, Point) and p not in points
-                        ]
-                    )
-                else:
-                    premises.append(line)
-            elif NUMERICAL_CHECK == line.reason:
-                if is_aux:
-                    numercial_checked_aux.append(line)
-                    aux_points.update(
-                        [
-                            p
-                            for p in line.statement.args
-                            if isinstance(p, Point) and p not in points
-                        ]
-                    )
-                else:
-                    numercial_checked_premises.append(line)
-            elif TRIVIAL == line.reason:
-                if is_aux:
-                    trivial_aux.append(line)
-                    aux_points.update(
-                        [
-                            p
-                            for p in line.statement.args
-                            if isinstance(p, Point) and p not in points
-                        ]
-                    )
-                else:
-                    trivial_premises.append(line)
+            stmt_points = [
+                p for p in line.statement.args if isinstance(p, Point)]
+            aux_point_in_stmt = [p for p in stmt_points if p not in points]
+            is_aux = bool(aux_point_in_stmt)
+
+            reason = line.reason
+            if reason == IN_PREMISES:
+                (aux if is_aux else premises).append(line)
+            elif reason == NUMERICAL_CHECK:
+                (numerical_checked_aux if is_aux else numerical_checked_premises).append(line)
+            elif reason == TRIVIAL:
+                (trivial_aux if is_aux else trivial_premises).append(line)
             else:
                 proof_steps.append(line)
+                continue
+
+            if is_aux:
+                aux_points.update(aux_point_in_stmt)
 
         return (
             points,
             premises,
-            numercial_checked_premises,
+            numerical_checked_premises,
             trivial_premises,
             aux_points,
             aux,
-            numercial_checked_aux,
+            numerical_checked_aux,
             trivial_aux,
             proof_steps,
         )
+
+    def get_only_premises_and_aux(self, goals: list[Statement]) -> tuple[list[Dependency], list[Dependency]]:
+        sub_proof: dict[Statement, tuple[Dependency, ...]] = {}
+        seen: set[Dependency] = set()
+        premises: list[Dependency] = []
+        aux: list[Dependency] = []
+
+        def collect(stmt: Statement):
+            if stmt in sub_proof:
+                for dep in sub_proof[stmt]:
+                    if dep not in seen:
+                        seen.add(dep)
+                        (aux if any(getattr(p, 'is_aux', False) for p in dep.statement.args if isinstance(
+                            p, Point)) else premises).append(dep)
+                return
+
+            dep = self.hyper_graph[stmt]
+            cached = []
+
+            for p in dep.why:
+                collect(p)
+
+            if dep.reason == IN_PREMISES:
+                if dep not in seen:
+                    seen.add(dep)
+                    has_aux_point = any(isinstance(a, Point) and getattr(
+                        a, 'is_aux', False) for a in dep.statement.args)
+                    (aux if has_aux_point else premises).append(dep)
+                    cached.append(dep)
+
+            sub_proof[stmt] = tuple(cached)
+
+        for goal in goals:
+            collect(goal)
+
+        return premises, aux
 
     def save_pyvis(self, *, path: Path, stars: Collection[Statement] = []):
         if stars:
@@ -271,7 +281,8 @@ class DependencyGraph:
             if boring_statement(dep.statement):
                 continue
             for premise in dep.why:
-                add_edge(net, premise.pretty(), dep.statement.pretty())  # type: ignore
+                add_edge(net, premise.pretty(),
+                         dep.statement.pretty())  # type: ignore
         net.options.layout = {  # type: ignore
             "hierarchical": {
                 "enabled": True,
