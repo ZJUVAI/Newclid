@@ -25,27 +25,29 @@ void ReducedEquation::reduce()
     }
 
     bool changed = true;
-    while (changed)
+    do
     {
         changed = false;
-        for (const auto &[term, eq] : _system->solved_variables())
+        for (const auto &[term, eq_ptr] : _system->solved_variables())
         {
+            const Equation &eq = *eq_ptr;
             changed |= substitute_variable(term, eq);
         }
-    }
+    } while (changed);
 
     while (!_remainder.empty())
     {
-        auto &term = *_remainder.begin();
-        auto itr = _system->solved_terms().find(term);
-        if (itr != _system->solved_terms().end())
-        {
-            _remainder -= itr->second * term.coeff();
-        }
-        else
+        const Term &head = *_remainder.begin();
+
+        auto it = _system->solved_terms().find(head);
+
+        if (it == _system->solved_terms().end())
         {
             break;
         }
+
+        const Equation &substitute_eq = *it->second;
+        _remainder -= substitute_eq * head.coeff();
     }
     _remainder.reduction();
 }

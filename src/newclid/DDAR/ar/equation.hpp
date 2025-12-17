@@ -53,6 +53,8 @@ public:
     bool operator<(const Equation &other) const { return _terms < other._terms; }
 
     bool operator==(const Equation &other) const { return _terms == other._terms; }
+
+    size_t size() const { return _terms.size(); }
 };
 
 std::ostream &operator<<(std::ostream &os, const Equation &eq);

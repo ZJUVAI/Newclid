@@ -1,6 +1,6 @@
 from newclid.agent.ddarn import DDARN
 from newclid.generation.goal_filter import GeometryGoalFilter
-from newclid.generation.summary import Summary, get_first_predicate
+from newclid.generation.summary import get_first_predicate
 from newclid.proof import ProofState
 from newclid.statement import Statement
 from newclid.formulations.problem import ProblemJGEX
@@ -8,7 +8,7 @@ from newclid.formulations.definition import DefinitionJGEX
 from newclid.formulations.clause import translate_sentence
 from newclid.dependencies.symbols import Point
 from newclid.dependencies.dependency_graph import DependencyGraph
-from newclid.dependencies.dependency import Dependency, IN_PREMISES, NUMERICAL_CHECK
+from newclid.dependencies.dependency import IN_PREMISES, NUMERICAL_CHECK, Dependency
 from newclid.configs import default_defs_path
 from newclid.api import GeometricSolver, GeometricSolverBuilder, CSolver
 from newclid.numerical.draw_figure import draw_with_mapping
@@ -23,7 +23,6 @@ from collections import defaultdict
 import ray
 import numpy as np
 from copy import deepcopy
-
 from newclid.generation.clause_generation import CompoundClauseGen
 
 
@@ -82,6 +81,8 @@ class GeometryProblemWorker:
                     )
             except TimeoutError:
                 return [], {}
+
+            fl_statement = "a@0.7132879058235042_-1.0773946576022428 b@-0.014258169396125675_-0.474276499853301 c@-0.17280077788056475_-1.4059089622916354 = ieq_triangle a b c; d@0.17540965284893795_-0.9858600399157265 = angle_bisector d c b a, angle_bisector d a c b; e@0.2702435639714698_-1.241651809946939 = on_dia e c b, angle_mirror e a d c; f@-0.09352947363834521_-0.9400927310724683 g@0.12799269728767207_-0.85796415490012 h@0.04872139304545253_-1.3237803861192872 i@0.08835704516656236_-1.0908722705097038 = ninepoints f g h i e c b; j@0.30987921609257973_-1.0087436943373556 = on_tline j a b c, on_bline j h a; k@1.1948711821762605_-1.597425546165797 = on_circle k a h; l@1.235652950853591_-0.8837296298030451 = s_angle i e l 60o; m@-1.5404727379373901_-1.214392378417474 = mirror m k c; n@0.7523751991344201_-1.3030846202515762 = midpoint n k j; o@0.6871415599990647_-1.3976701156468994 = eqdistance o k a d, eqratio6 o h a e f i g; p@1.3975530622051038_-1.0908570347421578 = eqdistance p k a d, eqratio6 p h a e f i g; q@0.22282660841020396_-1.1137559249313327 = eq_triangle q i d; r@0.38958610620269446_-1.5308133693731598 = on_circle r a l, on_circle r l d; s@-0.3731090964884377_-0.9499225669544101 = angle_mirror s p m d, angle_mirror s d c k; t@-0.6499796189314967_-1.219132469891138 = on_bline t d g, eqdistance t e n f; u@0.9533819690681079_-0.6246917249247083 = on_bline u d g, eqdistance u e n f; v@-0.4084904058233441_-2.191866291132227 = parallelogram k u t v"
             # fl_statement, _ = args
             # seed=42
             # max_level=500
@@ -114,8 +115,8 @@ class GeometryProblemWorker:
             eq_predicates_goals = dict()
             for goal in possible_goals:
                 # find essential_clauses
-                points, premises, _, _, aux_points, aux, _, _, _ = solver.proof.dep_graph.get_proof_steps([
-                    goal])
+                premises, aux = solver.proof.dep_graph.get_only_premises_and_aux([
+                                                                                 goal])
                 if aux_only and len(aux) == 0:
                     continue
                 premises = [dep.statement for dep in premises]
@@ -326,24 +327,36 @@ class GeometryProblemWorker:
             solver_new.proof.goals = [goal_new]
 
             # get new proof
-            points, premises, _, _, aux_points, aux, _, _, proof_steps = solver_new.proof.dep_graph.get_proof_steps([
-                goal_new])
+            points, premises, numercial_checked_premises, trivial_premises, \
+                aux_points, aux, numercial_checked_aux, trivial_aux, proof_steps = \
+                solver_new.proof.dep_graph.get_proof_steps([goal_new])
+
             if aux_only and len(aux) == 0:
                 logging.warning(
                     "aux_only == True but still generate result with no aux.")
                 continue
+
             all_premises = [dep.statement for dep in premises + aux]
             n_premises = len(all_premises)
 
-            # filter proof
             n_proof_steps = len(proof_steps)
             # if n_proof_steps < min_proof_steps:
-            #     logging.debug(f"Naive proof with length {n_proof_steps}")
             #     continue
 
-            # llm data generation
+            # llm data generation —— 现在传入预计算的数据
             llm_renamed, mapping = GeometryProblemWorker.llm_solution_renamed(
-                solver_builder.problemJGEX, solver_new.proof)
+                solver_builder.problemJGEX,
+                solver_new.proof,
+                points=points,
+                premises=premises,
+                numercial_checked_premises=numercial_checked_premises,
+                trivial_premises=trivial_premises,
+                aux_points_list=aux_points,
+                aux=aux,
+                numercial_checked_aux=numercial_checked_aux,
+                trivial_aux=trivial_aux,
+                proof_steps=proof_steps,
+            )
 
             if len(aux_points) > 0 and not GeometryProblemWorker.filter.aux_predicates_valid_check(llm_renamed['llm_output']):
                 continue
@@ -356,6 +369,7 @@ class GeometryProblemWorker:
                 "n_proof_steps": n_proof_steps,
                 "llm_input_renamed": llm_renamed['llm_input'],
                 "llm_output_renamed": llm_renamed['llm_output'],
+                "point_mapping": mapping
             }
 
             if img:
@@ -410,23 +424,24 @@ class GeometryProblemWorker:
         return f"{conclusion_str} [{dep_idx[conclusion_str]}] {rule_id} {premise_ids}".strip()
 
     @staticmethod
-    def llm_solution_renamed(problem: ProblemJGEX, proof_state: ProofState) -> dict:
-        """Refactored main method to generate LLM solution with renamed points"""
+    def llm_solution_renamed(
+        problem: ProblemJGEX,
+        proof_state: ProofState,
+        points: set[Point],
+        premises: list[Dependency],
+        numercial_checked_premises: list[Dependency],
+        trivial_premises: list[Dependency],
+        aux_points_list: set[Point],
+        aux: list[Dependency],
+        numercial_checked_aux: list[Dependency],
+        trivial_aux: list[Dependency],
+        proof_steps: list[Dependency],
+    ) -> dict:
+        """Generate LLM solution with renamed points, using precomputed proof steps"""
         try:
             # Initialize data
             dep_idx: dict[str, str] = {}
             goals = [goal for goal in proof_state.goals if goal.check()]
-            (
-                points,
-                premises,
-                numercial_checked_premises,
-                trivial_premises,
-                aux_points_list,
-                aux,
-                numercial_checked_aux,
-                trivial_aux,
-                proof_steps,
-            ) = proof_state.dep_graph.get_proof_steps(goals)
 
             # Get all premises and essential premises/points
             all_premises = GeometryProblemWorker._get_all_premise(
