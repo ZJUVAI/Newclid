@@ -220,42 +220,6 @@ class DependencyGraph:
             proof_steps,
         )
 
-    def get_only_premises_and_aux(self, goals: list[Statement]) -> tuple[list[Dependency], list[Dependency]]:
-        sub_proof: dict[Statement, tuple[Dependency, ...]] = {}
-        seen: set[Dependency] = set()
-        premises: list[Dependency] = []
-        aux: list[Dependency] = []
-
-        def collect(stmt: Statement):
-            if stmt in sub_proof:
-                for dep in sub_proof[stmt]:
-                    if dep not in seen:
-                        seen.add(dep)
-                        (aux if any(getattr(p, 'is_aux', False) for p in dep.statement.args if isinstance(
-                            p, Point)) else premises).append(dep)
-                return
-
-            dep = self.hyper_graph[stmt]
-            cached = []
-
-            for p in dep.why:
-                collect(p)
-
-            if dep.reason == IN_PREMISES:
-                if dep not in seen:
-                    seen.add(dep)
-                    has_aux_point = any(isinstance(a, Point) and getattr(
-                        a, 'is_aux', False) for a in dep.statement.args)
-                    (aux if has_aux_point else premises).append(dep)
-                    cached.append(dep)
-
-            sub_proof[stmt] = tuple(cached)
-
-        for goal in goals:
-            collect(goal)
-
-        return premises, aux
-
     def save_pyvis(self, *, path: Path, stars: Collection[Statement] = []):
         if stars:
             deps = self.proof_deps(list(stars))
