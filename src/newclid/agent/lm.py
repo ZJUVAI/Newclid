@@ -8,6 +8,7 @@ from fractions import Fraction
 import re
 from collections import defaultdict
 import heapq
+import string
 import ray
 import numpy as np
 import torch
@@ -36,6 +37,17 @@ from newclid.DDAR.build import DDAR
 if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
 
+AUX_PREDICATES = [
+    "coll",
+    "cong",
+    "cyclic",
+    "eqangle",
+    # "eqratio",
+    "midp",
+    "para",
+    "perp",
+]
+
 class LMAgent(DeductiveAgent):
     def __init__(self, model_path: list[str], decoding_size: int, beam_size: int, search_depth: int):
         self.any_new_statement_has_been_added = True
@@ -59,7 +71,7 @@ class LMAgent(DeductiveAgent):
             self.tokenizers.append(tokenizer)
         
     @torch.no_grad()
-    def inference(self, model, tokenizer, query: str, response_prefix: str = '<aux>'):
+    def inference(self, model, tokenizer, query: str, new_point_name: str, response_prefix: str = '<aux>'):
         aux_dsl_dict = {}
         # Process each model/tokenizer pair
         messages = [
@@ -71,33 +83,63 @@ class LMAgent(DeductiveAgent):
             tokenize=False,
             add_generation_prompt=True,
         )
-        # text = query
         text += "<think>\n\n</think>\n\n"
         model_prompt_inputs = tokenizer([text], return_tensors="pt")
-        text += response_prefix
-        model_inputs = tokenizer([text], return_tensors="pt").to('cuda')
-        bad_words_ids = tokenizer(["<", " <"]).input_ids
-        past_key_values = DynamicCache()
+        
+        # # Calculate beams per predicate
+        beams_per_predicate = self.decoding_size // len(AUX_PREDICATES)
+        
+        if beams_per_predicate:
+            # Generate for each aux predicate
+            for aux_predicate_str in AUX_PREDICATES:
+                # Build prompt with predicate prefix
+                prompt_with_predicate = text + response_prefix + ' ' + new_point_name + ' : ' + aux_predicate_str
+                model_inputs = tokenizer([prompt_with_predicate], return_tensors="pt").to('cuda')
+                
+                generated_output = model.generate(
+                    **model_inputs,
+                    max_new_tokens=100,
+                    num_beams=beams_per_predicate,
+                    num_return_sequences=beams_per_predicate,
+                    pad_token_id=151643,
+                    eos_token_id=2587,  # ' ;'
+                    return_dict_in_generate=True, 
+                    output_scores=True,
+                )
+                scores = generated_output.sequences_scores
+                generated_output = generated_output.sequences[:, model_prompt_inputs.input_ids.shape[1]:]
+                aux_dsls = tokenizer.batch_decode(generated_output, skip_special_tokens=True)
+                
+                for aux_dsl, score in zip(aux_dsls, scores):
+                    score = score.item()
+                    aux_dsl_dict[aux_dsl] = score
+                    print(f"aux_dsl: {aux_dsl}")
+        
+        # prompt_no_predicate = text + response_prefix + ' ' + new_point_name + ' : '
+        prompt_no_predicate = text + response_prefix + ' ' + new_point_name
+        model_inputs = tokenizer([prompt_no_predicate], return_tensors="pt").to('cuda')
+        remaining_beams = self.decoding_size % len(AUX_PREDICATES)
+
         generated_output = model.generate(
             **model_inputs,
             max_new_tokens=100,
             num_beams=self.decoding_size,
             num_return_sequences=self.decoding_size,
             pad_token_id=151643,
-            eos_token_id=2587, #' ;' #29
-            # bad_words_ids=bad_words_ids,
+            eos_token_id=2587,  # ' ;'
             return_dict_in_generate=True, 
             output_scores=True,
-            past_key_values=past_key_values,
         )
         scores = generated_output.sequences_scores
         generated_output = generated_output.sequences[:, model_prompt_inputs.input_ids.shape[1]:]
         aux_dsls = tokenizer.batch_decode(generated_output, skip_special_tokens=True)
+
         for aux_dsl, score in zip(aux_dsls, scores):
             score = score.item()
             aux_dsl_dict[aux_dsl] = score
+            print(f"aux_dsl: {aux_dsl}")
             
-        return aux_dsl_dict # key: aux, value: score
+        return aux_dsl_dict  # key: aux, value: score
 
     def run(self, proof: "ProofState", rules: list[Rule], timeout: int = 3600
         ) -> dict[str, Any]:
@@ -148,7 +190,8 @@ class LMAgent(DeductiveAgent):
                         
                         # Stragety 1: insert the aux string into problem and predict the next aux
                         p_dsl = self.problem_to_dsl(problem, base_proof.defs)
-                        aux_dsl_dict = self.inference(self.models[i], self.tokenizers[i], p_dsl, '<aux> x00')
+                        print(f"inferencing on query: {p_dsl}")
+                        aux_dsl_dict = self.inference(self.models[i], self.tokenizers[i], p_dsl, self.get_new_point_name(problem), '<aux> x00')
                         for aux_dsl, score in aux_dsl_dict.items():
                             try:
                                 aux = self.try_dsl_to_constructions(aux_dsl[len('<aux> x00'):])
@@ -174,6 +217,7 @@ class LMAgent(DeductiveAgent):
                                 for task in running_futures:
                                     ray.cancel(task, force=True)
                                 ray.shutdown()
+                                print(f"success with problem: {str(new_problem)}")
                                 return infos(True, str(new_problem))
                             elif depth < self.search_depth -1:
                                 new_problem, prev_score, score = future_info[f]
@@ -190,6 +234,7 @@ class LMAgent(DeductiveAgent):
                                 for task in running_futures:
                                     ray.cancel(task, force=True)
                                 ray.shutdown()
+                                print(f"success with problem: {str(new_problem)}")
                                 return infos(True, str(new_problem))
                             elif depth < self.search_depth -1:
                                 new_problem, prev_score, score = future_info[f]
@@ -200,6 +245,16 @@ class LMAgent(DeductiveAgent):
             ray.shutdown()
             return infos(False, 'Tried but failed.')
 
+    def get_new_point_name(self, problem: ProblemJGEX) -> str:
+        num_points = sum([len(clause.points) for clause in problem.constructions])
+        return self._get_apha_geo_solver_var(num_points)
+    
+    def _get_apha_geo_solver_var(self, va_idx):
+        """Generate a point name using letters and numbers"""
+        letter_part = string.ascii_lowercase[va_idx % 26]
+        number_part = va_idx // 26
+        return f"{letter_part}{number_part - 1}" if number_part else letter_part
+    
     def step(self, proof: ProofState, rules: list[Rule]) -> bool:
         return
     
