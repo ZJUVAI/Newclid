@@ -213,6 +213,16 @@ class GeometryGenerator:
             f"Generated {all_data_len} samples successfully in {final_elapsed_time:.2f}s.")
         summary_reporter.output_report()
 
+def str_to_bool(value):
+    """Convert string to boolean value."""
+    if isinstance(value, bool):
+        return value
+    if value.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif value.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 def main():
     parser = argparse.ArgumentParser(
@@ -229,17 +239,17 @@ def main():
                         choices=["debug", "info", "warning", "error"])
     parser.add_argument("--timeout", required=False, type=int, default=3600)
     parser.add_argument("--max_level", required=False, type=int, default=500)
-    parser.add_argument("--img", required=False, type=bool, default=False,
+    parser.add_argument("--img", required=False, type=str_to_bool, default=False,
                         help="Whether to save images of the generated problems.")
-    parser.add_argument("--aux_only", required=False, type=bool, default=False,
+    parser.add_argument("--aux_only", required=False, type=str_to_bool, default=False,
                         help="Whether to save only data with aux.")
-    parser.add_argument("--clear", required=False, type=bool, default=False,
+    parser.add_argument("--clear", required=False, type=str_to_bool, default=False,
                         help="Whether to clear old dataset files.")
-    parser.add_argument("--add_auxiliary", required=False, type=bool, default=True,
+    parser.add_argument("--add_auxiliary", required=False, type=str_to_bool, default=True,
                         help="Whether to add auxiliary points (e.g., midpoint, orthocenter) for triangles.")
-    parser.add_argument("--prune", required=False, type=bool, default=True,
+    parser.add_argument("--prune", required=False, type=str_to_bool, default=True,
                         help="Whether to prune clauses to preserve only the deepest clause chain.")
-    parser.add_argument("--remove_coords", required=False, type=bool, default=False,
+    parser.add_argument("--remove_coords", required=False, type=str_to_bool, default=False,
                         help="Whether to remove coordinate information from the final clause output.")
     args = parser.parse_args()
 
