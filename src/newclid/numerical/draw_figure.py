@@ -62,6 +62,7 @@ def draw_figure(
     save_to: Optional[Union[Path, BytesIO]] = None,
     rng: Generator,
     format: str = "svg",
+    draw_annotations: bool = True,
 ) -> None:
     """Draw everything on the same canvas."""
     symbols_graph = proof.symbols_graph
@@ -75,20 +76,21 @@ def draw_figure(
             points,
             [dep.statement for dep in proof.dep_graph.proof_deps(proof.goals)],
             rng,
+            draw_annotations,
         )
     else:
-        _draw(ax, points, proof.dep_graph.checked(), rng)
+        _draw(ax, points, proof.dep_graph.checked(), rng, draw_annotations)
 
     if save_to is not None:
         fig.savefig(save_to, format=format)  # type: ignore
 
 
 def _draw(
-    ax: "Axes", points: list[Point], statements: Collection["Statement"], rng: Generator
+    ax: "Axes", points: list[Point], statements: Collection["Statement"], rng: Generator, draw_annotations: bool = True
 ):
     """Draw everything."""
     for statement in statements:
-        statement.draw(ax, rng)
+        statement.draw(ax, rng, draw_annotations)
     point_names = []
     for p in points:
         point_names.append(draw_point(ax, p))
@@ -101,6 +103,7 @@ def draw_with_mapping(
     goal: "Statement",
     rng: Generator,
     mapping: dict[str, str],
+    draw_annotations: bool = True,
 ):
     """Draw everything with point mapping."""
     point_names = []
@@ -120,18 +123,16 @@ def draw_with_mapping(
                 rng,
                 segment_parent,
                 segment_colors,
+                draw_annotations,
             )
         else:
-            statement.draw(ax, rng)
-
-    if goal.to_str() == 'para e v n u':
-        pass
+            statement.draw(ax, rng, draw_annotations)
 
     if goal.predicate.NAME == 'cong':
         draw_segment(ax, goal.args[0], goal.args[1])
         draw_segment(ax, goal.args[2], goal.args[3])
     else:
-        goal.draw(ax, rng)
+        goal.draw(ax, rng, draw_annotations)
 
     adjust_text(point_names, ax=ax)
 

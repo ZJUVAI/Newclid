@@ -99,7 +99,7 @@ class ConstantRatio(Predicate):
         return (a.name, b.name, c.name, d.name, fraction_to_ratio(r))  # type: ignore
     
     @classmethod
-    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator):
+    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True):
         draw_segment(ax, args[0], args[1])
         draw_segment(ax, args[2], args[3])
 
