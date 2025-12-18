@@ -137,7 +137,15 @@ class Cong(Predicate):
         rng: Generator,
         segment_parent: Optional[dict[tuple[str, str], tuple[str, str]]] = None,
         segment_colors: Optional[dict[tuple[str, str], int]] = None,
+        draw_annotations: bool = True,
     ):
+        # Draw original segments
+        for i in range(0, len(args), 2):
+            draw_segment(ax, args[i], args[i + 1], ls="solid")
+
+        if not draw_annotations:
+            return
+
         # Union-Find operations within draw function
         graph = dep_graph.symbols_graph
         if segment_parent is None:
@@ -181,10 +189,6 @@ class Cong(Predicate):
             color_index = getattr(ax, "cong_color")
             segment_colors[root] = color_index
         color_index = segment_colors[root]
-        
-        # Draw original segments
-        for i in range(0, len(args), 2):
-            draw_segment(ax, args[i], args[i + 1], ls="solid")
         
         # Find all segments in the same equivalence class and draw marks
         root = find_root(current_segments[0])

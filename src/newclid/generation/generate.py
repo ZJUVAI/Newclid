@@ -54,6 +54,7 @@ class GeometryGenerator:
             add_auxiliary=True,
             prune=True,
             remove_coords=False,
+            draw_annotations=True,
         ):
         self.n_clauses = n_clauses
         self.min_proof_steps = min_proof_steps
@@ -78,6 +79,7 @@ class GeometryGenerator:
         self.add_auxiliary = add_auxiliary
         self.prune = prune
         self.remove_coords = remove_coords
+        self.draw_annotations = draw_annotations
         self.data_count = 0
 
     def problem_hash_filter(self, data: list, key: str) -> list[str]:
@@ -128,7 +130,7 @@ class GeometryGenerator:
         def task_generator():
             for i in range(10**9):
                 seed = 42 + i  # 唯一种子 = 时间戳 + 任务ID
-                yield i, seed, self.n_clauses, self.max_level, self.img, self.aux_only, self.add_auxiliary, self.prune, self.remove_coords
+                yield i, seed, self.n_clauses, self.max_level, self.img, self.aux_only, self.add_auxiliary, self.prune, self.remove_coords, self.draw_annotations
 
         if not ray.is_initialized():
             ray.init(
@@ -251,6 +253,8 @@ def main():
                         help="Whether to prune clauses to preserve only the deepest clause chain.")
     parser.add_argument("--remove_coords", required=False, type=str_to_bool, default=False,
                         help="Whether to remove coordinate information from the final clause output.")
+    parser.add_argument("--draw_annotations", required=False, type=str_to_bool, default=True,
+                        help="Whether to add geometry property annotations in the figure.")
     args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, args.log_level.upper()))
@@ -270,6 +274,7 @@ def main():
         add_auxiliary=args.add_auxiliary,
         prune=args.prune,
         remove_coords=args.remove_coords,
+        draw_annotations=args.draw_annotations,
     )
 
     generator.generate()
