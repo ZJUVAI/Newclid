@@ -255,6 +255,10 @@ bool DDARSolver::establish_statement(Proof *pf, size_t thm_id)
 
 vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement> &pf)
 {
+    if (!pf->check_nondegen())
+    {
+        return {};
+    }
     auto eqn_ptrs = pf->as_equation(_log_enabled, _exp_enabled);
     if (eqn_ptrs.empty())
     {
