@@ -118,6 +118,12 @@ class Statement:
 
     def draw(self, ax: "Axes", rng: Generator, draw_annotations: bool = True):
         try:
-            self.predicate.draw(ax, self.args, self.dep_graph, rng, draw_annotations)
+            self.predicate.draw(
+                ax=ax,
+                args=self.args,
+                dep_graph=self.dep_graph,
+                rng=rng,
+                draw_annotations=draw_annotations,
+            )
         except Exception as e:
             logging.warning(f"Failed to draw statement {self}: {e}")
