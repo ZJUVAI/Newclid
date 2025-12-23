@@ -5,6 +5,7 @@ import numpy as np
 from newclid.dependencies.dependency import IN_PREMISES, NUMERICAL_CHECK, TRIVIAL
 from newclid.dependencies.symbols import Point
 from newclid.dependencies.symbols_graph import SymbolsGraph
+from newclid.formulations.clause import Clause
 from pyvis.network import Network  # type: ignore
 from newclid.statement import Statement
 from newclid.predicates import NAME_TO_PREDICATE
@@ -162,6 +163,7 @@ class DependencyGraph:
         proof_deps = self.proof_deps(goals)
 
         points: Set[Point] = set()
+        premise_clauses: Set[Clause] = set()
         queue = deque()
 
         for goal in goals:
@@ -173,10 +175,15 @@ class DependencyGraph:
 
         while queue:
             q = queue.popleft()
+            premise_clauses.add(q.clause)
             for p in q.rely_on:
                 if p not in points:
                     points.add(p)
                     queue.append(p)
+
+        possible_points: Set[Point] = set()
+        for clause in premise_clauses:
+            possible_points.update(self.symbols_graph.names2points(clause.points))
 
         premises: list[Dependency] = []
         numerical_checked_premises: list[Dependency] = []
@@ -189,10 +196,14 @@ class DependencyGraph:
         proof_steps: list[Dependency] = []
 
         for line in proof_deps:
-            stmt_points = [
-                p for p in line.statement.args if isinstance(p, Point)]
-            aux_point_in_stmt = [p for p in stmt_points if p not in points]
-            is_aux = bool(aux_point_in_stmt)
+            is_aux = False
+            for p in line.statement.args:
+                if isinstance(p, Point):
+                    if p in possible_points:
+                        points.add(p)
+                    else:
+                        aux_points.add(p)
+                        is_aux = True
 
             reason = line.reason
             if reason == IN_PREMISES:
@@ -204,9 +215,6 @@ class DependencyGraph:
             else:
                 proof_steps.append(line)
                 continue
-
-            if is_aux:
-                aux_points.update(aux_point_in_stmt)
 
         return (
             points,
