@@ -13,7 +13,7 @@ class ProofGraph:
     4. 计算节点层级(layer)和图的总深度。
     """
 
-    # --- 正则表达式定义 (复用自 proof_graph.py 和 filter_and_prune_engine.py) ---
+    # --- 正则表达式定义  ---
     # 解析形如 [001] 的ID
     _BRACKET_ID_RE = re.compile(r"\[(\d+)\]")
     # 解析事实片段: "pred a b c [000]"
@@ -56,7 +56,7 @@ class ProofGraph:
         output_str = data.get("llm_output_renamed", "")
 
         # 1. 提取各个部分的文本内容
-        problem_text = self._extract_tag_content(input_str, "problem") or input_str
+        problem_text = self._extract_tag_content(input_str, "problem")
         num_check_text = self._extract_tag_content(output_str, "numerical_check")
         tvl_check_text = self._extract_tag_content(output_str, "trivial")
         aux_text = self._extract_tag_content(output_str, "aux")
@@ -233,7 +233,6 @@ class ProofGraph:
         rule_node_id = f"R:{self.problem_id}:{step_idx}:{rule_code}"
         
         # 规则节点是否辅助：如果前提有辅助点，或者生成的结论将有辅助点(下面判断)，则视为辅助逻辑的一部分
-        # 这里主要看输入是否污染
         rule_is_aux = has_aux_premise
 
         self.nodes[rule_node_id] = {
@@ -256,10 +255,6 @@ class ProofGraph:
         
         # 添加边: Rule -> Conclusion
         self.edges.append((rule_node_id, concl_node_id))
-        
-        # 更新规则的 is_aux 属性：如果输出是辅助点，规则也算辅助相关
-        if self.nodes[concl_node_id]["is_aux"]:
-            self.nodes[rule_node_id]["is_aux"] = True
 
     # ---------------------------------------------------------
     # 辅助工具
@@ -577,7 +572,7 @@ class ProofGraph:
         # 4. 组装
         problem_xml = "<problem> " + " ; ".join(problem_facts) + " </problem>" if problem_facts else "<problem></problem>"
         proof_xml = "<proof> " + " ; ".join(proof_steps) + " ; </proof>" if proof_steps else "<proof></proof>"
-        
+                
         # 将 aux_xml 拼接到 output 中 (因为通常 parser 从 output 读取 aux)
         return {
             "id": self.problem_id,

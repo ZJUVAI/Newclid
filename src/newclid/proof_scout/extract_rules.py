@@ -205,10 +205,16 @@ def normalize_rules_file(input_path: str, output_path: str):
                 return new_args
 
             # 重构前提字符串
+            contain_con_sim = False
             norm_premises = []
             for pred, args in parsed_premises:
                 new_args = map_vars(args)
                 norm_premises.append(f"{pred} {' '.join(new_args)}")
+                if pred in ["contri", "simtri", "contrir", "simtrir"]:
+                    contain_con_sim = True
+            
+            if contain_con_sim:
+                continue
             
             # 重构结论字符串
             norm_conclusion = "null"

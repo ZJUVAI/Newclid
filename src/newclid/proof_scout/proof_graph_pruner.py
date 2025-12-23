@@ -30,14 +30,10 @@ class GraphPruner:
 
         # 1. 初始化待检查队列 (Alive)
         # 筛选: IsFact(node) and not HasAux(node)
-        # 排序: 按 Layer 降序 (从深层节点往回溯，通常更符合剪枝逻辑)
-        alive_ids = []
-        for nid, node in pg.nodes.items():
-            if node["type"] == "fact" and not node["is_aux"]:
-                alive_ids.append(nid)
+        alive_ids = list(pg.nodes.keys())
         
-        # 按 layer 降序排序，处理最深的结论
-        alive_ids.sort(key=lambda nid: pg.nodes[nid]["layer"], reverse=True)
+        # 按 layer 升序排序
+        alive_ids.sort(key=lambda nid: pg.nodes[nid]["layer"])
         
         # 使用 Set 加速查找，alive_ids 列表用于保持遍历顺序
         alive_set = set(alive_ids)
@@ -49,14 +45,17 @@ class GraphPruner:
         # 2. 迭代检查每个事实节点 F0
         # 注意：我们需要遍历 alive_ids 的副本，因为 alive_set 可能会在过程中缩减
         for f0_id in alive_ids:
-            
-            # 如果该节点已经被移出 alive_set (被之前的迭代作为祖先剪枝了)，则跳过
-            if f0_id not in alive_set:
-                continue
 
+            if pg.nodes[f0_id]["type"] != "fact" or pg.nodes[f0_id]["is_aux"] == True:
+                continue  # 仅处理不带辅助点的事实节点
+            
             # === Step 2.1: 寻找活着的祖先 (Ancestors Discovery) ===
             # 在全图中反向搜索 F0 的所有上游节点
             ancestors = pg.get_ancestors(f0_id)
+            for ancestor in list(ancestors):
+                # 只保留活着的事实节点
+                if ancestor not in alive_set:
+                    ancestors.remove(ancestor)
             
             # 若无祖先 (Layer 0 Fact)，跳过
             if not ancestors:
@@ -65,26 +64,15 @@ class GraphPruner:
             # === Step 2.2: 基于辅助点信息判定提取资格 (Extraction Eligibility) ===
             # F0 必然有一个直接规则前驱 R0 (因为它是 Fact 且有祖先)
             # 注意：ProofGraph 中 Fact 的前驱只能是 Rule (除了 Layer 0)
-            preds = pg.get_predecessors(f0_id)
-            if not preds: continue # 理论上不应发生
+            rule = pg.get_predecessors(f0_id)
+            if not rule: continue # 理论上不应发生
             
-            r0_id = preds[0] # Fact 通常只有一个生成规则
+            r0_id = rule[0] # Fact 通常只有一个生成规则
             r0_node = pg.nodes.get(r0_id)
             
-            # 获取 R0 的输入事实节点 F1s
-            f1_ids = pg.get_predecessors(r0_id)
-            
             should_extract = False
-            # 检查直接前驱规则的输入是否包含辅助点
-            # 逻辑：只要直接生成 F0 的规则用到了 Aux 节点，就认为这个分支与 Aux 相关
-            for f1_id in f1_ids:
-                if pg.nodes[f1_id]["is_aux"]:
-                    should_extract = True
-                    break
-            
-            # 如果不需要提取，直接处理下一个
-            if not should_extract:
-                continue
+            if r0_node["is_aux"] is True:
+                should_extract = True
 
             # === Step 2.3: 独占性检查 (Isolation Check) ===
             # 检查 Ancestors + {F0} 是否对 "当前还活着的外部世界" 封闭
@@ -127,7 +115,6 @@ class GraphPruner:
                 extracted_subgraphs.append({
                     "subgraph_object": sub_pg,          # 新的 ProofGraph 对象
                     "target_node_id": f0_id,           # 目标节点 ID
-                    "is_isolated": is_isolated,        # 隔离性标志
                     "node_count": len(subgraph_nodes_set) # 方便快速查看统计信息
                 })
                 
@@ -167,11 +154,12 @@ if __name__ == "__main__":
     # 2. 运行 Pruner
     pruner = GraphPruner(verbose=True)
     sub_graphs = pruner.prune_and_extract(pg)
-    
     print(f"\nTotal subgraphs extracted: {len(sub_graphs)}")
     for i, sub in enumerate(sub_graphs):
         print(f"Subgraph {i+1}: Target {sub.get('target_node_id')}, Nodes: {sub.get('node_count')}, Isolated: {sub.get('is_isolated')}")
     
     for sub in sub_graphs:
-        sub["subgraph_object"].print_graph()
-        print(sub["subgraph_object"].export_to_rule_format())
+        sub_pg = sub["subgraph_object"]
+        sub_pg.print_graph()
+        sub_pg.to_json_data()
+        print(sub_pg.export_to_rule_format())
