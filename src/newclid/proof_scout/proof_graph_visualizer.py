@@ -63,6 +63,8 @@ class ProofGraphVisualizer:
         if node['type'] == 'rule':
             return self.STYLE_RULE
         else:
+            if node['is_aux'] == True:
+                return self.STYLE_AUX
             # Fact 节点，判断是前提、中间还是结论
             in_degree = len(self.pg._adj_in.get(nid, []))
             out_degree = len(self.pg._adj_out.get(nid, []))
@@ -88,8 +90,6 @@ class ProofGraphVisualizer:
         for nid, node in self.pg.nodes.items():
             short_label = self.id_to_short_label[nid]
             style = self._determine_node_style(nid, node)
-            if node['is_aux']:
-                    style = self.STYLE_AUX
             # 将样式字典展开作为节点属性
             self.G.add_node(short_label, label=short_label, **style)
             
@@ -170,8 +170,8 @@ if __name__ == "__main__":
 
     sample_data = {
         "id": 8, 
-        "llm_input_renamed": "<problem> a : ; b : ; c : ; d : coll b c d [000] cong b d c d [001] ; e : coll a c e [002] cong a e c e [003] ? simtri a b c e d c </problem>", 
-        "llm_output_renamed": "<aux> x00 f : coll a b f [004] cong a f b f [005] ; </aux> <numerical_check> sameclock a b c c e d [006] ; </numerical_check> <proof> eqangle a c b c c e c d [007] AR [002] [000] ; eqratio a f a e b f c e [008] AR [005] [003] ; eqratio a b a c a f a e [009] r105 [004] [002] [008] ; eqratio a f b f b d c d [010] AR [005] [001] ; eqratio a b a f b c b d [011] r105 [004] [000] [010] ; eqratio a c b c c e c d [012] AR [003] [001] [009] [011] ; simtri a b c e d c [013] r62 [007] [012] [006] ; </proof>"
+        "llm_input_renamed": "<problem> a : ; b : ; c : ; d : perp a c b d [000] perp a b c d [001] ? perp a d b c </problem>", 
+        "llm_output_renamed": "<aux> x00 e : coll a c e [002] coll b d e [003] ; </aux> <numerical_check> sameclock a b e c e d [004] ; sameclock a d e b c e [005] ; </numerical_check> <proof> eqangle a e b e d e c e [006] a01 [002] [003] [000] ; eqangle a b b e c d c e [007] a01 [002] [003] [001] [000] ; simtri a b e d c e [008] r34 [007] [006] [004] ; eqratio a e b e d e c e [009] r52 [008] ; simtri a d e b c e [010] r62 [006] [009] [005] ; eqangle a d b c d e c e [011] r52 [010] ; perp a d b c [012] a01 [002] [003] [011] [000] ; </proof>"
     }
 
     # 渲染完整证明图
@@ -180,7 +180,7 @@ if __name__ == "__main__":
     pg.build_adjacency()
     visualizer = ProofGraphVisualizer(pg)    
     visualizer.build_graphviz_structure()
-    output_file = "full_graph_test.png"
+    output_file = "orthocenter_full.png"
     visualizer.render(output_file)
     
     pruner = GraphPruner(verbose=True)
@@ -193,5 +193,5 @@ if __name__ == "__main__":
     for sub in sub_graphs:
         sub_visualizer = ProofGraphVisualizer(sub["subgraph_object"])
         sub_visualizer.build_graphviz_structure()
-        sub_output_file = f"subgraph_{sub.get('target_node_id')}_test.png"
+        sub_output_file = f"orthocenter_sub_{sub.get('target_node_id')}.png"
         sub_visualizer.render(sub_output_file)
