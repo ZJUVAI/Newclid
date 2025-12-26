@@ -183,7 +183,11 @@ class DependencyGraph:
 
         possible_points: Set[Point] = set()
         for clause in premise_clauses:
-            possible_points.update(self.symbols_graph.names2points(clause.points))
+            possible_points.update(
+                self.symbols_graph.names2points(
+                    [p.split('@')[0] for p in clause.points]
+                )
+            )
 
         premises: list[Dependency] = []
         numerical_checked_premises: list[Dependency] = []
