@@ -18,6 +18,8 @@ sys.path.insert(0, project_root)
 
 from newclid import GeometricSolverBuilder, GeometricSolver
 from newclid import proof_writing
+from newclid.agent.lm import LMAgent
+from newclid.formulations.problem import ProblemJGEX
 
 
 def _extract_point_coords_from_solver(solver: GeometricSolver):
@@ -157,9 +159,11 @@ def solve_single_problem(
     返回值：dict - {"success": bool, "proof": list, "run_info": dict, "error": str}
     被调用：solve_problems_batch() 函数调用
     """
+    t_total0 = time.time()
     try:
         # 创建求解器构建器
         solver_builder = GeometricSolverBuilder(123)
+        # solver_builder.with_deductive_agent(LMAgent("/c23474/home/wangzi/myNewclid/models/sft4/checkpoint-50000", decoding_size=32,beam_size=8, search_depth=4))
                 
         # 加载问题并构建求解器
         solver_builder.load_problem_from_txt(problem_text)
@@ -173,8 +177,25 @@ def solve_single_problem(
         except Exception:
             point_lines, points_json = ([], [])
 
+        t0=time.time()
+
         # 运行求解，增加超时控制，防止单题长时间卡住
-        success = solver.run(timeout=timeout_sec)
+        def infos(is_success, error_msg = None):
+            infos: dict = {}
+            infos["runtime"] = time.time() - t0
+            infos["success"] = is_success
+            infos["problem"] = ""
+            if error_msg:
+                if is_success:
+                    infos["problem"] = error_msg[0]
+                    infos["proof"] = error_msg[1]
+                else:
+                    infos["error"] = error_msg
+            return infos
+        base_proof = LMAgent.run_ddar(solver.proof, solver.rules, t0, timeout=timeout_sec)
+        if base_proof.check_goals():
+            solver.run_infos = infos(True, [str(solver_builder.problemJGEX), base_proof])
+        success = solver.run_infos["success"]
         # 将 proof 转为可序列化的结构化文本，避免 JSON 序列化失败
         proof_obj = None
         if success:
@@ -202,6 +223,12 @@ def solve_single_problem(
             aux_points, aux_lines = ([], [])
         res["aux_points"] = aux_points
         res["aux_lines"] = aux_lines
+        res["elapsed_sec"] = time.time() - t_total0
+        # solver.run_infos["runtime"] 仅统计推理阶段（t0 之后），这里也一并返回，便于区分
+        try:
+            res["solve_runtime_sec"] = float(solver.run_infos.get("runtime", 0.0) or 0.0)
+        except Exception:
+            res["solve_runtime_sec"] = None
         return res
         
     except Exception as e:
@@ -211,6 +238,7 @@ def solve_single_problem(
             "run_info": None,
             "error": str(e)
         }
+        res["elapsed_sec"] = time.time() - t_total0
         # 异常情况下不强制注入坐标字段
         return res
 
@@ -218,6 +246,7 @@ def solve_single_problem(
 def _solve_problem_entry(args: Tuple[Dict, str, int, int]) -> Dict:
     """进程/线程池入口函数：独立求解一个问题（可被pickle）。"""
     problem, rules_file, max_attempts, timeout_sec = args
+    t0 = time.time()
     result = solve_single_problem(
         problem['problem_text'],
         rules_file,
@@ -225,6 +254,9 @@ def _solve_problem_entry(args: Tuple[Dict, str, int, int]) -> Dict:
         timeout_sec=timeout_sec,
     )
     result['problem_id'] = problem['problem_id']
+    # 兜底写入单题总耗时（从 worker 入口到返回），用于并行主进程逐题打印
+    if result.get("elapsed_sec") is None:
+        result["elapsed_sec"] = time.time() - t0
     return result
 
 
@@ -287,6 +319,8 @@ def solve_problems_batch(
         tasks = [(p, rules_file, max_attempts, timeout_sec) for p in problems]
         print(f"[并行] 使用 {backend} 池，workers={workers}")
         t_all = time.time()
+        last_heartbeat = t_all
+        heartbeat_sec = 5.0
         with Executor(max_workers=int(workers)) as ex:
             futures = {}
             for i, task in enumerate(tasks):
@@ -314,14 +348,30 @@ def solve_problems_batch(
                         'problem_id': problem_id,
                     }
 
+                # 每题完成立即输出：题目名称/ID + 单题耗时
+                pid = result.get('problem_id') or problem_id or '?'
+                elapsed_sec = result.get('elapsed_sec')
+                try:
+                    elapsed_str = f"{float(elapsed_sec):.1f}s" if elapsed_sec is not None else "?s"
+                except Exception:
+                    elapsed_str = "?s"
+                print(f"[完成] {completed + 1}/{total}: {pid} 用时 {elapsed_str}")
+
                 results_buffer[i] = result
                 completed += 1
                 if result.get('success'):
                     solved_count += 1
 
-                # 以完成数量为准的进度心跳，避免“头阻塞”无输出
-                if completed % 10 == 0 or completed == total:
-                    print(f"[并行进度] 已完成 {completed}/{total}")
+                # 进度心跳：按时间 + 按完成数双保险，避免最后几题“长时间无输出”
+                now = time.time()
+                if completed == total or completed % 10 == 0 or (now - last_heartbeat) >= heartbeat_sec:
+                    elapsed = now - t_all
+                    rate = completed / elapsed if elapsed > 0 else 0.0
+                    remaining = total - completed
+                    eta = (remaining / rate) if rate > 0 else float('inf')
+                    eta_str = f"{eta:.0f}s" if eta != float('inf') else "?"
+                    print(f"[并行进度] 已完成 {completed}/{total} | solved={solved_count} | elapsed={elapsed:.1f}s | eta~{eta_str}")
+                    last_heartbeat = now
 
             # 将结果按原顺序汇总
             results = [r for r in results_buffer if r is not None]

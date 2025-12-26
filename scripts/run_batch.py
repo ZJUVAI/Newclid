@@ -24,27 +24,30 @@ if SRC_DIR not in sys.path:
 # 直接使用底层工具函数
 from newclid.solver_utils import solve_problems_batch  # type: ignore
 
-
+# OUTPUT_FILE_NAME = os.path.join(OUTPUTS_DIR, f"hageo_basic_try_results_600.json")
+# OUTPUT_FILE_NAME = os.path.join(OUTPUTS_DIR, f"hageo_try_short50_results.json")
+OUTPUT_FILE_NAME = os.path.join(OUTPUTS_DIR, f"hageo_results.json")
 # 集中超参（每项均附注释说明用途）
 CONFIG = {
-    "problems_file": os.path.join(REPO_DIR, "benchmarks", "dev_imo.txt"),
-    # "problems_file": os.path.join(REPO_DIR, "problems_datasets", "all_problems_selected.txt"),  # rules_basic_augment的题目集
-    # "problems_file": os.path.join(REPO_DIR, "problems_datasets", "all_problems_unsolved.txt"),  # rules_basic_augment的题目集
-
+    "problems_file": os.path.join(REPO_DIR, "benchmarks", "hageo_409.txt"),
+    # "problems_file": os.path.join(REPO_DIR, "benchmarks", "all_problems.txt"),  # rules_basic_augment的题目集
     "max_attempts": 100,               # 构建状态的最大尝试次数
-    "timeout": 3600,                     # 单题求解超时时间（秒）
+    "timeout": 120,                     # 单题求解超时时间（秒）
     "limit": None,                     # 仅求解前 N 题；None 表示不限制
-    "workers": 20,                      # 并行工作数；1 为串行，大于 1 则启用并行
+    "workers": 50,                      # 并行工作数；1 为串行，大于 1 则启用并行
     "backend": "process",            # 并行后端："process"（推荐）或 "thread"
-    # "rules_file": os.path.join(REPO_DIR, "src", "newclid", "default_configs", "rules.txt"), 
-    "rules_file": os.path.join(REPO_DIR, "src", "newclid", "default_configs", "rules_try.txt"), 
-    # "rules_file": os.path.join(REPO_DIR, "src", "newclid", "default_configs", "rules_augment.txt"), 
+    # "rules_file": os.path.join(REPO_DIR, "src", "newclid", "default_configs", "rules_imo.txt"), 
+    "rules_file": os.path.join(REPO_DIR, "src", "newclid", "default_configs", "rules.txt"), 
+    # "rules_file": os.path.join(REPO_DIR, "src", "newclid", "default_configs", "rules_try.txt"), 
+    # "rules_file": os.path.join(REPO_DIR, "src", "newclid", "default_configs", "rules_try_short.txt"), 
+    # "rules_file": os.path.join(REPO_DIR, "src", "newclid", "default_configs", "rules_basic.txt"), 
+    # "rules_file": os.path.join(REPO_DIR, "src", "newclid", "default_configs", "rules_basic_try.txt"), 
 }
 
 
 def _write_results_json(src_problems: str, stats: dict) -> str:
     base = os.path.splitext(os.path.basename(src_problems))[0]
-    out_json = os.path.join(OUTPUTS_DIR, f"{base}.results.json")
+    out_json = OUTPUT_FILE_NAME
     with open(out_json, "w", encoding="utf-8") as f:
         import json
         json.dump(stats, f, ensure_ascii=False, indent=2)
