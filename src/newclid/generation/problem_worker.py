@@ -5,7 +5,7 @@ from newclid.proof import ProofState
 from newclid.statement import Statement
 from newclid.formulations.problem import ProblemJGEX
 from newclid.formulations.definition import DefinitionJGEX
-from newclid.formulations.clause import translate_sentence
+from newclid.formulations.clause import translate_sentence, Clause
 from newclid.dependencies.symbols import Point
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.dependencies.dependency import Dependency, IN_PREMISES, NUMERICAL_CHECK
@@ -15,9 +15,9 @@ from newclid.numerical.draw_figure import draw_with_mapping
 import logging
 import re
 import itertools
+import signal
 import string
 import time
-import signal
 from contextlib import contextmanager
 from collections import defaultdict
 import ray
@@ -88,6 +88,10 @@ class GeometryProblemWorker:
             # img = True
             # aux_only = False
             # start_time = time.time()
+            # remove_coords = False
+            # draw_annotations = True
+
+            print(f"problem: {fl_statement}")
 
             # Build solver
             solver, solver_builder = GeometryProblemWorker._build_solver(
@@ -100,7 +104,6 @@ class GeometryProblemWorker:
             n_clauses = len(fl_statement.split(';'))
             csolver = CSolver(fl_statement, seed=seed,
                               solver=solver, using_log=True)
-            # print(f"problem: {fl_statement}")
 
             # Run solver
             csolver.run(max_level=max_level)
@@ -111,33 +114,50 @@ class GeometryProblemWorker:
 
             # Process goals
             # first, group goals by problem key
-            eq_predicates_goals = dict()
+            # eq_predicates_goals = dict()
+            eq_clauses_goals = dict()
             for goal in possible_goals:
                 # find essential_clauses
-                _, premises, _, _, _, aux, _, _, _ = solver.proof.dep_graph.get_proof_steps([
+                points, _, _, _, aux_points, _, _, _, _ = solver.proof.dep_graph.get_proof_steps([
                     goal])
-                if aux_only and len(aux) == 0:
+                if aux_only and len(aux_points) == 0:
                     continue
-                premises = [dep.statement for dep in premises]
-                aux = [dep.statement for dep in aux]
-                predicates = sorted([statement.to_str()
-                                    for statement in premises + aux])
-                predicates = '; '.join(sorted([statement.to_str() for statement in premises])) + \
-                    ' $$ ' + \
-                    '; '.join(sorted([statement.to_str()
-                              for statement in aux]))
-                eq_predicates_goals.setdefault(
-                    predicates, []).append((goal, premises, aux))
+
+                # premises = [dep.statement for dep in premises]
+                # aux = [dep.statement for dep in aux]
+                # predicates = sorted([statement.to_str()
+                #                     for statement in premises + aux])
+                # predicates = '; '.join(sorted([statement.to_str() for statement in premises])) + \
+                #     ' $$ ' + \
+                #     '; '.join(sorted([statement.to_str()
+                #               for statement in aux]))
+                # eq_predicates_goals.setdefault(
+                #     predicates, []).append((goal, premises, aux))
+                
+                premise_clauses, aux_clauses = GeometryProblemWorker._get_clauses_from_points(
+                    points, aux_points, solver_builder.problemJGEX
+                )
+                clauses_str = '; '.join([str(c) for c in premise_clauses]) + ' $$ ' + \
+                    '; '.join([str(c) for c in aux_clauses])
+                eq_clauses_goals.setdefault(clauses_str, []).append(goal)
+
 
             # then, process goal groups
             process_goal_time = time.time()
             generated_data = []
-            for _, goal_list in eq_predicates_goals.items():
-                goals = [data[0] for data in goal_list]
-                premises = goal_list[0][1]
-                aux = goal_list[0][2]
+            # for _, goal_list in eq_predicates_goals.items():
+            #     goals = [data[0] for data in goal_list]
+            #     premises = goal_list[0][1]
+            #     aux = goal_list[0][2]
+            #     data = GeometryProblemWorker._process_goals_with_same_statement(
+            #         goals, solver, solver_builder, premises, aux, n_clauses, img, aux_only, draw_annotations)
+            #     generated_data.extend(data)
+            # process_goal_time = time.time() - process_goal_time
+            for clauses_str, goal_list in eq_clauses_goals.items():
+                goals = [data for data in goal_list]
+                premise_clauses_str, aux_clauses_str = clauses_str.split(' $$ ')
                 data = GeometryProblemWorker._process_goals_with_same_statement(
-                    goals, solver, solver_builder, premises, aux, n_clauses, img, aux_only, draw_annotations)
+                    goals, solver, solver_builder, premise_clauses_str, aux_clauses_str, n_clauses, img, aux_only, draw_annotations)
                 generated_data.extend(data)
             process_goal_time = time.time() - process_goal_time
 
@@ -162,6 +182,25 @@ class GeometryProblemWorker:
             import traceback
             traceback.print_exc()
             return [], {}
+
+    @staticmethod
+    def _get_clauses_from_points(
+        points: set[Point],
+        aux_points: set[Point],
+        problemJGEX: ProblemJGEX,
+    ) -> tuple[list[Clause], list[Clause]]:
+        premise_clauses_set = set([p.clause for p in points])
+        aux_clauses_set = set([p.clause for p in aux_points])
+        if premise_clauses_set & aux_clauses_set:
+            raise Exception("Premise and aux clauses overlap.")
+        premise_clauses: list[Clause] = []
+        aux_clauses: list[Clause] = []
+        for clause in problemJGEX.constructions:
+            if clause in premise_clauses_set:
+                premise_clauses.append(clause)
+            if clause in aux_clauses_set:
+                aux_clauses.append(clause)
+        return premise_clauses, aux_clauses
 
     @staticmethod
     def _build_solver(fl_statement, max_attempts=1):
@@ -255,27 +294,38 @@ class GeometryProblemWorker:
         #         continue
 
     @staticmethod
-    def _find_minimal_aux_clauses_new(solver, solver_builder, goals_str, premises, aux, aux_only):
+    def _find_minimal_aux_clauses_new(solver, solver_builder, goals_str, premise_clauses_str, aux_clauses_str, aux_only):
         """Find minimal auxiliary clause set"""
         # Iterate through all possible subsets to find the minimal necessary auxiliary clause set
         # Search through subsets from size 0 to len-1 (excluding full set)
+        if premise_clauses_str == '':
+            raise Exception("Premise clauses cannot be empty.")
         results = []
-        for r in range(len(aux)):
-            for aux_subset in itertools.combinations(aux, r):
-                proof_state = ProofState.build_predicates(
-                    predicates=premises + list(aux_subset),
-                    defsJGEX=solver_builder.defs,
-                    goals_str=goals_str,
-                    rng=np.random.default_rng(solver_builder.seed)
-                )
-                solver_test = GeometricSolver(
-                    proof_state,
-                    solver_builder.rules,
-                    DDARN()
-                )
+        aux_clause_strs = aux_clauses_str.split('; ') if aux_clauses_str else []
+        for r in range(len(aux_clause_strs)):
+            for aux_strs_subset in itertools.combinations(aux_clause_strs, r):
+                # proof_state = ProofState.build_predicates(
+                #     predicates=premises + list(aux_subset),
+                #     defsJGEX=solver_builder.defs,
+                #     goals_str=goals_str,
+                #     rng=np.random.default_rng(solver_builder.seed)
+                # )
+                # solver_test = GeometricSolver(
+                #     proof_state,
+                #     solver_builder.rules,
+                #     DDARN()
+                # )
+                # csolver_test = CSolver(
+                #     problem='', solver=solver_test, using_log=True)
+                # the element order of aux_strs_subset is the same as the relative order
+                # in aux_clauses_str, so we can directly join with '; '
                 csolver_test = CSolver(
-                    problem='', solver=solver_test, using_log=True)
+                    problem=premise_clauses_str + (' ; ' if r > 0 else '') + '; '.join(aux_strs_subset),
+                    using_log=True,
+                    using_exp=False,
+                )
                 csolver_test.run()
+                solver_test = csolver_test.solver
                 for goal in solver_test.goals:
                     # if found new solutions
                     if goal.check():
@@ -306,7 +356,7 @@ class GeometryProblemWorker:
         return results
 
     @staticmethod
-    def _process_goals_with_same_statement(goals, solver, solver_builder, premises, aux, n_clauses, img, aux_only, draw_annotations=True):
+    def _process_goals_with_same_statement(goals, solver, solver_builder, premise_clauses_str, aux_clauses_str, n_clauses, img, aux_only, draw_annotations=True):
         """Process a single goal"""
 
         results = []
@@ -315,8 +365,8 @@ class GeometryProblemWorker:
             solver,
             solver_builder,
             [goal.to_str() for goal in goals],
-            premises,
-            aux,
+            premise_clauses_str,
+            aux_clauses_str,
             aux_only
         )
 
@@ -326,12 +376,24 @@ class GeometryProblemWorker:
             solver_new.proof.goals = [goal_new]
 
             # get new proof
-            points, premises, _, _, aux_points, aux, _, _, proof_steps = solver_new.proof.dep_graph.get_proof_steps([
-                goal_new])
+            (
+                points,
+                premises,
+                numerical_checked_premises,
+                trivial_premises,
+                aux_points,
+                aux,
+                numerical_checked_aux,
+                trivial_aux,
+                proof_steps
+            ) = solver_new.proof.dep_graph.get_proof_steps([goal_new])
             if aux_only and len(aux) == 0:
-                logging.warning(
-                    "aux_only == True but still generate result with no aux.")
                 continue
+
+            premise_clauses, aux_clauses = GeometryProblemWorker._get_clauses_from_points(
+                points, aux_points, solver_builder.problemJGEX
+            )
+
             all_premises = [dep.statement for dep in premises + aux]
             n_premises = len(all_premises)
 
@@ -343,15 +405,27 @@ class GeometryProblemWorker:
 
             # llm data generation
             llm_renamed, mapping = GeometryProblemWorker.llm_solution_renamed(
-                solver_builder.problemJGEX, solver_new.proof)
+                premise_clauses,
+                points,
+                premises,
+                numerical_checked_premises,
+                trivial_premises,
+                aux_clauses,
+                aux_points,
+                aux,
+                numerical_checked_aux,
+                trivial_aux,
+                proof_steps,
+                solver_new.proof,
+            )
 
             if len(aux_points) > 0 and not GeometryProblemWorker.filter.aux_predicates_valid_check(llm_renamed['llm_output']):
                 continue
 
             result = {
-                "n_clauses": n_clauses,
+                "n_clauses": len(premise_clauses),
                 "n_premises": n_premises,
-                "fl_problem": str(solver_builder.problemJGEX) + goal_new.to_str(),
+                "fl_problem": '; '.join([str(c) for c in premise_clauses]) + ' ? ' + goal_new.to_str(),
                 "nl_problem": "",
                 "n_proof_steps": n_proof_steps,
                 "llm_input_renamed": llm_renamed['llm_input'],
@@ -411,41 +485,56 @@ class GeometryProblemWorker:
         return f"{conclusion_str} [{dep_idx[conclusion_str]}] {rule_id} {premise_ids}".strip()
 
     @staticmethod
-    def llm_solution_renamed(problem: ProblemJGEX, proof_state: ProofState) -> dict:
+    def llm_solution_renamed(
+        premise_clauses: list[Clause],
+        points: set[Point],
+        premises: list[Dependency],
+        numerical_checked_premises: list[Dependency],
+        trivial_premises: list[Dependency],
+        aux_clauses: list[Clause],
+        aux_points: set[Point],
+        aux: list[Dependency],
+        numerical_checked_aux: list[Dependency],
+        trivial_aux: list[Dependency],
+        proof_steps: list[Dependency],
+        proof_state: ProofState,
+    ) -> dict:
         """Refactored main method to generate LLM solution with renamed points"""
         try:
             # Initialize data
             dep_idx: dict[str, str] = {}
             goals = [goal for goal in proof_state.goals if goal.check()]
-            (
-                points,
-                premises,
-                numercial_checked_premises,
-                trivial_premises,
-                aux_points_list,
-                aux,
-                numercial_checked_aux,
-                trivial_aux,
-                proof_steps,
-            ) = proof_state.dep_graph.get_proof_steps(goals)
 
             # Get all premises and essential premises/points
-            all_premises = GeometryProblemWorker._get_all_premise(
-                problem, proof_state)
-            essential_points, essential_aux_points, essential_premises = GeometryProblemWorker._get_essential_points_and_premise(
-                premises+aux, proof_state.dep_graph.proof_deps(goals), points, aux_points_list)
+            all_premises = GeometryProblemWorker._get_all_premise(premise_clauses, proof_state)
+            all_aux = GeometryProblemWorker._get_all_premise(aux_clauses, proof_state)
+            # essential_points, essential_aux_points, essential_premises = GeometryProblemWorker._get_essential_points_and_premise(
+            #     premises+aux, proof_state.dep_graph.proof_deps(goals), points, aux_points_list)
 
             # Create point name mapping
-            mp = GeometryProblemWorker._create_point_mapping(
-                essential_points, essential_aux_points, essential_premises, all_premises)
+            # mp = GeometryProblemWorker._create_point_mapping(
+            #     essential_points, essential_aux_points, essential_premises, all_premises)
+            
+            mp: dict[str, str] = {}
+            for clause in premise_clauses:
+                for p in clause.points:
+                    p_name = p.split('@')[0]
+                    if p_name in mp:
+                        raise ValueError("Duplicated definition of point.")
+                    mp[p_name] = GeometryProblemWorker._get_apha_geo_solver_var(len(mp))
+            for p in aux_points:
+                if p.name in mp:
+                    raise ValueError("Premise points and aux points overlap")
+                mp[p.name] = GeometryProblemWorker._get_apha_geo_solver_var(len(mp))
+                    
 
             # Generate each section
             data_problem = GeometryProblemWorker._generate_problem_section(
-                mp, dep_idx, essential_points, essential_premises, all_premises, goals)
+                mp, dep_idx, points, all_premises, premises, goals, 0)
             data_aux = GeometryProblemWorker._generate_aux_section(
-                mp, dep_idx, essential_aux_points, essential_premises, all_premises)
+                mp, dep_idx, aux_points, aux, all_aux)
             numerical_check = GeometryProblemWorker._generate_numerical_check_section(
-                mp, dep_idx, numercial_checked_premises, numercial_checked_aux)
+                mp, dep_idx, numerical_checked_premises, numerical_checked_aux)
             trivial_check = GeometryProblemWorker._generate_trivial_section(
                 mp, dep_idx, trivial_premises, trivial_aux)
             proof = GeometryProblemWorker._generate_proof_section(
@@ -460,9 +549,6 @@ class GeometryProblemWorker:
         except Exception as e:
             import traceback
             traceback.print_exc()
-            print(essential_points)
-            print(essential_aux_points)
-            print(essential_premises)
             print(mp)
             print(all_premises)
             raise
@@ -488,10 +574,10 @@ class GeometryProblemWorker:
         return " ".join(res)
 
     @staticmethod
-    def _get_all_premise(problem, proof_state):
+    def _get_all_premise(clauses, proof_state):
         """Get all premises from the problem constructions"""
         data_tmp = defaultdict(list)
-        for construction in problem.constructions:
+        for construction in clauses:
             group = {}
             p2deps = defaultdict(list)
             points_in_basic_order = []
@@ -576,30 +662,39 @@ class GeometryProblemWorker:
         return mp
 
     @staticmethod
-    def _generate_problem_section(mp, dep_idx, essential_points, essential_premises, all_premise, goals):
-        """Generate problem description section"""
+    def _generate_problem_section(mp, dep_idx, essential_points, all_premise, essential_premises, goals, prune_level=0):
+        """
+        Generate problem description section
+        
+        prune_level:
+            0: keep all premises and points
+            1: remove useless premises, free useless points
+            2: remove useless premises, remove useless points
+        """
         string_premise = []
         for k, v in all_premise.items():
-            if any(p in essential_points for p in k.split(' ')):
-                tmp_string = ""
+            tmp_string = ""
+            if any(p in essential_points for p in k.split(' ')) or prune_level < 2:
                 for dep in v:
-                    if dep in essential_premises:  # only select useful premise and free points withou useful premises
+                    if dep in essential_premises or prune_level == 0:
+                        # only select useful premise and free points withou useful premises
                         dep_str_renamed = GeometryProblemWorker._statement2str_with_mapping(
                             dep, mp)
                         if dep_str_renamed not in dep_idx:
                             dep_idx[dep_str_renamed] = f"{len(dep_idx):03d}"
                         tmp_string += dep_str_renamed + \
                             f' [{dep_idx[dep_str_renamed]}] '
-                if tmp_string == "":
+            if tmp_string == "" :
+                if prune_level < 2:
                     # if this premise is useless, free all useful points in it
                     for p in k.split(' '):
                         if p in mp:
                             string_premise.append(mp[p] + " : ")
-                else:
-                    k_renamed = " ".join(mp[p]
-                                         for p in k.split(' ') if p in mp)
-                    tmp_string = k_renamed + ' : ' + tmp_string
-                    string_premise.append(tmp_string)
+            else:
+                k_renamed = " ".join(mp[p]
+                                        for p in k.split(' ') if p in mp)
+                tmp_string = k_renamed + ' : ' + tmp_string
+                string_premise.append(tmp_string)
         data_problem = '<problem> '
         data_problem += ' ; '.join([s.strip()
                                    for s in string_premise]) + ' ? '
