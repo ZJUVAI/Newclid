@@ -45,7 +45,9 @@ public:
 
     virtual std::vector<std::string> to_tokens() const;
 
-    virtual std::vector<std::unique_ptr<Equation>> as_equation(bool log, bool exp) const { return {}; }
+    virtual std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp, ObjectTable *table) const { return {}; }
+    virtual std::vector<std::unique_ptr<Equation>> as_equation_dist(bool exp, ObjectTable *table) const { return {}; }
+    virtual std::vector<std::unique_ptr<Equation>> as_equation_distlog(bool exp, ObjectTable *table) const { return {}; }
 
     virtual bool operator==(const Statement &other) const
     {

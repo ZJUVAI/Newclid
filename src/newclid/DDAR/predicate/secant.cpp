@@ -70,7 +70,7 @@ Coll Secant::coll_pab() const
     return Coll(_p, _a, _b);
 }
 
-vector<unique_ptr<Equation>> Secant::as_equation(bool log, bool exp) const
+vector<unique_ptr<Equation>> Secant::as_equation_dist(bool exp, ObjectTable *table) const
 {
     vector<unique_ptr<Equation>> result;
     if (!exp)
@@ -78,19 +78,19 @@ vector<unique_ptr<Equation>> Secant::as_equation(bool log, bool exp) const
         return result;
     }
 
-    Term pab({Dist(_p, _a), Dist(_p, _b)});
-    Term oa2({Dist(_o, _a), Dist(_o, _a)});
-    Term ob2({Dist(_o, _b), Dist(_o, _b)});
-    Term op2({Dist(_o, _p), Dist(_o, _p)});
+    Term pab({Dist(_p, _a), Dist(_p, _b)}, table);
+    Term oa2({Dist(_o, _a), Dist(_o, _a)}, table);
+    Term ob2({Dist(_o, _b), Dist(_o, _b)}, table);
+    Term op2({Dist(_o, _p), Dist(_o, _p)}, table);
     if (Coll(_a, _p, _b).is_between())
     {
-        result.push_back(make_unique<Equation>(Equation({oa2, -op2, -pab})));
-        result.push_back(make_unique<Equation>(Equation({ob2, -op2, -pab})));
+        result.push_back(make_unique<Equation>(Equation({oa2, -op2, -pab}, table)));
+        result.push_back(make_unique<Equation>(Equation({ob2, -op2, -pab}, table)));
     }
     else
     {
-        result.push_back(make_unique<Equation>(Equation({oa2, -op2, pab})));
-        result.push_back(make_unique<Equation>(Equation({ob2, -op2, pab})));
+        result.push_back(make_unique<Equation>(Equation({oa2, -op2, pab}, table)));
+        result.push_back(make_unique<Equation>(Equation({ob2, -op2, pab}, table)));
     }
 
     return result;

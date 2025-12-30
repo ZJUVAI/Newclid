@@ -55,6 +55,21 @@ bool Theorem::check_numerically() const
     return check_hypotheses_numerically() && check_conclusions_numerically();
 }
 
+void Theorem::print() const
+{
+    cout << _name << endl;
+    cout << "Hypotheses: " << endl;
+    for (const auto &stmt : _hypotheses)
+    {
+        cout << *stmt << endl;
+    }
+    cout << "Conclusions: " << endl;
+    for (const auto &stmt : _conclusions)
+    {
+        cout << *stmt << endl;
+    }
+}
+
 Theorem &Theorem::add_hypothesis(unique_ptr<Statement> stmt)
 {
     _hypotheses.emplace_back(move(stmt->normalize()));

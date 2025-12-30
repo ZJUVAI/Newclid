@@ -52,9 +52,9 @@ ostream &Para::print(ostream &os) const
     return os << _left.left() << _left.right() << " ∥ " << _right.left() << _right.right();
 }
 
-vector<unique_ptr<Equation>> Para::as_equation(bool log, bool exp) const
+vector<unique_ptr<Equation>> Para::as_equation_slope(bool exp, ObjectTable *table) const
 {
     vector<unique_ptr<Equation>> result;
-    result.push_back(make_unique<Equation>(Equation({Term(_left), -Term(_right)})));
+    result.push_back(make_unique<Equation>(Equation({Term(_left, table), -Term(_right, table)}, table)));
     return result;
 }
