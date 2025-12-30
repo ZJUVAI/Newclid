@@ -34,6 +34,8 @@ public:
 
     bool check_numerically() const;
 
+    void print() const;
+
     Theorem &add_hypothesis(std::unique_ptr<Statement> stmt);
     Theorem &add_conclusion(std::unique_ptr<Statement> stmt);
 
