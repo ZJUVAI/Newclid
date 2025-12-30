@@ -93,7 +93,7 @@ class GeometryProblemWorker:
             # remove_coords = False
             # draw_annotations = True
 
-            print(f"problem: {fl_statement}")
+            # print(f"problem: {fl_statement}")
 
             # Build solver
             solver, solver_builder = GeometryProblemWorker._build_solver(
