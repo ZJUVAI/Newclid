@@ -67,9 +67,9 @@ void LinearSystem::print_equations() const
     }
 }
 
-void LinearSystem::add_reduced_equation(Proof *pf)
+void LinearSystem::add_reduced_equation(Proof *pf, string type)
 {
-    auto eqs = pf->reduced_equations();
+    auto eqs = pf->reduced_equations(type);
 
     for (auto &eq : eqs)
     {

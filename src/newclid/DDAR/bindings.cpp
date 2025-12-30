@@ -78,7 +78,7 @@ extern "C"
         //     const std::vector<StatementTokens> &dependencies = std::get<1>(tupleElem);
         //     const std::string &reason = std::get<2>(tupleElem);
 
-        //     if (reason == "Numerical Check")
+        //     if (reason == "Numerical Check" || reason == "Trivial")
         //     {
         //         continue;
         //     }
