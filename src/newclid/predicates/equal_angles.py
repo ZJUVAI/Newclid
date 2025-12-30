@@ -187,7 +187,12 @@ class EqAngle(Predicate):
                 point0 = args[i + 1]
             point1 = args[i + 1] if point0 == args[i] else args[i]
             point2 = args[i + 3] if point0 == args[i + 2] else args[i + 2]   
-            r = rng.random() * 0.1 + 0.1
+            xlim = ax.get_xlim()
+            ylim = ax.get_ylim()
+            figure_width = xlim[1] - xlim[0]
+            figure_height = ylim[1] - ylim[0]
+            figure_size = max(figure_width, figure_height)
+            r = figure_size * rng.random() * 0.1 + 0.1
             width = r * 0.1  
             if draw_annotations:
                 draw_angle(ax, point0, point1, point2, color=color, alpha=0.5, width=width, r=r)

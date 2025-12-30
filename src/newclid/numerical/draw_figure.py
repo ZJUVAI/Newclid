@@ -3,21 +3,24 @@ from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Collection, Optional, Union
 from adjustText import adjust_text
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
+from numpy.random import Generator
 
 import numpy as np
+import matplotlib.patches as patches
 
 from newclid.numerical.geometries import (
     PointNum,
     intersect,
 )
 from newclid.dependencies.symbols import Point, Circle, Line
+from newclid.formulations.clause import Clause, translate_sentence
+from newclid.formulations.definition import DefinitionJGEX
 from newclid.numerical.geometries import CircleNum
-import matplotlib.patches as patches
-from numpy.random import Generator
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure
 
 if TYPE_CHECKING:
+    from newclid.dependencies.dependency_graph import DependencyGraph
     from newclid.proof import ProofState
     from newclid.statement import Statement
 
@@ -114,6 +117,7 @@ def draw_with_mapping(
 
     segment_parent: dict[tuple[str, str], tuple[str, str]] = {}
     segment_colors: dict[tuple[str, str], int] = {}
+    figure_sizes: list = []
     for statement in statements:
         if statement.predicate.NAME == 'cong':
             statement.predicate.draw(
@@ -123,6 +127,7 @@ def draw_with_mapping(
                 rng,
                 segment_parent,
                 segment_colors,
+                figure_sizes,
                 draw_annotations,
             )
         else:
@@ -135,7 +140,6 @@ def draw_with_mapping(
         goal.draw(ax, rng, draw_annotations)
 
     adjust_text(point_names, ax=ax)
-
 
 def fill_missing(d0: dict[Any, Any], d1: dict[Any, Any]):
     for k in d1.keys():
