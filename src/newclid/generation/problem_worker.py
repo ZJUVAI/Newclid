@@ -764,7 +764,7 @@ class GeometryProblemWorker:
             )
         if len(renamed_basic_strs_with_idx) == 0:
             return ''
-        return '<aux> ' + ' ; '.join(renamed_basic_strs_with_idx) + ' </aux>'
+        return '<aux> ' + ' ; '.join(renamed_basic_strs_with_idx) + ' </aux> '
 
     @staticmethod
     def _generate_numerical_check_section(mp, dep_idx, numercial_checked_premises, numercial_checked_aux):
