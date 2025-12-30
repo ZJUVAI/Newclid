@@ -1,13 +1,12 @@
 #include "ar/equation.hpp"
 #include "ar/equation_index.hpp"
-#include "type/pi.hpp"
 #include "ar/term.hpp"
 
 using namespace std;
 
-Equation::Equation(vector<Term> terms) : _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))})
+Equation::Equation(vector<Term> terms, ObjectTable *table) : _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))}), _table(std::move(table))
 {
-    for (const auto &term : terms)
+    for (auto &term : terms)
     {
         auto it = std::find(_terms.begin(), _terms.end(), term);
 
@@ -25,7 +24,7 @@ Equation::Equation(vector<Term> terms) : _combination({std::make_pair(1.0, Equat
 
 Equation &Equation::operator+=(const Equation &other)
 {
-    for (const auto &term : other._terms)
+    for (auto &term : other._terms)
     {
         bool merged = false;
         for (auto &my_term : _terms)

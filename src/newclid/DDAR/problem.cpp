@@ -37,12 +37,12 @@ void Problem::clear()
     this->_name.clear();
 }
 
-PointNum Problem::add_point(const string &name, double x, double y)
+void Problem::add_point(const string &name, double x, double y)
 {
     Point p(name, x, y);
     _points.push_back(p);
     sort(_points.begin(), _points.end());
-    return p.num();
+    return;
 }
 
 void Problem::set_name(const string &name)

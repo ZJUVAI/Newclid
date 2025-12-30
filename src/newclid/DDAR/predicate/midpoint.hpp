@@ -5,7 +5,6 @@
 #include "predicate/cong.hpp"
 #include "predicate/coll.hpp"
 #include "type/point.hpp"
-#include "type/product.hpp"
 
 class Midp : public Statement
 {

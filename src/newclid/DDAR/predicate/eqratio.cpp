@@ -1,6 +1,7 @@
 #include "predicate/eqratio.hpp"
 #include "typedef.hpp"
 #include "type/dist.hpp"
+#include "type/distlog.hpp"
 #include <algorithm>
 #include <iostream>
 
@@ -80,16 +81,19 @@ ostream &EqRatio::print(ostream &os) const
     return os << _left_up << ":" << _left_down << " = " << _right_up << ":" << _right_down;
 }
 
-vector<unique_ptr<Equation>> EqRatio::as_equation(bool log, bool exp) const
+vector<unique_ptr<Equation>> EqRatio::as_equation_dist(bool exp, ObjectTable *table) const
 {
     vector<unique_ptr<Equation>> result;
     if (exp)
     {
-        result.push_back(make_unique<Equation>(Equation({Term({_left_up, _right_down}), -Term({_left_down, _right_up})})));
+        result.push_back(make_unique<Equation>(Equation({Term({_left_up, _right_down}, table), -Term({_left_down, _right_up}, table)}, table)));
     }
-    if (log)
-    {
-        result.push_back(make_unique<Equation>(Equation({Term(DistLog(_left_up)), Term(DistLog(_right_down)), -Term(DistLog(_left_down)), -Term(DistLog(_right_up))})));
-    }
+    return result;
+}
+
+vector<unique_ptr<Equation>> EqRatio::as_equation_distlog(bool exp, ObjectTable *table) const
+{
+    vector<unique_ptr<Equation>> result;
+    result.push_back(make_unique<Equation>(Equation({Term(DistLog(_left_up), table), Term(DistLog(_right_down), table), -Term(DistLog(_left_down), table), -Term(DistLog(_right_up), table)}, table)));
     return result;
 }

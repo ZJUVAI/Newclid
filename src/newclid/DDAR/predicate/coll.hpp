@@ -3,7 +3,6 @@
 
 #include "predicate/statement.hpp"
 #include "predicate/eqratio.hpp"
-#include "type/product.hpp"
 #include "typedef.hpp"
 #include <set>
 
@@ -66,7 +65,8 @@ public:
 
     bool operator<(const Coll &other) const;
 
-    std::vector<std::unique_ptr<Equation>> as_equation(bool log, bool exp) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation_dist(bool exp, ObjectTable *table) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp, ObjectTable *table) const override;
 
     Coll reverse() const;
 };

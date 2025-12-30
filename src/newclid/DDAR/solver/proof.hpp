@@ -16,7 +16,9 @@ enum class ProofState : uint8_t
     PROVED_BY_ASSUMPTION,
     PROVED_NUMERICALLY,
     PROVED_TRIVIAL,
-    PROVED_AR,
+    PROVED_AR_DIST,
+    PROVED_AR_SLOPE,
+    PROVED_AR_DISTLOG,
     PROVED_BY_THEOREM,
 };
 
@@ -48,8 +50,6 @@ public:
 
     void set_theorem(size_t index);
 
-    bool needs_aux() const;
-
     void set_proved(ProofState state);
 
     void print_equations() const;
@@ -58,9 +58,21 @@ public:
 
     const DDARSolver *solver() const { return _solver; }
 
-    std::vector<ReducedEquation *> reduced_equations() const
+    std::vector<ReducedEquation *> reduced_equations(std::string type) const
     {
-        return _eqn;
+        if (type == "dist")
+        {
+            return _eqn_dist;
+        }
+        if (type == "distlog")
+        {
+            return _eqn_distlog;
+        }
+        if (type == "slope")
+        {
+            return _eqn_slope;
+        }
+        return {};
     }
 
 private:
@@ -69,7 +81,9 @@ private:
     size_t _theoremId;
     ProofState _state{ProofState::NOT_PROVED};
     std::set<Point> _point_dependencies;
-    std::vector<ReducedEquation *> _eqn;
+    std::vector<ReducedEquation *> _eqn_dist;
+    std::vector<ReducedEquation *> _eqn_slope;
+    std::vector<ReducedEquation *> _eqn_distlog;
     ReducedEquation *_dep;
 };
 

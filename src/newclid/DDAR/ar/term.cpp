@@ -1,58 +1,77 @@
 #include "ar/term.hpp"
-#include "typedef.hpp"
+#include "solver/object_table.hpp"
+#include <iomanip>
+#include <unordered_map>
 #include <map>
 
 using namespace std;
 
-Term::Term(const std::vector<term_arg> &vars, const Rational &coeff) : _coeff(coeff)
+Term::Term(const std::vector<TermArg> &vars, const Rational &coeff, ObjectTable *table) : _coeff(coeff), _table(table)
 {
     for (const auto &var : vars)
     {
         _vars[var] += 1;
     }
+    update();
 }
 
-Term::Term(const term_arg &var, const Rational &coeff) : _coeff(coeff)
+Term::Term(const TermArg &var, const Rational &coeff, ObjectTable *table) : _coeff(coeff), _table(table)
 {
     _vars[var] += 1;
+    update();
 }
 
-Term::Term(const Rational &coeff) : _coeff(coeff)
+Term::Term(const Rational &coeff, ObjectTable *table) : _coeff(coeff), _table(table)
 {
 }
 
-Term::Term(const std::vector<term_arg> &vars) : _coeff(1)
+Term::Term(const std::vector<TermArg> &vars, ObjectTable *table) : _coeff(1), _table(table)
 {
     for (const auto &var : vars)
     {
         _vars[var] += 1;
     }
+    update();
 }
 
-Term::Term(const term_arg &var) : _coeff(1)
+Term::Term(const TermArg &var, ObjectTable *table) : _coeff(1), _table(table)
 {
     _vars[var] += 1;
+    update();
 }
 
-Term::Term() : _coeff(1)
+Term::Term(ObjectTable *table) : _coeff(1), _table(table)
 {
 }
 
-Term Term::gcd(const Term &other) const
+Term Term::gcd(Term &other) const
 {
-    Term res;
-    for (const auto &pair : _vars)
+    update();
+    other.update();
+    Term res(1, _table);
+    for (const auto &[arg, exp] : _vars)
     {
-        if (other._vars.count(pair.first))
+        auto it = other._vars.find(arg);
+        if (it != other._vars.end())
         {
-            res._vars[pair.first] = std::min(pair.second, other._vars.at(pair.first));
+            res._vars[arg] = std::min(exp, it->second);
         }
     }
+    for (const auto &[obj, exp] : _actual_vars)
+    {
+        auto it = other._actual_vars.find(obj);
+        if (it != other._actual_vars.end())
+        {
+            res._actual_vars[obj] = std::min(exp, it->second);
+        }
+    }
+    res._version = _version;
     return res;
 }
 
 Term Term::operator*(const Rational &multiplier) const
 {
+    update();
     Term res = *this;
     res._coeff *= multiplier;
     return res;
@@ -60,6 +79,7 @@ Term Term::operator*(const Rational &multiplier) const
 
 Term Term::operator/(const Rational &divisor) const
 {
+    update();
     Term res = *this;
     res._coeff /= divisor;
     return res;
@@ -67,55 +87,127 @@ Term Term::operator/(const Rational &divisor) const
 
 Term &Term::operator*=(const Rational &multiplier)
 {
+    update();
     _coeff *= multiplier;
     return *this;
 }
 
 Term &Term::operator/=(const Rational &divisor)
 {
+    update();
     _coeff /= divisor;
     return *this;
 }
 
 Term Term::operator*(const Term &other) const
 {
-    Term res = *this;
-    res._coeff *= other._coeff;
-    for (const auto &pair : other._vars)
+    update();
+    other.update();
+
+    Term res(_coeff * other._coeff, _table);
+
+    for (const auto &[term, exp] : _vars)
     {
-        res._vars[pair.first] += pair.second;
-        if (res._vars[pair.first] == 0)
+        res._vars[term] += exp;
+        if (res._vars[term] == 0)
         {
-            res._vars.erase(pair.first);
+            res._vars.erase(term);
         }
     }
+    for (const auto &[term, exp] : other._vars)
+    {
+        res._vars[term] += exp;
+        if (res._vars[term] == 0)
+        {
+            res._vars.erase(term);
+        }
+    }
+    for (const auto &[obj, exp] : _actual_vars)
+    {
+        res._actual_vars[obj] += exp;
+        if (res._actual_vars[obj] == 0)
+        {
+            res._actual_vars.erase(obj);
+        }
+    }
+    for (const auto &[obj, exp] : other._actual_vars)
+    {
+        res._actual_vars[obj] += exp;
+        if (res._actual_vars[obj] == 0)
+        {
+            res._actual_vars.erase(obj);
+        }
+    }
+
+    res._version = _version;
+
     return res;
 }
 
 Term Term::operator/(const Term &other) const
 {
-    Term res = *this;
-    res._coeff /= other._coeff;
-    for (const auto &pair : other._vars)
+    update();
+    other.update();
+
+    Term res(_coeff * other._coeff, _table);
+
+    for (const auto &[term, exp] : _vars)
     {
-        res._vars[pair.first] -= pair.second;
-        if (res._vars[pair.first] == 0)
+        res._vars[term] += exp;
+        if (res._vars[term] == 0)
         {
-            res._vars.erase(pair.first);
+            res._vars.erase(term);
         }
     }
+    for (const auto &[term, exp] : other._vars)
+    {
+        res._vars[term] -= exp;
+        if (res._vars[term] == 0)
+        {
+            res._vars.erase(term);
+        }
+    }
+    for (const auto &[obj, exp] : _actual_vars)
+    {
+        res._actual_vars[obj] += exp;
+        if (res._actual_vars[obj] == 0)
+        {
+            res._actual_vars.erase(obj);
+        }
+    }
+    for (const auto &[obj, exp] : other._actual_vars)
+    {
+        res._actual_vars[obj] -= exp;
+        if (res._actual_vars[obj] == 0)
+        {
+            res._actual_vars.erase(obj);
+        }
+    }
+
+    res._version = _version;
+
     return res;
 }
 
 Term &Term::operator*=(const Term &other)
 {
+    update();
+    other.update();
     _coeff *= other._coeff;
-    for (const auto &pair : other._vars)
+    for (const auto &[term, exp] : other._vars)
     {
-        _vars[pair.first] += pair.second;
-        if (_vars[pair.first] == 0)
+        _vars[term] += exp;
+        if (_vars[term] == 0)
         {
-            _vars.erase(pair.first);
+            _vars.erase(term);
+        }
+    }
+    for (const auto &[obj, exp] : other._actual_vars)
+    {
+        _actual_vars[obj] += exp;
+        if (_actual_vars[obj] == 0)
+        {
+            _actual_vars.erase(obj);
         }
     }
     return *this;
@@ -123,13 +215,23 @@ Term &Term::operator*=(const Term &other)
 
 Term &Term::operator/=(const Term &other)
 {
-    _coeff /= other._coeff;
-    for (const auto &pair : other._vars)
+    update();
+    other.update();
+    _coeff *= other._coeff;
+    for (const auto &[term, exp] : other._vars)
     {
-        _vars[pair.first] -= pair.second;
-        if (_vars[pair.first] == 0)
+        _vars[term] -= exp;
+        if (_vars[term] == 0)
         {
-            _vars.erase(pair.first);
+            _vars.erase(term);
+        }
+    }
+    for (const auto &[obj, exp] : other._actual_vars)
+    {
+        _actual_vars[obj] -= exp;
+        if (_actual_vars[obj] == 0)
+        {
+            _actual_vars.erase(obj);
         }
     }
     return *this;
@@ -137,6 +239,8 @@ Term &Term::operator/=(const Term &other)
 
 Term Term::operator+(const Term &other) const
 {
+    update();
+    other.update();
     if (_vars != other._vars)
     {
         throw runtime_error("Terms are not compatible");
@@ -148,6 +252,8 @@ Term Term::operator+(const Term &other) const
 
 Term &Term::operator+=(const Term &other)
 {
+    update();
+    other.update();
     if (_vars != other._vars)
     {
         throw runtime_error("Terms are not compatible");
@@ -158,12 +264,20 @@ Term &Term::operator+=(const Term &other)
 
 Term Term::operator-() const
 {
+    update();
     Term res = *this;
     res._coeff = -res._coeff;
     return res;
 }
+
 void Term::normalize()
 {
+    if (_coeff == 0)
+    {
+        _vars.clear();
+        _actual_vars.clear();
+        return;
+    }
     for (auto it = _vars.begin(); it != _vars.end();)
     {
         if (it->second == 0)
@@ -175,18 +289,71 @@ void Term::normalize()
             ++it;
         }
     }
+    for (auto it = _actual_vars.begin(); it != _actual_vars.end();)
+    {
+        if (it->second == 0)
+        {
+            it = _actual_vars.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
 }
 
-void Term::round()
+void Term::update() const
 {
-    while (_coeff > 1)
+    if (!_table || _vars.empty() || _version == _table->version())
     {
-        _coeff -= 1;
+        return;
     }
-    while (_coeff < 0)
+    _actual_vars.clear();
+
+    unordered_map<Object *, TermArg> min_arg_map;
+
+    for (const auto &[arg, exponent] : _vars)
     {
-        _coeff += 1;
+        Object *obj = _table->get_or_create_obj(arg);
+        if (!obj)
+        {
+            continue;
+        }
+        _actual_vars[obj] += exponent;
+        auto it = min_arg_map.find(obj);
+        if (it == min_arg_map.end())
+        {
+            min_arg_map[obj] = arg;
+        }
+        else if (arg < it->second)
+        {
+            it->second = arg;
+        }
     }
+
+    for (auto it = _actual_vars.begin(); it != _actual_vars.end();)
+    {
+        if (it->second == 0)
+        {
+            it = _actual_vars.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    _vars.clear();
+    for (const auto &[obj, exponent] : _actual_vars)
+    {
+        if (exponent != 0)
+        {
+            TermArg min_arg = min_arg_map[obj];
+            _vars[min_arg] = exponent;
+        }
+    }
+
+    _version = _table->version();
 }
 
 int Term::degree() const
@@ -202,6 +369,10 @@ int Term::degree() const
 double Term::to_double() const
 {
     double res = _coeff.to_double();
+    // for (const auto &pair : _actual_vars)
+    // {
+    //     res *= pow(pair.first->to_double(), pair.second);
+    // }
     for (const auto &pair : _vars)
     {
         res *= pow(pair.first.to_double(), pair.second);
@@ -228,7 +399,9 @@ string Term::to_string() const
 
 bool Term::contain(const Term &other) const
 {
-    for (const auto &pair : other._vars)
+    update();
+    other.update();
+    for (auto &pair : other._vars)
     {
         if (_vars.count(pair.first) == 0)
         {
@@ -244,36 +417,55 @@ bool Term::contain(const Term &other) const
 
 bool Term::operator==(const Term &other) const
 {
-    return _vars == other._vars;
+    update();
+    other.update();
+    return _actual_vars == other._actual_vars;
 }
 
 bool Term::operator<(const Term &other) const
 {
-    return _vars < other._vars;
+    update();
+    other.update();
+    return _actual_vars < other._actual_vars;
 }
 
 bool Term::operator>(const Term &other) const
 {
-    return _vars > other._vars;
+    return other < *this;
 }
 
 bool Term::operator<=(const Term &other) const
 {
-    return _vars <= other._vars;
+    return !(other < *this);
 }
 
 bool Term::operator>=(const Term &other) const
 {
-    return _vars >= other._vars;
+    return !(*this < other);
 }
 
 bool Term::operator!=(const Term &other) const
 {
-    return _vars != other._vars;
+    return !(*this == other);
 }
 
 ostream &operator<<(ostream &os, const Term &term)
 {
+    term.update();
     os << term.to_string();
     return os;
+}
+
+size_t Term::hash() const
+{
+    std::size_t seed = std::hash<std::string>{}(_coeff.to_string());
+    update();
+    for (const auto &[obj, exp] : _actual_vars)
+    {
+        std::size_t h1 = std::hash<Object *>{}(obj);
+        std::size_t h2 = std::hash<int>{}(exp);
+        seed ^= h1 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        seed ^= h2 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    }
+    return seed;
 }

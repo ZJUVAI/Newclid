@@ -51,10 +51,10 @@ ostream &RConst::print(ostream &os) const
     return os << _left << ":" << _right << " = " << _ratio;
 }
 
-vector<unique_ptr<Equation>> RConst::as_equation(bool log, bool exp) const
+vector<unique_ptr<Equation>> RConst::as_equation_dist(bool exp, ObjectTable *table) const
 {
     vector<unique_ptr<Equation>> result;
-    result.push_back(make_unique<Equation>(Equation({Term(_left), -Term(_right, _ratio)})));
+    result.push_back(make_unique<Equation>(Equation({Term(_left, table), -Term(_right, _ratio, table)})));
     return result;
 }
 

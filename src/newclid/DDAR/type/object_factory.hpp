@@ -1,0 +1,4 @@
+#ifndef OBJECT_FACTORY_HPP
+#define OBJECT_FACTORY_HPP
+
+#endif // OBJECT_FACTORY_HPP
