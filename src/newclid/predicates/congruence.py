@@ -137,7 +137,9 @@ class Cong(Predicate):
         rng: Generator,
         segment_parent: Optional[dict[tuple[str, str], tuple[str, str]]] = None,
         segment_colors: Optional[dict[tuple[str, str], int]] = None,
+        figure_sizes: list = [],
         draw_annotations: bool = True,
+        
     ):
         # Draw original segments
         for i in range(0, len(args), 2):
@@ -212,11 +214,15 @@ class Cong(Predicate):
             perpendicular = direction.rot90()
             
             # Get current axis limits to determine figure size
-            xlim = ax.get_xlim()
-            ylim = ax.get_ylim()
-            figure_width = xlim[1] - xlim[0]
-            figure_height = ylim[1] - ylim[0]
-            figure_size = max(figure_width, figure_height)
+            if len(figure_sizes) > 0:
+                figure_size = figure_sizes[0]
+            else:
+                xlim = ax.get_xlim()
+                ylim = ax.get_ylim()
+                figure_width = xlim[1] - xlim[0]
+                figure_height = ylim[1] - ylim[0]
+                figure_size = max(figure_width, figure_height)
+                figure_sizes.append(figure_size)
             
             # Set slash parameters proportional to figure size
             slash_length = figure_size * 0.015  # 1.5% of figure size

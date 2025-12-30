@@ -1,4 +1,5 @@
 from newclid.agent.ddarn import DDARN
+from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulator
 from newclid.generation.goal_filter import GeometryGoalFilter
 from newclid.generation.summary import Summary, get_first_predicate
 from newclid.proof import ProofState
@@ -12,6 +13,7 @@ from newclid.dependencies.dependency import Dependency, IN_PREMISES, NUMERICAL_C
 from newclid.configs import default_defs_path
 from newclid.api import GeometricSolver, GeometricSolverBuilder, CSolver
 from newclid.numerical.draw_figure import draw_with_mapping
+from newclid.numerical.draw_clause_figure import draw_clauses
 import logging
 import re
 import itertools
@@ -91,7 +93,7 @@ class GeometryProblemWorker:
             # remove_coords = False
             # draw_annotations = True
 
-            # print(f"problem: {fl_statement}")
+            print(f"problem: {fl_statement}")
 
             # Build solver
             solver, solver_builder = GeometryProblemWorker._build_solver(
@@ -345,7 +347,7 @@ class GeometryProblemWorker:
             # #     continue
 
             # llm data generation
-            llm_renamed, mapping, n_premises, n_proof_steps = GeometryProblemWorker.llm_solution_renamed(
+            llm_renamed, clause2basics, clauses, mapping, n_premises, n_proof_steps = GeometryProblemWorker.llm_solution_renamed(
                 solver_builder.problemJGEX, solver_new.proof)
             
             if aux_only and 'aux' not in llm_renamed['llm_output']:
@@ -353,6 +355,17 @@ class GeometryProblemWorker:
 
             if 'aux' in llm_renamed['llm_output'] and not GeometryProblemWorker.filter.aux_predicates_valid_check(llm_renamed['llm_output']):
                 continue
+
+            expected_dsl = problem_to_dsl(ProblemJGEX.from_text(llm_renamed['fl_problem']), GeometryProblemWorker.defs)
+            actual_dsl = llm_renamed['llm_input']
+            error_msg = (
+                f"\n{'='*20} DSL Conversion Mismatch {'='*20}\n"
+                f"Problem: {llm_renamed['fl_problem']}\n"
+                f"--- [ACTUAL] ---\n{actual_dsl}\n"
+                f"--- [EXPECTED] ---\n{expected_dsl}\n"
+                f"{'='*50}"
+            )
+            assert actual_dsl == expected_dsl, error_msg
 
             result = {
                 # "n_clauses": n_clauses,
@@ -366,19 +379,30 @@ class GeometryProblemWorker:
 
             if img:
                 fig = deepcopy(solver_new.proof.fig)
-                draw_with_mapping(
+                draw_clauses(
                     fig.axes[0],
-                    solver_new.proof.symbols_graph.names2points(
-                        list(set(mapping.keys()) & set(
-                            [p.name for p in points]))
-                    ),
-                    [premise.statement for premise in premises],
+                    clauses,
+                    GeometryProblemWorker.defs,
                     goal_new,
                     np.random.default_rng(solver_builder.seed),
+                    solver_new.proof.dep_graph,
                     mapping,
-                    draw_annotations,
+                    True,
                 )
                 result["fig"] = fig
+
+                fig_no_annotations = deepcopy(solver_new.proof.fig)
+                draw_clauses(
+                    fig_no_annotations.axes[0],
+                    clauses,
+                    GeometryProblemWorker.defs,
+                    goal_new,
+                    np.random.default_rng(solver_builder.seed),
+                    solver_new.proof.dep_graph,
+                    mapping,
+                    False,
+                )
+                result["fig_no_annotations"] = fig_no_annotations
 
             results.append(result)
         return results
@@ -387,10 +411,10 @@ class GeometryProblemWorker:
     def _rediger_new_format(dep, mp, dep_idx) -> str:
         """Generate proof step in new format: statement [id] rule_id [required_statement_ids]"""
         for statement in (dep.statement,) + dep.why:
-            statemtn_str = GeometryProblemWorker._statement2str_with_mapping(
+            statement_str = GeometryProblemWorker._statement2str_with_mapping(
                 statement, mp)
-            if statemtn_str not in dep_idx:
-                dep_idx[statemtn_str] = f"{len(dep_idx):03d}"
+            if statement_str not in dep_idx:
+                dep_idx[statement_str] = f"{len(dep_idx):03d}"
 
         # Extract rule ID from reason string and handle special cases
         reason = dep.reason
@@ -497,15 +521,14 @@ class GeometryProblemWorker:
                 "fl_problem": data_problem_clauses,
                 "llm_input": data_problem,
                 "llm_output": data_aux + numerical_check + trivial_check + proof,
-            }, mp, n_premises, len(proof_steps)
+            }, clause2basics, essential_premise_clauses, mp, n_premises, len(proof_steps)
 
         except Exception as e:
             import traceback
             traceback.print_exc()
             print(f"clauses_without_coords: {clauses_without_coords}")
             print(f"clause2basics: {clause2basics}")
-            print(f"essential_clauses: {essential_clauses}")
-            print(f"essential_premises: {essential_premises}")
+            print(f"essential_clauses: {essential_premise_clauses}")
             print(f"essential_aux_basics: {essential_aux_basics}")
             print(f"mp: {mp}")
             raise
@@ -660,9 +683,14 @@ class GeometryProblemWorker:
         goals: list[Statement],
     ) -> str:
         """Generate problem clauses section"""
+        dep_graph = DependencyGraph(AlgebraicManipulator())
         renamed_clauses = [clause.renamed(mp) for clause in essential_premise_clauses]
         renamed_goal_strs = [
-            GeometryProblemWorker._statement2str_with_mapping(goal, mp) for goal in goals
+            Statement.from_tokens(
+                translate_sentence(mp, goal.to_str().split(' ')),
+                dep_graph,
+            ).to_str() 
+            for goal in goals
         ]
         return '; '.join([str(clause) for clause in renamed_clauses]) + ' ? ' + \
             '; '.join(renamed_goal_strs)
@@ -677,23 +705,34 @@ class GeometryProblemWorker:
     ):
         """Generate problem predicates section"""
         renamed_basic_strs_with_idx: list[str] = []
+        dep_graph = DependencyGraph(AlgebraicManipulator())
         for clause in clauses:
             basics = clause2basics[clause]
             for points, bs in basics:
                 predicate_strs_with_idx: list[str] = []
                 for b in bs:
-                    statemtn_str = GeometryProblemWorker._statement2str_with_mapping(
-                        b, mp)
-                    assert statemtn_str not in dep_idx
-                    if statemtn_str not in dep_idx:
-                        dep_idx[statemtn_str] = f"{len(dep_idx):03d}"
+                    # leverage preparsing in Statement.from_tokens to ensure format
+                    statement_str = Statement.from_tokens(
+                        translate_sentence(mp, b.to_str().split(' ')),
+                        dep_graph,
+                    ).to_str()
+                    assert statement_str not in dep_idx
+                    if statement_str not in dep_idx:
+                        dep_idx[statement_str] = f"{len(dep_idx):03d}"
                     predicate_strs_with_idx.append(
-                        f"{statemtn_str} [{dep_idx[statemtn_str]}]")
-                renamed_basic_strs_with_idx.append(
-                    ' '.join([mp[p] for p in points]) + ' : ' + ', '.join(predicate_strs_with_idx)
-                )
+                        f"{statement_str} [{dep_idx[statement_str]}]")
+                if len(predicate_strs_with_idx) > 0:
+                    renamed_basic_strs_with_idx.append(
+                        ' '.join([mp[p] for p in points]) + ' : ' + ' '.join(predicate_strs_with_idx)
+                    )
+                else:
+                    renamed_basic_strs_with_idx.append(' '.join([mp[p] for p in points]) + ' :')
         renamed_goal_strs = [
-            GeometryProblemWorker._statement2str_with_mapping(goal, mp) for goal in goals
+            Statement.from_tokens(
+                translate_sentence(mp, goal.to_str().split(' ')),
+                dep_graph,
+            ).to_str()
+            for goal in goals
         ]
         return '<problem> ' + ' ; '.join(renamed_basic_strs_with_idx) + ' ? ' + \
             '; '.join(renamed_goal_strs) + ' </problem>'
@@ -706,16 +745,20 @@ class GeometryProblemWorker:
     ):
         """Generate auxiliary information section"""
         renamed_basic_strs_with_idx: list[str] = []
+        dep_graph = DependencyGraph(AlgebraicManipulator())
         for points, bs in aux_basics:
             predicate_strs_with_idx: list[str] = []
             for b in bs:
-                statemtn_str = GeometryProblemWorker._statement2str_with_mapping(
-                    b, mp)
-                assert statemtn_str not in dep_idx
-                if statemtn_str not in dep_idx:
-                    dep_idx[statemtn_str] = f"{len(dep_idx):03d}"
+                # leverage preparsing in Statement.from_tokens to ensure format
+                statement_str = Statement.from_tokens(
+                    translate_sentence(mp, b.to_str().split(' ')),
+                    dep_graph,
+                ).to_str()
+                assert statement_str not in dep_idx
+                if statement_str not in dep_idx:
+                    dep_idx[statement_str] = f"{len(dep_idx):03d}"
                 predicate_strs_with_idx.append(
-                    f"{statemtn_str} [{dep_idx[statemtn_str]}]")
+                    f"{statement_str} [{dep_idx[statement_str]}]")
             renamed_basic_strs_with_idx.append(
                 ' '.join([mp[p] for p in points]) + ' : ' + ', '.join(predicate_strs_with_idx)
             )
@@ -730,30 +773,30 @@ class GeometryProblemWorker:
         numerical_check_items = []
         # numercial_checked_premises
         for line in numercial_checked_premises:
-            statemtn_str = instance._statement2str_with_mapping(
+            statement_str = instance._statement2str_with_mapping(
                 line.statement, mp)
-            if statemtn_str not in dep_idx:
-                dep_idx[statemtn_str] = f"{len(dep_idx):03d}"
+            if statement_str not in dep_idx:
+                dep_idx[statement_str] = f"{len(dep_idx):03d}"
         sorted_numercial_checked_premises = sorted(
             numercial_checked_premises, key=lambda line: dep_idx[instance._statement2str_with_mapping(line.statement, mp)])
         for line in sorted_numercial_checked_premises:
-            statemtn_str = instance._statement2str_with_mapping(
+            statement_str = instance._statement2str_with_mapping(
                 line.statement, mp)
             numerical_check_items.append(
-                f"{statemtn_str} [{dep_idx[statemtn_str]}]")
+                f"{statement_str} [{dep_idx[statement_str]}]")
         # numercial_checked_premises
         for line in numercial_checked_aux:
-            statemtn_str = instance._statement2str_with_mapping(
+            statement_str = instance._statement2str_with_mapping(
                 line.statement, mp)
-            if statemtn_str not in dep_idx:
-                dep_idx[statemtn_str] = f"{len(dep_idx):03d}"
+            if statement_str not in dep_idx:
+                dep_idx[statement_str] = f"{len(dep_idx):03d}"
         sorted_numercial_checked_aux = sorted(
             numercial_checked_aux, key=lambda line: dep_idx[instance._statement2str_with_mapping(line.statement, mp)])
         for line in sorted_numercial_checked_aux:
-            statemtn_str = instance._statement2str_with_mapping(
+            statement_str = instance._statement2str_with_mapping(
                 line.statement, mp)
             numerical_check_items.append(
-                f"{statemtn_str} [{dep_idx[statemtn_str]}]")
+                f"{statement_str} [{dep_idx[statement_str]}]")
         if len(numerical_check_items) > 0:
             numerical_check = "<numerical_check> " + \
                 " ; ".join(numerical_check_items) + \
@@ -769,30 +812,30 @@ class GeometryProblemWorker:
         trivial_items = []
         # trivial_premises
         for line in trivial_premises:
-            statemtn_str = instance._statement2str_with_mapping(
+            statement_str = instance._statement2str_with_mapping(
                 line.statement, mp)
-            if statemtn_str not in dep_idx:
-                dep_idx[statemtn_str] = f"{len(dep_idx):03d}"
+            if statement_str not in dep_idx:
+                dep_idx[statement_str] = f"{len(dep_idx):03d}"
         sorted_trivial_premises = sorted(
             trivial_premises, key=lambda line: dep_idx[instance._statement2str_with_mapping(line.statement, mp)])
         for line in sorted_trivial_premises:
-            statemtn_str = instance._statement2str_with_mapping(
+            statement_str = instance._statement2str_with_mapping(
                 line.statement, mp)
             trivial_items.append(
-                f"{statemtn_str} [{dep_idx[statemtn_str]}]")
+                f"{statement_str} [{dep_idx[statement_str]}]")
         # trivial_premises
         for line in trivial_aux:
-            statemtn_str = instance._statement2str_with_mapping(
+            statement_str = instance._statement2str_with_mapping(
                 line.statement, mp)
-            if statemtn_str not in dep_idx:
-                dep_idx[statemtn_str] = f"{len(dep_idx):03d}"
+            if statement_str not in dep_idx:
+                dep_idx[statement_str] = f"{len(dep_idx):03d}"
         sorted_trivial_aux = sorted(
             trivial_aux, key=lambda line: dep_idx[instance._statement2str_with_mapping(line.statement, mp)])
         for line in sorted_trivial_aux:
-            statemtn_str = instance._statement2str_with_mapping(
+            statement_str = instance._statement2str_with_mapping(
                 line.statement, mp)
             trivial_items.append(
-                f"{statemtn_str} [{dep_idx[statemtn_str]}]")
+                f"{statement_str} [{dep_idx[statement_str]}]")
         if len(trivial_items) > 0:
             trivial = "<trivial> " + \
                 " ; ".join(trivial_items) + \
@@ -812,3 +855,64 @@ class GeometryProblemWorker:
                     GeometryProblemWorker._rediger_new_format(line, mp, dep_idx))
         proof += " ; ".join(proof_steps_formatted) + " ; </proof>"
         return proof
+
+
+from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulator
+
+def problem_to_dsl(problem: "ProblemJGEX", defs: dict[str, DefinitionJGEX]) -> str:
+    """Convert the problem to a DSL string."""
+    dep_idx: dict[Statement, str] = {}
+    dep_graph = DependencyGraph(AlgebraicManipulator())
+    
+    data_tmp = defaultdict(list)
+    for construction in problem.constructions:
+        group = {}
+        p2deps = defaultdict(list)
+        for constr_sentence in construction.sentences:
+            cdef = defs[constr_sentence[0]]
+            if len(constr_sentence) == len(cdef.declare):
+                mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
+            else:
+                assert len(constr_sentence) + len(construction.points) == len(cdef.declare)
+                points = tuple(p.split('@')[0] for p in construction.points)
+                mapping = dict(zip(cdef.declare[1:], points + constr_sentence[1:]))
+            for points, bs in cdef.basics:
+                points = tuple([mapping[x] for x in points])
+                for p in points:
+                    group[p] = points
+                if len(bs) == 0:
+                    data_tmp[' '.join(points)] = []
+                for b in bs:
+                    statement = Statement.from_tokens(translate_sentence(mapping, b), dep_graph)
+                    p2deps[points].append(statement)
+                    data_tmp[' '.join(points)].append(statement)
+
+        # points = construction.points
+        # points = [p.split('@')[0] for p in points]
+        # while points:
+        #     p = points[0]
+        #     gr = group[p]
+        #     points = [x for x in points if x not in gr]
+
+        #     deps = []
+        #     for dep in p2deps[gr]:
+        #         deps.append(dep)
+        #     data_tmp[' '.join(gr)] = deps
+
+    # <problem> </problem>
+    data_problem = '<problem> '
+    string_premise = []
+    for k, v in data_tmp.items():
+        tmp_string = k + ' : '
+        for dep in v:
+            if dep not in dep_idx:
+                dep_idx[dep] = f"{len(dep_idx):03d}"
+            tmp_string += dep.to_str() + f' [{dep_idx[dep]}] '
+        string_premise.append(tmp_string)
+    data_problem += ' ; '.join([s.strip() for s in string_premise]) + ' ? '
+    data_problem += ' ; '.join([
+        Statement.from_tokens(goal, dep_graph).to_str()
+        for goal in problem.goals
+        ])
+    data_problem += ' </problem>'
+    return data_problem

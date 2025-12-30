@@ -12,6 +12,7 @@ import signal
 from contextlib import contextmanager
 import matplotlib.pyplot as plt
 from copy import deepcopy
+import cairosvg
 
 from newclid.configs import default_defs_path
 from newclid.formulations.definition import DefinitionJGEX
@@ -36,6 +37,21 @@ def time_limit(seconds):
     finally:
         signal.alarm(0)
 
+def convert_svg_to_png(svg_path, png_path, width=1024):
+    # Ensure the output directory exists
+    output_dir = os.path.dirname(png_path)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+
+    try:
+        cairosvg.svg2png(
+            url=svg_path,
+            write_to=png_path,
+            output_width=width
+        )
+    except Exception as e:
+        # Catch the exception, add context (filename), and re-raise it
+        raise RuntimeError(f"Failed to convert '{svg_path}' to PNG. Error: {str(e)}") from e
 
 class GeometryGenerator:
     def __init__(
@@ -98,20 +114,29 @@ class GeometryGenerator:
         if len(self.write_buffer) > 10000 or force:
             filename = self.path_prefix + ".jsonl"
             imgs_dir = os.path.join(self.output_dir, "imgs")
+            imgs_png_dir = os.path.join(self.output_dir, "imgs_png")
             os.makedirs(os.path.dirname(filename), exist_ok=True)
             os.makedirs(imgs_dir, exist_ok=True)
+            os.makedirs(imgs_png_dir, exist_ok=True)
             with open(filename, 'a', encoding='utf-8') as f:
                 for data_item in self.write_buffer:
                     self.data_count += 1
-                    data_item['fl_problem'] = ''
+                    # data_item['fl_problem'] = ''
                     if self.img:
-                        fig = deepcopy(data_item.pop('fig'))
-                        fig.savefig(
-                            os.path.join(imgs_dir, f"{self.data_count}.svg"),
-                            format='svg'
-                        )
-                        plt.close(fig)
-                        result_data = {'image_path': f"imgs_png/{self.data_count}.png", **data_item}
+                        paths_update = {}
+                        for key, suffix in [('fig', ''), ('fig_no_annotations', '_no_annotations')]:
+                            fig = deepcopy(data_item.pop(key))
+                            file_name = f"{self.data_count}{suffix}"
+                            svg_path = os.path.join(imgs_dir, f"{file_name}.svg")
+                            png_path = os.path.join(imgs_png_dir, f"{file_name}.png")
+                            
+                            fig.savefig(svg_path, format='svg')
+                            plt.close(fig)
+                            convert_svg_to_png(svg_path, png_path)
+                            
+                            paths_update[f'image_path{suffix}'] = png_path
+
+                        result_data = {**paths_update, **data_item}
                     else:
                         result_data = data_item
                     json.dump(result_data, f, ensure_ascii=False)
@@ -122,10 +147,13 @@ class GeometryGenerator:
         if self.clear:
             filename = self.path_prefix + ".jsonl"
             imgs_dir = os.path.join(self.output_dir, "imgs")
+            imgs_png_dir = os.path.join(self.output_dir, "imgs_png")
             if os.path.exists(filename):
                 os.remove(filename)
             if os.path.exists(imgs_dir):
                 shutil.rmtree(imgs_dir)
+            if os.path.exists(imgs_png_dir):
+                shutil.rmtree(imgs_png_dir)
 
         def task_generator():
             for i in range(10**9):

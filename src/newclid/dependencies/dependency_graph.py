@@ -5,7 +5,6 @@ import numpy as np
 from newclid.dependencies.dependency import IN_PREMISES, NUMERICAL_CHECK, TRIVIAL
 from newclid.dependencies.symbols import Point
 from newclid.dependencies.symbols_graph import SymbolsGraph
-from newclid.formulations.clause import Clause
 from pyvis.network import Network  # type: ignore
 from newclid.statement import Statement
 from newclid.predicates import NAME_TO_PREDICATE
@@ -162,38 +161,34 @@ class DependencyGraph:
     ]:
         proof_deps = self.proof_deps(goals)
 
-        points: Set[Point] = set()
-        premise_clauses: Set[Clause] = set()
+        possible_points: set[Point] = set()
         queue = deque()
 
         for goal in goals:
             for arg in goal.args:
                 if isinstance(arg, Point):
-                    if arg not in points:
-                        points.add(arg)
+                    if arg not in possible_points:
+                        possible_points.add(arg)
                         queue.append(arg)
 
         while queue:
             q = queue.popleft()
-            premise_clauses.add(q.clause)
+            for p in q.clause.points:
+                p_name = p.split('@')[0]
+                p_point = self.symbols_graph.names2points([p_name])[0]
+                if p_point not in possible_points:
+                    possible_points.add(p_point)
+                    queue.append(p_point)
             for p in q.rely_on:
-                if p not in points:
-                    points.add(p)
+                if p not in possible_points:
+                    possible_points.add(p)
                     queue.append(p)
 
-        possible_points: Set[Point] = set()
-        for clause in premise_clauses:
-            possible_points.update(
-                self.symbols_graph.names2points(
-                    [p.split('@')[0] for p in clause.points]
-                )
-            )
-
+        points: set[Point] = set()
         premises: list[Dependency] = []
         numerical_checked_premises: list[Dependency] = []
         trivial_premises: list[Dependency] = []
         aux_points: set[Point] = set()
-
         aux: list[Dependency] = []
         numerical_checked_aux: list[Dependency] = []
         trivial_aux: list[Dependency] = []
