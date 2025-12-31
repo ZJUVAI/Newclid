@@ -17,7 +17,7 @@ from typing import Optional
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_DIR = os.path.normpath(os.path.join(SCRIPT_DIR, ".."))                 # .../Newclid
 SRC_DIR = os.path.normpath(os.path.join(REPO_DIR, "src"))                   # .../Newclid/src
-OUTPUTS_DIR = os.path.join(REPO_DIR, "datasets")
+OUTPUTS_DIR = os.path.join(REPO_DIR, "datasets", "c10s50k")
 
 # 确保可以 import newclid.*
 if SRC_DIR not in sys.path:
@@ -27,13 +27,13 @@ from newclid.solver_utils import solve_problems_batch  # type: ignore
 
 # candidate_rules 目录（你刚刚生成的那批文件）
 CANDIDATE_RULES_DIR = os.path.join(
-    REPO_DIR, "src", "newclid", "default_configs", "candidate_rules"
+    REPO_DIR, "src", "newclid", "default_configs", "candidate_rules_c10s50k"
 )
 CANDIDATE_RULES_GLOB = os.path.join(CANDIDATE_RULES_DIR, "rules_*.txt")
 
 # 集中超参（每项均附注释说明用途）
 CONFIG = {
-    "problems_file": os.path.join(REPO_DIR, "benchmarks", "hageo_409.txt"),
+    "problems_file": os.path.join(REPO_DIR, "benchmarks", "hageo_224.txt"),
     "max_attempts": 100,               # 构建状态的最大尝试次数
     "timeout": 120,                    # 单题求解超时时间（秒）
     "limit": None,                     # 仅求解前 N 题；None 表示不限制
@@ -80,7 +80,7 @@ def _extract_candidate_id(path: str) -> str:
     若提取失败，fallback 为文件名去掉扩展名。
     """
     name = os.path.basename(path)
-    m = re.match(r"candidate_rules_(\d+)\.txt$", name)
+    m = re.match(r"rules_(\d+)\.txt$", name)
     if m:
         return m.group(1)
     return os.path.splitext(name)[0]
@@ -126,6 +126,8 @@ def main(_: Optional[list[str]] = None) -> None:
     # 逐个 candidate 跑同一题目集
     for rules_path in candidate_rules_files:
         cid = _extract_candidate_id(rules_path)
+        if int(cid) <= 121:
+            continue
         out_json = os.path.join(OUTPUTS_DIR, f"hageo_candidate_rules_{cid}_results.json")
         _solve_with_rules(src_problems=src_problems, rules_file=rules_path, out_json=out_json)
 
