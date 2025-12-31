@@ -600,10 +600,28 @@ class ProofGraph:
         output_pred = "null"
         
         for nid, node in self.nodes.items():
-            if node["type"] == "fact":
+            if node["type"] == "fact" and not node["is_aux"]:
                 # 入度为0 -> 输入
                 if not self._adj_in.get(nid):
-                    input_preds.append(node['label'])
+                    # 与 export_to_rule_format() 对齐：过滤掉会被导出阶段剔除的 trivial 前提
+                    label = node.get("label")
+                    args = node.get("args", [])
+                    if label == "cong" and len(args) == 4:
+                        if args[0] == args[2] and args[1] == args[3]:
+                            continue
+                    elif label == "eqangle" and len(args) == 8:
+                        if (
+                            args[0] == args[2]
+                            and args[1] == args[3]
+                            and args[4] == args[6]
+                            and args[5] == args[7]
+                        ):
+                            continue
+                    elif label == "sameclock" and len(args) == 6:
+                        if args[0] == args[3] and args[1] == args[4] and args[2] == args[5]:
+                            continue
+
+                    input_preds.append(label)
                 # 出度为0 -> 输出
                 if not self._adj_out.get(nid):
                     output_pred = node['label']
