@@ -81,7 +81,7 @@ class Coll(Predicate):
 
     @classmethod
     def draw(
-        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
+        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True
     ):
         for k in range(len(args) - 1):
             draw_segment(ax, args[k], args[k + 1])

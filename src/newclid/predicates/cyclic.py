@@ -77,7 +77,7 @@ class Cyclic(Predicate):
 
     @classmethod
     def draw(
-        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
+        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True
     ):
         c_num = CircleNum(
             p1=args[0].num,

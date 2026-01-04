@@ -26,6 +26,7 @@ from newclid.numerical.distances import (
     check_too_close_numerical,
 )
 
+MAX_TRY = 10
 
 BASIC = [
     'segment',
@@ -79,15 +80,13 @@ INTERSECT = [
 
 OTHER = [
     'circle',
-    'circumcenter',
+    # 'circumcenter',
     'eq_triangle',
     'eqangle2',
     'foot',
-    # 'incenter',
+    'incenter',
     'incenter2',
-    'incenter2',
-    # 'excenter',
-    'excenter2',
+    'excenter',
     'excenter2',
     'centroid',
     'ninepoints',
@@ -100,16 +99,16 @@ OTHER = [
     'intersection_tt',
     'midpoint',
     'mirror',
-    'nsquare',
+    # 'nsquare',
     'orthocenter',
     'parallelogram',
-    'psquare',
+    # 'psquare',
     'reflect',
-    'shift',
+    # 'shift',
     'square',
-    '2l1c',
-    'e5128',
-    '3peq',
+    # '2l1c',
+    # 'e5128',
+    # '3peq',
     'trisect',
     'trisegment',
     'cc_tangent',
@@ -236,10 +235,10 @@ class CompoundClauseGen:
             numerics.append(tuple(mapping[a] if a in mapping else a for a in n))
         return numerics
     
-    def _format_point_with_coords(self, point_name: str) -> str:
-        """Format point name with coordinates"""
-        p_num = self.symbols_graph.names2points([point_name])[0]
-        return f'{point_name}@{p_num.num.x}_{p_num.num.y}'
+    def _format_points_with_coords(self, point_names: list[str]) -> list[str]:
+        """Format multiple point names with coordinates"""
+        points = self.symbols_graph.names2points(point_names)
+        return [f'{p.name}@{p.num.x}_{p.num.y}' for p in points]
     
     def _calculate_max_level(self, construction_text: str) -> int:
         """Calculate maximum level from construction dependencies"""
@@ -274,26 +273,42 @@ class CompoundClauseGen:
         max_basic_clause = int(0.15 * length)
         res = []
         for clause_set in range(length):
-            new_clause2 = None
+            if clause_set == length - 1:
+                pass
             # step 1: add clause with basic 
             if len(res) == 0: 
-                new_clause = self.get_clause_with_n_constructions(BASIC, 1)
+                new_clauses = self._get_clauses(
+                    construction_candidates=BASIC,
+                    n_constructions=1,
+                    n_clauses=1,
+                )
             # step 2: add clause with basic (free) 
             # elif clause_set < max_basic_clause:
-            #     new_clause = self.get_clause_with_n_constructions(BASIC_FREE, 1)
+            #     new_clauses = self._get_clauses(
+            #         construction_candidates=BASIC_FREE,
+            #         n_constructions=1,
+            #         n_clauses=1,
+            #     )
             # step 3: add cluase with single constructions or two constructions
             else:
                 if random.random() < 0.5:
-                    new_clause, new_clause2 = self.get_clause_with_n_constructions(INTERSECT, 2)
+                    new_clauses = self._get_clauses(
+                        construction_candidates=INTERSECT,
+                        n_constructions=2,
+                        n_clauses=2,
+                        n_points=1,
+                    )
                 else:
-                    new_clause = self.get_clause_with_n_constructions(OTHER+INTERSECT+BASIC_FREE, 1)
-            if new_clause:
-                res.append(new_clause)
-                # Add auxiliary points if needed
-                if add_auxiliary:
-                    self._add_auxiliary_points_if_needed(new_clause, res[0], res)
-            if new_clause2:
-                res.append(new_clause2)
+                    new_clauses = self._get_clauses(
+                        construction_candidates=OTHER+INTERSECT+BASIC_FREE,
+                        n_constructions=1,
+                        n_clauses=1,
+                    )
+            res.extend(new_clauses)
+            # Add auxiliary points if needed
+            if new_clauses and add_auxiliary:
+                self._add_auxiliary_points_if_needed(new_clauses[0], res[0], res)
+            
         
         # Prune clauses if requested
         if prune:
@@ -308,268 +323,212 @@ class CompoundClauseGen:
         
         return output
 
-    def get_clause_with_n_constructions(self, construction_candidates, n: int):
-        try_count = 0
-        while try_count < 10:
-            try_count += 1
+    def _get_clauses(
+        self,
+        construction_candidates: list[str],
+        n_constructions: int,
+        n_clauses: int,
+        n_points: int = None,
+    ) -> list[str]:
+        """
+        Generate clauses using specified construction candidates.
+
+        Args:
+            construction_candidates: List of candidate construction types
+            n_constructions: Number of constructions to use per clause
+            n_clauses: Number of clauses to generate (with same constructions)
+            n_points: Number of new points to generate (optional). If None, determined by first construction.
+
+        Returns:
+            A list of generated clause strings
+        """
+        n_points_backup = n_points
+        for _ in range(MAX_TRY):
             try:
-                if n == 1:
-                    # Direct call to choose_construction_unified (standard mode)
-                    new_points, construction, numeric = self.choose_construction_unified(
-                        construction_candidates,
-                        new_points=None,
-                        rely_points=None,
-                        dual_solution=False
-                    )
-                    
-                    # check numerics by drawing diagram
-                    self.draw_diagram(new_points, numeric)
-                    self.point_generator.define_points(new_points)
-                    
-                    # calculate level and dependencies using extracted methods
-                    max_level = self._calculate_max_level(construction)
-                    rely_points = self._extract_rely_points(construction)
-                    
-                    # format output with coordinates
-                    new_points_str = [self._format_point_with_coords(p) for p in new_points]
-                    
-                    # update metadata
-                    for p in new_points:
-                        self.point_level[p] = max_level + 1
-                        self.point_rely[p] = rely_points
-                    
-                    return ' '.join(new_points_str) + " = " + construction
-                else:
-                    # multiple n_constructions shares the same new points (dual solution mode)
-                    new_points = self.point_generator.prefetch_points(2)
-                    constructions = []
-                    constructions2 = []
-                    numerics = []
-                    max_level = -1
-                    rely_points = set()
-                    rely_points2 = set()
-                    
-                    for _ in range(n):
-                        # Direct call to choose_construction_unified (dual solution mode)
-                        resA, resB = self.choose_construction_unified(
-                            construction_candidates,
-                            new_points=new_points,
-                            rely_points=None,
-                            dual_solution=True
-                        )
-                        
-                        _, construction, numeric = resA
-                        constructions.append(construction)
-                        numerics += numeric
-                        level = self._calculate_max_level(construction)
-                        max_level = max(max_level, level)
-                        rely_points.update(self._extract_rely_points(construction))
-                        
-                        _, construction, numeric = resB
-                        constructions2.append(construction)
-                        rely_points2.update(self._extract_rely_points(construction))
-                    
-                    # check numerics by drawing diagram for first point
-                    self.draw_diagram(new_points[0:1], numerics)
-                    self.point_generator.define_points(new_points[0:1])
-                    
-                    # format first point
-                    new_points_str = [self._format_point_with_coords(new_points[0])]
-                    self.point_level[new_points[0]] = max_level + 1
-                    self.point_rely[new_points[0]] = rely_points
-                    res1 = ' '.join(new_points_str) + " = " + ', '.join(constructions)
+                # Select constructions, map arguments, and extract numerics
+                # If n_points is None, it will be set by the first construction
+                selected_constructions, args_mappings, numeric_list, n_points = self._get_constructions(
+                    construction_candidates,
+                    n_constructions,
+                    n_points_backup,
+                )
+                # If unable to select enough constructions, retry
+                if len(selected_constructions) != n_constructions:
+                    continue
 
-                    # try to draw second point
-                    try:
-                        self.draw_diagram(new_points[1:2], numerics)
-                        self.point_generator.define_points(new_points[1:2])
-                    except Exception as e:
-                        return res1, None
-                    
-                    # format second point
-                    new_points_str = [self._format_point_with_coords(new_points[1])]
-                    self.point_level[new_points[1]] = max_level + 1
-                    self.point_rely[new_points[1]] = rely_points2
-                    res2 = ' '.join(new_points_str) + " = " + ', '.join(constructions2)
-
-                    return res1, res2
+                # Determine max level and rely points from argument mappings
+                # (same for all clauses with the same constructions)
+                max_level: int = -1
+                rely_points: set[str] = set()
+                for mapping in args_mappings:
+                    for arg in mapping.values():
+                        max_level = max(max_level, self.point_level.get(arg, -1))
+                        if arg in self.point_generator.defined_points:
+                            rely_points.add(arg)
                 
+                try:
+                    # Apply constructions to generate clauses,
+                    # update point levels and dependencies
+                    clause_strs = self._apply_constructions(
+                        selected_constructions,
+                        args_mappings,
+                        numeric_list,
+                        n_clauses,
+                        n_points,
+                        max_level,
+                        rely_points,
+                    )
+                except Exception as e:
+                    # If clause application fails, retry
+                    # May fail due to duplicate points, numerical issues, etc.
+                    logging.debug(f"Clause application failed: {e}")
+                    continue
+
+                return clause_strs
+
             except Exception as e:
+                logging.debug(f"Clause generation attempt failed: {e}")
                 continue
+        return []
+
+    def _get_constructions(
+        self,
+        construction_candidates: list[str],
+        n_constructions: int,
+        n_points: int,
+    ) -> tuple[list[str], list[dict[str, str]], list[tuple], int]:
+        """
+        Select constructions and map their arguments.
+
+        Args:
+            construction_candidates: List of candidate construction types
+            n_constructions: Number of constructions to select
+            n_points: Number of new points to generate (optional). If None, determined by first construction.
+
+        Returns:
+            A tuple of (selected_constructions, args_mappings, numeric_list, n_points)
+            selected_constructions: List of selected construction types
+            args_mappings: List of argument mappings for each construction
+            numeric_list: List of numerical constraints extracted
+            n_points: Number of new points to generate
+        """
+        selected_constructions: list[str] = []
+        args_mappings: list[dict[str, str]] = []
+        numeric_list: list[tuple] = []
+        for _ in range(n_constructions):
+            random_construction_candidates = construction_candidates.copy()
+            self.rng.shuffle(random_construction_candidates)
+            for construction in random_construction_candidates:
+                construction_def = self.defs[construction]
+
+                if n_points is None:
+                    # n_points not specified,
+                    # accept the point count of the first construction
+                    n_points = len(construction_def.points)
+                elif len(construction_def.points) != n_points:
+                    continue
+
+                if len(construction_def.args) > len(self.point_generator.defined_points):
+                    continue
+
+                args_mapping = self._map_args(
+                    construction_def,
+                    self.point_generator.defined_points,
+                )
+                if not self._validate_construction_requirements(construction_def, args_mapping):
+                    continue
+                numerics = self._extract_numerics(construction_def, args_mapping)
+
+                selected_constructions.append(construction)
+                args_mappings.append(args_mapping)
+                numeric_list.extend(numerics)
+
+                # Successfully selected a construction, break to select next
+                break
+        return selected_constructions, args_mappings, numeric_list, n_points
+    
+    def _apply_constructions(
+        self,
+        selected_constructions: list[str],
+        args_mappings: list[dict[str, str]],
+        numeric_list: list[tuple],
+        n_clauses: int,
+        n_points: int,
+        max_level: int,
+        rely_points: set[str],
+    ) -> list[str]:
+        """Apply selected constructions to generate clauses."""
+        clause_strs: list[str] = []
+        # Generate n_clauses clauses with the same constructions
+        for i in range(n_clauses):
+            try:
+                new_points = self.point_generator.prefetch_points(n_points)
+                # Check numerics by drawing diagram
+                self.draw_diagram(new_points, numeric_list)
+                self.point_generator.define_points(new_points)
+
+                # Update point levels and dependencies
+                for p in new_points:
+                    self.point_level[p] = max_level + 1
+                    self.point_rely[p] = rely_points
+
+                construction_strs: list[str] = []
+                for construction, mapping in zip(selected_constructions, args_mappings):
+                    mapping.update(dict(zip(self.defs[construction].points, new_points)))
+                    construction_strs.append(
+                        self.construction_text(self.defs[construction], mapping)
+                    )
+
+                    self._validate_construction_basics(
+                        self.defs[construction], mapping
+                    )
+
+                new_point_strs = self._format_points_with_coords(new_points)
+                clause_str = ' '.join(new_point_strs) + " = " + ', '.join(construction_strs)
+                clause_strs.append(clause_str)
+            except Exception as e:
+                if i == 0:
+                    # for the first clause, we must succeed
+                    raise e
+                else:
+                    # for subsequent clauses, we can skip on failure and return what we have
+                    logging.debug(f"Multiple clause generation attempt failed: {e}")
+                    break
+        return clause_strs
         
-        if n == 1:
-            return None
-        if n == 2:
-            return None, None
-            
-    def get_auxiliary_construction_clause(self, construction_type, rpoints):
+    def get_auxiliary_construction_clause(self, construction, rpoints):
         """
         Generate auxiliary construction clause with strict point order.
         
-        For auxiliary constructions, we don't need to call choose_construction_unified
-        because there's only one construction type and we need to preserve the exact
-        order of points as specified in AUXILIARY_POINT_RULES.
-        
         Args:
-            construction_type: A single construction type string (e.g., 'midpoint')
+            construction: A single construction type string (e.g., 'midpoint')
             rpoints: List of point names to use as construction arguments in exact order
             
         Returns:
             A string representing the auxiliary construction clause, or None if generation fails
         """
-        try_count = 0
-        while try_count < 10:
-            try_count += 1
-            try:
-                # Get the construction definition
-                construction_def = self.defs[construction_type]
-                
-                # Generate new point names
-                new_points = self.point_generator.prefetch_points(len(construction_def.points))
-                
-                # Create mapping directly with rpoints in exact order (no random.sample)
-                mapping = dict(zip(construction_def.points, new_points))
-                for i, arg in enumerate(construction_def.args):
-                    mapping[arg] = rpoints[i]
-                
-                # Validate construction requirements
-                if not self._validate_construction_requirements(construction_def, mapping):
-                    continue
-                if not self._validate_construction_basics(construction_def, mapping):
-                    continue
-                
-                # Extract numerics
-                numerics = self._extract_numerics(construction_def, mapping)
-                
-                # Verify numerics by drawing diagram
-                self.draw_diagram(new_points, numerics)
-                self.point_generator.define_points(new_points)
-                
-                # Calculate level and dependencies
-                construction_text = self.construction_text(construction_def, mapping)
-                max_level = self._calculate_max_level(construction_text)
-                rely_points_set = self._extract_rely_points(construction_text)
-                
-                # Format output with coordinates
-                new_points_str = [self._format_point_with_coords(p) for p in new_points]
-                
-                # Update metadata
-                for p in new_points:
-                    self.point_level[p] = max_level + 1
-                    self.point_rely[p] = rely_points_set
-                
-                return ' '.join(new_points_str) + " = " + construction_text
-                
-            except Exception as e:
-                continue
-        
-        return None
-    
-    def _try_create_construction_mapping(self, construction_def, available_points, target_points):
-        """
-        Try to create and validate a construction mapping.
-        
-        Returns:
-            Tuple of (mapping, numerics) if successful, (None, None) otherwise
-        """
-        mapping = self.map_points(construction_def, available_points, target_points)
-        
-        # validate construction
-        if not self._validate_construction_requirements(construction_def, mapping):
-            return None, None
-        if not self._validate_construction_basics(construction_def, mapping):
-            return None, None
-        
-        # extract numerics
-        numerics = self._extract_numerics(construction_def, mapping)
-        return mapping, numerics
-    
-    def _handle_dual_solution(self, construction_def, new_points, mapping, numerics):
-        """
-        Handle dual solution mode by creating second mapping.
-        
-        Returns:
-            Tuple of (resA, resB) if successful, (None, None) otherwise
-        """
-        resA = [new_points[0:1], self.construction_text(construction_def, mapping), numerics]
-        
-        # create mapping for second point by replacing target point name
-        old_point, new_point = new_points
-        for k, v in mapping.items():
-            if v == old_point:
-                mapping[k] = new_point
-                break
-        
-        # validate construction for second point
-        if not self._validate_construction_requirements(construction_def, mapping):
-            return None, None
-        if not self._validate_construction_basics(construction_def, mapping):
-            return None, None
-        
-        # extract numerics for second point
-        numerics_b = self._extract_numerics(construction_def, mapping)
-        resB = [new_points[1:2], self.construction_text(construction_def, mapping), numerics_b]
-        
-        return resA, resB
-    
-    def choose_construction_unified(self, construction_candidates, new_points=None, 
-                                   rely_points=None, dual_solution=False):
-        """
-        Unified construction selection method.
-        
-        Args:
-            construction_candidates: List of candidate construction types
-            new_points: Pre-generated point names (optional)
-            rely_points: Specific points to use for mapping (optional, uses defined_points if None)
-            dual_solution: If True, generate two solutions (mappingA and mappingB)
-        
-        Returns:
-            If dual_solution=False: (new_points, construction_text, numerics)
-            If dual_solution=True: (resA, resB) where each res is [new_points, construction_text, numerics]
-        """
-        random_construction_candidates = construction_candidates.copy()
-        self.rng.shuffle(random_construction_candidates)
-        
-        for construction in random_construction_candidates:
+        try:
             construction_def = self.defs[construction]
-
-            # create new point if new_points is None
-            if not new_points:
-                new_points = self.point_generator.prefetch_points(len(construction_def.points))
-
-            # determine available points for mapping
-            available_points = rely_points if rely_points is not None else self.point_generator.defined_points
+            args_mapping = dict(zip(construction_def.args, rpoints))
+            if not self._validate_construction_requirements(construction_def, args_mapping):
+                raise Exception("Requirement validation failed.")
+            numerics = self._extract_numerics(construction_def, args_mapping)
             
-            # check number of points based on mode
-            if dual_solution:
-                # dual solution mode: only use first point initially
-                if len(construction_def.points) != len(new_points[0:1]):
-                    continue
-            else:
-                if len(construction_def.points) != len(new_points):
-                    continue
-            
-            if len(construction_def.args) > len(available_points):
-                continue
-
-            # create mapping for first point (or only point in standard mode)
-            target_points = new_points[0:1] if dual_solution else new_points
-            mapping, numerics = self._try_create_construction_mapping(
-                construction_def, available_points, target_points
+            clause_str = self._apply_constructions(
+                selected_constructions=[construction],
+                args_mappings=[args_mapping],
+                numeric_list=numerics,
+                n_clauses=1,
+                n_points=len(construction_def.points),
+                max_level=max([self.point_level[p] for p in rpoints]),
+                rely_points=set(rpoints),
             )
+
+            return clause_str[0]
             
-            if mapping is None:
-                continue
-            
-            # handle dual solution mode
-            if dual_solution:
-                resA, resB = self._handle_dual_solution(construction_def, new_points, mapping, numerics)
-                if resA is not None:
-                    return resA, resB
-            else:
-                return new_points, self.construction_text(construction_def, mapping), numerics
-        
-        raise ConstructionError("No valid construction found.")
+        except Exception as e:
+            logging.debug(f"Auxiliary construction generation failed: {e}")
+            return None
     
     def draw_diagram(self, new_points, numerics,):
         def draw_fn() -> tuple[PointNum, ...]:
@@ -608,20 +567,20 @@ class CompoundClauseGen:
         for p, num in zip(_new_points, _new_numerical_point):
             p.num = num 
     
-    def map_points(self, construction_def, defined_points, new_points):
-        # mapping point to new points
-        mapping = dict(zip(construction_def.points, new_points))
-        # mapping args to predefined_points
-        if construction_def.declare[0] in ['s_angle']:
+    def _map_args(
+        self,
+        construction_def: DefinitionJGEX,
+        defined_points: list[str],
+    ) -> dict[str, str]:
+        """Map construction definition args to actual point names."""
+        mapping: dict[str, str] = {}
+        if construction_def.declare[0] == 's_angle':
             points = random.sample(defined_points, len(construction_def.args) - 1)
-            for i, point in enumerate(points):
-                mapping[construction_def.args[i]] = point
-            if construction_def.declare[0] == 's_angle':
-                mapping[construction_def.args[-1]] = f'{random.choice(range(15, 180, 15))}o'
+            mapping.update(dict(zip(construction_def.args[:-1], points)))
+            mapping[construction_def.args[-1]] = f'{random.choice(range(15, 180, 15))}o'
         else:
             points = random.sample(defined_points, len(construction_def.args))
-            for i, point in enumerate(points):
-                mapping[construction_def.args[i]] = point
+            mapping.update(dict(zip(construction_def.args, points)))
         return mapping
 
     def construction_text(self, construction_def, mapping):
@@ -698,8 +657,10 @@ if __name__ == "__main__":
     # print(sum/count)
 
     # import pdb; pdb.set_trace()
-    # clause_text = cc_gen.generate(15)
+    # clause_text = cc_gen.generate(50, prune=False)
+    # print(clause_text)
     # clause_text = cc_gen.generate(50)
+    # print(clause_text)
     # clause_text = cc_gen.generate(50)
     # print(clause_text)
     # for i in range(20):
@@ -707,9 +668,17 @@ if __name__ == "__main__":
     #     cc_gen = CompoundClauseGen(i)
     #     clause_text = cc_gen.generate(50)
     #     print(f'{time.time() - s_time:.2f}s')
-    # for _ in range(100):
-    #     clause_text = cc_gen.generate(50)
-    #     cleaned_str, sorted_depths, max_depth = process_geometric_string(clause_text)
-    #     print(f'Max Depth: {max_depth}, Points: {len(sorted_depths)}')
-    #     print(f'Clauses: {clause_text}')
-    #     print(f'Cleaned_str: {cleaned_str}\n')
+    for _ in range(200, 1000):
+        cc_gen = CompoundClauseGen(_)
+        clause_text = cc_gen.generate(50)
+        cleaned_str, sorted_depths, max_depth = process_geometric_string(clause_text)
+        print(f'seed: {_}, Max Depth: {max_depth}, Points: {len(sorted_depths)}')
+        # print(f'Clauses: {clause_text}')
+        print(f'Cleaned_str: {cleaned_str}\n')
+
+    # cc_gen = CompoundClauseGen(998)
+    # clause_text = cc_gen.generate(50, prune=False)
+    # print(clause_text)
+    # cleaned_str, sorted_depths, max_depth = process_geometric_string(clause_text)
+    # print(f'Max Depth: {max_depth}, Points: {len(sorted_depths)}')
+    # print(f'Cleaned_str: {cleaned_str}\n')

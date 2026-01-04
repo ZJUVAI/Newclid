@@ -78,29 +78,6 @@ bool DDARSolver::run_level(const Point &max_pt)
         }
         _solved = res;
     }
-    else
-    {
-        for (auto it = _ars.begin(); it != _ars.end();)
-        {
-            auto &goal = *it;
-            if (goal->is_proved())
-            {
-                it = _ars.erase(it);
-            }
-            else
-            {
-                goal->ar();
-                if (goal->is_proved())
-                {
-                    it = _ars.erase(it);
-                }
-                else
-                {
-                    ++it;
-                }
-            }
-        }
-    }
 
     // cout << "新证明" << _checked_statements.size() - num_stmts << "个结论, "
     //      << "总计" << _checked_statements.size() << "个结论" << endl;
@@ -111,39 +88,56 @@ bool DDARSolver::run_level(const Point &max_pt)
 
 bool DDARSolver::run(size_t max_levels)
 {
-    if (_problem->goals().empty())
+    bool has_goal = !_problem->goals().empty();
+
+    for (Point const &pt : _problem->points())
     {
-        for (Point const &max_pt : _problem->points())
+        for (size_t i = 0; i < max_levels; ++i)
         {
-            for (size_t i = 0; i < max_levels; i++)
+            if (!run_level(pt))
             {
-                if (!run_level(max_pt))
+                break;
+            }
+
+            if (has_goal && _solved)
+            {
+                return _solved;
+            }
+        }
+    }
+
+    if (!has_goal)
+    {
+        bool changed = true;
+        while (changed)
+        {
+            changed = false;
+            for (auto it = _ars.begin(); it != _ars.end();)
+            {
+                auto &goal = *it;
+                if (goal->is_proved())
                 {
-                    break;
+                    it = _ars.erase(it);
+                    changed = true;
+                }
+                else
+                {
+                    goal->ar();
+                    if (goal->is_proved())
+                    {
+                        it = _ars.erase(it);
+                        changed = true;
+                    }
+                    else
+                    {
+                        ++it;
+                    }
                 }
             }
         }
 
         _solved = true;
     }
-    else
-    {
-        auto const max_pt = _problem->points().back();
-        for (size_t i = 0; i < max_levels; i++)
-        {
-            if (!run_level(max_pt))
-            {
-                // cout << "没有新结论, 提前结束" << endl;
-                break;
-            }
-            if (_solved)
-            {
-                // cout << "目标已证明, 提前结束" << endl;
-                break;
-            }
-        }
-    }
-
     // _system.print_equations();
 
     return _solved;
