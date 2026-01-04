@@ -20,3 +20,4 @@ qwen_vl_utils
 modelscope
 torchvision
 cairosvg
+timm
