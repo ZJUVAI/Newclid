@@ -67,7 +67,7 @@ class GeometryProblemWorker:
     def _process_single_problem(args: tuple) -> tuple[list, dict]:
         """Process a single geometry problem with unique seed."""
         try:
-            pid, seed, n_clauses, max_level, img, aux_only, add_auxiliary, prune, remove_coords = args
+            pid, seed, n_clauses, max_level, img, aux_only, add_auxiliary, prune, remove_coords, draw_annotations = args
             start_time = time.time()
 
             # geneate fl_statement
@@ -114,7 +114,7 @@ class GeometryProblemWorker:
             eq_predicates_goals = dict()
             for goal in possible_goals:
                 # find essential_clauses
-                points, premises, _, _, aux_points, aux, _, _, _ = solver.proof.dep_graph.get_proof_steps([
+                _, premises, _, _, _, aux, _, _, _ = solver.proof.dep_graph.get_proof_steps([
                     goal])
                 if aux_only and len(aux) == 0:
                     continue
@@ -137,7 +137,7 @@ class GeometryProblemWorker:
                 premises = goal_list[0][1]
                 aux = goal_list[0][2]
                 data = GeometryProblemWorker._process_goals_with_same_statement(
-                    goals, solver, solver_builder, premises, aux, n_clauses, img, aux_only)
+                    goals, solver, solver_builder, premises, aux, n_clauses, img, aux_only, draw_annotations)
                 generated_data.extend(data)
             process_goal_time = time.time() - process_goal_time
 
@@ -306,7 +306,7 @@ class GeometryProblemWorker:
         return results
 
     @staticmethod
-    def _process_goals_with_same_statement(goals, solver, solver_builder, premises, aux, n_clauses, img, aux_only):
+    def _process_goals_with_same_statement(goals, solver, solver_builder, premises, aux, n_clauses, img, aux_only, draw_annotations=True):
         """Process a single goal"""
 
         results = []
@@ -370,6 +370,7 @@ class GeometryProblemWorker:
                     goal_new,
                     np.random.default_rng(solver_builder.seed),
                     mapping,
+                    draw_annotations,
                 )
                 result["fig"] = fig
 
