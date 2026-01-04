@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 import time
-import argparse 
+import argparse
 import ray
 import csv
 from rich.live import Live
@@ -9,6 +9,7 @@ from rich.table import Table
 
 from newclid.agent.lm import LMAgent
 from newclid.api import GeometricSolverBuilder
+from newclid.generation.problem_worker import GeometryProblemWorker
 
 @ray.remote(num_cpus=0, num_gpus=1)
 def ray_solve_problem(args):
@@ -24,6 +25,7 @@ def ray_solve_problem(args):
             .with_deductive_agent(LMAgent(model_path, decoding_size=decoding_size,beam_size=beam_size, search_depth=search_depth))
             .build()
         )
+        print(f"problem_name: {problem_name}")
         is_solved = solver.run(timeout=timeout)
         elapsed_time = time.time() - start_time
         return (pid, problem_name, is_solved, elapsed_time) 
@@ -47,7 +49,7 @@ def render_table(all_tasks_info, start_time, reorder: bool):
         priority = {"Failed": 0, "Pending": 1, "Success": 2}
         all_tasks_info = sorted(
             all_tasks_info,
-            key=lambda x: priority.get(x[1], 99)  # x[1] 就是 status
+            key=lambda x: priority.get(x[1], 99)  # x[1] is the status
         )
     for problem_name, status, elapsed_time in all_tasks_info:
         elapsed = "-" if status == "Pending" else f"{elapsed_time:.2f}"
@@ -59,7 +61,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
     Main function, read the file and execute tasks using Ray.
     """
     
-    # Read all problem names 
+    # Read all problem names
     if not os.path.exists(filepath):
         print(f"File {filepath} not found.")
         return
@@ -68,7 +70,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
         lines = file.readlines()
         for i in range(0, len(lines), 2):
             problem_names.append(lines[i].strip())
-
+ 
     print(f"Total problems to solve: {len(problem_names)}")
 
     # Multi-threaded execution using Ray with limited concurrent tasks
@@ -77,10 +79,11 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
         ray.init(
             # local_mode=True,
             # include_dashboard=True, dashboard_host="0.0.0.0", dashboard_port=8265,
+            dashboard_host="0.0.0.0",
             ignore_reinit_error=True, num_cpus=num_cpus
         )
 
-    total_time = 0 
+    total_time = 0
     start_time = time.time()
     all_tasks_info = []
     pending_tasks = []
