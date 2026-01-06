@@ -74,8 +74,11 @@ class GeometricSolver:
         # self.run_infos = infos
         # return infos["success"]
 
-    def write_proof_steps(self, out_file: Optional[Path]):
-        write_proof_steps(self.proof, out_file)
+    def write_proof_steps(self, out_file: Optional[Path] = None):
+        if out_file is not None:      
+            write_proof_steps(self.proof, out_file)
+        else:
+            write_proof_steps(self.proof)
 
     def draw_figure(self, *, out_file: Optional[Path]):
         draw_figure(self.proof, save_to=out_file, rng=self.rng)
@@ -359,3 +362,77 @@ class CSolver:
         print("\n[Goals]")
         for g in self.goals:
             print(g)
+
+class DirectSolver:
+    """
+    直接求解器，直接从点、前提和目标构建
+    
+    输入格式与 DDAR.run_ddar() 完全一致。
+    """
+    
+    def __init__(
+        self,
+        points: list[tuple[str, float, float]],
+        premises: list[tuple[str, list[str]]],
+        goal: tuple[str, list[str]],
+        problem_name: str = "anonymous",
+        rules_path: Path = "/c23474/home/duzhengtong/Discovery-GenesisGeo/src/newclid/default_configs/tmp_rules.txt",
+    ):
+        """
+        初始化 DirectSolver。
+        
+        Args:
+            points: 点坐标列表，格式为 [(name, x, y), ...]
+            premises: 前提条件列表，格式为 [(predicate, [arg1, arg2, ...]), ...]
+            goal: 目标，格式为 (predicate, [arg1, arg2, ...])
+            problem_name: 问题名称
+            rules_path: 规则文件路径
+        """
+        self.problem_name = problem_name
+        self.max_level = 500
+        self.log_enabled = False
+        self.exp_enabled = False
+        
+        # 存储输入（与 DDAR.run_ddar 接口一致）
+        self.points: List[Tuple[str, float, float]] = list(points)
+        self.premises: List[Tuple[str, List[str]]] = list(premises)
+        self.goal: Tuple[str, List[str]] = goal
+
+        solver_builder=GeometricSolverBuilder(seed=998244353)
+        solver_builder.with_deductive_agent(DDARN())
+        solver_builder.load_rules_from_file(rules_path)
+        self.problem = solver_builder.problemJGEX
+        proof_state = ProofState.build_premises(
+                    points=self.points,
+                    premises=self.premises,
+                    defsJGEX=solver_builder.defs,
+                    goals_str=[goal],
+                    rng=np.random.default_rng(solver_builder.seed)
+                )
+        self.solver=GeometricSolver(
+            proof_state,
+            solver_builder.rules,
+            DDARN()
+        )
+    
+    def run(self, timeout: int = 3600) -> bool:
+        """
+        运行直接求解器。
+        
+        Args:
+            timeout: 超时时间（秒）
+        
+        Returns:
+            bool: 是否成功求解
+        """
+        is_solved = self.solver.run(timeout=timeout)
+        self.run_infos = self.solver.run_infos
+        return is_solved
+    
+    def write_proof_steps(self, out_file: Optional[Path] = None):
+        if out_file is not None:
+            return self.solver.write_proof_steps(out_file)
+        else:
+            return self.solver.write_proof_steps()
+
+    

@@ -308,6 +308,56 @@ class ProofState:
             ]
 
         return proof
+    
+    @classmethod
+    def build_premises(
+        cls,
+        points: list[tuple[str, float, float]],
+        premises: list[tuple[str, list[str]]],
+        defsJGEX: dict[str, DefinitionJGEX],
+        goals_str: list[tuple[str, list[str]]],
+        *,
+        rng: "Generator",
+    ) -> ProofState:
+        """Build a proof state from given predicates and points."""
+        proof = ProofState(rng=rng, defs=defsJGEX)
+        adds: list[Dependency] = []
+
+        for point in points:
+            proof.symbols_graph.new_node(Point, point[0])
+
+        new_premises = [(name, *args) for name, args in premises]
+        new_goals = [(name, *args) for name, args in goals_str]
+        for statement in new_premises:
+            new_statement = notNone(
+                Statement.from_tokens(
+                    statement,
+                    proof.dep_graph
+                )
+            )
+            adds.append(Dependency.mk(new_statement, IN_PREMISES, ()))
+
+        new_points = proof.symbols_graph.names2points([p[0] for p in points])
+        for p, p_new in zip(points, new_points):
+            p_new.num = PointNum(p[1], p[2])
+            p_new.rely_on = set()
+        
+        for add in adds:
+            if not add.statement.check_numerical():
+                raise ValueError(
+                    "Numerical check failed when building from predicates."
+                )
+            add.add()
+
+        proof.matcher.update()
+        
+        if goals_str:
+            proof.goals = [
+                notNone(Statement.from_tokens(new_goals[0], proof.dep_graph))
+                for goal_str in goals_str
+            ]
+
+        return proof    
             
 
     def match_theorem(self, theorem: Rule) -> list[Dependency]:
