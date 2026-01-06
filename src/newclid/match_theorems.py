@@ -394,10 +394,10 @@ class Matcher:
             res = self.cache_simtri_conclusion_theorem(theorem, points)
         elif theorem.premises[0][0] == 'simtri' or theorem.premises[0][0] == 'simtrir':
             res = self.cache_simtri_premise_theorem(theorem, points)
-        elif theorem.premises[0][0] == 'eqangle' or theorem.premises[0][0] == 'eqratio':
-            res = self.cache_eq_premise_theorem(theorem, points)
-        elif theorem.conclusions[0][0] == 'eqangle' or theorem.conclusions[0][0] == 'eqratio':
-            res = self.cache_eq_conclusion_theorem(theorem, points)
+        # elif theorem.premises[0][0] == 'eqangle' or theorem.premises[0][0] == 'eqratio':
+        #     res = self.cache_eq_premise_theorem(theorem, points)
+        # elif theorem.conclusions[0][0] == 'eqangle' or theorem.conclusions[0][0] == 'eqratio':
+        #     res = self.cache_eq_conclusion_theorem(theorem, points)
         elif theorem.premises[0][0] == 'midp':
             res = self.cache_midp_premise_theorem(theorem, points)
         else:
