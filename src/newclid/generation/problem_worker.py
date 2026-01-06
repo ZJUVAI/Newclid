@@ -356,6 +356,7 @@ class GeometryProblemWorker:
                 "n_proof_steps": n_proof_steps,
                 "llm_input_renamed": llm_renamed['llm_input'],
                 "llm_output_renamed": llm_renamed['llm_output'],
+                "rename_map": mapping,
             }
 
             if img:

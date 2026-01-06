@@ -101,7 +101,7 @@ class GeometryGenerator:
             with open(filename, 'a', encoding='utf-8') as f:
                 for data_item in self.write_buffer:
                     self.data_count += 1
-                    data_item['fl_problem'] = ''
+                    # data_item['fl_problem'] = ''
                     if self.img:
                         fig = deepcopy(data_item.pop('fig'))
                         fig.savefig(
