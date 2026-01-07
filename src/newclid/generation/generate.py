@@ -54,6 +54,7 @@ class GeometryGenerator:
             add_auxiliary=True,
             prune=True,
             remove_coords=False,
+            draw_annotations=True,
         ):
         self.n_clauses = n_clauses
         self.min_proof_steps = min_proof_steps
@@ -78,6 +79,7 @@ class GeometryGenerator:
         self.add_auxiliary = add_auxiliary
         self.prune = prune
         self.remove_coords = remove_coords
+        self.draw_annotations = draw_annotations
         self.data_count = 0
 
     def problem_hash_filter(self, data: list, key: str) -> list[str]:
@@ -128,7 +130,7 @@ class GeometryGenerator:
         def task_generator():
             for i in range(10**9):
                 seed = 42 + i  # 唯一种子 = 时间戳 + 任务ID
-                yield i, seed, self.n_clauses, self.max_level, self.img, self.aux_only, self.add_auxiliary, self.prune, self.remove_coords
+                yield i, seed, self.n_clauses, self.max_level, self.img, self.aux_only, self.add_auxiliary, self.prune, self.remove_coords, self.draw_annotations
 
         if not ray.is_initialized():
             ray.init(
@@ -213,6 +215,16 @@ class GeometryGenerator:
             f"Generated {all_data_len} samples successfully in {final_elapsed_time:.2f}s.")
         summary_reporter.output_report()
 
+def str_to_bool(value):
+    """Convert string to boolean value."""
+    if isinstance(value, bool):
+        return value
+    if value.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif value.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 def main():
     parser = argparse.ArgumentParser(
@@ -229,18 +241,20 @@ def main():
                         choices=["debug", "info", "warning", "error"])
     parser.add_argument("--timeout", required=False, type=int, default=3600)
     parser.add_argument("--max_level", required=False, type=int, default=500)
-    parser.add_argument("--img", required=False, type=bool, default=False,
+    parser.add_argument("--img", required=False, type=str_to_bool, default=False,
                         help="Whether to save images of the generated problems.")
-    parser.add_argument("--aux_only", required=False, type=bool, default=False,
+    parser.add_argument("--aux_only", required=False, type=str_to_bool, default=False,
                         help="Whether to save only data with aux.")
-    parser.add_argument("--clear", required=False, type=bool, default=False,
+    parser.add_argument("--clear", required=False, type=str_to_bool, default=False,
                         help="Whether to clear old dataset files.")
-    parser.add_argument("--add_auxiliary", required=False, type=bool, default=True,
+    parser.add_argument("--add_auxiliary", required=False, type=str_to_bool, default=True,
                         help="Whether to add auxiliary points (e.g., midpoint, orthocenter) for triangles.")
-    parser.add_argument("--prune", required=False, type=bool, default=True,
+    parser.add_argument("--prune", required=False, type=str_to_bool, default=True,
                         help="Whether to prune clauses to preserve only the deepest clause chain.")
-    parser.add_argument("--remove_coords", required=False, type=bool, default=False,
+    parser.add_argument("--remove_coords", required=False, type=str_to_bool, default=False,
                         help="Whether to remove coordinate information from the final clause output.")
+    parser.add_argument("--draw_annotations", required=False, type=str_to_bool, default=True,
+                        help="Whether to add geometry property annotations in the figure.")
     args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, args.log_level.upper()))
@@ -260,6 +274,7 @@ def main():
         add_auxiliary=args.add_auxiliary,
         prune=args.prune,
         remove_coords=args.remove_coords,
+        draw_annotations=args.draw_annotations,
     )
 
     generator.generate()

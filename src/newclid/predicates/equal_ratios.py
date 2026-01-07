@@ -1,8 +1,11 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any
+from matplotlib.axes import Axes
+from numpy.random import Generator
 
 from newclid.dependencies.symbols import Point
 from newclid.numerical import close_enough
+from newclid.numerical.draw_figure import draw_segment
 from newclid.predicates.equal_angles import EqAngle
 from newclid.predicates.predicate import Predicate
 from newclid.algebraic_reasoning.tables import Ratio_Chase
@@ -118,6 +121,13 @@ class EqRatio(Predicate):
             f"{a.pretty_name}{b.pretty_name}:{c.pretty_name}{d.pretty_name}"
             for a, b, c, d in reshape(args, 4)
         )
+    
+    @classmethod
+    def draw(
+        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True
+    ):
+        for i in range(0, len(args), 2):
+            draw_segment(ax, args[i], args[i + 1])
 
 
 class EqRatio3(Predicate):
