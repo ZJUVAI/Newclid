@@ -126,8 +126,6 @@ def main(_: Optional[list[str]] = None) -> None:
     # 逐个 candidate 跑同一题目集
     for rules_path in candidate_rules_files:
         cid = _extract_candidate_id(rules_path)
-        if int(cid) <= 121:
-            continue
         out_json = os.path.join(OUTPUTS_DIR, f"hageo_candidate_rules_{cid}_results.json")
         _solve_with_rules(src_problems=src_problems, rules_file=rules_path, out_json=out_json)
 
