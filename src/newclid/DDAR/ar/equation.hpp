@@ -52,7 +52,23 @@ public:
 
     bool operator<(const Equation &other) const { return _terms < other._terms; }
 
-    bool operator==(const Equation &other) const { return _terms == other._terms; }
+    bool operator==(const Equation &other) const
+    {
+        if (_terms.size() != other._terms.size())
+        {
+            return false;
+        }
+        for (size_t i = 0; i < _terms.size(); ++i)
+        {
+            const Term &a = _terms[i];
+            const Term &b = other._terms[i];
+            if (a != b || a.coeff() != b.coeff())
+            {
+                return false;
+            }
+        }
+        return true;
+    }
 
     size_t size() const { return _terms.size(); }
 };
