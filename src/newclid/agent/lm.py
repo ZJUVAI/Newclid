@@ -42,7 +42,7 @@ AUX_PREDICATES = [
     "cong",
     "cyclic",
     "eqangle",
-    # "eqratio",
+    "eqratio",
     "midp",
     "para",
     "perp",
@@ -72,17 +72,6 @@ class LMAgent(DeductiveAgent):
         
     @torch.no_grad()
     def inference(self, model, tokenizer, query: str, new_point_name: str, response_prefix: str = '<aux>', with_predicate: bool = True):
-        """
-        Args:
-            model: 模型
-            tokenizer: 分词器
-            query: 查询字符串
-            new_point_name: 新点的名称
-            response_prefix: 响应前缀
-            with_predicate: 是否带谓词前缀进行推理
-        Returns:
-            aux_dsl_dict: 辅助构造的字典，key为aux_dsl，value为score
-        """
         aux_dsl_dict = {}
         # Process each model/tokenizer pair
         messages = [
@@ -98,7 +87,7 @@ class LMAgent(DeductiveAgent):
         model_prompt_inputs = tokenizer([text], return_tensors="pt")
         
         if with_predicate:
-            # 带谓词前缀的推理
+            # Inference with predicate prefix
             beams_per_predicate = self.decoding_size // len(AUX_PREDICATES)
             if beams_per_predicate:
                 for aux_predicate_str in AUX_PREDICATES:
@@ -124,7 +113,7 @@ class LMAgent(DeductiveAgent):
                         aux_dsl_dict[aux_dsl] = score
                         print(f"aux_dsl (with_predicate): {aux_dsl}")
         else:
-            # 不带谓词前缀的推理
+            # Inference without predicate prefix
             prompt_no_predicate = text + response_prefix + ' ' + new_point_name
             model_inputs = tokenizer([prompt_no_predicate], return_tensors="pt").to('cuda')
 
@@ -179,8 +168,8 @@ class LMAgent(DeductiveAgent):
             future_info = dict()
             running_futures = []
             
-            # 为每个模型创建两组 BeamQueue：一组用于 with_predicate，一组用于 no_predicate
-            # beam_queues[i][j]: i 表示模型索引，j=0 表示 with_predicate，j=1 表示 no_predicate
+            # Create two BeamQueues for each model: one for with_predicate, one for no_predicate
+            # beam_queues[i][j]: i is the model index, j=0 for with_predicate, j=1 for no_predicate
             beam_queues = []
             for i in range(len(self.models)):
                 q_with_pred = BeamQueue(max_size=self.beam_size)
@@ -292,8 +281,8 @@ class LMAgent(DeductiveAgent):
         points = points[0]
     
         # premises
-        premises = re.split(r"\s*\[\d+\]", premises) # coll a c e [002] coll b d e [003] 》'coll a c e' , 'coll b d e'
-        premises = [seg.strip() for seg in premises if seg.strip()]  # 
+        premises = re.split(r"\s*\[\d+\]", premises) # coll a c e [002] coll b d e [003] => 'coll a c e' , 'coll b d e'
+        premises = [seg.strip() for seg in premises if seg.strip()]
         # currently, we only support two premises following alphageometry
         if len(premises) > 2:
             return 
@@ -322,27 +311,27 @@ class LMAgent(DeductiveAgent):
         Return:
             (predicate, args): translated to constructive predicate.
         """
-        # 直线垂直
+        # Line perpendicularity
         if predicate == 'perp':
             return Perp.to_constructive(point, tuple(args))
 
-        # 直线平行
+        # Line parallelism
         elif predicate == 'para':
             return Para.to_constructive(point, tuple(args))
 
-        # 全等/等距
+        # Congruence/Equal distance
         elif predicate == 'cong':
             return Cong.to_constructive(point, tuple(args))
 
-        # 中点
+        # Midpoint
         elif predicate == 'midp':
             return MidPoint.to_constructive(point, tuple(args))
 
-        # 共线
+        # Collinearity
         elif predicate == 'coll':
             return Coll.to_constructive(point, tuple(args))
 
-        # 等角
+        # Equal angles
         elif predicate == 'eqangle':
             def arrange_angle_points(a, b, c, d):
                 if a == c:
@@ -381,14 +370,14 @@ class LMAgent(DeductiveAgent):
                 res1 = EqAngle.to_constructive(point, arrange_angle_points(a, b, c, d) + arrange_angle_points(e, f, g, h))
             return res1
             
-        # 四点共圆
+        # Cyclic (four points on a circle)
         elif predicate == 'cyclic':
             return Cyclic.to_constructive(point, tuple(args))
 
         elif predicate == 'eqratio':
             return EqRatio.to_constructive(point, tuple(args))
 
-        # 其它直接返回
+        # For others, return directly
         return f"{predicate} {' '.join(args)}"
     
     def problem_to_dsl(self, problem: "ProblemJGEX", defs: dict[str, DefinitionJGEX]) -> str:
