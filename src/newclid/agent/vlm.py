@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import time
+import uuid
 import logging
 from typing import TYPE_CHECKING, Any, List, Tuple
 from fractions import Fraction
@@ -14,6 +15,8 @@ import torch
 from modelscope import Qwen3VLForConditionalGeneration, AutoProcessor, DynamicCache
 from qwen_vl_utils import process_vision_info 
 import cairosvg
+from PIL import Image, ImageOps
+from copy import deepcopy
 
 from newclid.agent.agents_interface import DeductiveAgent
 from newclid.formulations.problem import ProblemJGEX
@@ -175,7 +178,8 @@ class VLMAgent(DeductiveAgent):
                 return infos(False, f"{goal.pretty()} fails numerical check")
         # Run ddar
         # print(f"running first ddar")
-        base_proof = VLMAgent.run_ddar_c(proof, rules, t0, timeout)
+        base_proof = deepcopy(proof)
+        base_proof = VLMAgent.run_ddar_c(base_proof, rules, t0, timeout)
         # print(f"finish first ddar")
         # if proofed by ddar, return
         if base_proof.check_goals():
@@ -189,14 +193,14 @@ class VLMAgent(DeductiveAgent):
             beam_queues = []
             for i in range(len(self.model_path)):
                 q = BeamQueue(max_size=self.beam_size)
-                q.add(node=(self.problemJGEX, base_proof), val=0)
+                q.add(node=(self.problemJGEX, base_proof, proof), val=0)
                 beam_queues.append(q)
 
             for depth in range(self.search_depth):
                 new_beam_queues = []
                 for i, beam_queue in enumerate(beam_queues):
                     new_queue = BeamQueue(max_size=self.beam_size)  # to replace beam_queue.
-                    for prev_score, (problem, proof) in beam_queue:
+                    for prev_score, (problem, proof, proof_ori) in beam_queue:
                     # for prev_score, (problem, proof) in beam_queue:
                         if time.time() - t0 > timeout:
                             ray.shutdown()
@@ -206,14 +210,35 @@ class VLMAgent(DeductiveAgent):
                         # draw current figure
                         # print("drawing picture")
                         timestamp = int(time.time()*1000)
-                        svg_path = os.path.join(image_dir, f"{timestamp}.svg")
-                        png_path = os.path.join(image_dir, f"{timestamp}.png")
-                        draw_figure(proof=proof, save_to=svg_path, rng=proof.rng)
+                        unique_id = uuid.uuid4().hex
+                        svg_path = os.path.join(image_dir, f"{timestamp}_{unique_id}.svg")
+                        png_path = os.path.join(image_dir, f"{timestamp}_{unique_id}.png")
+                        draw_figure(proof=proof_ori, save_to=svg_path, rng=proof.rng)
                         cairosvg.svg2png(
                             url=str(svg_path),
                             write_to=str(png_path),
                             output_width=1024,
                         )
+                        # 对生成的 PNG 进行反色处理
+                        with Image.open(png_path) as img:
+                            if img.mode == 'RGBA':
+                                r, g, b, a = img.split()
+                                rgb_img = Image.merge('RGB', (r, g, b))
+                                inverted_rgb = ImageOps.invert(rgb_img)
+                                r_inv, g_inv, b_inv = inverted_rgb.split()
+                                img_out = Image.merge('RGBA', (r_inv, g_inv, b_inv, a))
+                            elif img.mode == 'LA':
+                                l, a = img.split()
+                                l_inv = ImageOps.invert(l)
+                                img_out = Image.merge('LA', (l_inv, a))
+                            else:
+                                img_out = ImageOps.invert(img.convert('RGB'))
+                            img_out.save(png_path)
+
+                        # 使用纯白图片
+                        # with Image.open(png_path) as img:
+                        #     img_out = Image.new('RGB', img.size, (255, 255, 255))
+                        #     img_out.save(png_path)
                         # print("finish drawing")
                         
                         # Stragety 1: insert the aux string into problem and predict the next aux
@@ -243,7 +268,7 @@ class VLMAgent(DeductiveAgent):
                         # check any done task. if we find a solution early, we can save time
                         done, running_futures = ray.wait(running_futures, timeout=0)
                         for f in done:
-                            res = ray.get(f)
+                            res, proof_ori = ray.get(f)
                             if res is None:
                                 continue
                             elif res.check_goals():
@@ -254,12 +279,12 @@ class VLMAgent(DeductiveAgent):
                                 return infos(True, str(new_problem))
                             elif depth < self.search_depth -1:
                                 new_problem, prev_score, score = future_info[f]
-                                new_queue.add(node=(new_problem, res), val=prev_score+score)
+                                new_queue.add(node=(new_problem, res, proof_ori), val=prev_score+score)
                     # check remaining tasks
                     while running_futures:
                         done, running_futures = ray.wait(running_futures, num_returns=min(1000, len(running_futures)))
                         for f in done:
-                            res = ray.get(f)
+                            res, proof_ori = ray.get(f)
                             if res is None:
                                 continue
                             elif res.check_goals():
@@ -271,7 +296,7 @@ class VLMAgent(DeductiveAgent):
                                 return infos(True, str(new_problem))
                             elif depth < self.search_depth -1:
                                 new_problem, prev_score, score = future_info[f]
-                                new_queue.add(node=(new_problem, res), val=prev_score+score)
+                                new_queue.add(node=(new_problem, res, proof_ori), val=prev_score+score)
                     new_beam_queues.append(new_queue)
                 beam_queues = new_beam_queues
 
@@ -538,7 +563,7 @@ def run_ddar_remote(problem, proof, aux, rules: list[Rule], start_time: int, tim
         VLMAgent.add_construction(proof, aux)
     except Exception as e:
         try:
-            proof = ProofState.build_problemJGEX(
+            proof_ori = ProofState.build_problemJGEX(
                 problemJGEX=problem,
                 defsJGEX=proof.defs,
                 rng=np.random.default_rng(998244353),
@@ -546,12 +571,13 @@ def run_ddar_remote(problem, proof, aux, rules: list[Rule], start_time: int, tim
                 problem_path=None,
             )
         except Exception:
-            return
+            return None, None
     try:
+        proof = deepcopy(proof_ori)
         proof = VLMAgent.run_ddar_c(proof, rules, start_time, timeout)
     except Exception:
-        return
-    return proof
+        return None, None
+    return proof, proof_ori
 
 
 class BeamQueue:
