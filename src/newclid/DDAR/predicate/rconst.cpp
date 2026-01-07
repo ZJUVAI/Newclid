@@ -26,6 +26,25 @@ unique_ptr<Statement> RConst::normalize() const
     return make_unique<RConst>(swap());
 }
 
+unique_ptr<Statement> RConst::replace(Point p, Point q) const
+{
+    auto left_pts = _left.points();
+    Point la = left_pts[0], lb = left_pts[1];
+
+    Point new_la = (la == p) ? q : la;
+    Point new_lb = (lb == p) ? q : lb;
+    Dist new_left(new_la, new_lb);
+
+    auto right_pts = _right.points();
+    Point ra = right_pts[0], rb = right_pts[1];
+
+    Point new_ra = (ra == p) ? q : ra;
+    Point new_rb = (rb == p) ? q : rb;
+    Dist new_right(new_ra, new_rb);
+
+    return make_unique<RConst>(new_left, new_right, _ratio);
+}
+
 bool RConst::check_nondegen() const
 {
     return _left.check_nondegen() && _right.check_nondegen();

@@ -26,6 +26,8 @@ public:
 
     std::unique_ptr<Statement> clone() const override;
 
+    std::unique_ptr<Statement> replace(Point p, Point q) const override;
+
     std::unique_ptr<Statement> normalize() const override;
 
     bool check_nondegen() const override;

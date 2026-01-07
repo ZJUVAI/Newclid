@@ -1,17 +1,17 @@
-#ifndef NCOLL_HPP
-#define NCOLL_HPP
-
+#ifndef EQPOINT_HPP
+#define EQPOINT_HPP
 #include "predicate/statement.hpp"
 
-class NColl : public Statement
+class EqPoint : public Statement
 {
 private:
     Point _a;
     Point _b;
-    Point _c;
 
 public:
-    NColl(Point a, Point b, Point c);
+    EqPoint(Point a, Point b);
+
+    EqPoint(const std::vector<statement_arg> &args);
 
     std::string name() const override;
 
@@ -25,21 +25,17 @@ public:
 
     bool check_equations() const override;
 
-    std::vector<statement_arg> args() const override;
-
     std::unique_ptr<Statement> clone() const override;
 
-    std::ostream &print(std::ostream &os) const override;
+    std::vector<statement_arg> args() const override;
 
-    const Point &a() const { return _a; }
+    std::ostream &print(std::ostream &out) const override;
 
-    const Point &b() const { return _b; }
-
-    const Point &c() const { return _c; }
-
-    bool numerical_only() const { return true; }
+    bool numerical_only() const { return false; }
 
     bool trivial() const { return false; }
 };
 
-#endif // NCOLL_HPP
+std::ostream &operator<<(std::ostream &out, const Statement &stmt);
+
+#endif // EQPOINT_HPP

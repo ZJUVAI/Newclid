@@ -93,3 +93,24 @@ vector<unique_ptr<Equation>> Cong::as_equation_slope(bool exp, ObjectTable *tabl
     }
     return result;
 }
+
+unique_ptr<Statement> Cong::replace(Point p, Point q) const
+{
+    auto left_pts = _left.points();
+    Point la = left_pts[0], lb = left_pts[1];
+
+    Point new_la = (la == p) ? q : la;
+    Point new_lb = (lb == p) ? q : lb;
+
+    Dist new_left(new_la, new_lb);
+
+    auto right_pts = _right.points();
+    Point ra = right_pts[0], rb = right_pts[1];
+
+    Point new_ra = (ra == p) ? q : ra;
+    Point new_rb = (rb == p) ? q : rb;
+
+    Dist new_right(new_ra, new_rb);
+
+    return make_unique<Cong>(new_left, new_right);
+}
