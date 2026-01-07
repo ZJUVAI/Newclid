@@ -20,6 +20,7 @@ enum class ProofState : uint8_t
     PROVED_AR_SLOPE,
     PROVED_AR_DISTLOG,
     PROVED_BY_THEOREM,
+    PROVED_BY_DOUBLEPOINT,
 };
 
 class Proof
@@ -41,22 +42,21 @@ public:
 
     std::vector<Proof *> get_dependencies() const;
 
-    const std::set<Point> &point_dependencies() const
-    {
-        return _point_dependencies;
-    }
-
     std::string reason() const;
 
     void set_theorem(size_t index);
+
+    void set_proved(Proof *doublepoint, Proof *original);
 
     void set_proved(ProofState state);
 
     void print_equations() const;
 
-    const size_t &theorem() { return _theoremId; }
+    const size_t &theorem() const { return _theoremId; }
 
     const DDARSolver *solver() const { return _solver; }
+
+    std::string name() const { return _statement->name(); }
 
     std::vector<ReducedEquation *> reduced_equations(std::string type) const
     {
@@ -80,11 +80,11 @@ private:
     std::unique_ptr<Statement> _statement;
     size_t _theoremId;
     ProofState _state{ProofState::NOT_PROVED};
-    std::set<Point> _point_dependencies;
     std::vector<ReducedEquation *> _eqn_dist;
     std::vector<ReducedEquation *> _eqn_slope;
     std::vector<ReducedEquation *> _eqn_distlog;
     ReducedEquation *_dep;
+    std::vector<Proof *> _deps;
 };
 
 #endif // PROOF_HPP

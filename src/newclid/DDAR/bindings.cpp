@@ -83,15 +83,15 @@ extern "C"
         //         continue;
         //     }
 
-        //     std::cout << "Statement: " << join(tokens) << "\n";
+        //     std::cout << "Statement: " << join(tokens) << endl;
 
-        //     std::cout << "Dependencies: \n";
+        //     std::cout << "Dependencies:" << endl;
         //     for (const auto &dep : dependencies)
         //     {
-        //         std::cout << "  - " << join(dep) << "\n";
+        //         std::cout << "  - " << join(dep) << endl;
         //     }
 
-        //     std::cout << "Reason: " << reason << "\n";
+        //     std::cout << "Reason: " << reason << endl;
         //     std::cout << "---------------------------------------\n";
         // }
 

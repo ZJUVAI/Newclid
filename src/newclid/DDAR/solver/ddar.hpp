@@ -29,7 +29,7 @@ private:
 
     std::vector<Proof *> _ars;
 
-    std::vector<const Proof *> _checked_statements;
+    std::vector<Proof *> _checked_statements;
 
     bool _solved{false};
 
@@ -46,7 +46,9 @@ private:
     eqns_map_type _equations_dist;
     eqns_map_type _equations_distlog;
 
-    ObjectTable *_table;
+    ObjectTable *_table_slope;
+    ObjectTable *_table_dist;
+    ObjectTable *_table_distlog;
 
 public:
     bool run_level(const Point &max_pt);
@@ -63,7 +65,7 @@ public:
 
     size_t num_applications() const;
 
-    size_t push_established_statement(const Proof *pf);
+    size_t push_established_statement(Proof *pf);
 
     DDARSolver(Problem *problem, bool log_enabled = false, bool exp_enabled = false);
 

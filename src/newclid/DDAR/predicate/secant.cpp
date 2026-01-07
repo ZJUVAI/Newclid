@@ -27,6 +27,16 @@ vector<statement_arg> Secant::args() const
     return {_o, _a, _b, _p};
 }
 
+unique_ptr<Statement> Secant::replace(Point p, Point q) const
+{
+    Point new_o = (_o == p) ? q : _o;
+    Point new_a = (_a == p) ? q : _a;
+    Point new_b = (_b == p) ? q : _b;
+    Point new_p = (_p == p) ? q : _p;
+
+    return make_unique<Secant>(new_o, new_a, new_b, new_p);
+}
+
 unique_ptr<Statement> Secant::clone() const
 {
     return make_unique<Secant>(*this);

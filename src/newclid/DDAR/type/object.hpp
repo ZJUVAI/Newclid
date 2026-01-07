@@ -26,6 +26,8 @@ public:
 
     std::vector<Point> points() const;
 
+    const std::set<Point> &points_set() const { return _points; }
+
     double to_double() const { return 0.0; }
 };
 

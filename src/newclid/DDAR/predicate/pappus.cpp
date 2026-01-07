@@ -1,5 +1,6 @@
 #include "predicate/pappus.hpp"
 #include <set>
+#include <memory>
 
 using namespace std;
 
@@ -21,6 +22,17 @@ unique_ptr<Statement> Pappus::normalize() const
 {
     auto all = permutations();
     return make_unique<Pappus>(*min_element(all.begin(), all.end()));
+}
+
+unique_ptr<Statement> Pappus::replace(Point p, Point q) const
+{
+    auto left_ptr = _left.replace(p, q);
+    auto middle_ptr = _middle.replace(p, q);
+    auto right_ptr = _right.replace(p, q);
+    return make_unique<Pappus>(
+        static_cast<const Coll &>(*left_ptr),
+        static_cast<const Coll &>(*middle_ptr),
+        static_cast<const Coll &>(*right_ptr));
 }
 
 bool Pappus::check_nondegen() const

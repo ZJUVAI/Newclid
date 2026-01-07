@@ -138,6 +138,9 @@ public:
     // r106
     static Theorem definition_of_secant(const Secant &sec);
 
+    // r107
+    static Theorem eqpoints_of_same_intersections(const Point &p, const Point &q, const Point &a, const Point &b, const Point &c, const Point &d);
+
 private:
     std::string _name;
     std::string _rule;
