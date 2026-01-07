@@ -86,7 +86,7 @@ class LMAgent(DeductiveAgent):
         text += "<think>\n\n</think>\n\n"
         model_prompt_inputs = tokenizer([text], return_tensors="pt")
         
-        if with_predicate:
+        if with_predicate and len(AUX_PREDICATES) > 0:
             # Inference with predicate prefix
             beams_per_predicate = self.decoding_size // len(AUX_PREDICATES)
             if beams_per_predicate:
@@ -112,7 +112,8 @@ class LMAgent(DeductiveAgent):
                         score = score.item()
                         aux_dsl_dict[aux_dsl] = score
                         print(f"aux_dsl (with_predicate): {aux_dsl}")
-        else:
+        
+        if not with_predicate:
             # Inference without predicate prefix
             prompt_no_predicate = text + response_prefix + ' ' + new_point_name
             model_inputs = tokenizer([prompt_no_predicate], return_tensors="pt").to('cuda')
