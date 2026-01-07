@@ -22,6 +22,7 @@ public:
     bool is_close(const Point &other) const;
 
     bool operator==(const Point &other) const;
+    bool operator!=(const Point &other) const;
     bool operator<(const Point &other) const;
     bool operator>(const Point &other) const;
     bool operator<=(const Point &other) const;

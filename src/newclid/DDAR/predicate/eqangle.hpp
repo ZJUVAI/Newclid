@@ -29,6 +29,8 @@ public:
 
     std::vector<statement_arg> args() const override;
 
+    std::unique_ptr<Statement> replace(Point p, Point q) const override;
+
     std::unique_ptr<Statement> normalize() const override;
 
     std::ostream &print(std::ostream &os) const override;

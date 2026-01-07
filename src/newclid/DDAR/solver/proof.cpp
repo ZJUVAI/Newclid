@@ -50,7 +50,6 @@ void Proof::ar()
     {
         return;
     }
-
     for (const auto &req : _eqn_dist)
     {
         req->reduce();
@@ -81,7 +80,6 @@ void Proof::ar()
             return;
         }
     }
-
     return;
 }
 
@@ -127,11 +125,12 @@ vector<Proof *> Proof::get_dependencies() const
         return {};
     case ProofState::PROVED_BY_THEOREM:
         return _solver->applications()[_theoremId].hypotheses();
+    case ProofState::PROVED_BY_DOUBLEPOINT:
+        return _deps;
     case ProofState::PROVED_AR_DIST:
     case ProofState::PROVED_AR_DISTLOG:
     case ProofState::PROVED_AR_SLOPE:
-        vector<Proof *> deps = _dep->statement_dependencies();
-        return deps;
+        return _dep->statement_dependencies();
     }
     return {};
 }
@@ -156,9 +155,38 @@ string Proof::reason() const
         return "AR with Distlog";
     case ProofState::PROVED_AR_SLOPE:
         return "AR with Slope";
+    case ProofState::PROVED_BY_DOUBLEPOINT:
+        return "Transfer";
     default:
         return "Unknown";
     }
+}
+
+void Proof::set_proved(Proof *doublepoint, Proof *original)
+{
+    if (_state != ProofState::NOT_PROVED)
+    {
+        throw runtime_error("Proof already proved");
+    }
+    _deps.emplace_back(doublepoint);
+    _deps.emplace_back(original);
+    _state = ProofState::PROVED_BY_DOUBLEPOINT;
+    _solver->push_established_statement(this);
+    assert(_statement->check_numerically());
+
+    for (const auto req : _eqn_dist)
+    {
+        req->reduce();
+    }
+    for (const auto req : _eqn_distlog)
+    {
+        req->reduce();
+    }
+    for (const auto req : _eqn_slope)
+    {
+        req->reduce();
+    }
+    _solver->add_established_equations(this);
 }
 
 void Proof::set_proved(ProofState state)
@@ -192,17 +220,4 @@ void Proof::set_proved(ProofState state)
     }
 
     _solver->add_established_equations(this);
-
-    for (const auto &dep : get_dependencies())
-    {
-        for (Point const &pt : dep->point_dependencies())
-        {
-            _point_dependencies.insert(pt);
-        }
-    }
-
-    for (Point const &pt : _statement->points())
-    {
-        _point_dependencies.insert(pt);
-    }
 }

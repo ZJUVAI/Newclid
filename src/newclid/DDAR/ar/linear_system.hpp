@@ -18,7 +18,6 @@ private:
     std::unordered_map<Term, std::unique_ptr<Equation>> _solved_variables;
     std::unordered_map<Term, std::unique_ptr<Equation>> _solved_terms;
     std::unordered_map<Term, std::set<Term>> _pivot_by_next;
-    int _next_id = 0;
 
 public:
     LinearSystem() = default;
@@ -28,6 +27,8 @@ public:
     void add_reduced_equation(Proof *pf, std::string type);
 
     void print_equations() const;
+
+    void update();
 
     const Equation &at(size_t index) const;
 

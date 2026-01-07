@@ -4,6 +4,7 @@
 #include "type/dist.hpp"
 #include <iostream>
 #include <vector>
+
 using namespace std;
 
 Coll::Coll(Point a, Point b, Point c) : _a(a), _b(b), _c(c) {}
@@ -96,9 +97,9 @@ EqRatio Coll::eqratio_ab_ac(const Coll &other) const
     return EqRatio(Dist(_a, _b), Dist(_a, _c), Dist(other.a(), other.b()), Dist(other.a(), other.c()));
 }
 
-ostream &Coll::print(ostream &os) const
+ostream &Coll::print(ostream &out) const
 {
-    return os << _a << " ∈ " << _b << _c;
+    return out << _a << " ∈ " << _b << _c;
 }
 
 bool Coll::operator==(const Coll &other) const
@@ -151,4 +152,12 @@ vector<unique_ptr<Equation>> Coll::as_equation_dist(bool exp, ObjectTable *table
 Coll Coll::reverse() const
 {
     return {_c, _b, _a};
+}
+
+unique_ptr<Statement> Coll::replace(Point p, Point q) const
+{
+    Point new_a = (_a == p) ? q : _a;
+    Point new_b = (_b == p) ? q : _b;
+    Point new_c = (_c == p) ? q : _c;
+    return std::make_unique<Coll>(new_a, new_b, new_c);
 }
