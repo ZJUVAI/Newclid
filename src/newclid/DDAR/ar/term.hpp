@@ -6,6 +6,7 @@
 #include <iostream>
 #include <map>
 #include <vector>
+#include <memory>
 
 class ObjectTable;
 class Object;
@@ -14,7 +15,7 @@ class Term
 {
 private:
     mutable std::map<TermArg, int> _vars;
-    mutable std::map<Object *, int> _actual_vars;
+    mutable std::map<std::shared_ptr<Object>, int> _actual_vars;
     mutable size_t _version{SIZE_MAX};
     Rational _coeff;
     ObjectTable *_table{nullptr};

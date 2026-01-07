@@ -6,7 +6,7 @@
 
 using namespace std;
 
-Term::Term(const std::vector<TermArg> &vars, const Rational &coeff, ObjectTable *table) : _coeff(coeff), _table(table)
+Term::Term(const vector<TermArg> &vars, const Rational &coeff, ObjectTable *table) : _coeff(coeff), _table(table)
 {
     for (const auto &var : vars)
     {
@@ -25,7 +25,7 @@ Term::Term(const Rational &coeff, ObjectTable *table) : _coeff(coeff), _table(ta
 {
 }
 
-Term::Term(const std::vector<TermArg> &vars, ObjectTable *table) : _coeff(1), _table(table)
+Term::Term(const vector<TermArg> &vars, ObjectTable *table) : _coeff(1), _table(table)
 {
     for (const auto &var : vars)
     {
@@ -54,7 +54,7 @@ Term Term::gcd(Term &other) const
         auto it = other._vars.find(arg);
         if (it != other._vars.end())
         {
-            res._vars[arg] = std::min(exp, it->second);
+            res._vars[arg] = min(exp, it->second);
         }
     }
     for (const auto &[obj, exp] : _actual_vars)
@@ -62,7 +62,7 @@ Term Term::gcd(Term &other) const
         auto it = other._actual_vars.find(obj);
         if (it != other._actual_vars.end())
         {
-            res._actual_vars[obj] = std::min(exp, it->second);
+            res._actual_vars[obj] = min(exp, it->second);
         }
     }
     res._version = _version;
@@ -217,7 +217,7 @@ Term &Term::operator/=(const Term &other)
 {
     update();
     other.update();
-    _coeff *= other._coeff;
+    _coeff /= other._coeff;
     for (const auto &[term, exp] : other._vars)
     {
         _vars[term] -= exp;
@@ -310,25 +310,14 @@ void Term::update() const
     }
     _actual_vars.clear();
 
-    unordered_map<Object *, TermArg> min_arg_map;
-
     for (const auto &[arg, exponent] : _vars)
     {
-        Object *obj = _table->get_or_create_obj(arg);
+        auto obj = _table->get_or_create_obj(arg);
         if (!obj)
         {
             continue;
         }
         _actual_vars[obj] += exponent;
-        auto it = min_arg_map.find(obj);
-        if (it == min_arg_map.end())
-        {
-            min_arg_map[obj] = arg;
-        }
-        else if (arg < it->second)
-        {
-            it->second = arg;
-        }
     }
 
     for (auto it = _actual_vars.begin(); it != _actual_vars.end();)
@@ -344,13 +333,18 @@ void Term::update() const
     }
 
     _vars.clear();
-    for (const auto &[obj, exponent] : _actual_vars)
+    const auto &reverse_map = _table->obj_map_reverse();
+    for (const auto &[obj_ptr, exponent] : _actual_vars)
     {
-        if (exponent != 0)
+        auto it = reverse_map.find(obj_ptr);
+        if (it == reverse_map.end() || it->second.empty())
         {
-            TermArg min_arg = min_arg_map[obj];
-            _vars[min_arg] = exponent;
+            continue;
         }
+
+        const vector<TermArg> &args = it->second;
+        TermArg min_arg = *min_element(args.begin(), args.end());
+        _vars[min_arg] = exponent;
     }
 
     _version = _table->version();
@@ -369,10 +363,6 @@ int Term::degree() const
 double Term::to_double() const
 {
     double res = _coeff.to_double();
-    // for (const auto &pair : _actual_vars)
-    // {
-    //     res *= pow(pair.first->to_double(), pair.second);
-    // }
     for (const auto &pair : _vars)
     {
         res *= pow(pair.first.to_double(), pair.second);
@@ -458,12 +448,12 @@ ostream &operator<<(ostream &os, const Term &term)
 
 size_t Term::hash() const
 {
-    std::size_t seed = std::hash<std::string>{}(_coeff.to_string());
+    size_t seed = std::hash<string>{}(_coeff.to_string());
     update();
     for (const auto &[obj, exp] : _actual_vars)
     {
-        std::size_t h1 = std::hash<Object *>{}(obj);
-        std::size_t h2 = std::hash<int>{}(exp);
+        size_t h1 = std::hash<Object *>{}(obj.get());
+        size_t h2 = std::hash<int>{}(exp);
         seed ^= h1 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
         seed ^= h2 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
     }

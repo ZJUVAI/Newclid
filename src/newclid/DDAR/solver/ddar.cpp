@@ -12,20 +12,20 @@
 
 using namespace std;
 
-DDARSolver::DDARSolver(Problem *problem, bool log_enabled, bool exp_enabled) : _problem(problem), _log_enabled(log_enabled), _exp_enabled(exp_enabled), _table(new ObjectTable())
+DDARSolver::DDARSolver(Problem *problem, bool log_enabled, bool exp_enabled) : _problem(problem), _log_enabled(log_enabled), _exp_enabled(exp_enabled), _table_slope(new ObjectTable()), _table_dist(new ObjectTable()), _table_distlog(new ObjectTable())
 {
-    // cout << "添加前提条件" << endl;
-    for (const auto &hyp : problem->hypotheses())
-    {
-        this->insert_statement(hyp->normalize())->prove_by_assumption();
-        // cout << hyp->to_string() << "已添加" << endl;
-    }
-
     // cout << "匹配定理" << endl;
     Matcher matcher(problem, _goals.empty());
     for (const auto &thm : matcher.theorems())
     {
         insert_application(thm.clone());
+    }
+
+    // cout << "添加前提条件" << endl;
+    for (const auto &hyp : problem->hypotheses())
+    {
+        this->insert_statement(hyp->normalize())->prove_by_assumption();
+        // cout << hyp->to_string() << "已添加" << endl;
     }
 
     if (!problem->goals().empty())
@@ -139,7 +139,6 @@ bool DDARSolver::run(size_t max_levels)
         _solved = true;
     }
     // _system.print_equations();
-    // _table->print();
 
     return _solved;
 }
@@ -216,7 +215,7 @@ size_t DDARSolver::num_applications() const
     return _applications.size();
 }
 
-size_t DDARSolver::push_established_statement(const Proof *pf)
+size_t DDARSolver::push_established_statement(Proof *pf)
 {
     size_t const index = _checked_statements.size();
     _checked_statements.push_back(pf);
@@ -268,7 +267,7 @@ vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement
 
     if (type == "dist")
     {
-        auto eqn_ptrs = pf->as_equation_dist(_exp_enabled, _table);
+        auto eqn_ptrs = pf->as_equation_dist(_exp_enabled, _table_dist);
         if (!eqn_ptrs.empty())
         {
             for (const auto &eqn_ptr : eqn_ptrs)
@@ -288,7 +287,7 @@ vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement
     }
     if (type == "slope")
     {
-        auto eqn_ptrs = pf->as_equation_slope(_exp_enabled, _table);
+        auto eqn_ptrs = pf->as_equation_slope(_exp_enabled, _table_slope);
         if (!eqn_ptrs.empty())
         {
             for (const auto &eqn_ptr : eqn_ptrs)
@@ -308,7 +307,7 @@ vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement
     }
     if (type == "distlog" && _log_enabled)
     {
-        auto eqn_ptrs = pf->as_equation_distlog(_exp_enabled, _table);
+        auto eqn_ptrs = pf->as_equation_distlog(_exp_enabled, _table_distlog);
         if (!eqn_ptrs.empty())
         {
             for (const auto &eqn_ptr : eqn_ptrs)
@@ -335,4 +334,27 @@ void DDARSolver::add_established_equations(Proof *pf)
     _system_dist.add_reduced_equation(pf, "dist");
     _system_distlog.add_reduced_equation(pf, "distlog");
     _system_slope.add_reduced_equation(pf, "slope");
+    if (pf->name() == "eqpoint")
+    {
+        auto pts = pf->statement()->points();
+        Point p = pts[0];
+        Point q = pts[1];
+        for (auto &old_pf : _checked_statements)
+        {
+            if (old_pf->statement()->contain(p) && !old_pf->statement()->contain(q))
+            {
+                auto stmt = old_pf->statement()->replace(p, q);
+                string key = stmt->normalize()->to_string();
+                auto itr = _statement_proofs.find(key);
+                if (itr != _statement_proofs.end())
+                {
+                    Proof *new_pf = itr->second.get();
+                    if (!new_pf->is_proved())
+                    {
+                        new_pf->set_proved(pf, old_pf);
+                    }
+                }
+            }
+        }
+    }
 }

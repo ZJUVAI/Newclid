@@ -27,6 +27,11 @@ bool Point::operator==(const Point &other) const
     return _name == other.name();
 }
 
+bool Point::operator!=(const Point &other) const
+{
+    return _name == other.name();
+}
+
 bool Point::operator<(const Point &other) const
 {
     return _name < other.name();

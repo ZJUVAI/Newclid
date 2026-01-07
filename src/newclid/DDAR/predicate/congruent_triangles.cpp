@@ -39,6 +39,29 @@ unique_ptr<Statement> CongruentTriangles::normalize() const
     return make_unique<CongruentTriangles>(base.left(), base.right(), base.sameclock());
 }
 
+unique_ptr<Statement> CongruentTriangles::replace(Point p, Point q) const
+{
+    auto left_pts = left().points();
+    Point la = left_pts[0], lb = left_pts[1], lc = left_pts[2];
+
+    Point new_la = (la == p) ? q : la;
+    Point new_lb = (lb == p) ? q : lb;
+    Point new_lc = (lc == p) ? q : lc;
+
+    Triangle new_left(new_la, new_lb, new_lc);
+
+    auto right_pts = right().points();
+    Point ra = right_pts[0], rb = right_pts[1], rc = right_pts[2];
+
+    Point new_ra = (ra == p) ? q : ra;
+    Point new_rb = (rb == p) ? q : rb;
+    Point new_rc = (rc == p) ? q : rc;
+
+    Triangle new_right(new_ra, new_rb, new_rc);
+
+    return make_unique<CongruentTriangles>(new_left, new_right, sameclock());
+}
+
 Cong CongruentTriangles::cong_ab() const
 {
     return {left().dist_ab(), right().dist_ab()};

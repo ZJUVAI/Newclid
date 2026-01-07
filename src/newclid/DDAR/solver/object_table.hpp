@@ -17,7 +17,7 @@ class ObjectTable
 {
 private:
     std::map<std::string, std::shared_ptr<Object>> _obj_map;
-    std::unordered_map<std::shared_ptr<Object>, std::vector<std::string>> _obj_map_reverse;
+    std::unordered_map<std::shared_ptr<Object>, std::vector<TermArg>> _obj_map_reverse;
 
     size_t _version{0};
 
@@ -29,15 +29,17 @@ private:
 public:
     ObjectTable() = default;
 
-    Object *get_obj(const TermArg &s);
+    std::shared_ptr<Object> get_obj(const TermArg &s);
 
-    Object *get_or_create_obj(const TermArg &s);
+    std::shared_ptr<Object> get_or_create_obj(const TermArg &s);
 
-    void merge(const TermArg &s1, const TermArg &s2, std::vector<Proof *> reason);
+    void merge(const std::vector<TermArg> &terms, std::vector<Proof *> reason);
 
     std::vector<std::pair<std::string, Object *>> get_all_objs() const;
 
     void print() const;
+
+    const std::unordered_map<std::shared_ptr<Object>, std::vector<TermArg>> &obj_map_reverse() const { return _obj_map_reverse; }
 
     size_t version() const { return _version; }
 };

@@ -1,5 +1,4 @@
 #include "ar/reduced_equation.hpp"
-
 #include "ar/equation.hpp"
 #include "ar/linear_system.hpp"
 
@@ -18,6 +17,7 @@ void ReducedEquation::set_index(size_t index, const LinearSystem *system)
 
 void ReducedEquation::reduce()
 {
+    // _remainder.normalize();
     if (_remainder.empty())
     {
         return;
