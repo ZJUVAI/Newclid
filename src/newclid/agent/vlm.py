@@ -219,7 +219,7 @@ class VLMAgent(DeductiveAgent):
         
         t0 = time.time()
         step = 0
-        image_dir = "temp/vlm_images/"
+        image_dir = "temp/vlm_images_inverted/"
         os.makedirs(image_dir, exist_ok=True)
         
         # Check goals numerically 
@@ -243,7 +243,6 @@ class VLMAgent(DeductiveAgent):
             # Create two BeamQueues for each model: one for with_predicate, one for no_predicate
             # beam_queues[i][j]: i is the model index, j=0 for with_predicate, j=1 for no_predicate
             beam_queues = []
-<<<<<<< HEAD
             for i in range(len(self.models)):
                 q_with_pred = BeamQueue(max_size=self.beam_size)
                 q_with_pred.add(node=(self.problemJGEX, base_proof, proof), val=0)
@@ -356,7 +355,6 @@ class VLMAgent(DeductiveAgent):
                                 ray.shutdown()
                                 print(f"success with problem: {str(new_problem)}")
                                 return infos(True, str(new_problem))
-<<<<<<< HEAD
                             elif depth < self.search_depth - 1:
                                 new_problem, prev_score, score, queue_idx = future_info[f]
                                 new_queues[queue_idx].add(node=(new_problem, res, proof_ori), val=prev_score+score)
