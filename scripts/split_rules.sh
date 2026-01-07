@@ -2,8 +2,8 @@
 set -euo pipefail
 
 HEADER="src/newclid/default_configs/rules.txt"
-SPLIT_SRC="datasets/extracted_rules/c10s100k_rules_norm.txt"
-OUTDIR="src/newclid/default_configs/candidate_rules_c10s100k"
+SPLIT_SRC="datasets/extracted_rules/c10s200k/rules_folded.txt"
+OUTDIR="src/newclid/default_configs/candidate_rules_c10s200k_folded"
 
 mkdir -p "$OUTDIR"
 rm -f "$OUTDIR"/rules_*.txt
