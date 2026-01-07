@@ -5,6 +5,7 @@ import os
 import re
 from tqdm import tqdm  # 如果没有安装 tqdm，可以注释掉相关行
 from typing import Set, Dict, List, Tuple, Optional
+from pathlib import Path
 
 # 引入类
 from proof_graph import ProofGraph
@@ -13,16 +14,16 @@ from proof_graph_visualizer import ProofGraphVisualizer
 
 # 配置路径
 
-FILE_PROFIX = "geometry_clauses10_samples50"  # 文件前缀标识符
-FILE_PROFIX_SHORT = "c10s50"  # 文件前缀标识符
+FILE_PROFIX = "geometry_clauses10_samples200k"  # 文件前缀标识符
+FILE_PROFIX_SHORT = "c10s200k"  # 文件前缀标识符
 # FILE_PROFIX_SHORT = FILE_PROFIX.replace("geometry_clauses", "c").replace("_samples", "s")
 
 RAW_INPUT = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/generated_data/{FILE_PROFIX}.jsonl"  # 输入文件名
-INTERMEDIATE = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/{FILE_PROFIX_SHORT}_intermediate.jsonl"  # 中间文件名
-RULE_OUTPUT = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/{FILE_PROFIX_SHORT}_rules.txt" # 输出文件名
-SELECTED_SUBGRAPHS_OUTPUT = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/{FILE_PROFIX_SHORT}_selected_subgraphs.jsonl"  # 最终去重后保留的子图(用于最终渲染)
+INTERMEDIATE = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/{FILE_PROFIX_SHORT}/{FILE_PROFIX_SHORT}_intermediate.jsonl"  # 中间文件名
+RULE_OUTPUT = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/{FILE_PROFIX_SHORT}/{FILE_PROFIX_SHORT}_rules.txt" # 输出文件名
+SELECTED_SUBGRAPHS_OUTPUT = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/{FILE_PROFIX_SHORT}/{FILE_PROFIX_SHORT}_selected_subgraphs.jsonl"  # 最终去重后保留的子图(用于最终渲染)
 ENABLE_RULE_NORMALIZATION = True  # 是否启用规则规范化
-NORM_RULE_OUTPUT = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/{FILE_PROFIX_SHORT}_rules_norm.txt" # 输出文件名
+NORM_RULE_OUTPUT = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/extracted_rules/{FILE_PROFIX_SHORT}/{FILE_PROFIX_SHORT}_rules_norm.txt" # 输出文件名
 RENDER_SUBGRAPHS = False  # 是否渲染提取出的子图用于调试
 RENDER_DIR = f"/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/proof_graphs/{FILE_PROFIX_SHORT}/"  # 渲染输出目录
 ENABLE_REBUILD_PROBLEMS = True  # 是否重建题目
@@ -115,6 +116,10 @@ def stage_deduplicate_and_export(
 
         # 1) 前提按谓词名排序，保证一致性
         parsed_premises.sort(key=lambda x: (x[0]))
+        
+        # 如果premises的数量超过10，认为该定理长度过长，忽略该定理
+        if len(parsed_premises) > 10:
+            return None, None
 
         # 2) 变量重命名
         rename_map: dict[str, str] = {}
@@ -138,7 +143,7 @@ def stage_deduplicate_and_export(
         for pred, args in parsed_premises:
             new_args = map_vars(args)
             norm_premises.append(f"{pred} {' '.join(new_args)}")
-            if pred in ["contri", "simtri", "contrir", "simtrir"]:
+            if pred in ["contri", "simtri", "contrir", "simtrir", "aconst", "rconst"]:
                 contain_con_sim = True
         if contain_con_sim:
             return None, None
@@ -497,6 +502,12 @@ def stage_rebuild_problems(
 if __name__ == "__main__":
     # 运行处理
     print(f"=== Stage 1: Extracting Subgraphs to {INTERMEDIATE} ===")
+    # 确保输出目录存在
+    Path(INTERMEDIATE).parent.mkdir(parents=True, exist_ok=True)
+    Path(RULE_OUTPUT).parent.mkdir(parents=True, exist_ok=True)
+    Path(SELECTED_SUBGRAPHS_OUTPUT).parent.mkdir(parents=True, exist_ok=True)
+    Path(NORM_RULE_OUTPUT).parent.mkdir(parents=True, exist_ok=True)
+    Path(REBUILD_OUTPUT).parent.mkdir(parents=True, exist_ok=True)
     stage_extract_subgraphs(RAW_INPUT, INTERMEDIATE)
     final_rules = NORM_RULE_OUTPUT if ENABLE_RULE_NORMALIZATION else RULE_OUTPUT
     print(f"=== Stage 2: Deduplicating+Normalizing Exporting to {final_rules} ===")
