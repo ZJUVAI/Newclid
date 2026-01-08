@@ -27,6 +27,8 @@ def process_line(line_data):
     """
     # 形式1: 原形式
     form1 = copy.deepcopy(line_data)
+    if 'image_path' in form1:
+        form1['image_path'] = [form1['image_path']]
     
     # 形式2: 将image_path改为空
     form2 = copy.deepcopy(line_data)
@@ -37,9 +39,11 @@ def process_line(line_data):
     form3 = copy.deepcopy(line_data)
     if 'llm_input_renamed' in form3 and 'llm_output_renamed' in form3:
         # 将llm_input_renamed加到llm_output_renamed前面（中间加空格）
-        form3['llm_output_renamed'] = form3['llm_input_renamed'] + " " + form3['llm_output_renamed']
+        form3['llm_output_renamed'] = form3['llm_input_renamed']
         # 将llm_input_renamed改为空
         form3['llm_input_renamed'] = ""
+    if 'image_path' in form3:
+        form3['image_path'] = [form3['image_path']]
     
     return [form1, form2, form3]
 
