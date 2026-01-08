@@ -31,7 +31,7 @@ def process_line(line_data):
     # 形式2: 将image_path改为空
     form2 = copy.deepcopy(line_data)
     if 'image_path' in form2:
-        form2['image_path'] = ""
+        form2['image_path'] = []
     
     # 形式3: 将llm_input_renamed加到llm_output_renamed前，并将llm_input_renamed改为空
     form3 = copy.deepcopy(line_data)
