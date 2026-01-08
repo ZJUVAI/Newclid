@@ -13,6 +13,7 @@
 """
 
 import argparse
+import concurrent.futures
 import json
 import os
 import random
@@ -35,6 +36,7 @@ DEFAULT_N_AUX = 2        # 每次采样的辅助点数量
 DEFAULT_MAX_ATTEMPTS = 15  # 每道题的最大尝试次数
 DEFAULT_TIMEOUT = 600    # 单次求解超时秒数
 DEFAULT_SEED = 42        # 随机种子
+DEFAULT_MAX_WORKERS = 10  # 并行进程数（默认1即串行）
 
 
 @dataclass
@@ -439,6 +441,119 @@ def save_summary(results: List[SolveResult], summary_path: str, total_time: floa
             f.write("\n")
 
 
+def solve_single_problem(
+    problem: Problem,
+    candidates: List[AuxPoint],
+    args_dict: Dict,
+    problem_index: int
+) -> SolveResult:
+    """单题求解函数，用于并行调度
+    
+    Args:
+        problem: 题目对象
+        candidates: 该题目的候选辅助点列表
+        args_dict: 参数字典（可序列化）
+        problem_index: 题目在列表中的索引（用于生成随机种子）
+    
+    Returns:
+        SolveResult: 求解结果
+    """
+    # 为每道题设置独立的随机种子（基于 seed + problem_index）
+    random.seed(args_dict['seed'] + problem_index)
+    
+    rules_path = args_dict['rules']
+    n_aux = args_dict['n_aux']
+    max_attempts = args_dict['max_attempts']
+    timeout = args_dict['timeout']
+    is_parallel = args_dict.get('max_workers', 1) > 1
+    
+    # 没有候选辅助点时，直接求解
+    if not candidates:
+        solved, runtime, error = solve_problem(problem, rules_path, timeout)
+        result = SolveResult(
+            problem_name=problem.name,
+            solved=solved,
+            attempts=1,
+            runtime=runtime,
+            aux_points_used=[],
+            error=error
+        )
+        if not is_parallel:
+            status = "✓ 成功" if solved else ("✗ 错误: " + str(error) if error else "✗ 失败")
+            print(f"结果: {status}")
+            print(f"用时: {runtime:.2f}s\n")
+        return result
+    
+    # 获取已有点名，预生成足够的新点名
+    existing_point_names = [p[0] for p in problem.points]
+    n_sample = min(n_aux, len(candidates))
+    precomputed_new_names = generate_new_point_names(existing_point_names, n_sample)
+    
+    result = SolveResult(
+        problem_name=problem.name,
+        solved=False,
+        attempts=0,
+        runtime=0.0,
+        aux_points_used=[],
+        error=None
+    )
+    
+    total_runtime = 0.0
+    solved = False
+    
+    for attempt in range(max_attempts):
+        result.attempts = attempt + 1
+        
+        # 随机采样辅助点
+        sampled_aux = random.sample(candidates, n_sample)
+        
+        # 使用预生成的点名
+        new_names = precomputed_new_names
+        
+        # 构建增强后的题目
+        augmented = augment_problem(problem, sampled_aux, new_names)
+        
+        # 求解
+        try:
+            is_solved, runtime, error = solve_problem(augmented, rules_path, timeout)
+            total_runtime += runtime
+            
+            if is_solved:
+                solved = True
+                result.solved = True
+                result.runtime = total_runtime
+                result.aux_points_used = [
+                    {
+                        "name": new_name,
+                        "coords": [aux.x, aux.y],
+                        "predicates": [rename_predicate(p, aux.temp_name, new_name) for p in aux.predicates]
+                    }
+                    for aux, new_name in zip(sampled_aux, new_names)
+                ]
+                if not is_parallel:
+                    print(f"✓ 第 {attempt + 1} 次尝试成功！用时: {total_runtime:.2f}s")
+                    print(f"  使用辅助点: {new_names}")
+                break
+            
+            if error:
+                # 记录错误但继续尝试
+                pass
+        
+        except Exception as e:
+            result.error = str(e)
+        
+        # 串行模式下每 10 次打印进度
+        if not is_parallel and (attempt + 1) % 10 == 0:
+            print(f"  已尝试 {attempt + 1}/{max_attempts} 次...")
+    
+    if not solved:
+        result.runtime = total_runtime
+        if not is_parallel:
+            print(f"✗ {max_attempts} 次尝试后仍未成功，用时: {total_runtime:.2f}s")
+    
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="带辅助点随机采样的题目求解脚本"
@@ -502,6 +617,12 @@ def main():
         action="store_true",
         help="从已有结果断点续跑"
     )
+    parser.add_argument(
+        "--max-workers",
+        type=int,
+        default=DEFAULT_MAX_WORKERS,
+        help="并行进程数（默认1即串行）"
+    )
 
     args = parser.parse_args()
 
@@ -518,6 +639,7 @@ def main():
     print(f"最大尝试次数: {args.max_attempts}")
     print(f"单次超时: {args.timeout}s")
     print(f"随机种子: {args.seed}")
+    print(f"并行进程数: {args.max_workers}")
     print("=" * 60 + "\n")
 
     # 解析题目
@@ -537,117 +659,109 @@ def main():
         existing_results = load_existing_results(args.output)
         print(f"断点续跑：已有 {len(existing_results)} 道题目成功求解，将跳过\n")
 
-    # 求解
-    results: List[SolveResult] = []
+    # 构建参数字典（用于传递给子进程）
+    args_dict = {
+        'rules': args.rules,
+        'n_aux': args.n_aux,
+        'max_attempts': args.max_attempts,
+        'timeout': args.timeout,
+        'seed': args.seed,
+        'max_workers': args.max_workers,
+    }
+
+    # 准备待求解的题目列表（排除已成功的）
+    problems_to_solve = []
+    for idx, problem in enumerate(problems):
+        if problem.name in existing_results:
+            continue
+        candidates = aux_points_map.get(problem.name, [])
+        problems_to_solve.append((idx, problem, candidates))
+    
+    print(f"待求解题目数: {len(problems_to_solve)}\n")
+
+    # 初始化结果列表（包含已有结果）
+    results_dict: Dict[str, SolveResult] = dict(existing_results)
     total_start_time = time.time()
 
-    for idx, problem in enumerate(problems, 1):
-        print("-" * 60)
-        print(f"[{idx}/{len(problems)}] {problem.name}")
-        print("-" * 60)
-
-        # 检查是否已成功求解
-        if problem.name in existing_results:
-            print("已成功求解，跳过\n")
-            results.append(existing_results[problem.name])
-            continue
-
-        # 获取该题目的候选辅助点
-        candidates = aux_points_map.get(problem.name, [])
-        if not candidates:
-            print(f"警告：没有找到辅助点候选，尝试直接求解\n")
-            # 尝试直接求解（无辅助点）
-            solved, runtime, error = solve_problem(problem, args.rules, args.timeout)
-            result = SolveResult(
-                problem_name=problem.name,
-                solved=solved,
-                attempts=1,
-                runtime=runtime,
-                aux_points_used=[],
-                error=error
-            )
-            results.append(result)
-            status = "✓ 成功" if solved else ("✗ 错误: " + str(error) if error else "✗ 失败")
-            print(f"结果: {status}")
-            print(f"用时: {runtime:.2f}s\n")
-            continue
-
-        print(f"候选辅助点: {len(candidates)} 个")
-
-        # 获取已有点名，预生成足够的新点名（只需计算一次）
-        existing_point_names = [p[0] for p in problem.points]
-        n_sample = min(args.n_aux, len(candidates))
-        precomputed_new_names = generate_new_point_names(existing_point_names, n_sample)
-
-        result = SolveResult(
-            problem_name=problem.name,
-            solved=False,
-            attempts=0,
-            runtime=0.0,
-            aux_points_used=[],
-            error=None
-        )
-
-        total_runtime = 0.0
-        solved = False
-
-        for attempt in range(args.max_attempts):
-            result.attempts = attempt + 1
-
-            # 随机采样辅助点
-            sampled_aux = random.sample(candidates, n_sample)
-
-            # 使用预生成的点名
-            new_names = precomputed_new_names
-
-            # 构建增强后的题目
-            augmented = augment_problem(problem, sampled_aux, new_names)
-
-            # 求解
-            try:
-                is_solved, runtime, error = solve_problem(augmented, args.rules, args.timeout)
-                total_runtime += runtime
-
-                if is_solved:
-                    solved = True
-                    result.solved = True
-                    result.runtime = total_runtime
-                    result.aux_points_used = [
-                        {
-                            "name": new_name,
-                            "coords": [aux.x, aux.y],
-                            "predicates": [rename_predicate(p, aux.temp_name, new_name) for p in aux.predicates]
-                        }
-                        for aux, new_name in zip(sampled_aux, new_names)
-                    ]
-                    print(f"✓ 第 {attempt + 1} 次尝试成功！用时: {total_runtime:.2f}s")
-                    print(f"  使用辅助点: {new_names}")
-                    break
-
-                if error:
-                    # 记录错误但继续尝试
-                    pass
-
-            except Exception as e:
-                result.error = str(e)
-
-            # 每 10 次打印进度
-            if (attempt + 1) % 10 == 0:
-                print(f"  已尝试 {attempt + 1}/{args.max_attempts} 次...")
-
-        if not solved:
-            result.runtime = total_runtime
-            print(f"✗ {args.max_attempts} 次尝试后仍未成功，用时: {total_runtime:.2f}s")
-
-        results.append(result)
-        print()
-
-        # 定期保存结果
-        if idx % 10 == 0:
-            save_results(results, args.output)
-            print(f"[自动保存] 已保存 {len(results)} 道题目的结果\n")
+    if args.max_workers == 1:
+        # ============== 串行模式 ==============
+        for idx, problem, candidates in problems_to_solve:
+            print("-" * 60)
+            print(f"[{idx + 1}/{len(problems)}] {problem.name}")
+            print("-" * 60)
+            
+            if not candidates:
+                print(f"警告：没有找到辅助点候选，尝试直接求解")
+            else:
+                print(f"候选辅助点: {len(candidates)} 个")
+            
+            result = solve_single_problem(problem, candidates, args_dict, idx)
+            results_dict[problem.name] = result
+            print()
+            
+            # 定期保存结果
+            if (idx + 1) % 10 == 0:
+                results_list = [results_dict.get(p.name) for p in problems if p.name in results_dict]
+                save_results(results_list, args.output)
+                print(f"[自动保存] 已保存 {len(results_list)} 道题目的结果\n")
+    else:
+        # ============== 并行模式 ==============
+        print(f"启用并行模式，使用 {args.max_workers} 个进程\n")
+        
+        completed_count = 0
+        total_to_solve = len(problems_to_solve)
+        
+        with concurrent.futures.ProcessPoolExecutor(max_workers=args.max_workers) as executor:
+            # 提交所有任务
+            future_to_problem = {}
+            for idx, problem, candidates in problems_to_solve:
+                future = executor.submit(
+                    solve_single_problem,
+                    problem,
+                    candidates,
+                    args_dict,
+                    idx
+                )
+                future_to_problem[future] = (idx, problem)
+            
+            # 收集结果
+            for future in concurrent.futures.as_completed(future_to_problem):
+                idx, problem = future_to_problem[future]
+                completed_count += 1
+                
+                try:
+                    result = future.result()
+                    results_dict[problem.name] = result
+                    
+                    # 打印简洁进度
+                    status = "✓" if result.solved else "✗"
+                    attempts_info = f"({result.attempts} attempts)" if result.attempts > 1 else ""
+                    print(f"[{completed_count}/{total_to_solve}] {status} {problem.name} {attempts_info} ({result.runtime:.1f}s)")
+                    
+                except Exception as e:
+                    print(f"[{completed_count}/{total_to_solve}] ✗ {problem.name} 错误: {e}")
+                    results_dict[problem.name] = SolveResult(
+                        problem_name=problem.name,
+                        solved=False,
+                        attempts=0,
+                        runtime=0.0,
+                        aux_points_used=[],
+                        error=str(e)
+                    )
+                
+                # 定期保存结果
+                if completed_count % 10 == 0:
+                    results_list = [results_dict.get(p.name) for p in problems if p.name in results_dict]
+                    save_results(results_list, args.output)
+                    print(f"[自动保存] 已保存 {len(results_list)} 道题目的结果")
 
     total_time = time.time() - total_start_time
+
+    # 按原始顺序整理结果
+    results: List[SolveResult] = []
+    for problem in problems:
+        if problem.name in results_dict:
+            results.append(results_dict[problem.name])
 
     # 最终保存
     save_results(results, args.output)

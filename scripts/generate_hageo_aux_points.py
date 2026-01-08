@@ -31,15 +31,17 @@
 import argparse
 import logging
 import math
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from itertools import combinations
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Set
 
 # ==================== 默认配置（硬编码路径） ====================
 
-DEFAULT_INPUT = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/rebuild_problems/hageo_224_remain_rebuild.txt"
-DEFAULT_OUTPUT = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/rebuild_problems/hageo_224_remain_rebuild_aux_points.txt"
+DEFAULT_INPUT = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/rebuild_problems/hageo_409_rebuild.txt"
+DEFAULT_OUTPUT = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/rebuild_problems/hageo_409_rebuild_aux_points.txt"
 DEFAULT_TOLERANCE = 1e-6
+DEFAULT_MAX_WORKERS = 10  # 默认单进程，设置 > 1 启用并行
 
 # ==================== 日志配置 ====================
 
@@ -856,6 +858,12 @@ def main():
         default=DEFAULT_TOLERANCE,
         help=f"数值容差 (默认: {DEFAULT_TOLERANCE})"
     )
+    parser.add_argument(
+        "--max-workers", "-w",
+        type=int,
+        default=DEFAULT_MAX_WORKERS,
+        help=f"并行工作进程数，1 表示单进程 (默认: {DEFAULT_MAX_WORKERS})"
+    )
     
     args = parser.parse_args()
     
@@ -864,18 +872,49 @@ def main():
     logger.info(f"输入文件: {args.input}")
     logger.info(f"输出文件: {args.output}")
     logger.info(f"容差: {args.tolerance}")
+    logger.info(f"并行进程数: {args.max_workers}")
     logger.info("=" * 60)
     
     # 解析输入文件
     problems = parse_rebuild_file(args.input)
     
     # 为每道题目生成辅助点
-    all_aux_results = []
-    for idx, problem in enumerate(problems):
-        logger.info(f"[{idx + 1}/{len(problems)}] 处理: {problem['name']} (共 {len(problem['points'])} 个点)")
-        aux_points = generate_aux_points_for_problem(problem, args.tolerance)
-        all_aux_results.append(aux_points)
-        logger.info(f"  生成 {len(aux_points)} 个辅助点")
+    all_aux_results = [None] * len(problems)  # 预分配列表以保持顺序
+    
+    if args.max_workers <= 1:
+        # 单进程模式
+        for idx, problem in enumerate(problems):
+            logger.info(f"[{idx + 1}/{len(problems)}] 处理: {problem['name']} (共 {len(problem['points'])} 个点)")
+            aux_points = generate_aux_points_for_problem(problem, args.tolerance)
+            all_aux_results[idx] = aux_points
+            logger.info(f"  生成 {len(aux_points)} 个辅助点")
+    else:
+        # 并行模式
+        logger.info(f"启用并行处理，使用 {args.max_workers} 个工作进程")
+        
+        with ProcessPoolExecutor(max_workers=args.max_workers) as executor:
+            # 提交所有任务，记录 future 到索引的映射
+            future_to_idx = {}
+            for idx, problem in enumerate(problems):
+                future = executor.submit(
+                    generate_aux_points_for_problem, 
+                    problem, 
+                    args.tolerance
+                )
+                future_to_idx[future] = (idx, problem)
+            
+            # 收集结果（按完成顺序）
+            completed = 0
+            for future in as_completed(future_to_idx):
+                idx, problem = future_to_idx[future]
+                try:
+                    aux_points = future.result()
+                    all_aux_results[idx] = aux_points
+                    completed += 1
+                    logger.info(f"[{completed}/{len(problems)}] 完成: {problem['name']} - 生成 {len(aux_points)} 个辅助点")
+                except Exception as e:
+                    logger.error(f"处理 {problem['name']} 时出错: {e}")
+                    all_aux_results[idx] = []
     
     # 写出结果
     write_output(problems, all_aux_results, args.output, args.tolerance)
