@@ -8,6 +8,7 @@ from rich.live import Live
 from rich.table import Table
 
 from newclid.agent.vlm import VLMAgent
+from newclid.agent.internvlm import InternVLMAgent
 from newclid.api import GeometricSolverBuilder
 from newclid.generation.problem_worker import GeometryProblemWorker
 
@@ -16,14 +17,22 @@ def ray_solve_problem(args):
     """
     Process a single problem and return whether it was solved successfully along with the time taken.
     """
-    pid, problem_name, problems_path, model_path, decoding_size, beam_size, search_depth, timeout = args
+    pid, problem_name, problems_path, model_path, decoding_size, beam_size, search_depth, timeout, agent_type = args
     start_time = time.time()
     try:
         # print(f"building problem: {problem_name}")
+        # Select agent based on agent_type
+        if agent_type == "vlm":
+            agent = VLMAgent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
+        elif agent_type == "internvlm":
+            agent = InternVLMAgent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
+        else:
+            raise ValueError(f"Unknown agent type: {agent_type}. Must be 'vlm' or 'internvlm'")
+        
         solver = (
             GeometricSolverBuilder()
             .load_problem_from_file(problems_path, problem_name, rename=True)
-            .with_deductive_agent(VLMAgent(model_path, decoding_size=decoding_size,beam_size=beam_size, search_depth=search_depth))
+            .with_deductive_agent(agent)
             .build()
         )
         # print(f"problem_name: {problem_name}")
@@ -57,7 +66,7 @@ def render_table(all_tasks_info, start_time, reorder: bool):
         table.add_row(problem_name, status, elapsed)
     return table
 
-def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding_size: int, beam_size: int, search_depth: int, timeout: int = 3600):
+def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding_size: int, beam_size: int, search_depth: int, timeout: int = 3600, agent_type: str = "vlm"):
     """
     Main function, read the file and execute tasks using Ray.
     """
@@ -73,6 +82,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
             problem_names.append(lines[i].strip())
  
     print(f"Total problems to solve: {len(problem_names)}")
+    print(f"Using agent: {agent_type}")
 
     # Multi-threaded execution using Ray with limited concurrent tasks
     # Initialize Ray with specified number of CPUs
@@ -91,7 +101,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
     
     # Submit all tasks
     for i, problem_name in enumerate(problem_names):
-        task = ray_solve_problem.remote((i, problem_name, filepath, modelpath, decoding_size, beam_size, search_depth, timeout))
+        task = ray_solve_problem.remote((i, problem_name, filepath, modelpath, decoding_size, beam_size, search_depth, timeout, agent_type))
         all_tasks_info.append((problem_name, "Pending", 0))
         pending_tasks.append(task)
     
@@ -157,7 +167,9 @@ if __name__ == "__main__":
     parser.add_argument("--beam_size", type=int, default=64)
     parser.add_argument("--search_depth", type=int, default=4)
     parser.add_argument("--timeout", type=int, default=7200, help="Timeout for each problem")
+    parser.add_argument("--agent", type=str, default="vlm", choices=["vlm", "internvlm"],
+                        help="Agent type to use: 'vlm' for VLMAgent or 'internvlm' for InternVLMAgent")
     args = parser.parse_args()
     
     problems_path = Path(args.problems_path)
-    solve_problems(problems_path, args.model_path, num_cpus=args.max_workers, decoding_size=args.decoding_size, beam_size=args.beam_size, search_depth=args.search_depth, timeout=args.timeout)
+    solve_problems(problems_path, args.model_path, num_cpus=args.max_workers, decoding_size=args.decoding_size, beam_size=args.beam_size, search_depth=args.search_depth, timeout=args.timeout, agent_type=args.agent)
