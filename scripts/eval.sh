@@ -4,10 +4,9 @@ export LOGLEVEL=WARNING
 # Evaluation
 
 # Model directory - modify this as needed
-model_dir="vlm_sft20"
+model_dir="sft23"
 
 export CUDA_VISIBLE_DEVICES=1,2,3,4,5,6,7
-# export CUDA_VISIBLE_DEVICES=7
 export RAY_memory_usage_threshold=0.95
 
 # Dataset options
@@ -15,10 +14,12 @@ datasets=(
     # "imo_102_requires_aux.txt"
     # "imo_2012_p5.txt"
     # "dev_imo.txt"
+    # "imo_2000_p6.txt"
     # "imo_2008_p1.txt"
-    # "imo_2008_p1b.txt"
     # "imo_2004_p1.txt"
+    # "imo_2011_p6.txt"
     # "imo_2018_p1.txt"
+    # "imo_2020_p1.txt"
     # "imo_102_supple.txt"
     # "imo_102_requires_aux_less.txt"
     # "imo_102_requires_aux_less1.txt" 
@@ -26,7 +27,6 @@ datasets=(
     # "imo_102_requires_aux_less3.txt"
     # "dev_jgex.txt" 
     "hageo_409.txt"
-    # "2007USATSTp5.gex.txt"
 )
 
 # Decoding configurations (decoding_size beam_size)
@@ -37,15 +37,15 @@ configs=(
 
 # Checkpoint options - modify this list as needed
 checkpoints=(
-    # "checkpoint-2958"
-    # "checkpoint-986"
-    # "checkpoint-203"
-    # "checkpoint-1294"
-    "checkpoint-1972"
-    # "checkpoint-198"
-    # "checkpoint-1299"
-    # "checkpoint-241"
-    # "checkpoint-5918"
+    # "checkpoint-175"
+    "checkpoint-566"
+    # "checkpoint-609"
+    # "checkpoint-977"
+    # "checkpoint-7296"	
+    # "checkpoint-644"
+    # "checkpoint-628"
+    # "checkpoint-5911"
+    # "checkpoint-5915"
     # "checkpoint-218"
     # "checkpoint-582"
     # "checkpoint-10000"
@@ -101,7 +101,7 @@ for checkpoint in "${checkpoints[@]}"; do
             read -r decoding_size beam_size <<< "$config"
             
             # Build complete command
-            cmd="python scripts/evaluation_vlm.py --problems_path benchmarks/$dataset --model_path ./models/$model_dir/$checkpoint --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth 4 --timeout 3600 --agent vlm"
+            cmd="python scripts/evaluation.py --problems_path benchmarks/$dataset --model_path ./models/$model_dir/$checkpoint --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth 4 --timeout 3600"
             
             # Print current command to execute
             echo "Executing command:"

@@ -4,15 +4,17 @@ export LOGLEVEL=WARNING
 # Evaluation
 
 # Model directory - modify this as needed
-model_dir="vlm_sft20"
+model_dir="vlm_sft25"
 
 export CUDA_VISIBLE_DEVICES=1,2,3,4,5,6,7
 # export CUDA_VISIBLE_DEVICES=7
 export RAY_memory_usage_threshold=0.95
 
+timeout=7200
+
 # Dataset options
 datasets=(
-    # "imo_102_requires_aux.txt"
+    "imo_102_requires_aux.txt"
     # "imo_2012_p5.txt"
     # "dev_imo.txt"
     # "imo_2008_p1.txt"
@@ -25,8 +27,6 @@ datasets=(
     # "imo_102_requires_aux_less2.txt"
     # "imo_102_requires_aux_less3.txt"
     # "dev_jgex.txt" 
-    "hageo_409.txt"
-    # "2007USATSTp5.gex.txt"
 )
 
 # Decoding configurations (decoding_size beam_size)
@@ -37,6 +37,7 @@ configs=(
 
 # Checkpoint options - modify this list as needed
 checkpoints=(
+    # "checkpoint-1340"
     # "checkpoint-2958"
     # "checkpoint-986"
     # "checkpoint-203"
@@ -101,7 +102,7 @@ for checkpoint in "${checkpoints[@]}"; do
             read -r decoding_size beam_size <<< "$config"
             
             # Build complete command
-            cmd="python scripts/evaluation_vlm.py --problems_path benchmarks/$dataset --model_path ./models/$model_dir/$checkpoint --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth 4 --timeout 3600 --agent vlm"
+            cmd="python scripts/evaluation_vlm.py --problems_path benchmarks/$dataset --model_path ./models/$model_dir/$checkpoint --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth 4 --timeout $timeout --agent internvlm"
             
             # Print current command to execute
             echo "Executing command:"
