@@ -108,6 +108,25 @@ EqAngle::EqAngle(Point p1, Point p2, Point p3, Point p4, Point p5, Point p6, Poi
     }
 }
 
+unique_ptr<Statement> EqAngle::replace(Point p, Point q) const
+{
+    auto left_pts = _left.points();
+    Point la = left_pts[0], lb = left_pts[1], lc = left_pts[2];
+    Point new_la = (la == p) ? q : la;
+    Point new_lb = (lb == p) ? q : lb;
+    Point new_lc = (lc == p) ? q : lc;
+    Angle new_left(new_la, new_lb, new_lc);
+
+    auto right_pts = _right.points();
+    Point ra = right_pts[0], rb = right_pts[1], rc = right_pts[2];
+    Point new_ra = (ra == p) ? q : ra;
+    Point new_rb = (rb == p) ? q : rb;
+    Point new_rc = (rc == p) ? q : rc;
+    Angle new_right(new_ra, new_rb, new_rc);
+
+    return make_unique<EqAngle>(new_left, new_right);
+}
+
 string EqAngle::name() const
 {
     return "eqangle";
@@ -160,10 +179,10 @@ vector<EqAngle> EqAngle::permutations() const
     return res;
 }
 
-vector<unique_ptr<Equation>> EqAngle::as_equation(bool log, bool exp) const
+vector<unique_ptr<Equation>> EqAngle::as_equation_slope(bool exp, ObjectTable *table) const
 {
     vector<unique_ptr<Equation>> result;
-    result.push_back(make_unique<Equation>(Equation({Term(_left.left_side()), -Term(_left.right_side()), -Term(_right.left_side()), Term(_right.right_side())})));
+    result.push_back(make_unique<Equation>(Equation({Term(_left.left_side(), table), -Term(_left.right_side(), table), -Term(_right.left_side(), table), Term(_right.right_side(), table)}, table)));
     return result;
 }
 

@@ -1,13 +1,12 @@
 #include "ar/equation.hpp"
 #include "ar/equation_index.hpp"
-#include "type/pi.hpp"
 #include "ar/term.hpp"
 
 using namespace std;
 
-Equation::Equation(vector<Term> terms) : _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))})
+Equation::Equation(vector<Term> terms, ObjectTable *table) : _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))}), _table(std::move(table))
 {
-    for (const auto &term : terms)
+    for (auto &term : terms)
     {
         auto it = std::find(_terms.begin(), _terms.end(), term);
 
@@ -25,7 +24,7 @@ Equation::Equation(vector<Term> terms) : _combination({std::make_pair(1.0, Equat
 
 Equation &Equation::operator+=(const Equation &other)
 {
-    for (const auto &term : other._terms)
+    for (auto &term : other._terms)
     {
         bool merged = false;
         for (auto &my_term : _terms)
@@ -180,6 +179,7 @@ void Equation::normalize()
             ++it;
         }
     }
+
     for (auto it = _terms.begin(); it != _terms.end();)
     {
         if (it->is_zero())
@@ -191,18 +191,50 @@ void Equation::normalize()
             ++it;
         }
     }
-    if (_terms.size() == 1 && _terms[0].is_pi())
-    {
-        _terms.clear();
-        return;
-    }
-    if (_terms.size() == 0)
-    {
-        return;
-    }
+
     sort(_terms.begin(), _terms.end());
     reverse(_terms.begin(), _terms.end());
-    Rational r = Rational(1) / (*_terms.begin()).coeff();
+
+    if (_terms.empty())
+    {
+        return;
+    }
+
+    // vector<Term> new_terms;
+    // Term current = _terms[0];
+
+    // for (size_t i = 1; i < _terms.size(); ++i)
+    // {
+    //     if (_terms[i] == current)
+    //     {
+    //         current += _terms[i];
+    //     }
+    //     else
+    //     {
+    //         new_terms.push_back(current);
+    //         current = _terms[i];
+    //     }
+    // }
+
+    // new_terms.push_back(current);
+    // _terms = std::move(new_terms);
+
+    // for (auto it = _terms.begin(); it != _terms.end();)
+    // {
+    //     if (it->is_zero())
+    //     {
+    //         it = _terms.erase(it);
+    //     }
+    //     else
+    //     {
+    //         ++it;
+    //     }
+    // }
+
+    // if (_terms.empty())
+    //     return;
+
+    Rational r = Rational(1) / (_terms.front().coeff());
     for (auto &term : _terms)
     {
         term *= r;

@@ -124,3 +124,10 @@ bool Thales::operator>=(const Thales &other) const
 {
     return !(*this < other);
 }
+
+unique_ptr<Statement> Thales::replace(Point p, Point q) const
+{
+    auto new_left = static_cast<const Coll &>(*_left.replace(p, q));
+    auto new_right = static_cast<const Coll &>(*_right.replace(p, q));
+    return make_unique<Thales>(new_left, new_right);
+}

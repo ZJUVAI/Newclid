@@ -1,5 +1,4 @@
 #include "ar/reduced_equation.hpp"
-
 #include "ar/equation.hpp"
 #include "ar/linear_system.hpp"
 
@@ -14,11 +13,11 @@ ReducedEquation::ReducedEquation(Equation &equation, LinearSystem *system) : _or
 void ReducedEquation::set_index(size_t index, const LinearSystem *system)
 {
     _remainder.set_index(index, const_cast<LinearSystem *>(system));
-    // _original_equation.set_index(index, const_cast<LinearSystem *>(system));
 }
 
 void ReducedEquation::reduce()
 {
+    // _remainder.normalize();
     if (_remainder.empty())
     {
         return;
@@ -65,7 +64,7 @@ bool ReducedEquation::substitute_variable(Term var, const Equation &e)
     while (flag)
     {
         flag = false;
-        for (auto &term : new_equation.terms())
+        for (const auto &term : new_equation.terms())
         {
             if (term.contain(var))
             {

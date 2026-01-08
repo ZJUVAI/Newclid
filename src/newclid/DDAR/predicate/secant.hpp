@@ -5,7 +5,6 @@
 #include "predicate/cong.hpp"
 #include "predicate/coll.hpp"
 #include "type/point.hpp"
-#include "type/product.hpp"
 #include "typedef.hpp"
 
 class Secant : public Statement
@@ -26,6 +25,8 @@ public:
     std::vector<Point> points() const override;
 
     std::unique_ptr<Statement> clone() const override;
+
+    std::unique_ptr<Statement> replace(Point p, Point q) const override;
 
     std::unique_ptr<Statement> normalize() const override;
 
@@ -49,7 +50,7 @@ public:
 
     Coll coll_pab() const;
 
-    std::vector<std::unique_ptr<Equation>> as_equation(bool log, bool exp) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation_dist(bool exp, ObjectTable *table) const override;
 
     bool numerical_only() const override { return false; }
 

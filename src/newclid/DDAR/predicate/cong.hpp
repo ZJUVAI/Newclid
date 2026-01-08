@@ -24,6 +24,8 @@ public:
         return std::make_unique<Cong>(*this);
     }
 
+    std::unique_ptr<Statement> replace(Point p, Point q) const override;
+
     std::unique_ptr<Statement> normalize() const override;
 
     bool check_nondegen() const override;
@@ -32,7 +34,9 @@ public:
 
     std::vector<statement_arg> args() const override;
 
-    std::vector<std::unique_ptr<Equation>> as_equation(bool log, bool exp) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation_dist(bool exp, ObjectTable *table) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp, ObjectTable *table) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation_distlog(bool exp, ObjectTable *table) const override;
 
     const Dist &left() const { return _left; }
 

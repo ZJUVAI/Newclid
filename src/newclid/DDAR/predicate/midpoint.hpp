@@ -5,7 +5,6 @@
 #include "predicate/cong.hpp"
 #include "predicate/coll.hpp"
 #include "type/point.hpp"
-#include "type/product.hpp"
 
 class Midp : public Statement
 {
@@ -22,6 +21,8 @@ public:
     std::string name() const override;
 
     std::vector<Point> points() const override;
+
+    std::unique_ptr<Statement> replace(Point p, Point q) const override;
 
     std::unique_ptr<Statement> normalize() const override;
 

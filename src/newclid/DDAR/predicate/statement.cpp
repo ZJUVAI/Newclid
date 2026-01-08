@@ -13,6 +13,19 @@ ostream &operator<<(ostream &out, const Statement &stmt)
     return stmt.print(out);
 }
 
+bool Statement::contain(const Point &p) const
+{
+    auto pts = points();
+    for (const auto &pt : pts)
+    {
+        if (pt == p)
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 string Statement::to_string() const
 {
     string res = name();

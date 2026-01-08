@@ -18,6 +18,27 @@ vector<Point> Para::points() const
     return {_left.left(), _left.right(), _right.left(), _right.right()};
 }
 
+unique_ptr<Statement> Para::replace(Point p, Point q) const
+{
+    auto left_pts = _left.points();
+    Point la = left_pts[0], lb = left_pts[1];
+
+    Point new_la = (la == p) ? q : la;
+    Point new_lb = (lb == p) ? q : lb;
+
+    Slope new_left(new_la, new_lb);
+
+    auto right_pts = _right.points();
+    Point ra = right_pts[0], rb = right_pts[1];
+
+    Point new_ra = (ra == p) ? q : ra;
+    Point new_rb = (rb == p) ? q : rb;
+
+    Slope new_right(new_ra, new_rb);
+
+    return make_unique<Para>(new_left, new_right);
+}
+
 unique_ptr<Statement> Para::normalize() const
 {
     if (_left > _right)
@@ -52,9 +73,9 @@ ostream &Para::print(ostream &os) const
     return os << _left.left() << _left.right() << " ∥ " << _right.left() << _right.right();
 }
 
-vector<unique_ptr<Equation>> Para::as_equation(bool log, bool exp) const
+vector<unique_ptr<Equation>> Para::as_equation_slope(bool exp, ObjectTable *table) const
 {
     vector<unique_ptr<Equation>> result;
-    result.push_back(make_unique<Equation>(Equation({Term(_left), -Term(_right)})));
+    result.push_back(make_unique<Equation>(Equation({Term(_left, table), -Term(_right, table)}, table)));
     return result;
 }
