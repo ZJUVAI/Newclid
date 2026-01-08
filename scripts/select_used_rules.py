@@ -8,6 +8,10 @@ import re
 from pathlib import Path
 from typing import Any, Iterable
 
+INPUT_FILES_DIR = Path("datasets/c10s100k")
+NORM_RULES_FILE = Path("datasets/extracted_rules/c10s100k_rules_norm.txt")
+OUTPUT_FILE = Path("datasets/tmp_used_rules.txt")
+
 
 RULE_NAME_RE = re.compile(r"(?<![A-Za-z0-9_])(\d+sub_\d+)(?![A-Za-z0-9_])")
 RULE_NAME_FULL_RE = re.compile(r"^(\d+sub_\d+)$")
@@ -127,21 +131,21 @@ def main() -> int:
         )
     )
     parser.add_argument(
-        "--c10s50k-dir",
+        "--input-dir",
         type=Path,
-        default=Path("datasets/c10s50k"),
+        default=INPUT_FILES_DIR,
         help="包含 JSON 结果文件的目录 (默认: datasets/c10s50k)",
     )
     parser.add_argument(
         "--norm-file",
         type=Path,
-        default=Path("datasets/extracted_rules/c10s50k_rules_norm.txt"),
+        default=NORM_RULES_FILE,
         help="规则库文件 (默认: datasets/extracted_rules/c10s50k_rules_norm.txt)",
     )
     parser.add_argument(
         "--out-file",
         type=Path,
-        default=Path("datasets/tmp_used_rules.txt"),
+        default=OUTPUT_FILE,
         help="输出文件 (默认: datasets/tmp_used_rules.txt)",
     )
     parser.add_argument(
@@ -152,11 +156,11 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    c10s50k_dir: Path = args.c10s50k_dir
+    input_dir: Path = args.input_dir
     norm_file: Path = args.norm_file
     out_file: Path = args.out_file
 
-    used, ok, fail = load_used_rule_names(c10s50k_dir, verbose=args.verbose)
+    used, ok, fail = load_used_rule_names(input_dir, verbose=args.verbose)
     norm_rules = parse_rules_norm(norm_file)
     selected_cnt, total_norm = write_selected_rules(norm_rules, used, out_file)
 

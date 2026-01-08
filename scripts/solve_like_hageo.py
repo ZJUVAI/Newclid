@@ -21,6 +21,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+from newclid.api import CSolver, DirectSolver
 
 # ============== 硬编码默认路径 ==============
 DEFAULT_PROBLEMS_PATH = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/rebuild_problems/hageo_224_remain_rebuild.txt"
@@ -280,13 +281,19 @@ def rename_predicate(predicate: str, old_name: str, new_name: str) -> str:
     例如：coll aux_int_0 a b -> coll x a b (当 old_name=aux_int_0, new_name=x)
     """
     parts = predicate.split()
-    new_parts = []
-    for part in parts:
-        if part == old_name:
-            new_parts.append(new_name)
-        else:
-            new_parts.append(part)
+    new_parts = [new_name if part == old_name else part for part in parts]
     return " ".join(new_parts)
+
+
+def rename_predicate_as_tuple(predicate: str, old_name: str, new_name: str) -> Tuple[str, List[str]]:
+    """将 predicate 中的临时点名替换为新名称，直接返回解析后的元组
+    
+    例如：coll aux_int_0 a b -> ("coll", ["x", "a", "b"]) (当 old_name=aux_int_0, new_name=x)
+    避免了先拼接成字符串再解析的开销
+    """
+    parts = predicate.split()
+    new_parts = [new_name if part == old_name else part for part in parts]
+    return (new_parts[0], new_parts[1:])
 
 
 def augment_problem(
@@ -306,14 +313,9 @@ def augment_problem(
         # 添加点坐标
         new_points.append((new_name, aux_point.x, aux_point.y))
 
-        # 添加 predicates，替换临时名称
+        # 添加 predicates，替换临时名称，直接获得解析后的元组
         for pred in aux_point.predicates:
-            renamed_pred = rename_predicate(pred, aux_point.temp_name, new_name)
-            # 解析为 (predicate_name, [args]) 格式
-            parts = renamed_pred.split()
-            pred_name = parts[0]
-            pred_args = parts[1:]
-            new_premises.append((pred_name, pred_args))
+            new_premises.append(rename_predicate_as_tuple(pred, aux_point.temp_name, new_name))
 
     return Problem(
         name=problem.name,
@@ -328,7 +330,6 @@ def solve_problem(problem: Problem, rules_path: str, timeout: int) -> Tuple[bool
     
     返回：(是否成功, 运行时间, 错误信息)
     """
-    from newclid.api import DirectSolver, CSolver
 
     try:
         Dsolver = DirectSolver(
@@ -339,13 +340,19 @@ def solve_problem(problem: Problem, rules_path: str, timeout: int) -> Tuple[bool
             rules_path=Path(rules_path),
         )
         
-        csolver = CSolver(solver=Dsolver.solver)
-
+        solver = CSolver(
+            solver=Dsolver.solver,
+            points=problem.points,
+            premises=problem.premises,
+            goals=[problem.goal],
+            problem_name=problem.name,
+        )
+        
         start_time = time.time()
-        solved = csolver.run(timeout=timeout)
+        solved = solver.run()
         end_time = time.time()
 
-        runtime = csolver.run_infos.get('runtime', end_time - start_time)
+        runtime = solver.solver.run_infos.get('runtime', end_time - start_time)
         return (solved, runtime, None)
 
     except Exception as e:
@@ -567,8 +574,10 @@ def main():
 
         print(f"候选辅助点: {len(candidates)} 个")
 
-        # 获取已有点名
+        # 获取已有点名，预生成足够的新点名（只需计算一次）
         existing_point_names = [p[0] for p in problem.points]
+        n_sample = min(args.n_aux, len(candidates))
+        precomputed_new_names = generate_new_point_names(existing_point_names, n_sample)
 
         result = SolveResult(
             problem_name=problem.name,
@@ -586,11 +595,10 @@ def main():
             result.attempts = attempt + 1
 
             # 随机采样辅助点
-            n_sample = min(args.n_aux, len(candidates))
             sampled_aux = random.sample(candidates, n_sample)
 
-            # 生成新点名
-            new_names = generate_new_point_names(existing_point_names, n_sample)
+            # 使用预生成的点名
+            new_names = precomputed_new_names
 
             # 构建增强后的题目
             augmented = augment_problem(problem, sampled_aux, new_names)

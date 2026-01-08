@@ -231,7 +231,7 @@ class GeometricSolverBuilder:
 
 
 class CSolver:
-    def __init__(self, problem: str, problem_name: str = "anonymity", seed: int = 123, solver: GeometricSolver = None, using_log: bool = False, using_exp: bool = False):
+    def __init__(self, problem: str=None, problem_name: str = "anonymity", seed: int = 123, solver: GeometricSolver = None, using_log: bool = False, using_exp: bool = False, points: List[Tuple[str, Any, Any]] = None, premises: List[Tuple[str, List[str]]] = None, goals: List[Tuple[str, List[str]]] = None):
         self.problem = problem
         self.problem_name = problem_name
         self.seed = seed
@@ -249,15 +249,24 @@ class CSolver:
             self.solver = solver
 
         # 提取信息
-        self.points: List[Tuple[str, Any, Any]] = []
-        self.premises: List[Tuple[str, List[str]]] = []
-        self.goals: List[Tuple[str, List[str]]] = []
-        self.useful_points: List[str] = []
-
-        self._extract_premises()
-        self._extract_goals()
-        self._extract_points()
-
+        
+        if points is not None:
+            self.points = points
+        else:
+            self.points: List[Tuple[str, Any, Any]] = []
+            self.useful_points: List[str] = []
+            self._extract_points()
+        if premises is not None:
+            self.premises = premises
+        else:
+            self.premises: List[Tuple[str, List[str]]] = []
+            self._extract_premises()
+        if goals is not None:
+            self.goals = goals
+        else:
+            self.goals: List[Tuple[str, List[str]]] = []
+            self._extract_goals()
+    
     # -------------------- 内部方法 -------------------- #
     def _extract_points(self):
         """提取几何点"""
