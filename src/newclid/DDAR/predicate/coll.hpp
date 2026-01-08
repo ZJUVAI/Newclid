@@ -3,7 +3,6 @@
 
 #include "predicate/statement.hpp"
 #include "predicate/eqratio.hpp"
-#include "type/product.hpp"
 #include "typedef.hpp"
 #include <set>
 
@@ -23,6 +22,8 @@ public:
 
     std::vector<Point> points() const override;
 
+    std::unique_ptr<Statement> replace(Point p, Point q) const override;
+
     std::unique_ptr<Statement> normalize() const override;
 
     std::vector<statement_arg> args() const override;
@@ -36,6 +37,8 @@ public:
     std::vector<Coll> permutations() const;
 
     bool is_between() const;
+
+    double angle() const { return Slope(_a, _b).angle(); }
 
     const Point &a() const { return _a; }
 
@@ -52,7 +55,7 @@ public:
         return std::make_unique<Coll>(*this);
     }
 
-    std::ostream &print(std::ostream &os) const override;
+    std::ostream &print(std::ostream &out) const override;
 
     bool numerical_only() const { return false; }
 
@@ -66,7 +69,8 @@ public:
 
     bool operator<(const Coll &other) const;
 
-    std::vector<std::unique_ptr<Equation>> as_equation(bool log, bool exp) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation_dist(bool exp, ObjectTable *table) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp, ObjectTable *table) const override;
 
     Coll reverse() const;
 };

@@ -3,8 +3,10 @@
 #include "predicate/coll.hpp"
 #include "predicate/cong.hpp"
 #include "predicate/cyclic.hpp"
+#include "predicate/const_line.hpp"
 #include "predicate/eqangle.hpp"
 #include "predicate/eqratio.hpp"
+#include "predicate/eqpoint.hpp"
 #include "predicate/midpoint.hpp"
 #include "predicate/ncoll.hpp"
 #include "predicate/npara.hpp"
@@ -53,6 +55,21 @@ bool Theorem::check_conclusions_numerically() const
 bool Theorem::check_numerically() const
 {
     return check_hypotheses_numerically() && check_conclusions_numerically();
+}
+
+void Theorem::print() const
+{
+    cout << _name << endl;
+    cout << "Hypotheses: " << endl;
+    for (const auto &stmt : _hypotheses)
+    {
+        cout << *stmt << endl;
+    }
+    cout << "Conclusions: " << endl;
+    for (const auto &stmt : _conclusions)
+    {
+        cout << *stmt << endl;
+    }
 }
 
 Theorem &Theorem::add_hypothesis(unique_ptr<Statement> stmt)
@@ -437,6 +454,32 @@ Theorem Theorem::definition_of_secant(const Secant &sec)
     theorem.add_hypothesis(sec.coll_pab().clone());
     theorem.add_hypothesis(sec.cong_ab().clone());
     theorem.add_conclusion(sec.clone());
+    return theorem;
+}
+
+Theorem Theorem::eqpoints_of_same_intersections(const Point &p, const Point &q, const Point &a, const Point &b, const Point &c, const Point &d)
+{
+    Theorem theorem("Two distinct lines determine a unique point", "r107");
+    if (p == a || q == a)
+    {
+        theorem.add_hypothesis(ConstLine(b, p, q).clone());
+    }
+    else
+    {
+        theorem.add_hypothesis(Coll(p, a, b).clone());
+        theorem.add_hypothesis(Coll(q, a, b).clone());
+    }
+    if (p == c || q == c)
+    {
+        theorem.add_hypothesis(ConstLine(d, p, q).clone());
+    }
+    else
+    {
+        theorem.add_hypothesis(Coll(p, c, d).clone());
+        theorem.add_hypothesis(Coll(q, c, d).clone());
+    }
+    theorem.add_hypothesis(NColl(a, b, d).clone());
+    theorem.add_conclusion(EqPoint(p, q).clone());
     return theorem;
 }
 

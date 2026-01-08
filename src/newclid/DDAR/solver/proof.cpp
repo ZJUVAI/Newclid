@@ -14,7 +14,9 @@ using namespace std;
 Proof::Proof(DDARSolver *solver, std::unique_ptr<Statement> &&p)
     : _solver(solver),
       _statement(move(p)),
-      _eqn(_solver->insert_equation(_statement)),
+      _eqn_dist(_solver->insert_equation(_statement, "dist")),
+      _eqn_slope(_solver->insert_equation(_statement, "slope")),
+      _eqn_distlog(_solver->insert_equation(_statement, "distlog")),
       _dep(nullptr)
 {
 }
@@ -48,18 +50,36 @@ void Proof::ar()
     {
         return;
     }
-
-    for (const auto &req : _eqn)
+    for (const auto &req : _eqn_dist)
     {
         req->reduce();
         if (req->is_solved())
         {
             _dep = req;
-            set_proved(ProofState::PROVED_AR);
+            set_proved(ProofState::PROVED_AR_DIST);
             return;
         }
     }
-
+    for (const auto &req : _eqn_slope)
+    {
+        req->reduce();
+        if (req->is_solved())
+        {
+            _dep = req;
+            set_proved(ProofState::PROVED_AR_SLOPE);
+            return;
+        }
+    }
+    for (const auto &req : _eqn_distlog)
+    {
+        req->reduce();
+        if (req->is_solved())
+        {
+            _dep = req;
+            set_proved(ProofState::PROVED_AR_DISTLOG);
+            return;
+        }
+    }
     return;
 }
 
@@ -77,7 +97,17 @@ const unique_ptr<Statement> &Proof::statement() const
 void Proof::print_equations() const
 {
     cout << "Proof Equations for statement: " << _statement->to_string() << endl;
-    for (const auto &eq : _eqn)
+    for (const auto &eq : _eqn_dist)
+    {
+        cout << "Original Equation: " << eq->original_equation() << endl;
+        cout << "Reduced Equation: " << eq->remainder() << endl;
+    }
+    for (const auto &eq : _eqn_distlog)
+    {
+        cout << "Original Equation: " << eq->original_equation() << endl;
+        cout << "Reduced Equation: " << eq->remainder() << endl;
+    }
+    for (const auto &eq : _eqn_slope)
     {
         cout << "Original Equation: " << eq->original_equation() << endl;
         cout << "Reduced Equation: " << eq->remainder() << endl;
@@ -95,9 +125,12 @@ vector<Proof *> Proof::get_dependencies() const
         return {};
     case ProofState::PROVED_BY_THEOREM:
         return _solver->applications()[_theoremId].hypotheses();
-    case ProofState::PROVED_AR:
-        vector<Proof *> deps = _dep->statement_dependencies();
-        return deps;
+    case ProofState::PROVED_BY_DOUBLEPOINT:
+        return _deps;
+    case ProofState::PROVED_AR_DIST:
+    case ProofState::PROVED_AR_DISTLOG:
+    case ProofState::PROVED_AR_SLOPE:
+        return _dep->statement_dependencies();
     }
     return {};
 }
@@ -116,22 +149,44 @@ string Proof::reason() const
         return "Trivial";
     case ProofState::PROVED_BY_THEOREM:
         return _solver->applications()[_theoremId].theorem().rule();
-    case ProofState::PROVED_AR:
-        return "AR";
+    case ProofState::PROVED_AR_DIST:
+        return "AR with Dist";
+    case ProofState::PROVED_AR_DISTLOG:
+        return "AR with Distlog";
+    case ProofState::PROVED_AR_SLOPE:
+        return "AR with Slope";
+    case ProofState::PROVED_BY_DOUBLEPOINT:
+        return "Transfer";
     default:
         return "Unknown";
     }
 }
 
-bool Proof::needs_aux() const
+void Proof::set_proved(Proof *doublepoint, Proof *original)
 {
-    assert(_state != ProofState::NOT_PROVED);
-    const auto max_pt = *std::max_element(_statement->points().begin(), _statement->points().end());
-    return std::any_of(_point_dependencies.begin(), _point_dependencies.end(),
-                       [&max_pt](const Point &pt)
-                       {
-                           return pt > max_pt;
-                       });
+    if (_state != ProofState::NOT_PROVED)
+    {
+        throw runtime_error("Proof already proved");
+    }
+    _deps.emplace_back(doublepoint);
+    _deps.emplace_back(original);
+    _state = ProofState::PROVED_BY_DOUBLEPOINT;
+    _solver->push_established_statement(this);
+    assert(_statement->check_numerically());
+
+    for (const auto req : _eqn_dist)
+    {
+        req->reduce();
+    }
+    for (const auto req : _eqn_distlog)
+    {
+        req->reduce();
+    }
+    for (const auto req : _eqn_slope)
+    {
+        req->reduce();
+    }
+    _solver->add_established_equations(this);
 }
 
 void Proof::set_proved(ProofState state)
@@ -151,23 +206,18 @@ void Proof::set_proved(ProofState state)
 
     assert(_statement->check_numerically());
 
-    for (const auto req : _eqn)
+    for (const auto req : _eqn_dist)
+    {
+        req->reduce();
+    }
+    for (const auto req : _eqn_distlog)
+    {
+        req->reduce();
+    }
+    for (const auto req : _eqn_slope)
     {
         req->reduce();
     }
 
     _solver->add_established_equations(this);
-
-    for (const auto &dep : get_dependencies())
-    {
-        for (Point const &pt : dep->point_dependencies())
-        {
-            _point_dependencies.insert(pt);
-        }
-    }
-
-    for (Point const &pt : _statement->points())
-    {
-        _point_dependencies.insert(pt);
-    }
 }

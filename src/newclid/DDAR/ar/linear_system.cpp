@@ -17,9 +17,7 @@ void LinearSystem::reduce_next(Equation &e)
     {
         const auto &it_begin = e.begin();
         const auto &it_next = next(it_begin);
-
         Term head = *it_begin;
-
         if (it_next == e.end())
         {
             break;
@@ -33,7 +31,6 @@ void LinearSystem::reduce_next(Equation &e)
             _pivot_by_next[*it_next].insert(head);
             break;
         }
-
         if (eq_term)
         {
             e -= *eq_term * it_next->coeff();
@@ -41,6 +38,75 @@ void LinearSystem::reduce_next(Equation &e)
         else if (eq_var)
         {
             e -= *eq_var * it_next->coeff();
+        }
+    }
+    return;
+}
+
+void LinearSystem::update()
+{
+    _solved_variables.clear();
+    _solved_terms.clear();
+    _pivot_by_next.clear();
+
+    for (const auto &[original_eq, pf] : _equations)
+    {
+        Equation e = original_eq;
+        e.normalize();
+
+        if (e.empty())
+        {
+            continue;
+        }
+
+        ReducedEquation req(e, this);
+        req.reduce();
+        e = req.remainder();
+
+        if (e.empty())
+        {
+            continue;
+        }
+
+        Term head = *e.begin();
+        bool is_linear = e.linear();
+
+        auto ptr = std::make_unique<Equation>(std::move(e));
+        bool inserted = false;
+        if (is_linear)
+        {
+            inserted = _solved_variables.emplace(head, std::move(ptr)).second;
+        }
+        else
+        {
+            inserted = _solved_terms.emplace(head, std::move(ptr)).second;
+        }
+
+        if (!inserted)
+        {
+            throw std::runtime_error("Trying to insert a duplicate solved equation during update");
+        }
+
+        auto pivot_it = _pivot_by_next.find(head);
+        if (pivot_it != _pivot_by_next.end())
+        {
+
+            for (const Term &waiting_pivot : pivot_it->second)
+            {
+
+                auto var_it = _solved_variables.find(waiting_pivot);
+                if (var_it != _solved_variables.end())
+                {
+                    reduce_next(*var_it->second);
+                }
+
+                auto term_it = _solved_terms.find(waiting_pivot);
+                if (term_it != _solved_terms.end())
+                {
+                    reduce_next(*term_it->second);
+                }
+            }
+            _pivot_by_next.erase(pivot_it);
         }
     }
 }
@@ -67,10 +133,9 @@ void LinearSystem::print_equations() const
     }
 }
 
-void LinearSystem::add_reduced_equation(Proof *pf)
+void LinearSystem::add_reduced_equation(Proof *pf, string type)
 {
-    auto eqs = pf->reduced_equations();
-
+    auto eqs = pf->reduced_equations(type);
     for (auto &eq : eqs)
     {
         eq->reduce();
@@ -86,7 +151,6 @@ void LinearSystem::add_reduced_equation(Proof *pf)
         e.set_index(n.index(), this);
 
         Term head = *e.begin();
-
         e *= Rational(1) / head.coeff();
         reduce_next(e);
 

@@ -5,21 +5,24 @@
 #include <iostream>
 #include "ar/term.hpp"
 #include "ar/equation_index.hpp"
+#include "type/rational.hpp"
 
 class LinearSystem;
+class ObjectTable;
 
 class Equation final
 {
 private:
     std::vector<Term> _terms;
     std::vector<std::pair<double, EquationIndex>> _combination;
+    ObjectTable *_table;
 
 public:
-    Equation() : _terms(), _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))}) {}
+    Equation(ObjectTable *table = nullptr) : _terms(), _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))}), _table(std::move(table)) {}
 
-    Equation(std::vector<Term> terms);
+    Equation(std::vector<Term> terms, ObjectTable *table = nullptr);
 
-    Equation(const Term &term) : _terms({term}), _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))}) {}
+    Equation(Term &term, ObjectTable *table = nullptr) : _terms({term}), _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))}), _table(std::move(table)) {}
 
     Equation &operator+=(const Equation &other);
     Equation operator+(const Equation &other) const;
@@ -83,11 +86,10 @@ namespace std
         size_t operator()(const Equation &eq) const noexcept
         {
             size_t seed = 0;
-            std::hash<Term> term_hash;
 
             for (const auto &t : eq.terms())
             {
-                seed ^= term_hash(t) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+                seed ^= hash<string>()(t.to_string()) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
             }
 
             return seed;

@@ -18,6 +18,22 @@ vector<Point> OrthoCenter::points() const
     return {_triangle.a(), _triangle.b(), _triangle.c(), _center};
 }
 
+unique_ptr<Statement> OrthoCenter::replace(Point p, Point q) const
+{
+    Point new_center = (_center == p) ? q : _center;
+
+    auto pts = _triangle.points();
+    Point a = pts[0], b = pts[1], c = pts[2];
+
+    Point new_a = (a == p) ? q : a;
+    Point new_b = (b == p) ? q : b;
+    Point new_c = (c == p) ? q : c;
+
+    Triangle new_triangle(new_a, new_b, new_c);
+
+    return make_unique<OrthoCenter>(new_center, new_triangle);
+}
+
 unique_ptr<Statement> OrthoCenter::clone() const
 {
     return make_unique<OrthoCenter>(*this);

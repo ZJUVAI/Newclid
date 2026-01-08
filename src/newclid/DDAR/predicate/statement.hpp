@@ -15,8 +15,12 @@ public:
 
     virtual std::vector<Point> points() const = 0;
 
+    virtual bool contain(const Point &p) const;
+
     // 简化当前结论
     virtual std::unique_ptr<Statement> normalize() const = 0;
+
+    virtual std::unique_ptr<Statement> replace(Point p, Point q) const = 0;
 
     // 检查当前结论是否退化
     virtual bool check_nondegen() const = 0;
@@ -45,7 +49,9 @@ public:
 
     virtual std::vector<std::string> to_tokens() const;
 
-    virtual std::vector<std::unique_ptr<Equation>> as_equation(bool log, bool exp) const { return {}; }
+    virtual std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp, ObjectTable *table) const { return {}; }
+    virtual std::vector<std::unique_ptr<Equation>> as_equation_dist(bool exp, ObjectTable *table) const { return {}; }
+    virtual std::vector<std::unique_ptr<Equation>> as_equation_distlog(bool exp, ObjectTable *table) const { return {}; }
 
     virtual bool operator==(const Statement &other) const
     {

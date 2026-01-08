@@ -4,6 +4,7 @@
 #include "type/dist.hpp"
 #include <iostream>
 #include <vector>
+
 using namespace std;
 
 Coll::Coll(Point a, Point b, Point c) : _a(a), _b(b), _c(c) {}
@@ -96,9 +97,9 @@ EqRatio Coll::eqratio_ab_ac(const Coll &other) const
     return EqRatio(Dist(_a, _b), Dist(_a, _c), Dist(other.a(), other.b()), Dist(other.a(), other.c()));
 }
 
-ostream &Coll::print(ostream &os) const
+ostream &Coll::print(ostream &out) const
 {
-    return os << _a << " ∈ " << _b << _c;
+    return out << _a << " ∈ " << _b << _c;
 }
 
 bool Coll::operator==(const Coll &other) const
@@ -119,25 +120,31 @@ bool Coll::operator<(const Coll &other) const
     return _a < other._a;
 }
 
-vector<unique_ptr<Equation>> Coll::as_equation(bool log, bool exp) const
+vector<unique_ptr<Equation>> Coll::as_equation_slope(bool exp, ObjectTable *table) const
 {
     vector<unique_ptr<Equation>> result;
-    result.push_back(make_unique<Equation>(Equation({Term(Slope(_a, _b)), -Term(Slope(_a, _c))})));
-    result.push_back(make_unique<Equation>(Equation({Term(Slope(_a, _c)), -Term(Slope(_b, _c))})));
-    Term ab(Dist(_a, _b));
-    Term bc(Dist(_b, _c));
-    Term ac(Dist(_a, _c));
+    result.push_back(make_unique<Equation>(Equation({Term(Slope(_a, _b), table), -Term(Slope(_a, _c), table)}, table)));
+    result.push_back(make_unique<Equation>(Equation({Term(Slope(_a, _c), table), -Term(Slope(_b, _c), table)}, table)));
+    return result;
+}
+
+vector<unique_ptr<Equation>> Coll::as_equation_dist(bool exp, ObjectTable *table) const
+{
+    vector<unique_ptr<Equation>> result;
+    Term ab(Dist(_a, _b), table);
+    Term bc(Dist(_b, _c), table);
+    Term ac(Dist(_a, _c), table);
     if ((_a.x() > _b.x() && _a.x() < _c.x()) || (_a.x() < _b.x() && _a.x() > _c.x()))
     {
-        result.push_back(make_unique<Equation>(Equation({ab, ac, -bc})));
+        result.push_back(make_unique<Equation>(Equation({ab, ac, -bc}, table)));
     }
     else if ((_b.x() > _a.x() && _b.x() < _c.x()) || (_b.x() < _a.x() && _b.x() > _c.x()))
     {
-        result.push_back(make_unique<Equation>(Equation({ab, bc, -ac})));
+        result.push_back(make_unique<Equation>(Equation({ab, bc, -ac}, table)));
     }
     else
     {
-        result.push_back(make_unique<Equation>(Equation({bc, ac, -ab})));
+        result.push_back(make_unique<Equation>(Equation({bc, ac, -ab}, table)));
     }
     return result;
 }
@@ -145,4 +152,12 @@ vector<unique_ptr<Equation>> Coll::as_equation(bool log, bool exp) const
 Coll Coll::reverse() const
 {
     return {_c, _b, _a};
+}
+
+unique_ptr<Statement> Coll::replace(Point p, Point q) const
+{
+    Point new_a = (_a == p) ? q : _a;
+    Point new_b = (_b == p) ? q : _b;
+    Point new_c = (_c == p) ? q : _c;
+    return std::make_unique<Coll>(new_a, new_b, new_c);
 }

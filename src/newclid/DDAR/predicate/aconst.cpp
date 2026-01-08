@@ -54,10 +54,10 @@ ostream &AConst::print(std::ostream &out) const
     return out << _angle << " = " << _rhs << "π";
 }
 
-vector<unique_ptr<Equation>> AConst::as_equation(bool log, bool exp) const
+vector<unique_ptr<Equation>> AConst::as_equation_slope(bool exp, ObjectTable *table) const
 {
     vector<unique_ptr<Equation>> result;
-    result.push_back(make_unique<Equation>(Equation({Term(_angle.right_side()), -Term(_angle.left_side()), -Term(Pi(), _rhs)})));
+    result.push_back(make_unique<Equation>(Equation({Term(_angle.right_side(), table), -Term(_angle.left_side(), table)}, table)));
     return result;
 }
 
@@ -70,4 +70,18 @@ vector<string> AConst::to_tokens() const
     tokens.push_back(_angle.right().name());
     tokens.push_back(std::to_string(_rhs.numerator()) + "pi/" + std::to_string(_rhs.denominator()));
     return tokens;
+}
+
+unique_ptr<Statement> AConst::replace(Point p, Point q) const
+{
+    auto pts = _angle.points();
+    Point a = pts[0], b = pts[1], c = pts[2];
+
+    Point new_a = (a == p) ? q : a;
+    Point new_b = (b == p) ? q : b;
+    Point new_c = (c == p) ? q : c;
+
+    Angle new_angle(new_a, new_b, new_c);
+
+    return make_unique<AConst>(new_angle, _rhs);
 }
