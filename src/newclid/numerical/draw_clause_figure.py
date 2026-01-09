@@ -100,7 +100,7 @@ def _draw_clause(
         if len(constr_sentence) == len(cdef.declare):
             mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
             args = [
-                dep_graph.symbols_graph.name2node[name]
+                dep_graph.symbols_graph.name2node.get(name, name)
                 for name in constr_sentence[1:]
             ]
         else:
@@ -109,7 +109,7 @@ def _draw_clause(
             mapping = dict(
                 zip(cdef.declare[1:], clause.points + constr_sentence[1:]))
             args = [
-                dep_graph.symbols_graph.name2node[name]
+                dep_graph.symbols_graph.name2node.get(name, name)
                 for name in clause.points + constr_sentence[1:]
             ]
         for _, bs in cdef.basics:
