@@ -63,10 +63,14 @@ def draw_clauses(
     segment_colors: dict[tuple[str, str], int] = {}
     figure_sizes: list = []
     for clause in clauses:
-        _draw_clause(
-            clause, ax, defs, rng, dep_graph, draw_annotations, segment_parent, segment_colors, figure_sizes
+        clause_wo_coords = Clause(
+            points=[p.split('@')[0] for p in clause.points],
+            sentences=clause.sentences,
         )
-        points = dep_graph.symbols_graph.names2points(clause.points)
+        _draw_clause(
+            clause_wo_coords, ax, defs, rng, dep_graph, draw_annotations, segment_parent, segment_colors, figure_sizes
+        )
+        points = dep_graph.symbols_graph.names2points(clause_wo_coords.points)
         for p in points:
             if mapping is None:
                 point_names.append(draw_point(ax, p))
