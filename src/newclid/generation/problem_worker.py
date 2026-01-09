@@ -760,11 +760,11 @@ class GeometryProblemWorker:
                 predicate_strs_with_idx.append(
                     f"{statement_str} [{dep_idx[statement_str]}]")
             renamed_basic_strs_with_idx.append(
-                ' '.join([mp[p] for p in points]) + ' : ' + ', '.join(predicate_strs_with_idx)
+                ' '.join([mp[p] for p in points]) + ' : ' + ' '.join(predicate_strs_with_idx)
             )
         if len(renamed_basic_strs_with_idx) == 0:
             return ''
-        return '<aux> ' + ' ; '.join(renamed_basic_strs_with_idx) + ' </aux> '
+        return '<aux> ' + ' ; '.join(renamed_basic_strs_with_idx) + ' ; </aux> '
 
     @staticmethod
     def _generate_numerical_check_section(mp, dep_idx, numercial_checked_premises, numercial_checked_aux):
