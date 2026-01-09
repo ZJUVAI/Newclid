@@ -14,6 +14,7 @@ import torch
 from modelscope import Qwen3VLForConditionalGeneration, AutoProcessor, DynamicCache
 from qwen_vl_utils import process_vision_info 
 import cairosvg
+from PIL import Image, ImageOps
 
 from newclid.agent.agents_interface import DeductiveAgent
 from newclid.formulations.problem import ProblemJGEX
@@ -33,7 +34,7 @@ from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulator
 from newclid.dependencies.dependency import Dependency
 from newclid.numerical.geometries import PointNum
-from newclid.numerical.draw_figure import draw_figure
+from newclid.numerical.draw_clause_figure import draw_clause_figure
 from newclid.DDAR.build import DDAR
 
 if TYPE_CHECKING:
@@ -64,7 +65,7 @@ class VLMAgent(DeductiveAgent):
         
     @torch.no_grad()
     def inference(self, model, processor, query: str, img_path: str, response_prefix: str = '<aux>'):
-        # print(f"inferencing on query: {query} with image: {img_path}")
+        print(f"inferencing on query: {query} with image: {img_path}")
         aux_dsl_dict = {}
         
         # 1. Build the multi-modal message (System + User with Image)
@@ -148,7 +149,7 @@ class VLMAgent(DeductiveAgent):
         for aux_dsl, score in zip(aux_dsls, scores):
             score = score.item()
             aux_dsl_dict[aux_dsl] = score
-            # print(f"aux_dsl: {aux_dsl}")
+            print(f"aux_dsl: {aux_dsl}")
             
         return aux_dsl_dict
 
@@ -166,7 +167,7 @@ class VLMAgent(DeductiveAgent):
         
         t0 = time.time()
         step = 0
-        image_dir = "temp/vlm_images/"
+        image_dir = "temp/vlm_images_construction_vlm_sft26_devimo_inverted/"
         os.makedirs(image_dir, exist_ok=True)
         
         # Check goals numerically 
@@ -208,12 +209,35 @@ class VLMAgent(DeductiveAgent):
                         timestamp = int(time.time()*1000)
                         svg_path = os.path.join(image_dir, f"{timestamp}.svg")
                         png_path = os.path.join(image_dir, f"{timestamp}.png")
-                        draw_figure(proof=proof, save_to=svg_path, rng=proof.rng)
+                        draw_clause_figure(
+                            proof, problem, svg_path, proof.rng, draw_annotations=True
+                        )
                         cairosvg.svg2png(
                             url=str(svg_path),
                             write_to=str(png_path),
                             output_width=1024,
                         )
+
+                        # 对生成的 PNG 进行反色处理
+                        with Image.open(png_path) as img:
+                            if img.mode == 'RGBA':
+                                r, g, b, a = img.split()
+                                rgb_img = Image.merge('RGB', (r, g, b))
+                                inverted_rgb = ImageOps.invert(rgb_img)
+                                r_inv, g_inv, b_inv = inverted_rgb.split()
+                                img_out = Image.merge('RGBA', (r_inv, g_inv, b_inv, a))
+                            elif img.mode == 'LA':
+                                l, a = img.split()
+                                l_inv = ImageOps.invert(l)
+                                img_out = Image.merge('LA', (l_inv, a))
+                            else:
+                                img_out = ImageOps.invert(img.convert('RGB'))
+                            img_out.save(png_path)
+
+                        # 使用纯白图片
+                        # with Image.open(png_path) as img:
+                        #     img_out = Image.new('RGB', img.size, (255, 255, 255))
+                        #     img_out.save(png_path)
                         # print("finish drawing")
                         
                         # Stragety 1: insert the aux string into problem and predict the next aux
@@ -412,21 +436,12 @@ class VLMAgent(DeductiveAgent):
                     points = tuple([mapping[x] for x in points])
                     for p in points:
                         group[p] = points
+                    if len(bs) == 0:
+                        data_tmp[' '.join(points)] = []
                     for b in bs:
                         statement = Statement.from_tokens(translate_sentence(mapping, b), dep_graph)
                         p2deps[points].append(statement)
-
-            points = construction.points
-            points = [p.split('@')[0] for p in points]
-            while points:
-                p = points[0]
-                gr = group[p]
-                points = [x for x in points if x not in gr]
-
-                deps = []
-                for dep in p2deps[gr]:
-                    deps.append(dep)
-                data_tmp[' '.join(gr)] = deps
+                        data_tmp[' '.join(points)].append(statement)
 
         # <problem> </problem>
         data_problem = '<problem> '
