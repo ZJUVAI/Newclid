@@ -24,8 +24,28 @@ from newclid.statement import Statement
 if TYPE_CHECKING:
     from newclid.dependencies.dependency_graph import DependencyGraph
     from newclid.proof import ProofState
-    from newclid.statement import Statement
+    from newclid.formulations.problem import ProblemJGEX
 
+def draw_clause_figure(
+    proof: "ProofState",
+    problem: "ProblemJGEX",
+    save_to: Optional[Union[str, Path]],
+    rng: Generator,
+    draw_annotations: bool = True,
+):
+    """Draw clauses figure."""
+    fig = deepcopy(proof.fig)
+    draw_clauses(
+        fig.axes[0],
+        list(problem.constructions),
+        proof.defs,
+        Statement.from_tokens(problem.goals[0], proof.dep_graph),
+        rng,
+        proof.dep_graph,
+        draw_annotations=draw_annotations,
+    )
+    if save_to is not None:
+        fig.savefig(save_to, format='svg')
 
 def draw_clauses(
     ax: "Axes",
@@ -34,7 +54,7 @@ def draw_clauses(
     goal: "Statement",
     rng: Generator,
     dep_graph: "DependencyGraph",
-    mapping: dict[str, str],
+    mapping: dict[str, str] = None,
     draw_annotations: bool = True,
 ):
     """Draw clauses."""
@@ -48,9 +68,12 @@ def draw_clauses(
         )
         points = dep_graph.symbols_graph.names2points(clause.points)
         for p in points:
-            mapped_p = Point(name=mapping[p.name], symbols_graph=None, dep=None)
-            mapped_p.num = p.num
-            point_names.append(draw_point(ax, mapped_p))
+            if mapping is None:
+                point_names.append(draw_point(ax, p))
+            else:
+                mapped_p = Point(name=mapping[p.name], symbols_graph=None, dep=None)
+                mapped_p.num = p.num
+                point_names.append(draw_point(ax, mapped_p))
 
     goal.draw(ax, rng, draw_annotations=False)
 
