@@ -220,7 +220,7 @@ class VLMAgent(DeductiveAgent):
         
         t0 = time.time()
         step = 0
-        image_dir = "temp/vlm_images_construction_vlm_sft26_devimo_inverted/"
+        image_dir = "temp/vlm_images_construction_vlm_sft27_devimo_inverted/"
         os.makedirs(image_dir, exist_ok=True)
         
         # Check goals numerically 
@@ -330,7 +330,7 @@ class VLMAgent(DeductiveAgent):
                             # check any done task
                             done, running_futures = ray.wait(running_futures, timeout=0)
                             for f in done:
-                                res = ray.get(f)
+                                res, proof_ori = ray.get(f)
                                 if res is None:
                                     continue
                                 elif res.check_goals():
