@@ -327,7 +327,7 @@ class VLMAgent(DeductiveAgent):
                             # check any done task
                             done, running_futures = ray.wait(running_futures, timeout=0)
                             for f in done:
-                                res = ray.get(f)
+                                res, proof_ori = ray.get(f)
                                 if res is None:
                                     continue
                                 elif res.check_goals():
