@@ -51,14 +51,6 @@ Term Term::gcd(Term &other) const
             res._vars[arg] = min(exp, it->second);
         }
     }
-    for (const auto &[obj, exp] : _vars)
-    {
-        auto it = other._vars.find(obj);
-        if (it != other._vars.end())
-        {
-            res._vars[obj] = min(exp, it->second);
-        }
-    }
     return res;
 }
 
@@ -91,7 +83,6 @@ Term &Term::operator/=(const Rational &divisor)
 Term Term::operator*(const Term &other) const
 {
     Term res(_coeff * other._coeff);
-
     for (const auto &[term, exp] : _vars)
     {
         res._vars[term] += exp;
@@ -108,31 +99,12 @@ Term Term::operator*(const Term &other) const
             res._vars.erase(term);
         }
     }
-    for (const auto &[obj, exp] : _vars)
-    {
-        res._vars[obj] += exp;
-        if (res._vars[obj] == 0)
-        {
-            res._vars.erase(obj);
-        }
-    }
-    for (const auto &[obj, exp] : other._vars)
-    {
-        res._vars[obj] += exp;
-        if (res._vars[obj] == 0)
-        {
-            res._vars.erase(obj);
-        }
-    }
-
     return res;
 }
 
 Term Term::operator/(const Term &other) const
 {
-
-    Term res(_coeff * other._coeff);
-
+    Term res(_coeff / other._coeff);
     for (const auto &[term, exp] : _vars)
     {
         res._vars[term] += exp;
@@ -149,23 +121,6 @@ Term Term::operator/(const Term &other) const
             res._vars.erase(term);
         }
     }
-    for (const auto &[obj, exp] : _vars)
-    {
-        res._vars[obj] += exp;
-        if (res._vars[obj] == 0)
-        {
-            res._vars.erase(obj);
-        }
-    }
-    for (const auto &[obj, exp] : other._vars)
-    {
-        res._vars[obj] -= exp;
-        if (res._vars[obj] == 0)
-        {
-            res._vars.erase(obj);
-        }
-    }
-
     return res;
 }
 
@@ -180,14 +135,6 @@ Term &Term::operator*=(const Term &other)
             _vars.erase(term);
         }
     }
-    for (const auto &[obj, exp] : other._vars)
-    {
-        _vars[obj] += exp;
-        if (_vars[obj] == 0)
-        {
-            _vars.erase(obj);
-        }
-    }
     return *this;
 }
 
@@ -196,7 +143,7 @@ Term &Term::operator/=(const Term &other)
     _coeff /= other._coeff;
     for (const auto &[term, exp] : other._vars)
     {
-        _vars[term] -= exp;
+        _vars[term] += exp;
         if (_vars[term] == 0)
         {
             _vars.erase(term);
