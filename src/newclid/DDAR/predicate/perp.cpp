@@ -71,14 +71,14 @@ ostream &Perp::print(ostream &os) const
     return os << _left.left() << _left.right() << " ⟂  " << _right.left() << _right.right();
 }
 
-vector<unique_ptr<Equation>> Perp::as_equation_slope(bool exp, ObjectTable *table) const
+vector<unique_ptr<Equation>> Perp::as_equation_slope(bool exp) const
 {
     vector<unique_ptr<Equation>> result;
-    result.push_back(make_unique<Equation>(Equation({Term(_left, table), -Term(_right, table)}, table)));
+    result.push_back(make_unique<Equation>(Equation({Term(_left), -Term(_right)})));
     return result;
 }
 
-vector<unique_ptr<Equation>> Perp::as_equation_dist(bool exp, ObjectTable *table) const
+vector<unique_ptr<Equation>> Perp::as_equation_dist(bool exp) const
 {
     vector<unique_ptr<Equation>> result;
     if (!exp)
@@ -86,31 +86,31 @@ vector<unique_ptr<Equation>> Perp::as_equation_dist(bool exp, ObjectTable *table
         return result;
     }
 
-    Term l({_left.dist(), _left.dist()}, table);
-    Term r({_right.dist(), _right.dist()}, table);
+    Term l({_left.dist(), _left.dist()});
+    Term r({_right.dist(), _right.dist()});
     if (_left.left() == _right.left())
     {
         Dist x = Dist(_left.right(), _right.right());
-        Term h({x, x}, table);
-        result.push_back(make_unique<Equation>(Equation({l, r, -h}, table)));
+        Term h({x, x});
+        result.push_back(make_unique<Equation>(Equation({l, r, -h})));
     }
     else if (_left.left() == _right.right())
     {
         Dist x = Dist(_left.right(), _right.left());
-        Term h({x, x}, table);
-        result.push_back(make_unique<Equation>(Equation({l, r, -h}, table)));
+        Term h({x, x});
+        result.push_back(make_unique<Equation>(Equation({l, r, -h})));
     }
     else if (_left.right() == _right.left())
     {
         Dist x = Dist(_left.left(), _right.right());
-        Term h({x, x}, table);
-        result.push_back(make_unique<Equation>(Equation({l, r, -h}, table)));
+        Term h({x, x});
+        result.push_back(make_unique<Equation>(Equation({l, r, -h})));
     }
     else if (_left.right() == _right.right())
     {
         Dist x = Dist(_left.left(), _right.left());
-        Term h({x, x}, table);
-        result.push_back(make_unique<Equation>(Equation({l, r, -h}, table)));
+        Term h({x, x});
+        result.push_back(make_unique<Equation>(Equation({l, r, -h})));
     }
     return result;
 }

@@ -69,8 +69,8 @@ public:
 
     bool operator<(const Coll &other) const;
 
-    std::vector<std::unique_ptr<Equation>> as_equation_dist(bool exp, ObjectTable *table) const override;
-    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp, ObjectTable *table) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation_dist(bool exp) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp) const override;
 
     Coll reverse() const;
 };

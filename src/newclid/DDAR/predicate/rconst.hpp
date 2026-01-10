@@ -38,7 +38,7 @@ public:
 
     std::ostream &print(std::ostream &os) const override;
 
-    std::vector<std::unique_ptr<Equation>> as_equation_dist(bool exp, ObjectTable *table) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation_dist(bool exp) const override;
 
     bool numerical_only() const { return false; }
 

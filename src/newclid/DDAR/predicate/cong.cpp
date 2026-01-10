@@ -48,21 +48,21 @@ ostream &Cong::print(ostream &os) const
     return os << _left << " = " << _right;
 }
 
-vector<unique_ptr<Equation>> Cong::as_equation_dist(bool exp, ObjectTable *table) const
+vector<unique_ptr<Equation>> Cong::as_equation_dist(bool exp) const
 {
     vector<unique_ptr<Equation>> result;
-    result.push_back(make_unique<Equation>(Equation({Term(_left, table), -Term(_right, table)}, table)));
+    result.push_back(make_unique<Equation>(Equation({Term(_left), -Term(_right)})));
     return result;
 }
 
-vector<unique_ptr<Equation>> Cong::as_equation_distlog(bool exp, ObjectTable *table) const
+vector<unique_ptr<Equation>> Cong::as_equation_distlog(bool exp) const
 {
     vector<unique_ptr<Equation>> result;
-    result.push_back(make_unique<Equation>(Equation({Term(DistLog(_left), table), -Term(DistLog(_right), table)}, table)));
+    result.push_back(make_unique<Equation>(Equation({Term(DistLog(_left)), -Term(DistLog(_right))})));
     return result;
 }
 
-vector<unique_ptr<Equation>> Cong::as_equation_slope(bool exp, ObjectTable *table) const
+vector<unique_ptr<Equation>> Cong::as_equation_slope(bool exp) const
 {
     vector<unique_ptr<Equation>> result;
     Slope slope_left(_left.left(), _left.right());
@@ -74,22 +74,22 @@ vector<unique_ptr<Equation>> Cong::as_equation_slope(bool exp, ObjectTable *tabl
     if (_left.left() == _right.left())
     {
         Slope slope_down(_left.right(), _right.right());
-        result.push_back(make_unique<Equation>(Equation({Term(slope_left, table), Term(slope_right, table), -Term(slope_down, Rational(2), table)}, table)));
+        result.push_back(make_unique<Equation>(Equation({Term(slope_left), Term(slope_right), -Term(slope_down, Rational(2))})));
     }
     else if (_left.left() == _right.right())
     {
         Slope slope_down(_left.right(), _right.left());
-        result.push_back(make_unique<Equation>(Equation({Term(slope_left, table), Term(slope_right, table), -Term(slope_down, Rational(2), table)}, table)));
+        result.push_back(make_unique<Equation>(Equation({Term(slope_left), Term(slope_right), -Term(slope_down, Rational(2))})));
     }
     else if (_left.right() == _right.left())
     {
         Slope slope_down(_left.left(), _right.right());
-        result.push_back(make_unique<Equation>(Equation({Term(slope_left, table), Term(slope_right, table), -Term(slope_down, Rational(2), table)}, table)));
+        result.push_back(make_unique<Equation>(Equation({Term(slope_left), Term(slope_right), -Term(slope_down, Rational(2))})));
     }
     else if (_left.right() == _right.right())
     {
         Slope slope_down(_left.left(), _right.left());
-        result.push_back(make_unique<Equation>(Equation({Term(slope_left, table), Term(slope_right, table), -Term(slope_down, Rational(2), table)}, table)));
+        result.push_back(make_unique<Equation>(Equation({Term(slope_left), Term(slope_right), -Term(slope_down, Rational(2))})));
     }
     return result;
 }

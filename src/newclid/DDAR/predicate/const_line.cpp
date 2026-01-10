@@ -59,9 +59,9 @@ ostream &ConstLine::print(ostream &out) const
     return out << _q2 << " ∈ " << _p << _q1;
 }
 
-vector<unique_ptr<Equation>> ConstLine::as_equation_slope(bool exp, ObjectTable *table) const
+vector<unique_ptr<Equation>> ConstLine::as_equation_slope(bool exp) const
 {
     vector<unique_ptr<Equation>> result;
-    result.push_back(make_unique<Equation>(Equation({Term(Slope(_p, _q1), table), -Term(Slope(_p, _q2), table)}, table)));
+    result.push_back(make_unique<Equation>(Equation({Term(Slope(_p, _q1)), -Term(Slope(_p, _q2))})));
     return result;
 }
