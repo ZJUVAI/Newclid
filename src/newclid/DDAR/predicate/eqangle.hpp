@@ -41,7 +41,7 @@ public:
 
     const Angle &right() const { return _right; }
 
-    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp, ObjectTable *table) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp) const override;
 
     bool numerical_only() const { return false; }
 

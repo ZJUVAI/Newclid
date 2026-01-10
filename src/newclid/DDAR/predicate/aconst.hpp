@@ -35,7 +35,7 @@ public:
         return std::make_unique<AConst>(*this);
     }
 
-    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp, ObjectTable *table) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp) const override;
 
     std::ostream &print(std::ostream &out) const override;
 
