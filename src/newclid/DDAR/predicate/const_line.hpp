@@ -51,7 +51,7 @@ public:
 
     bool trivial() const { return false; }
 
-    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp, ObjectTable *table) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp) const override;
 };
 
 #endif // CONST_LINE_HPP

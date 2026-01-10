@@ -12,7 +12,7 @@
 
 using namespace std;
 
-DDARSolver::DDARSolver(Problem *problem, bool log_enabled, bool exp_enabled) : _problem(problem), _log_enabled(log_enabled), _exp_enabled(exp_enabled), _table_slope(new ObjectTable()), _table_dist(new ObjectTable()), _table_distlog(new ObjectTable())
+DDARSolver::DDARSolver(Problem *problem, bool log_enabled, bool exp_enabled) : _problem(problem), _log_enabled(log_enabled), _exp_enabled(exp_enabled)
 {
     // cout << "匹配定理" << endl;
     Matcher matcher(problem, _goals.empty());
@@ -267,7 +267,7 @@ vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement
 
     if (type == "dist")
     {
-        auto eqn_ptrs = pf->as_equation_dist(_exp_enabled, _table_dist);
+        auto eqn_ptrs = pf->as_equation_dist(_exp_enabled);
         if (!eqn_ptrs.empty())
         {
             for (const auto &eqn_ptr : eqn_ptrs)
@@ -287,7 +287,7 @@ vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement
     }
     if (type == "slope")
     {
-        auto eqn_ptrs = pf->as_equation_slope(_exp_enabled, _table_slope);
+        auto eqn_ptrs = pf->as_equation_slope(_exp_enabled);
         if (!eqn_ptrs.empty())
         {
             for (const auto &eqn_ptr : eqn_ptrs)
@@ -307,7 +307,7 @@ vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement
     }
     if (type == "distlog" && _log_enabled)
     {
-        auto eqn_ptrs = pf->as_equation_distlog(_exp_enabled, _table_distlog);
+        auto eqn_ptrs = pf->as_equation_distlog(_exp_enabled);
         if (!eqn_ptrs.empty())
         {
             for (const auto &eqn_ptr : eqn_ptrs)

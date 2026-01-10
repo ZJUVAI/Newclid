@@ -14,20 +14,17 @@ class Object;
 class Term
 {
 private:
-    mutable std::map<TermArg, int> _vars;
-    mutable std::map<std::shared_ptr<Object>, int> _actual_vars;
-    mutable size_t _version{SIZE_MAX};
+    std::map<TermArg, int> _vars;
     Rational _coeff;
-    ObjectTable *_table{nullptr};
 
 public:
     // Constructors
-    Term(const std::vector<TermArg> &vars, const Rational &coeff, ObjectTable *table = nullptr);
-    Term(const TermArg &var, const Rational &coeff, ObjectTable *table = nullptr);
-    Term(const Rational &coeff, ObjectTable *table = nullptr);
-    Term(const std::vector<TermArg> &vars, ObjectTable *table = nullptr);
-    Term(const TermArg &var, ObjectTable *table = nullptr);
-    Term(ObjectTable *table = nullptr);
+    Term(const std::vector<TermArg> &vars, const Rational &coeff);
+    Term(const TermArg &var, const Rational &coeff);
+    Term(const Rational &coeff);
+    Term(const std::vector<TermArg> &vars);
+    Term(const TermArg &var);
+    Term();
 
     // Accessors
     Rational coeff() const { return _coeff; }
@@ -35,7 +32,6 @@ public:
     // Operations
     Term gcd(Term &other) const;
     void normalize();
-    void update() const;
     int degree() const;
     double to_double() const;
     std::string to_string() const;

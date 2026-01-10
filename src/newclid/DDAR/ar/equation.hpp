@@ -15,14 +15,13 @@ class Equation final
 private:
     std::vector<Term> _terms;
     std::vector<std::pair<double, EquationIndex>> _combination;
-    ObjectTable *_table;
 
 public:
-    Equation(ObjectTable *table = nullptr) : _terms(), _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))}), _table(std::move(table)) {}
+    Equation(ObjectTable *table = nullptr) : _terms(), _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))}) {}
 
-    Equation(std::vector<Term> terms, ObjectTable *table = nullptr);
+    Equation(std::vector<Term> terms);
 
-    Equation(Term &term, ObjectTable *table = nullptr) : _terms({term}), _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))}), _table(std::move(table)) {}
+    Equation(Term &term) : _terms({term}), _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))}) {}
 
     Equation &operator+=(const Equation &other);
     Equation operator+(const Equation &other) const;

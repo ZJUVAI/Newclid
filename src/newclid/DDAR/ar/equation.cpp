@@ -4,7 +4,7 @@
 
 using namespace std;
 
-Equation::Equation(vector<Term> terms, ObjectTable *table) : _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))}), _table(std::move(table))
+Equation::Equation(vector<Term> terms) : _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))})
 {
     for (auto &term : terms)
     {
@@ -199,40 +199,6 @@ void Equation::normalize()
     {
         return;
     }
-
-    // vector<Term> new_terms;
-    // Term current = _terms[0];
-
-    // for (size_t i = 1; i < _terms.size(); ++i)
-    // {
-    //     if (_terms[i] == current)
-    //     {
-    //         current += _terms[i];
-    //     }
-    //     else
-    //     {
-    //         new_terms.push_back(current);
-    //         current = _terms[i];
-    //     }
-    // }
-
-    // new_terms.push_back(current);
-    // _terms = std::move(new_terms);
-
-    // for (auto it = _terms.begin(); it != _terms.end();)
-    // {
-    //     if (it->is_zero())
-    //     {
-    //         it = _terms.erase(it);
-    //     }
-    //     else
-    //     {
-    //         ++it;
-    //     }
-    // }
-
-    // if (_terms.empty())
-    //     return;
 
     Rational r = Rational(1) / (_terms.front().coeff());
     for (auto &term : _terms)
