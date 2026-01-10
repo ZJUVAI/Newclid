@@ -179,10 +179,10 @@ vector<EqAngle> EqAngle::permutations() const
     return res;
 }
 
-vector<unique_ptr<Equation>> EqAngle::as_equation_slope(bool exp, ObjectTable *table) const
+vector<unique_ptr<Equation>> EqAngle::as_equation_slope(bool exp) const
 {
     vector<unique_ptr<Equation>> result;
-    result.push_back(make_unique<Equation>(Equation({Term(_left.left_side(), table), -Term(_left.right_side(), table), -Term(_right.left_side(), table), Term(_right.right_side(), table)}, table)));
+    result.push_back(make_unique<Equation>(Equation({Term(_left.left_side()), -Term(_left.right_side()), -Term(_right.left_side()), Term(_right.right_side())})));
     return result;
 }
 

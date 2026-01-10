@@ -46,10 +46,6 @@ private:
     eqns_map_type _equations_dist;
     eqns_map_type _equations_distlog;
 
-    ObjectTable *_table_slope;
-    ObjectTable *_table_dist;
-    ObjectTable *_table_distlog;
-
 public:
     bool run_level(const Point &max_pt);
 
