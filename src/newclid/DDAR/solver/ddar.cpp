@@ -47,6 +47,7 @@ DDARSolver::DDARSolver(Problem *problem, bool log_enabled, bool exp_enabled) : _
 bool DDARSolver::run_level(const Point &max_pt)
 {
     size_t num_stmts = _checked_statements.size();
+    _level++;
     // cout << "开始第" << _level << "层, 初始有" << num_stmts << "个结论" << endl;
     // for (auto const &pf : _checked_statements)
     // {
@@ -69,7 +70,7 @@ bool DDARSolver::run_level(const Point &max_pt)
         {
             if (!goal->is_proved())
             {
-                goal->ar();
+                goal->ar(_level);
                 if (!goal->is_proved())
                 {
                     res = false;
@@ -82,7 +83,6 @@ bool DDARSolver::run_level(const Point &max_pt)
     // cout << "新证明" << _checked_statements.size() - num_stmts << "个结论, "
     //      << "总计" << _checked_statements.size() << "个结论" << endl;
 
-    ++_level;
     return num_stmts < _checked_statements.size();
 }
 
@@ -122,7 +122,7 @@ bool DDARSolver::run(size_t max_levels)
                 }
                 else
                 {
-                    goal->ar();
+                    goal->ar(_level);
                     if (goal->is_proved())
                     {
                         it = _ars.erase(it);
@@ -138,7 +138,6 @@ bool DDARSolver::run(size_t max_levels)
 
         _solved = true;
     }
-    // _system.print_equations();
 
     return _solved;
 }
@@ -151,7 +150,7 @@ void DDARSolver::advance_theorem(size_t index)
         return;
     }
 
-    app.advance_proof();
+    app.advance_proof(_level);
     if (app.state() == ApplicationState::PROVED)
     {
         for (auto *p : app.conclusions())
@@ -245,6 +244,12 @@ void DDARSolver::print_equations() const
         cout << "Reduced Equation: " << red_eqn.remainder() << endl;
         cout << endl;
     }
+
+    _system_dist.print_equations();
+
+    _system_distlog.print_equations();
+
+    _system_slope.print_equations();
 }
 
 bool DDARSolver::establish_statement(Proof *pf, size_t thm_id)
@@ -253,11 +258,7 @@ bool DDARSolver::establish_statement(Proof *pf, size_t thm_id)
     {
         return false;
     }
-    pf->ar();
-    if (!pf->is_proved())
-    {
-        pf->set_theorem(thm_id);
-    }
+    pf->set_theorem(thm_id, _level);
     return true;
 }
 
