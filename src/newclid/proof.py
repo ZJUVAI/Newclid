@@ -291,6 +291,7 @@ class ProofState:
         for p_old, p_new in zip(old_points, new_points):
             p_new.num = p_old.num
             p_new.rely_on = set(proof.symbols_graph.names2points([p.name for p in p_old.rely_on]))
+            p_new.clause = p_old.clause
         
         for add in adds:
             if not add.statement.check_numerical():

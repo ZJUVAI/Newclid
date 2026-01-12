@@ -3,21 +3,24 @@ from io import BytesIO
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Collection, Optional, Union
 from adjustText import adjust_text
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
+from numpy.random import Generator
 
 import numpy as np
+import matplotlib.patches as patches
 
 from newclid.numerical.geometries import (
     PointNum,
     intersect,
 )
 from newclid.dependencies.symbols import Point, Circle, Line
+from newclid.formulations.clause import Clause, translate_sentence
+from newclid.formulations.definition import DefinitionJGEX
 from newclid.numerical.geometries import CircleNum
-import matplotlib.patches as patches
-from numpy.random import Generator
-from matplotlib.axes import Axes
-from matplotlib.figure import Figure
 
 if TYPE_CHECKING:
+    from newclid.dependencies.dependency_graph import DependencyGraph
     from newclid.proof import ProofState
     from newclid.statement import Statement
 
@@ -114,6 +117,7 @@ def draw_with_mapping(
 
     segment_parent: dict[tuple[str, str], tuple[str, str]] = {}
     segment_colors: dict[tuple[str, str], int] = {}
+    figure_sizes: list = []
     for statement in statements:
         if statement.predicate.NAME == 'cong':
             statement.predicate.draw(
@@ -123,6 +127,7 @@ def draw_with_mapping(
                 rng,
                 segment_parent,
                 segment_colors,
+                figure_sizes,
                 draw_annotations,
             )
         else:
@@ -135,7 +140,6 @@ def draw_with_mapping(
         goal.draw(ax, rng, draw_annotations)
 
     adjust_text(point_names, ax=ax)
-
 
 def fill_missing(d0: dict[Any, Any], d1: dict[Any, Any]):
     for k in d1.keys():
@@ -192,23 +196,63 @@ def draw_segment_num(ax: "Axes", p0: PointNum, p1: PointNum, **args: Any):
     ax.plot((p0.x, p1.x), (p0.y, p1.y), **args)  # type: ignore
 
 
-def draw_angle(ax: "Axes", point0: Point, point1: Point, point2: Point, **args: Any):
-    draw_segment(ax, point0, point1)
-    draw_segment(ax, point0, point2)
-    dir1, dir2 = point1.num - point0.num, point2.num - point0.num
-    if dir1.x * dir2.y - dir1.y * dir2.x < 0:
-        dir1, dir2 = dir2, dir1
-    if dir1.x * dir2.x + dir1.y * dir2.y >= 0:
+def draw_angle(
+    ax: "Axes", 
+    point0: Point, 
+    point1: Point, 
+    point2: Point, 
+    rng: Generator, 
+    color: str = "black", 
+    alpha: float = 0.5
+):
+    # 1. Dynamic sizing based on figure bounds
+    xlim = ax.get_xlim()
+    ylim = ax.get_ylim()
+    figure_size = max(xlim[1] - xlim[0], ylim[1] - ylim[0])
+    
+    # Random base radius
+    base_r = figure_size * rng.random() * 0.1 + 0.1
+    
+    # Fixed styling ratios
+    wedge_radius = base_r * 0.8
+    wedge_width = wedge_radius * 0.15
+
+    # 2. Vector calculation
+    dir1 = point1.num - point0.num
+    dir2 = point2.num - point0.num
+    
+    # 3. Direction check (Cross Product)
+    cross_product = dir1.x * dir2.y - dir1.y * dir2.x
+    
+    if cross_product >= 0:
+        # Case A: CCW - Standard angle
         ang1 = np.arctan2(dir1.y, dir1.x)
         ang2 = np.arctan2(dir2.y, dir2.x)
     else:
+        # Case B: CW - Supplementary angle logic
+        # Calculate extension length (slightly longer than wedge)
         len2 = np.sqrt(dir2.x**2 + dir2.y**2)
-        o = point0.num - dir2 / len2 * 0.2
-        draw_segment_num(ax, point0.num, o, ls="dashed")
-        ang1 = np.arctan2(-dir2.y, -dir2.x)
-        ang2 = np.arctan2(dir1.y, dir1.x)
+        ext_len = wedge_radius * 1.3
+        
+        # Draw dashed extension line for dir2
+        if len2 > 0:
+            vec_ext = (dir2 / len2) * ext_len
+            o_pos = point0.num - vec_ext
+            draw_segment_num(ax, point0.num, o_pos, ls="dashed", alpha=0.5)
+            
+        # Adjust angles (dir1 to -dir2)
+        ang1 = np.arctan2(dir1.y, dir1.x)
+        ang2 = np.arctan2(-dir2.y, -dir2.x)
+
+    # 4. Draw Wedge with explicit parameters
     wedge = patches.Wedge(
-        (point0.num.x, point0.num.y), theta1=ang1 / np.pi * 180, theta2=ang2 / np.pi * 180, **args
+        (point0.num.x, point0.num.y), 
+        r=wedge_radius, 
+        theta1=np.degrees(ang1), 
+        theta2=np.degrees(ang2), 
+        width=wedge_width,
+        color=color,
+        alpha=alpha
     )
     ax.add_patch(wedge)
 

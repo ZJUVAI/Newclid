@@ -161,38 +161,48 @@ class DependencyGraph:
     ]:
         proof_deps = self.proof_deps(goals)
 
-        points: Set[Point] = set()
+        possible_points: set[Point] = set()
         queue = deque()
 
         for goal in goals:
             for arg in goal.args:
                 if isinstance(arg, Point):
-                    if arg not in points:
-                        points.add(arg)
+                    if arg not in possible_points:
+                        possible_points.add(arg)
                         queue.append(arg)
 
         while queue:
             q = queue.popleft()
+            for p in q.clause.points:
+                p_name = p.split('@')[0]
+                p_point = self.symbols_graph.names2points([p_name])[0]
+                if p_point not in possible_points:
+                    possible_points.add(p_point)
+                    queue.append(p_point)
             for p in q.rely_on:
-                if p not in points:
-                    points.add(p)
+                if p not in possible_points:
+                    possible_points.add(p)
                     queue.append(p)
 
+        points: set[Point] = set()
         premises: list[Dependency] = []
         numerical_checked_premises: list[Dependency] = []
         trivial_premises: list[Dependency] = []
         aux_points: set[Point] = set()
-
         aux: list[Dependency] = []
         numerical_checked_aux: list[Dependency] = []
         trivial_aux: list[Dependency] = []
         proof_steps: list[Dependency] = []
 
         for line in proof_deps:
-            stmt_points = [
-                p for p in line.statement.args if isinstance(p, Point)]
-            aux_point_in_stmt = [p for p in stmt_points if p not in points]
-            is_aux = bool(aux_point_in_stmt)
+            is_aux = False
+            for p in line.statement.args:
+                if isinstance(p, Point):
+                    if p in possible_points:
+                        points.add(p)
+                    else:
+                        aux_points.add(p)
+                        is_aux = True
 
             reason = line.reason
             if reason == IN_PREMISES:
@@ -204,9 +214,6 @@ class DependencyGraph:
             else:
                 proof_steps.append(line)
                 continue
-
-            if is_aux:
-                aux_points.update(aux_point_in_stmt)
 
         return (
             points,
