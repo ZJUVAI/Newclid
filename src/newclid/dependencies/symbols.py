@@ -5,11 +5,11 @@ from abc import ABC
 from typing import TYPE_CHECKING, Optional, TypeVar, Union
 from typing_extensions import Self
 
-from newclid.formulations.clause import Clause
 from newclid.numerical.geometries import CircleNum, LineNum, PointNum
 from newclid.dependencies.dependency import Dependency
 
 if TYPE_CHECKING:
+    from newclid.formulations.clause import Clause
     from newclid.statement import Statement
     from newclid.dependencies.symbols_graph import SymbolsGraph
 
