@@ -45,6 +45,10 @@ Term Term::gcd(Term &other) const
     Term res(1);
     for (const auto &[arg, exp] : _vars)
     {
+        if (Numerical::close_enough(arg.to_double(), 0.0))
+        {
+            continue;
+        }
         auto it = other._vars.find(arg);
         if (it != other._vars.end())
         {

@@ -35,7 +35,7 @@ vector<statement_arg> Coll::args() const
 
 bool Coll::check_nondegen() const
 {
-    return !_a.is_close(_b) && !_b.is_close(_c) && !_c.is_close(_a);
+    return !_a.is_close(_b) || !_a.is_close(_c);
 }
 
 bool Coll::check_equations() const
@@ -123,8 +123,35 @@ bool Coll::operator<(const Coll &other) const
 vector<unique_ptr<Equation>> Coll::as_equation_slope(bool exp) const
 {
     vector<unique_ptr<Equation>> result;
-    result.push_back(make_unique<Equation>(Equation({Term(Slope(_a, _b)), -Term(Slope(_a, _c))})));
-    result.push_back(make_unique<Equation>(Equation({Term(Slope(_a, _c)), -Term(Slope(_b, _c))})));
+
+    vector<Slope> candidates = {
+        Slope(_a, _b),
+        Slope(_a, _c),
+        Slope(_b, _c),
+    };
+
+    vector<Slope> valid_slopes;
+    for (const auto &s : candidates)
+    {
+        if (s.check_numerically())
+        {
+            valid_slopes.push_back(s);
+        }
+    }
+
+    // 3. 两两配对，生成 p - q = 0 的方程
+    for (size_t i = 0; i < valid_slopes.size(); ++i)
+    {
+        for (size_t j = i + 1; j < valid_slopes.size(); ++j)
+        {
+            vector<Term> terms = {
+                Term(valid_slopes[i]),
+                -Term(valid_slopes[j])};
+
+            result.push_back(make_unique<Equation>(Equation(std::move(terms))));
+        }
+    }
+
     return result;
 }
 

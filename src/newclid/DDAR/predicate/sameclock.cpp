@@ -25,12 +25,12 @@ unique_ptr<Statement> SameClock::clone() const
 
 bool SameClock::check_nondegen() const
 {
-    return _left.check_nondegen() && _right.check_nondegen() && (_left.area() > 0) == (_right.area() > 0);
+    return _left.check_nondegen() && _right.check_nondegen();
 }
 
 bool SameClock::check_equations() const
 {
-    return true;
+    return (_left.area() > 0) == (_right.area() > 0);
 }
 
 unique_ptr<Statement> SameClock::normalize() const

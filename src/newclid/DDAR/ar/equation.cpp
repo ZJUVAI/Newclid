@@ -4,44 +4,9 @@
 
 using namespace std;
 
-Equation::Equation(vector<Term> terms) : _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))})
-{
-    for (auto &term : terms)
-    {
-        auto it = std::find(_terms.begin(), _terms.end(), term);
-
-        if (it == _terms.end())
-        {
-            _terms.push_back(term);
-        }
-        else
-        {
-            *it += term;
-        }
-    }
-    this->normalize();
-}
-
 Equation &Equation::operator+=(const Equation &other)
 {
-    for (auto &term : other._terms)
-    {
-        bool merged = false;
-        for (auto &my_term : _terms)
-        {
-            if (my_term == term)
-            {
-                my_term += term;
-                merged = true;
-                break;
-            }
-        }
-        if (!merged)
-        {
-            _terms.push_back(term);
-        }
-    }
-
+    _terms += other._terms;
     for (const auto &comb : other._combination)
     {
         bool merged = false;
@@ -59,7 +24,6 @@ Equation &Equation::operator+=(const Equation &other)
             _combination.push_back(comb);
         }
     }
-
     this->normalize();
     return *this;
 }
@@ -87,13 +51,10 @@ Equation Equation::operator-(const Equation &other) const
 
 Equation &Equation::operator*=(const Rational &multiplier)
 {
-    for (auto &term : _terms)
-    {
-        term *= multiplier;
-    }
+    _terms *= multiplier;
     for (auto &comb : _combination)
     {
-        comb.first *= multiplier.to_double();
+        comb.first *= multiplier;
     }
     return *this;
 }
@@ -107,13 +68,10 @@ Equation Equation::operator*(const Rational &multiplier) const
 
 Equation &Equation::operator*=(const Term &multiplier)
 {
-    for (auto &term : _terms)
-    {
-        term *= multiplier;
-    }
+    _terms *= multiplier;
     for (auto &comb : _combination)
     {
-        comb.first *= multiplier.to_double();
+        comb.first *= multiplier;
     }
     return *this;
 }
@@ -128,10 +86,7 @@ Equation Equation::operator*(const Term &multiplier) const
 Equation Equation::operator-() const
 {
     Equation res = *this;
-    for (auto &term : res._terms)
-    {
-        term = -term;
-    }
+    res._terms = -_terms;
     for (auto &comb : res._combination)
     {
         comb.first = -comb.first;
@@ -170,7 +125,8 @@ void Equation::normalize()
 {
     for (auto it = _combination.begin(); it != _combination.end();)
     {
-        if (Numerical::close_enough(it->first, 0.0))
+        it->first.normalize();
+        if (it->first.empty())
         {
             it = _combination.erase(it);
         }
@@ -180,35 +136,13 @@ void Equation::normalize()
         }
     }
 
-    for (auto it = _terms.begin(); it != _terms.end();)
-    {
-        if (it->is_zero())
-        {
-            it = _terms.erase(it);
-        }
-        else
-        {
-            ++it;
-        }
-    }
-
-    sort(_terms.begin(), _terms.end());
-    reverse(_terms.begin(), _terms.end());
-
     if (_terms.empty())
     {
         return;
     }
 
-    Rational r = Rational(1) / (_terms.front().coeff());
-    for (auto &term : _terms)
-    {
-        term *= r;
-    }
-    for (auto &comb : _combination)
-    {
-        comb.first *= r.to_double();
-    }
+    Rational r = Rational(1) / _terms.terms().front().coeff();
+    *this *= r;
 }
 
 void Equation::set_index(int n, LinearSystem *system)
@@ -226,31 +160,9 @@ void Equation::set_index(int n, LinearSystem *system)
 
 void Equation::reduction()
 {
-    if (_terms.empty())
-    {
-        return;
-    }
-
-    Term common = _terms[0];
-
-    for (size_t i = 1; i < _terms.size(); ++i)
-    {
-        common = common.gcd(_terms[i]);
-        if (common.is_one())
-        {
-            break;
-        }
-    }
-
-    if (!common.is_one())
-    {
-        for (auto &t : _terms)
-            t = t / common;
-        for (auto &c : _combination)
-            c.first /= common.to_double();
-    }
-
-    return;
+    Term common = _terms.gcd();
+    Term r = Term() / common;
+    *this *= r;
 }
 
 std::vector<Term>::const_iterator Equation::begin() const
