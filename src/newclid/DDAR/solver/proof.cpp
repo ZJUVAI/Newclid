@@ -24,6 +24,7 @@ Proof::Proof(DDARSolver *solver, std::unique_ptr<Statement> &&p)
 void Proof::prove_by_assumption()
 {
     set_proved(ProofState::PROVED_BY_ASSUMPTION);
+    _depth = 0;
 }
 
 void Proof::initial()
@@ -33,6 +34,7 @@ void Proof::initial()
         if (_statement->check_numerically())
         {
             set_proved(ProofState::PROVED_NUMERICALLY);
+            _depth = 0;
             return;
         }
         throw runtime_error("尝试添加错误的仅数值检验命题");
@@ -40,11 +42,12 @@ void Proof::initial()
     if (_statement->trivial())
     {
         set_proved(ProofState::PROVED_TRIVIAL);
+        _depth = 0;
         return;
     }
 }
 
-void Proof::ar()
+void Proof::ar(long long depth)
 {
     if (_state != ProofState::NOT_PROVED)
     {
@@ -57,6 +60,7 @@ void Proof::ar()
         {
             _dep = req;
             set_proved(ProofState::PROVED_AR_DIST);
+            _depth = depth;
             return;
         }
     }
@@ -67,6 +71,7 @@ void Proof::ar()
         {
             _dep = req;
             set_proved(ProofState::PROVED_AR_SLOPE);
+            _depth = depth;
             return;
         }
     }
@@ -77,16 +82,18 @@ void Proof::ar()
         {
             _dep = req;
             set_proved(ProofState::PROVED_AR_DISTLOG);
+            _depth = depth;
             return;
         }
     }
     return;
 }
 
-void Proof::set_theorem(size_t index)
+void Proof::set_theorem(size_t index, long long depth)
 {
     _theoremId = index;
     set_proved(ProofState::PROVED_BY_THEOREM);
+    _depth = depth;
 }
 
 const unique_ptr<Statement> &Proof::statement() const

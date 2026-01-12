@@ -18,7 +18,7 @@ class Application
 public:
     Application(DDARSolver *solver, Theorem &&theorem);
 
-    void advance_proof();
+    void advance_proof(long long depth);
 
     ApplicationState state() const { return _state; }
 

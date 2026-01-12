@@ -5,6 +5,7 @@
 #include <iostream>
 #include "ar/term.hpp"
 #include "ar/equation_index.hpp"
+#include "ar/linear_combination.hpp"
 #include "type/rational.hpp"
 
 class LinearSystem;
@@ -13,15 +14,15 @@ class ObjectTable;
 class Equation final
 {
 private:
-    std::vector<Term> _terms;
-    std::vector<std::pair<double, EquationIndex>> _combination;
+    LinearCombination _terms;
+    std::vector<std::pair<LinearCombination, EquationIndex>> _combination;
 
 public:
-    Equation(ObjectTable *table = nullptr) : _terms(), _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))}) {}
+    Equation() : _terms(), _combination({std::make_pair(LinearCombination({Term(1)}), EquationIndex(-1, nullptr))}) {}
 
-    Equation(std::vector<Term> terms);
+    Equation(std::vector<Term> terms) : _terms(terms), _combination({std::make_pair(LinearCombination({Term(1)}), EquationIndex(-1, nullptr))}) {}
 
-    Equation(Term &term) : _terms({term}), _combination({std::make_pair(1.0, EquationIndex(-1, nullptr))}) {}
+    Equation(Term &term) : _terms({term}), _combination({std::make_pair(LinearCombination({Term(1)}), EquationIndex(-1, nullptr))}) {}
 
     Equation &operator+=(const Equation &other);
     Equation operator+(const Equation &other) const;
@@ -47,30 +48,14 @@ public:
     std::vector<Term>::const_iterator begin() const;
     std::vector<Term>::const_iterator end() const;
 
-    const std::vector<Term> &terms() const { return _terms; }
-    const std::vector<std::pair<double, EquationIndex>> &combination() const { return _combination; }
+    const LinearCombination &terms() const { return _terms; }
+    const std::vector<std::pair<LinearCombination, EquationIndex>> &combination() const { return _combination; }
 
     void set_index(int n, LinearSystem *system);
 
     bool operator<(const Equation &other) const { return _terms < other._terms; }
 
-    bool operator==(const Equation &other) const
-    {
-        if (_terms.size() != other._terms.size())
-        {
-            return false;
-        }
-        for (size_t i = 0; i < _terms.size(); ++i)
-        {
-            const Term &a = _terms[i];
-            const Term &b = other._terms[i];
-            if (a != b || a.coeff() != b.coeff())
-            {
-                return false;
-            }
-        }
-        return true;
-    }
+    bool operator==(const Equation &other) const { return _terms == other._terms; }
 
     size_t size() const { return _terms.size(); }
 };
@@ -84,14 +69,7 @@ namespace std
     {
         size_t operator()(const Equation &eq) const noexcept
         {
-            size_t seed = 0;
-
-            for (const auto &t : eq.terms())
-            {
-                seed ^= hash<string>()(t.to_string()) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-            }
-
-            return seed;
+            return std::hash<LinearCombination>()(eq.terms());
         }
     };
 }

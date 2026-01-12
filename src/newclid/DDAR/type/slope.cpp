@@ -14,7 +14,7 @@ Slope::Slope(Point p1, Point p2) : _left(min(p1, p2)), _right(max(p1, p2))
     // }
 }
 
-bool Slope::check_numerically()
+bool Slope::check_numerically() const
 {
     return !_left.is_close(_right);
 }

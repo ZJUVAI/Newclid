@@ -18,6 +18,7 @@ private:
     std::unordered_map<Term, std::unique_ptr<Equation>> _solved_variables;
     std::unordered_map<Term, std::unique_ptr<Equation>> _solved_terms;
     std::unordered_map<Term, std::set<Term>> _pivot_by_next;
+    std::set<Term> _zero_terms;
 
 public:
     LinearSystem() = default;
