@@ -69,7 +69,7 @@ public:
 
     void insert_application(Theorem thm);
 
-    static bool establish_statement(Proof *pf, size_t thm_id);
+    bool establish_statement(Proof *pf, size_t thm_id);
 
     void add_established_equations(Proof *pf);
 

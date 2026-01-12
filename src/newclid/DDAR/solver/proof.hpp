@@ -34,7 +34,9 @@ public:
 
     ProofState state() const { return _state; }
 
-    void ar();
+    void ar(long long depth = -1);
+
+    long long depth() const { return _depth; }
 
     void initial();
 
@@ -44,7 +46,7 @@ public:
 
     std::string reason() const;
 
-    void set_theorem(size_t index);
+    void set_theorem(size_t index, long long depth = -1);
 
     void set_proved(Proof *doublepoint, Proof *original);
 
@@ -85,6 +87,7 @@ private:
     std::vector<ReducedEquation *> _eqn_distlog;
     ReducedEquation *_dep;
     std::vector<Proof *> _deps;
+    long long _depth{-1};
 };
 
 #endif // PROOF_HPP
