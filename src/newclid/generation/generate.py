@@ -37,6 +37,7 @@ def time_limit(seconds):
     finally:
         signal.alarm(0)
 
+
 def convert_svg_to_png(svg_path, png_path, width=1024):
     # Ensure the output directory exists
     output_dir = os.path.dirname(png_path)
@@ -51,27 +52,29 @@ def convert_svg_to_png(svg_path, png_path, width=1024):
         )
     except Exception as e:
         # Catch the exception, add context (filename), and re-raise it
-        raise RuntimeError(f"Failed to convert '{svg_path}' to PNG. Error: {str(e)}") from e
+        raise RuntimeError(
+            f"Failed to convert '{svg_path}' to PNG. Error: {str(e)}") from e
+
 
 class GeometryGenerator:
     def __init__(
-            self,
-            n_clauses=5,
-            n_threads=1,
-            output_dir="dataset",
-            min_proof_steps=5,
-            min_clauses_num=3,
-            n_samples=100,
-            timeout=3600,
-            max_level=500,
-            img=False,
-            aux_only=False,
-            clear=False,
-            add_auxiliary=True,
-            prune=True,
-            remove_coords=False,
-            draw_annotations=True,
-        ):
+        self,
+        n_clauses=5,
+        n_threads=1,
+        output_dir="dataset",
+        min_proof_steps=5,
+        min_clauses_num=3,
+        n_samples=100,
+        timeout=3600,
+        max_level=500,
+        img=False,
+        aux_only=False,
+        clear=False,
+        add_auxiliary=True,
+        prune=True,
+        remove_coords=False,
+        draw_annotations=True,
+    ):
         self.n_clauses = n_clauses
         self.min_proof_steps = min_proof_steps
         self.min_clauses_num = min_clauses_num
@@ -127,13 +130,15 @@ class GeometryGenerator:
                         for key, suffix in [('fig', ''), ('fig_no_annotations', '_no_annotations')]:
                             fig = deepcopy(data_item.pop(key))
                             file_name = f"{self.data_count}{suffix}"
-                            svg_path = os.path.join(imgs_dir, f"{file_name}.svg")
-                            png_path = os.path.join(imgs_png_dir, f"{file_name}.png")
-                            
+                            svg_path = os.path.join(
+                                imgs_dir, f"{file_name}.svg")
+                            png_path = os.path.join(
+                                imgs_png_dir, f"{file_name}.png")
+
                             fig.savefig(svg_path, format='svg')
                             plt.close(fig)
                             convert_svg_to_png(svg_path, png_path)
-                            
+
                             paths_update[f'image_path{suffix}'] = png_path
 
                         result_data = {**paths_update, **data_item}
@@ -154,6 +159,11 @@ class GeometryGenerator:
                 shutil.rmtree(imgs_dir)
             if os.path.exists(imgs_png_dir):
                 shutil.rmtree(imgs_png_dir)
+        # else:
+        #     filename = self.path_prefix + ".jsonl"
+        #     if os.path.exists(filename):
+        #         with open(filename, 'r', encoding='utf-8') as f:
+        #             self.data_count = sum(1 for line in f if line.strip())
 
         def task_generator():
             for i in range(10**9):
@@ -171,8 +181,8 @@ class GeometryGenerator:
         summary_reporter = Summary(prefix=self.path_prefix)
 
         start_time = time.time()
-        all_data_len = 0
-        all_data_len_raw = 0
+        all_data_len = self.data_count
+        all_data_len_raw = self.data_count
         pending_tasks = {}
         while all_data_len < self.n_samples:
             done, _ = ray.wait(list(pending_tasks.keys()),
@@ -213,8 +223,10 @@ class GeometryGenerator:
                         logging.info(
                             f"{millify(all_data_len)}/{millify(self.n_samples)} (+{len(data):3d}) in {elapsed_time:5.0f}s | "
                             f"Total: {summary['total_time']:3.0f}s = "
+                            f"Enh: {summary['enhance_runtime']:2.0f} + "
                             f"DDAR: {summary['runtime']:2.0f} + "
                             f"Chk: {summary['checkgoals_runtime']:2.0f} + "
+                            f"Group: {summary['group_runtime']:2.0f} + "
                             f"Proc: {summary['process_goal_runtime']:3.0f} | "
                             f"Speed (raw): {all_data_len/elapsed_time:3.0f} ({all_data_len_raw/elapsed_time:3.0f}) samp/s | "
                             f"ETA: {timedelta(seconds=int(self.n_samples/all_data_len*elapsed_time - elapsed_time))}"
@@ -243,6 +255,7 @@ class GeometryGenerator:
             f"Generated {all_data_len} samples successfully in {final_elapsed_time:.2f}s.")
         summary_reporter.output_report()
 
+
 def str_to_bool(value):
     """Convert string to boolean value."""
     if isinstance(value, bool):
@@ -253,6 +266,7 @@ def str_to_bool(value):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
 
 def main():
     parser = argparse.ArgumentParser(
