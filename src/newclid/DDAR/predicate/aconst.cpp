@@ -41,7 +41,7 @@ bool AConst::check_nondegen() const
 
 bool AConst::check_equations() const
 {
-    return Numerical::close_enough(_angle.angle(), _rhs.to_double());
+    return Numerical::close_enough(_angle.angle(), _rhs.to_double() * M_PI);
 }
 
 vector<statement_arg> AConst::args() const
