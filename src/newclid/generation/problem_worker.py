@@ -26,7 +26,7 @@ import ray
 import numpy as np
 from copy import deepcopy
 
-from newclid.generation.clause_generation import CompoundClauseGen
+from newclid.generation.clause_generation import CompoundClauseGen, enhance_text_with_potential_points
 
 
 class TimeoutError(Exception):
@@ -72,6 +72,9 @@ class GeometryProblemWorker:
             pid, seed, n_clauses, max_level, img, aux_only, add_auxiliary, prune, remove_coords, draw_annotations = args
             start_time = time.time()
 
+            TIMELIMIT = 120  # 2分钟
+            DEADLINE = start_time + TIMELIMIT
+
             # geneate fl_statement
             clauses_generator = CompoundClauseGen(seed=seed)
             try:
@@ -92,6 +95,11 @@ class GeometryProblemWorker:
             # start_time = time.time()
             # remove_coords = False
             # draw_annotations = True
+
+            enhance_runtime = time.time()
+            fl_statement = enhance_text_with_potential_points(
+                fl_statement, clauses_generator.point_generator)
+            enhance_runtime = time.time() - enhance_runtime
 
             # print(f"problem: {fl_statement}")
 
@@ -116,11 +124,15 @@ class GeometryProblemWorker:
 
             # Process goals
             # first, group goals by problem key
+            group_runtime = time.time()
             eq_predicates_goals = dict()
             for goal in possible_goals:
+                if (time.time() > DEADLINE):
+                    DEADLINE += TIMELIMIT
+                    break
                 # find essential_clauses
-                _, premises, _, _, _, aux, _, _, _ = solver.proof.dep_graph.get_proof_steps([
-                    goal])
+                premises, aux = solver.proof.dep_graph.get_premises_and_aux([
+                                                                            goal])
                 if aux_only and len(aux) == 0:
                     continue
                 premises = [dep.statement for dep in premises]
@@ -133,11 +145,14 @@ class GeometryProblemWorker:
                               for statement in aux]))
                 eq_predicates_goals.setdefault(
                     predicates, []).append((goal, premises, aux))
+            group_runtime = time.time() - group_runtime
 
             # then, process goal groups
             process_goal_time = time.time()
             generated_data = []
             for _, goal_list in eq_predicates_goals.items():
+                if (time.time() > DEADLINE):
+                    break
                 goals = [data[0] for data in goal_list]
                 premises = goal_list[0][1]
                 aux = goal_list[0][2]
@@ -152,6 +167,8 @@ class GeometryProblemWorker:
                 'runtime': solver.run_infos['runtime'],
                 'checkgoals_runtime': checkgoals_runtime,
                 'process_goal_runtime': process_goal_time,
+                'group_runtime': group_runtime,
+                'enhance_runtime': enhance_runtime,
                 'n_samples_raw': len(generated_data),
                 'goals_raw': [re.search(r'\?\s*(\w+)', d['fl_problem']).group(1) for d in generated_data],
                 'first_predicate_raw': [get_first_predicate(d['fl_problem']) for d in generated_data],
@@ -349,14 +366,15 @@ class GeometryProblemWorker:
             # llm data generation
             llm_renamed, clause2basics, clauses, mapping, n_premises, n_proof_steps = GeometryProblemWorker.llm_solution_renamed(
                 solver_builder.problemJGEX, solver_new.proof)
-            
+
             if aux_only and 'aux' not in llm_renamed['llm_output']:
                 continue
 
             if 'aux' in llm_renamed['llm_output'] and not GeometryProblemWorker.filter.aux_predicates_valid_check(llm_renamed['llm_output']):
                 continue
 
-            expected_dsl = problem_to_dsl(ProblemJGEX.from_text(llm_renamed['fl_problem']), GeometryProblemWorker.defs)
+            expected_dsl = problem_to_dsl(ProblemJGEX.from_text(
+                llm_renamed['fl_problem']), GeometryProblemWorker.defs)
             actual_dsl = llm_renamed['llm_input']
             error_msg = (
                 f"\n{'='*20} DSL Conversion Mismatch {'='*20}\n"
@@ -406,7 +424,7 @@ class GeometryProblemWorker:
 
             results.append(result)
         return results
-    
+
     @staticmethod
     def _rediger_new_format(dep, mp, dep_idx) -> str:
         """Generate proof step in new format: statement [id] rule_id [required_statement_ids]"""
@@ -559,7 +577,8 @@ class GeometryProblemWorker:
         clause2basics: dict[Clause, list] = defaultdict(list)
         clause2args: dict[Clause, set] = defaultdict(set)
         for clause in clauses:
-            points2basics: dict[tuple[str, ...], list[Statement]] = defaultdict(list)
+            points2basics: dict[tuple[str, ...],
+                                list[Statement]] = defaultdict(list)
             for constr_sentence in clause.sentences:
                 cdef = GeometryProblemWorker.defs[constr_sentence[0]]
                 if len(constr_sentence) == len(cdef.declare):
@@ -584,7 +603,7 @@ class GeometryProblemWorker:
             for points, bs_statements in points2basics.items():
                 clause2basics[clause].append((points, bs_statements))
         return clause2basics, clause2args
-    
+
     @staticmethod
     def _get_essential_premise_clauses(
         clause2basics: dict[Clause, list],
@@ -594,7 +613,7 @@ class GeometryProblemWorker:
     ) -> list[Clause]:
         """
         Get essential clauses according to the premise statements and essential points.
-        
+
         A clause is considered essential if one of the following conditions is met:
         1. any predicate in the clause's basics is in the premise_statements
         2. any point in the clause is in the essential points and the clause has no predicate (e.g. triangle)
@@ -636,7 +655,7 @@ class GeometryProblemWorker:
         for free_clause, p in new_free_points:
             clause2basics[free_clause] = [((p,), ())]
         return essential_premise_clauses
-    
+
     @staticmethod
     def _get_aux_basics(
         clause2basics: dict[Clause, list],
@@ -645,10 +664,11 @@ class GeometryProblemWorker:
     ) -> list[tuple[tuple[str, ...], tuple[Statement, ...]]]:
         """
         Get auxiliary basics according to the auxiliary statements and auxiliary points.
-        
+
         Only reserve basics that contain auxiliary statements or points.
         """
-        essential_aux_basics: list[tuple[tuple[str, ...], tuple[Statement, ...]]] = []
+        essential_aux_basics: list[tuple[tuple[str, ...],
+                                         tuple[Statement, ...]]] = []
         for clause, basics in clause2basics.items():
             for points, bs in basics:
                 bs_filtered = [
@@ -663,7 +683,7 @@ class GeometryProblemWorker:
                         )
                     )
         return essential_aux_basics
-    
+
     @staticmethod
     def _create_point_mapping(
         essential_premise_point_names: list[str],
@@ -675,7 +695,7 @@ class GeometryProblemWorker:
             assert p not in mp
             mp[p] = GeometryProblemWorker._get_apha_geo_solver_var(idx)
         return mp
-    
+
     @staticmethod
     def _generate_problem_clauses_section(
         mp: dict[str, str],
@@ -684,12 +704,13 @@ class GeometryProblemWorker:
     ) -> str:
         """Generate problem clauses section"""
         dep_graph = DependencyGraph(AlgebraicManipulator())
-        renamed_clauses = [clause.renamed(mp) for clause in essential_premise_clauses]
+        renamed_clauses = [clause.renamed(mp)
+                           for clause in essential_premise_clauses]
         renamed_goal_strs = [
             Statement.from_tokens(
                 translate_sentence(mp, goal.to_str().split(' ')),
                 dep_graph,
-            ).to_str() 
+            ).to_str()
             for goal in goals
         ]
         return '; '.join([str(clause) for clause in renamed_clauses]) + ' ? ' + \
@@ -723,10 +744,12 @@ class GeometryProblemWorker:
                         f"{statement_str} [{dep_idx[statement_str]}]")
                 if len(predicate_strs_with_idx) > 0:
                     renamed_basic_strs_with_idx.append(
-                        ' '.join([mp[p] for p in points]) + ' : ' + ' '.join(predicate_strs_with_idx)
+                        ' '.join([mp[p] for p in points]) + ' : ' +
+                        ' '.join(predicate_strs_with_idx)
                     )
                 else:
-                    renamed_basic_strs_with_idx.append(' '.join([mp[p] for p in points]) + ' :')
+                    renamed_basic_strs_with_idx.append(
+                        ' '.join([mp[p] for p in points]) + ' :')
         renamed_goal_strs = [
             Statement.from_tokens(
                 translate_sentence(mp, goal.to_str().split(' ')),
@@ -760,7 +783,8 @@ class GeometryProblemWorker:
                 predicate_strs_with_idx.append(
                     f"{statement_str} [{dep_idx[statement_str]}]")
             renamed_basic_strs_with_idx.append(
-                ' '.join([mp[p] for p in points]) + ' : ' + ' '.join(predicate_strs_with_idx)
+                ' '.join([mp[p] for p in points]) + ' : ' +
+                ' '.join(predicate_strs_with_idx)
             )
         if len(renamed_basic_strs_with_idx) == 0:
             return ''
@@ -857,13 +881,11 @@ class GeometryProblemWorker:
         return proof
 
 
-from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulator
-
 def problem_to_dsl(problem: "ProblemJGEX", defs: dict[str, DefinitionJGEX]) -> str:
     """Convert the problem to a DSL string."""
     dep_idx: dict[Statement, str] = {}
     dep_graph = DependencyGraph(AlgebraicManipulator())
-    
+
     data_tmp = defaultdict(list)
     for construction in problem.constructions:
         group = {}
@@ -873,9 +895,11 @@ def problem_to_dsl(problem: "ProblemJGEX", defs: dict[str, DefinitionJGEX]) -> s
             if len(constr_sentence) == len(cdef.declare):
                 mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
             else:
-                assert len(constr_sentence) + len(construction.points) == len(cdef.declare)
+                assert len(constr_sentence) + \
+                    len(construction.points) == len(cdef.declare)
                 points = tuple(p.split('@')[0] for p in construction.points)
-                mapping = dict(zip(cdef.declare[1:], points + constr_sentence[1:]))
+                mapping = dict(
+                    zip(cdef.declare[1:], points + constr_sentence[1:]))
             for points, bs in cdef.basics:
                 points = tuple([mapping[x] for x in points])
                 for p in points:
@@ -883,7 +907,8 @@ def problem_to_dsl(problem: "ProblemJGEX", defs: dict[str, DefinitionJGEX]) -> s
                 if len(bs) == 0:
                     data_tmp[' '.join(points)] = []
                 for b in bs:
-                    statement = Statement.from_tokens(translate_sentence(mapping, b), dep_graph)
+                    statement = Statement.from_tokens(
+                        translate_sentence(mapping, b), dep_graph)
                     p2deps[points].append(statement)
                     data_tmp[' '.join(points)].append(statement)
 
@@ -913,6 +938,6 @@ def problem_to_dsl(problem: "ProblemJGEX", defs: dict[str, DefinitionJGEX]) -> s
     data_problem += ' ; '.join([
         Statement.from_tokens(goal, dep_graph).to_str()
         for goal in problem.goals
-        ])
+    ])
     data_problem += ' </problem>'
     return data_problem
