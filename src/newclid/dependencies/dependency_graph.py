@@ -227,6 +227,64 @@ class DependencyGraph:
             proof_steps,
         )
 
+    def get_premises_and_aux(self, goals):
+        visited: Set[Statement] = set()
+        top_premises: Set[Dependency] = set()
+
+        def dfs(stmt):
+            if stmt in visited:
+                return
+            visited.add(stmt)
+
+            if stmt not in self.hyper_graph:
+                return
+
+            dep = self.hyper_graph[stmt]
+
+            if not dep.why:       # 顶层
+                if dep.reason == IN_PREMISES:
+                    top_premises.add(dep)
+                return
+
+            for pre in dep.why:
+                dfs(pre)
+
+        for goal in goals:
+            dfs(goal)
+
+        points: Set[Point] = set()
+        queue = deque()
+
+        for goal in goals:
+            for arg in goal.args:
+                if isinstance(arg, Point):
+                    if arg not in points:
+                        points.add(arg)
+                        queue.append(arg)
+
+        while queue:
+            q = queue.popleft()
+            for p in q.rely_on:
+                if p not in points:
+                    points.add(p)
+                    queue.append(p)
+
+        premises = []
+        aux = []
+
+        for dep in top_premises:
+            uses_aux = any(
+                isinstance(p, Point) and p not in points
+                for p in dep.statement.args
+            )
+
+            if not uses_aux:
+                premises.append(dep)
+            else:
+                aux.append(dep)
+
+        return premises, aux
+
     def save_pyvis(self, *, path: Path, stars: Collection[Statement] = []):
         if stars:
             deps = self.proof_deps(list(stars))

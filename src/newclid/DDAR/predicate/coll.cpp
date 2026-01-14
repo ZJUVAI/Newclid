@@ -158,21 +158,14 @@ vector<unique_ptr<Equation>> Coll::as_equation_slope(bool exp) const
 vector<unique_ptr<Equation>> Coll::as_equation_dist(bool exp) const
 {
     vector<unique_ptr<Equation>> result;
-    Term ab(Dist(_a, _b));
-    Term bc(Dist(_b, _c));
-    Term ac(Dist(_a, _c));
-    if ((_a.x() > _b.x() && _a.x() < _c.x()) || (_a.x() < _b.x() && _a.x() > _c.x()))
-    {
-        result.push_back(make_unique<Equation>(Equation({ab, ac, -bc})));
-    }
-    else if ((_b.x() > _a.x() && _b.x() < _c.x()) || (_b.x() < _a.x() && _b.x() > _c.x()))
-    {
-        result.push_back(make_unique<Equation>(Equation({ab, bc, -ac})));
-    }
-    else
-    {
-        result.push_back(make_unique<Equation>(Equation({bc, ac, -ab})));
-    }
+    vector<Term> candidates = {
+        Term(Dist(_a, _b)),
+        Term(Dist(_a, _c)),
+        Term(Dist(_b, _c)),
+    };
+    sort(candidates.begin(), candidates.end(), [](const Term &a, const Term &b)
+         { return a.to_double() < b.to_double(); });
+    result.push_back(make_unique<Equation>(Equation({candidates[0], candidates[1], -candidates[2]})));
     return result;
 }
 
