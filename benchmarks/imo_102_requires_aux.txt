@@ -18,20 +18,14 @@ imo_sl_2002_g8
 a b = segment a b; c = free c; y = free y; o1 = circle o1 a b c; o2 = circle o2 a b y; d = intersection_lc d c o2 a; m = on_line m c d; n = on_pline n m b d, on_line n b c; k = on_pline k m b c, on_line k b d; e = on_tline e n b c, on_circle e o1 a; f = on_tline f k b d, on_circle f o2 a ? perp e m m f
 imo_sl_2002_g8_variant
 a b = segment a b; c = free c; d = on_line d a c; m = on_line m c d; n = on_pline n m b d, on_line n b c; k = on_pline k m b c, on_line k b d; e = on_tline e n b c, on_circum e a b c; f = on_tline f k b d, on_circum f a b d ? perp e m m f
-imo_sl_2003_g2
-b a c = between b a c; d = free d; o = circle o a c d; p = on_tline p a a o, on_tline p c c o; q = on_line q p b, on_circle q o a; r = angle_bisector r a q c, on_line r a c; d1 = free d1; o1 = circle o1 a c d1; p1 = on_tline p1 a a o1, on_tline p1 c c o1; q1 = on_line q1 p1 b, on_circle q1 o1 a; s = on_line s r q, on_circle s o a; s1 = on_line s1 r q1, on_circle s1 o1 a ? eqangle a q1 q1 r r q1 q1 c
 imo_sl_2004_g4a
-a b c = triangle a b c; d = on_circum d a b c; p = on_aline p b c a b d, on_aline p d c a d b ? cong a p c p
+a b c = triangle a b c; d = on_circum d a b c; p = on_aline p b c a b d? cong a p c p
 imo_sl_2004_g7
 a b c = triangle a b c; x = on_line x c b; d e f i = incenter2 d e f i a b x; d1 e1 f1 j = incenter2 d1 e1 f1 j a c x; p = on_circle p i d, on_circle p j d1; q = intersection_cc q i j p; m = midpoint m a b; n = midpoint n a c; u = on_line u m n, angle_bisector u a b c; v = on_line v m n, angle_bisector v a c x; w = midpoint w u v ? coll p q w
 imo_sl_2004_g8
 a b c = triangle a b c; o = circle o a b c; d = on_circle d o a; e = intersection_ll e a d b c; f = intersection_ll f a c b d; m = midpoint m c d; o1 = circle o1 a b m; n = eqratio6 n a b m a m b, on_circle n o1 a ? coll e f n
-imo_sl_2005_g1
-a c = segment a c; p1 = on_line p1 c a, eqdistance p1 c c a; p2 = on_line p2 p1 c, eqdistance p2 p1 c a; x = between_bound x a p2; b = eqdistance b a a x, eqdistance b c p2 x; i = incenter i c a b; d = foot d i a b; e = foot e i b c; k = mirror k d i; l = mirror l e i ? cyclic a c k l
 imo_sl_2005_g6
 a b c = triangle a b c; m = midpoint m b c; d e f i = incenter2 d e f i a b c; k = on_circle k i e, on_line k a m; l = intersection_lc l a i k; x = on_pline x k b c, on_circle x i e; y = on_pline y l b c, on_circle y i e; p = intersection_ll p a x b c; q = intersection_ll q a y b c ? cong b p c q
-imo_sl_2006_g2
-a b c d = trapezoid a b c d; k = between_bound k a b; l = eqratio6 l d c k a k b, on_line l d c; p = on_line p k l, eqangle3 p a b c d b; q = on_line q k l, eqangle3 q c d b c a ? cyclic p q b c
 imo_sl_2006_g4
 a b c = triangle a b c; d = eqdistance d b b a, on_line d a c; x l k i = incenter2 x l k i a b c; j = incenter j b c d; p = intersection_ll p a j k l ? cong a p p j
 imo_sl_2006_g6
@@ -52,8 +46,6 @@ imo_sl_2008_g1a_variant2
 a b c = triangle a b c; h = orthocenter h a b c; e = midpoint e a c; f = midpoint f a b; b1 = on_circle b1 e h, on_line b1 c a; b2 = on_circle b2 e h, on_line b2 c a; c1 = on_circle c1 f h, on_line c1 a b; c2 = on_circle c2 f h, on_line c2 a b ? cyclic c1 c2 b1 b2
 imo_sl_2008_g1b
 a b c = triangle a b c; h = orthocenter h a b c; d = midpoint d b c; e = midpoint e a c; f = midpoint f a b; a1 = on_circle a1 d h, on_line a1 b c; a2 = on_circle a2 d h, on_line a2 b c; b1 = on_circle b1 e h, on_line b1 c a; b2 = on_circle b2 e h, on_line b2 c a; c1 = on_circle c1 f h, on_line c1 a b; c2 = on_circle c2 f h, on_line c2 a b ? cyclic c1 c2 b1 a1
-imo_sl_2008_g3
-e p q = between e p q; a = free a; d = on_circum d a p q, eqangle3 d e q a p e; b = free b; c = on_circum c b p q, eqangle3 c e q b p e ? cyclic a b c d
 imo_sl_2009_g2
 m l k = triangle m l k; w = circle w m l k; q = on_tline q m w m; p = mirror p q m; b = mirror b p k; c = mirror c q l; a = on_line a b q, on_line a c p; o = circle o a b c ? cong o p o q
 imo_sl_2009_g3
@@ -74,8 +66,6 @@ imo_sl_2010_g4
 a b c = triangle a b c; o = circle o a b c; i = incenter i a b c; d = on_line d a i, on_circle d o a; f = on_line f b c; e = on_aline e a c b a f, on_circle e o a; g = midpoint g i f; k = on_line k d g, on_line k e i ? cong o a o k
 imo_sl_2011_g3
 a b c d = quadrangle a b c d; o1 = midpoint o1 a b; o2 = midpoint o2 c d; e = on_circle e o1 a, on_circle e o2 c; f = intersection_cc f o1 o2 e; x3 = foot x3 e a b; y3 = foot y3 e b c; z3 = foot z3 e c d; o3 = circle o3 x3 y3 z3; x4 = foot x4 f c d; y4 = foot y4 f d a; z4 = foot z4 f a b; o4 = circle o4 x4 y4 z4; m = midpoint m e f; u = on_circle u o3 x3, on_circle u o4 x4; v = intersection_cc v o3 o4 u ? coll m u v
-imo_sl_2011_g4
-w o x = between w o x; a = on_circle a o x; m = midpoint m a o; n = midpoint n a x; b0 = on_circle b0 w x, on_circle b0 m n; c0 = on_circle c0 w x, on_circle c0 m n; b = mirror b a b0; c = mirror c a c0; d = foot d a b c; g = intersection_ll g b c0 c b0 ? coll d g x
 imo_sl_2011_g5
 a b c = triangle a b c; o = circle o a b c; i = incenter i a b c; d = intersection_lc d i o a; e = intersection_lc e i o b; f = intersection_ll f d e a c; g = intersection_ll g d e b c; p = intersection_pp p f a d g b e; k = on_tline k a o a, on_tline k b o b; x = intersection_ll x a e b d ? coll x k p
 imo_sl_2011_g7

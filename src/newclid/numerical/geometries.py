@@ -473,6 +473,7 @@ def reduce(
         for p in result:
             if all(not p.close_enough(x) for x in existing_points):
                 return (p,)
+        # return (rng.choice(result),)
         raise InvalidReduceError("All possible intersections are too close to existing points.")
     else:
         raise NotImplementedError

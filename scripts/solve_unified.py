@@ -33,22 +33,28 @@ from newclid.ag2.parse import AGProblem
 
 # ============== 硬编码默认路径 ==============
 # Construction 格式路径
-CONSTRUCTION_PROBLEMS_PATH = "/root/GenesisGeo-main/benchmarks/imo_ag_3.txt"
+# CONSTRUCTION_PROBLEMS_PATH = "/root/GenesisGeo-main/benchmarks/imo_ag_30.txt"
+CONSTRUCTION_PROBLEMS_PATH = "/root/GenesisGeo-main/benchmarks/imo_102_requires_aux.txt"
+# CONSTRUCTION_PROBLEMS_PATH = "/root/GenesisGeo-main/benchmarks/hageo_409.txt"
 # Rebuild 格式路径
-REBUILD_PROBLEMS_PATH = "/root/GenesisGeo-main/datasets/rebuild_problems/imo_30_rebuild.txt"
-AUX_POINTS_PATH = "/root/GenesisGeo-main/datasets/rebuild_problems/imo_30_rebuild_aux_points_overlap.txt"
+# REBUILD_PROBLEMS_PATH = "/root/GenesisGeo-main/evaluation_dataset/rebuild_problems/imo_30_rebuild.txt"
+# AUX_POINTS_PATH = "/root/GenesisGeo-main/evaluation_dataset/rebuild_problems/imo_30_rebuild_aux_points.txt"
+REBUILD_PROBLEMS_PATH = "/root/GenesisGeo-main/evaluation_dataset/rebuild_problems/imo_95_rebuild.txt"
+AUX_POINTS_PATH = "/root/GenesisGeo-main/evaluation_dataset/rebuild_problems/imo_95_rebuild_aux_points_overlap.txt"
+# REBUILD_PROBLEMS_PATH = "/root/GenesisGeo-main/evaluation_dataset/rebuild_problems/hageo_409_rebuild.txt"
+# AUX_POINTS_PATH = "/root/GenesisGeo-main/evaluation_dataset/rebuild_problems/hageo_409_rebuild_aux_points_overlap.txt"
 # 规则文件路径（用于 csolver-direct 模式）
 DEFAULT_RULES_PATH = "/root/GenesisGeo-main/src/newclid/default_configs/rules.txt"
 # 输出路径（会根据模式自动调整后缀）
 DEFAULT_OUTPUT_DIR = "/root/GenesisGeo-main/datasets/solve_results"
 
 # ============== 默认参数 ==============
-DEFAULT_SOLVE_MODE = "ag2"  # 可选: "csolver-construction", "csolver-direct", "ag2"
+DEFAULT_SOLVE_MODE = "csolver-construction"  # 可选: "csolver-construction", "csolver-direct", "ag2"
 USE_COORDINATES = True   # 是否在 construction 中包含点坐标（如 a@1.23_4.56）
 DEFAULT_N_AUX = 6        # 每次采样的辅助点数量
-DEFAULT_MAX_ATTEMPTS = 8192  # 每道题的最大尝试次数
-DEFAULT_SEED = 42        # 随机种子
-DEFAULT_MAX_WORKERS = 30  # 并行进程数（默认1即串行）
+DEFAULT_MAX_ATTEMPTS = 512 # 每道题的最大尝试次数
+DEFAULT_SEED = 998244353        # 随机种子
+DEFAULT_MAX_WORKERS = 50  # 并行进程数（默认1即串行）
 
 
 @dataclass
@@ -239,6 +245,80 @@ def parse_aux_points_file(filepath: str) -> Dict[str, List[AuxPoint]]:
             i += 1
 
     return aux_points_map
+
+
+# ============== 坐标映射函数 ==============
+
+def build_point_coordinates_map(rebuild_filepath: str) -> Dict[str, Dict[str, Tuple[float, float]]]:
+    """从 rebuild 格式文件中构建点坐标映射表
+    
+    返回：{problem_name: {point_name: (x, y)}}
+    """
+    problems = parse_problems_file_rebuild(rebuild_filepath)
+    coords_map = {}
+    for problem in problems:
+        point_coords = {}
+        for name, x, y in problem.points:
+            point_coords[name] = (x, y)
+        coords_map[problem.name] = point_coords
+    return coords_map
+
+
+def add_coordinates_to_construction(construction: str, coords_map: Dict[str, Tuple[float, float]]) -> str:
+    """将 construction 中的点名替换为带坐标形式
+    
+    例如：'a b c = triangle' -> 'a@1.0_2.0 b@3.0_4.0 c@5.0_6.0 = triangle'
+    
+    只处理 = 左边的点定义部分，不处理 = 右边的引用
+    
+    Args:
+        construction: construction 字符串
+        coords_map: {point_name: (x, y)} 坐标映射
+    
+    Returns:
+        添加坐标后的 construction 字符串
+    
+    Raises:
+        ValueError: 如果某个点在 coords_map 中找不到坐标
+    """
+    # 按 ; 分割各构造
+    constructs = construction.split(';')
+    new_constructs = []
+    
+    for construct in constructs:
+        construct = construct.strip()
+        if not construct:
+            continue
+        
+        if '=' not in construct:
+            new_constructs.append(construct)
+            continue
+        
+        # 分离 = 左右两边
+        left, right = construct.split('=', 1)
+        left = left.strip()
+        right = right.strip()
+        
+        # 处理左边的点名
+        tokens = left.split()
+        new_tokens = []
+        for token in tokens:
+            # 如果已经有坐标（如 a@1.23_4.56），跳过
+            if '@' in token:
+                new_tokens.append(token)
+                continue
+            
+            # 查找坐标
+            if token in coords_map:
+                x, y = coords_map[token]
+                new_tokens.append(f"{token}@{x}_{y}")
+            else:
+                raise ValueError(f"Point '{token}' not found in coordinates map")
+        
+        new_left = ' '.join(new_tokens)
+        new_constructs.append(f"{new_left} = {right}")
+    
+    return '; '.join(new_constructs)
 
 
 # ============== Rebuild 格式解析函数 ==============
@@ -530,7 +610,7 @@ def solve_problem_csolver_construction(problem: Problem, seed: int) -> Tuple[boo
         solver: GeometricSolver = solver_builder.build(max_attempts=100)
         
         # 使用 CSolver 求解
-        csolver = CSolver(problem_text, seed=seed, solver=solver, using_log=False)
+        csolver = CSolver(problem_text, seed=seed, solver=solver, using_log=True, using_exp=True)
         
         start_time = time.time()
         solved = csolver.run()
@@ -755,7 +835,7 @@ def solve_single_problem(
     solve_mode = args_dict['solve_mode']
     rules_path = args_dict.get('rules_path', DEFAULT_RULES_PATH)
     is_parallel = args_dict.get('max_workers', 1) > 1
-    seed = args_dict['seed'] + problem_index
+    seed = DEFAULT_SEED
     
     # 先尝试直接求解（不加辅助点）
     solved, runtime, error, proof_steps = solve_problem_unified(problem, solve_mode, seed, rules_path)
@@ -975,6 +1055,32 @@ def main():
     else:  # rebuild
         problems = parse_problems_file_rebuild(problems_path)
     print(f"已加载 {len(problems)} 道题目\n")
+
+    # 如果是 csolver-construction 模式且使用坐标，从 rebuild 文件加载坐标
+    point_coords_map: Dict[str, Dict[str, Tuple[float, float]]] = {}
+    if solve_mode == "csolver-construction" and use_coordinates:
+        print(f"正在从 rebuild 文件加载点坐标: {REBUILD_PROBLEMS_PATH}")
+        point_coords_map = build_point_coordinates_map(REBUILD_PROBLEMS_PATH)
+        print(f"已加载 {len(point_coords_map)} 道题目的点坐标\n")
+        
+        # 为每个题目的 construction 添加坐标
+        print("正在为 construction 添加点坐标...")
+        for i, problem in enumerate(problems):
+            if problem.name not in point_coords_map:
+                raise ValueError(f"Problem '{problem.name}' not found in coordinates file: {REBUILD_PROBLEMS_PATH}")
+            
+            coords = point_coords_map[problem.name]
+            try:
+                new_construction = add_coordinates_to_construction(problem.construction, coords)
+                problems[i] = Problem(
+                    name=problem.name,
+                    input_format="construction",
+                    construction=new_construction,
+                    goal_str=problem.goal_str
+                )
+            except ValueError as e:
+                raise ValueError(f"Error adding coordinates to problem '{problem.name}': {e}")
+        print("点坐标添加完成\n")
 
     # 解析辅助点（统一格式，同时包含 predicates 和 construction）
     print("正在加载辅助点...")

@@ -93,8 +93,7 @@ e:-0.49738765773887,0.7803129494549607
 f:0.04717337890284387,-0.024266036057063345
 j:0.5624384011453407,0.45590579816193194
 Premises:
-coll o b c
-cong o b o c
+midp o b c
 cong a o b o
 cong b o d o
 cong a d b d
@@ -122,8 +121,7 @@ e:-0.49738765773887,0.7803129494549607
 f:0.04717337890284387,-0.024266036057063345
 j:0.5624384011453407,0.45590579816193194
 Premises:
-coll o b c
-cong o b o c
+midp o b c
 cong a o b o
 cong b o d o
 cong a d b d
@@ -189,8 +187,7 @@ o1:-0.22807559283316167,-0.7764983354729522
 o2:0.6196935783469887,-1.1242958451541343
 p:0.29175872218780063,-1.2919287660517798
 Premises:
-coll o b c
-cong o b o c
+midp o b c
 cong b o m o
 coll a b m
 cong b o n o
@@ -279,10 +276,8 @@ cong b o c o
 cong a o o r
 cong a r b r
 eqangle a b a r b r a b
-coll l a c
-cong l a l c
-coll k b c
-cong k b k c
+midp l a c
+midp k b c
 coll k o p
 coll c p r
 coll l o q
@@ -313,12 +308,9 @@ c2:1.2148214107143458,1.2742696720541016
 Premises:
 perp a h b c
 perp a c b h
-coll d b c
-cong d b d c
-coll e a c
-cong e a e c
-coll f a b
-cong f a f b
+midp d b c
+midp e a c
+midp f a b
 cong d h d a1
 coll b c a1
 cong d h d a2
@@ -353,12 +345,9 @@ c2:1.2148214107143458,1.2742696720541016
 Premises:
 perp a h b c
 perp a c b h
-coll d b c
-cong d b d c
-coll e a c
-cong e a e c
-coll f a b
-cong f a f b
+midp d b c
+midp e a c
+midp f a b
 cong d h d a1
 coll b c a1
 cong d h d a2
@@ -427,8 +416,7 @@ cong a o d o
 coll b c f
 eqangle a b a e a f a c
 cong a o e o
-coll g f i
-cong g f g i
+midp g f i
 coll d g k
 coll e i k
 Goal:
@@ -651,8 +639,7 @@ perp a h b c
 perp a c b h
 coll a f h
 coll b c f
-coll m b c
-cong m b m c
+midp m b c
 cong a o b o
 cong b o c o
 perp a q h q
@@ -730,8 +717,7 @@ eqangle a c a d c d a c
 eqangle a c a d a d a e
 cong a e d e
 eqangle a d a e d e a d
-coll m c f
-cong m c m f
+midp m c f
 para a e m x
 para a m e x
 coll f x y
