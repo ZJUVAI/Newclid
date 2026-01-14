@@ -783,7 +783,7 @@ class GeometryProblemWorker:
                 predicate_strs_with_idx.append(
                     f"{statement_str} [{dep_idx[statement_str]}]")
             renamed_basic_strs_with_idx.append(
-                ' '.join([mp[p] for p in points]) + ' : ' +
+                'x00 ' + ' '.join([mp[p] for p in points]) + ' : ' +
                 ' '.join(predicate_strs_with_idx)
             )
         if len(renamed_basic_strs_with_idx) == 0:
