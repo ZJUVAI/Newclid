@@ -15,9 +15,12 @@ p:0.8355331411980911,0.8977814554149368
 Premises:
 cong a o b o
 cong b o c o
-midp a1 b c
-midp b1 a c
-midp c1 a b
+coll a1 b c
+cong a1 b a1 c
+coll b1 a c
+cong b1 a b1 c
+coll c1 a b
+cong c1 a c1 b
 coll o a1 a2
 eqangle a o a a1 a a2 o a1
 coll o b1 b2
@@ -104,8 +107,10 @@ perp a b e p
 coll a b e
 perp c d f p
 coll c d f
-midp m a d
-midp n b c
+coll m a d
+cong m a m d
+coll n b c
+cong n b n c
 Goal:
 perp e f m n
 
@@ -221,8 +226,10 @@ d:0.5798361468721125,0.7948880574374896
 e:1.0646537762942174,1.6873551189245597
 f:1.5752120156689011,0.9638088296822929
 Premises:
-midp o1 a b
-midp o2 a c
+coll o1 a b
+cong o1 a o1 b
+coll o2 a c
+cong o2 a o2 c
 perp a h b c
 coll b c h
 coll b c d
@@ -289,7 +296,8 @@ perp b q m p
 coll b m q
 perp a q n p
 coll a n q
-midp x k p
+coll x k p
+cong x k x p
 Goal:
 coll m n x
 
@@ -501,7 +509,8 @@ y:-0.5343998169770808,0.21038973978792286
 p:0.4194762088986359,0.054678250225096064
 q:-0.2767345455014981,-1.0442596888806976
 Premises:
-midp m b c
+coll m b c
+cong m b m c
 eqangle a b a i a i a c
 eqangle a c c i c i b c
 perp b c d i
@@ -574,7 +583,8 @@ cong c o4 d o4
 coll m o s
 cong o o4 s o4
 Goal:
-midp m s t
+coll m s t
+cong m s m t
 
 Problem Name:
 2006CTSTp19
@@ -636,9 +646,12 @@ coll b p b1
 cong a o o b1
 coll c p c1
 cong a o o c1
-midp m1 b c
-midp m2 a c
-midp m3 a b
+coll m1 b c
+cong m1 b m1 c
+coll m2 a c
+cong m2 a m2 c
+coll m3 a b
+cong m3 a m3 b
 coll a1 m1 a2
 cong a1 m1 m1 a2
 coll b1 b2 m2
@@ -709,7 +722,8 @@ eqangle b d d j d j c d
 coll k l m
 coll a j m
 Goal:
-midp m a j
+coll m a j
+cong m a m j
 
 Problem Name:
 2006G9
@@ -751,13 +765,16 @@ cong c o3 a1 o3
 cong a1 o3 b1 o3
 cong c o3 c2 o3
 cong c o o c2
-midp m1 b c
+coll m1 b c
+cong m1 b m1 c
 coll a1 m1 a3
 cong a1 m1 m1 a3
-midp m2 a c
+coll m2 a c
+cong m2 a m2 c
 coll b1 m2 b3
 cong b1 m2 m2 b3
-midp m3 a b
+coll m3 a b
+cong m3 a m3 b
 coll c1 c3 m3
 cong c1 m3 c3 m3
 Goal:
@@ -796,7 +813,8 @@ p:-0.7722724583716117,-0.8308804708903047
 e:-0.1401772015294912,0.5193500134919504
 f:-0.5180781862430816,-0.2878913383693707
 Premises:
-midp o a b
+coll o a b
+cong o a o b
 cong a o c o
 cong a o d o
 coll c d p
@@ -838,8 +856,10 @@ coll d f p
 coll a c p
 coll d e q
 coll a b q
-midp m e p
-midp n f q
+coll m e p
+cong m e m p
+coll n f q
+cong n f n q
 Goal:
 perp i o m n
 
@@ -858,8 +878,10 @@ p:0.8431094790850572,2.2256866679251575
 Premises:
 eqangle a b a i a i a c
 eqangle a c c i c i b c
-midp m a b
-midp n a c
+coll m a b
+cong m a m b
+coll n a c
+cong n a n c
 coll a b d
 cong b c b d
 coll a c e
@@ -947,7 +969,8 @@ perp a h b c
 perp a c b h
 cong a o b o
 cong b o c o
-midp b0 a c
+coll b0 a c
+cong b0 a b0 c
 coll b o p
 coll a c p
 coll b h q
@@ -1058,8 +1081,10 @@ perp a q b d
 coll b d q
 perp b d c p
 coll b d p
-midp m a c
-midp e b c
+coll m a c
+cong m a m c
+coll e b c
+cong e b e c
 cong o p o q
 cong m o o q
 coll a c h
@@ -1086,8 +1111,10 @@ perp b c i m
 coll b c m
 perp a c i n
 coll a c n
-midp e a b
-midp f a c
+coll e a b
+cong e a e b
+coll f a c
+cong f a f c
 coll d e f
 coll b d i
 Goal:
@@ -1118,7 +1145,8 @@ eqangle a c a m c m a c
 cyclic a b c n
 cong a n b n
 eqangle a b a n b n a b
-midp d m n
+coll d m n
+cong d m d n
 cyclic a b c g
 eqangle a b a i a i a c
 eqangle a c c i c i b c
@@ -1238,9 +1266,12 @@ d:0.833636336568065,0.9673047986507639
 e:0.9025174164893791,1.0118845283293365
 f:0.9025865250764304,0.950563356530429
 Premises:
-midp m b c
-midp n a c
-midp p a b
+coll m b c
+cong m b m c
+coll n a c
+cong n a n c
+coll p a b
+cong p a p b
 cong a d b d
 eqangle a b a d b d a b
 coll a d m
@@ -1296,7 +1327,8 @@ coll b d e
 cong a o e o
 cong a o f o
 perp d f e f
-midp m a c
+coll m a c
+cong m a m c
 cong b f b f1
 cong d f d f1
 Goal:
@@ -1315,7 +1347,8 @@ d:0.5058779871448729,1.35995731516686
 o1:-0.14444408046413132,1.109828926883366
 Premises:
 perp a b a c
-midp o b c
+coll o b c
+cong o b o c
 cong a o e o
 coll c e f
 eqangle a c a e a f a c
@@ -1348,7 +1381,8 @@ coll a d f
 cong b o f o
 coll b f g
 coll d e g
-midp m a g
+coll m a g
+cong m a m g
 Goal:
 perp a o c m
 
@@ -1401,8 +1435,10 @@ coll a c e
 coll b d e
 coll a d f
 coll b c f
-midp g a b
-midp h c d
+coll g a b
+cong g a g b
+coll h c d
+cong h c h d
 cong e o1 g o1
 cong g o1 h o1
 Goal:
@@ -1434,8 +1470,10 @@ cong c o2 d o2
 cong d o2 p o2
 perp c h2 d p
 perp c p d h2
-midp e1 h1 o1
-midp e2 h2 o2
+coll e1 h1 o1
+cong e1 h1 e1 o1
+coll e2 h2 o2
+cong e2 h2 e2 o2
 perp c d x e1
 perp a b x e2
 Goal:
@@ -1506,7 +1544,8 @@ coll a d p
 perp a b o p
 coll a d q
 perp a c o q
-midp m b c
+coll m b c
+cong m b m c
 cong o s p s
 cong p s q s
 Goal:
@@ -1656,10 +1695,12 @@ f:0.8566455735436259,1.24444902688065
 Premises:
 eqangle a b b c b c a c
 cong a b a c
-midp d b c
+coll d b c
+cong d b d c
 perp a b c e
 cong b d b e
-midp m b e
+coll m b e
+cong m b m e
 cong a o b o
 cong b o d o
 cong a o f o
@@ -1679,7 +1720,8 @@ e:0.5598982795497713,0.07772402905759734
 f:0.36642337796855345,0.09986428605382182
 m:0.09366172631951081,0.13107770452241516
 Premises:
-midp o a b
+coll o a b
+cong o a o b
 cong a o c o
 cong a o d o
 perp c e c o
@@ -1714,7 +1756,8 @@ coll d e g
 coll d e h
 para a h b g
 Goal:
-midp g e h
+coll g e h
+cong g e g h
 
 Problem Name:
 2010CTSTp19
@@ -1729,7 +1772,8 @@ o1:0.7232170683212306,1.6179570162703754
 o2:1.4227544703698245,0.7292745519122841
 n:1.0729857693455276,1.1736157840913297
 Premises:
-midp m b c
+coll m b c
+cong m b m c
 eqangle a b a m a p a c
 cong a o b o
 cong b o c o
@@ -1737,7 +1781,8 @@ cong a o1 b o1
 cong b o1 p o1
 cong a o2 c o2
 cong c o2 p o2
-midp n o1 o2
+coll n o1 o2
+cong n o1 n o2
 Goal:
 coll a n o
 
@@ -1757,8 +1802,10 @@ q:0.6588096342972027,0.6477885586012359
 Premises:
 eqangle a b a i a i a c
 eqangle a c c i c i b c
-midp m a c
-midp n a b
+coll m a c
+cong m a m c
+coll n a b
+cong n a n b
 coll a c d
 para b d i m
 coll a b e
@@ -1866,7 +1913,8 @@ cong b o c o
 cong a o n o
 cong a n c n
 eqangle a c a n c n a c
-midp m a c
+coll m a c
+cong m a m c
 eqangle a b a i1 a i1 a m
 eqangle a m m i1 m i1 b m
 eqangle b c c i2 c i2 c m
@@ -1925,8 +1973,10 @@ coll a b c1
 eqangle a c c c1 c c1 b c
 coll a b c2
 perp c c1 c c2
-midp m1 b1 b2
-midp m2 c1 c2
+coll m1 b1 b2
+cong m1 b1 m1 b2
+coll m2 c1 c2
+cong m2 c1 m2 c2
 cong p m1 b1 m1
 cong p m2 c1 m2
 Goal:
@@ -1949,8 +1999,10 @@ Premises:
 cyclic a b c d
 coll a c e
 coll b d e
-midp f a b
-midp g c d
+coll f a b
+cong f a f b
+coll g c d
+cong g c g d
 para a b g s
 perp e h g s
 coll g h s
@@ -1990,7 +2042,8 @@ coll b f o1
 coll d f o
 coll c g o1
 coll e g o
-midp m1 f g
+coll m1 f g
+cong m1 f m1 g
 Goal:
 coll m n m1
 
@@ -2011,8 +2064,10 @@ cong b o c o
 coll a b m
 coll a c n
 coll m n o
-midp e b n
-midp f c m
+coll e b n
+cong e b e n
+coll f c m
+cong f c f m
 Goal:
 eqangle a b a c e o f o
 
@@ -2039,7 +2094,8 @@ perp a c e i
 coll a c e
 perp a b f i
 coll a b f
-midp m b c
+coll m b c
+cong m b m c
 perp a h b c
 coll b c h
 coll a i k
@@ -2108,8 +2164,10 @@ k1:0.14002397061844657,-0.8133711900461474
 k2:0.8251003987457863,-0.3297444462367586
 m:0.3786104519445244,-0.6449420946296303
 Premises:
-midp m1 a b
-midp m2 c d
+coll m1 a b
+cong m1 a m1 b
+coll m2 c d
+cong m2 c m2 d
 cong a m1 e m1
 cong c m2 e m2
 cong a m1 f m1
@@ -2134,7 +2192,8 @@ cong e1 o1 k1 o1
 cong f1 o2 k1 o2
 cong e1 o1 o1 k2
 cong f1 o2 k2 o2
-midp m e f
+coll m e f
+cong m e m f
 Goal:
 coll m k1 k2
 
@@ -2191,7 +2250,8 @@ k:0.837371613014093,0.9712463980748817
 Premises:
 eqangle a b b c b c a c
 cong a b a c
-midp d a c
+coll d a c
+cong d a d c
 cong b o1 d o1
 cong b o1 c o1
 cong d o1 e o1
@@ -2245,7 +2305,8 @@ o:0.8183076411169484,1.0576300638589091
 Premises:
 perp a h b c
 perp a c b h
-midp e a h
+coll e a h
+cong e a e h
 eqangle a b a i a i a c
 eqangle a c c i c i b c
 perp a c i b1
@@ -2275,7 +2336,8 @@ para a b c d
 para a d b c
 perp a h b c
 coll b c h
-midp m a b
+coll m a b
+cong m a m b
 cong a o b o
 cong b o c o
 coll c k m
@@ -2297,7 +2359,8 @@ f:1.8517001498322707,0.5484727082015063
 Premises:
 perp a d b c
 coll b c d
-midp m b c
+coll m b c
+cong m b m c
 perp a h b c
 perp a c b h
 coll e h m
@@ -2402,7 +2465,8 @@ coll b c d
 coll b c e
 cong a e e o
 eqangle a e a o a o e o
-midp n h o
+coll n h o
+cong n h n o
 Goal:
 cyclic a d e n
 
@@ -2575,7 +2639,8 @@ cong a o b o
 cong b o c o
 coll b c d
 eqangle a b a d a d a c
-midp m b c
+coll m b c
+cong m b m c
 coll d e m
 cong d m e m
 coll a o x
@@ -2767,7 +2832,8 @@ coll a c e
 perp a h d e
 perp a e d h
 Goal:
-midp h b c
+coll h b c
+cong h b h c
 
 Problem Name:
 2013ARMOg9p7
@@ -2804,7 +2870,8 @@ cong l o2 y o2
 cong m o2 y o2
 cong k o1 p o1
 cong l o2 p o2
-midp s a b
+coll s a b
+cong s a s b
 Goal:
 eqangle a c c p c s b c
 
@@ -2917,10 +2984,12 @@ eqangle a b b b1 b b1 b c
 eqangle a b a b1 a b1 a c
 eqangle a c c c1 c c1 b c
 eqangle a b b c1 b c1 b c
-midp m1 a c
+coll m1 a c
+cong m1 a m1 c
 coll b1 m1 b2
 cong b1 m1 m1 b2
-midp m2 a b
+coll m2 a b
+cong m2 a m2 b
 coll c1 c2 m2
 cong c1 m2 c2 m2
 eqangle a b a a1 a a1 a c
@@ -2957,8 +3026,10 @@ perp a b f g
 coll a b g
 perp c d f h
 coll c d h
-midp m b c
-midp n e f
+coll m b c
+cong m b m c
+coll n e f
+cong n e n f
 cong m o1 n o1
 cong g o1 n o1
 coll b f p
@@ -2988,8 +3059,10 @@ k:-0.523356330540204,-1.3947362241972558
 Premises:
 cong a o b o
 cong b o c o
-midp m a b
-midp n a c
+coll m a b
+cong m a m b
+coll n a c
+cong n a n c
 cong a o o t
 eqangle a b a t a t a c
 cong a o1 m o1
@@ -3056,7 +3129,8 @@ coll a d q
 coll b c q
 coll a c r
 coll b d r
-midp m p q
+coll m p q
+cong m p m q
 coll k m r
 cong a o k o
 cong k o1 p o1
@@ -3163,7 +3237,8 @@ d:1.1562112680170844,0.7823321937397655
 o1:1.0520926752279742,0.6165466885560408
 k:1.24082845461536,0.6685497718535058
 Premises:
-midp m a c
+coll m a c
+cong m a m c
 cong a o b o
 cong b o c o
 perp a o a p
@@ -3202,8 +3277,10 @@ coll a c a1
 cong c o o a1
 coll b c b1
 cong c o o b1
-midp m1 a c
-midp m2 b c
+coll m1 a c
+cong m1 a m1 c
+coll m2 b c
+cong m2 b m2 c
 coll a1 m1 a2
 cong a1 m1 m1 a2
 coll b1 b2 m2
@@ -3299,8 +3376,10 @@ p:0.8297232043163234,1.3180966407729926
 o3:0.5796311974393396,0.8049377874328411
 q:1.0222914306449078,0.895260835301549
 Premises:
-midp d a b
-midp e a c
+coll d a b
+cong d a d b
+coll e a c
+cong e a e c
 cong a o1 d o1
 cong d o1 e o1
 cong b o2 c o2
@@ -3361,9 +3440,12 @@ p:0.9025865250764304,0.9505633565304287
 Premises:
 cong a o b o
 cong b o c o
-midp d b c
-midp e a c
-midp f a b
+coll d b c
+cong d b d c
+coll e a c
+cong e a e c
+coll f a b
+cong f a f b
 coll a d m
 coll f m o
 coll a d n
@@ -3385,7 +3467,8 @@ d:1.638330493283387,1.346141498087746
 o:0.8183076411169484,1.0576300638589091
 e:0.722206963242657,1.6239091215490828
 Premises:
-midp m b c
+coll m b c
+cong m b m c
 eqangle a b a i a i a c
 eqangle a c c i c i b c
 coll a b d
@@ -3408,7 +3491,8 @@ d:-0.618530973705173,-0.26823517417719367
 p:-0.2268522920069301,-0.7945768236277287
 q:-0.3006019844280578,-0.0790366977012666
 Premises:
-midp o a b
+coll o a b
+cong o a o b
 cong a o c o
 cong a o d o
 cong a p o p
@@ -3558,7 +3642,8 @@ p:0.8762152007725741,0.9948617745057592
 x:0.1787615613868191,0.5822916205726519
 y:0.9559529192200161,1.0420296447646464
 Premises:
-midp m b c
+coll m b c
+cong m b m c
 coll a b e
 cong b m e m
 coll a c f
@@ -3658,7 +3743,8 @@ p:0.6929903778786304,0.10276121647014522
 o1:-0.005928798291408174,0.34267089295729736
 x:0.4172884806137937,0.9484198529452218
 Premises:
-midp m b c
+coll m b c
+cong m b m c
 perp a h b c
 coll b c h
 coll a b q
@@ -3696,7 +3782,8 @@ coll a i q
 eqangle b d d q d q c d
 coll b i p
 eqangle b d d p d p c d
-midp m p q
+coll m p q
+cong m p m q
 cong a o n o
 perp c i c n
 Goal:
@@ -3811,8 +3898,10 @@ m:0.7363680252925155,0.8733507164203097
 Premises:
 cong a o b o
 cong b o c o
-midp d b c
-midp o1 a d
+coll d b c
+cong d b d c
+coll o1 a d
+cong o1 a o1 d
 coll a b e
 cong a o1 e o1
 coll a c f
@@ -3925,7 +4014,8 @@ coll l m o
 cong l o m o
 perp a b l p
 coll a b p
-midp n a b
+coll n a b
+cong n a n b
 Goal:
 para k p m n
 
@@ -4039,7 +4129,8 @@ z:1.0160704541922605,0.6974968631015156
 Premises:
 perp a h b c
 coll b c h
-midp m b c
+coll m b c
+cong m b m c
 coll h m h1
 cong h m m h1
 cong a o b o
@@ -4101,8 +4192,10 @@ perp a c e i
 coll a c e
 perp a b f i
 coll a b f
-midp m b c
-midp o1 a d
+coll m b c
+cong m b m c
+coll o1 a d
+cong o1 a o1 d
 cong d i i q
 cong a o1 q o1
 coll a i p
@@ -4128,9 +4221,12 @@ y:-0.05391297509570471,-0.5538203138990093
 z:0.46370204294173933,-0.8854543163098091
 k:-0.11024341742522267,-1.2891144077910723
 Premises:
-midp m1 b c
-midp m2 a c
-midp m3 a b
+coll m1 b c
+cong m1 b m1 c
+coll m2 a c
+cong m2 a m2 c
+coll m3 a b
+cong m3 a m3 b
 cong a o b o
 cong b o c o
 perp a h b c
@@ -4190,7 +4286,8 @@ r:0.3780130848039867,-0.10558938995726724
 o1:0.18698347074520527,-0.12078603360907024
 t:0.16086652216143366,-0.3106311189349714
 Premises:
-midp m a b
+coll m a b
+cong m a m b
 cong a o b o
 cong b o c o
 coll c o c1
@@ -4238,9 +4335,12 @@ coll a b m3
 cong a m3 b m3
 coll a m m1
 coll b m m2
-midp p1 a m
-midp p2 b m
-midp p3 c m
+coll p1 a m
+cong p1 a p1 m
+coll p2 b m
+cong p2 b p2 m
+coll p3 c m
+cong p3 c p3 m
 perp b c m1 o1
 cong m1 o1 o1 p1
 eqangle m1 o1 m1 p1 m1 p1 o1 p1
@@ -4282,9 +4382,12 @@ perp a d f k
 coll a d k
 perp b c f l
 coll b c l
-midp m e f
-midp s c f
-midp t d f
+coll m e f
+cong m e m f
+coll s c f
+cong s c s f
+coll t d f
+cong t d t f
 cong k o1 m o1
 cong k o1 t o1
 cong l o2 m o2
@@ -4360,8 +4463,10 @@ coll b c q
 coll i j q
 coll a d s
 coll i j s
-midp m p r
-midp n q s
+coll m p r
+cong m p m r
+coll n q s
+cong n q n s
 Goal:
 perp m o n o
 
@@ -4428,7 +4533,8 @@ perp a c b e
 coll a c e
 perp a h b c
 perp a c b h
-midp m a b
+coll m a b
+cong m a m b
 cong d o1 e o1
 cong e o1 m o1
 cong a o2 b o2
@@ -4498,9 +4604,12 @@ Premises:
 cyclic a b c d
 coll a c x
 coll b d x
-midp c1 c x
-midp d1 d x
-midp m c d
+coll c1 c x
+cong c1 c c1 x
+coll d1 d x
+cong d1 d d1 x
+coll m c d
+cong m c m d
 coll a y d1
 coll b y c1
 coll a c e
@@ -4557,7 +4666,8 @@ cong a o b o
 cong b o c o
 eqangle a b a i a i a c
 eqangle a c c i c i b c
-midp m b c
+coll m b c
+cong m b m c
 perp b c d i
 coll b c d
 coll a c e
@@ -4627,7 +4737,8 @@ cong a s s y
 coll a c y
 perp a p b c
 coll b c p
-midp m b c
+coll m b c
+cong m b m c
 cong s o1 x o1
 cong s o1 y o1
 Goal:
@@ -4656,7 +4767,8 @@ coll a c f
 eqangle a d d f d f c d
 coll b e p
 coll d f p
-midp m a c
+coll m a c
+cong m a m c
 cong b o o p
 cong d o o p
 coll b m x
@@ -4797,7 +4909,8 @@ coll a s y
 cong a o2 y o2
 cong b o3 e o3
 cong e o3 f o3
-midp m x y
+coll m x y
+cong m x m y
 cong t x t y
 eqangle t x x y x y t y
 para t o3 x y
@@ -4902,7 +5015,8 @@ perp b c b1 b2
 coll b c b2
 coll k a1 a2
 coll k b1 b2
-midp m a2 b2
+coll m a2 b2
+cong m a2 m b2
 Goal:
 eqangle k m k a1 k b1 k n
 
@@ -4961,8 +5075,10 @@ perp a h b c
 perp a c b h
 cong a o b o
 cong b o c o
-midp m a h
-midp n b c
+coll m a h
+cong m a m h
+coll n b c
+cong n b n c
 cong a m g m
 cong a o g o
 coll a n q
@@ -5031,7 +5147,8 @@ cong b o3 p1 o3
 cong c o4 p1 o4
 cong b o3 p2 o3
 cong c o4 p2 o4
-midp m d k
+coll m d k
+cong m d m k
 Goal:
 coll m p1 p2
 
@@ -5130,7 +5247,8 @@ eqangle a b a d a d a c
 perp a d a z
 cong a z c z
 eqangle a c a z c z a c
-midp n a b
+coll n a b
+cong n a n b
 Goal:
 cyclic a d n z
 
@@ -5213,8 +5331,10 @@ n:0.9585573421318537,0.4371730164066452
 o1:0.23299041748054153,0.9246922272684169
 o2:0.6678933403114297,0.5139116350224814
 Premises:
-midp d b c
-midp k a d
+coll d b c
+cong d b d c
+coll k a d
+cong k a k d
 perp a b d e
 coll a b e
 perp a c d f
@@ -5299,7 +5419,8 @@ cong p o1 k1 o1
 cong x o2 k1 o2
 cong p o1 o1 k2
 cong x o2 k2 o2
-midp m b h
+coll m b h
+cong m b m h
 Goal:
 coll m k1 k2
 
@@ -5335,9 +5456,12 @@ coll z p1 p2
 coll a c z
 coll p1 z1 p2
 coll b d z1
-midp m1 x x1
-midp m2 y y1
-midp m3 z z1
+coll m1 x x1
+cong m1 x m1 x1
+coll m2 y y1
+cong m2 y m2 y1
+coll m3 z z1
+cong m3 z m3 z1
 cong t m1 x m1
 cong t m2 y m2
 Goal:
@@ -5485,7 +5609,8 @@ coll f m x
 cong a o1 m o1
 coll a l m
 coll d e l
-midp q a e
+coll q a e
+cong q a q e
 cong a o2 l o2
 cong d o2 l o2
 coll l q t
@@ -5526,7 +5651,8 @@ coll a o q
 coll c h q
 cong k p k q
 cong h k k q
-midp m b c
+coll m b c
+cong m b m c
 Goal:
 coll a k m
 
@@ -5561,7 +5687,8 @@ coll b c p
 cong a o1 p o1
 coll b c q
 cong a o1 q o1
-midp m a d
+coll m a d
+cong m a m d
 cong m o2 p o2
 cong p o2 q o2
 cong m o2 u o2
@@ -5652,8 +5779,10 @@ cong a o b o
 cong b o c o
 coll c k o
 perp a k b c
-midp p a k
-midp m a c
+coll p a k
+cong p a p k
+coll m a c
+cong m a m c
 coll b c y
 coll o p y
 cong b o1 c o1
@@ -5817,14 +5946,16 @@ perp d k k m
 cong a o k o
 coll k m s
 coll b c s
-midp n i s
+coll n i s
+cong n i n s
 cong i o1 k o1
 cong d o1 i o1
 cong a o2 m o2
 cong a o2 n o2
 cong k o1 l o1
 cong l o2 m o2
-midp p i l
+coll p i l
+cong p i p l
 Goal:
 cyclic a b c p
 
@@ -5882,8 +6013,10 @@ d:1.1648691173970485,0.7787911980132948
 k:0.6405012252983041,0.5896634128600945
 q:1.7168835542091216,0.9778904742656988
 Premises:
-midp m a b
-midp n a c
+coll m a b
+cong m a m b
+coll n a c
+cong n a n c
 perp a d b c
 coll b c d
 coll k m n
@@ -5955,7 +6088,8 @@ cong p o3 q o3
 coll a m o3
 coll b c m
 Goal:
-midp m b c
+coll m b c
+cong m b m c
 
 Problem Name:
 2018CHNWesternMOp5
@@ -5971,7 +6105,8 @@ e:-0.025223320601601314,1.5658211843199292
 Premises:
 cong a o b o
 cong b o c o
-midp m b c
+coll m b c
+cong m b m c
 cong a o1 o o1
 cong m o1 o o1
 coll a b d
@@ -6150,7 +6285,8 @@ y:0.8390333066896201,0.8745855359848258
 Premises:
 eqangle a b b c b c a c
 cong a b a c
-midp m b c
+coll m b c
+cong m b m c
 para a p b c
 coll b p x
 coll c p y
@@ -6344,7 +6480,8 @@ perp a p b1 c1
 perp a c1 p b1
 perp a h b c
 perp a c b h
-midp m p a1
+coll m p a1
+cong m p m a1
 Goal:
 para h m i o
 
@@ -6535,7 +6672,8 @@ coll b d p
 perp a p b p
 coll b e q
 perp b q c q
-midp m b l
+coll m b l
+cong m b m l
 Goal:
 coll m p q
 
@@ -6611,7 +6749,8 @@ cong a o b o
 cong b o c o
 perp a l a o
 perp b l b o
-midp m a b
+coll m a b
+cong m a m b
 cong c o1 d o1
 cong d o1 l o1
 para c m d f
@@ -6645,7 +6784,8 @@ coll b e p
 coll c f p
 coll a d p
 coll b c d
-midp m e f
+coll m e f
+cong m e m f
 cong a b a b1
 cong b d d b1
 cong a c a c1
@@ -6771,8 +6911,10 @@ cong b o e o
 cong a o c o
 cong a o d o
 cong a b c d
-midp m b c
-midp n d e
+coll m b c
+cong m b m c
+coll n d e
+cong n d n e
 perp a h b e
 perp a e b h
 coll m n g1
@@ -6820,13 +6962,20 @@ perp a b c f
 coll a b f
 perp a h b c
 perp a c b h
-midp k b c
-midp l a c
-midp m a b
-midp p1 a h
-midp p2 d k
-midp p3 e l
-midp p4 f m
+coll k b c
+cong k b k c
+coll l a c
+cong l a l c
+coll m a b
+cong m a m b
+coll p1 a h
+cong p1 a p1 h
+coll p2 d k
+cong p2 d p2 k
+coll p3 e l
+cong p3 e p3 l
+coll p4 f m
+cong p4 f p4 m
 Goal:
 cyclic p1 p2 p3 p4
 
@@ -6856,7 +7005,8 @@ cyclic a b c q
 coll b m q
 coll e f m
 Goal:
-midp m e f
+coll m e f
+cong m e m f
 
 Problem Name:
 2019ELMOSLp3
@@ -6893,7 +7043,8 @@ cong e o1 a1 o1
 cong e o1 f o1
 cyclic a b c g
 cyclic e f g a1
-midp m e f
+coll m e f
+cong m e m f
 cong a o2 m o2
 cong g o2 m o2
 cyclic a g h m
@@ -7034,7 +7185,8 @@ perp a c e i
 coll a c e
 perp a b f i
 coll a b f
-midp o1 a d
+coll o1 a d
+cong o1 a o1 d
 cong d i g i
 cong a o1 g o1
 coll d g p
@@ -7068,7 +7220,8 @@ coll d f q
 perp a c a q
 coll p q t
 coll b c t
-midp m b c
+coll m b c
+cong m b m c
 Goal:
 perp a m a t
 
@@ -7257,9 +7410,12 @@ coll c k c1
 cong c k k c1
 coll a b1 c1
 eqangle a k b k c k a k
-midp m b c
-midp n a c
-midp p a b
+coll m b c
+cong m b m c
+coll n a c
+cong n a n c
+coll p a b
+cong p a p b
 coll e m n
 coll b e k
 coll f m p
@@ -7293,7 +7449,8 @@ Premises:
 cyclic a b c d
 coll a c e
 coll b d e
-midp f a b
+coll f a b
+cong f a f b
 perp a d e p
 coll a d p
 perp a b e q
@@ -7451,7 +7608,8 @@ k:1.6882380732739422,0.5861516305741866
 j:-0.2654503204530212,-0.6968266702651004
 o1:0.5246015314642541,0.22910535508057844
 Premises:
-midp m a c
+coll m a c
+cong m a m c
 cong b o m o
 cong c o m o
 perp c k c o
@@ -7477,7 +7635,8 @@ p:1.2418855817481917,0.9963292083354088
 Premises:
 para a b c d
 cong a d b c
-midp e a c
+coll e a c
+cong e a e c
 cong a o1 b o1
 cong b o1 e o1
 cong c o2 d o2
@@ -7572,9 +7731,12 @@ perp a c b e
 coll a c e
 perp a b c f
 coll a b f
-midp x a d
-midp y b e
-midp z c f
+coll x a d
+cong x a x d
+coll y b e
+cong y b y e
+coll z c f
+cong z c z f
 coll a d p
 coll p y z
 coll b e q
@@ -7619,7 +7781,8 @@ coll b c d
 cong a o o v
 coll d u v
 cong a o o u
-midp m b c
+coll m b c
+cong m b m c
 coll m u x
 cong a o o x
 coll a x y
@@ -7661,8 +7824,10 @@ z:-0.33554258026290973,0.12627270489382064
 Premises:
 cong a o b o
 cong b o c o
-midp m a b
-midp n a c
+coll m a b
+cong m a m b
+coll n a c
+cong n a n c
 perp m n o t
 coll m n t
 perp a d b c
@@ -7705,8 +7870,10 @@ n:0.8089415196741367,1.1128205010354804
 Premises:
 coll a b d
 coll a c e
-midp p c d
-midp q b e
+coll p c d
+cong p c p d
+coll q b e
+cong q b q e
 cong a m c m
 eqangle a c a m c m a c
 perp d e m p
@@ -7785,14 +7952,16 @@ m:-0.5215529329073243,1.3705970704614854
 Premises:
 eqangle a b b c b c a c
 cong a b a c
-midp d a c
+coll d a c
+cong d a d c
 cong a o1 b o1
 cong b o1 d o1
 coll b c e
 perp a e a o1
 cong a o b o
 cong b o e o
-midp m a o
+coll m a o
+cong m a m o
 Goal:
 cong a o1 m o1
 
@@ -7828,7 +7997,8 @@ eqangle i q o q p q i q
 cong b m c m
 eqangle b c b m c m b c
 cong a o m o
-midp n i o
+coll n i o
+cong n i n o
 coll d m n
 cong a o d o
 Goal:
@@ -7937,7 +8107,8 @@ eqangle a b a i a i a c
 eqangle a c c i c i b c
 cong a o b o
 cong b o c o
-midp m1 a i
+coll m1 a i
+cong m1 a m1 i
 cong a m1 s m1
 cong a o o s
 cong b m c m
@@ -8077,7 +8248,8 @@ para a b c d
 para a d b c
 coll a c p
 coll b d p
-midp m a b
+coll m a b
+cong m a m b
 cong a o1 m o1
 cong a o1 d o1
 cong b o2 m o2
@@ -8106,7 +8278,8 @@ perp a h b c
 perp a c b h
 perp a d b c
 coll b c d
-midp m b c
+coll m b c
+cong m b m c
 coll d m d1
 cong d m m d1
 coll h p d1
@@ -8235,9 +8408,12 @@ Premises:
 cong a o b o
 cong b o c o
 cong a o o p
-midp m3 a b
-midp m2 a c
-midp m1 b c
+coll m3 a b
+cong m3 a m3 b
+coll m2 a c
+cong m2 a m2 c
+coll m1 b c
+cong m1 b m1 c
 cong d m3 p m3
 cong d m2 p m2
 cong e m3 p m3
@@ -8313,7 +8489,8 @@ cong b o c o
 cong b n c n
 eqangle b c b n c n b c
 cong a o n o
-midp m b c
+coll m b c
+cong m b m c
 coll a m p
 cong a m m p
 coll a n q
@@ -8345,7 +8522,8 @@ k:0.5422277113538073,0.5226554098886551
 Premises:
 perp a h b c
 perp a c b h
-midp m b c
+coll m b c
+cong m b m c
 cong a o b o
 cong b o c o
 coll a m x
@@ -8425,7 +8603,8 @@ coll e f k
 cong a o o t
 cong b t c t
 eqangle b c b t c t b c
-midp m b c
+coll m b c
+cong m b m c
 coll a m x
 cong a o o x
 cong a o1 e o1
@@ -8534,7 +8713,8 @@ cong b o c o
 cong a o o p
 coll a d p
 coll b c d
-midp m b c
+coll m b c
+cong m b m c
 coll d m t
 cong d m m t
 cong d o1 p o1
@@ -8578,7 +8758,8 @@ coll b c d
 cong b m c m
 eqangle b c b m c m b c
 cong a o m o
-midp n d m
+coll n d m
+cong n d n m
 cong d i i p
 cong m n n p
 cong a o1 m o1
@@ -8710,7 +8891,8 @@ perp a b f i
 coll a b f
 perp d p e f
 coll e f p
-midp m b c
+coll m b c
+cong m b m c
 coll a g p
 cyclic a b c g
 coll i p q
@@ -8743,7 +8925,8 @@ perp a b f i
 coll a b f
 perp d p e f
 coll e f p
-midp m b c
+coll m b c
+cong m b m c
 coll a g p
 cyclic a b c g
 coll i p q
@@ -8913,16 +9096,19 @@ eqangle a b a j a j a c
 eqangle a c c j c j b c
 cong a o b o
 cong b o c o
-midp m1 a i
+coll m1 a i
+cong m1 a m1 i
 cong a o o x
 cong a m1 x m1
-midp m2 a j
+coll m2 a j
+cong m2 a m2 j
 cong a o o y
 cong a m2 y m2
 coll b c k
 cong i k j k
 eqangle i j i k j k i j
-midp m x y
+coll m x y
+cong m x m y
 Goal:
 coll a k m
 
@@ -9011,7 +9197,8 @@ cong a o2 d o2
 cong d o2 k o2
 cong a o2 t o2
 cyclic a b c t
-midp n b c
+coll n b c
+cong n b n c
 Goal:
 coll a n t
 
@@ -9079,7 +9266,8 @@ perp b c d i
 coll b c d
 eqangle a b a i1 a i1 a c
 eqangle a c c i1 c i1 b c
-midp m d i1
+coll m d i1
+cong m d m i1
 cong b o1 m o1
 cong c o1 m o1
 coll i x o1
@@ -9299,14 +9487,16 @@ perp b c d i
 coll b c d
 cong a o b o
 cong b o c o
-midp m1 a i
+coll m1 a i
+cong m1 a m1 i
 cong a o o s
 cong a m1 s m1
 perp b h c i
 perp b c h i
 coll h q s
 cong a m1 q m1
-midp m2 d q
+coll m2 d q
+cong m2 d m2 q
 coll i x m2
 cong i m2 x m2
 Goal:
@@ -9334,9 +9524,12 @@ y:1.6721054200093033,0.33375277865985986
 Premises:
 eqangle a b a i a i a c
 eqangle a c c i c i b c
-midp m1 b c
-midp m2 a c
-midp m3 a b
+coll m1 b c
+cong m1 b m1 c
+coll m2 a c
+cong m2 a m2 c
+coll m3 a b
+cong m3 a m3 b
 perp b i a1 m2
 perp c i a1 m3
 perp a i b1 m1
@@ -9345,7 +9538,8 @@ perp a i c1 m1
 perp b i c1 m2
 perp h a1 b1 c1
 perp h b1 a1 c1
-midp m h i
+coll m h i
+cong m h m i
 cong a o b o
 cong b o c o
 cong a1 o1 b1 o1
@@ -9446,8 +9640,10 @@ coll c q c1
 cong d i i c1
 coll x b1 c1
 coll b c x
-midp m1 b c
-midp m2 e f
+coll m1 b c
+cong m1 b m1 c
+coll m2 e f
+cong m2 e m2 f
 coll t m1 m2
 para b c i t
 Goal:
@@ -9498,7 +9694,8 @@ h:0.6846808923086153,0.4990146295310666
 Premises:
 cong a o b o
 cong b o c o
-midp d a c
+coll d a c
+cong d a d c
 perp a e b c
 coll b c e
 coll a b f
@@ -9591,7 +9788,8 @@ eqangle a b b c b c a c
 cong a b a c
 perp a h b c
 perp a c b h
-midp e a c
+coll e a c
+cong e a e c
 coll b c d
 coll b c f
 cong c d d f
@@ -9619,7 +9817,8 @@ cong a o b o
 cong b o c o
 coll a i m
 cong a o m o
-midp n b c
+coll n b c
+cong n b n c
 cong a o o t
 perp i n m t
 coll b p t
@@ -9748,7 +9947,8 @@ perp a b m q
 coll a b m
 perp c d n q
 coll c d n
-midp f a c
+coll f a c
+cong f a f c
 cyclic f k n r
 cyclic f l m r
 Goal:
@@ -9781,8 +9981,10 @@ perp a c b s
 coll a c s
 perp a b c t
 coll a b t
-midp m s t
-midp n a h
+coll m s t
+cong m s m t
+coll n a h
+cong n a n h
 para b c f o
 coll a c f
 para b c g o
@@ -9813,7 +10015,8 @@ q:1.2487422753695623,-0.3185718477110644
 e:0.9928609149134533,0.03534108211770122
 m1:0.5723840390930299,0.6169082692766026
 Premises:
-midp m a b
+coll m a b
+cong m a m b
 coll a c b1
 cong b c c b1
 cong a o b o
@@ -9827,7 +10030,8 @@ eqangle a b a q b q a b
 cong a o o q
 coll e q b1
 coll b c e
-midp m1 e b1
+coll m1 e b1
+cong m1 e m1 b1
 Goal:
 coll c k m1
 
@@ -9909,7 +10113,8 @@ p:-0.3980653749068706,-0.32165801389260773
 q:0.22467058629262962,0.10253386868493394
 Premises:
 coll b c d
-midp m b c
+coll m b c
+cong m b m c
 coll d e m
 cong d m e m
 cong a o1 d o1
@@ -9941,7 +10146,8 @@ perp c x o y
 coll c x y
 coll a x z
 para a b c z
-midp m a c
+coll m a c
+cong m a m c
 Goal:
 coll m y z
 
@@ -9958,7 +10164,8 @@ j:1.8495350352749549,1.6592023265754423
 Premises:
 eqangle a b a i a i a c
 eqangle a c c i c i b c
-midp m b c
+coll m b c
+cong m b m c
 perp b c i l
 coll a l m
 coll a i j
@@ -9985,7 +10192,8 @@ eqangle a o a p o p a o
 para b c o p
 eqangle a b a c b d a b
 eqangle a b a c a c c d
-midp q a d
+coll q a d
+cong q a q d
 cong a p k p
 cong a q k q
 Goal:
@@ -10042,7 +10250,8 @@ coll b c d
 eqangle a b a d a d a c
 coll a o x
 perp b c d x
-midp y a d
+coll y a d
+cong y a y d
 Goal:
 cyclic b c x y
 
@@ -10255,7 +10464,8 @@ cong a e b e
 cong b e d e
 cong a f c f
 cong c f d f
-midp m e f
+coll m e f
+cong m e m f
 cong a o1 m o1
 cong d o1 m o1
 perp d t d o1
@@ -10285,8 +10495,10 @@ cong a o b o
 cong b o c o
 perp a h b c
 coll b c h
-midp m b c
-midp n a h
+coll m b c
+cong m b m c
+coll n a h
+cong n a n h
 coll a d o
 coll b c d
 coll h m h1
@@ -10552,7 +10764,8 @@ cong a o b o
 cong b o c o
 eqangle a b a i a i a c
 eqangle a c c i c i b c
-midp m b c
+coll m b c
+cong m b m c
 perp a i h m
 coll a h i
 coll h m v1
@@ -10728,7 +10941,8 @@ perp a c e i
 coll a c e
 perp a b f i
 coll a b f
-midp m e f
+coll m e f
+cong m e m f
 perp a p b c
 coll b c p
 coll k m p
@@ -10750,14 +10964,16 @@ e:1.4617448524383707,0.5843526909781463
 o:0.8183076411169484,1.0576300638589091
 n:1.0177136308483707,1.148443701836096
 Premises:
-midp m c d
+coll m c d
+cong m c m d
 cong a m b m
 perp a b b c
 cong a m e m
 perp a e d e
 cong a o c o
 cong c o d o
-midp n b e
+coll n b e
+cong n b n e
 Goal:
 coll a n o
 
@@ -11011,10 +11227,12 @@ perp a n e i
 perp a e i n
 coll e m p
 coll f n p
-midp x b c
+coll x b c
+cong x b x c
 coll a d y
 perp i p x y
-midp m1 x y
+coll m1 x y
+cong m1 x m1 y
 Goal:
 coll a i m1
 
@@ -11039,8 +11257,10 @@ o3:1.043944865917168,1.0415887660440832
 o4:0.9697337721876372,0.9781150033380244
 a1:0.5984401348542505,0.6605424808757839
 Premises:
-midp m a c
-midp n a b
+coll m a c
+cong m a m c
+coll n a b
+cong n a n b
 perp a d b c
 coll b c d
 cong a o b o
@@ -11067,7 +11287,8 @@ cong e o4 f o4
 coll a1 o3 o4
 cong p o4 a1 o4
 Goal:
-midp o4 a a1
+coll o4 a a1
+cong o4 a o4 a1
 
 Problem Name:
 2023IranGOMp4
@@ -11095,7 +11316,8 @@ para a h p q
 para a p h q
 para a c q s
 para a s c q
-midp t a q
+coll t a q
+cong t a t q
 coll q r s
 coll b p r
 coll a b x
@@ -11426,7 +11648,8 @@ cong a o1 k o1
 cong a o k o
 coll h k l
 cong a o l o
-midp m b c
+coll m b c
+cong m b m c
 coll h m p
 cong e p f p
 eqangle e f e p f p e f
@@ -11539,7 +11762,8 @@ cong c o1 o o1
 cong d o1 o o1
 coll a o p
 cong o o1 p o1
-midp m b c
+coll m b c
+cong m b m c
 cong a o2 m o2
 cong a o2 a1 o2
 coll b c l
@@ -11728,11 +11952,14 @@ cong a o o s
 cong b n c n
 eqangle b c b n c n b c
 cong a o n o
-midp m1 b c
+coll m1 b c
+cong m1 b m1 c
 coll d o m1
 cong d o o m1
-midp m3 a b
-midp m2 a c
+coll m3 a b
+cong m3 a m3 b
+coll m2 a c
+cong m2 a m2 c
 cong a d d x
 coll x m2 m3
 cong a d d y
@@ -11793,12 +12020,14 @@ p:0.6646751044506262,0.8579533473878267
 q:0.4172884806137963,0.9484198529452194
 n:0.8791579450674094,1.1220536893727424
 Premises:
-midp m b c
+coll m b c
+cong m b m c
 perp a m c p
 coll a m p
 coll b c q
 cyclic a b p q
-midp n a q
+coll n a q
+cong n a n q
 Goal:
 cong b n c n
 
@@ -11867,7 +12096,8 @@ perp a b c f
 coll a b f
 coll b e h
 coll c f h
-midp m a h
+coll m a h
+cong m a m h
 perp e f h k
 coll e f k
 cong a o o p
@@ -11968,7 +12198,8 @@ cong a o2 o o2
 cong o o2 x o2
 cong a o o y
 cong a o2 y o2
-midp m b c
+coll m b c
+cong m b m c
 Goal:
 coll m x y
 
@@ -12230,7 +12461,8 @@ perp a b a x
 cong a b a x
 coll a c x
 cong a x c x
-midp m b c
+coll m b c
+cong m b m c
 eqangle a b a i a i a c
 eqangle a c c i c i b c
 perp b i h m
@@ -12270,15 +12502,18 @@ perp a c b d
 coll a c d
 perp a b c e
 coll a b e
-midp f a b
-midp g a c
+coll f a b
+cong f a f b
+coll g a c
+cong g a g c
 coll d f x
 coll e g x
 cong e o1 f o1
 cong f o1 x o1
 cong d o2 g o2
 cong g o2 x o2
-midp m o1 o2
+coll m o1 o2
+cong m o1 m o2
 Goal:
 coll h m x
 
@@ -12310,8 +12545,10 @@ perp a c e i
 coll a c e
 perp a b f i
 coll a b f
-midp m a b
-midp n a c
+coll m a b
+cong m a m b
+coll n a c
+cong n a n c
 cong d m d m1
 cong e m e m1
 cong d n d n1
@@ -12450,7 +12687,8 @@ perp d e f f1
 coll d e f1
 cong d n1 e n1
 cong e n1 f n1
-midp m b c
+coll m b c
+cong m b m c
 coll j e1 f1
 coll b c j
 coll k d1 n1
@@ -12486,8 +12724,10 @@ l:1.1585066544448677,0.8468539361632836
 Premises:
 para a b c d
 para a d b c
-midp m1 a b
-midp m2 c d
+coll m1 a b
+cong m1 a m1 b
+coll m2 c d
+cong m2 c m2 d
 cong a m1 x m1
 cong c m2 x m2
 cong a o o x
@@ -12526,7 +12766,8 @@ perp a c b d
 coll a c d
 perp a h b c
 perp a c b h
-midp m1 b c
+coll m1 b c
+cong m1 b m1 c
 cong b m1 p m1
 perp p q p m1
 coll b d q
@@ -12534,7 +12775,8 @@ coll a b x
 perp b c p x
 coll h p r
 coll q r x
-midp m2 a h
+coll m2 a h
+cong m2 a m2 h
 coll a r u
 cong a m2 u m2
 Goal:
@@ -12593,12 +12835,18 @@ coll j t3 t4
 coll c g j
 coll k t3 t4
 coll c d k
-midp m1 a i
-midp m2 f h
-midp m3 d j
-midp m4 g k
-midp m5 b j
-midp m6 c i
+coll m1 a i
+cong m1 a m1 i
+coll m2 f h
+cong m2 f m2 h
+coll m3 d j
+cong m3 d m3 j
+coll m4 g k
+cong m4 g m4 k
+coll m5 b j
+cong m5 b m5 j
+coll m6 c i
+cong m6 c m6 i
 coll p m1 m2
 coll p m3 m4
 Goal:
@@ -12664,7 +12912,8 @@ k:-0.38098711849092004,0.8160028301271134
 Premises:
 cong a o b o
 cong b o c o
-midp m b c
+coll m b c
+cong m b m c
 coll a e m
 cong a o e o
 cong b n c n
@@ -13040,8 +13289,10 @@ cong a2 o3 a3 o3
 cong a3 o3 o3 a4
 cong a3 o4 a4 o4
 cong a1 o4 a4 o4
-midp m1 a1 a3
-midp m2 a2 a4
+coll m1 a1 a3
+cong m1 a1 m1 a3
+coll m2 a2 a4
+cong m2 a2 m2 a4
 perp a1 b1 a1 o1
 eqangle b1 a3 a2 a3 a3 a4 m2 a3
 perp a2 b2 a2 o2
@@ -13096,7 +13347,8 @@ cong a o b o
 cong b o c o
 coll p t z
 cong o p o x
-midp m4 p x
+coll m4 p x
+cong m4 p m4 x
 Goal:
 cyclic m1 m2 m3 m4
 
@@ -13157,9 +13409,12 @@ f:0.7211672067386818,1.1280827903956134
 Premises:
 cong a o b o
 cong b o c o
-midp m1 b c
-midp m2 a c
-midp m3 a b
+coll m1 b c
+cong m1 b m1 c
+coll m2 a c
+cong m2 a m2 c
+coll m3 a b
+cong m3 a m3 b
 cong n m1 n m2
 cong n m2 n m3
 perp b o b p
@@ -13605,7 +13860,8 @@ eqangle e f f i f k f i1
 eqangle e f e i e k e i1
 perp e f k x
 coll e f x
-midp m k x
+coll m k x
+cong m k m x
 Goal:
 coll i m o
 
@@ -13685,9 +13941,12 @@ k:0.8174231953576224,0.23465377761562584
 Premises:
 perp a h b c
 perp a c b h
-midp m1 b c
-midp m2 a c
-midp m3 a b
+coll m1 b c
+cong m1 b m1 c
+coll m2 a c
+cong m2 a m2 c
+coll m3 a b
+cong m3 a m3 b
 cong v m1 v m2
 cong v m2 v m3
 cong a o1 v o1
@@ -13827,9 +14086,12 @@ coll a g m1
 coll b g m2
 eqangle a b a g a k a c
 eqangle a b b g b k b c
-midp m4 a o
-midp m5 b o
-midp m6 c o
+coll m4 a o
+cong m4 a m4 o
+coll m5 b o
+cong m5 b m5 o
+coll m6 c o
+cong m6 c m6 o
 cong x m1 x m5
 cong x m5 x m6
 cong y m2 y m4
@@ -13844,9 +14106,11 @@ perp e i x z
 coll e x z
 coll d x g1
 coll e y g1
-midp n k o
+coll n k o
+cong n k n o
 Goal:
-midp g1 k n
+coll g1 k n
+cong g1 k g1 n
 
 Problem Name:
 ShuZhiMiGeo309
@@ -13971,13 +14235,16 @@ coll h1 h2 n3
 cong h1 n3 h2 n3
 coll g1 h1 n1
 coll g1 h2 n2
-midp m1 b c
+coll m1 b c
+cong m1 b m1 c
 coll h1 m1 h4
 cong h1 m1 m1 h4
-midp m2 a c
+coll m2 a c
+cong m2 a m2 c
 coll h2 m2 h5
 cong h2 m2 m2 h5
-midp m3 a b
+coll m3 a b
+cong m3 a m3 b
 coll h3 m3 h6
 cong h3 m3 m3 h6
 perp h4 h7 h5 h6
@@ -14026,7 +14293,8 @@ cong a1 o1 b1 o1
 cong b1 o1 c1 o1
 perp a1 h1 b1 c1
 perp a1 c1 b1 h1
-midp m o o1
+coll m o o1
+cong m o m o1
 Goal:
 coll k m h1
 
@@ -14055,18 +14323,21 @@ coll h o x
 coll a b x
 coll h o y
 coll a c y
-midp t x y
+coll t x y
+cong t x t y
 para b o e h
 coll a c e
 para c o f h
 coll a b f
-midp d a h
+coll d a h
+cong d a d h
 coll e f s
 coll a s t
 perp d o o s1
 perp d h h s1
 Goal:
-midp s d s1
+coll s d s1
+cong s d s s1
 
 Problem Name:
 ShuZhiMiGeo489
