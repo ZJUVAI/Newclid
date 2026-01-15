@@ -699,41 +699,61 @@ def find_potential_points(text: str, min_duplicated: int = 3):
     def round_coord(coord):
         return (round(coord[0], ROUND_DECIMALS), round(coord[1], ROUND_DECIMALS))
 
-    def is_original_point(coord):
-        x, y = coord
-        return any(abs(x - ox) < TOLERANCE and abs(y - oy) < TOLERANCE
-                   for ox, oy in original_points.values())
-
     def normalize_direction(dx, dy):
         norm = np.sqrt(dx**2 + dy**2)
         return (0.0, 0.0) if norm < TOLERANCE else (dx / norm, dy / norm)
 
+    def is_point_too_far(new_coord, existing_coords, factor=5.0):
+        """
+        简单判断：新点是否离所有已有点都太远
+        - 如果已有点少于2个 → 不算远
+        - 找到已有点中最远的两个点（近似直径）
+        - 新点到最近已有点的距离 > factor × 已有最大间距 → 认为过远
+        """
+        if len(existing_coords) < 2:
+            return False
+
+        # 找到已有点集合的“粗略直径”（最远两点距离）
+        max_dist = 0
+        for i in range(len(existing_coords)):
+            for j in range(i + 1, len(existing_coords)):
+                dx = existing_coords[i][0] - existing_coords[j][0]
+                dy = existing_coords[i][1] - existing_coords[j][1]
+                dist = (dx*dx + dy*dy)**0.5
+                if dist > max_dist:
+                    max_dist = dist
+
+        if max_dist < 1e-8:  # 所有点几乎重合
+            return False
+
+        # 新点到最近已有点的距离
+        min_dist_to_exist = float('inf')
+        nx, ny = new_coord
+        for px, py in existing_coords:
+            dx = nx - px
+            dy = ny - py
+            dist = (dx*dx + dy*dy)**0.5
+            if dist < min_dist_to_exist:
+                min_dist_to_exist = dist
+
+        return min_dist_to_exist > factor * max_dist
+
     # ----------------------------- 生成中点 -----------------------------
     midpoints = []
-    existing_names = set(original_points.keys())
     midpoint_counter = 1
-
     for p1, p2 in combinations(point_names, 2):
         x1, y1 = original_points[p1]
         x2, y2 = original_points[p2]
         mid_coord = round_coord(((x1 + x2) / 2, (y1 + y2) / 2))
-
         new_name = f"m{midpoint_counter}"
-        while new_name in existing_names:
-            midpoint_counter += 1
-            new_name = f"m{midpoint_counter}_"
-        existing_names.add(new_name)
-
         midpoints.append((new_name, mid_coord, "midpoint", [p1, p2]))
         midpoint_counter += 1
 
     # ----------------------------- 点关于点的对称（reflection over point） -----------------------------
     reflections_over_point = []
     refl_point_counter = 1
-    existing_names = set(original_points.keys())
-
-    for center_name in point_names:          # 中心点（对称中心）
-        for pt_name in point_names:          # 被对称的点
+    for center_name in point_names:  # 中心点（对称中心）
+        for pt_name in point_names:  # 被对称的点
             if pt_name == center_name:
                 continue
             center_coord = original_points[center_name]
@@ -742,58 +762,54 @@ def find_potential_points(text: str, min_duplicated: int = 3):
                 2 * center_coord[0] - pt_coord[0],
                 2 * center_coord[1] - pt_coord[1]
             ))
-
-            if is_original_point(sym_coord):
-                continue
-
             new_name = f"sympt{refl_point_counter}"
-            while new_name in existing_names:
-                refl_point_counter += 1
-                new_name = f"sympt{refl_point_counter}"
-            existing_names.add(new_name)
-
-            reflections_over_point.append((
-                new_name,
-                sym_coord,
-                "symmetric_over_point",
-                {"center": center_name, "original": pt_name}
-            ))
+            reflections_over_point.append(
+                (new_name, sym_coord, "symmetric_over_point", [center_name, pt_name]))
             refl_point_counter += 1
 
     # ----------------------------- 检测共线组（直线） -----------------------------
     line_to_points = defaultdict(set)
 
     for i, j in combinations(range(len(point_names)), 2):
+        if i >= j:
+            continue
         p1, p2 = coords[i], coords[j]
-        dx, dy = p2[0] - p1[0], p2[1] - p1[1]
-        dir_norm = normalize_direction(dx, dy)
-
-        if i > j:
-            start_pt, dir_norm = p2, (-dir_norm[0], -dir_norm[1])
-        else:
-            start_pt = p1
-
-        key = (start_pt[0], start_pt[1], dir_norm[0], dir_norm[1])
+        dir_norm = normalize_direction(p2[0] - p1[0], p2[1] - p1[1])
+        if dir_norm == (0.0, 0.0):
+            continue
+        key = (p1[0], p1[1], dir_norm[0], dir_norm[1])
         line_to_points[key].update([point_names[i], point_names[j]])
 
     final_lines = []
     for key, pts_set in line_to_points.items():
         current_pts = sorted(list(pts_set))
         current_indices = [point_names.index(p) for p in current_pts]
-
         while True:
             added = False
+            max_dist = -1
+            base1_idx, base2_idx = current_indices[0], current_indices[1]
+
+            for ii in range(len(current_indices)):
+                for jj in range(ii + 1, len(current_indices)):
+                    a = current_indices[ii]
+                    b = current_indices[jj]
+                    dist_sq = (coords[a][0] - coords[b][0])**2 + \
+                        (coords[a][1] - coords[b][1])**2
+                    if dist_sq > max_dist:
+                        max_dist = dist_sq
+                        base1_idx, base2_idx = a, b
+
+            direction = coords[base2_idx] - coords[base1_idx]
+            dir_norm = np.linalg.norm(direction)
+
             for k in range(len(point_names)):
                 if point_names[k] in pts_set:
                     continue
                 pt = coords[k]
-                if len(current_indices) < 2:
-                    continue
-                base1, base2 = current_indices[0], current_indices[1]
-                direction = coords[base2] - coords[base1]
-                vec = pt - coords[base1]
-                dist = abs(np.cross(direction, vec)) / \
-                    np.linalg.norm(direction)
+                vec = pt - coords[base1_idx]
+                # 点到直线的距离（向量叉积 / 方向向量长度）
+                dist = abs(np.cross(direction, vec)) / dir_norm
+
                 if dist < TOLERANCE:
                     pts_set.add(point_names[k])
                     current_pts.append(point_names[k])
@@ -801,18 +817,19 @@ def find_potential_points(text: str, min_duplicated: int = 3):
                     added = True
             if not added:
                 break
-
-        final_lines.append(sorted(list(pts_set)))
+        if len(pts_set) >= 2:  # 至少两条点才算有效线
+            final_lines.append(sorted(list(pts_set)))
 
     unique_lines = sorted(
         {tuple(sorted(line)) for line in final_lines},
         key=lambda x: (-len(x), x)
     )
 
-    collinear_lines = [line for line in unique_lines if len(line) >= 3]
-
     # ----------------------------- 线交点 -----------------------------
     def line_intersection(line1_pts, line2_pts):
+        if set(line1_pts) & set(line2_pts):
+            return None
+
         A = coords[point_names.index(line1_pts[0])]
         B = coords[point_names.index(line1_pts[1])]
         C = coords[point_names.index(line2_pts[0])]
@@ -824,136 +841,50 @@ def find_potential_points(text: str, min_duplicated: int = 3):
         if abs(denom) < TOLERANCE:
             return None
         t = np.cross(C - A, CD) / denom
-        return round_coord(A + t * AB)
+        return A + t * AB
 
     intersections = []
+    inter_counter = 1
     for line1, line2 in combinations(unique_lines, 2):
         inter = line_intersection(line1, line2)
-        if inter is not None:
-            intersections.append({
-                "coord": inter,
-                "lines": [sorted(line1), sorted(line2)]
-            })
-
-    inter_groups = defaultdict(list)
-    for item in intersections:
-        if not is_original_point(item["coord"]):
-            inter_groups[item["coord"]].append(item["lines"])
-
-    new_intersections = []
-    existing_names = set(original_points.keys())
-    inter_counter = 1
-
-    for coord, line_pairs in inter_groups.items():
-        all_lines = [line for pair in line_pairs for line in pair]
-        unique_lines_on_point = [sorted(list(set(line)))
-                                 for line in {tuple(l) for l in all_lines}]
-
-        new_name = f"inter{inter_counter}"
-        while new_name in existing_names:
-            inter_counter += 1
+        if inter is not None and not is_point_too_far(inter, coords, factor=5.0):
             new_name = f"inter{inter_counter}"
-        existing_names.add(new_name)
+            intersections.append((new_name, round_coord(inter), "intersection", [
+                                 sorted(line1), sorted(line2)]))
+            inter_counter += 1
 
-        new_intersections.append(
-            (new_name, coord, "intersection", unique_lines_on_point))
-        inter_counter += 1
-
-    # ----------------------------- 垂足 -----------------------------
+    # ----------------------------- 垂足和关于线的对称点 -----------------------------
     def point_to_line_foot(pt_coord, line_pts):
         A = coords[point_names.index(line_pts[0])]
         B = coords[point_names.index(line_pts[1])]
         AB = B - A
         AP = pt_coord - A
         proj = np.dot(AP, AB) / np.dot(AB, AB)
-        return round_coord(A + proj * AB)
+        return A + proj * AB
 
-    raw_feet = []
-    foot_counter = 1
-    existing_names = set(original_points.keys())
+    feet = []
+    reflections_over_line = []
+    counter = 1
 
     for line in unique_lines:
-        if len(line) < 2:
-            continue
         line_sorted = sorted(line)
         for pt_name in point_names:
             if pt_name in line_sorted:
                 continue
+            pt_coord = original_points[pt_name]
             foot_coord = point_to_line_foot(
-                coords[point_names.index(pt_name)], line_sorted)
-            if is_original_point(foot_coord):
-                continue
+                pt_coord, line_sorted)
+            new_name = f"foot{counter}"
+            feet.append((new_name, round_coord(foot_coord),
+                        "foot", [pt_name, line_sorted]))
 
-            new_name = f"foot{foot_counter}"
-            while new_name in existing_names:
-                foot_counter += 1
-                new_name = f"foot{foot_counter}"
-            existing_names.add(new_name)
+            sym_coord = round_coord(
+                (2 * foot_coord[0] - pt_coord[0], 2 * foot_coord[1] - pt_coord[1]))
+            new_name = f"symline{counter}"
+            reflections_over_line.append(
+                (new_name, sym_coord, "symmetric_over_line", [pt_name, line_sorted]))
 
-            raw_feet.append((new_name, foot_coord, "foot", {
-                            "point": pt_name, "line": line_sorted}))
-            foot_counter += 1
-
-    foot_groups = defaultdict(list)
-    for item in raw_feet:
-        name, coord, typ, source = item
-        foot_groups[coord].append((name, source))
-
-    feet = []
-    counter = 1
-    for coord, group in foot_groups.items():
-        sources = []
-        seen = set()
-        for _, src in group:
-            key = (src["point"], tuple(src["line"]))
-            if key not in seen:
-                seen.add(key)
-                sources.append(src)
-
-        new_name = f"foot{counter}"
-        feet.append((new_name, coord, "foot", sources))
-        counter += 1
-
-    # ----------------------------- 点关于直线的对称（reflection over line） -----------------------------
-    def reflect_point_over_line(pt_coord, line_pts):
-        # 先求垂足
-        foot = point_to_line_foot(pt_coord, line_pts)
-        # 对称点 = 2*垂足 - 原点
-        return round_coord((
-            2 * foot[0] - pt_coord[0],
-            2 * foot[1] - pt_coord[1]
-        ))
-
-    reflections_over_line = []
-    refl_line_counter = 1
-    existing_names = set(original_points.keys())
-
-    for line in unique_lines:
-        if len(line) < 2:
-            continue
-        line_sorted = sorted(line)
-        for pt_name in point_names:
-            if pt_name in line_sorted:       # 点在直线上，对称仍是自身，跳过
-                continue
-            pt_coord = coords[point_names.index(pt_name)]
-            sym_coord = reflect_point_over_line(pt_coord, line_sorted)
-
-            if is_original_point(sym_coord):
-                continue
-
-            new_name = f"symline{refl_line_counter}"
-            while new_name in existing_names:
-                refl_line_counter += 1
-                new_name = f"symline{refl_line_counter}"
-            existing_names.add(new_name)
-
-            reflections_over_line.append((
-                new_name,
-                sym_coord,
-                "symmetric_over_line",
-                {"point": pt_name, "line": line_sorted}
-            ))
-            refl_line_counter += 1
+            counter += 1
 
     # ----------------------------- 共圆检测 -----------------------------
     def get_circle_from_three(p1, p2, p3):
@@ -972,13 +903,13 @@ def find_potential_points(text: str, min_duplicated: int = 3):
               * (C[1]-A[1]) + (C[0]**2 + C[1]**2)*(A[1]-B[1])) / D
         uy = ((A[0]**2 + A[1]**2)*(C[0]-B[0]) + (B[0]**2 + B[1]**2)
               * (A[0]-C[0]) + (C[0]**2 + C[1]**2)*(B[0]-A[0])) / D
-        center = round_coord((ux, uy))
-        radius = round(np.linalg.norm(np.array(center) - A), ROUND_DECIMALS)
+        center = (ux, uy)
+        radius = np.linalg.norm(np.array(center) - A)
         return center, radius
 
     def point_on_circle(pt_name, center, radius):
         dist = np.linalg.norm(
-            np.array(center) - coords[point_names.index(pt_name)])
+            np.array(center) - original_points[pt_name])
         return abs(dist - radius) < 2e-8
 
     raw_circles = defaultdict(set)
@@ -1017,37 +948,21 @@ def find_potential_points(text: str, min_duplicated: int = 3):
     dedup_circles.sort(key=lambda x: (-len(x["points"]), x["radius"]))
     circles = dedup_circles
 
-    cyclic_circles = [c for c in circles if len(c["points"]) >= 4]
-
     # ----------------------------- 生成圆心点 -----------------------------
     circle_centers = []
     center_counter = 1
-    existing_names = set(original_points.keys())
 
     for cir in circles:
         center_coord = cir["center"]
-
-        if is_original_point(center_coord):
-            continue
-
         new_name = f"center{center_counter}"
-        while new_name in existing_names:
-            center_counter += 1
-            new_name = f"center{center_counter}"
-        existing_names.add(new_name)
-
-        circle_centers.append((
-            new_name,
-            center_coord,
-            "circle_center",
-            {"points": cir["points"], "radius": cir["radius"]}
-        ))
+        circle_centers.append(
+            (new_name, round_coord(center_coord), "circle_center", cir["points"]))
         center_counter += 1
 
     # ----------------------------- 线与圆交点 -----------------------------
-    def line_circle_intersections(line_pts, center, radius):
-        if len(line_pts) < 2:
-            return []
+    def line_circle_intersections(line_pts, circle):
+        center = circle["center"]
+        radius = circle["radius"]
         A = coords[point_names.index(line_pts[0])]
         d_vec = coords[point_names.index(line_pts[1])] - A
         f = A - np.array(center)
@@ -1059,57 +974,115 @@ def find_potential_points(text: str, min_duplicated: int = 3):
             return []
         disc = max(0, disc)
         sqrt_disc = np.sqrt(disc)
-        inters = []
+        candidates = []
         for sign in [1, -1]:
             t = (-b + sign * sqrt_disc) / (2*a)
-            inter = round_coord(A + t * d_vec)
-            inters.append(inter)
+            inter = A + t * d_vec
+            candidates.append(inter)
+
+        known_points = set(circle["points"])
+        known_points = [round_coord(
+            (original_points[p][0], original_points[p][1])) for p in known_points]
+
+        inters = [pt for pt in candidates if round_coord(
+            pt) not in known_points]
         unique = []
         for pt in inters:
             if not any(abs(pt[0]-u[0]) < TOLERANCE and abs(pt[1]-u[1]) < TOLERANCE for u in unique):
                 unique.append(pt)
         return unique
 
-    raw_circle_line_inters = []
-    for cir in circles:
-        for line in unique_lines:
-            pts = line_circle_intersections(line, cir["center"], cir["radius"])
-            for pt in pts:
-                raw_circle_line_inters.append({
-                    "coord": pt,
-                    "circle_points": cir["points"],
-                    "line_points": sorted(line)
-                })
-
-    cl_inter_groups = defaultdict(list)
-    for item in raw_circle_line_inters:
-        cl_inter_groups[item["coord"]].append(
-            (item["circle_points"], item["line_points"]))
-
     circle_line_inters = []
     counter = 1
-    existing_names = set(original_points.keys())
 
-    for coord, groups in cl_inter_groups.items():
-        if is_original_point(coord):
-            continue
-        circles_list = [c for c, _ in groups]
-        lines_list = [l for _, l in groups]
+    for cir in circles:
+        for line in unique_lines:
+            pts = line_circle_intersections(line, cir)
+            for pt in pts:
+                new_name = f"cirinter{counter}"
+                circle_line_inters.append(
+                    (new_name, round_coord(pt), "circle_line_inter", [line, cir["points"]]))
+                counter += 1
 
-        new_name = f"cirinter{counter}"
-        while new_name in existing_names:
-            counter += 1
-            new_name = f"cirinter{counter}"
-        existing_names.add(new_name)
+    # ----------------------------- 圆与圆交点 -----------------------------
+    def circle_circle_intersections(cir1, cir2):
+        c1 = np.array(cir1["center"])
+        c2 = np.array(cir2["center"])
+        r1 = cir1["radius"]
+        r2 = cir2["radius"]
 
-        circle_line_inters.append((new_name, coord, "circle_line_inter", {
-                                  "circles": circles_list, "lines": lines_list}))
-        counter += 1
+        d_vec = c2 - c1
+        d = np.linalg.norm(d_vec)
+
+        if d < TOLERANCE:
+            return []
+
+        if d > r1 + r2 + TOLERANCE:
+            return []
+        if d + min(r1, r2) < max(r1, r2) - TOLERANCE:
+            return []
+
+        a = (r1**2 - r2**2 + d**2) / (2 * d)
+        h_squared = r1**2 - a**2
+
+        h = np.sqrt(max(0.0, h_squared))
+
+        P = c1 + a * (d_vec / d)
+
+        if h < TOLERANCE:
+            candidates = [tuple(P)]
+        else:
+            perp_vec = np.array([-d_vec[1], d_vec[0]])
+            perp_norm = np.linalg.norm(perp_vec)
+            if perp_norm < 1e-9:  # 几乎不可能，但防止除0
+                return []
+            perp_unit = perp_vec / perp_norm
+
+            pt1 = P + h * perp_unit
+            pt2 = P - h * perp_unit
+
+            candidates = [
+                tuple(pt1),
+                tuple(pt2)
+            ]
+
+        known_points = set(cir1["points"]) & set(cir2["points"])
+        known_points = [round_coord((
+            original_points[p][0], original_points[p][1])) for p in known_points]
+
+        result = []
+        for pt in candidates:
+            if round_coord(pt) not in known_points:
+                result.append(pt)
+
+        unique = []
+        for pt in result:
+            if not any(np.hypot(pt[0]-u[0], pt[1]-u[1]) < TOLERANCE*2 for u in unique):
+                unique.append(pt)
+
+        return unique
+
+    abcd = {'a', 'b', 'c', 'd'}
+    circles = [c for c in circles if len(
+        c["points"]) >= 4 or all(p in abcd for p in c["points"])]
+
+    # 两两组合圆（避免自交
+    circle_circle_inters = []
+    counter = 1
+
+    for i, cir1 in enumerate(circles):
+        for cir2 in circles[i+1:]:
+            pts = circle_circle_intersections(cir1, cir2)
+            for pt in pts:
+                new_name = f"ccinter{counter}"
+                circle_circle_inters.append(
+                    (new_name, round_coord(pt), "circle_circle_inter", [cir1["points"], cir2["points"]]))
+                counter += 1
 
     # ----------------------------- 汇总重复出现的构造点 -----------------------------
-    all_generated = midpoints + new_intersections + \
-        feet + circle_line_inters + circle_centers + \
-        reflections_over_point + reflections_over_line
+    all_generated = midpoints + intersections + feet + circle_line_inters + \
+        circle_centers + reflections_over_point + \
+        reflections_over_line + circle_circle_inters
 
     coord_to_appearances = defaultdict(list)
     for name, coord, typ, info in all_generated:
@@ -1117,7 +1090,7 @@ def find_potential_points(text: str, min_duplicated: int = 3):
 
     repeated_points = []
     for coord, apps in coord_to_appearances.items():
-        if len(apps) >= min_duplicated and not is_original_point(coord):
+        if len(apps) >= min_duplicated:
             repeated_points.append((coord, apps))
 
     return repeated_points
@@ -1134,46 +1107,29 @@ def enhance_text_with_potential_points(original_text: str, generator: PointGener
     current_count = len(generator.defined_points)
     remaining_slots = max(0, MAX_TOTAL_POINTS - current_count)
 
-    new_clauses = []
-    total_appearances = sum(len(apps) for _, apps in repeated_points)
+    repeated_points.sort(key=lambda x: (-len(x[1]), random.random()))
 
-    # 最多只打算新增这么多点
-    wanted_new_points = min(total_appearances // 2 +
-                            len(repeated_points), remaining_slots)
+    if len(repeated_points) > remaining_slots:
+        repeated_points = repeated_points[:remaining_slots]
+
+    new_clauses = []
+    wanted_new_points = len(repeated_points)
 
     try:
         new_point_names = generator.prefetch_points(wanted_new_points)
+        generator.define_points(new_point_names)
     except ValueError:
         return original_text
 
-    name_idx = 0
-
-    for coord, appearances in repeated_points:
-        if name_idx >= len(new_point_names):
-            break  # 已经没有可用的新点了
-
-        k = len(appearances) // 2
-        # k = 1
-        # 即使要选很多，但全局名额不够也限制一下
-        k = min(k, remaining_slots - name_idx)
-        if k <= 0:
-            break
-
-        selected_appearances = random.sample(appearances, k)
-
-        for app in selected_appearances:
-            new_name = new_point_names[name_idx]
-            name_idx += 1
-            clause = generate_clause_for_potential_point(
-                coord, [app], new_name)
-            new_clauses.append(clause)
-
-    # 真正定义的点数可能比预取的少
-    if name_idx > 0:
-        generator.define_points(new_point_names[:name_idx])
+    for (coord, appearances), new_name in zip(repeated_points, new_point_names):
+        if not appearances:
+            continue
+        app = random.choice(appearances)
+        clause = generate_clause_for_potential_point(coord, app, new_name)
+        new_clauses.append(clause)
 
     if not new_clauses:
-        return original_text
+        return ""
 
     additional_part = "; ".join(new_clauses)
     enhanced = original_text.rstrip()
@@ -1182,74 +1138,60 @@ def enhance_text_with_potential_points(original_text: str, generator: PointGener
     return enhanced
 
 
-def generate_clause_for_potential_point(coord, appearances, new_name):
+def generate_clause_for_potential_point(coord, appearance, new_name):
     """
     根据一种随机的构造方式，为一个 potential_point 生成对应的描述语句
     """
     x, y = coord
     coord_str = f"{x:.10f}_{y:.10f}".rstrip('0').rstrip('.')  # 去掉多余的0和小数点
 
-    name, typ, info = appearances[0]
+    name, typ, info = appearance
 
     if typ == "midpoint":
-        p1, p2 = info  # info 是 [p1, p2]
+        p1, p2 = info
         clause = f"midpoint {new_name} {p1} {p2}"
 
     elif typ == "intersection":
-        # info 是列表 of 线，每条线是点列表
-        line1 = random.choice(info)
-        line2 = random.choice(info)
-        while line2 == line1:
-            line2 = random.choice(info)
-        # 每条线任选2个点
+        line1, line2 = info
         pt1, pt2 = random.sample(line1, 2)
         pt3, pt4 = random.sample(line2, 2)
         clause = f"on_line {new_name} {pt1} {pt2}, on_line {new_name} {pt3} {pt4}"
 
     elif typ == "foot":
-        # info 是 list of dict: {"point": ..., "line": [...]}
-        src = random.choice(info)
-        a = src["point"]
-        line_pts = src["line"]
-        b, c = random.sample(line_pts, min(2, len(line_pts)))
-        clause = f"foot {new_name} {a} {b} {c}"
+        pt, line = info
+        a, b = random.sample(line, 2)
+        clause = f"foot {new_name} {pt} {a} {b}"
 
     elif typ == "circle_center":
-        points = info["points"]
-        # 任选3个点定义圆心（因为圆心由任意3点确定）
-        a, b, c = random.sample(points, 3)
+        circle = info
+        a, b, c = random.sample(circle, 3)
         clause = f"circumcenter {new_name} {a} {b} {c}"
 
     elif typ == "circle_line_inter":
-        # info: {"circles": [[pts], ...], "lines": [[pts], ...]}
-        circ_list = info["circles"]
-        line_list = info["lines"]
-
-        # 随机选一个圆和一条线
-        circ_pts = random.choice(circ_list)
-        line_pts = random.choice(line_list)
-
-        # 圆取3点，线取2点
-        circ_a, circ_b, circ_c = random.sample(circ_pts, min(3, len(circ_pts)))
-        line_d, line_e = random.sample(line_pts, 2)
-
+        line, circle = info
+        circ_a, circ_b, circ_c = random.sample(circle, 3)
+        line_d, line_e = random.sample(line, 2)
         clause = f"on_line {new_name} {line_d} {line_e}, on_circum {new_name} {circ_a} {circ_b} {circ_c}"
 
+    elif typ == "circle_circle_inter":
+        circle1, circle2 = info
+        circ1_a, circ1_b, circ1_c = random.sample(circle1, 3)
+        circ2_a, circ2_b, circ2_c = random.sample(circle2, 3)
+        clause = (
+            f"on_circum {new_name} {circ1_a} {circ1_b} {circ1_c}, "
+            f"on_circum {new_name} {circ2_a} {circ2_b} {circ2_c}"
+        )
+
     elif typ == "symmetric_over_point":
-        # info = {"center": center_name, "original": pt_name}
-        center = info["center"]
-        original = info["original"]
+        center, original = info
         clause = f"mirror {new_name} {original} {center}"
 
     elif typ == "symmetric_over_line":
-        # info = {"point": pt_name, "line": line_sorted}
-        pt = info["point"]
-        line_pts = info["line"]
-        a, b = random.sample(line_pts, min(2, len(line_pts)))
+        pt, line = info
+        a, b = random.sample(line, 2)
         clause = f"reflect {new_name} {pt} {a} {b}"
 
     else:
-        # 未知类型，fallback
         clause = f"% unknown type {typ} for {new_name}"
 
     return f"{new_name}@{coord_str} = {clause}"
