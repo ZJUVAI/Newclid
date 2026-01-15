@@ -909,7 +909,7 @@ def solve_single_problem(
             max_sample_retries = DEFAULT_MAX_SAMPLE_RETRIES
             sample_retry_count = 0
             found_new = False
-            while sample_retry_count < max_sample_retries or DEFAULT_MAX_ATTEMPTS == 0:
+            while sample_retry_count < max_sample_retries or DEFAULT_MAX_SAMPLE_RETRIES == 0:
                 indices = tuple(sorted(random.sample(range(n_candidates), n_sample)))
                 if indices not in tried_combinations:
                     tried_combinations.add(indices)
