@@ -1,13 +1,5 @@
 Problem Name:
 translated_imo_2000_p1
-aux_int_0
-(-0.5650370613745379,-0.706368858312268)
-coll aux_int_0 a b, coll aux_int_0 a n
-aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 a n
-aux_int_1
-(0.05350914208056878,-0.18618246666286098)
-coll aux_int_1 a b, coll aux_int_1 b n
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 b n
 aux_int_2
 (-0.36719474346578607,-0.5399869762577969)
 coll aux_int_2 a b, coll aux_int_2 e p
@@ -32,22 +24,10 @@ aux_int_7
 (-0.36928085730840443,0.07524753378434446)
 coll aux_int_7 a m, coll aux_int_7 g1 g2
 aux_int_7 = on_line aux_int_7 a m, on_line aux_int_7 g1 g2
-aux_int_8
-(-0.4539903462562861,-0.2629809552878225)
-coll aux_int_8 a m, coll aux_int_8 c d
-aux_int_8 = on_line aux_int_8 a m, on_line aux_int_8 c d
 aux_int_9
 (-0.35788396197198324,0.12075311689703494)
 coll aux_int_9 a m, coll aux_int_9 e q
 aux_int_9 = on_line aux_int_9 a m, on_line aux_int_9 e q
-aux_int_10
-(-0.6252147702510716,-0.4069776604370445)
-coll aux_int_10 a n, coll aux_int_10 b p
-aux_int_10 = on_line aux_int_10 a n, on_line aux_int_10 b p
-aux_int_11
-(-0.699854337314919,-0.03563701272343012)
-coll aux_int_11 a n, coll aux_int_11 b n
-aux_int_11 = on_line aux_int_11 a n, on_line aux_int_11 b n
 aux_int_12
 (-0.6591352660319848,-0.238219193988861)
 coll aux_int_12 a n, coll aux_int_12 g1 g2
@@ -56,22 +36,6 @@ aux_int_13
 (-6.025678427579567,-1.1061290442398282)
 coll aux_int_13 a c, coll aux_int_13 b m
 aux_int_13 = on_line aux_int_13 a c, on_line aux_int_13 b m
-aux_int_14
-(-0.1091747166805005,-0.6729962920785493)
-coll aux_int_14 a c, coll aux_int_14 b d
-aux_int_14 = on_line aux_int_14 a c, on_line aux_int_14 b d
-aux_int_15
-(-1.0208994060685752,-0.7397414245459868)
-coll aux_int_15 a c, coll aux_int_15 c d
-aux_int_15 = on_line aux_int_15 a c, on_line aux_int_15 c d
-aux_int_16
-(0.21619300084163784,0.30063135875282687)
-coll aux_int_16 a d, coll aux_int_16 b d
-aux_int_16 = on_line aux_int_16 a d, on_line aux_int_16 b d
-aux_int_17
-(-0.28276592226150055,-0.1189842501386007)
-coll aux_int_17 a q, coll aux_int_17 b n
-aux_int_17 = on_line aux_int_17 a q, on_line aux_int_17 b n
 aux_int_18
 (-0.3833527320110909,-0.3282976925892017)
 coll aux_int_18 a q, coll aux_int_18 b p
@@ -136,14 +100,6 @@ aux_int_33
 (-0.11771528191421665,-0.33017917181208284)
 coll aux_int_33 a b, cyclic aux_int_33 a e p
 aux_int_33 = on_line aux_int_33 a b, on_circum aux_int_33 a e p
-aux_int_34
-(-0.8160395781926747,-0.4079053530612997)
-coll aux_int_34 a g1, coll aux_int_34 b g1
-aux_int_34 = on_line aux_int_34 a g1, on_line aux_int_34 b g1
-aux_int_35
-(-0.2630054105479488,0.19018046402797328)
-coll aux_int_35 a g2, coll aux_int_35 b g2
-aux_int_35 = on_line aux_int_35 a g2, on_line aux_int_35 b g2
 aux_int_36
 (0.2853554739086994,-0.6441137026962725)
 coll aux_int_36 a c, cyclic aux_int_36 a b m
@@ -467,22 +423,6 @@ aux_ref_14 = reflect aux_ref_14 q b g2
 
 Problem Name:
 translated_imo_2000_p6
-aux_int_0
-(0.6607996362729662,-0.4307284675388107)
-coll aux_int_0 a b, coll aux_int_0 c h
-aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 c h
-aux_int_1
-(-0.692572595496007,0.23348587299435297)
-coll aux_int_1 a b, coll aux_int_1 b c
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 b c
-aux_int_2
-(0.3626106469278112,-0.2843818836036139)
-coll aux_int_2 a b, coll aux_int_2 a c
-aux_int_2 = on_line aux_int_2 a b, on_line aux_int_2 a c
-aux_int_3
-(0.034316836447901844,-0.12326031504297283)
-coll aux_int_3 a b, coll aux_int_3 c t3
-aux_int_3 = on_line aux_int_3 a b, on_line aux_int_3 c t3
 aux_int_4
 (0.5885856100131861,-0.3952869306848372)
 coll aux_int_4 a b, coll aux_int_4 i t1
@@ -503,22 +443,10 @@ aux_int_8
 (0.1882506178669321,-0.19880865474651055)
 coll aux_int_8 a b, coll aux_int_8 t2 x2
 aux_int_8 = on_line aux_int_8 a b, on_line aux_int_8 t2 x2
-aux_int_9
-(0.41568659340828523,-0.1161389526708099)
-coll aux_int_9 a c, coll aux_int_9 b h
-aux_int_9 = on_line aux_int_9 a c, on_line aux_int_9 b h
 aux_int_10
 (0.15840488695050212,-0.9316840581316266)
 coll aux_int_10 a c, coll aux_int_10 b i
 aux_int_10 = on_line aux_int_10 a c, on_line aux_int_10 b i
-aux_int_11
-(-0.3032227182574212,-2.3949755573843947)
-coll aux_int_11 a c, coll aux_int_11 b c
-aux_int_11 = on_line aux_int_11 a c, on_line aux_int_11 b c
-aux_int_12
-(0.25258736354366296,-0.63313948275843)
-coll aux_int_12 a c, coll aux_int_12 b t2
-aux_int_12 = on_line aux_int_12 a c, on_line aux_int_12 b t2
 aux_int_13
 (0.3148305210301523,-0.43583784349531113)
 coll aux_int_13 a c, coll aux_int_13 i t1
@@ -535,18 +463,10 @@ aux_int_16
 (-1.0557128321162979,-4.780258357760872)
 coll aux_int_16 a c, coll aux_int_16 t3 z
 aux_int_16 = on_line aux_int_16 a c, on_line aux_int_16 t3 z
-aux_int_17
-(-0.5948529572061406,-0.42620946852512864)
-coll aux_int_17 a h, coll aux_int_17 b c
-aux_int_17 = on_line aux_int_17 a h, on_line aux_int_17 b c
 aux_int_18
 (-0.24826248677356322,-0.37486956467288046)
 coll aux_int_18 a h, coll aux_int_18 b i
 aux_int_18 = on_line aux_int_18 a h, on_line aux_int_18 b i
-aux_int_19
-(0.7616328786568014,-0.22527534502421304)
-coll aux_int_19 a h, coll aux_int_19 b h
-aux_int_19 = on_line aux_int_19 a h, on_line aux_int_19 b h
 aux_int_20
 (-0.46453873031871584,-0.4069062260827433)
 coll aux_int_20 a h, coll aux_int_20 i t2
@@ -575,14 +495,6 @@ aux_int_26
 (0.6113977960944226,-0.1778803718306281)
 coll aux_int_26 a i, coll aux_int_26 b h
 aux_int_26 = on_line aux_int_26 a i, on_line aux_int_26 b h
-aux_int_27
-(-0.616893870224358,-0.7036909685568442)
-coll aux_int_27 a i, coll aux_int_27 b x1
-aux_int_27 = on_line aux_int_27 a i, on_line aux_int_27 b x1
-aux_int_28
-(-0.15311033084434122,-0.5051531893955932)
-coll aux_int_28 a i, coll aux_int_28 b i
-aux_int_28 = on_line aux_int_28 a i, on_line aux_int_28 b i
 aux_int_29
 (-0.34179625559215787,-0.5859263977515785)
 coll aux_int_29 a i, coll aux_int_29 t1 t2
@@ -611,30 +523,10 @@ aux_int_35
 (-0.0441526876612891,-0.45851029101001217)
 coll aux_int_35 a i, coll aux_int_35 t3 z
 aux_int_35 = on_line aux_int_35 a i, on_line aux_int_35 t3 z
-aux_int_36
-(-0.5739256047165913,-0.5674878971940915)
-coll aux_int_36 a t1, coll aux_int_36 b c
-aux_int_36 = on_line aux_int_36 a t1, on_line aux_int_36 b c
 aux_int_37
 (-0.0061879164020886,-0.3958661864257398)
 coll aux_int_37 a t1, coll aux_int_37 b t2
 aux_int_37 = on_line aux_int_37 a t1, on_line aux_int_37 b t2
-aux_int_38
-(0.3320235482212591,-1.169405088085846)
-coll aux_int_38 a x2, coll aux_int_38 b i
-aux_int_38 = on_line aux_int_38 a x2, on_line aux_int_38 b i
-aux_int_39
-(-0.2340775133046673,-0.39429182307654653)
-coll aux_int_39 a y2, coll aux_int_39 b i
-aux_int_39 = on_line aux_int_39 a y2, on_line aux_int_39 b i
-aux_int_40
-(-0.17564050182688085,-0.7887941454230851)
-coll aux_int_40 a y3, coll aux_int_40 c i
-aux_int_40 = on_line aux_int_40 a y3, on_line aux_int_40 c i
-aux_int_41
-(-0.15464132862707103,-0.9305574284039626)
-coll aux_int_41 a z, coll aux_int_41 x1 x2
-aux_int_41 = on_line aux_int_41 a z, on_line aux_int_41 x1 x2
 aux_int_42
 (-0.6042406402757257,-0.3628341747044913)
 coll aux_int_42 b c, coll aux_int_42 i t2
@@ -3150,22 +3042,6 @@ aux_foot_6 = foot aux_foot_6 y3 t2 y2
 
 Problem Name:
 translated_imo_2002_p2a
-aux_int_0
-(-0.45736908635285456,0.22082222615131109)
-coll aux_int_0 b c, coll aux_int_0 o a
-aux_int_0 = on_line aux_int_0 b c, on_line aux_int_0 o a
-aux_int_1
-(-0.815290522664552,0.6527060079111612)
-coll aux_int_1 b c, coll aux_int_1 a j
-aux_int_1 = on_line aux_int_1 b c, on_line aux_int_1 a j
-aux_int_2
-(-0.09944765004115697,-0.21106155560853912)
-coll aux_int_2 b a, coll aux_int_2 b c
-aux_int_2 = on_line aux_int_2 b a, on_line aux_int_2 b c
-aux_int_3
-(0.007154807516828454,0.5352246872465862)
-coll aux_int_3 b a, coll aux_int_3 a j
-aux_int_3 = on_line aux_int_3 b a, on_line aux_int_3 a j
 aux_int_4
 (-1.9258577099215768,0.81134378608047)
 coll aux_int_4 b d, coll aux_int_4 a j
@@ -3190,10 +3066,6 @@ aux_int_9
 (0.16928786034029636,0.13130808703533425)
 coll aux_int_9 b f, coll aux_int_9 o d
 aux_int_9 = on_line aux_int_9 b f, on_line aux_int_9 o d
-aux_int_10
-(0.5624384011453407,0.4559057981619319)
-coll aux_int_10 b j, coll aux_int_10 a j
-aux_int_10 = on_line aux_int_10 b j, on_line aux_int_10 a j
 aux_int_11
 (-0.6322859522589914,0.9796227157607558)
 coll aux_int_11 c d, coll aux_int_11 e f
@@ -3258,18 +3130,6 @@ aux_int_26
 (-0.19829505429941008,-0.9030574028876486)
 coll aux_int_26 b a, cyclic aux_int_26 b o d
 aux_int_26 = on_line aux_int_26 b a, on_circum aux_int_26 b o d
-aux_int_27
-(-1.0126526799813669,0.3001411152359654)
-coll aux_int_27 b d, coll aux_int_27 c d
-aux_int_27 = on_line aux_int_27 b d, on_line aux_int_27 c d
-aux_int_28
-(-0.4973876577388701,0.7803129494549609)
-coll aux_int_28 b e, coll aux_int_28 c e
-aux_int_28 = on_line aux_int_28 b e, on_line aux_int_28 c e
-aux_int_29
-(0.0471733789028439,-0.024266036057063317)
-coll aux_int_29 b f, coll aux_int_29 c f
-aux_int_29 = on_line aux_int_29 b f, on_line aux_int_29 c f
 aux_int_30
 (-0.5481287861116839,0.6145435763312406)
 coll aux_int_30 a j, cyclic aux_int_30 c o d
@@ -3337,22 +3197,6 @@ aux_ref_6 = reflect aux_ref_6 f a j
 
 Problem Name:
 translated_imo_2002_p2b
-aux_int_0
-(-0.45736908635285456,0.22082222615131109)
-coll aux_int_0 b c, coll aux_int_0 o a
-aux_int_0 = on_line aux_int_0 b c, on_line aux_int_0 o a
-aux_int_1
-(-0.815290522664552,0.6527060079111612)
-coll aux_int_1 b c, coll aux_int_1 a j
-aux_int_1 = on_line aux_int_1 b c, on_line aux_int_1 a j
-aux_int_2
-(-0.09944765004115697,-0.21106155560853912)
-coll aux_int_2 b a, coll aux_int_2 b c
-aux_int_2 = on_line aux_int_2 b a, on_line aux_int_2 b c
-aux_int_3
-(0.007154807516828454,0.5352246872465862)
-coll aux_int_3 b a, coll aux_int_3 a j
-aux_int_3 = on_line aux_int_3 b a, on_line aux_int_3 a j
 aux_int_4
 (-1.9258577099215768,0.81134378608047)
 coll aux_int_4 b d, coll aux_int_4 a j
@@ -3377,10 +3221,6 @@ aux_int_9
 (0.16928786034029636,0.13130808703533425)
 coll aux_int_9 b f, coll aux_int_9 o d
 aux_int_9 = on_line aux_int_9 b f, on_line aux_int_9 o d
-aux_int_10
-(0.5624384011453407,0.4559057981619319)
-coll aux_int_10 b j, coll aux_int_10 a j
-aux_int_10 = on_line aux_int_10 b j, on_line aux_int_10 a j
 aux_int_11
 (-0.6322859522589914,0.9796227157607558)
 coll aux_int_11 c d, coll aux_int_11 e f
@@ -3445,18 +3285,6 @@ aux_int_26
 (-0.19829505429941008,-0.9030574028876486)
 coll aux_int_26 b a, cyclic aux_int_26 b o d
 aux_int_26 = on_line aux_int_26 b a, on_circum aux_int_26 b o d
-aux_int_27
-(-1.0126526799813669,0.3001411152359654)
-coll aux_int_27 b d, coll aux_int_27 c d
-aux_int_27 = on_line aux_int_27 b d, on_line aux_int_27 c d
-aux_int_28
-(-0.4973876577388701,0.7803129494549609)
-coll aux_int_28 b e, coll aux_int_28 c e
-aux_int_28 = on_line aux_int_28 b e, on_line aux_int_28 c e
-aux_int_29
-(0.0471733789028439,-0.024266036057063317)
-coll aux_int_29 b f, coll aux_int_29 c f
-aux_int_29 = on_line aux_int_29 b f, on_line aux_int_29 c f
 aux_int_30
 (-0.5481287861116839,0.6145435763312406)
 coll aux_int_30 a j, cyclic aux_int_30 c o d
@@ -3524,58 +3352,22 @@ aux_ref_6 = reflect aux_ref_6 f a j
 
 Problem Name:
 translated_imo_2003_p4
-aux_int_0
-(0.052630714342450355,0.11284871306222755)
-coll aux_int_0 a b, coll aux_int_0 a c
-aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 a c
-aux_int_1
-(1.0442972927758705,0.45371352281418315)
-coll aux_int_1 a b, coll aux_int_1 b c
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 b c
-aux_int_2
-(-0.2504154600956602,0.008682878655376189)
-coll aux_int_2 a b, coll aux_int_2 c r
-aux_int_2 = on_line aux_int_2 a b, on_line aux_int_2 c r
 aux_int_3
 (-2.945114182967284,-0.917563893683683)
 coll aux_int_3 a b, coll aux_int_3 b1 d1
 aux_int_3 = on_line aux_int_3 a b, on_line aux_int_3 b1 d1
-aux_int_4
-(0.94953857546464,-1.4038376557388543)
-coll aux_int_4 a c, coll aux_int_4 b b1
-aux_int_4 = on_line aux_int_4 a c, on_line aux_int_4 b b1
 aux_int_5
 (-0.18605916550878582,0.5164773385134418)
 coll aux_int_5 a c, coll aux_int_5 b d1
 aux_int_5 = on_line aux_int_5 a c, on_line aux_int_5 b d1
-aux_int_6
-(-0.5978614803420889,1.2128420205744832)
-coll aux_int_6 a c, coll aux_int_6 b c
-aux_int_6 = on_line aux_int_6 a c, on_line aux_int_6 b c
-aux_int_7
-(-0.1732225147777139,0.49477034493160615)
-coll aux_int_7 a c, coll aux_int_7 b q
-aux_int_7 = on_line aux_int_7 a c, on_line aux_int_7 b q
 aux_int_8
 (-0.2726153829998192,0.6628453668183553)
 coll aux_int_8 a c, coll aux_int_8 b1 d1
 aux_int_8 = on_line aux_int_8 a c, on_line aux_int_8 b1 d1
-aux_int_9
-(0.30133171744557374,1.0022548036320351)
-coll aux_int_9 a o, coll aux_int_9 b1 d1
-aux_int_9 = on_line aux_int_9 a o, on_line aux_int_9 b1 d1
-aux_int_10
-(1.0962603892473979,1.47234393309001)
-coll aux_int_10 a b1, coll aux_int_10 b b1
-aux_int_10 = on_line aux_int_10 a b1, on_line aux_int_10 b b1
 aux_int_11
 (-0.3086008996658969,-0.357713464668103)
 coll aux_int_11 a b1, coll aux_int_11 p q
 aux_int_11 = on_line aux_int_11 a b1, on_line aux_int_11 p q
-aux_int_12
-(-0.4935969543562502,0.5321656741740604)
-coll aux_int_12 a d1, coll aux_int_12 b1 d1
-aux_int_12 = on_line aux_int_12 a d1, on_line aux_int_12 b1 d1
 aux_int_13
 (-0.20274154152799229,0.30888769903848323)
 coll aux_int_13 a d1, coll aux_int_13 p q
@@ -3584,14 +3376,6 @@ aux_int_14
 (-0.5649655068343472,0.48996115709574267)
 coll aux_int_14 a d, coll aux_int_14 b1 d1
 aux_int_14 = on_line aux_int_14 a d, on_line aux_int_14 b1 d1
-aux_int_15
-(-0.3762325433107353,0.3747183063405032)
-coll aux_int_15 a d, coll aux_int_15 d1 d
-aux_int_15 = on_line aux_int_15 a d, on_line aux_int_15 d1 d
-aux_int_16
-(-0.09602956945976777,0.980857811207834)
-coll aux_int_16 a p, coll aux_int_16 b c
-aux_int_16 = on_line aux_int_16 a p, on_line aux_int_16 b c
 aux_int_17
 (0.106684520899884,0.8871482105232511)
 coll aux_int_17 b c, coll aux_int_17 b1 d1
@@ -3903,46 +3687,14 @@ aux_ref_17 = reflect aux_ref_17 r b1 x
 
 Problem Name:
 translated_imo_2004_p1
-aux_int_0
-(-0.8038154984416004,-1.2286264201237227)
-coll aux_int_0 a b, coll aux_int_0 b c
-aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 b c
-aux_int_1
-(0.4518803033858614,-0.5052858301621286)
-coll aux_int_1 a b, coll aux_int_1 c m
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 c m
-aux_int_2
-(0.6647962619175382,-0.3826360969764289)
-coll aux_int_2 a b, coll aux_int_2 a c
-aux_int_2 = on_line aux_int_2 a b, on_line aux_int_2 a c
 aux_int_3
 (1.036635364324272,-0.16843906349567692)
 coll aux_int_3 a b, coll aux_int_3 o r
 aux_int_3 = on_line aux_int_3 a b, on_line aux_int_3 o r
-aux_int_4
-(0.9261388529263415,-1.3285832890678728)
-coll aux_int_4 a c, coll aux_int_4 b c
-aux_int_4 = on_line aux_int_4 a c, on_line aux_int_4 b c
-aux_int_5
-(0.7778007961911512,-0.7916636553131595)
-coll aux_int_5 a c, coll aux_int_5 b n
-aux_int_5 = on_line aux_int_5 a c, on_line aux_int_5 b n
 aux_int_6
 (0.7087224180684935,-0.5416297914598777)
 coll aux_int_6 a c, coll aux_int_6 o r
 aux_int_6 = on_line aux_int_6 a c, on_line aux_int_6 o r
-aux_int_7
-(0.061161677242370316,-1.278604854595798)
-coll aux_int_7 a o, coll aux_int_7 b c
-aux_int_7 = on_line aux_int_7 a o, on_line aux_int_7 b c
-aux_int_8
-(0.2917587221878007,-1.2919287660517806)
-coll aux_int_8 a p, coll aux_int_8 b c
-aux_int_8 = on_line aux_int_8 a p, on_line aux_int_8 b c
-aux_int_9
-(0.5039714253522023,-0.7746525278162009)
-coll aux_int_9 a p, coll aux_int_9 b r
-aux_int_9 = on_line aux_int_9 a p, on_line aux_int_9 b r
 aux_int_10
 (1.1490462049371162,-1.3414628895925975)
 coll aux_int_10 b c, coll aux_int_10 o1 o2
@@ -4055,18 +3807,10 @@ aux_int_37
 (0.370275862054392,-1.1005403612033553)
 coll aux_int_37 a p, cyclic aux_int_37 a c m
 aux_int_37 = on_line aux_int_37 a p, on_circum aux_int_37 a c m
-aux_int_38
-(-0.22807559283316348,-0.776498335472953)
-coll aux_int_38 a o1, coll aux_int_38 b o1
-aux_int_38 = on_line aux_int_38 a o1, on_line aux_int_38 b o1
 aux_int_39
 (0.2743530027790596,-0.5548678178352936)
 coll aux_int_39 a o1, cyclic aux_int_39 b m o1
 aux_int_39 = on_line aux_int_39 a o1, on_circum aux_int_39 b m o1
-aux_int_40
-(0.6196935783469887,-1.1242958451541338)
-coll aux_int_40 a o2, coll aux_int_40 b o2
-aux_int_40 = on_line aux_int_40 a o2, on_line aux_int_40 b o2
 aux_int_41
 (0.6307747120932201,-0.9420798390732927)
 coll aux_int_41 a o2, cyclic aux_int_41 b m o2
@@ -4310,34 +4054,10 @@ aux_int_3
 (-1.771775172774176,-1.2829722638629084)
 coll aux_int_3 c d, coll aux_int_3 o p
 aux_int_3 = on_line aux_int_3 c d, on_line aux_int_3 o p
-aux_int_4
-(-2.004784792583711,0.18770521968871645)
-coll aux_int_4 a b, coll aux_int_4 b c
-aux_int_4 = on_line aux_int_4 a b, on_line aux_int_4 b c
-aux_int_5
-(-0.43824313265914255,-0.05736356597738601)
-coll aux_int_5 a b, coll aux_int_5 a c
-aux_int_5 = on_line aux_int_5 a b, on_line aux_int_5 a c
-aux_int_6
-(0.011214846377468335,-0.9645841768501766)
-coll aux_int_6 a c, coll aux_int_6 b c
-aux_int_6 = on_line aux_int_6 a c, on_line aux_int_6 b c
-aux_int_7
-(-1.4039053555169632,-1.100721086330767)
-coll aux_int_7 a o, coll aux_int_7 b o
-aux_int_7 = on_line aux_int_7 a o, on_line aux_int_7 b o
-aux_int_8
-(-2.7786835004135275,-1.4627756350488101)
-coll aux_int_8 a d, coll aux_int_8 b d
-aux_int_8 = on_line aux_int_8 a d, on_line aux_int_8 b d
 aux_int_9
 (-2.6527040282626615,-1.7801328310638453)
 coll aux_int_9 a p, cyclic aux_int_9 a b c
 aux_int_9 = on_line aux_int_9 a p, on_circum aux_int_9 a b c
-aux_int_10
-(-2.4377678283344326,-1.6129203596555772)
-coll aux_int_10 a p, coll aux_int_10 b p
-aux_int_10 = on_line aux_int_10 a p, on_line aux_int_10 b p
 aux_int_11
 (-2.701017905180758,-1.6826123798189512)
 coll aux_int_11 c p, cyclic aux_int_11 a b c
@@ -4357,26 +4077,6 @@ aux_ref_1 = reflect aux_ref_1 p a c
 
 Problem Name:
 translated_imo_2005_p5
-aux_int_0
-(0.24631618602807248,1.1099089962473907)
-coll aux_int_0 a b, coll aux_int_0 b c
-aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 b c
-aux_int_1
-(1.3410274095210233,1.2956875258002656)
-coll aux_int_1 a b, coll aux_int_1 a c
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 a c
-aux_int_2
-(1.1760310339732012,0.9919571713230462)
-coll aux_int_2 a c, coll aux_int_2 b d
-aux_int_2 = on_line aux_int_2 a c, on_line aux_int_2 b d
-aux_int_3
-(0.9031060858843237,0.48954861262906646)
-coll aux_int_3 a c, coll aux_int_3 b c
-aux_int_3 = on_line aux_int_3 a c, on_line aux_int_3 b c
-aux_int_4
-(1.0751757988850226,0.8062997821682313)
-coll aux_int_4 a c, coll aux_int_4 b r
-aux_int_4 = on_line aux_int_4 a c, on_line aux_int_4 b r
 aux_int_5
 (1.141087492351155,0.9276320354022424)
 coll aux_int_5 a c, coll aux_int_5 o1 o2
@@ -4385,22 +4085,6 @@ aux_int_6
 (-1.6323856440299094,2.88440672870993)
 coll aux_int_6 a d, coll aux_int_6 b c
 aux_int_6 = on_line aux_int_6 a d, on_line aux_int_6 b c
-aux_int_7
-(0.7446268810596371,1.6143492640544004)
-coll aux_int_7 a d, coll aux_int_7 b f
-aux_int_7 = on_line aux_int_7 a d, on_line aux_int_7 b f
-aux_int_8
-(2.1378654286503878,0.8699303774325048)
-coll aux_int_8 a d, coll aux_int_8 b d
-aux_int_8 = on_line aux_int_8 a d, on_line aux_int_8 b d
-aux_int_9
-(1.3946863493240071,0.025234345808911263)
-coll aux_int_9 a e, coll aux_int_9 b c
-aux_int_9 = on_line aux_int_9 a e, on_line aux_int_9 b c
-aux_int_10
-(0.9895509127634372,1.0156156840997537)
-coll aux_int_10 a q, coll aux_int_10 b d
-aux_int_10 = on_line aux_int_10 a q, on_line aux_int_10 b d
 aux_int_11
 (-0.49216399083062545,3.4343433157414003)
 coll aux_int_11 a o1, coll aux_int_11 c o2
@@ -4453,18 +4137,6 @@ aux_int_23
 (-0.3453744807913688,-0.04811124203817796)
 coll aux_int_23 a q, cyclic aux_int_23 a c m
 aux_int_23 = on_line aux_int_23 a q, on_circum aux_int_23 a c m
-aux_int_24
-(1.6565261961554085,0.9276172268529757)
-coll aux_int_24 a o1, coll aux_int_24 b o1
-aux_int_24 = on_line aux_int_24 a o1, on_line aux_int_24 b o1
-aux_int_25
-(0.6955321756121737,0.9276448362024344)
-coll aux_int_25 a o2, coll aux_int_25 b o2
-aux_int_25 = on_line aux_int_25 a o2, on_line aux_int_25 b o2
-aux_int_26
-(1.1760273377943808,0.8633048917323638)
-coll aux_int_26 a m, coll aux_int_26 b m
-aux_int_26 = on_line aux_int_26 a m, on_line aux_int_26 b m
 aux_int_27
 (0.5077899449527123,1.3745990667025232)
 coll aux_int_27 b f, cyclic aux_int_27 a f r
@@ -4632,14 +4304,6 @@ aux_mid_18 = coll aux_mid_18 q r, cong aux_mid_18 q aux_mid_18 r
 
 Problem Name:
 translated_imo_2007_p4
-aux_int_0
-(-0.44453474755968364,-0.011767156352470491)
-coll aux_int_0 a b, coll aux_int_0 a c
-aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 a c
-aux_int_1
-(-1.8439288803898104,0.17281026599357519)
-coll aux_int_1 a b, coll aux_int_1 b c
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 b c
 aux_int_2
 (-1.144231813974747,0.08052155482055233)
 coll aux_int_2 a b, coll aux_int_2 o r
@@ -4652,14 +4316,6 @@ aux_int_4
 (-0.7817419943237771,0.03270983761508873)
 coll aux_int_4 a b, coll aux_int_4 k p
 aux_int_4 = on_line aux_int_4 a b, on_line aux_int_4 k p
-aux_int_5
-(-0.41995768832306296,-0.4891770373342449)
-coll aux_int_5 a c, coll aux_int_5 b l
-aux_int_5 = on_line aux_int_5 a c, on_line aux_int_5 b l
-aux_int_6
-(-0.3953806290864424,-0.9665869183160191)
-coll aux_int_6 a c, coll aux_int_6 b c
-aux_int_6 = on_line aux_int_6 a c, on_line aux_int_6 b c
 aux_int_7
 (-0.6443789765727076,3.8702111010723184)
 coll aux_int_7 a c, coll aux_int_7 o r
@@ -4672,18 +4328,10 @@ aux_int_9
 (-0.34800546186592135,-1.8868505156198006)
 coll aux_int_9 a c, coll aux_int_9 k k1
 aux_int_9 = on_line aux_int_9 a c, on_line aux_int_9 k k1
-aux_int_10
-(-1.2248392108278763,-0.53061233569125)
-coll aux_int_10 a o, coll aux_int_10 l q
-aux_int_10 = on_line aux_int_10 a o, on_line aux_int_10 l q
 aux_int_11
 (-2.822718963434914,-3.8255888304276158)
 coll aux_int_11 a r, coll aux_int_11 b p
 aux_int_11 = on_line aux_int_11 a r, on_line aux_int_11 b p
-aux_int_12
-(-1.3473739350386706,-1.4596228936947298)
-coll aux_int_12 a r, coll aux_int_12 c k1
-aux_int_12 = on_line aux_int_12 a r, on_line aux_int_12 c k1
 aux_int_13
 (-0.7529217605040355,-0.5063180267683755)
 coll aux_int_13 a r, coll aux_int_13 l q
@@ -4692,14 +4340,6 @@ aux_int_14
 (-0.7177411578083247,-0.44989996454582826)
 coll aux_int_14 a r, coll aux_int_14 l k
 aux_int_14 = on_line aux_int_14 a r, on_line aux_int_14 l k
-aux_int_15
-(-1.1196547547381264,-0.39688832616122205)
-coll aux_int_15 a k, coll aux_int_15 b c
-aux_int_15 = on_line aux_int_15 a k, on_line aux_int_15 b c
-aux_int_16
-(-2.373651900288102,-1.9911307881754743)
-coll aux_int_16 a p, coll aux_int_16 c k1
-aux_int_16 = on_line aux_int_16 a p, on_line aux_int_16 c k1
 aux_int_17
 (-1.970489163355388,0.5888794332565158)
 coll aux_int_17 a q, coll aux_int_17 b r
@@ -4708,18 +4348,6 @@ aux_int_18
 (-1.7621516864954563,0.5068735793015622)
 coll aux_int_18 a q, coll aux_int_18 b p
 aux_int_18 = on_line aux_int_18 a q, on_line aux_int_18 b p
-aux_int_19
-(0.6308973361629903,-0.4350790238352739)
-coll aux_int_19 a q, coll aux_int_19 c k1
-aux_int_19 = on_line aux_int_19 a q, on_line aux_int_19 c k1
-aux_int_20
-(-0.21980145148553099,-0.8756547126551095)
-coll aux_int_20 a l1, coll aux_int_20 c k1
-aux_int_20 = on_line aux_int_20 a l1, on_line aux_int_20 c k1
-aux_int_21
-(-0.733830108302024,-1.1418694208905116)
-coll aux_int_21 a k1, coll aux_int_21 c k1
-aux_int_21 = on_line aux_int_21 a k1, on_line aux_int_21 c k1
 aux_int_22
 (-1.1989722215815206,-0.3344988970851682)
 coll aux_int_22 b c, coll aux_int_22 o r
@@ -5255,54 +4883,14 @@ aux_int_0
 (0.7823886429669759,1.2008834474511858)
 coll aux_int_0 a b, coll aux_int_0 c h
 aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 c h
-aux_int_1
-(0.24631618602807248,1.1099089962473907)
-coll aux_int_1 a b, coll aux_int_1 a1 a2
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 a1 a2
-aux_int_2
-(1.3410274095210228,1.2956875258002656)
-coll aux_int_2 a b, coll aux_int_2 a b1
-aux_int_2 = on_line aux_int_2 a b, on_line aux_int_2 a b1
-aux_int_3
-(0.7936717977745474,1.2027982610238281)
-coll aux_int_3 a b, coll aux_int_3 c f
-aux_int_3 = on_line aux_int_3 a b, on_line aux_int_3 c f
-aux_int_4
-(0.3725221848347483,1.1313268499935547)
-coll aux_int_4 a b, coll aux_int_4 c c1
-aux_int_4 = on_line aux_int_4 a b, on_line aux_int_4 c c1
-aux_int_5
-(1.2148214107143458,1.2742696720541016)
-coll aux_int_5 a b, coll aux_int_5 c c2
-aux_int_5 = on_line aux_int_5 a b, on_line aux_int_5 c c2
 aux_int_6
 (1.013661186290724,0.6930618093536108)
 coll aux_int_6 a b1, coll aux_int_6 b h
 aux_int_6 = on_line aux_int_6 a b1, on_line aux_int_6 b h
-aux_int_7
-(0.9031060858843238,0.4895486126290667)
-coll aux_int_7 a b1, coll aux_int_7 a1 a2
-aux_int_7 = on_line aux_int_7 a b1, on_line aux_int_7 a1 a2
-aux_int_8
-(1.1220667477026733,0.8926180692146661)
-coll aux_int_8 a b1, coll aux_int_8 b e
-aux_int_8 = on_line aux_int_8 a b1, on_line aux_int_8 b e
-aux_int_9
-(1.2609553123415513,1.1482883700351358)
-coll aux_int_9 a b1, coll aux_int_9 b b1
-aux_int_9 = on_line aux_int_9 a b1, on_line aux_int_9 b b1
-aux_int_10
-(0.9831781830637951,0.6369477683941965)
-coll aux_int_10 a b1, coll aux_int_10 b b2
-aux_int_10 = on_line aux_int_10 a b1, on_line aux_int_10 b b2
 aux_int_11
 (0.7321337912986009,0.6510377559312369)
 coll aux_int_11 a h, coll aux_int_11 a1 a2
 aux_int_11 = on_line aux_int_11 a h, on_line aux_int_11 a1 a2
-aux_int_12
-(0.574711135956198,0.7997288044382287)
-coll aux_int_12 a d, coll aux_int_12 a1 a2
-aux_int_12 = on_line aux_int_12 a d, on_line aux_int_12 a1 a2
 aux_int_13
 (0.8301498938111397,0.9650483782255743)
 coll aux_int_13 a d, coll aux_int_13 b e
@@ -5315,14 +4903,6 @@ aux_int_15
 (2.5615034244342416,2.085577737831878)
 coll aux_int_15 a d, coll aux_int_15 e a2
 aux_int_15 = on_line aux_int_15 a d, on_line aux_int_15 e a2
-aux_int_16
-(0.37128177103451343,0.9918747538349368)
-coll aux_int_16 a a1, coll aux_int_16 a1 a2
-aux_int_16 = on_line aux_int_16 a a1, on_line aux_int_16 a1 a2
-aux_int_17
-(0.7781405008778828,0.6075828550415205)
-coll aux_int_17 a a2, coll aux_int_17 a1 a2
-aux_int_17 = on_line aux_int_17 a a2, on_line aux_int_17 a1 a2
 aux_int_18
 (0.8772056949040065,0.9533729091031968)
 coll aux_int_18 b e, coll aux_int_18 d b1
@@ -5375,10 +4955,6 @@ aux_int_30
 (0.61043318339768,0.5221905049035687)
 coll aux_int_30 a h, cyclic aux_int_30 a b c
 aux_int_30 = on_line aux_int_30 a h, on_circum aux_int_30 a b c
-aux_int_31
-(0.8538343991995223,0.7798850069589056)
-coll aux_int_31 a h, coll aux_int_31 b h
-aux_int_31 = on_line aux_int_31 a h, on_line aux_int_31 b h
 aux_int_32
 (1.2193268016201022,1.1668402747725979)
 coll aux_int_32 a h, cyclic aux_int_32 h b1 b2
@@ -6126,54 +5702,14 @@ aux_int_0
 (0.7823886429669759,1.2008834474511858)
 coll aux_int_0 a b, coll aux_int_0 c h
 aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 c h
-aux_int_1
-(0.24631618602807248,1.1099089962473907)
-coll aux_int_1 a b, coll aux_int_1 a1 a2
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 a1 a2
-aux_int_2
-(1.3410274095210228,1.2956875258002656)
-coll aux_int_2 a b, coll aux_int_2 a b1
-aux_int_2 = on_line aux_int_2 a b, on_line aux_int_2 a b1
-aux_int_3
-(0.7936717977745474,1.2027982610238281)
-coll aux_int_3 a b, coll aux_int_3 c f
-aux_int_3 = on_line aux_int_3 a b, on_line aux_int_3 c f
-aux_int_4
-(0.3725221848347483,1.1313268499935547)
-coll aux_int_4 a b, coll aux_int_4 c c1
-aux_int_4 = on_line aux_int_4 a b, on_line aux_int_4 c c1
-aux_int_5
-(1.2148214107143458,1.2742696720541016)
-coll aux_int_5 a b, coll aux_int_5 c c2
-aux_int_5 = on_line aux_int_5 a b, on_line aux_int_5 c c2
 aux_int_6
 (1.013661186290724,0.6930618093536108)
 coll aux_int_6 a b1, coll aux_int_6 b h
 aux_int_6 = on_line aux_int_6 a b1, on_line aux_int_6 b h
-aux_int_7
-(0.9031060858843238,0.4895486126290667)
-coll aux_int_7 a b1, coll aux_int_7 a1 a2
-aux_int_7 = on_line aux_int_7 a b1, on_line aux_int_7 a1 a2
-aux_int_8
-(1.1220667477026733,0.8926180692146661)
-coll aux_int_8 a b1, coll aux_int_8 b e
-aux_int_8 = on_line aux_int_8 a b1, on_line aux_int_8 b e
-aux_int_9
-(1.2609553123415513,1.1482883700351358)
-coll aux_int_9 a b1, coll aux_int_9 b b1
-aux_int_9 = on_line aux_int_9 a b1, on_line aux_int_9 b b1
-aux_int_10
-(0.9831781830637951,0.6369477683941965)
-coll aux_int_10 a b1, coll aux_int_10 b b2
-aux_int_10 = on_line aux_int_10 a b1, on_line aux_int_10 b b2
 aux_int_11
 (0.7321337912986009,0.6510377559312369)
 coll aux_int_11 a h, coll aux_int_11 a1 a2
 aux_int_11 = on_line aux_int_11 a h, on_line aux_int_11 a1 a2
-aux_int_12
-(0.574711135956198,0.7997288044382287)
-coll aux_int_12 a d, coll aux_int_12 a1 a2
-aux_int_12 = on_line aux_int_12 a d, on_line aux_int_12 a1 a2
 aux_int_13
 (0.8301498938111397,0.9650483782255743)
 coll aux_int_13 a d, coll aux_int_13 b e
@@ -6186,14 +5722,6 @@ aux_int_15
 (2.5615034244342416,2.085577737831878)
 coll aux_int_15 a d, coll aux_int_15 e a2
 aux_int_15 = on_line aux_int_15 a d, on_line aux_int_15 e a2
-aux_int_16
-(0.37128177103451343,0.9918747538349368)
-coll aux_int_16 a a1, coll aux_int_16 a1 a2
-aux_int_16 = on_line aux_int_16 a a1, on_line aux_int_16 a1 a2
-aux_int_17
-(0.7781405008778828,0.6075828550415205)
-coll aux_int_17 a a2, coll aux_int_17 a1 a2
-aux_int_17 = on_line aux_int_17 a a2, on_line aux_int_17 a1 a2
 aux_int_18
 (0.8772056949040065,0.9533729091031968)
 coll aux_int_18 b e, coll aux_int_18 d b1
@@ -6246,10 +5774,6 @@ aux_int_30
 (0.61043318339768,0.5221905049035687)
 coll aux_int_30 a h, cyclic aux_int_30 a b c
 aux_int_30 = on_line aux_int_30 a h, on_circum aux_int_30 a b c
-aux_int_31
-(0.8538343991995223,0.7798850069589056)
-coll aux_int_31 a h, coll aux_int_31 b h
-aux_int_31 = on_line aux_int_31 a h, on_line aux_int_31 b h
 aux_int_32
 (1.2193268016201022,1.1668402747725979)
 coll aux_int_32 a h, cyclic aux_int_32 h b1 b2
@@ -6993,46 +6517,6 @@ aux_ref_23 = reflect aux_ref_23 c2 c h
 
 Problem Name:
 translated_imo_2009_p2
-aux_int_0
-(1.3410274095210222,1.2956875258002656)
-coll aux_int_0 m l, coll aux_int_0 m o
-aux_int_0 = on_line aux_int_0 m l, on_line aux_int_0 m o
-aux_int_1
-(0.24631618602807204,1.1099089962473907)
-coll aux_int_1 m l, coll aux_int_1 l c
-aux_int_1 = on_line aux_int_1 m l, on_line aux_int_1 l c
-aux_int_2
-(0.9031060858843238,0.4895486126290667)
-coll aux_int_2 m k, coll aux_int_2 k b
-aux_int_2 = on_line aux_int_2 m k, on_line aux_int_2 k b
-aux_int_3
-(-0.017747710141879036,0.676873056005876)
-coll aux_int_3 m o, coll aux_int_3 l o
-aux_int_3 = on_line aux_int_3 m o, on_line aux_int_3 l o
-aux_int_4
-(1.5227318740114106,0.8967060579570111)
-coll aux_int_4 m p, coll aux_int_4 l p
-aux_int_4 = on_line aux_int_4 m p, on_line aux_int_4 l p
-aux_int_5
-(1.1593229450306346,1.69466899364352)
-coll aux_int_5 m p, coll aux_int_5 l c
-aux_int_5 = on_line aux_int_5 m p, on_line aux_int_5 l c
-aux_int_6
-(0.2834802977572368,0.08239116730112195)
-coll aux_int_6 m b, coll aux_int_6 k b
-aux_int_6 = on_line aux_int_6 m b, on_line aux_int_6 k b
-aux_int_7
-(-0.6666905729744894,0.5251489988512618)
-coll aux_int_7 m c, coll aux_int_7 l c
-aux_int_7 = on_line aux_int_7 m c, on_line aux_int_7 l c
-aux_int_8
-(0.6449177032373321,0.7477361539610147)
-coll aux_int_8 m a, coll aux_int_8 b a
-aux_int_8 = on_line aux_int_8 m a, on_line aux_int_8 b a
-aux_int_9
-(0.8183076411169486,1.0576300638589091)
-coll aux_int_9 m o, coll aux_int_9 l w
-aux_int_9 = on_line aux_int_9 m o, on_line aux_int_9 l w
 aux_int_10
 (0.6397766027556537,0.7382722595783734)
 coll aux_int_10 l k, coll aux_int_10 b a
@@ -7116,38 +6600,14 @@ aux_ref_3 = reflect aux_ref_3 o q p
 
 Problem Name:
 translated_imo_2010_p2
-aux_int_0
-(0.24631618602807182,1.1099089962473907)
-coll aux_int_0 a b, coll aux_int_0 b c
-aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 b c
 aux_int_1
 (0.9863009735792305,1.2354884940843707)
 coll aux_int_1 a b, coll aux_int_1 o d
 aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 o d
-aux_int_2
-(1.3410274095210228,1.2956875258002656)
-coll aux_int_2 a b, coll aux_int_2 a d
-aux_int_2 = on_line aux_int_2 a b, on_line aux_int_2 a d
-aux_int_3
-(0.9031060858843238,0.4895486126290667)
-coll aux_int_3 a c, coll aux_int_3 b c
-aux_int_3 = on_line aux_int_3 a c, on_line aux_int_3 b c
 aux_int_4
 (1.7442432508068413,2.0379395298091447)
 coll aux_int_4 a c, coll aux_int_4 o d
 aux_int_4 = on_line aux_int_4 a c, on_line aux_int_4 o d
-aux_int_5
-(0.42390808645530886,0.6400701247494812)
-coll aux_int_5 a d, coll aux_int_5 b d
-aux_int_5 = on_line aux_int_5 a d, on_line aux_int_5 b d
-aux_int_6
-(0.8325197837670905,0.9321727250250889)
-coll aux_int_6 a d, coll aux_int_6 f g
-aux_int_6 = on_line aux_int_6 a d, on_line aux_int_6 f g
-aux_int_7
-(0.6855634970256848,0.6950249817194039)
-coll aux_int_7 a f, coll aux_int_7 b c
-aux_int_7 = on_line aux_int_7 a f, on_line aux_int_7 b c
 aux_int_8
 (-0.8746525898674544,-0.7347461257415056)
 coll aux_int_8 a f, coll aux_int_8 o d
@@ -7156,18 +6616,6 @@ aux_int_9
 (0.8875880538132881,0.8801588722868934)
 coll aux_int_9 a f, coll aux_int_9 d g
 aux_int_9 = on_line aux_int_9 a f, on_line aux_int_9 d g
-aux_int_10
-(0.33523204248884486,0.746912704388168)
-coll aux_int_10 a e, coll aux_int_10 e k
-aux_int_10 = on_line aux_int_10 a e, on_line aux_int_10 e k
-aux_int_11
-(0.7590416403963873,0.813598853372246)
-coll aux_int_11 a g, coll aux_int_11 f g
-aux_int_11 = on_line aux_int_11 a g, on_line aux_int_11 f g
-aux_int_12
-(1.3869312097638642,1.1387136543419807)
-coll aux_int_12 a k, coll aux_int_12 e k
-aux_int_12 = on_line aux_int_12 a k, on_line aux_int_12 e k
 aux_int_13
 (0.5470743960814766,0.825832644577053)
 coll aux_int_13 b c, coll aux_int_13 e k
@@ -7200,10 +6648,6 @@ aux_int_20
 (3.2276017623847437,3.608405526666833)
 coll aux_int_20 c k, coll aux_int_20 o d
 aux_int_20 = on_line aux_int_20 c k, on_line aux_int_20 o d
-aux_int_21
-(0.8183076411169483,1.0576300638589091)
-coll aux_int_21 a o, coll aux_int_21 b o
-aux_int_21 = on_line aux_int_21 a o, on_line aux_int_21 b o
 aux_int_22
 (0.6837307555747103,1.0699301355430602)
 coll aux_int_22 b o, cyclic aux_int_22 b c i
@@ -7307,38 +6751,10 @@ aux_ref_9 = reflect aux_ref_9 e i d
 
 Problem Name:
 translated_imo_2010_p4
-aux_int_0
-(0.08571206781558449,1.0815361198162707)
-coll aux_int_0 c m, coll aux_int_0 s m
-aux_int_0 = on_line aux_int_0 c m, on_line aux_int_0 s m
-aux_int_1
-(0.3973775700442842,1.1344274736946565)
-coll aux_int_1 c m, coll aux_int_1 a k
-aux_int_1 = on_line aux_int_1 c m, on_line aux_int_1 a k
-aux_int_2
-(1.1828125871491435,1.2677201260450115)
-coll aux_int_2 c s, coll aux_int_2 c m
-aux_int_2 = on_line aux_int_2 c s, on_line aux_int_2 c m
-aux_int_3
-(0.9102595242399908,0.49299753493705456)
-coll aux_int_3 c s, coll aux_int_3 a b
-aux_int_3 = on_line aux_int_3 c s, on_line aux_int_3 a b
-aux_int_4
-(-0.04596358885407059,1.5772053132222386)
-coll aux_int_4 c a, coll aux_int_4 a k
-aux_int_4 = on_line aux_int_4 c a, on_line aux_int_4 a k
-aux_int_5
-(0.6016499543819886,0.8429126243251701)
-coll aux_int_5 c b, coll aux_int_5 b l
-aux_int_5 = on_line aux_int_5 c b, on_line aux_int_5 b l
 aux_int_6
 (-0.0903931400621818,1.7444523227887943)
 coll aux_int_6 c l, coll aux_int_6 p s
 aux_int_6 = on_line aux_int_6 c l, on_line aux_int_6 p s
-aux_int_7
-(-0.008630964081629111,1.7138377402961953)
-coll aux_int_7 c l, coll aux_int_7 b l
-aux_int_7 = on_line aux_int_7 c l, on_line aux_int_7 b l
 aux_int_8
 (0.594198498823132,1.4881175695725517)
 coll aux_int_8 c l, coll aux_int_8 o m
@@ -7347,10 +6763,6 @@ aux_int_9
 (0.6473831952961717,0.8217608033575221)
 coll aux_int_9 c k, coll aux_int_9 p s
 aux_int_9 = on_line aux_int_9 c k, on_line aux_int_9 p s
-aux_int_10
-(0.6817671689354742,0.8503992267029825)
-coll aux_int_10 c k, coll aux_int_10 a k
-aux_int_10 = on_line aux_int_10 c k, on_line aux_int_10 a k
 aux_int_11
 (21.929532303740313,18.54767003835544)
 coll aux_int_11 c k, coll aux_int_11 o m
@@ -7391,10 +6803,6 @@ aux_int_20
 (0.8110450362599826,1.2046291231782575)
 coll aux_int_20 c m, cyclic aux_int_20 p b k
 aux_int_20 = on_line aux_int_20 c m, on_circum aux_int_20 p b k
-aux_int_21
-(0.5826310818951417,1.4788683608272983)
-coll aux_int_21 c o, coll aux_int_21 p o
-aux_int_21 = on_line aux_int_21 c o, on_line aux_int_21 p o
 aux_int_22
 (0.20587345797501136,1.3739298969550982)
 coll aux_int_22 p s, cyclic aux_int_22 c s m
@@ -7562,14 +6970,6 @@ aux_int_21
 (2.419567881700618,1.7868773045836643)
 coll aux_int_21 a o, coll aux_int_21 a1 x
 aux_int_21 = on_line aux_int_21 a o, on_line aux_int_21 a1 x
-aux_int_22
-(0.8183076411169483,1.0576300638589091)
-coll aux_int_22 a o, coll aux_int_22 o o1
-aux_int_22 = on_line aux_int_22 a o, on_line aux_int_22 o o1
-aux_int_23
-(0.6302302710748001,0.05148363998084626)
-coll aux_int_23 a p1, coll aux_int_23 p1 p2
-aux_int_23 = on_line aux_int_23 a p1, on_line aux_int_23 p1 p2
 aux_int_24
 (0.4128428007317514,0.6508063001997825)
 coll aux_int_24 a p2, coll aux_int_24 b p1
@@ -7582,10 +6982,6 @@ aux_int_26
 (2.691959037025944,2.234283614766031)
 coll aux_int_26 a p2, coll aux_int_26 p p1
 aux_int_26 = on_line aux_int_26 a p2, on_line aux_int_26 p p1
-aux_int_27
-(0.9230220107935402,1.0052670304737832)
-coll aux_int_27 a p2, coll aux_int_27 p1 p2
-aux_int_27 = on_line aux_int_27 a p2, on_line aux_int_27 p1 p2
 aux_int_28
 (-8.221994890284199,-5.348479467215731)
 coll aux_int_28 a p2, coll aux_int_28 b1 c1
@@ -7602,26 +6998,10 @@ aux_int_31
 (1.475613314957421,0.9465102396701166)
 coll aux_int_31 a p3, coll aux_int_31 p p1
 aux_int_31 = on_line aux_int_31 a p3, on_line aux_int_31 p p1
-aux_int_32
-(1.1579700760589087,1.770621826663807)
-coll aux_int_32 a p3, coll aux_int_32 p1 p2
-aux_int_32 = on_line aux_int_32 a p3, on_line aux_int_32 p1 p2
 aux_int_33
 (1.593989526608874,0.63938830002276)
 coll aux_int_33 a p3, coll aux_int_33 b1 c1
 aux_int_33 = on_line aux_int_33 a p3, on_line aux_int_33 b1 c1
-aux_int_34
-(1.1560080741889576,0.3722143814211649)
-coll aux_int_34 a q1, coll aux_int_34 b1 c1
-aux_int_34 = on_line aux_int_34 a q1, on_line aux_int_34 b1 c1
-aux_int_35
-(0.6252963413075121,0.4661288918845139)
-coll aux_int_35 a q2, coll aux_int_35 a1 c1
-aux_int_35 = on_line aux_int_35 a q2, on_line aux_int_35 a1 c1
-aux_int_36
-(0.7047722105840847,2.1876616346935394)
-coll aux_int_36 a q3, coll aux_int_36 a1 b1
-aux_int_36 = on_line aux_int_36 a q3, on_line aux_int_36 a1 b1
 aux_int_37
 (1.38952116210934,0.997443479790331)
 coll aux_int_37 a a1, coll aux_int_37 b b1
@@ -7634,26 +7014,6 @@ aux_int_39
 (1.46093706067698,0.5582247062079528)
 coll aux_int_39 a a1, coll aux_int_39 b1 c1
 aux_int_39 = on_line aux_int_39 a a1, on_line aux_int_39 b1 c1
-aux_int_40
-(1.2824259410336172,1.6560955810848546)
-coll aux_int_40 a a1, coll aux_int_40 a1 c1
-aux_int_40 = on_line aux_int_40 a a1, on_line aux_int_40 a1 c1
-aux_int_41
-(2.0710437412722715,0.9303970704006139)
-coll aux_int_41 a b1, coll aux_int_41 b1 c1
-aux_int_41 = on_line aux_int_41 a b1, on_line aux_int_41 b1 c1
-aux_int_42
-(0.27749496524350903,-0.16368911075409498)
-coll aux_int_42 a c1, coll aux_int_42 b1 c1
-aux_int_42 = on_line aux_int_42 a c1, on_line aux_int_42 b1 c1
-aux_int_43
-(1.0407915832618182,0.6021657106787215)
-coll aux_int_43 a o1, coll aux_int_43 o o1
-aux_int_43 = on_line aux_int_43 a o1, on_line aux_int_43 o o1
-aux_int_44
-(0.566207571394993,1.5737239180294011)
-coll aux_int_44 a x, coll aux_int_44 o o1
-aux_int_44 = on_line aux_int_44 a x, on_line aux_int_44 o o1
 aux_int_45
 (1.0448058091140078,1.4019837007623095)
 coll aux_int_45 a x, coll aux_int_45 p1 p2
@@ -7850,14 +7210,6 @@ aux_int_93
 (0.6781488150048067,1.61097027375994)
 coll aux_int_93 p3 x, coll aux_int_93 q2 q3
 aux_int_93 = on_line aux_int_93 p3 x, on_line aux_int_93 q2 q3
-aux_int_94
-(0.24631618602807204,1.1099089962473907)
-coll aux_int_94 a b, coll aux_int_94 b c
-aux_int_94 = on_line aux_int_94 a b, on_line aux_int_94 b c
-aux_int_95
-(1.3410274095210226,1.2956875258002656)
-coll aux_int_95 a b, coll aux_int_95 a c
-aux_int_95 = on_line aux_int_95 a b, on_line aux_int_95 a c
 aux_int_96
 (-1.0968249608924,0.8819705391439097)
 coll aux_int_96 a b, cyclic aux_int_96 a p q
@@ -7874,10 +7226,6 @@ aux_int_99
 (1.7012980412675183,1.3568274381082719)
 coll aux_int_99 a b, cyclic aux_int_99 b p q3
 aux_int_99 = on_line aux_int_99 a b, on_circum aux_int_99 b p q3
-aux_int_100
-(0.903106085884324,0.4895486126290669)
-coll aux_int_100 a c, coll aux_int_100 b c
-aux_int_100 = on_line aux_int_100 a c, on_line aux_int_100 b c
 aux_int_101
 (0.6050094026911641,-0.059196842864287724)
 coll aux_int_101 a c, cyclic aux_int_101 a p q
@@ -7894,10 +7242,6 @@ aux_int_104
 (1.426891146885389,1.453748109251441)
 coll aux_int_104 a c, cyclic aux_int_104 c p q2
 aux_int_104 = on_line aux_int_104 a c, on_circum aux_int_104 c p q2
-aux_int_105
-(1.3249044003249657,0.7869512227458596)
-coll aux_int_105 a p, coll aux_int_105 b p
-aux_int_105 = on_line aux_int_105 a p, on_line aux_int_105 b p
 aux_int_106
 (1.3431898972477605,1.3639214390929655)
 coll aux_int_106 a p, cyclic aux_int_106 a b p3
@@ -7914,10 +7258,6 @@ aux_int_109
 (1.4118904428372834,3.5316595552246697)
 coll aux_int_109 a p, cyclic aux_int_109 a c c1
 aux_int_109 = on_line aux_int_109 a p, on_circum aux_int_109 a c c1
-aux_int_110
-(1.0346653967031036,0.24374607961023353)
-coll aux_int_110 a q, coll aux_int_110 b q
-aux_int_110 = on_line aux_int_110 a q, on_line aux_int_110 b q
 aux_int_111
 (1.3764570635894553,1.417340733376331)
 coll aux_int_111 a q, cyclic aux_int_111 a b q3
@@ -8713,30 +8053,6 @@ aux_foot_0 = foot aux_foot_0 q1 b c1
 
 Problem Name:
 translated_imo_2012_p1
-aux_int_0
-(0.24631618602807204,1.1099089962473907)
-coll aux_int_0 a b, coll aux_int_0 b c
-aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 b c
-aux_int_1
-(1.3410274095210222,1.2956875258002656)
-coll aux_int_1 a b, coll aux_int_1 a c
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 a c
-aux_int_2
-(-0.10392242080495984,1.0504715738717652)
-coll aux_int_2 a b, coll aux_int_2 c k
-aux_int_2 = on_line aux_int_2 a b, on_line aux_int_2 c k
-aux_int_3
-(0.9031060858843237,0.48954861262906646)
-coll aux_int_3 a c, coll aux_int_3 b c
-aux_int_3 = on_line aux_int_3 a c, on_line aux_int_3 b c
-aux_int_4
-(0.641423176871982,0.007834741939147571)
-coll aux_int_4 a c, coll aux_int_4 b l
-aux_int_4 = on_line aux_int_4 a c, on_line aux_int_4 b l
-aux_int_5
-(0.015296389143526268,0.347967524473873)
-coll aux_int_5 a j, coll aux_int_5 b f
-aux_int_5 = on_line aux_int_5 a j, on_line aux_int_5 b f
 aux_int_6
 (0.5286575428120418,0.7149519472243557)
 coll aux_int_6 a j, coll aux_int_6 l f
@@ -8745,10 +8061,6 @@ aux_int_7
 (0.6698293878106475,0.815870896146009)
 coll aux_int_7 a j, coll aux_int_7 k g
 aux_int_7 = on_line aux_int_7 a j, on_line aux_int_7 k g
-aux_int_8
-(0.5045733286098601,0.8659763473450932)
-coll aux_int_8 a m, coll aux_int_8 b c
-aux_int_8 = on_line aux_int_8 a m, on_line aux_int_8 b c
 aux_int_9
 (0.11106186099874793,0.6638178782291363)
 coll aux_int_9 a m, coll aux_int_9 b f
@@ -8765,14 +8077,6 @@ aux_int_12
 (0.7833913555802473,1.0092134068301506)
 coll aux_int_12 a m, coll aux_int_12 f t
 aux_int_12 = on_line aux_int_12 a m, on_line aux_int_12 f t
-aux_int_13
-(-0.5608963457025615,1.872348668287923)
-coll aux_int_13 a f, coll aux_int_13 b c
-aux_int_13 = on_line aux_int_13 a f, on_line aux_int_13 b c
-aux_int_14
-(0.3900655319092293,1.5840180970440947)
-coll aux_int_14 a f, coll aux_int_14 b f
-aux_int_14 = on_line aux_int_14 a f, on_line aux_int_14 b f
 aux_int_15
 (2.9324438522056933,0.8131718510831669)
 coll aux_int_15 a f, coll aux_int_15 c g
@@ -8789,18 +8093,10 @@ aux_int_18
 (-0.7275831939395128,1.9228879331128095)
 coll aux_int_18 a f, coll aux_int_18 l k
 aux_int_18 = on_line aux_int_18 a f, on_line aux_int_18 l k
-aux_int_19
-(1.570043002922284,-0.14039597359773848)
-coll aux_int_19 a g, coll aux_int_19 b c
-aux_int_19 = on_line aux_int_19 a g, on_line aux_int_19 b c
 aux_int_20
 (0.9831200635573363,3.5400099591256806)
 coll aux_int_20 a g, coll aux_int_20 b f
 aux_int_20 = on_line aux_int_20 a g, on_line aux_int_20 b f
-aux_int_21
-(1.4555352062216533,0.5776457761012634)
-coll aux_int_21 a g, coll aux_int_21 c g
-aux_int_21 = on_line aux_int_21 a g, on_line aux_int_21 c g
 aux_int_22
 (1.278831059756183,1.6857009318462712)
 coll aux_int_22 a g, coll aux_int_22 j m
@@ -9272,42 +8568,10 @@ aux_ref_24 = reflect aux_ref_24 t m k
 
 Problem Name:
 translated_imo_2012_p5
-aux_int_0
-(1.195291655077993,0.40666591039510597)
-coll aux_int_0 a c, coll aux_int_0 a b
-aux_int_0 = on_line aux_int_0 a c, on_line aux_int_0 a b
-aux_int_1
-(1.0417973089406787,1.3111406301791568)
-coll aux_int_1 a c, coll aux_int_1 c d
-aux_int_1 = on_line aux_int_1 a c, on_line aux_int_1 c d
-aux_int_2
-(0.660064822433217,0.8445798624836037)
-coll aux_int_2 a b, coll aux_int_2 c d
-aux_int_2 = on_line aux_int_2 a b, on_line aux_int_2 c d
-aux_int_3
-(0.25336071741474697,1.1773385941024606)
-coll aux_int_3 a b, coll aux_int_3 b l
-aux_int_3 = on_line aux_int_3 a b, on_line aux_int_3 b l
 aux_int_4
 (-6.146715094666382,6.413777280640735)
 coll aux_int_4 a b, coll aux_int_4 x m
 aux_int_4 = on_line aux_int_4 a b, on_line aux_int_4 x m
-aux_int_5
-(0.8230427715465107,1.043774638258232)
-coll aux_int_5 a k, coll aux_int_5 c d
-aux_int_5 = on_line aux_int_5 a k, on_line aux_int_5 c d
-aux_int_6
-(0.27797257693428423,1.976669251644313)
-coll aux_int_6 a k, coll aux_int_6 c k
-aux_int_6 = on_line aux_int_6 a k, on_line aux_int_6 c k
-aux_int_7
-(0.2625450502568746,1.4756223870825642)
-coll aux_int_7 a l, coll aux_int_7 c m
-aux_int_7 = on_line aux_int_7 a l, on_line aux_int_7 c m
-aux_int_8
-(0.5921243908715081,1.0979142625914977)
-coll aux_int_8 a l, coll aux_int_8 b l
-aux_int_8 = on_line aux_int_8 a l, on_line aux_int_8 b l
 aux_int_9
 (0.619881053535061,1.3914885185117245)
 coll aux_int_9 a k, cyclic aux_int_9 a c b
@@ -9363,30 +8627,10 @@ aux_ref_3 = reflect aux_ref_3 x a b
 
 Problem Name:
 translated_imo_2013_p4
-aux_int_0
-(0.7823886429669759,1.2008834474511858)
-coll aux_int_0 a b, coll aux_int_0 c h
-aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 c h
-aux_int_1
-(1.341027409521024,1.2956875258002658)
-coll aux_int_1 a b, coll aux_int_1 a c
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 a c
-aux_int_2
-(0.24631618602807226,1.1099089962473907)
-coll aux_int_2 a b, coll aux_int_2 b c
-aux_int_2 = on_line aux_int_2 a b, on_line aux_int_2 b c
 aux_int_3
 (0.03861825564684973,1.0746615124641505)
 coll aux_int_3 a b, coll aux_int_3 o2 y
 aux_int_3 = on_line aux_int_3 a b, on_line aux_int_3 o2 y
-aux_int_4
-(1.013661186290724,0.6930618093536108)
-coll aux_int_4 a c, coll aux_int_4 b h
-aux_int_4 = on_line aux_int_4 a c, on_line aux_int_4 b h
-aux_int_5
-(0.9031060858843238,0.4895486126290668)
-coll aux_int_5 a c, coll aux_int_5 b c
-aux_int_5 = on_line aux_int_5 a c, on_line aux_int_5 b c
 aux_int_6
 (0.7160546342160672,0.14521860215431093)
 coll aux_int_6 a c, coll aux_int_6 o1 x
@@ -9395,10 +8639,6 @@ aux_int_7
 (0.7321337912986009,0.6510377559312369)
 coll aux_int_7 a h, coll aux_int_7 b c
 aux_int_7 = on_line aux_int_7 a h, on_line aux_int_7 b c
-aux_int_8
-(0.8538343991995218,0.7798850069589051)
-coll aux_int_8 a h, coll aux_int_8 b h
-aux_int_8 = on_line aux_int_8 a h, on_line aux_int_8 b h
 aux_int_9
 (0.6345603852063328,0.5477345320177601)
 coll aux_int_9 a h, coll aux_int_9 o1 x
@@ -9407,30 +8647,10 @@ aux_int_10
 (0.7713584551885182,0.6925658156662765)
 coll aux_int_10 a h, coll aux_int_10 o2 y
 aux_int_10 = on_line aux_int_10 a h, on_line aux_int_10 o2 y
-aux_int_11
-(0.5856289098682382,0.7894165959012007)
-coll aux_int_11 a w, coll aux_int_11 b c
-aux_int_11 = on_line aux_int_11 a w, on_line aux_int_11 b c
 aux_int_12
 (0.766295650900802,0.9105001286675904)
 coll aux_int_12 a w, coll aux_int_12 h x
 aux_int_12 = on_line aux_int_12 a w, on_line aux_int_12 h x
-aux_int_13
-(0.5289650225752449,1.0692905448063867)
-coll aux_int_13 a o1, coll aux_int_13 o1 x
-aux_int_13 = on_line aux_int_13 a o1, on_line aux_int_13 o1 x
-aux_int_14
-(0.7868675681823694,0.6844784126006207)
-coll aux_int_14 a o2, coll aux_int_14 o2 y
-aux_int_14 = on_line aux_int_14 a o2, on_line aux_int_14 o2 y
-aux_int_15
-(0.4723011352822468,1.349164493711573)
-coll aux_int_15 a x, coll aux_int_15 h x
-aux_int_15 = on_line aux_int_15 a x, on_line aux_int_15 h x
-aux_int_16
-(0.9881062264965006,0.579540229300039)
-coll aux_int_16 a y, coll aux_int_16 h x
-aux_int_16 = on_line aux_int_16 a y, on_line aux_int_16 h x
 aux_int_17
 (0.6706290504804157,0.8794082125721734)
 coll aux_int_17 b h, coll aux_int_17 c o2
@@ -9822,46 +9042,14 @@ aux_ref_22 = reflect aux_ref_22 y b w
 
 Problem Name:
 translated_imo_2014_p4
-aux_int_0
-(-0.6925725954960072,0.23348587299435308)
-coll aux_int_0 a b, coll aux_int_0 b c
-aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 b c
-aux_int_1
-(0.3626106469278113,-0.28438188360361394)
-coll aux_int_1 a b, coll aux_int_1 a m
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 a m
 aux_int_2
 (-1.7477558379198266,0.7513536295923205)
 coll aux_int_2 a b, coll aux_int_2 m n
 aux_int_2 = on_line aux_int_2 a b, on_line aux_int_2 m n
-aux_int_3
-(-0.3032227182574214,-2.3949755573843956)
-coll aux_int_3 a c, coll aux_int_3 b c
-aux_int_3 = on_line aux_int_3 a c, on_line aux_int_3 b c
 aux_int_4
 (-0.9690560834426524,-4.505569231165172)
 coll aux_int_4 a c, coll aux_int_4 m n
 aux_int_4 = on_line aux_int_4 a c, on_line aux_int_4 m n
-aux_int_5
-(-0.6163835601672656,-0.2808585572637972)
-coll aux_int_5 a m, coll aux_int_5 b c
-aux_int_5 = on_line aux_int_5 a m, on_line aux_int_5 b c
-aux_int_6
-(-1.5953777672623426,-0.2773352309239805)
-coll aux_int_6 a m, coll aux_int_6 b m
-aux_int_6 = on_line aux_int_6 a m, on_line aux_int_6 b m
-aux_int_7
-(-0.5733223542450155,-0.5715603797864592)
-coll aux_int_7 a n, coll aux_int_7 b c
-aux_int_7 = on_line aux_int_7 a n, on_line aux_int_7 b c
-aux_int_8
-(-1.5092553554178418,-0.8587388759693042)
-coll aux_int_8 a n, coll aux_int_8 b n
-aux_int_8 = on_line aux_int_8 a n, on_line aux_int_8 b n
-aux_int_9
-(-1.8517917392524992,-0.42241821485929754)
-coll aux_int_9 a x, coll aux_int_9 b m
-aux_int_9 = on_line aux_int_9 a x, on_line aux_int_9 b m
 aux_int_10
 (6.981203962532515,-3.532686002150084)
 coll aux_int_10 a b, cyclic aux_int_10 a p x
@@ -9894,10 +9082,6 @@ aux_int_17
 (-0.49968270691419936,-0.3381335467039346)
 coll aux_int_17 a x, cyclic aux_int_17 b q n
 aux_int_17 = on_line aux_int_17 a x, on_circum aux_int_17 b q n
-aux_int_18
-(-0.6974087727412094,-1.1102981114847217)
-coll aux_int_18 a o, coll aux_int_18 b o
-aux_int_18 = on_line aux_int_18 a o, on_line aux_int_18 b o
 aux_int_19
 (-0.76262929540793,-1.161114810746846)
 coll aux_int_19 a o, cyclic aux_int_19 p m o
@@ -10021,18 +9205,10 @@ aux_int_0
 (0.7823886429669759,1.2008834474511858)
 coll aux_int_0 a b, coll aux_int_0 c h
 aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 c h
-aux_int_1
-(0.24631618602807204,1.1099089962473907)
-coll aux_int_1 a b, coll aux_int_1 b c
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 b c
 aux_int_2
 (2.43376679001061,1.48113142272509)
 coll aux_int_2 a b, coll aux_int_2 c q
 aux_int_2 = on_line aux_int_2 a b, on_line aux_int_2 c q
-aux_int_3
-(1.3410274095210237,1.2956875258002658)
-coll aux_int_3 a b, coll aux_int_3 a f
-aux_int_3 = on_line aux_int_3 a b, on_line aux_int_3 a f
 aux_int_4
 (-0.944858671693668,0.9077600561809833)
 coll aux_int_4 a b, coll aux_int_4 h m
@@ -10049,10 +9225,6 @@ aux_int_7
 (1.013661186290724,0.6930618093536108)
 coll aux_int_7 a c, coll aux_int_7 b h
 aux_int_7 = on_line aux_int_7 a c, on_line aux_int_7 b h
-aux_int_8
-(0.9031060858843237,0.48954861262906646)
-coll aux_int_8 a c, coll aux_int_8 b c
-aux_int_8 = on_line aux_int_8 a c, on_line aux_int_8 b c
 aux_int_9
 (1.0841050412111353,0.8227370034582056)
 coll aux_int_9 a c, coll aux_int_9 b q
@@ -10069,14 +9241,6 @@ aux_int_12
 (1.0619866536818263,0.7820208018905268)
 coll aux_int_12 a c, coll aux_int_12 o o1
 aux_int_12 = on_line aux_int_12 a c, on_line aux_int_12 o o1
-aux_int_13
-(0.7321337912986009,0.6510377559312369)
-coll aux_int_13 a f, coll aux_int_13 b c
-aux_int_13 = on_line aux_int_13 a f, on_line aux_int_13 b c
-aux_int_14
-(0.8538343991995218,0.7798850069589051)
-coll aux_int_14 a f, coll aux_int_14 h m
-aux_int_14 = on_line aux_int_14 a f, on_line aux_int_14 h m
 aux_int_15
 (1.6263419444836336,1.5977566291698946)
 coll aux_int_15 a f, coll aux_int_15 m o2
@@ -10085,10 +9249,6 @@ aux_int_16
 (0.9184966261500958,0.8483444036012913)
 coll aux_int_16 a f, coll aux_int_16 o k
 aux_int_16 = on_line aux_int_16 a f, on_line aux_int_16 o k
-aux_int_17
-(0.574711135956198,0.7997288044382287)
-coll aux_int_17 a m, coll aux_int_17 b c
-aux_int_17 = on_line aux_int_17 a m, on_line aux_int_17 b c
 aux_int_18
 (0.2955878727128738,0.8195726019175524)
 coll aux_int_18 a o, coll aux_int_18 h m
@@ -10097,10 +9257,6 @@ aux_int_19
 (1.259766555099849,0.15267067715463223)
 coll aux_int_19 a q, coll aux_int_19 b c
 aux_int_19 = on_line aux_int_19 a q, on_line aux_int_19 b c
-aux_int_20
-(1.3020916911649716,0.7480169110609356)
-coll aux_int_20 a q, coll aux_int_20 h m
-aux_int_20 = on_line aux_int_20 a q, on_line aux_int_20 h m
 aux_int_21
 (1.2864595117935604,0.5281343546954208)
 coll aux_int_21 a q, coll aux_int_21 o o1
@@ -10109,18 +9265,6 @@ aux_int_22
 (1.1274905605340901,0.7079336524328299)
 coll aux_int_22 a k, coll aux_int_22 o o1
 aux_int_22 = on_line aux_int_22 a k, on_line aux_int_22 o o1
-aux_int_23
-(1.0663182144334318,0.5395585755586951)
-coll aux_int_23 a k, coll aux_int_23 k o1
-aux_int_23 = on_line aux_int_23 a k, on_line aux_int_23 k o1
-aux_int_24
-(1.0779630451822468,0.7639509590099203)
-coll aux_int_24 a o1, coll aux_int_24 h m
-aux_int_24 = on_line aux_int_24 a o1, on_line aux_int_24 h m
-aux_int_25
-(1.1005265402199158,1.1987427168040616)
-coll aux_int_25 a o2, coll aux_int_25 k o1
-aux_int_25 = on_line aux_int_25 a o2, on_line aux_int_25 k o1
 aux_int_26
 (0.9546697622194709,0.4408449677663123)
 coll aux_int_26 b c, coll aux_int_26 q k
@@ -10229,10 +9373,6 @@ aux_int_52
 (0.3642916928391028,0.8508617515413761)
 coll aux_int_52 a o, cyclic aux_int_52 a b f
 aux_int_52 = on_line aux_int_52 a o, on_circum aux_int_52 a b f
-aux_int_53
-(0.8183076411169483,1.0576300638589091)
-coll aux_int_53 a o, coll aux_int_53 b o
-aux_int_53 = on_line aux_int_53 a o, on_line aux_int_53 b o
 aux_int_54
 (0.6742654823786463,0.9920302668080216)
 coll aux_int_54 a o, cyclic aux_int_54 a c f
@@ -10576,18 +9716,6 @@ aux_ref_15 = reflect aux_ref_15 o1 q k
 
 Problem Name:
 translated_imo_2015_p4
-aux_int_0
-(-0.5498756539435156,-0.959419206440028)
-coll aux_int_0 a b, coll aux_int_0 b c
-aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 b c
-aux_int_1
-(-0.18103347838955816,0.7004440105791959)
-coll aux_int_1 a b, coll aux_int_1 c k
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 c k
-aux_int_2
-(-0.33714450208476804,-0.002086673754078337)
-coll aux_int_2 a b, coll aux_int_2 a c
-aux_int_2 = on_line aux_int_2 a b, on_line aux_int_2 a c
 aux_int_3
 (-0.24398223423698615,0.41716207778139863)
 coll aux_int_3 a b, coll aux_int_3 o o1
@@ -10604,14 +9732,6 @@ aux_int_6
 (-0.7884605565831537,-2.033098764459323)
 coll aux_int_6 a b, coll aux_int_6 f g
 aux_int_6 = on_line aux_int_6 a b, on_line aux_int_6 f g
-aux_int_7
-(1.124222598411649,-1.2399090941948718)
-coll aux_int_7 a c, coll aux_int_7 b c
-aux_int_7 = on_line aux_int_7 a c, on_line aux_int_7 b c
-aux_int_8
-(-2.2164661668995924,1.5897559858608048)
-coll aux_int_8 a c, coll aux_int_8 b l
-aux_int_8 = on_line aux_int_8 a c, on_line aux_int_8 b l
 aux_int_9
 (0.35055431337481713,-0.5845885050853616)
 coll aux_int_9 a c, coll aux_int_9 o o2
@@ -10636,10 +9756,6 @@ aux_int_14
 (-3.098489820151144,2.598481862921784)
 coll aux_int_14 a o, coll aux_int_14 b g
 aux_int_14 = on_line aux_int_14 a o, on_line aux_int_14 b g
-aux_int_15
-(-2.531325306212076,2.0643399791019688)
-coll aux_int_15 a o, coll aux_int_15 b x
-aux_int_15 = on_line aux_int_15 a o, on_line aux_int_15 b x
 aux_int_16
 (1.1281719560490355,-1.3820864341478578)
 coll aux_int_16 a o, coll aux_int_16 c f
@@ -10676,18 +9792,10 @@ aux_int_24
 (-1.9552490204921347,1.521805203184326)
 coll aux_int_24 a o, coll aux_int_24 o2 l
 aux_int_24 = on_line aux_int_24 a o, on_line aux_int_24 o2 l
-aux_int_25
-(0.5265828481372871,-1.1397764369649512)
-coll aux_int_25 a d, coll aux_int_25 b c
-aux_int_25 = on_line aux_int_25 a d, on_line aux_int_25 b c
 aux_int_26
 (1.8681416996386961,-2.9068592689555075)
 coll aux_int_26 a d, coll aux_int_26 c o2
 aux_int_26 = on_line aux_int_26 a d, on_line aux_int_26 c o2
-aux_int_27
-(-1.524525907384537,-0.7961196272168224)
-coll aux_int_27 a e, coll aux_int_27 b c
-aux_int_27 = on_line aux_int_27 a e, on_line aux_int_27 b c
 aux_int_28
 (1.483160998436989,1.2151991506090414)
 coll aux_int_28 a e, coll aux_int_28 b o1
@@ -10704,10 +9812,6 @@ aux_int_31
 (4.351521749811154,-0.11878392313122818)
 coll aux_int_31 a f, coll aux_int_31 o2 l
 aux_int_31 = on_line aux_int_31 a f, on_line aux_int_31 o2 l
-aux_int_32
-(1.0908260035477217,-0.03762774689649428)
-coll aux_int_32 a f, coll aux_int_32 f k
-aux_int_32 = on_line aux_int_32 a f, on_line aux_int_32 f k
 aux_int_33
 (-1.3053489523342727,11.383175117801771)
 coll aux_int_33 a g, coll aux_int_33 o o2
@@ -10720,10 +9824,6 @@ aux_int_35
 (-0.4733107790831227,1.599113062942308)
 coll aux_int_35 a g, coll aux_int_35 o1 k
 aux_int_35 = on_line aux_int_35 a g, on_line aux_int_35 o1 k
-aux_int_36
-(-0.21610892494093797,-1.4253622345299517)
-coll aux_int_36 a g, coll aux_int_36 g l
-aux_int_36 = on_line aux_int_36 a g, on_line aux_int_36 g l
 aux_int_37
 (2.546045874741294,-1.478131104536185)
 coll aux_int_37 a o1, coll aux_int_37 b c
@@ -10796,10 +9896,6 @@ aux_int_54
 (-0.6831059456042241,-0.7214623528811256)
 coll aux_int_54 a o2, coll aux_int_54 g l
 aux_int_54 = on_line aux_int_54 a o2, on_line aux_int_54 g l
-aux_int_55
-(0.360920357172133,-0.6595073511555435)
-coll aux_int_55 a o, coll aux_int_55 b o
-aux_int_55 = on_line aux_int_55 a o, on_line aux_int_55 b o
 aux_int_56
 (0.6415730932835665,-1.1590426902500297)
 coll aux_int_56 b c, coll aux_int_56 o o1
@@ -11024,18 +10120,10 @@ aux_int_111
 (-0.6169478080108333,3.2881624955098205)
 coll aux_int_111 a g, cyclic aux_int_111 a e o2
 aux_int_111 = on_line aux_int_111 a g, on_circum aux_int_111 a e o2
-aux_int_112
-(0.12428179837973174,-0.23831308685926647)
-coll aux_int_112 a o1, coll aux_int_112 b o1
-aux_int_112 = on_line aux_int_112 a o1, on_line aux_int_112 b o1
 aux_int_113
 (-1.549045590979498,0.6183440363716416)
 coll aux_int_113 a o1, cyclic aux_int_113 a f x
 aux_int_113 = on_line aux_int_113 a o1, on_circum aux_int_113 a f x
-aux_int_114
-(0.134315135777688,0.9782439484044647)
-coll aux_int_114 a o2, coll aux_int_114 b o2
-aux_int_114 = on_line aux_int_114 a o2, on_line aux_int_114 b o2
 aux_int_115
 (-2.2164123499465895,-3.909746355608755)
 coll aux_int_115 a o2, cyclic aux_int_115 a g x
@@ -11451,14 +10539,6 @@ aux_ref_18 = reflect aux_ref_18 x f g
 
 Problem Name:
 translated_imo_2016_p1
-aux_int_0
-(-0.5944138547552881,0.49807820167624384)
-coll aux_int_0 a b, coll aux_int_0 a d
-aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 a d
-aux_int_1
-(-1.4568779978190274,1.0818174942383143)
-coll aux_int_1 a b, coll aux_int_1 b e
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 b e
 aux_int_2
 (-1.3244882999528695,0.9922125301404785)
 coll aux_int_2 a b, coll aux_int_2 f x
@@ -11475,10 +10555,6 @@ aux_int_5
 (0.45908974151586035,-0.2149618115750302)
 coll aux_int_5 a b, coll aux_int_5 m x
 aux_int_5 = on_line aux_int_5 a b, on_line aux_int_5 m x
-aux_int_6
-(-1.6762135016220805,-0.17125386231927536)
-coll aux_int_6 a d, coll aux_int_6 b d
-aux_int_6 = on_line aux_int_6 a d, on_line aux_int_6 b d
 aux_int_7
 (-2.7580131484888613,-0.8405859263147872)
 coll aux_int_7 a d, coll aux_int_7 b x
@@ -11495,30 +10571,10 @@ aux_int_10
 (-0.7905844361836671,0.3767033606481933)
 coll aux_int_10 a d, coll aux_int_10 m x
 aux_int_10 = on_line aux_int_10 a d, on_line aux_int_10 m x
-aux_int_11
-(-0.6227099053509327,-0.8842938755705498)
-coll aux_int_11 a c, coll aux_int_11 b c
-aux_int_11 = on_line aux_int_11 a c, on_line aux_int_11 b c
 aux_int_12
 (-0.46666888574846366,6.738916567683804)
 coll aux_int_12 a c, coll aux_int_12 b d
 aux_int_12 = on_line aux_int_12 a c, on_line aux_int_12 b d
-aux_int_13
-(-0.5748047869618628,1.456057396929823)
-coll aux_int_13 a c, coll aux_int_13 b e
-aux_int_13 = on_line aux_int_13 a c, on_line aux_int_13 b e
-aux_int_14
-(-0.5987573461563979,0.28588176067963456)
-coll aux_int_14 a c, coll aux_int_14 b m
-aux_int_14 = on_line aux_int_14 a c, on_line aux_int_14 b m
-aux_int_15
-(0.47981268703305835,1.1627246271917613)
-coll aux_int_15 a d, coll aux_int_15 b z
-aux_int_15 = on_line aux_int_15 a d, on_line aux_int_15 b z
-aux_int_16
-(-1.652260942427546,0.9989217739309086)
-coll aux_int_16 a e, coll aux_int_16 b e
-aux_int_16 = on_line aux_int_16 a e, on_line aux_int_16 b e
 aux_int_17
 (-1.0705988986007775,0.723530652406731)
 coll aux_int_17 a e, coll aux_int_17 b m
@@ -11539,14 +10595,6 @@ aux_int_21
 (-1.1255091442919718,0.6424017673052715)
 coll aux_int_21 a x, coll aux_int_21 f d
 aux_int_21 = on_line aux_int_21 a x, on_line aux_int_21 f d
-aux_int_22
-(-1.656604433828655,0.7867253329342989)
-coll aux_int_22 a x, coll aux_int_22 f x
-aux_int_22 = on_line aux_int_22 a x, on_line aux_int_22 f x
-aux_int_23
-(-1.4905463668907628,0.8894689315373887)
-coll aux_int_23 a y, coll aux_int_23 b d
-aux_int_23 = on_line aux_int_23 a y, on_line aux_int_23 b d
 aux_int_24
 (-6.432346651700239,3.0478269802711355)
 coll aux_int_24 a y, coll aux_int_24 c d
@@ -12070,22 +11118,10 @@ aux_ref_24 = reflect aux_ref_24 y f e
 
 Problem Name:
 translated_imo_2017_p4
-aux_int_0
-(0.6095221301450753,0.4911465662594867)
-coll aux_int_0 r s, coll aux_int_0 t o
-aux_int_0 = on_line aux_int_0 r s, on_line aux_int_0 t o
 aux_int_1
 (0.8594936061730205,0.5153781411786091)
 coll aux_int_1 r s, coll aux_int_1 o o1
 aux_int_1 = on_line aux_int_1 r s, on_line aux_int_1 o o1
-aux_int_2
-(0.9105153205667765,0.5203240514659739)
-coll aux_int_2 r s, coll aux_int_2 a b
-aux_int_2 = on_line aux_int_2 r s, on_line aux_int_2 a b
-aux_int_3
-(0.7600187253559259,0.5057353088627303)
-coll aux_int_3 r s, coll aux_int_3 s o
-aux_int_3 = on_line aux_int_3 r s, on_line aux_int_3 s o
 aux_int_4
 (0.8648764958907177,0.45923927551609095)
 coll aux_int_4 r o, coll aux_int_4 s b
@@ -12102,22 +11138,10 @@ aux_int_7
 (0.8705745842983325,0.5735085959450041)
 coll aux_int_7 r j, coll aux_int_7 o o1
 aux_int_7 = on_line aux_int_7 r j, on_line aux_int_7 o o1
-aux_int_8
-(0.9484453502508132,0.46981693669314506)
-coll aux_int_8 r j, coll aux_int_8 a k
-aux_int_8 = on_line aux_int_8 r j, on_line aux_int_8 a k
-aux_int_9
-(1.1782691270739623,0.32027471279679903)
-coll aux_int_9 a b, coll aux_int_9 s b
-aux_int_9 = on_line aux_int_9 a b, on_line aux_int_9 s b
 aux_int_10
 (0.8706294890937234,0.5501243157928988)
 coll aux_int_10 a b, coll aux_int_10 t k
 aux_int_10 = on_line aux_int_10 a b, on_line aux_int_10 t k
-aux_int_11
-(1.02010805021459,0.4384430378027512)
-coll aux_int_11 a b, coll aux_int_11 a k
-aux_int_11 = on_line aux_int_11 a b, on_line aux_int_11 a k
 aux_int_12
 (0.2154268374843863,0.6095468276436818)
 coll aux_int_12 r k, coll aux_int_12 s j
@@ -12130,10 +11154,6 @@ aux_int_14
 (1.6459782670423135,0.42591873839073724)
 coll aux_int_14 r k, coll aux_int_14 t j
 aux_int_14 = on_line aux_int_14 r k, on_line aux_int_14 t j
-aux_int_15
-(0.8009573967394311,0.5343870986233571)
-coll aux_int_15 r k, coll aux_int_15 a k
-aux_int_15 = on_line aux_int_15 r k, on_line aux_int_15 a k
 aux_int_16
 (0.8530664160934129,0.4816613087859696)
 coll aux_int_16 s a, coll aux_int_16 o o1
@@ -12174,10 +11194,6 @@ aux_int_25
 (0.9192669371270334,0.2435454028349878)
 coll aux_int_25 o k, coll aux_int_25 o1 a
 aux_int_25 = on_line aux_int_25 o k, on_line aux_int_25 o1 a
-aux_int_26
-(0.8432829690452587,0.430337660308314)
-coll aux_int_26 r o, coll aux_int_26 s o
-aux_int_26 = on_line aux_int_26 r o, on_line aux_int_26 s o
 aux_int_27
 (0.5305527918511517,0.011767442029000375)
 coll aux_int_27 r o, cyclic aux_int_27 r o1 a
@@ -12186,10 +11202,6 @@ aux_int_28
 (0.6668790017084758,0.19423173738145705)
 coll aux_int_28 r o, cyclic aux_int_28 s t o
 aux_int_28 = on_line aux_int_28 r o, on_circum aux_int_28 s t o
-aux_int_29
-(0.7425817817333219,-0.09793752873724448)
-coll aux_int_29 r o1, coll aux_int_29 s o1
-aux_int_29 = on_line aux_int_29 r o1, on_line aux_int_29 s o1
 aux_int_30
 (0.8918074881590103,0.4514495782252644)
 coll aux_int_30 r o1, cyclic aux_int_30 s t o1
@@ -12273,26 +11285,6 @@ aux_ref_6 = reflect aux_ref_6 k r o
 
 Problem Name:
 translated_imo_2018_p1
-aux_int_0
-(0.6662453159466735,1.1811732845806857)
-coll aux_int_0 a b, coll aux_int_0 c d
-aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 c d
-aux_int_1
-(1.341027409521023,1.2956875258002656)
-coll aux_int_1 a b, coll aux_int_1 a c
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 a c
-aux_int_2
-(1.6677379975792208,1.8971063290491692)
-coll aux_int_2 a c, coll aux_int_2 b e
-aux_int_2 = on_line aux_int_2 a c, on_line aux_int_2 b e
-aux_int_3
-(0.24631618602807204,1.109908996247391)
-coll aux_int_3 a b, coll aux_int_3 b c
-aux_int_3 = on_line aux_int_3 a b, on_line aux_int_3 b c
-aux_int_4
-(0.9031060858843233,0.48954861262906724)
-coll aux_int_4 a c, coll aux_int_4 b c
-aux_int_4 = on_line aux_int_4 a c, on_line aux_int_4 b c
 aux_int_5
 (0.2457429887485656,1.4820513269251174)
 coll aux_int_5 a f, coll aux_int_5 e g
@@ -12309,18 +11301,6 @@ aux_int_8
 (0.8500282200339939,0.9893494607301849)
 coll aux_int_8 o g, coll aux_int_8 d f
 aux_int_8 = on_line aux_int_8 o g, on_line aux_int_8 d f
-aux_int_9
-(0.8183076411169483,1.0576300638589091)
-coll aux_int_9 a o, coll aux_int_9 b o
-aux_int_9 = on_line aux_int_9 a o, on_line aux_int_9 b o
-aux_int_10
-(0.40373523370834885,1.4551687795606727)
-coll aux_int_10 a f, coll aux_int_10 b f
-aux_int_10 = on_line aux_int_10 a f, on_line aux_int_10 b f
-aux_int_11
-(0.5763131634171962,1.5785388699173146)
-coll aux_int_11 a g, coll aux_int_11 b g
-aux_int_11 = on_line aux_int_11 a g, on_line aux_int_11 b g
 aux_int_12
 (0.4149620925200396,1.0015394575232348)
 coll aux_int_12 d e, cyclic aux_int_12 b d f
@@ -12356,14 +11336,6 @@ aux_ref_1 = reflect aux_ref_1 c o g
 
 Problem Name:
 translated_imo_2019_p2
-aux_int_0
-(-1.1210379870781657,-0.4550801623700962)
-coll aux_int_0 a b, coll aux_int_0 b a1
-aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 b a1
-aux_int_1
-(-1.0803258848114194,-1.1351419806886531)
-coll aux_int_1 a b, coll aux_int_1 a b1
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 a b1
 aux_int_2
 (-1.0506388421218058,-1.6310393455488725)
 coll aux_int_2 a b, coll aux_int_2 a1 q
@@ -12372,14 +11344,6 @@ aux_int_3
 (-1.1637523377078476,0.2584275500833755)
 coll aux_int_3 a b, coll aux_int_3 b1 p
 aux_int_3 = on_line aux_int_3 a b, on_line aux_int_3 b1 p
-aux_int_4
-(-0.39660388672133073,-0.5599612856498121)
-coll aux_int_4 a b1, coll aux_int_4 b a1
-aux_int_4 = on_line aux_int_4 a b1, on_line aux_int_4 b a1
-aux_int_5
-(-0.8220780666553186,-0.9178911682908947)
-coll aux_int_5 a b1, coll aux_int_5 b b1
-aux_int_5 = on_line aux_int_5 a b1, on_line aux_int_5 b b1
 aux_int_6
 (-0.9182240725445623,-0.9987739344547194)
 coll aux_int_6 a b1, coll aux_int_6 a1 q
@@ -12388,26 +11352,6 @@ aux_int_7
 (-0.8737469393195658,-0.9613575744821714)
 coll aux_int_7 a b1, coll aux_int_7 p q
 aux_int_7 = on_line aux_int_7 a b1, on_line aux_int_7 p q
-aux_int_8
-(-0.8136780676510718,-0.4995786938235409)
-coll aux_int_8 a a1, coll aux_int_8 b a1
-aux_int_8 = on_line aux_int_8 a a1, on_line aux_int_8 b a1
-aux_int_9
-(-0.8904384676442307,-0.682539471977579)
-coll aux_int_9 a a1, coll aux_int_9 b p
-aux_int_9 = on_line aux_int_9 a a1, on_line aux_int_9 b p
-aux_int_10
-(-0.8818924037921558,-0.8252943630079954)
-coll aux_int_10 a q, coll aux_int_10 b b1
-aux_int_10 = on_line aux_int_10 a q, on_line aux_int_10 b b1
-aux_int_11
-(-0.7793505755872739,-1.0649936919245315)
-coll aux_int_11 a p1, coll aux_int_11 b1 p
-aux_int_11 = on_line aux_int_11 a p1, on_line aux_int_11 b1 p
-aux_int_12
-(-0.7904707765690788,-0.3887665277548731)
-coll aux_int_12 a q1, coll aux_int_12 a1 q
-aux_int_12 = on_line aux_int_12 a q1, on_line aux_int_12 a1 q
 aux_int_13
 (-0.9492838518246735,-0.4799461462110688)
 coll aux_int_13 b a1, coll aux_int_13 b1 p
@@ -12467,30 +11411,10 @@ aux_int_26 = on_line aux_int_26 a1 b1, on_circum aux_int_26 c b1 p1
 
 Problem Name:
 translated_imo_2019_p6
-aux_int_0
-(0.24631618602807204,1.1099089962473907)
-coll aux_int_0 a b, coll aux_int_0 b c
-aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 b c
-aux_int_1
-(1.3410274095210235,1.2956875258002658)
-coll aux_int_1 a b, coll aux_int_1 a c
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 a c
-aux_int_2
-(0.7867912965700028,1.2016306020385767)
-coll aux_int_2 a b, coll aux_int_2 c f
-aux_int_2 = on_line aux_int_2 a b, on_line aux_int_2 c f
 aux_int_3
 (-0.03615141217966045,1.0619726876436242)
 coll aux_int_3 a b, coll aux_int_3 i o2
 aux_int_3 = on_line aux_int_3 a b, on_line aux_int_3 i o2
-aux_int_4
-(0.9031060858843237,0.48954861262906646)
-coll aux_int_4 a c, coll aux_int_4 b c
-aux_int_4 = on_line aux_int_4 a c, on_line aux_int_4 b c
-aux_int_5
-(1.0726818086083534,0.8017087688912401)
-coll aux_int_5 a c, coll aux_int_5 b e
-aux_int_5 = on_line aux_int_5 a c, on_line aux_int_5 b e
 aux_int_6
 (0.9464380928420292,0.569315491081852)
 coll aux_int_6 a c, coll aux_int_6 i o1
@@ -12511,10 +11435,6 @@ aux_int_10
 (0.5992434653113451,0.7654114216851825)
 coll aux_int_10 a i, coll aux_int_10 d p
 aux_int_10 = on_line aux_int_10 a i, on_line aux_int_10 d p
-aux_int_11
-(0.8325197837670903,0.9321727250250886)
-coll aux_int_11 a i, coll aux_int_11 d t
-aux_int_11 = on_line aux_int_11 a i, on_line aux_int_11 d t
 aux_int_12
 (0.9297365525891783,1.0016696854649085)
 coll aux_int_12 a i, coll aux_int_12 e f
@@ -12535,18 +11455,10 @@ aux_int_16
 (0.7362439599653492,0.8633484141666878)
 coll aux_int_16 a i, coll aux_int_16 f p
 aux_int_16 = on_line aux_int_16 a i, on_line aux_int_16 f p
-aux_int_17
-(0.6448489433025361,0.7334812615313642)
-coll aux_int_17 a d, coll aux_int_17 b c
-aux_int_17 = on_line aux_int_17 a d, on_line aux_int_17 b c
 aux_int_18
 (0.8378076696313517,0.8893071164686279)
 coll aux_int_18 a d, coll aux_int_18 b e
 aux_int_18 = on_line aux_int_18 a d, on_line aux_int_18 b e
-aux_int_19
-(0.7100206599931758,0.687852020416221)
-coll aux_int_19 a p, coll aux_int_19 b p
-aux_int_19 = on_line aux_int_19 a p, on_line aux_int_19 b p
 aux_int_20
 (0.862969170881623,0.8351840980575134)
 coll aux_int_20 a p, coll aux_int_20 i o1
@@ -12555,14 +11467,6 @@ aux_int_21
 (0.9460450779667929,0.9152093687953247)
 coll aux_int_21 a p, coll aux_int_21 i o2
 aux_int_21 = on_line aux_int_21 a p, on_line aux_int_21 i o2
-aux_int_22
-(1.0812504354738084,1.045449840664129)
-coll aux_int_22 a p, coll aux_int_22 b r
-aux_int_22 = on_line aux_int_22 a p, on_line aux_int_22 b r
-aux_int_23
-(0.8639214616204551,0.8823007544055247)
-coll aux_int_23 a q, coll aux_int_23 p q
-aux_int_23 = on_line aux_int_23 a q, on_line aux_int_23 p q
 aux_int_24
 (4.025797309953582,-2.4599393836223413)
 coll aux_int_24 a t, coll aux_int_24 b c
@@ -12583,10 +11487,6 @@ aux_int_28
 (0.7386013148360214,2.138399466131852)
 coll aux_int_28 a t, coll aux_int_28 c q
 aux_int_28 = on_line aux_int_28 a t, on_line aux_int_28 c q
-aux_int_29
-(1.2698787535225002,1.3952147914308328)
-coll aux_int_29 a t, coll aux_int_29 d t
-aux_int_29 = on_line aux_int_29 a t, on_line aux_int_29 d t
 aux_int_30
 (1.4121760655195448,1.1961602601696986)
 coll aux_int_30 a t, coll aux_int_30 i r
@@ -12883,10 +11783,6 @@ aux_int_103
 (0.9084597507818206,0.8790042151078297)
 coll aux_int_103 a p, cyclic aux_int_103 a i t
 aux_int_103 = on_line aux_int_103 a p, on_circum aux_int_103 a i t
-aux_int_104
-(0.9090296499240687,0.6884703857915807)
-coll aux_int_104 a o1, coll aux_int_104 b o1
-aux_int_104 = on_line aux_int_104 a o1, on_line aux_int_104 b o1
 aux_int_105
 (1.058074691136806,0.8979684714809886)
 coll aux_int_105 a o1, cyclic aux_int_105 a e r
@@ -12895,10 +11791,6 @@ aux_int_106
 (0.9387910119224964,0.7303030312486055)
 coll aux_int_106 a o1, cyclic aux_int_106 a e p
 aux_int_106 = on_line aux_int_106 a o1, on_circum aux_int_106 a e p
-aux_int_107
-(0.5472659285095114,0.9747963781656448)
-coll aux_int_107 a o2, coll aux_int_107 b o2
-aux_int_107 = on_line aux_int_107 a o2, on_line aux_int_107 b o2
 aux_int_108
 (0.8685515031027105,1.104681361521451)
 coll aux_int_108 a o2, cyclic aux_int_108 a f r
@@ -13290,38 +12182,14 @@ aux_ref_27 = reflect aux_ref_27 t o1 o2
 
 Problem Name:
 translated_imo_2020_p1
-aux_int_0
-(0.24631618602807248,1.1099089962473907)
-coll aux_int_0 p a, coll aux_int_0 a d
-aux_int_0 = on_line aux_int_0 p a, on_line aux_int_0 a d
-aux_int_1
-(0.9031060858843234,0.489548612629066)
-coll aux_int_1 p b, coll aux_int_1 b c
-aux_int_1 = on_line aux_int_1 p b, on_line aux_int_1 b c
-aux_int_2
-(0.8433278332768128,1.7547293545836355)
-coll aux_int_2 p z, coll aux_int_2 a d
-aux_int_2 = on_line aux_int_2 p z, on_line aux_int_2 a d
 aux_int_3
 (0.7222069632426564,1.6239091215490826)
 coll aux_int_3 p t, coll aux_int_3 a d
 aux_int_3 = on_line aux_int_3 p t, on_line aux_int_3 a d
-aux_int_4
-(1.650395733743013,2.626427277360458)
-coll aux_int_4 p d, coll aux_int_4 a d
-aux_int_4 = on_line aux_int_4 p d, on_line aux_int_4 a d
-aux_int_5
-(2.3584131437873475,1.5081430932309179)
-coll aux_int_5 p u, coll aux_int_5 b c
-aux_int_5 = on_line aux_int_5 p u, on_line aux_int_5 b c
 aux_int_6
 (1.3230200163030224,0.7834536064443434)
 coll aux_int_6 p v, coll aux_int_6 a y
 aux_int_6 = on_line aux_int_6 p v, on_line aux_int_6 a y
-aux_int_7
-(1.6718750013889263,1.027623220278939)
-coll aux_int_7 p c, coll aux_int_7 b c
-aux_int_7 = on_line aux_int_7 p c, on_line aux_int_7 b c
 aux_int_8
 (0.36633661421561964,1.0735189374711633)
 coll aux_int_8 a y, coll aux_int_8 c o
@@ -13330,30 +12198,6 @@ aux_int_9
 (0.8138523566699799,1.049230186625115)
 coll aux_int_9 b x, coll aux_int_9 d o
 aux_int_9 = on_line aux_int_9 b x, on_line aux_int_9 d o
-aux_int_10
-(1.3410274095210226,1.2956875258002656)
-coll aux_int_10 p a, coll aux_int_10 p b
-aux_int_10 = on_line aux_int_10 p a, on_line aux_int_10 p b
-aux_int_11
-(0.7464835443819129,1.4716784499249074)
-coll aux_int_11 p x, coll aux_int_11 a x
-aux_int_11 = on_line aux_int_11 p x, on_line aux_int_11 a x
-aux_int_12
-(0.7957040810855139,0.9433352046521166)
-coll aux_int_12 p y, coll aux_int_12 a y
-aux_int_12 = on_line aux_int_12 p y, on_line aux_int_12 a y
-aux_int_13
-(0.9273548181827047,1.515098954209233)
-coll aux_int_13 p t, coll aux_int_13 a t
-aux_int_13 = on_line aux_int_13 p t, on_line aux_int_13 a t
-aux_int_14
-(1.3028133566927242,0.2086598912203368)
-coll aux_int_14 p v, coll aux_int_14 a v
-aux_int_14 = on_line aux_int_14 p v, on_line aux_int_14 a v
-aux_int_15
-(0.8183076411169475,1.057630063858909)
-coll aux_int_15 p o, coll aux_int_15 a o
-aux_int_15 = on_line aux_int_15 p o, on_line aux_int_15 a o
 aux_int_16
 (0.4942178058020609,0.7343706919328935)
 coll aux_int_16 x z, cyclic aux_int_16 p a z
@@ -13429,46 +12273,10 @@ aux_ref_5 = reflect aux_ref_5 o p v
 
 Problem Name:
 translated_imo_2021_p3
-aux_int_0
-(1.341027409521023,1.2956875258002656)
-coll aux_int_0 a b, coll aux_int_0 a c
-aux_int_0 = on_line aux_int_0 a b, on_line aux_int_0 a c
-aux_int_1
-(1.0153662151365788,1.2404210258075719)
-coll aux_int_1 a b, coll aux_int_1 c f
-aux_int_1 = on_line aux_int_1 a b, on_line aux_int_1 c f
-aux_int_2
-(0.24631618602807204,1.1099089962473907)
-coll aux_int_2 a b, coll aux_int_2 b c
-aux_int_2 = on_line aux_int_2 a b, on_line aux_int_2 b c
 aux_int_3
 (0.6075007074062461,1.1712040006639852)
 coll aux_int_3 a b, coll aux_int_3 d o1
 aux_int_3 = on_line aux_int_3 a b, on_line aux_int_3 d o1
-aux_int_4
-(1.1501876725727112,0.944383924377517)
-coll aux_int_4 a c, coll aux_int_4 b e
-aux_int_4 = on_line aux_int_4 a c, on_line aux_int_4 b e
-aux_int_5
-(1.7442432508068406,2.037939529809143)
-coll aux_int_5 a c, coll aux_int_5 b x
-aux_int_5 = on_line aux_int_5 a c, on_line aux_int_5 b x
-aux_int_6
-(0.9031060858843238,0.4895486126290668)
-coll aux_int_6 a c, coll aux_int_6 b c
-aux_int_6 = on_line aux_int_6 a c, on_line aux_int_6 b c
-aux_int_7
-(1.4380413784247317,0.7209701977862977)
-coll aux_int_7 a o1, coll aux_int_7 o1 o2
-aux_int_7 = on_line aux_int_7 a o1, on_line aux_int_7 o1 o2
-aux_int_8
-(1.1966469903900836,1.6272788091748)
-coll aux_int_8 a o2, coll aux_int_8 o1 o2
-aux_int_8 = on_line aux_int_8 a o2, on_line aux_int_8 o1 o2
-aux_int_9
-(1.700212997450163,-0.26334595769247593)
-coll aux_int_9 a y, coll aux_int_9 b c
-aux_int_9 = on_line aux_int_9 a y, on_line aux_int_9 b c
 aux_int_10
 (0.634757761215859,-0.0044351582526023225)
 coll aux_int_10 a c, cyclic aux_int_10 a f y
@@ -13477,10 +12285,6 @@ aux_int_11
 (1.548293051516582,1.677228433624716)
 coll aux_int_11 a c, cyclic aux_int_11 b f x
 aux_int_11 = on_line aux_int_11 a c, on_circum aux_int_11 b f x
-aux_int_12
-(0.9256402942089791,0.9987414097152694)
-coll aux_int_12 a d, coll aux_int_12 b d
-aux_int_12 = on_line aux_int_12 a d, on_line aux_int_12 b d
 aux_int_13
 (0.7566822568190879,0.8779590572184126)
 coll aux_int_13 a d, cyclic aux_int_13 b d f
@@ -13556,50 +12360,10 @@ aux_int_0
 (-0.35517326938934396,-0.7648555790695594)
 coll aux_int_0 b c, coll aux_int_0 d e
 aux_int_0 = on_line aux_int_0 b c, on_line aux_int_0 d e
-aux_int_1
-(0.5207560763577828,-0.47179119110010087)
-coll aux_int_1 b c, coll aux_int_1 c d
-aux_int_1 = on_line aux_int_1 b c, on_line aux_int_1 c d
-aux_int_2
-(-0.47574494617590213,-0.805195892857956)
-coll aux_int_2 b c, coll aux_int_2 a p
-aux_int_2 = on_line aux_int_2 b c, on_line aux_int_2 a p
 aux_int_3
 (0.8408081443269442,1.0041114137630403)
 coll aux_int_3 b d, coll aux_int_3 c e
 aux_int_3 = on_line aux_int_3 b d, on_line aux_int_3 c e
-aux_int_4
-(0.307681004974832,0.2714475845973594)
-coll aux_int_4 b d, coll aux_int_4 c d
-aux_int_4 = on_line aux_int_4 b d, on_line aux_int_4 c d
-aux_int_5
-(0.8738865239269564,1.1566505519291905)
-coll aux_int_5 b e, coll aux_int_5 a r
-aux_int_5 = on_line aux_int_5 b e, on_line aux_int_5 a r
-aux_int_6
-(-1.6085726497175226,0.8424668269975819)
-coll aux_int_6 b t, coll aux_int_6 c q
-aux_int_6 = on_line aux_int_6 b t, on_line aux_int_6 c q
-aux_int_7
-(0.3615764407145049,0.0834519762193009)
-coll aux_int_7 a p, coll aux_int_7 c d
-aux_int_7 = on_line aux_int_7 a p, on_line aux_int_7 c d
-aux_int_8
-(0.08931515728461648,-0.20549849505759765)
-coll aux_int_8 a p, coll aux_int_8 c q
-aux_int_8 = on_line aux_int_8 a p, on_line aux_int_8 c q
-aux_int_9
-(0.8230436261724032,0.5732063733083055)
-coll aux_int_9 a p, coll aux_int_9 a r
-aux_int_9 = on_line aux_int_9 a p, on_line aux_int_9 a r
-aux_int_10
-(0.6827414767248623,-1.0368212993538843)
-coll aux_int_10 b r, coll aux_int_10 c d
-aux_int_10 = on_line aux_int_10 b r, on_line aux_int_10 c d
-aux_int_11
-(0.7843691919324998,0.12940056138038147)
-coll aux_int_11 b s, coll aux_int_11 d s
-aux_int_11 = on_line aux_int_11 b s, on_line aux_int_11 d s
 aux_int_12
 (2.142018826008117,0.07064339882528803)
 coll aux_int_12 b c, cyclic aux_int_12 b q s
