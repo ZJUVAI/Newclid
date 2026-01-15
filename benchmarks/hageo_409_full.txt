@@ -19,7 +19,7 @@ a b c = triangle a b c; e = on_line e c a; f = on_line f a b, on_pline f e b c; 
 2005CHNSouthEastMOp2
 o = free o; r1 = free r1; p = free p; q = on_tline q p o p; a b = tangent a b q o r1; k = on_line k a b, on_line k o p; m = foot m p q b; n = foot n p q a; x = midpoint x k p ? coll x m n
 2005CHNWesternMOp2
-o a b = iso_triangle o a b; p = on_tline p a o a, on_tline p b o b; t = free t; c = on_circle c o a; d = on_line d p c, on_circle d o a; e = on_line e a c, on_pline e b p a; f = on_line f a d, on_pline f b p a ? cong b e b f
+o a b = iso_triangle o a b; p = on_tline p a o a, on_tline p b o b; c = on_circle c o a; d = on_line d p c, on_circle d o a; e = on_line e a c, on_pline e b p a; f = on_line f a d, on_pline f b p a ? cong b e b f
 2005CMOp2
 a b c = triangle a b c; o = free o; d1 = on_line d1 b c; d2 = on_line d2 b c, on_circle d2 o d1; e1 = on_line e1 a c, on_circle e1 o d1; e2 = on_line e2 a c, on_circle e2 o d1; f1 = on_line f1 a b, on_circle f1 o d1; f2 = on_line f2 a b, on_circle f2 o d1; l = on_line l d1 e1, on_line l d2 f2; m = on_line m e1 f1, on_line m e2 d2; n = on_line n f1 d1, on_line n f2 e2; p = on_line p a l, on_line p b m ? coll c n p
 2005CTSTp1
