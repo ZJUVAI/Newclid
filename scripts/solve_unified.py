@@ -34,27 +34,28 @@ from newclid.ag2.parse import AGProblem
 # ============== 硬编码默认路径 ==============
 # Construction 格式路径
 # CONSTRUCTION_PROBLEMS_PATH = "/root/GenesisGeo-main/benchmarks/imo_ag_30.txt"
-CONSTRUCTION_PROBLEMS_PATH = "/root/GenesisGeo-main/benchmarks/imo_102_requires_aux.txt"
-# CONSTRUCTION_PROBLEMS_PATH = "/root/GenesisGeo-main/benchmarks/hageo_409.txt"
+# CONSTRUCTION_PROBLEMS_PATH = "/root/GenesisGeo-main/benchmarks/imo_102_requires_aux.txt"
+CONSTRUCTION_PROBLEMS_PATH = "/root/GenesisGeo-main/benchmarks/hageo_409.txt"
 # Rebuild 格式路径
 # REBUILD_PROBLEMS_PATH = "/root/GenesisGeo-main/evaluation_dataset/rebuild_problems/imo_30_rebuild.txt"
 # AUX_POINTS_PATH = "/root/GenesisGeo-main/evaluation_dataset/rebuild_problems/imo_30_rebuild_aux_points.txt"
-REBUILD_PROBLEMS_PATH = "/root/GenesisGeo-main/evaluation_dataset/rebuild_problems/imo_95_rebuild.txt"
-AUX_POINTS_PATH = "/root/GenesisGeo-main/evaluation_dataset/rebuild_problems/imo_95_rebuild_aux_points_overlap.txt"
-# REBUILD_PROBLEMS_PATH = "/root/GenesisGeo-main/evaluation_dataset/rebuild_problems/hageo_409_rebuild.txt"
-# AUX_POINTS_PATH = "/root/GenesisGeo-main/evaluation_dataset/rebuild_problems/hageo_409_rebuild_aux_points_overlap.txt"
+# REBUILD_PROBLEMS_PATH = "/root/GenesisGeo-main/evaluation_dataset/rebuild_problems/imo_95_rebuild.txt"
+# AUX_POINTS_PATH = "/root/GenesisGeo-main/evaluation_dataset/rebuild_problems/imo_95_rebuild_aux_points_overlap.txt"
+REBUILD_PROBLEMS_PATH = "/root/GenesisGeo-main/evaluation_dataset/rebuild_problems/hageo_409_rebuild.txt"
+AUX_POINTS_PATH = "/root/GenesisGeo-main/evaluation_dataset/rebuild_problems/hageo_409_rebuild_aux_points_overlap.txt"
 # 规则文件路径（用于 csolver-direct 模式）
 DEFAULT_RULES_PATH = "/root/GenesisGeo-main/src/newclid/default_configs/rules.txt"
 # 输出路径（会根据模式自动调整后缀）
 DEFAULT_OUTPUT_DIR = "/root/GenesisGeo-main/datasets/solve_results"
 
 # ============== 默认参数 ==============
-DEFAULT_SOLVE_MODE = "csolver-construction"  # 可选: "csolver-construction", "csolver-direct", "ag2"
+DEFAULT_SOLVE_MODE = "ag2"  # 可选: "csolver-construction", "csolver-direct", "ag2"
 USE_COORDINATES = True   # 是否在 construction 中包含点坐标（如 a@1.23_4.56）
 DEFAULT_N_AUX = 6        # 每次采样的辅助点数量
 DEFAULT_MAX_ATTEMPTS = 512 # 每道题的最大尝试次数
 DEFAULT_SEED = 998244353        # 随机种子
-DEFAULT_MAX_WORKERS = 50  # 并行进程数（默认1即串行）
+DEFAULT_MAX_WORKERS = 30  # 并行进程数（默认1即串行）
+DEFAULT_TIMEOUT = 300    # 单题超时时间（秒），0 表示不限制
 
 
 @dataclass
@@ -979,6 +980,12 @@ def main():
         help="并行进程数（默认1即串行）"
     )
     parser.add_argument(
+        "--timeout",
+        type=int,
+        default=DEFAULT_TIMEOUT,
+        help="单题超时时间（秒），0 表示不限制"
+    )
+    parser.add_argument(
         "--use-coordinates",
         action="store_true",
         default=USE_COORDINATES,
@@ -1044,6 +1051,7 @@ def main():
     print(f"最大尝试次数: {args.max_attempts}")
     print(f"随机种子: {args.seed}")
     print(f"并行进程数: {args.max_workers}")
+    print(f"单题超时: {args.timeout}秒" if args.timeout > 0 else "单题超时: 不限制")
     print(f"使用坐标: {use_coordinates}")
     print(f"输出文件: {output_path}")
     print("=" * 60 + "\n")
@@ -1097,6 +1105,7 @@ def main():
         'use_coordinates': use_coordinates,
         'solve_mode': solve_mode,
         'rules_path': args.rules,
+        'timeout': args.timeout,
     }
 
     # 准备待求解的题目列表
@@ -1149,23 +1158,86 @@ def main():
             return solve_single_problem(problem, candidates, args_dict, problem_index)
         
         total_to_solve = len(problems_to_solve)
+        timeout = args.timeout  # 超时时间（秒），0 表示不限制
+        max_concurrent = args.max_workers  # 最大并发任务数
         
-        futures = []
-        future_to_problem = {}
-        for idx, problem, candidates in problems_to_solve:
-            future = solve_remote.remote(problem, candidates, args_dict, idx)
-            futures.append(future)
-            future_to_problem[future] = (idx, problem)
+        # 使用队列管理待处理任务
+        pending_queue = list(problems_to_solve)  # 待处理队列
+        future_to_problem = {}  # future -> (idx, problem)
+        future_start_time = {}  # future -> 任务开始执行时间
+        pending = []  # 当前正在执行的 futures
         
         completed_count = 0
-        pending = list(futures)
+        timeout_count = 0
+        
+        def submit_task(task_item):
+            """提交一个任务并记录开始时间"""
+            idx, problem, candidates = task_item
+            future = solve_remote.remote(problem, candidates, args_dict, idx)
+            future_to_problem[future] = (idx, problem)
+            future_start_time[future] = time.time()  # 记录实际开始执行的时间
+            pending.append(future)
+            return future
+        
+        # 初始提交：填满所有可用进程
+        initial_batch_size = min(max_concurrent, len(pending_queue))
+        for _ in range(initial_batch_size):
+            task_item = pending_queue.pop(0)
+            submit_task(task_item)
+        
+        print(f"初始提交 {initial_batch_size} 个任务，剩余 {len(pending_queue)} 个待处理\n")
         
         while pending:
-            done, pending = ray.wait(pending, num_returns=1, timeout=None)
+            # 每5秒检查一次，便于及时发现超时任务
+            done, pending = ray.wait(pending, num_returns=1, timeout=5.0)
             
+            current_time = time.time()
+            
+            # 检查并取消超时任务
+            if timeout > 0:
+                timed_out_futures = []
+                for future in pending:
+                    elapsed = current_time - future_start_time[future]
+                    if elapsed > timeout:
+                        timed_out_futures.append(future)
+                
+                for future in timed_out_futures:
+                    idx, problem = future_to_problem[future]
+                    elapsed = current_time - future_start_time[future]
+                    
+                    # 强制取消任务
+                    ray.cancel(future, force=True)
+                    pending.remove(future)
+                    
+                    completed_count += 1
+                    timeout_count += 1
+                    
+                    print(f"[{completed_count}/{total_to_solve}] ⏱ {problem.name} 超时 ({elapsed:.1f}s > {timeout}s)")
+                    results_dict[problem.name] = SolveResult(
+                        problem_name=problem.name,
+                        solved=False,
+                        attempts=0,
+                        runtime=elapsed,
+                        aux_points_used=[],
+                        error=f"Timeout after {elapsed:.1f} seconds"
+                    )
+                    
+                    # 提交新任务填补空位
+                    if pending_queue:
+                        task_item = pending_queue.pop(0)
+                        submit_task(task_item)
+                        print(f"    → 已提交新任务，剩余 {len(pending_queue)} 个待处理")
+                    
+                    if completed_count % 10 == 0:
+                        results_list = [results_dict.get(p.name) for p in problems if p.name in results_dict]
+                        save_results(results_list, output_path)
+                        print(f"[自动保存] 已保存 {len(results_list)} 道题目的结果")
+            
+            # 处理已完成的任务
             for future in done:
                 idx, problem = future_to_problem[future]
                 completed_count += 1
+                elapsed = current_time - future_start_time[future]
                 
                 try:
                     result = ray.get(future)
@@ -1175,13 +1247,25 @@ def main():
                     attempts_info = f"({result.attempts} attempts)" if result.attempts > 1 else ""
                     print(f"[{completed_count}/{total_to_solve}] {status} {problem.name} {attempts_info} ({result.runtime:.1f}s)")
                     
+                except ray.exceptions.TaskCancelledError:
+                    # 任务被取消（超时取消后可能会触发）
+                    print(f"[{completed_count}/{total_to_solve}] ⏱ {problem.name} 已取消")
+                    if problem.name not in results_dict:
+                        results_dict[problem.name] = SolveResult(
+                            problem_name=problem.name,
+                            solved=False,
+                            attempts=0,
+                            runtime=elapsed,
+                            aux_points_used=[],
+                            error="Task cancelled"
+                        )
                 except ray.exceptions.RayTaskError as e:
                     print(f"[{completed_count}/{total_to_solve}] ✗ {problem.name} 任务错误: {e}")
                     results_dict[problem.name] = SolveResult(
                         problem_name=problem.name,
                         solved=False,
                         attempts=0,
-                        runtime=0.0,
+                        runtime=elapsed,
                         aux_points_used=[],
                         error=str(e)
                     )
@@ -1191,7 +1275,7 @@ def main():
                         problem_name=problem.name,
                         solved=False,
                         attempts=0,
-                        runtime=0.0,
+                        runtime=elapsed,
                         aux_points_used=[],
                         error=f"Worker crashed: {e}"
                     )
@@ -1201,15 +1285,23 @@ def main():
                         problem_name=problem.name,
                         solved=False,
                         attempts=0,
-                        runtime=0.0,
+                        runtime=elapsed,
                         aux_points_used=[],
                         error=str(e)
                     )
+                
+                # 提交新任务填补空位
+                if pending_queue:
+                    task_item = pending_queue.pop(0)
+                    submit_task(task_item)
                 
                 if completed_count % 10 == 0:
                     results_list = [results_dict.get(p.name) for p in problems if p.name in results_dict]
                     save_results(results_list, output_path)
                     print(f"[自动保存] 已保存 {len(results_list)} 道题目的结果")
+        
+        if timeout_count > 0:
+            print(f"\n[超时统计] 共 {timeout_count} 道题目超时")
         
         ray.shutdown()
 
