@@ -15,12 +15,14 @@
 """
 
 import argparse
+import itertools
 import json
 import os
 import random
 import re
 import sys
 import time
+from math import comb
 
 import ray
 from dataclasses import dataclass, field
@@ -56,6 +58,7 @@ DEFAULT_MAX_ATTEMPTS = 512 # 每道题的最大尝试次数
 DEFAULT_SEED = 998244353        # 随机种子
 DEFAULT_MAX_WORKERS = 30  # 并行进程数（默认1即串行）
 DEFAULT_TIMEOUT = 300    # 单题超时时间（秒），0 表示不限制
+DEFAULT_MAX_SAMPLE_RETRIES = 60  # 随机采样模式下连续采样到重复组合的最大重试次数
 
 
 @dataclass
@@ -875,11 +878,58 @@ def solve_single_problem(
     total_runtime = runtime
     solved = False
     
-    for attempt in range(max_attempts):
+    # 计算组合总数，决定使用穷举还是随机采样
+    n_candidates = len(candidates)
+    total_combinations = comb(n_candidates, n_sample)
+    use_exhaustive = (total_combinations <= max_attempts)
+    
+    if use_exhaustive:
+        # 穷举所有组合
+        all_combinations = list(itertools.combinations(range(n_candidates), n_sample))
+        random.shuffle(all_combinations)  # 随机打乱顺序
+        attempts_to_try = len(all_combinations)
+        if not is_parallel:
+            print(f"组合总数 C({n_candidates},{n_sample})={total_combinations} <= max_attempts={max_attempts}，使用穷举模式")
+    else:
+        # 随机采样模式
+        tried_combinations = set()
+        attempts_to_try = max_attempts
+        if not is_parallel:
+            print(f"组合总数 C({n_candidates},{n_sample})={total_combinations} > max_attempts={max_attempts}，使用随机采样模式")
+    
+    for attempt in range(attempts_to_try):
         result.attempts = attempt + 2  # +2 因为第一次是直接求解
         
-        # 随机采样辅助点
-        sampled_aux = random.sample(candidates, n_sample)
+        # 根据模式选择辅助点
+        if use_exhaustive:
+            indices = all_combinations[attempt]
+            sampled_aux = [candidates[i] for i in indices]
+        else:
+            # 随机采样，避免重复
+            max_sample_retries = DEFAULT_MAX_SAMPLE_RETRIES
+            sample_retry_count = 0
+            found_new = False
+            while sample_retry_count < max_sample_retries:
+                indices = tuple(sorted(random.sample(range(n_candidates), n_sample)))
+                if indices not in tried_combinations:
+                    tried_combinations.add(indices)
+                    found_new = True
+                    break
+                sample_retry_count += 1
+                # 如果已经尝试了所有组合，退出循环
+                if len(tried_combinations) >= total_combinations:
+                    break
+            
+            # 如果没找到新组合（连续重试失败或已穷尽），退出主循环
+            if not found_new:
+                if not is_parallel:
+                    if len(tried_combinations) >= total_combinations:
+                        print(f"已穷尽所有 {total_combinations} 种组合")
+                    else:
+                        print(f"连续 {max_sample_retries} 次采样均为重复，已尝试 {len(tried_combinations)}/{total_combinations} 种组合")
+                break
+            sampled_aux = [candidates[i] for i in indices]
+        
         new_names = precomputed_new_names
         
         # 构建增强后的题目
@@ -904,12 +954,15 @@ def solve_single_problem(
             result.error = str(e)
         
         if not is_parallel and (attempt + 1) % 10 == 0:
-            print(f"  已尝试 {attempt + 1}/{max_attempts} 次辅助点采样...")
+            print(f"  已尝试 {attempt + 1}/{attempts_to_try} 次辅助点采样...")
     
     if not solved:
         result.runtime = total_runtime
         if not is_parallel:
-            print(f"✗ {max_attempts} 次辅助点采样后仍未成功，用时: {total_runtime:.2f}s")
+            if use_exhaustive:
+                print(f"✗ 穷举所有 {total_combinations} 种组合后仍未成功，用时: {total_runtime:.2f}s")
+            else:
+                print(f"✗ {max_attempts} 次辅助点采样后仍未成功，用时: {total_runtime:.2f}s")
     
     return result
 
