@@ -609,6 +609,10 @@ void Matcher::on_circle(const Point &center, const vector<pair<double, Point>> &
                     on_quadrangle_circumcenter(center, {points[pt_a].second, points[pt_b].second, points[pt_c].second, points[pt_d].second});
                 }
             }
+            if (points[pt_a].second.is_close(points[pt_b].second))
+            {
+                continue;
+            }
             for (auto const &pt : _problem->points())
             {
                 auto sec = Secant(center, points[pt_a].second, points[pt_b].second, pt);
