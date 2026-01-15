@@ -371,39 +371,39 @@ aux_int_91 = on_line aux_int_91 n e, on_circum aux_int_91 b e q
 aux_mid_0
 (-0.2557639596469846,-0.44627566248756456)
 coll aux_mid_0 a b, cong a aux_mid_0 b aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 a b
+aux_mid_0 = coll aux_mid_0 a b, cong aux_mid_0 a aux_mid_0 b
 aux_mid_1
 (-0.5769223417856025,-0.14930898400562637)
 coll aux_mid_1 m n, cong m aux_mid_1 n aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 m n
+aux_mid_1 = coll aux_mid_1 m n, cong aux_mid_1 m aux_mid_1 n
 aux_mid_2
 (-0.7374448761624306,-0.5013611899169047)
 coll aux_mid_2 m c, cong m aux_mid_2 c aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 m c
+aux_mid_2 = coll aux_mid_2 m c, cong aux_mid_2 m aux_mid_2 c
 aux_mid_3
 (-0.11889867270732407,0.01882520173250224)
 coll aux_mid_3 m d, cong m aux_mid_3 d aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 m d
+aux_mid_3 = coll aux_mid_3 m d, cong aux_mid_3 m aux_mid_3 d
 aux_mid_4
 (-0.28158253146839335,-0.467988623683186)
 coll aux_mid_4 m e, cong m aux_mid_4 e aux_mid_4
-aux_mid_4 = midpoint aux_mid_4 m e
+aux_mid_4 = coll aux_mid_4 m e, cong aux_mid_4 m aux_mid_4 e
 aux_mid_5
 (-0.5396025582536789,-0.3349793078624336)
 coll aux_mid_5 m p, cong m aux_mid_5 p aux_mid_5
-aux_mid_5 = midpoint aux_mid_5 m p
+aux_mid_5 = coll aux_mid_5 m p, cong aux_mid_5 m aux_mid_5 p
 aux_mid_6
 (-0.3683781342588933,-0.19098260271321166)
 coll aux_mid_6 m q, cong m aux_mid_6 q aux_mid_6
-aux_mid_6 = midpoint aux_mid_6 m q
+aux_mid_6 = coll aux_mid_6 m q, cong aux_mid_6 m aux_mid_6 q
 aux_mid_7
 (-0.6518326641650378,-0.42936283734229375)
 coll aux_mid_7 c q, cong c aux_mid_7 q aux_mid_7
-aux_mid_7 = midpoint aux_mid_7 c q
+aux_mid_7 = coll aux_mid_7 c q, cong aux_mid_7 c aux_mid_7 q
 aux_mid_8
 (-0.20451088470471684,-0.05317315084210869)
 coll aux_mid_8 d p, cong d aux_mid_8 p aux_mid_8
-aux_mid_8 = midpoint aux_mid_8 d p
+aux_mid_8 = coll aux_mid_8 d p, cong aux_mid_8 d aux_mid_8 p
 aux_ref_0
 (-0.9098526909503233,-0.29635352152154115)
 perp a aux_ref_0 m c, cong a m aux_ref_0 m
@@ -2582,135 +2582,135 @@ aux_int_527 = on_line aux_int_527 y2 y3, on_circum aux_int_527 t2 x2 z
 aux_mid_0
 (-0.16498097428409791,-0.025448005304630483)
 coll aux_mid_0 a b, cong a aux_mid_0 b aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 a b
+aux_mid_0 = coll aux_mid_0 a b, cong aux_mid_0 a aux_mid_0 b
 aux_mid_1
 (0.029693964335194917,-1.339678720494005)
 coll aux_mid_1 a c, cong a aux_mid_1 c aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 a c
+aux_mid_1 = coll aux_mid_1 a c, cong aux_mid_1 a aux_mid_1 c
 aux_mid_2
 (0.5621217627923063,-0.25482861431391346)
 coll aux_mid_2 a h, cong a aux_mid_2 h aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 a h
+aux_mid_2 = coll aux_mid_2 a h, cong aux_mid_2 a aux_mid_2 h
 aux_mid_3
 (0.30759900523573713,-0.45876068318102203)
 coll aux_mid_3 a t2, cong a aux_mid_3 t2 aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 a t2
+aux_mid_3 = coll aux_mid_3 a t2, cong aux_mid_3 a aux_mid_3 t2
 aux_mid_4
 (0.19846374168785663,-0.20382109932329343)
 coll aux_mid_4 a t3, cong a aux_mid_4 t3 aux_mid_4
-aux_mid_4 = midpoint aux_mid_4 a t3
+aux_mid_4 = coll aux_mid_4 a t3, cong aux_mid_4 a aux_mid_4 t3
 aux_mid_5
 (0.38914862016804824,-0.2002604181372119)
 coll aux_mid_5 a h2, cong a aux_mid_5 h2 aux_mid_5
-aux_mid_5 = midpoint aux_mid_5 a h2
+aux_mid_5 = coll aux_mid_5 a h2, cong aux_mid_5 a aux_mid_5 h2
 aux_mid_6
 (0.5117051416003888,-0.35755517557121236)
 coll aux_mid_6 a h3, cong a aux_mid_6 h3 aux_mid_6
-aux_mid_6 = midpoint aux_mid_6 a h3
+aux_mid_6 = coll aux_mid_6 a h3, cong aux_mid_6 a aux_mid_6 h3
 aux_mid_7
 (-0.4978976568767143,-1.0807448421950214)
 coll aux_mid_7 b c, cong b aux_mid_7 c aux_mid_7
-aux_mid_7 = midpoint aux_mid_7 b c
+aux_mid_7 = coll aux_mid_7 b c, cong aux_mid_7 b aux_mid_7 c
 aux_mid_8
 (0.03453014158039713,0.004105263985069968)
 coll aux_mid_8 b h, cong b aux_mid_8 h aux_mid_8
-aux_mid_8 = midpoint aux_mid_8 b h
+aux_mid_8 = coll aux_mid_8 b h, cong aux_mid_8 b aux_mid_8 h
 aux_mid_9
 (-0.42284146317017424,-0.1358336582006201)
 coll aux_mid_9 b i, cong b aux_mid_9 i aux_mid_9
-aux_mid_9 = midpoint aux_mid_9 b i
+aux_mid_9 = coll aux_mid_9 b i, cong aux_mid_9 b aux_mid_9 i
 aux_mid_10
 (-0.6332491001062991,-0.16700101209986923)
 coll aux_mid_10 b t1, cong b aux_mid_10 t1 aux_mid_10
-aux_mid_10 = midpoint aux_mid_10 b t1
+aux_mid_10 = coll aux_mid_10 b t1, cong aux_mid_10 b aux_mid_10 t1
 aux_mid_11
 (-0.3291278795240526,0.05511277897569003)
 coll aux_mid_11 b t3, cong b aux_mid_11 t3 aux_mid_11
-aux_mid_11 = midpoint aux_mid_11 b t3
+aux_mid_11 = coll aux_mid_11 b t3, cong aux_mid_11 b aux_mid_11 t3
 aux_mid_12
 (-0.6437127763510737,-0.09636179776538784)
 coll aux_mid_12 b h1, cong b aux_mid_12 h1 aux_mid_12
-aux_mid_12 = midpoint aux_mid_12 b h1
+aux_mid_12 = coll aux_mid_12 b h1, cong aux_mid_12 b aux_mid_12 h1
 aux_mid_13
 (-0.0158864796115204,-0.0986212972722289)
 coll aux_mid_13 b h3, cong b aux_mid_13 h3 aux_mid_13
-aux_mid_13 = midpoint aux_mid_13 b h3
+aux_mid_13 = coll aux_mid_13 b h3, cong aux_mid_13 b aux_mid_13 h3
 aux_mid_14
 (-0.180274523637374,-0.4679596075457466)
 coll aux_mid_14 b x2, cong b aux_mid_14 x2 aux_mid_14
-aux_mid_14 = midpoint aux_mid_14 b x2
+aux_mid_14 = coll aux_mid_14 b x2, cong aux_mid_14 b aux_mid_14 x2
 aux_mid_15
 (-0.46332505440033717,-0.08040297504109678)
 coll aux_mid_15 b y2, cong b aux_mid_15 y2 aux_mid_15
-aux_mid_15 = midpoint aux_mid_15 b y2
+aux_mid_15 = coll aux_mid_15 b y2, cong aux_mid_15 b aux_mid_15 y2
 aux_mid_16
 (0.22920508019968996,-1.3101254512043046)
 coll aux_mid_16 c h, cong c aux_mid_16 h aux_mid_16
-aux_mid_16 = midpoint aux_mid_16 c h
+aux_mid_16 = coll aux_mid_16 c h, cong aux_mid_16 c aux_mid_16 h
 aux_mid_17
 (-0.43857416148700623,-1.4812317272892437)
 coll aux_mid_17 c t1, cong c aux_mid_17 t1 aux_mid_17
-aux_mid_17 = midpoint aux_mid_17 c t1
+aux_mid_17 = coll aux_mid_17 c t1, cong aux_mid_17 c aux_mid_17 t1
 aux_mid_18
 (-0.02531767735687926,-1.514057520071413)
 coll aux_mid_18 c t2, cong c aux_mid_18 t2 aux_mid_18
-aux_mid_18 = midpoint aux_mid_18 c t2
+aux_mid_18 = coll aux_mid_18 c t2, cong aux_mid_18 c aux_mid_18 t2
 aux_mid_19
 (-0.44903783773178096,-1.4105925129547623)
 coll aux_mid_19 c h1, cong c aux_mid_19 h1 aux_mid_19
-aux_mid_19 = midpoint aux_mid_19 c h1
+aux_mid_19 = coll aux_mid_19 c h1, cong aux_mid_19 c aux_mid_19 h1
 aux_mid_20
 (0.05623193757543185,-1.255557255027603)
 coll aux_mid_20 c h2, cong c aux_mid_20 h2 aux_mid_20
-aux_mid_20 = midpoint aux_mid_20 c h2
+aux_mid_20 = coll aux_mid_20 c h2, cong aux_mid_20 c aux_mid_20 h2
 aux_mid_21
 (0.0894566086884589,-0.8372791387407197)
 coll aux_mid_21 i x2, cong i aux_mid_21 x2 aux_mid_21
-aux_mid_21 = midpoint aux_mid_21 i x2
+aux_mid_21 = coll aux_mid_21 i x2, cong aux_mid_21 i aux_mid_21 x2
 aux_mid_22
 (-0.19359392207450427,-0.44972250623606985)
 coll aux_mid_22 i y2, cong i aux_mid_22 y2 aux_mid_22
-aux_mid_22 = midpoint aux_mid_22 i y2
+aux_mid_22 = coll aux_mid_22 i y2, cong aux_mid_22 i aux_mid_22 y2
 aux_mid_23
 (-0.16066912058646404,-0.6003136899762608)
 coll aux_mid_23 t1 t2, cong t1 aux_mid_23 t2 aux_mid_23
-aux_mid_23 = midpoint aux_mid_23 t1 t2
+aux_mid_23 = coll aux_mid_23 t1 t2, cong aux_mid_23 t1 aux_mid_23 t2
 aux_mid_24
 (-0.26980438413434454,-0.34537410611853214)
 coll aux_mid_24 t1 t3, cong t1 aux_mid_24 t3 aux_mid_24
-aux_mid_24 = midpoint aux_mid_24 t1 t3
+aux_mid_24 = coll aux_mid_24 t1 t3, cong aux_mid_24 t1 aux_mid_24 t3
 aux_mid_25
 (-0.5843892809613658,-0.49684868285961004)
 coll aux_mid_25 t1 h1, cong t1 aux_mid_25 h1 aux_mid_25
-aux_mid_25 = midpoint aux_mid_25 t1 h1
+aux_mid_25 = coll aux_mid_25 t1 h1, cong aux_mid_25 t1 aux_mid_25 h1
 aux_mid_26
 (0.14345209999578246,-0.3781998989007015)
 coll aux_mid_26 t2 t3, cong t2 aux_mid_26 t3 aux_mid_26
-aux_mid_26 = midpoint aux_mid_26 t2 t3
+aux_mid_26 = coll aux_mid_26 t2 t3, cong aux_mid_26 t2 aux_mid_26 t3
 aux_mid_27
 (0.33413697847597407,-0.37463921771462)
 coll aux_mid_27 t2 h2, cong t2 aux_mid_27 h2 aux_mid_27
-aux_mid_27 = midpoint aux_mid_27 t2 h2
+aux_mid_27 = coll aux_mid_27 t2 h2, cong aux_mid_27 t2 aux_mid_27 h2
 aux_mid_28
 (0.34755823636043415,-0.2769943912908919)
 coll aux_mid_28 t3 h3, cong t3 aux_mid_28 h3 aux_mid_28
-aux_mid_28 = midpoint aux_mid_28 t3 h3
+aux_mid_28 = coll aux_mid_28 t3 h3, cong aux_mid_28 t3 aux_mid_28 h3
 aux_mid_29
 (-0.6058734137152493,-0.5649502185409863)
 coll aux_mid_29 h1 x1, cong h1 aux_mid_29 x1 aux_mid_29
-aux_mid_29 = midpoint aux_mid_29 h1 x1
+aux_mid_29 = coll aux_mid_29 h1 x1, cong aux_mid_29 h1 aux_mid_29 x1
 aux_mid_30
 (0.37385507081477215,-0.642772020378328)
 coll aux_mid_30 h2 x2, cong h2 aux_mid_30 x2 aux_mid_30
-aux_mid_30 = midpoint aux_mid_30 h2 x2
+aux_mid_30 = coll aux_mid_30 h2 x2, cong aux_mid_30 h2 aux_mid_30 x2
 aux_mid_31
 (0.090804540051809,-0.2552153878736782)
 coll aux_mid_31 h2 y2, cong h2 aux_mid_31 y2 aux_mid_31
-aux_mid_31 = midpoint aux_mid_31 h2 y2
+aux_mid_31 = coll aux_mid_31 h2 y2, cong aux_mid_31 h2 aux_mid_31 y2
 aux_mid_32
 (0.24257956722304272,-0.609761306480948)
 coll aux_mid_32 h3 y3, cong h3 aux_mid_32 y3 aux_mid_32
-aux_mid_32 = midpoint aux_mid_32 h3 y3
+aux_mid_32 = coll aux_mid_32 h3 y3, cong aux_mid_32 h3 aux_mid_32 y3
 aux_ref_0
 (-1.552316561340092,-0.5680370534466433)
 perp a aux_ref_0 b c, cong a b aux_ref_0 b
@@ -3301,11 +3301,11 @@ aux_int_36 = on_line aux_int_36 d j, on_circum aux_int_36 b c j
 aux_mid_0
 (-0.046146421262164256,0.16208156581902355)
 coll aux_mid_0 b a, cong b aux_mid_0 a aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 b a
+aux_mid_0 = coll aux_mid_0 b a, cong aux_mid_0 b aux_mid_0 a
 aux_mid_1
 (0.23149537555209188,0.12242212127669641)
 coll aux_mid_1 b j, cong b aux_mid_1 j aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 b j
+aux_mid_1 = coll aux_mid_1 b j, cong aux_mid_1 b aux_mid_1 j
 aux_ref_0
 (0.11375726507481376,1.2815109301017116)
 perp b aux_ref_0 c j, cong b c aux_ref_0 c
@@ -3488,11 +3488,11 @@ aux_int_36 = on_line aux_int_36 d j, on_circum aux_int_36 b c j
 aux_mid_0
 (-0.046146421262164256,0.16208156581902355)
 coll aux_mid_0 b a, cong b aux_mid_0 a aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 b a
+aux_mid_0 = coll aux_mid_0 b a, cong aux_mid_0 b aux_mid_0 a
 aux_mid_1
 (0.23149537555209188,0.12242212127669641)
 coll aux_mid_1 b j, cong b aux_mid_1 j aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 b j
+aux_mid_1 = coll aux_mid_1 b j, cong aux_mid_1 b aux_mid_1 j
 aux_ref_0
 (0.11375726507481376,1.2815109301017116)
 perp b aux_ref_0 c j, cong b c aux_ref_0 c
@@ -3799,35 +3799,35 @@ aux_int_67 = on_line aux_int_67 p q, on_circum aux_int_67 b d1 r
 aux_mid_0
 (0.5010846449035451,-0.6454944713383134)
 coll aux_mid_0 a x, cong a aux_mid_0 x aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 a x
+aux_mid_0 = coll aux_mid_0 a x, cong aux_mid_0 a aux_mid_0 x
 aux_mid_1
 (-0.060295900217631766,0.3038095289969168)
 coll aux_mid_1 a q, cong a aux_mid_1 q aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 a q
+aux_mid_1 = coll aux_mid_1 a q, cong aux_mid_1 a aux_mid_1 q
 aux_mid_2
 (0.33403237473256775,0.4142159145773433)
 coll aux_mid_2 b d, cong b aux_mid_2 d aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 b d
+aux_mid_2 = coll aux_mid_2 b d, cong aux_mid_2 b aux_mid_2 d
 aux_mid_3
 (0.17583854756127548,-0.09549781758218545)
 coll aux_mid_3 c x, cong c aux_mid_3 x aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 c x
+aux_mid_3 = coll aux_mid_3 c x, cong aux_mid_3 c aux_mid_3 x
 aux_mid_4
 (-0.38554199755990143,0.8538061827530448)
 coll aux_mid_4 c q, cong c aux_mid_4 q aux_mid_4
-aux_mid_4 = midpoint aux_mid_4 c q
+aux_mid_4 = coll aux_mid_4 c q, cong aux_mid_4 c aux_mid_4 q
 aux_mid_5
 (1.022899482356019,0.03425313867557789)
 coll aux_mid_5 b1 x, cong b1 aux_mid_5 x aux_mid_5
-aux_mid_5 = midpoint aux_mid_5 b1 x
+aux_mid_5 = coll aux_mid_5 b1 x, cong aux_mid_5 b1 aux_mid_5 x
 aux_mid_6
 (0.22797081055419474,-0.43583599078239693)
 coll aux_mid_6 d1 x, cong d1 aux_mid_6 x aux_mid_6
-aux_mid_6 = midpoint aux_mid_6 d1 x
+aux_mid_6 = coll aux_mid_6 d1 x, cong aux_mid_6 d1 aux_mid_6 x
 aux_mid_7
 (0.388158030343463,-0.4545336554036241)
 coll aux_mid_7 x q, cong x aux_mid_7 q aux_mid_7
-aux_mid_7 = midpoint aux_mid_7 x q
+aux_mid_7 = coll aux_mid_7 x q, cong aux_mid_7 x aux_mid_7 q
 aux_ref_0
 (1.9961294368250049,0.013705578722360112)
 perp a aux_ref_0 b1 x, cong a b1 aux_ref_0 b1
@@ -4182,47 +4182,47 @@ aux_int_68 = on_line aux_int_68 o2 p, on_circum aux_int_68 b m r
 aux_mid_0
 (-0.06950961826203128,-0.805631258550076)
 coll aux_mid_0 a b, cong a aux_mid_0 b aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 a b
+aux_mid_0 = coll aux_mid_0 a b, cong aux_mid_0 a aux_mid_0 b
 aux_mid_1
 (0.7954675574219398,-0.8556096930221508)
 coll aux_mid_1 a c, cong a aux_mid_1 c aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 a c
+aux_mid_1 = coll aux_mid_1 a c, cong aux_mid_1 a aux_mid_1 c
 aux_mid_2
 (-0.3713269105996151,-1.2536156373597604)
 coll aux_mid_2 b o, cong b aux_mid_2 o aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 b o
+aux_mid_2 = coll aux_mid_2 b o, cong aux_mid_2 b aux_mid_2 o
 aux_mid_3
 (-0.1759675975278696,-0.8669561251429257)
 coll aux_mid_3 b m, cong b aux_mid_3 m aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 b m
+aux_mid_3 = coll aux_mid_3 b m, cong aux_mid_3 b aux_mid_3 m
 aux_mid_4
 (-0.2560283881269,-1.2602775930877512)
 coll aux_mid_4 b p, cong b aux_mid_4 p aux_mid_4
-aux_mid_4 = midpoint aux_mid_4 b p
+aux_mid_4 = coll aux_mid_4 b p, cong aux_mid_4 b aux_mid_4 p
 aux_mid_5
 (0.49365026508435594,-1.3035940718318353)
 coll aux_mid_5 c o, cong c aux_mid_5 o aux_mid_5
-aux_mid_5 = midpoint aux_mid_5 c o
+aux_mid_5 = coll aux_mid_5 c o, cong aux_mid_5 c aux_mid_5 o
 aux_mid_6
 (0.8519698245587464,-1.0601234721905162)
 coll aux_mid_6 c n, cong c aux_mid_6 n aux_mid_6
-aux_mid_6 = midpoint aux_mid_6 c n
+aux_mid_6 = coll aux_mid_6 c n, cong aux_mid_6 c aux_mid_6 n
 aux_mid_7
 (0.608948787557071,-1.3102560275598263)
 coll aux_mid_7 c p, cong c aux_mid_7 p aux_mid_7
-aux_mid_7 = midpoint aux_mid_7 c p
+aux_mid_7 = coll aux_mid_7 c p, cong aux_mid_7 c aux_mid_7 p
 aux_mid_8
 (0.17646019971508553,-1.2852668103237888)
 coll aux_mid_8 o p, cong o aux_mid_8 p aux_mid_8
-aux_mid_8 = midpoint aux_mid_8 o p
+aux_mid_8 = coll aux_mid_8 o p, cong aux_mid_8 o aux_mid_8 p
 aux_mid_9
 (0.6148405497885063,-0.648474742737644)
 coll aux_mid_9 m n, cong m aux_mid_9 n aux_mid_9
-aux_mid_9 = midpoint aux_mid_9 m n
+aux_mid_9 = coll aux_mid_9 m n, cong aux_mid_9 m aux_mid_9 n
 aux_mid_10
 (0.3978650737700016,-1.0332906469339902)
 coll aux_mid_10 r p, cong r aux_mid_10 p aux_mid_10
-aux_mid_10 = midpoint aux_mid_10 r p
+aux_mid_10 = coll aux_mid_10 r p, cong aux_mid_10 r aux_mid_10 p
 aux_ref_0
 (-1.0167314569732775,-1.351276153309422)
 perp a aux_ref_0 o o1, cong a o aux_ref_0 o
@@ -4345,7 +4345,7 @@ aux_int_11 = on_line aux_int_11 c p, on_circum aux_int_11 a b c
 aux_mid_0
 (-0.21351414314083697,-0.5109738714137816)
 coll aux_mid_0 a c, cong a aux_mid_0 c aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 a c
+aux_mid_0 = coll aux_mid_0 a c, cong aux_mid_0 a aux_mid_0 c
 aux_ref_0
 (0.9768770692352897,0.07877334350320431)
 perp o aux_ref_0 a c, cong o a aux_ref_0 a
@@ -4556,79 +4556,79 @@ aux_int_48 = on_line aux_int_48 o2 m, on_circum aux_int_48 a d p
 aux_mid_0
 (1.1220667477026733,0.8926180692146661)
 coll aux_mid_0 a c, cong a aux_mid_0 c aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 a c
+aux_mid_0 = coll aux_mid_0 a c, cong aux_mid_0 a aux_mid_0 c
 aux_mid_1
 (1.258529221747112,1.1438223485616559)
 coll aux_mid_1 a p, cong a aux_mid_1 p aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 a p
+aux_mid_1 = coll aux_mid_1 a p, cong aux_mid_1 a aux_mid_1 p
 aux_mid_2
 (1.2081016042030228,1.0509936539842484)
 coll aux_mid_2 a r, cong a aux_mid_2 r aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 a r
+aux_mid_2 = coll aux_mid_2 a r, cong aux_mid_2 a aux_mid_2 r
 aux_mid_3
 (1.1920908073392302,0.9899196868399476)
 coll aux_mid_3 b d, cong b aux_mid_3 d aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 b d
+aux_mid_3 = coll aux_mid_3 b d, cong aux_mid_3 b aux_mid_3 d
 aux_mid_4
 (0.711173610000637,1.0509330837852184)
 coll aux_mid_4 b p, cong b aux_mid_4 p aux_mid_4
-aux_mid_4 = midpoint aux_mid_4 b p
+aux_mid_4 = coll aux_mid_4 b p, cong aux_mid_4 b aux_mid_4 p
 aux_mid_5
 (0.6179335493957547,1.0627623401735722)
 coll aux_mid_5 b q, cong b aux_mid_5 q aux_mid_5
-aux_mid_5 = midpoint aux_mid_5 b q
+aux_mid_5 = coll aux_mid_5 b q, cong aux_mid_5 b aux_mid_5 q
 aux_mid_6
 (1.0395685599287627,0.7407528919760564)
 coll aux_mid_6 c p, cong c aux_mid_6 p aux_mid_6
-aux_mid_6 = midpoint aux_mid_6 c p
+aux_mid_6 = coll aux_mid_6 c p, cong aux_mid_6 c aux_mid_6 p
 aux_mid_7
 (0.9891409423846733,0.6479241973986489)
 coll aux_mid_7 c r, cong c aux_mid_7 r aux_mid_7
-aux_mid_7 = midpoint aux_mid_7 c r
+aux_mid_7 = coll aux_mid_7 c r, cong aux_mid_7 c aux_mid_7 r
 aux_mid_8
 (1.656948231311795,0.9309437743777753)
 coll aux_mid_8 d p, cong d aux_mid_8 p aux_mid_8
-aux_mid_8 = midpoint aux_mid_8 d p
+aux_mid_8 = coll aux_mid_8 d p, cong aux_mid_8 d aux_mid_8 p
 aux_mid_9
 (1.5637081707069127,0.9427730307661292)
 coll aux_mid_9 d q, cong d aux_mid_9 q aux_mid_9
-aux_mid_9 = midpoint aux_mid_9 d q
+aux_mid_9 = coll aux_mid_9 d q, cong aux_mid_9 d aux_mid_9 q
 aux_mid_10
 (1.069656615191822,0.8197918049316558)
 coll aux_mid_10 e f, cong e aux_mid_10 f aux_mid_10
-aux_mid_10 = midpoint aux_mid_10 e f
+aux_mid_10 = coll aux_mid_10 e f, cong aux_mid_10 e aux_mid_10 f
 aux_mid_11
 (1.1921186310437222,0.5204250149543326)
 coll aux_mid_11 e q, cong e aux_mid_11 q aux_mid_11
-aux_mid_11 = midpoint aux_mid_11 e q
+aux_mid_11 = coll aux_mid_11 e q, cong aux_mid_11 e aux_mid_11 q
 aux_mid_12
 (1.234931074104515,0.4157670639885712)
 coll aux_mid_12 e r, cong e aux_mid_12 r aux_mid_12
-aux_mid_12 = midpoint aux_mid_12 e r
+aux_mid_12 = coll aux_mid_12 e r, cong aux_mid_12 e aux_mid_12 r
 aux_mid_13
 (0.8670888969115371,1.3149824740770772)
 coll aux_mid_13 f q, cong f aux_mid_13 q aux_mid_13
-aux_mid_13 = midpoint aux_mid_13 f q
+aux_mid_13 = coll aux_mid_13 f q, cong aux_mid_13 f aux_mid_13 q
 aux_mid_14
 (0.9099013399723299,1.2103245231113158)
 coll aux_mid_14 f r, cong f aux_mid_14 r aux_mid_14
-aux_mid_14 = midpoint aux_mid_14 f r
+aux_mid_14 = coll aux_mid_14 f r, cong aux_mid_14 f aux_mid_14 r
 aux_mid_15
 (1.0827909733683194,1.0037864277114)
 coll aux_mid_15 p q, cong p aux_mid_15 q aux_mid_15
-aux_mid_15 = midpoint aux_mid_15 p q
+aux_mid_15 = coll aux_mid_15 p q, cong aux_mid_15 p aux_mid_15 q
 aux_mid_16
 (1.1256034164291122,0.8991284767456387)
 coll aux_mid_16 p r, cong p aux_mid_16 r aux_mid_16
-aux_mid_16 = midpoint aux_mid_16 p r
+aux_mid_16 = coll aux_mid_16 p r, cong aux_mid_16 p aux_mid_16 r
 aux_mid_17
 (1.1760291858837912,0.927631031527705)
 coll aux_mid_17 p m, cong p aux_mid_17 m aux_mid_17
-aux_mid_17 = midpoint aux_mid_17 p m
+aux_mid_17 = coll aux_mid_17 p m, cong aux_mid_17 p aux_mid_17 m
 aux_mid_18
 (1.03236335582423,0.9109577331339925)
 coll aux_mid_18 q r, cong q aux_mid_18 r aux_mid_18
-aux_mid_18 = midpoint aux_mid_18 q r
+aux_mid_18 = coll aux_mid_18 q r, cong aux_mid_18 q aux_mid_18 r
 
 Problem Name:
 translated_imo_2007_p4
@@ -5119,75 +5119,75 @@ aux_int_120 = on_line aux_int_120 k k1, on_circum aux_int_120 b o k
 aux_mid_0
 (-0.8959543412991773,-0.7356950250236003)
 coll aux_mid_0 a r, cong a aux_mid_0 r aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 a r
+aux_mid_0 = coll aux_mid_0 a r, cong aux_mid_0 a aux_mid_0 r
 aux_mid_1
 (-1.5956514077142407,-0.6434063138505774)
 coll aux_mid_1 b r, cong b aux_mid_1 r aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 b r
+aux_mid_1 = coll aux_mid_1 b r, cong aux_mid_1 b aux_mid_1 r
 aux_mid_2
 (-0.8713772820625566,-1.2131049060053745)
 coll aux_mid_2 c r, cong c aux_mid_2 r aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 c r
+aux_mid_2 = coll aux_mid_2 c r, cong aux_mid_2 c aux_mid_2 r
 aux_mid_3
 (-0.40766915870475273,-0.727881977825132)
 coll aux_mid_3 c l, cong c aux_mid_3 l aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 c l
+aux_mid_3 = coll aux_mid_3 c l, cong aux_mid_3 c aux_mid_3 l
 aux_mid_4
 (-0.7575176919122844,-0.6817376222386204)
 coll aux_mid_4 c k, cong c aux_mid_4 k aux_mid_4
-aux_mid_4 = midpoint aux_mid_4 c k
+aux_mid_4 = coll aux_mid_4 c k, cong aux_mid_4 c aux_mid_4 k
 aux_mid_5
 (-1.3845162646872722,-1.4788588532457467)
 coll aux_mid_5 c p, cong c aux_mid_5 p aux_mid_5
-aux_mid_5 = midpoint aux_mid_5 c p
+aux_mid_5 = coll aux_mid_5 c p, cong aux_mid_5 c aux_mid_5 p
 aux_mid_6
 (0.11775835353827394,-0.7008329710756465)
 coll aux_mid_6 c q, cong c aux_mid_6 q aux_mid_6
-aux_mid_6 = midpoint aux_mid_6 c q
+aux_mid_6 = coll aux_mid_6 c q, cong aux_mid_6 c aux_mid_6 q
 aux_mid_7
 (-0.3075910402859867,-0.9211208154855641)
 coll aux_mid_7 c l1, cong c aux_mid_7 l1 aux_mid_7
-aux_mid_7 = midpoint aux_mid_7 c l1
+aux_mid_7 = coll aux_mid_7 c l1, cong aux_mid_7 c aux_mid_7 l1
 aux_mid_8
 (-0.5646053686942332,-1.0542281696032652)
 coll aux_mid_8 c k1, cong c aux_mid_8 k1 aux_mid_8
-aux_mid_8 = midpoint aux_mid_8 c k1
+aux_mid_8 = coll aux_mid_8 c k1, cong aux_mid_8 c aux_mid_8 k1
 aux_mid_9
 (-1.8605129176633866,-1.7253768409351022)
 coll aux_mid_9 r p, cong r aux_mid_9 p aux_mid_9
-aux_mid_9 = midpoint aux_mid_9 r p
+aux_mid_9 = coll aux_mid_9 r p, cong aux_mid_9 r aux_mid_9 p
 aux_mid_10
 (-0.3582382994378403,-0.947350958765002)
 coll aux_mid_10 r q, cong r aux_mid_10 q aux_mid_10
-aux_mid_10 = midpoint aux_mid_10 r q
+aux_mid_10 = coll aux_mid_10 r q, cong aux_mid_10 r aux_mid_10 q
 aux_mid_11
 (-0.783587693262101,-1.1676388031749196)
 coll aux_mid_11 r l1, cong r aux_mid_11 l1 aux_mid_11
-aux_mid_11 = midpoint aux_mid_11 r l1
+aux_mid_11 = coll aux_mid_11 r l1, cong aux_mid_11 r aux_mid_11 l1
 aux_mid_12
 (-1.0406020216703473,-1.3007461572926207)
 coll aux_mid_12 r k1, cong r aux_mid_12 k1 aux_mid_12
-aux_mid_12 = midpoint aux_mid_12 r k1
+aux_mid_12 = coll aux_mid_12 r k1, cong aux_mid_12 r aux_mid_12 k1
 aux_mid_13
 (-1.2967266758868166,-1.4333927504152917)
 coll aux_mid_13 p l1, cong p aux_mid_13 l1 aux_mid_13
-aux_mid_13 = midpoint aux_mid_13 p l1
+aux_mid_13 = coll aux_mid_13 p l1, cong aux_mid_13 p aux_mid_13 l1
 aux_mid_14
 (-1.553741004295063,-1.566500104532993)
 coll aux_mid_14 p k1, cong p aux_mid_14 k1 aux_mid_14
-aux_mid_14 = midpoint aux_mid_14 p k1
+aux_mid_14 = coll aux_mid_14 p k1, cong aux_mid_14 p aux_mid_14 k1
 aux_mid_15
 (0.2055479423387296,-0.6553668682451916)
 coll aux_mid_15 q l1, cong q aux_mid_15 l1 aux_mid_15
-aux_mid_15 = midpoint aux_mid_15 q l1
+aux_mid_15 = coll aux_mid_15 q l1, cong aux_mid_15 q aux_mid_15 l1
 aux_mid_16
 (-0.05146638606951681,-0.7884742223628927)
 coll aux_mid_16 q k1, cong q aux_mid_16 k1 aux_mid_16
-aux_mid_16 = midpoint aux_mid_16 q k1
+aux_mid_16 = coll aux_mid_16 q k1, cong aux_mid_16 q aux_mid_16 k1
 aux_mid_17
 (-0.47681577989377744,-1.0087620667728103)
 coll aux_mid_17 l1 k1, cong l1 aux_mid_17 k1 aux_mid_17
-aux_mid_17 = midpoint aux_mid_17 l1 k1
+aux_mid_17 = coll aux_mid_17 l1 k1, cong aux_mid_17 l1 aux_mid_17 k1
 aux_ref_0
 (0.3560901997904439,-1.5576778576359298)
 perp a aux_ref_0 r p, cong a r aux_ref_0 r
@@ -5882,147 +5882,147 @@ aux_int_156 = on_line aux_int_156 a2 b1, on_circum aux_int_156 a b e
 aux_mid_0
 (1.0974309043602721,1.0377862663795854)
 coll aux_mid_0 a h, cong a aux_mid_0 h aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 a h
+aux_mid_0 = coll aux_mid_0 a h, cong aux_mid_0 a aux_mid_0 h
 aux_mid_1
 (0.9578692727386103,1.0477081651192472)
 coll aux_mid_1 a d, cong a aux_mid_1 d aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 a d
+aux_mid_1 = coll aux_mid_1 a d, cong aux_mid_1 a aux_mid_1 d
 aux_mid_2
 (1.231547078611848,1.0941527975074659)
 coll aux_mid_2 a e, cong a aux_mid_2 e aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 a e
+aux_mid_2 = coll aux_mid_2 a e, cong aux_mid_2 a aux_mid_2 e
 aux_mid_3
 (1.067349603647785,1.2492428934120468)
 coll aux_mid_3 a f, cong a aux_mid_3 f aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 a f
+aux_mid_3 = coll aux_mid_3 a f, cong aux_mid_3 a aux_mid_3 f
 aux_mid_4
 (0.856154590277768,1.1437811398176012)
 coll aux_mid_4 a a1, cong a aux_mid_4 a1 aux_mid_4
-aux_mid_4 = midpoint aux_mid_4 a a1
+aux_mid_4 = coll aux_mid_4 a a1, cong aux_mid_4 a aux_mid_4 a1
 aux_mid_5
 (1.0595839551994526,0.9516351904208931)
 coll aux_mid_5 a a2, cong a aux_mid_5 a2 aux_mid_5
-aux_mid_5 = midpoint aux_mid_5 a a2
+aux_mid_5 = coll aux_mid_5 a a2, cong aux_mid_5 a aux_mid_5 a2
 aux_mid_6
 (1.300991360931287,1.2219879479177007)
 coll aux_mid_6 a b1, cong a aux_mid_6 b1 aux_mid_6
-aux_mid_6 = midpoint aux_mid_6 a b1
+aux_mid_6 = coll aux_mid_6 a b1, cong aux_mid_6 a aux_mid_6 b1
 aux_mid_7
 (1.1621027962924089,0.966317647097231)
 coll aux_mid_7 a b2, cong a aux_mid_7 b2 aux_mid_7
-aux_mid_7 = midpoint aux_mid_7 a b2
+aux_mid_7 = coll aux_mid_7 a b2, cong aux_mid_7 a aux_mid_7 b2
 aux_mid_8
 (0.8567747971778854,1.2135071878969101)
 coll aux_mid_8 a c1, cong a aux_mid_8 c1 aux_mid_8
-aux_mid_8 = midpoint aux_mid_8 a c1
+aux_mid_8 = coll aux_mid_8 a c1, cong aux_mid_8 a aux_mid_8 c1
 aux_mid_9
 (1.2779244101176843,1.2849785989271836)
 coll aux_mid_9 a c2, cong a aux_mid_9 c2 aux_mid_9
-aux_mid_9 = midpoint aux_mid_9 a c2
+aux_mid_9 = coll aux_mid_9 a c2, cong aux_mid_9 a aux_mid_9 c2
 aux_mid_10
 (0.5500752926137971,0.9448970016031479)
 coll aux_mid_10 b h, cong b aux_mid_10 h aux_mid_10
-aux_mid_10 = midpoint aux_mid_10 b h
+aux_mid_10 = coll aux_mid_10 b h, cong aux_mid_10 b aux_mid_10 h
 aux_mid_11
 (0.41051366099213515,0.9548189003428097)
 coll aux_mid_11 b d, cong b aux_mid_11 d aux_mid_11
-aux_mid_11 = midpoint aux_mid_11 b d
+aux_mid_11 = coll aux_mid_11 b d, cong aux_mid_11 b aux_mid_11 d
 aux_mid_12
 (0.6841914668653728,1.0012635327310284)
 coll aux_mid_12 b e, cong b aux_mid_12 e aux_mid_12
-aux_mid_12 = midpoint aux_mid_12 b e
+aux_mid_12 = coll aux_mid_12 b e, cong aux_mid_12 b aux_mid_12 e
 aux_mid_13
 (0.5199939919013099,1.1563536286356095)
 coll aux_mid_13 b f, cong b aux_mid_13 f aux_mid_13
-aux_mid_13 = midpoint aux_mid_13 b f
+aux_mid_13 = coll aux_mid_13 b f, cong aux_mid_13 b aux_mid_13 f
 aux_mid_14
 (0.3087989785312928,1.0508918750411638)
 coll aux_mid_14 b a1, cong b aux_mid_14 a1 aux_mid_14
-aux_mid_14 = midpoint aux_mid_14 b a1
+aux_mid_14 = coll aux_mid_14 b a1, cong aux_mid_14 b aux_mid_14 a1
 aux_mid_15
 (0.5122283434529775,0.8587459256444556)
 coll aux_mid_15 b a2, cong b aux_mid_15 a2 aux_mid_15
-aux_mid_15 = midpoint aux_mid_15 b a2
+aux_mid_15 = coll aux_mid_15 b a2, cong aux_mid_15 b aux_mid_15 a2
 aux_mid_16
 (0.7536357491848119,1.1290986831412633)
 coll aux_mid_16 b b1, cong b aux_mid_16 b1 aux_mid_16
-aux_mid_16 = midpoint aux_mid_16 b b1
+aux_mid_16 = coll aux_mid_16 b b1, cong aux_mid_16 b aux_mid_16 b1
 aux_mid_17
 (0.6147471845459338,0.8734283823207936)
 coll aux_mid_17 b b2, cong b aux_mid_17 b2 aux_mid_17
-aux_mid_17 = midpoint aux_mid_17 b b2
+aux_mid_17 = coll aux_mid_17 b b2, cong aux_mid_17 b aux_mid_17 b2
 aux_mid_18
 (0.3094191854314102,1.1206179231204727)
 coll aux_mid_18 b c1, cong b aux_mid_18 c1 aux_mid_18
-aux_mid_18 = midpoint aux_mid_18 b c1
+aux_mid_18 = coll aux_mid_18 b c1, cong aux_mid_18 b aux_mid_18 c1
 aux_mid_19
 (0.730568798371209,1.1920893341507461)
 coll aux_mid_19 b c2, cong b aux_mid_19 c2 aux_mid_19
-aux_mid_19 = midpoint aux_mid_19 b c2
+aux_mid_19 = coll aux_mid_19 b c2, cong aux_mid_19 b aux_mid_19 c2
 aux_mid_20
 (0.8784702425419229,0.6347168097939858)
 coll aux_mid_20 c h, cong c aux_mid_20 h aux_mid_20
-aux_mid_20 = midpoint aux_mid_20 c h
+aux_mid_20 = coll aux_mid_20 c h, cong aux_mid_20 c aux_mid_20 h
 aux_mid_21
 (0.7389086109202609,0.6446387085336477)
 coll aux_mid_21 c d, cong c aux_mid_21 d aux_mid_21
-aux_mid_21 = midpoint aux_mid_21 c d
+aux_mid_21 = coll aux_mid_21 c d, cong aux_mid_21 c aux_mid_21 d
 aux_mid_22
 (1.0125864167934986,0.6910833409218664)
 coll aux_mid_22 c e, cong c aux_mid_22 e aux_mid_22
-aux_mid_22 = midpoint aux_mid_22 c e
+aux_mid_22 = coll aux_mid_22 c e, cong aux_mid_22 c aux_mid_22 e
 aux_mid_23
 (0.8483889418294357,0.8461734368264474)
 coll aux_mid_23 c f, cong c aux_mid_23 f aux_mid_23
-aux_mid_23 = midpoint aux_mid_23 c f
+aux_mid_23 = coll aux_mid_23 c f, cong aux_mid_23 c aux_mid_23 f
 aux_mid_24
 (0.6371939284594186,0.7407116832320016)
 coll aux_mid_24 c a1, cong c aux_mid_24 a1 aux_mid_24
-aux_mid_24 = midpoint aux_mid_24 c a1
+aux_mid_24 = coll aux_mid_24 c a1, cong aux_mid_24 c aux_mid_24 a1
 aux_mid_25
 (0.8406232933811033,0.5485657338352935)
 coll aux_mid_25 c a2, cong c aux_mid_25 a2 aux_mid_25
-aux_mid_25 = midpoint aux_mid_25 c a2
+aux_mid_25 = coll aux_mid_25 c a2, cong aux_mid_25 c aux_mid_25 a2
 aux_mid_26
 (1.0820306991129378,0.8189184913321013)
 coll aux_mid_26 c b1, cong c aux_mid_26 b1 aux_mid_26
-aux_mid_26 = midpoint aux_mid_26 c b1
+aux_mid_26 = coll aux_mid_26 c b1, cong aux_mid_26 c aux_mid_26 b1
 aux_mid_27
 (0.9431421344740596,0.5632481905116314)
 coll aux_mid_27 c b2, cong c aux_mid_27 b2 aux_mid_27
-aux_mid_27 = midpoint aux_mid_27 c b2
+aux_mid_27 = coll aux_mid_27 c b2, cong aux_mid_27 c aux_mid_27 b2
 aux_mid_28
 (0.637814135359536,0.8104377313113107)
 coll aux_mid_28 c c1, cong c aux_mid_28 c1 aux_mid_28
-aux_mid_28 = midpoint aux_mid_28 c c1
+aux_mid_28 = coll aux_mid_28 c c1, cong aux_mid_28 c aux_mid_28 c1
 aux_mid_29
 (1.0589637482993348,0.8819091423415841)
 coll aux_mid_29 c c2, cong c aux_mid_29 c2 aux_mid_29
-aux_mid_29 = midpoint aux_mid_29 c c2
+aux_mid_29 = coll aux_mid_29 c c2, cong aux_mid_29 c aux_mid_29 c2
 aux_mid_30
 (0.4729964534953557,0.8958017791365827)
 coll aux_mid_30 d a1, cong d aux_mid_30 a1 aux_mid_30
-aux_mid_30 = midpoint aux_mid_30 d a1
+aux_mid_30 = coll aux_mid_30 d a1, cong aux_mid_30 d aux_mid_30 a1
 aux_mid_31
 (0.6764258184170404,0.7036558297398745)
 coll aux_mid_31 d a2, cong d aux_mid_31 a2 aux_mid_31
-aux_mid_31 = midpoint aux_mid_31 d a2
+aux_mid_31 = coll aux_mid_31 d a2, cong aux_mid_31 d aux_mid_31 a2
 aux_mid_32
 (1.1915110300221126,1.020453219624901)
 coll aux_mid_32 e b1, cong e aux_mid_32 b1 aux_mid_32
-aux_mid_32 = midpoint aux_mid_32 e b1
+aux_mid_32 = coll aux_mid_32 e b1, cong aux_mid_32 e aux_mid_32 b1
 aux_mid_33
 (1.0526224653832343,0.7647829188044313)
 coll aux_mid_33 e b2, cong e aux_mid_33 b2 aux_mid_33
-aux_mid_33 = midpoint aux_mid_33 e b2
+aux_mid_33 = coll aux_mid_33 e b2, cong aux_mid_33 e aux_mid_33 b2
 aux_mid_34
 (0.5830969913046479,1.1670625555086915)
 coll aux_mid_34 f c1, cong f aux_mid_34 c1 aux_mid_34
-aux_mid_34 = midpoint aux_mid_34 f c1
+aux_mid_34 = coll aux_mid_34 f c1, cong aux_mid_34 f aux_mid_34 c1
 aux_mid_35
 (1.0042466042444467,1.2385339665389647)
 coll aux_mid_35 f c2, cong f aux_mid_35 c2 aux_mid_35
-aux_mid_35 = midpoint aux_mid_35 f c2
+aux_mid_35 = coll aux_mid_35 f c2, cong aux_mid_35 f aux_mid_35 c2
 aux_ref_0
 (0.12324017307617918,0.006387986062208029)
 perp a aux_ref_0 b c, cong a b aux_ref_0 b
@@ -6753,147 +6753,147 @@ aux_int_156 = on_line aux_int_156 a2 b1, on_circum aux_int_156 a b e
 aux_mid_0
 (1.0974309043602721,1.0377862663795854)
 coll aux_mid_0 a h, cong a aux_mid_0 h aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 a h
+aux_mid_0 = coll aux_mid_0 a h, cong aux_mid_0 a aux_mid_0 h
 aux_mid_1
 (0.9578692727386103,1.0477081651192472)
 coll aux_mid_1 a d, cong a aux_mid_1 d aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 a d
+aux_mid_1 = coll aux_mid_1 a d, cong aux_mid_1 a aux_mid_1 d
 aux_mid_2
 (1.231547078611848,1.0941527975074659)
 coll aux_mid_2 a e, cong a aux_mid_2 e aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 a e
+aux_mid_2 = coll aux_mid_2 a e, cong aux_mid_2 a aux_mid_2 e
 aux_mid_3
 (1.067349603647785,1.2492428934120468)
 coll aux_mid_3 a f, cong a aux_mid_3 f aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 a f
+aux_mid_3 = coll aux_mid_3 a f, cong aux_mid_3 a aux_mid_3 f
 aux_mid_4
 (0.856154590277768,1.1437811398176012)
 coll aux_mid_4 a a1, cong a aux_mid_4 a1 aux_mid_4
-aux_mid_4 = midpoint aux_mid_4 a a1
+aux_mid_4 = coll aux_mid_4 a a1, cong aux_mid_4 a aux_mid_4 a1
 aux_mid_5
 (1.0595839551994526,0.9516351904208931)
 coll aux_mid_5 a a2, cong a aux_mid_5 a2 aux_mid_5
-aux_mid_5 = midpoint aux_mid_5 a a2
+aux_mid_5 = coll aux_mid_5 a a2, cong aux_mid_5 a aux_mid_5 a2
 aux_mid_6
 (1.300991360931287,1.2219879479177007)
 coll aux_mid_6 a b1, cong a aux_mid_6 b1 aux_mid_6
-aux_mid_6 = midpoint aux_mid_6 a b1
+aux_mid_6 = coll aux_mid_6 a b1, cong aux_mid_6 a aux_mid_6 b1
 aux_mid_7
 (1.1621027962924089,0.966317647097231)
 coll aux_mid_7 a b2, cong a aux_mid_7 b2 aux_mid_7
-aux_mid_7 = midpoint aux_mid_7 a b2
+aux_mid_7 = coll aux_mid_7 a b2, cong aux_mid_7 a aux_mid_7 b2
 aux_mid_8
 (0.8567747971778854,1.2135071878969101)
 coll aux_mid_8 a c1, cong a aux_mid_8 c1 aux_mid_8
-aux_mid_8 = midpoint aux_mid_8 a c1
+aux_mid_8 = coll aux_mid_8 a c1, cong aux_mid_8 a aux_mid_8 c1
 aux_mid_9
 (1.2779244101176843,1.2849785989271836)
 coll aux_mid_9 a c2, cong a aux_mid_9 c2 aux_mid_9
-aux_mid_9 = midpoint aux_mid_9 a c2
+aux_mid_9 = coll aux_mid_9 a c2, cong aux_mid_9 a aux_mid_9 c2
 aux_mid_10
 (0.5500752926137971,0.9448970016031479)
 coll aux_mid_10 b h, cong b aux_mid_10 h aux_mid_10
-aux_mid_10 = midpoint aux_mid_10 b h
+aux_mid_10 = coll aux_mid_10 b h, cong aux_mid_10 b aux_mid_10 h
 aux_mid_11
 (0.41051366099213515,0.9548189003428097)
 coll aux_mid_11 b d, cong b aux_mid_11 d aux_mid_11
-aux_mid_11 = midpoint aux_mid_11 b d
+aux_mid_11 = coll aux_mid_11 b d, cong aux_mid_11 b aux_mid_11 d
 aux_mid_12
 (0.6841914668653728,1.0012635327310284)
 coll aux_mid_12 b e, cong b aux_mid_12 e aux_mid_12
-aux_mid_12 = midpoint aux_mid_12 b e
+aux_mid_12 = coll aux_mid_12 b e, cong aux_mid_12 b aux_mid_12 e
 aux_mid_13
 (0.5199939919013099,1.1563536286356095)
 coll aux_mid_13 b f, cong b aux_mid_13 f aux_mid_13
-aux_mid_13 = midpoint aux_mid_13 b f
+aux_mid_13 = coll aux_mid_13 b f, cong aux_mid_13 b aux_mid_13 f
 aux_mid_14
 (0.3087989785312928,1.0508918750411638)
 coll aux_mid_14 b a1, cong b aux_mid_14 a1 aux_mid_14
-aux_mid_14 = midpoint aux_mid_14 b a1
+aux_mid_14 = coll aux_mid_14 b a1, cong aux_mid_14 b aux_mid_14 a1
 aux_mid_15
 (0.5122283434529775,0.8587459256444556)
 coll aux_mid_15 b a2, cong b aux_mid_15 a2 aux_mid_15
-aux_mid_15 = midpoint aux_mid_15 b a2
+aux_mid_15 = coll aux_mid_15 b a2, cong aux_mid_15 b aux_mid_15 a2
 aux_mid_16
 (0.7536357491848119,1.1290986831412633)
 coll aux_mid_16 b b1, cong b aux_mid_16 b1 aux_mid_16
-aux_mid_16 = midpoint aux_mid_16 b b1
+aux_mid_16 = coll aux_mid_16 b b1, cong aux_mid_16 b aux_mid_16 b1
 aux_mid_17
 (0.6147471845459338,0.8734283823207936)
 coll aux_mid_17 b b2, cong b aux_mid_17 b2 aux_mid_17
-aux_mid_17 = midpoint aux_mid_17 b b2
+aux_mid_17 = coll aux_mid_17 b b2, cong aux_mid_17 b aux_mid_17 b2
 aux_mid_18
 (0.3094191854314102,1.1206179231204727)
 coll aux_mid_18 b c1, cong b aux_mid_18 c1 aux_mid_18
-aux_mid_18 = midpoint aux_mid_18 b c1
+aux_mid_18 = coll aux_mid_18 b c1, cong aux_mid_18 b aux_mid_18 c1
 aux_mid_19
 (0.730568798371209,1.1920893341507461)
 coll aux_mid_19 b c2, cong b aux_mid_19 c2 aux_mid_19
-aux_mid_19 = midpoint aux_mid_19 b c2
+aux_mid_19 = coll aux_mid_19 b c2, cong aux_mid_19 b aux_mid_19 c2
 aux_mid_20
 (0.8784702425419229,0.6347168097939858)
 coll aux_mid_20 c h, cong c aux_mid_20 h aux_mid_20
-aux_mid_20 = midpoint aux_mid_20 c h
+aux_mid_20 = coll aux_mid_20 c h, cong aux_mid_20 c aux_mid_20 h
 aux_mid_21
 (0.7389086109202609,0.6446387085336477)
 coll aux_mid_21 c d, cong c aux_mid_21 d aux_mid_21
-aux_mid_21 = midpoint aux_mid_21 c d
+aux_mid_21 = coll aux_mid_21 c d, cong aux_mid_21 c aux_mid_21 d
 aux_mid_22
 (1.0125864167934986,0.6910833409218664)
 coll aux_mid_22 c e, cong c aux_mid_22 e aux_mid_22
-aux_mid_22 = midpoint aux_mid_22 c e
+aux_mid_22 = coll aux_mid_22 c e, cong aux_mid_22 c aux_mid_22 e
 aux_mid_23
 (0.8483889418294357,0.8461734368264474)
 coll aux_mid_23 c f, cong c aux_mid_23 f aux_mid_23
-aux_mid_23 = midpoint aux_mid_23 c f
+aux_mid_23 = coll aux_mid_23 c f, cong aux_mid_23 c aux_mid_23 f
 aux_mid_24
 (0.6371939284594186,0.7407116832320016)
 coll aux_mid_24 c a1, cong c aux_mid_24 a1 aux_mid_24
-aux_mid_24 = midpoint aux_mid_24 c a1
+aux_mid_24 = coll aux_mid_24 c a1, cong aux_mid_24 c aux_mid_24 a1
 aux_mid_25
 (0.8406232933811033,0.5485657338352935)
 coll aux_mid_25 c a2, cong c aux_mid_25 a2 aux_mid_25
-aux_mid_25 = midpoint aux_mid_25 c a2
+aux_mid_25 = coll aux_mid_25 c a2, cong aux_mid_25 c aux_mid_25 a2
 aux_mid_26
 (1.0820306991129378,0.8189184913321013)
 coll aux_mid_26 c b1, cong c aux_mid_26 b1 aux_mid_26
-aux_mid_26 = midpoint aux_mid_26 c b1
+aux_mid_26 = coll aux_mid_26 c b1, cong aux_mid_26 c aux_mid_26 b1
 aux_mid_27
 (0.9431421344740596,0.5632481905116314)
 coll aux_mid_27 c b2, cong c aux_mid_27 b2 aux_mid_27
-aux_mid_27 = midpoint aux_mid_27 c b2
+aux_mid_27 = coll aux_mid_27 c b2, cong aux_mid_27 c aux_mid_27 b2
 aux_mid_28
 (0.637814135359536,0.8104377313113107)
 coll aux_mid_28 c c1, cong c aux_mid_28 c1 aux_mid_28
-aux_mid_28 = midpoint aux_mid_28 c c1
+aux_mid_28 = coll aux_mid_28 c c1, cong aux_mid_28 c aux_mid_28 c1
 aux_mid_29
 (1.0589637482993348,0.8819091423415841)
 coll aux_mid_29 c c2, cong c aux_mid_29 c2 aux_mid_29
-aux_mid_29 = midpoint aux_mid_29 c c2
+aux_mid_29 = coll aux_mid_29 c c2, cong aux_mid_29 c aux_mid_29 c2
 aux_mid_30
 (0.4729964534953557,0.8958017791365827)
 coll aux_mid_30 d a1, cong d aux_mid_30 a1 aux_mid_30
-aux_mid_30 = midpoint aux_mid_30 d a1
+aux_mid_30 = coll aux_mid_30 d a1, cong aux_mid_30 d aux_mid_30 a1
 aux_mid_31
 (0.6764258184170404,0.7036558297398745)
 coll aux_mid_31 d a2, cong d aux_mid_31 a2 aux_mid_31
-aux_mid_31 = midpoint aux_mid_31 d a2
+aux_mid_31 = coll aux_mid_31 d a2, cong aux_mid_31 d aux_mid_31 a2
 aux_mid_32
 (1.1915110300221126,1.020453219624901)
 coll aux_mid_32 e b1, cong e aux_mid_32 b1 aux_mid_32
-aux_mid_32 = midpoint aux_mid_32 e b1
+aux_mid_32 = coll aux_mid_32 e b1, cong aux_mid_32 e aux_mid_32 b1
 aux_mid_33
 (1.0526224653832343,0.7647829188044313)
 coll aux_mid_33 e b2, cong e aux_mid_33 b2 aux_mid_33
-aux_mid_33 = midpoint aux_mid_33 e b2
+aux_mid_33 = coll aux_mid_33 e b2, cong aux_mid_33 e aux_mid_33 b2
 aux_mid_34
 (0.5830969913046479,1.1670625555086915)
 coll aux_mid_34 f c1, cong f aux_mid_34 c1 aux_mid_34
-aux_mid_34 = midpoint aux_mid_34 f c1
+aux_mid_34 = coll aux_mid_34 f c1, cong aux_mid_34 f aux_mid_34 c1
 aux_mid_35
 (1.0042466042444467,1.2385339665389647)
 coll aux_mid_35 f c2, cong f aux_mid_35 c2 aux_mid_35
-aux_mid_35 = midpoint aux_mid_35 f c2
+aux_mid_35 = coll aux_mid_35 f c2, cong aux_mid_35 f aux_mid_35 c2
 aux_ref_0
 (0.12324017307617918,0.006387986062208029)
 perp a aux_ref_0 b c, cong a b aux_ref_0 b
@@ -7084,19 +7084,19 @@ aux_int_21 = on_line aux_int_21 k a, on_circum aux_int_21 m k p
 aux_mid_0
 (0.9021203241339835,1.2212025738022674)
 coll aux_mid_0 q a, cong q aux_mid_0 a aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 q a
+aux_mid_0 = coll aux_mid_0 q a, cong aux_mid_0 q aux_mid_0 a
 aux_mid_1
 (1.0838247886243715,0.822221105959013)
 coll aux_mid_1 p a, cong p aux_mid_1 a aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 p a
+aux_mid_1 = coll aux_mid_1 p a, cong aux_mid_1 p aux_mid_1 a
 aux_mid_2
 (0.46419900049728474,0.4150636606310685)
 coll aux_mid_2 b a, cong b aux_mid_2 a aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 b a
+aux_mid_2 = coll aux_mid_2 b a, cong aux_mid_2 b aux_mid_2 a
 aux_mid_3
 (-0.01088643486857882,0.6364425764061381)
 coll aux_mid_3 c a, cong c aux_mid_3 a aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 c a
+aux_mid_3 = coll aux_mid_3 c a, cong aux_mid_3 c aux_mid_3 a
 aux_ref_0
 (1.8637471779250974,1.5337449877416216)
 perp w aux_ref_0 q p, cong w q aux_ref_0 q
@@ -7259,11 +7259,11 @@ aux_int_34 = on_line aux_int_34 d f, on_circum aux_int_34 a f e
 aux_mid_0
 (1.0867735966440564,1.1139301254126772)
 coll aux_mid_0 a i, cong a aux_mid_0 i aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 a i
+aux_mid_0 = coll aux_mid_0 a i, cong aux_mid_0 a aux_mid_0 i
 aux_mid_1
 (0.574711135956198,0.7997288044382287)
 coll aux_mid_1 b c, cong b aux_mid_1 c aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 b c
+aux_mid_1 = coll aux_mid_1 b c, cong aux_mid_1 b aux_mid_1 c
 aux_ref_0
 (0.8109988995960116,0.31999489820132077)
 perp b aux_ref_0 i d, cong b i aux_ref_0 i
@@ -7434,15 +7434,15 @@ aux_int_30 = on_line aux_int_30 m k, on_circum aux_int_30 c s b
 aux_mid_0
 (0.24154481892993418,1.1079817967554637)
 coll aux_mid_0 p m, cong p aux_mid_0 m aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 p m
+aux_mid_0 = coll aux_mid_0 p m, cong aux_mid_0 p aux_mid_0 m
 aux_mid_1
 (0.27784318276395914,1.2100589687737044)
 coll aux_mid_1 a b, cong a aux_mid_1 b aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 a b
+aux_mid_1 = coll aux_mid_1 a b, cong aux_mid_1 a aux_mid_1 b
 aux_mid_2
 (0.33656810242692276,1.282118483499589)
 coll aux_mid_2 l k, cong l aux_mid_2 k aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 l k
+aux_mid_2 = coll aux_mid_2 l k, cong aux_mid_2 l aux_mid_2 k
 aux_ref_0
 (-0.3070084962206838,2.0153598357127054)
 perp s aux_ref_0 o m, cong s o aux_ref_0 o
@@ -8565,99 +8565,99 @@ aux_int_271 = on_line aux_int_271 c1 x, on_circum aux_int_271 q q3 a1
 aux_mid_0
 (0.9775673356998829,0.41921743136335277)
 coll aux_mid_0 p p1, cong p aux_mid_0 p1 aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 p p1
+aux_mid_0 = coll aux_mid_0 p p1, cong aux_mid_0 p aux_mid_0 p1
 aux_mid_1
 (1.123963205559253,0.8961091266098213)
 coll aux_mid_1 p p2, cong p aux_mid_1 p2 aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 p p2
+aux_mid_1 = coll aux_mid_1 p p2, cong aux_mid_1 p aux_mid_1 p2
 aux_mid_2
 (1.2414372381919372,1.2787865247048333)
 coll aux_mid_2 p p3, cong p aux_mid_2 p3 aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 p p3
+aux_mid_2 = coll aux_mid_2 p p3, cong aux_mid_2 p aux_mid_2 p3
 aux_mid_3
 (1.0953367354460306,0.3079802305156994)
 coll aux_mid_3 q q1, cong q aux_mid_3 q1 aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 q q1
+aux_mid_3 = coll aux_mid_3 q q1, cong aux_mid_3 q aux_mid_3 q1
 aux_mid_4
 (0.8299808690053078,0.3549374857473739)
 coll aux_mid_4 q q2, cong q aux_mid_4 q2 aux_mid_4
-aux_mid_4 = midpoint aux_mid_4 q q2
+aux_mid_4 = coll aux_mid_4 q q2, cong aux_mid_4 q aux_mid_4 q2
 aux_mid_5
 (0.8697188036435957,1.2157038571518848)
 coll aux_mid_5 q q3, cong q aux_mid_5 q3 aux_mid_5
-aux_mid_5 = midpoint aux_mid_5 q q3
+aux_mid_5 = coll aux_mid_5 q q3, cong aux_mid_5 q aux_mid_5 q3
 aux_mid_6
 (0.8931191726318788,0.2118490107010054)
 coll aux_mid_6 p1 q1, cong p1 aux_mid_6 q1 aux_mid_6
-aux_mid_6 = midpoint aux_mid_6 p1 q1
+aux_mid_6 = coll aux_mid_6 p1 q1, cong aux_mid_6 p1 aux_mid_6 q1
 aux_mid_7
 (1.3506370061735358,0.4909403551907299)
 coll aux_mid_7 p1 b1, cong p1 aux_mid_7 b1 aux_mid_7
-aux_mid_7 = midpoint aux_mid_7 p1 b1
+aux_mid_7 = coll aux_mid_7 p1 b1, cong aux_mid_7 p1 aux_mid_7 b1
 aux_mid_8
 (0.4538626181591545,-0.05610273538662447)
 coll aux_mid_8 p1 c1, cong p1 aux_mid_8 c1 aux_mid_8
-aux_mid_8 = midpoint aux_mid_8 p1 c1
+aux_mid_8 = coll aux_mid_8 p1 c1, cong aux_mid_8 p1 aux_mid_8 c1
 aux_mid_9
 (0.7741591760505261,0.7356979611791484)
 coll aux_mid_9 p2 q2, cong p2 aux_mid_9 q2 aux_mid_9
-aux_mid_9 = midpoint aux_mid_9 p2 q2
+aux_mid_9 = coll aux_mid_9 p2 q2, cong aux_mid_9 p2 aux_mid_9 q2
 aux_mid_10
 (1.1027239759135787,1.330681305779319)
 coll aux_mid_10 p2 a1, cong p2 aux_mid_10 a1 aux_mid_10
-aux_mid_10 = midpoint aux_mid_10 p2 a1
+aux_mid_10 = coll aux_mid_10 p2 a1, cong aux_mid_10 p2 aux_mid_10 a1
 aux_mid_11
 (0.6002584880185247,0.4207889598598441)
 coll aux_mid_11 p2 c1, cong p2 aux_mid_11 c1 aux_mid_11
-aux_mid_11 = midpoint aux_mid_11 p2 c1
+aux_mid_11 = coll aux_mid_11 p2 c1, cong aux_mid_11 p2 aux_mid_11 c1
 aux_mid_12
 (0.9313711433214982,1.9791417306786712)
 coll aux_mid_12 p3 q3, cong p3 aux_mid_12 q3 aux_mid_12
-aux_mid_12 = midpoint aux_mid_12 p3 q3
+aux_mid_12 = coll aux_mid_12 p3 q3, cong aux_mid_12 p3 aux_mid_12 q3
 aux_mid_13
 (1.220198008546263,1.713358703874331)
 coll aux_mid_13 p3 a1, cong p3 aux_mid_13 a1 aux_mid_13
-aux_mid_13 = midpoint aux_mid_13 p3 a1
+aux_mid_13 = coll aux_mid_13 p3 a1, cong aux_mid_13 p3 aux_mid_13 a1
 aux_mid_14
 (1.61450690866559,1.3505094485322104)
 coll aux_mid_14 p3 b1, cong p3 aux_mid_14 b1 aux_mid_14
-aux_mid_14 = midpoint aux_mid_14 p3 b1
+aux_mid_14 = coll aux_mid_14 p3 b1, cong aux_mid_14 p3 aux_mid_14 b1
 aux_mid_15
 (1.6135259077306146,0.6513057259108893)
 coll aux_mid_15 q1 b1, cong q1 aux_mid_15 b1 aux_mid_15
-aux_mid_15 = midpoint aux_mid_15 q1 b1
+aux_mid_15 = coll aux_mid_15 q1 b1, cong aux_mid_15 q1 aux_mid_15 b1
 aux_mid_16
 (0.7167515197162333,0.10426263533353489)
 coll aux_mid_16 q1 c1, cong q1 aux_mid_16 c1 aux_mid_16
-aux_mid_16 = midpoint aux_mid_16 q1 c1
+aux_mid_16 = coll aux_mid_16 q1 c1, cong aux_mid_16 q1 aux_mid_16 c1
 aux_mid_17
 (0.9538611411705645,1.0611122364846843)
 coll aux_mid_17 q2 a1, cong q2 aux_mid_17 a1 aux_mid_17
-aux_mid_17 = midpoint aux_mid_17 q2 a1
+aux_mid_17 = coll aux_mid_17 q2 a1, cong aux_mid_17 q2 aux_mid_17 a1
 aux_mid_18
 (0.45139565327551046,0.15121989056520937)
 coll aux_mid_18 q2 c1, cong q2 aux_mid_18 c1 aux_mid_18
-aux_mid_18 = midpoint aux_mid_18 q2 c1
+aux_mid_18 = coll aux_mid_18 q2 c1, cong aux_mid_18 q2 aux_mid_18 c1
 aux_mid_19
 (0.9935990758088524,1.921878607889195)
 coll aux_mid_19 q3 a1, cong q3 aux_mid_19 a1 aux_mid_19
-aux_mid_19 = midpoint aux_mid_19 q3 a1
+aux_mid_19 = coll aux_mid_19 q3 a1, cong aux_mid_19 q3 aux_mid_19 a1
 aux_mid_20
 (1.3879079759281796,1.5590293525470746)
 coll aux_mid_20 q3 b1, cong q3 aux_mid_20 b1 aux_mid_20
-aux_mid_20 = midpoint aux_mid_20 q3 b1
+aux_mid_20 = coll aux_mid_20 q3 b1, cong aux_mid_20 q3 aux_mid_20 b1
 aux_mid_21
 (1.6767348411529444,1.2932463257427342)
 coll aux_mid_21 a1 b1, cong a1 aux_mid_21 b1 aux_mid_21
-aux_mid_21 = midpoint aux_mid_21 a1 b1
+aux_mid_21 = coll aux_mid_21 a1 b1, cong aux_mid_21 a1 aux_mid_21 b1
 aux_mid_22
 (0.7799604531385631,0.7462032351653799)
 coll aux_mid_22 a1 c1, cong a1 aux_mid_22 c1 aux_mid_22
-aux_mid_22 = midpoint aux_mid_22 a1 c1
+aux_mid_22 = coll aux_mid_22 a1 c1, cong aux_mid_22 a1 aux_mid_22 c1
 aux_mid_23
 (1.1742693532578903,0.3833539798232594)
 coll aux_mid_23 b1 c1, cong b1 aux_mid_23 c1 aux_mid_23
-aux_mid_23 = midpoint aux_mid_23 b1 c1
+aux_mid_23 = coll aux_mid_23 b1 c1, cong aux_mid_23 b1 aux_mid_23 c1
 aux_ref_0
 (0.9068990015974838,0.49653072741937687)
 perp a aux_ref_0 p p2, cong a p aux_ref_0 p
@@ -9104,71 +9104,71 @@ aux_int_96 = on_line aux_int_96 g s, on_circum aux_int_96 m l g
 aux_mid_0
 (0.7936717977745474,1.2027982610238281)
 coll aux_mid_0 a b, cong a aux_mid_0 b aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 a b
+aux_mid_0 = coll aux_mid_0 a b, cong aux_mid_0 a aux_mid_0 b
 aux_mid_1
 (1.1220667477026733,0.8926180692146661)
 coll aux_mid_1 a c, cong a aux_mid_1 c aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 a c
+aux_mid_1 = coll aux_mid_1 a c, cong aux_mid_1 a aux_mid_1 c
 aux_mid_2
 (0.9228003690654414,1.0808319365726793)
 coll aux_mid_2 a m, cong a aux_mid_2 m aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 a m
+aux_mid_2 = coll aux_mid_2 a m, cong aux_mid_2 a aux_mid_2 m
 aux_mid_3
 (0.574711135956198,0.7997288044382287)
 coll aux_mid_3 b c, cong b aux_mid_3 c aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 b c
+aux_mid_3 = coll aux_mid_3 b c, cong aux_mid_3 b aux_mid_3 c
 aux_mid_4
 (0.37544475731896615,0.987942671796242)
 coll aux_mid_4 b m, cong b aux_mid_4 m aux_mid_4
-aux_mid_4 = midpoint aux_mid_4 b m
+aux_mid_4 = coll aux_mid_4 b m, cong aux_mid_4 b aux_mid_4 m
 aux_mid_5
 (-0.15729007983724486,1.4911288322676572)
 coll aux_mid_5 b s, cong b aux_mid_5 s aux_mid_5
-aux_mid_5 = midpoint aux_mid_5 b s
+aux_mid_5 = coll aux_mid_5 b s, cong aux_mid_5 b aux_mid_5 s
 aux_mid_6
 (0.9081795944751782,0.48475651132482594)
 coll aux_mid_6 b t, cong b aux_mid_6 t aux_mid_6
-aux_mid_6 = midpoint aux_mid_6 b t
+aux_mid_6 = coll aux_mid_6 b t, cong aux_mid_6 b aux_mid_6 t
 aux_mid_7
 (0.7038397072470919,0.67776247998708)
 coll aux_mid_7 c m, cong c aux_mid_7 m aux_mid_7
-aux_mid_7 = midpoint aux_mid_7 c m
+aux_mid_7 = coll aux_mid_7 c m, cong aux_mid_7 c aux_mid_7 m
 aux_mid_8
 (0.17110487009088093,1.180948640458495)
 coll aux_mid_8 c s, cong c aux_mid_8 s aux_mid_8
-aux_mid_8 = midpoint aux_mid_8 c s
+aux_mid_8 = coll aux_mid_8 c s, cong aux_mid_8 c aux_mid_8 s
 aux_mid_9
 (1.2365745444033038,0.1745763195156639)
 coll aux_mid_9 c t, cong c aux_mid_9 t aux_mid_9
-aux_mid_9 = midpoint aux_mid_9 c t
+aux_mid_9 = coll aux_mid_9 c t, cong aux_mid_9 c aux_mid_9 t
 aux_mid_10
 (0.5729982527409211,0.43690554464212017)
 coll aux_mid_10 m l, cong m aux_mid_10 l aux_mid_10
-aux_mid_10 = midpoint aux_mid_10 m l
+aux_mid_10 = coll aux_mid_10 m l, cong aux_mid_10 m aux_mid_10 l
 aux_mid_11
 (0.20032545390245018,0.9582239606084293)
 coll aux_mid_11 m k, cong m aux_mid_11 k aux_mid_11
-aux_mid_11 = midpoint aux_mid_11 m k
+aux_mid_11 = coll aux_mid_11 m k, cong aux_mid_11 m aux_mid_11 k
 aux_mid_12
 (0.4473194302595447,1.224997222194594)
 coll aux_mid_12 m f, cong m aux_mid_12 f aux_mid_12
-aux_mid_12 = midpoint aux_mid_12 m f
+aux_mid_12 = coll aux_mid_12 m f, cong aux_mid_12 m aux_mid_12 f
 aux_mid_13
 (0.9800542674157566,0.7218110617231783)
 coll aux_mid_13 m g, cong m aux_mid_13 g aux_mid_13
-aux_mid_13 = midpoint aux_mid_13 m g
+aux_mid_13 = coll aux_mid_13 m g, cong aux_mid_13 m aux_mid_13 g
 aux_mid_14
 (-0.028161508546350966,1.3691625078165084)
 coll aux_mid_14 m s, cong m aux_mid_14 s aux_mid_14
-aux_mid_14 = midpoint aux_mid_14 m s
+aux_mid_14 = coll aux_mid_14 m s, cong aux_mid_14 m aux_mid_14 s
 aux_mid_15
 (1.037308165766072,0.3627901868736772)
 coll aux_mid_15 m t, cong m aux_mid_15 t aux_mid_15
-aux_mid_15 = midpoint aux_mid_15 m t
+aux_mid_15 = coll aux_mid_15 m t, cong aux_mid_15 m aux_mid_15 t
 aux_mid_16
 (0.2687503780335112,0.5291531579054563)
 coll aux_mid_16 l k, cong l aux_mid_16 k aux_mid_16
-aux_mid_16 = midpoint aux_mid_16 l k
+aux_mid_16 = coll aux_mid_16 l k, cong aux_mid_16 l aux_mid_16 k
 aux_ref_0
 (-0.8035266534540001,-0.2373812099893533)
 perp a aux_ref_0 l k, cong a l aux_ref_0 l
@@ -9335,15 +9335,15 @@ aux_int_14 = on_line aux_int_14 x m, on_circum aux_int_14 b d x
 aux_mid_0
 (0.6598849429374816,1.6439049409117348)
 coll aux_mid_0 c k, cong c aux_mid_0 k aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 c k
+aux_mid_0 = coll aux_mid_0 c k, cong aux_mid_0 c aux_mid_0 k
 aux_mid_1
 (0.8169608499060934,1.2045274463853275)
 coll aux_mid_1 c l, cong c aux_mid_1 l aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 c l
+aux_mid_1 = coll aux_mid_1 c l, cong aux_mid_1 c aux_mid_1 l
 aux_mid_2
 (0.4350484839028963,1.5372917571179052)
 coll aux_mid_2 k l, cong k aux_mid_2 l aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 k l
+aux_mid_2 = coll aux_mid_2 k l, cong aux_mid_2 k aux_mid_2 l
 aux_ref_0
 (0.12483798978844063,1.2824938145721019)
 perp a aux_ref_0 c x, cong a c aux_ref_0 c
@@ -9726,7 +9726,7 @@ aux_int_89 = on_line aux_int_89 o2 x, on_circum aux_int_89 b m x
 aux_mid_0
 (0.71973165453388,0.7846508014300528)
 coll aux_mid_0 h w, cong h aux_mid_0 w aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 h w
+aux_mid_0 = coll aux_mid_0 h w, cong aux_mid_0 h aux_mid_0 w
 aux_ref_0
 (0.12324017307617918,0.006387986062208029)
 perp a aux_ref_0 b c, cong a b aux_ref_0 b
@@ -9957,27 +9957,27 @@ aux_int_32 = on_line aux_int_32 m n, on_circum aux_int_32 a b m
 aux_mid_0
 (-0.4978976568767143,-1.0807448421950214)
 coll aux_mid_0 b c, cong b aux_mid_0 c aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 b c
+aux_mid_0 = coll aux_mid_0 b c, cong aux_mid_0 b aux_mid_0 c
 aux_mid_1
 (-0.6544780778316364,-0.02368634213472212)
 coll aux_mid_1 b p, cong b aux_mid_1 p aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 b p
+aux_mid_1 = coll aux_mid_1 b p, cong aux_mid_1 b aux_mid_1 p
 aux_mid_2
 (-0.6329474748705113,-0.16903725339605308)
 coll aux_mid_2 b q, cong b aux_mid_2 q aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 b q
+aux_mid_2 = coll aux_mid_2 b q, cong aux_mid_2 b aux_mid_2 q
 aux_mid_3
 (-0.4598031392123435,-1.3379170573240966)
 coll aux_mid_3 c p, cong c aux_mid_3 p aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 c p
+aux_mid_3 = coll aux_mid_3 c p, cong aux_mid_3 c aux_mid_3 p
 aux_mid_4
 (-0.4382725362512184,-1.4832679685854275)
 coll aux_mid_4 c q, cong c aux_mid_4 q aux_mid_4
-aux_mid_4 = midpoint aux_mid_4 c q
+aux_mid_4 = coll aux_mid_4 c q, cong aux_mid_4 c aux_mid_4 q
 aux_mid_5
 (-0.5948529572061405,-0.4262094685251282)
 coll aux_mid_5 p q, cong p aux_mid_5 q aux_mid_5
-aux_mid_5 = midpoint aux_mid_5 p q
+aux_mid_5 = coll aux_mid_5 p q, cong aux_mid_5 p aux_mid_5 q
 aux_ref_0
 (-1.552316561340092,-0.5680370534466433)
 perp a aux_ref_0 b c, cong a b aux_ref_0 b
@@ -10428,87 +10428,87 @@ aux_int_101 = on_line aux_int_101 k o1, on_circum aux_int_101 a b c
 aux_mid_0
 (1.321559550342997,1.0218522184306005)
 coll aux_mid_0 a q, cong a aux_mid_0 q aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 a q
+aux_mid_0 = coll aux_mid_0 a q, cong aux_mid_0 a aux_mid_0 q
 aux_mid_1
 (0.5500752926137971,0.9448970016031479)
 coll aux_mid_1 b h, cong b aux_mid_1 h aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 b h
+aux_mid_1 = coll aux_mid_1 b h, cong aux_mid_1 b aux_mid_1 h
 aux_mid_2
 (0.48922498866333647,0.8804733760893138)
 coll aux_mid_2 b f, cong b aux_mid_2 f aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 b f
+aux_mid_2 = coll aux_mid_2 b f, cong aux_mid_2 b aux_mid_2 f
 aux_mid_3
 (0.41051366099213515,0.9548189003428097)
 coll aux_mid_3 b m, cong b aux_mid_3 m aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 b m
+aux_mid_3 = coll aux_mid_3 b m, cong aux_mid_3 b aux_mid_3 m
 aux_mid_4
 (0.7742039385965219,0.928962953654163)
 coll aux_mid_4 b q, cong b aux_mid_4 q aux_mid_4
-aux_mid_4 = midpoint aux_mid_4 b q
+aux_mid_4 = coll aux_mid_4 b q, cong aux_mid_4 b aux_mid_4 q
 aux_mid_5
 (0.656317200230752,0.8247337859030429)
 coll aux_mid_5 b k, cong b aux_mid_5 k aux_mid_5
-aux_mid_5 = midpoint aux_mid_5 b k
+aux_mid_5 = coll aux_mid_5 b k, cong aux_mid_5 b aux_mid_5 k
 aux_mid_6
 (0.8784702425419229,0.6347168097939858)
 coll aux_mid_6 c h, cong c aux_mid_6 h aux_mid_6
-aux_mid_6 = midpoint aux_mid_6 c h
+aux_mid_6 = coll aux_mid_6 c h, cong aux_mid_6 c aux_mid_6 h
 aux_mid_7
 (0.8176199385914622,0.5702931842801517)
 coll aux_mid_7 c f, cong c aux_mid_7 f aux_mid_7
-aux_mid_7 = midpoint aux_mid_7 c f
+aux_mid_7 = coll aux_mid_7 c f, cong aux_mid_7 c aux_mid_7 f
 aux_mid_8
 (0.7389086109202609,0.6446387085336477)
 coll aux_mid_8 c m, cong c aux_mid_8 m aux_mid_8
-aux_mid_8 = midpoint aux_mid_8 c m
+aux_mid_8 = coll aux_mid_8 c m, cong aux_mid_8 c aux_mid_8 m
 aux_mid_9
 (1.1025988885246476,0.618782761845001)
 coll aux_mid_9 c q, cong c aux_mid_9 q aux_mid_9
-aux_mid_9 = midpoint aux_mid_9 c q
+aux_mid_9 = coll aux_mid_9 c q, cong aux_mid_9 c aux_mid_9 q
 aux_mid_10
 (0.9847121501588778,0.5145535940938809)
 coll aux_mid_10 c k, cong c aux_mid_10 k aux_mid_10
-aux_mid_10 = midpoint aux_mid_10 c k
+aux_mid_10 = coll aux_mid_10 c k, cong aux_mid_10 c aux_mid_10 k
 aux_mid_11
 (0.7929840952490612,0.715461381445071)
 coll aux_mid_11 h f, cong h aux_mid_11 f aux_mid_11
-aux_mid_11 = midpoint aux_mid_11 h f
+aux_mid_11 = coll aux_mid_11 h f, cong aux_mid_11 h aux_mid_11 f
 aux_mid_12
 (0.71427276757786,0.7898069056985668)
 coll aux_mid_12 h m, cong h aux_mid_12 m aux_mid_12
-aux_mid_12 = midpoint aux_mid_12 h m
+aux_mid_12 = coll aux_mid_12 h m, cong aux_mid_12 h aux_mid_12 m
 aux_mid_13
 (0.9600763068164768,0.6597217912588)
 coll aux_mid_13 h k, cong h aux_mid_13 k aux_mid_13
-aux_mid_13 = midpoint aux_mid_13 h k
+aux_mid_13 = coll aux_mid_13 h k, cong aux_mid_13 h aux_mid_13 k
 aux_mid_14
 (0.9658987221908841,0.7719179829844125)
 coll aux_mid_14 h o1, cong h aux_mid_14 o1 aux_mid_14
-aux_mid_14 = midpoint aux_mid_14 h o1
+aux_mid_14 = coll aux_mid_14 h o1, cong aux_mid_14 h aux_mid_14 o1
 aux_mid_15
 (0.6534224636273993,0.7253832801847329)
 coll aux_mid_15 f m, cong f aux_mid_15 m aux_mid_15
-aux_mid_15 = midpoint aux_mid_15 f m
+aux_mid_15 = coll aux_mid_15 f m, cong aux_mid_15 f aux_mid_15 m
 aux_mid_16
 (0.9384014135605848,0.7738728577495821)
 coll aux_mid_16 m q, cong m aux_mid_16 q aux_mid_16
-aux_mid_16 = midpoint aux_mid_16 m q
+aux_mid_16 = coll aux_mid_16 m q, cong aux_mid_16 m aux_mid_16 q
 aux_mid_17
 (0.8263370905692223,0.7818398817240744)
 coll aux_mid_17 m o1, cong m aux_mid_17 o1 aux_mid_17
-aux_mid_17 = midpoint aux_mid_17 m o1
+aux_mid_17 = coll aux_mid_17 m o1, cong aux_mid_17 m aux_mid_17 o1
 aux_mid_18
 (0.9481353431495976,0.9107905114344146)
 coll aux_mid_18 o o1, cong o aux_mid_18 o1 aux_mid_18
-aux_mid_18 = midpoint aux_mid_18 o o1
+aux_mid_18 = coll aux_mid_18 o o1, cong aux_mid_18 o aux_mid_18 o1
 aux_mid_19
 (1.1842049527992016,0.6437877433098154)
 coll aux_mid_19 q k, cong q aux_mid_19 k aux_mid_19
-aux_mid_19 = midpoint aux_mid_19 q k
+aux_mid_19 = coll aux_mid_19 q k, cong aux_mid_19 q aux_mid_19 k
 aux_mid_20
 (1.190027368173609,0.7559839350354277)
 coll aux_mid_20 q o1, cong q aux_mid_20 o1 aux_mid_20
-aux_mid_20 = midpoint aux_mid_20 q o1
+aux_mid_20 = coll aux_mid_20 q o1, cong aux_mid_20 q aux_mid_20 o1
 aux_ref_0
 (0.12324017307617918,0.006387986062208029)
 perp a aux_ref_0 b c, cong a b aux_ref_0 b
@@ -11331,47 +11331,47 @@ aux_int_187 = on_line aux_int_187 k l, on_circum aux_int_187 b g k
 aux_mid_0
 (0.2871734722340666,-1.0996641503174498)
 coll aux_mid_0 b c, cong b aux_mid_0 c aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 b c
+aux_mid_0 = coll aux_mid_0 b c, cong aux_mid_0 b aux_mid_0 c
 aux_mid_1
 (-0.01164640290311425,-1.0495978217024895)
 coll aux_mid_1 b d, cong b aux_mid_1 d aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 b d
+aux_mid_1 = coll aux_mid_1 b d, cong aux_mid_1 b aux_mid_1 d
 aux_mid_2
 (-1.0372007806640264,-0.8777694168284254)
 coll aux_mid_2 b e, cong b aux_mid_2 e aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 b e
+aux_mid_2 = coll aux_mid_2 b e, cong aux_mid_2 b aux_mid_2 e
 aux_mid_3
 (0.2704751748021032,-0.49852347666826113)
 coll aux_mid_3 b f, cong b aux_mid_3 f aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 b f
+aux_mid_3 = coll aux_mid_3 b f, cong aux_mid_3 b aux_mid_3 f
 aux_mid_4
 (0.8254027232744678,-1.1898427655799115)
 coll aux_mid_4 c d, cong c aux_mid_4 d aux_mid_4
-aux_mid_4 = midpoint aux_mid_4 c d
+aux_mid_4 = coll aux_mid_4 c d, cong aux_mid_4 c aux_mid_4 d
 aux_mid_5
 (-0.20015165448644423,-1.0180143607058472)
 coll aux_mid_5 c e, cong c aux_mid_5 e aux_mid_5
-aux_mid_5 = midpoint aux_mid_5 c e
+aux_mid_5 = coll aux_mid_5 c e, cong aux_mid_5 c aux_mid_5 e
 aux_mid_6
 (0.45405683673535546,-1.3326356643624129)
 coll aux_mid_6 c g, cong c aux_mid_6 g aux_mid_6
-aux_mid_6 = midpoint aux_mid_6 c g
+aux_mid_6 = coll aux_mid_6 c g, cong aux_mid_6 c aux_mid_6 g
 aux_mid_7
 (-0.49897152962362507,-0.9679480320908869)
 coll aux_mid_7 d e, cong d aux_mid_7 e aux_mid_7
-aux_mid_7 = midpoint aux_mid_7 d e
+aux_mid_7 = coll aux_mid_7 d e, cong aux_mid_7 d aux_mid_7 e
 aux_mid_8
 (0.8087044258425045,-0.5887020919307228)
 coll aux_mid_8 d f, cong d aux_mid_8 f aux_mid_8
-aux_mid_8 = midpoint aux_mid_8 d f
+aux_mid_8 = coll aux_mid_8 d f, cong aux_mid_8 d aux_mid_8 f
 aux_mid_9
 (-0.8703174161627375,-1.1107409308733884)
 coll aux_mid_9 e g, cong e aux_mid_9 g aux_mid_9
-aux_mid_9 = midpoint aux_mid_9 e g
+aux_mid_9 = coll aux_mid_9 e g, cong aux_mid_9 e aux_mid_9 g
 aux_mid_10
 (0.4373585393033921,-0.7314949907132243)
 coll aux_mid_10 f g, cong f aux_mid_10 g aux_mid_10
-aux_mid_10 = midpoint aux_mid_10 f g
+aux_mid_10 = coll aux_mid_10 f g, cong aux_mid_10 f aux_mid_10 g
 aux_ref_0
 (1.9545533537697772,-1.1753175101073667)
 perp a aux_ref_0 d f, cong a d aux_ref_0 d
@@ -11934,39 +11934,39 @@ aux_int_119 = on_line aux_int_119 m x, on_circum aux_int_119 b f m
 aux_mid_0
 (-1.025645926287158,0.7899478479572792)
 coll aux_mid_0 a b, cong a aux_mid_0 b aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 a b
+aux_mid_0 = coll aux_mid_0 a b, cong aux_mid_0 a aux_mid_0 b
 aux_mid_1
 (-0.5846093208585754,0.9770677993030312)
 coll aux_mid_1 a f, cong a aux_mid_1 f aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 a f
+aux_mid_1 = coll aux_mid_1 a f, cong aux_mid_1 a aux_mid_1 f
 aux_mid_2
 (-0.6085618800531104,-0.19310783694715292)
 coll aux_mid_2 a c, cong a aux_mid_2 c aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 a c
+aux_mid_2 = coll aux_mid_2 a c, cong aux_mid_2 a aux_mid_2 c
 aux_mid_3
 (-1.1353136781886843,0.16341216967848424)
 coll aux_mid_3 a d, cong a aux_mid_3 d aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 a d
+aux_mid_3 = coll aux_mid_3 a d, cong aux_mid_3 a aux_mid_3 d
 aux_mid_4
 (-0.596585600455843,0.3919799811779392)
 coll aux_mid_4 a m, cong a aux_mid_4 m aux_mid_4
-aux_mid_4 = midpoint aux_mid_4 a m
+aux_mid_4 = coll aux_mid_4 a m, cong aux_mid_4 a aux_mid_4 m
 aux_mid_5
 (-1.5567412158238414,0.9342714135863068)
 coll aux_mid_5 b x, cong b aux_mid_5 x aux_mid_5
-aux_mid_5 = midpoint aux_mid_5 b x
+aux_mid_5 = coll aux_mid_5 b x, cong aux_mid_5 b aux_mid_5 x
 aux_mid_6
 (-0.5867810665591304,0.8709695788047267)
 coll aux_mid_6 f m, cong f aux_mid_6 m aux_mid_6
-aux_mid_6 = midpoint aux_mid_6 f m
+aux_mid_6 = coll aux_mid_6 f m, cong aux_mid_6 f aux_mid_6 m
 aux_mid_7
 (-1.137485423889239,0.05731394918017918)
 coll aux_mid_7 c e, cong c aux_mid_7 e aux_mid_7
-aux_mid_7 = midpoint aux_mid_7 c e
+aux_mid_7 = coll aux_mid_7 c e, cong aux_mid_7 c aux_mid_7 e
 aux_mid_8
 (-0.6107336257536653,-0.29920605744545753)
 coll aux_mid_8 c m, cong c aux_mid_8 m aux_mid_8
-aux_mid_8 = midpoint aux_mid_8 c m
+aux_mid_8 = coll aux_mid_8 c m, cong aux_mid_8 c aux_mid_8 m
 aux_ref_0
 (-1.87238408305046,-0.2926287033473252)
 perp a aux_ref_0 c x, cong a c aux_ref_0 c
@@ -12233,15 +12233,15 @@ aux_int_39 = on_line aux_int_39 b k, on_circum aux_int_39 r j b
 aux_mid_0
 (0.8542320378033694,0.4877761227779378)
 coll aux_mid_0 s j, cong s aux_mid_0 j aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 s j
+aux_mid_0 = coll aux_mid_0 s j, cong aux_mid_0 s aux_mid_0 j
 aux_mid_1
 (0.9842767002327019,0.45412998724794795)
 coll aux_mid_1 j a, cong j aux_mid_1 a aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 j a
+aux_mid_1 = coll aux_mid_1 j a, cong aux_mid_1 j aux_mid_1 a
 aux_mid_2
 (0.8747013734951213,0.5021020176582514)
 coll aux_mid_2 j k, cong j aux_mid_2 k aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 j k
+aux_mid_2 = coll aux_mid_2 j k, cong aux_mid_2 j aux_mid_2 k
 aux_ref_0
 (0.865181106561479,0.5452145852475601)
 perp o aux_ref_0 s j, cong o s aux_ref_0 s
@@ -13154,27 +13154,27 @@ aux_int_170 = on_line aux_int_170 o2 q, on_circum aux_int_170 c e p
 aux_mid_0
 (0.8587653759554448,0.767595015211302)
 coll aux_mid_0 d e, cong d aux_mid_0 e aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 d e
+aux_mid_0 = coll aux_mid_0 d e, cong aux_mid_0 d aux_mid_0 e
 aux_mid_1
 (0.7158201199362695,0.9675559317849705)
 coll aux_mid_1 d f, cong d aux_mid_1 f aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 d f
+aux_mid_1 = coll aux_mid_1 d f, cong aux_mid_1 d aux_mid_1 f
 aux_mid_2
 (0.8913512343007646,0.7447803946537304)
 coll aux_mid_2 e p, cong e aux_mid_2 p aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 e p
+aux_mid_2 = coll aux_mid_2 e p, cong aux_mid_2 e aux_mid_2 p
 aux_mid_3
 (0.7484059782815893,0.9447413112273988)
 coll aux_mid_3 f p, cong f aux_mid_3 p aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 f p
+aux_mid_3 = coll aux_mid_3 f p, cong aux_mid_3 f aux_mid_3 p
 aux_mid_4
 (0.8956355477334921,0.866650930540175)
 coll aux_mid_4 r p, cong r aux_mid_4 p aux_mid_4
-aux_mid_4 = midpoint aux_mid_4 r p
+aux_mid_4 = coll aux_mid_4 r p, cong aux_mid_4 r aux_mid_4 p
 aux_mid_5
 (0.7869710608068152,0.7850763874108726)
 coll aux_mid_5 p q, cong p aux_mid_5 q aux_mid_5
-aux_mid_5 = midpoint aux_mid_5 p q
+aux_mid_5 = coll aux_mid_5 p q, cong aux_mid_5 p aux_mid_5 q
 aux_ref_0
 (1.4020872207631874,1.2102731779455826)
 perp a aux_ref_0 d r, cong a d aux_ref_0 d
@@ -13524,27 +13524,27 @@ aux_int_22 = on_line aux_int_22 o1 o2, on_circum aux_int_22 b c o2
 aux_mid_0
 (1.1220667477026733,0.8926180692146661)
 coll aux_mid_0 a c, cong a aux_mid_0 c aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 a c
+aux_mid_0 = coll aux_mid_0 a c, cong aux_mid_0 a aux_mid_0 c
 aux_mid_1
 (1.245607541046867,1.1200357250888913)
 coll aux_mid_1 a e, cong a aux_mid_1 e aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 a e
+aux_mid_1 = coll aux_mid_1 a e, cong aux_mid_1 a aux_mid_1 e
 aux_mid_2
 (1.542635330163932,1.6668135278047045)
 coll aux_mid_2 a x, cong a aux_mid_2 x aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 a x
+aux_mid_2 = coll aux_mid_2 a x, cong aux_mid_2 a aux_mid_2 x
 aux_mid_3
 (1.0266468792285175,0.7169662685032918)
 coll aux_mid_3 c e, cong c aux_mid_3 e aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 c e
+aux_mid_3 = coll aux_mid_3 c e, cong aux_mid_3 c aux_mid_3 e
 aux_mid_4
 (1.3236746683455825,1.263744071219105)
 coll aux_mid_4 c x, cong c aux_mid_4 x aux_mid_4
-aux_mid_4 = midpoint aux_mid_4 c x
+aux_mid_4 = coll aux_mid_4 c x, cong aux_mid_4 c aux_mid_4 x
 aux_mid_5
 (1.447215461689776,1.4911617270933302)
 coll aux_mid_5 e x, cong e aux_mid_5 x aux_mid_5
-aux_mid_5 = midpoint aux_mid_5 e x
+aux_mid_5 = coll aux_mid_5 e x, cong aux_mid_5 e aux_mid_5 x
 aux_ref_0
 (1.3400189919808398,1.2955163917844905)
 perp c aux_ref_0 d o1, cong c d aux_ref_0 d
@@ -13671,73 +13671,73 @@ aux_int_28 = on_line aux_int_28 t r, on_circum aux_int_28 c q r
 aux_mid_0
 (0.17364933999825033,-0.11599475977482532)
 coll aux_mid_0 b a, cong b aux_mid_0 a aux_mid_0
-aux_mid_0 = midpoint aux_mid_0 b a
+aux_mid_0 = coll aux_mid_0 b a, cong aux_mid_0 b aux_mid_0 a
 aux_mid_1
 (-0.05708425273069864,-0.36087195831932745)
 coll aux_mid_1 b p, cong b aux_mid_1 p aux_mid_1
-aux_mid_1 = midpoint aux_mid_1 b p
+aux_mid_1 = coll aux_mid_1 b p, cong aux_mid_1 b aux_mid_1 p
 aux_mid_2
 (-0.19321489444564305,-0.5053471939577768)
 coll aux_mid_2 b q, cong b aux_mid_2 q aux_mid_2
-aux_mid_2 = midpoint aux_mid_2 b q
+aux_mid_2 = coll aux_mid_2 b q, cong aux_mid_2 b aux_mid_2 q
 aux_mid_3
 (0.41421854066630714,-0.10017180325137087)
 coll aux_mid_3 c d, cong c aux_mid_3 d aux_mid_3
-aux_mid_3 = midpoint aux_mid_3 c d
+aux_mid_3 = coll aux_mid_3 c d, cong aux_mid_3 c aux_mid_3 d
 aux_mid_4
 (0.4411662585361439,-0.19416960744039988)
 coll aux_mid_4 c p, cong c aux_mid_4 p aux_mid_4
-aux_mid_4 = midpoint aux_mid_4 c p
+aux_mid_4 = coll aux_mid_4 c p, cong aux_mid_4 c aux_mid_4 p
 aux_mid_5
 (0.6017487765413225,-0.7543062452269926)
 coll aux_mid_5 c r, cong c aux_mid_5 r aux_mid_5
-aux_mid_5 = midpoint aux_mid_5 c r
+aux_mid_5 = coll aux_mid_5 c r, cong aux_mid_5 c aux_mid_5 r
 aux_mid_6
 (0.3346287228446685,0.17744978040833018)
 coll aux_mid_6 d p, cong d aux_mid_6 p aux_mid_6
-aux_mid_6 = midpoint aux_mid_6 d p
+aux_mid_6 = coll aux_mid_6 d p, cong aux_mid_6 d aux_mid_6 p
 aux_mid_7
 (0.4952112408498471,-0.3826868573782626)
 coll aux_mid_7 d r, cong d aux_mid_7 r aux_mid_7
-aux_mid_7 = midpoint aux_mid_7 d r
+aux_mid_7 = coll aux_mid_7 d r, cong aux_mid_7 d aux_mid_7 r
 aux_mid_8
 (0.8484650750496798,0.864928462618748)
 coll aux_mid_8 e a, cong e aux_mid_8 a aux_mid_8
-aux_mid_8 = midpoint aux_mid_8 e a
+aux_mid_8 = coll aux_mid_8 e a, cong aux_mid_8 e aux_mid_8 a
 aux_mid_9
 (0.7783140003259095,0.059914626287653094)
 coll aux_mid_9 e r, cong e aux_mid_9 r aux_mid_9
-aux_mid_9 = midpoint aux_mid_9 e r
+aux_mid_9 = coll aux_mid_9 e r, cong aux_mid_9 e aux_mid_9 r
 aux_mid_10
 (0.8291278579297281,0.643025556654786)
 coll aux_mid_10 e s, cong e aux_mid_10 s aux_mid_10
-aux_mid_10 = midpoint aux_mid_10 e s
+aux_mid_10 = coll aux_mid_10 e s, cong aux_mid_10 e aux_mid_10 s
 aux_mid_11
 (0.5923100334434541,0.32832917476380336)
 coll aux_mid_11 a p, cong a aux_mid_11 p aux_mid_11
-aux_mid_11 = midpoint aux_mid_11 a p
+aux_mid_11 = coll aux_mid_11 a p, cong aux_mid_11 a aux_mid_11 p
 aux_mid_12
 (0.45617939172850974,0.18385393912535394)
 coll aux_mid_12 a q, cong a aux_mid_12 q aux_mid_12
-aux_mid_12 = midpoint aux_mid_12 a q
+aux_mid_12 = coll aux_mid_12 a q, cong aux_mid_12 a aux_mid_12 q
 aux_mid_13
 (0.7528925514486328,-0.23180746302278943)
 coll aux_mid_13 a r, cong a aux_mid_13 r aux_mid_13
-aux_mid_13 = midpoint aux_mid_13 a r
+aux_mid_13 = coll aux_mid_13 a r, cong aux_mid_13 a aux_mid_13 r
 aux_mid_14
 (0.8037064090524514,0.3513034673443435)
 coll aux_mid_14 a s, cong a aux_mid_14 s aux_mid_14
-aux_mid_14 = midpoint aux_mid_14 a s
+aux_mid_14 = coll aux_mid_14 a s, cong aux_mid_14 a aux_mid_14 s
 aux_mid_15
 (0.22544579899956077,-0.061023259419148206)
 coll aux_mid_15 p q, cong p aux_mid_15 q aux_mid_15
-aux_mid_15 = midpoint aux_mid_15 p q
+aux_mid_15 = coll aux_mid_15 p q, cong aux_mid_15 p aux_mid_15 q
 aux_mid_16
 (0.5221589587196838,-0.47668466156729156)
 coll aux_mid_16 p r, cong p aux_mid_16 r aux_mid_16
-aux_mid_16 = midpoint aux_mid_16 p r
+aux_mid_16 = coll aux_mid_16 p r, cong aux_mid_16 p aux_mid_16 r
 aux_mid_17
 (0.733555334328681,-0.45371036898675143)
 coll aux_mid_17 r s, cong r aux_mid_17 s aux_mid_17
-aux_mid_17 = midpoint aux_mid_17 r s
+aux_mid_17 = coll aux_mid_17 r s, cong aux_mid_17 r aux_mid_17 s
 
