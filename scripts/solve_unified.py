@@ -56,9 +56,9 @@ USE_COORDINATES = True   # 是否在 construction 中包含点坐标（如 a@1.2
 DEFAULT_N_AUX = 6        # 每次采样的辅助点数量
 DEFAULT_MAX_ATTEMPTS = 512 # 每道题的最大尝试次数
 DEFAULT_SEED = 998244353        # 随机种子
-DEFAULT_MAX_WORKERS = 30  # 并行进程数（默认1即串行）
-DEFAULT_TIMEOUT = 300    # 单题超时时间（秒），0 表示不限制
-DEFAULT_MAX_SAMPLE_RETRIES = 60  # 随机采样模式下连续采样到重复组合的最大重试次数
+DEFAULT_MAX_WORKERS = 50  # 并行进程数（默认1即串行）
+DEFAULT_TIMEOUT = 7200    # 单题超时时间（秒），0 表示不限制
+DEFAULT_MAX_SAMPLE_RETRIES = 0  # 随机采样模式下连续采样到重复组合的最大重试次数, 0 说明不限制
 
 
 @dataclass
@@ -909,7 +909,7 @@ def solve_single_problem(
             max_sample_retries = DEFAULT_MAX_SAMPLE_RETRIES
             sample_retry_count = 0
             found_new = False
-            while sample_retry_count < max_sample_retries:
+            while sample_retry_count < max_sample_retries or DEFAULT_MAX_ATTEMPTS == 0:
                 indices = tuple(sorted(random.sample(range(n_candidates), n_sample)))
                 if indices not in tried_combinations:
                     tried_combinations.add(indices)
