@@ -703,40 +703,81 @@ def find_potential_points(text: str, min_duplicated: int = 3):
         norm = np.sqrt(dx**2 + dy**2)
         return (0.0, 0.0) if norm < TOLERANCE else (dx / norm, dy / norm)
 
-    def is_point_too_far(new_coord, existing_coords, factor=5.0):
+    def is_point_too_close(
+        new_coords: list[tuple[float, float]],
+        existing_coords: list[tuple[float, float]],
+        tol: float = 0.05,
+        round_eps: float = 1e-10
+    ) -> bool:
         """
-        简单判断：新点是否离所有已有点都太远
-        - 如果已有点少于2个 → 不算远
-        - 找到已有点中最远的两个点（近似直径）
-        - 新点到最近已有点的距离 > factor × 已有最大间距 → 认为过远
+        判断新点是否跟已有点「靠得太近」
+        - 如果已有点少于2个 → 不算太近
+        - 计算已有点的平均点间距（粗略）
+        - 如果新点到某个已有点的距离 在 (round_eps ~ tol × 平均间距) 之间 → 认为太近
         """
         if len(existing_coords) < 2:
             return False
 
-        # 找到已有点集合的“粗略直径”（最远两点距离）
-        max_dist = 0
-        for i in range(len(existing_coords)):
-            for j in range(i + 1, len(existing_coords)):
-                dx = existing_coords[i][0] - existing_coords[j][0]
-                dy = existing_coords[i][1] - existing_coords[j][1]
-                dist = (dx*dx + dy*dy)**0.5
-                if dist > max_dist:
-                    max_dist = dist
+        # 计算所有点对的平均距离（近似平均点间距）
+        total_dist = 0.0
+        count = 0
+        n = len(existing_coords)
+        for i in range(n):
+            for j in range(i + 1, n):
+                x1, y1 = existing_coords[i]
+                x2, y2 = existing_coords[j]
+                dist = ((x1 - x2)**2 + (y1 - y2)**2) ** 0.5
+                total_dist += dist
+                count += 1
+        avg_dist = total_dist / count
 
-        if max_dist < 1e-8:  # 所有点几乎重合
+        # 检查每个新点
+        for nx, ny in new_coords:
+            for px, py in existing_coords:
+                dx = nx - px
+                dy = ny - py
+                dist = (dx*dx + dy*dy) ** 0.5
+                if round_eps < dist < tol * avg_dist:
+                    return True
+        return False
+
+    def is_point_too_far(
+        new_coords: list[tuple[float, float]],
+        existing_coords: list[tuple[float, float]],
+        factor: float = 5.0
+    ) -> bool:
+        """
+        原始风格的“太远”判断：
+        只要新点与「任何一个」已有旧点的距离 > factor × 尺度，就认为太远。
+        （注意：这和“离最近点太远”或“离所有点太远”是不同的语义）
+        """
+        if len(existing_coords) < 2:
             return False
 
-        # 新点到最近已有点的距离
-        min_dist_to_exist = float('inf')
-        nx, ny = new_coord
-        for px, py in existing_coords:
-            dx = nx - px
-            dy = ny - py
-            dist = (dx*dx + dy*dy)**0.5
-            if dist < min_dist_to_exist:
-                min_dist_to_exist = dist
+        # 计算质心（平均位置）
+        n = len(existing_coords)
+        sum_x = sum(y for x, y in existing_coords)
+        sum_y = sum(y for x, y in existing_coords)
+        avg_x = sum_x / n
+        avg_y = sum_y / n
 
-        return min_dist_to_exist > factor * max_dist
+        # 计算到质心的最大距离（作为点群尺度）
+        maxdist = 0.0
+        for px, py in existing_coords:
+            dx = px - avg_x
+            dy = py - avg_y
+            dist = (dx*dx + dy*dy) ** 0.5
+            if dist > maxdist:
+                maxdist = dist
+
+        for nx, ny in new_coords:
+            for px, py in existing_coords:
+                dx = nx - px
+                dy = ny - py
+                dist = (dx*dx + dy*dy) ** 0.5
+                if dist > factor * maxdist:
+                    return True
+        return False
 
     # ----------------------------- 生成中点 -----------------------------
     midpoints = []
@@ -847,7 +888,7 @@ def find_potential_points(text: str, min_duplicated: int = 3):
     inter_counter = 1
     for line1, line2 in combinations(unique_lines, 2):
         inter = line_intersection(line1, line2)
-        if inter is not None and not is_point_too_far(inter, coords, factor=5.0):
+        if inter is not None:
             new_name = f"inter{inter_counter}"
             intersections.append((new_name, round_coord(inter), "intersection", [
                                  sorted(line1), sorted(line2)]))
@@ -1089,11 +1130,21 @@ def find_potential_points(text: str, min_duplicated: int = 3):
         coord_to_appearances[coord].append((name, typ, info))
 
     repeated_points = []
+    existing_coords = list(original_points.values())
     for coord, apps in coord_to_appearances.items():
         if len(apps) >= min_duplicated:
             repeated_points.append((coord, apps))
+    repeated_points.sort(key=lambda x: (-len(x[1]), random.random()))
 
-    return repeated_points
+    selected = []
+    for coord, apps in repeated_points:
+        # 检查单个点：[coord] 是 list of tuples
+        if (not is_point_too_close([coord], existing_coords) and
+                not is_point_too_far([coord], existing_coords)):
+            selected.append((coord, apps))
+            existing_coords.append(coord)
+
+    return selected
 
 
 def enhance_text_with_potential_points(original_text: str, generator: PointGenerator) -> str:
@@ -1106,8 +1157,6 @@ def enhance_text_with_potential_points(original_text: str, generator: PointGener
     # 当前已定义的点数
     current_count = len(generator.defined_points)
     remaining_slots = max(0, MAX_TOTAL_POINTS - current_count)
-
-    repeated_points.sort(key=lambda x: (-len(x[1]), random.random()))
 
     if len(repeated_points) > remaining_slots:
         repeated_points = repeated_points[:remaining_slots]
