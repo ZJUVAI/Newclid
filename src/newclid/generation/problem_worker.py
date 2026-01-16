@@ -121,6 +121,35 @@ class GeometryProblemWorker:
             # Generate possible goals
             possible_goals, checkgoals_runtime = GeometryProblemWorker._generate_possible_goals(
                 solver)
+            
+            # Obtain mapping from clauses to basic statements
+            proof_state_temp = ProofState(
+                rng=np.random.default_rng(seed), defs=solver_builder.defs
+            )
+            clauses_without_coords: list[Clause] = []
+            for clause in solver_builder.problemJGEX.constructions:
+                clauses_without_coords.append(
+                    Clause(
+                        points=tuple(p.split('@')[0] for p in clause.points),
+                        sentences=clause.sentences,
+                    )
+                )
+            clause2basics, _ = GeometryProblemWorker._get_all_premise(
+                clauses_without_coords, proof_state_temp
+            )
+            statement_str_idxs = dict()
+            pointstr2basicstrs = defaultdict(set)
+            basicstr2pointstrs = defaultdict(set)
+            for clause in clauses_without_coords:
+                for points, basics in clause2basics[clause]:
+                    for b in basics:
+                        b_str = b.to_str()
+                        if b_str not in statement_str_idxs:
+                            statement_str_idxs[b_str] = len(
+                                statement_str_idxs)
+                        for pname in points:
+                            pointstr2basicstrs[pname].add(b_str)
+                            basicstr2pointstrs[b_str].add(pname)
 
             # Process goals
             # first, group goals by problem key
@@ -136,9 +165,9 @@ class GeometryProblemWorker:
                 if aux_only and len(aux) == 0:
                     continue
                 premises = [dep.statement for dep in premises]
-                aux = [dep.statement for dep in aux]
-                predicates = sorted([statement.to_str()
-                                    for statement in premises + aux])
+                aux = sorted([dep.statement for dep in aux], key=lambda s: statement_str_idxs[s.to_str()])
+                # predicates = sorted([statement.to_str()
+                #                     for statement in premises + aux])
                 predicates = '; '.join(sorted([statement.to_str() for statement in premises])) + \
                     ' $$ ' + \
                     '; '.join(sorted([statement.to_str()
@@ -157,7 +186,7 @@ class GeometryProblemWorker:
                 premises = goal_list[0][1]
                 aux = goal_list[0][2]
                 data = GeometryProblemWorker._process_goals_with_same_statement(
-                    goals, solver, solver_builder, premises, aux, n_clauses, img, aux_only, draw_annotations)
+                    pointstr2basicstrs, basicstr2pointstrs, goals, solver, solver_builder, premises, aux, n_clauses, img, aux_only, draw_annotations)
                 generated_data.extend(data)
             process_goal_time = time.time() - process_goal_time
 
@@ -277,63 +306,167 @@ class GeometryProblemWorker:
         #         continue
 
     @staticmethod
-    def _find_minimal_aux_clauses_new(solver, solver_builder, goals_str, premises, aux, aux_only):
+    def _find_minimal_aux_clauses_new(pointstr2basicstrs, basicstr2pointstrs, solver, solver_builder, goals_str, premises, aux, aux_only):
         """Find minimal auxiliary clause set"""
-        # Iterate through all possible subsets to find the minimal necessary auxiliary clause set
-        # Search through subsets from size 0 to len-1 (excluding full set)
         results = []
-        for r in range(len(aux)):
-            for aux_subset in itertools.combinations(aux, r):
-                proof_state = ProofState.build_predicates(
-                    predicates=premises + list(aux_subset),
+        
+        # Step 1: First try solving without aux
+        proof_state_no_aux = ProofState.build_predicates(
+            predicates=premises,
+            defsJGEX=solver_builder.defs,
+            goals_str=goals_str.copy(),
+            rng=np.random.default_rng(solver_builder.seed)
+        )
+        solver_no_aux = GeometricSolver(
+            proof_state_no_aux,
+            solver_builder.rules,
+            DDARN()
+        )
+        csolver_no_aux = CSolver(
+            problem='', solver=solver_no_aux, using_log=True)
+        csolver_no_aux.run()
+        
+        for goal in solver_no_aux.goals:
+            if goal.check():
+                goals_str.remove(goal.to_str())
+                if not aux_only:
+                    results.append({
+                        "solver": solver_no_aux,
+                        "goal": goal
+                    })
+
+        if len(aux) == 1:
+            # If only one aux, no need to continue
+            for goal_str in goals_str:
+                goal = Statement.from_tokens(
+                    goal_str.split(" "), solver.proof.dep_graph)
+                results.append({
+                    "solver": solver,
+                    "goal": goal
+                })
+            return results
+        
+        if len(goals_str) == 0:
+            return results
+        
+        # Step 2: For remaining goals, try removing aux one by one from back to front
+        # Group goals by the minimal aux they need
+        goal_groups = [{"goals": goals_str.copy(), "aux": list(aux), "solvers": {}}]
+        premise_strs = set([p.to_str() for p in premises])
+            
+        for i in range(len(aux) - 1, -1, -1):
+            new_goal_groups = []
+            
+            for group in goal_groups:
+                # Try without this aux for all goals in this group
+                test_aux = group["aux"][:i] + group["aux"][i+1:]
+
+                # Check if the aux set is valid w.r.t rely_on
+                flag = True
+                exist_stmt_strs = premise_strs.copy()
+                # print(f"test_aux: {test_aux}")
+                for aux_stmt in test_aux:
+                    aux_str = aux_stmt.to_str()
+                    exist_stmt_strs.add(aux_str)
+                    # print(f"aux: {aux_stmt}, points: {basicstr2pointstrs[aux_stmt.to_str()]}")
+                    # print(f"exist_stmt_strs: {exist_stmt_strs}")
+                    for pname in basicstr2pointstrs[aux_str]:
+                        p = solver.proof.symbols_graph.name2node[pname]
+                        # print(f"point: {pname}, rely_on: {[q.name for q in p.rely_on]}")
+                        for q in p.rely_on:
+                            # print(f"  checking rely_on point: {q.name}, basicstrs: {pointstr2basicstrs[q.name]}")
+                            if len(pointstr2basicstrs[q.name]) > 0 \
+                                and pointstr2basicstrs[q.name].isdisjoint(exist_stmt_strs):
+                                flag = False
+                                break
+                        if not flag:
+                            break
+                    if not flag:
+                        break
+                # print(f"test result for {test_aux}: {flag}")
+                if not flag:
+                    # Cannot remove this aux due to rely_on
+                    new_goal_groups.append(group)
+                    continue
+                
+                proof_state_test = ProofState.build_predicates(
+                    predicates=premises + test_aux,
                     defsJGEX=solver_builder.defs,
-                    goals_str=goals_str,
+                    goals_str=group["goals"],
                     rng=np.random.default_rng(solver_builder.seed)
                 )
                 solver_test = GeometricSolver(
-                    proof_state,
+                    proof_state_test,
                     solver_builder.rules,
                     DDARN()
                 )
                 csolver_test = CSolver(
                     problem='', solver=solver_test, using_log=True)
                 csolver_test.run()
-                for goal in solver_test.goals:
-                    # if found new solutions
-                    if goal.check():
-                        goals_str.remove(goal.to_str())
-                        if aux_only and r == 0:
-                            continue
-                        results.append({
-                            "solver": solver_test,
-                            "goal": goal
-                        })
-
-                if len(goals_str) == 0:
-                    break
-            if len(goals_str) == 0:
-                break
-
-        # goals requiring full aux set or the aux set is empty
-        for goal_str in goals_str:
-            goal = Statement.from_tokens(
-                goal_str.split(" "), solver.proof.dep_graph)
-            # problem_new = str(solver_builder.problemJGEX).split(
-            #     ' ? ')[0] + ' ? ' + goal_str
-            # problem_new = ProblemJGEX.from_text(problem_new)
-            results.append({
-                "solver": solver,
-                "goal": goal
-            })
+                
+                # Check which goals are solved
+                solved_goals = []
+                unsolved_goals = []
+                for goal_str in group["goals"]:
+                    goal_found = False
+                    for goal in solver_test.goals:
+                        if goal.to_str() == goal_str:
+                            if goal.check():
+                                solved_goals.append(goal_str)
+                                # Save solver for this goal
+                                group["solvers"][goal_str] = (solver_test, goal)
+                            else:
+                                unsolved_goals.append(goal_str)
+                            goal_found = True
+                            break
+                    assert goal_found, f"Goal {goal_str} not found in solver_test.goals"
+                
+                # Split into groups based on whether they can be solved without this aux
+                if len(solved_goals) > 0:
+                    new_goal_groups.append({
+                        "goals": solved_goals,
+                        "aux": test_aux,
+                        "solvers": {g: group["solvers"][g] for g in solved_goals if g in group["solvers"]}
+                    })
+                if len(unsolved_goals) > 0:
+                    new_goal_groups.append({
+                        "goals": unsolved_goals,
+                        "aux": group["aux"],
+                        "solvers": {g: group["solvers"][g] for g in unsolved_goals if g in group["solvers"]}
+                    })
+            
+            goal_groups = new_goal_groups
+        
+        # Collect results from all groups
+        for group in goal_groups:
+            for goal_str in group["goals"]:
+                if goal_str in group["solvers"]:
+                    # Use saved solver
+                    best_solver, best_goal = group["solvers"][goal_str]
+                    results.append({
+                        "solver": best_solver,
+                        "goal": best_goal
+                    })
+                else:
+                    # No aux removal succeeded, use original solver requiring full aux set
+                    goal = Statement.from_tokens(
+                        goal_str.split(" "), solver.proof.dep_graph)
+                    results.append({
+                        "solver": solver,
+                        "goal": goal
+                    })
+        
         return results
 
     @staticmethod
-    def _process_goals_with_same_statement(goals, solver, solver_builder, premises, aux, n_clauses, img, aux_only, draw_annotations=True):
+    def _process_goals_with_same_statement(pointstr2basicstrs, basicstr2pointstrs, goals, solver, solver_builder, premises, aux, n_clauses, img, aux_only, draw_annotations=True):
         """Process a single goal"""
 
         results = []
 
-        res_list = GeometryProblemWorker._find_minimal_aux_clauses_new(
+        res_list, run_count = GeometryProblemWorker._find_minimal_aux_clauses_new(
+            pointstr2basicstrs,
+            basicstr2pointstrs,
             solver,
             solver_builder,
             [goal.to_str() for goal in goals],
