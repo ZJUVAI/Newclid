@@ -577,7 +577,7 @@ class CompoundClauseGen:
 
         # check point distance
         _existing_numerical_points = [p.num for p in _existing_points]
-        if check_too_close_numerical(_new_numerical_point, _existing_numerical_points):
+        if check_too_close_numerical(_new_numerical_point, _existing_numerical_points, round=-1.0):
             raise PointTooCloseError()
         if check_too_far_numerical(_new_numerical_point, _existing_numerical_points):
             raise PointTooFarError()
@@ -1129,7 +1129,7 @@ def enhance_text_with_potential_points(original_text: str, generator: PointGener
         new_clauses.append(clause)
 
     if not new_clauses:
-        return ""
+        return original_text
 
     additional_part = "; ".join(new_clauses)
     enhanced = original_text.rstrip()
