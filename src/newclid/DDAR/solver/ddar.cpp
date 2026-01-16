@@ -9,6 +9,7 @@
 #include <iostream>
 #include <type_traits>
 #include <cmath>
+#include <chrono>
 
 using namespace std;
 
@@ -48,21 +49,39 @@ bool DDARSolver::run_level(const Point &max_pt)
 {
     size_t num_stmts = _checked_statements.size();
     _level++;
-    // cout << "开始第" << _level << "层, 初始有" << num_stmts << "个结论" << endl;
-    // for (auto const &pf : _checked_statements)
-    // {
-    //     cout << pf->statement()->to_string() << "已证明" << endl;
-    // }
+
+    // size_t call_count = 0;
+    // double total_advance_time_ms = 0.0;
 
     size_t const n = _applications.size();
     for (size_t i = 0; i < n; i++)
     {
-        if (_applications[i].max_point() <= max_pt)
+        if (_applications[i].max_point() <= max_pt && _applications[i].state() == ApplicationState::PENDING)
         {
+            // auto t_start = std::chrono::steady_clock::now();
             advance_theorem(i);
+            // auto t_end = std::chrono::steady_clock::now();
+
+            // double ms = std::chrono::duration<double, std::micro>(t_end - t_start).count() / 1000.0;
+
+            // call_count++;
+            // total_advance_time_ms += ms;
         }
     }
 
+    // ────────────────────────────────────────────────
+    // 你可以选择只在有调用时才打印，避免太多0行
+    // if (call_count > 0)
+    // {
+    //     std::cout << "Level " << _level << " | "
+    //               << "advance_theorem calls: " << call_count
+    //               << " | total time: " << total_advance_time_ms << " ms"
+    //               << " | avg: " << (call_count ? total_advance_time_ms / call_count : 0.0) << " ms/call"
+    //               << endl;
+    // }
+    // ────────────────────────────────────────────────
+
+    // 後面原有的 goals 部分保持不變 ...
     if (!_problem->goals().empty())
     {
         bool res = true;
@@ -80,9 +99,6 @@ bool DDARSolver::run_level(const Point &max_pt)
         _solved = res;
     }
 
-    // cout << "新证明" << _checked_statements.size() - num_stmts << "个结论, "
-    //      << "总计" << _checked_statements.size() << "个结论" << endl;
-
     return num_stmts < _checked_statements.size();
 }
 
@@ -90,11 +106,29 @@ bool DDARSolver::run(size_t max_levels)
 {
     bool has_goal = !_problem->goals().empty();
 
-    for (Point const &pt : _problem->points())
+    if (has_goal)
+    {
+        for (Point const &pt : _problem->points())
+        {
+            for (size_t i = 0; i < max_levels; ++i)
+            {
+                if (!run_level(pt))
+                {
+                    break;
+                }
+
+                if (has_goal && _solved)
+                {
+                    return _solved;
+                }
+            }
+        }
+    }
+    else
     {
         for (size_t i = 0; i < max_levels; ++i)
         {
-            if (!run_level(pt))
+            if (!run_level(_problem->points().back()))
             {
                 break;
             }
@@ -104,10 +138,6 @@ bool DDARSolver::run(size_t max_levels)
                 return _solved;
             }
         }
-    }
-
-    if (!has_goal)
-    {
         bool changed = true;
         while (changed)
         {
@@ -340,20 +370,25 @@ void DDARSolver::add_established_equations(Proof *pf)
         auto pts = pf->statement()->points();
         Point p = pts[0];
         Point q = pts[1];
-        for (auto &old_pf : _checked_statements)
+        std::vector<Proof *> to_process;
+        for (const auto &old_pf : _checked_statements)
         {
             if (old_pf->statement()->contain(p) && !old_pf->statement()->contain(q))
             {
-                auto stmt = old_pf->statement()->replace(p, q);
-                string key = stmt->normalize()->to_string();
-                auto itr = _statement_proofs.find(key);
-                if (itr != _statement_proofs.end())
+                to_process.push_back(old_pf);
+            }
+        }
+        for (auto &old_pf : to_process)
+        {
+            auto stmt = old_pf->statement()->replace(p, q);
+            string key = stmt->normalize()->to_string();
+            auto itr = _statement_proofs.find(key);
+            if (itr != _statement_proofs.end())
+            {
+                Proof *new_pf = itr->second.get();
+                if (!new_pf->is_proved())
                 {
-                    Proof *new_pf = itr->second.get();
-                    if (!new_pf->is_proved())
-                    {
-                        new_pf->set_proved(pf, old_pf);
-                    }
+                    new_pf->set_proved(pf, old_pf);
                 }
             }
         }

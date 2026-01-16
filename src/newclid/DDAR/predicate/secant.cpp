@@ -53,12 +53,12 @@ unique_ptr<Statement> Secant::normalize() const
 
 bool Secant::check_nondegen() const
 {
-    return !(_p == _a) && !(_p == _b) && !(_p == _o) && !(_o == _a) && !(_o == _b);
+    return !(_p.is_close(_a)) && !(_p .is_close(_b)) && !(_p.is_close(_o)) && !(_o.is_close( _a)) && !(_o.is_close( _b));
 }
 
 bool Secant::check_equations() const
 {
-    if (_a == _b)
+    if (_a.is_close( _b))
     {
         return cong_ab().check_equations() && Perp(Slope(_a, _o), Slope(_o, _p)).check_equations();
     }

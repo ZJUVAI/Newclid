@@ -123,6 +123,7 @@ bool Equation::check_numerically() const
 
 void Equation::normalize()
 {
+    _terms.normalize();
     for (auto it = _combination.begin(); it != _combination.end();)
     {
         it->first.normalize();
