@@ -11,24 +11,26 @@ class PointTooFarError(Exception):
 
 
 def check_too_close_numerical(
-    newpoints: Sequence[PointNum], points: Sequence[PointNum], tol: float = 0.05
+    newpoints: Sequence[PointNum], points: Sequence[PointNum], tol: float = 0.05, round: float = 1e-10
 ) -> bool:
     if len(points) < 2:
         return False
     mindist = (
-        sum([sum([p.distance(p1) for p1 in points if p1 != p]) for p in points])
+        sum([sum([p.distance(p1) for p1 in points if p1 != p])
+            for p in points])
         / len(points)
         / (len(points) - 1)
     )
     for p0 in newpoints:
         for p1 in points:
-            if p0.distance(p1) < tol * mindist:
+            dist = p0.distance(p1)
+            if dist > round and dist < tol * mindist:
                 return True
     return False
 
 
 def check_too_far_numerical(
-    newpoints: Sequence[PointNum], points: Sequence[PointNum], tol: float = 4.0
+    newpoints: Sequence[PointNum], points: Sequence[PointNum], tol: float = 5.0
 ) -> bool:
     if len(points) < 2:
         return False
