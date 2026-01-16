@@ -463,8 +463,8 @@ class GeometryProblemWorker:
         """Process a single goal"""
 
         results = []
-
-        res_list, run_count = GeometryProblemWorker._find_minimal_aux_clauses_new(
+        
+        res_list = GeometryProblemWorker._find_minimal_aux_clauses_new(
             pointstr2basicstrs,
             basicstr2pointstrs,
             solver,
