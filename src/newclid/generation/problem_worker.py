@@ -636,38 +636,19 @@ class GeometryProblemWorker:
             }
 
             if img:
-                from newclid.numerical.draw_figure import init_figure
-
-                dep_graph_for_draw = DependencyGraph(AlgebraicManipulator())
-                dep_graph_for_draw.symbols_graph.name2node = name2node
-                
-                # Draw with annotations
-                fig = init_figure()
-                draw_clauses(
-                    fig.axes[0],
-                    clauses,
-                    GeometryProblemWorker.defs,
-                    goal_new,
-                    np.random.default_rng(solver_builder.seed),
-                    dep_graph_for_draw,
-                    mapping,
-                    True,
-                )
-                result["fig"] = fig
-
-                # Draw without annotations
-                fig_no_annotations = init_figure()
-                draw_clauses(
-                    fig_no_annotations.axes[0],
-                    clauses,
-                    GeometryProblemWorker.defs,
-                    goal_new,
-                    np.random.default_rng(solver_builder.seed),
-                    dep_graph_for_draw,
-                    mapping,
-                    False,
-                )
-                result["fig_no_annotations"] = fig_no_annotations
+                # Store drawing metadata instead of matplotlib figures
+                # to reduce memory usage in Ray workers
+                point_coords = {
+                    name: (p.num.x, p.num.y)
+                    for name, p in name2node.items()
+                }
+                result["draw_data"] = {
+                    "clauses": [(c.points, c.sentences) for c in clauses],
+                    "mapping": mapping,
+                    "goal_tokens": goal_new.to_str().split(' '),
+                    "point_coords": point_coords,
+                    "seed": solver_builder.seed,
+                }
 
             results.append(result)
         return results
