@@ -501,7 +501,6 @@ class GeometryProblemWorker:
             csolver_all_aux = CSolver(
                 problem='', solver=solver_all_aux, using_log=True)
             csolver_all_aux.run()
-            run_count += 1
 
             for goal in solver_all_aux.goals:
                 if goal.check():
