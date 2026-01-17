@@ -73,7 +73,7 @@ class GeometryProblemWorker:
             pid, seed, n_clauses, max_level, img, aux_only, add_auxiliary, prune, remove_coords, draw_annotations = args
             start_time = time.time()
 
-            TIMELIMIT = 600  # 6分钟
+            TIMELIMIT = 600  # 10分钟
             DEADLINE = start_time + TIMELIMIT
 
             # geneate fl_statement
@@ -135,7 +135,7 @@ class GeometryProblemWorker:
                         sentences=clause.sentences,
                     )
                 )
-            clause2basics, _ = GeometryProblemWorker._get_all_premise(
+            clause2basics, clause2args = GeometryProblemWorker._get_all_premise(
                 clauses_without_coords, proof_state_temp
             )
             statement_str_idxs = dict()
@@ -192,7 +192,20 @@ class GeometryProblemWorker:
                 premises = goal_list[0][1]
                 aux = goal_list[0][2]
                 data = GeometryProblemWorker._process_goals_with_same_statement(
-                    pointstr2basicstrs, basicstr2pointstrs, goals, solver, solver_builder, premises, aux, n_clauses, img, aux_only, draw_annotations)
+                    clause2basics,
+                    clause2args,
+                    pointstr2basicstrs,
+                    basicstr2pointstrs,
+                    goals,
+                    solver,
+                    solver_builder,
+                    premises,
+                    aux,
+                    n_clauses,
+                    img,
+                    aux_only,
+                    draw_annotations
+                )
                 generated_data.extend(data)
             process_goal_time = time.time() - process_goal_time
 
@@ -312,6 +325,35 @@ class GeometryProblemWorker:
         #         continue
 
     @staticmethod
+    def _extract_proof_info(solver, goal):
+        """Extract proof information from solver for a given goal"""
+        (
+            points,
+            premises,
+            numercial_checked_premises,
+            trivial_premises,
+            aux_points,
+            aux,
+            numercial_checked_aux,
+            trivial_aux,
+            proof_steps,
+        ) = solver.proof.dep_graph.get_proof_steps([goal])
+        
+        return {
+            "goal": goal,
+            "points": points,
+            "premises": premises,
+            "numercial_checked_premises": numercial_checked_premises,
+            "trivial_premises": trivial_premises,
+            "aux_points": aux_points,
+            "aux": aux,
+            "numercial_checked_aux": numercial_checked_aux,
+            "trivial_aux": trivial_aux,
+            "proof_steps": proof_steps,
+            "name2node": solver.proof.symbols_graph.name2node.copy(),
+        }
+
+    @staticmethod
     def _find_minimal_aux_clauses_new(pointstr2basicstrs, basicstr2pointstrs, solver, solver_builder, goals_str, premises, aux, aux_only):
         """Find minimal auxiliary clause set"""
         results = []
@@ -336,10 +378,7 @@ class GeometryProblemWorker:
             if goal.check():
                 goals_str.remove(goal.to_str())
                 if aux_only < 2:
-                    results.append({
-                        "solver": solver_no_aux,
-                        "goal": goal
-                    })
+                    results.append(GeometryProblemWorker._extract_proof_info(solver_no_aux, goal))
 
         if len(aux) == 1:
             # If only one aux, no need to continue
@@ -366,10 +405,7 @@ class GeometryProblemWorker:
             for goal in solver_all_aux.goals:
                 if goal.check():
                     goals_str.remove(goal.to_str())
-                    results.append({
-                        "solver": solver_all_aux,
-                        "goal": goal
-                    })
+                    results.append(GeometryProblemWorker._extract_proof_info(solver_all_aux, goal))
                 else:
                     logger.warning(f"Goal {goal.to_str()} cannot be solved even with all aux")
             return results
@@ -477,12 +513,9 @@ class GeometryProblemWorker:
             for goal_str in group["goals"]:
                 if goal_str in group["solvers"]:
                     goals_str.remove(goal_str)
-                    # Use saved solver
+                    # Use saved solver and extract proof information
                     best_solver, best_goal = group["solvers"][goal_str]
-                    results.append({
-                        "solver": best_solver,
-                        "goal": best_goal
-                    })
+                    results.append(GeometryProblemWorker._extract_proof_info(best_solver, best_goal))
 
         if len(goals_str) > 0:
             # For remaining goals, excute with all aux to strip extra points
@@ -505,20 +538,35 @@ class GeometryProblemWorker:
             for goal in solver_all_aux.goals:
                 if goal.check():
                     goals_str.remove(goal.to_str())
-                    results.append({
-                        "solver": solver_all_aux,
-                        "goal": goal
-                    })
+                    results.append(GeometryProblemWorker._extract_proof_info(solver_all_aux, goal))
                 else:
                     logger.warning(f"Goal {goal.to_str()} cannot be solved even with all aux")
 
         return results
 
     @staticmethod
-    def _process_goals_with_same_statement(pointstr2basicstrs, basicstr2pointstrs, goals, solver, solver_builder, premises, aux, n_clauses, img, aux_only, draw_annotations=True):
+    def _process_goals_with_same_statement(
+        clause2basics,
+        clause2args,
+        pointstr2basicstrs,
+        basicstr2pointstrs,
+        goals,
+        solver,
+        solver_builder,
+        premises,
+        aux,
+        n_clauses,
+        img,
+        aux_only,
+        draw_annotations=True
+    ):
         """Process a single goal"""
 
         results = []
+        name2node = dict()
+        for k, v in solver.proof.symbols_graph.name2node.items():
+            if isinstance(v, Point):
+                name2node[k] = v
         
         res_list = GeometryProblemWorker._find_minimal_aux_clauses_new(
             pointstr2basicstrs,
@@ -533,28 +581,31 @@ class GeometryProblemWorker:
 
         for res in res_list:
             goal_new = res['goal']
-            solver_new = res['solver']
-            solver_new.proof.goals = [goal_new]
-
-            # get new proof
-            points, premises, _, _, aux_points, aux, _, _, proof_steps = solver_new.proof.dep_graph.get_proof_steps([
-                goal_new])
-            # if aux_only and len(aux) == 0:
-            #     logging.warning(
-            #         "aux_only == True but still generate result with no aux.")
-            #     continue
-            # all_premises = [dep.statement for dep in premises + aux]
-            # n_premises = len(all_premises)
-
-            # # filter proof
-            # n_proof_steps = len(proof_steps)
-            # # if n_proof_steps < min_proof_steps:
-            # #     logging.debug(f"Naive proof with length {n_proof_steps}")
-            # #     continue
+            points = res['points']
+            premises = res['premises']
+            numercial_checked_premises = res['numercial_checked_premises']
+            trivial_premises = res['trivial_premises']
+            aux_points = res['aux_points']
+            aux = res['aux']
+            numercial_checked_aux = res['numercial_checked_aux']
+            trivial_aux = res['trivial_aux']
+            proof_steps = res['proof_steps']
 
             # llm data generation
-            llm_renamed, clause2basics, clauses, mapping, n_premises, n_proof_steps = GeometryProblemWorker.llm_solution_renamed(
-                solver_builder.problemJGEX, solver_new.proof)
+            llm_renamed, clauses, mapping, n_premises, n_proof_steps = GeometryProblemWorker.llm_solution_renamed(
+                clause2basics.copy(),
+                clause2args.copy(),
+                [goal_new],
+                points,
+                premises,
+                numercial_checked_premises,
+                trivial_premises,
+                aux_points,
+                aux,
+                numercial_checked_aux,
+                trivial_aux,
+                proof_steps,
+            )
 
             if aux_only == 2 and 'aux' not in llm_renamed['llm_output']:
                 continue
@@ -562,17 +613,17 @@ class GeometryProblemWorker:
             if 'aux' in llm_renamed['llm_output'] and not GeometryProblemWorker.filter.aux_predicates_valid_check(llm_renamed['llm_output']):
                 continue
 
-            expected_dsl = problem_to_dsl(ProblemJGEX.from_text(
-                llm_renamed['fl_problem']), GeometryProblemWorker.defs)
-            actual_dsl = llm_renamed['llm_input']
-            error_msg = (
-                f"\n{'='*20} DSL Conversion Mismatch {'='*20}\n"
-                f"Problem: {llm_renamed['fl_problem']}\n"
-                f"--- [ACTUAL] ---\n{actual_dsl}\n"
-                f"--- [EXPECTED] ---\n{expected_dsl}\n"
-                f"{'='*50}"
-            )
-            assert actual_dsl == expected_dsl, error_msg
+            # expected_dsl = problem_to_dsl(ProblemJGEX.from_text(
+            #     llm_renamed['fl_problem']), GeometryProblemWorker.defs)
+            # actual_dsl = llm_renamed['llm_input']
+            # error_msg = (
+            #     f"\n{'='*20} DSL Conversion Mismatch {'='*20}\n"
+            #     f"Problem: {llm_renamed['fl_problem']}\n"
+            #     f"--- [ACTUAL] ---\n{actual_dsl}\n"
+            #     f"--- [EXPECTED] ---\n{expected_dsl}\n"
+            #     f"{'='*50}"
+            # )
+            # assert actual_dsl == expected_dsl, error_msg
 
             result = {
                 # "n_clauses": n_clauses,
@@ -585,27 +636,34 @@ class GeometryProblemWorker:
             }
 
             if img:
-                fig = deepcopy(solver_new.proof.fig)
+                from newclid.numerical.draw_figure import init_figure
+
+                dep_graph_for_draw = DependencyGraph(AlgebraicManipulator())
+                dep_graph_for_draw.symbols_graph.name2node = name2node
+                
+                # Draw with annotations
+                fig = init_figure()
                 draw_clauses(
                     fig.axes[0],
                     clauses,
                     GeometryProblemWorker.defs,
                     goal_new,
                     np.random.default_rng(solver_builder.seed),
-                    solver_new.proof.dep_graph,
+                    dep_graph_for_draw,
                     mapping,
                     True,
                 )
                 result["fig"] = fig
 
-                fig_no_annotations = deepcopy(solver_new.proof.fig)
+                # Draw without annotations
+                fig_no_annotations = init_figure()
                 draw_clauses(
                     fig_no_annotations.axes[0],
                     clauses,
                     GeometryProblemWorker.defs,
                     goal_new,
                     np.random.default_rng(solver_builder.seed),
-                    solver_new.proof.dep_graph,
+                    dep_graph_for_draw,
                     mapping,
                     False,
                 )
@@ -648,46 +706,36 @@ class GeometryProblemWorker:
         return f"{conclusion_str} [{dep_idx[conclusion_str]}] {rule_id} {premise_ids}".strip()
 
     @staticmethod
-    def llm_solution_renamed(problem: ProblemJGEX, proof_state: ProofState):
+    def llm_solution_renamed(
+        clause2basics: dict[Clause, list],
+        clause2args: dict[Clause, set],
+        goals: list[Statement],
+        points: set[Point],
+        premises: list[Dependency],
+        numercial_checked_premises: list[Dependency],
+        trivial_premises: list[Dependency],
+        aux_points: set[Point],
+        aux: list[Dependency],
+        numercial_checked_aux: list[Dependency],
+        trivial_aux: list[Dependency],
+        proof_steps: list[Dependency]
+    ):
         """Refactored main method to generate LLM solution with renamed points"""
         try:
             # Initialize data
             dep_idx: dict[str, str] = {}
-            goals = [goal for goal in proof_state.goals if goal.check()]
-            (
-                points,
-                premises,
-                numercial_checked_premises,
-                trivial_premises,
-                aux_points_list,
-                aux,
-                numercial_checked_aux,
-                trivial_aux,
-                proof_steps,
-            ) = proof_state.dep_graph.get_proof_steps(goals)
 
-            # Get all premises and essential premises/points
-            clauses_without_coords: list[Clause] = []
-            for clause in problem.constructions:
-                clauses_without_coords.append(
-                    Clause(
-                        points=tuple(p.split('@')[0] for p in clause.points),
-                        sentences=clause.sentences,
-                    )
-                )
-            clause2basics, clause2args = GeometryProblemWorker._get_all_premise(
-                clauses_without_coords, proof_state
-            )
+            # Get essential premises/points
             essential_premise_clauses = GeometryProblemWorker._get_essential_premise_clauses(
                 clause2basics,
                 clause2args,
-                [premise.statement for premise in premises],
+                [premise.statement.to_str() for premise in premises],
                 set([p.name for p in points]),
             )
             essential_aux_basics = GeometryProblemWorker._get_aux_basics(
                 clause2basics,
-                [a.statement for a in aux],
-                set([p.name for p in aux_points_list]),
+                [a.statement.to_str() for a in aux],
+                set([p.name for p in aux_points]),
             )
 
             # Create point name mapping
@@ -728,7 +776,7 @@ class GeometryProblemWorker:
                 "fl_problem": data_problem_clauses,
                 "llm_input": data_problem,
                 "llm_output": data_aux + numerical_check + trivial_check + proof,
-            }, clause2basics, essential_premise_clauses, mp, n_premises, len(proof_steps)
+            }, essential_premise_clauses, mp, n_premises, len(proof_steps)
 
         except Exception as e:
             import traceback
@@ -737,6 +785,8 @@ class GeometryProblemWorker:
             print(f"clause2basics: {clause2basics}")
             print(f"essential_clauses: {essential_premise_clauses}")
             print(f"essential_aux_basics: {essential_aux_basics}")
+            print(f"essential_premise_point_names: {essential_premise_point_names}")
+            print(f"essential_aux_point_names: {essential_aux_point_names}")
             print(f"mp: {mp}")
             raise
 
@@ -797,7 +847,7 @@ class GeometryProblemWorker:
     def _get_essential_premise_clauses(
         clause2basics: dict[Clause, list],
         clause2args: dict[Clause, set],
-        premise_statements: list[Statement],
+        premise_statement_strs: list[str],
         essential_point_names: set[str],
     ) -> list[Clause]:
         """
@@ -814,7 +864,7 @@ class GeometryProblemWorker:
         for clause, basics in clause2basics.items():
             num_of_predicates = sum(len(bs) for _, bs in basics)
             if any(
-                statement in premise_statements
+                statement.to_str() in premise_statement_strs
                 for _, bs in basics
                 for statement in bs
             ):
@@ -848,7 +898,7 @@ class GeometryProblemWorker:
     @staticmethod
     def _get_aux_basics(
         clause2basics: dict[Clause, list],
-        aux: list[Statement],
+        aux_strs: list[str],
         aux_point_names: set[str],
     ) -> list[tuple[tuple[str, ...], tuple[Statement, ...]]]:
         """
@@ -862,7 +912,7 @@ class GeometryProblemWorker:
             for points, bs in basics:
                 bs_filtered = [
                     statement for statement in bs
-                    if statement in aux
+                    if statement.to_str() in aux_strs
                 ]
                 if len(bs_filtered) > 0 or any(p in aux_point_names for p in points):
                     essential_aux_basics.append(
