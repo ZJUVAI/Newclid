@@ -167,12 +167,17 @@ class GeometryProblemWorker:
                     continue
                 premises = [dep.statement for dep in premises]
                 aux = sorted([dep.statement for dep in aux], key=lambda s: statement_str_idxs[s.to_str()])
-                # predicates = sorted([statement.to_str()
-                #                     for statement in premises + aux])
-                predicates = '; '.join(sorted([statement.to_str() for statement in premises])) + \
-                    ' $$ ' + \
-                    '; '.join(sorted([statement.to_str()
-                              for statement in aux]))
+                point_names = set()
+                for premise in premises:
+                    for arg in premise.args:
+                        if isinstance(arg, Point):
+                            point_names.add(arg.name)
+                for arg in goal.args:
+                    if isinstance(arg, Point):
+                        point_names.add(arg.name)
+                predicates = ' '.join(sorted(point_names)) + ' $$ ' \
+                        + '; '.join(sorted([statement.to_str() for statement in premises])) + ' $$ ' \
+                        + '; '.join(sorted([statement.to_str() for statement in aux]))
                 eq_predicates_goals.setdefault(
                     predicates, []).append((goal, premises, aux))
             group_runtime = time.time() - group_runtime
