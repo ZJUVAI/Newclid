@@ -28,6 +28,7 @@ from copy import deepcopy
 
 from newclid.generation.clause_generation import CompoundClauseGen, enhance_text_with_potential_points
 
+logger = logging.getLogger(__name__)
 
 class TimeoutError(Exception):
     pass
@@ -91,7 +92,7 @@ class GeometryProblemWorker:
             # seed=42
             # max_level=500
             # img = True
-            # aux_only = False
+            # aux_only = 0
             # start_time = time.time()
             # remove_coords = False
             # draw_annotations = True
@@ -162,7 +163,7 @@ class GeometryProblemWorker:
                 # find essential_clauses
                 premises, aux = solver.proof.dep_graph.get_premises_and_aux([
                                                                             goal])
-                if aux_only and len(aux) == 0:
+                if aux_only > 0 and len(aux) == 0:
                     continue
                 premises = [dep.statement for dep in premises]
                 aux = sorted([dep.statement for dep in aux], key=lambda s: statement_str_idxs[s.to_str()])
@@ -329,7 +330,7 @@ class GeometryProblemWorker:
         for goal in solver_no_aux.goals:
             if goal.check():
                 goals_str.remove(goal.to_str())
-                if not aux_only:
+                if aux_only < 2:
                     results.append({
                         "solver": solver_no_aux,
                         "goal": goal
@@ -500,7 +501,7 @@ class GeometryProblemWorker:
             llm_renamed, clause2basics, clauses, mapping, n_premises, n_proof_steps = GeometryProblemWorker.llm_solution_renamed(
                 solver_builder.problemJGEX, solver_new.proof)
 
-            if aux_only and 'aux' not in llm_renamed['llm_output']:
+            if aux_only == 2 and 'aux' not in llm_renamed['llm_output']:
                 continue
 
             if 'aux' in llm_renamed['llm_output'] and not GeometryProblemWorker.filter.aux_predicates_valid_check(llm_renamed['llm_output']):

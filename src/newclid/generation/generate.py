@@ -68,7 +68,7 @@ class GeometryGenerator:
         timeout=3600,
         max_level=500,
         img=False,
-        aux_only=False,
+        aux_only=0,
         clear=False,
         add_auxiliary=True,
         prune=True,
@@ -285,8 +285,11 @@ def main():
     parser.add_argument("--max_level", required=False, type=int, default=500)
     parser.add_argument("--img", required=False, type=str_to_bool, default=False,
                         help="Whether to save images of the generated problems.")
-    parser.add_argument("--aux_only", required=False, type=str_to_bool, default=False,
-                        help="Whether to save only data with aux.")
+    parser.add_argument("--aux_only", required=False, type=int, default=0, choices=[0, 1, 2],
+                        help="Auxiliary data filter: " \
+                            "0=all data, " \
+                            "1=include data without aux after doublecheck, " \
+                            "2=only data with aux.")
     parser.add_argument("--clear", required=False, type=str_to_bool, default=False,
                         help="Whether to clear old dataset files.")
     parser.add_argument("--add_auxiliary", required=False, type=str_to_bool, default=True,
