@@ -32,7 +32,6 @@ void Application::advance_proof(long long depth)
         if (!pf->is_proved() || pf->depth() >= depth)
         {
             hypotheses_proved = false;
-            break;
         }
     }
 
