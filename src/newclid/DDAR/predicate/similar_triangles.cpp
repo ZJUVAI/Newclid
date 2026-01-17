@@ -62,7 +62,7 @@ unique_ptr<Statement> SimilarTriangles::normalize() const
 
 bool SimilarTriangles::check_nondegen() const
 {
-    return _left.check_nondegen() && _right.check_nondegen() && (_sameclock == ((_left.area() > 0) == (_right.area() > 0)));
+    return _left.check_nondegen() && _right.check_nondegen() && (_sameclock == ((_left.area() > 0) == (_right.area() > 0))) && !_left.overlap(_right);
 }
 
 bool SimilarTriangles::check_equations() const

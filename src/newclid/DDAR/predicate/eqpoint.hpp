@@ -25,6 +25,10 @@ public:
 
     bool check_equations() const override;
 
+    const Point &a() const { return _a; }
+
+    const Point &b() const { return _b; }
+
     std::unique_ptr<Statement> clone() const override;
 
     std::vector<statement_arg> args() const override;
@@ -34,6 +38,8 @@ public:
     bool numerical_only() const { return false; }
 
     bool trivial() const { return false; }
+
+    std::vector<std::unique_ptr<Equation>> as_equation_dist(bool exp) const override;
 };
 
 std::ostream &operator<<(std::ostream &out, const Statement &stmt);

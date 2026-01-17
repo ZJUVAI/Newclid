@@ -11,6 +11,7 @@
 #include "predicate/similar_triangles.hpp"
 #include "predicate/congruent_triangles.hpp"
 #include "predicate/statement.hpp"
+#include "predicate/eqpoint.hpp"
 #include "predicate/thales.hpp"
 #include "predicate/secant.hpp"
 #include "type/angle.hpp"
@@ -140,6 +141,9 @@ public:
 
     // r107
     static Theorem eqpoints_of_same_intersections(const Point &p, const Point &q, const Point &a, const Point &b, const Point &c, const Point &d);
+
+    // r108
+    static Theorem cong_of_eqpoints(const EqPoint &eq, const Point &p);
 
 private:
     std::string _name;

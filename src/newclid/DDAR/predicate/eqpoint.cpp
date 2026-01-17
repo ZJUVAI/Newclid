@@ -55,3 +55,10 @@ unique_ptr<Statement> EqPoint::replace(Point p, Point q) const
     Point new_b = (_b == p) ? q : _b;
     return std::make_unique<EqPoint>(new_a, new_b);
 }
+
+vector<unique_ptr<Equation>> EqPoint::as_equation_dist(bool exp) const
+{
+    vector<unique_ptr<Equation>> result;
+    result.push_back(make_unique<Equation>(Equation({Term(Dist(_a, _b))})));
+    return result;
+}

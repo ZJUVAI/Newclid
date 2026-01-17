@@ -462,7 +462,7 @@ Theorem Theorem::eqpoints_of_same_intersections(const Point &p, const Point &q, 
     Theorem theorem("Two distinct lines determine a unique point", "r107");
     if (p == a || q == a)
     {
-        theorem.add_hypothesis(ConstLine(b, p, q).clone());
+        theorem.add_hypothesis(Coll(b, p, q).clone());
     }
     else
     {
@@ -471,7 +471,7 @@ Theorem Theorem::eqpoints_of_same_intersections(const Point &p, const Point &q, 
     }
     if (p == c || q == c)
     {
-        theorem.add_hypothesis(ConstLine(d, p, q).clone());
+        theorem.add_hypothesis(Coll(d, p, q).clone());
     }
     else
     {
@@ -480,6 +480,14 @@ Theorem Theorem::eqpoints_of_same_intersections(const Point &p, const Point &q, 
     }
     theorem.add_hypothesis(NColl(a, b, d).clone());
     theorem.add_conclusion(EqPoint(p, q).clone());
+    return theorem;
+}
+
+Theorem Theorem::cong_of_eqpoints(const EqPoint &eq, const Point &p)
+{
+    Theorem theorem("Distances to overlapped point are equal", "r108");
+    theorem.add_hypothesis(eq.clone());
+    theorem.add_conclusion(make_unique<Cong>(Cong(Dist(p, eq.a()), Dist(p, eq.b()))));
     return theorem;
 }
 

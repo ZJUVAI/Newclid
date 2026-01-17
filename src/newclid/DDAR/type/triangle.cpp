@@ -108,6 +108,11 @@ bool Triangle::check_nondegen() const
     return !Coll(_a, _b, _c).check_numerically();
 }
 
+bool Triangle::overlap(Triangle const &other) const
+{
+    return _a.is_close(other._a) && _b.is_close(other._b) && _c.is_close(other._c);
+}
+
 ostream &operator<<(ostream &os, const Triangle &triangle)
 {
     os << "▵" << triangle.a() << " " << triangle.b() << " " << triangle.c();
