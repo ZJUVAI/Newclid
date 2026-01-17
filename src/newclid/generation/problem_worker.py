@@ -73,7 +73,7 @@ class GeometryProblemWorker:
             pid, seed, n_clauses, max_level, img, aux_only, add_auxiliary, prune, remove_coords, draw_annotations = args
             start_time = time.time()
 
-            TIMELIMIT = 120  # 2分钟
+            TIMELIMIT = 600  # 6分钟
             DEADLINE = start_time + TIMELIMIT
 
             # geneate fl_statement
@@ -338,13 +338,35 @@ class GeometryProblemWorker:
 
         if len(aux) == 1:
             # If only one aux, no need to continue
-            for goal_str in goals_str:
-                goal = Statement.from_tokens(
-                    goal_str.split(" "), solver.proof.dep_graph)
-                results.append({
-                    "solver": solver,
-                    "goal": goal
-                })
+            if len(goals_str) == 0:
+                return results
+            
+            # For remaining goals, excute with all aux to strip extra points
+            # that might be introduced in numerical checks
+            proof_state_all_aux = ProofState.build_predicates(
+                predicates=premises + aux,
+                defsJGEX=solver_builder.defs,
+                goals_str=goals_str.copy(),
+                rng=np.random.default_rng(solver_builder.seed)
+            )
+            solver_all_aux = GeometricSolver(
+                proof_state_all_aux,
+                solver_builder.rules,
+                DDARN()
+            )
+            csolver_all_aux = CSolver(
+                problem='', solver=solver_all_aux, using_log=True)
+            csolver_all_aux.run()
+
+            for goal in solver_all_aux.goals:
+                if goal.check():
+                    goals_str.remove(goal.to_str())
+                    results.append({
+                        "solver": solver_all_aux,
+                        "goal": goal
+                    })
+                else:
+                    logger.warning(f"Goal {goal.to_str()} cannot be solved even with all aux")
             return results
         
         if len(goals_str) == 0:
@@ -354,6 +376,11 @@ class GeometryProblemWorker:
         # Group goals by the minimal aux they need
         goal_groups = [{"goals": goals_str.copy(), "aux": list(aux), "solvers": {}}]
         premise_strs = set([p.to_str() for p in premises])
+        # premise_pointstrs = set()
+        # for p in premises:
+        #     for arg in p.args:
+        #         if isinstance(arg, Point):
+        #             premise_pointstrs.add(arg.name)
             
         for i in range(len(aux) - 1, -1, -1):
             new_goal_groups = []
@@ -362,33 +389,35 @@ class GeometryProblemWorker:
                 # Try without this aux for all goals in this group
                 test_aux = group["aux"][:i] + group["aux"][i+1:]
 
-                # Check if the aux set is valid w.r.t rely_on
-                flag = True
-                exist_stmt_strs = premise_strs.copy()
-                # print(f"test_aux: {test_aux}")
-                for aux_stmt in test_aux:
-                    aux_str = aux_stmt.to_str()
-                    exist_stmt_strs.add(aux_str)
-                    # print(f"aux: {aux_stmt}, points: {basicstr2pointstrs[aux_stmt.to_str()]}")
-                    # print(f"exist_stmt_strs: {exist_stmt_strs}")
-                    for pname in basicstr2pointstrs[aux_str]:
-                        p = solver.proof.symbols_graph.name2node[pname]
-                        # print(f"point: {pname}, rely_on: {[q.name for q in p.rely_on]}")
-                        for q in p.rely_on:
-                            # print(f"  checking rely_on point: {q.name}, basicstrs: {pointstr2basicstrs[q.name]}")
-                            if len(pointstr2basicstrs[q.name]) > 0 \
-                                and pointstr2basicstrs[q.name].isdisjoint(exist_stmt_strs):
-                                flag = False
-                                break
-                        if not flag:
-                            break
-                    if not flag:
-                        break
-                # print(f"test result for {test_aux}: {flag}")
-                if not flag:
-                    # Cannot remove this aux due to rely_on
-                    new_goal_groups.append(group)
-                    continue
+                # # Check if the aux set is valid w.r.t rely_on
+                # flag = True
+                # exist_stmt_strs = premise_strs.copy()
+                # # print(f"group[aux][:i]: {group["aux"][:i]}, group[aux][i+1:]: {group["aux"][i+1:]}")
+                # for aux_stmt in group["aux"][:i]:
+                #     exist_stmt_strs.add(aux_stmt.to_str())
+                # for aux_stmt in group["aux"][i+1:]:
+                #     aux_str = aux_stmt.to_str()
+                #     exist_stmt_strs.add(aux_str)
+                #     # print(f"aux: {aux_stmt}, points: {basicstr2pointstrs[aux_stmt.to_str()]}")
+                #     # print(f"exist_stmt_strs: {exist_stmt_strs}")
+                #     pointstrs_to_check = set()
+                #     for arg in aux_stmt.args:
+                #         if isinstance(arg, Point):
+                #             pointstrs_to_check.add(arg.name)
+                #     for pname in pointstrs_to_check:
+                #         if pname in premise_pointstrs or len(pointstr2basicstrs[pname]) == 0:
+                #             continue
+                #         # print(f"  checking point: {pname}, basicstrs: {pointstr2basicstrs[pname]}")
+                #         if pointstr2basicstrs[pname].isdisjoint(exist_stmt_strs):
+                #             flag = False
+                #             break
+                #     if not flag:
+                #         break
+                # # print(f"test result for {test_aux}: {flag}")
+                # if not flag:
+                #     # Cannot remove this aux due to rely_on
+                #     new_goal_groups.append(group)
+                #     continue
                 
                 proof_state_test = ProofState.build_predicates(
                     predicates=premises + test_aux,
@@ -442,21 +471,43 @@ class GeometryProblemWorker:
         for group in goal_groups:
             for goal_str in group["goals"]:
                 if goal_str in group["solvers"]:
+                    goals_str.remove(goal_str)
                     # Use saved solver
                     best_solver, best_goal = group["solvers"][goal_str]
                     results.append({
                         "solver": best_solver,
                         "goal": best_goal
                     })
-                else:
-                    # No aux removal succeeded, use original solver requiring full aux set
-                    goal = Statement.from_tokens(
-                        goal_str.split(" "), solver.proof.dep_graph)
+
+        if len(goals_str) > 0:
+            # For remaining goals, excute with all aux to strip extra points
+            # that might be introduced in numerical checks
+            proof_state_all_aux = ProofState.build_predicates(
+                predicates=premises + aux,
+                defsJGEX=solver_builder.defs,
+                goals_str=goals_str.copy(),
+                rng=np.random.default_rng(solver_builder.seed)
+            )
+            solver_all_aux = GeometricSolver(
+                proof_state_all_aux,
+                solver_builder.rules,
+                DDARN()
+            )
+            csolver_all_aux = CSolver(
+                problem='', solver=solver_all_aux, using_log=True)
+            csolver_all_aux.run()
+            run_count += 1
+
+            for goal in solver_all_aux.goals:
+                if goal.check():
+                    goals_str.remove(goal.to_str())
                     results.append({
-                        "solver": solver,
+                        "solver": solver_all_aux,
                         "goal": goal
                     })
-        
+                else:
+                    logger.warning(f"Goal {goal.to_str()} cannot be solved even with all aux")
+
         return results
 
     @staticmethod

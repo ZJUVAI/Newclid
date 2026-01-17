@@ -264,6 +264,12 @@ class DependencyGraph:
 
         while queue:
             q = queue.popleft()
+            for p in q.clause.points:
+                p_name = p.split('@')[0]
+                p_point = self.symbols_graph.names2points([p_name])[0]
+                if p_point not in points:
+                    points.add(p_point)
+                    queue.append(p_point)
             for p in q.rely_on:
                 if p not in points:
                     points.add(p)
