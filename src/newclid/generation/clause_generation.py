@@ -1149,6 +1149,7 @@ def find_potential_points(text: str, min_duplicated: int = 3):
 
 def enhance_text_with_potential_points(original_text: str, generator: PointGenerator) -> str:
     MAX_TOTAL_POINTS = 25
+    MAX_NEW_POINTS = 8
 
     repeated_points = find_potential_points(original_text, 3)
     if not repeated_points:
@@ -1156,7 +1157,8 @@ def enhance_text_with_potential_points(original_text: str, generator: PointGener
 
     # 当前已定义的点数
     current_count = len(generator.defined_points)
-    remaining_slots = max(0, MAX_TOTAL_POINTS - current_count)
+    # remaining_slots = max(0, MAX_TOTAL_POINTS - current_count)
+    remaining_slots = MAX_NEW_POINTS
 
     if len(repeated_points) > remaining_slots:
         repeated_points = repeated_points[:remaining_slots]
