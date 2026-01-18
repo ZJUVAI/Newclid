@@ -673,7 +673,7 @@ def process_geometric_string(input_str):
 
 # ----------------------------- 配置与常量 -----------------------------
 TOLERANCE = 1e-8          # 浮点比较容差
-ROUND_DECIMALS = 10       # 坐标保留小数位数（避免浮点误差积累）
+ROUND_DECIMALS = 9       # 坐标保留小数位数（避免浮点误差积累）
 
 
 def find_potential_points(text: str, min_duplicated: int = 3):
@@ -895,13 +895,16 @@ def find_potential_points(text: str, min_duplicated: int = 3):
             inter_counter += 1
 
     # ----------------------------- 垂足和关于线的对称点 -----------------------------
-    def point_to_line_foot(pt_coord, line_pts):
+    def point_to_line_foot_and_reflect(pt_coord, line_pts):
         A = coords[point_names.index(line_pts[0])]
         B = coords[point_names.index(line_pts[1])]
         AB = B - A
         AP = pt_coord - A
         proj = np.dot(AP, AB) / np.dot(AB, AB)
-        return A + proj * AB
+        foot_coord = A + proj * AB
+        sym_coord = (2 * foot_coord[0] - pt_coord[0],
+                     2 * foot_coord[1] - pt_coord[1])
+        return foot_coord, sym_coord
 
     feet = []
     reflections_over_line = []
@@ -913,21 +916,34 @@ def find_potential_points(text: str, min_duplicated: int = 3):
             if pt_name in line_sorted:
                 continue
             pt_coord = original_points[pt_name]
-            foot_coord = point_to_line_foot(
+            foot_coord, sym_coord = point_to_line_foot_and_reflect(
                 pt_coord, line_sorted)
             new_name = f"foot{counter}"
             feet.append((new_name, round_coord(foot_coord),
                         "foot", [pt_name, line_sorted]))
-
-            sym_coord = round_coord(
-                (2 * foot_coord[0] - pt_coord[0], 2 * foot_coord[1] - pt_coord[1]))
             new_name = f"symline{counter}"
             reflections_over_line.append(
-                (new_name, sym_coord, "symmetric_over_line", [pt_name, line_sorted]))
-
+                (new_name, round_coord(sym_coord), "symmetric_over_line", [pt_name, line_sorted]))
             counter += 1
 
+    new_feet = []
+    for foot in feet:
+        name, coord, typ, deps = foot
+        line_points = deps[1]
+        remaining = list(line_points)
+        for p in line_points:
+            p_coord = original_points[p]
+            if (abs(coord[0] - p_coord[0]) < TOLERANCE and
+                    abs(coord[1] - p_coord[1]) < TOLERANCE):
+                remaining.remove(p)
+                break
+        if len(remaining) >= 2:
+            new_deps = [deps[0], remaining]
+            new_feet.append((name, coord, typ, new_deps))
+    feet = new_feet
+
     # ----------------------------- 共圆检测 -----------------------------
+
     def get_circle_from_three(p1, p2, p3):
         i1, i2, i3 = (point_names.index(p) for p in (p1, p2, p3))
         A, B, C = coords[i1], coords[i2], coords[i3]
@@ -1021,7 +1037,7 @@ def find_potential_points(text: str, min_duplicated: int = 3):
             inter = A + t * d_vec
             candidates.append(inter)
 
-        known_points = set(circle["points"])
+        known_points = set(circle["points"]) | set(line_pts)
         known_points = [round_coord(
             (original_points[p][0], original_points[p][1])) for p in known_points]
 
