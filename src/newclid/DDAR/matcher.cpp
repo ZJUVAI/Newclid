@@ -313,11 +313,6 @@ void Matcher::match_between()
     using item_type = tuple<double, Coll>;
     vector<item_type> betweens = all_betweens();
 
-    if (betweens.empty())
-    {
-        return;
-    }
-
     vector<pair<Point, Point>> eqpoints = all_eqpoints();
 
     for (const auto &eq_pair : eqpoints)
@@ -374,6 +369,11 @@ void Matcher::match_between()
                 insert_theorem(Theorem::eqpoints_of_same_intersections(p1, p2, a, b, c, d));
             }
         }
+    }
+
+    if (betweens.empty())
+    {
+        return;
     }
 
     for (size_t i = 0; i < betweens.size(); i++)

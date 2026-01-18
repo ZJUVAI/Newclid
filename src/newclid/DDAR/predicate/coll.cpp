@@ -35,7 +35,7 @@ vector<statement_arg> Coll::args() const
 
 bool Coll::check_nondegen() const
 {
-    return !_a.is_close(_b) || !_a.is_close(_c);
+    return !_a.is_close(_b) && !_a.is_close(_c) && !_b.is_close(_c);
 }
 
 bool Coll::check_equations() const
