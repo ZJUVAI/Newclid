@@ -5,6 +5,7 @@ import time
 
 from newclid.statement import Statement
 
+
 class GeometryGoalFilter:
     def naive_goal_filter(self, goal_name, goal_args, dep_graph):
         if goal_name == 'cong':
@@ -34,6 +35,7 @@ class GeometryGoalFilter:
         elif goal_name == 'contri' or goal_name == 'contrir':
             return self._naive_contri_filter(goal_args, dep_graph)
         return False
+
     def _naive_cong_filter(self, args, dep_graph):
         # case: cong AB = AB,
         seg1 = {args[0], args[1]}
@@ -41,13 +43,13 @@ class GeometryGoalFilter:
         if seg1 == seg2:
             return False
         return True
-    
+
     def _naive_para_filter(self, args, dep_graph):
         # case: para AB ∥ AC => coll
         if len(set(args)) < 4:
             return False
         return True
-    
+
     def _naive_simtri_filter(self, args, dep_graph):
         # case: simtri △ABC ≅ △ABC
         tri_1 = {args[0], args[1], args[2]}
@@ -61,7 +63,7 @@ class GeometryGoalFilter:
         if sm.check():
             return False
         return True
-    
+
     def _naive_contri_filter(self, args, dep_graph):
         # case: contri △ABC ≅ △ABC
         tri_1 = {args[0], args[1], args[2]}
@@ -69,7 +71,7 @@ class GeometryGoalFilter:
         if tri_1 == tri_2:
             return False
         return True
-    
+
     def _naive_eqangle_filter(self, args, dep_graph):
         seg_1 = {args[0], args[1]}
         seg_2 = {args[2], args[3]}
@@ -84,15 +86,15 @@ class GeometryGoalFilter:
         # case: eqangle ∠(AB,AB) = ∠(CD,EF) => para CD∥EF
         if seg_1 == seg_2 or seg_3 == seg_4:
             return False
-        
+
         # case: eqangle ∠(AB,CD) = ∠(AB,CD)
         if seg_1 == seg_3 and seg_2 == seg_4:
             return False
-        
+
         # case: eqangle ∠(AB,CD) = ∠(CD,AB) => perp AB⊥CD
         if seg_1 == seg_4 and seg_2 == seg_3:
             return False
-        
+
         # case: angles with accurate degree
         parallel_sets = [
             [args[0], args[1], args[2], args[3]],
@@ -110,11 +112,11 @@ class GeometryGoalFilter:
             sm = Statement.from_tokens(['para'] + arg_set, dep_graph)
             if sm.check():
                 return False
-        for arg_set in parallel_sets:    
+        for arg_set in parallel_sets:
             sm = Statement.from_tokens(['perp'] + arg_set, dep_graph)
             if sm.check():
-                return False       
-        
+                return False
+
         # case: simtri
         # a1_args = list(set(args[:4]))
         # a2_args = list(set(args[4:]))
@@ -147,16 +149,16 @@ class GeometryGoalFilter:
         # case: eqratio AB/AB = CD/EF => cong CD = EF
         if seg_1 == seg_2 or seg_3 == seg_4:
             return False
-        
+
         # case: eqratio AB/CD = AB/CD
         # case: eqratio AB/CD = AB/EF => cong CD = EF
         if seg_1 == seg_3 or seg_2 == seg_4:
             return False
-        
-        # case: eqratio AB/CD = CD/AB => cong AB = CD        
+
+        # case: eqratio AB/CD = CD/AB => cong AB = CD
         if seg_1 == seg_4 and seg_3 == seg_4:
             return False
-        
+
         # two segments with the same length
         sets = [
             [args[0], args[1], args[2], args[3]],
@@ -169,13 +171,14 @@ class GeometryGoalFilter:
             if sm.check():
                 return False
             for ratio in ('1/1',):
-                sm = Statement.from_tokens(['rconst'] + arg_set + [ratio], dep_graph)
+                sm = Statement.from_tokens(
+                    ['rconst'] + arg_set + [ratio], dep_graph)
                 if sm.check():
                     return False
             sm = Statement.from_tokens(['rcompute'] + arg_set, dep_graph)
             if sm.check():
                 return False
-            
+
         return True
 
     def _naive_rconst_filter(self, args, dep_graph):
@@ -192,29 +195,31 @@ class GeometryGoalFilter:
         def group_equivalent_predicates(goals, predicate_type):
             """
             Group equivalent predicate goals together.
-            
+
             Two predicate statements are considered equivalent if they represent
             the same relationship, even with different point orderings.
             """
             # Groups of equivalent pairs
-            predicate_groups = []  
+            predicate_groups = []
             # Corresponding goal objects for each group
-            goal_groups = []   
-            
+            goal_groups = []
+
             for goal in goals:
                 # Extract point names from the goal arguments
                 args = [arg.name for arg in goal.args]
                 # Each predicate has 8 args representing two relationships
                 # First relationship: args[0:4], Second relationship: args[4:8]
-                
+
                 found_group = False
                 # Check if this goal belongs to an existing group
                 for i, (group, goal_group) in enumerate(zip(predicate_groups, goal_groups)):
                     for existing_pair in group:
-                        # Check if the relationships in this goal are equivalent to 
+                        # Check if the relationships in this goal are equivalent to
                         # relationships in the existing group
-                        sm1 = Statement.from_tokens([predicate_type] + args[:4] + existing_pair, dep_graph)
-                        sm2 = Statement.from_tokens([predicate_type] + args[4:] + existing_pair, dep_graph)
+                        sm1 = Statement.from_tokens(
+                            [predicate_type] + args[:4] + existing_pair, dep_graph)
+                        sm2 = Statement.from_tokens(
+                            [predicate_type] + args[4:] + existing_pair, dep_graph)
                         if sm1.check() or sm2.check():
                             found_group = True
                             # Add first relationship to group if not already present
@@ -228,14 +233,14 @@ class GeometryGoalFilter:
                             break
                     if found_group:
                         break
-                
+
                 # If no existing group was found, create a new one
                 if not found_group:
                     predicate_groups.append([args[:4], args[4:]])
                     goal_groups.append([goal])
-            
+
             return goal_groups
-        
+
         def check_equivalence(p1, p2, token_type):
             args1 = [arg.name for arg in p1.args]
             args2 = [arg.name for arg in p2.args]
@@ -252,26 +257,45 @@ class GeometryGoalFilter:
                 if not any(equivalence_fn(existing_goal, goal, token_type) for existing_goal in unique_goals):
                     unique_goals.append(goal)
             return unique_goals
-        
+
         filtered_goals = []
+        eq_pairs = set()
         for goal in possible_goals:
             parts = goal.to_str().split(" ")
+            if parts[0] == "eqpoint":
+                eq_pairs.add(frozenset([parts[1], parts[2]]))
             if self.naive_goal_filter(parts[0], parts[1:], dep_graph):
                 filtered_goals.append(goal)
         possible_goals = filtered_goals
 
+        filtered_goals = []
+        for goal in possible_goals:
+            parts = goal.to_str().split(" ")
+            args = parts[1:]
+            discard = False
+            for i in range(len(args)):
+                for j in range(i + 1, len(args)):
+                    if frozenset([args[i], args[j]]) in eq_pairs:
+                        discard = True
+                        break
+                if discard:
+                    break
+            if not discard:
+                filtered_goals.append(goal)
+        possible_goals = filtered_goals
+
         eqangle_goals = [
-            goal for goal in possible_goals 
+            goal for goal in possible_goals
             if goal.predicate.NAME == 'eqangle'
         ]
 
         eqratio_goals = [
-            goal for goal in possible_goals 
+            goal for goal in possible_goals
             if goal.predicate.NAME == 'eqratio'
         ]
 
         other_goals = [
-            goal for goal in possible_goals 
+            goal for goal in possible_goals
             if goal.predicate.NAME not in (
                 'eqangle', 'eqratio', 'eqratio3',
                 # 'simtri', 'contri', 'simtrir', 'contrir',
@@ -289,7 +313,7 @@ class GeometryGoalFilter:
 
         # eqangle_goals = remove_duplicates(eqangle_goals, check_equivalence, 'para')
         # eqratio_goals = remove_duplicates(eqratio_goals, check_equivalence, 'cong')
-        
+
         return eqangle_goals + eqratio_goals + other_goals
 
     def aux_predicates_valid_check(self, llm_output: str) -> bool:
@@ -311,7 +335,8 @@ class GeometryGoalFilter:
             return True
 
         # <aux> x00 c : perp k n n s [024] cong k n n s [025]; x00 h : ; x00 i : ; x00 j : perp h i h j [009] cong h i h j [010] ; </aux> <proof> cong a k c k [002] r19 [000] [001] ; cong b k c k [003] r19 [000] [001] ; cong a k b k [004] a00 [002] [003] ; </proof>
-        valid_aux_predicates = {'perp', 'para', 'cong', 'coll', 'eqangle', 'cyclic', 'midp'}
+        valid_aux_predicates = {'perp', 'para', 'cong',
+                                'coll', 'eqangle', 'cyclic', 'midp'}
         aux_match = re.match(r"<aux>\s*(.*)\s*</aux>", llm_output)
         # c : perp a c b c [001] ; c : perp a c b c [001] ;
         if aux_match:
