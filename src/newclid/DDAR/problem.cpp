@@ -12,6 +12,7 @@
 #include "predicate/congruent_triangles.hpp"
 #include "predicate/cyclic.hpp"
 #include "predicate/eqangle.hpp"
+#include "predicate/eqpoint.hpp"
 #include "predicate/eqratio.hpp"
 #include "predicate/midpoint.hpp"
 #include "predicate/orthocenter.hpp"
@@ -448,6 +449,16 @@ unique_ptr<Statement> Problem::create_statement(const string &type, const vector
         Point p5 = this->find_point(args[4]);
         Point p6 = this->find_point(args[5]);
         return make_unique<Thales>(Coll(p1, p2, p3), Coll(p4, p5, p6));
+    }
+    else if (type == "eqpoint")
+    {
+        if (args.size() != 2)
+        {
+            throw runtime_error("Invalid number of arguments for " + type);
+        }
+        Point p1 = this->find_point(args[0]);
+        Point p2 = this->find_point(args[1]);
+        return make_unique<EqPoint>(EqPoint(p1, p2));
     }
     else
     {
