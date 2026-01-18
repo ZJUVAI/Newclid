@@ -762,7 +762,6 @@ class GeometryProblemWorker:
         except Exception as e:
             import traceback
             traceback.print_exc()
-            print(f"clauses_without_coords: {clauses_without_coords}")
             print(f"clause2basics: {clause2basics}")
             print(f"essential_clauses: {essential_premise_clauses}")
             print(f"essential_aux_basics: {essential_aux_basics}")
