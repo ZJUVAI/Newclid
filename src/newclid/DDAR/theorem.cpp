@@ -488,6 +488,7 @@ Theorem Theorem::cong_of_eqpoints(const EqPoint &eq, const Point &p)
     Theorem theorem("Distances to overlapped point are equal", "r108");
     theorem.add_hypothesis(eq.clone());
     theorem.add_conclusion(make_unique<Cong>(Cong(Dist(p, eq.a()), Dist(p, eq.b()))));
+    theorem.add_conclusion(make_unique<ConstLine>(ConstLine(p, eq.a(), eq.b())));
     return theorem;
 }
 

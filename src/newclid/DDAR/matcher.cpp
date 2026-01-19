@@ -15,7 +15,7 @@
 
 using namespace std;
 
-Matcher::Matcher(Problem *prob, bool ar) : _problem(prob)
+Matcher::Matcher(Problem *prob) : _problem(prob)
 {
     // auto t0 = std::chrono::steady_clock::now();
 
@@ -53,15 +53,12 @@ Matcher::Matcher(Problem *prob, bool ar) : _problem(prob)
     //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
     //           << " ms" << endl;
 
-    if (ar)
-    {
-        // t0 = t1;
-        match_perps_paras();
-        // t1 = std::chrono::steady_clock::now();
-        // std::cout << "match_perps_paras       : "
-        //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
-        //           << " ms" << endl;
-    }
+    // t0 = t1;
+    match_perps_paras();
+    // t1 = std::chrono::steady_clock::now();
+    // std::cout << "match_perps_paras       : "
+    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
+    //           << " ms" << endl;
 }
 
 vector<tuple<double, double, Triangle>> Matcher::all_triangles()
