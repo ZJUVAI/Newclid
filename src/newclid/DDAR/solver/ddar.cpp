@@ -10,13 +10,15 @@
 #include <type_traits>
 #include <cmath>
 #include <chrono>
+#include <sstream>
+#include <iomanip>
 
 using namespace std;
 
 DDARSolver::DDARSolver(Problem *problem, bool log_enabled, bool exp_enabled) : _problem(problem), _log_enabled(log_enabled), _exp_enabled(exp_enabled)
 {
     // cout << "匹配定理" << endl;
-    Matcher matcher(problem, _goals.empty());
+    Matcher matcher(problem);
     for (const auto &thm : matcher.theorems())
     {
         insert_application(thm.clone());
@@ -41,7 +43,10 @@ DDARSolver::DDARSolver(Problem *problem, bool log_enabled, bool exp_enabled) : _
 
     for (const auto &stmt : matcher.stmts())
     {
-        _ars.push_back(this->insert_statement(stmt));
+        if (stmt->check_numerically())
+        {
+            _ars.push_back(this->insert_statement(stmt));
+        }
     }
 }
 
@@ -99,6 +104,34 @@ bool DDARSolver::run_level(const Point &max_pt)
         _solved = res;
     }
 
+    bool changed = true;
+    while (changed)
+    {
+        changed = false;
+        for (auto it = _ars.begin(); it != _ars.end();)
+        {
+            auto &goal = *it;
+            if (goal->is_proved())
+            {
+                it = _ars.erase(it);
+                changed = true;
+            }
+            else
+            {
+                goal->ar(_level);
+                if (goal->is_proved())
+                {
+                    it = _ars.erase(it);
+                    changed = true;
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+        }
+    }
+
     return num_stmts < _checked_statements.size();
 }
 
@@ -117,7 +150,7 @@ bool DDARSolver::run(size_t max_levels)
                     break;
                 }
 
-                if (has_goal && _solved)
+                if (_solved)
                 {
                     return _solved;
                 }
@@ -132,40 +165,7 @@ bool DDARSolver::run(size_t max_levels)
             {
                 break;
             }
-
-            if (has_goal && _solved)
-            {
-                return _solved;
-            }
         }
-        bool changed = true;
-        while (changed)
-        {
-            changed = false;
-            for (auto it = _ars.begin(); it != _ars.end();)
-            {
-                auto &goal = *it;
-                if (goal->is_proved())
-                {
-                    it = _ars.erase(it);
-                    changed = true;
-                }
-                else
-                {
-                    goal->ar(_level);
-                    if (goal->is_proved())
-                    {
-                        it = _ars.erase(it);
-                        changed = true;
-                    }
-                    else
-                    {
-                        ++it;
-                    }
-                }
-            }
-        }
-
         _solved = true;
     }
 
