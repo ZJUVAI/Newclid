@@ -38,14 +38,14 @@ if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
 
 AUX_PREDICATES = [
-    "coll",
-    "cong",
-    "cyclic",
-    "eqangle",
-    "eqratio",
-    "midp",
-    "para",
-    "perp",
+    # "coll",
+    # "cong",
+    # "cyclic",
+    # "eqangle",
+    # "eqratio",
+    # "midp",
+    # "para",
+    # "perp",
 ]
 
 class LMAgent(DeductiveAgent):
@@ -100,7 +100,9 @@ class LMAgent(DeductiveAgent):
                         num_beams=beams_per_predicate,
                         num_return_sequences=beams_per_predicate,
                         pad_token_id=151643,
-                        eos_token_id=2587,  # ' ;'
+                        # eos_token_id=2587,  # ' ;'
+                        stop_strings=["</aux>"],
+                        tokenizer=tokenizer,
                         return_dict_in_generate=True, 
                         output_scores=True,
                     )
@@ -124,7 +126,9 @@ class LMAgent(DeductiveAgent):
                 num_beams=self.decoding_size,
                 num_return_sequences=self.decoding_size,
                 pad_token_id=151643,
-                eos_token_id=2587,  # ' ;'
+                # eos_token_id=2587,  # ' ;'
+                stop_strings=["</aux>"],
+                tokenizer=tokenizer,
                 return_dict_in_generate=True, 
                 output_scores=True,
             )
@@ -207,7 +211,8 @@ class LMAgent(DeductiveAgent):
                             
                             for aux_dsl, score in aux_dsl_dict.items():
                                 try:
-                                    aux = self.try_dsl_to_constructions(aux_dsl[len('<aux> x00'):])
+                                    aux = self.try_dsl_to_constructions(aux_dsl)
+                                    print(f"aux: {aux}")
                                     if aux:
                                         new_problem = problem.with_more_construction(aux)
                                         future = run_ddar_remote.remote(new_problem, proof_ref, aux, rules_ref, t0, timeout)
@@ -272,33 +277,79 @@ class LMAgent(DeductiveAgent):
         return
     
     def try_dsl_to_constructions(self, content):
-        points, premises = content.split(';')[0].split(' : ')
+        """
+        Process multiple constructions separated by ';'
+        Format: <aux> x00 .... ; x00 .. ; </aux>
+        Each part is processed independently
+        """
+        # Remove <aux> and </aux> tags if present
+        content = content.strip()
+        if content.startswith('<aux>'):
+            content = content[5:].strip()
+        if content.endswith('</aux>'):
+            content = content[:-6].strip()
+        
+        # Split by ';' to get multiple construction parts
+        parts = content.split(';')
+        all_constructions = []
+        
+        # print(f"parts: {parts}")
 
-        # points
-        points = points.strip().split()
-        # currently, we only support one point following alphageometry
-        if len(points) == 0 or len(points) > 1:
-            return
-        points = points[0]
-    
-        # premises
-        premises = re.split(r"\s*\[\d+\]", premises) # coll a c e [002] coll b d e [003] => 'coll a c e' , 'coll b d e'
-        premises = [seg.strip() for seg in premises if seg.strip()]
-        # currently, we only support two premises following alphageometry
-        if len(premises) > 2:
-            return 
-            # segments = segments[:2]
-        # TODO: should we support free points?
-        if len(premises) == 0:
-            return f'{points} = free {points}'
-        result_constructions = []
-        for premise in premises:
-            parts = premise.split()
-            if not parts[0].isalpha():
-                return
-            construction = self.translate_dsl_to_construction(points, parts[0], parts[1:])
-            result_constructions.append(construction)
-        return points + ' = ' + ', '.join(result_constructions)
+        for part in parts:
+            part = part.strip()
+            if part.startswith('x00'):
+                part = part[3:].strip()
+
+            # print(f"part: {part}")
+
+            if not part:
+                continue
+                
+            # Process each part using the existing logic
+            if ' : ' not in part:
+                continue
+                
+            points, premises = part.split(' : ', 1)
+
+            # points
+            points = points.strip().split()
+            # currently, we only support one point following alphageometry
+            if len(points) == 0 or len(points) > 1:
+                continue
+            points = points[0]
+        
+            # premises
+            premises = re.split(r"\s*\[\d+\]", premises) # coll a c e [002] coll b d e [003] => 'coll a c e' , 'coll b d e'
+            premises = [seg.strip() for seg in premises if seg.strip()]
+            # currently, we only support two premises following alphageometry
+            if len(premises) > 2:
+                continue
+
+            # print(f"points: {points}, premises: {premises}")
+
+            # TODO: should we support free points?
+            if len(premises) == 0:
+                construction = f'{points} = free {points}'
+            else:
+                result_constructions = []
+                for premise in premises:
+                    parts_tokens = premise.split()
+                    if not parts_tokens or not parts_tokens[0].isalpha():
+                        continue
+                    construction_part = self.translate_dsl_to_construction(points, parts_tokens[0], parts_tokens[1:])
+                    result_constructions.append(construction_part)
+                
+                if result_constructions:
+                    construction = points + ' = ' + ', '.join(result_constructions)
+                else:
+                    continue
+            
+            all_constructions.append(construction)
+        
+        # Return all constructions joined by ' ; '
+        if all_constructions:
+            return ' ; '.join(all_constructions)
+        return None
 
     def translate_dsl_to_construction(self, point: str, predicate: str, args: list[str]
         ) -> tuple[str, list[str]]:
