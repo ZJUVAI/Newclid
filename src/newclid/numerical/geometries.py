@@ -452,6 +452,7 @@ def line_line_intersection(line_1: LineNum, line_2: LineNum) -> tuple[PointNum, 
 def reduce(
     objs: Sequence[ObjNum],
     existing_points: Sequence[PointNum],
+    construction_points: Sequence[PointNum],
     rng: Generator,
 ) -> tuple[PointNum, ...]:
     """
@@ -491,6 +492,8 @@ def reduce(
         best_close_count = len(existing_points) + 1  # 初始值设很大
         for p in result:
             if any(points_too_close(p, x) for x in existing_points):
+                continue
+            if any(p.close_enough(x) for x in construction_points):
                 continue
             close_count = sum(1 for x in existing_points if p.close_enough(x))
             # 数量越少越好（理想是0，但如果没有0就选最小的）
