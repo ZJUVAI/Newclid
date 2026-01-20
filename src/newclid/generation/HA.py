@@ -645,7 +645,7 @@ def enhance_text_with_potential_points(original_text: str, generator: PointGener
     if len(potential_points) == 0:
         # print(type, 0)
         return original_text
-    MAX_NEW_POINTS = 1000
+    MAX_NEW_POINTS = 8
     added_count = 0
     current_text = original_text
     random.shuffle(potential_points)
