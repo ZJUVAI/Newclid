@@ -230,10 +230,10 @@ class VLMAgent(DeductiveAgent):
         # Run ddar
         # print(f"running first ddar")
         base_proof = deepcopy(proof)
-        base_proof = VLMAgent.run_ddar_c(base_proof, rules, t0, timeout)
+        solved, base_proof = VLMAgent.run_ddar_c(base_proof, rules, t0, timeout)
         # print(f"finish first ddar")
         # if proofed by ddar, return
-        if base_proof.check_goals():
+        if solved:
             return infos(True)
         # else seek help from llm
         else:
@@ -330,10 +330,10 @@ class VLMAgent(DeductiveAgent):
                             # check any done task
                             done, running_futures = ray.wait(running_futures, timeout=0)
                             for f in done:
-                                res, proof_ori = ray.get(f)
+                                solved, res, proof_ori = ray.get(f)
                                 if res is None:
                                     continue
-                                elif res.check_goals():
+                                elif solved:
                                     new_problem, prev_score, score, queue_idx = future_info[f]
                                     for task in running_futures:
                                         ray.cancel(task, force=True)
@@ -348,10 +348,10 @@ class VLMAgent(DeductiveAgent):
                     while running_futures:
                         done, running_futures = ray.wait(running_futures, num_returns=min(1000, len(running_futures)))
                         for f in done:
-                            res, proof_ori = ray.get(f)
+                            solved, res, proof_ori = ray.get(f)
                             if res is None:
                                 continue
-                            elif res.check_goals():
+                            elif solved:
                                 new_problem, prev_score, score, queue_idx = future_info[f]
                                 for task in running_futures:
                                     ray.cancel(task, force=True)
@@ -538,37 +538,6 @@ class VLMAgent(DeductiveAgent):
         data_problem += ' </problem>'
         return data_problem
     
-    @staticmethod
-    def run_ddar(proof: "ProofState", rules: list[Rule], start_time: int, timeout: int = 3600): 
-        rule_buffer: list[Rule] = []
-        application_buffer: list[Dependency] = []
-        any_new_statement_has_been_added = True
-        proof.dep_graph.obtain_numerical_checked_premises()
-        running = True
-        while running and time.time() - start_time < timeout:
-            if proof.check_goals():
-                running = False
-            if rule_buffer:
-                theorem = rule_buffer.pop()
-                logging.debug("ddarn matching" + str(theorem))
-                deps = proof.match_theorem(theorem)
-                logging.debug("ddarn matched " + str(len(deps)))
-                application_buffer.extend(deps)
-            elif application_buffer:
-                dep = application_buffer.pop()
-                logging.debug(f"ddarn : apply {dep}")
-                if proof.apply_dep(dep):
-                    any_new_statement_has_been_added = True
-            else:
-                if not any_new_statement_has_been_added:
-                    running = False
-                any_new_statement_has_been_added = False
-                rule_buffer = list(rules)
-                logging.debug("ddarn : reload")
-            # TODO: add step later..
-            # step += 1
-        return proof
-    
     def _extract_points(proof: ProofState):
         points: List[Tuple[str, Any, Any]] = []
         for name, point in proof.symbols_graph.name2node.items():
@@ -608,7 +577,7 @@ class VLMAgent(DeductiveAgent):
         premises = VLMAgent._extract_premises(proof)
         goals = VLMAgent._extract_goals(proof)
         
-        _, dep_graph = DDAR.run_ddar("", points, premises, goals, 500, True, True)
+        solved, dep_graph = DDAR.run_ddar("", points, premises, goals, 500, True, True)
 
         for stmt, deps, reason in dep_graph:
             conclusion = Statement.from_tokens(
@@ -621,7 +590,7 @@ class VLMAgent(DeductiveAgent):
             dep = Dependency.mk(conclusion, reason, tuple(why))
             proof.dep_graph.hyper_graph[conclusion] = dep
 
-        return proof   
+        return solved, proof   
 
 
 @ray.remote(num_cpus=1)
@@ -638,13 +607,13 @@ def run_ddar_remote(problem, proof, aux, rules: list[Rule], start_time: int, tim
                 problem_path=None,
             )
         except Exception:
-            return None, None
+            return None, None, None
     try:
         proof = deepcopy(proof_ori)
-        proof = VLMAgent.run_ddar_c(proof, rules, start_time, timeout)
+        solved, proof = VLMAgent.run_ddar_c(proof, rules, start_time, timeout)
     except Exception:
-        return None, None
-    return proof, proof_ori
+        return None, None, None
+    return solved, proof, proof_ori
 
 
 class BeamQueue:
