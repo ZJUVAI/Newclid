@@ -247,6 +247,14 @@ class CompoundClauseGen:
             numerics.append(
                 tuple(mapping[a] if a in mapping else a for a in n))
         return numerics
+    
+    def _extract_construction_points(self, construction_def, mapping) -> set[Point]:
+        """Extract construction points from construction definition"""
+        construction_points = set()
+        for arg in construction_def.args:
+            if mapping[arg] in self.symbols_graph.name2node:
+                construction_points.add(self.symbols_graph.name2node[mapping[arg]])
+        return construction_points
 
     def _format_points_with_coords(self, point_names: list[str]) -> list[str]:
         """Format multiple point names with coordinates"""
@@ -359,7 +367,13 @@ class CompoundClauseGen:
             try:
                 # Select constructions, map arguments, and extract numerics
                 # If n_points is None, it will be set by the first construction
-                selected_constructions, args_mappings, numeric_list, n_points = self._get_constructions(
+                (
+                    selected_constructions,
+                    args_mappings,
+                    numeric_list,
+                    construction_points,
+                    n_points
+                ) = self._get_constructions(
                     construction_candidates,
                     n_constructions,
                     n_points_backup,
@@ -386,6 +400,7 @@ class CompoundClauseGen:
                         selected_constructions,
                         args_mappings,
                         numeric_list,
+                        construction_points,
                         n_clauses,
                         n_points,
                         max_level,
@@ -428,6 +443,7 @@ class CompoundClauseGen:
         selected_constructions: list[str] = []
         args_mappings: list[dict[str, str]] = []
         numeric_list: list[tuple] = []
+        construction_points: set[Point] = set()
         for _ in range(n_constructions):
             random_construction_candidates = construction_candidates.copy()
             self.rng.shuffle(random_construction_candidates)
@@ -450,22 +466,26 @@ class CompoundClauseGen:
                 )
                 if not self._validate_construction_requirements(construction_def, args_mapping):
                     continue
-                numerics = self._extract_numerics(
-                    construction_def, args_mapping)
+                numerics = self._extract_numerics(construction_def, args_mapping)
+                new_construction_points = self._extract_construction_points(
+                    construction_def, args_mapping
+                )
 
                 selected_constructions.append(construction)
                 args_mappings.append(args_mapping)
                 numeric_list.extend(numerics)
+                construction_points.update(new_construction_points)
 
                 # Successfully selected a construction, break to select next
                 break
-        return selected_constructions, args_mappings, numeric_list, n_points
+        return selected_constructions, args_mappings, numeric_list, construction_points, n_points
 
     def _apply_constructions(
         self,
         selected_constructions: list[str],
         args_mappings: list[dict[str, str]],
         numeric_list: list[tuple],
+        construction_points: set[Point],
         n_clauses: int,
         n_points: int,
         max_level: int,
@@ -478,7 +498,7 @@ class CompoundClauseGen:
             try:
                 new_points = self.point_generator.prefetch_points(n_points)
                 # Check numerics by drawing diagram
-                self.draw_diagram(new_points, numeric_list)
+                self.draw_diagram(new_points, numeric_list, construction_points)
                 self.point_generator.define_points(new_points)
 
                 # Update point levels and dependencies
@@ -531,11 +551,15 @@ class CompoundClauseGen:
             if not self._validate_construction_requirements(construction_def, args_mapping):
                 raise Exception("Requirement validation failed.")
             numerics = self._extract_numerics(construction_def, args_mapping)
+            construction_points = self._extract_construction_points(
+                construction_def, args_mapping
+            )
 
             clause_str = self._apply_constructions(
                 selected_constructions=[construction],
                 args_mappings=[args_mapping],
                 numeric_list=numerics,
+                construction_points_sets=construction_points,
                 n_clauses=1,
                 n_points=len(construction_def.points),
                 max_level=max([self.point_level[p] for p in rpoints]),
@@ -548,7 +572,7 @@ class CompoundClauseGen:
             logging.debug(f"Auxiliary construction generation failed: {e}")
             return None
 
-    def draw_diagram(self, new_points, numerics,):
+    def draw_diagram(self, new_points, numerics, construction_points):
         def draw_fn() -> tuple[PointNum, ...]:
             to_be_intersected: list[ObjNum] = []
             for n in numerics:
@@ -562,7 +586,10 @@ class CompoundClauseGen:
                 to_be_intersected += sketch(n[0], tuple(args), self.rng)
 
             return reduce(
-                to_be_intersected, [p.num for p in _existing_points], rng=self.rng
+                to_be_intersected,
+                [p.num for p in _existing_points],
+                [p.num for p in construction_points],
+                rng=self.rng,
             )
 
         # some points are created in previous draw, but not pass the check. we should replace this points
