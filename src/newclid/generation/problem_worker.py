@@ -26,9 +26,10 @@ import ray
 import numpy as np
 from copy import deepcopy
 
-from newclid.generation.clause_generation import CompoundClauseGen, enhance_text_with_potential_points
-
+from newclid.generation.clause_generation import CompoundClauseGen
+from newclid.generation.HA import enhance_text_with_potential_points
 logger = logging.getLogger(__name__)
+
 
 class TimeoutError(Exception):
     pass
@@ -97,12 +98,15 @@ class GeometryProblemWorker:
             # remove_coords = False
             # draw_annotations = True
 
+            # print(f"before: {fl_statement}")
+
             enhance_runtime = time.time()
             fl_statement = enhance_text_with_potential_points(
                 fl_statement, clauses_generator.point_generator)
             enhance_runtime = time.time() - enhance_runtime
 
-            # print(f"problem: {fl_statement}")
+            # print(f"after: {fl_statement}")
+            # print()
 
             # Build solver
             solver, solver_builder = GeometryProblemWorker._build_solver(
@@ -122,7 +126,7 @@ class GeometryProblemWorker:
             # Generate possible goals
             possible_goals, checkgoals_runtime = GeometryProblemWorker._generate_possible_goals(
                 solver)
-            
+
             # Obtain mapping from clauses to basic statements
             proof_state_temp = ProofState(
                 rng=np.random.default_rng(seed), defs=solver_builder.defs
@@ -166,7 +170,8 @@ class GeometryProblemWorker:
                 if aux_only > 0 and len(aux) == 0:
                     continue
                 premises = [dep.statement for dep in premises]
-                aux = sorted([dep.statement for dep in aux], key=lambda s: statement_str_idxs[s.to_str()])
+                aux = sorted([dep.statement for dep in aux],
+                             key=lambda s: statement_str_idxs[s.to_str()])
                 point_names = set()
                 for premise in premises:
                     for arg in premise.args:
@@ -176,8 +181,9 @@ class GeometryProblemWorker:
                     if isinstance(arg, Point):
                         point_names.add(arg.name)
                 predicates = ' '.join(sorted(point_names)) + ' $$ ' \
-                        + '; '.join(sorted([statement.to_str() for statement in premises])) + ' $$ ' \
-                        + '; '.join(sorted([statement.to_str() for statement in aux]))
+                    + '; '.join(sorted([statement.to_str() for statement in premises])) + ' $$ ' \
+                    + '; '.join(sorted([statement.to_str()
+                                        for statement in aux]))
                 eq_predicates_goals.setdefault(
                     predicates, []).append((goal, premises, aux))
             group_runtime = time.time() - group_runtime
@@ -338,7 +344,7 @@ class GeometryProblemWorker:
             trivial_aux,
             proof_steps,
         ) = solver.proof.dep_graph.get_proof_steps([goal])
-        
+
         return {
             "goal": goal,
             "points": points,
@@ -357,7 +363,7 @@ class GeometryProblemWorker:
     def _find_minimal_aux_clauses_new(pointstr2basicstrs, basicstr2pointstrs, solver, solver_builder, goals_str, premises, aux, aux_only):
         """Find minimal auxiliary clause set"""
         results = []
-        
+
         # Step 1: First try solving without aux
         proof_state_no_aux = ProofState.build_predicates(
             predicates=premises,
@@ -373,18 +379,19 @@ class GeometryProblemWorker:
         csolver_no_aux = CSolver(
             problem='', solver=solver_no_aux, using_log=True)
         csolver_no_aux.run()
-        
+
         for goal in solver_no_aux.goals:
             if goal.check():
                 goals_str.remove(goal.to_str())
                 if aux_only < 2:
-                    results.append(GeometryProblemWorker._extract_proof_info(solver_no_aux, goal))
+                    results.append(
+                        GeometryProblemWorker._extract_proof_info(solver_no_aux, goal))
 
         if len(aux) == 1:
             # If only one aux, no need to continue
             if len(goals_str) == 0:
                 return results
-            
+
             # For remaining goals, excute with all aux to strip extra points
             # that might be introduced in numerical checks
             proof_state_all_aux = ProofState.build_predicates(
@@ -405,27 +412,30 @@ class GeometryProblemWorker:
             for goal in solver_all_aux.goals:
                 if goal.check():
                     goals_str.remove(goal.to_str())
-                    results.append(GeometryProblemWorker._extract_proof_info(solver_all_aux, goal))
+                    results.append(GeometryProblemWorker._extract_proof_info(
+                        solver_all_aux, goal))
                 else:
-                    logger.warning(f"Goal {goal.to_str()} cannot be solved even with all aux")
+                    logger.warning(
+                        f"Goal {goal.to_str()} cannot be solved even with all aux")
             return results
-        
+
         if len(goals_str) == 0:
             return results
-        
+
         # Step 2: For remaining goals, try removing aux one by one from back to front
         # Group goals by the minimal aux they need
-        goal_groups = [{"goals": goals_str.copy(), "aux": list(aux), "solvers": {}}]
+        goal_groups = [
+            {"goals": goals_str.copy(), "aux": list(aux), "solvers": {}}]
         premise_strs = set([p.to_str() for p in premises])
         # premise_pointstrs = set()
         # for p in premises:
         #     for arg in p.args:
         #         if isinstance(arg, Point):
         #             premise_pointstrs.add(arg.name)
-            
+
         for i in range(len(aux) - 1, -1, -1):
             new_goal_groups = []
-            
+
             for group in goal_groups:
                 # Try without this aux for all goals in this group
                 test_aux = group["aux"][:i] + group["aux"][i+1:]
@@ -459,7 +469,7 @@ class GeometryProblemWorker:
                 #     # Cannot remove this aux due to rely_on
                 #     new_goal_groups.append(group)
                 #     continue
-                
+
                 proof_state_test = ProofState.build_predicates(
                     predicates=premises + test_aux,
                     defsJGEX=solver_builder.defs,
@@ -474,7 +484,7 @@ class GeometryProblemWorker:
                 csolver_test = CSolver(
                     problem='', solver=solver_test, using_log=True)
                 csolver_test.run()
-                
+
                 # Check which goals are solved
                 solved_goals = []
                 unsolved_goals = []
@@ -485,13 +495,14 @@ class GeometryProblemWorker:
                             if goal.check():
                                 solved_goals.append(goal_str)
                                 # Save solver for this goal
-                                group["solvers"][goal_str] = (solver_test, goal)
+                                group["solvers"][goal_str] = (
+                                    solver_test, goal)
                             else:
                                 unsolved_goals.append(goal_str)
                             goal_found = True
                             break
                     assert goal_found, f"Goal {goal_str} not found in solver_test.goals"
-                
+
                 # Split into groups based on whether they can be solved without this aux
                 if len(solved_goals) > 0:
                     new_goal_groups.append({
@@ -505,9 +516,9 @@ class GeometryProblemWorker:
                         "aux": group["aux"],
                         "solvers": {g: group["solvers"][g] for g in unsolved_goals if g in group["solvers"]}
                     })
-            
+
             goal_groups = new_goal_groups
-        
+
         # Collect results from all groups
         for group in goal_groups:
             for goal_str in group["goals"]:
@@ -515,7 +526,8 @@ class GeometryProblemWorker:
                     goals_str.remove(goal_str)
                     # Use saved solver and extract proof information
                     best_solver, best_goal = group["solvers"][goal_str]
-                    results.append(GeometryProblemWorker._extract_proof_info(best_solver, best_goal))
+                    results.append(GeometryProblemWorker._extract_proof_info(
+                        best_solver, best_goal))
 
         if len(goals_str) > 0:
             # For remaining goals, excute with all aux to strip extra points
@@ -538,9 +550,11 @@ class GeometryProblemWorker:
             for goal in solver_all_aux.goals:
                 if goal.check():
                     goals_str.remove(goal.to_str())
-                    results.append(GeometryProblemWorker._extract_proof_info(solver_all_aux, goal))
+                    results.append(GeometryProblemWorker._extract_proof_info(
+                        solver_all_aux, goal))
                 else:
-                    logger.warning(f"Goal {goal.to_str()} cannot be solved even with all aux")
+                    logger.warning(
+                        f"Goal {goal.to_str()} cannot be solved even with all aux")
 
         return results
 
@@ -567,7 +581,7 @@ class GeometryProblemWorker:
         for k, v in solver.proof.symbols_graph.name2node.items():
             if isinstance(v, Point):
                 name2node[k] = v
-        
+
         res_list = GeometryProblemWorker._find_minimal_aux_clauses_new(
             pointstr2basicstrs,
             basicstr2pointstrs,
@@ -765,7 +779,8 @@ class GeometryProblemWorker:
             print(f"clause2basics: {clause2basics}")
             print(f"essential_clauses: {essential_premise_clauses}")
             print(f"essential_aux_basics: {essential_aux_basics}")
-            print(f"essential_premise_point_names: {essential_premise_point_names}")
+            print(
+                f"essential_premise_point_names: {essential_premise_point_names}")
             print(f"essential_aux_point_names: {essential_aux_point_names}")
             print(f"mp: {mp}")
             raise
