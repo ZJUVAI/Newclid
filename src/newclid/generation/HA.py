@@ -624,51 +624,74 @@ def enhance_text_with_potential_points(original_text: str, generator: PointGener
     # 1. 提取原始点
     point_names, coords = extract_points(original_text)
 
-    # 2. 寻找辅助构造
-    type = random.randint(0, 5)
-    potential_points: list[str] = []
-    if type == 0:
-        potential_points = intersection_between_lines(point_names, coords)
-    elif type == 1:
-        potential_points = intersection_between_circles(point_names, coords)
-    elif type == 2:
-        potential_points = intersection_between_line_and_circle(
-            point_names, coords)
-    elif type == 3:
-        potential_points = midpoint(point_names, coords)
-    elif type == 4:
-        potential_points = reflection(point_names, coords)
-    elif type == 5:
-        potential_points = foot(point_names, coords)
+    MAX_NEW_POINTS = 2
 
-    # 3. 转化成构造语句
-    if len(potential_points) == 0:
-        # print(type, 0)
+    # 先随机选取若干种类（数量 < MAX_NEW_POINTS，且至少 1 种）
+    all_types = list(range(6))  # 0..5 六种类型
+    random.shuffle(all_types)
+    max_type_count = max(1, min(MAX_NEW_POINTS, len(all_types)))
+    type_count = random.randint(1, max_type_count)
+    selected_types = all_types[:type_count]
+
+    # 只对选中的种类计算 potential points，避免不必要的计算
+    type_to_points: dict[int, list[tuple[tuple[float, float], str]]] = {}
+    for t in selected_types:
+        if t == 0:
+            type_to_points[t] = intersection_between_lines(point_names, coords)
+        elif t == 1:
+            type_to_points[t] = intersection_between_circles(point_names, coords)
+        elif t == 2:
+            type_to_points[t] = intersection_between_line_and_circle(point_names, coords)
+        elif t == 3:
+            type_to_points[t] = midpoint(point_names, coords)
+        elif t == 4:
+            type_to_points[t] = reflection(point_names, coords)
+        elif t == 5:
+            type_to_points[t] = foot(point_names, coords)
+
+    # 如果选中的所有类型都没有可用点，直接返回
+    if all(len(v) == 0 for v in type_to_points.values()):
         return original_text
-    MAX_NEW_POINTS = 8
+
     added_count = 0
     current_text = original_text
-    random.shuffle(potential_points)
     existing_coords = list(coords.values())
-    potential_points.sort(key=lambda item: item[1].split("=")[-1].strip())
 
-    for potential_point in potential_points:
-        if added_count >= MAX_NEW_POINTS:
-            break
+    # 为了避免死循环，设置一个最大尝试次数
+    max_trials = MAX_NEW_POINTS * 20
+    trials = 0
 
-        new_coord = potential_point[0]
-        if is_point_too_close([new_coord], existing_coords) or is_point_too_far([new_coord], existing_coords):
+    while added_count < MAX_NEW_POINTS and trials < max_trials:
+        trials += 1
+        # 每次选择一个新点时，从已选类型中随机一个种类
+        t = random.choice(selected_types)
+        candidates = type_to_points.get(t, [])
+        if not candidates:
+            # 该类型已经没有候选点，继续尝试
             continue
-        existing_coords.append(new_coord)
+
+        # 从该种类的 points 中随机选取一个
+        coord, text_tmpl = random.choice(candidates)
+
+        # 距离过滤
+        if is_point_too_close([coord], existing_coords) or is_point_too_far([coord], existing_coords):
+            # 该点不合适，继续尝试
+            # 同时从该类型候选中删除这个点，避免反复选到
+            type_to_points[t] = [item for item in candidates if item[0] != coord]
+            continue
+
+        # 通过过滤后，真正加入
+        existing_coords.append(coord)
 
         new_point_names = generator.prefetch_points(1)
         generator.define_points(new_point_names)
 
         new_name = new_point_names[0]
-        construction_str = potential_point[1].replace('X', new_name)
+        construction_str = text_tmpl.replace('X', new_name)
         current_text += "; " + construction_str
         added_count += 1
 
-    # print(type, added_count)
+        # 为了减少将来重复选择同一个几何位置，把该点从候选集中删除
+        type_to_points[t] = [item for item in candidates if item[0] != coord]
 
     return current_text
