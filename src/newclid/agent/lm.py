@@ -37,6 +37,9 @@ from newclid.DDAR.build import DDAR
 if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 AUX_PREDICATES = [
     "coll",
     "cong",
@@ -111,7 +114,7 @@ class LMAgent(DeductiveAgent):
                     for aux_dsl, score in zip(aux_dsls, scores):
                         score = score.item()
                         aux_dsl_dict[aux_dsl] = score
-                        print(f"aux_dsl (with_predicate): {aux_dsl}")
+                        logger.info(f"aux_dsl (with_predicate): {aux_dsl}")
         
         if not with_predicate:
             # Inference without predicate prefix
@@ -135,7 +138,7 @@ class LMAgent(DeductiveAgent):
             for aux_dsl, score in zip(aux_dsls, scores):
                 score = score.item()
                 aux_dsl_dict[aux_dsl] = score
-                print(f"aux_dsl (no_predicate): {aux_dsl}")
+                logger.info(f"aux_dsl (no_predicate): {aux_dsl}")
             
         return aux_dsl_dict
 
@@ -198,7 +201,7 @@ class LMAgent(DeductiveAgent):
                             proof_ref = ray.put(proof)
                             
                             p_dsl = self.problem_to_dsl(problem, base_proof.defs)
-                            print(f"inferencing on query ({queue_type}): {p_dsl}")
+                            logger.info(f"inferencing on query ({queue_type}): {p_dsl}")
                             aux_dsl_dict = self.inference(
                                 self.models[i], self.tokenizers[i], p_dsl, 
                                 self.get_new_point_name(problem), '<aux> x00',
@@ -227,7 +230,7 @@ class LMAgent(DeductiveAgent):
                                     for task in running_futures:
                                         ray.cancel(task, force=True)
                                     ray.shutdown()
-                                    print(f"success with problem: {str(new_problem)}")
+                                    logger.info(f"success with problem: {str(new_problem)}")
                                     return infos(True, str(new_problem))
                                 elif depth < self.search_depth - 1:
                                     new_problem, prev_score, score, queue_idx = future_info[f]
@@ -245,7 +248,7 @@ class LMAgent(DeductiveAgent):
                                 for task in running_futures:
                                     ray.cancel(task, force=True)
                                 ray.shutdown()
-                                print(f"success with problem: {str(new_problem)}")
+                                logger.info(f"success with problem: {str(new_problem)}")
                                 return infos(True, str(new_problem))
                             elif depth < self.search_depth - 1:
                                 new_problem, prev_score, score, queue_idx = future_info[f]
