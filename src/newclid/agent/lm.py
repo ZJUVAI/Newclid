@@ -37,7 +37,6 @@ from newclid.DDAR.build import DDAR
 if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 AUX_PREDICATES = [
