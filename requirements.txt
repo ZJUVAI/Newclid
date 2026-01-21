@@ -21,3 +21,5 @@ modelscope
 torchvision
 cairosvg
 timm
+adjustText
+ray[default]
