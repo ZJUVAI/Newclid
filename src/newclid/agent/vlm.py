@@ -43,6 +43,9 @@ from newclid.DDAR.build import DDAR
 if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 AUX_PREDICATES = [
     "coll",
     "cong",
@@ -91,7 +94,7 @@ class VLMAgent(DeductiveAgent):
         Returns:
             aux_dsl_dict: Dictionary of auxiliary constructions, key is aux_dsl, value is score
         """
-        print(f"inferencing on query: {query} with image: {img_path}")
+        logger.info(f"inferencing on query: {query} with image: {img_path}")
         aux_dsl_dict = {}
         
         # 1. Build the multi-modal message (System + User with Image)
@@ -169,7 +172,7 @@ class VLMAgent(DeductiveAgent):
                     for aux_dsl, score in zip(aux_dsls, scores):
                         score = score.item()
                         aux_dsl_dict[aux_dsl] = score
-                        print(f"aux_dsl (with_predicate): {aux_dsl}")
+                        logger.info(f"aux_dsl (with_predicate): {aux_dsl}")
         
         if not with_predicate:
             # Inference without predicate prefix
@@ -202,7 +205,7 @@ class VLMAgent(DeductiveAgent):
             for aux_dsl, score in zip(aux_dsls, scores):
                 score = score.item()
                 aux_dsl_dict[aux_dsl] = score
-                print(f"aux_dsl (no_predicate): {aux_dsl}")
+                logger.info(f"aux_dsl (no_predicate): {aux_dsl}")
             
         return aux_dsl_dict
 
@@ -228,10 +231,10 @@ class VLMAgent(DeductiveAgent):
             if not goal.check_numerical():
                 return infos(False, f"{goal.pretty()} fails numerical check")
         # Run ddar
-        # print(f"running first ddar")
+        # logger.info(f"running first ddar")
         base_proof = deepcopy(proof)
         solved, base_proof = VLMAgent.run_ddar_c(base_proof, rules, t0, timeout)
-        # print(f"finish first ddar")
+        # logger.info(f"finish first ddar")
         # if proofed by ddar, return
         if solved:
             return infos(True)
@@ -302,10 +305,10 @@ class VLMAgent(DeductiveAgent):
                             # with Image.open(png_path) as img:
                             #     img_out = Image.new('RGB', img.size, (255, 255, 255))
                             #     img_out.save(png_path)
-                            # print("finish drawing")         
+                            # logger.info("finish drawing")         
 
                             p_dsl = self.problem_to_dsl(problem, base_proof.defs)
-                            print(f"inferencing on query ({queue_type}): {p_dsl}")
+                            logger.info(f"inferencing on query ({queue_type}): {p_dsl}")
                             aux_dsl_dict = self.inference(
                                 model=self.models[i],
                                 processor=self.processors[i],
@@ -338,7 +341,7 @@ class VLMAgent(DeductiveAgent):
                                     for task in running_futures:
                                         ray.cancel(task, force=True)
                                     ray.shutdown()
-                                    print(f"success with problem: {str(new_problem)}")
+                                    logger.info(f"success with problem: {str(new_problem)}")
                                     return infos(True, str(new_problem))
                                 elif depth < self.search_depth - 1:
                                     new_problem, prev_score, score, queue_idx = future_info[f]
@@ -356,7 +359,7 @@ class VLMAgent(DeductiveAgent):
                                 for task in running_futures:
                                     ray.cancel(task, force=True)
                                 ray.shutdown()
-                                print(f"success with problem: {str(new_problem)}")
+                                logger.info(f"success with problem: {str(new_problem)}")
                                 return infos(True, str(new_problem))
                             elif depth < self.search_depth - 1:
                                 new_problem, prev_score, score, queue_idx = future_info[f]
