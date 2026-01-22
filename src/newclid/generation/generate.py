@@ -12,6 +12,7 @@ import signal
 from contextlib import contextmanager
 import cairosvg
 import numpy as np
+import uuid
 
 from newclid.configs import default_defs_path
 from newclid.formulations.definition import DefinitionJGEX
@@ -57,7 +58,7 @@ def convert_svg_to_png(svg_path, png_path, width=1024):
 
 
 @ray.remote(num_cpus=0.5)
-def draw_figure_task(draw_data: dict, defs_data: dict, imgs_dir: str, imgs_png_dir: str, file_idx: int):
+def draw_figure_task(draw_data: dict, defs_data: dict, imgs_dir: str, imgs_png_dir: str, file_idx: int, session_id: str):
     """
     Ray remote task for drawing figures.
     This runs in a separate Ray worker to avoid blocking the main process.
@@ -95,7 +96,8 @@ def draw_figure_task(draw_data: dict, defs_data: dict, imgs_dir: str, imgs_png_d
 
         paths_update = {}
         for suffix, annotations in [('', True), ('_no_annotations', False)]:
-            file_name = f"{file_idx}{suffix}"
+            # Use session_id + file_idx to ensure uniqueness across multiple runs
+            file_name = f"{session_id}_{file_idx}{suffix}"
             svg_path = os.path.join(imgs_dir, f"{file_name}.svg")
             png_path = os.path.join(imgs_png_dir, f"{file_name}.png")
 
@@ -173,6 +175,10 @@ class GeometryGenerator:
         # Pending draw tasks and their associated data
         self.pending_draw_tasks = {}  # task_id -> (file_idx, data_item)
         self.completed_data = {}  # file_idx -> result_data
+        # Generate a unique session ID using UUID4 (globally unique, collision-proof)
+        # Use first 16 chars for shorter filenames while maintaining uniqueness
+        self.session_id = uuid.uuid4().hex[:16]
+        logging.info(f"Session ID: {self.session_id}")
 
     def problem_hash_filter(self, data: list, key: str) -> list[str]:
         """Check if the input has already been written to the output file."""
@@ -242,13 +248,14 @@ class GeometryGenerator:
             self.data_count += 1
             if self.img and "draw_data" in data_item:
                 draw_data = data_item.pop("draw_data")
-                # Submit draw task to Ray
+                # Submit draw task to Ray with session_id for unique filenames
                 task_id = draw_figure_task.remote(
                     draw_data, 
                     self.defs_data, 
                     imgs_dir, 
                     imgs_png_dir, 
-                    self.data_count
+                    self.data_count,
+                    self.session_id
                 )
                 self.pending_draw_tasks[task_id] = (self.data_count, data_item)
             else:
