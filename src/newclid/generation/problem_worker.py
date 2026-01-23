@@ -359,7 +359,7 @@ class GeometryProblemWorker:
         }
 
     @staticmethod
-    def _find_minimal_aux_clauses_new(pointstr2basicstrs, basicstr2pointstrs, solver, solver_builder, goals_str, premises, aux, aux_only):
+    def _find_minimal_aux_clauses_new(pointstr2basicstrs, basicstr2pointstrs, solver, solver_builder, goals_str, premises, aux, aux_only, rng):
         """Find minimal auxiliary clause set"""
         results = []
 
@@ -382,7 +382,10 @@ class GeometryProblemWorker:
         for goal in solver_no_aux.goals:
             if goal.check():
                 goals_str.remove(goal.to_str())
-                if aux_only < 2:
+                # For aux_only==1, keep data without aux with 0.1 probability
+                # For aux_only==0, always keep
+                # For aux_only==2, never keep
+                if aux_only == 0 or (aux_only == 1 and rng.random() < 0.1):
                     results.append(
                         GeometryProblemWorker._extract_proof_info(solver_no_aux, goal))
 
@@ -580,6 +583,9 @@ class GeometryProblemWorker:
             if isinstance(v, Point):
                 name2node[k] = v
 
+        # Create RNG for probabilistic filtering
+        rng = np.random.default_rng(solver_builder.seed)
+        
         res_list = GeometryProblemWorker._find_minimal_aux_clauses_new(
             pointstr2basicstrs,
             basicstr2pointstrs,
@@ -588,7 +594,8 @@ class GeometryProblemWorker:
             [goal.to_str() for goal in goals],
             premises,
             aux,
-            aux_only
+            aux_only,
+            rng
         )
 
         for res in res_list:
