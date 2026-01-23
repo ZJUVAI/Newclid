@@ -315,13 +315,15 @@ ostream &operator<<(ostream &os, const Term &term)
 
 size_t Term::hash() const
 {
-    size_t seed = std::hash<string>{}(_coeff.to_string());
+    size_t seed = 0;
+    // 直接哈希 Rational 的分子分母
+    seed ^= std::hash<int64_t>{}(_coeff.numerator()) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    seed ^= std::hash<int64_t>{}(_coeff.denominator()) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+
     for (const auto &[obj, exp] : _vars)
     {
-        size_t h1 = std::hash<string>{}(obj.to_string());
-        size_t h2 = std::hash<int>{}(exp);
-        seed ^= h1 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-        seed ^= h2 + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        seed ^= std::hash<TermArg>{}(obj) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        seed ^= std::hash<int>{}(exp) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
     }
     return seed;
 }

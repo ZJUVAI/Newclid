@@ -68,7 +68,7 @@ vector<string> AConst::to_tokens() const
     tokens.push_back(_angle.vertex().name());
     tokens.push_back(_angle.vertex().name());
     tokens.push_back(_angle.right().name());
-    tokens.push_back(std::to_string(_rhs.numerator()) + "pi/" + std::to_string(_rhs.denominator()));
+    tokens.push_back(std::to_string(_rhs.numerator()) + "/" + std::to_string(_rhs.denominator()));
     return tokens;
 }
 

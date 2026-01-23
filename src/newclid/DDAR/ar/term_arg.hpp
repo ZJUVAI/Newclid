@@ -56,7 +56,12 @@ namespace std
     {
         size_t operator()(const TermArg &t) const noexcept
         {
-            return std::hash<std::string>{}(t.to_string());
+            size_t seed = static_cast<size_t>(t.type());
+            for (const auto &pt : t.points())
+            {
+                seed ^= std::hash<std::string>{}(pt.name()) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+            }
+            return seed;
         }
     };
 }

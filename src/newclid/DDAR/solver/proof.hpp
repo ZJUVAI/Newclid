@@ -60,6 +60,8 @@ public:
 
     std::string name() const { return _statement->name(); }
 
+    Point max_point() const { return _statement->max_point(); }
+
     std::vector<ReducedEquation *> reduced_equations(std::string type) const
     {
         if (type == "dist")
