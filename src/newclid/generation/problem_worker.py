@@ -71,7 +71,7 @@ class GeometryProblemWorker:
     def _process_single_problem(args: tuple) -> tuple[list, dict]:
         """Process a single geometry problem with unique seed."""
         try:
-            pid, seed, n_clauses, max_level, img, aux_only, add_auxiliary, prune, remove_coords, draw_annotations = args
+            pid, seed, n_clauses, max_level, img, aux_only, add_auxiliary, prune, remove_coords = args
             start_time = time.time()
 
             TIMELIMIT = 600  # 10分钟
@@ -209,8 +209,7 @@ class GeometryProblemWorker:
                     aux,
                     n_clauses,
                     img,
-                    aux_only,
-                    draw_annotations
+                    aux_only
                 )
                 generated_data.extend(data)
             process_goal_time = time.time() - process_goal_time
@@ -571,8 +570,7 @@ class GeometryProblemWorker:
         aux,
         n_clauses,
         img,
-        aux_only,
-        draw_annotations=True
+        aux_only
     ):
         """Process a single goal"""
 

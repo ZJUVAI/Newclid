@@ -58,10 +58,11 @@ def convert_svg_to_png(svg_path, png_path, width=1024):
 
 
 @ray.remote(num_cpus=0.5)
-def draw_figure_task(draw_data: dict, defs_data: dict, imgs_dir: str, imgs_png_dir: str, file_idx: int, session_id: str):
+def draw_figure_task(draw_data: dict, defs_data: dict, imgs_dir: str, imgs_png_dir: str, file_idx: int, session_id: str, img_mode: int):
     """
     Ray remote task for drawing figures.
     This runs in a separate Ray worker to avoid blocking the main process.
+    img_mode: 0=no images, 1=with annotations only, 2=without annotations only, 3=both
     """
     try:
         from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulator
@@ -95,7 +96,18 @@ def draw_figure_task(draw_data: dict, defs_data: dict, imgs_dir: str, imgs_png_d
         goal = Statement.from_tokens(tuple(draw_data["goal_tokens"]), dep_graph)
 
         paths_update = {}
-        for suffix, annotations in [('', True), ('_no_annotations', False)]:
+        
+        # Determine which images to generate based on img_mode
+        # 1: with annotations only, 2: without annotations only, 3: both
+        draw_configs = []
+        if img_mode == 1:
+            draw_configs = [('', True)]
+        elif img_mode == 2:
+            draw_configs = [('_no_annotations', False)]
+        elif img_mode == 3:
+            draw_configs = [('', True), ('_no_annotations', False)]
+        
+        for suffix, annotations in draw_configs:
             # Use session_id + file_idx to ensure uniqueness across multiple runs
             file_name = f"{session_id}_{file_idx}{suffix}"
             svg_path = os.path.join(imgs_dir, f"{file_name}.svg")
@@ -136,13 +148,12 @@ class GeometryGenerator:
         n_samples=100,
         timeout=3600,
         max_level=500,
-        img=False,
+        img=0,
         aux_only=0,
         clear=False,
         add_auxiliary=True,
         prune=True,
         remove_coords=False,
-        draw_annotations=True,
     ):
         self.n_clauses = n_clauses
         self.min_proof_steps = min_proof_steps
@@ -167,7 +178,6 @@ class GeometryGenerator:
         self.add_auxiliary = add_auxiliary
         self.prune = prune
         self.remove_coords = remove_coords
-        self.draw_annotations = draw_annotations
         self.data_count = 0
         self.written_count = 0  # Track actually written data count
         # Serialize defs for Ray remote tasks
@@ -246,7 +256,7 @@ class GeometryGenerator:
         
         for data_item in all_data:
             self.data_count += 1
-            if self.img and "draw_data" in data_item:
+            if self.img > 0 and "draw_data" in data_item:
                 draw_data = data_item.pop("draw_data")
                 # Submit draw task to Ray with session_id for unique filenames
                 task_id = draw_figure_task.remote(
@@ -255,7 +265,8 @@ class GeometryGenerator:
                     imgs_dir, 
                     imgs_png_dir, 
                     self.data_count,
-                    self.session_id
+                    self.session_id,
+                    self.img
                 )
                 self.pending_draw_tasks[task_id] = (self.data_count, data_item)
             else:
@@ -305,7 +316,7 @@ class GeometryGenerator:
             for i in range(10**9):
                 # seed = 42 + i  # 唯一种子 = 42 + 任务ID
                 seed = MACHINE_BASE_SEED + i
-                yield i, seed, self.n_clauses, self.max_level, self.img, self.aux_only, self.add_auxiliary, self.prune, self.remove_coords, self.draw_annotations
+                yield i, seed, self.n_clauses, self.max_level, self.img, self.aux_only, self.add_auxiliary, self.prune, self.remove_coords
 
         if not ray.is_initialized():
             ray.init(
@@ -433,8 +444,12 @@ def main():
                         choices=["debug", "info", "warning", "error"])
     parser.add_argument("--timeout", required=False, type=int, default=3600)
     parser.add_argument("--max_level", required=False, type=int, default=500)
-    parser.add_argument("--img", required=False, type=str_to_bool, default=False,
-                        help="Whether to save images of the generated problems.")
+    parser.add_argument("--img", required=False, type=int, default=0, choices=[0, 1, 2, 3],
+                        help="Image generation mode: " \
+                            "0=no images, " \
+                            "1=with annotations only, " \
+                            "2=without annotations only, " \
+                            "3=both.")
     parser.add_argument("--aux_only", required=False, type=int, default=0, choices=[0, 1, 2],
                         help="Auxiliary data filter: " \
                             "0=all data, " \
@@ -448,8 +463,6 @@ def main():
                         help="Whether to prune clauses to preserve only the deepest clause chain.")
     parser.add_argument("--remove_coords", required=False, type=str_to_bool, default=False,
                         help="Whether to remove coordinate information from the final clause output.")
-    parser.add_argument("--draw_annotations", required=False, type=str_to_bool, default=True,
-                        help="Whether to add geometry property annotations in the figure.")
     args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, args.log_level.upper()))
@@ -469,7 +482,6 @@ def main():
         add_auxiliary=args.add_auxiliary,
         prune=args.prune,
         remove_coords=args.remove_coords,
-        draw_annotations=args.draw_annotations,
     )
 
     generator.generate()
