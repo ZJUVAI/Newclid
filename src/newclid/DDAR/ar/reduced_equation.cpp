@@ -8,6 +8,7 @@ ReducedEquation::ReducedEquation(Equation &equation, LinearSystem *system) : _or
                                                                              _system(system),
                                                                              _remainder(equation)
 {
+    _remainder.reduction();
 }
 
 void ReducedEquation::set_index(size_t index, const LinearSystem *system)
@@ -17,22 +18,29 @@ void ReducedEquation::set_index(size_t index, const LinearSystem *system)
 
 void ReducedEquation::reduce()
 {
-    // _remainder.normalize();
+    _remainder.normalize();
     if (_remainder.empty())
     {
         return;
     }
 
-    bool changed = true;
-    do
+    while (true)
     {
-        changed = false;
+        bool changed = false;
         for (const auto &[term, eq_ptr] : _system->solved_variables())
         {
             const Equation &eq = *eq_ptr;
-            changed |= substitute_variable(term, eq);
+            if (substitute_variable(term, eq))
+            {
+                changed = true;
+                break;
+            }
         }
-    } while (changed);
+        if (!changed)
+        {
+            break;
+        }
+    }
 
     while (!_remainder.empty())
     {
@@ -64,6 +72,7 @@ bool ReducedEquation::substitute_variable(Term var, const Equation &e)
     while (flag)
     {
         flag = false;
+        // cout << "before: " << new_equation << endl;
         for (const auto &term : new_equation.terms())
         {
             if (term.contain(var))
@@ -72,9 +81,11 @@ bool ReducedEquation::substitute_variable(Term var, const Equation &e)
                 changed = true;
                 flag = true;
                 break;
+                // cout << "after: " << new_equation << endl;
             }
         }
         new_equation.reduction();
+        // cout << "after reduction: " << new_equation << endl;
     }
     _remainder = new_equation;
     return changed;

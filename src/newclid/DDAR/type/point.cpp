@@ -1,8 +1,8 @@
 #include "type/point.hpp"
 
-Point::Point(std::string name, double x, double y) : _num(PointNum(x, y)), _name(name) {}
+Point::Point(std::string name, double x, double y) : _num(PointNum(x, y)), _name(name) { parseName(_name, _prefix, _index); }
 
-Point::Point(std::string name, PointNum num) : _num(num), _name(name) {}
+Point::Point(std::string name, PointNum num) : _num(num), _name(name) { parseName(_name, _prefix, _index); }
 
 std::string Point::name() const { return _name; }
 
@@ -29,27 +29,31 @@ bool Point::operator==(const Point &other) const
 
 bool Point::operator!=(const Point &other) const
 {
-    return _name == other.name();
+    return !(_name == other.name());
 }
 
 bool Point::operator<(const Point &other) const
 {
-    return _name < other.name();
+    if (other._index != _index)
+    {
+        return _index < other._index;
+    }
+    return _prefix < other._prefix;
 }
 
 bool Point::operator>(const Point &other) const
 {
-    return _name > other.name();
+    return other < *this;
 }
 
 bool Point::operator<=(const Point &other) const
 {
-    return _name <= other.name();
+    return !(*this > other);
 }
 
 bool Point::operator>=(const Point &other) const
 {
-    return _name >= other.name();
+    return !(*this < other);
 }
 
 std::ostream &operator<<(std::ostream &os, const Point &pt)

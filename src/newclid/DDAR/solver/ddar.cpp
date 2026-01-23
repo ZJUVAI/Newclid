@@ -55,55 +55,6 @@ bool DDARSolver::run_level(const Point &max_pt)
     size_t num_stmts = _checked_statements.size();
     _level++;
 
-    // size_t call_count = 0;
-    // double total_advance_time_ms = 0.0;
-
-    size_t const n = _applications.size();
-    for (size_t i = 0; i < n; i++)
-    {
-        if (_applications[i].max_point() <= max_pt && _applications[i].state() == ApplicationState::PENDING)
-        {
-            // auto t_start = std::chrono::steady_clock::now();
-            advance_theorem(i);
-            // auto t_end = std::chrono::steady_clock::now();
-
-            // double ms = std::chrono::duration<double, std::micro>(t_end - t_start).count() / 1000.0;
-
-            // call_count++;
-            // total_advance_time_ms += ms;
-        }
-    }
-
-    // ────────────────────────────────────────────────
-    // 你可以选择只在有调用时才打印，避免太多0行
-    // if (call_count > 0)
-    // {
-    //     std::cout << "Level " << _level << " | "
-    //               << "advance_theorem calls: " << call_count
-    //               << " | total time: " << total_advance_time_ms << " ms"
-    //               << " | avg: " << (call_count ? total_advance_time_ms / call_count : 0.0) << " ms/call"
-    //               << endl;
-    // }
-    // ────────────────────────────────────────────────
-
-    // 後面原有的 goals 部分保持不變 ...
-    if (!_problem->goals().empty())
-    {
-        bool res = true;
-        for (auto &goal : _goals)
-        {
-            if (!goal->is_proved())
-            {
-                goal->ar(_level);
-                if (!goal->is_proved())
-                {
-                    res = false;
-                }
-            }
-        }
-        _solved = res;
-    }
-
     bool changed = true;
     while (changed)
     {
@@ -111,6 +62,11 @@ bool DDARSolver::run_level(const Point &max_pt)
         for (auto it = _ars.begin(); it != _ars.end();)
         {
             auto &goal = *it;
+            if (goal->max_point() > max_pt)
+            {
+                ++it;
+                continue;
+            }
             if (goal->is_proved())
             {
                 it = _ars.erase(it);
@@ -132,6 +88,32 @@ bool DDARSolver::run_level(const Point &max_pt)
         }
     }
 
+    size_t const n = _applications.size();
+    for (size_t i = 0; i < n; i++)
+    {
+        if (_applications[i].max_point() <= max_pt && _applications[i].state() == ApplicationState::PENDING)
+        {
+            advance_theorem(i);
+        }
+    }
+
+    if (!_problem->goals().empty())
+    {
+        bool res = true;
+        for (auto &goal : _goals)
+        {
+            if (!goal->is_proved())
+            {
+                goal->ar(_level);
+                if (!goal->is_proved())
+                {
+                    res = false;
+                }
+            }
+        }
+        _solved = res;
+    }
+
     return num_stmts < _checked_statements.size();
 }
 
@@ -139,7 +121,7 @@ bool DDARSolver::run(size_t max_levels)
 {
     bool has_goal = !_problem->goals().empty();
 
-    if (has_goal)
+    if (!has_goal)
     {
         for (Point const &pt : _problem->points())
         {
@@ -149,13 +131,9 @@ bool DDARSolver::run(size_t max_levels)
                 {
                     break;
                 }
-
-                if (_solved)
-                {
-                    return _solved;
-                }
             }
         }
+        _solved = true;
     }
     else
     {
@@ -165,10 +143,12 @@ bool DDARSolver::run(size_t max_levels)
             {
                 break;
             }
+            if (_solved)
+            {
+                break;
+            }
         }
-        _solved = true;
     }
-
     return _solved;
 }
 

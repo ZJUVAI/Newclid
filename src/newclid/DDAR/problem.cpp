@@ -10,6 +10,7 @@
 #include "predicate/coll.hpp"
 #include "predicate/cong.hpp"
 #include "predicate/congruent_triangles.hpp"
+#include "predicate/const_line.hpp"
 #include "predicate/cyclic.hpp"
 #include "predicate/eqangle.hpp"
 #include "predicate/eqpoint.hpp"
@@ -20,6 +21,7 @@
 #include "predicate/perp.hpp"
 #include "predicate/rconst.hpp"
 #include "predicate/similar_triangles.hpp"
+#include "predicate/secant.hpp"
 #include "predicate/thales.hpp"
 #include "type/angle.hpp"
 #include "type/dist.hpp"
@@ -459,6 +461,29 @@ unique_ptr<Statement> Problem::create_statement(const string &type, const vector
         Point p1 = this->find_point(args[0]);
         Point p2 = this->find_point(args[1]);
         return make_unique<EqPoint>(EqPoint(p1, p2));
+    }
+    else if (type == "constline")
+    {
+        if (args.size() != 3)
+        {
+            throw runtime_error("Invalid number of arguments for " + type);
+        }
+        Point p = this->find_point(args[0]);
+        Point q1 = this->find_point(args[1]);
+        Point q2 = this->find_point(args[2]);
+        return make_unique<ConstLine>(ConstLine(p, q1, q2));
+    }
+    else if (type == "secant")
+    {
+        if (args.size() != 4)
+        {
+            throw runtime_error("Invalid number of arguments for " + type);
+        }
+        Point a = this->find_point(args[0]);
+        Point b = this->find_point(args[1]);
+        Point c = this->find_point(args[2]);
+        Point d = this->find_point(args[3]);
+        return make_unique<Secant>(Secant(a, b, c, d));
     }
     else
     {

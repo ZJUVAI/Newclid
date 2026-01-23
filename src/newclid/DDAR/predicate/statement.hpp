@@ -53,6 +53,8 @@ public:
     virtual std::vector<std::unique_ptr<Equation>> as_equation_dist(bool exp) const { return {}; }
     virtual std::vector<std::unique_ptr<Equation>> as_equation_distlog(bool exp) const { return {}; }
 
+    virtual Point max_point() const;
+
     virtual bool operator==(const Statement &other) const
     {
         return this->normalize()->to_string() == other.normalize()->to_string();
