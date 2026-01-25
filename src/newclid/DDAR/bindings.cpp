@@ -70,7 +70,8 @@ extern "C"
         //     cout << "Not solved!" << endl;
         // }
 
-        DepGraph dep_graph = solver.dependency_graph();
+        // DepGraph dep_graph = solver.dependency_graph();
+        DepGraph dep_graph;
 
         // for (const auto &tupleElem : dep_graph)
         // {
