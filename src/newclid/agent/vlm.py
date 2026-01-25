@@ -44,16 +44,17 @@ if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
 
 logger = logging.getLogger(__name__)
+# logger.setLevel(logging.INFO)
 
 AUX_PREDICATES = [
-    "coll",
-    "cong",
-    "cyclic",
-    "eqangle",
-    "eqratio",
-    "midp",
-    "para",
-    "perp",
+    # "coll",
+    # "cong",
+    # "cyclic",
+    # "eqangle",
+    # "eqratio",
+    # "midp",
+    # "para",
+    # "perp",
 ]
 
 class VLMAgent(DeductiveAgent):
@@ -222,7 +223,7 @@ class VLMAgent(DeductiveAgent):
         
         t0 = time.time()
         step = 0
-        image_dir = "temp/vlm_images_construction_vlm_sft27_devimo_inverted/"
+        image_dir = "temp/vlm_images_construction_vlm_test/"
         os.makedirs(image_dir, exist_ok=True)
         
         # Check goals numerically 
@@ -232,7 +233,7 @@ class VLMAgent(DeductiveAgent):
         # Run ddar
         # logger.info(f"running first ddar")
         base_proof = deepcopy(proof)
-        solved, base_proof = VLMAgent.run_ddar_c(base_proof, rules, t0, timeout)
+        solved = VLMAgent.run_ddar_c(base_proof, rules, t0, timeout)
         # logger.info(f"finish first ddar")
         # if proofed by ddar, return
         if solved:
@@ -245,13 +246,14 @@ class VLMAgent(DeductiveAgent):
             
             # Create two BeamQueues for each model: one for with_predicate, one for no_predicate
             # beam_queues[i][j]: i is the model index, j=0 for with_predicate, j=1 for no_predicate
+            # Each queue stores (problem, proof) tuples
             beam_queues = []
             for i in range(len(self.models)):
                 q_with_pred = BeamQueue(max_size=self.beam_size)
-                q_with_pred.add(node=(self.problemJGEX, base_proof, proof), val=0)
+                q_with_pred.add(node=(self.problemJGEX, base_proof), val=0)
                 
                 q_no_pred = BeamQueue(max_size=self.beam_size)
-                q_no_pred.add(node=(self.problemJGEX, base_proof, proof), val=0)
+                q_no_pred.add(node=(self.problemJGEX, base_proof), val=0)
                 
                 beam_queues.append([q_with_pred, q_no_pred])
 
@@ -262,21 +264,20 @@ class VLMAgent(DeductiveAgent):
                     new_queues = [BeamQueue(max_size=self.beam_size), BeamQueue(max_size=self.beam_size)]
                     
                     # j=0: with_predicate, j=1: no_predicate
-                    for j, with_predicate in enumerate([True, False]):
+                    for j, with_predicate in enumerate([False]):
                         queue_type = 'with_pred' if with_predicate else 'no_pred'
                         
-                        for prev_score, (problem, proof, proof_ori) in beam_queues[i][j]:
+                        for prev_score, (problem, current_proof) in beam_queues[i][j]:
                             if time.time() - t0 > timeout:
                                 ray.shutdown()
                                 return infos(False, 'Timeout')
-                            proof_ref = ray.put(proof)
 
                             # draw current figure
                             timestamp = int(time.time()*1000)
                             svg_path = os.path.join(image_dir, f"{timestamp}.svg")
                             png_path = os.path.join(image_dir, f"{timestamp}.png")
                             draw_clause_figure(
-                                proof_ori, problem, svg_path, proof.rng, draw_annotations=True
+                                current_proof, problem, svg_path, current_proof.rng, draw_annotations=True
                             )
                             cairosvg.svg2png(
                                 url=str(svg_path),
@@ -323,7 +324,7 @@ class VLMAgent(DeductiveAgent):
                                     aux = self.try_dsl_to_constructions(aux_dsl[len('<aux> x00'):])
                                     if aux:
                                         new_problem = problem.with_more_construction(aux)
-                                        future = run_ddar_remote.remote(new_problem, proof_ref, aux, rules_ref, t0, timeout)
+                                        future = run_ddar_remote.remote(new_problem, proof.defs, aux, rules_ref, t0, timeout)
                                         future_info[future] = (new_problem, prev_score, score, j)
                                         running_futures.append(future)
                                 except Exception as e:
@@ -332,8 +333,8 @@ class VLMAgent(DeductiveAgent):
                             # check any done task
                             done, running_futures = ray.wait(running_futures, timeout=0)
                             for f in done:
-                                solved, res, proof_ori = ray.get(f)
-                                if res is None:
+                                solved, new_proof = ray.get(f)
+                                if solved is None:
                                     continue
                                 elif solved:
                                     new_problem, prev_score, score, queue_idx = future_info[f]
@@ -344,14 +345,14 @@ class VLMAgent(DeductiveAgent):
                                     return infos(True, str(new_problem))
                                 elif depth < self.search_depth - 1:
                                     new_problem, prev_score, score, queue_idx = future_info[f]
-                                    new_queues[queue_idx].add(node=(new_problem, res, proof_ori), val=prev_score+score)
+                                    new_queues[queue_idx].add(node=(new_problem, new_proof), val=prev_score+score)
                     
                     # check remaining tasks
                     while running_futures:
                         done, running_futures = ray.wait(running_futures, num_returns=min(1000, len(running_futures)))
                         for f in done:
-                            solved, res, proof_ori = ray.get(f)
-                            if res is None:
+                            solved, new_proof = ray.get(f)
+                            if solved is None:
                                 continue
                             elif solved:
                                 new_problem, prev_score, score, queue_idx = future_info[f]
@@ -362,7 +363,7 @@ class VLMAgent(DeductiveAgent):
                                 return infos(True, str(new_problem))
                             elif depth < self.search_depth - 1:
                                 new_problem, prev_score, score, queue_idx = future_info[f]
-                                new_queues[queue_idx].add(node=(new_problem, res, proof_ori), val=prev_score+score)
+                                new_queues[queue_idx].add(node=(new_problem, new_proof), val=prev_score+score)
                     
                     new_beam_queues.append(new_queues)
                 
@@ -592,30 +593,26 @@ class VLMAgent(DeductiveAgent):
             dep = Dependency.mk(conclusion, reason, tuple(why))
             proof.dep_graph.hyper_graph[conclusion] = dep
 
-        return solved, proof   
+        return solved   
 
 
 @ray.remote(num_cpus=1)
-def run_ddar_remote(problem, proof, aux, rules: list[Rule], start_time: int, timeout: int = 3600): 
+def run_ddar_remote(problem, defs, aux, rules: list[Rule], start_time: int, timeout: int = 3600): 
     try:
-        VLMAgent.add_construction(proof, aux)
-    except Exception as e:
-        try:
-            proof_ori = ProofState.build_problemJGEX(
-                problemJGEX=problem,
-                defsJGEX=proof.defs,
-                rng=np.random.default_rng(998244353),
-                max_attempts=100,
-                problem_path=None,
-            )
-        except Exception:
-            return None, None, None
-    try:
-        proof = deepcopy(proof_ori)
-        solved, proof = VLMAgent.run_ddar_c(proof, rules, start_time, timeout)
+        proof = ProofState.build_problemJGEX(
+            problemJGEX=problem,
+            defsJGEX=defs,
+            rng=np.random.default_rng(998244353),
+            max_attempts=100,
+            problem_path=None,
+        )
     except Exception:
-        return None, None, None
-    return solved, proof, proof_ori
+        return None, None
+    try:
+        solved = VLMAgent.run_ddar_c(proof, rules, start_time, timeout)
+    except Exception:
+        return None, None
+    return solved, proof
 
 
 class BeamQueue:
