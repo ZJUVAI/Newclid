@@ -1,0 +1,175 @@
+import os
+from pathlib import Path
+import time
+import argparse
+import ray
+import csv
+from rich.live import Live
+from rich.table import Table
+
+from newclid.agent.vlm_v1 import VLMAgent
+from newclid.agent.internvlm import InternVLMAgent
+from newclid.api import GeometricSolverBuilder
+from newclid.generation.problem_worker import GeometryProblemWorker
+
+@ray.remote(num_cpus=0, num_gpus=1)
+def ray_solve_problem(args):
+    """
+    Process a single problem and return whether it was solved successfully along with the time taken.
+    """
+    pid, problem_name, problems_path, model_path, decoding_size, beam_size, search_depth, timeout, agent_type = args
+    start_time = time.time()
+    try:
+        # print(f"building problem: {problem_name}")
+        # Select agent based on agent_type
+        if agent_type == "vlm":
+            agent = VLMAgent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
+        elif agent_type == "internvlm":
+            agent = InternVLMAgent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
+        else:
+            raise ValueError(f"Unknown agent type: {agent_type}. Must be 'vlm' or 'internvlm'")
+        
+        solver = (
+            GeometricSolverBuilder()
+            .load_problem_from_file(problems_path, problem_name, rename=True)
+            .with_deductive_agent(agent)
+            .build()
+        )
+        # print(f"problem_name: {problem_name}")
+        is_solved = solver.run(timeout=timeout)
+        elapsed_time = time.time() - start_time
+        return (pid, problem_name, is_solved, elapsed_time) 
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        print(f"Warning: solver crashed on problem '{problem_name}' : ({type(e)}) {e}")
+        elapsed_time = time.time() - start_time 
+        return (pid, problem_name, False, elapsed_time)
+
+def render_table(all_tasks_info, start_time, reorder: bool):
+    total_problems = len(all_tasks_info)
+    solved_count = sum(status == "Success" for _, status, _ in all_tasks_info)
+    processed_count = sum(status != "Pending" for _, status, _ in all_tasks_info)
+
+    table = Table()
+    table.add_column(f"Problem Names ({solved_count} Solved /{processed_count} Processed /{total_problems} Total)", justify="left", no_wrap=True)
+    table.add_column("Status", justify="center")
+    table.add_column(f"Time ({time.time()-start_time:.2f}s)", justify="right")
+    if reorder:
+        priority = {"Failed": 0, "Pending": 1, "Success": 2}
+        all_tasks_info = sorted(
+            all_tasks_info,
+            key=lambda x: priority.get(x[1], 99)  # x[1] is the status
+        )
+    for problem_name, status, elapsed_time in all_tasks_info:
+        elapsed = "-" if status == "Pending" else f"{elapsed_time:.2f}"
+        table.add_row(problem_name, status, elapsed)
+    return table
+
+def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding_size: int, beam_size: int, search_depth: int, timeout: int = 3600, agent_type: str = "vlm"):
+    """
+    Main function, read the file and execute tasks using Ray.
+    """
+    
+    # Read all problem names
+    if not os.path.exists(filepath):
+        print(f"File {filepath} not found.")
+        return
+    problem_names = []
+    with open(filepath, "r") as file:
+        lines = file.readlines()
+        for i in range(0, len(lines), 2):
+            problem_names.append(lines[i].strip())
+ 
+    print(f"Total problems to solve: {len(problem_names)}")
+    print(f"Using agent: {agent_type} V1")
+
+    # Multi-threaded execution using Ray with limited concurrent tasks
+    # Initialize Ray with specified number of CPUs
+    if not ray.is_initialized():
+        ray.init(
+            # local_mode=True,
+            # include_dashboard=True, dashboard_host="0.0.0.0", dashboard_port=8265,
+            dashboard_host="0.0.0.0",
+            ignore_reinit_error=True, num_cpus=num_cpus
+        )
+
+    total_time = 0
+    start_time = time.time()
+    all_tasks_info = []
+    pending_tasks = []
+    
+    # Submit all tasks
+    for i, problem_name in enumerate(problem_names):
+        task = ray_solve_problem.remote((i, problem_name, filepath, modelpath, decoding_size, beam_size, search_depth, timeout, agent_type))
+        all_tasks_info.append((problem_name, "Pending", 0))
+        pending_tasks.append(task)
+    
+    # Process tasks as they complete
+    with Live(refresh_per_second=1) as live:
+        while pending_tasks:
+            # Wait for at least one task to complete
+            done_tasks, pending_tasks = ray.wait(pending_tasks, num_returns=1, timeout=5)
+            # Process completed tasks
+            for task in done_tasks:
+                pid, problem_name, is_solved, elapsed_time = ray.get(task)
+                all_tasks_info[pid] = (problem_name, "Success" if is_solved else "Failed", elapsed_time)
+                total_time += elapsed_time
+                    
+            live.update(render_table(all_tasks_info, start_time, True))
+        live.update(render_table(all_tasks_info, start_time, False))
+    ray.shutdown()
+    
+    # Generate CSV filename based on problems_path and model_path
+    problems_name = filepath.stem  # Get the file name without extension
+    # Get the deepest folder name from modelpath (assuming it's a list, take the first if not empty)
+    model_name = "default"
+    if modelpath:
+        # If modelpath is a list, take the first element
+        first_model_path = modelpath[0] if isinstance(modelpath, list) else modelpath
+        # Get the deepest folder name
+        # model_name = Path(first_model_path).name
+        # Change to use second deepest folder name + deepest folder name
+        path_obj = Path(first_model_path)
+        deepest_folder = path_obj.name
+        parent_folder = path_obj.parent.name
+        model_name = f"{parent_folder}_{deepest_folder}" if parent_folder else deepest_folder
+    
+    # Create CSV filename with parameters - add v1 suffix
+    csv_filename = f"eval_v1_{problems_name}_{model_name}_d{decoding_size}_b{beam_size}_s{search_depth}.csv"
+    
+    # Ensure results directory exists
+    results_dir = Path("results")
+    results_dir.mkdir(exist_ok=True)
+    csv_filepath = results_dir / csv_filename
+    
+    # Write results to CSV file
+    with open(csv_filepath, 'w', newline='', encoding='utf-8') as csvfile:
+        writer = csv.writer(csvfile)
+        # Write header
+        writer.writerow(['Problem Name', 'Solved', 'Time (s)'])  # Column 1: problem name, Column 2: solved status, Column 3: time taken
+        # Write data
+        for problem_name, status, elapsed_time in all_tasks_info:
+            solved = "√" if status == "Success" else "x"  # Mark √ if solved, x if not
+            time_str = f"{elapsed_time:.2f}" if status != "Pending" else ""  # Show time for processed problems, leave empty for pending
+            writer.writerow([problem_name, solved, time_str])
+    
+    print(f"Results saved to {csv_filepath}")
+            
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run Newclid evaluation V1 with configurable paths.")
+    parser.add_argument("--problems_path", type=str, default="problems_datasets/dev_jgex.txt",
+                        help="Path to the problems dataset file")
+    parser.add_argument("--model_path", type=str, nargs='+', help="Path to the model checkpoint")
+    parser.add_argument("--max_workers", type=int, default=8, help="Number of worker processes to use")
+    parser.add_argument("--decoding_size", type=int, default=8)
+    parser.add_argument("--beam_size", type=int, default=64)
+    parser.add_argument("--search_depth", type=int, default=4)
+    parser.add_argument("--timeout", type=int, default=7200, help="Timeout for each problem")
+    parser.add_argument("--agent", type=str, default="vlm", choices=["vlm", "internvlm"],
+                        help="Agent type to use: 'vlm' for VLMAgent or 'internvlm' for InternVLMAgent")
+    args = parser.parse_args()
+    
+    problems_path = Path(args.problems_path)
+    solve_problems(problems_path, args.model_path, num_cpus=args.max_workers, decoding_size=args.decoding_size, beam_size=args.beam_size, search_depth=args.search_depth, timeout=args.timeout, agent_type=args.agent)
