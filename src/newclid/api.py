@@ -8,7 +8,9 @@ from fractions import Fraction
 
 from newclid.agent.ddarn import DDARN
 from newclid.agent.lm import LMAgent
+from newclid.agent.lm_v1 import LMAgentV1
 from newclid.agent.vlm import VLMAgent
+from newclid.agent.vlm_v1 import VLMAgentV1
 from newclid.agent.internvlm import InternVLMAgent
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.dependencies.dependency_graph import DependencyGraph
@@ -147,9 +149,7 @@ class GeometricSolverBuilder:
         if self.deductive_agent is None:
             self.deductive_agent = DDARN()
 
-        if isinstance(self.deductive_agent, LMAgent) or \
-            isinstance(self.deductive_agent, VLMAgent) or \
-            isinstance(self.deductive_agent, InternVLMAgent):
+        if isinstance(self.deductive_agent, (LMAgent, LMAgentV1, VLMAgent, VLMAgentV1, InternVLMAgent)):
             self.deductive_agent.problemJGEX = self.problemJGEX
 
         # proof_state.dep_graph.obtain_numerical_checked_eqangle_and_eqratio()

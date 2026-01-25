@@ -7,7 +7,7 @@ import csv
 from rich.live import Live
 from rich.table import Table
 
-from newclid.agent.lm_v1 import LMAgent
+from newclid.agent.lm_v1 import LMAgentV1
 from newclid.api import GeometricSolverBuilder
 from newclid.generation.problem_worker import GeometryProblemWorker
 
@@ -22,7 +22,7 @@ def ray_solve_problem(args):
         solver = (
             GeometricSolverBuilder()
             .load_problem_from_file(problems_path, problem_name, rename=True)
-            .with_deductive_agent(LMAgent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth))
+            .with_deductive_agent(LMAgentV1(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth))
             .build()
         )
         print(f"problem_name: {problem_name}")

@@ -7,7 +7,7 @@ import csv
 from rich.live import Live
 from rich.table import Table
 
-from newclid.agent.vlm_v1 import VLMAgent
+from newclid.agent.vlm_v1 import VLMAgentV1
 from newclid.agent.internvlm import InternVLMAgent
 from newclid.api import GeometricSolverBuilder
 from newclid.generation.problem_worker import GeometryProblemWorker
@@ -23,7 +23,7 @@ def ray_solve_problem(args):
         # print(f"building problem: {problem_name}")
         # Select agent based on agent_type
         if agent_type == "vlm":
-            agent = VLMAgent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
+            agent = VLMAgentV1(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
         elif agent_type == "internvlm":
             agent = InternVLMAgent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
         else:

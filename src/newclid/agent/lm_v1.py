@@ -1,4 +1,4 @@
-2from __future__ import annotations
+from __future__ import annotations
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import time
@@ -51,7 +51,7 @@ AUX_PREDICATES = [
     # "perp",
 ]
 
-class LMAgent(DeductiveAgent):
+class LMAgentV1(DeductiveAgent):
     def __init__(self, model_path: list[str], decoding_size: int, beam_size: int, search_depth: int):
         self.any_new_statement_has_been_added = True
         self.decoding_size = decoding_size
@@ -162,7 +162,7 @@ class LMAgent(DeductiveAgent):
             if not goal.check_numerical():
                 return infos(False, f"{goal.pretty()} fails numerical check")
         # Run ddar
-        solved = LMAgent.run_ddar_c(proof, rules, t0, timeout)
+        solved = LMAgentV1.run_ddar_c(proof, rules, t0, timeout)
         # if proofed by ddar, return
         if solved:
             return infos(True)
@@ -474,9 +474,9 @@ class LMAgent(DeductiveAgent):
     
     @staticmethod
     def run_ddar_c(proof: "ProofState", rules: list[Rule], start_time: int, timeout: int = 3600): 
-        points = LMAgent._extract_points(proof)
-        premises = LMAgent._extract_premises(proof)
-        goals = LMAgent._extract_goals(proof)
+        points = LMAgentV1._extract_points(proof)
+        premises = LMAgentV1._extract_premises(proof)
+        goals = LMAgentV1._extract_goals(proof)
         
         solved, dep_graph = DDAR.run_ddar("", points, premises, goals, 500, True, True)
 
@@ -496,7 +496,7 @@ def run_ddar_remote(problem, defs, aux, rules: list[Rule], start_time: int, time
     except Exception:
         return None
     try:
-        solved = LMAgent.run_ddar_c(proof, rules, start_time, timeout)
+        solved = LMAgentV1.run_ddar_c(proof, rules, start_time, timeout)
     except Exception:
         return None
     return solved

@@ -57,7 +57,7 @@ AUX_PREDICATES = [
     # "perp",
 ]
 
-class VLMAgent(DeductiveAgent):
+class VLMAgentV1(DeductiveAgent):
     def __init__(self, model_path: list[str], decoding_size: int, beam_size: int, search_depth: int):
         self.any_new_statement_has_been_added = True
         self.decoding_size = decoding_size
@@ -233,7 +233,7 @@ class VLMAgent(DeductiveAgent):
         # Run ddar
         # logger.info(f"running first ddar")
         base_proof = deepcopy(proof)
-        solved = VLMAgent.run_ddar_c(base_proof, rules, t0, timeout)
+        solved = VLMAgentV1.run_ddar_c(base_proof, rules, t0, timeout)
         # logger.info(f"finish first ddar")
         # if proofed by ddar, return
         if solved:
@@ -576,9 +576,9 @@ class VLMAgent(DeductiveAgent):
     
     @staticmethod
     def run_ddar_c(proof: "ProofState", rules: list[Rule], start_time: int, timeout: int = 3600): 
-        points = VLMAgent._extract_points(proof)
-        premises = VLMAgent._extract_premises(proof)
-        goals = VLMAgent._extract_goals(proof)
+        points = VLMAgentV1._extract_points(proof)
+        premises = VLMAgentV1._extract_premises(proof)
+        goals = VLMAgentV1._extract_goals(proof)
         
         solved, dep_graph = DDAR.run_ddar("", points, premises, goals, 500, True, True)
 
@@ -609,7 +609,7 @@ def run_ddar_remote(problem, defs, aux, rules: list[Rule], start_time: int, time
     except Exception:
         return None, None
     try:
-        solved = VLMAgent.run_ddar_c(proof, rules, start_time, timeout)
+        solved = VLMAgentV1.run_ddar_c(proof, rules, start_time, timeout)
     except Exception:
         return None, None
     return solved, proof
