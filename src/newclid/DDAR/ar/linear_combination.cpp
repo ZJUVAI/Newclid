@@ -123,6 +123,7 @@ void LinearCombination::normalize()
     }
 
     sort(_terms.begin(), _terms.end());
+    reverse(_terms.begin(), _terms.end());
 }
 
 Term LinearCombination::gcd()

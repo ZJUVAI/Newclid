@@ -27,12 +27,23 @@ void ReducedEquation::reduce()
     while (true)
     {
         bool changed = false;
-        for (const auto &[term, eq_ptr] : _system->solved_variables())
+        for (const auto &term : _remainder.terms())
         {
-            const Equation &eq = *eq_ptr;
-            if (substitute_variable(term, eq))
+            for (const auto &[var_arg, exp] : term.vars())
             {
-                changed = true;
+                Term single_var(var_arg);
+                const Equation *solved_eq = _system->get_solved_variable(single_var);
+                if (solved_eq != nullptr)
+                {
+                    if (substitute_variable(single_var, *solved_eq))
+                    {
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            if (changed)
+            {
                 break;
             }
         }

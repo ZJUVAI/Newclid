@@ -28,6 +28,7 @@ public:
 
     // Accessors
     Rational coeff() const { return _coeff; }
+    const std::map<TermArg, int> &vars() const { return _vars; }
 
     // Operations
     Term gcd(Term &other) const;
