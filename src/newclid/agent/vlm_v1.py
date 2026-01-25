@@ -2,6 +2,7 @@ from __future__ import annotations
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import time
+import uuid
 import logging
 from typing import TYPE_CHECKING, Any, List, Tuple
 from fractions import Fraction
@@ -12,7 +13,11 @@ import string
 import ray
 import numpy as np
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, DynamicCache
+from modelscope import Qwen3VLForConditionalGeneration, AutoProcessor, DynamicCache
+from qwen_vl_utils import process_vision_info 
+import cairosvg
+from PIL import Image, ImageOps
+from copy import deepcopy
 
 from newclid.agent.agents_interface import DeductiveAgent
 from newclid.formulations.problem import ProblemJGEX
@@ -32,6 +37,7 @@ from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulator
 from newclid.dependencies.dependency import Dependency
 from newclid.numerical.geometries import PointNum
+from newclid.numerical.draw_clause_figure import draw_clause_figure
 from newclid.DDAR.build import DDAR
 
 if TYPE_CHECKING:
@@ -51,7 +57,7 @@ AUX_PREDICATES = [
     # "perp",
 ]
 
-class LMAgent(DeductiveAgent):
+class VLMAgent(DeductiveAgent):
     def __init__(self, model_path: list[str], decoding_size: int, beam_size: int, search_depth: int):
         self.any_new_statement_has_been_added = True
         self.decoding_size = decoding_size
@@ -60,42 +66,94 @@ class LMAgent(DeductiveAgent):
         # LLM model
         self.model_path = model_path
         self.models = []
-        self.tokenizers = []
-        # Load all models and tokenizers
+        self.processors = []
+        # Load all models and processors
         for path in self.model_path:
-            model = AutoModelForCausalLM.from_pretrained(
+            model = Qwen3VLForConditionalGeneration.from_pretrained(
                 path,
                 torch_dtype="auto",
                 device_map="auto", #"sequential",
                 attn_implementation="flash_attention_2"  # Sliding Window Attention is enabled but not implemented for others
             )
-            tokenizer = AutoTokenizer.from_pretrained(path)
+            # processor = AutoProcessor.from_pretrained(path)
+            processor = AutoProcessor.from_pretrained("Qwen/Qwen3-VL-2B-Instruct")
             self.models.append(model)
-            self.tokenizers.append(tokenizer)
+            self.processors.append(processor)
         
     @torch.no_grad()
-    def inference(self, model, tokenizer, query: str, new_point_name: str, response_prefix: str = '<aux>', with_predicate: bool = True):
+    def inference(self, model, processor, query: str, img_path: str, new_point_name: str, response_prefix: str = '<aux>', with_predicate: bool = True):
+        """
+        Args:
+            model: Model
+            processor: Processor
+            query: Query string
+            img_path: Path to the image
+            new_point_name: Name of the new point
+            response_prefix: Response prefix
+            with_predicate: Whether to use predicate prefix for inference
+        Returns:
+            aux_dsl_dict: Dictionary of auxiliary constructions, key is aux_dsl, value is score
+        """
+        logger.info(f"inferencing on query: {query} with image: {img_path}")
         aux_dsl_dict = {}
-        # Process each model/tokenizer pair
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": query}
-        ]
-        text = tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True,
-        )
-        text += "<think>\n\n</think>\n\n"
-        model_prompt_inputs = tokenizer([text], return_tensors="pt")
         
+        # 1. Build the multi-modal message (System + User with Image)
+        messages = [
+            {
+                "role": "system",
+                "content": "You are a helpful assistant.",
+            },
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image", "image": img_path},
+                    {"type": "text", "text": query},
+                ],
+            }
+        ]
+
+        # 2. Prepare image input
+        # use process_vision_info to parse images/videos from messages
+        image_inputs, video_inputs = process_vision_info(messages, image_patch_size=16)
+        
+        # 3. Generate the base text Prompt (without response_prefix)
+        # add_generation_prompt=True will append "<|im_start|>assistant\n"
+        text_prompt = processor.apply_chat_template(
+            messages, 
+            tokenize=False, 
+            add_generation_prompt=True
+        )
+
+        # 4. Calculate the input length without the prefix (for subsequent slicing)
+        # We need to know the length of the prompt when there is no prefix
+        inputs_without_prefix = processor(
+            text=[text_prompt],
+            images=image_inputs,
+            videos=video_inputs,
+            padding=True,
+            return_tensors="pt",
+            # Note: Since qwen-vl-utils already resizes images/videos, pass do_resize=False to the processor to avoid duplicate resizing.
+            do_resize=False,
+        )
+        prompt_len = inputs_without_prefix.input_ids.shape[1]
+
         if with_predicate and len(AUX_PREDICATES) > 0:
             # Inference with predicate prefix
             beams_per_predicate = self.decoding_size // len(AUX_PREDICATES)
             if beams_per_predicate:
                 for aux_predicate_str in AUX_PREDICATES:
-                    prompt_with_predicate = text + response_prefix + ' ' + new_point_name + ' : ' + aux_predicate_str
-                    model_inputs = tokenizer([prompt_with_predicate], return_tensors="pt").to('cuda')
+                    # Build prompt with predicate prefix
+                    text_with_predicate = text_prompt + response_prefix + ' ' + new_point_name + ' : ' + aux_predicate_str
+                    
+                    model_inputs = processor(
+                        text=[text_with_predicate],
+                        images=image_inputs,
+                        videos=video_inputs,
+                        padding=True,
+                        return_tensors="pt",
+                        do_resize=False,
+                    ).to(model.device)
+
                     generated_output = model.generate(
                         **model_inputs,
                         max_new_tokens=100,
@@ -103,12 +161,13 @@ class LMAgent(DeductiveAgent):
                         num_return_sequences=beams_per_predicate,
                         pad_token_id=151643,
                         eos_token_id=2587,  # ' ;'
-                        return_dict_in_generate=True, 
+                        return_dict_in_generate=True,
                         output_scores=True,
                     )
+                    
                     scores = generated_output.sequences_scores
-                    generated_output = generated_output.sequences[:, model_prompt_inputs.input_ids.shape[1]:]
-                    aux_dsls = tokenizer.batch_decode(generated_output, skip_special_tokens=True)
+                    output_sequences = generated_output.sequences[:, prompt_len:]
+                    aux_dsls = processor.batch_decode(output_sequences, skip_special_tokens=True)
                     
                     for aux_dsl, score in zip(aux_dsls, scores):
                         score = score.item()
@@ -117,9 +176,17 @@ class LMAgent(DeductiveAgent):
         
         if not with_predicate:
             # Inference without predicate prefix
-            prompt_no_predicate = text + response_prefix + ' ' + new_point_name
-            logger.info(f"inferencing on query ({prompt_no_predicate})")
-            model_inputs = tokenizer([prompt_no_predicate], return_tensors="pt").to('cuda')
+            text_with_prefix = text_prompt + response_prefix + ' ' + new_point_name
+            
+            model_inputs = processor(
+                text=[text_with_prefix],
+                images=image_inputs,
+                videos=video_inputs,
+                padding=True,
+                return_tensors="pt",
+                do_resize=False,
+            ).to(model.device)
+
             generated_output = model.generate(
                 **model_inputs,
                 max_new_tokens=100,
@@ -127,12 +194,13 @@ class LMAgent(DeductiveAgent):
                 num_return_sequences=self.decoding_size,
                 pad_token_id=151643,
                 eos_token_id=2587,  # ' ;'
-                return_dict_in_generate=True, 
+                return_dict_in_generate=True,
                 output_scores=True,
             )
+
             scores = generated_output.sequences_scores
-            generated_output = generated_output.sequences[:, model_prompt_inputs.input_ids.shape[1]:]
-            aux_dsls = tokenizer.batch_decode(generated_output, skip_special_tokens=True)
+            output_sequences = generated_output.sequences[:, prompt_len:]
+            aux_dsls = processor.batch_decode(output_sequences, skip_special_tokens=True)
 
             for aux_dsl, score in zip(aux_dsls, scores):
                 score = score.item()
@@ -155,13 +223,18 @@ class LMAgent(DeductiveAgent):
         
         t0 = time.time()
         step = 0
+        image_dir = "temp/vlm_images_construction_vlm_test/"
+        os.makedirs(image_dir, exist_ok=True)
         
         # Check goals numerically 
         for goal in proof.goals:
             if not goal.check_numerical():
                 return infos(False, f"{goal.pretty()} fails numerical check")
         # Run ddar
-        solved = LMAgent.run_ddar_c(proof, rules, t0, timeout)
+        # logger.info(f"running first ddar")
+        base_proof = deepcopy(proof)
+        solved = VLMAgent.run_ddar_c(base_proof, rules, t0, timeout)
+        # logger.info(f"finish first ddar")
         # if proofed by ddar, return
         if solved:
             return infos(True)
@@ -170,17 +243,17 @@ class LMAgent(DeductiveAgent):
             rules_ref = ray.put(rules)
             future_info = dict()
             running_futures = []
-            original_p_dsl = self.problem_to_dsl(self.problemJGEX, proof.defs)
             
             # Create two BeamQueues for each model: one for with_predicate, one for no_predicate
             # beam_queues[i][j]: i is the model index, j=0 for with_predicate, j=1 for no_predicate
+            # Each queue stores (problem, proof) tuples
             beam_queues = []
             for i in range(len(self.models)):
                 q_with_pred = BeamQueue(max_size=self.beam_size)
-                q_with_pred.add(node=(self.problemJGEX, ""), val=0)
+                q_with_pred.add(node=(self.problemJGEX, base_proof), val=0)
                 
                 q_no_pred = BeamQueue(max_size=self.beam_size)
-                q_no_pred.add(node=(self.problemJGEX, ""), val=0)
+                q_no_pred.add(node=(self.problemJGEX, base_proof), val=0)
                 
                 beam_queues.append([q_with_pred, q_no_pred])
 
@@ -191,31 +264,68 @@ class LMAgent(DeductiveAgent):
                     new_queues = [BeamQueue(max_size=self.beam_size), BeamQueue(max_size=self.beam_size)]
                     
                     # j=0: with_predicate, j=1: no_predicate
-                    for j, with_predicate in enumerate([True, False]):
+                    for j, with_predicate in enumerate([False]):
                         queue_type = 'with_pred' if with_predicate else 'no_pred'
                         
-                        logger.info(f"!!!")
-                        for prev_score, (problem, aux_prefix) in beam_queues[i][j]:
+                        for prev_score, (problem, current_proof) in beam_queues[i][j]:
                             if time.time() - t0 > timeout:
                                 ray.shutdown()
                                 return infos(False, 'Timeout')
-                            
-                            p_dsl = self.problem_to_dsl(problem, proof.defs)
+
+                            # draw current figure
+                            timestamp = int(time.time()*1000)
+                            svg_path = os.path.join(image_dir, f"{timestamp}.svg")
+                            png_path = os.path.join(image_dir, f"{timestamp}.png")
+                            draw_clause_figure(
+                                current_proof, problem, svg_path, current_proof.rng, draw_annotations=True
+                            )
+                            cairosvg.svg2png(
+                                url=str(svg_path),
+                                write_to=str(png_path),
+                                output_width=1024,
+                            )
+
+                            # 对生成的 PNG 进行反色处理
+                            with Image.open(png_path) as img:
+                                if img.mode == 'RGBA':
+                                    r, g, b, a = img.split()
+                                    rgb_img = Image.merge('RGB', (r, g, b))
+                                    inverted_rgb = ImageOps.invert(rgb_img)
+                                    r_inv, g_inv, b_inv = inverted_rgb.split()
+                                    img_out = Image.merge('RGBA', (r_inv, g_inv, b_inv, a))
+                                elif img.mode == 'LA':
+                                    l, a = img.split()
+                                    l_inv = ImageOps.invert(l)
+                                    img_out = Image.merge('LA', (l_inv, a))
+                                else:
+                                    img_out = ImageOps.invert(img.convert('RGB'))
+                                img_out.save(png_path)
+
+                            # 使用纯白图片
+                            # with Image.open(png_path) as img:
+                            #     img_out = Image.new('RGB', img.size, (255, 255, 255))
+                            #     img_out.save(png_path)
+                            # logger.info("finish drawing")         
+
+                            p_dsl = self.problem_to_dsl(problem, base_proof.defs)
                             logger.info(f"inferencing on query ({queue_type}): {p_dsl}")
                             aux_dsl_dict = self.inference(
-                                self.models[i], self.tokenizers[i], original_p_dsl, 
-                                self.get_new_point_name(problem), '<aux>' + aux_prefix + ' x00',
+                                model=self.models[i],
+                                processor=self.processors[i],
+                                query=p_dsl,
+                                img_path=png_path,
+                                new_point_name=self.get_new_point_name(problem),
+                                response_prefix='<aux> x00',
                                 with_predicate=with_predicate
                             )
                             
                             for aux_dsl, score in aux_dsl_dict.items():
                                 try:
-                                    aux = self.try_dsl_to_constructions(aux_dsl[len('<aux>' + aux_prefix + ' x00'):])
+                                    aux = self.try_dsl_to_constructions(aux_dsl[len('<aux> x00'):])
                                     if aux:
                                         new_problem = problem.with_more_construction(aux)
                                         future = run_ddar_remote.remote(new_problem, proof.defs, aux, rules_ref, t0, timeout)
-                                        aux_prefix_new = aux_dsl[len("<aux>"):]
-                                        future_info[future] = (new_problem, prev_score, score, j, aux_prefix_new)
+                                        future_info[future] = (new_problem, prev_score, score, j)
                                         running_futures.append(future)
                                 except Exception as e:
                                     continue
@@ -223,37 +333,37 @@ class LMAgent(DeductiveAgent):
                             # check any done task
                             done, running_futures = ray.wait(running_futures, timeout=0)
                             for f in done:
-                                solved = ray.get(f)
+                                solved, new_proof = ray.get(f)
                                 if solved is None:
                                     continue
                                 elif solved:
-                                    new_problem, prev_score, score, queue_idx, aux_prefix = future_info[f]
+                                    new_problem, prev_score, score, queue_idx = future_info[f]
                                     for task in running_futures:
                                         ray.cancel(task, force=True)
                                     ray.shutdown()
                                     logger.info(f"success with problem: {str(new_problem)}")
                                     return infos(True, str(new_problem))
                                 elif depth < self.search_depth - 1:
-                                    new_problem, prev_score, score, queue_idx, aux_prefix = future_info[f]
-                                    new_queues[queue_idx].add(node=(new_problem, aux_prefix), val=prev_score+score)
+                                    new_problem, prev_score, score, queue_idx = future_info[f]
+                                    new_queues[queue_idx].add(node=(new_problem, new_proof), val=prev_score+score)
                     
                     # check remaining tasks
                     while running_futures:
                         done, running_futures = ray.wait(running_futures, num_returns=min(1000, len(running_futures)))
                         for f in done:
-                            solved = ray.get(f)
+                            solved, new_proof = ray.get(f)
                             if solved is None:
                                 continue
                             elif solved:
-                                new_problem, prev_score, score, queue_idx, aux_prefix = future_info[f]
+                                new_problem, prev_score, score, queue_idx = future_info[f]
                                 for task in running_futures:
                                     ray.cancel(task, force=True)
                                 ray.shutdown()
                                 logger.info(f"success with problem: {str(new_problem)}")
                                 return infos(True, str(new_problem))
                             elif depth < self.search_depth - 1:
-                                new_problem, prev_score, score, queue_idx, aux_prefix = future_info[f]
-                                new_queues[queue_idx].add(node=(new_problem, aux_prefix), val=prev_score+score)
+                                new_problem, prev_score, score, queue_idx = future_info[f]
+                                new_queues[queue_idx].add(node=(new_problem, new_proof), val=prev_score+score)
                     
                     new_beam_queues.append(new_queues)
                 
@@ -264,14 +374,14 @@ class LMAgent(DeductiveAgent):
 
     def get_new_point_name(self, problem: ProblemJGEX) -> str:
         num_points = sum([len(clause.points) for clause in problem.constructions])
-        return self._get_apha_geo_solver_var(num_points)
+        return self._get_alpha_geo_solver_var(num_points)
     
-    def _get_apha_geo_solver_var(self, va_idx):
+    def _get_alpha_geo_solver_var(self, va_idx):
         """Generate a point name using letters and numbers"""
         letter_part = string.ascii_lowercase[va_idx % 26]
         number_part = va_idx // 26
         return f"{letter_part}{number_part - 1}" if number_part else letter_part
-    
+
     def step(self, proof: ProofState, rules: list[Rule]) -> bool:
         return
     
@@ -406,21 +516,12 @@ class LMAgent(DeductiveAgent):
                     points = tuple([mapping[x] for x in points])
                     for p in points:
                         group[p] = points
+                    if len(bs) == 0:
+                        data_tmp[' '.join(points)] = []
                     for b in bs:
                         statement = Statement.from_tokens(translate_sentence(mapping, b), dep_graph)
                         p2deps[points].append(statement)
-
-            points = construction.points
-            points = [p.split('@')[0] for p in points]
-            while points:
-                p = points[0]
-                gr = group[p]
-                points = [x for x in points if x not in gr]
-
-                deps = []
-                for dep in p2deps[gr]:
-                    deps.append(dep)
-                data_tmp[' '.join(gr)] = deps
+                        data_tmp[' '.join(points)].append(statement)
 
         # <problem> </problem>
         data_problem = '<problem> '
@@ -475,13 +576,24 @@ class LMAgent(DeductiveAgent):
     
     @staticmethod
     def run_ddar_c(proof: "ProofState", rules: list[Rule], start_time: int, timeout: int = 3600): 
-        points = LMAgent._extract_points(proof)
-        premises = LMAgent._extract_premises(proof)
-        goals = LMAgent._extract_goals(proof)
+        points = VLMAgent._extract_points(proof)
+        premises = VLMAgent._extract_premises(proof)
+        goals = VLMAgent._extract_goals(proof)
         
         solved, dep_graph = DDAR.run_ddar("", points, premises, goals, 500, True, True)
 
-        return solved
+        for stmt, deps, reason in dep_graph:
+            conclusion = Statement.from_tokens(
+                stmt, proof.dep_graph)
+            why = []
+            for dep in deps:
+                premise = Statement.from_tokens(
+                    dep, proof.dep_graph)
+                why.append(premise)
+            dep = Dependency.mk(conclusion, reason, tuple(why))
+            proof.dep_graph.hyper_graph[conclusion] = dep
+
+        return solved   
 
 
 @ray.remote(num_cpus=1)
@@ -495,14 +607,14 @@ def run_ddar_remote(problem, defs, aux, rules: list[Rule], start_time: int, time
             problem_path=None,
         )
     except Exception:
-        return None
+        return None, None
     try:
-        solved = LMAgent.run_ddar_c(proof, rules, start_time, timeout)
+        solved = VLMAgent.run_ddar_c(proof, rules, start_time, timeout)
     except Exception:
-        return None
-    return solved
-    
-    
+        return None, None
+    return solved, proof
+
+
 class BeamQueue:
     """Keep only the top k objects according to their values."""
 

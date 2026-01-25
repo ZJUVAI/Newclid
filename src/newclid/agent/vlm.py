@@ -243,17 +243,18 @@ class VLMAgent(DeductiveAgent):
             rules_ref = ray.put(rules)
             future_info = dict()
             running_futures = []
+            original_p_dsl = self.problem_to_dsl(self.problemJGEX, base_proof.defs)
             
             # Create two BeamQueues for each model: one for with_predicate, one for no_predicate
             # beam_queues[i][j]: i is the model index, j=0 for with_predicate, j=1 for no_predicate
-            # Each queue stores (problem, proof) tuples
+            # Each queue stores (problem, proof, aux_prefix) tuples
             beam_queues = []
             for i in range(len(self.models)):
                 q_with_pred = BeamQueue(max_size=self.beam_size)
-                q_with_pred.add(node=(self.problemJGEX, base_proof), val=0)
+                q_with_pred.add(node=(self.problemJGEX, base_proof, ""), val=0)
                 
                 q_no_pred = BeamQueue(max_size=self.beam_size)
-                q_no_pred.add(node=(self.problemJGEX, base_proof), val=0)
+                q_no_pred.add(node=(self.problemJGEX, base_proof, ""), val=0)
                 
                 beam_queues.append([q_with_pred, q_no_pred])
 
@@ -267,7 +268,7 @@ class VLMAgent(DeductiveAgent):
                     for j, with_predicate in enumerate([False]):
                         queue_type = 'with_pred' if with_predicate else 'no_pred'
                         
-                        for prev_score, (problem, current_proof) in beam_queues[i][j]:
+                        for prev_score, (problem, current_proof, aux_prefix) in beam_queues[i][j]:
                             if time.time() - t0 > timeout:
                                 ray.shutdown()
                                 return infos(False, 'Timeout')
@@ -312,20 +313,21 @@ class VLMAgent(DeductiveAgent):
                             aux_dsl_dict = self.inference(
                                 model=self.models[i],
                                 processor=self.processors[i],
-                                query=p_dsl,
+                                query=original_p_dsl,
                                 img_path=png_path,
                                 new_point_name=self.get_new_point_name(problem),
-                                response_prefix='<aux> x00',
+                                response_prefix='<aux>' + aux_prefix + ' x00',
                                 with_predicate=with_predicate
                             )
                             
                             for aux_dsl, score in aux_dsl_dict.items():
                                 try:
-                                    aux = self.try_dsl_to_constructions(aux_dsl[len('<aux> x00'):])
+                                    aux = self.try_dsl_to_constructions(aux_dsl[len('<aux>' + aux_prefix + ' x00'):])
                                     if aux:
                                         new_problem = problem.with_more_construction(aux)
                                         future = run_ddar_remote.remote(new_problem, proof.defs, aux, rules_ref, t0, timeout)
-                                        future_info[future] = (new_problem, prev_score, score, j)
+                                        aux_prefix_new = aux_dsl[len("<aux>"):]
+                                        future_info[future] = (new_problem, prev_score, score, j, aux_prefix_new)
                                         running_futures.append(future)
                                 except Exception as e:
                                     continue
@@ -337,15 +339,15 @@ class VLMAgent(DeductiveAgent):
                                 if solved is None:
                                     continue
                                 elif solved:
-                                    new_problem, prev_score, score, queue_idx = future_info[f]
+                                    new_problem, prev_score, score, queue_idx, aux_prefix = future_info[f]
                                     for task in running_futures:
                                         ray.cancel(task, force=True)
                                     ray.shutdown()
                                     logger.info(f"success with problem: {str(new_problem)}")
                                     return infos(True, str(new_problem))
                                 elif depth < self.search_depth - 1:
-                                    new_problem, prev_score, score, queue_idx = future_info[f]
-                                    new_queues[queue_idx].add(node=(new_problem, new_proof), val=prev_score+score)
+                                    new_problem, prev_score, score, queue_idx, aux_prefix = future_info[f]
+                                    new_queues[queue_idx].add(node=(new_problem, new_proof, aux_prefix), val=prev_score+score)
                     
                     # check remaining tasks
                     while running_futures:
@@ -355,15 +357,15 @@ class VLMAgent(DeductiveAgent):
                             if solved is None:
                                 continue
                             elif solved:
-                                new_problem, prev_score, score, queue_idx = future_info[f]
+                                new_problem, prev_score, score, queue_idx, aux_prefix = future_info[f]
                                 for task in running_futures:
                                     ray.cancel(task, force=True)
                                 ray.shutdown()
                                 logger.info(f"success with problem: {str(new_problem)}")
                                 return infos(True, str(new_problem))
                             elif depth < self.search_depth - 1:
-                                new_problem, prev_score, score, queue_idx = future_info[f]
-                                new_queues[queue_idx].add(node=(new_problem, new_proof), val=prev_score+score)
+                                new_problem, prev_score, score, queue_idx, aux_prefix = future_info[f]
+                                new_queues[queue_idx].add(node=(new_problem, new_proof, aux_prefix), val=prev_score+score)
                     
                     new_beam_queues.append(new_queues)
                 
