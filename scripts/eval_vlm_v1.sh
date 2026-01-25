@@ -35,6 +35,11 @@ configs=(
     "32 512"
 )
 
+# Search depth options
+search_depths=(
+    "4"
+)
+
 # Checkpoint options - modify this list as needed
 checkpoints=(
     # "checkpoint-2958"
@@ -85,8 +90,8 @@ checkpoints=(
 )
 
 echo "Starting evaluation V1 tasks..."
-echo "Will process ${#checkpoints[@]} checkpoints, ${#datasets[@]} datasets, and ${#configs[@]} configurations"
-echo "Total commands to execute: $((${#checkpoints[@]} * ${#datasets[@]} * ${#configs[@]}))"
+echo "Will process ${#checkpoints[@]} checkpoints, ${#datasets[@]} datasets, ${#configs[@]} configurations, and ${#search_depths[@]} search depths"
+echo "Total commands to execute: $((${#checkpoints[@]} * ${#datasets[@]} * ${#configs[@]} * ${#search_depths[@]}))"
 echo "=================================="
 
 # Loop through all checkpoints
@@ -101,25 +106,28 @@ for checkpoint in "${checkpoints[@]}"; do
             # Split configuration parameters
             read -r decoding_size beam_size <<< "$config"
             
-            # Build complete command - using evaluation_vlm_v1.py
-            cmd="python scripts/evaluation_vlm_v1.py --problems_path benchmarks/$dataset --model_path ./models/$model_dir/$checkpoint --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth 4 --timeout 3600 --agent vlm"
+            # Loop through all search depths
+            for search_depth in "${search_depths[@]}"; do
+                # Build complete command - using evaluation_vlm_v1.py
+                cmd="python scripts/evaluation_vlm_v1.py --problems_path benchmarks/$dataset --model_path ./models/$model_dir/$checkpoint --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth $search_depth --timeout 3600 --agent vlm"
             
             # Print current command to execute
             echo "Executing command:"
             echo "$cmd"
             echo "----------------------------------"
             
-            # Execute command
-            eval "$cmd"
-            
-            # Check command execution status
-            if [ $? -eq 0 ]; then
-                echo "✓ Command executed successfully"
-            else
-                echo "✗ Command execution failed"
-            fi
-            
-            echo "=================================="
+                # Execute command
+                eval "$cmd"
+                
+                # Check command execution status
+                if [ $? -eq 0 ]; then
+                    echo "✓ Command executed successfully"
+                else
+                    echo "✗ Command execution failed"
+                fi
+                
+                echo "=================================="
+            done
         done
     done
     

@@ -18,14 +18,14 @@ datasets=(
     # "imo_2008_p1.txt"
     # "imo_2008_p1b.txt"
     # "imo_2004_p1.txt"
-    # "imo_2018_p1.txt"
+    "imo_2018_p1.txt"
     # "imo_102_supple.txt"
     # "imo_102_requires_aux_less.txt"
     # "imo_102_requires_aux_less1.txt" 
     # "imo_102_requires_aux_less2.txt"
     # "imo_102_requires_aux_less3.txt"
     # "dev_jgex.txt" 
-    "hageo_409.txt"
+    # "hageo_409.txt"
     # "2007USATSTp5.gex.txt"
 )
 
@@ -33,6 +33,11 @@ datasets=(
 configs=(
     # "8 64"
     "32 512"
+)
+
+# Search depth options
+search_depths=(
+    "4"
 )
 
 # Checkpoint options - modify this list as needed
@@ -84,8 +89,8 @@ checkpoints=(
 )
 
 echo "Starting evaluation tasks..."
-echo "Will process ${#checkpoints[@]} checkpoints, ${#datasets[@]} datasets, and ${#configs[@]} configurations"
-echo "Total commands to execute: $((${#checkpoints[@]} * ${#datasets[@]} * ${#configs[@]}))"
+echo "Will process ${#checkpoints[@]} checkpoints, ${#datasets[@]} datasets, ${#configs[@]} configurations, and ${#search_depths[@]} search depths"
+echo "Total commands to execute: $((${#checkpoints[@]} * ${#datasets[@]} * ${#configs[@]} * ${#search_depths[@]}))"
 echo "=================================="
 
 # Loop through all checkpoints
@@ -100,25 +105,28 @@ for checkpoint in "${checkpoints[@]}"; do
             # Split configunration parameters
             read -r decoding_size beam_size <<< "$config"
             
-            # Build complete command
-            cmd="python scripts/evaluation_vlm.py --problems_path benchmarks/$dataset --model_path ./models/$model_dir/$checkpoint --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth 4 --timeout 3600 --agent vlm"
+            # Loop through all search depths
+            for search_depth in "${search_depths[@]}"; do
+                # Build complete command
+                cmd="python scripts/evaluation_vlm.py --problems_path benchmarks/$dataset --model_path ./models/$model_dir/$checkpoint --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth $search_depth --timeout 3600 --agent vlm"
             
             # Print current command to execute
             echo "Executing command:"
             echo "$cmd"
             echo "----------------------------------"
             
-            # Execute command
-            eval "$cmd"
-            
-            # Check command execution status
-            if [ $? -eq 0 ]; then
-                echo "✓ Command executed successfully"
-            else
-                echo "✗ Command execution failed"
-            fi
-            
-            echo "=================================="
+                # Execute command
+                eval "$cmd"
+                
+                # Check command execution status
+                if [ $? -eq 0 ]; then
+                    echo "✓ Command executed successfully"
+                else
+                    echo "✗ Command execution failed"
+                fi
+                
+                echo "=================================="
+            done
         done
     done
     
