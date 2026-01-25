@@ -52,6 +52,10 @@ vector<unique_ptr<Equation>> Cong::as_equation_dist(bool exp) const
 {
     vector<unique_ptr<Equation>> result;
     result.push_back(make_unique<Equation>(Equation({Term(_left), -Term(_right)})));
+    if (exp)
+    {
+        result.push_back(make_unique<Equation>(Equation({Term({_left, _left}), -Term({_right, _right})})));
+    }
     return result;
 }
 
