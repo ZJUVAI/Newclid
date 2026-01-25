@@ -38,16 +38,17 @@ if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
 
 logger = logging.getLogger(__name__)
+# logger.setLevel(logging.INFO)
 
 AUX_PREDICATES = [
-    "coll",
-    "cong",
-    "cyclic",
-    "eqangle",
-    "eqratio",
-    "midp",
-    "para",
-    "perp",
+    # "coll",
+    # "cong",
+    # "cyclic",
+    # "eqangle",
+    # "eqratio",
+    # "midp",
+    # "para",
+    # "perp",
 ]
 
 class LMAgent(DeductiveAgent):
@@ -161,7 +162,7 @@ class LMAgent(DeductiveAgent):
             if not goal.check_numerical():
                 return infos(False, f"{goal.pretty()} fails numerical check")
         # Run ddar
-        solved, base_proof = LMAgent.run_ddar_c(proof, rules, t0, timeout)
+        solved = LMAgent.run_ddar_c(proof, rules, t0, timeout)
         # if proofed by ddar, return
         if solved:
             return infos(True)
@@ -176,10 +177,10 @@ class LMAgent(DeductiveAgent):
             beam_queues = []
             for i in range(len(self.models)):
                 q_with_pred = BeamQueue(max_size=self.beam_size)
-                q_with_pred.add(node=(self.problemJGEX, base_proof), val=0)
+                q_with_pred.add(node=self.problemJGEX, val=0)
                 
                 q_no_pred = BeamQueue(max_size=self.beam_size)
-                q_no_pred.add(node=(self.problemJGEX, base_proof), val=0)
+                q_no_pred.add(node=self.problemJGEX, val=0)
                 
                 beam_queues.append([q_with_pred, q_no_pred])
 
@@ -193,13 +194,13 @@ class LMAgent(DeductiveAgent):
                     for j, with_predicate in enumerate([True, False]):
                         queue_type = 'with_pred' if with_predicate else 'no_pred'
                         
-                        for prev_score, (problem, proof) in beam_queues[i][j]:
+                        logger.info(f"!!!")
+                        for prev_score, problem in beam_queues[i][j]:
                             if time.time() - t0 > timeout:
                                 ray.shutdown()
                                 return infos(False, 'Timeout')
-                            proof_ref = ray.put(proof)
                             
-                            p_dsl = self.problem_to_dsl(problem, base_proof.defs)
+                            p_dsl = self.problem_to_dsl(problem, proof.defs)
                             logger.info(f"inferencing on query ({queue_type}): {p_dsl}")
                             aux_dsl_dict = self.inference(
                                 self.models[i], self.tokenizers[i], p_dsl, 
@@ -212,7 +213,7 @@ class LMAgent(DeductiveAgent):
                                     aux = self.try_dsl_to_constructions(aux_dsl[len('<aux> x00'):])
                                     if aux:
                                         new_problem = problem.with_more_construction(aux)
-                                        future = run_ddar_remote.remote(new_problem, proof_ref, aux, rules_ref, t0, timeout)
+                                        future = run_ddar_remote.remote(new_problem, proof.defs, aux, rules_ref, t0, timeout)
                                         future_info[future] = (new_problem, prev_score, score, j)
                                         running_futures.append(future)
                                 except Exception as e:
@@ -221,8 +222,8 @@ class LMAgent(DeductiveAgent):
                             # check any done task
                             done, running_futures = ray.wait(running_futures, timeout=0)
                             for f in done:
-                                solved, res = ray.get(f)
-                                if res is None:
+                                solved = ray.get(f)
+                                if solved is None:
                                     continue
                                 elif solved:
                                     new_problem, prev_score, score, queue_idx = future_info[f]
@@ -233,14 +234,14 @@ class LMAgent(DeductiveAgent):
                                     return infos(True, str(new_problem))
                                 elif depth < self.search_depth - 1:
                                     new_problem, prev_score, score, queue_idx = future_info[f]
-                                    new_queues[queue_idx].add(node=(new_problem, res), val=prev_score+score)
+                                    new_queues[queue_idx].add(node=new_problem, val=prev_score+score)
                     
                     # check remaining tasks
                     while running_futures:
                         done, running_futures = ray.wait(running_futures, num_returns=min(1000, len(running_futures)))
                         for f in done:
-                            solved, res = ray.get(f)
-                            if res is None:
+                            solved = ray.get(f)
+                            if solved is None:
                                 continue
                             elif solved:
                                 new_problem, prev_score, score, queue_idx = future_info[f]
@@ -251,7 +252,7 @@ class LMAgent(DeductiveAgent):
                                 return infos(True, str(new_problem))
                             elif depth < self.search_depth - 1:
                                 new_problem, prev_score, score, queue_idx = future_info[f]
-                                new_queues[queue_idx].add(node=(new_problem, res), val=prev_score+score)
+                                new_queues[queue_idx].add(node=new_problem, val=prev_score+score)
                     
                     new_beam_queues.append(new_queues)
                 
@@ -479,40 +480,26 @@ class LMAgent(DeductiveAgent):
         
         solved, dep_graph = DDAR.run_ddar("", points, premises, goals, 500, True, True)
 
-        for stmt, deps, reason in dep_graph:
-            conclusion = Statement.from_tokens(
-                stmt, proof.dep_graph)
-            why = []
-            for dep in deps:
-                premise = Statement.from_tokens(
-                    dep, proof.dep_graph)
-                why.append(premise)
-            dep = Dependency.mk(conclusion, reason, tuple(why))
-            proof.dep_graph.hyper_graph[conclusion] = dep
-
-        return solved, proof
+        return solved
 
 
 @ray.remote(num_cpus=1)
-def run_ddar_remote(problem, proof, aux, rules: list[Rule], start_time: int, timeout: int = 3600): 
+def run_ddar_remote(problem, defs, aux, rules: list[Rule], start_time: int, timeout: int = 3600): 
     try:
-        LMAgent.add_construction(proof, aux)
-    except Exception as e:
-        try:
-            proof = ProofState.build_problemJGEX(
-                problemJGEX=problem,
-                defsJGEX=proof.defs,
-                rng=np.random.default_rng(998244353),
-                max_attempts=100,
-                problem_path=None,
-            )
-        except Exception:
-            return None, None
-    try:
-        solved, proof = LMAgent.run_ddar_c(proof, rules, start_time, timeout)
+        proof = ProofState.build_problemJGEX(
+            problemJGEX=problem,
+            defsJGEX=defs,
+            rng=np.random.default_rng(998244353),
+            max_attempts=100,
+            problem_path=None,
+        )
     except Exception:
-        return None, None
-    return solved, proof
+        return None
+    try:
+        solved = LMAgent.run_ddar_c(proof, rules, start_time, timeout)
+    except Exception:
+        return None
+    return solved
     
     
 class BeamQueue:
