@@ -282,7 +282,7 @@ class VLMAgentV1(DeductiveAgent):
                             cairosvg.svg2png(
                                 url=str(svg_path),
                                 write_to=str(png_path),
-                                output_width=1024,
+                                output_width=512,
                             )
 
                             # 对生成的 PNG 进行反色处理
