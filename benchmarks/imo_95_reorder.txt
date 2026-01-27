@@ -3,7 +3,7 @@ m l k = triangle m l k; w = circle w m l k; q = on_tline q m w m; p = mirror p q
 imo_sl_2006_g6
 o1 o2 o = triangle o1 o2 o; d e f i = excenter2 d e f i o o2 o1; a = on_circle a o e, on_pline a o o1 o2; b = on_circle b o e, on_pline b o o1 o2; x = intersection_ll x a o1 b o2 ? coll x e f
 imo_sl_2004_g4a
-a b c = triangle a b c; d = on_circum d a b c; p = on_aline p b c a b d ? cong a p c p
+a b c = triangle a b c; d = on_circum d a b c; p = on_aline p b c a b d, on_aline p d c a d b ? cong a p c p
 imo_sl_2019_g2_variant
 a b c = triangle a b c; d = foot d a b c; e = foot e b c a; f = foot f c a b; i2 = incenter i2 b d f; m = foot m i2 d f; i3 = incenter i3 c d e; n = foot n i3 d e; p = intersection_lc p n i2 m; q = intersection_lc q m i3 n ? cong m p n q
 imo_sl_2015_g3_variant

@@ -19,7 +19,7 @@ a b = segment a b; c = free c; y = free y; o1 = circle o1 a b c; o2 = circle o2 
 imo_sl_2002_g8_variant
 a b = segment a b; c = free c; d = on_line d a c; m = on_line m c d; n = on_pline n m b d, on_line n b c; k = on_pline k m b c, on_line k b d; e = on_tline e n b c, on_circum e a b c; f = on_tline f k b d, on_circum f a b d ? perp e m m f
 imo_sl_2004_g4a
-a b c = triangle a b c; d = on_circum d a b c; p = on_aline p b c a b d? cong a p c p
+a b c = triangle a b c; d = on_circum d a b c; p = on_aline p b c a b d, on_aline p d c a d b ? cong a p c p
 imo_sl_2004_g7
 a b c = triangle a b c; x = on_line x c b; d e f i = incenter2 d e f i a b x; d1 e1 f1 j = incenter2 d1 e1 f1 j a c x; p = on_circle p i d, on_circle p j d1; q = intersection_cc q i j p; m = midpoint m a b; n = midpoint n a c; u = on_line u m n, angle_bisector u a b c; v = on_line v m n, angle_bisector v a c x; w = midpoint w u v ? coll p q w
 imo_sl_2004_g8
@@ -33,7 +33,7 @@ o1 o2 o = triangle o1 o2 o; d e f i = excenter2 d e f i o o2 o1; a = on_circle a
 imo_sl_2006_g7a
 a b c = triangle a b c; o = circle o a b c; m1 = midpoint m1 b c; m2 = midpoint m2 a c; m3 = midpoint m3 a b; t1 = angle_bisector t1 c a b, on_circle t1 o a; t2 = angle_bisector t2 a b c, on_circle t2 o a; t3 = angle_bisector t3 b c a, on_circle t3 o a; o1 = midpoint o1 m1 t1; o2 = midpoint o2 m2 t2; o3 = midpoint o3 m3 t3; x3 y3 x31 y31 = cc_tangent x3 y3 x31 y31 o1 m1 o2 m2; x21 y21 x2 y2 = cc_tangent x21 y21 x2 y2 o3 m3 o1 m1; x1 y1 x11 y11 = cc_tangent x1 y1 x11 y11 o2 m2 o3 m3; a1 = intersection_ll a1 x2 y2 x3 y3; b1 = intersection_ll b1 x1 y1 x3 y3; c1 = intersection_ll c1 x1 y1 x2 y2 ? simtri a b c a1 b1 c1
 imo_sl_2006_g7b
-a b c = triangle a b c; o = circle o a b c; m1 = midpoint m1 b c; m2 = midpoint m2 a c; m3 = midpoint m3 a b; t1 = angle_bisector t1 c a b, on_circle t1 o a; t2 = angle_bisector t2 a b c, on_circle t2 o a; t3 = angle_bisector t3 b c a, on_circle t3 o a; o1 = midpoint o1 m1 t1; o2 = midpoint o2 m2 t2; o3 = midpoint o3 m3 t3; x3 y3 x31 y31 = cc_tangent x3 y3 x31 y31 o1 m1 o2 m2; x21 y21 x2 y2 = cc_t1ngent x21 y21 x2 y2 o3 m3 o1 m1; x1 y1 x11 y11 = cc_tangent x1 y1 x11 y11 o2 m2 o3 m3; a1 = intersection_ll a1 x2 y2 x3 y3; b1 = intersection_ll b1 x1 y1 x3 y3; c1 = intersection_ll c1 x1 y1 x2 y2; n1 = midpoint n1 m2 m3; n2 = midpoint n2 m1 m3; n3 = midpoint n3 m1 m2 ? contri n1 n2 n3 a1 b1 c1
+a b c = triangle a b c; o = circle o a b c; m1 = midpoint m1 b c; m2 = midpoint m2 a c; m3 = midpoint m3 a b; t1 = angle_bisector t1 c a b, on_circle t1 o a; t2 = angle_bisector t2 a b c, on_circle t2 o a; t3 = angle_bisector t3 b c a, on_circle t3 o a; o1 = midpoint o1 m1 t1; o2 = midpoint o2 m2 t2; o3 = midpoint o3 m3 t3; x3 y3 x31 y31 = cc_tangent x3 y3 x31 y31 o1 m1 o2 m2; x21 y21 x2 y2 = cc_tangent x21 y21 x2 y2 o3 m3 o1 m1; x1 y1 x11 y11 = cc_tangent x1 y1 x11 y11 o2 m2 o3 m3; a1 = intersection_ll a1 x2 y2 x3 y3; b1 = intersection_ll b1 x1 y1 x3 y3; c1 = intersection_ll c1 x1 y1 x2 y2; n1 = midpoint n1 m2 m3; n2 = midpoint n2 m1 m3; n3 = midpoint n3 m1 m2 ? contri n1 n2 n3 a1 b1 c1
 imo_sl_2007_g2_variant
 a b c = iso_triangle a b c; m = midpoint m b c; o1 = circle o1 a b m; x = on_circle x o1 a; t = on_tline t m m x, on_circle t x b; u = on_aline u t m m t c; x1 = on_circle x1 o1 a; t1 = on_tline t1 m m x1, on_circle t1 x1 b; u1 = on_aline u1 t1 m m t1 c ? eqangle u t t b u1 t1 t1 b
 imo_sl_2007_g3
