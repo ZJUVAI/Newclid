@@ -276,30 +276,53 @@ class VLMAgentV1(DeductiveAgent):
                             timestamp = int(time.time()*1000)
                             svg_path = os.path.join(image_dir, f"{timestamp}.svg")
                             png_path = os.path.join(image_dir, f"{timestamp}.png")
-                            draw_clause_figure(
-                                current_proof, problem, svg_path, current_proof.rng, draw_annotations=True
-                            )
-                            cairosvg.svg2png(
-                                url=str(svg_path),
-                                write_to=str(png_path),
-                                output_width=512,
-                            )
+                            
+                            try:
+                                draw_clause_figure(
+                                    current_proof, problem, svg_path, current_proof.rng, draw_annotations=True
+                                )
+                                
+                                # 检查 SVG 文件是否存在且不为空
+                                if not os.path.exists(svg_path) or os.path.getsize(svg_path) == 0:
+                                    logger.error(f"SVG file {svg_path} is empty or doesn't exist")
+                                    continue
+                                
+                                # 转换 SVG 到 PNG
+                                cairosvg.svg2png(
+                                    url=str(svg_path),
+                                    write_to=str(png_path),
+                                    output_width=512,
+                                )
+                                
+                                # 检查 PNG 文件是否存在且不为空
+                                if not os.path.exists(png_path) or os.path.getsize(png_path) == 0:
+                                    logger.error(f"PNG file {png_path} is empty or doesn't exist")
+                                    continue
 
-                            # 对生成的 PNG 进行反色处理
-                            with Image.open(png_path) as img:
-                                if img.mode == 'RGBA':
-                                    r, g, b, a = img.split()
-                                    rgb_img = Image.merge('RGB', (r, g, b))
-                                    inverted_rgb = ImageOps.invert(rgb_img)
-                                    r_inv, g_inv, b_inv = inverted_rgb.split()
-                                    img_out = Image.merge('RGBA', (r_inv, g_inv, b_inv, a))
-                                elif img.mode == 'LA':
-                                    l, a = img.split()
-                                    l_inv = ImageOps.invert(l)
-                                    img_out = Image.merge('LA', (l_inv, a))
-                                else:
-                                    img_out = ImageOps.invert(img.convert('RGB'))
-                                img_out.save(png_path)
+                                # 对生成的 PNG 进行反色处理
+                                with Image.open(png_path) as img:
+                                    # 确保图像已完全加载
+                                    img.load()
+                                    
+                                    if img.mode == 'RGBA':
+                                        r, g, b, a = img.split()
+                                        rgb_img = Image.merge('RGB', (r, g, b))
+                                        inverted_rgb = ImageOps.invert(rgb_img)
+                                        r_inv, g_inv, b_inv = inverted_rgb.split()
+                                        img_out = Image.merge('RGBA', (r_inv, g_inv, b_inv, a))
+                                    elif img.mode == 'LA':
+                                        l, a = img.split()
+                                        l_inv = ImageOps.invert(l)
+                                        img_out = Image.merge('LA', (l_inv, a))
+                                    else:
+                                        img_out = ImageOps.invert(img.convert('RGB'))
+                                    
+                                    # 保存到同一路径
+                                    img_out.save(png_path)
+                                    
+                            except Exception as e:
+                                logger.error(f"Error processing image {png_path}: {e}")
+                                continue
 
                             # 使用纯白图片
                             # with Image.open(png_path) as img:
