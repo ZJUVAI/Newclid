@@ -31,15 +31,10 @@ datasets=(
     # "hageo_409.txt"
 )
 
-# Decoding configurations (decoding_size beam_size)
+# Decoding configurations (decoding_size beam_size search_depth)
 configs=(
-    # "8 64"
-    "32 512"
-)
-
-# Search depth options
-search_depths=(
-    "4"
+    # "8 64 4"
+    "32 512 4"
 )
 
 timeout=3600
@@ -99,8 +94,8 @@ checkpoints=(
 )
 
 echo "Starting evaluation tasks (V1)..."
-echo "Will process ${#checkpoints[@]} checkpoints, ${#datasets[@]} datasets, ${#configs[@]} configurations, and ${#search_depths[@]} search depths"
-echo "Total commands to execute: $((${#checkpoints[@]} * ${#datasets[@]} * ${#configs[@]} * ${#search_depths[@]}))"
+echo "Will process ${#checkpoints[@]} checkpoints, ${#datasets[@]} datasets, and ${#configs[@]} configurations"
+echo "Total commands to execute: $((${#checkpoints[@]} * ${#datasets[@]} * ${#configs[@]}))"
 echo "=================================="
 
 # Loop through all checkpoints
@@ -113,30 +108,27 @@ for checkpoint in "${checkpoints[@]}"; do
         # Loop through all configurations
         for config in "${configs[@]}"; do
             # Split configuration parameters
-            read -r decoding_size beam_size <<< "$config"
+            read -r decoding_size beam_size search_depth <<< "$config"
             
-            # Loop through all search depths
-            for search_depth in "${search_depths[@]}"; do
-                # Build complete command - use evaluation_v1.py instead of evaluation.py
-                cmd="python scripts/evaluation_v1.py --problems_path benchmarks/$dataset --model_path ./models/$model_dir/$checkpoint --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth $search_depth --timeout $timeout"
+            # Build complete command - use evaluation_v1.py instead of evaluation.py
+            cmd="python scripts/evaluation_v1.py --problems_path benchmarks/$dataset --model_path ./models/$model_dir/$checkpoint --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth $search_depth --timeout $timeout"
             
             # Print current command to execute
             echo "Executing command:"
             echo "$cmd"
             echo "----------------------------------"
             
-                # Execute command
-                eval "$cmd"
-                
-                # Check command execution status
-                if [ $? -eq 0 ]; then
-                    echo "✓ Command executed successfully"
-                else
-                    echo "✗ Command execution failed"
-                fi
-                
-                echo "=================================="
-            done
+            # Execute command
+            eval "$cmd"
+            
+            # Check command execution status
+            if [ $? -eq 0 ]; then
+                echo "✓ Command executed successfully"
+            else
+                echo "✗ Command execution failed"
+            fi
+            
+            echo "=================================="
         done
     done
     
