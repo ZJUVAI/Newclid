@@ -106,7 +106,7 @@ class VLMAgent(DeductiveAgent):
             {
                 "role": "user",
                 "content": [
-                    # {"type": "image", "image": img_path},
+                    {"type": "image", "image": img_path},
                     {"type": "text", "text": query},
                 ],
             }
