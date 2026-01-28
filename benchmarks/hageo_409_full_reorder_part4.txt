@@ -1,0 +1,160 @@
+2025IranTSTp12
+a b c = triangle a b c; y = on_line y a c; x = on_line x b c, on_tline x y b c; m1 m2 m3 n = ninepoints m1 m2 m3 n a b c; z = mirror z x m1; t = mirror t y m2; o = circumcenter o a b c; p = on_line p z t, on_circle p o x; m4 = midpoint m4 x p ? cyclic m4 m1 m2 m3
+2011G5
+a b c = triangle a b c; i = incenter i a b c; o = circumcenter o a b c; d = on_line d a i, on_circle d o a; e = on_line e b i, on_circle e o b; f = on_line f d e, on_line f a c; g = on_line g d e, on_line g b c; p = on_pline p f a d, on_pline p g b e; k = on_tline k a o a, on_tline k b o b; x = on_line x a e, on_line x b d ? coll x k p
+2016USATSTSTp2
+a b c = triangle a b c; h = orthocenter h a b c; o = circumcenter o a b c; m = midpoint m a h; n = midpoint n b c; g = on_circle g m a, on_circle g o a; q = on_line q a n, on_circle q m a; p = on_tline p g m g, on_line p o m; o1 = circumcenter o1 g n q; o2 = circumcenter o2 m b c; t = on_circle t o1 g, on_circle t o2 m ? coll t p n
+2011ARMOg11p8
+a b c = triangle a b c; o = circumcenter o a b c; n = on_circle n o a, on_bline n a c; m = midpoint m a c; i1 = incenter i1 a b m; i2 = incenter i2 c b m ? cyclic i1 i2 b n
+2020CSMGOp3
+a b c = triangle a b c; h = orthocenter h a b c; b1 = reflect b1 b a c; c1 = reflect c1 c a b; o = circumcenter o a b c; x = on_tline x b o b, on_tline x c o c; t = on_line t b1 c1, on_line t b c ? perp a t x h
+2017EGMOp6
+a b c = triangle a b c; x y z g = centroid x y z g a b c; o = circumcenter o a b c; g1 = reflect g1 g b c; g2 = reflect g2 g a c; g3 = reflect g3 g a b; o1 = reflect o1 o b c; o2 = reflect o2 o a c; o3 = reflect o3 o a b; p = on_circum p a b c, on_circum p g1 g2 c ? cyclic p o2 o3 a
+2023ARMOg11p4
+a b c = triangle a b c; o = circumcenter o a b c; i = incenter i a b c; m = midpoint m b c; h = foot h m a i; v1 = on_line v1 m h, on_line v1 b i; v2 = on_line v2 m h, on_line v2 a b; o2 = circumcenter o2 v1 v2 b; b1 = on_circle b1 o2 b, on_circle b1 o a; w1 = on_line w1 m h, on_line w1 c i; w2 = on_line w2 m h, on_line w2 a c; o3 = circumcenter o3 w1 w2 c; c1 = on_circle c1 o3 c, on_circle c1 o a ? coll b1 h c1
+2022IranGOMp5
+a b c = triangle a b c; d = on_circum d a b c; o = circumcenter o a b c; p = on_line p a c, on_line p b d; q = on_line q o p; e = foot e q a d; f = foot f q b c; o1 = circumcenter o1 q e f; m = on_circle m o1 q, on_pline m q a c; n = on_circle n o1 q, on_pline n q b d; x = on_line x m e, on_line x n f ? cong x c x d
+2005USAMOp3
+a b c = triangle a b c; p = on_line p b c; q = on_line q b c; c1 = on_circum c1 a p b, on_pline c1 q c a; b1 = on_circum b1 a p c, on_pline b1 q b a ? cyclic b1 c1 p q
+2006CTSTp5
+a b c = triangle a b c; o = circumcenter o a b c; p = free p; a1 = on_line a1 a p, on_circle a1 o a; b1 = on_line b1 b p, on_circle b1 o a; c1 = on_line c1 c p, on_circle c1 o a; m1 = midpoint m1 b c; m2 = midpoint m2 c a; m3 = midpoint m3 a b; a2 = mirror a2 a1 m1; b2 = mirror b2 b1 m2; c2 = mirror c2 c1 m3; h = orthocenter h a b c ? cyclic h a2 b2 c2
+2020CzechAPSlovakp1
+a b c = triangle a b c; d = parallelogram a b c d; p = on_line p a c, on_line p b d; m = midpoint m a b; o1 = circumcenter o1 m a d; o2 = circumcenter o2 m b c; q = on_tline q a o1 a, on_tline q b o2 b ? coll q m p
+2024ARMOg9p4
+a b c = triangle a b c; d = on_circum d a b c, on_tline d c a b; e = on_line e a c, on_line e b d; z = on_line z a c, eqdistance z a c e; t = on_line t d b, eqdistance t d b e; x = on_line x a b, on_line x z t; y = on_line y c d, on_line y z t; o1 = circumcenter o1 e z t; e1 = mirror e1 e o1 ? cong e e1 x y
+2025XinXingSpringMOp5
+a b c = triangle a b c; o = circumcenter o a b c; h = orthocenter h a b c; e = on_pline e h a o, on_line e a c; f = on_pline f h a o, on_line f a b; o1 = circumcenter o1 a e f; g = on_circle g o a, on_circle g o1 a; j = on_line j a g, on_line j b c; h1 = orthocenter h1 a e f; k = on_circle k o1 a, on_circle k h a; l = mirror l a o1; x = on_line x a g, on_line x h h1; y = on_line y l x, on_line y j k ? cyclic y a e f
+2015IranTSTp18
+a b c = triangle a b c; h = foot h a b c; m = midpoint m b c; h1 = mirror h1 h m; o = circumcenter o a b c; x = on_tline x b o b, on_tline x c o c; y = on_line y a b, on_tline y h1 x h1; z = on_line z a c, on_tline z h1 x h1 ? eqangle z x x c y x x b
+2016G5
+a b c = triangle a b c; o = circumcenter o a b c; h = orthocenter h a b c; d = foot d a o h; s = on_bline s a d; x = on_circle x s a, on_line x a b; y = on_circle y s a, on_line y a c; p = foot p a b c; m = midpoint m b c; o1 = circumcenter o1 x s y ? cong o1 p o1 m
+ShuZhiMi2024SpFp19
+a b c = triangle a b c; o = circumcenter o a b c; i = incenter i a b c; d = foot d a b c; e = foot e b a c; f = foot f c a b; i1 = incenter i1 a e f; i2 = incenter i2 b f d; i3 = incenter i3 c d e; d2 = foot d2 i2 b c; d3 = foot d3 i3 b c; e1 = foot e1 i1 a c; e3 = foot e3 i3 a c; p2 = reflect p2 d2 i2 i3; p3 = reflect p3 d3 i2 i3; q1 = reflect q1 e1 i1 i3; q3 = reflect q3 e3 i1 i3; x = on_line x p3 p2, on_line x q1 q3 ? coll x i o
+2023KoMaLA855
+a b c = triangle a b c; m = on_line m a b, eqdistance m b c b; n = on_line n a c, eqdistance n c c b; i = incenter i a b c; o = circumcenter o a b c; d = incenter d a m n; e = circumcenter e a m n; x = on_line x i o, on_line x d e ? cyclic x a b c
+2019IOMetrop3
+a b c = triangle a b c; i = incenter i a b c; o = circumcenter o a b c; x = on_tline x i i o; b1 = reflect b1 b i x; c1 = reflect c1 c i x; k = on_line k b1 c1, on_line k a b; l = on_line l b1 c1, on_line l a c; o1 = circumcenter o1 a k l ? coll o1 i o
+2022TurkeyTSTp3
+a b c = triangle a b c; i = incenter i a b c; d = foot d i b c; e = foot e i a c; f = foot f i a b; p = free p; x = foot x a i p; y = foot y b i p; z = foot z c i p; t = on_line t d x, on_line t e y ? coll t f z
+2015BalkanMOp2
+a b c = triangle a b c; i = incenter i a b c; o = circumcenter o a b c; d = on_line d a i, on_circle d o a; e = on_line e b i, on_circle e o b; f = on_line f c i, on_circle f o c; k = on_line k e f, on_pline k i b c; l = on_line l d f, on_pline l i a c; m = on_line m d e, on_pline m i a b ? coll k l m
+2021AsiaPacificMOp3
+a b c = triangle a b c; d = on_circum d a b c; o = circumcenter o a b c; e = on_line e a c, on_line e b d; x = on_line x a b, on_line x c d; l = incenter l x b c; m = on_bline m b c, on_circle m o a; i1 = excenter i1 e b c ? coll i1 l m
+2008CTSTp19
+a b c = triangle a b c; i = incenter i a b c; e = foot e i b c; d = on_line d a e, on_circle d i e; f = on_line f a e, on_circle f c e; g = on_line g c f, on_line g b d ? cong c f f g
+2020G6
+a b c = triangle a b c; i = incenter i a b c; i1 = excenter i1 a b c; d = foot d i b c; e = on_line e a d, on_line e b i1; f = on_line f a d, on_line f c i1; o1 = circumcenter o1 a i d; o2 = circumcenter o2 i1 e f; t = on_circle t o1 a, on_circle t o2 i1 ? coll o1 o2 t
+2015CTSTp9
+a b c = triangle a b c; o = circumcenter o a b c; d d1 d2 g = centroid d d1 d2 g a b c; e = on_circle e d b, on_tline e a b c; f = on_line f e g, on_line f o d; k = on_line k b c, on_pline k f o b; l = on_line l b c, on_pline l f o c; m = on_line m a b, on_tline m k b c; n = on_line n a c, on_tline n l b c; o1 = on_bline o1 b c, on_tline o1 b o b; o2 = circumcenter o2 a m n; t = on_circle t o1 b, on_circle t o2 a ? coll o2 o1 t
+2020USATSTSTp2b
+a b c = triangle a b c; i = incenter i a b c; d = foot d i b c; e = foot e i a c; f = foot f i a b; p = foot p d e f; m = midpoint m b c; g = on_line g a p, on_circum g a b c; q = on_line q i p, on_circum q a b c ? eqangle q m m d m d m g
+2020AQGOp3
+a b c = triangle a b c; o = circumcenter o a b c; m = midpoint m a b; n = midpoint n a c; t = foot t o m n; d = foot d a b c; o1 = circumcenter o1 b o c; u = on_line u t d, on_circle u o1 b; v = on_line v t d, on_circle v o1 b; o2 = circumcenter o2 a u v; x = on_line x m n, on_circle x o2 a; y = on_line y m n, on_circle y o2 a; o3 = circumcenter o3 a m n; r = on_line r a y, on_circle r o3 a; s = on_line s a x, on_circle s o3 a; z = on_line z a o, on_line z r s ? coll z m n
+2008CTSTp7
+a b c = triangle a b c; q = free q; p = on_aline p a c b a q, on_aline p b a c b q; o1 = circumcenter o1 p b c; o2 = circumcenter o2 p c a; o3 = circumcenter o3 p a b; o4 = circumcenter o4 q b c; o5 = circumcenter o5 q c a; o6 = circumcenter o6 q a b; o = circumcenter o o1 o2 o3; u = circumcenter u o4 o5 o6 ? para o u p q
+2021GOWACAp5
+a b c = triangle a b c; d = foot d a b c; o = circumcenter o a b c; m m1 m2 g = centroid m m1 m2 g a b c; k = on_aline k a c b a g, on_aline k b a c b g; d1 = mirror d1 d m; d2 = on_line d2 b c, on_aline d2 a b c a d1; p = on_tline p k a o, on_line p a d2; x = on_line x b c, on_tline x k b o; y = on_line y b c, on_tline y k c o; i = incenter i p x y ? coll i a d
+2024AsiaPacificMOp1
+a b c = triangle a b c; d = on_line d a b; e = on_line e a c, on_pline e d b c; x = free x; p = on_line p b c, on_line p d x; q = on_line q b c, on_line q e x; y = on_circum y b q x, on_circum y c p x ? coll a x y
+2019IranTSTp15
+k b c = triangle k b c; b1 = mirror b1 b k; c1 = mirror c1 c k; a = on_line a b1 c1, angle_bisector a b k c; m = midpoint m b c; n = midpoint n c a; p = midpoint p a b; e = on_line e m n, on_line e b k; f = on_line f m p, on_line f c k; h = foot h a b c; o1 = circumcenter o1 a k h; o2 = circumcenter o2 h e f; l = on_circle l o1 a, on_circle l o2 h; x = on_line x m k, on_line x e f ? coll x h l
+ShuZhiMiGeo309
+a b c = triangle a b c; i = incenter i a b c; i1 = excenter i1 a b c; i2 = excenter i2 b c a; i3 = excenter i3 c a b; a1 = foot a1 i1 a b; a2 = foot a2 i1 a c; b1 = foot b1 i2 b c; b2 = foot b2 i2 b a; c1 = foot c1 i3 c a; c2 = foot c2 i3 c b; d = on_line d b1 b2, on_line d c1 c2; e = on_line e a1 a2, on_line e c1 c2; f = on_line f a1 a2, on_line f b1 b2; o1 = circumcenter o1 d e f; x1 = on_circle x1 o1 d, on_circle x1 i1 a1; x2 = on_circle x2 o1 d, on_circle x2 i1 a1; y1 = on_circle y1 o1 d, on_circle y1 i2 b1; y2 = on_circle y2 o1 d, on_circle y2 i2 b1; z1 = on_circle z1 o1 d, on_circle z1 i3 c1; z2 = on_circle z2 o1 d, on_circle z2 i3 c1; x = on_line x y1 y2, on_line x z1 z2; y = on_line y x1 x2, on_line y z1 z2; z = on_line z x1 x2, on_line z y1 y2; o2 = circumcenter o2 x y z ? coll i o1 o2
+2023G7
+a b c = triangle a b c; h = orthocenter h a b c; b1 = reflect b1 b c h; c1 = reflect c1 c b h; c2 = reflect c2 c a h; a2 = reflect a2 a c h; a3 = reflect a3 a b h; b3 = reflect b3 b a h; p = on_line p b1 c1, on_line p c2 a2; q = on_line q c2 a2, on_line q a3 b3; r = on_line r a3 b3, on_line r b1 c1; h1 = orthocenter h1 p q r; o1 = circumcenter o1 p q r ? coll h1 o1 h
+ShuZhiMiGeo180
+a b c = triangle a b c; i = incenter i a b c; o = circumcenter o a b c; i1 = excenter i1 a b c; d = foot d i1 b c; i2 = excenter i2 b c a; e = foot e i2 a c; i3 = excenter i3 c a b; f = foot f i3 a b; u = on_line u a c; z = mirror z u e; v = on_line v a b, eqdistance v f e u; x = mirror x v f; w = on_line w b c, eqdistance w d u e; y = mirror y w d; o1 = circumcenter o1 a u v; o2 = circumcenter o2 b v w; o3 = circumcenter o3 c w u; o4 = circumcenter o4 a z x; o5 = circumcenter o5 b x y; o6 = circumcenter o6 c y z; o7 = circumcenter o7 o1 o2 o3; o8 = circumcenter o8 o4 o5 o6; t = on_circle t o7 o1, on_circle t o8 o4 ? coll i o t
+2021CGMOp2
+a b c = triangle a b c; i = incenter i a b c; j = excenter j a b c; o = circumcenter o a b c; m1 = midpoint m1 a i; x = on_circle x o a, on_circle x m1 a; m2 = midpoint m2 a j; y = on_circle y o a, on_circle y m2 a; k = on_line k b c, on_bline k i j; m = midpoint m x y ? coll a k m
+2002CTSTp25
+a b c d = quadrangle a b c d; e = on_line e a b, on_line e c d; f = on_line f a d, on_line f b c; p = on_line p a c, on_line p b d; o = foot o p e f ? eqangle b o o c a o o d
+2009G6
+a b c d = quadrangle a b c d; p = on_line p a d, on_line p b c; o1 = circumcenter o1 a b p; h1 = orthocenter h1 a b p; o2 = circumcenter o2 c d p; h2 = orthocenter h2 c d p; e1 = midpoint e1 o1 h1; e2 = midpoint e2 o2 h2; x = on_tline x e1 c d, on_tline x e2 a b ? coll x h1 h2
+2023VietnamTSTp3
+a b c = triangle a b c; o = circumcenter o a b c; e = foot e b a c; f = foot f c a b; h = on_line h b e, on_line h c f; m = midpoint m a h; k = foot k h e f; p = on_circle p o a; q = on_circle q o a, on_pline q p b c; o1 = circumcenter o1 c q e; o2 = circumcenter o2 b p f; x = on_tline x e o1 e, on_tline x f o2 f ? coll x m k
+XinXingV28p2
+a b c = triangle a b c; o = circumcenter o a b c; i = incenter i a b c; j1 = on_line j1 a i, on_circle j1 o a; j = mirror j j1 o; k1 = on_line k1 b i, on_circle k1 o a; k = mirror k k1 o; l1 = on_line l1 c i, on_circle l1 o a; l = mirror l l1 o; d = foot d i b c; e = foot e i a c; f = foot f i a b; x = on_line x j d, on_circle x o a; y = on_line y k e, on_circle y o a; z = on_line z l f, on_circle z o a; o1 = circumcenter o1 x e f; o2 = circumcenter o2 y f d; o3 = circumcenter o3 z d e; u = on_circle u o1 f, on_circle u o2 f; v = on_circle v o1 e, on_circle v o3 e; t = on_line t u f, on_line t v e ? coll t o i
+2024KoMaLA877
+t1 t2 t3 = triangle t1 t2 t3; i = circumcenter i t1 t2 t3; t4 = on_circle t4 i t1; a = on_tline a t1 i t1, on_tline a t2 i t2; b = on_tline b t2 i t2, on_tline b t3 i t3; c = on_tline c t3 i t3, on_tline c t4 i t4; d = on_tline d t1 i t1, on_tline d t4 i t4; t5 = on_circle t5 i t1, on_tline t5 i a c; p = on_tline p t5 i t5, on_line p b d; t = reflect t t5 i p; o = circumcenter o a t c ? coll i o t
+2020CSMGOp5
+a b c = triangle a b c; i = incenter i a b c; o = circumcenter o a b c; d = on_line d b i, on_line d a c; e = on_line e c i, on_line e a b; m = on_line m a i, on_circle m o a; v = on_bline v b d, on_bline v c e; x = on_bline x o m, on_tline x o m v ? cong x a x i
+2023IranTSTp6
+a b c = triangle a b c; h = orthocenter h a b c; h1 = reflect h1 h b c; c1 = reflect c1 c h b; b1 = reflect b1 b h c; p = eqangle3 p h b c b1 h1, eqangle3 p h c b c1 h1; x = reflect x p b h; y = reflect y p c h; s = circumcenter s a x y ? eqangle b a a s p a a c
+2021IranTSTp6
+a b c = triangle a b c; o = circumcenter o a b c; h = orthocenter h a b c; d = on_line d o h; e = on_line e b d, on_line e a c; f = on_line f c d, on_line f a b; x = on_line x a d, eqangle3 x e f a b c; o1 = circumcenter o1 c x f; o2 = circumcenter o2 b x e; p = on_circle p o1 c, on_circle p o2 b; q = on_line q x p, on_line q e f ? coll q a h
+2023TurkeyTSTp5
+a b c = triangle a b c; o = circumcenter o a b c; i = incenter i a b c; h = orthocenter h a b c; o1 = on_bline o1 o i, on_tline o1 i i h; o2 = on_bline o2 h i, on_tline o2 i i o; m = on_circle m o1 o, on_circle m o2 h ? cyclic m a b c
+2022CHNSouthEastMOg11p6
+a b c = triangle a b c; o = circumcenter o a b c; p = on_bline p a o, on_pline p o b c; d = on_aline d b a b a c, on_aline d c a c a b; q = midpoint q a d; k = on_circle k p a, on_circle k q a ? cyclic k b c d
+2023PlanetCupp9
+a b c = triangle a b c; o = circumcenter o a b c; h = orthocenter h a b c; e = on_line e o h, on_line e a c; f = on_line f o h, on_line f a b; o1 = circumcenter o1 a h o; k = on_circle k o1 a, on_circle k o a; l = on_line l k h, on_circle l o a; m = midpoint m b c; p = on_line p h m, on_bline p e f; q = on_line q p l, on_line q b c ? cong q h q o
+2020CSMGOp6
+a b c = triangle a b c; i = incenter i a b c; d = foot d i b c; e = foot e i a c; f = foot f i a b; x = on_line x a d, on_circle x i d; p = on_pline p e a d, on_circle p i d; q = on_pline q f a d, on_circle q i d; o1 = circumcenter o1 x b q; o2 = circumcenter o2 x c p; k = on_circle k o1 x, on_circle k o2 x ? coll i x k
+2021CzechAPSlovakp6
+a b c = triangle a b c; a2 = on_line a2 a b; b1 = on_line b1 b a; b3 = on_line b3 c b; c2 = on_line c2 b c; c1 = on_line c1 a c; a3 = on_line a3 a c; o1 = circumcenter o1 a a2 c1; o2 = circumcenter o2 a a3 b1; a0 = on_circle a0 o1 a, on_circle a0 o2 a; o3 = circumcenter o3 b b3 a2; o4 = circumcenter o4 b b1 c2; b0 = on_circle b0 o3 b, on_circle b0 o4 b; o5 = circumcenter o5 c c1 b3; o6 = circumcenter o6 c c2 a3; c0 = on_circle c0 o5 c, on_circle c0 o6 c; x = on_line x a a0, on_line x b b0 ? cyclic x a0 b0 c0
+2021IsraelOlympicRev
+a b c = triangle a b c; p = eqangle3 p b c a c b; p1 = on_line p1 a p, on_line p1 b c; p2 = on_line p2 b p, on_line p2 a c; p3 = on_line p3 c p, on_line p3 a b; o = circumcenter o a b c; o2 = circumcenter o2 a p2 p3; x1 = on_circle x1 o a, on_circle x1 o2 a; o3 = circumcenter o3 b p3 p1; x2 = on_circle x2 o b, on_circle x2 o3 b; o4 = circumcenter o4 c p1 p2; x3 = on_circle x3 o c, on_circle x3 o4 c; b1 = on_line b1 a x1, on_line b1 c x3; c1 = on_line c1 a x1, on_line c1 b x2; k = on_line k b b1, on_line k c c1 ? cyclic k a p2 p3
+2021USEMOp3
+a1 b1 c1 = triangle a1 b1 c1; a2 = on_bline a2 b1 c1; b2 = on_circle b2 c1 a2, on_bline b2 a1 c1; c2 = on_circle c2 b1 a2, on_bline c2 a1 b1; o1 = circumcenter o1 a1 b1 c1; h1 = orthocenter h1 a1 b1 c1; o2 = circumcenter o2 a2 b2 c2; h2 = orthocenter h2 a2 b2 c2 ? para o1 o2 h1 h2
+2020KoMaLA771
+a b c = triangle a b c; i = incenter i a b c; d = foot d i b c; g = on_line g a d, on_circle g i d; e = on_line e a b, on_tline e g i g; f = on_line f a c, on_tline f g i g; o1 = circumcenter o1 d e f; m = on_circle m i d, on_circle m o1 d; o2 = circumcenter o2 b c g; n = on_circle n i d, on_circle n o2 g ? para a d m n
+2022USATSTSTp6
+a b c = triangle a b c; o = circumcenter o a b c; h = orthocenter h a b c; x1 = on_bline x1 a h, on_line x1 a b; y1 = on_bline y1 a h, on_line y1 a c; o4 = circumcenter o4 o x1 y1; o1 = circumcenter o1 b o c; k1 = on_circle k1 o4 o, on_circle k1 o1 o; x2 = on_bline x2 b h, on_line x2 b c; y2 = on_bline y2 b h, on_line y2 b a; o5 = circumcenter o5 o x2 y2; o2 = circumcenter o2 a o c; k2 = on_circle k2 o5 o, on_circle k2 o2 o; x3 = on_bline x3 c h, on_line x3 c a; y3 = on_bline y3 c h, on_line y3 c b; o6 = circumcenter o6 o x3 y3; o3 = circumcenter o3 a o b; k3 = on_circle k3 o6 o, on_circle k3 o3 o ? cyclic k1 k2 k3 o
+2023IranGOAp4
+a b c = triangle a b c; e = on_line e a c, angle_bisector e a b c; f = on_line f a b, angle_bisector f a c b; i = incenter i a b c; d = foot d i b c; m = orthocenter m a i f; n = orthocenter n a i e; p = on_line p e m, on_line p f n; x = midpoint x b c; y = on_line y a d, on_tline y x i p; m1 = midpoint m1 x y ? coll m1 a i
+2024PlanetCupp10
+a b c = triangle a b c; d = foot d a b c; e = foot e b a c; f = foot f c a b; d1 = foot d1 d e f; e1 = foot e1 e d f; f1 = foot f1 f d e; n1 = circumcenter n1 d e f; m = midpoint m b c; j = on_line j e1 f1, on_line j b c; k = on_line k d1 n1, on_line k b c; o = circumcenter o a j k; t = on_line t a m, on_circle t o a; p = on_line p a m, on_line p e f; q = on_line q t k, on_line q a j ? perp p q o m
+2021GOWACAp6
+a b c = triangle a b c; i = incenter i a b c; d = foot d i b c; e = foot e i a c; f = foot f i a b; k = on_line k d i, on_line k e f; p = on_circle p i d, on_tline p d e f; q = on_line q a p, on_circle q i d; b1 = on_line b1 b q, on_circle b1 i d; c1 = on_line c1 c q, on_circle c1 i d; x = on_line x b1 c1, on_line x b c; m1 = midpoint m1 b c; m2 = midpoint m2 e f; t = on_line t m1 m2, on_pline t i b c ? coll t k x
+2023RMMSLG3
+a b c = triangle a b c; p = free p; o = circumcenter o a b c; o1 = circumcenter o1 a p b; o2 = circumcenter o2 b p c; o3 = circumcenter o3 c p a; o4 = circumcenter o4 o1 o2 o3; x = on_circle x o a, on_circle x o4 o1; y = on_circle y o a, on_circle y o4 o1; q = reflect q p x y ? eqangle b a a p q a a c
+2024KoMaLA864
+a b c = triangle a b c; o = circumcenter o a b c; i = incenter i a b c; d = foot d i b c; e = foot e i a c; f = foot f i a b; m = midpoint m a b; n = midpoint n a c; m1 = reflect m1 m d e; n1 = reflect n1 n d f; h = on_line h c m1, on_line h d e; j = on_line j b n1, on_line j d f ? coll h j o
+2021ARMOg10p8
+a b c = triangle a b c; d = on_circum d a b c; e = on_circum e a b c; o = circumcenter o a b c; x = on_line x c d, on_line x a b; y = on_line y c d, on_line y a e; p = on_line p e x, on_line p b y; q = on_line q e x, on_circle q o a; r = on_line r b y, on_circle r o a; a1 = reflect a1 a c d; o1 = circumcenter o1 p q r; o2 = circumcenter o2 a1 x y; m = on_circle m o1 p, on_circle m o2 x; n = on_circle n o1 p, on_circle n o2 x; z = on_line z c m, on_line z d n ? cyclic z p q r
+2024ShuZhiMiMOM12p2
+a b c = triangle a b c; x = free x; o = circumcenter o a b c; x1 = on_line x1 a x, on_circle x1 o a; x2 = on_line x2 b x, on_circle x2 o a; x3 = on_line x3 c x, on_circle x3 o a; y = on_aline y x1 x2 x3 x1 x, on_aline y x2 x1 x3 x2 x; o1 = circumcenter o1 b x c; p = on_line p a x, on_circle p o1 b; q = on_line q y x, on_circle q o1 b; r = on_line r p q, on_line r b c ? cong p r a r
+2021ARMOg11p4
+a b c = triangle a b c; a1 = on_line a1 b c, angle_bisector a1 b a c; c1 = on_line c1 a b, angle_bisector c1 a c b; i = incenter i a b c; a2 = on_pline a2 b a c, on_line a2 a a1; c2 = on_pline c2 b a c, on_line c2 c c1; o4 = circumcenter o4 a c1 c2; o6 = circumcenter o6 c a1 a2 ? eqangle o4 b b o6 a i i c
+2020G7
+a b c = triangle a b c; o = circumcenter o a b c; p = on_circle p o a; m3 = midpoint m3 a b; m2 = midpoint m2 a c; m1 = midpoint m1 b c; d = reflect d p m3 m2; e = reflect e p m3 m1; f = reflect f p m2 m1; v1 = on_bline v1 a d, on_bline v1 b e; v2 = on_bline v2 b e, on_bline v2 c f; v3 = on_bline v3 c f, on_bline v3 a d; o1 = circumcenter o1 a d p; o2 = circumcenter o2 b e p; o3 = circumcenter o3 c f p; k = on_circle k o1 p, on_circle k o2 b ? cyclic k v1 v2 v3
+2020IranTSTp9
+a b c = triangle a b c; o = circumcenter o a b c; i = incenter i a b c; e = on_line e a c, angle_bisector e c b a; f = on_line f a b, angle_bisector f b c a; k = on_line k a i, on_line k e f; t = on_circle t o a, on_bline t b c; m = midpoint m b c; x = on_line x a m, on_circle x o a; o1 = circumcenter o1 a e f; s = on_circle s o1 a, on_circle s o a; s1 = reflect s1 s a i; o2 = circumcenter o2 a s1 k; j = on_line j a x, on_circle j o2 a ? cyclic t j i x
+2023USAMOp6
+a b c = triangle a b c; i = incenter i a b c; i1 = excenter i1 a b c; i2 = excenter i2 b c a; i3 = excenter i3 c a b; o = circumcenter o a b c; d = on_circle d o a; o1 = circumcenter o1 d i i1; o2 = circumcenter o2 d i2 i3; f = on_circle f o1 d, on_circle f o2 d; e = on_line e d f, on_line e b c ? eqangle b a a d e a a c
+2024TurkeyTSTp5
+a b c = triangle a b c; o = circumcenter o a b c; h = orthocenter h a b c; m1 m2 m3 g = centroid m1 m2 m3 g a b c; a2 = on_line a2 a b, on_tline a2 h o a; a3 = on_line a3 a c, on_tline a3 h o a; o1 = circumcenter o1 a a2 a3; b3 = on_line b3 b c, on_tline b3 h o b; b1 = on_line b1 b a, on_tline b1 h o b; o2 = circumcenter o2 b b3 b1; c1 = on_line c1 c a, on_tline c1 h o c; c2 = on_line c2 c b, on_tline c2 h o c; o3 = circumcenter o3 c c1 c2; n1 n2 n3 g1 = centroid n1 n2 n3 g1 o1 o2 o3 ? coll g1 h g
+2023SpFMOp5
+a b c = triangle a b c; o = circumcenter o a b c; s = on_bline s b c, on_circle s o a; n = on_bline n b c, on_circle n o a; m1 = midpoint m1 b c; d = mirror d m1 o; m3 = midpoint m3 a b; m2 = midpoint m2 a c; x = on_circle x d a, on_line x m2 m3; y = on_circle y d a, on_line y m2 m3; n1 = circumcenter n1 m1 m2 m3; i = incenter i a b c; d1 = foot d1 i b c; f1 = on_circle f1 i d1, on_circle f1 n1 m1; i1 = excenter i1 a b c; p = foot p i1 b c ? cyclic x f1 y p
+ShuZhiMiGeo409
+a b c = triangle a b c; o = circumcenter o a b c; h = orthocenter h a b c; x = on_line x o h, on_line x a b; y = on_line y o h, on_line y a c; t = midpoint t x y; e = on_pline e h o b, on_line e a c; f = on_pline f h o c, on_line f a b; d = midpoint d a h; s = on_line s e f, on_line s a t; s1 = on_tline s1 o o d, on_tline s1 h h d ? midp s d s1
+2023MOSTMockp2
+a1 a3 a5 = triangle a1 a3 a5; a4 = free a4; a6 = free a6; a2 = on_aline a2 a4 a6 a5 a1 a3, on_aline a2 a6 a4 a5 a3 a1; x1 = on_line x1 a1 a3, on_line x1 a2 a6; x2 = on_line x2 a1 a3, on_line x2 a2 a4; x3 = on_line x3 a2 a4, on_line x3 a3 a5; x4 = on_line x4 a3 a5, on_line x4 a4 a6; x5 = on_line x5 a1 a5, on_line x5 a6 a4; x6 = on_line x6 a1 a5, on_line x6 a2 a6; o1 = circumcenter o1 a1 x1 a2; o2 = circumcenter o2 a2 x2 a3; o3 = circumcenter o3 a3 x3 a4; o4 = circumcenter o4 a4 x4 a5; o5 = circumcenter o5 a5 x5 a6; o6 = circumcenter o6 a6 x6 a1; k = on_line k o1 o4, on_line k o2 o5 ? coll k o3 o6
+2007CTSTp2
+a b c = triangle a b c; i = incenter i a b c; m = midpoint m a b; n = midpoint n a c; d = on_line d a b, on_circle d b c; e = on_line e a c, on_circle e c b; p = on_tline p d i m, on_tline p e i n ? perp a p b c
+2011G3
+a b c d = quadrangle a b c d; m1 = midpoint m1 a b; m2 = midpoint m2 c d; e = on_circle e m1 a, on_circle e m2 c; f = on_circle f m1 a, on_circle f m2 c; e1 = foot e1 e a b; e2 = foot e2 e b c; e3 = foot e3 e c d; o1 = circumcenter o1 e1 e2 e3; f1 = foot f1 f c d; f2 = foot f2 f d a; f3 = foot f3 f a b; o2 = circumcenter o2 f1 f2 f3; k1 = on_circle k1 o1 e1, on_circle k1 o2 f1; k2 = on_circle k2 o1 e1, on_circle k2 o2 f1; m = midpoint m e f ? coll m k1 k2
+2021IranGOAp5a
+a b c = triangle a b c; i = incenter i a b c; d = foot d i b c; p = on_line p b c, on_aline p a b b c a; q = on_line q b c, on_aline q a c c b a; k = incenter k a b p; l = incenter l a c q; o1 = circumcenter o1 i k l; h1 = orthocenter h1 i k l ? coll a d o1
+2009G3
+a b c = triangle a b c; i = incenter i a b c; z = foot z i a b; y = foot y i a c; g = on_line g b y, on_line g c z; r = parallelogram y c b r; s = parallelogram z b c s ? cong g r g s
+2010CTSTp4
+a b c = triangle a b c; i = incenter i a b c; m = midpoint m a c; n = midpoint n a b; d = on_line d a c, on_pline d b i m; e = on_line e a b, on_pline e c i n; p = on_line p b c, on_pline p i d e; q = foot q p a i ? cyclic q a b c
+2020POGCHAMPp2
+a b c = triangle a b c; o = circumcenter o a b c; i = incenter i a b c; d = foot d i b c; m = on_bline m b c, on_circle m o a; n = midpoint n m d; p = on_circle p i d, on_circle p n m; o1 = circumcenter o1 m a p; x = on_circle x o1 a, on_circle x i d; y = on_line y b c, on_circle y o1 a; t = on_line t a x, on_line t m y ? cyclic t a b c
+2017CHNWesternMOp3
+a b c = triangle a b c; d = on_line d b c; i1 = incenter i1 a b d; i2 = incenter i2 a c d; o1 = circumcenter o1 a i1 d; o2 = circumcenter o2 a i2 d; p = on_line p i1 o2, on_line p i2 o1 ? perp p d b c
+2025KoeraFinalRoundp3
+a b c = triangle a b c; i = incenter i a b c; d = foot d i b c; e = foot e i a c; f = foot f i a b; p = on_line p a d, on_line p b e; o1 = circumcenter o1 d i p; o2 = circumcenter o2 e i p; o3 = circumcenter o3 f i p; q = on_tline q d o1 d, on_tline q e o2 e ? perp q f o3 f
+2009G8
+t1 t2 t3 = triangle t1 t2 t3; i = circumcenter i t1 t2 t3; t4 = on_circle t4 i t1; a = on_tline a t1 i t1, on_tline a t2 i t2; b = on_tline b t2 i t2, on_tline b t3 i t3; c = on_tline c t3 i t3, on_tline c t4 i t4; d = on_tline d t1 i t1, on_tline d t4 i t4; m = on_line m b c; n = on_line n a m, on_line n c d; i1 = incenter i1 a b m; i2 = incenter i2 m n c; i3 = incenter i3 n d a; h = orthocenter h i1 i2 i3 ? coll h a m
+2023CHNSouthEastMOg10p3
+a b c = triangle a b c; i = incenter i a b c; d = foot d i b c; e = foot e i a c; f = foot f i a b; j = on_line j a d, on_circle j i d; o1 = circumcenter o1 b c j; k = on_circle k o1 b, on_circle k i d; o2 = circumcenter o2 b f k; o3 = circumcenter o3 c e k; l = on_circle l o2 b, on_circle l o3 c; o = circumcenter o a b c; m = on_bline m b c, on_circle m o a ? coll m i l
+JCGV2p2(2023ShuZhiMiMOM9p2)
+a b c = triangle a b c; o = circumcenter o a b c; p = free p; x = on_circle x o a, on_line x a p; y = on_circle y o a, on_line y b p; z = on_circle z o a, on_line z c p; w = on_line w y z, on_line w a b; v = on_line v y z, on_line v a c; s = on_line s x z, on_line s b c; r = on_line r x z, on_line r b a; u = on_line u x y, on_line u c a; t = on_line t x y, on_line t c b; o1 = circumcenter o1 z r w; m = on_circle m o1 z, on_circle m o a; o2 = circumcenter o2 x s t; n = on_circle n o2 x, on_circle n o a; o3 = circumcenter o3 y u v; q = on_circle q o3 y, on_circle q o a; k = on_line k a n, on_line k b q ? coll k c m
+ShuZhiMiGeo117
+a b c = triangle a b c; o = circumcenter o a b c; i = incenter i a b c; i1 = excenter i1 a b c; e = on_line e b i, on_line e a c; f = on_line f c i, on_line f a b; k = on_aline k f e i1 f i, on_aline k e f i1 e i; x = foot x k e f; m = midpoint m k x ? coll m o i
+2017CTSTp9
+a b c d = quadrangle a b c d; p1 p2 = segment p1 p2; x = on_line x p1 p2, on_line x a b; x1 = on_line x1 p1 p2, on_line x1 c d; y = on_line y p1 p2, on_line y b c; y1 = on_line y1 p1 p2, on_line y1 d a; z = on_line z p1 p2, on_line z a c; z1 = on_line z1 p1 p2, on_line z1 b d; m1 = midpoint m1 x x1; m2 = midpoint m2 y y1; m3 = midpoint m3 z z1; t = on_circle t m1 x, on_circle t m2 y ? perp t z t z1
+2005CMOp2
+a b c = triangle a b c; o = free o; d1 = on_line d1 b c; d2 = on_line d2 b c, on_circle d2 o d1; e1 = on_line e1 a c, on_circle e1 o d1; e2 = on_line e2 a c, on_circle e2 o d1; f1 = on_line f1 a b, on_circle f1 o d1; f2 = on_line f2 a b, on_circle f2 o d1; l = on_line l d1 e1, on_line l d2 f2; m = on_line m e1 f1, on_line m e2 d2; n = on_line n f1 d1, on_line n f2 e2; p = on_line p a l, on_line p b m ? coll c n p
