@@ -9,6 +9,7 @@ from rich.table import Table
 
 from newclid.agent.vlm import VLMAgent
 from newclid.agent.internvlm import InternVLMAgent
+from newclid.agent.qwen35 import Qwen35Agent
 from newclid.api import GeometricSolverBuilder
 from newclid.generation.problem_worker import GeometryProblemWorker
 
@@ -26,8 +27,10 @@ def ray_solve_problem(args):
             agent = VLMAgent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
         elif agent_type == "internvlm":
             agent = InternVLMAgent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
+        elif agent_type == "qwen35":
+            agent = Qwen35Agent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
         else:
-            raise ValueError(f"Unknown agent type: {agent_type}. Must be 'vlm' or 'internvlm'")
+            raise ValueError(f"Unknown agent type: {agent_type}. Must be 'vlm', 'internvlm', or 'qwen35'")
         
         solver = (
             GeometricSolverBuilder()
@@ -167,8 +170,8 @@ if __name__ == "__main__":
     parser.add_argument("--beam_size", type=int, default=64)
     parser.add_argument("--search_depth", type=int, default=4)
     parser.add_argument("--timeout", type=int, default=7200, help="Timeout for each problem")
-    parser.add_argument("--agent", type=str, default="vlm", choices=["vlm", "internvlm"],
-                        help="Agent type to use: 'vlm' for VLMAgent or 'internvlm' for InternVLMAgent")
+    parser.add_argument("--agent", type=str, default="vlm", choices=["vlm", "internvlm", "qwen35"],
+                        help="Agent type to use: 'vlm' for VLMAgent, 'internvlm' for InternVLMAgent, or 'qwen35' for Qwen35Agent")
     args = parser.parse_args()
     
     problems_path = Path(args.problems_path)
