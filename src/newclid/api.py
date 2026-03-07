@@ -10,6 +10,7 @@ from newclid.agent.ddarn import DDARN
 from newclid.agent.lm import LMAgent
 from newclid.agent.vlm import VLMAgent
 from newclid.agent.internvlm import InternVLMAgent
+from newclid.agent.qwen35 import Qwen35Agent
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.load_geogebra import load_geogebra
@@ -149,7 +150,8 @@ class GeometricSolverBuilder:
 
         if isinstance(self.deductive_agent, LMAgent) or \
             isinstance(self.deductive_agent, VLMAgent) or \
-            isinstance(self.deductive_agent, InternVLMAgent):
+            isinstance(self.deductive_agent, InternVLMAgent) or \
+            isinstance(self.deductive_agent, Qwen35Agent):
             self.deductive_agent.problemJGEX = self.problemJGEX
 
         # proof_state.dep_graph.obtain_numerical_checked_eqangle_and_eqratio()
