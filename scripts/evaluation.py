@@ -126,18 +126,29 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
     
     # Create CSV filename with parameters
     csv_filename = f"eval_{problems_name}_{model_name}_d{decoding_size}_b{beam_size}_s{search_depth}.csv"
-    
-    # Ensure results directory exists
-    results_dir = Path("results")
-    results_dir.mkdir(exist_ok=True)
-    csv_filepath = results_dir / csv_filename
-    
+
+    # Determine output directory
+    if args.log_dir:
+        output_dir = Path(args.log_dir)
+    else:
+        output_dir = Path("results")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    csv_filepath = output_dir / csv_filename
+
+    # Calculate summary statistics
+    total_problems = len(all_tasks_info)
+    solved_count = sum(1 for _, status, _ in all_tasks_info if status == "Success")
+    total_time = sum(elapsed for _, _, elapsed in all_tasks_info if elapsed is not None)
+
     # Write results to CSV file
     with open(csv_filepath, 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.writer(csvfile)
-        # Write header
-        writer.writerow(['Problem Name', 'Solved', 'Time (s)'])  # Column 1: problem name, Column 2: solved status, Column 3: time taken
-        # Write data
+        # Write summary header row
+        dataset_name = Path(args.problems_path).stem
+        writer.writerow([f"Dataset: {dataset_name}, Solved: {solved_count}/{total_problems}, Total Time: {total_time:.2f}s"])
+        # Write column headers
+        writer.writerow(['Problem Name', 'Solved', 'Time (s)'])
+        # Write data rows
         for problem_name, status, elapsed_time in all_tasks_info:
             solved = "√" if status == "Success" else "x"  # Mark √ if solved, x if not
             time_str = f"{elapsed_time:.2f}" if status != "Pending" else ""  # Show time for processed problems, leave empty for pending
@@ -156,6 +167,8 @@ if __name__ == "__main__":
     parser.add_argument("--beam_size", type=int, default=64)
     parser.add_argument("--search_depth", type=int, default=4)
     parser.add_argument("--timeout", type=int, default=7200, help="Timeout for each problem")
+    parser.add_argument("--log_dir", type=str, default=None,
+                        help="Directory to save evaluation results (default: results/)")
     args = parser.parse_args()
     
     problems_path = Path(args.problems_path)
