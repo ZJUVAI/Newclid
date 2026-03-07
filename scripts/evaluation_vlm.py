@@ -69,7 +69,7 @@ def render_table(all_tasks_info, start_time, reorder: bool):
         table.add_row(problem_name, status, elapsed)
     return table
 
-def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding_size: int, beam_size: int, search_depth: int, timeout: int = 3600, agent_type: str = "vlm"):
+def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding_size: int, beam_size: int, search_depth: int, timeout: int = 3600, agent_type: str = "vlm", log_dir: str = None):
     """
     Main function, read the file and execute tasks using Ray.
     """
@@ -141,16 +141,24 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
     # Create CSV filename with parameters
     csv_filename = f"eval_{problems_name}_{model_name}_d{decoding_size}_b{beam_size}_s{search_depth}.csv"
     
-    # Ensure results directory exists
-    results_dir = Path("results")
-    results_dir.mkdir(exist_ok=True)
-    csv_filepath = results_dir / csv_filename
+    # Ensure output directory exists
+    if log_dir:
+        output_dir = Path(log_dir)
+    else:
+        output_dir = Path("results")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    csv_filepath = output_dir / csv_filename
     
     # Write results to CSV file
     with open(csv_filepath, 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.writer(csvfile)
-        # Write header
-        writer.writerow(['Problem Name', 'Solved', 'Time (s)'])  # Column 1: problem name, Column 2: solved status, Column 3: time taken
+        # Write summary header row
+        dataset_name = filepath.stem
+        solved_count = sum(1 for _, status, _ in all_tasks_info if status == "Success")
+        total_problems = len(all_tasks_info)
+        writer.writerow([f"Dataset: {dataset_name}, Solved: {solved_count}/{total_problems}, Total Time: {total_time:.2f}s"])
+        # Write column headers
+        writer.writerow(['Problem Name', 'Solved', 'Time (s)'])
         # Write data
         for problem_name, status, elapsed_time in all_tasks_info:
             solved = "√" if status == "Success" else "x"  # Mark √ if solved, x if not
@@ -172,7 +180,9 @@ if __name__ == "__main__":
     parser.add_argument("--timeout", type=int, default=7200, help="Timeout for each problem")
     parser.add_argument("--agent", type=str, default="vlm", choices=["vlm", "internvlm", "qwen35"],
                         help="Agent type to use: 'vlm' for VLMAgent, 'internvlm' for InternVLMAgent, or 'qwen35' for Qwen35Agent")
+    parser.add_argument("--log_dir", type=str, default=None,
+                        help="Directory to save evaluation results (default: results/)")
     args = parser.parse_args()
     
     problems_path = Path(args.problems_path)
-    solve_problems(problems_path, args.model_path, num_cpus=args.max_workers, decoding_size=args.decoding_size, beam_size=args.beam_size, search_depth=args.search_depth, timeout=args.timeout, agent_type=args.agent)
+    solve_problems(problems_path, args.model_path, num_cpus=args.max_workers, decoding_size=args.decoding_size, beam_size=args.beam_size, search_depth=args.search_depth, timeout=args.timeout, agent_type=args.agent, log_dir=args.log_dir)
