@@ -51,6 +51,8 @@ results/
 datasets/
 core*
 temp/
+experiments/*/data/
+experiments/*/logs/
 
 # TODO
 TODO.md
