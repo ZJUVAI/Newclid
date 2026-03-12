@@ -462,6 +462,8 @@ def main():
                         help="Whether to add auxiliary points (e.g., midpoint, orthocenter) for triangles.")
     parser.add_argument("--prune", required=False, type=str_to_bool, default=True,
                         help="Whether to prune clauses to preserve only the deepest clause chain.")
+    parser.add_argument("--max_auxiliary_points", required=False, type=int, default=2,
+                        help="Maximum number of auxiliary points to add per problem.")
     parser.add_argument("--remove_coords", required=False, type=str_to_bool, default=False,
                         help="Whether to remove coordinate information from the final clause output.")
     args = parser.parse_args()
@@ -481,6 +483,7 @@ def main():
         aux_only=args.aux_only,
         clear=args.clear,
         add_auxiliary=args.add_auxiliary,
+        max_auxiliary_points=args.max_auxiliary_points,
         prune=args.prune,
         remove_coords=args.remove_coords,
     )
