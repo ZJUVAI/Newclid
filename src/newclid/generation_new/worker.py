@@ -70,7 +70,19 @@ class ProblemWorker:
     def _process_single_problem(args: tuple) -> tuple[list, dict]:
         """Process a single geometry problem with unique seed."""
         try:
-            pid, seed, n_clauses, max_level, img, aux_only, add_auxiliary, max_auxiliary_points, prune, remove_coords = args
+            (
+                pid,
+                seed,
+                n_clauses,
+                max_level,
+                img,
+                aux_only,
+                add_auxiliary,
+                max_auxiliary_points,
+                prune,
+                remove_coords,
+                construction_config,
+            ) = args
             start_time = time.time()
 
             TIMELIMIT = 600  # 10分钟
@@ -78,7 +90,10 @@ class ProblemWorker:
 
             # geneate fl_statement
             generation_start = time.time()
-            clauses_generator = ProblemSampler(seed=seed)
+            clauses_generator = ProblemSampler(
+                seed=seed,
+                construction_config=construction_config,
+            )
             try:
                 with time_limit(10):
                     fl_statement = clauses_generator.generate(

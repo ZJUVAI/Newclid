@@ -32,7 +32,7 @@ from newclid.numerical.distances import (
 )
 
 from newclid.generation_new.point_naming import PointNaming
-from newclid.generation_new.constructions import BASIC, BASIC_FREE, INTERSECT, OTHER
+from newclid.generation_new.constructions import resolve_construction_config
 from newclid.generation_new.auxiliary import add_potential_points
 
 MAX_TRY = 10
@@ -353,16 +353,27 @@ class ProblemSampler:
     and other construction types, managing them through a DAG structure.
     """
 
-    def __init__(self, seed: int = None, defs: dict = None):
+    def __init__(
+        self,
+        seed: int = None,
+        defs: dict = None,
+        construction_config: dict | None = None,
+    ):
         """
         Initialize the problem sampler.
 
         Args:
             seed: Random seed for reproducibility.
             defs: Definition dictionary. If None, loads from default path.
+            construction_config: Optional external config defining the
+                construction sets and the three sampler steps.
         """
         self.construction_defs = defs or DefinitionJGEX.to_dict(
             DefinitionJGEX.parse_txt_file(default_defs_path())
+        )
+        resolved_profile = resolve_construction_config(
+            construction_config=construction_config,
+            available_constructions=set(self.construction_defs.keys()),
         )
         self.rng = numpy.random.default_rng(seed)
         random.seed(seed)
@@ -370,6 +381,10 @@ class ProblemSampler:
         self.symbols_graph = None
         self.dep_graph: DependencyGraph = None
         self.dag: ClauseDAG = None
+        self.construction_config = construction_config
+        self.step1_pool = resolved_profile["step1_pool"]
+        self.step2_pool = resolved_profile["step2_pool"]
+        self.step3_pool = resolved_profile["step3_pool"]
 
     def generate(
         self,
@@ -404,21 +419,21 @@ class ProblemSampler:
         for clause_set in range(length):
             if clause_set == 0:
                 new_clause_strs = self._sample_clauses(
-                    construction_type_candidates=BASIC,
+                    construction_type_candidates=self.step1_pool,
                     num_construction_types=1,
                     num_clauses=1,
                 )
             else:
                 if random.random() < 0.5:
                     new_clause_strs = self._sample_clauses(
-                        construction_type_candidates=INTERSECT,
+                        construction_type_candidates=self.step2_pool,
                         num_construction_types=2,
                         num_clauses=2,
                         num_points=1,
                     )
                 else:
                     new_clause_strs = self._sample_clauses(
-                        construction_type_candidates=OTHER + INTERSECT + BASIC_FREE,
+                        construction_type_candidates=self.step3_pool,
                         num_construction_types=1,
                         num_clauses=1,
                     )
