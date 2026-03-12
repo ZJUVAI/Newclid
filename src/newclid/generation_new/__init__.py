@@ -35,6 +35,9 @@ from newclid.generation_new.constructions import (
     BASIC_FREE,
     INTERSECT,
     OTHER,
+    CONSTRUCTION_SETS,
+    load_default_construction_config,
+    resolve_construction_config,
 )
 from newclid.generation_new.sampler import ProblemSampler
 from newclid.generation_new.filter import GoalFilter
@@ -69,6 +72,9 @@ __all__ = [
     "BASIC_FREE",
     "INTERSECT",
     "OTHER",
+    "CONSTRUCTION_SETS",
+    "load_default_construction_config",
+    "resolve_construction_config",
     # Problem sampler
     "ProblemSampler",
     # Auxiliary points

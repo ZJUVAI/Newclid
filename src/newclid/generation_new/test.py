@@ -8,8 +8,8 @@ the full newclid package dependencies.
 import sys
 import os
 
-# Add parent directory to path
-sys.path.insert(0, '/root/autodl-fs/projects/GenesisGeo/src')
+# Add project src directory to path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 
 def test_primitives():
@@ -180,6 +180,90 @@ def test_construction_types():
     print("\n✅ All construction_types tests passed!")
 
 
+def test_construction_config():
+    """Test config resolution and external config replacement behavior."""
+    print("\n" + "="*60)
+    print("Testing construction config resolution...")
+    print("="*60)
+
+    from newclid.generation_new.constructions import (
+        resolve_construction_config,
+        load_default_construction_config,
+    )
+
+    default_config = load_default_construction_config()
+    assert "construction_sets" in default_config, "Expected construction_sets in default JSON"
+    assert "step1_sets" in default_config, "Expected step1_sets in default JSON"
+    assert "step2_intersect_sets" in default_config, "Expected step2_intersect_sets in default JSON"
+    assert "step3_single_sets" in default_config, "Expected step3_single_sets in default JSON"
+    print("✓ default construction JSON load test passed")
+
+    default_resolved = resolve_construction_config()
+    assert default_resolved["step1_pool"], "Expected non-empty step1_pool"
+    assert default_resolved["step2_pool"], "Expected non-empty step2_pool"
+    assert default_resolved["step3_pool"], "Expected non-empty step3_pool"
+    print("✓ built-in default config test passed")
+
+    custom_config = {
+        "construction_sets": {
+            "BASIC_TINY": ["triangle", "rectangle"],
+            "INTERSECT_TINY": ["on_line"],
+            "SINGLE_TINY": ["midpoint", "free"],
+        },
+        "step1_sets": ["BASIC_TINY"],
+        "step2_intersect_sets": ["INTERSECT_TINY"],
+        "step3_single_sets": ["SINGLE_TINY", "INTERSECT_TINY"],
+    }
+    tiny_config = resolve_construction_config(construction_config=custom_config)
+    assert tiny_config["step1_pool"] == ["triangle", "rectangle"], tiny_config["step1_pool"]
+    assert tiny_config["step2_pool"] == ["on_line"], tiny_config["step2_pool"]
+    assert tiny_config["step3_pool"] == ["midpoint", "free", "on_line"], tiny_config["step3_pool"]
+    print("✓ external config replacement test passed")
+
+    try:
+        resolve_construction_config(
+            construction_config={
+                "construction_sets": {"ONLY": ["triangle"]},
+                "step1_sets": ["ONLY"],
+                "step2_intersect_sets": ["BASIC_FREE"],
+                "step3_single_sets": ["ONLY"],
+            }
+        )
+        assert False, "Should have raised ValueError because external config does not inherit defaults"
+    except ValueError:
+        print("✓ external config does not merge with defaults test passed")
+
+    try:
+        resolve_construction_config(
+            construction_config={
+                "construction_sets": {"ONLY": ["triangle"]},
+                "step1_sets": ["ONLY"],
+                "step2_intersect_sets": ["ONLY"],
+            }
+        )
+        assert False, "Should have raised ValueError for missing step key"
+    except ValueError:
+        print("✓ missing step key validation test passed")
+
+    try:
+        resolve_construction_config(
+            construction_config={
+                "construction_sets": {"ONLY": ["triangle"]},
+                "step1_sets": ["MISSING_SET"],
+                "step2_intersect_sets": ["ONLY"],
+                "step3_single_sets": ["ONLY"],
+            },
+        )
+        assert False, "Should have raised ValueError for unknown set"
+    except ValueError:
+        print("✓ unknown set validation test passed")
+
+    assert default_config["step1_sets"] == ["BASIC"], default_config["step1_sets"]
+    print("✓ built-in default step config test passed")
+
+    print("\n✅ All construction config tests passed!")
+
+
 def main():
     """Run all tests."""
     print("\n" + "="*60)
@@ -192,6 +276,7 @@ def main():
         test_point_naming()
         test_line_utils()
         test_construction_types()
+        test_construction_config()
 
         print("\n" + "="*60)
         print("✅ ALL TESTS PASSED!")
@@ -202,7 +287,8 @@ def main():
         print("  - point_naming: 6/6 tests passed")
         print("  - line_utils: 4/4 tests passed")
         print("  - construction_types: 1/1 test passed")
-        print("\n  Total: 18/18 tests passed ✓")
+        print("  - construction_config: 6/6 tests passed")
+        print("\n  Total: 24/24 tests passed ✓")
 
     except Exception as e:
         print(f"\n❌ Test failed with error:")

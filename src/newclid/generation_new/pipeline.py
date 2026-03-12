@@ -156,6 +156,7 @@ class ProblemPipeline:
         max_auxiliary_points=2,
         prune=True,
         remove_coords=False,
+        construction_config=None,
     ):
         self.n_clauses = n_clauses
         self.min_proof_steps = min_proof_steps
@@ -179,6 +180,7 @@ class ProblemPipeline:
         self.add_auxiliary = add_auxiliary
         self.prune = prune
         self.remove_coords = remove_coords
+        self.construction_config = construction_config
         self.data_count = 0
         self.written_count = 0  # Track actually written data count
         # Serialize defs for Ray remote tasks
@@ -190,6 +192,10 @@ class ProblemPipeline:
         # Use first 16 chars for shorter filenames while maintaining uniqueness
         self.session_id = uuid.uuid4().hex[:16]
         logging.info(f"Session ID: {self.session_id}")
+        logging.info(
+            "Construction config: %s",
+            "external" if self.construction_config is not None else "default",
+        )
 
     def problem_hash_filter(self, data: list, key: str) -> list[str]:
         """Check if the input has already been written to the output file."""
@@ -317,7 +323,19 @@ class ProblemPipeline:
             for i in range(10**9):
                 # seed = 42 + i  # 唯一种子 = 42 + 任务ID
                 seed = MACHINE_BASE_SEED + i
-                yield i, seed, self.n_clauses, self.max_level, self.img, self.aux_only, self.add_auxiliary, self.max_auxiliary_points, self.prune, self.remove_coords
+                yield (
+                    i,
+                    seed,
+                    self.n_clauses,
+                    self.max_level,
+                    self.img,
+                    self.aux_only,
+                    self.add_auxiliary,
+                    self.max_auxiliary_points,
+                    self.prune,
+                    self.remove_coords,
+                    self.construction_config,
+                )
 
         if not ray.is_initialized():
             ray.init(
@@ -430,6 +448,17 @@ def str_to_bool(value):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
+def load_construction_config(config_path: str | None) -> dict | None:
+    """Load optional construction config JSON from disk."""
+    if not config_path:
+        return None
+    with open(config_path, 'r', encoding='utf-8') as f:
+        config = json.load(f)
+    if not isinstance(config, dict):
+        raise ValueError("Construction config JSON must contain a top-level object.")
+    return config
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Create problem fl - nl dataset")
@@ -466,10 +495,17 @@ def main():
                         help="Maximum number of auxiliary points to add per problem.")
     parser.add_argument("--remove_coords", required=False, type=str_to_bool, default=False,
                         help="Whether to remove coordinate information from the final clause output.")
+    parser.add_argument(
+        "--construction_config",
+        required=False,
+        default=None,
+        help="Optional JSON file defining construction sets and the three sampler steps.",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, args.log_level.upper()), force=True)
-    logging.info('hahahahah')
+    logging.info("Starting generation pipeline.")
+    construction_config = load_construction_config(args.construction_config)
     generator = ProblemPipeline(
         n_clauses=args.n_clauses,
         n_threads=args.n_threads,
@@ -486,6 +522,7 @@ def main():
         max_auxiliary_points=args.max_auxiliary_points,
         prune=args.prune,
         remove_coords=args.remove_coords,
+        construction_config=construction_config,
     )
     generator.generate()
 
