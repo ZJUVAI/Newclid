@@ -8,6 +8,7 @@
 #include "predicate/aconst.hpp"
 #include "predicate/circumcenter.hpp"
 #include "predicate/coll.hpp"
+#include "predicate/ncoll.hpp"
 #include "predicate/cong.hpp"
 #include "predicate/congruent_triangles.hpp"
 #include "predicate/const_line.hpp"
@@ -18,10 +19,15 @@
 #include "predicate/midpoint.hpp"
 #include "predicate/orthocenter.hpp"
 #include "predicate/para.hpp"
+#include "predicate/npara.hpp"
 #include "predicate/perp.hpp"
 #include "predicate/rconst.hpp"
 #include "predicate/similar_triangles.hpp"
 #include "predicate/secant.hpp"
+#include "predicate/sameside.hpp"
+#include "predicate/nsameside.hpp"
+#include "predicate/sameclock.hpp"
+#include "predicate/pappus.hpp"
 #include "predicate/thales.hpp"
 #include "type/angle.hpp"
 #include "type/dist.hpp"
@@ -242,6 +248,17 @@ unique_ptr<Statement> Problem::create_statement(const string &type, const vector
         Point p2 = this->find_point(args[1]);
         Point p3 = this->find_point(args[2]);
         return make_unique<Coll>(p1, p2, p3);
+    }
+    else if(type == "ncoll")
+    {
+        if (args.size() != 3)
+        {
+            throw runtime_error("Invalid number of arguments for " + type);
+        }
+        Point p1 = this->find_point(args[0]);
+        Point p2 = this->find_point(args[1]);
+        Point p3 = this->find_point(args[2]);
+        return make_unique<NColl>(p1, p2, p3);
     }
     else if (type == "cong")
     {
@@ -484,6 +501,103 @@ unique_ptr<Statement> Problem::create_statement(const string &type, const vector
         Point c = this->find_point(args[2]);
         Point d = this->find_point(args[3]);
         return make_unique<Secant>(Secant(a, b, c, d));
+    }
+    else if (type == "npara")
+    {
+        if (args.size() != 4)
+        {
+            throw runtime_error("Invalid number of arguments for " + type);
+        }
+        Point a = this->find_point(args[0]);
+        Point b = this->find_point(args[1]);
+        Point c = this->find_point(args[2]);
+        Point d = this->find_point(args[3]);
+        return make_unique<NPara>(NPara(Slope(a, b), Slope(c, d)));
+    }
+    else if (type == "sameside")
+    {
+        if (args.size() != 6)
+        {
+            throw runtime_error("Invalid number of arguments for " + type);
+        }
+        Point a = this->find_point(args[0]);
+        Point b = this->find_point(args[1]);
+        Point c = this->find_point(args[2]);
+        Point d = this->find_point(args[3]);
+        Point e = this->find_point(args[4]);
+        Point f = this->find_point(args[5]);
+        return make_unique<SameSide>(SameSide(a, b, c, d, e, f));
+    }
+    else if (type == "nsameside")
+    {
+        if (args.size() != 6)
+        {
+            throw runtime_error("Invalid number of arguments for " + type);
+        }
+        Point a = this->find_point(args[0]);
+        Point b = this->find_point(args[1]);
+        Point c = this->find_point(args[2]);
+        Point d = this->find_point(args[3]);
+        Point e = this->find_point(args[4]);
+        Point f = this->find_point(args[5]);
+        return make_unique<NSameSide>(NSameSide(a, b, c, d, e, f));
+    }
+    else if (type == "sameclock")
+    {
+        if (args.size() != 6)
+        {
+            throw runtime_error("Invalid number of arguments for " + type);
+        }
+        Point a = this->find_point(args[0]);
+        Point b = this->find_point(args[1]);
+        Point c = this->find_point(args[2]);
+        Point d = this->find_point(args[3]);
+        Point e = this->find_point(args[4]);
+        Point f = this->find_point(args[5]);
+        return make_unique<SameClock>(SameClock(Triangle(a, b, c), Triangle(d, e, f)));
+    }
+    else if (type == "pappus")
+    {
+        if (args.size() != 9)
+        {
+            throw runtime_error("Invalid number of arguments for " + type);
+        }
+        Point a = this->find_point(args[0]);
+        Point b = this->find_point(args[1]);
+        Point c = this->find_point(args[2]);
+        Point d = this->find_point(args[3]);
+        Point e = this->find_point(args[4]);
+        Point f = this->find_point(args[5]);
+        Point g = this->find_point(args[6]);
+        Point h = this->find_point(args[7]);
+        Point i = this->find_point(args[8]);
+        return make_unique<Pappus>(Pappus(Coll(a, b, c), Coll(d, e, f), Coll(g, h, i)));
+    }
+    else if (type == "thales")
+    {
+        if (args.size() != 6)
+        {
+            throw runtime_error("Invalid number of arguments for " + type);
+        }
+        Point a = this->find_point(args[0]);
+        Point b = this->find_point(args[1]);
+        Point c = this->find_point(args[2]);
+        Point d = this->find_point(args[3]);
+        Point e = this->find_point(args[4]);
+        Point f = this->find_point(args[5]);
+        return make_unique<Thales>(Thales(Coll(a, b, c), Coll(d, e, f)));
+    }
+    else if (type == "orthocenter")
+    {
+        if (args.size() != 4)
+        {
+            throw runtime_error("Invalid number of arguments for " + type);
+        }
+        Point center = this->find_point(args[0]);
+        Point a = this->find_point(args[1]);
+        Point b = this->find_point(args[2]);
+        Point c = this->find_point(args[3]);
+        return make_unique<OrthoCenter>(OrthoCenter(center, Triangle(a, b, c)));
     }
     else
     {
