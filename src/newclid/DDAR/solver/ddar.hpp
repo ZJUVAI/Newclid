@@ -6,6 +6,7 @@
 #include <string>
 #include <memory>
 #include "problem.hpp"
+#include "matcher.hpp"
 #include "ar/linear_system.hpp"
 #include "ar/reduced_equation.hpp"
 #include "typedef.hpp"
@@ -23,7 +24,7 @@ private:
 
     std::vector<Application> _applications;
 
-    std::map<std::string, std::unique_ptr<Proof>> _statement_proofs;
+    std::unordered_map<std::string, std::unique_ptr<Proof>> _statement_proofs;
 
     std::vector<Proof *> _goals;
 

@@ -39,27 +39,43 @@ extern "C"
     {
         Problem problem;
         problem.load_from_data(name, points, premises, goals);
+        // auto t1 = std::chrono::steady_clock::now();
+        // std::cout << "load : "
+        //         << std::chrono::duration<double, std::milli>(t1 - t0).count()
+        //         << " ms" << endl;
 
-        // for (auto &p : problem.points())
-        // {
-        //     cout << "point " << p.name() << " " << p.x() << " " << p.y() << endl;
+        // 输出实际输入，用于 main.cpp 测试
+        // std::cout << "=== INPUT DUMP ===" << std::endl;
+        // std::cout << "name: " << name << std::endl;
+        // std::cout << "points:" << std::endl;
+        // for (const auto &p : points)
+        //     std::cout << "  " << get<0>(p) << " " << get<1>(p) << " " << get<2>(p) << std::endl;
+        // std::cout << "premises:" << std::endl;
+        // for (const auto &pr : premises) {
+        //     std::cout << "  " << pr.first;
+        //     for (const auto &a : pr.second) std::cout << " " << a;
+        //     std::cout << std::endl;
         // }
-
-        // for (auto &stmt : problem.hypotheses())
-        // {
-        //     cout << "premise " << stmt->to_string() << endl;
+        // std::cout << "goals:" << std::endl;
+        // for (const auto &g : goals) {
+        //     std::cout << "  " << g.first;
+        //     for (const auto &a : g.second) std::cout << " " << a;
+        //     std::cout << std::endl;
         // }
+        // std::cout << "=== END INPUT DUMP ===" << std::endl;
 
-        // for (auto &stmt : problem.goals())
-        // {
-        //     cout << "goal " << stmt->to_string() << endl;
-        // }
 
-        // cout << "------------------------------------------------------------" << endl;
-        // cout << "Problem: " << name << endl;
-
+        // t0 = std::chrono::steady_clock::now();
         DDARSolver solver(&problem, log_enabled, exp_enabled);
+        // t1 = std::chrono::steady_clock::now();
+        // std::cout << "build : "
+        //         << std::chrono::duration<double, std::milli>(t1 - t0).count()
+        //         << " ms" << endl;
         solver.run(max_level);
+        // auto t2 = std::chrono::steady_clock::now();
+        // std::cout << "run : "
+        //         << std::chrono::duration<double, std::milli>(t2 - t1).count()
+        //         << " ms" << endl;
 
         // if (solver.is_solved())
         // {

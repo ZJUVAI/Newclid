@@ -7,58 +7,26 @@
 #include "predicate/congruent_triangles.hpp"
 #include "predicate/secant.hpp"
 #include "predicate/eqpoint.hpp"
+#include "predicate/para.hpp"
+#include "predicate/perp.hpp"
 #include <algorithm>
 #include <tuple>
 #include <vector>
 #include <set>
-#include <chrono>
+#include <map>
+#include <unordered_map>
+#include <functional>
 
 using namespace std;
 
 Matcher::Matcher(Problem *prob) : _problem(prob)
 {
-    // auto t0 = std::chrono::steady_clock::now();
-
     match_similar_triangles();
-    // auto t1 = std::chrono::steady_clock::now();
-    // std::cout << "match_similar_triangles : "
-    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
-    //           << " ms" << endl;
-
-    // t0 = t1;  // 重置起点
     match_between();
-    // t1 = std::chrono::steady_clock::now();
-    // std::cout << "match_between           : "
-    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
-    //           << " ms" << endl;
-
-    // t0 = t1;
     match_equal_angles();
-    // t1 = std::chrono::steady_clock::now();
-    // std::cout << "match_equal_angles      : "
-    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
-    //           << " ms" << endl;
-
-    // t0 = t1;
     match_circles();
-    // t1 = std::chrono::steady_clock::now();
-    // std::cout << "match_circles           : "
-    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
-    //           << " ms" << endl;
-
-    // t0 = t1;
     match_orthocenters();
-    // t1 = std::chrono::steady_clock::now();
-    // std::cout << "match_orthocenters      : "
-    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
-    //           << " ms" << endl;
-
-    // t0 = t1;
-    match_perps_paras();
-    // t1 = std::chrono::steady_clock::now();
-    // std::cout << "match_perps_paras       : "
-    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
-    //           << " ms" << endl;
+    // match_perps_paras();
 }
 
 vector<tuple<double, double, Triangle>> Matcher::all_triangles()
@@ -110,11 +78,8 @@ void Matcher::on_similar_triangles(const SimilarTriangles &simtri)
     CongruentTriangles const congtri(simtri.left(), simtri.right(), simtri.sameclock());
     if (congtri.check_numerically())
     {
-        for (const auto &rotated : congtri.cyclic_rotations())
-        {
-            insert_theorem(Theorem::congruent_triangles_of_cong(rotated));
-            insert_theorem(Theorem::congruent_triangles_properties(rotated));
-        }
+        insert_theorem(Theorem::congruent_triangles_of_cong(congtri));
+        insert_theorem(Theorem::congruent_triangles_properties(congtri));
     }
 }
 
@@ -373,61 +338,61 @@ void Matcher::match_between()
         return;
     }
 
-    for (size_t i = 0; i < betweens.size(); i++)
-    {
-        for (size_t j = i + 1; j < betweens.size(); j++)
-        {
-            for (size_t k = j + 1; k < betweens.size(); k++)
-            {
-                Coll left1 = get<1>(betweens[i]);
-                Coll middle1 = get<1>(betweens[j]);
-                Coll right1 = get<1>(betweens[k]);
-                Coll left2 = left1.reverse();
-                Coll middle2 = middle1.reverse();
-                Coll right2 = right1.reverse();
-                Pappus p1(left1, middle1, right1);
-                Pappus p2(left1, middle1, right2);
-                Pappus p3(left1, middle2, right1);
-                Pappus p4(left1, middle2, right2);
-                Pappus p5(left2, middle1, right1);
-                Pappus p6(left2, middle1, right2);
-                Pappus p7(left2, middle2, right1);
-                Pappus p8(left2, middle2, right2);
-                if (p1.check_numerically())
-                {
-                    on_pappus(p1);
-                }
-                if (p2.check_numerically())
-                {
-                    on_pappus(p2);
-                }
-                if (p3.check_numerically())
-                {
-                    on_pappus(p3);
-                }
-                if (p4.check_numerically())
-                {
-                    on_pappus(p4);
-                }
-                if (p5.check_numerically())
-                {
-                    on_pappus(p5);
-                }
-                if (p6.check_numerically())
-                {
-                    on_pappus(p6);
-                }
-                if (p7.check_numerically())
-                {
-                    on_pappus(p7);
-                }
-                if (p8.check_numerically())
-                {
-                    on_pappus(p8);
-                }
-            }
-        }
-    }
+    // for (size_t i = 0; i < betweens.size(); i++)
+    // {
+    //     for (size_t j = i + 1; j < betweens.size(); j++)
+    //     {
+    //         for (size_t k = j + 1; k < betweens.size(); k++)
+    //         {
+    //             Coll left1 = get<1>(betweens[i]);
+    //             Coll middle1 = get<1>(betweens[j]);
+    //             Coll right1 = get<1>(betweens[k]);
+    //             Coll left2 = left1.reverse();
+    //             Coll middle2 = middle1.reverse();
+    //             Coll right2 = right1.reverse();
+    //             Pappus p1(left1, middle1, right1);
+    //             Pappus p2(left1, middle1, right2);
+    //             Pappus p3(left1, middle2, right1);
+    //             Pappus p4(left1, middle2, right2);
+    //             Pappus p5(left2, middle1, right1);
+    //             Pappus p6(left2, middle1, right2);
+    //             Pappus p7(left2, middle2, right1);
+    //             Pappus p8(left2, middle2, right2);
+    //             if (p1.check_numerically())
+    //             {
+    //                 on_pappus(p1);
+    //             }
+    //             if (p2.check_numerically())
+    //             {
+    //                 on_pappus(p2);
+    //             }
+    //             if (p3.check_numerically())
+    //             {
+    //                 on_pappus(p3);
+    //             }
+    //             if (p4.check_numerically())
+    //             {
+    //                 on_pappus(p4);
+    //             }
+    //             if (p5.check_numerically())
+    //             {
+    //                 on_pappus(p5);
+    //             }
+    //             if (p6.check_numerically())
+    //             {
+    //                 on_pappus(p6);
+    //             }
+    //             if (p7.check_numerically())
+    //             {
+    //                 on_pappus(p7);
+    //             }
+    //             if (p8.check_numerically())
+    //             {
+    //                 on_pappus(p8);
+    //             }
+    //         }
+    //     }
+    // }
 
     sort(betweens.begin(), betweens.end(),
          [](const item_type &a, const item_type &b)
@@ -490,7 +455,7 @@ vector<tuple<double, Angle>> Matcher::all_angles()
 {
     vector<tuple<double, Angle>> res;
     const size_t num_pts = _problem->num_points();
-    res.reserve(num_pts * (num_pts - 1) / 2);
+    res.reserve(num_pts * (num_pts - 1) * (num_pts - 2));
     for (const auto &left : _problem->points())
     {
         for (const auto &vertex : _problem->points())
@@ -709,14 +674,23 @@ void Matcher::match_circles()
 
 void Matcher::match_orthocenters()
 {
-    for (const auto &pt_d : _problem->points())
+    const auto &all_pts = _problem->points();
+    const size_t n = all_pts.size();
+
+    // 使用索引遍历，避免重复组合：只考虑 a < b < c < d
+    for (size_t idx_d = 0; idx_d < n; idx_d++)
     {
-        for (const auto &pt_c : _problem->points())
+        for (size_t idx_c = 0; idx_c < idx_d; idx_c++)
         {
-            for (const auto &pt_b : _problem->points())
-            {
-                for (const auto &pt_a : _problem->points())
+            for (size_t idx_b = 0; idx_b < idx_c; idx_b++)
+        {
+                for (size_t idx_a = 0; idx_a < idx_b; idx_a++)
                 {
+                    const auto &pt_a = all_pts[idx_a];
+                    const auto &pt_b = all_pts[idx_b];
+                    const auto &pt_c = all_pts[idx_c];
+                    const auto &pt_d = all_pts[idx_d];
+
                     OrthoCenter const ortho(pt_d, Triangle(pt_a, pt_b, pt_c));
                     if (ortho.check_numerically())
                     {
