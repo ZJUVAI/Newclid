@@ -4,6 +4,7 @@ import time
 import argparse
 import ray
 import csv
+import logging
 from rich.live import Live
 from rich.table import Table
 
@@ -12,6 +13,13 @@ from newclid.agent.internvlm import InternVLMAgent
 from newclid.agent.qwen35 import Qwen35Agent
 from newclid.api import GeometricSolverBuilder
 from newclid.generation.problem_worker import GeometryProblemWorker
+
+
+LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
+logging.basicConfig(
+    level=getattr(logging, LOGLEVEL, logging.INFO),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
 
 @ray.remote(num_cpus=0, num_gpus=1)
 def ray_solve_problem(args):
