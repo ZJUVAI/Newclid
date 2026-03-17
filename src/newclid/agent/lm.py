@@ -54,6 +54,7 @@ AUX_PREDICATES = [
 class LMAgent(DeductiveAgent):
     def __init__(self, model_path: list[str], decoding_size: int, beam_size: int, search_depth: int):
         self.any_new_statement_has_been_added = True
+        self.problemJGEX = None
         self.decoding_size = decoding_size
         self.beam_size = beam_size
         self.search_depth = search_depth
