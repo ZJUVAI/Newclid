@@ -13,7 +13,8 @@ import string
 import ray
 import numpy as np
 import torch
-from transformers import AutoModelForCausalLM, AutoProcessor
+from transformers import AutoProcessor, Qwen3_5ForConditionalGeneration
+from transformers.utils import logging as hf_logging
 from qwen_vl_utils import process_vision_info
 import cairosvg
 from PIL import Image, ImageOps
@@ -45,6 +46,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Suppress per-worker Transformers weight-loading progress bars during Ray eval.
+hf_logging.disable_progress_bar()
+hf_logging.set_verbosity_error()
+
+DEBUG_QWEN35_INPUT = os.environ.get("NEWCLID_DEBUG_QWEN35_INPUT", "").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
 AUX_PREDICATES = [
     # "coll",
     # "cong",
@@ -59,6 +71,7 @@ AUX_PREDICATES = [
 class Qwen35Agent(DeductiveAgent):
     def __init__(self, model_path: list[str], decoding_size: int, beam_size: int, search_depth: int):
         self.any_new_statement_has_been_added = True
+        self.problemJGEX = None
         self.decoding_size = decoding_size
         self.beam_size = beam_size
         self.search_depth = search_depth
@@ -68,7 +81,7 @@ class Qwen35Agent(DeductiveAgent):
         self.processors = []
         # Load all models and processors
         for path in self.model_path:
-            model = AutoModelForCausalLM.from_pretrained(
+            model = Qwen3_5ForConditionalGeneration.from_pretrained(
                 path,
                 torch_dtype="auto",
                 device_map="auto",
@@ -81,6 +94,63 @@ class Qwen35Agent(DeductiveAgent):
             )
             self.models.append(model)
             self.processors.append(processor)
+
+    def _log_input_snapshot(
+        self,
+        *,
+        query: str,
+        img_path: str,
+        messages: list[dict[str, Any]],
+        text_prompt: str,
+        final_text: str,
+        model_inputs,
+        prompt_len: int,
+    ) -> None:
+        print(f"entering logging fuction")
+
+        if not DEBUG_QWEN35_INPUT:
+            return
+        
+        print(f"start logging input snapshot")
+
+        logger.info("Qwen35 input snapshot: query=%s", query)
+        logger.info("Qwen35 input snapshot: img_path=%s", img_path)
+        logger.info("Qwen35 input snapshot: messages=%s", messages)
+        logger.info("Qwen35 input snapshot: text_prompt=%s", text_prompt)
+        logger.info("Qwen35 input snapshot: final_text=%s", final_text)
+        logger.info("Qwen35 input snapshot: model_input_keys=%s", list(model_inputs.keys()))
+        if "input_ids" in model_inputs:
+            logger.info("Qwen35 input snapshot: input_ids.shape=%s", tuple(model_inputs["input_ids"].shape))
+        if "pixel_values" in model_inputs:
+            logger.info("Qwen35 input snapshot: pixel_values.shape=%s", tuple(model_inputs["pixel_values"].shape))
+        if "image_grid_thw" in model_inputs:
+            logger.info("Qwen35 input snapshot: image_grid_thw=%s", model_inputs["image_grid_thw"].tolist())
+        logger.info("Qwen35 input snapshot: prompt_len=%s", prompt_len)
+
+    def _build_model_inputs(self, processor, text: str, image_inputs, video_inputs):
+        return processor(
+            text=[text],
+            images=image_inputs,
+            videos=video_inputs,
+            padding=True,
+            return_tensors="pt",
+            do_resize=False,
+        )
+
+    def _log_model_output(
+        self,
+        *,
+        queue_type: str,
+        aux_dsl: str,
+        aux_content: str | None = None,
+        aux: str | None = None,
+        score: float | None = None,
+    ) -> None:
+        if score is not None:
+            logger.info("Qwen35 output [%s]: score=%s", queue_type, score)
+        logger.info("Qwen35 output [%s]: aux_dsl=%s", queue_type, aux_dsl)
+        logger.info("Qwen35 output [%s]: aux_content=%s", queue_type, aux_content)
+        logger.info("Qwen35 output [%s]: aux=%s", queue_type, aux)
         
     @torch.no_grad()
     def inference(self, model, processor, query: str, img_path: str, new_point_name: str, response_prefix: str = '<aux>', with_predicate: bool = True):
@@ -144,17 +214,22 @@ class Qwen35Agent(DeductiveAgent):
             beams_per_predicate = self.decoding_size // len(AUX_PREDICATES)
             if beams_per_predicate:
                 for aux_predicate_str in AUX_PREDICATES:
-                    # Build prompt with predicate prefix (add <think> tags to match training format)
-                    text_with_predicate = text_prompt + '<think>\n\n</think>\n\n' + response_prefix + ' ' + new_point_name + ' : ' + aux_predicate_str
+                    # Qwen3.5 chat template already inserts the assistant thinking scaffold.
+                    text_with_predicate = text_prompt + response_prefix + ' ' + new_point_name + ' : ' + aux_predicate_str
                     
-                    model_inputs = processor(
-                        text=[text_with_predicate],
-                        images=image_inputs,
-                        videos=video_inputs,
-                        padding=True,
-                        return_tensors="pt",
-                        do_resize=False,
-                    ).to(model.device)
+                    model_inputs = self._build_model_inputs(
+                        processor, text_with_predicate, image_inputs, video_inputs
+                    )
+                    self._log_input_snapshot(
+                        query=query,
+                        img_path=img_path,
+                        messages=messages,
+                        text_prompt=text_prompt,
+                        final_text=text_with_predicate,
+                        model_inputs=model_inputs,
+                        prompt_len=prompt_len,
+                    )
+                    model_inputs = model_inputs.to(model.device)
 
                     generated_output = model.generate(
                         **model_inputs,
@@ -174,20 +249,28 @@ class Qwen35Agent(DeductiveAgent):
                     for aux_dsl, score in zip(aux_dsls, scores):
                         score = score.item()
                         aux_dsl_dict[aux_dsl] = score
-                        logger.info(f"aux_dsl (with_predicate): {aux_dsl}")
+                        self._log_model_output(
+                            queue_type="with_pred",
+                            aux_dsl=aux_dsl,
+                            score=score,
+                        )
         
         if not with_predicate:
-            # Inference without predicate prefix (add <think> tags to match training format)
-            text_with_prefix = text_prompt + '<think>\n\n</think>\n\n' + response_prefix + ' ' + new_point_name
+            text_with_prefix = text_prompt + response_prefix + ' ' + new_point_name
             
-            model_inputs = processor(
-                text=[text_with_prefix],
-                images=image_inputs,
-                videos=video_inputs,
-                padding=True,
-                return_tensors="pt",
-                do_resize=False,
-            ).to(model.device)
+            model_inputs = self._build_model_inputs(
+                processor, text_with_prefix, image_inputs, video_inputs
+            )
+            self._log_input_snapshot(
+                query=query,
+                img_path=img_path,
+                messages=messages,
+                text_prompt=text_prompt,
+                final_text=text_with_prefix,
+                model_inputs=model_inputs,
+                prompt_len=prompt_len,
+            )
+            model_inputs = model_inputs.to(model.device)
 
             generated_output = model.generate(
                 **model_inputs,
@@ -207,7 +290,11 @@ class Qwen35Agent(DeductiveAgent):
             for aux_dsl, score in zip(aux_dsls, scores):
                 score = score.item()
                 aux_dsl_dict[aux_dsl] = score
-                logger.info(f"aux_dsl (no_predicate): {aux_dsl}")
+                self._log_model_output(
+                    queue_type="no_pred",
+                    aux_dsl=aux_dsl,
+                    score=score,
+                )
             
         return aux_dsl_dict
 
@@ -313,7 +400,23 @@ class Qwen35Agent(DeductiveAgent):
                             
                             for aux_dsl, score in aux_dsl_dict.items():
                                 try:
-                                    aux = self.try_dsl_to_constructions(aux_dsl[len('<aux> x00'):])
+                                    aux_content = self.extract_aux_content(aux_dsl, '<aux> x00')
+                                    self._log_model_output(
+                                        queue_type=queue_type,
+                                        aux_dsl=aux_dsl,
+                                        aux_content=aux_content,
+                                        score=score,
+                                    )
+                                    if not aux_content:
+                                        continue
+                                    aux = self.try_dsl_to_constructions(aux_content)
+                                    self._log_model_output(
+                                        queue_type=queue_type,
+                                        aux_dsl=aux_dsl,
+                                        aux_content=aux_content,
+                                        aux=aux,
+                                        score=score,
+                                    )
                                     if aux:
                                         new_problem = problem.with_more_construction(aux)
                                         future = run_ddar_remote_qwen35.remote(new_problem, proof.defs, aux, rules_ref, t0, timeout)
@@ -376,6 +479,17 @@ class Qwen35Agent(DeductiveAgent):
 
     def step(self, proof: ProofState, rules: list[Rule]) -> bool:
         return
+
+    @staticmethod
+    def extract_aux_content(text: str, response_prefix: str = '<aux> x00') -> str | None:
+        start = text.find(response_prefix)
+        if start == -1:
+            return None
+        content = text[start + len(response_prefix):]
+        end_tag = content.find("</aux>")
+        if end_tag != -1:
+            content = content[:end_tag]
+        return content.strip()
     
     def try_dsl_to_constructions(self, content):
         points, premises = content.split(';')[0].split(' : ')
