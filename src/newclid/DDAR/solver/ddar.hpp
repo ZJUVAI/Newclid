@@ -70,6 +70,8 @@ public:
 
     void insert_application(Theorem thm);
 
+    void add_custom_theorems(const std::vector<CustomRule> &rules);
+
     bool establish_statement(Proof *pf, size_t thm_id);
 
     void add_established_equations(Proof *pf);

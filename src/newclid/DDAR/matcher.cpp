@@ -521,7 +521,7 @@ void Matcher::match_equal_angles()
     {
         return;
     }
-
+    
     sort(angles.begin(), angles.end(),
          [](const item_type &a, const item_type &b)
          {
@@ -683,7 +683,7 @@ void Matcher::match_orthocenters()
         for (size_t idx_c = 0; idx_c < idx_d; idx_c++)
         {
             for (size_t idx_b = 0; idx_b < idx_c; idx_b++)
-        {
+            {
                 for (size_t idx_a = 0; idx_a < idx_b; idx_a++)
                 {
                     const auto &pt_a = all_pts[idx_a];
@@ -766,4 +766,187 @@ void Matcher::insert_theorem(const Theorem &thm)
         return;
     }
     _theorems.push_back(thm.normalize());
+}
+
+// ============================================================================
+// CustomTheoremMatcher 实现 - 独立的自定义定理匹配功能
+// ============================================================================
+
+// 收集 stmt 参数中尚未在 mapping 中出现的新点代号（去重，保序）
+static vector<string> new_vars(const Stmt &stmt, const Mapping &mapping)
+{
+    vector<string> vars;
+    for (const auto &arg : stmt.second)
+    {
+        bool known = false;
+        for (const auto &kv : mapping)
+            if (kv.first == arg) { known = true; break; }
+        if (!known)
+        {
+            bool dup = false;
+            for (const auto &v : vars)
+                if (v == arg) { dup = true; break; }
+            if (!dup)
+                vars.push_back(arg);
+        }
+    }
+    return vars;
+}
+
+// 将 mapping 中的代号替换为实际点名，构造 Statement 并做数值检测
+static bool check_stmt_numerically(const Stmt &stmt, const Mapping &mapping, Problem *problem)
+{
+    vector<string> real_args;
+    for (const auto &arg : stmt.second)
+    {
+        bool found = false;
+        for (const auto &kv : mapping)
+        {
+            if (kv.first == arg)
+            {
+                real_args.push_back(problem->point(kv.second).name());
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+            return false;
+    }
+    try
+    {
+        auto s = problem->create_statement(stmt.first, real_args);
+        if (!s) return false;
+        return s->check_numerically();
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
+
+void CustomTheoremMatcher::backtrack(
+    const vector<Stmt> &stmts,
+    size_t idx,
+    Mapping &current,
+    vector<Mapping> &out) const
+{
+    if (idx == stmts.size())
+    {
+        out.push_back(current);
+        return;
+    }
+
+    const Stmt &stmt = stmts[idx];
+    vector<string> vars = new_vars(stmt, current);
+
+    if (vars.empty())
+    {
+        if (check_stmt_numerically(stmt, current, _problem))
+            backtrack(stmts, idx + 1, current, out);
+        return;
+    }
+
+    size_t n_pts = _problem->num_points();
+    size_t n_vars = vars.size();
+    vector<size_t> indices(n_vars, 0);
+
+    while (true)
+    {
+        for (size_t i = 0; i < n_vars; i++)
+            current.push_back({vars[i], (int)indices[i]});
+
+        if (check_stmt_numerically(stmt, current, _problem))
+            backtrack(stmts, idx + 1, current, out);
+
+        for (size_t i = 0; i < n_vars; i++)
+            current.pop_back();
+
+        // 进位
+        size_t carry = n_vars;
+        while (carry > 0)
+        {
+            carry--;
+            indices[carry]++;
+            if (indices[carry] < n_pts)
+                break;
+            indices[carry] = 0;
+            if (carry == 0)
+                goto done;
+        }
+    }
+done:;
+}
+
+void CustomTheoremMatcher::match_rule(const CustomRule &rule)
+{
+    // 按新变量数量升序排列前提，优先匹配约束强的
+    vector<Stmt> sorted_premises = rule.premises;
+    sort(sorted_premises.begin(), sorted_premises.end(), [](const Stmt &a, const Stmt &b) {
+        set<string> sa(a.second.begin(), a.second.end());
+        set<string> sb(b.second.begin(), b.second.end());
+        return sa.size() < sb.size();
+    });
+
+    Mapping current;
+    vector<Mapping> mappings;
+    backtrack(sorted_premises, 0, current, mappings);
+
+    // 去重
+    set<map<string, int>> seen;
+    for (auto &mapping : mappings)
+    {
+        map<string, int> mm(mapping.begin(), mapping.end());
+        if (!seen.insert(mm).second)
+            continue;
+
+        Theorem thm(rule.name, rule.rule);
+
+        // 添加前提
+        for (const auto &stmt : rule.premises)
+        {
+            vector<string> real_args;
+            for (const auto &arg : stmt.second)
+            {
+                auto it = mm.find(arg);
+                if (it != mm.end())
+                    real_args.push_back(_problem->point(it->second).name());
+                else
+                    real_args.push_back(arg);
+            }
+            try {
+                auto s = _problem->create_statement(stmt.first, real_args);
+                if (s) thm.add_hypothesis(move(s));
+            } catch (...) {}
+        }
+
+        // 添加结论
+        for (const auto &stmt : rule.conclusions)
+        {
+            vector<string> real_args;
+            for (const auto &arg : stmt.second)
+            {
+                auto it = mm.find(arg);
+                if (it != mm.end())
+                    real_args.push_back(_problem->point(it->second).name());
+                else
+                    real_args.push_back(arg);
+            }
+            try {
+                auto s = _problem->create_statement(stmt.first, real_args);
+                if (s) thm.add_conclusion(move(s));
+            } catch (...) {}
+        }
+
+        if (thm.check_numerically())
+            _theorems.push_back(thm.normalize());
+    }
+}
+
+CustomTheoremMatcher::CustomTheoremMatcher(Problem *prob, const vector<CustomRule> &rules)
+    : _problem(prob)
+{
+    for (const auto &rule : rules)
+    {
+        match_rule(rule);
+    }
 }

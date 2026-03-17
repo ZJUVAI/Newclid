@@ -73,4 +73,44 @@ public:
     const std::vector<std::unique_ptr<Statement>> &stmts() const { return _stmts; }
 };
 
+// 自定义定理匹配器 - 独立功能，不影响原有Matcher
+
+// Stmt: (谓词类型, [点代号列表])，例如 ("coll", ["A","B","C"])
+using Stmt = std::pair<std::string, std::vector<std::string>>;
+
+// Mapping: 定理点代号 -> Problem中点的索引
+using Mapping = std::vector<std::pair<std::string, int>>;
+
+// Rule: (前提列表, 结论列表, 定理名, 规则名)
+struct CustomRule
+{
+    std::vector<Stmt> premises;
+    std::vector<Stmt> conclusions;
+    std::string name;
+    std::string rule;
+};
+
+class CustomTheoremMatcher
+{
+private:
+    Problem *_problem;
+    std::vector<Theorem> _theorems;
+
+    // 递归匹配 stmts[idx..] 在当前 mapping 下的所有合法扩展
+    void backtrack(
+        const std::vector<Stmt> &stmts,
+        size_t idx,
+        Mapping &current,
+        std::vector<Mapping> &out) const;
+
+    // 对一条 rule 的所有前提匹配，生成 Theorem 并插入 _theorems
+    void match_rule(const CustomRule &rule);
+
+public:
+    // rules: 每条规则包含前提、结论、名称、规则id
+    CustomTheoremMatcher(Problem *prob, const std::vector<CustomRule> &rules);
+
+    const std::vector<Theorem> &theorems() const { return _theorems; }
+};
+
 #endif // MATCHER_HPP
