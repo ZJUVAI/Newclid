@@ -2,6 +2,8 @@
 #define MATCHER_HPP
 
 #include <vector>
+#include <unordered_map>
+#include <string>
 #include "type/triangle.hpp"
 #include "theorem.hpp"
 #include "problem.hpp"

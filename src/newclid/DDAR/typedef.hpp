@@ -84,6 +84,54 @@ struct statement_arg
         else if (type == Type::SlopeType)
             slope.~Slope();
     }
+
+    bool operator==(const statement_arg &other) const
+    {
+        if (type != other.type)
+            return false;
+        switch (type)
+        {
+        case Type::PointType:
+            return point == other.point;
+        case Type::BoolType:
+            return b == other.b;
+        case Type::TriangleType:
+            return tri == other.tri;
+        case Type::RationalType:
+            return rat == other.rat;
+        case Type::DistType:
+            return dist == other.dist;
+        case Type::SlopeType:
+            return slope == other.slope;
+        case Type::AngleType:
+            return angle == other.angle;
+        }
+        return false;
+    }
+
+    bool operator<(const statement_arg &other) const
+    {
+        if (type != other.type)
+            return type < other.type;
+        switch (type)
+        {
+        case Type::PointType:
+            return point < other.point;
+        case Type::BoolType:
+            return b < other.b;
+        case Type::TriangleType:
+            return tri < other.tri;
+        case Type::RationalType:
+            return rat < other.rat;
+        case Type::DistType:
+            return dist < other.dist;
+        case Type::SlopeType:
+            return slope < other.slope;
+        case Type::AngleType:
+            return angle < other.angle;
+        }
+        return false;
+    }
 };
 
 #endif // TYPEDEF_HPP

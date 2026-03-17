@@ -17,37 +17,69 @@ using namespace std;
 
 DDARSolver::DDARSolver(Problem *problem, bool log_enabled, bool exp_enabled) : _problem(problem), _log_enabled(log_enabled), _exp_enabled(exp_enabled)
 {
-    // cout << "匹配定理" << endl;
+    // std::cout << "\n=== DDARSolver Constructor Timing ===" << std::endl;
+    // auto t_total = std::chrono::steady_clock::now();
+
+    // auto t0 = std::chrono::steady_clock::now();
     Matcher matcher(problem);
+    // auto t1 = std::chrono::steady_clock::now();
+    // std::cout << "Matcher construction    : "
+    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
+    //           << " ms" << std::endl;
+
+    // t0 = t1;
     for (const auto &thm : matcher.theorems())
     {
         insert_application(thm.clone());
     }
+    // auto t2 = std::chrono::steady_clock::now();
+    // std::cout << "insert_application      : "
+            //   << std::chrono::duration<double, std::milli>(t2 - t0).count()
+            //   << " ms (theorems: " << matcher.theorems().size() << ")" << std::endl;
 
-    // cout << "添加前提条件" << endl;
+    // t0 = t2;
     for (const auto &hyp : problem->hypotheses())
     {
         this->insert_statement(hyp->normalize())->prove_by_assumption();
-        // cout << hyp->to_string() << "已添加" << endl;
     }
+    // auto t3 = std::chrono::steady_clock::now();
+    // std::cout << "insert hypotheses       : "
+    //           << std::chrono::duration<double, std::milli>(t3 - t0).count()
+    //           << " ms (count: " << problem->hypotheses().size() << ")" << std::endl;
 
+    // t0 = t3;
     if (!problem->goals().empty())
     {
-        // cout << "添加目标" << endl;
         for (const auto &goal : problem->goals())
         {
-            _goals.push_back(this->insert_statement(goal));
-            // cout << goal->to_string() << "已添加" << endl;
+            _goals.push_back(this->insert_statement(goal->normalize()));
         }
     }
+    // auto t4 = std::chrono::steady_clock::now();
+    // std::cout << "insert goals            : "
+    //           << std::chrono::duration<double, std::milli>(t4 - t0).count()
+    //           << " ms (count: " << problem->goals().size() << ")" << std::endl;
 
+    // t0 = t4;
+    // int ar_count = 0;
     for (const auto &stmt : matcher.stmts())
     {
         if (stmt->check_numerically())
         {
             _ars.push_back(this->insert_statement(stmt));
+            // ar_count++;
         }
     }
+    // auto t5 = std::chrono::steady_clock::now();
+    // std::cout << "insert AR statements    : "
+    //           << std::chrono::duration<double, std::milli>(t5 - t0).count()
+    //           << " ms (count: " << ar_count << "/" << matcher.stmts().size() << ")" << std::endl;
+
+    // auto t_end = std::chrono::steady_clock::now();
+    // std::cout << "TOTAL DDARSolver init   : "
+    //           << std::chrono::duration<double, std::milli>(t_end - t_total).count()
+    //           << " ms" << std::endl;
+    // std::cout << "======================================\n" << std::endl;
 }
 
 bool DDARSolver::run_level(const Point &max_pt)
@@ -172,19 +204,13 @@ void DDARSolver::advance_theorem(size_t index)
 
 void DDARSolver::insert_application(Theorem thm)
 {
-    if (!thm.check_numerically())
-    {
-        cout << thm.name() << endl;
-        throw runtime_error("Wrong theorem!!");
-    }
     _applications.emplace_back(this, move(thm));
 }
 
 Proof *DDARSolver::insert_statement(const unique_ptr<Statement> &p)
 {
-    auto val = p->normalize();
-    auto key = val->to_string();
-    auto [it, success] = _statement_proofs.insert({key, std::make_unique<Proof>(this, std::move(val))});
+    auto key = p->to_string();
+    auto [it, success] = _statement_proofs.insert({key, std::make_unique<Proof>(this, p->clone())});
     if (success)
     {
         it->second->initial();
@@ -361,7 +387,7 @@ void DDARSolver::add_established_equations(Proof *pf)
         for (auto &old_pf : to_process)
         {
             auto stmt = old_pf->statement()->replace(p, q);
-            string key = stmt->normalize()->to_string();
+            string key = stmt->to_string();
             auto itr = _statement_proofs.find(key);
             if (itr != _statement_proofs.end())
             {
