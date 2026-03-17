@@ -40,6 +40,13 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 # logger.setLevel(logging.INFO)
 
+DEBUG_LM_INPUT = os.environ.get("NEWCLID_DEBUG_LM_INPUT", "").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
 AUX_PREDICATES = [
     # "coll",
     # "cong",
@@ -73,6 +80,45 @@ class LMAgent(DeductiveAgent):
             tokenizer = AutoTokenizer.from_pretrained(path)
             self.models.append(model)
             self.tokenizers.append(tokenizer)
+
+    def _log_input_snapshot(
+        self,
+        *,
+        query: str,
+        messages: list[dict[str, Any]],
+        text_prompt: str,
+        final_text: str,
+        model_inputs,
+        prompt_len: int,
+    ) -> None:
+        if not DEBUG_LM_INPUT:
+            return
+
+        logger.info("LM input snapshot: query=%s", query)
+        logger.info("LM input snapshot: messages=%s", messages)
+        logger.info("LM input snapshot: text_prompt=%s", text_prompt)
+        logger.info("LM input snapshot: final_text=%s", final_text)
+        logger.info("LM input snapshot: model_input_keys=%s", list(model_inputs.keys()))
+        if "input_ids" in model_inputs:
+            logger.info("LM input snapshot: input_ids.shape=%s", tuple(model_inputs["input_ids"].shape))
+        if "attention_mask" in model_inputs:
+            logger.info("LM input snapshot: attention_mask.shape=%s", tuple(model_inputs["attention_mask"].shape))
+        logger.info("LM input snapshot: prompt_len=%s", prompt_len)
+
+    def _log_model_output(
+        self,
+        *,
+        queue_type: str,
+        aux_dsl: str | None = None,
+        score: float | None = None,
+        aux: str | None = None,
+    ) -> None:
+        if score is not None:
+            logger.info("LM output [%s]: score=%s", queue_type, score)
+        if aux_dsl is not None:
+            logger.info("LM output [%s]: aux_dsl=%s", queue_type, aux_dsl)
+        if aux is not None:
+            logger.info("LM output [%s]: aux=%s", queue_type, aux)
         
     @torch.no_grad()
     def inference(self, model, tokenizer, query: str, new_point_name: str, response_prefix: str = '<aux>', with_predicate: bool = True):
@@ -89,6 +135,8 @@ class LMAgent(DeductiveAgent):
         )
         text += "<think>\n\n</think>\n\n"
         model_prompt_inputs = tokenizer([text], return_tensors="pt")
+        pad_token_id = tokenizer.pad_token_id
+        eos_token_id = tokenizer.encode(' ;', add_special_tokens=False)[0]
         
         if with_predicate and len(AUX_PREDICATES) > 0:
             # Inference with predicate prefix
@@ -96,15 +144,24 @@ class LMAgent(DeductiveAgent):
             if beams_per_predicate:
                 for aux_predicate_str in AUX_PREDICATES:
                     prompt_with_predicate = text + response_prefix + ' ' + new_point_name + ' : ' + aux_predicate_str
-                    model_inputs = tokenizer([prompt_with_predicate], return_tensors="pt").to('cuda')
+                    model_inputs = tokenizer([prompt_with_predicate], return_tensors="pt")
+                    self._log_input_snapshot(
+                        query=query,
+                        messages=messages,
+                        text_prompt=text,
+                        final_text=prompt_with_predicate,
+                        model_inputs=model_inputs,
+                        prompt_len=model_prompt_inputs.input_ids.shape[1],
+                    )
+                    model_inputs = model_inputs.to(model.device)
                     
                     generated_output = model.generate(
                         **model_inputs,
                         max_new_tokens=100,
                         num_beams=beams_per_predicate,
                         num_return_sequences=beams_per_predicate,
-                        pad_token_id=151643,
-                        eos_token_id=2587,  # ' ;'
+                        pad_token_id=pad_token_id,
+                        eos_token_id=eos_token_id,
                         return_dict_in_generate=True, 
                         output_scores=True,
                     )
@@ -115,20 +172,28 @@ class LMAgent(DeductiveAgent):
                     for aux_dsl, score in zip(aux_dsls, scores):
                         score = score.item()
                         aux_dsl_dict[aux_dsl] = score
-                        logger.info(f"aux_dsl (with_predicate): {aux_dsl}")
         
         if not with_predicate:
             # Inference without predicate prefix
             prompt_no_predicate = text + response_prefix + ' ' + new_point_name
-            model_inputs = tokenizer([prompt_no_predicate], return_tensors="pt").to('cuda')
+            model_inputs = tokenizer([prompt_no_predicate], return_tensors="pt")
+            self._log_input_snapshot(
+                query=query,
+                messages=messages,
+                text_prompt=text,
+                final_text=prompt_no_predicate,
+                model_inputs=model_inputs,
+                prompt_len=model_prompt_inputs.input_ids.shape[1],
+            )
+            model_inputs = model_inputs.to(model.device)
 
             generated_output = model.generate(
                 **model_inputs,
                 max_new_tokens=100,
                 num_beams=self.decoding_size,
                 num_return_sequences=self.decoding_size,
-                pad_token_id=151643,
-                eos_token_id=2587,  # ' ;'
+                pad_token_id=pad_token_id,
+                eos_token_id=eos_token_id,
                 return_dict_in_generate=True, 
                 output_scores=True,
             )
@@ -139,7 +204,6 @@ class LMAgent(DeductiveAgent):
             for aux_dsl, score in zip(aux_dsls, scores):
                 score = score.item()
                 aux_dsl_dict[aux_dsl] = score
-                logger.info(f"aux_dsl (no_predicate): {aux_dsl}")
             
         return aux_dsl_dict
 
@@ -211,7 +275,9 @@ class LMAgent(DeductiveAgent):
                             
                             for aux_dsl, score in aux_dsl_dict.items():
                                 try:
+                                    self._log_model_output(queue_type=queue_type, aux_dsl=aux_dsl, score=score)
                                     aux = self.try_dsl_to_constructions(aux_dsl[len('<aux> x00'):])
+                                    self._log_model_output(queue_type=queue_type, aux=aux)
                                     if aux:
                                         new_problem = problem.with_more_construction(aux)
                                         future = run_ddar_remote.remote(new_problem, proof.defs, aux, rules_ref, t0, timeout)
