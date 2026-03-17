@@ -106,13 +106,9 @@ class Qwen35Agent(DeductiveAgent):
         model_inputs,
         prompt_len: int,
     ) -> None:
-        print(f"entering logging fuction")
-
         if not DEBUG_QWEN35_INPUT:
             return
         
-        print(f"start logging input snapshot")
-
         logger.info("Qwen35 input snapshot: query=%s", query)
         logger.info("Qwen35 input snapshot: img_path=%s", img_path)
         logger.info("Qwen35 input snapshot: messages=%s", messages)
@@ -141,16 +137,19 @@ class Qwen35Agent(DeductiveAgent):
         self,
         *,
         queue_type: str,
-        aux_dsl: str,
+        aux_dsl: str | None = None,
         aux_content: str | None = None,
         aux: str | None = None,
         score: float | None = None,
     ) -> None:
         if score is not None:
             logger.info("Qwen35 output [%s]: score=%s", queue_type, score)
-        logger.info("Qwen35 output [%s]: aux_dsl=%s", queue_type, aux_dsl)
-        logger.info("Qwen35 output [%s]: aux_content=%s", queue_type, aux_content)
-        logger.info("Qwen35 output [%s]: aux=%s", queue_type, aux)
+        if aux_dsl is not None:
+            logger.info("Qwen35 output [%s]: aux_dsl=%s", queue_type, aux_dsl)
+        if aux_content is not None:
+            logger.info("Qwen35 output [%s]: aux_content=%s", queue_type, aux_content)
+        if aux is not None:
+            logger.info("Qwen35 output [%s]: aux=%s", queue_type, aux)
         
     @torch.no_grad()
     def inference(self, model, processor, query: str, img_path: str, new_point_name: str, response_prefix: str = '<aux>', with_predicate: bool = True):
@@ -237,7 +236,7 @@ class Qwen35Agent(DeductiveAgent):
                         num_beams=beams_per_predicate,
                         num_return_sequences=beams_per_predicate,
                         pad_token_id=processor.tokenizer.pad_token_id,
-                        eos_token_id=processor.tokenizer.encode(';', add_special_tokens=False)[0],
+                        eos_token_id=processor.tokenizer.encode(' ;', add_special_tokens=False)[0],
                         return_dict_in_generate=True,
                         output_scores=True,
                     )
@@ -249,11 +248,6 @@ class Qwen35Agent(DeductiveAgent):
                     for aux_dsl, score in zip(aux_dsls, scores):
                         score = score.item()
                         aux_dsl_dict[aux_dsl] = score
-                        self._log_model_output(
-                            queue_type="with_pred",
-                            aux_dsl=aux_dsl,
-                            score=score,
-                        )
         
         if not with_predicate:
             text_with_prefix = text_prompt + response_prefix + ' ' + new_point_name
@@ -278,7 +272,7 @@ class Qwen35Agent(DeductiveAgent):
                 num_beams=self.decoding_size,
                 num_return_sequences=self.decoding_size,
                 pad_token_id=processor.tokenizer.pad_token_id,
-                eos_token_id=processor.tokenizer.encode(';', add_special_tokens=False)[0],
+                eos_token_id=processor.tokenizer.encode(' ;', add_special_tokens=False)[0],
                 return_dict_in_generate=True,
                 output_scores=True,
             )
@@ -290,11 +284,6 @@ class Qwen35Agent(DeductiveAgent):
             for aux_dsl, score in zip(aux_dsls, scores):
                 score = score.item()
                 aux_dsl_dict[aux_dsl] = score
-                self._log_model_output(
-                    queue_type="no_pred",
-                    aux_dsl=aux_dsl,
-                    score=score,
-                )
             
         return aux_dsl_dict
 
@@ -400,7 +389,7 @@ class Qwen35Agent(DeductiveAgent):
                             
                             for aux_dsl, score in aux_dsl_dict.items():
                                 try:
-                                    aux_content = self.extract_aux_content(aux_dsl, '<aux> x00')
+                                    aux_content = aux_dsl[len('<aux> x00'):]
                                     self._log_model_output(
                                         queue_type=queue_type,
                                         aux_dsl=aux_dsl,
@@ -412,10 +401,7 @@ class Qwen35Agent(DeductiveAgent):
                                     aux = self.try_dsl_to_constructions(aux_content)
                                     self._log_model_output(
                                         queue_type=queue_type,
-                                        aux_dsl=aux_dsl,
-                                        aux_content=aux_content,
                                         aux=aux,
-                                        score=score,
                                     )
                                     if aux:
                                         new_problem = problem.with_more_construction(aux)
@@ -479,17 +465,6 @@ class Qwen35Agent(DeductiveAgent):
 
     def step(self, proof: ProofState, rules: list[Rule]) -> bool:
         return
-
-    @staticmethod
-    def extract_aux_content(text: str, response_prefix: str = '<aux> x00') -> str | None:
-        start = text.find(response_prefix)
-        if start == -1:
-            return None
-        content = text[start + len(response_prefix):]
-        end_tag = content.find("</aux>")
-        if end_tag != -1:
-            content = content[:end_tag]
-        return content.strip()
     
     def try_dsl_to_constructions(self, content):
         points, premises = content.split(';')[0].split(' : ')

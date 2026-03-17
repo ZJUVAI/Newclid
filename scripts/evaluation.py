@@ -4,28 +4,50 @@ import time
 import argparse
 import ray
 import csv
+import logging
 from rich.live import Live
 from rich.table import Table
 
 from newclid.agent.lm import LMAgent
+from newclid.agent.qwen35_text import Qwen35TextAgent
 from newclid.api import GeometricSolverBuilder
 from newclid.generation.problem_worker import GeometryProblemWorker
+
+LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
+
+
+def configure_logging(*, force: bool = False) -> None:
+    logging.basicConfig(
+        level=getattr(logging, LOGLEVEL, logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        force=force,
+    )
+
+
+configure_logging()
 
 @ray.remote(num_cpus=0, num_gpus=1)
 def ray_solve_problem(args):
     """
     Process a single problem and return whether it was solved successfully along with the time taken.
     """
-    pid, problem_name, problems_path, model_path, decoding_size, beam_size, search_depth, timeout = args
+    configure_logging(force=True)
+    pid, problem_name, problems_path, model_path, decoding_size, beam_size, search_depth, timeout, agent_type = args
     start_time = time.time()
     try:
+        if agent_type == "lm":
+            agent = LMAgent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
+        elif agent_type == "qwen35_text":
+            agent = Qwen35TextAgent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
+        else:
+            raise ValueError(f"Unknown agent type: {agent_type}. Must be 'lm' or 'qwen35_text'")
+
         solver = (
             GeometricSolverBuilder()
             .load_problem_from_file(problems_path, problem_name, rename=True)
-            .with_deductive_agent(LMAgent(model_path, decoding_size=decoding_size,beam_size=beam_size, search_depth=search_depth))
+            .with_deductive_agent(agent)
             .build()
         )
-        print(f"problem_name: {problem_name}")
         is_solved = solver.run(timeout=timeout)
         elapsed_time = time.time() - start_time
         return (pid, problem_name, is_solved, elapsed_time) 
@@ -56,7 +78,7 @@ def render_table(all_tasks_info, start_time, reorder: bool):
         table.add_row(problem_name, status, elapsed)
     return table
 
-def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding_size: int, beam_size: int, search_depth: int, timeout: int = 3600):
+def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding_size: int, beam_size: int, search_depth: int, timeout: int = 3600, agent_type: str = "lm", log_dir: str = None):
     """
     Main function, read the file and execute tasks using Ray.
     """
@@ -72,6 +94,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
             problem_names.append(lines[i].strip())
  
     print(f"Total problems to solve: {len(problem_names)}")
+    print(f"Using agent: {agent_type}")
 
     # Multi-threaded execution using Ray with limited concurrent tasks
     # Initialize Ray with specified number of CPUs
@@ -90,7 +113,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
     
     # Submit all tasks
     for i, problem_name in enumerate(problem_names):
-        task = ray_solve_problem.remote((i, problem_name, filepath, modelpath, decoding_size, beam_size, search_depth, timeout))
+        task = ray_solve_problem.remote((i, problem_name, filepath, modelpath, decoding_size, beam_size, search_depth, timeout, agent_type))
         all_tasks_info.append((problem_name, "Pending", 0))
         pending_tasks.append(task)
     
@@ -128,8 +151,8 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
     csv_filename = f"eval_{problems_name}_{model_name}_d{decoding_size}_b{beam_size}_s{search_depth}.csv"
 
     # Determine output directory
-    if args.log_dir:
-        output_dir = Path(args.log_dir)
+    if log_dir:
+        output_dir = Path(log_dir)
     else:
         output_dir = Path("results")
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -144,7 +167,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
     with open(csv_filepath, 'w', newline='', encoding='utf-8') as csvfile:
         writer = csv.writer(csvfile)
         # Write summary header row
-        dataset_name = Path(args.problems_path).stem
+        dataset_name = filepath.stem
         writer.writerow([f"Dataset: {dataset_name}, Solved: {solved_count}/{total_problems}, Total Time: {total_time:.2f}s"])
         # Write column headers
         writer.writerow(['Problem Name', 'Solved', 'Time (s)'])
@@ -167,9 +190,21 @@ if __name__ == "__main__":
     parser.add_argument("--beam_size", type=int, default=64)
     parser.add_argument("--search_depth", type=int, default=4)
     parser.add_argument("--timeout", type=int, default=7200, help="Timeout for each problem")
+    parser.add_argument("--agent", type=str, default="lm", choices=["lm", "qwen35_text"],
+                        help="Agent type to use: 'lm' for LMAgent or 'qwen35_text' for Qwen35TextAgent")
     parser.add_argument("--log_dir", type=str, default=None,
                         help="Directory to save evaluation results (default: results/)")
     args = parser.parse_args()
     
     problems_path = Path(args.problems_path)
-    solve_problems(problems_path, args.model_path, num_cpus=args.max_workers, decoding_size=args.decoding_size, beam_size=args.beam_size, search_depth=args.search_depth, timeout=args.timeout)
+    solve_problems(
+        problems_path,
+        args.model_path,
+        num_cpus=args.max_workers,
+        decoding_size=args.decoding_size,
+        beam_size=args.beam_size,
+        search_depth=args.search_depth,
+        timeout=args.timeout,
+        agent_type=args.agent,
+        log_dir=args.log_dir,
+    )

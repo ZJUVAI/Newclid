@@ -15,17 +15,25 @@ from newclid.api import GeometricSolverBuilder
 from newclid.generation.problem_worker import GeometryProblemWorker
 
 
-LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
-logging.basicConfig(
-    level=getattr(logging, LOGLEVEL, logging.INFO),
-    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-)
+LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
+
+
+def configure_logging(*, force: bool = False) -> None:
+    logging.basicConfig(
+        level=getattr(logging, LOGLEVEL, logging.INFO),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        force=force,
+    )
+
+
+configure_logging()
 
 @ray.remote(num_cpus=0, num_gpus=1)
 def ray_solve_problem(args):
     """
     Process a single problem and return whether it was solved successfully along with the time taken.
     """
+    configure_logging(force=True)
     pid, problem_name, problems_path, model_path, decoding_size, beam_size, search_depth, timeout, agent_type = args
     start_time = time.time()
     try:

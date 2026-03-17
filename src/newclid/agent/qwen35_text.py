@@ -3,6 +3,7 @@ import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import logging
 from pathlib import Path
+from typing import Any
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -14,6 +15,13 @@ from newclid.agent.lm import LMAgent, AUX_PREDICATES
 logger = logging.getLogger(__name__)
 hf_logging.disable_progress_bar()
 hf_logging.set_verbosity_error()
+
+DEBUG_QWEN35_TEXT_INPUT = os.environ.get("NEWCLID_DEBUG_QWEN35_TEXT_INPUT", "").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 
 def _resolve_model_path(path: str) -> str:
@@ -64,6 +72,45 @@ class Qwen35TextAgent(LMAgent):
             self.models.append(model)
             self.tokenizers.append(tokenizer)
 
+    def _log_input_snapshot(
+        self,
+        *,
+        query: str,
+        messages: list[dict[str, Any]],
+        text_prompt: str,
+        final_text: str,
+        model_inputs,
+        prompt_len: int,
+    ) -> None:
+        if not DEBUG_QWEN35_TEXT_INPUT:
+            return
+
+        logger.info("Qwen35Text input snapshot: query=%s", query)
+        logger.info("Qwen35Text input snapshot: messages=%s", messages)
+        logger.info("Qwen35Text input snapshot: text_prompt=%s", text_prompt)
+        logger.info("Qwen35Text input snapshot: final_text=%s", final_text)
+        logger.info("Qwen35Text input snapshot: model_input_keys=%s", list(model_inputs.keys()))
+        if "input_ids" in model_inputs:
+            logger.info("Qwen35Text input snapshot: input_ids.shape=%s", tuple(model_inputs["input_ids"].shape))
+        if "attention_mask" in model_inputs:
+            logger.info("Qwen35Text input snapshot: attention_mask.shape=%s", tuple(model_inputs["attention_mask"].shape))
+        logger.info("Qwen35Text input snapshot: prompt_len=%s", prompt_len)
+
+    def _log_model_output(
+        self,
+        *,
+        queue_type: str,
+        aux_dsl: str | None = None,
+        score: float | None = None,
+        aux: str | None = None,
+    ) -> None:
+        if score is not None:
+            logger.info("Qwen35Text output [%s]: score=%s", queue_type, score)
+        if aux_dsl is not None:
+            logger.info("Qwen35Text output [%s]: aux_dsl=%s", queue_type, aux_dsl)
+        if aux is not None:
+            logger.info("Qwen35Text output [%s]: aux=%s", queue_type, aux)
+
     @torch.no_grad()
     def inference(self, model, tokenizer, query: str, new_point_name: str, response_prefix: str = '<aux>', with_predicate: bool = True):
         aux_dsl_dict = {}
@@ -79,16 +126,23 @@ class Qwen35TextAgent(LMAgent):
         prompt_inputs = tokenizer([text], return_tensors="pt")
         prompt_len = prompt_inputs.input_ids.shape[1]
         pad_token_id = tokenizer.pad_token_id
-        if pad_token_id is None:
-            pad_token_id = tokenizer.eos_token_id
-        eos_token_id = tokenizer.encode(';', add_special_tokens=False)[0]
+        eos_token_id = tokenizer.encode(' ;', add_special_tokens=False)[0]
 
         if with_predicate and len(AUX_PREDICATES) > 0:
             beams_per_predicate = self.decoding_size // len(AUX_PREDICATES)
             if beams_per_predicate:
                 for aux_predicate_str in AUX_PREDICATES:
                     prompt_with_predicate = text + response_prefix + ' ' + new_point_name + ' : ' + aux_predicate_str
-                    model_inputs = tokenizer([prompt_with_predicate], return_tensors="pt").to(model.device)
+                    model_inputs = tokenizer([prompt_with_predicate], return_tensors="pt")
+                    self._log_input_snapshot(
+                        query=query,
+                        messages=messages,
+                        text_prompt=text,
+                        final_text=prompt_with_predicate,
+                        model_inputs=model_inputs,
+                        prompt_len=prompt_len,
+                    )
+                    model_inputs = model_inputs.to(model.device)
                     generated_output = model.generate(
                         **model_inputs,
                         max_new_tokens=100,
@@ -103,12 +157,21 @@ class Qwen35TextAgent(LMAgent):
                     output_sequences = generated_output.sequences[:, prompt_len:]
                     aux_dsls = tokenizer.batch_decode(output_sequences, skip_special_tokens=True)
                     for aux_dsl, score in zip(aux_dsls, scores):
-                        aux_dsl_dict[aux_dsl] = score.item()
-                        logger.info("aux_dsl (with_predicate): %s", aux_dsl)
+                        score = score.item()
+                        aux_dsl_dict[aux_dsl] = score
 
         if not with_predicate:
             prompt_no_predicate = text + response_prefix + ' ' + new_point_name
-            model_inputs = tokenizer([prompt_no_predicate], return_tensors="pt").to(model.device)
+            model_inputs = tokenizer([prompt_no_predicate], return_tensors="pt")
+            self._log_input_snapshot(
+                query=query,
+                messages=messages,
+                text_prompt=text,
+                final_text=prompt_no_predicate,
+                model_inputs=model_inputs,
+                prompt_len=prompt_len,
+            )
+            model_inputs = model_inputs.to(model.device)
             generated_output = model.generate(
                 **model_inputs,
                 max_new_tokens=100,
@@ -123,7 +186,7 @@ class Qwen35TextAgent(LMAgent):
             output_sequences = generated_output.sequences[:, prompt_len:]
             aux_dsls = tokenizer.batch_decode(output_sequences, skip_special_tokens=True)
             for aux_dsl, score in zip(aux_dsls, scores):
-                aux_dsl_dict[aux_dsl] = score.item()
-                logger.info("aux_dsl (no_predicate): %s", aux_dsl)
+                score = score.item()
+                aux_dsl_dict[aux_dsl] = score
 
         return aux_dsl_dict
