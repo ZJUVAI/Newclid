@@ -14,11 +14,20 @@ using namespace std;
 Proof::Proof(DDARSolver *solver, std::unique_ptr<Statement> &&p)
     : _solver(solver),
       _statement(move(p)),
-      _eqn_dist(_solver->insert_equation(_statement, "dist")),
-      _eqn_slope(_solver->insert_equation(_statement, "slope")),
-      _eqn_distlog(_solver->insert_equation(_statement, "distlog")),
       _dep(nullptr)
 {
+}
+
+void Proof::ensure_equations_initialized()
+{
+    if (_equations_initialized)
+    {
+        return;
+    }
+    _eqn_dist = _solver->insert_equation(_statement, "dist");
+    _eqn_slope = _solver->insert_equation(_statement, "slope");
+    _eqn_distlog = _solver->insert_equation(_statement, "distlog");
+    _equations_initialized = true;
 }
 
 void Proof::prove_by_assumption()
@@ -53,6 +62,7 @@ void Proof::ar(long long depth)
     {
         return;
     }
+    ensure_equations_initialized();
     for (const auto &req : _eqn_dist)
     {
         req->reduce();
@@ -103,6 +113,7 @@ const unique_ptr<Statement> &Proof::statement() const
 
 void Proof::print_equations() const
 {
+    const_cast<Proof*>(this)->ensure_equations_initialized();
     cout << "Proof Equations for statement: " << _statement->to_string() << endl;
     for (const auto &eq : _eqn_dist)
     {
@@ -175,6 +186,7 @@ void Proof::set_proved(Proof *doublepoint, Proof *original)
     {
         throw runtime_error("Proof already proved");
     }
+    ensure_equations_initialized();
     _deps.emplace_back(doublepoint);
     _deps.emplace_back(original);
     _state = ProofState::PROVED_BY_DOUBLEPOINT;
@@ -207,6 +219,8 @@ void Proof::set_proved(ProofState state)
     {
         throw runtime_error("Proof already proved");
     }
+
+    ensure_equations_initialized();
 
     _state = state;
     _solver->push_established_statement(this);

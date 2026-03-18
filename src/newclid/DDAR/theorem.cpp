@@ -74,13 +74,13 @@ void Theorem::print() const
 
 Theorem &Theorem::add_hypothesis(unique_ptr<Statement> stmt)
 {
-    _hypotheses.emplace_back(move(stmt->normalize()));
+    _hypotheses.emplace_back(move(stmt));
     return *this;
 }
 
 Theorem &Theorem::add_conclusion(unique_ptr<Statement> stmt)
 {
-    _conclusions.emplace_back(move(stmt->normalize()));
+    _conclusions.emplace_back(move(stmt));
     return *this;
 }
 
