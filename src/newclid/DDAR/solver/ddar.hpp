@@ -6,6 +6,7 @@
 #include <string>
 #include <memory>
 #include "problem.hpp"
+#include "matcher.hpp"
 #include "ar/linear_system.hpp"
 #include "ar/reduced_equation.hpp"
 #include "typedef.hpp"
@@ -23,7 +24,7 @@ private:
 
     std::vector<Application> _applications;
 
-    std::map<std::string, std::unique_ptr<Proof>> _statement_proofs;
+    std::unordered_map<std::string, std::unique_ptr<Proof>> _statement_proofs;
 
     std::vector<Proof *> _goals;
 
@@ -68,6 +69,8 @@ public:
     void advance_theorem(size_t index);
 
     void insert_application(Theorem thm);
+
+    void add_custom_theorems(const std::vector<CustomRule> &rules);
 
     bool establish_statement(Proof *pf, size_t thm_id);
 

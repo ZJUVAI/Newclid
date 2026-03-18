@@ -289,7 +289,7 @@ class CSolver:
             self.goals.append((predicate, args))
 
     # -------------------- 核心方法 -------------------- #
-    def run(self, max_level: int = 500, save_path: str | Path | None = None) -> bool:
+    def run(self, max_level: int = 500, save_path: str | Path | None = None, custom_rules: List[str] = None) -> bool:
         """
         运行 DDAR 并执行求解。
         :param max_level: 最大推理层数
@@ -298,8 +298,12 @@ class CSolver:
         """
         t0 = time.time()
 
-        solved, dep_graph = DDAR.run_ddar(
-            self.problem_name, self.points, self.premises, self.goals, max_level, self.log_enabled, self.exp_enabled)
+        if custom_rules:
+            solved, dep_graph = DDAR.run_ddar_with_custom_theorems(
+                self.problem_name, self.points, self.premises, self.goals, custom_rules, max_level, self.log_enabled, self.exp_enabled)
+        else:
+            solved, dep_graph = DDAR.run_ddar(
+                self.problem_name, self.points, self.premises, self.goals, max_level, self.log_enabled, self.exp_enabled)
 
         for stmt, deps, reason in dep_graph:
             conclusion = Statement.from_tokens(

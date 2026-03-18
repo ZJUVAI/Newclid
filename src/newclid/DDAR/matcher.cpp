@@ -7,58 +7,26 @@
 #include "predicate/congruent_triangles.hpp"
 #include "predicate/secant.hpp"
 #include "predicate/eqpoint.hpp"
+#include "predicate/para.hpp"
+#include "predicate/perp.hpp"
 #include <algorithm>
 #include <tuple>
 #include <vector>
 #include <set>
-#include <chrono>
+#include <map>
+#include <unordered_map>
+#include <functional>
 
 using namespace std;
 
 Matcher::Matcher(Problem *prob) : _problem(prob)
 {
-    // auto t0 = std::chrono::steady_clock::now();
-
     match_similar_triangles();
-    // auto t1 = std::chrono::steady_clock::now();
-    // std::cout << "match_similar_triangles : "
-    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
-    //           << " ms" << endl;
-
-    // t0 = t1;  // 重置起点
     match_between();
-    // t1 = std::chrono::steady_clock::now();
-    // std::cout << "match_between           : "
-    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
-    //           << " ms" << endl;
-
-    // t0 = t1;
     match_equal_angles();
-    // t1 = std::chrono::steady_clock::now();
-    // std::cout << "match_equal_angles      : "
-    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
-    //           << " ms" << endl;
-
-    // t0 = t1;
     match_circles();
-    // t1 = std::chrono::steady_clock::now();
-    // std::cout << "match_circles           : "
-    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
-    //           << " ms" << endl;
-
-    // t0 = t1;
     match_orthocenters();
-    // t1 = std::chrono::steady_clock::now();
-    // std::cout << "match_orthocenters      : "
-    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
-    //           << " ms" << endl;
-
-    // t0 = t1;
-    match_perps_paras();
-    // t1 = std::chrono::steady_clock::now();
-    // std::cout << "match_perps_paras       : "
-    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
-    //           << " ms" << endl;
+    // match_perps_paras();
 }
 
 vector<tuple<double, double, Triangle>> Matcher::all_triangles()
@@ -110,11 +78,8 @@ void Matcher::on_similar_triangles(const SimilarTriangles &simtri)
     CongruentTriangles const congtri(simtri.left(), simtri.right(), simtri.sameclock());
     if (congtri.check_numerically())
     {
-        for (const auto &rotated : congtri.cyclic_rotations())
-        {
-            insert_theorem(Theorem::congruent_triangles_of_cong(rotated));
-            insert_theorem(Theorem::congruent_triangles_properties(rotated));
-        }
+        insert_theorem(Theorem::congruent_triangles_of_cong(congtri));
+        insert_theorem(Theorem::congruent_triangles_properties(congtri));
     }
 }
 
@@ -373,61 +338,61 @@ void Matcher::match_between()
         return;
     }
 
-    for (size_t i = 0; i < betweens.size(); i++)
-    {
-        for (size_t j = i + 1; j < betweens.size(); j++)
-        {
-            for (size_t k = j + 1; k < betweens.size(); k++)
-            {
-                Coll left1 = get<1>(betweens[i]);
-                Coll middle1 = get<1>(betweens[j]);
-                Coll right1 = get<1>(betweens[k]);
-                Coll left2 = left1.reverse();
-                Coll middle2 = middle1.reverse();
-                Coll right2 = right1.reverse();
-                Pappus p1(left1, middle1, right1);
-                Pappus p2(left1, middle1, right2);
-                Pappus p3(left1, middle2, right1);
-                Pappus p4(left1, middle2, right2);
-                Pappus p5(left2, middle1, right1);
-                Pappus p6(left2, middle1, right2);
-                Pappus p7(left2, middle2, right1);
-                Pappus p8(left2, middle2, right2);
-                if (p1.check_numerically())
-                {
-                    on_pappus(p1);
-                }
-                if (p2.check_numerically())
-                {
-                    on_pappus(p2);
-                }
-                if (p3.check_numerically())
-                {
-                    on_pappus(p3);
-                }
-                if (p4.check_numerically())
-                {
-                    on_pappus(p4);
-                }
-                if (p5.check_numerically())
-                {
-                    on_pappus(p5);
-                }
-                if (p6.check_numerically())
-                {
-                    on_pappus(p6);
-                }
-                if (p7.check_numerically())
-                {
-                    on_pappus(p7);
-                }
-                if (p8.check_numerically())
-                {
-                    on_pappus(p8);
-                }
-            }
-        }
-    }
+    // for (size_t i = 0; i < betweens.size(); i++)
+    // {
+    //     for (size_t j = i + 1; j < betweens.size(); j++)
+    //     {
+    //         for (size_t k = j + 1; k < betweens.size(); k++)
+    //         {
+    //             Coll left1 = get<1>(betweens[i]);
+    //             Coll middle1 = get<1>(betweens[j]);
+    //             Coll right1 = get<1>(betweens[k]);
+    //             Coll left2 = left1.reverse();
+    //             Coll middle2 = middle1.reverse();
+    //             Coll right2 = right1.reverse();
+    //             Pappus p1(left1, middle1, right1);
+    //             Pappus p2(left1, middle1, right2);
+    //             Pappus p3(left1, middle2, right1);
+    //             Pappus p4(left1, middle2, right2);
+    //             Pappus p5(left2, middle1, right1);
+    //             Pappus p6(left2, middle1, right2);
+    //             Pappus p7(left2, middle2, right1);
+    //             Pappus p8(left2, middle2, right2);
+    //             if (p1.check_numerically())
+    //             {
+    //                 on_pappus(p1);
+    //             }
+    //             if (p2.check_numerically())
+    //             {
+    //                 on_pappus(p2);
+    //             }
+    //             if (p3.check_numerically())
+    //             {
+    //                 on_pappus(p3);
+    //             }
+    //             if (p4.check_numerically())
+    //             {
+    //                 on_pappus(p4);
+    //             }
+    //             if (p5.check_numerically())
+    //             {
+    //                 on_pappus(p5);
+    //             }
+    //             if (p6.check_numerically())
+    //             {
+    //                 on_pappus(p6);
+    //             }
+    //             if (p7.check_numerically())
+    //             {
+    //                 on_pappus(p7);
+    //             }
+    //             if (p8.check_numerically())
+    //             {
+    //                 on_pappus(p8);
+    //             }
+    //         }
+    //     }
+    // }
 
     sort(betweens.begin(), betweens.end(),
          [](const item_type &a, const item_type &b)
@@ -490,7 +455,7 @@ vector<tuple<double, Angle>> Matcher::all_angles()
 {
     vector<tuple<double, Angle>> res;
     const size_t num_pts = _problem->num_points();
-    res.reserve(num_pts * (num_pts - 1) / 2);
+    res.reserve(num_pts * (num_pts - 1) * (num_pts - 2));
     for (const auto &left : _problem->points())
     {
         for (const auto &vertex : _problem->points())
@@ -556,7 +521,7 @@ void Matcher::match_equal_angles()
     {
         return;
     }
-
+    
     sort(angles.begin(), angles.end(),
          [](const item_type &a, const item_type &b)
          {
@@ -709,14 +674,23 @@ void Matcher::match_circles()
 
 void Matcher::match_orthocenters()
 {
-    for (const auto &pt_d : _problem->points())
+    const auto &all_pts = _problem->points();
+    const size_t n = all_pts.size();
+
+    // 使用索引遍历，避免重复组合：只考虑 a < b < c < d
+    for (size_t idx_d = 0; idx_d < n; idx_d++)
     {
-        for (const auto &pt_c : _problem->points())
+        for (size_t idx_c = 0; idx_c < idx_d; idx_c++)
         {
-            for (const auto &pt_b : _problem->points())
+            for (size_t idx_b = 0; idx_b < idx_c; idx_b++)
             {
-                for (const auto &pt_a : _problem->points())
+                for (size_t idx_a = 0; idx_a < idx_b; idx_a++)
                 {
+                    const auto &pt_a = all_pts[idx_a];
+                    const auto &pt_b = all_pts[idx_b];
+                    const auto &pt_c = all_pts[idx_c];
+                    const auto &pt_d = all_pts[idx_d];
+
                     OrthoCenter const ortho(pt_d, Triangle(pt_a, pt_b, pt_c));
                     if (ortho.check_numerically())
                     {
@@ -792,4 +766,187 @@ void Matcher::insert_theorem(const Theorem &thm)
         return;
     }
     _theorems.push_back(thm.normalize());
+}
+
+// ============================================================================
+// CustomTheoremMatcher 实现 - 独立的自定义定理匹配功能
+// ============================================================================
+
+// 收集 stmt 参数中尚未在 mapping 中出现的新点代号（去重，保序）
+static vector<string> new_vars(const Stmt &stmt, const Mapping &mapping)
+{
+    vector<string> vars;
+    for (const auto &arg : stmt.second)
+    {
+        bool known = false;
+        for (const auto &kv : mapping)
+            if (kv.first == arg) { known = true; break; }
+        if (!known)
+        {
+            bool dup = false;
+            for (const auto &v : vars)
+                if (v == arg) { dup = true; break; }
+            if (!dup)
+                vars.push_back(arg);
+        }
+    }
+    return vars;
+}
+
+// 将 mapping 中的代号替换为实际点名，构造 Statement 并做数值检测
+static bool check_stmt_numerically(const Stmt &stmt, const Mapping &mapping, Problem *problem)
+{
+    vector<string> real_args;
+    for (const auto &arg : stmt.second)
+    {
+        bool found = false;
+        for (const auto &kv : mapping)
+        {
+            if (kv.first == arg)
+            {
+                real_args.push_back(problem->point(kv.second).name());
+                found = true;
+                break;
+            }
+        }
+        if (!found)
+            return false;
+    }
+    try
+    {
+        auto s = problem->create_statement(stmt.first, real_args);
+        if (!s) return false;
+        return s->check_numerically();
+    }
+    catch (...)
+    {
+        return false;
+    }
+}
+
+void CustomTheoremMatcher::backtrack(
+    const vector<Stmt> &stmts,
+    size_t idx,
+    Mapping &current,
+    vector<Mapping> &out) const
+{
+    if (idx == stmts.size())
+    {
+        out.push_back(current);
+        return;
+    }
+
+    const Stmt &stmt = stmts[idx];
+    vector<string> vars = new_vars(stmt, current);
+
+    if (vars.empty())
+    {
+        if (check_stmt_numerically(stmt, current, _problem))
+            backtrack(stmts, idx + 1, current, out);
+        return;
+    }
+
+    size_t n_pts = _problem->num_points();
+    size_t n_vars = vars.size();
+    vector<size_t> indices(n_vars, 0);
+
+    while (true)
+    {
+        for (size_t i = 0; i < n_vars; i++)
+            current.push_back({vars[i], (int)indices[i]});
+
+        if (check_stmt_numerically(stmt, current, _problem))
+            backtrack(stmts, idx + 1, current, out);
+
+        for (size_t i = 0; i < n_vars; i++)
+            current.pop_back();
+
+        // 进位
+        size_t carry = n_vars;
+        while (carry > 0)
+        {
+            carry--;
+            indices[carry]++;
+            if (indices[carry] < n_pts)
+                break;
+            indices[carry] = 0;
+            if (carry == 0)
+                goto done;
+        }
+    }
+done:;
+}
+
+void CustomTheoremMatcher::match_rule(const CustomRule &rule)
+{
+    // 按新变量数量升序排列前提，优先匹配约束强的
+    vector<Stmt> sorted_premises = rule.premises;
+    sort(sorted_premises.begin(), sorted_premises.end(), [](const Stmt &a, const Stmt &b) {
+        set<string> sa(a.second.begin(), a.second.end());
+        set<string> sb(b.second.begin(), b.second.end());
+        return sa.size() < sb.size();
+    });
+
+    Mapping current;
+    vector<Mapping> mappings;
+    backtrack(sorted_premises, 0, current, mappings);
+
+    // 去重
+    set<map<string, int>> seen;
+    for (auto &mapping : mappings)
+    {
+        map<string, int> mm(mapping.begin(), mapping.end());
+        if (!seen.insert(mm).second)
+            continue;
+
+        Theorem thm(rule.name, rule.rule);
+
+        // 添加前提
+        for (const auto &stmt : rule.premises)
+        {
+            vector<string> real_args;
+            for (const auto &arg : stmt.second)
+            {
+                auto it = mm.find(arg);
+                if (it != mm.end())
+                    real_args.push_back(_problem->point(it->second).name());
+                else
+                    real_args.push_back(arg);
+            }
+            try {
+                auto s = _problem->create_statement(stmt.first, real_args);
+                if (s) thm.add_hypothesis(move(s));
+            } catch (...) {}
+        }
+
+        // 添加结论
+        for (const auto &stmt : rule.conclusions)
+        {
+            vector<string> real_args;
+            for (const auto &arg : stmt.second)
+            {
+                auto it = mm.find(arg);
+                if (it != mm.end())
+                    real_args.push_back(_problem->point(it->second).name());
+                else
+                    real_args.push_back(arg);
+            }
+            try {
+                auto s = _problem->create_statement(stmt.first, real_args);
+                if (s) thm.add_conclusion(move(s));
+            } catch (...) {}
+        }
+
+        if (thm.check_numerically())
+            _theorems.push_back(thm.normalize());
+    }
+}
+
+CustomTheoremMatcher::CustomTheoremMatcher(Problem *prob, const vector<CustomRule> &rules)
+    : _problem(prob)
+{
+    for (const auto &rule : rules)
+    {
+        match_rule(rule);
+    }
 }
