@@ -85,7 +85,7 @@ class RuleReducer:
             seed: Random seed for reproducibility
             verbose: Print progress messages
             n_workers: Number of parallel workers for subsumption testing
-            batch_size: Batch size for parallel testing
+            batch_size: Progress reporting granularity (print every N rules processed)
             max_premises: Maximum number of premises allowed (default: None = no limit)
             debug: Output proof steps when a subsumption test succeeds
             debug_output_dir: Directory to write subsumption_proofs.txt; if None
@@ -182,7 +182,8 @@ class RuleReducer:
             rule.parse()
 
         # Step 2: Sort by generality (most general first)
-        sorted_rules = sorted(rules, key=lambda r: r.generality_score)
+        # Score is (-n_premises, n_conclusions), so reverse=True puts fewer premises first
+        sorted_rules = sorted(rules, key=lambda r: r.generality_score, reverse=True)
 
         if self.verbose:
             print(f"Step 2: Sorted {len(sorted_rules)} rules by generality")
@@ -191,7 +192,7 @@ class RuleReducer:
 
         # Step 3: Greedy elimination
         if self.verbose:
-            mode = "batch parallel" if self.n_workers > 1 else "sequential"
+            mode = "parallel (serial state)" if self.n_workers > 1 else "sequential"
             print(f"Step 3: Greedy elimination ({mode})...")
 
         active_flags = [True] * len(sorted_rules)
@@ -202,71 +203,66 @@ class RuleReducer:
         batch_size = getattr(self, 'batch_size', 10)
 
         if self.n_workers > 1:
-            # Batch parallel execution
-            from concurrent.futures import ProcessPoolExecutor, as_completed
+            # Parallel execution with serial state updates to avoid race conditions
+            # Each rule_i is processed sequentially so active_flags stays consistent,
+            # but the subsumption tests for rule_i vs all targets run in parallel.
+            from concurrent.futures import ProcessPoolExecutor
 
             if self.verbose:
-                print(f"  Using {self.n_workers} workers with batch_size={batch_size}")
+                print(f"  Using {self.n_workers} workers (serial state updates, progress every {batch_size} rules)")
 
-            for batch_start in range(0, len(sorted_rules), batch_size):
-                batch_end = min(batch_start + batch_size, len(sorted_rules))
-                batch_indices = [i for i in range(batch_start, batch_end) if active_flags[i]]
+            with ProcessPoolExecutor(max_workers=self.n_workers) as executor:
+                for i, rule_i in enumerate(sorted_rules):
+                    if not active_flags[i]:
+                        continue
 
-                if not batch_indices:
-                    continue
+                    # Progress reporting
+                    if self.verbose and (i + 1) % batch_size == 0:
+                        n_active = sum(active_flags)
+                        print(f"  Progress: {i+1}/{len(sorted_rules)} rules processed, {n_active} active, {n_tests} tests")
 
-                if self.verbose:
-                    n_active = sum(active_flags)
-                    print(f"  Batch {batch_start//batch_size + 1}: processing rules {batch_start}-{batch_end-1}, {n_active} active")
+                    # Build target rules based on CURRENT active_flags (not a stale snapshot)
+                    target_rules = []
+                    target_indices = []
+                    for j in range(len(sorted_rules)):
+                        if active_flags[j] and j != i:
+                            target_rules.append(sorted_rules[j])
+                            target_indices.append(j)
 
-                # Prepare target rules for this batch
-                with ProcessPoolExecutor(max_workers=self.n_workers) as executor:
-                    futures = {}
-                    for i in batch_indices:
-                        rule_i = sorted_rules[i]
-                        # Build list of target rules (all active rules except rule_i)
-                        target_rules = []
-                        target_indices = []
-                        for j in range(len(sorted_rules)):
-                            if active_flags[j] and j != i:
-                                target_rules.append(sorted_rules[j])
-                                target_indices.append(j)
+                    if not target_rules:
+                        continue
 
-                        if target_rules:
-                            future = executor.submit(
-                                _test_subsumption_batch_worker,
-                                rule_i,
-                                target_rules,
-                                self.timeout,
-                                self.seed,
-                            )
-                            futures[i] = (future, target_indices)
+                    # Submit single rule's subsumption tests to worker pool, wait for result
+                    future = executor.submit(
+                        _test_subsumption_batch_worker,
+                        rule_i,
+                        target_rules,
+                        self.timeout,
+                        self.seed,
+                    )
 
-                    # Collect results
-                    for i, (future, target_indices) in futures.items():
-                        try:
-                            eliminated_ids = future.result()
-                            n_tests += len(target_indices)
+                    try:
+                        eliminated_ids = future.result()
+                        n_tests += len(target_indices)
 
-                            # Mark eliminated rules
-                            for rule_id in eliminated_ids:
-                                # Find the rule index by id
-                                for j, rule_j in enumerate(sorted_rules):
-                                    if rule_j.rule_id == rule_id and active_flags[j]:
-                                        active_flags[j] = False
-                                        eliminated_rules.append({
-                                            "rule_id": rule_j.rule_id,
-                                            "rule_text": rule_j.rule_text,
-                                            "subsumed_by": sorted_rules[i].rule_id,
-                                            "reason": f"Subsumed by {sorted_rules[i].rule_id}",
-                                        })
+                        # Immediately update active_flags before processing next rule
+                        for rule_id in eliminated_ids:
+                            for j, rule_j in enumerate(sorted_rules):
+                                if rule_j.rule_id == rule_id and active_flags[j]:
+                                    active_flags[j] = False
+                                    eliminated_rules.append({
+                                        "rule_id": rule_j.rule_id,
+                                        "rule_text": rule_j.rule_text,
+                                        "subsumed_by": rule_i.rule_id,
+                                        "reason": f"Subsumed by {rule_i.rule_id}",
+                                    })
 
-                                        if self.verbose:
-                                            print(f"    Eliminated {rule_j.rule_id} (subsumed by {sorted_rules[i].rule_id})")
-                                        break
-                        except Exception as e:
-                            if self.verbose:
-                                print(f"  Warning: Error processing rule {sorted_rules[i].rule_id}: {e}")
+                                    if self.verbose:
+                                        print(f"    Eliminated {rule_j.rule_id} (subsumed by {rule_i.rule_id})")
+                                    break
+                    except Exception as e:
+                        if self.verbose:
+                            print(f"  Warning: Error processing rule {rule_i.rule_id}: {e}")
 
         else:
             # Sequential execution (original code)

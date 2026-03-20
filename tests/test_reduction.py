@@ -214,6 +214,194 @@ def test_rule_reducer_small():
     return passed
 
 
+def test_parallel_consistency():
+    """Test that parallel and sequential reduction produce consistent results."""
+    print("="*60)
+    print("Test 4: Parallel Consistency")
+    print("="*60)
+
+    # Create a set of rules with potential subsumption relationships
+    rules_text = [
+        ("r1", "cong a b c d => cong c d a b"),
+        ("r2", "cong a b c d, para a b c d => cong c d a b"),
+        ("r3", "cong a b c d, cong e f g h => cong c d a b"),
+        ("r4", "para a b c d => coll a b c"),
+        ("r5", "para a b c d, cong a b c d => coll a b c"),
+    ]
+
+    rules = []
+    for rule_id, rule_text in rules_text:
+        try:
+            rules.append(_rule_text_to_rule_with_source(rule_id, rule_text))
+        except Exception as e:
+            print(f"Warning: Failed to convert {rule_id}: {e}")
+
+    if len(rules) < len(rules_text):
+        print(f"  Failed to generate all source problems")
+        return False
+
+    print(f"Testing with {len(rules)} rules")
+
+    # Run sequential reduction
+    print("\nRunning sequential reduction (n_workers=1)...")
+    reducer_seq = RuleReducer(timeout=60, seed=42, verbose=False, n_workers=1)
+    result_seq = reducer_seq.reduce(rules)
+    basis_seq = {r.rule_id for r in result_seq["basis_rules"]}
+
+    # Run parallel reduction
+    print("Running parallel reduction (n_workers=4)...")
+    reducer_par = RuleReducer(timeout=60, seed=42, verbose=False, n_workers=4)
+    result_par = reducer_par.reduce(rules)
+    basis_par = {r.rule_id for r in result_par["basis_rules"]}
+
+    print(f"\nResults:")
+    print(f"  Sequential basis: {sorted(basis_seq)}")
+    print(f"  Parallel basis: {sorted(basis_par)}")
+
+    # Check consistency
+    consistent = basis_seq == basis_par
+    has_basis = len(basis_seq) > 0 and len(basis_par) > 0
+
+    passed = consistent and has_basis
+    print(f"\nParallel Consistency: {'PASSED' if passed else 'FAILED'}")
+    print(f"  Results are consistent: {consistent}")
+    print(f"  Both have basis rules: {has_basis}")
+
+    if not consistent:
+        print(f"  Difference: seq only: {basis_seq - basis_par}, par only: {basis_par - basis_seq}")
+
+    print()
+    return passed
+
+
+def test_circular_subsumption_regression():
+    """Test that circular subsumption doesn't eliminate all rules.
+
+    Regression test for the race condition where two rules that mutually
+    subsume each other could both be eliminated in the same batch.
+    """
+    print("="*60)
+    print("Test 5: Circular Subsumption Regression")
+    print("="*60)
+
+    # Create rules that might have circular subsumption patterns
+    # True circular subsumption means the rules are equivalent
+    # and at least one should survive
+    rules_text = [
+        ("r1", "cong a b c d => cong c d a b"),
+        ("r2", "cong c d a b => cong a b c d"),  # Potentially equivalent to r1
+    ]
+
+    rules = []
+    for rule_id, rule_text in rules_text:
+        try:
+            rules.append(_rule_text_to_rule_with_source(rule_id, rule_text))
+        except Exception as e:
+            print(f"Warning: Failed to convert {rule_id}: {e}")
+
+    if len(rules) < 2:
+        print(f"  Failed to generate all source problems")
+        return False
+
+    print(f"Testing with {len(rules)} rules (potential circular subsumption)")
+    for rule in rules:
+        print(f"  {rule.rule_id}: {rule.rule_text}")
+
+    # Run parallel reduction (where the bug would manifest)
+    print("\nRunning parallel reduction (n_workers=4)...")
+    reducer = RuleReducer(timeout=60, seed=42, verbose=True, n_workers=4)
+    result = reducer.reduce(rules)
+
+    basis_ids = {r.rule_id for r in result["basis_rules"]}
+    eliminated_ids = {r["rule_id"] for r in result["eliminated_rules"]}
+
+    print(f"\nResults:")
+    print(f"  Basis rules: {basis_ids}")
+    print(f"  Eliminated rules: {eliminated_ids}")
+
+    # Critical check: at least one rule should survive
+    has_survivor = len(basis_ids) > 0
+    no_double_elimination = not ("r1" in eliminated_ids and "r2" in eliminated_ids)
+
+    passed = has_survivor and no_double_elimination
+    print(f"\nCircular Subsumption Regression: {'PASSED' if passed else 'FAILED'}")
+    print(f"  At least one rule survived: {has_survivor}")
+    print(f"  No double elimination: {no_double_elimination}")
+
+    if not has_survivor:
+        print(f"  ERROR: All rules were eliminated (race condition bug!)")
+
+    print()
+    return passed
+
+
+def test_reduce_by_seed_consistency():
+    """Test that reduce_by_seed produces consistent group statistics."""
+    print("="*60)
+    print("Test 6: reduce_by_seed Consistency")
+    print("="*60)
+
+    # Create rules with different seeds
+    rules_text = [
+        ("r1", "cong a b c d => cong c d a b", 100),
+        ("r2", "cong a b c d, para a b c d => cong c d a b", 100),
+        ("r3", "para a b c d => coll a b c", 200),
+        ("r4", "para a b c d, cong a b c d => coll a b c", 200),
+        ("r5", "coll a b c => para a b c d", 300),
+    ]
+
+    rules = []
+    for rule_id, rule_text, seed in rules_text:
+        try:
+            rule = _rule_text_to_rule_with_source(rule_id, rule_text)
+            rule.seed = seed
+            rules.append(rule)
+        except Exception as e:
+            print(f"Warning: Failed to convert {rule_id}: {e}")
+
+    if len(rules) < len(rules_text):
+        print(f"  Failed to generate all source problems")
+        return False
+
+    print(f"Testing with {len(rules)} rules across 3 seed groups")
+
+    # Run reduce_by_seed with parallel workers
+    print("\nRunning reduce_by_seed (n_workers=4)...")
+    reducer = RuleReducer(timeout=60, seed=42, verbose=True, n_workers=4)
+    result = reducer.reduce_by_seed(rules)
+
+    stats = result["stats"]
+    group_phase = stats["group_phase"]
+    global_phase = stats["global_phase"]
+
+    print(f"\nResults:")
+    print(f"  Original count: {stats['original_count']}")
+    print(f"  Group phase survivors: {group_phase['survivors']}")
+    print(f"  Global phase input: {global_phase['original_count']}")
+    print(f"  Final basis: {stats['basis_count']}")
+
+    # Check consistency
+    survivors_match = group_phase['survivors'] == global_phase['original_count']
+    has_basis = stats['basis_count'] > 0
+    no_zero_groups = all(g['basis'] > 0 or g['input'] == g['skipped_premises']
+                         for g in group_phase['group_details'])
+
+    passed = survivors_match and has_basis and no_zero_groups
+    print(f"\nreduce_by_seed Consistency: {'PASSED' if passed else 'FAILED'}")
+    print(f"  Group survivors == global input: {survivors_match}")
+    print(f"  Has final basis rules: {has_basis}")
+    print(f"  No groups with basis=0 (unless all skipped): {no_zero_groups}")
+
+    if not no_zero_groups:
+        print(f"  ERROR: Some groups have basis=0 (race condition bug!)")
+        for g in group_phase['group_details']:
+            if g['basis'] == 0 and g['input'] != g['skipped_premises']:
+                print(f"    Seed {g['seed']}: input={g['input']}, basis={g['basis']}, eliminated={g['eliminated']}")
+
+    print()
+    return passed
+
+
 def main():
     """Run all tests."""
     print("\n" + "="*60)
@@ -224,6 +412,9 @@ def main():
     results.append(("GeneralityScorer", test_generality_scorer()))
     results.append(("SubsumptionTester", test_subsumption_tester()))
     results.append(("RuleReducer (Small)", test_rule_reducer_small()))
+    results.append(("Parallel Consistency", test_parallel_consistency()))
+    results.append(("Circular Subsumption Regression", test_circular_subsumption_regression()))
+    results.append(("reduce_by_seed Consistency", test_reduce_by_seed_consistency()))
 
     print("="*60)
     print("Test Summary")

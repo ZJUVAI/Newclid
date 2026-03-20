@@ -33,6 +33,7 @@ from typing import Dict, List, Optional, Set, Tuple
 import os
 
 import ray
+from ray.exceptions import TaskCancelledError, WorkerCrashedError
 
 # Disable Ray's OOM killer to prevent infinite OOM retries
 os.environ["RAY_memory_monitor_refresh_ms"] = "0"
@@ -87,6 +88,80 @@ def load_problems(
     if skipped:
         print(f"Skipped {skipped} problems from skip list")
     return problems
+
+
+# ---------------------------------------------------------------------------
+# Result collection with hard timeout
+# ---------------------------------------------------------------------------
+
+CHECK_INTERVAL = 30.0  # seconds between timeout checks
+
+
+def collect_results_with_hard_timeout(
+    refs: list,
+    ref_to_pid: dict,
+    timeout: int,
+    label: str = "",
+) -> list[dict]:
+    """Collect Ray task results with hard kill for timed-out tasks."""
+    results = []
+    remaining = list(refs)
+    batch_start = time.time()
+
+    while remaining:
+        done, remaining = ray.wait(remaining, num_returns=1, timeout=CHECK_INTERVAL)
+
+        # Process completed tasks
+        for ref in done:
+            pid = ref_to_pid[ref]
+            try:
+                result = ray.get(ref)
+            except (TaskCancelledError, WorkerCrashedError) as e:
+                result = {'problem_id': pid, 'solved': False, 'time': 0.0,
+                          'error': f'worker killed: {e}'}
+            except Exception as e:
+                result = {'problem_id': pid, 'solved': False, 'time': 0.0,
+                          'error': f'worker crashed: {e}'}
+            results.append(result)
+            if result['solved']:
+                print(f"  ✓ {result['problem_id']} ({result['time']:.2f}s)")
+            else:
+                err_tag = f" [{result['error']}]" if result.get('error') else ""
+                print(f"  ✗ {result['problem_id']}{err_tag}")
+
+        # Check for timed-out tasks and hard kill
+        if not done:
+            elapsed = time.time() - batch_start
+            if elapsed > timeout:
+                for ref in list(remaining):
+                    pid = ref_to_pid[ref]
+                    print(f"  ⏰ Hard kill: {pid} (elapsed {elapsed:.0f}s > timeout {timeout}s)")
+                    ray.cancel(ref, force=True)
+                    results.append({
+                        'problem_id': pid, 'solved': False,
+                        'time': elapsed, 'error': 'hard_timeout'
+                    })
+                remaining = []
+
+    return results
+
+
+def compute_adaptive_timeout(baseline_results: list[dict]) -> Optional[dict]:
+    """Compute adaptive timeout from baseline results.
+
+    Returns {max_solved_time, avg_solved_time, adaptive_timeout, solved_count} or None.
+    """
+    solved_times = [r['time'] for r in baseline_results if r.get('solved')]
+    if not solved_times:
+        return None
+    max_t = max(solved_times)
+    avg_t = sum(solved_times) / len(solved_times)
+    return {
+        'max_solved_time': round(max_t, 2),
+        'avg_solved_time': round(avg_t, 2),
+        'adaptive_timeout': round(max_t * 3, 2),
+        'solved_count': len(solved_times),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -207,9 +282,6 @@ def run_baseline(
         problems = load_problems(bench_path, skip_ids=skip_ids)
         print(f"Loaded {len(problems)} problems")
 
-        results = []
-        solved_count = 0
-
         ref_to_pid = {}
         refs = []
         for pid, ptext in problems:
@@ -217,30 +289,25 @@ def run_baseline(
             refs.append(ref)
             ref_to_pid[ref] = pid
 
-        remaining = list(refs)
-        while remaining:
-            done, remaining = ray.wait(remaining, num_returns=1)
-            ref = done[0]
-            pid = ref_to_pid[ref]
-            try:
-                result = ray.get(ref)
-            except Exception as e:
-                result = {'problem_id': pid, 'solved': False, 'time': 0.0, 'error': f'worker crashed: {e}'}
-            results.append(result)
-            if result['solved']:
-                solved_count += 1
-                print(f"✓ {result['problem_id']} ({result['time']:.2f}s)")
-            else:
-                print(f"✗ {result['problem_id']}")
+        results = collect_results_with_hard_timeout(refs, ref_to_pid, timeout, label=name)
+        solved_count = sum(1 for r in results if r['solved'])
 
         total = len(problems)
         solve_rate = solved_count / total if total > 0 else 0.0
+
+        # Compute adaptive timeout
+        timing_stats = compute_adaptive_timeout(results)
+        if timing_stats:
+            print(f"Timing stats: avg={timing_stats['avg_solved_time']:.2f}s, "
+                  f"max={timing_stats['max_solved_time']:.2f}s, "
+                  f"adaptive_timeout={timing_stats['adaptive_timeout']:.2f}s")
 
         # Save results
         output_data = {
             'total': total,
             'solved': solved_count,
             'solve_rate': solve_rate,
+            'timing_stats': timing_stats,
             'results': results
         }
 
@@ -298,6 +365,7 @@ def run_evaluate(
     workers: int,
     timeout: int,
     skip_ids: Optional[Set[str]] = None,
+    skip_baseline_solved: bool = True,
 ) -> None:
     """Evaluate extracted rules against baseline on each benchmark."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -342,8 +410,6 @@ def run_evaluate(
             print(f"{'='*60}")
 
             problems = load_problems(bench_path, skip_ids=skip_ids)
-            results = []
-            solved_count = 0
 
             ref_to_pid = {}
             refs = []
@@ -352,18 +418,8 @@ def run_evaluate(
                 refs.append(ref)
                 ref_to_pid[ref] = pid
 
-            remaining = list(refs)
-            while remaining:
-                done, remaining = ray.wait(remaining, num_returns=1)
-                ref = done[0]
-                pid = ref_to_pid[ref]
-                try:
-                    result = ray.get(ref)
-                except Exception as e:
-                    result = {'problem_id': pid, 'solved': False, 'time': 0.0, 'error': f'worker crashed: {e}'}
-                results.append(result)
-                if result['solved']:
-                    solved_count += 1
+            results = collect_results_with_hard_timeout(refs, ref_to_pid, timeout, label=name)
+            solved_count = sum(1 for r in results if r['solved'])
 
             baseline_result = {
                 'total': len(problems),
@@ -377,39 +433,45 @@ def run_evaluate(
         print(f"Augmented: {name} ({bench_path})")
         print(f"{'='*60}")
 
-        problems = load_problems(bench_path, skip_ids=skip_ids)
-        print(f"Loaded {len(problems)} problems")
+        # Determine which problems to run
+        all_problems = load_problems(bench_path, skip_ids=skip_ids)
+        baseline_solved_ids = set()
+        if skip_baseline_solved and baseline_result:
+            baseline_solved_ids = build_solved_set(baseline_result)
+            problems_to_run = [(pid, pt) for pid, pt in all_problems if pid not in baseline_solved_ids]
+            skipped_from_baseline = len(all_problems) - len(problems_to_run)
+            print(f"Loaded {len(all_problems)} problems, skipping {skipped_from_baseline} baseline-solved")
+        else:
+            problems_to_run = all_problems
+            skipped_from_baseline = 0
+            print(f"Loaded {len(all_problems)} problems")
 
-        results = []
-        solved_count = 0
-
+        # Run augmented solver on remaining problems
         ref_to_pid = {}
         refs = []
-        for pid, ptext in problems:
+        for pid, ptext in problems_to_run:
             ref = solve_single_problem.remote(pid, ptext, rules_text, timeout, 42)
             refs.append(ref)
             ref_to_pid[ref] = pid
 
-        remaining = list(refs)
-        while remaining:
-            done, remaining = ray.wait(remaining, num_returns=1)
-            ref = done[0]
-            pid = ref_to_pid[ref]
-            try:
-                result = ray.get(ref)
-            except Exception as e:
-                result = {'problem_id': pid, 'solved': False, 'time': 0.0, 'error': f'worker crashed: {e}'}
-            results.append(result)
-            if result['solved']:
-                solved_count += 1
-                print(f"✓ {result['problem_id']} ({result['time']:.2f}s)")
-            else:
-                print(f"✗ {result['problem_id']}")
+        results = collect_results_with_hard_timeout(refs, ref_to_pid, timeout, label=name)
+
+        # Merge skipped problems from baseline cache
+        if skipped_from_baseline > 0:
+            baseline_results_by_id = {r['problem_id']: r for r in baseline_result['results']}
+            for pid in baseline_solved_ids:
+                if pid in baseline_results_by_id:
+                    merged = dict(baseline_results_by_id[pid])
+                    merged['source'] = 'baseline_cache'
+                    results.append(merged)
+
+        solved_count = sum(1 for r in results if r['solved'])
+        hard_timeout_count = sum(1 for r in results if r.get('error') == 'hard_timeout')
 
         augmented_result = {
-            'total': len(problems),
+            'total': len(all_problems),
             'solved': solved_count,
-            'solve_rate': solved_count / len(problems) if problems else 0.0,
+            'solve_rate': solved_count / len(all_problems) if all_problems else 0.0,
             'results': results
         }
 
@@ -440,6 +502,9 @@ def run_evaluate(
             },
             "new_solved": new_solved,
             "regressed": regressed,
+            "skipped_baseline_solved": skipped_from_baseline,
+            "timeout_used": timeout,
+            "hard_timeouts": hard_timeout_count,
         }
 
         table_rows.append((name, b_total, b_solved, a_solved))
@@ -522,8 +587,14 @@ def main():
     p_eval.add_argument("--output", type=Path, required=True, help="Output directory for evaluation results")
     p_eval.add_argument("--benchmarks", type=str, default=None, help="Comma-separated benchmark names (default: all)")
     p_eval.add_argument("--workers", type=int, default=30, help="Parallel workers (default: 30)")
-    p_eval.add_argument("--timeout", type=int, default=3600, help="Per-problem timeout in seconds (default: 3600)")
+    p_eval.add_argument("--timeout", type=int, default=600, help="Per-problem timeout in seconds (default: 600)")
     p_eval.add_argument("--skip", type=Path, default=None, help="File with problem IDs to skip (one per line)")
+    p_eval.add_argument(
+        "--skip-baseline-solved",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Skip problems already solved by baseline (default: True)"
+    )
 
     args = parser.parse_args()
 
@@ -571,6 +642,7 @@ def main():
                 args.workers,
                 args.timeout,
                 skip_ids=skip_ids,
+                skip_baseline_solved=args.skip_baseline_solved,
             )
         finally:
             ray.shutdown()

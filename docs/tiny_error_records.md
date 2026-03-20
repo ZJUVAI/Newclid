@@ -155,3 +155,57 @@ One Ray worker (PID 93068) ran for >65 minutes (past 3600s timeout), consuming 2
 - The solver's internal timeout mechanism does not reliably enforce time limits for all problems, especially when augmented rules cause exponential state expansion.
 - This only occurred with augmented rules (baseline completed normally for this problem).
 - Consider adding a hard process-level timeout wrapper in `solve_single_problem` as a safety net.
+
+### [2026-03-13] Rule Reduction — Generality Sorting Bug (Critical)
+
+**Command:**
+```bash
+bash scripts/run_discovery_pipeline.sh
+# Stage 2: Rule Reduction with seed-based group reduction
+```
+
+**Expected Output:**
+Rules should be sorted by generality with fewer premises first:
+- Most general: 8 premises → score=(-8, 1)
+- Least general: 34 premises → score=(-34, 1)
+
+**Actual Output:**
+```
+Step 2: Sorted 294 rules by generality
+  Most general: coll a b c, coll a d e, ... (score: (-34, 1))  # 34 premises
+  Least general: cong a b b c, cong b d d e, ... (score: (-8, 1))  # 8 premises
+```
+
+**Root Cause:**
+File: `src/newclid/proof_scout/reduction/rule_reducer.py`, line 185
+```python
+sorted_rules = sorted(rules, key=lambda r: r.generality_score)  # ✗ Wrong: ascending order
+```
+
+The generality score is `(-n_premises, n_conclusions)`. With ascending sort:
+- (-34, 1) < (-8, 1), so (-34, 1) comes first ✗
+- This puts rules with MORE premises first (opposite of intended)
+
+**Fix:**
+```python
+sorted_rules = sorted(rules, key=lambda r: r.generality_score, reverse=True)  # ✓ Correct
+```
+
+With descending sort:
+- (-8, 1) > (-34, 1), so (-8, 1) comes first ✓
+- This correctly puts rules with FEWER premises first
+
+**Impact:**
+- **Critical Bug**: Greedy elimination algorithm starts from wrong end
+- May have kept more specific rules and eliminated more general ones
+- All previous rule reduction results are suboptimal
+- Need to re-run pipeline after fix
+
+**Status:** ✓ (Fixed on 2026-03-13)
+
+**Notes:**
+- Bug discovered by user while monitoring 100k pipeline logs
+- Affects all experiments using rule reduction
+- Fix is one-line change: add `reverse=True` parameter
+- Verification: After fix, log should show fewer premises for "most general"
+

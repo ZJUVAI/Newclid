@@ -175,7 +175,8 @@ def run_stage2_reduction(
 
     # Save extracted_rules.txt (basis rules)
     basis_rules = result.get("basis_rules", [])
-    extracted_path = output_dir / "extracted_rules.txt"
+    mp_suffix = f"_maxprem{max_premises}" if max_premises else ""
+    extracted_path = output_dir / f"extracted_rules{mp_suffix}.txt"
     with open(extracted_path, "w", encoding="utf-8") as f:
         for rule in basis_rules:
             f.write(f"{rule.rule_id}\n{rule.rule_text}\n")
@@ -184,21 +185,21 @@ def run_stage2_reduction(
     # Save eliminated rules
     eliminated = result.get("eliminated_rules", [])
     if eliminated:
-        elim_path = output_dir / "eliminated_rules.json"
+        elim_path = output_dir / f"eliminated_rules{mp_suffix}.json"
         with open(elim_path, "w", encoding="utf-8") as f:
             json.dump(eliminated, f, ensure_ascii=False, indent=2)
 
     # Save skipped by premises
     skipped = result.get("skipped_by_premises", [])
     if skipped:
-        skip_path = output_dir / "skipped_by_premises.json"
+        skip_path = output_dir / f"skipped_by_premises{mp_suffix}.json"
         with open(skip_path, "w", encoding="utf-8") as f:
             json.dump(skipped, f, ensure_ascii=False, indent=2)
 
     # Save stats
     stats = result.get("stats", {})
     stats["elapsed_seconds"] = elapsed
-    stats_path = output_dir / "reduction_stats.json"
+    stats_path = output_dir / f"reduction_stats{mp_suffix}.json"
     with open(stats_path, "w", encoding="utf-8") as f:
         json.dump(stats, f, ensure_ascii=False, indent=2)
 
