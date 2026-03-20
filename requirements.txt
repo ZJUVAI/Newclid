@@ -16,3 +16,7 @@ transformers
 accelerate
 rich
 py-data-juicer
+qwen_vl_utils
+modelscope
+torchvision
+cairosvg

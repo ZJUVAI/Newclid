@@ -2,7 +2,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Collection, Optional
 import numpy as np
-from newclid.dependencies.dependency import IN_PREMISES, NUMERICAL_CHECK
+from newclid.dependencies.dependency import IN_PREMISES, NUMERICAL_CHECK, TRIVIAL
 from newclid.dependencies.symbols import Point
 from newclid.dependencies.symbols_graph import SymbolsGraph
 from pyvis.network import Network  # type: ignore
@@ -158,7 +158,9 @@ class DependencyGraph:
         set[Point],
         list[Dependency],
         list[Dependency],
+        list[Dependency],
         set[Point],
+        list[Dependency],
         list[Dependency],
         list[Dependency],
         list[Dependency],
@@ -182,9 +184,11 @@ class DependencyGraph:
 
         premises: list[Dependency] = []
         numercial_checked_premises: list[Dependency] = []
+        trivial_premises: list[Dependency] = []
         aux_points: set[Point] = set()
         aux: list[Dependency] = []
         numercial_checked_aux: list[Dependency] = []
+        trivial_aux: list[Dependency] = []
         proof_steps: list[Dependency] = []
 
         for line in proof_deps:
@@ -215,6 +219,18 @@ class DependencyGraph:
                     )
                 else:
                     numercial_checked_premises.append(line)
+            elif TRIVIAL == line.reason:
+                if is_aux:
+                    trivial_aux.append(line)
+                    aux_points.update(
+                        [
+                            p
+                            for p in line.statement.args
+                            if isinstance(p, Point) and p not in points
+                        ]
+                    )
+                else:
+                    trivial_premises.append(line)
             else:
                 proof_steps.append(line)
 
@@ -222,9 +238,11 @@ class DependencyGraph:
             points,
             premises,
             numercial_checked_premises,
+            trivial_premises,
             aux_points,
             aux,
             numercial_checked_aux,
+            trivial_aux,
             proof_steps,
         )
 

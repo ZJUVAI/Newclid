@@ -8,6 +8,7 @@ from fractions import Fraction
 
 from newclid.agent.ddarn import DDARN
 from newclid.agent.lm import LMAgent
+from newclid.agent.vlm import VLMAgent
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.load_geogebra import load_geogebra
@@ -73,8 +74,11 @@ class GeometricSolver:
         # self.run_infos = infos
         # return infos["success"]
 
-    def write_proof_steps(self, out_file: Optional[Path]):
-        write_proof_steps(self.proof, out_file)
+    def write_proof_steps(self, out_file: Optional[Path] = None):
+        if out_file is not None:      
+            write_proof_steps(self.proof, out_file)
+        else:
+            write_proof_steps(self.proof)
 
     def draw_figure(self, *, out_file: Optional[Path]):
         draw_figure(self.proof, save_to=out_file, rng=self.rng)
@@ -145,7 +149,8 @@ class GeometricSolverBuilder:
         if self.deductive_agent is None:
             self.deductive_agent = DDARN()
 
-        if isinstance(self.deductive_agent, LMAgent):
+        if isinstance(self.deductive_agent, LMAgent) or \
+            isinstance(self.deductive_agent, VLMAgent):
             self.deductive_agent.problemJGEX = self.problemJGEX
 
         # proof_state.dep_graph.obtain_numerical_checked_eqangle_and_eqratio()
@@ -226,7 +231,7 @@ class GeometricSolverBuilder:
 
 
 class CSolver:
-    def __init__(self, problem: str, problem_name: str = "anonymity", seed: int = 123, solver: GeometricSolver = None, using_log: bool = False, using_exp: bool = False):
+    def __init__(self, problem: str=None, problem_name: str = "anonymity", seed: int = 123, solver: GeometricSolver = None, using_log: bool = False, using_exp: bool = False, points: List[Tuple[str, Any, Any]] = None, premises: List[Tuple[str, List[str]]] = None, goals: List[Tuple[str, List[str]]] = None):
         self.problem = problem
         self.problem_name = problem_name
         self.seed = seed
@@ -244,19 +249,29 @@ class CSolver:
             self.solver = solver
 
         # 提取信息
-        self.points: List[Tuple[str, Any, Any]] = []
-        self.premises: List[Tuple[str, List[str]]] = []
-        self.goals: List[Tuple[str, List[str]]] = []
-
-        self._extract_points()
-        self._extract_premises()
-        self._extract_goals()
-
+        
+        if points is not None:
+            self.points = points
+        else:
+            self.points: List[Tuple[str, Any, Any]] = []
+            self.useful_points: List[str] = []
+            self._extract_points()
+        if premises is not None:
+            self.premises = premises
+        else:
+            self.premises: List[Tuple[str, List[str]]] = []
+            self._extract_premises()
+        if goals is not None:
+            self.goals = goals
+        else:
+            self.goals: List[Tuple[str, List[str]]] = []
+            self._extract_goals()
+    
     # -------------------- 内部方法 -------------------- #
     def _extract_points(self):
         """提取几何点"""
         for name, point in self.solver.proof.symbols_graph.name2node.items():
-            if isinstance(point.num, PointNum):
+            if isinstance(point.num, PointNum) and name in self.useful_points:
                 self.points.append((name, point.num.x, point.num.y))
 
     def _extract_premises(self):
@@ -269,6 +284,8 @@ class CSolver:
                     args.append(str(pt))
                 else:
                     args.append(pt.name)
+                    if pt.name not in self.useful_points:
+                        self.useful_points.append(pt.name)
             self.premises.append((predicate, args))
 
     def _extract_goals(self):
@@ -281,6 +298,8 @@ class CSolver:
                     args.append(str(pt))
                 else:
                     args.append(pt.name)
+                    if pt.name not in self.useful_points:
+                        self.useful_points.append(pt.name)
             self.goals.append((predicate, args))
 
     # -------------------- 核心方法 -------------------- #
@@ -352,3 +371,77 @@ class CSolver:
         print("\n[Goals]")
         for g in self.goals:
             print(g)
+
+class DirectSolver:
+    """
+    直接求解器，直接从点、前提和目标构建
+    
+    输入格式与 DDAR.run_ddar() 完全一致。
+    """
+    
+    def __init__(
+        self,
+        points: list[tuple[str, float, float]],
+        premises: list[tuple[str, list[str]]],
+        goal: tuple[str, list[str]],
+        problem_name: str = "anonymous",
+        rules_path: Path = "/c23474/home/duzhengtong/Discovery-GenesisGeo/src/newclid/default_configs/tmp_rules.txt",
+    ):
+        """
+        初始化 DirectSolver。
+        
+        Args:
+            points: 点坐标列表，格式为 [(name, x, y), ...]
+            premises: 前提条件列表，格式为 [(predicate, [arg1, arg2, ...]), ...]
+            goal: 目标，格式为 (predicate, [arg1, arg2, ...])
+            problem_name: 问题名称
+            rules_path: 规则文件路径
+        """
+        self.problem_name = problem_name
+        self.max_level = 500
+        self.log_enabled = False
+        self.exp_enabled = False
+        
+        # 存储输入（与 DDAR.run_ddar 接口一致）
+        self.points: List[Tuple[str, float, float]] = list(points)
+        self.premises: List[Tuple[str, List[str]]] = list(premises)
+        self.goal: Tuple[str, List[str]] = goal
+
+        solver_builder=GeometricSolverBuilder(seed=998244353)
+        solver_builder.with_deductive_agent(DDARN())
+        solver_builder.load_rules_from_file(rules_path)
+        self.problem = solver_builder.problemJGEX
+        proof_state = ProofState.build_premises(
+                    points=self.points,
+                    premises=self.premises,
+                    defsJGEX=solver_builder.defs,
+                    goals_str=[goal],
+                    rng=np.random.default_rng(solver_builder.seed)
+                )
+        self.solver=GeometricSolver(
+            proof_state,
+            solver_builder.rules,
+            DDARN()
+        )
+    
+    def run(self, timeout: int = 3600) -> bool:
+        """
+        运行直接求解器。
+        
+        Args:
+            timeout: 超时时间（秒）
+        
+        Returns:
+            bool: 是否成功求解
+        """
+        is_solved = self.solver.run(timeout=timeout)
+        self.run_infos = self.solver.run_infos
+        return is_solved
+    
+    def write_proof_steps(self, out_file: Optional[Path] = None):
+        if out_file is not None:
+            return self.solver.write_proof_steps(out_file)
+        else:
+            return self.solver.write_proof_steps()
+
+    

@@ -22,7 +22,7 @@ DDARSolver::DDARSolver(Problem *problem, bool log_enabled, bool exp_enabled) : _
     }
 
     // cout << "匹配定理" << endl;
-    Matcher matcher(problem);
+    Matcher matcher(problem, _goals.empty());
     for (const auto &thm : matcher.theorems())
     {
         insert_application(thm.clone());
@@ -38,10 +38,10 @@ DDARSolver::DDARSolver(Problem *problem, bool log_enabled, bool exp_enabled) : _
         }
     }
 
-    // for (const auto &stmt : matcher.stmts())
-    // {
-    //     _ars.push_back(this->insert_statement(stmt));
-    // }
+    for (const auto &stmt : matcher.stmts())
+    {
+        _ars.push_back(this->insert_statement(stmt));
+    }
 }
 
 bool DDARSolver::run_level(const Point &max_pt)
@@ -77,6 +77,29 @@ bool DDARSolver::run_level(const Point &max_pt)
             }
         }
         _solved = res;
+    }
+    else
+    {
+        for (auto it = _ars.begin(); it != _ars.end();)
+        {
+            auto &goal = *it;
+            if (goal->is_proved())
+            {
+                it = _ars.erase(it);
+            }
+            else
+            {
+                goal->ar();
+                if (goal->is_proved())
+                {
+                    it = _ars.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+        }
     }
 
     // cout << "新证明" << _checked_statements.size() - num_stmts << "个结论, "

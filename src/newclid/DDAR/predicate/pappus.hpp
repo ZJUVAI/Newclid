@@ -42,6 +42,8 @@ public:
 
     bool numerical_only() const { return false; }
 
+    bool trivial() const { return false; }
+
     bool operator==(const Pappus &other) const;
 
     bool operator!=(const Pappus &other) const;

@@ -15,8 +15,11 @@ def check_too_close_numerical(
 ) -> bool:
     if len(points) < 2:
         return False
-    avg = sum(points, PointNum(0.0, 0.0)) * 1.0 / len(points)
-    mindist = min(p.distance(avg) for p in points)
+    mindist = (
+        sum([sum([p.distance(p1) for p1 in points if p1 != p]) for p in points])
+        / len(points)
+        / (len(points) - 1)
+    )
     for p0 in newpoints:
         for p1 in points:
             if p0.distance(p1) < tol * mindist:

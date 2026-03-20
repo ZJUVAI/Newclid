@@ -52,6 +52,8 @@ public:
     std::vector<OrthoCenter> cyclic_rotations() const;
 
     bool numerical_only() const { return false; }
+
+    bool trivial() const { return false; }
 };
 
 #endif // ORTHOCENTER_HPP

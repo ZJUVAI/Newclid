@@ -34,6 +34,8 @@ public:
     std::ostream &print(std::ostream &out) const override;
 
     bool numerical_only() const { return true; }
+
+    bool trivial() const { return false; }
 };
 
 #endif // SAMECLOCK_HPP

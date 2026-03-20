@@ -109,7 +109,9 @@ class GeometryGenerator:
                             format='svg'
                         )
                         plt.close(fig)
-                    result_data = {'id': self.data_count, **data_item}
+                        result_data = {'image_path': f"imgs_png/{self.data_count}.png", **data_item}
+                    else:
+                        result_data = data_item
                     json.dump(result_data, f, ensure_ascii=False)
                     f.write('\n')
             self.write_buffer.clear()

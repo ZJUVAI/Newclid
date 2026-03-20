@@ -4,11 +4,9 @@ from newclid.formulations.problem import ProblemJGEX
 
 solver_builder = GeometricSolverBuilder(123)
 solver_builder.load_problem_from_txt(
-    # 'a b c = triangle a b c; d = on_circum d a b c ? eqangle a c a d b c b d'
-    'a b c = triangle a b c; d = foot d a b c; e = free e; f = foot f e b c; g = midpoint g a e; h = midpoint h d f ? cong g d g f'
+    'a b c = triangle; a1 = on_line b c; b1 = on_line a c; p = on_line a a1; q = on_line b b1, on_pline p a b; p1 = on_line p b1, eqangle3 p c a b c; q1 = on_line q a1, eqangle3 c q b c a; a2 = on_line a2 a a1, on_circum a2 a b c; b2 = on_line b2 b b1, on_circum b2 a b c ? cyclic p q p1 q1'
 )
 
-problem = ProblemJGEX.from_text('a b c = triangle a b c; d = foot d a b c; e = free e; f = foot f e b c; g = midpoint g a e; h = midpoint h d f ? cong g d g f')
 
 # We now obtain the GeometricSolver with the build method
 try:

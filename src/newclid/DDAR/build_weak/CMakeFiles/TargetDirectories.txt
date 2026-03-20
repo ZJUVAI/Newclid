@@ -1,3 +1,0 @@
-/C20545/home/duzhengtong/GeoDiscovery/src/newclid/DDAR/build_weak/CMakeFiles/DDAR.dir
-/C20545/home/duzhengtong/GeoDiscovery/src/newclid/DDAR/build_weak/CMakeFiles/edit_cache.dir
-/C20545/home/duzhengtong/GeoDiscovery/src/newclid/DDAR/build_weak/CMakeFiles/rebuild_cache.dir
