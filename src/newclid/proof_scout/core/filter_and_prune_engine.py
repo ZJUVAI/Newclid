@@ -4,7 +4,7 @@
 FilterAndPruneEngine
 
 职责：封装 scripts/filter_and_prune.py 中的完整流程为可复用类，便于脚本薄封装调用：
-  - 读取“新格式”数据（仅支持 llm_input_renamed / llm_output_renamed）
+  - 读取"新格式"数据（仅支持 llm_input_renamed / llm_output_renamed）
   - 过滤 aux_points 非空的题目
   - 使用 SingleProofGraph + GraphPruner 进行图修剪
   - 基于修剪结果生成不含辅助点的命题与规则文本，去重并落盘 *_pruned_rules.txt
@@ -161,7 +161,8 @@ def _convert_llm_record(record: Dict[str, Any], base: str, index: int) -> Dict[s
     llm_input = record.get("llm_input_renamed", "")
     llm_output = record.get("llm_output_renamed", "")
 
-    problem_id = record.get("problem_id")
+    # Priority: pid (new format) > problem_id (legacy) > fallback line-number
+    problem_id = record.get("pid") or record.get("problem_id")
     if not problem_id:
         problem_id = f"{base}:{index:06d}"
 
@@ -171,6 +172,9 @@ def _convert_llm_record(record: Dict[str, Any], base: str, index: int) -> Dict[s
     analysis_segments.extend(_extract_fact_segments(aux_section))
     analysis = "; ".join(analysis_segments)
     numerical = _sanitize_clause_section(_extract_tag_content(llm_output, "numerical_check"))
+    trivial = _sanitize_clause_section(_extract_tag_content(llm_output, "trivial"))
+    if trivial:
+        numerical = f"{numerical}; {trivial}" if numerical else trivial
     proof_text = _sanitize_clause_section(_extract_tag_content(llm_output, "proof"))
     aux_points = _extract_aux_points(aux_section)
     existing_aux = record.get("aux_points")
@@ -273,6 +277,16 @@ def _combine_pngs_h(left_png: Path, right_png: Path, out_png: Path, *, title: Op
     return str(out_png)
 
 
+# ========================= Step 1d/1e helper functions =========================
+# These module-level helpers are used by Steps 1d and 1e in the pipeline.
+# - _parse_args_from_label: extract arguments from a fact label like "cong(A,B,C,D)"
+# - _is_point_token / _alpha_seq: point name detection and a,b,c,... renaming
+# - _parse_name_args: split "pred(arg1,arg2)" into (pred, [arg1, arg2])
+# - _to_rule_text: (Step 1e) rename points to a,b,c,... and format rule string
+# - _build_proposition_no_aux: (Step 1d) extract premises/conclusion from pruned graph
+# - _worker_prune: (Step 1c) build + prune proof graph for one record
+# ==============================================================================
+
 def _parse_args_from_label(raw_label: str) -> List[str]:
     try:
         if "(" in raw_label and ")" in raw_label:
@@ -310,6 +324,14 @@ def _parse_name_args(raw_label: str) -> Tuple[str, List[str]]:
 
 
 def _to_rule_text(premises: List[str], conclusion: str) -> Tuple[str, Dict[str, str]]:
+    """Step 1e helper: convert premises + conclusion into a canonical rule string.
+
+    1. Collect all point names in first-appearance order from premises then conclusion.
+    2. Rename: 1st point → a, 2nd → b, ...  (via _alpha_seq)
+    3. Format: "pred1 a b, pred2 c d => pred3 a c"
+
+    Returns (rule_text, rename_map).
+    """
     seq: List[str] = []
 
     def _collect(args: List[str]):
@@ -412,7 +434,28 @@ def _fmt_rule_id(idx: int) -> str:
     return f"r{idx:04d}"
 
 
+def _pid_to_rid(pid: str) -> str:
+    """Convert pid to rid by replacing 'p' prefix with 'r'.
+
+    Examples: p000042 → r000042, p000042_0 → r000042_0
+    For legacy pids without 'p' prefix, fall back to using the pid as-is with 'r' prefix.
+    """
+    pid_str = str(pid)
+    if pid_str.startswith("p"):
+        return "r" + pid_str[1:]
+    # Legacy format (e.g., "base:000042") — keep as-is for backward compat
+    return pid_str
+
+
 def _build_proposition_no_aux(rendered: Dict[str, Any], aux_points: List[str]) -> Optional[Dict[str, Any]]:
+    """Step 1d helper: extract proposition (premises + conclusion) from a pruned proof graph.
+
+    1. Identify fact nodes (type=="fact") in the pruned graph.
+    2. Premises = fact nodes with in-degree 0 (root facts).
+    3. Conclusion = fact node with out-degree 0 (must be exactly 1, else return None).
+    4. Filter out premises whose arguments contain any aux point.
+    5. Return {premises: [...], conclusion: "...", text: "..."}.
+    """
     nodes = (rendered or {}).get("nodes") or []
     edges = (rendered or {}).get("edges") or []
     if not isinstance(nodes, list) or not isinstance(edges, list) or not nodes:
@@ -444,6 +487,13 @@ def _build_proposition_no_aux(rendered: Dict[str, Any], aux_points: List[str]) -
 
 
 def _worker_prune(rec: Dict[str, Any]) -> Tuple[str, Any]:
+    """Step 1c helper: build SingleProofGraph from one record and prune it.
+
+    Called in parallel by ProcessPoolExecutor in run().
+    Code path: SingleProofGraph.build_from_result_record(rec)
+             → GraphPruner().prune_proof_graph(spg)
+    Returns (pid, rendered_list) where rendered_list = [{nodes: [...], edges: [...]}, ...].
+    """
     try:
         pid_val = rec.get("problem_id")
         if pid_val is None:
@@ -454,8 +504,8 @@ def _worker_prune(rec: Dict[str, Any]) -> Tuple[str, Any]:
         from newclid.proof_scout.core.single_proof_graph import SingleProofGraph
         pruner = GraphPruner()
         spg = SingleProofGraph.build_from_result_record(rec, verbose=False)
-        rendered_one = pruner.prune_proof_graph(spg).get(pid)
-        return (pid, rendered_one)
+        rendered_list = pruner.prune_proof_graph(spg).get(pid, [])
+        return (pid, rendered_list if rendered_list else None)
     except Exception:
         return (str(rec.get("problem_id")), None)
 
@@ -547,6 +597,10 @@ class FilterAndPruneEngine:
         keep_pid_images: bool = False,
         # 新增：谓词对称性配置文件路径（JSON），用于规则级去重的规范化
         symmetry_config_path: Optional[str] = None,
+        # 需要跳过的谓词集合（若记录的 llm_output_renamed 包含这些谓词则过滤掉）
+        skip_predicates: Optional[List[str]] = None,
+        # 规则落盘时需要跳过的谓词集合（若规则文本包含这些谓词则不写入最终 rules.txt）
+        rule_skip_predicates: Optional[List[str]] = None,
     ) -> None:
         self.label_mode = label_mode
         self.figsize_single = figsize_single
@@ -564,129 +618,113 @@ class FilterAndPruneEngine:
         self.render_by_rule = render_by_rule
         self.keep_pid_images = keep_pid_images
         self.symmetry_config_path = symmetry_config_path
-        # 预加载对称性配置（若提供）
-        self._symmetry_cfg: Dict[str, Any] = {}
+        self.skip_predicates = set(p.lower() for p in (skip_predicates if skip_predicates is not None else ["eqpoint", "constline"]))
+        self.rule_skip_predicates = set(p.lower() for p in (rule_skip_predicates if rule_skip_predicates is not None else ["aconst", "rconst"]))
+        # 硬编码 19 个谓词的对称性配置（优先），外部 JSON 仅作覆盖
+        self._symmetry_cfg: Dict[str, Any] = self._build_hardcoded_symmetry_config()
         if self.symmetry_config_path:
             try:
                 p = Path(self.symmetry_config_path)
                 if p.exists():
                     with open(p, "r", encoding="utf-8") as f:
-                        self._symmetry_cfg = json.load(f)
+                        override = json.load(f)
+                    self._symmetry_cfg.update(override)
+                    print(f"[symmetry] merged overrides from {p}")
                 else:
                     print(f"[symmetry] config not found: {p}")
             except Exception as e:
                 print(f"[symmetry] failed to load config: {e}")
 
-    # --- 粗去重：基于谓词计数签名（不做谓词名规范化） ---
-    def _signature_from_rule_text(self, rule_text: str) -> Optional[str]:
-        """从规则文本生成“premise 谓词计数 + 结论谓词计数”的签名。
-        不做大小写/别名规范化，仅使用解析到的谓词名原文；解析失败返回 None。
-        例：prem:coll*1+eqangle*1+perp*2|concl:cong*1
-        """
-        try:
-            if not isinstance(rule_text, str) or not rule_text.strip():
-                return None
-            left_parsed, right_parsed = _split_rule_text(rule_text)
-            # 统计左侧谓词计数
-            prem_counts: Dict[str, int] = {}
-            for name, _ in left_parsed:
-                if not name:
-                    continue
-                prem_counts[name] = prem_counts.get(name, 0) + 1
-            # 统计右侧（允许多结论时的统一处理）
-            concl_counts: Dict[str, int] = {}
-            rn, _ = right_parsed
-            if rn:
-                concl_counts[rn] = concl_counts.get(rn, 0) + 1
-            # 生成稳定签名（按名称字典序排序，区分大小写）
-            prem_sig = "+".join([f"{k}*{prem_counts[k]}" for k in sorted(prem_counts.keys())]) if prem_counts else ""
-            concl_sig = "+".join([f"{k}*{concl_counts[k]}" for k in sorted(concl_counts.keys())]) if concl_counts else ""
-            return f"prem:{prem_sig}|concl:{concl_sig}"
-        except Exception:
-            return None
-
-    def _dedup_by_signature(
-        self, results: List[Dict[str, Any]]
-    ) -> Tuple[List[Dict[str, Any]], Dict[str, List[Tuple[str, str]]]]:
-        """对结果按签名粗去重：同一签名仅保留首条，其余并入重复映射。
-        返回：(保留后的 results, 重复映射 signature -> [(pid, rule_text), ...])。
-        注意：重复映射包含该签名下的所有条目（含首条），便于审计输出。
-        """
-        seen: Dict[str, int] = {}
-        kept: List[Dict[str, Any]] = []
-        sig_groups: Dict[str, List[Tuple[str, str]]] = {}
-        for rec in results:
-            if not isinstance(rec, dict):
-                continue
-            rule = rec.get("proposition_rule")
-            if not isinstance(rule, str) or not rule.strip():
-                kept.append(rec)
-                continue
-            sig = self._signature_from_rule_text(rule)
-            if not sig:
-                kept.append(rec)
-                continue
-            pid = str(rec.get("problem_id", "<unknown>"))
-            sig_groups.setdefault(sig, []).append((pid, rule))
-            if sig not in seen:
-                seen[sig] = 1
-                kept.append(rec)
-            else:
-                # 后续重复样本不再加入 kept（仅记录于 sig_groups）
-                seen[sig] += 1
-        # 仅保留那些实际出现次数 > 1 的签名用于重复报告
-        dup_map: Dict[str, List[Tuple[str, str]]] = {
-            sig: lst for sig, lst in sig_groups.items() if len(lst) > 1
+    # --- 硬编码 19 个谓词的对称性配置 ---
+    @staticmethod
+    def _build_hardcoded_symmetry_config() -> Dict[str, Any]:
+        """Return hardcoded symmetry rules for 19 geometric predicates."""
+        return {
+            # [ab][cd], groups inter-swappable, intra-swappable
+            "cong": {
+                "kind": "swap-pairs",
+                "groups": [[0, 1], [2, 3]],
+                "allow_group_permutation": True,
+            },
+            "para": {
+                "kind": "swap-pairs",
+                "groups": [[0, 1], [2, 3]],
+                "allow_group_permutation": True,
+            },
+            "perp": {
+                "kind": "swap-pairs",
+                "groups": [[0, 1], [2, 3]],
+                "allow_group_permutation": True,
+            },
+            # [abc], fully unordered
+            "coll": {"kind": "unordered"},
+            "ncoll": {"kind": "unordered"},
+            # [abcd], fully unordered
+            "cyclic": {"kind": "unordered"},
+            # [a][bc], a fixed, bc swappable
+            "midp": {
+                "kind": "swap-pairs",
+                "groups": [[0], [1, 2]],
+                "allow_group_permutation": False,
+            },
+            # complex symmetry, delegate to EqAngle.preparse()
+            "eqangle": {"kind": "preparse"},
+            # same logic as eqangle
+            "eqratio": {"kind": "preparse"},
+            # [abc][def], groups inter-swappable, intra same-direction rotation
+            "contri": {
+                "kind": "rotation",
+                "groups": [[0, 1, 2], [3, 4, 5]],
+                "allow_group_permutation": True,
+                "rotation_mode": "same",
+            },
+            # [abc][def], groups inter-swappable, intra opposite-direction rotation
+            "contrir": {
+                "kind": "rotation",
+                "groups": [[0, 1, 2], [3, 4, 5]],
+                "allow_group_permutation": True,
+                "rotation_mode": "opposite",
+            },
+            "simtri": {
+                "kind": "rotation",
+                "groups": [[0, 1, 2], [3, 4, 5]],
+                "allow_group_permutation": True,
+                "rotation_mode": "same",
+            },
+            "simtrir": {
+                "kind": "rotation",
+                "groups": [[0, 1, 2], [3, 4, 5]],
+                "allow_group_permutation": True,
+                "rotation_mode": "opposite",
+            },
+            "sameclock": {
+                "kind": "rotation",
+                "groups": [[0, 1, 2], [3, 4, 5]],
+                "allow_group_permutation": True,
+                "rotation_mode": "same",
+            },
+            # [a][bc][d][ef], pair (a,bc) <-> (d,ef) swappable, bc/ef swappable
+            "sameside": {
+                "kind": "sameside",
+            },
+            # [ab][cd][const], ab/cd groups swappable, constant stays
+            "aconst": {
+                "kind": "swap-pairs-const",
+                "groups": [[0, 1], [2, 3]],
+                "allow_group_permutation": True,
+                "const_indices": [4],
+            },
+            "rconst": {
+                "kind": "swap-pairs-const",
+                "groups": [[0, 1], [2, 3]],
+                "allow_group_permutation": True,
+                "const_indices": [4],
+            },
+            # [ab], swappable
+            "eqpoint": {"kind": "unordered"},
+            # [abc], fully unordered
+            "constline": {"kind": "unordered"},
         }
-        return kept, dup_map
-
-    # 内部工具：收集有效且去重后的规则条目，绑定首个出现的 pid
-    # 返回：entries（按编号顺序），skipped_count，skipped_entries
-    def _collect_rules_entries(self, results: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], int, List[Tuple[str, List[str], str]]]:
-        seen: Dict[str, str] = {}
-        ordered_norm: List[str] = []
-        skipped = 0
-        skipped_entries: List[Tuple[str, List[str], str]] = []  # (pid, missing_points, rule)
-        norm_first_pid: Dict[str, str] = {}
-        for rec in results:
-            if not isinstance(rec, dict):
-                continue
-            rule = rec.get("proposition_rule")
-            if not isinstance(rule, str) or not rule.strip():
-                continue
-            left_parsed, right_parsed = _split_rule_text(rule)
-            left_points = _collect_point_set(left_parsed)
-            right_points = set(_collect_point_list(right_parsed[1]))
-            missing = right_points - left_points
-            if missing:
-                pid = rec.get("problem_id", "<unknown>")
-                print(f"[rules] skip pid={pid} missing_points={sorted(missing)}")
-                if self.print_skipped_rules:
-                    # 打印被跳过的原始规则文本
-                    print(f"[rules] skipped rule: {rule}")
-                    skipped_entries.append((str(pid), sorted(missing), rule))
-                skipped += 1
-                continue
-            # 先做点名重命名与基本规范，再结合谓词对称性生成稳定键
-            norm = self._canonicalize_rule_with_symmetry(rule)
-            if not norm:
-                continue
-            if norm not in seen:
-                seen[norm] = rule
-                ordered_norm.append(norm)
-                # 记录首个出现该规范化规则的 pid
-                pid_val = rec.get("problem_id", "<unknown>")
-                norm_first_pid[norm] = str(pid_val)
-        # 汇总 entries
-        entries: List[Dict[str, Any]] = []
-        for idx, norm in enumerate(ordered_norm):
-            entries.append({
-                "rid": _fmt_rule_id(idx),
-                "norm_rule": norm,
-                "rule": seen[norm],
-                "pid": norm_first_pid.get(norm, "<unknown>"),
-            })
-        return entries, skipped, skipped_entries
 
     # --- 谓词对称性与规范化 ---
     def _normalize_clause_by_symmetry(self, pred: str, args: List[str]) -> Tuple[str, Tuple[str, ...]]:
@@ -696,20 +734,25 @@ class FilterAndPruneEngine:
         kind = spec.get("kind")
         if kind == "unordered":
             return pred, tuple(sorted(args))
+        if kind == "preparse":
+            return self._normalize_by_preparse(pred, args)
+        if kind == "rotation":
+            return self._normalize_by_rotation(pred, args, spec)
+        if kind == "sameside":
+            return self._normalize_sameside(pred, args)
+        if kind == "swap-pairs-const":
+            return self._normalize_swap_pairs_const(pred, args, spec)
         groups = spec.get("groups")
         allow_perm = bool(spec.get("allow_group_permutation", False))
         if kind in ("swap-pairs", "swap-groups") and isinstance(groups, list):
-            # 切分为分组
             blocks: List[List[str]] = []
             try:
                 for g in groups:
                     block = [args[i] for i in g if 0 <= i < len(args)]
-                    # 组内排序
                     block.sort()
                     blocks.append(block)
             except Exception:
                 return pred, tuple(args)
-            # 组间排序（若允许）
             if allow_perm:
                 blocks.sort(key=lambda b: ",".join(b))
             norm_args: List[str] = []
@@ -718,7 +761,97 @@ class FilterAndPruneEngine:
             return pred, tuple(norm_args)
         return pred, tuple(args)
 
+    def _normalize_by_preparse(self, pred: str, args: List[str]) -> Tuple[str, Tuple[str, ...]]:
+        """Delegate to EqAngle.preparse() for eqangle/eqratio normalization."""
+        if len(args) != 8:
+            return pred, tuple(args)
+        try:
+            from newclid.predicates.equal_angles import EqAngle
+            result = EqAngle.preparse(tuple(args))
+            if result is None:
+                return pred, tuple(args)
+            return pred, tuple(result)
+        except Exception:
+            return pred, tuple(args)
+
+    def _normalize_by_rotation(self, pred: str, args: List[str], spec: Dict[str, Any]) -> Tuple[str, Tuple[str, ...]]:
+        """Normalize predicates with rotation symmetry (contri, simtri, etc.)."""
+        groups = spec.get("groups", [[0, 1, 2], [3, 4, 5]])
+        allow_perm = bool(spec.get("allow_group_permutation", False))
+        rotation_mode = spec.get("rotation_mode", "same")
+
+        try:
+            g1 = [args[i] for i in groups[0]]
+            g2 = [args[i] for i in groups[1]]
+        except (IndexError, TypeError):
+            return pred, tuple(args)
+
+        # Generate 3 rotations for g1
+        g1_rots = [g1, [g1[1], g1[2], g1[0]], [g1[2], g1[0], g1[1]]]
+
+        # Generate corresponding rotations for g2
+        if rotation_mode == "same":
+            g2_rots = [g2, [g2[1], g2[2], g2[0]], [g2[2], g2[0], g2[1]]]
+        else:  # opposite
+            g2_rev = g2[::-1]
+            g2_rots = [g2_rev, [g2_rev[1], g2_rev[2], g2_rev[0]], [g2_rev[2], g2_rev[0], g2_rev[1]]]
+
+        candidates: List[Tuple[str, ...]] = []
+        for r1 in g1_rots:
+            for r2 in g2_rots:
+                candidates.append(tuple(r1 + r2))
+                if allow_perm:
+                    candidates.append(tuple(r2 + r1))
+
+        return pred, min(candidates)
+
+    def _normalize_sameside(self, pred: str, args: List[str]) -> Tuple[str, Tuple[str, ...]]:
+        """Normalize sameside: [a][bc][d][ef], pair (a,bc)<->(d,ef) swappable, bc/ef swappable."""
+        if len(args) != 6:
+            return pred, tuple(args)
+        a, b, c, d, e, f = args
+        # Sort within bc and ef
+        bc = sorted([b, c])
+        ef = sorted([e, f])
+        # Two candidates: (a, bc, d, ef) vs (d, ef, a, bc)
+        cand1 = tuple([a] + bc + [d] + ef)
+        cand2 = tuple([d] + ef + [a] + bc)
+        return pred, min(cand1, cand2)
+
+    def _normalize_swap_pairs_const(self, pred: str, args: List[str], spec: Dict[str, Any]) -> Tuple[str, Tuple[str, ...]]:
+        """Normalize aconst/rconst: [ab][cd][const], ab/cd groups swappable, constant stays."""
+        groups = spec.get("groups", [[0, 1], [2, 3]])
+        allow_perm = bool(spec.get("allow_group_permutation", False))
+        const_indices = spec.get("const_indices", [4])
+
+        try:
+            blocks: List[List[str]] = []
+            for g in groups:
+                block = [args[i] for i in g if 0 <= i < len(args)]
+                block.sort()
+                blocks.append(block)
+            consts = [args[i] for i in const_indices if 0 <= i < len(args)]
+        except (IndexError, TypeError):
+            return pred, tuple(args)
+
+        if allow_perm:
+            blocks.sort(key=lambda b: ",".join(b))
+
+        norm_args: List[str] = []
+        for b in blocks:
+            norm_args.extend(b)
+        norm_args.extend(consts)
+        return pred, tuple(norm_args)
+
     def _canonicalize_rule_with_symmetry(self, rule_text: str) -> str:
+        """Step 1e Phase 2 helper: normalize a rule string for dedup.
+
+        1. Rename points to a,b,c,... by first-appearance order
+        2. Normalize argument order per predicate symmetry config
+           (e.g. cong(a,b,c,d) has group_size=2, allow_perm=True)
+        3. Sort premise clauses lexicographically
+        4. Final point renaming based on sorted predicate order
+        """
         left_parsed, right_parsed = _split_rule_text(rule_text)
         # 收集点出现顺序并重命名（稳定）
         seq: List[str] = []
@@ -748,9 +881,30 @@ class FilterAndPruneEngine:
         if rn:
             right_norm_clause = self._normalize_clause_by_symmetry(rn, map_args(ra))
 
-        # 前提子句排序（字典序），生成稳定文本
+        # 前提子句排序（字典序）
+        left_norm_clauses.sort(key=lambda nc: f"{nc[0]} " + " ".join(nc[1]) if nc[1] else nc[0])
+
+        # Step 3.5: 根据排序后的点出现顺序重新命名
+        final_seq: List[str] = []
+
+        def collect_final(args: Iterable[str]) -> None:
+            for a in args:
+                if _is_point_token(a) and a not in final_seq:
+                    final_seq.append(a)
+
+        for n, a in left_norm_clauses:
+            collect_final(a)
+        collect_final(right_norm_clause[1])
+
+        final_rename: Dict[str, str] = {old: _alpha_seq(i) for i, old in enumerate(final_seq)}
+
+        def final_map_args(args: Tuple[str, ...]) -> Tuple[str, ...]:
+            return tuple(final_rename.get(a, a) if _is_point_token(a) else a for a in args)
+
+        left_norm_clauses = [(n, final_map_args(a)) for n, a in left_norm_clauses]
+        right_norm_clause = (right_norm_clause[0], final_map_args(right_norm_clause[1]))
+
         left_texts = [f"{n} " + " ".join(a) if a else n for (n, a) in left_norm_clauses]
-        left_texts.sort()
         right_text = f"{right_norm_clause[0]} " + " ".join(right_norm_clause[1]) if right_norm_clause[0] else ""
         if left_texts and right_text:
             return ", ".join(left_texts) + " => " + right_text
@@ -758,67 +912,150 @@ class FilterAndPruneEngine:
             return "=> " + right_text
         return ", ".join(left_texts)
 
-    # 分离：写规则文件（内部实现依赖规范化与过滤规则），并返回 entries
-    def _write_rules_file(self, pruned_path: Path, results: List[Dict[str, Any]]) -> Tuple[int, int, List[Dict[str, Any]]]:
-        # 先进行“谓词计数签名”的粗去重（默认启用）
-        results_coarse, coarse_dup_map = self._dedup_by_signature(results)
-        # 再进行现有的规则级规范化去重与收集
-        entries, skipped, skipped_entries = self._collect_rules_entries(results_coarse)
-        # 生成重复项清单（规范化键出现次数>1 的原始规则文本聚合）
-        # 由于 _collect_rules_entries 只保留首个规范化规则，这里简单通过再次统计来获取重复项文本
-        norm_dup_lines: List[str] = []
-        coarse_dup_lines: List[str] = []
-        try:
-            norm_counter: Dict[str, List[Tuple[str, str]]] = {}
-            for rec in results_coarse:
-                rule = rec.get("proposition_rule")
-                if not isinstance(rule, str) or not rule.strip():
-                    continue
-                norm = self._canonicalize_rule_with_symmetry(rule)
-                if not norm:
-                    continue
-                pid = str(rec.get("problem_id", "<unknown>"))
-                norm_counter.setdefault(norm, []).append((pid, rule))
-            for norm, lst in norm_counter.items():
-                if len(lst) > 1:
-                    norm_dup_lines.append(f"norm={norm}")
-                    for pid, rule in lst:
-                        norm_dup_lines.append(f"  pid={pid} :: {rule}")
-            # 追加粗去重的签名分组（signature）
-            if coarse_dup_map:
-                for sig, lst in coarse_dup_map.items():
-                    coarse_dup_lines.append(f"signature={sig}")
-                    for pid, rule in lst:
-                        coarse_dup_lines.append(f"  pid={pid} :: {rule}")
-        except Exception:
-            norm_dup_lines = []
-            coarse_dup_lines = []
+    # --- Step 4: Normalization ---
+    def _normalize_rules(self, results: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], int, List[Tuple[str, List[str], str]]]:
+        """Step 4: Normalize rules — missing_points check + canonicalize + signature.
+
+        Returns: (normalized_rules, n_skipped, skipped_entries)
+        """
+        normalized_rules: List[Dict[str, Any]] = []
+        skipped = 0
+        skipped_entries: List[Tuple[str, List[str], str]] = []
+
+        for rec in results:
+            if not isinstance(rec, dict):
+                continue
+            rule = rec.get("proposition_rule")
+            if not isinstance(rule, str) or not rule.strip():
+                continue
+
+            # Check missing_points
+            left_parsed, right_parsed = _split_rule_text(rule)
+            left_points = _collect_point_set(left_parsed)
+            right_points = set(_collect_point_list(right_parsed[1]))
+            missing = right_points - left_points
+
+            if missing:
+                pid = rec.get("problem_id", "<unknown>")
+                print(f"[Step 4] skip pid={pid} missing_points={sorted(missing)}")
+                if self.print_skipped_rules:
+                    skipped_entries.append((str(pid), sorted(missing), rule))
+                skipped += 1
+                continue
+
+            # Normalize
+            norm = self._canonicalize_rule_with_symmetry(rule)
+            if not norm:
+                continue
+
+            normalized_rules.append({
+                "pid": str(rec.get("problem_id", "<unknown>")),
+                "seed": rec.get("seed"),
+                "original": rule,
+                "normalized": norm,
+                "llm_input_renamed": rec.get("llm_input_renamed", ""),
+                "llm_output_renamed": rec.get("llm_output_renamed", ""),
+                "point_coords": rec.get("point_coords", {}),
+            })
+
+        # Generate signatures
+        for item in normalized_rules:
+            item["signature"] = self._signature_from_normalized_rule(item["normalized"])
+
+        print(f"[Step 4: normalization] input={skipped + len(normalized_rules)} "
+              f"normalized={len(normalized_rules)} skipped={skipped}")
+        return normalized_rules, skipped, skipped_entries
+
+    # --- Step 5: Deduplication ---
+    def _dedup_rules(self, normalized_rules: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], Dict[str, List[Tuple[str, str]]]]:
+        """Step 5: Deduplicate rules — sort by signature + SHA256 hash dedup.
+
+        Returns: (deduped_entries, norm_dup_map)
+        """
+        # Sort by signature
+        normalized_rules.sort(key=lambda x: x["signature"])
+
+        # Dedup by full normalized string hash
+        seen_hashes: Dict[str, Dict[str, Any]] = {}
+        entries: List[Dict[str, Any]] = []
+        norm_dup_map: Dict[str, List[Tuple[str, str]]] = {}
+
+        for item in normalized_rules:
+            norm_hash = hashlib.sha256(item["normalized"].encode("utf-8")).hexdigest()
+
+            if norm_hash not in seen_hashes:
+                seen_hashes[norm_hash] = item
+                entries.append({
+                    "rid": _pid_to_rid(item["pid"]),
+                    "norm_rule": item["normalized"],
+                    "rule": item["original"],
+                    "pid": item["pid"],
+                    "seed": item.get("seed"),
+                    "llm_input_renamed": item.get("llm_input_renamed", ""),
+                    "llm_output_renamed": item.get("llm_output_renamed", ""),
+                    "point_coords": item.get("point_coords", {}),
+                })
+            else:
+                # Track duplicates
+                if norm_hash not in norm_dup_map:
+                    first = seen_hashes[norm_hash]
+                    norm_dup_map[norm_hash] = [(first["pid"], first["original"])]
+                norm_dup_map[norm_hash].append((item["pid"], item["original"]))
+
+        print(f"[Step 5: deduplication] input={len(normalized_rules)} "
+              f"unique={len(entries)} duplicates={len(normalized_rules) - len(entries)}")
+        return entries, norm_dup_map
+
+    # --- Step 6: Rule dump ---
+    def _dump_rules(
+        self,
+        entries: List[Dict[str, Any]],
+        norm_dup_map: Dict[str, List[Tuple[str, str]]],
+        skipped_entries: List[Tuple[str, List[str], str]],
+        pruned_path: Path,
+    ) -> Tuple[int, int, List[Dict[str, Any]]]:
+        """Step 6: Dump rules — filter by rule_skip_predicates + write output files.
+
+        Returns: (n_rules, n_skipped_predicates, final_entries)
+        """
+        # Filter by rule_skip_predicates
+        final_entries: List[Dict[str, Any]] = []
+        skipped_by_pred: List[Dict[str, Any]] = []
+        if self.rule_skip_predicates:
+            for e in entries:
+                rule_lower = e["norm_rule"].lower()
+                matched = [p for p in self.rule_skip_predicates if p in rule_lower]
+                if matched:
+                    skipped_by_pred.append({"rid": e["rid"], "rule": e["norm_rule"], "matched_predicates": matched})
+                else:
+                    final_entries.append(e)
+        else:
+            final_entries = entries
+
+        # rid is already aligned with pid via _pid_to_rid(), no re-numbering needed
+
+        # Write rules.txt
         rules_path = pruned_path.with_name(pruned_path.stem + "_rules.txt")
         lines: List[str] = []
-        for e in entries:
+        for e in final_entries:
             lines.append(e["rid"])
-            lines.append(e["rule"])
+            lines.append(e["norm_rule"])
         rules_path.parent.mkdir(parents=True, exist_ok=True)
         with open(rules_path, "w", encoding="utf-8") as f:
             f.write("\n".join(lines) + ("\n" if lines else ""))
-        print(f"[rules] wrote {len(entries)} entries to {rules_path} (skipped={skipped})")
 
-        # 写出 duplicated_rules.txt（若有）
-        combined_dup_lines: List[str] = []
-        if norm_dup_lines:
-            combined_dup_lines.append("[norm] normalized duplicates")
-            combined_dup_lines.extend(norm_dup_lines)
-        if coarse_dup_lines:
-            combined_dup_lines.append("[coarse] signature duplicates")
-            combined_dup_lines.extend(coarse_dup_lines)
-        if combined_dup_lines:
+        # Write duplicated_rules.txt
+        if norm_dup_map:
+            norm_dup_lines: List[str] = []
+            for norm_hash, lst in norm_dup_map.items():
+                norm_dup_lines.append(f"norm={lst[0][1]}")
+                for pid, rule in lst:
+                    norm_dup_lines.append(f"  pid={pid} :: {rule}")
             dup_path = pruned_path.with_name(pruned_path.stem + "_duplicated_rules.txt")
-            # 采用覆盖写（一次生成），与以往行为一致；包含 [norm] 与 [coarse] 两个分段
             with open(dup_path, "w", encoding="utf-8") as f:
-                f.write("\n".join(combined_dup_lines) + "\n")
-            print(f"[rules] duplicated list saved to {dup_path}")
+                f.write("\n".join(norm_dup_lines) + "\n")
 
-        # 可选：将被跳过的规则另存，便于后续排查
+        # Write skipped rules (missing points)
         if self.print_skipped_rules and skipped_entries:
             skipped_path = pruned_path.with_name(pruned_path.stem + "_rules_skipped.txt")
             out_lines: List[str] = []
@@ -828,90 +1065,286 @@ class FilterAndPruneEngine:
             skipped_path.parent.mkdir(parents=True, exist_ok=True)
             with open(skipped_path, "w", encoding="utf-8") as f:
                 f.write("\n".join(out_lines) + ("\n" if out_lines else ""))
-            print(f"[rules] skipped rules saved to {skipped_path}")
-        return len(entries), skipped, entries
 
-    def run(self, input_json: str | Path, output_dir: str | Path) -> Dict[str, Any]:
+        print(f"[Step 6: rule dump] wrote {len(final_entries)} rules to {rules_path}"
+              f" (skipped_predicates={len(skipped_by_pred)}"
+              f"{' rule_skip_predicates=' + str(sorted(self.rule_skip_predicates)) if skipped_by_pred else ''})")
+
+        return len(final_entries), len(skipped_by_pred), final_entries
+
+    def _signature_from_normalized_rule(self, normalized_rule: str) -> str:
+        """Generate signature from normalized rule for sorting purposes only."""
+        try:
+            left_parsed, right_parsed = _split_rule_text(normalized_rule)
+            n_prem = len([n for n, _ in left_parsed if n])
+            n_concl = 1 if right_parsed[0] else 0
+            first_pred = left_parsed[0][0] if left_parsed else ""
+            return f"prem:{n_prem}|concl:{n_concl}|{first_pred}"
+        except Exception:
+            return "prem:0|concl:0|"
+
+    def run(self, input_json: str | Path, output_dir: str | Path, save_intermediates: bool = False) -> Dict[str, Any]:
+        """Run the complete filter-and-prune pipeline.
+
+        Pipeline steps:
+          Step 1: Input filter — aux filter + predicate filter (skip_predicates)
+          Step 2: Graph prune — build SingleProofGraph + GraphPruner for each record
+          Step 3: Proposition extraction — _build_proposition_no_aux() from pruned graph
+          Step 4: Normalization — point rename + predicate symmetry + premise sort
+          Step 5: Deduplication — SHA256 hash dedup on normalized rule text
+          Step 6: Rule dump — predicate filter (rule_skip_predicates) + write rules.txt
+        """
         in_path = Path(input_json)
         if not in_path.exists():
             raise FileNotFoundError(f"input not found: {in_path}")
 
-        from newclid.proof_scout.core.aux_extractor import AuxExtractor
+        # Setup intermediates directory for --save_intermediates
+        intermediates_dir = None
+        if save_intermediates:
+            intermediates_dir = Path(output_dir) / "intermediates"
+            intermediates_dir.mkdir(parents=True, exist_ok=True)
 
+        # ================================================================
+        # Step 1: Input filter
+        # Keep only records with non-empty aux_points, and optionally
+        # remove records whose llm_output_renamed contains skip_predicates.
+        # ================================================================
         normalized_obj = _normalize_input_object(in_path)
         src_results_all = normalized_obj.get("results", []) or []
         total_results = len(src_results_all)
 
+        from newclid.proof_scout.core.aux_extractor import AuxExtractor
         aux_extractor = AuxExtractor()
-        aux_obj = aux_extractor.filter_results_obj(normalized_obj)
-        src_results_aux = aux_obj.get("results", []) or []
-        kept = len(src_results_aux)
-        dropped = max(0, total_results - kept)
-        print(f"[aux] filtered: total={total_results} kept={kept} dropped={dropped}")
 
-        # 新增：基于(题干+aux)的去重，放在含 aux 筛选之后、修剪之前
-        if kept > 0:
-            src_results_dedup, dedup_stats = _dedup_by_question_and_aux(src_results_aux)
-            if dedup_stats.get("removed", 0) > 0:
-                print(f"[dedup] removed={dedup_stats['removed']} kept={dedup_stats['kept']}")
-                if self.print_dedup_removed:
-                    removed_ids = list(dedup_stats.get("removed_ids") or [])
-                    if removed_ids:
-                        print(f"[dedup] removed pids (first 20 shown): {removed_ids[:20]}{' ...' if len(removed_ids) > 20 else ''}")
-        else:
-            src_results_dedup, dedup_stats = [], {"removed": 0, "kept": 0}
-
-        if len(src_results_dedup) <= 0:
-            return {"total": total_results, "kept": 0, "dropped": dropped, "rendered": 0, "skipped": 0, "failed": 0}
-
-        pids = [str(r.get("problem_id")) for r in src_results_dedup if isinstance(r, dict) and r.get("problem_id") is not None]
-
-        pruned_map: Dict[str, Any] = {}
-        mw = int(self.max_workers or 0)
-        if mw > 1:
-            print(f"[filter+prune] parallel pruning with max_workers={mw}")
-            with ProcessPoolExecutor(max_workers=mw) as ex:
-                futs = [ex.submit(_worker_prune, rec) for rec in src_results_dedup if isinstance(rec, dict) and rec.get("problem_id") is not None]
-                for pid, rendered_one in (f.result() for f in as_completed(futs)):
-                    if rendered_one:
-                        pruned_map[pid] = rendered_one
-        else:
-            print("[filter+prune] sequential pruning")
-            for rec in src_results_dedup:
-                if not isinstance(rec, dict) or rec.get("problem_id") is None:
+        src_results_kept = []
+        dropped_no_aux = []
+        dropped_predicate = []
+        for rec in src_results_all:
+            # Aux filter: keep only records with non-empty aux_points
+            aux_points = rec.get("aux_points") if isinstance(rec, dict) else None
+            if not aux_points:
+                dropped_no_aux.append(rec)
+                continue
+            # Predicate filter: skip records whose llm_output_renamed contains skip_predicates
+            if self.skip_predicates:
+                llm_out = (rec.get("llm_output_renamed") or "").lower()
+                matched_preds = [p for p in self.skip_predicates if p in llm_out]
+                if matched_preds:
+                    dropped_predicate.append({"record": rec, "matched_predicates": matched_preds})
                     continue
-                pid, rendered_one = _worker_prune(rec)
-                if rendered_one:
-                    pruned_map[pid] = rendered_one
+            src_results_kept.append(rec)
 
+        kept = len(src_results_kept)
+        print(f"[Step 1: input filter] total={total_results} kept={kept} "
+              f"dropped_no_aux={len(dropped_no_aux)} dropped_predicate={len(dropped_predicate)}"
+              f"{' skip_predicates=' + str(sorted(self.skip_predicates)) if self.skip_predicates else ''}")
+
+        # Save intermediate: step 1
+        if intermediates_dir:
+            kept_records = [{"problem_id": str(r.get("problem_id", "")),
+                            "aux_points": r.get("aux_points", []),
+                            "fl_problem": r.get("fl_problem", "")[:200]}
+                           for r in src_results_kept]
+            no_aux_records = [{"problem_id": str(r.get("problem_id", "")),
+                              "aux_points": r.get("aux_points", []),
+                              "fl_problem": r.get("fl_problem", "")[:200]}
+                             for r in dropped_no_aux]
+            pred_records = [{"problem_id": str(d["record"].get("problem_id", "")),
+                            "matched_predicates": d["matched_predicates"]}
+                           for d in dropped_predicate]
+            with open(intermediates_dir / "step1_input_filter.json", "w", encoding="utf-8") as f:
+                json.dump({"total": total_results, "kept": kept,
+                           "dropped_no_aux": len(dropped_no_aux),
+                           "dropped_predicate": len(dropped_predicate),
+                           "skip_predicates": sorted(self.skip_predicates) if self.skip_predicates else [],
+                           "kept_records": kept_records,
+                           "dropped_no_aux_records": no_aux_records,
+                           "dropped_predicate_records": pred_records}, f, ensure_ascii=False, indent=2)
+
+        if kept <= 0:
+            return {"total": total_results, "kept": 0, "dropped": total_results - kept, "rendered": 0, "skipped": 0, "failed": 0}
+
+        # Update normalized_obj with filtered results for downstream steps
+        aux_obj = dict(normalized_obj)
+        aux_obj["results"] = src_results_kept
+        src_results_for_prune = src_results_kept
+
+        pids = [str(r.get("problem_id")) for r in src_results_for_prune if isinstance(r, dict) and r.get("problem_id") is not None]
+
+        # Build pid → source record index for later steps
         idx_src: Dict[str, Any] = {}
-        for r in src_results_dedup:
+        for r in src_results_for_prune:
             if isinstance(r, dict) and r.get("problem_id") is not None:
                 idx_src[str(r["problem_id"])] = r
 
+        # ================================================================
+        # Step 2: Graph prune
+        # Build SingleProofGraph from each record, then prune with GraphPruner.
+        # Code: _worker_prune() → SingleProofGraph.build_from_result_record()
+        #                        → GraphPruner().prune_proof_graph()
+        # Output: pruned_map[pid] = [rendered_dict, ...] (list of sub-graphs)
+        # ================================================================
+        pruned_map: Dict[str, List[Dict[str, Any]]] = {}
+        mw = int(self.max_workers or 0)
+        if mw > 1:
+            print(f"[Step 2: graph prune] parallel pruning with max_workers={mw}")
+            with ProcessPoolExecutor(max_workers=mw) as ex:
+                futs = [ex.submit(_worker_prune, rec) for rec in src_results_for_prune if isinstance(rec, dict) and rec.get("problem_id") is not None]
+                for pid, rendered_list in (f.result() for f in as_completed(futs)):
+                    if rendered_list:
+                        pruned_map[pid] = rendered_list
+        else:
+            print("[Step 2: graph prune] sequential pruning")
+            for rec in src_results_for_prune:
+                if not isinstance(rec, dict) or rec.get("problem_id") is None:
+                    continue
+                pid, rendered_list = _worker_prune(rec)
+                if rendered_list:
+                    pruned_map[pid] = rendered_list
+
+        # Build flat rendered lookup: sub_pid → rendered (for rendering steps)
+        # Also build sub_pid → original pid mapping
+        flat_rendered_map: Dict[str, Dict[str, Any]] = {}
+        sub_pid_to_orig: Dict[str, str] = {}
+        for pid, rendered_list in pruned_map.items():
+            if len(rendered_list) == 1:
+                flat_rendered_map[pid] = rendered_list[0]
+                sub_pid_to_orig[pid] = pid
+            else:
+                for sub_idx, rendered in enumerate(rendered_list):
+                    sub_pid = f"{pid}_{sub_idx}"
+                    flat_rendered_map[sub_pid] = rendered
+                    sub_pid_to_orig[sub_pid] = pid
+
+        # Save intermediate: step 1c
+        if intermediates_dir:
+            pruned_count = len(pruned_map)
+            total_subgraphs = sum(len(rl) for rl in pruned_map.values())
+            failed_count = len(pids) - pruned_count
+            failed_pids = [p for p in pids if p not in pruned_map]
+            pruned_records = []
+            failed_records = []
+            for pid, rendered_list in pruned_map.items():
+                for sub_idx, rendered in enumerate(rendered_list):
+                    sub_pid = f"{pid}_{sub_idx}" if len(rendered_list) > 1 else pid
+                    nodes = rendered.get("nodes", [])
+                    edges = rendered.get("edges", [])
+                    fact_nodes = [n for n in nodes if n.get("type") == "fact"]
+                    thm_nodes = [n for n in nodes if n.get("type") == "theorem"]
+                    pruned_records.append({"problem_id": sub_pid, "orig_pid": pid,
+                                           "n_subgraphs": len(rendered_list),
+                                           "n_nodes": len(nodes), "n_edges": len(edges),
+                                           "n_fact_nodes": len(fact_nodes), "n_theorem_nodes": len(thm_nodes)})
+            # Collect failed records with details
+            for pid in failed_pids:
+                src_rec = idx_src.get(pid, {})
+                fl_problem = src_rec.get("fl_problem", "")
+                failed_records.append({
+                    "problem_id": pid,
+                    "fl_problem": fl_problem[:300],
+                    "aux_points": src_rec.get("aux_points", []),
+                    "reason": "Graph pruning failed (likely no valid proof structure)"
+                })
+            with open(intermediates_dir / "step2_graph_prune.json", "w", encoding="utf-8") as f:
+                json.dump({"input": len(pids), "pruned": pruned_count, "total_subgraphs": total_subgraphs,
+                           "failed": failed_count,
+                           "pruned_records": pruned_records, "failed_pids": failed_pids,
+                           "failed_records": failed_records}, f, ensure_ascii=False, indent=2)
+        print(f"[Step 2: graph prune] input={len(pids)} pruned={len(pruned_map)} subgraphs={sum(len(rl) for rl in pruned_map.values())} failed={len(pids)-len(pruned_map)}")
+
+        # ================================================================
+        # Step 3: Proposition extraction
+        # From each pruned graph, extract premise facts (in-degree=0) and
+        # conclusion fact (out-degree=0, must be exactly 1).
+        # Remove premises that reference aux points.
+        # For split sub-graphs, iterate with pid_0, pid_1 suffixes.
+        # Code: _build_proposition_no_aux(rendered, aux_points)
+        #       → _to_rule_text(premises, conclusion)
+        # Output: out_results[i]["proposition_no_aux"], out_results[i]["proposition_rule"]
+        # ================================================================
         out_results: List[Dict[str, Any]] = []
         for pid in pids:
-            rendered = pruned_map.get(pid)
-            if not rendered:
+            rendered_list = pruned_map.get(pid)
+            if not rendered_list:
                 continue
-            base = {"problem_id": pid, "rendered": rendered}
-            src = idx_src.get(pid, {})
-            for k in ("aux_points", "point_lines", "points", "point_rely_on"):
-                if k in src:
-                    base[k] = src[k]
-            if "aux_points" not in base and isinstance(src.get("aux_points"), list):
-                base["aux_points"] = src["aux_points"]
-            prop = _build_proposition_no_aux(rendered, list(base.get("aux_points", []) or []))
-            if prop:
-                base["proposition_no_aux"] = prop
-                try:
-                    rule_text, rename_map = _to_rule_text(prop.get("premises", []) or [], prop.get("conclusion", ""))
-                    base["proposition_rule"] = rule_text
-                    base["rename_map"] = rename_map
-                    base["proposition_no_aux"]["rule_text"] = rule_text
-                except Exception:
-                    base["proposition_no_aux"].setdefault("rule_text", prop.get("text", ""))
-            out_results.append(base)
+            for sub_idx, rendered in enumerate(rendered_list):
+                # pid 命名：多子图用后缀，单子图保持原 pid
+                if len(rendered_list) > 1:
+                    sub_pid = f"{pid}_{sub_idx}"
+                else:
+                    sub_pid = pid
+                base: Dict[str, Any] = {"problem_id": sub_pid, "rendered": rendered}
+                src = idx_src.get(pid, {})  # 用原始 pid 查找源数据
+                for k in ("aux_points", "point_lines", "points", "point_rely_on"):
+                    if k in src:
+                        base[k] = src[k]
+                if "aux_points" not in base and isinstance(src.get("aux_points"), list):
+                    base["aux_points"] = src["aux_points"]
+                # 保留原始 llm_input_renamed / llm_output_renamed（不修改 goal）
+                base["llm_input_renamed"] = src.get("llm_input_renamed", "")
+                base["llm_output_renamed"] = src.get("llm_output_renamed", "")
+                base["point_coords"] = src.get("point_coords", {})
+                base["seed"] = src.get("seed")
+                prop = _build_proposition_no_aux(rendered, list(base.get("aux_points", []) or []))
+                if prop:
+                    base["proposition_no_aux"] = prop
+                    try:
+                        rule_text, rename_map = _to_rule_text(prop.get("premises", []) or [], prop.get("conclusion", ""))
+                        base["proposition_rule"] = rule_text
+                        base["rename_map"] = rename_map
+                        base["proposition_no_aux"]["rule_text"] = rule_text
+                    except Exception:
+                        base["proposition_no_aux"].setdefault("rule_text", prop.get("text", ""))
+                out_results.append(base)
+
+        # Save intermediate: step 1d proposition extraction
+        if intermediates_dir:
+            has_prop = sum(1 for r in out_results if r.get("proposition_no_aux"))
+            has_rule = sum(1 for r in out_results if r.get("proposition_rule"))
+            no_fact = 0
+            multi_concl = 0
+            # Build detailed records for successes and failures
+            success_records = []
+            fail_no_fact_records = []
+            fail_multi_concl_records = []
+            out_pid_set = {r.get("problem_id") for r in out_results if r.get("proposition_no_aux")}
+            # Iterate over all sub_pids in flat_rendered_map
+            for sub_pid, rendered in flat_rendered_map.items():
+                nodes = rendered.get("nodes", [])
+                edges = rendered.get("edges", [])
+                fact_nodes_d = [n for n in nodes if n.get("type") == "fact"]
+                if sub_pid in out_pid_set:
+                    rec_d = next((r for r in out_results if r.get("problem_id") == sub_pid), {})
+                    prop = rec_d.get("proposition_no_aux", {})
+                    success_records.append({
+                        "problem_id": sub_pid, "aux_points": rec_d.get("aux_points", []),
+                        "rule": rec_d.get("proposition_rule", ""),
+                        "premises": prop.get("premises", []),
+                        "conclusion": prop.get("conclusion", ""),
+                    })
+                elif not fact_nodes_d:
+                    no_fact += 1
+                    thm_labels = [n.get("label", "") for n in nodes if n.get("type") == "theorem"]
+                    fail_no_fact_records.append({"problem_id": sub_pid, "n_nodes": len(nodes),
+                                                  "theorem_labels": thm_labels[:10]})
+                else:
+                    indeg_c = {n.get("idx"): 0 for n in nodes}
+                    outdeg_c = {n.get("idx"): 0 for n in nodes}
+                    for u, v in edges:
+                        outdeg_c[u] = outdeg_c.get(u, 0) + 1
+                        indeg_c[v] = indeg_c.get(v, 0) + 1
+                    concl_ids = [n.get("idx") for n in fact_nodes_d if outdeg_c.get(n.get("idx"), 0) == 0]
+                    concl_labels = [str(fact_nodes_d[i].get("label", "")) for i, n in enumerate(fact_nodes_d) if n.get("idx") in concl_ids] if len(concl_ids) != 1 else []
+                    if len(concl_ids) != 1:
+                        multi_concl += 1
+                        fail_multi_concl_records.append({"problem_id": sub_pid, "n_conclusions": len(concl_ids),
+                                                          "conclusion_labels": concl_labels[:5]})
+            with open(intermediates_dir / "step3_propositions.json", "w", encoding="utf-8") as f:
+                json.dump({"input": len(out_results), "has_proposition": has_prop, "has_rule": has_rule,
+                           "fail_no_fact_nodes": no_fact, "fail_multi_conclusion": multi_concl,
+                           "success_records": success_records,
+                           "fail_no_fact_records": fail_no_fact_records,
+                           "fail_multi_concl_records": fail_multi_concl_records}, f, ensure_ascii=False, indent=2)
 
         out_obj = {k: v for k, v in normalized_obj.items() if k != "results"}
         out_obj["results"] = out_results
@@ -921,7 +1354,136 @@ class FilterAndPruneEngine:
             json.dump(out_obj, f, ensure_ascii=False, indent=2)
         print(f"[filter+prune] pruned json written: {pruned_json}")
 
-        n_rules, skipped_rules, rule_entries = self._write_rules_file(pruned_json, out_results)
+        # ================================================================
+        # Step 4: Normalization
+        # ================================================================
+        normalized_rules, skipped_rules, skipped_entries = self._normalize_rules(out_results)
+
+        # Save intermediate: step 4
+        if intermediates_dir:
+            all_rules_raw = [r.get("proposition_rule", "") for r in out_results if r.get("proposition_rule")]
+
+            # Normalized rules JSON
+            normalized_rules_json = []
+            for item in normalized_rules:
+                normalized_rules_json.append({
+                    "pid": item["pid"],
+                    "original": item["original"],
+                    "normalized": item["normalized"],
+                    "signature": item.get("signature", ""),
+                })
+            with open(intermediates_dir / "step4_normalized_rules.json", "w", encoding="utf-8") as f:
+                json.dump(normalized_rules_json, f, ensure_ascii=False, indent=2)
+
+            # Signature distribution
+            sig_dist: Dict[str, int] = {}
+            for item in normalized_rules:
+                sig = item.get("signature", "")
+                sig_dist[sig] = sig_dist.get(sig, 0) + 1
+            with open(intermediates_dir / "step4_signature_distribution.json", "w", encoding="utf-8") as f:
+                json.dump(sig_dist, f, indent=2)
+
+            # Predicate normalization samples
+            pred_samples: Dict[str, List[Dict[str, Any]]] = {}
+            sample_limit = 5
+            for rec in out_results:
+                rule = rec.get("proposition_rule")
+                if not rule:
+                    continue
+                left_parsed, right_parsed = _split_rule_text(rule)
+                for pred_name, pred_args in left_parsed:
+                    if not pred_name or pred_name in pred_samples and len(pred_samples[pred_name]) >= sample_limit:
+                        continue
+                    _, norm_args = self._normalize_clause_by_symmetry(pred_name, list(pred_args))
+                    if list(pred_args) != list(norm_args):
+                        pred_samples.setdefault(pred_name, []).append({
+                            "input": list(pred_args), "output": list(norm_args)
+                        })
+                rn, ra = right_parsed
+                if rn and (rn not in pred_samples or len(pred_samples.get(rn, [])) < sample_limit):
+                    _, norm_args = self._normalize_clause_by_symmetry(rn, list(ra))
+                    if list(ra) != list(norm_args):
+                        pred_samples.setdefault(rn, []).append({
+                            "input": list(ra), "output": list(norm_args)
+                        })
+            with open(intermediates_dir / "step4_predicate_normalization_samples.json", "w", encoding="utf-8") as f:
+                json.dump(pred_samples, f, ensure_ascii=False, indent=2)
+
+        # ================================================================
+        # Step 5: Deduplication
+        # ================================================================
+        rule_entries, norm_dup_map = self._dedup_rules(normalized_rules)
+
+        # Save intermediate: step 5
+        if intermediates_dir:
+            # Build dedup groups for JSON output
+            dedup_groups = []
+            for norm_hash, lst in norm_dup_map.items():
+                # Find the normalized form from the first entry
+                norm_form = ""
+                for e in rule_entries:
+                    h = hashlib.sha256(e.get("norm_rule", "").encode("utf-8")).hexdigest()
+                    if h == norm_hash:
+                        norm_form = e.get("norm_rule", "")
+                        break
+                dedup_groups.append({
+                    "hash": norm_hash[:16],
+                    "normalized": norm_form,
+                    "count": len(lst),
+                    "rules": [{"pid": pid, "original": rule} for pid, rule in lst]
+                })
+            with open(intermediates_dir / "step5_dedup.json", "w", encoding="utf-8") as f:
+                json.dump({
+                    "input": len(normalized_rules),
+                    "unique": len(rule_entries),
+                    "duplicates": len(normalized_rules) - len(rule_entries),
+                    "dedup_groups": dedup_groups,
+                }, f, ensure_ascii=False, indent=2)
+
+        # ================================================================
+        # Step 6: Rule dump
+        # ================================================================
+        n_rules, n_skipped_pred, rule_entries = self._dump_rules(
+            rule_entries, norm_dup_map, skipped_entries, pruned_json)
+
+        # Save intermediate: step 6
+        if intermediates_dir:
+            all_rules_raw = [r.get("proposition_rule", "") for r in out_results if r.get("proposition_rule")]
+            skipped_entries_json = []
+            for rec in out_results:
+                rule = rec.get("proposition_rule")
+                if not rule:
+                    continue
+                left_parsed, right_parsed = _split_rule_text(rule)
+                left_points = _collect_point_set(left_parsed)
+                right_points = set(_collect_point_list(right_parsed[1]))
+                missing = right_points - left_points
+                if missing:
+                    skipped_entries_json.append({
+                        "pid": str(rec.get("problem_id", "")),
+                        "missing_points": sorted(missing),
+                        "rule": rule,
+                    })
+
+            with open(intermediates_dir / "step6_rules_stats.json", "w", encoding="utf-8") as f:
+                json.dump({
+                    "input_rules_raw": len(all_rules_raw),
+                    "output_rules_deduped": n_rules,
+                    "skipped_rules_missing_points": skipped_rules,
+                    "skipped_rules_predicates": n_skipped_pred,
+                    "rule_skip_predicates": sorted(self.rule_skip_predicates) if self.rule_skip_predicates else [],
+                    "skipped_entries": skipped_entries_json,
+                    "entries": [{
+                        "rid": e.get("rid"),
+                        "pid": e.get("pid"),
+                        "seed": e.get("seed"),
+                        "rule": e.get("norm_rule"),
+                        "rule_original": e.get("rule"),
+                        "llm_input_renamed": e.get("llm_input_renamed", ""),
+                        "llm_output_renamed": e.get("llm_output_renamed", ""),
+                        "point_coords": e.get("point_coords", {}),
+                    } for e in rule_entries]
+                }, f, indent=2)
 
         # 合并图渲染输出目录
         combo_stem = in_path.stem + "_aux"
@@ -932,30 +1494,32 @@ class FilterAndPruneEngine:
         # 渲染：按 pid 的图片（可选，默认关闭）
         pid_done = pid_skipped = pid_failed = 0
         if self.keep_pid_images:
-            total = len(pids)
+            all_sub_pids = sorted(flat_rendered_map.keys())
+            total = len(all_sub_pids)
             print(f"[filter+prune] start rendering by pid: total={total}")
             skipped_render_entries: List[Tuple[str, str]] = []  # (pid, reason)
 
             def submit_all(executor=None):
                 tasks = []
-                for pid in pids:
-                    out_png = out_base_dir / f"proof_{pid}.png"
+                for sub_pid in all_sub_pids:
+                    orig_pid = sub_pid_to_orig.get(sub_pid, sub_pid)
+                    out_png = out_base_dir / f"proof_{sub_pid}.png"
                     if out_png.exists() and not self.overwrite:
                         if self.print_render_skipped:
-                            skipped_render_entries.append((pid, "exists_overwrite_false"))
-                        yield (pid, "skipped")
+                            skipped_render_entries.append((sub_pid, "exists_overwrite_false"))
+                        yield (sub_pid, "skipped")
                         continue
-                    rendered = pruned_map.get(pid)
+                    rendered = flat_rendered_map.get(sub_pid)
                     if not isinstance(rendered, dict):
                         if self.print_render_skipped:
-                            skipped_render_entries.append((pid, "no_pruned_rendered"))
-                        yield (pid, "skipped")
+                            skipped_render_entries.append((sub_pid, "no_pruned_rendered"))
+                        yield (sub_pid, "skipped")
                         continue
-                    rec = idx_src.get(pid)
+                    rec = idx_src.get(orig_pid)
                     if rec is None:
                         if self.print_render_skipped:
-                            skipped_render_entries.append((pid, "no_source_record"))
-                        yield (pid, "skipped")
+                            skipped_render_entries.append((sub_pid, "no_source_record"))
+                        yield (sub_pid, "skipped")
                         continue
                     if executor is None:
                         yield _worker_render_combined(
@@ -998,7 +1562,7 @@ class FilterAndPruneEngine:
                         else:
                             pid_failed += 1
                         if self.progress_every and (idx % self.progress_every == 0):
-                            print(f"[filter+prune] (pid) {idx}/{len(pids)} done={pid_done} skipped={pid_skipped} failed={pid_failed}")
+                            print(f"[filter+prune] (pid) {idx}/{total} done={pid_done} skipped={pid_skipped} failed={pid_failed}")
             else:
                 print("[filter+prune] sequential rendering by pid")
                 for idx, (pid, st) in enumerate(submit_all(None), start=1):
@@ -1009,7 +1573,7 @@ class FilterAndPruneEngine:
                     else:
                         pid_failed += 1
                     if self.progress_every and (idx % self.progress_every == 0):
-                        print(f"[filter+prune] (pid) {idx}/{len(pids)} done={pid_done} skipped={pid_skipped} failed={pid_failed}")
+                        print(f"[filter+prune] (pid) {idx}/{total} done={pid_done} skipped={pid_skipped} failed={pid_failed}")
 
             if self.print_render_skipped and (pid_skipped > 0):
                 skipped_render_path = out_base_dir / "render_skipped.txt"
@@ -1030,19 +1594,20 @@ class FilterAndPruneEngine:
                 for e in rule_entries:
                     rid = str(e.get("rid"))
                     pid = str(e.get("pid"))
+                    orig_pid = sub_pid_to_orig.get(pid, pid)
                     out_png = out_base_dir / f"{rid}.png"
                     if out_png.exists() and not self.overwrite:
                         if self.print_render_skipped:
                             rid_skipped_entries.append((rid, "exists_overwrite_false"))
                         yield (rid, "skipped")
                         continue
-                    rendered = pruned_map.get(pid)
+                    rendered = flat_rendered_map.get(pid)
                     if not isinstance(rendered, dict):
                         if self.print_render_skipped:
                             rid_skipped_entries.append((rid, "no_pruned_rendered"))
                         yield (rid, "skipped")
                         continue
-                    rec = idx_src.get(pid)
+                    rec = idx_src.get(orig_pid)
                     if rec is None:
                         if self.print_render_skipped:
                             rid_skipped_entries.append((rid, "no_source_record"))
@@ -1128,14 +1693,6 @@ class FilterAndPruneEngine:
         print(f"Output directory: {out_base_dir}")
         print(f"JSON saved: {pruned_json}")
 
-        # 保存去重被移除的 pid 列表
-        if self.print_dedup_removed and (dedup_stats.get("removed_ids")):
-            dedup_removed_path = out_base_dir / "dedup_removed.txt"
-            with open(dedup_removed_path, "w", encoding="utf-8") as f:
-                for spid in dedup_stats["removed_ids"]:
-                    f.write(f"pid={spid}\n")
-            print(f"[dedup] removed pid list saved to {dedup_removed_path}")
-
         # 导出 pid -> 输入题目文本 的映射（JSONL），便于按 pid 检索题目
         if self.save_pid_inputs and pids:
             pid_inputs_path = out_base_dir / "pid_inputs.jsonl"
@@ -1152,12 +1709,12 @@ class FilterAndPruneEngine:
         return {
             "total": total_results,
             "kept": kept,
-            "dropped": dropped,
+            "dropped": total_results - kept,
             "rendered": (pid_done if self.keep_pid_images else 0) + rid_done,
             "skipped": (pid_skipped if self.keep_pid_images else 0) + rid_skipped,
             "failed": (pid_failed if self.keep_pid_images else 0) + rid_failed,
             "rules": n_rules,
-            "skipped_rules": skipped_rules,
+            "skipped_rules": n_skipped_pred,
             "json": str(pruned_json),
             "images_dir": str(out_base_dir),
         }
@@ -1201,250 +1758,4 @@ def _combine_pngs_h(left_png: Path, right_png: Path, out_png: Path, *, title: Op
     fig.savefig(str(out_png), dpi=200)
     plt.close(fig)
     return str(out_png)
-
-
-def _parse_args_from_label(raw_label: str) -> List[str]:
-    try:
-        if "(" in raw_label and ")" in raw_label:
-            inside = raw_label.split("(", 1)[1].rsplit(")", 1)[0]
-            parts = [p.strip() for p in inside.split(",") if p.strip()]
-            return parts
-    except Exception:
-        pass
-    return []
-
-
-def _is_point_token(tok: str) -> bool:
-    if not tok:
-        return False
-    return re.match(r"^[A-Za-z][A-Za-z0-9_]*$", tok) is not None
-
-
-def _alpha_seq(n: int) -> str:
-    letters: List[str] = []
-    while True:
-        n, r = divmod(n, 26)
-        letters.append(chr(ord('a') + r))
-        if n == 0:
-            break
-        n -= 1
-    return "".join(reversed(letters))
-
-
-def _parse_name_args(raw_label: str) -> Tuple[str, List[str]]:
-    name = raw_label
-    args = _parse_args_from_label(raw_label)
-    if "(" in raw_label:
-        name = raw_label.split("(", 1)[0].strip()
-    return name, args
-
-
-def _to_rule_text(premises: List[str], conclusion: str) -> Tuple[str, Dict[str, str]]:
-    seq: List[str] = []
-
-    def _collect(args: List[str]):
-        for a in args:
-            if _is_point_token(a) and a not in seq:
-                seq.append(a)
-
-    parsed_prems: List[Tuple[str, List[str]]] = []
-    for pl in premises:
-        pn, pa = _parse_name_args(str(pl))
-        parsed_prems.append((pn, pa))
-        _collect(pa)
-    cn, ca = _parse_name_args(str(conclusion))
-    _collect(ca)
-
-    rename: Dict[str, str] = {old: _alpha_seq(i) for i, old in enumerate(seq)}
-
-    def _fmt(name: str, args: List[str]) -> str:
-        out: List[str] = []
-        for a in args:
-            if _is_point_token(a) and a in rename:
-                out.append(rename[a])
-            else:
-                out.append(a)
-        return name + (" " + " ".join(out) if out else "")
-
-    prem_txts = [_fmt(n, a) for (n, a) in parsed_prems]
-    concl_txt = _fmt(cn, ca)
-    rule_text = (", ".join(prem_txts) + " => " + concl_txt) if prem_txts else ("=> " + concl_txt)
-    return rule_text, rename
-
-
-def _split_clauses(text: str) -> List[str]:
-    parts = [p.strip() for p in (text or "").split(",")]
-    return [p for p in parts if p]
-
-
-def _parse_clause(clause: str) -> Tuple[str, List[str]]:
-    tokens = [t for t in (clause or "").strip().split() if t]
-    if not tokens:
-        return "", []
-    return tokens[0], tokens[1:]
-
-
-def _split_rule_text(rule_text: str) -> Tuple[List[Tuple[str, List[str]]], Tuple[str, List[str]]]:
-    if not isinstance(rule_text, str):
-        return [], ("", [])
-    if "=>" in rule_text:
-        left, right = re.split(r"\s*=>\s*", rule_text.strip(), maxsplit=1)
-    else:
-        left, right = rule_text.strip(), ""
-    left_parsed = [_parse_clause(c) for c in _split_clauses(left)] if left else []
-    right_parsed = _parse_clause(right) if right else ("", [])
-    return left_parsed, right_parsed
-
-
-def _collect_point_set(clauses: Iterable[Tuple[str, List[str]]]) -> set[str]:
-    points: set[str] = set()
-    for _, args in clauses:
-        for arg in args:
-            if _is_point_token(arg):
-                points.add(arg)
-    return points
-
-
-def _collect_point_list(args: Iterable[str]) -> List[str]:
-    return [a for a in args if _is_point_token(a)]
-
-
-def _canonicalize_rule_text(rule_text: str) -> str:
-    left_parsed, right_parsed = _split_rule_text(rule_text)
-
-    seq: List[str] = []
-
-    def collect(args: Iterable[str]) -> None:
-        for a in args:
-            if _is_point_token(a) and a not in seq:
-                seq.append(a)
-
-    for _, args in left_parsed:
-        collect(args)
-    collect(right_parsed[1])
-
-    rename: Dict[str, str] = {old: _alpha_seq(i) for i, old in enumerate(seq)}
-
-    def fmt(name: str, args: List[str]) -> str:
-        mapped = [rename.get(a, a) if _is_point_token(a) else a for a in args]
-        return (name + (" " + " ".join(mapped) if mapped else "")).strip()
-
-    left_norm = ", ".join([fmt(n, a) for n, a in left_parsed if n])
-    right_norm = fmt(*right_parsed) if right_parsed[0] else ""
-    if left_norm and right_norm:
-        return f"{left_norm} => {right_norm}"
-    if right_norm:
-        return f"=> {right_norm}"
-    return left_norm
-
-
-def _fmt_rule_id(idx: int) -> str:
-    return f"r{idx:04d}"
-
-
-def _build_proposition_no_aux(rendered: Dict[str, Any], aux_points: List[str]) -> Optional[Dict[str, Any]]:
-    nodes = (rendered or {}).get("nodes") or []
-    edges = (rendered or {}).get("edges") or []
-    if not isinstance(nodes, list) or not isinstance(edges, list) or not nodes:
-        return None
-
-    indeg = {n.get("idx"): 0 for n in nodes}
-    outdeg = {n.get("idx"): 0 for n in nodes}
-    for u, v in edges:
-        outdeg[u] = outdeg.get(u, 0) + 1
-        indeg[v] = indeg.get(v, 0) + 1
-
-    fact_nodes = {n.get("idx"): n for n in nodes if n.get("type") == "fact"}
-    premise_ids = [idx for idx, n in fact_nodes.items() if indeg.get(idx, 0) == 0]
-    concl_ids = [idx for idx, n in fact_nodes.items() if outdeg.get(idx, 0) == 0]
-    if len(concl_ids) != 1:
-        return None
-
-    aux_set = set(aux_points or [])
-    kept_premises: List[str] = []
-    for pid in premise_ids:
-        raw_label = str(fact_nodes[pid].get("label", ""))
-        args = _parse_args_from_label(raw_label)
-        if not any(a in aux_set for a in args):
-            kept_premises.append(raw_label)
-
-    concl_label = str(fact_nodes[concl_ids[0]].get("label", ""))
-    text = (", ".join(kept_premises) + " -> " + concl_label) if kept_premises else ("-> " + concl_label)
-    return {"premises": kept_premises, "conclusion": concl_label, "text": text}
-
-
-def _worker_prune(rec: Dict[str, Any]) -> Tuple[str, Any]:
-    try:
-        pid_val = rec.get("problem_id")
-        if pid_val is None:
-            return ("<none>", None)
-        pid = str(pid_val)
-        # 延迟导入，降低主进程依赖
-        from newclid.proof_scout.core.graph_pruner import GraphPruner
-        from newclid.proof_scout.core.single_proof_graph import SingleProofGraph
-        pruner = GraphPruner()
-        spg = SingleProofGraph.build_from_result_record(rec, verbose=False)
-        rendered_one = pruner.prune_proof_graph(spg).get(pid)
-        return (pid, rendered_one)
-    except Exception:
-        return (str(rec.get("problem_id")), None)
-
-
-def _worker_render_combined(
-    rec: Dict[str, Any],
-    rendered: Dict[str, Any],
-    out_png: str,
-    label_mode: str,
-    single_figsize: Tuple[int, int],
-    ranksep: float,
-    nodesep: float,
-    font_size: int,
-) -> Tuple[str, str]:
-    try:
-        from pathlib import Path as _Path
-        import tempfile as _tempfile
-        from newclid.proof_scout.core.proof_graph_visualizer import ProofGraphVisualizer
-        from newclid.proof_scout.core.single_proof_graph import SingleProofGraph
-
-        pid = str(rec.get("problem_id"))
-        viz_left = ProofGraphVisualizer()
-        viz_left.LAYOUT_RANKSEP = ranksep
-        viz_left.LAYOUT_NODESEP = nodesep
-        spg = SingleProofGraph.build_from_result_record(rec, verbose=False)
-        with _tempfile.TemporaryDirectory() as td:
-            td_path = _Path(td)
-            left_png = td_path / f"left_{pid}.png"
-            right_png = td_path / f"right_{pid}.png"
-            viz_left.render_problem(spg, pid, str(left_png), label_mode=label_mode, highlight=True, figsize=single_figsize)
-            # 修剪图（附 aux_points）
-            rendered2 = dict(rendered)
-            aux_points = rec.get("aux_points") or []
-            if isinstance(aux_points, list):
-                rendered2["aux_points"] = aux_points
-            viz_right = ProofGraphVisualizer()
-            viz_right.render_rendered(
-                rendered2,
-                str(right_png),
-                label_mode=label_mode,
-                highlight=True,
-                figsize=single_figsize,
-                font_size=font_size,
-                show_direction_legend=True,
-                layout_ranksep=ranksep,
-                layout_nodesep=nodesep,
-            )
-            # 合图副标题优先使用规则文本
-            prop = _build_proposition_no_aux(rendered2, list(rec.get("aux_points") or []))
-            subtitle = None
-            if isinstance(prop, dict):
-                try:
-                    rule_text, _ = _to_rule_text(prop.get("premises", []) or [], prop.get("conclusion", ""))
-                    subtitle = rule_text
-                except Exception:
-                    subtitle = prop.get("text")
-            _combine_pngs_h(left_png, right_png, _Path(out_png), title=f"Problem {pid}", subtitle=subtitle)
-        return (pid, "ok")
-    except Exception:
-        return (str(rec.get("problem_id")), "failed")
-
 

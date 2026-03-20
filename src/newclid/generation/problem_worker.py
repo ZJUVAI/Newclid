@@ -118,7 +118,7 @@ class GeometryProblemWorker:
 
             n_clauses = len(fl_statement.split(';'))
             csolver = CSolver(fl_statement, seed=seed,
-                              solver=solver, using_log=True, using_exp=True)
+                              solver=solver, using_log=True, using_exp=False)
 
             # Run solver
             csolver.run(max_level=max_level)
@@ -213,6 +213,10 @@ class GeometryProblemWorker:
                 )
                 generated_data.extend(data)
             process_goal_time = time.time() - process_goal_time
+
+            # Inject per-problem seed into each result
+            for item in generated_data:
+                item["seed"] = seed
 
             # Create summary
             summary = {
@@ -376,7 +380,7 @@ class GeometryProblemWorker:
             DDARN()
         )
         csolver_no_aux = CSolver(
-            problem='', solver=solver_no_aux, using_log=True, using_exp=True)
+            problem='', solver=solver_no_aux, using_log=True, using_exp=False)
         csolver_no_aux.run()
 
         for goal in solver_no_aux.goals:
@@ -408,7 +412,7 @@ class GeometryProblemWorker:
                 DDARN()
             )
             csolver_all_aux = CSolver(
-                problem='', solver=solver_all_aux, using_log=True, using_exp=True)
+                problem='', solver=solver_all_aux, using_log=True, using_exp=False)
             csolver_all_aux.run()
 
             for goal in solver_all_aux.goals:
@@ -484,7 +488,7 @@ class GeometryProblemWorker:
                     DDARN()
                 )
                 csolver_test = CSolver(
-                    problem='', solver=solver_test, using_log=True, using_exp=True)
+                    problem='', solver=solver_test, using_log=True, using_exp=False)
                 csolver_test.run()
 
                 # Check which goals are solved
@@ -546,7 +550,7 @@ class GeometryProblemWorker:
                 DDARN()
             )
             csolver_all_aux = CSolver(
-                problem='', solver=solver_all_aux, using_log=True, using_exp=True)
+                problem='', solver=solver_all_aux, using_log=True, using_exp=False)
             csolver_all_aux.run()
 
             for goal in solver_all_aux.goals:
@@ -644,29 +648,34 @@ class GeometryProblemWorker:
             # )
             # assert actual_dsl == expected_dsl, error_msg
 
+            # Extract point coordinates (always, not just when img=True)
+            # Use mapping to rename points consistently with fl_problem/llm_input/llm_output
+            point_coords = {
+                mapping[name]: [float(p.num.x), float(p.num.y)]
+                for name, p in name2node.items()
+                if p.num is not None and name in mapping
+            }
+
             result = {
                 # "n_clauses": n_clauses,
+                # seed is injected by _process_single_problem after collection
                 "n_premises": n_premises,
                 "fl_problem": llm_renamed['fl_problem'],
                 "nl_problem": "",
                 "n_proof_steps": n_proof_steps,
                 "llm_input_renamed": llm_renamed['llm_input'],
                 "llm_output_renamed": llm_renamed['llm_output'],
+                "aux_points": [mapping[str(p.name)] for p in aux_points if str(p.name) in mapping] if aux_points else [],
+                "point_coords": point_coords,  # Always include coordinates
             }
 
             if img:
-                # Store drawing metadata instead of matplotlib figures
-                # to reduce memory usage in Ray workers
-                point_coords = {
-                    name: (p.num.x, p.num.y)
-                    for name, p in name2node.items()
-                }
+                # Store drawing metadata for image generation
                 result["draw_data"] = {
                     "clauses": [(c.points, c.sentences) for c in clauses],
                     "mapping": mapping,
                     "goal_tokens": goal_new.to_str().split(' '),
-                    "point_coords": point_coords,
-                    "seed": solver_builder.seed,
+                    "point_coords": point_coords,  # Reuse top-level field
                 }
 
             results.append(result)

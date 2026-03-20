@@ -59,6 +59,75 @@ def _run_ddar_in_subprocess(problem_name, points, premises, goals, max_level, re
                          "traceback": traceback.format_exc()})
 
 
+def extract_solver_data(
+    problem_txt: str,
+    seed: int = 42,
+    max_attempts: int = 100,
+) -> Tuple[
+    List[Tuple[str, float, float]],      # points
+    List[Tuple[str, List[str]]],          # premises
+    List[Tuple[str, List[str]]],          # goals
+]:
+    """Extract (points, premises, goals) from a JGEX problem text.
+
+    Builds the problem via JGEX construction to get numerical coordinates,
+    then extracts the structured data.
+
+    Args:
+        problem_txt: JGEX problem text
+        seed: Random seed for problem construction
+        max_attempts: Maximum attempts for numerical construction
+
+    Returns:
+        Tuple of (points, premises, goals) where:
+        - points: [(name, x, y), ...]
+        - premises: [(predicate, [arg1, arg2, ...]), ...]
+        - goals: [(predicate, [arg1, arg2, ...]), ...]
+    """
+    builder = GeometricSolverBuilder(seed=seed)
+    builder.load_problem_from_txt(problem_txt)
+    builder.with_deductive_agent(DDARN())
+    solver = builder.build(max_attempts=max_attempts)
+
+    points = []
+    premises = []
+    goals = []
+    useful_points = []
+
+    # Extract premises
+    for stmt in solver.proof.dep_graph.hyper_graph:
+        predicate = stmt.predicate.NAME
+        args = []
+        for pt in stmt.args:
+            if isinstance(pt, Fraction):
+                args.append(str(pt))
+            else:
+                args.append(pt.name)
+                if pt.name not in useful_points:
+                    useful_points.append(pt.name)
+        premises.append((predicate, args))
+
+    # Extract goals
+    for stmt in solver.proof.goals:
+        predicate = stmt.predicate.NAME
+        args = []
+        for pt in stmt.args:
+            if isinstance(pt, Fraction):
+                args.append(str(pt))
+            else:
+                args.append(pt.name)
+                if pt.name not in useful_points:
+                    useful_points.append(pt.name)
+        goals.append((predicate, args))
+
+    # Extract point coordinates
+    for name, point in solver.proof.symbols_graph.name2node.items():
+        if point.num is not None and isinstance(point.num, PointNum) and name in useful_points:
+            points.append((name, point.num.x, point.num.y))
+
+    return points, premises, goals
+
+
 class GeometricSolver:
     def __init__(
         self, proof: "ProofState", rules: list[Rule], deductive_agent: DeductiveAgent
@@ -117,6 +186,7 @@ class GeometricSolverBuilder:
         self.deductive_agent: Optional[DeductiveAgent] = None
         self.seed = seed or 998244353
         self.problem_path: Optional[Path] = None
+        self._premises_data: Optional[dict] = None  # For premises-based loading
 
     @property
     def defs(self) -> dict[str, DefinitionJGEX]:
@@ -133,7 +203,18 @@ class GeometricSolverBuilder:
         return self._rules
 
     def build(self, max_attempts: int = 10000) -> "GeometricSolver":
-        if self.problemJGEX:
+        if self._premises_data:
+            # Path 3: Build from premises (no JGEX construction)
+            logging.debug("Use premises data to build the proof state")
+            proof_state = ProofState.build_premises(
+                points=self._premises_data["points"],
+                premises=self._premises_data["premises"],
+                defsJGEX=self.defs,
+                goals_str=self._premises_data["goals"],
+                rng=np.random.default_rng(self.seed),
+            )
+        elif self.problemJGEX:
+            # Path 1: Build from JGEX (existing)
             logging.debug(
                 f"Use problemJGEX {self.problemJGEX} to build the proof state")
             proof_state = ProofState.build_problemJGEX(
@@ -144,6 +225,7 @@ class GeometricSolverBuilder:
                 max_attempts=max_attempts,
             )
         else:
+            # Path 2: Build from dep_graph (existing)
             logging.info("Use dep_graph to build the proof state")
             proof_state = ProofState(
                 rng=np.random.default_rng(self.seed),
@@ -188,8 +270,42 @@ class GeometricSolverBuilder:
         self.problemJGEX = ProblemJGEX.from_text(problem_txt)
         return self
 
+    def load_problem_from_premises(
+        self,
+        points: List[Tuple[str, float, float]],
+        premises: List[Tuple[str, List[str]]],
+        goals: List[Tuple[str, List[str]]],
+    ) -> Self:
+        """Load problem directly from points, premises, and goals.
+
+        Unlike load_problem_from_txt, this does NOT use JGEX construction.
+        All points are treated as free points with given coordinates.
+
+        Args:
+            points: [(name, x, y), ...] - all points with numerical coordinates
+            premises: [(predicate, [arg1, arg2, ...]), ...] - all premises
+            goals: [(predicate, [arg1, arg2, ...]), ...] - goals to prove
+
+        Returns:
+            Self for method chaining
+        """
+        self._premises_data = {
+            "points": points,
+            "premises": premises,
+            "goals": goals,
+        }
+        return self
+
     def load_rules_from_txt(self, rule_txt: str) -> Self:
         self._rules = Rule.parse_text(rule_txt)
+        return self
+
+    def append_rules_from_txt(self, rule_txt: str) -> Self:
+        """Append rules to the existing rule set (loading defaults first if needed)."""
+        new_rules = Rule.parse_text(rule_txt)
+        if self._rules is None:
+            self._rules = Rule.parse_txt_file(default_rules_path())
+        self._rules = self._rules + new_rules
         return self
 
     def load_rules_from_file(self, rules_path: Optional[Path] = None) -> Self:
@@ -385,72 +501,60 @@ class CSolver:
             print(g)
 
 class DirectSolver:
-    """
-    直接求解器，直接从点、前提和目标构建
-    
-    输入格式与 DDAR.run_ddar() 完全一致。
-    """
-    
+    """Solver that loads problems directly from (points, premises, goals)."""
+
     def __init__(
         self,
-        points: list[tuple[str, float, float]],
-        premises: list[tuple[str, list[str]]],
-        goal: tuple[str, list[str]],
-        problem_name: str = "anonymous",
-        rules_path: Path = "/c23474/home/duzhengtong/Discovery-GenesisGeo/src/newclid/default_configs/tmp_rules.txt",
+        points: List[Tuple[str, float, float]],
+        premises: List[Tuple[str, List[str]]],
+        goal: Tuple[str, List[str]],
+        problem_name: str = "direct_problem",
+        seed: int = 998244353,
+        custom_rules: Optional[List[str]] = None,
     ):
-        """
-        初始化 DirectSolver。
-        
-        Args:
-            points: 点坐标列表，格式为 [(name, x, y), ...]
-            premises: 前提条件列表，格式为 [(predicate, [arg1, arg2, ...]), ...]
-            goal: 目标，格式为 (predicate, [arg1, arg2, ...])
-            problem_name: 问题名称
-            rules_path: 规则文件路径
-        """
-        self.problem_name = problem_name
-        self.max_level = 500
-        self.log_enabled = False
-        self.exp_enabled = False
-        
-        # 存储输入（与 DDAR.run_ddar 接口一致）
-        self.points: List[Tuple[str, float, float]] = list(points)
-        self.premises: List[Tuple[str, List[str]]] = list(premises)
-        self.goal: Tuple[str, List[str]] = goal
+        """Initialize DirectSolver.
 
-        solver_builder=GeometricSolverBuilder(seed=998244353)
-        solver_builder.with_deductive_agent(DDARN())
-        solver_builder.load_rules_from_file(rules_path)
-        self.problem = solver_builder.problemJGEX
-        proof_state = ProofState.build_premises(
-                    points=self.points,
-                    premises=self.premises,
-                    defsJGEX=solver_builder.defs,
-                    goals_str=[goal],
-                    rng=np.random.default_rng(solver_builder.seed)
-                )
-        self.solver=GeometricSolver(
-            proof_state,
-            solver_builder.rules,
-            DDARN()
-        )
-    
-    def run(self, timeout: int = 3600) -> bool:
-        """
-        运行直接求解器。
-        
         Args:
-            timeout: 超时时间（秒）
-        
+            points: Point coordinates [(name, x, y), ...]
+            premises: Premise list [(predicate, [arg1, arg2, ...]), ...]
+            goal: Goal (predicate, [arg1, arg2, ...])
+            problem_name: Problem name
+            seed: Random seed
+            custom_rules: Optional list of custom rule texts
+        """
+        self.points = list(points)
+        self.premises = list(premises)
+        self.goal = goal
+        self.problem_name = problem_name
+
+        builder = GeometricSolverBuilder(seed=seed)
+        builder.load_problem_from_premises(
+            points=self.points,
+            premises=self.premises,
+            goals=[self.goal],
+        )
+        builder.with_deductive_agent(DDARN())
+        if custom_rules:
+            builder.append_rules_from_txt("\n".join(custom_rules))
+
+        self.solver = builder.build()
+        self.run_infos = {}
+
+    def run(self, timeout: int = 3600) -> bool:
+        """Run the solver.
+
+        Args:
+            timeout: Timeout in seconds
+
         Returns:
-            bool: 是否成功求解
+            bool: Whether the problem was solved
         """
         is_solved = self.solver.run(timeout=timeout)
         self.run_infos = self.solver.run_infos
         return is_solved
-    
+
     def write_proof_steps(self, out_file: Optional[Path] = None):
+        """Write proof steps to file or return as string."""
         if out_file is not None:
             return self.solver.write_proof_steps(out_file)
         else:

@@ -87,6 +87,13 @@ docs/source
 outputs/
 models/ckpts/
 
+# Synthetic datasets (large files)
+outputs/datasets/
+datasets/synthetic_*
+datasets/*.jsonl
+datasets/imgs/
+datasets/imgs_png/
+
 # Keep model info file but ignore checkpoints
 !models/ckpts_info.md
 
@@ -94,3 +101,4 @@ tests-exp/*
 !tests-exp/*.ggb
 !tests-exp/*.ggb
 !tests-exp/runtime_cache.json
+.hypothesis/

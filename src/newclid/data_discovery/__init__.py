@@ -4,7 +4,6 @@ DEPRECATED: This module has been reorganized into newclid.proof_scout
 Please update your imports:
   - newclid.data_discovery.proof_graph -> newclid.proof_scout.core.proof_graph
   - newclid.data_discovery.filter_and_prune_engine -> newclid.proof_scout.core.filter_and_prune_engine
-  - newclid.data_discovery.rule_extractor -> newclid.proof_scout.extraction.rule_extractor
 
 This compatibility layer will be removed in a future version.
 """
@@ -26,7 +25,6 @@ from newclid.proof_scout.core import (
     FilterAndPruneEngine,
     AuxExtractor,
 )
-from newclid.proof_scout.extraction import RuleExtractor
 
 # Lazy import for ProofGraphVisualizer to avoid visualization dependencies
 def __getattr__(name):
@@ -42,5 +40,4 @@ __all__ = [
     "ProofGraphVisualizer",
     "FilterAndPruneEngine",
     "AuxExtractor",
-    "RuleExtractor",
 ]

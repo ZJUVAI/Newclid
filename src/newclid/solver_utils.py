@@ -8,17 +8,12 @@ import sys
 from typing import List, Dict, Optional, Tuple
 import concurrent.futures as cf
 import time
-from newclid.generation.problem_worker import GeometryProblemWorker
-
-
 
 # 添加项目根目录到 Python 路径以导入 newclid
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 sys.path.insert(0, project_root)
 
 from newclid import GeometricSolverBuilder, GeometricSolver
-from newclid import proof_writing
-from newclid.agent.lm import LMAgent
 from newclid.formulations.problem import ProblemJGEX
 
 
@@ -192,14 +187,16 @@ def solve_single_problem(
                 else:
                     infos["error"] = error_msg
             return infos
-        base_proof = LMAgent.run_ddar(solver.proof, solver.rules, t0, timeout=timeout_sec)
-        if base_proof.check_goals():
-            solver.run_infos = infos(True, [str(solver_builder.problemJGEX), base_proof])
+        from newclid.agent.lm import LMAgent
+        solved = LMAgent.run_ddar_c(solver.proof, solver.rules, t0, timeout=timeout_sec)
+        if solved:
+            solver.run_infos = infos(True, [str(solver_builder.problemJGEX), solver.proof])
         success = solver.run_infos["success"]
         # 将 proof 转为可序列化的结构化文本，避免 JSON 序列化失败
         proof_obj = None
         if success:
             try:
+                from newclid.generation.problem_worker import GeometryProblemWorker
                 problem = solver_builder.problemJGEX
                 proof = solver.run_infos["proof"]
                 renamed, _ = GeometryProblemWorker.llm_solution_renamed(problem, proof)

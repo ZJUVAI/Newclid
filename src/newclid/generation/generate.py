@@ -295,6 +295,22 @@ class GeometryGenerator:
             self._process_completed_draw_tasks(wait_all=True)
             self._flush_completed_data(filename)
 
+    @staticmethod
+    def _inject_pids(jsonl_path: str):
+        """Post-process JSONL file to inject sequential pid into each record."""
+        if not os.path.exists(jsonl_path):
+            return
+        tmp_path = jsonl_path + ".tmp"
+        with open(jsonl_path, 'r', encoding='utf-8') as fin, \
+             open(tmp_path, 'w', encoding='utf-8') as fout:
+            for i, line in enumerate(fin, start=1):
+                record = json.loads(line)
+                record["pid"] = f"p{i:06d}"
+                json.dump(record, fout, ensure_ascii=False)
+                fout.write('\n')
+        os.replace(tmp_path, jsonl_path)
+        logging.info(f"Injected pid into {i} records in {jsonl_path}")
+
     def generate(self):
         if self.clear:
             filename = self.path_prefix + ".jsonl"
@@ -412,6 +428,10 @@ class GeometryGenerator:
         self.write_data([], force=True)
         
         ray.shutdown()
+
+        # Post-process: inject sequential pid into each JSONL record
+        jsonl_path = self.path_prefix + ".jsonl"
+        self._inject_pids(jsonl_path)
 
         final_elapsed_time = time.time() - start_time
         summary_reporter.total_elapsed_time = final_elapsed_time

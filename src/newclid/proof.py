@@ -326,43 +326,61 @@ class ProofState:
         *,
         rng: "Generator",
     ) -> ProofState:
-        """Build a proof state from given predicates and points."""
+        """Build a proof state directly from points, premises, and goals.
+
+        Unlike build_problemJGEX, this does NOT go through JGEX clause-based
+        construction. All points are treated as free points with given coordinates.
+
+        Args:
+            points: [(name, x, y), ...] - all points with numerical coordinates
+            premises: [(predicate, [arg1, arg2, ...]), ...] - all premises
+            defsJGEX: definition dictionary
+            goals_str: [(predicate, [arg1, arg2, ...]), ...] - goals to prove
+            rng: random number generator
+
+        Returns:
+            ProofState with all points, premises, and goals loaded
+        """
         proof = ProofState(rng=rng, defs=defsJGEX)
         adds: list[Dependency] = []
 
-        for point in points:
-            proof.symbols_graph.new_node(Point, point[0])
+        # 1. Create Point nodes in symbols_graph
+        for name, x, y in points:
+            proof.symbols_graph.new_node(Point, name)
 
-        new_premises = [(name, *args) for name, args in premises]
-        new_goals = [(name, *args) for name, args in goals_str]
-        for statement in new_premises:
+        # 2. Set coordinates, clause, rely_on for each point
+        new_points = proof.symbols_graph.names2points([p[0] for p in points])
+        for (name, x, y), p_new in zip(points, new_points):
+            p_new.num = PointNum(x, y)
+            p_new.rely_on = set()
+            # Free point clause: same as JGEX "a : ;" → Clause(points=(name,), sentences=())
+            p_new.clause = Clause(points=(name,), sentences=())
+
+        # 3. Create Statement objects from premises
+        for pred_name, args in premises:
+            tokens = (pred_name, *args)
             new_statement = notNone(
-                Statement.from_tokens(
-                    statement,
-                    proof.dep_graph
-                )
+                Statement.from_tokens(tokens, proof.dep_graph)
             )
             adds.append(Dependency.mk(new_statement, IN_PREMISES, ()))
 
-        new_points = proof.symbols_graph.names2points([p[0] for p in points])
-        for p, p_new in zip(points, new_points):
-            p_new.num = PointNum(p[1], p[2])
-            p_new.rely_on = set()
-        
+        # 4. Add premises to dependency graph with numerical validation
         for add in adds:
             if not add.statement.check_numerical():
                 raise ValueError(
-                    "Numerical check failed when building from predicates."
+                    f"Numerical check failed for premise: {add.statement.to_str()}"
                 )
             add.add()
 
         proof.matcher.update()
-        
+
+        # 5. Create goal statements
         if goals_str:
-            proof.goals = [
-                notNone(Statement.from_tokens(new_goals[0], proof.dep_graph))
-                for goal_str in goals_str
-            ]
+            proof.goals = []
+            for pred_name, args in goals_str:
+                tokens = (pred_name, *args)
+                goal_stmt = notNone(Statement.from_tokens(tokens, proof.dep_graph))
+                proof.goals.append(goal_stmt)
 
         return proof
             
