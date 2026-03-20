@@ -8,7 +8,7 @@ authors = [
     {name = "Vladmir Sicca", email = "vsiccag@gmail.com"},
     {name = "Tianxiang Xia", email = "xia.tianxiang00@gmail.com"}
 ]
-dynamic = ["version", "readme", "dependencies"]
+dynamic = ["version", "readme"]
 description = "Symbolic solver for geometric problems."
 requires-python = ">=3.6"
 classifiers=[
@@ -22,7 +22,66 @@ classifiers=[
     'Operating System :: MacOS',
 ]
 
+# Core dependencies - only what's needed for pure engine inference
+dependencies = [
+    "numpy>=1.23.5,<2.0",
+    "scipy>=1.10.0",
+    "typing-extensions",
+    "networkx",
+    "pybind11",
+    "colorama",
+    "rich",
+]
+
 [project.optional-dependencies]
+# Visualization
+viz = [
+    "matplotlib>=3.7.0",
+    "pyvis",
+    "seaborn",
+    "pillow",
+    "cairosvg",
+    "adjustText",
+]
+
+# Data generation (Ray parallel)
+generation = [
+    "ray[default]",
+    "millify",
+    "newclid[viz]",
+]
+
+# ML/LLM inference
+ml = [
+    "torch",
+    "torchvision",
+    "transformers>=4.40.0",
+    "accelerate",
+    "ray[default]",
+    "newclid[viz]",
+]
+
+# VLM specific
+vlm = [
+    "qwen_vl_utils",
+    "modelscope",
+    "timm",
+    "newclid[ml]",
+]
+
+# OpenAI API
+openai = ["openai"]
+
+# Full installation (backward compatible)
+full = [
+    "newclid[viz]",
+    "newclid[generation]",
+    "newclid[ml]",
+    "newclid[vlm]",
+    "newclid[openai]",
+    "py-data-juicer",
+]
+
 dev = ['black', 'ruff', 'pytest', 'pytest-cov', 'pytest-check', 'pytest-mock', 'pre-commit']
 doc = ['numpy', 'sphinx-autoapi', 'autoapi', 'sphinx_rtd_theme', 'sphinx-autodoc-typehints', 'sphinx-autobuild']
 
@@ -34,7 +93,6 @@ newclid = "newclid.__main__:main"
 
 [tool.setuptools.dynamic]
 readme = { file = ["README.md"] }
-dependencies = { file = ["requirements.txt"] }
 
 [tool.setuptools_scm]
 

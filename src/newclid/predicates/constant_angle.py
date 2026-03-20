@@ -112,7 +112,7 @@ class ConstantAngle(Predicate):
         return f"∠({a.pretty_name}{b.pretty_name},{c.pretty_name}{d.pretty_name}) = {fraction_to_angle(y)}"
         
     @classmethod
-    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator):
+    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True):
         draw_segment(ax, args[0], args[1])
         draw_segment(ax, args[2], args[3])
 

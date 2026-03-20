@@ -13,30 +13,33 @@
 """
 
 import argparse
-import concurrent.futures
 import json
 import os
 import random
 import re
 import time
+
+import ray
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from newclid.api import CSolver, DirectSolver
 
 # ============== 硬编码默认路径 ==============
-DEFAULT_PROBLEMS_PATH = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/rebuild_problems/hageo_224_remain_rebuild.txt"
-DEFAULT_AUX_POINTS_PATH = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/rebuild_problems/hageo_224_remain_rebuild_aux_points.txt"
-DEFAULT_RULES_PATH = "/c23474/home/duzhengtong/Discovery-GenesisGeo/src/newclid/default_configs/rules.txt"
-DEFAULT_OUTPUT_PATH = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/solve_results/hageo_224_remain_like_hageo_solve_results.json"
-DEFAULT_SUMMARY_PATH = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/solve_results/hageo_224_remain_like_hageo_summary.txt"
+DEFAULT_PROBLEMS_PATH = "/root/GenesisGeo/datasets/rebuild_problems/hageo_409_rebuild.txt"
+DEFAULT_PROBLEMS_PATH = "/root/GenesisGeo/datasets/rebuild_problems/test_single.txt"
+DEFAULT_AUX_POINTS_PATH = "/root/GenesisGeo/datasets/rebuild_problems/hageo_409_rebuild_aux_points_overlap_correct.txt"
+DEFAULT_RULES_PATH = "/root/GenesisGeo/src/newclid/default_configs/rules.txt"
+DEFAULT_OUTPUT_PATH = "/root/GenesisGeo/datasets/solve_results/hageo_409_like_hageo_solve_results_overlap_correct_8k.json"
+DEFAULT_SUMMARY_PATH = "/root/GenesisGeo/datasets/solve_results/hageo_409_like_hageo_summary_overlap_correct_8k.txt"
 
 # ============== 默认参数 ==============
-DEFAULT_N_AUX = 2        # 每次采样的辅助点数量
-DEFAULT_MAX_ATTEMPTS = 15  # 每道题的最大尝试次数
+DEFAULT_N_AUX = 6        # 每次采样的辅助点数量
+DEFAULT_MAX_ATTEMPTS = 8192  # 每道题的最大尝试次数
 DEFAULT_TIMEOUT = 600    # 单次求解超时秒数
 DEFAULT_SEED = 42        # 随机种子
-DEFAULT_MAX_WORKERS = 10  # 并行进程数（默认1即串行）
+DEFAULT_MAX_WORKERS =50  # 并行进程数（默认1即串行）
+DEFAULT_MAX_WORKERS =1  # 并行进程数（默认1即串行）
 
 
 @dataclass
@@ -66,6 +69,7 @@ class SolveResult:
     runtime: float = 0.0
     aux_points_used: List[Dict] = field(default_factory=list)
     error: Optional[str] = None
+    proof_steps: Optional[List[str]] = None  # 证明步骤（按行分割）
 
 
 def parse_point_line(line: str) -> Tuple[str, float, float]:
@@ -327,10 +331,10 @@ def augment_problem(
     )
 
 
-def solve_problem(problem: Problem, rules_path: str, timeout: int) -> Tuple[bool, float, Optional[str]]:
+def solve_problem(problem: Problem, rules_path: str, timeout: int) -> Tuple[bool, float, Optional[str], Optional[List[str]]]:
     """使用 DirectSolver 求解题目
     
-    返回：(是否成功, 运行时间, 错误信息)
+    返回：(是否成功, 运行时间, 错误信息, 证明步骤列表)
     """
 
     try:
@@ -352,13 +356,17 @@ def solve_problem(problem: Problem, rules_path: str, timeout: int) -> Tuple[bool
         
         start_time = time.time()
         solved = solver.run()
+        proof_steps = None
+        if solved:
+            # 按行分割证明步骤
+            proof_steps = solver.solver.write_proof_steps().split('\n')
         end_time = time.time()
 
         runtime = solver.solver.run_infos.get('runtime', end_time - start_time)
-        return (solved, runtime, None)
+        return (solved, runtime, None, proof_steps)
 
     except Exception as e:
-        return (False, 0.0, str(e))
+        return (False, 0.0, str(e), None)
 
 
 def load_existing_results(output_path: str) -> Dict[str, SolveResult]:
@@ -377,7 +385,8 @@ def load_existing_results(output_path: str) -> Dict[str, SolveResult]:
                             attempts=item.get('attempts', 0),
                             runtime=item.get('runtime', 0.0),
                             aux_points_used=item.get('aux_points_used', []),
-                            error=item.get('error')
+                            error=item.get('error'),
+                            proof_steps=item.get('proof_steps')
                         )
                         results[item['problem_name']] = result
         except Exception as e:
@@ -391,14 +400,18 @@ def save_results(results: List[SolveResult], output_path: str):
 
     data = []
     for r in results:
-        data.append({
+        item = {
             'problem_name': r.problem_name,
             'solved': r.solved,
             'attempts': r.attempts,
             'runtime': r.runtime,
             'aux_points_used': r.aux_points_used,
             'error': r.error
-        })
+        }
+        # 只有成功求解的题目才保存证明步骤
+        if r.solved and r.proof_steps:
+            item['proof_steps'] = r.proof_steps
+        data.append(item)
 
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
@@ -469,14 +482,15 @@ def solve_single_problem(
     
     # 没有候选辅助点时，直接求解
     if not candidates:
-        solved, runtime, error = solve_problem(problem, rules_path, timeout)
+        solved, runtime, error, proof_steps = solve_problem(problem, rules_path, timeout)
         result = SolveResult(
             problem_name=problem.name,
             solved=solved,
             attempts=1,
             runtime=runtime,
             aux_points_used=[],
-            error=error
+            error=error,
+            proof_steps=proof_steps
         )
         if not is_parallel:
             status = "✓ 成功" if solved else ("✗ 错误: " + str(error) if error else "✗ 失败")
@@ -515,13 +529,14 @@ def solve_single_problem(
         
         # 求解
         try:
-            is_solved, runtime, error = solve_problem(augmented, rules_path, timeout)
+            is_solved, runtime, error, proof_steps = solve_problem(augmented, rules_path, timeout)
             total_runtime += runtime
             
             if is_solved:
                 solved = True
                 result.solved = True
                 result.runtime = total_runtime
+                result.proof_steps = proof_steps
                 result.aux_points_used = [
                     {
                         "name": new_name,
@@ -705,32 +720,46 @@ def main():
                 save_results(results_list, args.output)
                 print(f"[自动保存] 已保存 {len(results_list)} 道题目的结果\n")
     else:
-        # ============== 并行模式 ==============
-        print(f"启用并行模式，使用 {args.max_workers} 个进程\n")
+        # ============== 并行模式 (Ray) ==============
+        print(f"启用 Ray 并行模式，使用 {args.max_workers} 个进程\n")
         
-        completed_count = 0
+        # 初始化 Ray（如果尚未初始化）
+        if not ray.is_initialized():
+            ray.init(
+                num_cpus=args.max_workers,
+                ignore_reinit_error=True,
+                log_to_driver=False,  # 减少日志输出
+            )
+        
+        # 定义 Ray remote 函数（每个任务独立进程，崩溃不影响其他任务）
+        @ray.remote(max_retries=0)  # 不自动重试，崩溃直接标记失败
+        def solve_remote(problem, candidates, args_dict, problem_index):
+            return solve_single_problem(problem, candidates, args_dict, problem_index)
+        
         total_to_solve = len(problems_to_solve)
         
-        with concurrent.futures.ProcessPoolExecutor(max_workers=args.max_workers) as executor:
-            # 提交所有任务
-            future_to_problem = {}
-            for idx, problem, candidates in problems_to_solve:
-                future = executor.submit(
-                    solve_single_problem,
-                    problem,
-                    candidates,
-                    args_dict,
-                    idx
-                )
-                future_to_problem[future] = (idx, problem)
+        # 提交所有任务
+        futures = []
+        future_to_problem = {}
+        for idx, problem, candidates in problems_to_solve:
+            future = solve_remote.remote(problem, candidates, args_dict, idx)
+            futures.append(future)
+            future_to_problem[future] = (idx, problem)
+        
+        # 逐个收集结果（使用 ray.wait 实现 as_completed 效果）
+        completed_count = 0
+        pending = list(futures)
+        
+        while pending:
+            # 等待任意一个任务完成
+            done, pending = ray.wait(pending, num_returns=1, timeout=None)
             
-            # 收集结果
-            for future in concurrent.futures.as_completed(future_to_problem):
+            for future in done:
                 idx, problem = future_to_problem[future]
                 completed_count += 1
                 
                 try:
-                    result = future.result()
+                    result = ray.get(future)
                     results_dict[problem.name] = result
                     
                     # 打印简洁进度
@@ -738,7 +767,30 @@ def main():
                     attempts_info = f"({result.attempts} attempts)" if result.attempts > 1 else ""
                     print(f"[{completed_count}/{total_to_solve}] {status} {problem.name} {attempts_info} ({result.runtime:.1f}s)")
                     
+                except ray.exceptions.RayTaskError as e:
+                    # 任务内部抛出异常
+                    print(f"[{completed_count}/{total_to_solve}] ✗ {problem.name} 任务错误: {e}")
+                    results_dict[problem.name] = SolveResult(
+                        problem_name=problem.name,
+                        solved=False,
+                        attempts=0,
+                        runtime=0.0,
+                        aux_points_used=[],
+                        error=str(e)
+                    )
+                except ray.exceptions.WorkerCrashedError as e:
+                    # Worker 进程崩溃（段错误等）
+                    print(f"[{completed_count}/{total_to_solve}] ✗ {problem.name} 进程崩溃: {e}")
+                    results_dict[problem.name] = SolveResult(
+                        problem_name=problem.name,
+                        solved=False,
+                        attempts=0,
+                        runtime=0.0,
+                        aux_points_used=[],
+                        error=f"Worker crashed: {e}"
+                    )
                 except Exception as e:
+                    # 其他异常
                     print(f"[{completed_count}/{total_to_solve}] ✗ {problem.name} 错误: {e}")
                     results_dict[problem.name] = SolveResult(
                         problem_name=problem.name,
@@ -754,6 +806,9 @@ def main():
                     results_list = [results_dict.get(p.name) for p in problems if p.name in results_dict]
                     save_results(results_list, args.output)
                     print(f"[自动保存] 已保存 {len(results_list)} 道题目的结果")
+        
+        # 关闭 Ray
+        ray.shutdown()
 
     total_time = time.time() - total_start_time
 

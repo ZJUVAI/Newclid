@@ -22,14 +22,33 @@ public:
     bool is_close(const Point &other) const;
 
     bool operator==(const Point &other) const;
+    bool operator!=(const Point &other) const;
     bool operator<(const Point &other) const;
     bool operator>(const Point &other) const;
     bool operator<=(const Point &other) const;
     bool operator>=(const Point &other) const;
 
+    static void parseName(const std::string &name,
+                          std::string &prefix,
+                          int &index)
+    {
+        size_t i = 0;
+        while (i < name.size() && std::isalpha(name[i]))
+            ++i;
+
+        prefix = name.substr(0, i);
+
+        if (i == name.size())
+            index = -1; // 没有数字
+        else
+            index = std::stoi(name.substr(i));
+    }
+
 private:
     PointNum _num;
     std::string _name;
+    std::string _prefix;
+    int _index;
 };
 
 // 声明 operator<<

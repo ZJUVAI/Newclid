@@ -29,6 +29,27 @@ bool Perp::check_nondegen() const
     return _left.check_nondegen() && _right.check_nondegen();
 }
 
+unique_ptr<Statement> Perp::replace(Point p, Point q) const
+{
+    auto left_pts = _left.points();
+    Point la = left_pts[0], lb = left_pts[1];
+
+    Point new_la = (la == p) ? q : la;
+    Point new_lb = (lb == p) ? q : lb;
+
+    Slope new_left(new_la, new_lb);
+
+    auto right_pts = _right.points();
+    Point ra = right_pts[0], rb = right_pts[1];
+
+    Point new_ra = (ra == p) ? q : ra;
+    Point new_rb = (rb == p) ? q : rb;
+
+    Slope new_right(new_ra, new_rb);
+
+    return make_unique<Perp>(new_left, new_right);
+}
+
 bool Perp::check_equations() const
 {
     return Numerical::close_enough((_left.right().x() - _left.left().x()) * (_right.right().x() - _right.left().x()),
@@ -50,10 +71,16 @@ ostream &Perp::print(ostream &os) const
     return os << _left.left() << _left.right() << " ⟂  " << _right.left() << _right.right();
 }
 
-vector<unique_ptr<Equation>> Perp::as_equation(bool log, bool exp) const
+vector<unique_ptr<Equation>> Perp::as_equation_slope(bool exp) const
 {
     vector<unique_ptr<Equation>> result;
-    result.push_back(make_unique<Equation>(Equation({Term(_left), -Term(_right), -Term(Pi(), Rational(0.5))})));
+    result.push_back(make_unique<Equation>(Equation({Term(_left), -Term(_right)})));
+    return result;
+}
+
+vector<unique_ptr<Equation>> Perp::as_equation_dist(bool exp) const
+{
+    vector<unique_ptr<Equation>> result;
     if (!exp)
     {
         return result;

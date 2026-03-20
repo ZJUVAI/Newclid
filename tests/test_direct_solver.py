@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from typing import List, Tuple, Optional
 from newclid.api import DirectSolver
 
-PROBLEMS_FILE_PATH="/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/rebuild_problems/c10s50_rules_rebuild.txt"
-RULES_FILE_PATH="/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/candidate_rules/tmp_rules.txt"
-OUTPUT_FILE_PATH="/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/tmp.txt"
+PROBLEMS_FILE_PATH="/root/GenesisGeo/datasets/rebuild_problems/c10s50_rules_rebuild.txt"
+RULES_FILE_PATH="/root/GenesisGeo/datasets/candidate_rules/tmp_rules.txt"
+OUTPUT_FILE_PATH="/root/GenesisGeo/datasets/tmp.txt"
 TIMEOUT=3600
 
 @dataclass

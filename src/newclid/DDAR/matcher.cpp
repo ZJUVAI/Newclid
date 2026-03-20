@@ -6,24 +6,59 @@
 #include "type/angle.hpp"
 #include "predicate/congruent_triangles.hpp"
 #include "predicate/secant.hpp"
+#include "predicate/eqpoint.hpp"
 #include <algorithm>
 #include <tuple>
 #include <vector>
 #include <set>
+#include <chrono>
 
 using namespace std;
 
-Matcher::Matcher(Problem *prob, bool ar) : _problem(prob)
+Matcher::Matcher(Problem *prob) : _problem(prob)
 {
+    // auto t0 = std::chrono::steady_clock::now();
+
     match_similar_triangles();
+    // auto t1 = std::chrono::steady_clock::now();
+    // std::cout << "match_similar_triangles : "
+    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
+    //           << " ms" << endl;
+
+    // t0 = t1;  // 重置起点
     match_between();
+    // t1 = std::chrono::steady_clock::now();
+    // std::cout << "match_between           : "
+    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
+    //           << " ms" << endl;
+
+    // t0 = t1;
     match_equal_angles();
+    // t1 = std::chrono::steady_clock::now();
+    // std::cout << "match_equal_angles      : "
+    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
+    //           << " ms" << endl;
+
+    // t0 = t1;
     match_circles();
+    // t1 = std::chrono::steady_clock::now();
+    // std::cout << "match_circles           : "
+    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
+    //           << " ms" << endl;
+
+    // t0 = t1;
     match_orthocenters();
-    if (ar)
-    {
-        match_perps_paras();
-    }
+    // t1 = std::chrono::steady_clock::now();
+    // std::cout << "match_orthocenters      : "
+    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
+    //           << " ms" << endl;
+
+    // t0 = t1;
+    match_perps_paras();
+    // t1 = std::chrono::steady_clock::now();
+    // std::cout << "match_perps_paras       : "
+    //           << std::chrono::duration<double, std::milli>(t1 - t0).count()
+    //           << " ms" << endl;
 }
 
 vector<tuple<double, double, Triangle>> Matcher::all_triangles()
@@ -41,7 +76,7 @@ vector<tuple<double, double, Triangle>> Matcher::all_triangles()
             }
             for (const auto &pt_c : _problem->points())
             {
-                if (Coll(pt_a, pt_b, pt_c).check_equations())
+                if (pt_a.is_close(pt_b) || pt_a.is_close(pt_c) || Coll(pt_a, pt_b, pt_c).check_equations())
                 {
                     continue;
                 }
@@ -187,6 +222,23 @@ vector<tuple<double, Coll>> Matcher::all_betweens()
     return res;
 }
 
+vector<pair<Point, Point>> Matcher::all_eqpoints()
+{
+    const auto &pts = _problem->points();
+    vector<pair<Point, Point>> res;
+    for (size_t i = 0; i < pts.size(); i++)
+    {
+        for (size_t j = i + 1; j < pts.size(); j++)
+        {
+            if (pts[i].is_close(pts[j]))
+            {
+                res.push_back(make_pair(pts[i], pts[j]));
+            }
+        }
+    }
+    return res;
+}
+
 void Matcher::on_pappus(const Pappus &pappus)
 {
     for (const auto &rotated : pappus.permutations())
@@ -258,6 +310,69 @@ void Matcher::match_between()
     using item_type = tuple<double, Coll>;
     vector<item_type> betweens = all_betweens();
 
+    vector<pair<Point, Point>> eqpoints = all_eqpoints();
+
+    for (const auto &eq_pair : eqpoints)
+    {
+        const Point &p1 = eq_pair.first;
+        const Point &p2 = eq_pair.second;
+        vector<Coll> colls;
+        for (const auto &item : betweens)
+        {
+            const Coll &coll = get<1>(item);
+            if (coll.a() == p1 || coll.b() == p1 || coll.c() == p1)
+            {
+                colls.push_back(coll);
+            }
+        }
+        set<Point> used_points;
+        vector<tuple<double, Point, Point>> candidates;
+        for (const auto &coll : colls)
+        {
+            Point a = p1 == coll.a() ? coll.b() : coll.a();
+            Point b = p1 == coll.c() ? coll.b() : coll.c();
+            used_points.insert(a);
+            used_points.insert(b);
+            candidates.emplace_back(coll.angle(), a, b);
+        }
+        for (const Point &pt : _problem->points())
+        {
+            if (pt == p1 || p1.is_close(pt))
+            {
+                continue;
+            }
+            candidates.emplace_back(Slope(p1, pt).angle(), p1, pt);
+            insert_theorem(Theorem::cong_of_eqpoints(EqPoint(p1, p2), pt));
+        }
+
+        std::sort(candidates.begin(), candidates.end());
+
+        for (size_t i = 0; i < candidates.size(); ++i)
+        {
+            for (size_t j = i + 1; j < candidates.size(); ++j)
+            {
+                const auto &cand1 = candidates[i];
+                const auto &cand2 = candidates[j];
+                double angle1 = std::get<0>(cand1);
+                double angle2 = std::get<0>(cand2);
+                if (Numerical::close_enough(angle1, angle2))
+                {
+                    continue;
+                }
+                const Point &a = std::get<1>(cand1);
+                const Point &b = std::get<2>(cand1);
+                const Point &c = std::get<1>(cand2);
+                const Point &d = std::get<2>(cand2);
+                insert_theorem(Theorem::eqpoints_of_same_intersections(p1, p2, a, b, c, d));
+            }
+        }
+    }
+
+    if (betweens.empty())
+    {
+        return;
+    }
+
     for (size_t i = 0; i < betweens.size(); i++)
     {
         for (size_t j = i + 1; j < betweens.size(); j++)
@@ -312,11 +427,6 @@ void Matcher::match_between()
                 }
             }
         }
-    }
-
-    if (betweens.empty())
-    {
-        return;
     }
 
     sort(betweens.begin(), betweens.end(),
@@ -533,6 +643,10 @@ void Matcher::on_circle(const Point &center, const vector<pair<double, Point>> &
                 {
                     on_quadrangle_circumcenter(center, {points[pt_a].second, points[pt_b].second, points[pt_c].second, points[pt_d].second});
                 }
+            }
+            if (points[pt_a].second.is_close(points[pt_b].second))
+            {
+                continue;
             }
             for (auto const &pt : _problem->points())
             {

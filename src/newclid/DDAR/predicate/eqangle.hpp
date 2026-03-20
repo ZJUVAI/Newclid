@@ -29,6 +29,8 @@ public:
 
     std::vector<statement_arg> args() const override;
 
+    std::unique_ptr<Statement> replace(Point p, Point q) const override;
+
     std::unique_ptr<Statement> normalize() const override;
 
     std::ostream &print(std::ostream &os) const override;
@@ -39,7 +41,7 @@ public:
 
     const Angle &right() const { return _right; }
 
-    std::vector<std::unique_ptr<Equation>> as_equation(bool log, bool exp) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp) const override;
 
     bool numerical_only() const { return false; }
 

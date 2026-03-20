@@ -1,6 +1,6 @@
 # main.py
-import newclid.proof_scout.scout_config as config
-from newclid.proof_scout.scout_pipeline import PipelineManager
+import newclid.proof_scout.ml.scout_config as config
+from newclid.proof_scout.ml.scout_pipeline import PipelineManager
 
 def main():
     # 初始化管线

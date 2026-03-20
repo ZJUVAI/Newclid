@@ -30,8 +30,8 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from newclid.data_discovery.proof_graph_visualizer import ProofGraphVisualizer  # noqa: E402
-from newclid.data_discovery.single_proof_graph import SingleProofGraph  # noqa: E402
+from newclid.proof_scout.core.proof_graph_visualizer import ProofGraphVisualizer  # noqa: E402
+from newclid.proof_scout.core.single_proof_graph import SingleProofGraph  # noqa: E402
 import inspect  # noqa: E402
 
 

@@ -1,5 +1,4 @@
 #include "ar/reduced_equation.hpp"
-
 #include "ar/equation.hpp"
 #include "ar/linear_system.hpp"
 
@@ -9,43 +8,64 @@ ReducedEquation::ReducedEquation(Equation &equation, LinearSystem *system) : _or
                                                                              _system(system),
                                                                              _remainder(equation)
 {
+    _remainder.reduction();
 }
 
 void ReducedEquation::set_index(size_t index, const LinearSystem *system)
 {
     _remainder.set_index(index, const_cast<LinearSystem *>(system));
-    // _original_equation.set_index(index, const_cast<LinearSystem *>(system));
 }
 
 void ReducedEquation::reduce()
 {
+    _remainder.normalize();
     if (_remainder.empty())
     {
         return;
     }
 
-    bool changed = true;
-    while (changed)
+    while (true)
     {
-        changed = false;
-        for (const auto &[term, eq] : _system->solved_variables())
+        bool changed = false;
+        for (const auto &term : _remainder.terms())
         {
-            changed |= substitute_variable(term, eq);
+            for (const auto &[var_arg, exp] : term.vars())
+            {
+                Term single_var(var_arg);
+                const Equation *solved_eq = _system->get_solved_variable(single_var);
+                if (solved_eq != nullptr)
+                {
+                    if (substitute_variable(single_var, *solved_eq))
+                    {
+                        changed = true;
+                        break;
+                    }
+                }
+            }
+            if (changed)
+            {
+                break;
+            }
+        }
+        if (!changed)
+        {
+            break;
         }
     }
 
     while (!_remainder.empty())
     {
-        auto &term = *_remainder.begin();
-        auto itr = _system->solved_terms().find(term);
-        if (itr != _system->solved_terms().end())
-        {
-            _remainder -= itr->second * term.coeff();
-        }
-        else
+        const Term &head = *_remainder.begin();
+
+        auto it = _system->solved_terms().find(head);
+
+        if (it == _system->solved_terms().end())
         {
             break;
         }
+
+        const Equation &substitute_eq = *it->second;
+        _remainder -= substitute_eq * head.coeff();
     }
     _remainder.reduction();
 }
@@ -63,7 +83,8 @@ bool ReducedEquation::substitute_variable(Term var, const Equation &e)
     while (flag)
     {
         flag = false;
-        for (auto &term : new_equation.terms())
+        // cout << "before: " << new_equation << endl;
+        for (const auto &term : new_equation.terms())
         {
             if (term.contain(var))
             {
@@ -71,9 +92,11 @@ bool ReducedEquation::substitute_variable(Term var, const Equation &e)
                 changed = true;
                 flag = true;
                 break;
+                // cout << "after: " << new_equation << endl;
             }
         }
         new_equation.reduction();
+        // cout << "after reduction: " << new_equation << endl;
     }
     _remainder = new_equation;
     return changed;

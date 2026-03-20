@@ -8,6 +8,7 @@ from fractions import Fraction
 import re
 from collections import defaultdict
 import heapq
+import string
 import ray
 import numpy as np
 import torch
@@ -36,6 +37,20 @@ from newclid.DDAR.build import DDAR
 if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
 
+logger = logging.getLogger(__name__)
+# logger.setLevel(logging.INFO)
+
+AUX_PREDICATES = [
+    # "coll",
+    # "cong",
+    # "cyclic",
+    # "eqangle",
+    # "eqratio",
+    # "midp",
+    # "para",
+    # "perp",
+]
+
 class LMAgent(DeductiveAgent):
     def __init__(self, model_path: list[str], decoding_size: int, beam_size: int, search_depth: int):
         self.any_new_statement_has_been_added = True
@@ -59,7 +74,7 @@ class LMAgent(DeductiveAgent):
             self.tokenizers.append(tokenizer)
         
     @torch.no_grad()
-    def inference(self, model, tokenizer, query: str, response_prefix: str = '<aux>'):
+    def inference(self, model, tokenizer, query: str, new_point_name: str, response_prefix: str = '<aux>', with_predicate: bool = True):
         aux_dsl_dict = {}
         # Process each model/tokenizer pair
         messages = [
@@ -71,33 +86,61 @@ class LMAgent(DeductiveAgent):
             tokenize=False,
             add_generation_prompt=True,
         )
-        # text = query
         text += "<think>\n\n</think>\n\n"
         model_prompt_inputs = tokenizer([text], return_tensors="pt")
-        text += response_prefix
-        model_inputs = tokenizer([text], return_tensors="pt").to('cuda')
-        bad_words_ids = tokenizer(["<", " <"]).input_ids
-        past_key_values = DynamicCache()
-        generated_output = model.generate(
-            **model_inputs,
-            max_new_tokens=100,
-            num_beams=self.decoding_size,
-            num_return_sequences=self.decoding_size,
-            pad_token_id=151643,
-            eos_token_id=2587, #' ;' #29
-            # bad_words_ids=bad_words_ids,
-            return_dict_in_generate=True, 
-            output_scores=True,
-            past_key_values=past_key_values,
-        )
-        scores = generated_output.sequences_scores
-        generated_output = generated_output.sequences[:, model_prompt_inputs.input_ids.shape[1]:]
-        aux_dsls = tokenizer.batch_decode(generated_output, skip_special_tokens=True)
-        for aux_dsl, score in zip(aux_dsls, scores):
-            score = score.item()
-            aux_dsl_dict[aux_dsl] = score
+        
+        if with_predicate and len(AUX_PREDICATES) > 0:
+            # Inference with predicate prefix
+            beams_per_predicate = self.decoding_size // len(AUX_PREDICATES)
+            if beams_per_predicate:
+                for aux_predicate_str in AUX_PREDICATES:
+                    prompt_with_predicate = text + response_prefix + ' ' + new_point_name + ' : ' + aux_predicate_str
+                    model_inputs = tokenizer([prompt_with_predicate], return_tensors="pt").to('cuda')
+                    
+                    generated_output = model.generate(
+                        **model_inputs,
+                        max_new_tokens=100,
+                        num_beams=beams_per_predicate,
+                        num_return_sequences=beams_per_predicate,
+                        pad_token_id=151643,
+                        eos_token_id=2587,  # ' ;'
+                        return_dict_in_generate=True, 
+                        output_scores=True,
+                    )
+                    scores = generated_output.sequences_scores
+                    generated_output = generated_output.sequences[:, model_prompt_inputs.input_ids.shape[1]:]
+                    aux_dsls = tokenizer.batch_decode(generated_output, skip_special_tokens=True)
+                    
+                    for aux_dsl, score in zip(aux_dsls, scores):
+                        score = score.item()
+                        aux_dsl_dict[aux_dsl] = score
+                        logger.info(f"aux_dsl (with_predicate): {aux_dsl}")
+        
+        if not with_predicate:
+            # Inference without predicate prefix
+            prompt_no_predicate = text + response_prefix + ' ' + new_point_name
+            model_inputs = tokenizer([prompt_no_predicate], return_tensors="pt").to('cuda')
+
+            generated_output = model.generate(
+                **model_inputs,
+                max_new_tokens=100,
+                num_beams=self.decoding_size,
+                num_return_sequences=self.decoding_size,
+                pad_token_id=151643,
+                eos_token_id=2587,  # ' ;'
+                return_dict_in_generate=True, 
+                output_scores=True,
+            )
+            scores = generated_output.sequences_scores
+            generated_output = generated_output.sequences[:, model_prompt_inputs.input_ids.shape[1]:]
+            aux_dsls = tokenizer.batch_decode(generated_output, skip_special_tokens=True)
+
+            for aux_dsl, score in zip(aux_dsls, scores):
+                score = score.item()
+                aux_dsl_dict[aux_dsl] = score
+                logger.info(f"aux_dsl (no_predicate): {aux_dsl}")
             
-        return aux_dsl_dict # key: aux, value: score
+        return aux_dsl_dict
 
     def run(self, proof: "ProofState", rules: list[Rule], timeout: int = 3600
         ) -> dict[str, Any]:
@@ -107,13 +150,8 @@ class LMAgent(DeductiveAgent):
             infos["runtime"] = time.time() - t0
             infos["success"] = is_success
             infos["steps"] = step
-            infos["problem"] = ""
             if error_msg:
-                if is_success:
-                    infos["problem"] = error_msg[0]
-                    infos["proof"] = error_msg[1]
-                else:
-                    infos["error"] = error_msg
+                infos["error"] = error_msg
             return infos
         
         t0 = time.time()
@@ -124,88 +162,115 @@ class LMAgent(DeductiveAgent):
             if not goal.check_numerical():
                 return infos(False, f"{goal.pretty()} fails numerical check")
         # Run ddar
-        base_proof = LMAgent.run_ddar_c(proof, rules, t0, timeout)
+        solved = LMAgent.run_ddar_c(proof, rules, t0, timeout)
         # if proofed by ddar, return
-        if base_proof.check_goals():
-            return infos(True, [str(self.problemJGEX), base_proof])
+        if solved:
+            return infos(True)
         # else seek help from llm
         else:
             rules_ref = ray.put(rules)
             future_info = dict()
             running_futures = []
             
+            # Create two BeamQueues for each model: one for with_predicate, one for no_predicate
+            # beam_queues[i][j]: i is the model index, j=0 for with_predicate, j=1 for no_predicate
             beam_queues = []
             for i in range(len(self.models)):
-                q = BeamQueue(max_size=self.beam_size)
-                q.add(node=(self.problemJGEX, base_proof), val=0)
-                beam_queues.append(q)
+                q_with_pred = BeamQueue(max_size=self.beam_size)
+                q_with_pred.add(node=self.problemJGEX, val=0)
+                
+                q_no_pred = BeamQueue(max_size=self.beam_size)
+                q_no_pred.add(node=self.problemJGEX, val=0)
+                
+                beam_queues.append([q_with_pred, q_no_pred])
 
             for depth in range(self.search_depth):
                 new_beam_queues = []
-                for i, beam_queue in enumerate(beam_queues):
-                    new_queue = BeamQueue(max_size=self.beam_size)  # to replace beam_queue.
-                    for prev_score, (problem, proof) in beam_queue:
-                    # for prev_score, (problem, proof) in beam_queue:
-                        if time.time() - t0 > timeout:
-                            ray.shutdown()
-                            return infos(False, 'Timeout')
-                        proof_ref = ray.put(proof)
+                
+                for i in range(len(self.models)):
+                    new_queues = [BeamQueue(max_size=self.beam_size), BeamQueue(max_size=self.beam_size)]
+                    
+                    # j=0: with_predicate, j=1: no_predicate
+                    for j, with_predicate in enumerate([True, False]):
+                        queue_type = 'with_pred' if with_predicate else 'no_pred'
                         
-                        # Stragety 1: insert the aux string into problem and predict the next aux
-                        p_dsl = self.problem_to_dsl(problem, base_proof.defs)
-                        aux_dsl_dict = self.inference(self.models[i], self.tokenizers[i], p_dsl, '<aux> x00')
-                        for aux_dsl, score in aux_dsl_dict.items():
-                            try:
-                                aux = self.try_dsl_to_constructions(aux_dsl[len('<aux> x00'):])
-                                if aux:
-                                    # create new problem as new task
-                                    new_problem = problem.with_more_construction(aux)  # will recreate the problem
-                                    # sumbit ray task
-                                    future = run_ddar_remote.remote(new_problem, proof_ref, aux, rules_ref, t0, timeout)
-                                    future_info[future] = (new_problem, prev_score, score)
-                                    running_futures.append(future)       
-                            except Exception as e:
-                                continue
-                        # Stragey 2: keep the aux string behind previous '<aux> x00' (AG).
-                        # Not implement yet
-
-                        # check any done task. if we find a solution early, we can save time
-                        done, running_futures = ray.wait(running_futures, timeout=0)
-                        for f in done:
-                            res = ray.get(f)
-                            if res is None:
-                                continue
-                            elif res.check_goals():
-                                new_problem, prev_score, score = future_info[f]
-                                for task in running_futures:
-                                    ray.cancel(task, force=True)
+                        logger.info(f"!!!")
+                        for prev_score, problem in beam_queues[i][j]:
+                            if time.time() - t0 > timeout:
                                 ray.shutdown()
-                                return infos(True, [str(new_problem), res])
-                            elif depth < self.search_depth -1:
-                                new_problem, prev_score, score = future_info[f]
-                                new_queue.add(node=(new_problem, res), val=prev_score+score)
+                                return infos(False, 'Timeout')
+                            
+                            p_dsl = self.problem_to_dsl(problem, proof.defs)
+                            logger.info(f"inferencing on query ({queue_type}): {p_dsl}")
+                            aux_dsl_dict = self.inference(
+                                self.models[i], self.tokenizers[i], p_dsl, 
+                                self.get_new_point_name(problem), '<aux> x00',
+                                with_predicate=with_predicate
+                            )
+                            
+                            for aux_dsl, score in aux_dsl_dict.items():
+                                try:
+                                    aux = self.try_dsl_to_constructions(aux_dsl[len('<aux> x00'):])
+                                    if aux:
+                                        new_problem = problem.with_more_construction(aux)
+                                        future = run_ddar_remote.remote(new_problem, proof.defs, aux, rules_ref, t0, timeout)
+                                        future_info[future] = (new_problem, prev_score, score, j)
+                                        running_futures.append(future)
+                                except Exception as e:
+                                    continue
+                            
+                            # check any done task
+                            done, running_futures = ray.wait(running_futures, timeout=0)
+                            for f in done:
+                                solved = ray.get(f)
+                                if solved is None:
+                                    continue
+                                elif solved:
+                                    new_problem, prev_score, score, queue_idx = future_info[f]
+                                    for task in running_futures:
+                                        ray.cancel(task, force=True)
+                                    ray.shutdown()
+                                    logger.info(f"success with problem: {str(new_problem)}")
+                                    return infos(True, str(new_problem))
+                                elif depth < self.search_depth - 1:
+                                    new_problem, prev_score, score, queue_idx = future_info[f]
+                                    new_queues[queue_idx].add(node=new_problem, val=prev_score+score)
+                    
                     # check remaining tasks
                     while running_futures:
                         done, running_futures = ray.wait(running_futures, num_returns=min(1000, len(running_futures)))
                         for f in done:
-                            res = ray.get(f)
-                            if res is None:
+                            solved = ray.get(f)
+                            if solved is None:
                                 continue
-                            elif res.check_goals():
-                                new_problem, prev_score, score = future_info[f]
+                            elif solved:
+                                new_problem, prev_score, score, queue_idx = future_info[f]
                                 for task in running_futures:
                                     ray.cancel(task, force=True)
                                 ray.shutdown()
-                                return infos(True, [str(new_problem), res])
-                            elif depth < self.search_depth -1:
-                                new_problem, prev_score, score = future_info[f]
-                                new_queue.add(node=(new_problem, res), val=prev_score+score)
-                    new_beam_queues.append(new_queue)
+                                logger.info(f"success with problem: {str(new_problem)}")
+                                return infos(True, str(new_problem))
+                            elif depth < self.search_depth - 1:
+                                new_problem, prev_score, score, queue_idx = future_info[f]
+                                new_queues[queue_idx].add(node=new_problem, val=prev_score+score)
+                    
+                    new_beam_queues.append(new_queues)
+                
                 beam_queues = new_beam_queues
 
             ray.shutdown()
             return infos(False, 'Tried but failed.')
 
+    def get_new_point_name(self, problem: ProblemJGEX) -> str:
+        num_points = sum([len(clause.points) for clause in problem.constructions])
+        return self._get_apha_geo_solver_var(num_points)
+    
+    def _get_apha_geo_solver_var(self, va_idx):
+        """Generate a point name using letters and numbers"""
+        letter_part = string.ascii_lowercase[va_idx % 26]
+        number_part = va_idx // 26
+        return f"{letter_part}{number_part - 1}" if number_part else letter_part
+    
     def step(self, proof: ProofState, rules: list[Rule]) -> bool:
         return
     
@@ -220,8 +285,8 @@ class LMAgent(DeductiveAgent):
         points = points[0]
     
         # premises
-        premises = re.split(r"\s*\[\d+\]", premises) # coll a c e [002] coll b d e [003] 》'coll a c e' , 'coll b d e'
-        premises = [seg.strip() for seg in premises if seg.strip()]  # 
+        premises = re.split(r"\s*\[\d+\]", premises) # coll a c e [002] coll b d e [003] => 'coll a c e' , 'coll b d e'
+        premises = [seg.strip() for seg in premises if seg.strip()]
         # currently, we only support two premises following alphageometry
         if len(premises) > 2:
             return 
@@ -250,27 +315,27 @@ class LMAgent(DeductiveAgent):
         Return:
             (predicate, args): translated to constructive predicate.
         """
-        # 直线垂直
+        # Line perpendicularity
         if predicate == 'perp':
             return Perp.to_constructive(point, tuple(args))
 
-        # 直线平行
+        # Line parallelism
         elif predicate == 'para':
             return Para.to_constructive(point, tuple(args))
 
-        # 全等/等距
+        # Congruence/Equal distance
         elif predicate == 'cong':
             return Cong.to_constructive(point, tuple(args))
 
-        # 中点
+        # Midpoint
         elif predicate == 'midp':
             return MidPoint.to_constructive(point, tuple(args))
 
-        # 共线
+        # Collinearity
         elif predicate == 'coll':
             return Coll.to_constructive(point, tuple(args))
 
-        # 等角
+        # Equal angles
         elif predicate == 'eqangle':
             def arrange_angle_points(a, b, c, d):
                 if a == c:
@@ -309,14 +374,14 @@ class LMAgent(DeductiveAgent):
                 res1 = EqAngle.to_constructive(point, arrange_angle_points(a, b, c, d) + arrange_angle_points(e, f, g, h))
             return res1
             
-        # 四点共圆
+        # Cyclic (four points on a circle)
         elif predicate == 'cyclic':
             return Cyclic.to_constructive(point, tuple(args))
 
         elif predicate == 'eqratio':
             return EqRatio.to_constructive(point, tuple(args))
 
-        # 其它直接返回
+        # For others, return directly
         return f"{predicate} {' '.join(args)}"
     
     def problem_to_dsl(self, problem: "ProblemJGEX", defs: dict[str, DefinitionJGEX]) -> str:
@@ -374,37 +439,6 @@ class LMAgent(DeductiveAgent):
         data_problem += ' </problem>'
         return data_problem
     
-    @staticmethod
-    def run_ddar(proof: "ProofState", rules: list[Rule], start_time: int, timeout: int = 3600): 
-        rule_buffer: list[Rule] = []
-        application_buffer: list[Dependency] = []
-        any_new_statement_has_been_added = True
-        proof.dep_graph.obtain_numerical_checked_premises()
-        running = True
-        while running and time.time() - start_time < timeout:
-            if proof.check_goals():
-                running = False
-            if rule_buffer:
-                theorem = rule_buffer.pop()
-                logging.debug("ddarn matching" + str(theorem))
-                deps = proof.match_theorem(theorem)
-                logging.debug("ddarn matched " + str(len(deps)))
-                application_buffer.extend(deps)
-            elif application_buffer:
-                dep = application_buffer.pop()
-                logging.debug(f"ddarn : apply {dep}")
-                if proof.apply_dep(dep):
-                    any_new_statement_has_been_added = True
-            else:
-                if not any_new_statement_has_been_added:
-                    running = False
-                any_new_statement_has_been_added = False
-                rule_buffer = list(rules)
-                logging.debug("ddarn : reload")
-            # TODO: add step later..
-            # step += 1
-        return proof
-    
     def _extract_points(proof: ProofState):
         points: List[Tuple[str, Any, Any]] = []
         for name, point in proof.symbols_graph.name2node.items():
@@ -444,42 +478,28 @@ class LMAgent(DeductiveAgent):
         premises = LMAgent._extract_premises(proof)
         goals = LMAgent._extract_goals(proof)
         
-        _, dep_graph = DDAR.run_ddar("", points, premises, goals, 500, True, True)
+        solved, dep_graph = DDAR.run_ddar("", points, premises, goals, 500, True, True)
 
-        for stmt, deps, reason in dep_graph:
-            conclusion = Statement.from_tokens(
-                stmt, proof.dep_graph)
-            why = []
-            for dep in deps:
-                premise = Statement.from_tokens(
-                    dep, proof.dep_graph)
-                why.append(premise)
-            dep = Dependency.mk(conclusion, reason, tuple(why))
-            proof.dep_graph.hyper_graph[conclusion] = dep
-
-        return proof   
+        return solved
 
 
 @ray.remote(num_cpus=1)
-def run_ddar_remote(problem, proof, aux, rules: list[Rule], start_time: int, timeout: int = 3600): 
+def run_ddar_remote(problem, defs, aux, rules: list[Rule], start_time: int, timeout: int = 3600): 
     try:
-        LMAgent.add_construction(proof, aux)
-    except Exception as e:
-        try:
-            proof = ProofState.build_problemJGEX(
-                problemJGEX=problem,
-                defsJGEX=proof.defs,
-                rng=np.random.default_rng(998244353),
-                max_attempts=100,
-                problem_path=None,
-            )
-        except Exception:
-            return
-    try:
-        proof = LMAgent.run_ddar_c(proof, rules, start_time, timeout)
+        proof = ProofState.build_problemJGEX(
+            problemJGEX=problem,
+            defsJGEX=defs,
+            rng=np.random.default_rng(998244353),
+            max_attempts=100,
+            problem_path=None,
+        )
     except Exception:
-        return
-    return proof
+        return None
+    try:
+        solved = LMAgent.run_ddar_c(proof, rules, start_time, timeout)
+    except Exception:
+        return None
+    return solved
     
     
 class BeamQueue:

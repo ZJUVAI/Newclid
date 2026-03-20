@@ -136,7 +136,7 @@ if __name__ == "__main__":
     parser.add_argument("--beam_size", type=int, default=64)
     parser.add_argument("--search_depth", type=int, default=4)
     parser.add_argument("--timeout", type=int, default=7200, help="Timeout for each problem")
-    parser.add_argument("--success_proofs_path", type=str, default="datasets/success_proofs/dev_imo.jsonl", help="Path to save successful proofs")
+    parser.add_argument("--success_proofs_path", type=str, default="datasets/success_proofs/hageo_224_remain_results.jsonl", help="Path to save successful proofs")
     args = parser.parse_args()
     
     problems_path = Path(args.problems_path)

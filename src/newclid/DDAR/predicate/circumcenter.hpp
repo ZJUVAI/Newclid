@@ -46,6 +46,8 @@ public:
 
     bool trivial() const { return false; }
 
+    std::unique_ptr<Statement> replace(Point p, Point q) const override;
+
     std::unique_ptr<Statement> normalize() const override;
 
 private:

@@ -16,8 +16,8 @@ import sys
 from pathlib import Path
 
 # ------------------ 默认配置（可通过命令行位置参数覆盖输入/输出根目录） ------------------
-INPUT_JSON = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/geometry_clauses5_samples20k.jsonl"
-OUTPUT_DIR = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/proof_graphs"
+INPUT_JSON = "/c23474/home/math/dzt/Newclid/outputs/geometry_clauses9_samples20k_aux.jsonl"
+OUTPUT_DIR = "/c23474/home/math/dzt/Newclid/outputs/proof_graphs"
 
 # 绘图与运行参数
 LABEL_MODE = "legend"
@@ -37,7 +37,7 @@ SRC_DIR = PROJECT_ROOT / "src"
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from newclid.data_discovery.filter_and_prune_engine import FilterAndPruneEngine  # noqa: E402
+from newclid.proof_scout.core.filter_and_prune_engine import FilterAndPruneEngine  # noqa: E402
 
 
 def main() -> int:

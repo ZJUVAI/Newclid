@@ -4,6 +4,7 @@
 #include "type/dist.hpp"
 #include <iostream>
 #include <vector>
+
 using namespace std;
 
 Coll::Coll(Point a, Point b, Point c) : _a(a), _b(b), _c(c) {}
@@ -34,7 +35,7 @@ vector<statement_arg> Coll::args() const
 
 bool Coll::check_nondegen() const
 {
-    return !_a.is_close(_b) && !_b.is_close(_c) && !_c.is_close(_a);
+    return !_a.is_close(_b) && !_a.is_close(_c) && !_b.is_close(_c);
 }
 
 bool Coll::check_equations() const
@@ -96,9 +97,9 @@ EqRatio Coll::eqratio_ab_ac(const Coll &other) const
     return EqRatio(Dist(_a, _b), Dist(_a, _c), Dist(other.a(), other.b()), Dist(other.a(), other.c()));
 }
 
-ostream &Coll::print(ostream &os) const
+ostream &Coll::print(ostream &out) const
 {
-    return os << _a << " ∈ " << _b << _c;
+    return out << _a << " ∈ " << _b << _c;
 }
 
 bool Coll::operator==(const Coll &other) const
@@ -119,30 +120,64 @@ bool Coll::operator<(const Coll &other) const
     return _a < other._a;
 }
 
-vector<unique_ptr<Equation>> Coll::as_equation(bool log, bool exp) const
+vector<unique_ptr<Equation>> Coll::as_equation_slope(bool exp) const
 {
     vector<unique_ptr<Equation>> result;
-    result.push_back(make_unique<Equation>(Equation({Term(Slope(_a, _b)), -Term(Slope(_a, _c))})));
-    result.push_back(make_unique<Equation>(Equation({Term(Slope(_a, _c)), -Term(Slope(_b, _c))})));
-    Term ab(Dist(_a, _b));
-    Term bc(Dist(_b, _c));
-    Term ac(Dist(_a, _c));
-    if ((_a.x() > _b.x() && _a.x() < _c.x()) || (_a.x() < _b.x() && _a.x() > _c.x()))
+
+    vector<Slope> candidates = {
+        Slope(_a, _b),
+        Slope(_a, _c),
+        Slope(_b, _c),
+    };
+
+    vector<Slope> valid_slopes;
+    for (const auto &s : candidates)
     {
-        result.push_back(make_unique<Equation>(Equation({ab, ac, -bc})));
+        if (s.check_numerically())
+        {
+            valid_slopes.push_back(s);
+        }
     }
-    else if ((_b.x() > _a.x() && _b.x() < _c.x()) || (_b.x() < _a.x() && _b.x() > _c.x()))
+
+    // 3. 两两配对，生成 p - q = 0 的方程
+    for (size_t i = 0; i < valid_slopes.size(); ++i)
     {
-        result.push_back(make_unique<Equation>(Equation({ab, bc, -ac})));
+        for (size_t j = i + 1; j < valid_slopes.size(); ++j)
+        {
+            vector<Term> terms = {
+                Term(valid_slopes[i]),
+                -Term(valid_slopes[j])};
+
+            result.push_back(make_unique<Equation>(Equation(std::move(terms))));
+        }
     }
-    else
-    {
-        result.push_back(make_unique<Equation>(Equation({bc, ac, -ab})));
-    }
+
+    return result;
+}
+
+vector<unique_ptr<Equation>> Coll::as_equation_dist(bool exp) const
+{
+    vector<unique_ptr<Equation>> result;
+    vector<Term> candidates = {
+        Term(Dist(_a, _b)),
+        Term(Dist(_a, _c)),
+        Term(Dist(_b, _c)),
+    };
+    sort(candidates.begin(), candidates.end(), [](const Term &a, const Term &b)
+         { return a.to_double() < b.to_double(); });
+    result.push_back(make_unique<Equation>(Equation({candidates[0], candidates[1], -candidates[2]})));
     return result;
 }
 
 Coll Coll::reverse() const
 {
     return {_c, _b, _a};
+}
+
+unique_ptr<Statement> Coll::replace(Point p, Point q) const
+{
+    Point new_a = (_a == p) ? q : _a;
+    Point new_b = (_b == p) ? q : _b;
+    Point new_c = (_c == p) ? q : _c;
+    return std::make_unique<Coll>(new_a, new_b, new_c);
 }

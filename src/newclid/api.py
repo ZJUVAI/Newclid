@@ -1,14 +1,12 @@
 from __future__ import annotations
 import logging
 from pathlib import Path
-from typing import Any, Optional, List, Tuple
+from typing import Any, Optional, List, Tuple, TYPE_CHECKING
 from typing_extensions import Self
 from fractions import Fraction
 
 
 from newclid.agent.ddarn import DDARN
-from newclid.agent.lm import LMAgent
-from newclid.agent.vlm import VLMAgent
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.load_geogebra import load_geogebra
@@ -34,6 +32,14 @@ from newclid.DDAR.build import DDAR
 
 import time
 import multiprocessing as mp
+
+
+def _is_ml_agent(agent) -> bool:
+    """Check if agent is an ML-based agent (LMAgent, VLMAgent, InternVLMAgent).
+
+    Uses string-based type checking to avoid importing ML dependencies.
+    """
+    return type(agent).__name__ in ('LMAgent', 'VLMAgent', 'InternVLMAgent')
 
 
 # Worker function for subprocess isolation (must be at module level for pickling)
@@ -78,7 +84,7 @@ class GeometricSolver:
         if out_file is not None:      
             write_proof_steps(self.proof, out_file)
         else:
-            write_proof_steps(self.proof)
+            return write_proof_steps(self.proof)
 
     def draw_figure(self, *, out_file: Optional[Path]):
         draw_figure(self.proof, save_to=out_file, rng=self.rng)
@@ -149,8 +155,7 @@ class GeometricSolverBuilder:
         if self.deductive_agent is None:
             self.deductive_agent = DDARN()
 
-        if isinstance(self.deductive_agent, LMAgent) or \
-            isinstance(self.deductive_agent, VLMAgent):
+        if _is_ml_agent(self.deductive_agent):
             self.deductive_agent.problemJGEX = self.problemJGEX
 
         # proof_state.dep_graph.obtain_numerical_checked_eqangle_and_eqratio()

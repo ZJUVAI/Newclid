@@ -19,6 +19,8 @@ public:
 
     bool check_equations() const override;
 
+    std::unique_ptr<Statement> replace(Point p, Point q) const override;
+
     std::unique_ptr<Statement> normalize() const override;
 
     Cong cong_ab() const;

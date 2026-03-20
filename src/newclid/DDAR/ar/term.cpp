@@ -1,10 +1,12 @@
 #include "ar/term.hpp"
-#include "typedef.hpp"
+#include "solver/object_table.hpp"
+#include <iomanip>
+#include <unordered_map>
 #include <map>
 
 using namespace std;
 
-Term::Term(const std::vector<term_arg> &vars, const Rational &coeff) : _coeff(coeff)
+Term::Term(const vector<TermArg> &vars, const Rational &coeff) : _coeff(coeff)
 {
     for (const auto &var : vars)
     {
@@ -12,7 +14,7 @@ Term::Term(const std::vector<term_arg> &vars, const Rational &coeff) : _coeff(co
     }
 }
 
-Term::Term(const term_arg &var, const Rational &coeff) : _coeff(coeff)
+Term::Term(const TermArg &var, const Rational &coeff) : _coeff(coeff)
 {
     _vars[var] += 1;
 }
@@ -21,7 +23,7 @@ Term::Term(const Rational &coeff) : _coeff(coeff)
 {
 }
 
-Term::Term(const std::vector<term_arg> &vars) : _coeff(1)
+Term::Term(const vector<TermArg> &vars) : _coeff(1)
 {
     for (const auto &var : vars)
     {
@@ -29,7 +31,7 @@ Term::Term(const std::vector<term_arg> &vars) : _coeff(1)
     }
 }
 
-Term::Term(const term_arg &var) : _coeff(1)
+Term::Term(const TermArg &var) : _coeff(1)
 {
     _vars[var] += 1;
 }
@@ -38,14 +40,19 @@ Term::Term() : _coeff(1)
 {
 }
 
-Term Term::gcd(const Term &other) const
+Term Term::gcd(Term &other) const
 {
-    Term res;
-    for (const auto &pair : _vars)
+    Term res(1);
+    for (const auto &[arg, exp] : _vars)
     {
-        if (other._vars.count(pair.first))
+        if (Numerical::close_enough(arg.to_double(), 0.0))
         {
-            res._vars[pair.first] = std::min(pair.second, other._vars.at(pair.first));
+            continue;
+        }
+        auto it = other._vars.find(arg);
+        if (it != other._vars.end())
+        {
+            res._vars[arg] = min(exp, it->second);
         }
     }
     return res;
@@ -79,14 +86,21 @@ Term &Term::operator/=(const Rational &divisor)
 
 Term Term::operator*(const Term &other) const
 {
-    Term res = *this;
-    res._coeff *= other._coeff;
-    for (const auto &pair : other._vars)
+    Term res(_coeff * other._coeff);
+    for (const auto &[term, exp] : _vars)
     {
-        res._vars[pair.first] += pair.second;
-        if (res._vars[pair.first] == 0)
+        res._vars[term] += exp;
+        if (res._vars[term] == 0)
         {
-            res._vars.erase(pair.first);
+            res._vars.erase(term);
+        }
+    }
+    for (const auto &[term, exp] : other._vars)
+    {
+        res._vars[term] += exp;
+        if (res._vars[term] == 0)
+        {
+            res._vars.erase(term);
         }
     }
     return res;
@@ -94,14 +108,21 @@ Term Term::operator*(const Term &other) const
 
 Term Term::operator/(const Term &other) const
 {
-    Term res = *this;
-    res._coeff /= other._coeff;
-    for (const auto &pair : other._vars)
+    Term res(_coeff / other._coeff);
+    for (const auto &[term, exp] : _vars)
     {
-        res._vars[pair.first] -= pair.second;
-        if (res._vars[pair.first] == 0)
+        res._vars[term] += exp;
+        if (res._vars[term] == 0)
         {
-            res._vars.erase(pair.first);
+            res._vars.erase(term);
+        }
+    }
+    for (const auto &[term, exp] : other._vars)
+    {
+        res._vars[term] -= exp;
+        if (res._vars[term] == 0)
+        {
+            res._vars.erase(term);
         }
     }
     return res;
@@ -110,12 +131,12 @@ Term Term::operator/(const Term &other) const
 Term &Term::operator*=(const Term &other)
 {
     _coeff *= other._coeff;
-    for (const auto &pair : other._vars)
+    for (const auto &[term, exp] : other._vars)
     {
-        _vars[pair.first] += pair.second;
-        if (_vars[pair.first] == 0)
+        _vars[term] += exp;
+        if (_vars[term] == 0)
         {
-            _vars.erase(pair.first);
+            _vars.erase(term);
         }
     }
     return *this;
@@ -124,12 +145,20 @@ Term &Term::operator*=(const Term &other)
 Term &Term::operator/=(const Term &other)
 {
     _coeff /= other._coeff;
-    for (const auto &pair : other._vars)
+    for (const auto &[term, exp] : other._vars)
     {
-        _vars[pair.first] -= pair.second;
-        if (_vars[pair.first] == 0)
+        _vars[term] += exp;
+        if (_vars[term] == 0)
         {
-            _vars.erase(pair.first);
+            _vars.erase(term);
+        }
+    }
+    for (const auto &[obj, exp] : other._vars)
+    {
+        _vars[obj] -= exp;
+        if (_vars[obj] == 0)
+        {
+            _vars.erase(obj);
         }
     }
     return *this;
@@ -162,8 +191,15 @@ Term Term::operator-() const
     res._coeff = -res._coeff;
     return res;
 }
+
 void Term::normalize()
 {
+    if (_coeff == 0)
+    {
+        _vars.clear();
+        _vars.clear();
+        return;
+    }
     for (auto it = _vars.begin(); it != _vars.end();)
     {
         if (it->second == 0)
@@ -175,17 +211,16 @@ void Term::normalize()
             ++it;
         }
     }
-}
-
-void Term::round()
-{
-    while (_coeff > 1)
+    for (auto it = _vars.begin(); it != _vars.end();)
     {
-        _coeff -= 1;
-    }
-    while (_coeff < 0)
-    {
-        _coeff += 1;
+        if (it->second == 0)
+        {
+            it = _vars.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
     }
 }
 
@@ -228,7 +263,7 @@ string Term::to_string() const
 
 bool Term::contain(const Term &other) const
 {
-    for (const auto &pair : other._vars)
+    for (auto &pair : other._vars)
     {
         if (_vars.count(pair.first) == 0)
         {
@@ -254,26 +289,41 @@ bool Term::operator<(const Term &other) const
 
 bool Term::operator>(const Term &other) const
 {
-    return _vars > other._vars;
+    return other < *this;
 }
 
 bool Term::operator<=(const Term &other) const
 {
-    return _vars <= other._vars;
+    return !(other < *this);
 }
 
 bool Term::operator>=(const Term &other) const
 {
-    return _vars >= other._vars;
+    return !(*this < other);
 }
 
 bool Term::operator!=(const Term &other) const
 {
-    return _vars != other._vars;
+    return !(*this == other);
 }
 
 ostream &operator<<(ostream &os, const Term &term)
 {
     os << term.to_string();
     return os;
+}
+
+size_t Term::hash() const
+{
+    size_t seed = 0;
+    // 直接哈希 Rational 的分子分母
+    seed ^= std::hash<int64_t>{}(_coeff.numerator()) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    seed ^= std::hash<int64_t>{}(_coeff.denominator()) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+
+    for (const auto &[obj, exp] : _vars)
+    {
+        seed ^= std::hash<TermArg>{}(obj) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        seed ^= std::hash<int>{}(exp) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    }
+    return seed;
 }

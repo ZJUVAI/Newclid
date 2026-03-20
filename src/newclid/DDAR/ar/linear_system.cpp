@@ -17,30 +17,96 @@ void LinearSystem::reduce_next(Equation &e)
     {
         const auto &it_begin = e.begin();
         const auto &it_next = next(it_begin);
-
         Term head = *it_begin;
-
         if (it_next == e.end())
         {
             break;
         }
 
-        const auto &term_it = _solved_terms.find(*it_next);
-        const auto &var_it = _solved_variables.find(*it_next);
+        const Equation *eq_var = get_solved_variable(*it_next);
+        const Equation *eq_term = get_solved_term(*it_next);
 
-        if (term_it == _solved_terms.end() && var_it == _solved_variables.end())
+        if (!eq_var && !eq_term)
         {
             _pivot_by_next[*it_next].insert(head);
             break;
         }
-
-        if (term_it != _solved_terms.end())
+        if (eq_term)
         {
-            e -= term_it->second * it_next->coeff();
+            e -= *eq_term * it_next->coeff();
+        }
+        else if (eq_var)
+        {
+            e -= *eq_var * it_next->coeff();
+        }
+    }
+    return;
+}
+
+void LinearSystem::update()
+{
+    _solved_variables.clear();
+    _solved_terms.clear();
+    _pivot_by_next.clear();
+
+    for (const auto &[original_eq, pf] : _equations)
+    {
+        Equation e = original_eq;
+        e.normalize();
+
+        if (e.empty())
+        {
+            continue;
+        }
+
+        ReducedEquation req(e, this);
+        req.reduce();
+        e = req.remainder();
+
+        if (e.empty())
+        {
+            continue;
+        }
+
+        Term head = *e.begin();
+        bool is_linear = e.linear();
+
+        auto ptr = std::make_unique<Equation>(std::move(e));
+        bool inserted = false;
+        if (is_linear)
+        {
+            inserted = _solved_variables.emplace(head, std::move(ptr)).second;
         }
         else
         {
-            e -= var_it->second * it_next->coeff();
+            inserted = _solved_terms.emplace(head, std::move(ptr)).second;
+        }
+
+        if (!inserted)
+        {
+            throw std::runtime_error("Trying to insert a duplicate solved equation during update");
+        }
+
+        auto pivot_it = _pivot_by_next.find(head);
+        if (pivot_it != _pivot_by_next.end())
+        {
+
+            for (const Term &waiting_pivot : pivot_it->second)
+            {
+
+                auto var_it = _solved_variables.find(waiting_pivot);
+                if (var_it != _solved_variables.end())
+                {
+                    reduce_next(*var_it->second);
+                }
+
+                auto term_it = _solved_terms.find(waiting_pivot);
+                if (term_it != _solved_terms.end())
+                {
+                    reduce_next(*term_it->second);
+                }
+            }
+            _pivot_by_next.erase(pivot_it);
         }
     }
 }
@@ -57,20 +123,19 @@ void LinearSystem::print_equations() const
     cout << "Solved Variables:" << endl;
     for (const auto &[var, eqn] : _solved_variables)
     {
-        cout << var << " : " << eqn << endl;
+        cout << var << " : " << *eqn << endl;
     }
     cout << endl;
     cout << "Solved Terms:" << endl;
     for (const auto &[term, eqn] : _solved_terms)
     {
-        cout << term << " : " << eqn << endl;
+        cout << term << " : " << *eqn << endl;
     }
 }
 
-void LinearSystem::add_reduced_equation(Proof *pf)
+void LinearSystem::add_reduced_equation(Proof *pf, string type)
 {
-    auto eqs = pf->reduced_equations();
-
+    auto eqs = pf->reduced_equations(type);
     for (auto &eq : eqs)
     {
         eq->reduce();
@@ -80,24 +145,28 @@ void LinearSystem::add_reduced_equation(Proof *pf)
         }
 
         EquationIndex const n(_equations.size(), this);
-        _equations.push_back(make_pair(eq->original_equation(), pf));
+        _equations.emplace_back(eq->original_equation(), pf);
 
         Equation e = eq->remainder();
         e.set_index(n.index(), this);
 
         Term head = *e.begin();
-
         e *= Rational(1) / head.coeff();
         reduce_next(e);
 
+        bool is_linear = e.linear();
+        head = *e.begin();
+
         bool success = false;
-        if (e.linear())
+        auto ptr = std::make_unique<Equation>(std::move(e));
+
+        if (is_linear)
         {
-            success = _solved_variables.insert(make_pair(*e.begin(), e)).second;
+            success = _solved_variables.emplace(head, std::move(ptr)).second;
         }
         else
         {
-            success = _solved_terms.insert(make_pair(*e.begin(), e)).second;
+            success = _solved_terms.emplace(head, std::move(ptr)).second;
         }
         if (!success)
         {
@@ -109,15 +178,16 @@ void LinearSystem::add_reduced_equation(Proof *pf)
         {
             for (const auto &pivot : it->second)
             {
-                auto it_pivot = _solved_variables.find(pivot);
-                if (it_pivot != _solved_variables.end())
+                auto it_var = _solved_variables.find(pivot);
+                if (it_var != _solved_variables.end())
                 {
-                    reduce_next(it_pivot->second);
+                    reduce_next(*it_var->second);
                 }
-                it_pivot = _solved_terms.find(pivot);
-                if (it_pivot != _solved_terms.end())
+
+                auto it_term = _solved_terms.find(pivot);
+                if (it_term != _solved_terms.end())
                 {
-                    reduce_next(it_pivot->second);
+                    reduce_next(*it_term->second);
                 }
             }
             _pivot_by_next.erase(it);

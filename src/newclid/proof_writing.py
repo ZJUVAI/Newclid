@@ -11,7 +11,7 @@ from newclid.dependencies.symbols import Point
 if TYPE_CHECKING:
     from newclid.proof import ProofState
 
-def write_proof_steps(proof_state: "ProofState", out_file: Optional[Path] = None, print_output: bool = True) -> None:
+def write_proof_steps(proof_state: "ProofState", out_file: Optional[Path] = None, print_output: bool = True):
     """Output the solution to out_file.
 
     Args:
@@ -70,7 +70,7 @@ def write_proof_steps(proof_state: "ProofState", out_file: Optional[Path] = None
             solution += f"{k:03d}. {rediger(line)}\n"
     solution += "=========================="
     if out_file is None and print_output is True:
-        print(solution)
+        return solution
     elif out_file is not None:
         out_file.parent.mkdir(parents=True, exist_ok=True)
         with open(out_file, "w", encoding="utf-8") as f:

@@ -7,7 +7,7 @@ import logging
 
 from newclid.dependencies.symbols import Line
 from newclid.numerical import close_enough
-from newclid.numerical.draw_figure import PALETTE, draw_angle, draw_line
+from newclid.numerical.draw_figure import PALETTE, draw_angle, draw_segment
 from newclid.predicates.predicate import Predicate
 from newclid.algebraic_reasoning.tables import Angle_Chase
 from newclid.tools import reshape
@@ -171,7 +171,7 @@ class EqAngle(Predicate):
 
     @classmethod
     def draw(
-        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
+        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True
     ):
         setattr(ax, "angle_color", (getattr(ax, "angle_color", 0) + 1) % len(PALETTE))
         color = PALETTE[ax.angle_color]  # type: ignore
@@ -186,7 +186,8 @@ class EqAngle(Predicate):
             else:
                 point0 = args[i + 1]
             point1 = args[i + 1] if point0 == args[i] else args[i]
-            point2 = args[i + 3] if point0 == args[i + 2] else args[i + 2]   
-            r = rng.random() * 0.1 + 0.1
-            width = r * 0.1  
-            draw_angle(ax, point0, point1, point2, color=color, alpha=0.5, width=width, r=r)
+            point2 = args[i + 3] if point0 == args[i + 2] else args[i + 2]
+            if draw_annotations:
+                draw_angle(ax, point0, point1, point2, rng=rng, color=color, alpha=0.5)
+            draw_segment(ax, point0, point1)
+            draw_segment(ax, point0, point2)
