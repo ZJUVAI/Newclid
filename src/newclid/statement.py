@@ -116,14 +116,8 @@ class Statement:
         assert newst
         return newst
 
-    def draw(self, ax: "Axes", rng: Generator, draw_annotations: bool = True):
+    def draw(self, ax: "Axes", rng: Generator):
         try:
-            self.predicate.draw(
-                ax=ax,
-                args=self.args,
-                dep_graph=self.dep_graph,
-                rng=rng,
-                draw_annotations=draw_annotations,
-            )
+            self.predicate.draw(ax, self.args, self.dep_graph, rng)
         except Exception as e:
             logging.warning(f"Failed to draw statement {self}: {e}")

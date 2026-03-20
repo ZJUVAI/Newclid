@@ -20,8 +20,6 @@ public:
 
     std::vector<Point> points() const override;
 
-    std::unique_ptr<Statement> replace(Point p, Point q) const override;
-
     std::unique_ptr<Statement> normalize() const override;
 
     bool check_nondegen() const override;
@@ -49,8 +47,6 @@ public:
     Thales rotate() const;
 
     bool numerical_only() const { return false; }
-
-    bool trivial() const { return false; }
 
     bool operator==(const Thales &other) const;
 

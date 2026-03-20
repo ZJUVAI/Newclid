@@ -77,12 +77,11 @@ class Cyclic(Predicate):
 
     @classmethod
     def draw(
-        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True
+        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
     ):
-        if draw_annotations:
-            c_num = CircleNum(
-                p1=args[0].num,
-                p2=args[1].num,
-                p3=args[2].num,
-            )
-            draw_circle_num(ax, c_num)
+        c_num = CircleNum(
+            p1=args[0].num,
+            p2=args[1].num,
+            p3=args[2].num,
+        )
+        draw_circle_num(ax, c_num)

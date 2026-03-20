@@ -25,8 +25,6 @@ public:
 
     bool check_equations() const override;
 
-    std::unique_ptr<Statement> replace(Point p, Point q) const override;
-
     std::unique_ptr<Statement> normalize() const override;
 
     const Triangle &left() const { return _left; }
@@ -36,8 +34,6 @@ public:
     std::ostream &print(std::ostream &out) const override;
 
     bool numerical_only() const { return true; }
-
-    bool trivial() const { return false; }
 };
 
 #endif // SAMECLOCK_HPP

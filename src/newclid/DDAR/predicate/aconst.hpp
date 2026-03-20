@@ -16,8 +16,6 @@ public:
 
     std::vector<Point> points() const override;
 
-    std::unique_ptr<Statement> replace(Point p, Point q) const override;
-
     std::unique_ptr<Statement> normalize() const override;
 
     bool check_nondegen() const override;
@@ -35,13 +33,11 @@ public:
         return std::make_unique<AConst>(*this);
     }
 
-    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation(bool log, bool exp) const override;
 
     std::ostream &print(std::ostream &out) const override;
 
     bool numerical_only() const { return false; }
-
-    bool trivial() const { return false; }
 
     std::vector<std::string> to_tokens() const;
 

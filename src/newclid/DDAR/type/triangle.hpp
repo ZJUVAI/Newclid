@@ -50,8 +50,6 @@ public:
 
     bool check_nondegen() const;
 
-    bool overlap(const Triangle &other) const;
-
     Triangle normalize() const;
 
     bool operator==(const Triangle &other) const;

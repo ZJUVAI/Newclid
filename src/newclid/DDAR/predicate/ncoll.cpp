@@ -16,14 +16,6 @@ vector<Point> NColl::points() const
     return {_a, _b, _c};
 }
 
-unique_ptr<Statement> NColl::replace(Point p, Point q) const
-{
-    Point new_a = (_a == p) ? q : _a;
-    Point new_b = (_b == p) ? q : _b;
-    Point new_c = (_c == p) ? q : _c;
-    return std::make_unique<NColl>(new_a, new_b, new_c);
-}
-
 unique_ptr<Statement> NColl::normalize() const
 {
     vector<Point> points = {_a, _b, _c};

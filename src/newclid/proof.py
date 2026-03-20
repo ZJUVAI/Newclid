@@ -75,7 +75,6 @@ class ProofState:
         """Add a new clause of construction, e.g. a new excenter."""
         adds: list[Dependency] = []
         numerics: list[tuple[str, ...]] = []
-        construction_points: set[Point] = set()
         existing_points = list(self.symbols_graph.nodes_of_type(Point))
         existing_point_names = list(p.name for p in existing_points)
 
@@ -104,10 +103,6 @@ class ProofState:
                 )
                 if not statement.check_numerical():
                     raise ConstructionError("Requirement check_numerical failed. " + str(construction))
-                
-            for arg in cdef.args:
-                if mapping[arg] in existing_point_names:
-                    construction_points.add(self.symbols_graph.name2node[mapping[arg]])
 
             for bs in cdef.basics:
                 for t in bs.sentences:
@@ -117,7 +112,6 @@ class ProofState:
                         )
                     ) 
                     adds.append(Dependency.mk(statement, IN_PREMISES, ()))
-
             for n in cdef.numerics:
                 numerics.append(tuple(mapping[a] if a in mapping else a for a in n))
 
@@ -151,7 +145,7 @@ class ProofState:
                 to_be_intersected += sketch(n[0], tuple(args), self.rng)
 
             return reduce(
-                to_be_intersected, [p.num for p in existing_points], [p.num for p in construction_points], rng=self.rng
+                to_be_intersected, [p.num for p in existing_points], rng=self.rng
             )
 
         if None in fix_point_postions:
@@ -297,7 +291,6 @@ class ProofState:
         for p_old, p_new in zip(old_points, new_points):
             p_new.num = p_old.num
             p_new.rely_on = set(proof.symbols_graph.names2points([p.name for p in p_old.rely_on]))
-            p_new.clause = p_old.clause
         
         for add in adds:
             if not add.statement.check_numerical():

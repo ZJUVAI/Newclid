@@ -17,7 +17,7 @@ Application::Application(DDARSolver *solver, Theorem &&theorem) : _theorem(move(
     }
 }
 
-void Application::advance_proof(long long depth)
+void Application::advance_proof()
 {
     if (_state != ApplicationState::PENDING)
     {
@@ -28,10 +28,11 @@ void Application::advance_proof(long long depth)
 
     for (auto *pf : _hypotheses)
     {
-        pf->ar(depth);
-        if (!pf->is_proved() || pf->depth() >= depth)
+        pf->ar();
+        if (!pf->is_proved())
         {
             hypotheses_proved = false;
+            break;
         }
     }
 
@@ -45,7 +46,7 @@ void Application::advance_proof(long long depth)
 
     for (auto *pf : _conclusions)
     {
-        pf->ar(depth);
+        pf->ar();
         conclusion_proved &= pf->is_proved();
     }
 

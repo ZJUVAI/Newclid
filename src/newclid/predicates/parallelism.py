@@ -112,16 +112,13 @@ class Para(Predicate):
         args: tuple[Any, ...],
         dep_graph: "DependencyGraph",
         rng: Generator,
-        draw_annotations: bool = True,
     ):
         setattr(ax, "para_color", (getattr(ax, "para_color", 0) + 1) % len(PALETTE))
         points: tuple[Point, ...] = args
         seglen = 100
         for i in range(0, len(points), 2):
-            draw_segment(ax, points[i], points[i + 1], ls="solid")
+            draw_segment(ax, points[i], points[i + 1], ls="dashed")
             seglen = min(seglen, points[i].num.distance(points[i + 1].num))
-        if not draw_annotations:
-            return
         seglen /= 3.0
         for i in range(0, len(points), 2):
             d = points[i + 1].num - points[i].num

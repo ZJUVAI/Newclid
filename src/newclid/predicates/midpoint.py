@@ -1,10 +1,7 @@
 from __future__ import annotations
-from matplotlib.axes import Axes
-from numpy.random import Generator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from newclid.dependencies.symbols import Point
-from newclid.numerical.draw_figure import draw_segment
 from newclid.predicates.predicate import Predicate
 
 if TYPE_CHECKING:
@@ -51,9 +48,3 @@ class MidPoint(Predicate):
         args: tuple[Point, ...] = statement.args
         m, a, b = args
         return f"{m.pretty_name} is the midpoint of {a.pretty_name}{b.pretty_name}"
-
-    @classmethod
-    def draw(
-        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True
-    ):
-        draw_segment(ax, args[1], args[2])

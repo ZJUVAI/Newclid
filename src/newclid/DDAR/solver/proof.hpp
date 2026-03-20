@@ -15,12 +15,8 @@ enum class ProofState : uint8_t
     NOT_PROVED,
     PROVED_BY_ASSUMPTION,
     PROVED_NUMERICALLY,
-    PROVED_TRIVIAL,
-    PROVED_AR_DIST,
-    PROVED_AR_SLOPE,
-    PROVED_AR_DISTLOG,
+    PROVED_AR,
     PROVED_BY_THEOREM,
-    PROVED_BY_DOUBLEPOINT,
 };
 
 class Proof
@@ -34,9 +30,7 @@ public:
 
     ProofState state() const { return _state; }
 
-    void ar(long long depth = -1);
-
-    long long depth() const { return _depth; }
+    void ar();
 
     void initial();
 
@@ -44,39 +38,28 @@ public:
 
     std::vector<Proof *> get_dependencies() const;
 
+    const std::set<Point> &point_dependencies() const
+    {
+        return _point_dependencies;
+    }
+
     std::string reason() const;
 
-    void set_theorem(size_t index, long long depth = -1);
+    void set_theorem(size_t index);
 
-    void set_proved(Proof *doublepoint, Proof *original);
+    bool needs_aux() const;
 
     void set_proved(ProofState state);
 
     void print_equations() const;
 
-    const size_t &theorem() const { return _theoremId; }
+    const size_t &theorem() { return _theoremId; }
 
     const DDARSolver *solver() const { return _solver; }
 
-    std::string name() const { return _statement->name(); }
-
-    Point max_point() const { return _statement->max_point(); }
-
-    std::vector<ReducedEquation *> reduced_equations(std::string type) const
+    std::vector<ReducedEquation *> reduced_equations() const
     {
-        if (type == "dist")
-        {
-            return _eqn_dist;
-        }
-        if (type == "distlog")
-        {
-            return _eqn_distlog;
-        }
-        if (type == "slope")
-        {
-            return _eqn_slope;
-        }
-        return {};
+        return _eqn;
     }
 
 private:
@@ -84,12 +67,9 @@ private:
     std::unique_ptr<Statement> _statement;
     size_t _theoremId;
     ProofState _state{ProofState::NOT_PROVED};
-    std::vector<ReducedEquation *> _eqn_dist;
-    std::vector<ReducedEquation *> _eqn_slope;
-    std::vector<ReducedEquation *> _eqn_distlog;
+    std::set<Point> _point_dependencies;
+    std::vector<ReducedEquation *> _eqn;
     ReducedEquation *_dep;
-    std::vector<Proof *> _deps;
-    long long _depth{-1};
 };
 
 #endif // PROOF_HPP

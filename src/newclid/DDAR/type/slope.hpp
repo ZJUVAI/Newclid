@@ -16,7 +16,7 @@ private:
 public:
     Slope(Point p1, Point p2);
 
-    bool check_numerically() const;
+    bool check_numerically();
 
     bool check_nondegen() const { return !_left.is_close(_right); }
 

@@ -1,11 +1,8 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Optional
-from matplotlib.axes import Axes
-from numpy.random import Generator
 from newclid.dependencies.symbols import Point
 from newclid.numerical import close_enough
 from newclid.numerical.check import same_clock
-from newclid.numerical.draw_figure import draw_segment
 from newclid.predicates.predicate import Predicate
 from newclid.predicates.triangles_similar import two_triangles
 
@@ -59,16 +56,6 @@ class ContriClock(Predicate):
         a, b, c, p, q, r = args
         return f"▲{a.pretty_name}{b.pretty_name}{c.pretty_name} ≡ ▲{p.pretty_name}{q.pretty_name}{r.pretty_name}"
 
-    @classmethod
-    def draw(
-        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True
-    ):
-        draw_segment(ax, args[0], args[1], ls="dashed")
-        draw_segment(ax, args[1], args[2], ls="dashed")
-        draw_segment(ax, args[0], args[2], ls="dashed")
-        draw_segment(ax, args[0 + 3], args[1 + 3], ls="dashed")
-        draw_segment(ax, args[1 + 3], args[2 + 3], ls="dashed")
-        draw_segment(ax, args[0 + 3], args[2 + 3], ls="dashed")
 
 class ContriReflect(Predicate):
     """contrir A B C P Q R -
@@ -113,14 +100,3 @@ class ContriReflect(Predicate):
         args: tuple[Point, ...] = statement.args
         a, b, c, p, q, r = args
         return f"▲{a.pretty_name}{b.pretty_name}{c.pretty_name} ≡ ▲{p.pretty_name}{q.pretty_name}{r.pretty_name}"
-    
-    @classmethod
-    def draw(
-        cls,
-        ax: Axes,
-        args: tuple[Any, ...],
-        dep_graph: "DependencyGraph",
-        rng: Generator,
-        draw_annotations: bool = True,
-    ):
-        ContriClock.draw(ax, args, dep_graph, rng, draw_annotations)

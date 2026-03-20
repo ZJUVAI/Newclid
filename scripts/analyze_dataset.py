@@ -146,43 +146,6 @@ def extract_aux_predicates(llm_output):
     
     return combinations
 
-def extract_aux_segments_and_points(llm_output):
-    """
-    Extract segment count and points per segment from auxiliary content between <aux> and </aux> tags.
-    Each semicolon-separated segment may contain point definitions before ':'.
-    The 'x00' prefix is ignored when counting points.
-    
-    Example: "<aux> x00 g : coll a b g [006] ; x00 h : perp h g [008] ; </aux>"
-    Returns: (segment_count, points_per_segment_list)
-             e.g., (2, [1, 1]) for the above example (segment 1 has 1 point: g; segment 2 has 1 point: h)
-    """
-    aux_match = re.search(r'<aux>(.*?)</aux>', llm_output, re.DOTALL)
-    if not aux_match:
-        return 0, []
-    
-    aux_content = aux_match.group(1).strip()
-    points_per_segment = []
-    
-    # Split by semicolons to get separate segments
-    segments = aux_content.split(';')
-    
-    for segment in segments:
-        segment = segment.strip()
-        if not segment:
-            continue
-        
-        # Extract points before ':' in each segment
-        if ':' in segment:
-            before_colon = segment.split(':')[0].strip()
-            if before_colon:
-                # Split by space to get individual points, ignoring 'x00' prefix
-                points = [p for p in before_colon.split() if p and p != 'x00']
-                points_per_segment.append(len(points))
-                # if len(points_per_segment) > 1:
-                #     import pdb; pdb.set_trace()
-    
-    return len(points_per_segment), points_per_segment
-
 # ============================================================================
 # ANALYSIS FUNCTIONS  
 # ============================================================================
@@ -203,7 +166,7 @@ def analyze_jsonl_file(file_path):
     """
     Main analysis function that processes the entire JSONL file.
     
-    Returns: (point_counts, predicates_before, predicates_after, aux_predicates, proof_lengths, aux_count, aux_segment_counts, aux_points_per_segment)
+    Returns: (point_counts, predicates_before, predicates_after, aux_predicates, proof_lengths, aux_count)
     """
     print(f"Analyzing {file_path}...")
     
@@ -211,8 +174,6 @@ def analyze_jsonl_file(file_path):
     predicates_before = Counter()
     predicates_after = Counter()
     aux_predicate_combinations = Counter()
-    aux_segment_counts = Counter()  # Distribution of segment counts per aux
-    aux_points_per_segment = Counter()  # Distribution of points per segment
     proof_lengths = []
     aux_count = 0
     
@@ -239,11 +200,6 @@ def analyze_jsonl_file(file_path):
                     for combo in aux_pred_combos:
                         if combo:  # Only count non-empty combinations
                             aux_predicate_combinations[combo] += 1
-                    # Extract aux segment count and points per segment
-                    segment_count, pts_per_seg = extract_aux_segments_and_points(llm_output)
-                    aux_segment_counts[segment_count] += 1
-                    for pts in pts_per_seg:
-                        aux_points_per_segment[pts] += 1
                 
                 # Extract problem text from <problem> tags
                 problem_match = re.search(r'<problem>(.*?)</problem>', llm_input, re.DOTALL)
@@ -270,13 +226,13 @@ def analyze_jsonl_file(file_path):
                 print(f"Error processing line {i}: {e}")
                 continue
     
-    return point_counts, predicates_before, predicates_after, aux_predicate_combinations, proof_lengths, aux_count, aux_segment_counts, aux_points_per_segment
+    return point_counts, predicates_before, predicates_after, aux_predicate_combinations, proof_lengths, aux_count
 
 # ============================================================================
 # REPORTING FUNCTIONS
 # ============================================================================
 
-def generate_report(point_counts, predicates_before, predicates_after, aux_predicate_combinations, proof_lengths, aux_count, aux_segment_counts, aux_points_per_segment):
+def generate_report(point_counts, predicates_before, predicates_after, aux_predicate_combinations, proof_lengths, aux_count):
     """
     Generate comprehensive analysis report with all statistics.
     
@@ -304,24 +260,6 @@ def generate_report(point_counts, predicates_before, predicates_after, aux_predi
             # Format combination as [pred1, pred2, ...]
             combo_str = '[' + ', '.join(combo) + ']'
             print(f"  {combo_str}: {count:,} ({percentage:.2f}%)")
-    
-    # Auxiliary segment count distribution (number of semicolon-separated segments per aux)
-    if aux_segment_counts:
-        print(f"\nAuxiliary Segment Count Distribution (semicolon-separated segments):")
-        total_aux_samples = sum(aux_segment_counts.values())
-        for num_segments in sorted(aux_segment_counts.keys()):
-            count = aux_segment_counts[num_segments]
-            percentage = (count / total_aux_samples) * 100
-            print(f"  {num_segments} segments: {count:,} samples ({percentage:.2f}%)")
-    
-    # Auxiliary points per segment distribution (points in each segment)
-    if aux_points_per_segment:
-        print(f"\nAuxiliary Points Per Segment Distribution (points per segment):")
-        total_segments = sum(aux_points_per_segment.values())
-        for num_points in sorted(aux_points_per_segment.keys()):
-            count = aux_points_per_segment[num_points]
-            percentage = (count / total_segments) * 100
-            print(f"  {num_points} points: {count:,} segments ({percentage:.2f}%)")
     
     # 1. Point Distribution Analysis
     print("\n1. POINT DISTRIBUTION ANALYSIS")
@@ -416,10 +354,10 @@ def main():
     file_path = sys.argv[1]
     
     # Analyze the data
-    point_counts, predicates_before, predicates_after, aux_predicate_combinations, proof_lengths, aux_count, aux_segment_counts, aux_points_per_segment = analyze_jsonl_file(file_path)
+    point_counts, predicates_before, predicates_after, aux_predicate_combinations, proof_lengths, aux_count = analyze_jsonl_file(file_path)
     
     # Generate report
-    generate_report(point_counts, predicates_before, predicates_after, aux_predicate_combinations, proof_lengths, aux_count, aux_segment_counts, aux_points_per_segment)
+    generate_report(point_counts, predicates_before, predicates_after, aux_predicate_combinations, proof_lengths, aux_count)
     
     print("\n" + "="*80)
     print("Analysis complete!")

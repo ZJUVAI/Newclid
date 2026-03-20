@@ -73,7 +73,7 @@ double Angle::angle() const
 {
     double a1 = Slope(_vertex_pt, _left_pt).angle();
     double a2 = Slope(_vertex_pt, _right_pt).angle();
-    double ang = a2 - a1;
+    double ang = a1 - a2;
     if (ang < 0)
     {
         ang += M_PI;

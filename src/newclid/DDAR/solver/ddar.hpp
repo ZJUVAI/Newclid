@@ -12,7 +12,6 @@
 #include "theorem.hpp"
 #include "solver/application.hpp"
 #include "solver/proof.hpp"
-#include "solver/object_table.hpp"
 
 class DDARSolver
 {
@@ -29,22 +28,18 @@ private:
 
     std::vector<Proof *> _ars;
 
-    std::vector<Proof *> _checked_statements;
+    std::vector<const Proof *> _checked_statements;
 
     bool _solved{false};
 
     bool _log_enabled;
     bool _exp_enabled;
 
-    LinearSystem _system_slope;
-    LinearSystem _system_dist;
-    LinearSystem _system_distlog;
+    LinearSystem _system;
 
     using eqns_map_type = std::unordered_map<Equation, ReducedEquation>;
 
-    eqns_map_type _equations_slope;
-    eqns_map_type _equations_dist;
-    eqns_map_type _equations_distlog;
+    eqns_map_type _equations;
 
 public:
     bool run_level(const Point &max_pt);
@@ -61,7 +56,7 @@ public:
 
     size_t num_applications() const;
 
-    size_t push_established_statement(Proof *pf);
+    size_t push_established_statement(const Proof *pf);
 
     DDARSolver(Problem *problem, bool log_enabled = false, bool exp_enabled = false);
 
@@ -69,7 +64,7 @@ public:
 
     void insert_application(Theorem thm);
 
-    bool establish_statement(Proof *pf, size_t thm_id);
+    static bool establish_statement(Proof *pf, size_t thm_id);
 
     void add_established_equations(Proof *pf);
 
@@ -77,7 +72,7 @@ public:
 
     std::vector<std::tuple<std::vector<std::string>, std::vector<std::vector<std::string>>, std::string>> dependency_graph() const;
 
-    std::vector<ReducedEquation *> insert_equation(const std::unique_ptr<Statement> &pf, std::string type);
+    std::vector<ReducedEquation *> insert_equation(const std::unique_ptr<Statement> &pf);
 };
 
 #endif // DDAR_HPP

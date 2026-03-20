@@ -71,7 +71,7 @@ class SimtriClock(Predicate):
 
     @classmethod
     def draw(
-        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True
+        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
     ):
         draw_segment(ax, args[0], args[1], ls="dashed")
         draw_segment(ax, args[1], args[2], ls="dashed")
@@ -132,6 +132,5 @@ class SimtriReflect(Predicate):
         args: tuple[Any, ...],
         dep_graph: "DependencyGraph",
         rng: Generator,
-        draw_annotations: bool = True,
     ):
-        SimtriClock.draw(ax, args, dep_graph, rng, draw_annotations)
+        SimtriClock.draw(ax, args, dep_graph, rng)

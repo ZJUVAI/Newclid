@@ -8,8 +8,6 @@ from fractions import Fraction
 
 from newclid.agent.ddarn import DDARN
 from newclid.agent.lm import LMAgent
-from newclid.agent.vlm import VLMAgent
-from newclid.agent.internvlm import InternVLMAgent
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.load_geogebra import load_geogebra
@@ -147,9 +145,7 @@ class GeometricSolverBuilder:
         if self.deductive_agent is None:
             self.deductive_agent = DDARN()
 
-        if isinstance(self.deductive_agent, LMAgent) or \
-            isinstance(self.deductive_agent, VLMAgent) or \
-            isinstance(self.deductive_agent, InternVLMAgent):
+        if isinstance(self.deductive_agent, LMAgent):
             self.deductive_agent.problemJGEX = self.problemJGEX
 
         # proof_state.dep_graph.obtain_numerical_checked_eqangle_and_eqratio()
@@ -251,17 +247,16 @@ class CSolver:
         self.points: List[Tuple[str, Any, Any]] = []
         self.premises: List[Tuple[str, List[str]]] = []
         self.goals: List[Tuple[str, List[str]]] = []
-        self.useful_points: List[str] = []
 
+        self._extract_points()
         self._extract_premises()
         self._extract_goals()
-        self._extract_points()
 
     # -------------------- 内部方法 -------------------- #
     def _extract_points(self):
         """提取几何点"""
         for name, point in self.solver.proof.symbols_graph.name2node.items():
-            if isinstance(point.num, PointNum) and name in self.useful_points:
+            if isinstance(point.num, PointNum):
                 self.points.append((name, point.num.x, point.num.y))
 
     def _extract_premises(self):
@@ -274,8 +269,6 @@ class CSolver:
                     args.append(str(pt))
                 else:
                     args.append(pt.name)
-                    if pt.name not in self.useful_points:
-                        self.useful_points.append(pt.name)
             self.premises.append((predicate, args))
 
     def _extract_goals(self):
@@ -288,8 +281,6 @@ class CSolver:
                     args.append(str(pt))
                 else:
                     args.append(pt.name)
-                    if pt.name not in self.useful_points:
-                        self.useful_points.append(pt.name)
             self.goals.append((predicate, args))
 
     # -------------------- 核心方法 -------------------- #
@@ -339,7 +330,15 @@ class CSolver:
         return solved
 
     def possible_goals(self) -> List[str]:
-        return DDAR.get_possible_goals(self.problem_name, self.points, self.premises)
+        ret = []
+        tmp_goals = DDAR.get_possible_goals(self.problem_name, self.points, self.premises)
+        while len(tmp_goals) != 0:
+            ret.append(tmp_goals[0])
+            predicate = tmp_goals[0].split()[0]
+            args = tmp_goals[0].split()[1:]
+            self.premises.append((predicate, args))
+            tmp_goals = DDAR.get_possible_goals(self.problem_name, self.points, self.premises)
+        return ret
 
     # -------------------- 辅助输出 -------------------- #
     def print_info(self):

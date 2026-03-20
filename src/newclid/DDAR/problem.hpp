@@ -18,7 +18,7 @@ public:
 
     void clear();
 
-    void add_point(const std::string &name, double x, double y);
+    PointNum add_point(const std::string &name, double x, double y);
 
     void set_name(const std::string &name);
 

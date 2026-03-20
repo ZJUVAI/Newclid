@@ -54,15 +54,3 @@ std::ostream &SameSide::print(std::ostream &os) const
 {
     return os << _a << " on the same side of [" << _b << ", " << _c << "] as " << _d << " of [" << _e << ", " << _f << "]";
 }
-
-unique_ptr<Statement> SameSide::replace(Point p, Point q) const
-{
-    Point new_a = (_a == p) ? q : _a;
-    Point new_b = (_b == p) ? q : _b;
-    Point new_c = (_c == p) ? q : _c;
-    Point new_d = (_d == p) ? q : _d;
-    Point new_e = (_e == p) ? q : _e;
-    Point new_f = (_f == p) ? q : _f;
-
-    return make_unique<SameSide>(new_a, new_b, new_c, new_d, new_e, new_f);
-}

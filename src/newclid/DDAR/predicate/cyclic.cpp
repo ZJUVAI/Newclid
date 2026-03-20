@@ -79,12 +79,3 @@ vector<Cyclic> Cyclic::permutation() const
     res.push_back(Cyclic(_b, _c, _a, _d));
     return res;
 }
-
-unique_ptr<Statement> Cyclic::replace(Point p, Point q) const
-{
-    Point new_a = (_a == p) ? q : _a;
-    Point new_b = (_b == p) ? q : _b;
-    Point new_c = (_c == p) ? q : _c;
-    Point new_d = (_d == p) ? q : _d;
-    return std::make_unique<Cyclic>(new_a, new_b, new_c, new_d);
-}

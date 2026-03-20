@@ -19,18 +19,6 @@ string NSameSide::name() const
     return "nsameside";
 }
 
-unique_ptr<Statement> NSameSide::replace(Point p, Point q) const
-{
-    Point new_a = (_a == p) ? q : _a;
-    Point new_b = (_b == p) ? q : _b;
-    Point new_c = (_c == p) ? q : _c;
-    Point new_d = (_d == p) ? q : _d;
-    Point new_e = (_e == p) ? q : _e;
-    Point new_f = (_f == p) ? q : _f;
-
-    return make_unique<NSameSide>(new_a, new_b, new_c, new_d, new_e, new_f);
-}
-
 vector<Point> NSameSide::points() const
 {
     return {_a, _b, _c, _d, _e, _f};

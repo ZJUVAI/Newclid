@@ -12,14 +12,7 @@ millify
 ray
 openai
 pybind11
-transformers>=4.40.0
+transformers
 accelerate
 rich
 py-data-juicer
-qwen_vl_utils
-modelscope
-torchvision
-cairosvg
-timm
-adjustText
-ray[default]

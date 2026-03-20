@@ -9,26 +9,23 @@
 #include <iostream>
 #include <type_traits>
 #include <cmath>
-#include <chrono>
-#include <sstream>
-#include <iomanip>
 
 using namespace std;
 
 DDARSolver::DDARSolver(Problem *problem, bool log_enabled, bool exp_enabled) : _problem(problem), _log_enabled(log_enabled), _exp_enabled(exp_enabled)
 {
-    // cout << "匹配定理" << endl;
-    Matcher matcher(problem);
-    for (const auto &thm : matcher.theorems())
-    {
-        insert_application(thm.clone());
-    }
-
     // cout << "添加前提条件" << endl;
     for (const auto &hyp : problem->hypotheses())
     {
         this->insert_statement(hyp->normalize())->prove_by_assumption();
         // cout << hyp->to_string() << "已添加" << endl;
+    }
+
+    // cout << "匹配定理" << endl;
+    Matcher matcher(problem);
+    for (const auto &thm : matcher.theorems())
+    {
+        insert_application(thm.clone());
     }
 
     if (!problem->goals().empty())
@@ -41,57 +38,25 @@ DDARSolver::DDARSolver(Problem *problem, bool log_enabled, bool exp_enabled) : _
         }
     }
 
-    for (const auto &stmt : matcher.stmts())
-    {
-        if (stmt->check_numerically())
-        {
-            _ars.push_back(this->insert_statement(stmt));
-        }
-    }
+    // for (const auto &stmt : matcher.stmts())
+    // {
+    //     _ars.push_back(this->insert_statement(stmt));
+    // }
 }
 
 bool DDARSolver::run_level(const Point &max_pt)
 {
     size_t num_stmts = _checked_statements.size();
-    _level++;
-
-    bool changed = true;
-    while (changed)
-    {
-        changed = false;
-        for (auto it = _ars.begin(); it != _ars.end();)
-        {
-            auto &goal = *it;
-            if (goal->max_point() > max_pt)
-            {
-                ++it;
-                continue;
-            }
-            if (goal->is_proved())
-            {
-                it = _ars.erase(it);
-                changed = true;
-            }
-            else
-            {
-                goal->ar(_level);
-                if (goal->is_proved())
-                {
-                    it = _ars.erase(it);
-                    changed = true;
-                }
-                else
-                {
-                    ++it;
-                }
-            }
-        }
-    }
+    // cout << "开始第" << _level << "层, 初始有" << num_stmts << "个结论" << endl;
+    // for (auto const &pf : _checked_statements)
+    // {
+    //     cout << pf->statement()->to_string() << "已证明" << endl;
+    // }
 
     size_t const n = _applications.size();
     for (size_t i = 0; i < n; i++)
     {
-        if (_applications[i].max_point() <= max_pt && _applications[i].state() == ApplicationState::PENDING)
+        if (_applications[i].max_point() <= max_pt)
         {
             advance_theorem(i);
         }
@@ -104,7 +69,7 @@ bool DDARSolver::run_level(const Point &max_pt)
         {
             if (!goal->is_proved())
             {
-                goal->ar(_level);
+                goal->ar();
                 if (!goal->is_proved())
                 {
                     res = false;
@@ -114,41 +79,50 @@ bool DDARSolver::run_level(const Point &max_pt)
         _solved = res;
     }
 
+    // cout << "新证明" << _checked_statements.size() - num_stmts << "个结论, "
+    //      << "总计" << _checked_statements.size() << "个结论" << endl;
+
+    ++_level;
     return num_stmts < _checked_statements.size();
 }
 
 bool DDARSolver::run(size_t max_levels)
 {
-    bool has_goal = !_problem->goals().empty();
-
-    if (!has_goal)
+    if (_problem->goals().empty())
     {
-        for (Point const &pt : _problem->points())
+        for (Point const &max_pt : _problem->points())
         {
-            for (size_t i = 0; i < max_levels; ++i)
+            for (size_t i = 0; i < max_levels; i++)
             {
-                if (!run_level(pt))
+                if (!run_level(max_pt))
                 {
                     break;
                 }
             }
         }
+
         _solved = true;
     }
     else
     {
-        for (size_t i = 0; i < max_levels; ++i)
+        auto const max_pt = _problem->points().back();
+        for (size_t i = 0; i < max_levels; i++)
         {
-            if (!run_level(_problem->points().back()))
+            if (!run_level(max_pt))
             {
+                // cout << "没有新结论, 提前结束" << endl;
                 break;
             }
             if (_solved)
             {
+                // cout << "目标已证明, 提前结束" << endl;
                 break;
             }
         }
     }
+
+    // _system.print_equations();
+
     return _solved;
 }
 
@@ -160,7 +134,7 @@ void DDARSolver::advance_theorem(size_t index)
         return;
     }
 
-    app.advance_proof(_level);
+    app.advance_proof();
     if (app.state() == ApplicationState::PROVED)
     {
         for (auto *p : app.conclusions())
@@ -224,7 +198,7 @@ size_t DDARSolver::num_applications() const
     return _applications.size();
 }
 
-size_t DDARSolver::push_established_statement(Proof *pf)
+size_t DDARSolver::push_established_statement(const Proof *pf)
 {
     size_t const index = _checked_statements.size();
     _checked_statements.push_back(pf);
@@ -233,33 +207,13 @@ size_t DDARSolver::push_established_statement(Proof *pf)
 
 void DDARSolver::print_equations() const
 {
-    cout << "Slope Equations:" << endl;
-    for (const auto &[eqn, red_eqn] : _equations_slope)
+    cout << "Equations:" << endl;
+    for (const auto &[eqn, red_eqn] : _equations)
     {
         cout << "Equation: " << eqn << endl;
         cout << "Reduced Equation: " << red_eqn.remainder() << endl;
         cout << endl;
     }
-    cout << "Dist Equations:" << endl;
-    for (const auto &[eqn, red_eqn] : _equations_dist)
-    {
-        cout << "Equation: " << eqn << endl;
-        cout << "Reduced Equation: " << red_eqn.remainder() << endl;
-        cout << endl;
-    }
-    cout << "DistLog Equations:" << endl;
-    for (const auto &[eqn, red_eqn] : _equations_distlog)
-    {
-        cout << "Equation: " << eqn << endl;
-        cout << "Reduced Equation: " << red_eqn.remainder() << endl;
-        cout << endl;
-    }
-
-    _system_dist.print_equations();
-
-    _system_distlog.print_equations();
-
-    _system_slope.print_equations();
 }
 
 bool DDARSolver::establish_statement(Proof *pf, size_t thm_id)
@@ -268,109 +222,39 @@ bool DDARSolver::establish_statement(Proof *pf, size_t thm_id)
     {
         return false;
     }
-    pf->set_theorem(thm_id, _level);
+    pf->ar();
+    if (!pf->is_proved())
+    {
+        pf->set_theorem(thm_id);
+    }
     return true;
 }
 
-vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement> &pf, string type)
+vector<ReducedEquation *> DDARSolver::insert_equation(const unique_ptr<Statement> &pf)
 {
+    auto eqn_ptrs = pf->as_equation(_log_enabled, _exp_enabled);
+    if (eqn_ptrs.empty())
+    {
+        return {};
+    }
+
     vector<ReducedEquation *> res;
-
-    if (type == "dist")
+    for (const auto &eqn_ptr : eqn_ptrs)
     {
-        auto eqn_ptrs = pf->as_equation_dist(_exp_enabled);
-        if (!eqn_ptrs.empty())
+        LinearSystem *sys = &_system;
+        eqns_map_type *eqns = &_equations;
+        if (!eqn_ptr->empty())
         {
-            for (const auto &eqn_ptr : eqn_ptrs)
-            {
-                LinearSystem *sys = &_system_dist;
-                eqns_map_type *eqns = &_equations_dist;
-                if (!eqn_ptr->empty())
-                {
-                    Rational coeff = Rational(1) / eqn_ptr->begin()->coeff();
-                    Equation eqn = *eqn_ptr * coeff;
-                    auto red_eq = ReducedEquation(eqn, sys);
-                    res.push_back(&(eqns->insert({eqn, red_eq}).first->second));
-                }
-            }
+            Rational coeff = Rational(1) / eqn_ptr->begin()->coeff();
+            Equation eqn = *eqn_ptr * coeff;
+            auto red_eq = ReducedEquation(eqn, sys);
+            res.push_back(&(eqns->insert({eqn, red_eq}).first->second));
         }
-        return res;
     }
-    if (type == "slope")
-    {
-        auto eqn_ptrs = pf->as_equation_slope(_exp_enabled);
-        if (!eqn_ptrs.empty())
-        {
-            for (const auto &eqn_ptr : eqn_ptrs)
-            {
-                LinearSystem *sys = &_system_slope;
-                eqns_map_type *eqns = &_equations_slope;
-                if (!eqn_ptr->empty())
-                {
-                    Rational coeff = Rational(1) / eqn_ptr->begin()->coeff();
-                    Equation eqn = *eqn_ptr * coeff;
-                    auto red_eq = ReducedEquation(eqn, sys);
-                    res.push_back(&(eqns->insert({eqn, red_eq}).first->second));
-                }
-            }
-        }
-        return res;
-    }
-    if (type == "distlog" && _log_enabled)
-    {
-        auto eqn_ptrs = pf->as_equation_distlog(_exp_enabled);
-        if (!eqn_ptrs.empty())
-        {
-            for (const auto &eqn_ptr : eqn_ptrs)
-            {
-                LinearSystem *sys = &_system_distlog;
-                eqns_map_type *eqns = &_equations_distlog;
-                if (!eqn_ptr->empty())
-                {
-                    Rational coeff = Rational(1) / eqn_ptr->begin()->coeff();
-                    Equation eqn = *eqn_ptr * coeff;
-                    auto red_eq = ReducedEquation(eqn, sys);
-                    res.push_back(&(eqns->insert({eqn, red_eq}).first->second));
-                }
-            }
-        }
-        return res;
-    }
-
     return res;
 }
 
 void DDARSolver::add_established_equations(Proof *pf)
 {
-    _system_dist.add_reduced_equation(pf, "dist");
-    _system_distlog.add_reduced_equation(pf, "distlog");
-    _system_slope.add_reduced_equation(pf, "slope");
-    if (pf->name() == "eqpoint")
-    {
-        auto pts = pf->statement()->points();
-        Point p = pts[0];
-        Point q = pts[1];
-        std::vector<Proof *> to_process;
-        for (const auto &old_pf : _checked_statements)
-        {
-            if (old_pf->statement()->contain(p) && !old_pf->statement()->contain(q))
-            {
-                to_process.push_back(old_pf);
-            }
-        }
-        for (auto &old_pf : to_process)
-        {
-            auto stmt = old_pf->statement()->replace(p, q);
-            string key = stmt->normalize()->to_string();
-            auto itr = _statement_proofs.find(key);
-            if (itr != _statement_proofs.end())
-            {
-                Proof *new_pf = itr->second.get();
-                if (!new_pf->is_proved())
-                {
-                    new_pf->set_proved(pf, old_pf);
-                }
-            }
-        }
-    }
+    _system.add_reduced_equation(pf);
 }

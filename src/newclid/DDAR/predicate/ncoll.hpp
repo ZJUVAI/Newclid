@@ -17,8 +17,6 @@ public:
 
     std::vector<Point> points() const override;
 
-    std::unique_ptr<Statement> replace(Point p, Point q) const override;
-
     std::unique_ptr<Statement> normalize() const override;
 
     bool check_nondegen() const override;
@@ -38,8 +36,6 @@ public:
     const Point &c() const { return _c; }
 
     bool numerical_only() const { return true; }
-
-    bool trivial() const { return false; }
 };
 
 #endif // NCOLL_HPP

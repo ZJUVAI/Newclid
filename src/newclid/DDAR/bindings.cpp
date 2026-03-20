@@ -78,20 +78,20 @@ extern "C"
         //     const std::vector<StatementTokens> &dependencies = std::get<1>(tupleElem);
         //     const std::string &reason = std::get<2>(tupleElem);
 
-        //     if (reason == "Numerical Check" || reason == "Trivial")
+        //     if (reason == "Numerical Check")
         //     {
         //         continue;
         //     }
 
-        //     std::cout << "Statement: " << join(tokens) << endl;
+        //     std::cout << "Statement: " << join(tokens) << "\n";
 
-        //     std::cout << "Dependencies:" << endl;
+        //     std::cout << "Dependencies: \n";
         //     for (const auto &dep : dependencies)
         //     {
-        //         std::cout << "  - " << join(dep) << endl;
+        //         std::cout << "  - " << join(dep) << "\n";
         //     }
 
-        //     std::cout << "Reason: " << reason << endl;
+        //     std::cout << "Reason: " << reason << "\n";
         //     std::cout << "---------------------------------------\n";
         // }
 
@@ -122,7 +122,8 @@ extern "C"
                 {
                     continue;
                 }
-                possible_goals.push_back(c->statement()->to_string());
+                if(!c->is_proved())
+                    possible_goals.push_back(c->statement()->to_string());
             }
         }
         std::sort(possible_goals.begin(), possible_goals.end());

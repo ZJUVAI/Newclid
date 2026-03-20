@@ -20,14 +20,6 @@ vector<Point> Midp::points() const
     return {_middle, _left, _right};
 }
 
-unique_ptr<Statement> Midp::replace(Point p, Point q) const
-{
-    Point new_middle = (_middle == p) ? q : _middle;
-    Point new_left = (_left == p) ? q : _left;
-    Point new_right = (_right == p) ? q : _right;
-    return make_unique<Midp>(new_middle, new_left, new_right);
-}
-
 unique_ptr<Statement> Midp::normalize() const
 {
     if (_left < _right)

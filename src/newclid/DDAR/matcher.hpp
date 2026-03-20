@@ -35,8 +35,6 @@ private:
 
     std::vector<std::tuple<double, Coll>> all_betweens();
 
-    std::vector<std::pair<Point, Point>> all_eqpoints();
-
     std::vector<std::tuple<double, Angle>> all_angles();
 
     void on_similar_triangles(const SimilarTriangles &simtri);

@@ -27,16 +27,6 @@ vector<statement_arg> Secant::args() const
     return {_o, _a, _b, _p};
 }
 
-unique_ptr<Statement> Secant::replace(Point p, Point q) const
-{
-    Point new_o = (_o == p) ? q : _o;
-    Point new_a = (_a == p) ? q : _a;
-    Point new_b = (_b == p) ? q : _b;
-    Point new_p = (_p == p) ? q : _p;
-
-    return make_unique<Secant>(new_o, new_a, new_b, new_p);
-}
-
 unique_ptr<Statement> Secant::clone() const
 {
     return make_unique<Secant>(*this);
@@ -53,12 +43,12 @@ unique_ptr<Statement> Secant::normalize() const
 
 bool Secant::check_nondegen() const
 {
-    return !(_p.is_close(_a)) && !(_p .is_close(_b)) && !(_p.is_close(_o)) && !(_o.is_close( _a)) && !(_o.is_close( _b));
+    return !(_p == _a) && !(_p == _b) && !(_p == _o) && !(_o == _a) && !(_o == _b);
 }
 
 bool Secant::check_equations() const
 {
-    if (_a.is_close( _b))
+    if (_a == _b)
     {
         return cong_ab().check_equations() && Perp(Slope(_a, _o), Slope(_o, _p)).check_equations();
     }
@@ -80,7 +70,7 @@ Coll Secant::coll_pab() const
     return Coll(_p, _a, _b);
 }
 
-vector<unique_ptr<Equation>> Secant::as_equation_dist(bool exp) const
+vector<unique_ptr<Equation>> Secant::as_equation(bool log, bool exp) const
 {
     vector<unique_ptr<Equation>> result;
     if (!exp)

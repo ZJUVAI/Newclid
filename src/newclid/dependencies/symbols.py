@@ -5,11 +5,11 @@ from abc import ABC
 from typing import TYPE_CHECKING, Optional, TypeVar, Union
 from typing_extensions import Self
 
+from newclid.formulations.clause import Clause
 from newclid.numerical.geometries import CircleNum, LineNum, PointNum
 from newclid.dependencies.dependency import Dependency
 
 if TYPE_CHECKING:
-    from newclid.formulations.clause import Clause
     from newclid.statement import Statement
     from newclid.dependencies.symbols_graph import SymbolsGraph
 
@@ -126,16 +126,7 @@ class Line(Symbol):
         )
         line.points = s
         points = list(line.points)
-        p1 = points[0]
-        p2 = None
-        for p in points[1:]:
-            if not p1.num.close_enough(p.num):
-                p2 = p
-                break
-        if p2 is None:
-            p2 = points[-1]
-        line.num = LineNum(p1=p1.num, p2=p2.num)
-        # line.num = LineNum(p1=points[0].num, p2=points[1].num)
+        line.num = LineNum(p1=points[0].num, p2=points[1].num)
         line.merge(merge)
         return line, merge
 
@@ -165,8 +156,7 @@ class Line(Symbol):
                             break
                     if s <= current_points:
                         break
-                    lines = [line for line in lines if not line <=
-                             current_points]
+                    lines = [line for line in lines if not line <= current_points]
                     lines.append(current_points)
                 return Dependency.mk(statement, "Same Line", why)
                 # return Dependency.mk(statement, "Same Line", [])
@@ -237,8 +227,7 @@ class Circle(Symbol):
                             break
                     if s <= current_points:
                         break
-                    circles = [
-                        circle for circle in circles if not circle <= current_points]
+                    circles = [circle for circle in circles if not circle <= current_points]
                     circles.append(current_points)
                 return Dependency.mk(statement, "Same Circle", why)
                 # return target.dep.with_new(statement)

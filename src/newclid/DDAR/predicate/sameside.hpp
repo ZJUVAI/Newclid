@@ -25,8 +25,6 @@ public:
 
     std::vector<Point> points() const override;
 
-    std::unique_ptr<Statement> replace(Point p, Point q) const override;
-
     std::unique_ptr<Statement> normalize() const override;
 
     bool check_nondegen() const override;
@@ -52,8 +50,6 @@ public:
     std::ostream &print(std::ostream &os) const override;
 
     bool numerical_only() const { return true; }
-
-    bool trivial() const { return false; }
 };
 
 #endif // SAMESIDE_HPP

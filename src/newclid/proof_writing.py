@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
-from newclid.dependencies.dependency import IN_PREMISES, NUMERICAL_CHECK, TRIVIAL, Dependency
+from newclid.dependencies.dependency import IN_PREMISES, NUMERICAL_CHECK, Dependency
 from newclid.statement import Statement
 from newclid.dependencies.symbols import Point
 
@@ -35,11 +35,9 @@ def write_proof_steps(proof_state: "ProofState", out_file: Optional[Path] = None
         points,
         premises,
         numercial_checked_premises,
-        trivial_premises,
         aux_points,
         aux,
         numercial_checked_aux,
-        trivial_aux,
         proof_steps,
     ) = proof_state.dep_graph.get_proof_steps(goals)
     points = sorted([p.pretty_name for p in points if isinstance(p, Point)])
@@ -52,8 +50,6 @@ def write_proof_steps(proof_state: "ProofState", out_file: Optional[Path] = None
         solution += rediger(line) + "\n"
     for line in numercial_checked_premises:
         solution += rediger(line) + "\n"
-    for line in trivial_premises:
-        solution += rediger(line) + "\n"
 
     solution += "\n* Auxiliary Constructions:\n"
     solution += f"Points : {', '.join(aux_points)}\n"
@@ -61,12 +57,10 @@ def write_proof_steps(proof_state: "ProofState", out_file: Optional[Path] = None
         solution += rediger(line) + "\n"
     for line in numercial_checked_aux:
         solution += rediger(line) + "\n"
-    for line in trivial_aux:
-        solution += rediger(line) + "\n"
 
     solution += "\n* Proof steps:\n"
     for k, line in enumerate(proof_steps):
-        if NUMERICAL_CHECK not in line.reason and IN_PREMISES not in line and TRIVIAL not in line.reason:
+        if NUMERICAL_CHECK not in line.reason and IN_PREMISES not in line:
             solution += f"{k:03d}. {rediger(line)}\n"
     solution += "=========================="
     if out_file is None and print_output is True:

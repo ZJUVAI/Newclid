@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any, Optional
 from matplotlib.axes import Axes
 import matplotlib.patches as patches
 import numpy as np
-from numpy.random import Generator
 
 from newclid.dependencies.symbols import Line, Point
 from newclid.numerical import nearly_zero
@@ -12,6 +11,7 @@ from newclid.numerical.draw_figure import draw_line, draw_rectangle, draw_segmen
 from newclid.predicates.equal_angles import EqAngle
 from newclid.predicates.predicate import Predicate
 from newclid.tools import notNone
+from numpy.random import Generator
 from newclid.numerical.geometries import intersect
 from newclid.numerical.geometries import LineNum
 
@@ -115,7 +115,7 @@ class Perp(Predicate):
 
     @classmethod
     def draw(
-        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True
+        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator
     ):
         line0_num = LineNum(p1=args[0].num, p2=args[1].num)
         line1_num = LineNum(p1=args[2].num, p2=args[3].num)
@@ -131,21 +131,19 @@ class Perp(Predicate):
         figure_height = ylim[1] - ylim[0]
         figure_size = max(figure_width, figure_height)
         
-        if draw_annotations:
-            # Set rectangle size proportional to figure size
-            rectangle_size = figure_size * 0.03  # 3% of figure size
-            
-            ang = np.arctan2(dir1.y, dir1.x)
-            rectangle = patches.Rectangle(
-                (o.x, o.y),
-                angle=ang / np.pi * 180,
-                fill=False,
-                color="yellow",
-                width=rectangle_size,
-                height=rectangle_size,
-            )
-            ax.add_patch(rectangle)
-
+        # Set rectangle size proportional to figure size
+        rectangle_size = figure_size * 0.03  # 3% of figure size
+        
+        ang = np.arctan2(dir1.y, dir1.x)
+        rectangle = patches.Rectangle(
+            (o.x, o.y),
+            angle=ang / np.pi * 180,
+            fill=False,
+            color="yellow",
+            width=rectangle_size,
+            height=rectangle_size,
+        )
+        ax.add_patch(rectangle)
         draw_segment_num(ax, o, args[0].num)
         draw_segment_num(ax, o, args[1].num)
         draw_segment_num(ax, o, args[2].num)

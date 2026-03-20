@@ -26,8 +26,6 @@ public:
 
     std::unique_ptr<Statement> clone() const override;
 
-    std::unique_ptr<Statement> replace(Point p, Point q) const override;
-
     std::unique_ptr<Statement> normalize() const override;
 
     bool check_nondegen() const override;
@@ -65,8 +63,6 @@ public:
     std::ostream &print(std::ostream &os) const override;
 
     bool numerical_only() const { return false; }
-
-    bool trivial() const { return _left == _right; }
 
     bool operator==(const SimilarTriangles &other) const;
 

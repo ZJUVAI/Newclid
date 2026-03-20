@@ -11,7 +11,6 @@
 #include "predicate/similar_triangles.hpp"
 #include "predicate/congruent_triangles.hpp"
 #include "predicate/statement.hpp"
-#include "predicate/eqpoint.hpp"
 #include "predicate/thales.hpp"
 #include "predicate/secant.hpp"
 #include "type/angle.hpp"
@@ -34,8 +33,6 @@ public:
     bool check_conclusions_numerically() const;
 
     bool check_numerically() const;
-
-    void print() const;
 
     Theorem &add_hypothesis(std::unique_ptr<Statement> stmt);
     Theorem &add_conclusion(std::unique_ptr<Statement> stmt);
@@ -138,12 +135,6 @@ public:
 
     // r106
     static Theorem definition_of_secant(const Secant &sec);
-
-    // r107
-    static Theorem eqpoints_of_same_intersections(const Point &p, const Point &q, const Point &a, const Point &b, const Point &c, const Point &d);
-
-    // r108
-    static Theorem cong_of_eqpoints(const EqPoint &eq, const Point &p);
 
 private:
     std::string _name;

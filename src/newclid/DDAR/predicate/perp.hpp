@@ -3,6 +3,7 @@
 
 #include "predicate/statement.hpp"
 #include "type/slope.hpp"
+#include "type/product.hpp"
 #include "ar/equation.hpp"
 #include "typedef.hpp"
 
@@ -18,8 +19,6 @@ public:
     std::string name() const override;
 
     std::vector<Point> points() const override;
-
-    std::unique_ptr<Statement> replace(Point p, Point q) const override;
 
     std::unique_ptr<Statement> normalize() const override;
 
@@ -37,12 +36,12 @@ public:
 
     std::ostream &print(std::ostream &os) const override;
 
-    std::vector<std::unique_ptr<Equation>> as_equation_slope(bool exp) const override;
-    std::vector<std::unique_ptr<Equation>> as_equation_dist(bool exp) const override;
+    std::vector<std::unique_ptr<Equation>> as_equation(bool log, bool exp) const override;
 
-    bool numerical_only() const { return false; }
-
-    bool trivial() const { return false; }
+    bool numerical_only() const
+    {
+        return false;
+    }
 };
 
 #endif // PERP_HPP
