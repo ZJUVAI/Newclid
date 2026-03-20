@@ -118,7 +118,7 @@ class GeometryProblemWorker:
 
             n_clauses = len(fl_statement.split(';'))
             csolver = CSolver(fl_statement, seed=seed,
-                              solver=solver, using_log=True)
+                              solver=solver, using_log=True, using_exp=True)
 
             # Run solver
             csolver.run(max_level=max_level)
@@ -376,7 +376,7 @@ class GeometryProblemWorker:
             DDARN()
         )
         csolver_no_aux = CSolver(
-            problem='', solver=solver_no_aux, using_log=True)
+            problem='', solver=solver_no_aux, using_log=True, using_exp=True)
         csolver_no_aux.run()
 
         for goal in solver_no_aux.goals:
@@ -408,7 +408,7 @@ class GeometryProblemWorker:
                 DDARN()
             )
             csolver_all_aux = CSolver(
-                problem='', solver=solver_all_aux, using_log=True)
+                problem='', solver=solver_all_aux, using_log=True, using_exp=True)
             csolver_all_aux.run()
 
             for goal in solver_all_aux.goals:
@@ -484,7 +484,7 @@ class GeometryProblemWorker:
                     DDARN()
                 )
                 csolver_test = CSolver(
-                    problem='', solver=solver_test, using_log=True)
+                    problem='', solver=solver_test, using_log=True, using_exp=True)
                 csolver_test.run()
 
                 # Check which goals are solved
@@ -546,7 +546,7 @@ class GeometryProblemWorker:
                 DDARN()
             )
             csolver_all_aux = CSolver(
-                problem='', solver=solver_all_aux, using_log=True)
+                problem='', solver=solver_all_aux, using_log=True, using_exp=True)
             csolver_all_aux.run()
 
             for goal in solver_all_aux.goals:

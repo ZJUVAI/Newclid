@@ -10,7 +10,7 @@
   - solved: 在 408 列里 success==True 的数量
   - 题目列：0/1（是否 solved）
 
-题目列顺序来自 benchmarks/hageo_408.txt。
+题目列顺序来自 benchmarks/core/hageo_409.txt。
 该 benchmark 文件格式通常是：
   problem_id.gex
   <题目描述...>
@@ -143,8 +143,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument(
         "--bench",
         type=Path,
-        default=Path(__file__).resolve().parents[1] / "benchmarks" / "hageo_408.txt",
-        help="题目列表文件（默认：benchmarks/hageo_408.txt）",
+        default=Path(__file__).resolve().parents[1] / "benchmarks" / "core" / "hageo_409.txt",
+        help="题目列表文件（默认：benchmarks/core/hageo_409.txt）",
     )
     parser.add_argument(
         "--out",

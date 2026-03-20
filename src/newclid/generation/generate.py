@@ -322,7 +322,11 @@ class GeometryGenerator:
             ray.init(
                 # local_mode=True,
                 ignore_reinit_error=True,
-                num_cpus=self.n_threads
+                num_cpus=self.n_threads,
+                _system_config={
+                    "raylet_start_wait_time_s": 120,
+                    "gcs_rpc_server_reconnect_timeout_s": 120,
+                }
             )
         task_iterator = task_generator()
         max_pending = int(self.n_threads * 1.5)

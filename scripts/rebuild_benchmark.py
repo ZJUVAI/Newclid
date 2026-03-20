@@ -40,8 +40,8 @@ from newclid.numerical.geometries import PointNum
 
 # ==================== 默认配置（硬编码路径） ====================
 
-DEFAULT_INPUT = "/c23474/home/duzhengtong/Discovery-GenesisGeo/benchmarks/hageo_409.txt"
-DEFAULT_OUTPUT = "/c23474/home/duzhengtong/Discovery-GenesisGeo/datasets/rebuild_problems/hageo_409_rebuild.txt"
+DEFAULT_INPUT = str(Path(__file__).resolve().parents[1] / "benchmarks" / "core" / "hageo_409.txt")
+DEFAULT_OUTPUT = str(Path(__file__).resolve().parents[1] / "datasets" / "rebuild_problems" / "hageo_409_rebuild.txt")
 DEFAULT_SEED = 998244353
 DEFAULT_MAX_WORKERS = 10  # 默认单线程，设置 > 1 开启并行
 

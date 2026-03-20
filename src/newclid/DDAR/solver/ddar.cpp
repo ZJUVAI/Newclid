@@ -3,6 +3,7 @@
 #include "solver/application.hpp"
 #include "solver/proof.hpp"
 #include "matcher.hpp"
+#include "custom_rule_matcher.hpp"
 #include <vector>
 #include <map>
 #include <string>
@@ -50,6 +51,69 @@ DDARSolver::DDARSolver(Problem *problem, bool log_enabled, bool exp_enabled) : _
     }
 }
 
+DDARSolver::DDARSolver(Problem *problem, const vector<Theorem>& custom_rules, bool log_enabled, bool exp_enabled) : _problem(problem), _log_enabled(log_enabled), _exp_enabled(exp_enabled)
+{
+    // Match built-in theorems
+    Matcher matcher(problem);
+    for (const auto &thm : matcher.theorems())
+    {
+        insert_application(thm.clone());
+    }
+
+    // Match custom rules
+    if (!custom_rules.empty())
+    {
+        CustomRuleMatcher custom_matcher(problem);
+        auto matched_custom = custom_matcher.match_rules(custom_rules);
+        for (auto &thm : matched_custom)
+        {
+            insert_application(move(thm));
+        }
+    }
+
+    // Add hypotheses
+    for (const auto &hyp : problem->hypotheses())
+    {
+        this->insert_statement(hyp->normalize())->prove_by_assumption();
+    }
+
+    // Add goals
+    if (!problem->goals().empty())
+    {
+        for (const auto &goal : problem->goals())
+        {
+            _goals.push_back(this->insert_statement(goal));
+        }
+    }
+
+    // Add AR statements
+    for (const auto &stmt : matcher.stmts())
+    {
+        if (stmt->check_numerically())
+        {
+            _ars.push_back(this->insert_statement(stmt));
+        }
+    }
+}
+
+bool DDARSolver::check_goals_proved()
+{
+    if (_goals.empty()) return false;
+
+    for (auto &goal : _goals)
+    {
+        if (!goal->is_proved())
+        {
+            goal->ar(_level);
+            if (!goal->is_proved())
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 bool DDARSolver::run_level(const Point &max_pt)
 {
     size_t num_stmts = _checked_statements.size();
@@ -86,6 +150,13 @@ bool DDARSolver::run_level(const Point &max_pt)
                 }
             }
         }
+
+        // Early termination: check if goals are proved after AR operations
+        if (!_goals.empty() && check_goals_proved())
+        {
+            _solved = true;
+            return true;
+        }
     }
 
     size_t const n = _applications.size();
@@ -94,6 +165,13 @@ bool DDARSolver::run_level(const Point &max_pt)
         if (_applications[i].max_point() <= max_pt && _applications[i].state() == ApplicationState::PENDING)
         {
             advance_theorem(i);
+
+            // Early termination: check if goals are proved after each theorem application
+            if (!_goals.empty() && check_goals_proved())
+            {
+                _solved = true;
+                return true;
+            }
         }
     }
 

@@ -128,7 +128,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Newclid evaluation with configurable paths.")
-    parser.add_argument("--problems_path", type=str, default="benchmarks/dev_imo.txt",
+    parser.add_argument("--problems_path", type=str, default="benchmarks/dev/dev_imo.txt",
                         help="Path to the problems dataset file")
     parser.add_argument("--model_path", type=str, nargs='+', help="Path to the model checkpoint")
     parser.add_argument("--max_workers", type=int, default=8, help="Number of worker processes to use")

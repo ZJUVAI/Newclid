@@ -16,7 +16,7 @@ timeout=7200
 datasets=(
     "imo_102_requires_aux.txt"
     # "imo_2012_p5.txt"
-    # "dev_imo.txt"
+    # "dev/dev_imo.txt"
     # "imo_2008_p1.txt"
     # "imo_2008_p1b.txt"
     # "imo_2004_p1.txt"
@@ -26,7 +26,7 @@ datasets=(
     # "imo_102_requires_aux_less1.txt" 
     # "imo_102_requires_aux_less2.txt"
     # "imo_102_requires_aux_less3.txt"
-    # "dev_jgex.txt" 
+    # "dev/dev_jgex.txt"
 )
 
 # Decoding configurations (decoding_size beam_size)

@@ -18,9 +18,16 @@ void ReducedEquation::set_index(size_t index, const LinearSystem *system)
 
 void ReducedEquation::reduce()
 {
+    // Fast path: if already solved, no need to reduce again
+    if (_reduction_complete)
+    {
+        return;
+    }
+
     _remainder.normalize();
     if (_remainder.empty())
     {
+        _reduction_complete = true;
         return;
     }
 
@@ -68,6 +75,12 @@ void ReducedEquation::reduce()
         _remainder -= substitute_eq * head.coeff();
     }
     _remainder.reduction();
+
+    // Mark as complete only if fully solved
+    if (_remainder.empty())
+    {
+        _reduction_complete = true;
+    }
 }
 
 bool ReducedEquation::is_solved() const

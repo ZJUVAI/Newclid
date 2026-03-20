@@ -236,12 +236,13 @@ class GeometricSolverBuilder:
 
 
 class CSolver:
-    def __init__(self, problem: str=None, problem_name: str = "anonymity", seed: int = 123, solver: GeometricSolver = None, using_log: bool = False, using_exp: bool = False, points: List[Tuple[str, Any, Any]] = None, premises: List[Tuple[str, List[str]]] = None, goals: List[Tuple[str, List[str]]] = None):
+    def __init__(self, problem: str=None, problem_name: str = "anonymity", seed: int = 123, solver: GeometricSolver = None, using_log: bool = False, using_exp: bool = False, points: List[Tuple[str, Any, Any]] = None, premises: List[Tuple[str, List[str]]] = None, goals: List[Tuple[str, List[str]]] = None, custom_rules: List[str] = None):
         self.problem = problem
         self.problem_name = problem_name
         self.seed = seed
         self.log_enabled = using_log
         self.exp_enabled = using_exp
+        self.custom_rules = custom_rules or []
 
         # 构建 solver
         if solver is None:
@@ -254,23 +255,23 @@ class CSolver:
             self.solver = solver
 
         # 提取信息
-        
-        if points is not None:
-            self.points = points
-        else:
-            self.points: List[Tuple[str, Any, Any]] = []
-            self.useful_points: List[str] = []
-            self._extract_points()
+
         if premises is not None:
             self.premises = premises
         else:
             self.premises: List[Tuple[str, List[str]]] = []
+            self.useful_points: List[str] = []
             self._extract_premises()
         if goals is not None:
             self.goals = goals
         else:
             self.goals: List[Tuple[str, List[str]]] = []
             self._extract_goals()
+        if points is not None:
+            self.points = points
+        else:
+            self.points: List[Tuple[str, Any, Any]] = []
+            self._extract_points()
     
     # -------------------- 内部方法 -------------------- #
     def _extract_points(self):
@@ -317,8 +318,14 @@ class CSolver:
         """
         t0 = time.time()
 
-        solved, dep_graph = DDAR.run_ddar(
-            self.problem_name, self.points, self.premises, self.goals, max_level, self.log_enabled, self.exp_enabled)
+        # Use run_ddar_with_rules if custom rules are provided
+        if self.custom_rules:
+            solved, dep_graph = DDAR.run_ddar_with_rules(
+                self.problem_name, self.points, self.premises, self.goals,
+                self.custom_rules, max_level, self.log_enabled, self.exp_enabled)
+        else:
+            solved, dep_graph = DDAR.run_ddar(
+                self.problem_name, self.points, self.premises, self.goals, max_level, self.log_enabled, self.exp_enabled)
 
         for stmt, deps, reason in dep_graph:
             conclusion = Statement.from_tokens(

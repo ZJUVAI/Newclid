@@ -4,6 +4,9 @@ __pycache__/
 *$py.class
 *.so
 
+# IMO Shortlist PDFs (large, download on demand)
+datasets/imo_shortlists/*.pdf
+
 # Distribution / packaging
 .Python
 build/
@@ -48,8 +51,12 @@ run_results/
 src/newclid/generation/dataset/
 src/newclid/test.py
 results/
-datasets/
-core*
+# Ignore large dataset files but keep metadata
+datasets/*.jsonl
+datasets/*.json
+datasets/geometry_clauses*
+core.*
+/core/
 temp/
 
 # TODO

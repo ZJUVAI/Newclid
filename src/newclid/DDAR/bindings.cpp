@@ -4,6 +4,7 @@
 #include "theorem.hpp"
 #include "problem.hpp"
 #include "solver/ddar.hpp"
+#include "rule_parser.hpp"
 #include <iostream>
 #include <map>
 #include <vector>
@@ -130,10 +131,55 @@ extern "C"
         possible_goals.erase(it, possible_goals.end());
         return possible_goals;
     }
+
+    pair<bool, DepGraph> run_ddar_with_rules(
+        string name,
+        vector<tuple<string, double, double>> points,
+        vector<pair<string, vector<string>>> premises,
+        vector<pair<string, vector<string>>> goals,
+        vector<string> custom_rules,
+        int max_level = 500,
+        bool log_enabled = false,
+        bool exp_enabled = false)
+    {
+        Problem problem;
+        problem.load_from_data(name, points, premises, goals);
+
+        // Parse custom rules
+        vector<Theorem> parsed_rules;
+        if (!custom_rules.empty())
+        {
+            parsed_rules = RuleParser::parse_rules(custom_rules, &problem);
+        }
+
+        // Create solver with custom rules
+        DDARSolver solver(&problem, parsed_rules, log_enabled, exp_enabled);
+        solver.run(max_level);
+
+        DepGraph dep_graph = solver.dependency_graph();
+
+        return make_pair(solver.is_solved(), dep_graph);
+    }
 }
 
 PYBIND11_MODULE(DDAR, m)
 {
-    m.def("run_ddar", &run_ddar, "Run DDAR with given problem");
+    m.def("run_ddar", &run_ddar, "Run DDAR with given problem",
+          py::arg("name"),
+          py::arg("points"),
+          py::arg("premises"),
+          py::arg("goals"),
+          py::arg("max_level") = 500,
+          py::arg("log_enabled") = false,
+          py::arg("exp_enabled") = false);
     m.def("get_possible_goals", &get_possible_goals, "Get all possible goals for a given problem");
+    m.def("run_ddar_with_rules", &run_ddar_with_rules, "Run DDAR with custom rules",
+          py::arg("name"),
+          py::arg("points"),
+          py::arg("premises"),
+          py::arg("goals"),
+          py::arg("custom_rules"),
+          py::arg("max_level") = 500,
+          py::arg("log_enabled") = false,
+          py::arg("exp_enabled") = false);
 }

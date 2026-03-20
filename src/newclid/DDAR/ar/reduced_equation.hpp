@@ -10,6 +10,8 @@ private:
     Equation _original_equation;
     LinearSystem *_system;
     Equation _remainder;
+    size_t _cached_version{0};  // Version when last reduced
+    bool _reduction_complete{false};  // Whether reduction is complete
 
 public:
     explicit ReducedEquation(Equation &equation, LinearSystem *system);

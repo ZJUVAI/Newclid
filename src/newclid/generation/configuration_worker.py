@@ -78,7 +78,7 @@ class GeometryConfigurationWorker:
         if not solver:
             return [], {}
 
-        csolver = CSolver(fl_statement, seed=seed, solver=solver)
+        csolver = CSolver(fl_statement, seed=seed, solver=solver, using_log=True, using_exp=True)
         unsolved_goals_raw = csolver.possible_goals()  # List[str]
 
         unsolved_goals = []
