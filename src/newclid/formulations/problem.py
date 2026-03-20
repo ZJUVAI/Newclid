@@ -75,17 +75,23 @@ class ProblemJGEX(NamedTuple):
         )
 
     def renamed(self) -> ProblemJGEX:
+        renamed, _ = self.renamed_with_mapping()
+        return renamed
+
+    def renamed_with_mapping(self) -> tuple["ProblemJGEX", dict[str, str]]:
+        """Return renamed problem AND the original→renamed point name mapping."""
         mp: dict[str, str] = {}
         for construction in self.constructions:
             for point in construction.points:
                 point = point.split('@')[0]
                 if point not in mp:
                     mp[point] = chr(ord("a") + len(mp))
-        return ProblemJGEX(
+        renamed = ProblemJGEX(
             self.name,
             tuple(construction.renamed(mp) for construction in self.constructions),
             tuple(translate_sentence(mp, s) for s in self.goals),
         )
+        return renamed, mp
 
     def points(self) -> tuple[str, ...]:
         s: set[str] = set()

@@ -71,7 +71,10 @@ class GeometryProblemWorker:
     def _process_single_problem(args: tuple) -> tuple[list, dict]:
         """Process a single geometry problem with unique seed."""
         try:
-            pid, seed, n_clauses, max_level, img, aux_only, add_auxiliary, prune, remove_coords = args
+            pid, seed, n_clauses, max_level, img, aux_only, add_auxiliary, prune, remove_coords = args[:9]
+            # Optional flywheel params (backward compatible)
+            engine = args[9] if len(args) > 9 else "full"
+            custom_rules = args[10] if len(args) > 10 else None
             start_time = time.time()
 
             TIMELIMIT = 600  # 10分钟
@@ -118,7 +121,11 @@ class GeometryProblemWorker:
 
             n_clauses = len(fl_statement.split(';'))
             csolver = CSolver(fl_statement, seed=seed,
-                              solver=solver, using_log=True, using_exp=False)
+                              solver=solver,
+                              using_log=(engine != "weak"),
+                              using_exp=False,
+                              custom_rules=custom_rules,
+                              engine=engine)
 
             # Run solver
             csolver.run(max_level=max_level)

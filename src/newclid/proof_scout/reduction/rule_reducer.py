@@ -77,6 +77,8 @@ class RuleReducer:
         max_premises: Optional[int] = None,
         debug: bool = False,
         debug_output_dir: Optional[Path] = None,
+        solver_type: str = "python",
+        engine: str = "full",
     ):
         """Initialize RuleReducer.
 
@@ -90,6 +92,8 @@ class RuleReducer:
             debug: Output proof steps when a subsumption test succeeds
             debug_output_dir: Directory to write subsumption_proofs.txt; if None
                 and debug=True, proof steps are printed to stdout
+            solver_type: "python" for DirectSolver (DDARN), "csolver" for CSolver (C++ DDAR)
+            engine: DDAR engine variant ("full" or "weak"), only used when solver_type="csolver"
         """
         self.timeout = timeout
         self.seed = seed
@@ -99,6 +103,8 @@ class RuleReducer:
         self.max_premises = max_premises
         self.debug = debug
         self.debug_output_dir = Path(debug_output_dir) if debug_output_dir else None
+        self.solver_type = solver_type
+        self.engine = engine
 
         proof_output_file = None
         if debug and self.debug_output_dir is not None:
@@ -107,11 +113,20 @@ class RuleReducer:
             proof_output_file.write_text("", encoding="utf-8")
 
         self.scorer = GeneralityScorer()
-        self.tester = SubsumptionTester(
-            timeout=timeout,
-            seed=seed,
-            proof_output_file=proof_output_file,
-        )
+        if solver_type == "csolver":
+            from newclid.proof_scout.reduction.subsumption_tester import SubsumptionTesterCSolver
+            self.tester = SubsumptionTesterCSolver(
+                timeout=timeout,
+                seed=seed,
+                proof_output_file=proof_output_file,
+                engine=engine,
+            )
+        else:
+            self.tester = SubsumptionTester(
+                timeout=timeout,
+                seed=seed,
+                proof_output_file=proof_output_file,
+            )
 
     def reduce(self, rules: List[RuleWithSource]) -> Dict[str, Any]:
         """Reduce rules to a minimal basis set via greedy subsumption.
@@ -239,6 +254,8 @@ class RuleReducer:
                         target_rules,
                         self.timeout,
                         self.seed,
+                        self.solver_type,
+                        self.engine,
                     )
 
                     try:
@@ -572,23 +589,30 @@ def _test_subsumption_batch_worker(
     rules_weak: List[RuleWithSource],
     timeout: int,
     seed: int,
+    solver_type: str = "python",
+    engine: str = "full",
 ) -> List[str]:
     """Worker function for parallel subsumption testing.
 
-    Tests if rule_strong subsumes any rules in rules_weak using DirectSolver.
+    Tests if rule_strong subsumes any rules in rules_weak.
 
     Args:
         rule_strong: RuleWithSource that might subsume others
         rules_weak: List of RuleWithSource to test against
         timeout: Timeout in seconds for each test
         seed: Random seed
+        solver_type: "python" for DirectSolver, "csolver" for CSolver
+        engine: DDAR engine variant ("full" or "weak")
 
     Returns:
         List of rule_ids that are subsumed by rule_strong
     """
-    from newclid.proof_scout.reduction.subsumption_tester import SubsumptionTester
-
-    tester = SubsumptionTester(timeout=timeout, seed=seed)
+    if solver_type == "csolver":
+        from newclid.proof_scout.reduction.subsumption_tester import SubsumptionTesterCSolver
+        tester = SubsumptionTesterCSolver(timeout=timeout, seed=seed, engine=engine)
+    else:
+        from newclid.proof_scout.reduction.subsumption_tester import SubsumptionTester
+        tester = SubsumptionTester(timeout=timeout, seed=seed)
     eliminated = []
 
     for rule_weak in rules_weak:

@@ -42,6 +42,15 @@ file(GLOB_RECURSE SOURCES
 
 # 排除 build 目录（可选）
 list(FILTER SOURCES EXCLUDE REGEX "build/CMakeFiles/.*")
+list(FILTER SOURCES EXCLUDE REGEX "build_weak/.*")
+
+# -------------------------------
+# 4b. DDAR_WEAK 弱化模式
+# -------------------------------
+option(DDAR_WEAK "Build weakened DDAR with basic rules only" OFF)
+if(DDAR_WEAK)
+    add_compile_definitions(DDAR_WEAK)
+endif()
 
 # -------------------------------
 # 5. 添加 Python 模块库

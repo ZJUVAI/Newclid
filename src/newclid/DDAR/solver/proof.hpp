@@ -62,8 +62,9 @@ public:
 
     Point max_point() const { return _statement->max_point(); }
 
-    std::vector<ReducedEquation *> reduced_equations(std::string type) const
+    std::vector<ReducedEquation *> reduced_equations(std::string type)
     {
+        ensure_equations_initialized();
         if (type == "dist")
         {
             return _eqn_dist;
@@ -80,6 +81,8 @@ public:
     }
 
 private:
+    void ensure_equations_initialized();
+
     DDARSolver *_solver;
     std::unique_ptr<Statement> _statement;
     size_t _theoremId;
@@ -90,6 +93,7 @@ private:
     ReducedEquation *_dep;
     std::vector<Proof *> _deps;
     long long _depth{-1};
+    bool _equations_initialized{false};
 };
 
 #endif // PROOF_HPP

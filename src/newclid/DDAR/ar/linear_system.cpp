@@ -173,9 +173,6 @@ void LinearSystem::add_reduced_equation(Proof *pf, string type)
             throw runtime_error("Trying to insert a non-reduced equation");
         }
 
-        // Increment version after successful insertion
-        increment_version();
-
         auto it = _pivot_by_next.find(head);
         if (it != _pivot_by_next.end())
         {

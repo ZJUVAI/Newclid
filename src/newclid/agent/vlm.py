@@ -14,6 +14,7 @@ import ray
 import numpy as np
 import torch
 from modelscope import Qwen3VLForConditionalGeneration, AutoProcessor, DynamicCache
+from transformers.utils import logging as hf_logging
 from qwen_vl_utils import process_vision_info 
 import cairosvg
 from PIL import Image, ImageOps
@@ -44,7 +45,17 @@ if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
 
 logger = logging.getLogger(__name__)
-# logger.setLevel(logging.INFO)
+
+# Suppress per-worker Transformers weight-loading progress bars during Ray eval.
+hf_logging.disable_progress_bar()
+hf_logging.set_verbosity_error()
+
+DEBUG_VLM_INPUT = os.environ.get("NEWCLID_DEBUG_VLM_INPUT", "").lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
 
 AUX_PREDICATES = [
     # "coll",
@@ -60,6 +71,7 @@ AUX_PREDICATES = [
 class VLMAgent(DeductiveAgent):
     def __init__(self, model_path: list[str], decoding_size: int, beam_size: int, search_depth: int):
         self.any_new_statement_has_been_added = True
+        self.problemJGEX = None
         self.decoding_size = decoding_size
         self.beam_size = beam_size
         self.search_depth = search_depth
@@ -79,6 +91,62 @@ class VLMAgent(DeductiveAgent):
             processor = AutoProcessor.from_pretrained("Qwen/Qwen3-VL-2B-Instruct")
             self.models.append(model)
             self.processors.append(processor)
+
+    def _log_input_snapshot(
+        self,
+        *,
+        query: str,
+        img_path: str,
+        messages: list[dict[str, Any]],
+        text_prompt: str,
+        final_text: str,
+        model_inputs,
+        prompt_len: int,
+    ) -> None:
+        if not DEBUG_VLM_INPUT:
+            return
+
+        logger.info("VLM input snapshot: query=%s", query)
+        logger.info("VLM input snapshot: img_path=%s", img_path)
+        logger.info("VLM input snapshot: messages=%s", messages)
+        logger.info("VLM input snapshot: text_prompt=%s", text_prompt)
+        logger.info("VLM input snapshot: final_text=%s", final_text)
+        logger.info("VLM input snapshot: model_input_keys=%s", list(model_inputs.keys()))
+        if "input_ids" in model_inputs:
+            logger.info("VLM input snapshot: input_ids.shape=%s", tuple(model_inputs["input_ids"].shape))
+        if "pixel_values" in model_inputs:
+            logger.info("VLM input snapshot: pixel_values.shape=%s", tuple(model_inputs["pixel_values"].shape))
+        if "image_grid_thw" in model_inputs:
+            logger.info("VLM input snapshot: image_grid_thw=%s", model_inputs["image_grid_thw"].tolist())
+        logger.info("VLM input snapshot: prompt_len=%s", prompt_len)
+
+    def _build_model_inputs(self, processor, text: str, image_inputs, video_inputs):
+        return processor(
+            text=[text],
+            images=image_inputs,
+            videos=video_inputs,
+            padding=True,
+            return_tensors="pt",
+            do_resize=False,
+        )
+
+    def _log_model_output(
+        self,
+        *,
+        queue_type: str,
+        aux_dsl: str | None = None,
+        aux_content: str | None = None,
+        aux: str | None = None,
+        score: float | None = None,
+    ) -> None:
+        if score is not None:
+            logger.info("VLM output [%s]: score=%s", queue_type, score)
+        if aux_dsl is not None:
+            logger.info("VLM output [%s]: aux_dsl=%s", queue_type, aux_dsl)
+        if aux_content is not None:
+            logger.info("VLM output [%s]: aux_content=%s", queue_type, aux_content)
+        if aux is not None:
+            logger.info("VLM output [%s]: aux=%s", queue_type, aux)
         
     @torch.no_grad()
     def inference(self, model, processor, query: str, img_path: str, new_point_name: str, response_prefix: str = '<aux>', with_predicate: bool = True):
@@ -145,14 +213,19 @@ class VLMAgent(DeductiveAgent):
                     # Build prompt with predicate prefix
                     text_with_predicate = text_prompt + response_prefix + ' ' + new_point_name + ' : ' + aux_predicate_str
                     
-                    model_inputs = processor(
-                        text=[text_with_predicate],
-                        images=image_inputs,
-                        videos=video_inputs,
-                        padding=True,
-                        return_tensors="pt",
-                        do_resize=False,
-                    ).to(model.device)
+                    model_inputs = self._build_model_inputs(
+                        processor, text_with_predicate, image_inputs, video_inputs
+                    )
+                    self._log_input_snapshot(
+                        query=query,
+                        img_path=img_path,
+                        messages=messages,
+                        text_prompt=text_prompt,
+                        final_text=text_with_predicate,
+                        model_inputs=model_inputs,
+                        prompt_len=prompt_len,
+                    )
+                    model_inputs = model_inputs.to(model.device)
 
                     generated_output = model.generate(
                         **model_inputs,
@@ -172,20 +245,24 @@ class VLMAgent(DeductiveAgent):
                     for aux_dsl, score in zip(aux_dsls, scores):
                         score = score.item()
                         aux_dsl_dict[aux_dsl] = score
-                        logger.info(f"aux_dsl (with_predicate): {aux_dsl}")
         
         if not with_predicate:
             # Inference without predicate prefix
             text_with_prefix = text_prompt + response_prefix + ' ' + new_point_name
             
-            model_inputs = processor(
-                text=[text_with_prefix],
-                images=image_inputs,
-                videos=video_inputs,
-                padding=True,
-                return_tensors="pt",
-                do_resize=False,
-            ).to(model.device)
+            model_inputs = self._build_model_inputs(
+                processor, text_with_prefix, image_inputs, video_inputs
+            )
+            self._log_input_snapshot(
+                query=query,
+                img_path=img_path,
+                messages=messages,
+                text_prompt=text_prompt,
+                final_text=text_with_prefix,
+                model_inputs=model_inputs,
+                prompt_len=prompt_len,
+            )
+            model_inputs = model_inputs.to(model.device)
 
             generated_output = model.generate(
                 **model_inputs,
@@ -205,7 +282,6 @@ class VLMAgent(DeductiveAgent):
             for aux_dsl, score in zip(aux_dsls, scores):
                 score = score.item()
                 aux_dsl_dict[aux_dsl] = score
-                logger.info(f"aux_dsl (no_predicate): {aux_dsl}")
             
         return aux_dsl_dict
 
@@ -321,7 +397,20 @@ class VLMAgent(DeductiveAgent):
                             
                             for aux_dsl, score in aux_dsl_dict.items():
                                 try:
-                                    aux = self.try_dsl_to_constructions(aux_dsl[len('<aux> x00'):])
+                                    aux_content = aux_dsl[len('<aux> x00'):]
+                                    self._log_model_output(
+                                        queue_type=queue_type,
+                                        aux_dsl=aux_dsl,
+                                        aux_content=aux_content,
+                                        score=score,
+                                    )
+                                    if not aux_content:
+                                        continue
+                                    aux = self.try_dsl_to_constructions(aux_content)
+                                    self._log_model_output(
+                                        queue_type=queue_type,
+                                        aux=aux,
+                                    )
                                     if aux:
                                         new_problem = problem.with_more_construction(aux)
                                         future = run_ddar_remote.remote(new_problem, proof.defs, aux, rules_ref, t0, timeout)

@@ -10,10 +10,9 @@ class LinearCombination final
 {
 private:
     std::vector<Term> _terms;
-    bool _is_sorted{true};  // Track if _terms is sorted (descending order)
 
 public:
-    LinearCombination() : _terms(), _is_sorted(true) {}
+    LinearCombination() : _terms() {}
 
     LinearCombination(std::vector<Term> terms);
 

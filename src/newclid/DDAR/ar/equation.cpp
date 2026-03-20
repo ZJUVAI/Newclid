@@ -31,7 +31,8 @@ Equation &Equation::operator+=(const Equation &other)
 Equation Equation::operator+(const Equation &other) const
 {
     Equation res = *this;
-    res += other;  // operator+= already calls normalize()
+    res += other;
+    res.normalize();
     return res;
 }
 
@@ -43,7 +44,8 @@ Equation &Equation::operator-=(const Equation &other)
 Equation Equation::operator-(const Equation &other) const
 {
     Equation res = *this;
-    res -= other;  // operator-= calls operator+= which calls normalize()
+    res -= other;
+    res.normalize();
     return res;
 }
 

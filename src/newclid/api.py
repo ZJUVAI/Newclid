@@ -250,8 +250,9 @@ class GeometricSolverBuilder:
         `translate = True` for better LLM training
         """
         self.problemJGEX = ProblemJGEX.from_file(problems_path, problem_name)
+        self.rename_mapping: dict[str, str] | None = None
         if rename:
-            self.problemJGEX = self.problemJGEX.renamed()
+            self.problemJGEX, self.rename_mapping = self.problemJGEX.renamed_with_mapping()
         return self
 
     def load_problem(self, problem: ProblemJGEX) -> Self:
@@ -352,23 +353,30 @@ class GeometricSolverBuilder:
 
 
 class CSolver:
-    def __init__(self, problem: str=None, problem_name: str = "anonymity", seed: int = 123, solver: GeometricSolver = None, using_log: bool = False, using_exp: bool = False, points: List[Tuple[str, Any, Any]] = None, premises: List[Tuple[str, List[str]]] = None, goals: List[Tuple[str, List[str]]] = None, custom_rules: List[str] = None):
+    def __init__(self, problem: str=None, problem_name: str = "anonymity", seed: int = 123, solver: GeometricSolver = None, using_log: bool = False, using_exp: bool = False, points: List[Tuple[str, Any, Any]] = None, premises: List[Tuple[str, List[str]]] = None, goals: List[Tuple[str, List[str]]] = None, custom_rules: List[str] = None, engine: str = "full"):
         self.problem = problem
         self.problem_name = problem_name
         self.seed = seed
         self.log_enabled = using_log
         self.exp_enabled = using_exp
         self.custom_rules = custom_rules or []
+        self._ddar = self._load_engine(engine)
 
         # 构建 solver
-        if solver is None:
+        if solver is not None:
+            self.solver = solver
+        elif problem is not None:
             self.solver = (
                 GeometricSolverBuilder(self.seed)
                 .load_problem_from_txt(self.problem)
                 .build()
             )
+        elif points is not None and premises is not None and goals is not None:
+            # Direct construction from structured data — no solver needed,
+            # only points/premises/goals are used by DDAR C++ engine
+            self.solver = None
         else:
-            self.solver = solver
+            raise ValueError("CSolver requires either 'problem' text, a 'solver' instance, or (points, premises, goals)")
 
         # 提取信息
 
@@ -390,6 +398,15 @@ class CSolver:
             self._extract_points()
     
     # -------------------- 内部方法 -------------------- #
+    @staticmethod
+    def _load_engine(engine: str):
+        """Load DDAR engine module (full or weak)."""
+        if engine == "weak":
+            from newclid.DDAR.build_weak import DDAR as _DDAR
+        else:
+            from newclid.DDAR.build import DDAR as _DDAR
+        return _DDAR
+
     def _extract_points(self):
         """提取几何点"""
         for name, point in self.solver.proof.symbols_graph.name2node.items():
@@ -425,66 +442,66 @@ class CSolver:
             self.goals.append((predicate, args))
 
     # -------------------- 核心方法 -------------------- #
-    def run(self, max_level: int = 500, save_path: str | Path | None = None) -> bool:
+    def run(self, max_level: int = 500, save_path: str | Path | None = None, custom_rules: List[str] = None) -> bool:
         """
         运行 DDAR 并执行求解。
         :param max_level: 最大推理层数
         :param save_path: 可选，保存证明步骤的路径。
+        :param custom_rules: 可选，自定义规则列表（pipe 格式: "name|premises|conclusions"）
         :return: bool 表示是否成功求解。
         """
         t0 = time.time()
 
-        # Use run_ddar_with_rules if custom rules are provided
-        if self.custom_rules:
-            solved, dep_graph = DDAR.run_ddar_with_rules(
+        # Merge init-time and run-time custom rules
+        all_custom_rules = list(self.custom_rules or [])
+        if custom_rules:
+            all_custom_rules.extend(custom_rules)
+
+        if all_custom_rules:
+            solved, dep_graph = self._ddar.run_ddar_with_custom_theorems(
                 self.problem_name, self.points, self.premises, self.goals,
-                self.custom_rules, max_level, self.log_enabled, self.exp_enabled)
+                all_custom_rules, max_level, self.log_enabled, self.exp_enabled)
         else:
-            solved, dep_graph = DDAR.run_ddar(
+            solved, dep_graph = self._ddar.run_ddar(
                 self.problem_name, self.points, self.premises, self.goals, max_level, self.log_enabled, self.exp_enabled)
 
-        for stmt, deps, reason in dep_graph:
-            conclusion = Statement.from_tokens(
-                stmt, self.solver.proof.dep_graph)
-            why = []
-            flag = True
-            for dep in deps:
-                premise = Statement.from_tokens(
-                    dep, self.solver.proof.dep_graph)
-                if premise == conclusion:
-                    flag = False
-                    break
-                why.append(premise)
-            if not flag:
-                continue
-            dep = Dependency.mk(conclusion, reason, tuple(why))
-            # dep.add()
-            self.solver.proof.dep_graph.hyper_graph[conclusion] = dep
+        # Update solver proof state if solver is available
+        if self.solver is not None:
+            for stmt, deps, reason in dep_graph:
+                conclusion = Statement.from_tokens(
+                    stmt, self.solver.proof.dep_graph)
+                why = []
+                flag = True
+                for dep in deps:
+                    premise = Statement.from_tokens(
+                        dep, self.solver.proof.dep_graph)
+                    if premise == conclusion:
+                        flag = False
+                        break
+                    why.append(premise)
+                if not flag:
+                    continue
+                dep = Dependency.mk(conclusion, reason, tuple(why))
+                self.solver.proof.dep_graph.hyper_graph[conclusion] = dep
 
-        self.solver.run_infos['success'] = solved
-        self.solver.run_infos['runtime'] = time.time() - t0
+            self.solver.run_infos['success'] = solved
+            self.solver.run_infos['runtime'] = time.time() - t0
 
-        # print(self.solver.proof.check_goals())
-
-        if solved:
-            # print(
-            # f"[CSolver] Problem {self.problem_name} solved successfully ✅")
-            if save_path:
+            if solved and save_path:
                 out_path = Path(save_path)
                 self.solver.write_proof_steps(out_path)
-                # print(f"[CSolver] Proof steps written to {out_path}")
 
         return solved
 
     def possible_goals(self) -> List[str]:
         ret = []
-        tmp_goals = DDAR.get_possible_goals(self.problem_name, self.points, self.premises)
+        tmp_goals = self._ddar.get_possible_goals(self.problem_name, self.points, self.premises)
         while len(tmp_goals) != 0:
             ret.append(tmp_goals[0])
             predicate = tmp_goals[0].split()[0]
             args = tmp_goals[0].split()[1:]
             self.premises.append((predicate, args))
-            tmp_goals = DDAR.get_possible_goals(self.problem_name, self.points, self.premises)
+            tmp_goals = self._ddar.get_possible_goals(self.problem_name, self.points, self.premises)
         return ret
 
     # -------------------- 辅助输出 -------------------- #

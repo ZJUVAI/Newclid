@@ -12,8 +12,18 @@ from collections import Counter
 # Allow specifying experiment directory via command line
 exp_dir = sys.argv[1] if len(sys.argv) > 1 else 'outputs/experiments/20260309_10k_rule_extraction_no_eqpoint_constline'
 
-# Load data
-data = json.load(open(f'{exp_dir}/intermediates/step1e_rules_stats.json'))
+# Load data (try step6 first, fallback to step1e for backward compatibility)
+import os
+step6_path = f'{exp_dir}/intermediates/step6_rules_stats.json'
+step1e_path = f'{exp_dir}/intermediates/step1e_rules_stats.json'
+
+if os.path.exists(step6_path):
+    data = json.load(open(step6_path))
+elif os.path.exists(step1e_path):
+    data = json.load(open(step1e_path))
+else:
+    raise FileNotFoundError(f"Neither {step6_path} nor {step1e_path} found")
+
 entries = data['entries']
 
 # Count premises before and after filtering

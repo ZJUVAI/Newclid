@@ -133,7 +133,7 @@ def _worker_render(entry: dict, output_path: str, dpi: int) -> tuple:
         from scripts.figures.fig_rule_extraction import create_three_panel_figure_from_data
         fig = create_three_panel_figure_from_data(
             full_raw, pruned_rendered, rule_text,
-            show_arrows=False, figsize=(16, 7), node_size=320,
+            show_arrows=False, figsize=(16, 7),
             pid_text=f"{entry['pid']} / {rid}", verbose=False,
         )
         fig.savefig(output_path, dpi=dpi, bbox_inches="tight")

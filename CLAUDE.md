@@ -93,6 +93,12 @@ git checkout GenesisGeo/main -- src/newclid/DDAR/
    - 长时间运行的任务应使用`run_in_background=true`
    - 使用conda环境时，必须在命令中包含环境激活: `source ... && python ...`
 
+5. **CSolver 必须开启 using_log 和 using_exp** (CRITICAL):
+   - 所有 CSolver 实例化必须设置 `using_log=True, using_exp=True`
+   - 不开启这两个参数会导致 C++ DDAR 引擎缺少关键推理功能（对数推理、指数推理），结果不完整
+   - 示例: `CSolver(problem=..., using_log=True, using_exp=True)`
+   - **唯一例外**: 明确需要测试关闭这些功能的对比实验
+
 **Memory Update Rules** (Memory 更新铁律):
 - 每次任务完成后，必须更新 `memory/` 目录下对应的文件
 - 每次任务摘要必须写入至少一个对应的 memory 文件；涉及全局流程、约束或工作流变更时，同时更新 `memory/MEMORY.md` 和 `memory/design_docs.md`
@@ -147,6 +153,7 @@ git checkout GenesisGeo/main -- src/newclid/DDAR/
 | `docs/directory_structure.md` | 目录结构、环境配置 | 需要查找文件或了解项目组织时 |
 | `docs/data_formats.md` | 数据格式参考（JSONL/Rule/Problem/中间产物） | 处理数据文件、修改 pipeline 代码、新增数据格式时 **必读** |
 | `docs/pipeline_dashboard.md` | Discovery Pipeline 数据看板（每步逻辑+伪代码+漏斗数据） | 修改 pipeline 代码或分析 pipeline 数据时 **必读** |
+| `docs/ddar_engine.md` | DDAR C++ 引擎技术文档（架构、谓词、定理、AR、Python API） | 修改 DDAR 引擎代码、调试 CSolver、理解符号推理流程时 **必读** |
 | `docs/tiny_error_records.md` | 实验错误追踪记录（日期、命令、预期/实际输出、解决状态） | 遇到实验错误或数据异常时记录；排查历史问题时查看 |
 | `docs/manual/` | Sphinx 用户手册（问题格式、规则定义等） | 需要了解 JGEX 格式或规则语法细节时 |
 

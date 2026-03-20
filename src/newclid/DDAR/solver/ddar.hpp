@@ -6,6 +6,7 @@
 #include <string>
 #include <memory>
 #include "problem.hpp"
+#include "matcher.hpp"
 #include "ar/linear_system.hpp"
 #include "ar/reduced_equation.hpp"
 #include "typedef.hpp"
@@ -13,7 +14,6 @@
 #include "solver/application.hpp"
 #include "solver/proof.hpp"
 #include "solver/object_table.hpp"
-#include "custom_rule_matcher.hpp"
 
 class DDARSolver
 {
@@ -24,7 +24,7 @@ private:
 
     std::vector<Application> _applications;
 
-    std::map<std::string, std::unique_ptr<Proof>> _statement_proofs;
+    std::unordered_map<std::string, std::unique_ptr<Proof>> _statement_proofs;
 
     std::vector<Proof *> _goals;
 
@@ -56,9 +56,6 @@ public:
 
     bool is_solved() const { return _solved; }
 
-    // Check if all goals are proved (for early termination)
-    bool check_goals_proved();
-
     Proof *insert_statement(const std::unique_ptr<Statement> &p);
 
     const std::vector<Application> &applications() const { return _applications; }
@@ -69,11 +66,11 @@ public:
 
     DDARSolver(Problem *problem, bool log_enabled = false, bool exp_enabled = false);
 
-    DDARSolver(Problem *problem, const std::vector<Theorem>& custom_rules, bool log_enabled = false, bool exp_enabled = false);
-
     void advance_theorem(size_t index);
 
     void insert_application(Theorem thm);
+
+    void add_custom_theorems(const std::vector<CustomRule> &rules);
 
     bool establish_statement(Proof *pf, size_t thm_id);
 

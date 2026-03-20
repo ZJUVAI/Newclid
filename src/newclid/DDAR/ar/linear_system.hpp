@@ -19,14 +19,9 @@ private:
     std::unordered_map<Term, std::unique_ptr<Equation>> _solved_terms;
     std::unordered_map<Term, std::set<Term>> _pivot_by_next;
     std::set<Term> _zero_terms;
-    size_t _version{0};  // Version number for cache invalidation
 
 public:
     LinearSystem() = default;
-
-    // Version tracking for cache invalidation
-    size_t version() const { return _version; }
-    void increment_version() { ++_version; }
 
     void reduce_next(Equation &e);
 

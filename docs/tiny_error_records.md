@@ -209,3 +209,46 @@ With descending sort:
 - Fix is one-line change: add `reverse=True` parameter
 - Verification: After fix, log should show fewer premises for "most general"
 
+---
+
+### 2026-03-15: verify_groundtruth_rules.py 传入文件路径而非文件内容
+
+**Date:** 2026-03-15
+**Experiment:** 20260315_01_groundtruth_rule_extraction
+**Command:**
+```bash
+python scripts/verify_groundtruth_rules.py \
+    --problems .../success_proofs_aux_constructions.jsonl \
+    --extracted-rules .../v2/extracted_rules.txt \
+    --base-rules src/newclid/default_configs/rules.txt
+```
+
+**Expected Output:** 提取的 10 条规则被正确加载，与 62 条基础规则合并为 72 条规则进行验证
+
+**Actual Output:** 提取的规则完全未被加载（0 条），验证结果 0/25 (0%)
+
+**Root Cause:**
+- `append_rules_from_txt(rule_txt: str)` 接收的是**规则文本内容**，不是文件路径
+- 验证脚本错误地传入了 `str(base_rules_path)` 和 `str(extracted_rules_path)`（文件路径字符串）
+- 路径字符串中没有 `=>`，`Rule.parse_text()` 解析出 0 条规则
+- 第一次调用时 `self._rules is None`，触发 fallback 加载默认规则（31 条），掩盖了问题
+- 第二次调用（提取规则）解析出 0 条，什么都没加
+
+**Fix:**
+```python
+# Before (BUG):
+builder.append_rules_from_txt(str(base_rules_path))
+builder.append_rules_from_txt(str(extracted_rules_path))
+
+# After (FIXED):
+builder.append_rules_from_txt(base_rules_path.read_text(encoding='utf-8'))
+builder.append_rules_from_txt(extracted_rules_path.read_text(encoding='utf-8'))
+```
+
+**Impact:**
+- **严重**: 之前所有验证结果（v1: 0/25, v2: 0/25）均无效
+- 修复后验证结果: **13/25 (52%)**，证明提取的规则确实有效
+- 导致之前得出的"规则提取完全无效"结论是错误的
+
+**Status:** ✓ (Fixed on 2026-03-15)
+

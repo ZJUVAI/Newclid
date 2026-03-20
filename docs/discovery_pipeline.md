@@ -9,10 +9,13 @@
 - 开发新功能或修改现有流程
 
 **快速导航**:
+- [从 Main 分支过来？](#从-main-分支过来) - discovery 分支变更概览
 - [Pipeline 总览](#pipeline-总览) - 架构图和数据流
 - [Stage 0: 数据生成](#stage-0-数据生成) - 合成几何问题数据
 - [Stage 1: 规则提取](#stage-1-规则提取-filterandpruneengine) - 从证明图中提取规则
 - [Stage 2: 规则规约](#stage-2-规则规约-rulereducer) - 贪心subsumption规约
+- [CSolver Pipeline 变体](#csolver-pipeline-变体) - C++ DDAR 后端的 Stage 2
+- [Data Flywheel 基础设施](#data-flywheel-基础设施) - 弱引擎 + 迭代生成
 - [Stage 3: 规则评估](#stage-3-规则评估) - Benchmark性能测试
 - [Stage 4: 可视化](#stage-4-可视化) - 生成流程图和样例图
 - [端到端使用指南](#端到端使用指南) - 一键脚本和分阶段运行
@@ -21,7 +24,35 @@
 **相关文档**:
 - [快速上手指南](pipeline_quickstart.md) - 5分钟快速开始
 - [数据格式参考](data_formats.md) - JSONL/Rule/Problem格式详解
-- [冗余代码清单](unused_code_checklist.md) - 代码清理参考
+- [DDAR 引擎技术文档](ddar_engine.md) - C++ 引擎架构、谓词、定理、Python API
+
+---
+
+## 从 Main 分支过来？
+
+如果你从 GenesisGeo/main 分支切换过来，以下是 discovery 分支的核心变更：
+
+| 新增能力 | 说明 | 入口脚本 |
+|----------|------|----------|
+| **Discovery Pipeline** | 两阶段规则发现：Stage 1 提取 + Stage 2 规约 | `scripts/discovery_pipeline.py` |
+| **CSolver Pipeline 变体** | Stage 2 使用 C++ DDAR 后端，性能更优 | `scripts/discovery_pipeline_c.py` |
+| **规则评估框架** | 对比 baseline vs 增强规则在 benchmark 上的表现 | `scripts/evaluate_rules.py` / `evaluate_rules_csolver.py` |
+| **Data Flywheel** | 弱 DDAR 引擎 + 迭代数据生成，自动化规则发现循环 | `scripts/flywheel_generate.py` |
+| **LM 评估** | 神经语言模型在 HAGeo-409 上的辅助构造生成评估 | `scripts/evaluate_hageo409_with_lm.py` |
+| **Benchmark 重组** | `benchmarks/core/`（核心）+ `benchmarks/extended/`（扩展） | — |
+
+**数据路径变更**:
+- 100k 合成数据：`datasets/` → `outputs/datasets/`（已 gitignored）
+- Benchmark 文件：`benchmarks/` → `benchmarks/core/` + `benchmarks/extended/`
+
+**当前最佳结果**（CSolver + 100k 提取规则 108 条）:
+
+| Benchmark | Baseline | +Rules | New Solved | Regressed |
+|-----------|----------|--------|------------|-----------|
+| hageo_409 | 106/409 (25.9%) | 114/409 (27.9%) | +8 | 0 |
+| jgex_ag_231 | 204/231 (88.3%) | 213/231 (92.2%) | +9 | 0 |
+
+**快速开始**: 参见 [快速上手指南](pipeline_quickstart.md) 或直接运行 `./scripts/run_discovery_pipeline.sh`。
 
 ---
 
@@ -55,6 +86,8 @@ JSONL 合成数据
           ├─ Step 2: 泛化度排序
           └─ Step 3: 贪心淘汰 (subsumption)             ─→ extracted_rules.txt
 ```
+
+> **CSolver 变体**: Stage 2 可使用 `scripts/discovery_pipeline_c.py`，通过 `SubsumptionTesterCSolver`（C++ DDAR）替代 Python DDARN 进行 subsumption 测试，性能更优。详见 [CSolver Pipeline 变体](#csolver-pipeline-变体)。
 
 ---
 
@@ -255,6 +288,134 @@ basis = [r for i, r in enumerate(sorted_rules) if active[i]]
 
 ---
 
+## CSolver Pipeline 变体
+
+Stage 1 与 `discovery_pipeline.py` 完全相同，Stage 2 改用 `SubsumptionTesterCSolver`（C++ DDAR 引擎）进行 subsumption 测试。
+
+### 入口与关键差异
+
+| | Python Pipeline | CSolver Pipeline |
+|---|---|---|
+| **入口脚本** | `scripts/discovery_pipeline.py` | `scripts/discovery_pipeline_c.py` |
+| **Stage 2 Subsumption** | `SubsumptionTester`（Python DDARN） | `SubsumptionTesterCSolver`（C++ DDAR） |
+| **额外参数** | — | `--engine full\|weak`、`--max-rules` |
+| **评估脚本** | `scripts/evaluate_rules.py` | `scripts/evaluate_rules_csolver.py` |
+
+### CLI 使用
+
+```bash
+# 完整 CSolver pipeline（提取 + CSolver 规约）
+python scripts/discovery_pipeline_c.py \
+    -i outputs/datasets/geometry_clauses10_samples100k.jsonl \
+    -o outputs/experiments/YYYYMMDD_XX_csolver_experiment \
+    --save-intermediates --engine full
+
+# 仅 CSolver 规约（从已有提取结果）
+python scripts/discovery_pipeline_c.py \
+    -o outputs/experiments/YYYYMMDD_XX_csolver_experiment \
+    --skip-extraction \
+    --rules <path/to/pruned_rules.txt> \
+    --source-data <path/to/step6_rules_stats.json> \
+    --engine full
+```
+
+### CSolver 评估脚本
+
+`scripts/evaluate_rules_csolver.py` — 使用 CSolver 评估提取规则的效果，结构与 `evaluate_rules.py` 相同（`baseline` / `evaluate` 子命令），使用 Ray 并行 + hard timeout。
+
+```bash
+# CSolver baseline
+python scripts/evaluate_rules_csolver.py baseline \
+    --output outputs/eval_baselines_csolver/
+
+# CSolver 评估
+python scripts/evaluate_rules_csolver.py evaluate \
+    --rules outputs/experiments/.../extracted_rules.txt \
+    --baseline-cache outputs/eval_baselines_csolver/ \
+    --output outputs/experiments/.../eval/
+```
+
+Benchmark 路径:
+- `benchmarks/core/hageo_409.txt`
+- `benchmarks/extended/jgex_ag_231.txt`
+- `benchmarks/extended/imo_95.txt`
+
+### CSolver 评估结果
+
+**CSolver Baseline**:
+
+| Benchmark | Solved | Rate |
+|-----------|--------|------|
+| hageo_409 | 106/409 | 25.9% |
+| jgex_ag_231 | 204/231 | 88.3% |
+
+**CSolver + 100k Rules (108 条)**:
+
+| Benchmark | Baseline | Augmented | New | Regressed | Net |
+|-----------|----------|-----------|-----|-----------|-----|
+| hageo_409 | 106/409 | 114/409 | +8 | 0 | +8 |
+| jgex_ag_231 | 204/231 | 213/231 | +9 | 0 | +9 |
+| **Total** | | | **+17** | **0** | **+17** |
+
+### CSolver vs Python DDARN 对比
+
+| 指标 | Python DDARN | CSolver |
+|------|-------------|---------|
+| Baseline (hageo) | 100/405 | 106/409 |
+| Baseline (jgex) | 202/231 | 204/231 |
+| 10k basis rules | 16 | 19 |
+| 100k basis rules | 95 | 108 |
+| 100k eval (total new) | +18 | +17 |
+
+> **铁律**: CSolver 实例化必须设置 `using_log=True, using_exp=True`，否则 C++ 引擎缺少对数/指数推理功能。
+
+---
+
+## Data Flywheel 基础设施
+
+### 概念
+
+数据飞轮通过弱化的 DDAR 引擎生成"更难"的数据，从中提取新规则，再将规则反馈到下一轮生成，形成自动化的规则发现循环。
+
+### 架构
+
+- **弱引擎**: C++ `matcher.cpp` 通过 `#ifdef DDAR_WEAK` 编译宏禁用部分推理规则（`match_equal_angles()`, `match_orthocenters()`, 部分 `on_circle()` 等）
+- **双构建**: `scripts/build_ddar.sh` 生成两个 SO 文件:
+  - `build/DDAR.*.so` — 完整引擎
+  - `build_weak/DDAR.*.so` — 弱化引擎
+- **Python API**: `CSolver(engine="weak")` 动态加载弱引擎
+
+### 生成脚本
+
+`scripts/flywheel_generate.py` — 对 `generate.py` 的薄包装，默认使用 `--engine weak`。
+
+```bash
+# 第 0 轮: 无自定义规则
+python scripts/flywheel_generate.py \
+    --n_samples 10000 --n_clauses 5 --n_threads 20 \
+    --dir outputs/flywheel/iter_00
+
+# 第 N 轮: 带已发现规则
+python scripts/flywheel_generate.py \
+    --n_samples 10000 --n_clauses 5 --n_threads 20 \
+    --dir outputs/flywheel/iter_01 \
+    --custom_rules outputs/flywheel/iter_00/extracted_rules.txt
+```
+
+### 飞轮循环
+
+```
+iter 0: flywheel_generate.py (weak, no rules)        → JSONL
+        discovery_pipeline_c.py (extraction+reduction) → extracted_rules_iter0.txt
+
+iter 1: flywheel_generate.py (weak, --custom_rules iter0) → JSONL
+        discovery_pipeline_c.py                            → extracted_rules_iter1.txt
+
+iter N: ...（规则累积，数据覆盖范围扩大）
+```
+
+---
+
 ## Stage 0: 数据生成
 
 ### 概述
@@ -264,6 +425,8 @@ basis = [r for i, r in enumerate(sorted_rules) if active[i]]
 **脚本**: `src/newclid/generation/generate.py`
 
 **核心算法**: 随机构造几何配置 → DDAR求解器求解 → 提取证明轨迹
+
+> **注意 (2026-03-16)**: LMAgent/VLMAgent 的 `run_ddar_c()` 已从 C++ DDAR 替换为 Python DDARN，全流程统一使用 Python solver。
 
 **输出格式**: JSONL（每行一个问题记录，包含问题文本、辅助点、证明结果等）
 
@@ -533,6 +696,42 @@ python scripts/evaluate_rules.py evaluate \
 - 跳过 baseline 已解决的题目，节省计算资源
 - 跳过的题目结果从 baseline cache 复制，标记 `source: 'baseline_cache'`
 - 注意：跳过后无法检测 regression（退化），首次评估建议使用 `--no-skip-baseline-solved`
+
+### LM-Based Evaluation
+
+`scripts/evaluate_hageo409_with_lm.py` — 评估神经语言模型（LMAgent）在 HAGeo-409 上的辅助构造生成能力。
+
+**核心特性**:
+- Ray 并行 + batch=50 + 每 batch 重启 Ray（GPU 内存管理）
+- 多 GPU 支持（`--num-gpus`）
+- 增量写入结果（不丢失中间进度）
+- 自动提取成功证明中的辅助构造信息
+
+**使用方法**:
+```bash
+python scripts/evaluate_hageo409_with_lm.py \
+    --model-path /path/to/qwen3-model \
+    --output outputs/experiments/YYYYMMDD_XX_lm_eval \
+    --workers 8 --num-gpus 4 --timeout 600
+```
+
+**关键参数**:
+
+| 参数 | 说明 | 默认值 |
+|------|------|--------|
+| `--model-path` | 模型路径（Qwen3-0.6B-Base） | 必填 |
+| `--workers` | 并行 worker 数 | 8 |
+| `--num-gpus` | GPU 数量 | 1 |
+| `--decoding-size` | 解码候选数 | 64 |
+| `--beam-size` | Beam search 宽度 | 8 |
+| `--search-depth` | 搜索深度（辅助构造轮次） | 1 |
+| `--timeout` | 单题超时（秒） | 600 |
+
+**输出**:
+- `success_proofs.txt` — 成功证明列表
+- `success_proofs_aux_constructions.jsonl` — 辅助构造信息（问题名、辅助点、映射关系）
+
+> **CSolver 版评估**: 使用 `scripts/evaluate_rules_csolver.py`，详见 [CSolver Pipeline 变体](#csolver-pipeline-变体)。
 
 ---
 
@@ -818,6 +1017,15 @@ python scripts/evaluate_rules.py evaluate \
 
 **测试环境**: 30核CPU，64GB内存
 
+### CSolver 评估结果 (100k)
+
+| Solver | Benchmark | Baseline | +108 Rules | New | Regressed |
+|--------|-----------|----------|------------|-----|-----------|
+| CSolver | hageo_409 | 106/409 | 114/409 | +8 | 0 |
+| CSolver | jgex_ag_231 | 204/231 | 213/231 | +9 | 0 |
+| Python DDARN | hageo_409 | 100/405 | 109/409 | +9 | 0 |
+| Python DDARN | jgex_ag_231 | 202/231 | 211/231 | +9 | 0 |
+
 ### 优化建议
 
 1. **并行度调优**: `--max-workers` 和 `--workers` 设为 CPU核心数 × 1.5
@@ -852,6 +1060,15 @@ python scripts/evaluate_rules.py evaluate \
 --debug                       启用调试输出
 ```
 
+#### discovery_pipeline_c.py
+
+在 `discovery_pipeline.py` 基础上增加的参数:
+
+```
+--engine [full|weak]          DDAR引擎类型（默认full）
+--max-rules INT               最大规则数限制（默认无限制）
+```
+
 #### evaluate_rules.py
 
 ```
@@ -868,12 +1085,16 @@ evaluate                      评估提取规则
 --no-skip-baseline-solved     不跳过baseline已解决题目
 ```
 
+#### evaluate_rules_csolver.py
+
+与 `evaluate_rules.py` 参数相同，使用 CSolver（C++ DDAR）作为求解器。Baseline 缓存目录建议使用 `outputs/eval_baselines_csolver/`（与 Python DDARN 分开缓存）。
+
 ### 环境配置检查清单
 
 - [ ] conda环境已激活（`Discovery`）
 - [ ] Python版本正确（3.8+）
 - [ ] 项目已安装（`pip install -e .`）
-- [ ] DDAR引擎已编译（`src/newclid/DDAR/`）
+- [ ] DDAR引擎已编译（`src/newclid/DDAR/`）— 仅数据生成阶段需要，LMAgent/VLMAgent 已改用 Python DDARN
 - [ ] 数据目录存在（`datasets/geometry_clauses10_samples100k/`）
 - [ ] 输出目录可写（`outputs/experiments/`）
 
@@ -882,15 +1103,20 @@ evaluate                      评估提取规则
 **核心代码**:
 - `src/newclid/proof_scout/core/filter_and_prune_engine.py` - Stage 1核心
 - `src/newclid/proof_scout/reduction/rule_reducer.py` - Stage 2核心
-- `scripts/discovery_pipeline.py` - Pipeline入口
-- `scripts/evaluate_rules.py` - 评估脚本
+- `src/newclid/proof_scout/reduction/subsumption_tester.py` - Subsumption测试器（含CSolver版）
+- `scripts/discovery_pipeline.py` - Pipeline入口（Python DDARN）
+- `scripts/discovery_pipeline_c.py` - Pipeline入口（CSolver）
+- `scripts/evaluate_rules.py` - 评估脚本（Python DDARN）
+- `scripts/evaluate_rules_csolver.py` - 评估脚本（CSolver）
+- `scripts/flywheel_generate.py` - 飞轮数据生成
+- `scripts/evaluate_hageo409_with_lm.py` - LM模型评估
 
 **文档**:
 - `docs/discovery_pipeline.md` - 本文档
 - `docs/data_formats.md` - 数据格式参考
 - `docs/architecture.md` - 系统架构
+- `docs/ddar_engine.md` - DDAR C++ 引擎技术文档
 - `docs/pipeline_quickstart.md` - 快速上手
-- `docs/unused_code_checklist.md` - 冗余代码清单
 - `docs/tiny_error_records.md` - 错误记录
 
 **配置**:
@@ -899,5 +1125,5 @@ evaluate                      评估提取规则
 
 ---
 
-**文档版本**: 2026-03-12
-**最后更新**: 完善为完整参考手册，添加Stage 0-4详细说明
+**文档版本**: 2026-03-20
+**最后更新**: 新增 CSolver Pipeline 变体、Data Flywheel、LM 评估章节；添加从 Main 分支快速上手指南

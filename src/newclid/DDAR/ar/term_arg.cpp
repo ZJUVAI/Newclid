@@ -166,44 +166,7 @@ bool TermArg::operator!=(const TermArg &other) const
     return !(*this == other);
 }
 
-// Helper function to get string ordering for ArgType
-// String prefixes: DistLog="log(|" < Dist="|" < Pi="π" < Slope="∠"
-static int type_order(TermArg::ArgType t)
-{
-    switch (t)
-    {
-    case TermArg::ArgType::DistLog:
-        return 0; // "log(|" starts with 'l' (108)
-    case TermArg::ArgType::Dist:
-        return 1; // "|" starts with '|' (124)
-    case TermArg::ArgType::Pi:
-        return 2; // "π" (960)
-    case TermArg::ArgType::Slope:
-        return 3; // "∠" (8736)
-    default:
-        return 4;
-    }
-}
-
 bool TermArg::operator<(const TermArg &other) const
 {
-    // Compare types using string ordering
-    int this_order = type_order(_type);
-    int other_order = type_order(other._type);
-    if (this_order != other_order)
-    {
-        return this_order < other_order;
-    }
-
-    // Same type - compare points lexicographically by name
-    // Points are already sorted, so we can compare directly
-    size_t min_size = std::min(_points.size(), other._points.size());
-    for (size_t i = 0; i < min_size; ++i)
-    {
-        if (_points[i].name() != other._points[i].name())
-        {
-            return _points[i].name() < other._points[i].name();
-        }
-    }
-    return _points.size() < other._points.size();
+    return to_string() < other.to_string();
 }

@@ -10,6 +10,7 @@ datasets/imo_shortlists/*.pdf
 # Distribution / packaging
 .Python
 build/
+build_weak/
 develop-eggs/
 dist/
 downloads/

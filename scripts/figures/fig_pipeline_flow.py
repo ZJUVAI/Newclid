@@ -19,14 +19,19 @@ GREEN_ACCENT = "#27AE60"
 plt.rcParams["font.family"] = "DejaVu Sans"
 plt.rcParams["font.size"] = 10
 
-# Stage 1: FilterAndPruneEngine (step-level funnel data from 10k experiment)
+# Stage 1: FilterAndPruneEngine (step-level funnel data from 10k experiment, 20260310)
+# Step 1: 10050 input → 4334 kept (aux filter + predicate filter combined)
+# Step 2: 4334 problems → 3878 pruned successfully → 5573 subgraphs
+# Step 3: 5573 subgraphs → 5573 propositions (extraction)
+# Step 4: 5573 → 5573 (normalization, no loss)
+# Step 5: 5573 → 2173 (dedup by SHA256)
+# Step 6: 2173 → 2103 (rule output, skip unsupported predicates)
 STAGE1_DATA = [
-    ("Step 1\nInput Filter", 10050, 4650, 0.4627),
-    ("Step 2\nGraph Prune", 4650, 4120, 0.8860),
-    ("Step 3\nProposition\nExtraction", 4120, 3281, 0.7964),
-    ("Step 4\nNormalization", 3281, 3281, 1.0000),
-    ("Step 5\nDedup", 3281, 1186, 0.3615),
-    ("Step 6\nRule Output", 1186, 1082, 0.9123),
+    ("Step 1\nInput Filter", 10050, 4334, 0.4313),
+    ("Step 2\nGraph Prune", 4334, 3878, 0.8948),
+    ("Step 3\nProposition\nExtraction", 3878, 5573, 1.4371),
+    ("Step 4+5\nNormalize\n& Dedup", 5573, 2173, 0.3900),
+    ("Step 6\nRule Output", 2173, 2103, 0.9678),
 ]
 
 # Stage 2: RuleReducer (phase structure only; do not show unstable funnel counts)
@@ -99,29 +104,29 @@ def _draw_arrow(ax, start_x, end_x, y, *, label=None):
 
 
 def draw_pipeline():
-    fig, ax = plt.subplots(figsize=(20, 4.8))
-    ax.set_xlim(0, 20)
+    fig, ax = plt.subplots(figsize=(18, 4.8))
+    ax.set_xlim(0, 18)
     ax.set_ylim(0, 5.2)
     ax.axis("off")
 
     box_width = 1.15
     box_height = 2.35
     box_y = 1.0
-    step_positions = [1.7, 3.5, 5.3, 7.1, 8.9, 10.7, 14.0, 16.6]
+    step_positions = [1.7, 3.5, 5.3, 7.1, 8.9, 12.5, 15.1]
     pad = 0.4
 
     stage_configs = [
         (
             "Stage 1: FilterAndPruneEngine",
             step_positions[0] - box_width / 2 - pad,
-            step_positions[5] + box_width / 2 + pad,
+            step_positions[4] + box_width / 2 + pad,
             BLUE_LIGHT,
             0.15,
         ),
         (
             "Stage 2: RuleReducer",
-            step_positions[6] - box_width / 2 - pad,
-            step_positions[7] + box_width / 2 + pad,
+            step_positions[5] - box_width / 2 - pad,
+            step_positions[6] + box_width / 2 + pad,
             ORANGE_LIGHT,
             0.20,
         ),
@@ -157,28 +162,32 @@ def draw_pipeline():
 
         if i < len(STAGE1_DATA) - 1:
             next_x = step_positions[i + 1]
+            if retention > 1.0:
+                arrow_label = f"×{retention:.1f}"
+            else:
+                arrow_label = f"{retention * 100:.1f}%"
             _draw_arrow(
                 ax,
                 x + box_width / 2 + 0.1,
                 next_x - box_width / 2 - 0.1,
                 box_y + box_height / 2,
-                label=f"{retention * 100:.1f}%",
+                label=arrow_label,
             )
 
-    for i, (label, center_text) in enumerate(STAGE2_PHASES, start=6):
+    for i, (label, center_text) in enumerate(STAGE2_PHASES, start=5):
         x = step_positions[i]
         _draw_box(ax, x, box_y, box_width, box_height, label, center_text, ORANGE_PRIMARY)
 
     _draw_arrow(
         ax,
-        step_positions[5] + box_width / 2 + 0.1,
-        step_positions[6] - box_width / 2 - 0.1,
+        step_positions[4] + box_width / 2 + 0.1,
+        step_positions[5] - box_width / 2 - 0.1,
         box_y + box_height / 2,
     )
     _draw_arrow(
         ax,
-        step_positions[6] + box_width / 2 + 0.1,
-        step_positions[7] - box_width / 2 - 0.1,
+        step_positions[5] + box_width / 2 + 0.1,
+        step_positions[6] - box_width / 2 - 0.1,
         box_y + box_height / 2,
     )
 
@@ -200,9 +209,9 @@ def draw_pipeline():
     )
 
     ax.text(
-        (step_positions[5] + step_positions[6]) / 2,
+        (step_positions[4] + step_positions[5]) / 2,
         box_y + box_height / 2 + 0.55,
-        "1,082 extracted rules",
+        "2,103 extracted rules",
         ha="center",
         va="bottom",
         fontsize=9,
@@ -219,7 +228,7 @@ def draw_pipeline():
     ax.text(
         step_positions[-1] + box_width / 2 + 0.65,
         box_y + box_height / 2,
-        "11",
+        "16",
         ha="left",
         va="center",
         fontsize=15,
@@ -234,9 +243,9 @@ def draw_pipeline():
     )
 
     ax.text(
-        10,
+        9,
         0.28,
-        "Overall: 10,050 samples  ->  1,082 extracted rules  ->  11 basis rules",
+        "Overall: 10,050 samples  ->  2,103 extracted rules  ->  16 basis rules",
         ha="center",
         va="center",
         fontsize=11,

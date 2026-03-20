@@ -209,7 +209,30 @@ def _topo_levels(fact_nodes, fact_edges, conclusion_id):
     return depths
 
 
-def _layout(fact_nodes, depths, conclusion_id, fact_edges):
+def _compute_adaptive_params(n_facts: int, max_width: int, max_depth: int) -> dict:
+    """Compute adaptive layout/rendering params based on graph complexity.
+
+    Adjusts x_gap to keep the data aspect ratio close to 1.0 (matching panel shape),
+    and scales node_size / font_size for readability in dense graphs.
+    """
+    y_gap = 2.5
+    if max_width > 1 and max_depth > 0:
+        ideal_x_gap = (max_depth * y_gap) / (max_width - 1)
+        x_gap = max(1.2, min(2.8, ideal_x_gap))
+    else:
+        x_gap = 2.8
+
+    if n_facts <= 15:
+        node_size, font_size = 320, 7
+    elif n_facts <= 30:
+        node_size, font_size = 220, 6
+    else:
+        node_size, font_size = 150, 5
+
+    return {"x_gap": x_gap, "y_gap": y_gap, "node_size": node_size, "font_size": font_size}
+
+
+def _layout(fact_nodes, depths, conclusion_id, fact_edges, x_gap=2.8, y_gap=2.5):
     """Compute (x, y) for every fact node based on reverse depths.
 
     Depth = distance from conclusion (conclusion depth=0, at bottom).
@@ -217,8 +240,6 @@ def _layout(fact_nodes, depths, conclusion_id, fact_edges):
     Nodes at same depth are sorted by average x-position of their children.
     """
     max_depth = max(depths.values()) if depths else 0
-    y_gap = 2.5
-    x_gap = 2.8
 
     # Group nodes by depth
     groups = defaultdict(list)
@@ -374,7 +395,7 @@ _STYLES_B = _STYLES_A  # Same colors for both panels, no red border
 
 
 def _draw_graph(ax, pos, fact_nodes, fact_edges, aux_pts,
-                removed, conclusion_id, panel, title, *, node_size=825):
+                removed, conclusion_id, panel, title, *, node_size=825, font_size=7):
     ax.set_title(title, fontsize=13, weight="bold", pad=12)
     ax.axis("off")
 
@@ -427,7 +448,7 @@ def _draw_graph(ax, pos, fact_nodes, fact_edges, aux_pts,
         # Dark text for light backgrounds, white text for dark backgrounds
         font_c = "white" if fc in (BLUE_PRIMARY, ORANGE_PRIMARY) else GRAY_DARK
         ax.text(x, y, node["short"], ha="center", va="center",
-                fontsize=7, weight="bold", color=font_c, alpha=txt_alp, zorder=6)
+                fontsize=font_size, weight="bold", color=font_c, alpha=txt_alp, zorder=6)
 
     # ── limits ──
     xs = [pos[n["id"]][0] for n in fact_nodes if n["id"] in pos]
@@ -487,7 +508,17 @@ def prepare_figure_data(full_raw: dict, pruned_rendered: dict, rule_text: str | 
             break
 
     depths = _topo_levels(fact_nodes, fact_edges, conclusion_id)
-    pos = _layout(fact_nodes, depths, conclusion_id, fact_edges)
+
+    # Compute adaptive layout parameters
+    level_counts = defaultdict(int)
+    for d in depths.values():
+        level_counts[d] += 1
+    max_width = max(level_counts.values()) if level_counts else 1
+    max_depth = max(depths.values()) if depths else 0
+    adaptive = _compute_adaptive_params(len(fact_nodes), max_width, max_depth)
+
+    pos = _layout(fact_nodes, depths, conclusion_id, fact_edges,
+                  x_gap=adaptive["x_gap"], y_gap=adaptive["y_gap"])
 
     pruned_labels = {n["label"] for n in pruned_rendered["nodes"]}
     removed = {n["id"] for n in fact_nodes if n["full"] not in pruned_labels}
@@ -502,7 +533,8 @@ def prepare_figure_data(full_raw: dict, pruned_rendered: dict, rule_text: str | 
         "isolated": isolated,
         "n_full": len(fact_nodes),
         "n_pruned": sum(1 for n in pruned_rendered["nodes"] if n["type"] == "fact"),
-        "max_depth": max(depths.values()) if depths else 0,
+        "max_depth": max_depth,
+        "adaptive_params": adaptive,
     }
 
 
@@ -513,12 +545,17 @@ def create_three_panel_figure_from_data(
     *,
     show_arrows: bool = False,
     figsize: tuple = (16, 7),
-    node_size: int = 320,
+    node_size: int | None = None,
     pid_text: str | None = None,
     verbose: bool = True,
 ):
     """Create a three-panel figure from already loaded graph data."""
     prepared = prepare_figure_data(full_raw, pruned_rendered, rule_text=rule_text)
+    adaptive = prepared["adaptive_params"]
+
+    # Use adaptive params unless caller explicitly overrides
+    effective_node_size = node_size if node_size is not None else adaptive["node_size"]
+    effective_font_size = adaptive["font_size"]
 
     if verbose:
         print(
@@ -557,10 +594,12 @@ def create_three_panel_figure_from_data(
 
     _draw_graph(ax_a, prepared["pos"], prepared["fact_nodes"], prepared["fact_edges"],
                 prepared["aux_pts"], set(), prepared["conclusion_id"], "a",
-                f"(a) Full Proof Graph ({prepared['n_full']} facts)", node_size=node_size)
+                f"(a) Full Proof Graph ({prepared['n_full']} facts)",
+                node_size=effective_node_size, font_size=effective_font_size)
     _draw_graph(ax_b, prepared["pos"], prepared["fact_nodes"], prepared["fact_edges"],
                 prepared["aux_pts"], prepared["removed"], prepared["conclusion_id"], "b",
-                f"(b) Pruned Graph ({prepared['n_pruned']} facts)", node_size=node_size)
+                f"(b) Pruned Graph ({prepared['n_pruned']} facts)",
+                node_size=effective_node_size, font_size=effective_font_size)
     _draw_rule(ax_c, rule_text, pid_text=pid_text)
     return fig
 
