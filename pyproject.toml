@@ -4,6 +4,7 @@ requires = [
     "wheel",
     "setuptools_scm[toml]>=6.2",
     "pybind11",
+    "cmake",
 ]
 
 [project]
@@ -22,7 +23,7 @@ classifiers=[
     'Operating System :: MacOS',
 ]
 dependencies = [
-    "ray",
+    "ray[default]",
     "millify",
     "numpy",
     "cairosvg",
@@ -35,11 +36,13 @@ dependencies = [
     "transformers>=5.3.0",
     "pandas>=2.3",
     "pybind11",
+    "accelerate",
 ]
 
 [project.optional-dependencies]
 dev = ['black', 'ruff', 'pytest', 'pytest-cov', 'pytest-check', 'pytest-mock', 'pre-commit']
 doc = ['numpy', 'sphinx-autoapi', 'autoapi', 'sphinx_rtd_theme', 'sphinx-autodoc-typehints', 'sphinx-autobuild']
+
 
 # [[tool.uv.index]]
 # url = "https://mirrors.aliyun.com/pypi/simple"
