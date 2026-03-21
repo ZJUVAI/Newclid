@@ -47,6 +47,7 @@ class DDARBuildCommand(build_ext):
             f"-DCMAKE_BUILD_TYPE=Release",
             f"-Dpybind11_DIR={pybind11_cmake}",
             "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
+            f"-DPython_EXECUTABLE={sys.executable}",
         ]
 
         try:
