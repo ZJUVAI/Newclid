@@ -43,11 +43,30 @@ class DDARBuildCommand(build_ext):
             raise
 
         # 3. Run CMake configuration
+        # Resolve the real Python prefix (handles venv -> base Python)
+        python_prefix = subprocess.check_output(
+            [sys.executable, "-c",
+             "import sys; print(getattr(sys, 'real_prefix', sys.base_prefix))"],
+            text=True
+        ).strip()
+
+        python_include = subprocess.check_output(
+            [sys.executable, "-c",
+             "import sysconfig; print(sysconfig.get_path('include'))"],
+            text=True, env={**os.environ, "PYTHONPATH": ""}
+        ).strip()
+        # If the include dir points inside a venv (no Python.h), resolve to base
+        if not Path(python_include, "Python.h").exists():
+            python_include = str(Path(python_prefix) / "include" / f"python{sys.version_info.major}.{sys.version_info.minor}")
+
         cmake_args = [
             f"-DCMAKE_BUILD_TYPE=Release",
             f"-Dpybind11_DIR={pybind11_cmake}",
             "-DCMAKE_POSITION_INDEPENDENT_CODE=ON",
             f"-DPython_EXECUTABLE={sys.executable}",
+            f"-DPython_ROOT_DIR={python_prefix}",
+            f"-DPython_INCLUDE_DIR={python_include}",
+            "-DCMAKE_CUDA_FLAGS=-allow-unsupported-compiler",
         ]
 
         try:
