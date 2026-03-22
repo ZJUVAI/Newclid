@@ -496,8 +496,10 @@ void Matcher::on_cyclic(const Cyclic &cyclic)
 {
     for (const auto &rotated : cyclic.permutation())
     {
-        insert_theorem(Theorem::cyclic_of_equal_angles(rotated));
-        insert_theorem(Theorem::cyclic_properties(cyclic));
+        #ifndef DDAR_WEAK
+            insert_theorem(Theorem::cyclic_of_equal_angles(rotated));
+        #endif
+            insert_theorem(Theorem::cyclic_properties(cyclic));
     }
 }
 
@@ -598,9 +600,11 @@ void Matcher::on_quadrangle_circumcenter(const Point &center, const Cyclic &cyc)
     insert_theorem(Theorem::cong_of_circumcenter_of_cyclic({center, Triangle(cyc.b(), cyc.c(), cyc.d())}, cyc.a()));
     insert_theorem(Theorem::cong_of_circumcenter_of_cyclic({center, Triangle(cyc.c(), cyc.d(), cyc.a())}, cyc.b()));
     insert_theorem(Theorem::cong_of_circumcenter_of_cyclic({center, Triangle(cyc.d(), cyc.a(), cyc.b())}, cyc.c()));
-    insert_theorem(Theorem::center_of_cyclic_of_cong_of_cong(cyc, center));
-    insert_theorem(Theorem::center_of_cyclic_of_cong_of_cong(Cyclic(cyc.a(), cyc.c(), cyc.b(), cyc.d()), center));
-    insert_theorem(Theorem::center_of_cyclic_of_cong_of_cong(Cyclic(cyc.a(), cyc.d(), cyc.b(), cyc.c()), center));
+    #ifndef DDAR_WEAK
+        insert_theorem(Theorem::center_of_cyclic_of_cong_of_cong(cyc, center));
+        insert_theorem(Theorem::center_of_cyclic_of_cong_of_cong(Cyclic(cyc.a(), cyc.c(), cyc.b(), cyc.d()), center));
+        insert_theorem(Theorem::center_of_cyclic_of_cong_of_cong(Cyclic(cyc.a(), cyc.d(), cyc.b(), cyc.c()), center));
+    #endif
 }
 
 void Matcher::on_circle(const Point &center, const vector<pair<double, Point>> &points)
