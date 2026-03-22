@@ -328,6 +328,25 @@ void Matcher::match_between()
                 const Point &b = std::get<2>(cand1);
                 const Point &c = std::get<1>(cand2);
                 const Point &d = std::get<2>(cand2);
+
+                // Symmetric collinearity pre-check for NColl(a, b, d)
+                // to avoid order-dependent numerical check failures
+                {
+                    double cross = (b.x() - a.x()) * (d.y() - a.y())
+                                 - (d.x() - a.x()) * (b.y() - a.y());
+                    double ab2 = (b.x()-a.x())*(b.x()-a.x()) + (b.y()-a.y())*(b.y()-a.y());
+                    double ad2 = (d.x()-a.x())*(d.x()-a.x()) + (d.y()-a.y())*(d.y()-a.y());
+                    double bd2 = (d.x()-b.x())*(d.x()-b.x()) + (d.y()-b.y())*(d.y()-b.y());
+                    double max_side2 = std::max({ab2, ad2, bd2});
+                    // |cross|^2 / max_side^4 is order-independent; skip if near-collinear
+                    // Using REL_TOL = 0.001 (same as Numerical::REL_TOL)
+                    constexpr double rel_tol = 0.001;
+                    if (cross * cross < rel_tol * rel_tol * max_side2 * max_side2)
+                    {
+                        continue;
+                    }
+                }
+
                 insert_theorem(Theorem::eqpoints_of_same_intersections(p1, p2, a, b, c, d));
             }
         }
