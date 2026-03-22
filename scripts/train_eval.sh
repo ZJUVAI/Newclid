@@ -5,14 +5,14 @@ export LOGLEVEL=WARNING
 # Training
 
 # Model directory - modify this as needed
-model_dir="sft2"
+model_dir="sft15"
 
 PYTORCH_CUDA_ALLOC_CONF='expandable_segments:True' \
-NPROC_PER_NODE=4 \
-CUDA_VISIBLE_DEVICES=0,1,2,3 \
+NPROC_PER_NODE=8 \
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 \
 swift sft \
     --model Qwen/Qwen3-0.6B-Base \
-    --dataset datasets/geometry_clauses10_samples2M.jsonl \
+    --dataset datasets/0901/geometry_clauses25-30_all_filtered2.jsonl \
     --columns '{"llm_input_renamed": "query", "llm_output_renamed": "response"}' \
     --system 'You are a helpful assistant.' \
     --max_length 2048 \
@@ -27,7 +27,7 @@ swift sft \
     --use_liger_kernel true \
     --num_train_epochs 1 \
     --warmup_ratio 0.1 \
-    --per_device_train_batch_size 16 \
+    --per_device_train_batch_size 8 \
     --per_device_eval_batch_size 1 \
     --gradient_accumulation_steps 1 \
     --learning_rate 1e-4 \
@@ -52,19 +52,18 @@ swift sft \
 datasets=(
     "dev_jgex.txt" 
     "dev_imo.txt"
-    "imo_95.txt"
-    #"imo_102_requires_aux.txt"
+    "imo_102_requires_aux.txt"
 )
 
 # Decoding configurations (decoding_size beam_size)
 configs=(
     # "8 64"
-    "32 256"
+    "32 512"
 )
 
 # Checkpoint options - modify this list as needed
 checkpoints=(
-    "checkpoint-11940"
+    # "checkpoint-10000"
     # "checkpoint-20000"
 )
 
@@ -86,7 +85,7 @@ for checkpoint in "${checkpoints[@]}"; do
             read -r decoding_size beam_size <<< "$config"
             
             # Build complete command
-            cmd="python scripts/evaluation.py --problems_path benchmarks/$dataset --model_path ./models/$model_dir/$checkpoint --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth 4"
+            cmd="python scripts/evaluation.py --problems_path problems_datasets/$dataset --model_path ./models/$model_dir/$checkpoint --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth 4"
             
             # Print current command to execute
             echo "Executing command:"
