@@ -29,6 +29,7 @@ dependencies = [
     "cairosvg",
     "matplotlib>=3.7.0",
     "torch==2.8.0",
+    "torchvision",
     "markupsafe==3.0.2",
     "pyvis",
     "scipy>=1.15",
@@ -37,26 +38,30 @@ dependencies = [
     "pandas>=2.3",
     "pybind11",
     "accelerate",
-    # "flash-attn==2.7.4.post1",
+    "flash-attn",
+    # "deepspeed",
 ]
 
-# [tool.uv.extra-build-variables]
-# flash-attn = { MAX_JOBS = "10", FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE" }
-
-# [tool.uv.extra-build-dependencies]
-# flash-attn = [{ requirement = "torch", match-runtime = true }]
+[tool.uv.extra-build-dependencies]
+flash-attn = [{ requirement = "torch", match-runtime = true }]
 
 # [tool.uv.extra-build-dependencies]
 # flash-attn = ["torch", "setuptools", "wheel", "ninja", "packaging"]
+
+[tool.uv.extra-build-variables]
+flash-attn = { MAX_JOBS = "10", FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE"}
+# remove FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE", if you need to compile flash attn from source
+
 
 [project.optional-dependencies]
 dev = ['black', 'ruff', 'pytest', 'pytest-cov', 'pytest-check', 'pytest-mock', 'pre-commit']
 doc = ['numpy', 'sphinx-autoapi', 'autoapi', 'sphinx_rtd_theme', 'sphinx-autodoc-typehints', 'sphinx-autobuild']
 
 
-# [[tool.uv.index]]
-# url = "https://mirrors.aliyun.com/pypi/simple"
-# name = "aliyun"
+[[tool.uv.index]]
+url = "https://mirrors.aliyun.com/pypi/simple"
+name = "aliyun"
+# default = true
 
 [[tool.uv.index]]
 url = "http://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/"
