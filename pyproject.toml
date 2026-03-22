@@ -28,7 +28,7 @@ dependencies = [
     "numpy",
     "cairosvg",
     "matplotlib>=3.7.0",
-    "torch==2.7.1",
+    "torch==2.8.0",
     "markupsafe==3.0.2",
     "pyvis",
     "scipy>=1.15",
@@ -37,7 +37,17 @@ dependencies = [
     "pandas>=2.3",
     "pybind11",
     "accelerate",
+    # "flash-attn==2.7.4.post1",
 ]
+
+# [tool.uv.extra-build-variables]
+# flash-attn = { MAX_JOBS = "10", FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE" }
+
+# [tool.uv.extra-build-dependencies]
+# flash-attn = [{ requirement = "torch", match-runtime = true }]
+
+# [tool.uv.extra-build-dependencies]
+# flash-attn = ["torch", "setuptools", "wheel", "ninja", "packaging"]
 
 [project.optional-dependencies]
 dev = ['black', 'ruff', 'pytest', 'pytest-cov', 'pytest-check', 'pytest-mock', 'pre-commit']
@@ -54,7 +64,7 @@ name = "tsinghua"
 default = true
 
 [[tool.uv.index]]
-url = "https://download.pytorch.org/whl/cu118"
+url = "https://download.pytorch.org/whl/cu126"
 name = "pytorch"
 explicit = true
 
