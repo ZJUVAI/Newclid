@@ -50,12 +50,12 @@ def ray_solve_problem(args):
         )
         is_solved = solver.run(timeout=timeout)
         elapsed_time = time.time() - start_time
-        return (pid, problem_name, is_solved, elapsed_time) 
+        return (pid, problem_name, is_solved, elapsed_time)
     except Exception as e:
         import traceback
         traceback.print_exc()
         print(f"Warning: solver crashed on problem '{problem_name}' : ({type(e)}) {e}")
-        elapsed_time = time.time() - start_time 
+        elapsed_time = time.time() - start_time
         return (pid, problem_name, False, elapsed_time)
 
 def render_table(all_tasks_info, start_time, reorder: bool):
@@ -82,7 +82,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
     """
     Main function, read the file and execute tasks using Ray.
     """
-    
+
     # Read all problem names
     if not os.path.exists(filepath):
         print(f"File {filepath} not found.")
@@ -92,7 +92,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
         lines = file.readlines()
         for i in range(0, len(lines), 2):
             problem_names.append(lines[i].strip())
- 
+
     print(f"Total problems to solve: {len(problem_names)}")
     print(f"Using agent: {agent_type}")
 
@@ -110,13 +110,13 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
     start_time = time.time()
     all_tasks_info = []
     pending_tasks = []
-    
+
     # Submit all tasks
     for i, problem_name in enumerate(problem_names):
         task = ray_solve_problem.remote((i, problem_name, filepath, modelpath, decoding_size, beam_size, search_depth, timeout, agent_type))
         all_tasks_info.append((problem_name, "Pending", 0))
         pending_tasks.append(task)
-    
+
     # Process tasks as they complete
     with Live(refresh_per_second=1) as live:
         while pending_tasks:
@@ -127,11 +127,11 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
                 pid, problem_name, is_solved, elapsed_time = ray.get(task)
                 all_tasks_info[pid] = (problem_name, "Success" if is_solved else "Failed", elapsed_time)
                 total_time += elapsed_time
-                    
+
             live.update(render_table(all_tasks_info, start_time, True))
         live.update(render_table(all_tasks_info, start_time, False))
     ray.shutdown()
-    
+
     # Generate CSV filename based on problems_path and model_path
     problems_name = filepath.stem  # Get the file name without extension
     # Get the deepest folder name from modelpath (assuming it's a list, take the first if not empty)
@@ -146,7 +146,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
         deepest_folder = path_obj.name
         parent_folder = path_obj.parent.name
         model_name = f"{parent_folder}_{deepest_folder}" if parent_folder else deepest_folder
-    
+
     # Create CSV filename with parameters
     csv_filename = f"eval_{problems_name}_{model_name}_d{decoding_size}_b{beam_size}_s{search_depth}.csv"
 
@@ -176,9 +176,9 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
             solved = "√" if status == "Success" else "x"  # Mark √ if solved, x if not
             time_str = f"{elapsed_time:.2f}" if status != "Pending" else ""  # Show time for processed problems, leave empty for pending
             writer.writerow([problem_name, solved, time_str])
-    
+
     print(f"Results saved to {csv_filepath}")
-            
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run Newclid evaluation with configurable paths.")
@@ -195,7 +195,7 @@ if __name__ == "__main__":
     parser.add_argument("--log_dir", type=str, default=None,
                         help="Directory to save evaluation results (default: results/)")
     args = parser.parse_args()
-    
+
     problems_path = Path(args.problems_path)
     solve_problems(
         problems_path,
