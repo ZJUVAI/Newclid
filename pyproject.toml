@@ -39,6 +39,7 @@ dependencies = [
     "pybind11",
     "accelerate",
     "flash-attn",
+    "httpx[socks]",
     # "deepspeed",
 ]
 
