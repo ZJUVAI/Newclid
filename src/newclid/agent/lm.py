@@ -119,7 +119,7 @@ class LMAgent(DeductiveAgent):
             logger.info("LM output [%s]: aux_dsl=%s", queue_type, aux_dsl)
         if aux is not None:
             logger.info("LM output [%s]: aux=%s", queue_type, aux)
-
+        
     @torch.no_grad()
     def inference(self, model, tokenizer, query: str, new_point_name: str, response_prefix: str = '<aux>', with_predicate: bool = True):
         aux_dsl_dict = {}
@@ -137,7 +137,7 @@ class LMAgent(DeductiveAgent):
         model_prompt_inputs = tokenizer([text], return_tensors="pt")
         pad_token_id = tokenizer.pad_token_id
         eos_token_id = tokenizer.encode(' ;', add_special_tokens=False)[0]
-
+        
         if with_predicate and len(AUX_PREDICATES) > 0:
             # Inference with predicate prefix
             beams_per_predicate = self.decoding_size // len(AUX_PREDICATES)
@@ -154,7 +154,7 @@ class LMAgent(DeductiveAgent):
                         prompt_len=model_prompt_inputs.input_ids.shape[1],
                     )
                     model_inputs = model_inputs.to(model.device)
-
+                    
                     generated_output = model.generate(
                         **model_inputs,
                         max_new_tokens=100,
@@ -162,17 +162,17 @@ class LMAgent(DeductiveAgent):
                         num_return_sequences=beams_per_predicate,
                         pad_token_id=pad_token_id,
                         eos_token_id=eos_token_id,
-                        return_dict_in_generate=True,
+                        return_dict_in_generate=True, 
                         output_scores=True,
                     )
                     scores = generated_output.sequences_scores
                     generated_output = generated_output.sequences[:, model_prompt_inputs.input_ids.shape[1]:]
                     aux_dsls = tokenizer.batch_decode(generated_output, skip_special_tokens=True)
-
+                    
                     for aux_dsl, score in zip(aux_dsls, scores):
                         score = score.item()
                         aux_dsl_dict[aux_dsl] = score
-
+        
         if not with_predicate:
             # Inference without predicate prefix
             prompt_no_predicate = text + response_prefix + ' ' + new_point_name
@@ -194,7 +194,7 @@ class LMAgent(DeductiveAgent):
                 num_return_sequences=self.decoding_size,
                 pad_token_id=pad_token_id,
                 eos_token_id=eos_token_id,
-                return_dict_in_generate=True,
+                return_dict_in_generate=True, 
                 output_scores=True,
             )
             scores = generated_output.sequences_scores
@@ -204,7 +204,7 @@ class LMAgent(DeductiveAgent):
             for aux_dsl, score in zip(aux_dsls, scores):
                 score = score.item()
                 aux_dsl_dict[aux_dsl] = score
-
+            
         return aux_dsl_dict
 
     def run(self, proof: "ProofState", rules: list[Rule], timeout: int = 3600
@@ -218,11 +218,11 @@ class LMAgent(DeductiveAgent):
             if error_msg:
                 infos["error"] = error_msg
             return infos
-
+        
         t0 = time.time()
         step = 0
-
-        # Check goals numerically
+        
+        # Check goals numerically 
         for goal in proof.goals:
             if not goal.check_numerical():
                 return infos(False, f"{goal.pretty()} fails numerical check")
@@ -236,43 +236,43 @@ class LMAgent(DeductiveAgent):
             rules_ref = ray.put(rules)
             future_info = dict()
             running_futures = []
-
+            
             # Create two BeamQueues for each model: one for with_predicate, one for no_predicate
             # beam_queues[i][j]: i is the model index, j=0 for with_predicate, j=1 for no_predicate
             beam_queues = []
             for i in range(len(self.models)):
                 q_with_pred = BeamQueue(max_size=self.beam_size)
                 q_with_pred.add(node=self.problemJGEX, val=0)
-
+                
                 q_no_pred = BeamQueue(max_size=self.beam_size)
                 q_no_pred.add(node=self.problemJGEX, val=0)
-
+                
                 beam_queues.append([q_with_pred, q_no_pred])
 
             for depth in range(self.search_depth):
                 new_beam_queues = []
-
+                
                 for i in range(len(self.models)):
                     new_queues = [BeamQueue(max_size=self.beam_size), BeamQueue(max_size=self.beam_size)]
-
+                    
                     # j=0: with_predicate, j=1: no_predicate
                     for j, with_predicate in enumerate([True, False]):
                         queue_type = 'with_pred' if with_predicate else 'no_pred'
-
+                        
                         logger.info(f"!!!")
                         for prev_score, problem in beam_queues[i][j]:
                             if time.time() - t0 > timeout:
                                 ray.shutdown()
                                 return infos(False, 'Timeout')
-
+                            
                             p_dsl = self.problem_to_dsl(problem, proof.defs)
                             logger.info(f"inferencing on query ({queue_type}): {p_dsl}")
                             aux_dsl_dict = self.inference(
-                                self.models[i], self.tokenizers[i], p_dsl,
+                                self.models[i], self.tokenizers[i], p_dsl, 
                                 self.get_new_point_name(problem), '<aux> x00',
                                 with_predicate=with_predicate
                             )
-
+                            
                             for aux_dsl, score in aux_dsl_dict.items():
                                 try:
                                     self._log_model_output(queue_type=queue_type, aux_dsl=aux_dsl, score=score)
@@ -285,7 +285,7 @@ class LMAgent(DeductiveAgent):
                                         running_futures.append(future)
                                 except Exception as e:
                                     continue
-
+                            
                             # check any done task
                             done, running_futures = ray.wait(running_futures, timeout=0)
                             for f in done:
@@ -302,7 +302,7 @@ class LMAgent(DeductiveAgent):
                                 elif depth < self.search_depth - 1:
                                     new_problem, prev_score, score, queue_idx = future_info[f]
                                     new_queues[queue_idx].add(node=new_problem, val=prev_score+score)
-
+                    
                     # check remaining tasks
                     while running_futures:
                         done, running_futures = ray.wait(running_futures, num_returns=min(1000, len(running_futures)))
@@ -320,9 +320,9 @@ class LMAgent(DeductiveAgent):
                             elif depth < self.search_depth - 1:
                                 new_problem, prev_score, score, queue_idx = future_info[f]
                                 new_queues[queue_idx].add(node=new_problem, val=prev_score+score)
-
+                    
                     new_beam_queues.append(new_queues)
-
+                
                 beam_queues = new_beam_queues
 
             ray.shutdown()
@@ -331,16 +331,16 @@ class LMAgent(DeductiveAgent):
     def get_new_point_name(self, problem: ProblemJGEX) -> str:
         num_points = sum([len(clause.points) for clause in problem.constructions])
         return self._get_apha_geo_solver_var(num_points)
-
+    
     def _get_apha_geo_solver_var(self, va_idx):
         """Generate a point name using letters and numbers"""
         letter_part = string.ascii_lowercase[va_idx % 26]
         number_part = va_idx // 26
         return f"{letter_part}{number_part - 1}" if number_part else letter_part
-
+    
     def step(self, proof: ProofState, rules: list[Rule]) -> bool:
         return
-
+    
     def try_dsl_to_constructions(self, content):
         points, premises = content.split(';')[0].split(' : ')
 
@@ -350,13 +350,13 @@ class LMAgent(DeductiveAgent):
         if len(points) == 0 or len(points) > 1:
             return
         points = points[0]
-
+    
         # premises
         premises = re.split(r"\s*\[\d+\]", premises) # coll a c e [002] coll b d e [003] => 'coll a c e' , 'coll b d e'
         premises = [seg.strip() for seg in premises if seg.strip()]
         # currently, we only support two premises following alphageometry
         if len(premises) > 2:
-            return
+            return 
             # segments = segments[:2]
         # TODO: should we support free points?
         if len(premises) == 0:
@@ -373,12 +373,12 @@ class LMAgent(DeductiveAgent):
     def translate_dsl_to_construction(self, point: str, predicate: str, args: list[str]
         ) -> tuple[str, list[str]]:
         """ Translate a predicate into construction
-
+        
         Args:
             point: str: name of the new point
             predicate: str: name of the predicates, e.g., perp, para, etc.
             args: list[str]: list of predicate args.
-
+        
         Return:
             (predicate, args): translated to constructive predicate.
         """
@@ -436,11 +436,11 @@ class LMAgent(DeductiveAgent):
                     res1 = f"on_aline0 {a} {g} {h} {e} {f} {c} {d} {b}"
             else:
                 # Handle diagonal line exchange
-                if(len(set([a, b, c, d])) == 4 and len(set([a, b, e, f])) == 3):
+                if(len(set([a, b, c, d])) == 4 and len(set([a, b, e, f])) == 3): 
                     a, b, c, d, e, f, g, h = a, b, e, f, c, d, g, h
                 res1 = EqAngle.to_constructive(point, arrange_angle_points(a, b, c, d) + arrange_angle_points(e, f, g, h))
             return res1
-
+            
         # Cyclic (four points on a circle)
         elif predicate == 'cyclic':
             return Cyclic.to_constructive(point, tuple(args))
@@ -450,12 +450,12 @@ class LMAgent(DeductiveAgent):
 
         # For others, return directly
         return f"{predicate} {' '.join(args)}"
-
+    
     def problem_to_dsl(self, problem: "ProblemJGEX", defs: dict[str, DefinitionJGEX]) -> str:
         """Convert the problem to a DSL string."""
         dep_idx: dict[Statement, str] = {}
         dep_graph = DependencyGraph(AlgebraicManipulator())
-
+        
         data_tmp = defaultdict(list)
         for construction in problem.constructions:
             group = {}
@@ -505,7 +505,7 @@ class LMAgent(DeductiveAgent):
             ])
         data_problem += ' </problem>'
         return data_problem
-
+    
     def _extract_points(proof: ProofState):
         points: List[Tuple[str, Any, Any]] = []
         for name, point in proof.symbols_graph.name2node.items():
@@ -538,20 +538,20 @@ class LMAgent(DeductiveAgent):
                     args.append(pt.name)
             goals.append((predicate, args))
         return goals
-
+    
     @staticmethod
-    def run_ddar_c(proof: "ProofState", rules: list[Rule], start_time: int, timeout: int = 3600):
+    def run_ddar_c(proof: "ProofState", rules: list[Rule], start_time: int, timeout: int = 3600): 
         points = LMAgent._extract_points(proof)
         premises = LMAgent._extract_premises(proof)
         goals = LMAgent._extract_goals(proof)
-
+        
         solved, dep_graph = DDAR.run_ddar("", points, premises, goals, 500, True, True)
 
         return solved
 
 
 @ray.remote(num_cpus=1)
-def run_ddar_remote(problem, defs, aux, rules: list[Rule], start_time: int, timeout: int = 3600):
+def run_ddar_remote(problem, defs, aux, rules: list[Rule], start_time: int, timeout: int = 3600): 
     try:
         proof = ProofState.build_problemJGEX(
             problemJGEX=problem,
@@ -567,8 +567,8 @@ def run_ddar_remote(problem, defs, aux, rules: list[Rule], start_time: int, time
     except Exception:
         return None
     return solved
-
-
+    
+    
 class BeamQueue:
     """Keep only the top k objects according to their values."""
 
@@ -597,14 +597,14 @@ class BeamQueue:
                 self.counter += 1
                 heapq.heappush(self.queue, entry)
                 self.entry_finder[node] = entry
-
+    
     def remove(self, node: object) -> None:
         """Mark an existing node as REMOVED."""
         entry = self.entry_finder.pop(node, None)
         if entry:
             entry[-1] = self.REMOVED
         self._rebuild_heap()
-
+    
     def _rebuild_heap(self):
         """Rebuild the heap to remove any invalid entries marked as REMOVED."""
         self.queue = [entry for entry in self.queue if entry[-1] is not self.REMOVED]
@@ -617,7 +617,7 @@ class BeamQueue:
 
     def __len__(self) -> int:
         return len(self.queue)
-
+    
     def __repr__(self) -> str:
         # return f'BeamQueue(max_size={self.max_size}, size={len(self.queue)}])'
         items = ',\n  '.join(f'({val:.4f}, {repr(node)})' for val, _, node in self.queue if node is not self.REMOVED)

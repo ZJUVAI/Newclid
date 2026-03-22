@@ -1,0 +1,25 @@
+numpy>=1.23.5, <2.0
+matplotlib>=3.7.0
+scipy>=1.10.0
+typing-extensions
+networkx
+pyvis
+seaborn
+colorama
+pillow
+torch
+millify
+ray
+openai
+pybind11
+transformers>=4.40.0
+accelerate
+rich
+py-data-juicer
+qwen_vl_utils
+modelscope
+torchvision
+cairosvg
+timm
+adjustText
+ray[default]
