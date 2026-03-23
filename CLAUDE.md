@@ -48,6 +48,11 @@ git checkout GenesisGeo/main -- src/newclid/DDAR/
   - ✓ Tool description: "Run benchmark on HAGeo 409 dataset"
   - ✓ Commit message: "Add language usage rules to CLAUDE.md"
 
+**Planning Mode Language Rules**:
+- 所有 plan 文件必须使用中文编写，确保用户能够直接理解计划内容
+- Plan 文件中的所有章节（背景、实施步骤、验证方式等）都必须用中文表达
+- 唯一例外：文件路径、代码片段、技术术语可以保持英文
+
 **AI Tool Workflow Rules**:
 - 所有 AI 编程工具在开始处理仓库任务前，必须先阅读 `CLAUDE.md`
 - 在执行具体任务前，必须根据任务范围按需索引并阅读相关文档与 memory 文件，至少包括对应模块文档和 `memory/MEMORY.md`
