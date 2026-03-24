@@ -10,6 +10,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.utils import logging as hf_logging
 
 from newclid.agent.lm import LMAgent, AUX_PREDICATES
+from newclid.problem_db import ProblemDBRuntime
 
 
 logger = logging.getLogger(__name__)
@@ -46,7 +47,15 @@ def _resolve_model_path(path: str) -> str:
 
 
 class Qwen35TextAgent(LMAgent):
-    def __init__(self, model_path: list[str], decoding_size: int, beam_size: int, search_depth: int):
+    def __init__(
+        self,
+        model_path: list[str],
+        decoding_size: int,
+        beam_size: int,
+        search_depth: int,
+        *,
+        problem_db_runtime: ProblemDBRuntime | None = None,
+    ):
         self.any_new_statement_has_been_added = True
         self.problemJGEX = None
         self.decoding_size = decoding_size
@@ -55,6 +64,8 @@ class Qwen35TextAgent(LMAgent):
         self.model_path = model_path
         self.models = []
         self.tokenizers = []
+        self.problem_db_runtime = problem_db_runtime
+        self.agent_type = "qwen35_text"
 
         for path in self.model_path:
             resolved_path = _resolve_model_path(path)
@@ -85,16 +96,16 @@ class Qwen35TextAgent(LMAgent):
         if not DEBUG_QWEN35_TEXT_INPUT:
             return
 
-        logger.info("Qwen35Text input snapshot: query=%s", query)
-        logger.info("Qwen35Text input snapshot: messages=%s", messages)
-        logger.info("Qwen35Text input snapshot: text_prompt=%s", text_prompt)
-        logger.info("Qwen35Text input snapshot: final_text=%s", final_text)
-        logger.info("Qwen35Text input snapshot: model_input_keys=%s", list(model_inputs.keys()))
+        logger.debug("Qwen35Text input snapshot: query=%s", query)
+        logger.debug("Qwen35Text input snapshot: messages=%s", messages)
+        logger.debug("Qwen35Text input snapshot: text_prompt=%s", text_prompt)
+        logger.debug("Qwen35Text input snapshot: final_text=%s", final_text)
+        logger.debug("Qwen35Text input snapshot: model_input_keys=%s", list(model_inputs.keys()))
         if "input_ids" in model_inputs:
-            logger.info("Qwen35Text input snapshot: input_ids.shape=%s", tuple(model_inputs["input_ids"].shape))
+            logger.debug("Qwen35Text input snapshot: input_ids.shape=%s", tuple(model_inputs["input_ids"].shape))
         if "attention_mask" in model_inputs:
-            logger.info("Qwen35Text input snapshot: attention_mask.shape=%s", tuple(model_inputs["attention_mask"].shape))
-        logger.info("Qwen35Text input snapshot: prompt_len=%s", prompt_len)
+            logger.debug("Qwen35Text input snapshot: attention_mask.shape=%s", tuple(model_inputs["attention_mask"].shape))
+        logger.debug("Qwen35Text input snapshot: prompt_len=%s", prompt_len)
 
     def _log_model_output(
         self,
@@ -105,11 +116,11 @@ class Qwen35TextAgent(LMAgent):
         aux: str | None = None,
     ) -> None:
         if score is not None:
-            logger.info("Qwen35Text output [%s]: score=%s", queue_type, score)
+            logger.debug("Qwen35Text output [%s]: score=%s", queue_type, score)
         if aux_dsl is not None:
-            logger.info("Qwen35Text output [%s]: aux_dsl=%s", queue_type, aux_dsl)
+            logger.debug("Qwen35Text output [%s]: aux_dsl=%s", queue_type, aux_dsl)
         if aux is not None:
-            logger.info("Qwen35Text output [%s]: aux=%s", queue_type, aux)
+            logger.debug("Qwen35Text output [%s]: aux=%s", queue_type, aux)
 
     @torch.no_grad()
     def inference(self, model, tokenizer, query: str, new_point_name: str, response_prefix: str = '<aux>', with_predicate: bool = True):

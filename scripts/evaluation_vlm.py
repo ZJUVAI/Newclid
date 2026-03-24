@@ -13,9 +13,11 @@ from newclid.agent.internvlm import InternVLMAgent
 from newclid.agent.qwen35 import Qwen35Agent
 from newclid.api import GeometricSolverBuilder
 from newclid.generation.problem_worker import GeometryProblemWorker
+from newclid.problem_db import ProblemDBRuntime, ProblemDBWriter
 
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
+logger = logging.getLogger(__name__)
 
 
 def configure_logging(*, force: bool = False) -> None:
@@ -34,36 +36,88 @@ def ray_solve_problem(args):
     Process a single problem and return whether it was solved successfully along with the time taken.
     """
     configure_logging(force=True)
-    pid, problem_name, problems_path, model_path, decoding_size, beam_size, search_depth, timeout, agent_type = args
+    pid, problem_name, problems_path, model_path, decoding_size, beam_size, search_depth, timeout, agent_type, problem_db_root, enable_problem_db = args
     start_time = time.time()
     try:
+        builder = GeometricSolverBuilder().load_problem_from_file(problems_path, problem_name, rename=True)
+        problem_db_runtime = None
+        if enable_problem_db:
+            problem_db_runtime = ProblemDBRuntime(
+                db_root=problem_db_root,
+                problems_path=problems_path,
+                base_problem=builder.problemJGEX,
+            )
         # print(f"building problem: {problem_name}")
         # Select agent based on agent_type
         if agent_type == "vlm":
-            agent = VLMAgent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
+            agent = VLMAgent(
+                model_path,
+                decoding_size=decoding_size,
+                beam_size=beam_size,
+                search_depth=search_depth,
+                problem_db_runtime=problem_db_runtime,
+                agent_type="vlm",
+            )
         elif agent_type == "internvlm":
-            agent = InternVLMAgent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
+            agent = InternVLMAgent(
+                model_path,
+                decoding_size=decoding_size,
+                beam_size=beam_size,
+                search_depth=search_depth,
+                problem_db_runtime=problem_db_runtime,
+                agent_type="internvlm",
+            )
         elif agent_type == "qwen35":
-            agent = Qwen35Agent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
+            agent = Qwen35Agent(
+                model_path,
+                decoding_size=decoding_size,
+                beam_size=beam_size,
+                search_depth=search_depth,
+                problem_db_runtime=problem_db_runtime,
+                agent_type="qwen35",
+            )
         else:
             raise ValueError(f"Unknown agent type: {agent_type}. Must be 'vlm', 'internvlm', or 'qwen35'")
         
         solver = (
-            GeometricSolverBuilder()
-            .load_problem_from_file(problems_path, problem_name, rename=True)
+            builder
             .with_deductive_agent(agent)
             .build()
         )
         # print(f"problem_name: {problem_name}")
         is_solved = solver.run(timeout=timeout)
         elapsed_time = time.time() - start_time
-        return (pid, problem_name, is_solved, elapsed_time) 
+        problem_db_stats = solver.run_infos.get("problem_db_stats")
+        ddar_stats = solver.run_infos.get("ddar_stats")
+        if problem_db_stats is not None:
+            logger.debug(
+                "[problem_db_stats] "
+                f"problem={problem_name} "
+                f"cache_hits={problem_db_stats['cache_hits']} "
+                f"new_records={problem_db_stats['new_records']}"
+            )
+        if ddar_stats is not None:
+            logger.debug(
+                "[ddar_stats] "
+                f"problem={problem_name} "
+                f"base_calls={ddar_stats['base_calls']} "
+                f"remote_ddar_calls={ddar_stats['remote_ddar_calls']} "
+                f"remote_solved={ddar_stats['remote_solved']} "
+                f"remote_unsolved={ddar_stats['remote_unsolved']} "
+                f"remote_build_invalid={ddar_stats['remote_build_invalid']} "
+                f"remote_engine_invalid={ddar_stats['remote_engine_invalid']}"
+            )
+        return (pid, problem_name, is_solved, elapsed_time, solver.run_infos.get("problem_db_payload"))
     except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"Warning: solver crashed on problem '{problem_name}' : ({type(e)}) {e}")
+        logger.warning(
+            "Solver crashed on problem '%s': (%s) %s",
+            problem_name,
+            type(e),
+            e,
+            exc_info=True,
+        )
         elapsed_time = time.time() - start_time 
-        return (pid, problem_name, False, elapsed_time)
+        return (pid, problem_name, False, elapsed_time, None)
 
 def render_table(all_tasks_info, start_time, reorder: bool):
     total_problems = len(all_tasks_info)
@@ -85,14 +139,14 @@ def render_table(all_tasks_info, start_time, reorder: bool):
         table.add_row(problem_name, status, elapsed)
     return table
 
-def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding_size: int, beam_size: int, search_depth: int, timeout: int = 3600, agent_type: str = "vlm", log_dir: str = None):
+def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding_size: int, beam_size: int, search_depth: int, timeout: int = 3600, agent_type: str = "vlm", log_dir: str = None, problem_db_root: str = "problem_db", enable_problem_db: bool = False):
     """
     Main function, read the file and execute tasks using Ray.
     """
     
     # Read all problem names
     if not os.path.exists(filepath):
-        print(f"File {filepath} not found.")
+        logger.error("File %s not found.", filepath)
         return
     problem_names = []
     with open(filepath, "r") as file:
@@ -100,8 +154,8 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
         for i in range(0, len(lines), 2):
             problem_names.append(lines[i].strip())
  
-    print(f"Total problems to solve: {len(problem_names)}")
-    print(f"Using agent: {agent_type}")
+    logger.info("Total problems to solve: %s", len(problem_names))
+    logger.info("Using agent: %s", agent_type)
 
     # Multi-threaded execution using Ray with limited concurrent tasks
     # Initialize Ray with specified number of CPUs
@@ -117,10 +171,11 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
     start_time = time.time()
     all_tasks_info = []
     pending_tasks = []
+    problem_db_writer = ProblemDBWriter(problem_db_root, repo_root=Path.cwd()) if enable_problem_db else None
     
     # Submit all tasks
     for i, problem_name in enumerate(problem_names):
-        task = ray_solve_problem.remote((i, problem_name, filepath, modelpath, decoding_size, beam_size, search_depth, timeout, agent_type))
+        task = ray_solve_problem.remote((i, problem_name, filepath, modelpath, decoding_size, beam_size, search_depth, timeout, agent_type, problem_db_root, enable_problem_db))
         all_tasks_info.append((problem_name, "Pending", 0))
         pending_tasks.append(task)
     
@@ -131,7 +186,9 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
             done_tasks, pending_tasks = ray.wait(pending_tasks, num_returns=1, timeout=5)
             # Process completed tasks
             for task in done_tasks:
-                pid, problem_name, is_solved, elapsed_time = ray.get(task)
+                pid, problem_name, is_solved, elapsed_time, problem_db_payload = ray.get(task)
+                if problem_db_writer is not None:
+                    problem_db_writer.write_payload(problem_db_payload)
                 all_tasks_info[pid] = (problem_name, "Success" if is_solved else "Failed", elapsed_time)
                 total_time += elapsed_time
                     
@@ -181,7 +238,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
             time_str = f"{elapsed_time:.2f}" if status != "Pending" else ""  # Show time for processed problems, leave empty for pending
             writer.writerow([problem_name, solved, time_str])
     
-    print(f"Results saved to {csv_filepath}")
+    logger.info("Results saved to %s", csv_filepath)
             
 
 if __name__ == "__main__":
@@ -198,7 +255,11 @@ if __name__ == "__main__":
                         help="Agent type to use: 'vlm' for VLMAgent, 'internvlm' for InternVLMAgent, or 'qwen35' for Qwen35Agent")
     parser.add_argument("--log_dir", type=str, default=None,
                         help="Directory to save evaluation results (default: results/)")
+    parser.add_argument("--problem_db_root", type=str, default="problem_db",
+                        help="Directory to store the problem database")
+    parser.add_argument("--enable_problem_db", action=argparse.BooleanOptionalAction, default=False,
+                        help="Enable problem database cache reads/writes")
     args = parser.parse_args()
     
     problems_path = Path(args.problems_path)
-    solve_problems(problems_path, args.model_path, num_cpus=args.max_workers, decoding_size=args.decoding_size, beam_size=args.beam_size, search_depth=args.search_depth, timeout=args.timeout, agent_type=args.agent, log_dir=args.log_dir)
+    solve_problems(problems_path, args.model_path, num_cpus=args.max_workers, decoding_size=args.decoding_size, beam_size=args.beam_size, search_depth=args.search_depth, timeout=args.timeout, agent_type=args.agent, log_dir=args.log_dir, problem_db_root=args.problem_db_root, enable_problem_db=args.enable_problem_db)
