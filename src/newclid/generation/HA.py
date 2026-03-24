@@ -620,7 +620,7 @@ def foot(point_names, coords) -> list[tuple[tuple[float, float], str]]:
     return result
 
 
-def enhance_text_with_potential_points(original_text: str, generator: PointGenerator) -> str:
+def enhance_text_with_potential_points(original_text: str, generator: PointGenerator, allow_coincident_points: bool = True) -> str:
     # 1. 提取原始点
     point_names, coords = extract_points(original_text)
 
@@ -674,7 +674,8 @@ def enhance_text_with_potential_points(original_text: str, generator: PointGener
         coord, text_tmpl = random.choice(candidates)
 
         # 距离过滤
-        if is_point_too_close([coord], existing_coords) or is_point_too_far([coord], existing_coords):
+        round_threshold = 1e-10 if allow_coincident_points else -1.0
+        if is_point_too_close([coord], existing_coords, round_eps = round_threshold) or is_point_too_far([coord], existing_coords):
             # 该点不合适，继续尝试
             # 同时从该类型候选中删除这个点，避免反复选到
             type_to_points[t] = [item for item in candidates if item[0] != coord]

@@ -58,6 +58,7 @@ class ProofState:
         problem_path: Optional[Path] = None,
         goals: Optional[list[Statement]] = None,
         defs: dict[str, DefinitionJGEX],
+        allow_coincident_points: bool = True,
     ):
         self.dep_graph = dep_graph or DependencyGraph(AlgebraicManipulator())
         self.symbols_graph = self.dep_graph.symbols_graph
@@ -70,6 +71,7 @@ class ProofState:
 
         self.fig = init_figure()
         self.defs = defs
+        self.allow_coincident_points = allow_coincident_points
 
     def add_construction(self, construction: Clause):
         """Add a new clause of construction, e.g. a new excenter."""
@@ -165,7 +167,8 @@ class ProofState:
 
         # check two things
         existing_numerical_points = [p.num for p in existing_points]
-        if check_too_close_numerical(new_numerical_point, existing_numerical_points):
+        round_threshold = 1e-10 if self.allow_coincident_points else -1.0
+        if check_too_close_numerical(new_numerical_point, existing_numerical_points, round=round_threshold):
             raise PointTooCloseError()
         if check_too_far_numerical(new_numerical_point, existing_numerical_points):
             raise PointTooFarError()
@@ -222,6 +225,7 @@ class ProofState:
         max_attempts: int,
         *,
         rng: "Generator",
+        allow_coincident_points: bool = True,
     ) -> ProofState:
         """Build a problem into a Proof state object."""
 
@@ -229,7 +233,7 @@ class ProofState:
         for _ in range(max_attempts):
             # Search for coordinates that checks premises conditions numerically.
             try:
-                proof = ProofState(rng=rng, defs=defsJGEX)
+                proof = ProofState(rng=rng, defs=defsJGEX, allow_coincident_points=allow_coincident_points)
                 for construction in problemJGEX.constructions:
                     proof.add_construction(construction)
                 if problem_path:
@@ -275,9 +279,10 @@ class ProofState:
         goals_str: list[str] | None = None,
         *,
         rng: "Generator",
+        allow_coincident_points: bool = True,
     ) -> ProofState:
         """Build a proof state from given predicates and points."""
-        proof = ProofState(rng=rng, defs=defsJGEX)
+        proof = ProofState(rng=rng, defs=defsJGEX, allow_coincident_points=allow_coincident_points)
         adds: list[Dependency] = []
 
         old_points = predicates[0].dep_graph.symbols_graph.nodes_of_type(Point)
@@ -325,6 +330,7 @@ class ProofState:
         goals_str: list[tuple[str, list[str]]],
         *,
         rng: "Generator",
+        allow_coincident_points: bool = True,
     ) -> ProofState:
         """Build a proof state directly from points, premises, and goals.
 
@@ -341,7 +347,7 @@ class ProofState:
         Returns:
             ProofState with all points, premises, and goals loaded
         """
-        proof = ProofState(rng=rng, defs=defsJGEX)
+        proof = ProofState(rng=rng, defs=defsJGEX, allow_coincident_points=allow_coincident_points)
         adds: list[Dependency] = []
 
         # 1. Create Point nodes in symbols_graph
