@@ -9,10 +9,8 @@ from rich.live import Live
 from rich.table import Table
 
 from newclid.agent.vlm import VLMAgent
-from newclid.agent.internvlm import InternVLMAgent
 from newclid.agent.qwen35 import Qwen35Agent
 from newclid.api import GeometricSolverBuilder
-from newclid.generation.problem_worker import GeometryProblemWorker
 from newclid.problem_db import ProblemDBRuntime, ProblemDBWriter
 
 
@@ -58,15 +56,6 @@ def ray_solve_problem(args):
                 problem_db_runtime=problem_db_runtime,
                 agent_type="vlm",
             )
-        elif agent_type == "internvlm":
-            agent = InternVLMAgent(
-                model_path,
-                decoding_size=decoding_size,
-                beam_size=beam_size,
-                search_depth=search_depth,
-                problem_db_runtime=problem_db_runtime,
-                agent_type="internvlm",
-            )
         elif agent_type == "qwen35":
             agent = Qwen35Agent(
                 model_path,
@@ -77,7 +66,7 @@ def ray_solve_problem(args):
                 agent_type="qwen35",
             )
         else:
-            raise ValueError(f"Unknown agent type: {agent_type}. Must be 'vlm', 'internvlm', or 'qwen35'")
+            raise ValueError(f"Unknown agent type: {agent_type}. Must be 'vlm' or 'qwen35'")
         
         solver = (
             builder
@@ -251,8 +240,8 @@ if __name__ == "__main__":
     parser.add_argument("--beam_size", type=int, default=64)
     parser.add_argument("--search_depth", type=int, default=4)
     parser.add_argument("--timeout", type=int, default=7200, help="Timeout for each problem")
-    parser.add_argument("--agent", type=str, default="vlm", choices=["vlm", "internvlm", "qwen35"],
-                        help="Agent type to use: 'vlm' for VLMAgent, 'internvlm' for InternVLMAgent, or 'qwen35' for Qwen35Agent")
+    parser.add_argument("--agent", type=str, default="vlm", choices=["vlm", "qwen35"],
+                        help="Agent type to use: 'vlm' for VLMAgent or 'qwen35' for Qwen35Agent")
     parser.add_argument("--log_dir", type=str, default=None,
                         help="Directory to save evaluation results (default: results/)")
     parser.add_argument("--problem_db_root", type=str, default="problem_db",
