@@ -2,7 +2,6 @@ from __future__ import annotations
 import os
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import time
-import uuid
 import logging
 from typing import TYPE_CHECKING, Any, List, Tuple
 from fractions import Fraction
@@ -23,7 +22,7 @@ from copy import deepcopy
 from newclid.agent.agents_interface import DeductiveAgent
 from newclid.formulations.problem import ProblemJGEX
 from newclid.formulations.definition import DefinitionJGEX
-from newclid.formulations.clause import Clause, translate_sentence
+from newclid.formulations.clause import translate_sentence
 from newclid.statement import Statement
 from newclid.proof import ProofState
 from newclid.predicates.congruence import Cong
@@ -36,7 +35,6 @@ from newclid.predicates.equal_angles import EqAngle
 from newclid.predicates.equal_ratios import EqRatio
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulator
-from newclid.dependencies.dependency import Dependency
 from newclid.numerical.geometries import PointNum
 from newclid.numerical.draw_clause_figure import draw_clause_figure
 from newclid.DDAR.build import DDAR
@@ -436,9 +434,9 @@ class Qwen35Agent(DeductiveAgent):
                                     r_inv, g_inv, b_inv = inverted_rgb.split()
                                     img_out = Image.merge('RGBA', (r_inv, g_inv, b_inv, a))
                                 elif img.mode == 'LA':
-                                    l, a = img.split()
-                                    l_inv = ImageOps.invert(l)
-                                    img_out = Image.merge('LA', (l_inv, a))
+                                    lightness, alpha = img.split()
+                                    lightness_inv = ImageOps.invert(lightness)
+                                    img_out = Image.merge('LA', (lightness_inv, alpha))
                                 else:
                                     img_out = ImageOps.invert(img.convert('RGB'))
                                 img_out.save(png_path)
@@ -514,7 +512,7 @@ class Qwen35Agent(DeductiveAgent):
                                             "lookup": lookup,
                                         }
                                         running_futures.append(future)
-                                except Exception as e:
+                                except Exception:
                                     continue
                             
                             # check any done task
@@ -744,18 +742,7 @@ class Qwen35Agent(DeductiveAgent):
         premises = Qwen35Agent._extract_premises(proof)
         goals = Qwen35Agent._extract_goals(proof)
         
-        solved, dep_graph = DDAR.run_ddar("", points, premises, goals, 500, True, True)
-
-        for stmt, deps, reason in dep_graph:
-            conclusion = Statement.from_tokens(
-                stmt, proof.dep_graph)
-            why = []
-            for dep in deps:
-                premise = Statement.from_tokens(
-                    dep, proof.dep_graph)
-                why.append(premise)
-            dep = Dependency.mk(conclusion, reason, tuple(why))
-            proof.dep_graph.hyper_graph[conclusion] = dep
+        solved, _ = DDAR.run_ddar("", points, premises, goals, 500, True, True)
 
         return solved   
 
