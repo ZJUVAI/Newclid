@@ -9,9 +9,18 @@ from fractions import Fraction
 from newclid.agent.ddarn import DDARN
 from newclid.agent.lm import LMAgent
 from newclid.agent.lm_v1 import LMAgentV1
-from newclid.agent.vlm import VLMAgent
-from newclid.agent.vlm_v1 import VLMAgentV1
-from newclid.agent.internvlm import InternVLMAgent
+try:
+    from newclid.agent.vlm import VLMAgent
+except ImportError:
+    VLMAgent = None
+try:
+    from newclid.agent.vlm_v1 import VLMAgentV1
+except ImportError:
+    VLMAgentV1 = None
+try:
+    from newclid.agent.internvlm import InternVLMAgent
+except ImportError:
+    InternVLMAgent = None
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.load_geogebra import load_geogebra
@@ -37,6 +46,12 @@ from newclid.DDAR.build import DDAR
 
 import time
 import multiprocessing as mp
+
+
+_PROBLEM_CONTEXT_AGENT_TYPES = tuple(
+    agent_type for agent_type in (LMAgent, LMAgentV1, VLMAgent, VLMAgentV1, InternVLMAgent)
+    if agent_type is not None
+)
 
 
 # Worker function for subprocess isolation (must be at module level for pickling)
@@ -149,7 +164,7 @@ class GeometricSolverBuilder:
         if self.deductive_agent is None:
             self.deductive_agent = DDARN()
 
-        if isinstance(self.deductive_agent, (LMAgent, LMAgentV1, VLMAgent, VLMAgentV1, InternVLMAgent)):
+        if isinstance(self.deductive_agent, _PROBLEM_CONTEXT_AGENT_TYPES):
             self.deductive_agent.problemJGEX = self.problemJGEX
 
         # proof_state.dep_graph.obtain_numerical_checked_eqangle_and_eqratio()
