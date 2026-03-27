@@ -17,14 +17,35 @@ def ray_solve_problem(args):
     """
     Process a single problem and return whether it was solved successfully along with the time taken.
     """
-    pid, problem_name, problems_path, model_path, decoding_size, beam_size, search_depth, timeout, agent_type = args
+    (
+        pid,
+        problem_name,
+        problems_path,
+        model_path,
+        decoding_size,
+        beam_size,
+        search_depth,
+        timeout,
+        agent_type,
+        image_mode,
+    ) = args
     start_time = time.time()
     try:
         # print(f"building problem: {problem_name}")
         # Select agent based on agent_type
         if agent_type == "vlm":
-            agent = VLMAgent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
+            agent = VLMAgent(
+                model_path,
+                decoding_size=decoding_size,
+                beam_size=beam_size,
+                search_depth=search_depth,
+                image_mode=image_mode,
+            )
         elif agent_type == "internvlm":
+            if image_mode != "full":
+                raise ValueError(
+                    f"image_mode={image_mode} is only supported for agent_type='vlm'"
+                )
             agent = InternVLMAgent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
         else:
             raise ValueError(f"Unknown agent type: {agent_type}. Must be 'vlm' or 'internvlm'")
@@ -66,7 +87,17 @@ def render_table(all_tasks_info, start_time, reorder: bool):
         table.add_row(problem_name, status, elapsed)
     return table
 
-def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding_size: int, beam_size: int, search_depth: int, timeout: int = 3600, agent_type: str = "vlm"):
+def solve_problems(
+    filepath: Path,
+    modelpath: list[str],
+    num_cpus: int,
+    decoding_size: int,
+    beam_size: int,
+    search_depth: int,
+    timeout: int = 3600,
+    agent_type: str = "vlm",
+    image_mode: str = "full",
+):
     """
     Main function, read the file and execute tasks using Ray.
     """
@@ -83,6 +114,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
  
     print(f"Total problems to solve: {len(problem_names)}")
     print(f"Using agent: {agent_type}")
+    print(f"Using image mode: {image_mode}")
 
     # Multi-threaded execution using Ray with limited concurrent tasks
     # Initialize Ray with specified number of CPUs
@@ -101,7 +133,20 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
     
     # Submit all tasks
     for i, problem_name in enumerate(problem_names):
-        task = ray_solve_problem.remote((i, problem_name, filepath, modelpath, decoding_size, beam_size, search_depth, timeout, agent_type))
+        task = ray_solve_problem.remote(
+            (
+                i,
+                problem_name,
+                filepath,
+                modelpath,
+                decoding_size,
+                beam_size,
+                search_depth,
+                timeout,
+                agent_type,
+                image_mode,
+            )
+        )
         all_tasks_info.append((problem_name, "Pending", 0))
         pending_tasks.append(task)
     
@@ -136,7 +181,11 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
         model_name = f"{parent_folder}_{deepest_folder}" if parent_folder else deepest_folder
     
     # Create CSV filename with parameters
-    csv_filename = f"eval_{problems_name}_{model_name}_d{decoding_size}_b{beam_size}_s{search_depth}.csv"
+    image_mode_slug = image_mode.replace("_", "-")
+    csv_filename = (
+        f"eval_{problems_name}_{model_name}_img-{image_mode_slug}"
+        f"_d{decoding_size}_b{beam_size}_s{search_depth}.csv"
+    )
     
     # Ensure results directory exists
     results_dir = Path("results")
@@ -169,7 +218,29 @@ if __name__ == "__main__":
     parser.add_argument("--timeout", type=int, default=7200, help="Timeout for each problem")
     parser.add_argument("--agent", type=str, default="vlm", choices=["vlm", "internvlm"],
                         help="Agent type to use: 'vlm' for VLMAgent or 'internvlm' for InternVLMAgent")
+    parser.add_argument(
+        "--image_mode",
+        type=str,
+        default="full",
+        choices=["full", "white", "masked_quadrant"],
+        help="Image preprocessing mode for VLMAgent evaluation",
+    )
     args = parser.parse_args()
-    
+
+    if args.agent != "vlm" and args.image_mode != "full":
+        raise ValueError(
+            f"--image_mode {args.image_mode} is only supported when --agent vlm"
+        )
+
     problems_path = Path(args.problems_path)
-    solve_problems(problems_path, args.model_path, num_cpus=args.max_workers, decoding_size=args.decoding_size, beam_size=args.beam_size, search_depth=args.search_depth, timeout=args.timeout, agent_type=args.agent)
+    solve_problems(
+        problems_path,
+        args.model_path,
+        num_cpus=args.max_workers,
+        decoding_size=args.decoding_size,
+        beam_size=args.beam_size,
+        search_depth=args.search_depth,
+        timeout=args.timeout,
+        agent_type=args.agent,
+        image_mode=args.image_mode,
+    )

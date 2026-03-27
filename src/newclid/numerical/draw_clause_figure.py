@@ -45,7 +45,13 @@ def draw_clause_figure(
         draw_annotations=draw_annotations,
     )
     if save_to is not None:
-        fig.savefig(save_to, format='svg')
+        save_path = Path(save_to)
+        if save_path.suffix.lower() == ".svg":
+            fig.savefig(save_to, format="svg")
+        elif save_path.suffix.lower() == ".png":
+            fig.savefig(save_to, format="png")
+        else:
+            fig.savefig(save_to)
 
 def draw_clauses(
     ax: "Axes",

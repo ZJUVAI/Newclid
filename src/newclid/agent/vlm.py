@@ -15,7 +15,6 @@ import numpy as np
 import torch
 from modelscope import Qwen3VLForConditionalGeneration, AutoProcessor, DynamicCache
 from qwen_vl_utils import process_vision_info 
-import cairosvg
 from PIL import Image, ImageOps
 from copy import deepcopy
 
@@ -58,11 +57,26 @@ AUX_PREDICATES = [
 ]
 
 class VLMAgent(DeductiveAgent):
-    def __init__(self, model_path: list[str], decoding_size: int, beam_size: int, search_depth: int):
+    VALID_IMAGE_MODES = ("full", "white", "masked_quadrant")
+
+    def __init__(
+        self,
+        model_path: list[str],
+        decoding_size: int,
+        beam_size: int,
+        search_depth: int,
+        image_mode: str = "full",
+    ):
         self.any_new_statement_has_been_added = True
         self.decoding_size = decoding_size
         self.beam_size = beam_size
         self.search_depth = search_depth
+        if image_mode not in self.VALID_IMAGE_MODES:
+            raise ValueError(
+                f"Unsupported image_mode: {image_mode}. "
+                f"Expected one of {self.VALID_IMAGE_MODES}"
+            )
+        self.image_mode = image_mode
         # LLM model
         self.model_path = model_path
         self.models = []
@@ -79,6 +93,70 @@ class VLMAgent(DeductiveAgent):
             processor = AutoProcessor.from_pretrained("Qwen/Qwen3-VL-2B-Instruct")
             self.models.append(model)
             self.processors.append(processor)
+
+    @staticmethod
+    def _invert_image(img: Image.Image) -> Image.Image:
+        if img.mode == "RGBA":
+            r, g, b, a = img.split()
+            rgb_img = Image.merge("RGB", (r, g, b))
+            inverted_rgb = ImageOps.invert(rgb_img)
+            r_inv, g_inv, b_inv = inverted_rgb.split()
+            return Image.merge("RGBA", (r_inv, g_inv, b_inv, a))
+        if img.mode == "LA":
+            l, a = img.split()
+            l_inv = ImageOps.invert(l)
+            return Image.merge("LA", (l_inv, a))
+        return ImageOps.invert(img.convert("RGB"))
+
+    @staticmethod
+    def _white_fill_for_mode(mode: str):
+        if mode == "RGBA":
+            return (255, 255, 255, 255)
+        if mode == "LA":
+            return (255, 255)
+        return (255, 255, 255)
+
+    def _prepare_eval_image(self, png_path: str, rng: np.random.Generator) -> None:
+        with Image.open(png_path) as img:
+            img.load()
+            processed_img = self._invert_image(img)
+
+        if self.image_mode == "full":
+            output_img = processed_img
+        elif self.image_mode == "white":
+            output_img = Image.new(
+                processed_img.mode,
+                processed_img.size,
+                self._white_fill_for_mode(processed_img.mode),
+            )
+        elif self.image_mode == "masked_quadrant":
+            output_img = processed_img.copy()
+            width, height = output_img.size
+            mid_x = width // 2
+            mid_y = height // 2
+            quadrants = (
+                (0, 0, mid_x, mid_y),
+                (mid_x, 0, width, mid_y),
+                (0, mid_y, mid_x, height),
+                (mid_x, mid_y, width, height),
+            )
+            quadrant_idx = int(rng.integers(0, len(quadrants)))
+            output_img.paste(
+                self._white_fill_for_mode(output_img.mode),
+                quadrants[quadrant_idx],
+            )
+            logger.info(
+                "Applied masked_quadrant image mode to %s with quadrant %s",
+                png_path,
+                quadrant_idx,
+            )
+        else:
+            raise ValueError(
+                f"Unsupported image_mode: {self.image_mode}. "
+                f"Expected one of {self.VALID_IMAGE_MODES}"
+            )
+
+        output_img.save(png_path)
         
     @torch.no_grad()
     def inference(self, model, processor, query: str, img_path: str, new_point_name: str, response_prefix: str = '<aux>', with_predicate: bool = True):
@@ -275,61 +353,23 @@ class VLMAgent(DeductiveAgent):
 
                             # draw current figure
                             timestamp = int(time.time()*1000)
-                            svg_path = os.path.join(image_dir, f"{timestamp}.svg")
                             png_path = os.path.join(image_dir, f"{timestamp}.png")
                             
                             try:
                                 draw_clause_figure(
-                                    current_proof, problem, svg_path, current_proof.rng, draw_annotations=True
+                                    current_proof, problem, png_path, current_proof.rng, draw_annotations=True
                                 )
-                                
-                                # 检查 SVG 文件是否存在且不为空
-                                if not os.path.exists(svg_path) or os.path.getsize(svg_path) == 0:
-                                    logger.error(f"SVG file {svg_path} is empty or doesn't exist")
-                                    continue
-                                
-                                # 转换 SVG 到 PNG
-                                cairosvg.svg2png(
-                                    url=str(svg_path),
-                                    write_to=str(png_path),
-                                    output_width=512,
-                                )
-                                
+
                                 # 检查 PNG 文件是否存在且不为空
                                 if not os.path.exists(png_path) or os.path.getsize(png_path) == 0:
                                     logger.error(f"PNG file {png_path} is empty or doesn't exist")
                                     continue
 
-                                # 对生成的 PNG 进行反色处理
-                                with Image.open(png_path) as img:
-                                    # 确保图像已完全加载
-                                    img.load()
-                                    
-                                    if img.mode == 'RGBA':
-                                        r, g, b, a = img.split()
-                                        rgb_img = Image.merge('RGB', (r, g, b))
-                                        inverted_rgb = ImageOps.invert(rgb_img)
-                                        r_inv, g_inv, b_inv = inverted_rgb.split()
-                                        img_out = Image.merge('RGBA', (r_inv, g_inv, b_inv, a))
-                                    elif img.mode == 'LA':
-                                        l, a = img.split()
-                                        l_inv = ImageOps.invert(l)
-                                        img_out = Image.merge('LA', (l_inv, a))
-                                    else:
-                                        img_out = ImageOps.invert(img.convert('RGB'))
-                                    
-                                    # 保存到同一路径
-                                    img_out.save(png_path)
-                                    
+                                self._prepare_eval_image(png_path, current_proof.rng)
+
                             except Exception as e:
                                 logger.error(f"Error processing image {png_path}: {e}")
                                 continue
-
-                            # 使用纯白图片
-                            # with Image.open(png_path) as img:
-                            #     img_out = Image.new('RGB', img.size, (255, 255, 255))
-                            #     img_out.save(png_path)
-                            # logger.info("finish drawing")         
 
                             p_dsl = self.problem_to_dsl(problem, base_proof.defs)
                             logger.info(f"inferencing on query ({queue_type}): {p_dsl}")
