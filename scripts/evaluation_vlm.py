@@ -7,8 +7,6 @@ import csv
 from rich.live import Live
 from rich.table import Table
 
-from newclid.agent.vlm import VLMAgent
-from newclid.agent.internvlm import InternVLMAgent
 from newclid.api import GeometricSolverBuilder
 from newclid.generation.problem_worker import GeometryProblemWorker
 
@@ -34,6 +32,7 @@ def ray_solve_problem(args):
         # print(f"building problem: {problem_name}")
         # Select agent based on agent_type
         if agent_type == "vlm":
+            from newclid.agent.vlm import VLMAgent
             agent = VLMAgent(
                 model_path,
                 decoding_size=decoding_size,
@@ -46,6 +45,7 @@ def ray_solve_problem(args):
                 raise ValueError(
                     f"image_mode={image_mode} is only supported for agent_type='vlm'"
                 )
+            from newclid.agent.internvlm import InternVLMAgent
             agent = InternVLMAgent(model_path, decoding_size=decoding_size, beam_size=beam_size, search_depth=search_depth)
         else:
             raise ValueError(f"Unknown agent type: {agent_type}. Must be 'vlm' or 'internvlm'")
@@ -222,7 +222,7 @@ if __name__ == "__main__":
         "--image_mode",
         type=str,
         default="full",
-        choices=["full", "white", "masked_quadrant"],
+        choices=["full", "white", "masked_quadrant", "downsample_upsample"],
         help="Image preprocessing mode for VLMAgent evaluation",
     )
     args = parser.parse_args()

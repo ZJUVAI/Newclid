@@ -13,8 +13,8 @@ import string
 import ray
 import numpy as np
 import torch
-from modelscope import Qwen3VLForConditionalGeneration, AutoProcessor, DynamicCache
-from qwen_vl_utils import process_vision_info 
+from modelscope import snapshot_download
+from transformers import AutoProcessor, DynamicCache, Qwen3VLForConditionalGeneration
 from PIL import Image, ImageOps
 from copy import deepcopy
 
@@ -44,6 +44,28 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 # logger.setLevel(logging.INFO)
+from qwen_vl_utils import process_vision_info
+
+DEFAULT_VLM_PROCESSOR_MODEL_ID = os.getenv(
+    "GENESISGEO_VLM_PROCESSOR_MODEL_ID",
+    "Qwen/Qwen3-VL-2B-Instruct",
+)
+PROCESSOR_ALLOW_PATTERNS = [
+    "processor_config.json",
+    "preprocessor_config.json",
+    "tokenizer.json",
+    "tokenizer_config.json",
+    "special_tokens_map.json",
+    "added_tokens.json",
+    "chat_template.json",
+    "vocab.json",
+    "merges.txt",
+    "*.model",
+    "*.tiktoken",
+    "config.json",
+    "generation_config.json",
+    "*.py",
+]
 
 AUX_PREDICATES = [
     # "coll",
@@ -57,7 +79,7 @@ AUX_PREDICATES = [
 ]
 
 class VLMAgent(DeductiveAgent):
-    VALID_IMAGE_MODES = ("full", "white", "masked_quadrant")
+    VALID_IMAGE_MODES = ("full", "white", "masked_quadrant", "downsample_upsample")
 
     def __init__(
         self,
@@ -81,18 +103,51 @@ class VLMAgent(DeductiveAgent):
         self.model_path = model_path
         self.models = []
         self.processors = []
+        self._process_vision_info = process_vision_info
         # Load all models and processors
         for path in self.model_path:
+            resolved_model_path = self._resolve_model_path(path)
+            processor_source = self._resolve_processor_path(resolved_model_path)
+
             model = Qwen3VLForConditionalGeneration.from_pretrained(
-                path,
+                resolved_model_path,
                 torch_dtype="auto",
                 device_map="auto", #"sequential",
                 attn_implementation="flash_attention_2"  # Sliding Window Attention is enabled but not implemented for others
             )
-            # processor = AutoProcessor.from_pretrained(path)
-            processor = AutoProcessor.from_pretrained("Qwen/Qwen3-VL-2B-Instruct")
+            processor = AutoProcessor.from_pretrained(processor_source)
             self.models.append(model)
             self.processors.append(processor)
+
+    @staticmethod
+    def _is_local_model_path(path: str) -> bool:
+        return os.path.isdir(path) or os.path.isfile(path)
+
+    @classmethod
+    def _download_from_modelscope(
+        cls,
+        model_id: str,
+        allow_patterns: list[str] | None = None,
+    ) -> str:
+        logger.info("Downloading %s from ModelScope", model_id)
+        return snapshot_download(model_id=model_id, allow_patterns=allow_patterns)
+
+    @classmethod
+    def _resolve_model_path(cls, path: str) -> str:
+        if cls._is_local_model_path(path):
+            return path
+        return cls._download_from_modelscope(path)
+
+    @classmethod
+    def _resolve_processor_path(cls, model_path: str) -> str:
+        processor_config = os.path.join(model_path, "processor_config.json")
+        tokenizer_config = os.path.join(model_path, "tokenizer_config.json")
+        if os.path.exists(processor_config) or os.path.exists(tokenizer_config):
+            return model_path
+        return cls._download_from_modelscope(
+            DEFAULT_VLM_PROCESSOR_MODEL_ID,
+            allow_patterns=PROCESSOR_ALLOW_PATTERNS,
+        )
 
     @staticmethod
     def _invert_image(img: Image.Image) -> Image.Image:
@@ -115,6 +170,11 @@ class VLMAgent(DeductiveAgent):
         if mode == "LA":
             return (255, 255)
         return (255, 255, 255)
+
+    @staticmethod
+    def _pil_resampling(name: str):
+        resampling = getattr(Image, "Resampling", Image)
+        return getattr(resampling, name)
 
     def _prepare_eval_image(self, png_path: str, rng: np.random.Generator) -> None:
         with Image.open(png_path) as img:
@@ -149,6 +209,25 @@ class VLMAgent(DeductiveAgent):
                 "Applied masked_quadrant image mode to %s with quadrant %s",
                 png_path,
                 quadrant_idx,
+            )
+        elif self.image_mode == "downsample_upsample":
+            original_size = processed_img.size
+            low_res_size = (
+                max(1, min(128, original_size[0])),
+                max(1, min(128, original_size[1])),
+            )
+            downsampled_img = processed_img.resize(
+                low_res_size,
+                resample=self._pil_resampling("BOX"),
+            )
+            output_img = downsampled_img.resize(
+                original_size,
+                resample=self._pil_resampling("BILINEAR"),
+            )
+            logger.info(
+                "Applied downsample_upsample image mode to %s with low-res size %s",
+                png_path,
+                low_res_size,
             )
         else:
             raise ValueError(
@@ -192,7 +271,7 @@ class VLMAgent(DeductiveAgent):
 
         # 2. Prepare image input
         # use process_vision_info to parse images/videos from messages
-        image_inputs, video_inputs = process_vision_info(messages, image_patch_size=16)
+        image_inputs, video_inputs = self._process_vision_info(messages, image_patch_size=16)
         
         # 3. Generate the base text Prompt (without response_prefix)
         # add_generation_prompt=True will append "<|im_start|>assistant\n"
