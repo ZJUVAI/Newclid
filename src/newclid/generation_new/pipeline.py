@@ -157,6 +157,7 @@ class ProblemPipeline:
         prune=True,
         remove_coords=False,
         construction_config=None,
+        use_cache=False,
     ):
         self.n_clauses = n_clauses
         self.min_proof_steps = min_proof_steps
@@ -181,8 +182,21 @@ class ProblemPipeline:
         self.prune = prune
         self.remove_coords = remove_coords
         self.construction_config = construction_config
+        self.use_cache = use_cache
         self.data_count = 0
         self.written_count = 0  # Track actually written data count
+
+        # Load seed cache
+        self.seed_cache = {}
+        self.cache_file = os.path.join(self.output_dir, "seed_cache.jsonl")
+        if self.use_cache and os.path.exists(self.cache_file):
+            with open(self.cache_file, 'r') as f:
+                for line in f:
+                    if line.strip():
+                        entry = json.loads(line)
+                        key = (entry['seed'], entry['n_clauses'])
+                        self.seed_cache[key] = entry
+            logging.info(f"Loaded {len(self.seed_cache)} entries from cache")
         # Serialize defs for Ray remote tasks
         self.defs_data = {k: v._asdict() for k, v in self.defs.items()}
         # Pending draw tasks and their associated data
@@ -321,8 +335,19 @@ class ProblemPipeline:
 
         def task_generator():
             for i in range(10**9):
-                # seed = 42 + i  # 唯一种子 = 42 + 任务ID
                 seed = MACHINE_BASE_SEED + i
+                fl_statement = None
+
+                # Check cache if enabled
+                if self.use_cache:
+                    cache_key = (seed, self.n_clauses)
+                    if cache_key in self.seed_cache:
+                        entry = self.seed_cache[cache_key]
+                        # Cache hit: only process seeds with real aux points
+                        if not entry.get('has_real_aux', False):
+                            continue
+                        fl_statement = entry.get('fl_statement')
+
                 yield (
                     i,
                     seed,
@@ -335,6 +360,7 @@ class ProblemPipeline:
                     self.prune,
                     self.remove_coords,
                     self.construction_config,
+                    fl_statement,
                 )
 
         if not ray.is_initialized():
@@ -350,7 +376,7 @@ class ProblemPipeline:
         start_time = time.time()
         all_data_len = self.data_count  # Total generated (including pending draw)
         all_data_len_raw = self.data_count
-        pending_tasks = {}
+        pending_tasks = {}  # task_id -> (start_time, seed)
         last_logged_written = self.written_count
         
         while self.written_count < self.n_samples:
@@ -369,9 +395,24 @@ class ProblemPipeline:
                     logging.error(f"Task failed: {e}")
                     task_success = False
 
-                del pending_tasks[task_id]
+                _, seed = pending_tasks.pop(task_id)
 
                 if task_success:
+                    # Update cache if enabled
+                    if self.use_cache:
+                        has_real_aux = summary.get('has_real_aux', False) if summary else False
+                        cache_entry = {
+                            'seed': seed,
+                            'n_clauses': self.n_clauses,
+                            'has_real_aux': has_real_aux,
+                            'fl_statement': summary.get('fl_statement') if has_real_aux else None,
+                        }
+                        cache_key = (seed, self.n_clauses)
+                        if cache_key not in self.seed_cache:
+                            self.seed_cache[cache_key] = cache_entry
+                            with open(self.cache_file, 'a') as f:
+                                f.write(json.dumps(cache_entry) + '\n')
+
                     all_data_len_raw += len(data)
                     data = self.problem_hash_filter(data, 'llm_input_renamed')
                     if data:
@@ -408,7 +449,7 @@ class ProblemPipeline:
                                 f"ETA: {timedelta(seconds=int(self.n_samples/max(1,self.written_count)*elapsed_time - elapsed_time))}"
                             )
                             last_logged_written = self.written_count
-            for task, s_time in list(pending_tasks.items()):
+            for task, (s_time, _) in list(pending_tasks.items()):
                 if time.time() - s_time > self.timeout:
                     print(f"⚠️ Task {task} timeout. Canceling")
                     ray.cancel(task, force=True)
@@ -416,8 +457,9 @@ class ProblemPipeline:
 
             while len(pending_tasks) < max_pending:
                 task_args = next(task_iterator)
-                pending_tasks[ProblemWorker.ray_process_single_problem.remote(
-                    task_args)] = time.time()
+                seed = task_args[1]
+                task_id = ProblemWorker.ray_process_single_problem.remote(task_args)
+                pending_tasks[task_id] = (time.time(), seed)
 
         # Cancel any remaining problem generation tasks
         for task in pending_tasks.keys():
@@ -501,6 +543,8 @@ def main():
         default=None,
         help="Optional JSON file defining construction sets and the three sampler steps.",
     )
+    parser.add_argument("--use_cache", required=False, type=str_to_bool, default=False,
+                        help="Whether to use seed cache to skip already-computed seeds.")
     args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, args.log_level.upper()), force=True)
@@ -523,6 +567,7 @@ def main():
         prune=args.prune,
         remove_coords=args.remove_coords,
         construction_config=construction_config,
+        use_cache=args.use_cache,
     )
     generator.generate()
 
