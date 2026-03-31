@@ -10,7 +10,7 @@ from itertools import combinations
 
 import numpy as np
 
-from .primitives import TOLERANCE
+from .utils import TOLERANCE
 
 
 def circles(

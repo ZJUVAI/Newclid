@@ -26,7 +26,7 @@ newclid --problem-name <name> --env <env> --agent <agent> [options]
 
 ### 数据生成
 ```bash
-python src/newclid/generation/generate.py --n_threads=30 --n_samples=5000000 --timeout=3600
+python -m newclid.generation.pipeline --n_threads=30 --n_samples=5000000 --timeout=3600
 ```
 
 ### 模型评估
@@ -50,8 +50,7 @@ GenesisGeo/
 │   │   ├── ddarn.py                # DDARN 符号推理
 │   │   ├── lm.py                   # 语言模型代理
 │   │   └── vlm.py                  # 视觉语言模型代理
-│   ├── generation/                 # 数据生成（旧版）
-│   ├── generation_new/             # 数据生成（新版，重构后）
+│   ├── generation/                 # 数据生成（重构后）
 │   ├── DDAR/                       # C++ 符号引擎
 │   ├── dependencies/               # 依赖图管理
 │   ├── formulations/               # 问题表示
@@ -74,8 +73,7 @@ GenesisGeo/
 | `proof.py` | 证明状态 | `ProofState` |
 | `agent/ddarn.py` | 符号推理 | `DDARNAgent` |
 | `agent/lm.py` | LLM 辅助构造 | `LMAgent` |
-| `generation/` | 数据生成 | `GeometryGenerator` |
-| `generation_new/` | 新数据生成 | `ProblemPipeline`, `ProblemSampler` |
+| `generation/` | 数据生成 | `ProblemPipeline`, `ProblemSampler` |
 
 ---
 
@@ -182,7 +180,7 @@ a b c = triangle a b c; d = free d; e = on_circum e c b d, angle_bisector e a d 
 
 ---
 
-## generation_new 模块命名
+## generation 模块命名
 
 | 文件 | 类 | 用途 |
 |------|-----|------|
@@ -191,6 +189,7 @@ a b c = triangle a b c; d = free d; e = on_circum e c b d, angle_bisector e a d 
 | `filter.py` | `GoalFilter` | 目标过滤 |
 | `worker.py` | `ProblemWorker` | 问题处理 |
 | `pipeline.py` | `ProblemPipeline` | 生成流水线 |
+| `writer.py` | `Writer` | 数据写入和图像生成 |
 | `constructions.py` | - | 构造类型常量 |
 | `statistics.py` | `Statistics` | 统计信息 |
 | `auxiliary/` | - | 辅助点查找子包 |

@@ -1,7 +1,11 @@
 """
-Intersection utilities for geometric calculations.
+Geometric point construction utilities.
 
-Provides functions for calculating intersections between lines and circles.
+Provides functions for constructing auxiliary points including:
+- Intersections between lines and circles
+- Midpoints
+- Reflections (over points and lines)
+- Feet (perpendicular projections)
 """
 
 from collections import defaultdict
@@ -9,9 +13,9 @@ from itertools import combinations
 
 import numpy as np
 
-from .primitives import TOLERANCE, round_coord
-from .line_utils import lines
-from .circle_utils import circles
+from .utils import TOLERANCE, round_coord
+from .line_utils import lines, check_on_line
+from .circle_utils import circles, check_on_circle
 
 
 def intersection_between_lines(
@@ -322,5 +326,164 @@ def intersection_between_line_and_circle(
             ("on_line", [smallest_line[0], smallest_line[1]]),
         ]
         result.append((coord, constructions))
+
+    return result
+
+
+def midpoint(
+    point_names: list[str],
+    coords: dict[str, tuple[float, float]],
+    lines_result: list[tuple[str, ...]] | None = None,
+    circles_result: list[dict] | None = None,
+) -> list[tuple[tuple[float, float], list[tuple[str, list[str]]]]]:
+    """
+    Find midpoints that lie on non-trivial lines or circles.
+
+    Args:
+        point_names: List of point names.
+        coords: Dict mapping point names to (x, y) coordinates.
+        lines_result: Optional pre-computed lines result to avoid recomputation.
+        circles_result: Optional pre-computed circles result to avoid recomputation.
+
+    Returns:
+        List of (coord, constructions) tuples where:
+        - coord: (x, y) midpoint coordinate
+        - constructions: List of (construction_type, args) tuples,
+          e.g., [("midpoint", ["a", "b"])]
+    """
+    result = []
+    ls = lines_result if lines_result is not None else lines(point_names, coords)
+    cs = circles_result if circles_result is not None else circles(point_names, coords)
+
+    for p1, p2 in combinations(point_names, 2):
+        x1, y1 = coords[p1]
+        x2, y2 = coords[p2]
+        mid_coord = ((x1 + x2) / 2, (y1 + y2) / 2)
+
+        # Require midpoint to be on a non-trivial line or circle
+        if check_on_line(mid_coord, ls, coords, [[p1, p2]]) or check_on_circle(mid_coord, cs, coords):
+            constructions = [("midpoint", [p1, p2])]
+            result.append((mid_coord, constructions))
+
+    return result
+
+
+def reflection(
+    point_names: list[str],
+    coords: dict[str, tuple[float, float]],
+    lines_result: list[tuple[str, ...]] | None = None,
+    circles_result: list[dict] | None = None,
+) -> list[tuple[tuple[float, float], list[tuple[str, list[str]]]]]:
+    """
+    Find reflection points (over points and lines) that lie on non-trivial lines or circles.
+
+    Args:
+        point_names: List of point names.
+        coords: Dict mapping point names to (x, y) coordinates.
+        lines_result: Optional pre-computed lines result to avoid recomputation.
+        circles_result: Optional pre-computed circles result to avoid recomputation.
+
+    Returns:
+        List of (coord, constructions) tuples where:
+        - coord: (x, y) reflection point coordinate
+        - constructions: List of (construction_type, args) tuples,
+          e.g., [("mirror", ["p", "c"])] for point reflection
+          or [("reflect", ["p", "a", "b"])] for line reflection
+    """
+    result = []
+    ls = lines_result if lines_result is not None else lines(point_names, coords)
+    cs = circles_result if circles_result is not None else circles(point_names, coords)
+
+    # Reflection over points
+    for center_name in point_names:
+        for pt_name in point_names:
+            if pt_name == center_name:
+                continue
+            center_coord = coords[center_name]
+            pt_coord = coords[pt_name]
+            refl_coord = (
+                2 * center_coord[0] - pt_coord[0],
+                2 * center_coord[1] - pt_coord[1]
+            )
+
+            if check_on_line(refl_coord, ls, coords, [[center_name, pt_name]]) or check_on_circle(refl_coord, cs, coords):
+                constructions = [("mirror", [pt_name, center_name])]
+                result.append((refl_coord, constructions))
+
+    # Reflection over lines
+    for l in ls:
+        line_sorted = sorted(l)
+        for pt_name in point_names:
+            if pt_name in line_sorted:
+                continue
+            px, py = coords[pt_name]
+            x1, y1 = coords[line_sorted[0]]
+            x2, y2 = coords[line_sorted[1]]
+            abx = x2 - x1
+            aby = y2 - y1
+            denom = abx * abx + aby * aby
+
+            if abs(denom) < TOLERANCE:
+                continue
+
+            apx = px - x1
+            apy = py - y1
+            t = (apx * abx + apy * aby) / denom
+            foot_coord = (x1 + t * abx, y1 + t * aby)
+            refl_coord = (2 * foot_coord[0] - px, 2 * foot_coord[1] - py)
+
+            if check_on_line(refl_coord, ls, coords) or check_on_circle(refl_coord, cs, coords):
+                constructions = [("reflect", [pt_name, line_sorted[0], line_sorted[1]])]
+                result.append((refl_coord, constructions))
+
+    return result
+
+
+def foot(
+    point_names: list[str],
+    coords: dict[str, tuple[float, float]],
+    lines_result: list[tuple[str, ...]] | None = None,
+) -> list[tuple[tuple[float, float], list[tuple[str, list[str]]]]]:
+    """
+    Find foot points (perpendicular projections) that lie on non-trivial lines.
+
+    Args:
+        point_names: List of point names.
+        coords: Dict mapping point names to (x, y) coordinates.
+        lines_result: Optional pre-computed lines result to avoid recomputation.
+
+    Returns:
+        List of (coord, constructions) tuples where:
+        - coord: (x, y) foot point coordinate
+        - constructions: List of (construction_type, args) tuples,
+          e.g., [("foot", ["p", "a", "b"])]
+    """
+    ls = lines_result if lines_result is not None else lines(point_names, coords)
+    result = []
+
+    for l in ls:
+        line_sorted = sorted(l)
+        for pt_name in point_names:
+            if pt_name in line_sorted:
+                continue
+            px, py = coords[pt_name]
+            x1, y1 = coords[line_sorted[0]]
+            x2, y2 = coords[line_sorted[1]]
+            abx = x2 - x1
+            aby = y2 - y1
+            denom = abx * abx + aby * aby
+
+            if abs(denom) < TOLERANCE:
+                continue
+
+            apx = px - x1
+            apy = py - y1
+            t = (apx * abx + apy * aby) / denom
+            foot_coord = (x1 + t * abx, y1 + t * aby)
+
+            # Require foot to be on a non-trivial line
+            if check_on_line(foot_coord, ls, coords, [[pt_name], line_sorted]):
+                constructions = [("foot", [pt_name, line_sorted[0], line_sorted[1]])]
+                result.append((foot_coord, constructions))
 
     return result

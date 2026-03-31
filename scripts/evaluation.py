@@ -11,7 +11,6 @@ from rich.table import Table
 from newclid.agent.lm import LMAgent
 from newclid.agent.qwen35_text import Qwen35TextAgent
 from newclid.api import GeometricSolverBuilder
-from newclid.generation.problem_worker import GeometryProblemWorker
 from newclid.problem_db import ProblemDBRuntime, ProblemDBWriter
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()

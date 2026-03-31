@@ -11,7 +11,7 @@ from itertools import combinations
 
 import numpy as np
 
-from .primitives import TOLERANCE, normalize_direction
+from .utils import TOLERANCE, normalize_direction
 
 
 def extract_points(text: str) -> tuple[list[str], dict[str, tuple[float, float]]]:

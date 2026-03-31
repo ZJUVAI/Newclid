@@ -31,9 +31,9 @@ from newclid.numerical.distances import (
     check_too_close_numerical,
 )
 
-from newclid.generation_new.point_naming import PointNaming
-from newclid.generation_new.constructions import resolve_construction_config
-from newclid.generation_new.auxiliary import add_potential_points
+from newclid.generation.point_naming import PointNaming
+from newclid.generation.constructions import resolve_construction_config
+from newclid.generation.auxiliary import add_potential_points
 
 MAX_TRY = 10
 
