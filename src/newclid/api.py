@@ -27,12 +27,147 @@ import numpy as np
 from newclid.statement import Statement
 from newclid.tools import atomize
 from newclid.webapp import pull_to_server
-from newclid.numerical.geometries import PointNum
+from newclid.numerical.geometries import PointNum, reduce as _geo_reduce, InvalidIntersectError, InvalidReduceError
 from newclid.dependencies.dependency import Dependency
 from newclid.DDAR.build import DDAR
+from newclid.formulations.clause import translate_sentence
+from newclid.numerical.sketch import sketch
+from newclid.numerical.distances import (
+    PointTooCloseError, PointTooFarError,
+    check_too_close_numerical, check_too_far_numerical,
+)
+from newclid.dependencies.symbols import Point
 
 import time
 import multiprocessing as mp
+
+
+def _light_build(
+    problemJGEX: "ProblemJGEX",
+    defs: "dict[str, DefinitionJGEX]",
+    rng,
+    max_attempts: int = 10000,
+) -> "tuple[list, list, list]":
+    """轻量化 build，只提取坐标、前提、目标，跳过所有符号推理相关操作。
+
+    Returns:
+        points:   [(name, x, y), ...]
+        premises: [(predicate, [arg, ...]), ...]
+        goals:    [(predicate, [arg, ...]), ...]
+    """
+    err: Exception = Exception("Build failed")
+
+    for _ in range(max_attempts):
+        point_nums: dict[str, PointNum] = {}
+        raw_premises: list[tuple[str, list[str]]] = []
+
+        try:
+            for construction in problemJGEX.constructions:
+                existing_nums = list(point_nums.values())
+                construction_arg_nums: list[PointNum] = []
+                numerics: list[tuple[str, ...]] = []
+
+                for constr_sentence in construction.sentences:
+                    cdef = defs[constr_sentence[0]]
+                    if len(constr_sentence) == len(cdef.declare):
+                        mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
+                    else:
+                        assert len(constr_sentence) + len(construction.points) == len(cdef.declare)
+                        mapping = dict(zip(cdef.declare[1:], construction.points + constr_sentence[1:]))
+
+                    # 收集参与 reduce 的已有点坐标
+                    for arg in cdef.args:
+                        name = mapping[arg]
+                        if name in point_nums:
+                            num = point_nums[name]
+                            if num not in construction_arg_nums:
+                                construction_arg_nums.append(num)
+
+                    # 直接从 basics 收集前提 tuple，跳过 Statement / dep_graph
+                    for bs in cdef.basics:
+                        for t in bs.sentences:
+                            translated = translate_sentence(mapping, t)
+                            if translated:
+                                raw_premises.append((translated[0], list(translated[1:])))
+
+                    # 收集数值构造描述
+                    for n in cdef.numerics:
+                        numerics.append(tuple(mapping.get(a, a) for a in n))
+
+                # 解析新点名称和固定坐标
+                point_names: list[str] = []
+                fix_positions: list[Optional[PointNum]] = []
+                for s in construction.points:
+                    if "@" in s:
+                        name, pos = atomize(s, "@")
+                        x, y = atomize(pos, "_")
+                        point_names.append(name)
+                        fix_positions.append(PointNum(x, y))
+                    else:
+                        point_names.append(s)
+                        fix_positions.append(None)
+
+                # 计算坐标
+                if None in fix_positions:
+                    to_be_intersected = []
+                    for n in numerics:
+                        args: list = []
+                        for t in n[1:]:
+                            if t and t[0].isalpha():
+                                args.append(point_nums[t])
+                            else:
+                                args.append(t)
+                        to_be_intersected += sketch(n[0], tuple(args), rng)
+                    new_nums = _geo_reduce(to_be_intersected, existing_nums, construction_arg_nums, rng=rng)
+                    for name, num, fixed in zip(point_names, new_nums, fix_positions):
+                        point_nums[name] = fixed if fixed is not None else num
+                else:
+                    new_nums = list(fix_positions)
+                    for name, num in zip(point_names, fix_positions):
+                        point_nums[name] = num
+
+                # 距离检查（保证数值稳定）
+                if check_too_close_numerical(new_nums, existing_nums):
+                    raise PointTooCloseError()
+                if check_too_far_numerical(new_nums, existing_nums):
+                    raise PointTooFarError()
+
+            # 解析 goals 并收集有用的点
+            raw_goals: list[tuple[str, list[str]]] = []
+            useful_points: set[str] = set()
+            for goal_tokens in problemJGEX.goals:
+                raw_goals.append((goal_tokens[0], list(goal_tokens[1:])))
+                for t in goal_tokens[1:]:
+                    if t and t[0].isalpha():
+                        useful_points.add(t)
+            for _, args in raw_premises:
+                for a in args:
+                    if a and a[0].isalpha():
+                        useful_points.add(a)
+
+            # 数值检查 goals（创建临时对象用于检查）
+            temp_dep_graph = DependencyGraph(AlgebraicManipulator())
+            for name in point_nums.keys():
+                pt = temp_dep_graph.symbols_graph.new_node(Point, name, None)
+                pt.num = point_nums[name]
+
+            for goal_tokens in problemJGEX.goals:
+                goal_stmt = Statement.from_tokens(goal_tokens, temp_dep_graph)
+                if goal_stmt is None:
+                    raise ValueError(f"Failed to parse goal: {goal_tokens}")
+                if not goal_stmt.check_numerical():
+                    raise ValueError(f"Goal {goal_stmt.pretty()} fails numerical check")
+
+            # 成功构建，返回结果
+            points = [(name, num.x, num.y) for name, num in point_nums.items() if name in useful_points]
+            return points, raw_premises, raw_goals
+
+        except (InvalidIntersectError, InvalidReduceError,
+                PointTooCloseError, PointTooFarError, ValueError, KeyError, AssertionError) as e:
+            err = e
+            continue
+
+    raise Exception(f"Build failed too many times, last error: {repr(err)}")
 
 
 # Worker function for subprocess isolation (must be at module level for pickling)
@@ -226,32 +361,43 @@ class GeometricSolverBuilder:
 
 
 class CSolver:
-    def __init__(self, problem: str, problem_name: str = "anonymity", seed: int = 123, solver: GeometricSolver = None, using_log: bool = False, using_exp: bool = False):
+    def __init__(self, problem: str, problem_name: str = "anonymity", seed: int = 123, solver: GeometricSolver = None, using_log: bool = False, using_exp: bool = False, light: bool = False):
         self.problem = problem
         self.problem_name = problem_name
         self.seed = seed
         self.log_enabled = using_log
         self.exp_enabled = using_exp
 
-        # 构建 solver
-        if solver is None:
-            self.solver = (
-                GeometricSolverBuilder(self.seed)
-                .load_problem_from_txt(self.problem)
-                .build()
-            )
-        else:
-            self.solver = solver
-
-        # 提取信息
         self.points: List[Tuple[str, Any, Any]] = []
         self.premises: List[Tuple[str, List[str]]] = []
         self.goals: List[Tuple[str, List[str]]] = []
         self.useful_points: List[str] = []
 
-        self._extract_premises()
-        self._extract_goals()
-        self._extract_points()
+        if light:
+            # 轻量化路径：跳过 dep_graph、Matcher、rely 等符号推理开销
+            self.solver = None
+            problemJGEX = ProblemJGEX.from_text(self.problem)
+            _defs = DefinitionJGEX.to_dict(DefinitionJGEX.parse_txt_file(default_defs_path()))
+            rng = np.random.default_rng(self.seed)
+            self.points, self.premises, self.goals = _light_build(problemJGEX, _defs, rng)
+            for _, args in self.premises:
+                for a in args:
+                    if a and a not in self.useful_points:
+                        self.useful_points.append(a)
+        else:
+            # 完整路径
+            if solver is None:
+                self.solver = (
+                    GeometricSolverBuilder(self.seed)
+                    .load_problem_from_txt(self.problem)
+                    .build()
+                )
+            else:
+                self.solver = solver
+
+            self._extract_premises()
+            self._extract_goals()
+            self._extract_points()
 
     # -------------------- 内部方法 -------------------- #
     def _extract_points(self):
@@ -305,26 +451,27 @@ class CSolver:
             solved, dep_graph = DDAR.run_ddar(
                 self.problem_name, self.points, self.premises, self.goals, max_level, self.log_enabled, self.exp_enabled)
 
-        for stmt, deps, reason in dep_graph:
-            conclusion = Statement.from_tokens(
-                stmt, self.solver.proof.dep_graph)
-            why = []
-            flag = True
-            for dep in deps:
-                premise = Statement.from_tokens(
-                    dep, self.solver.proof.dep_graph)
-                if premise == conclusion:
-                    flag = False
-                    break
-                why.append(premise)
-            if not flag:
-                continue
-            dep = Dependency.mk(conclusion, reason, tuple(why))
-            # dep.add()
-            self.solver.proof.dep_graph.hyper_graph[conclusion] = dep
+        if self.solver is not None:
+            for stmt, deps, reason in dep_graph:
+                conclusion = Statement.from_tokens(
+                    stmt, self.solver.proof.dep_graph)
+                why = []
+                flag = True
+                for dep in deps:
+                    premise = Statement.from_tokens(
+                        dep, self.solver.proof.dep_graph)
+                    if premise == conclusion:
+                        flag = False
+                        break
+                    why.append(premise)
+                if not flag:
+                    continue
+                dep = Dependency.mk(conclusion, reason, tuple(why))
+                # dep.add()
+                self.solver.proof.dep_graph.hyper_graph[conclusion] = dep
 
-        self.solver.run_infos['success'] = solved
-        self.solver.run_infos['runtime'] = time.time() - t0
+            self.solver.run_infos['success'] = solved
+            self.solver.run_infos['runtime'] = time.time() - t0
 
         # print(self.solver.proof.check_goals())
 
