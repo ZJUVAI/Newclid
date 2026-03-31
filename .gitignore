@@ -53,6 +53,7 @@ core*
 temp/
 experiments/*/data/
 experiments/*/logs/
+experiments/*
 
 # TODO
 TODO.md

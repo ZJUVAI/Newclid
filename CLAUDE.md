@@ -12,32 +12,6 @@ GenesisGeo 是 [AlphaGeometry](https://www.nature.com/articles/s41586-023-06747-
 
 ---
 
-## 常用命令
-
-### 运行测试
-```bash
-pytest tests --cov=src --cov-fail-under=76
-```
-
-### 运行 CLI
-```bash
-newclid --problem-name <name> --env <env> --agent <agent> [options]
-```
-
-### 数据生成
-```bash
-python -m newclid.generation.pipeline --n_threads=30 --n_samples=5000000 --timeout=3600
-```
-
-### 模型评估
-```bash
-python scripts/evaluation.py --problems_path benchmarks/imo_ag_30.txt \
-  --model_path ZJUVAI/GenesisGeo --max_workers 80 \
-  --decoding_size 32 --beam_size 512 --search_depth 4
-```
-
----
-
 ## 项目结构
 
 ```
