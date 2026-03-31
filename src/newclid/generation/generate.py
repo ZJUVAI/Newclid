@@ -23,6 +23,24 @@ from newclid.generation.problem_worker import GeometryProblemWorker
 
 MACHINE_BASE_SEED = 42
 
+
+def _load_rules_as_pipe(rules_path) -> list[str]:
+    """Load extracted_rules.txt and convert to pipe format for CSolver custom_rules."""
+    lines = rules_path.read_text(encoding="utf-8").strip().split("\n")
+    rules_pipe = []
+    for i in range(0, len(lines) - 1, 2):
+        rule_id = lines[i].strip()
+        rule_text = lines[i + 1].strip()
+        if "=>" not in rule_text:
+            continue
+        left, right = rule_text.split("=>", 1)
+        premises = [c.strip() for c in left.split(",") if c.strip()]
+        conclusions = [c.strip() for c in right.split(",") if c.strip()]
+        if premises and conclusions:
+            pipe = f"{rule_id}|{','.join(premises)}|{','.join(conclusions)}"
+            rules_pipe.append(pipe)
+    return rules_pipe
+
 class TimeoutError(Exception):
     pass
 
@@ -154,6 +172,8 @@ class GeometryGenerator:
         add_auxiliary=True,
         prune=True,
         remove_coords=False,
+        engine="full",
+        custom_rules=None,
     ):
         self.n_clauses = n_clauses
         self.min_proof_steps = min_proof_steps
@@ -178,6 +198,8 @@ class GeometryGenerator:
         self.add_auxiliary = add_auxiliary
         self.prune = prune
         self.remove_coords = remove_coords
+        self.engine = engine
+        self.custom_rules = custom_rules
         self.data_count = 0
         self.written_count = 0  # Track actually written data count
         # Serialize defs for Ray remote tasks
@@ -295,6 +317,22 @@ class GeometryGenerator:
             self._process_completed_draw_tasks(wait_all=True)
             self._flush_completed_data(filename)
 
+    @staticmethod
+    def _inject_pids(jsonl_path: str):
+        """Post-process JSONL file to inject sequential pid into each record."""
+        if not os.path.exists(jsonl_path):
+            return
+        tmp_path = jsonl_path + ".tmp"
+        with open(jsonl_path, 'r', encoding='utf-8') as fin, \
+             open(tmp_path, 'w', encoding='utf-8') as fout:
+            for i, line in enumerate(fin, start=1):
+                record = json.loads(line)
+                record["pid"] = f"p{i:06d}"
+                json.dump(record, fout, ensure_ascii=False)
+                fout.write('\n')
+        os.replace(tmp_path, jsonl_path)
+        logging.info(f"Injected pid into {i} records in {jsonl_path}")
+
     def generate(self):
         if self.clear:
             filename = self.path_prefix + ".jsonl"
@@ -316,13 +354,19 @@ class GeometryGenerator:
             for i in range(10**9):
                 # seed = 42 + i  # 唯一种子 = 42 + 任务ID
                 seed = MACHINE_BASE_SEED + i
-                yield i, seed, self.n_clauses, self.max_level, self.img, self.aux_only, self.add_auxiliary, self.prune, self.remove_coords
+                yield (i, seed, self.n_clauses, self.max_level, self.img,
+                       self.aux_only, self.add_auxiliary, self.prune,
+                       self.remove_coords, self.engine, self.custom_rules)
 
         if not ray.is_initialized():
             ray.init(
                 # local_mode=True,
                 ignore_reinit_error=True,
-                num_cpus=self.n_threads
+                num_cpus=self.n_threads,
+                _system_config={
+                    "raylet_start_wait_time_s": 120,
+                    "gcs_rpc_server_reconnect_timeout_s": 120,
+                }
             )
         task_iterator = task_generator()
         max_pending = int(self.n_threads * 1.5)
@@ -409,6 +453,10 @@ class GeometryGenerator:
         
         ray.shutdown()
 
+        # Post-process: inject sequential pid into each JSONL record
+        jsonl_path = self.path_prefix + ".jsonl"
+        self._inject_pids(jsonl_path)
+
         final_elapsed_time = time.time() - start_time
         summary_reporter.total_elapsed_time = final_elapsed_time
         summary_reporter.total_samples_generated = self.written_count
@@ -463,9 +511,25 @@ def main():
                         help="Whether to prune clauses to preserve only the deepest clause chain.")
     parser.add_argument("--remove_coords", required=False, type=str_to_bool, default=False,
                         help="Whether to remove coordinate information from the final clause output.")
+    parser.add_argument("--engine", required=False, type=str, default="full",
+                        choices=["full", "weak"],
+                        help="DDAR engine variant: full (default) or weak.")
+    parser.add_argument("--custom_rules", required=False, type=str, default=None,
+                        help="Path to extracted_rules.txt for custom rules.")
     args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, args.log_level.upper()))
+
+    # Load custom rules from file if provided
+    custom_rules = None
+    if args.custom_rules:
+        from pathlib import Path
+        rules_path = Path(args.custom_rules)
+        if rules_path.exists():
+            custom_rules = _load_rules_as_pipe(rules_path)
+            logging.info(f"Loaded {len(custom_rules)} custom rules from {rules_path}")
+        else:
+            logging.warning(f"Custom rules file not found: {rules_path}")
 
     generator = GeometryGenerator(
         n_clauses=args.n_clauses,
@@ -482,6 +546,8 @@ def main():
         add_auxiliary=args.add_auxiliary,
         prune=args.prune,
         remove_coords=args.remove_coords,
+        engine=args.engine,
+        custom_rules=custom_rules,
     )
 
     generator.generate()

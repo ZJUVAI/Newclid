@@ -1,17 +1,16 @@
 [build-system]
-requires = [
-    "setuptools>=45",
-    "wheel",
-    "setuptools_scm[toml]>=6.2",
-    "pybind11",
-    "cmake",
-]
+requires = ["setuptools>=45", "wheel", "setuptools_scm[toml]>=6.2"]
 
 [project]
 name = "newclid"
+authors = [
+    {name = "Mathis Federico", email = "mathfederico@gmail.com"},
+    {name = "Vladmir Sicca", email = "vsiccag@gmail.com"},
+    {name = "Tianxiang Xia", email = "xia.tianxiang00@gmail.com"}
+]
 dynamic = ["version", "readme"]
 description = "Symbolic solver for geometric problems."
-requires-python = "==3.10.*"
+requires-python = ">=3.6"
 classifiers=[
     'Intended Audience :: Science/Research',
     'Intended Audience :: Developers',
@@ -22,63 +21,69 @@ classifiers=[
     'Operating System :: Unix',
     'Operating System :: MacOS',
 ]
+
+# Core dependencies - only what's needed for pure engine inference
 dependencies = [
-    "ray[default]",
-    "millify",
-    "numpy",
-    "cairosvg",
-    "matplotlib>=3.7.0",
-    "torch==2.8.0",
-    "torchvision",
-    "markupsafe==3.0.2",
-    "pyvis",
-    "scipy>=1.15",
-    "adjusttext>=1.3.0",
-    "transformers>=5.3.0",
-    "pandas>=2.3",
+    "numpy>=1.23.5,<2.0",
+    "scipy>=1.10.0",
+    "typing-extensions",
+    "networkx",
     "pybind11",
-    "accelerate",
-    "flash-attn",
-    "httpx[socks]",
-    # "deepspeed",
+    "colorama",
+    "rich",
 ]
 
-[tool.uv.extra-build-dependencies]
-flash-attn = [{ requirement = "torch", match-runtime = true }]
-
-# [tool.uv.extra-build-dependencies]
-# flash-attn = ["torch", "setuptools", "wheel", "ninja", "packaging"]
-
-[tool.uv.extra-build-variables]
-flash-attn = {
-    MAX_JOBS = "10",
-    # FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE",
-    # remove FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE", if you need to compile flash attn from source
-}
-
-
 [project.optional-dependencies]
+# Visualization
+viz = [
+    "matplotlib>=3.7.0",
+    "pyvis",
+    "seaborn",
+    "pillow",
+    "cairosvg",
+    "adjustText",
+]
+
+# Data generation (Ray parallel)
+generation = [
+    "ray[default]",
+    "millify",
+    "newclid[viz]",
+]
+
+# ML/LLM inference
+ml = [
+    "torch",
+    "torchvision",
+    "transformers>=4.40.0",
+    "accelerate",
+    "ray[default]",
+    "newclid[viz]",
+]
+
+# VLM specific
+vlm = [
+    "qwen_vl_utils",
+    "modelscope",
+    "timm",
+    "newclid[ml]",
+]
+
+# OpenAI API
+openai = ["openai"]
+
+# Full installation (backward compatible)
+full = [
+    "newclid[viz]",
+    "newclid[generation]",
+    "newclid[ml]",
+    "newclid[vlm]",
+    "newclid[openai]",
+    "py-data-juicer",
+]
+
 dev = ['black', 'ruff', 'pytest', 'pytest-cov', 'pytest-check', 'pytest-mock', 'pre-commit']
 doc = ['numpy', 'sphinx-autoapi', 'autoapi', 'sphinx_rtd_theme', 'sphinx-autodoc-typehints', 'sphinx-autobuild']
-
-
-[[tool.uv.index]]
-url = "https://mirrors.aliyun.com/pypi/simple"
-name = "aliyun"
-# default = true
-
-[[tool.uv.index]]
-url = "http://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/"
-name = "tsinghua"
-default = true
-
-[[tool.uv.index]]
-url = "https://download.pytorch.org/whl/cu126"
-name = "pytorch"
-explicit = true
-
-[tool.uv.sources]
-torch = { index = "pytorch" }
 
 [tool.setuptools]
 license-files = ['LICEN[CS]E*', 'COPYING*', 'NOTICE*', 'AUTHORS*']

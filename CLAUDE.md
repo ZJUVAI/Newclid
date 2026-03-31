@@ -1,196 +1,174 @@
-# GenesisGeo 项目全局记忆
+# CLAUDE.md
 
-## 项目简介
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-GenesisGeo 是 [AlphaGeometry](https://www.nature.com/articles/s41586-023-06747-5) 的复现项目，实现了一个能够证明几何定理的 AI 系统。
+## Project Overview
 
-**核心特性：**
-- 合成数据生成（生成了 2180 万道题目）
-- 增强的 DDARN 引擎（120 倍加速）
-- 神经符号推理器：使用 Qwen3-0.6B-Base 微调
-- 在 IMO-AG-30 基准测试中证明了 30 道题目中的 24 道
+GenesisGeo — 神经-符号几何定理证明器，复现 AlphaGeometry，结合 C++ 符号推理引擎 (DDAR) 与神经语言模型。
+
+## Current Focus: 知识发现 (Knowledge Discovery)
+
+当前主线任务是**从合成数据中提取几何推理规则**，核心 pipeline 流程：
+
+```
+合成数据 (JSONL)
+  → Stage 1: FilterAndPruneEngine (输入过滤/图修剪/命题提取/规范化/去重/落盘)
+  → Stage 2: RuleReducer (max_premises过滤 → 泛化度排序 → 贪心淘汰)
+  → 输出: extracted_rules.txt (最小基底规则集)
+```
+
+关键代码:
+- Pipeline 核心: `src/newclid/proof_scout/core/filter_and_prune_engine.py`
+- 规则规约: `src/newclid/proof_scout/reduction/rule_reducer.py`
+- Pipeline 入口脚本: `scripts/discovery_pipeline.py`
+
+详细 pipeline 数据看板: `docs/pipeline_dashboard.md`
 
 ---
 
-## 常用命令
+## Important Notes (铁律)
 
-### 运行测试
+**Git Workflow Rules**:
+- **Push**: 只推送到 `origin` 远端仓库，除非有特殊说明
+- **GenesisGeo 远端**: 仅用于拉取信息、对齐引擎开发进度，不进行推送
+- 示例: `git push origin <branch>` ✓ | `git push GenesisGeo <branch>` ✗
+
+**DDAR Code Synchronization**: When there are differences in the DDAR directory (`src/newclid/DDAR/`), always use the version from the GenesisGeo remote repository as the authoritative source, unless explicitly stated otherwise. To sync:
+
 ```bash
-pytest tests --cov=src --cov-fail-under=76
+git fetch GenesisGeo
+git checkout GenesisGeo/main -- src/newclid/DDAR/
 ```
 
-### 运行 CLI
-```bash
-newclid --problem-name <name> --env <env> --agent <agent> [options]
-```
+**Language Usage Rules**:
+- **Communication with User**: 与用户交流时尽量使用中文（特有名词可以用英语表达）
+- **Task Execution**: 执行任务时（如工具调用的 description、代码注释、commit message 等）使用英语
+- **Example**:
+  - ✓ 用户交流: "我现在开始运行 benchmark 测试"
+  - ✓ Tool description: "Run benchmark on HAGeo 409 dataset"
+  - ✓ Commit message: "Add language usage rules to CLAUDE.md"
 
-### 数据生成
-```bash
-python src/newclid/generation/generate.py --n_threads=30 --n_samples=5000000 --timeout=3600
-```
+**Planning Mode Language Rules**:
+- 所有 plan 文件必须使用中文编写，确保用户能够直接理解计划内容
+- Plan 文件中的所有章节（背景、实施步骤、验证方式等）都必须用中文表达
+- 唯一例外：文件路径、代码片段、技术术语可以保持英文
 
-### 模型评估
-```bash
-python scripts/evaluation.py --problems_path benchmarks/imo_ag_30.txt \
-  --model_path ZJUVAI/GenesisGeo --max_workers 80 \
-  --decoding_size 32 --beam_size 512 --search_depth 4
-```
+**AI Tool Workflow Rules**:
+- 所有 AI 编程工具在开始处理仓库任务前，必须先阅读 `CLAUDE.md`
+- 在执行具体任务前，必须根据任务范围按需索引并阅读相关文档与 memory 文件，至少包括对应模块文档和 `memory/MEMORY.md`
+- 完成任务后，必须按 `Memory Update Rules` 将本次任务摘要整理到 `memory/` 目录下对应文件
+- 完成 memory 更新后，必须执行 git 提交，并直接推送到 `origin` 当前分支，无需再次征求用户确认
+
+**Experiment Directory Rules** (实验目录铁律):
+1. 每次实验必须在 `outputs/experiments/` 下创建子目录
+2. 子目录命名格式: `YYYYMMDD_{id}_实验名称` 其中的id用两位数表示（如 01, 02, ..., 10, 11, ...），用来作为一天中任务的顺序标识
+3. 子目录中必须包含 `info.md` 文件，说明：
+   - 实验目的
+   - 使用的命令
+   - 关键参数
+   - 结果摘要
+4. Claude 在执行实验过程中需要同步编写 info.md
+
+**Environment and Script Execution Rules** (CRITICAL - 每次执行脚本前必须检查):
+
+1. **Conda Environment Activation**:
+   - 环境名称: `Discovery` (注意大写D)
+   - 激活命令: `source /C20545/home/duzhengtong/miniconda3/bin/activate Discovery`
+   - **所有Python脚本执行前必须先激活此环境**
+
+2. **PYTHONPATH Configuration**:
+   - 项目根目录: `/C20545/home/duzhengtong/GeoDiscovery`
+   - src目录: `/C20545/home/duzhengtong/GeoDiscovery/src`
+   - **如果脚本导入newclid模块失败，需要设置**: `PYTHONPATH=/C20545/home/duzhengtong/GeoDiscovery/src:$PYTHONPATH`
+   - **注意**: 使用conda环境激活后通常不需要手动设置PYTHONPATH，因为项目已通过`pip install -e .`安装
+
+3. **Script Execution Checklist** (执行脚本前的检查清单):
+   ```bash
+   # Step 1: 激活conda环境
+   source /C20545/home/duzhengtong/miniconda3/bin/activate Discovery
+
+   # Step 2: 验证环境
+   which python  # 应该显示 /C20545/home/duzhengtong/miniconda3/envs/Discovery/bin/python
+
+   # Step 3: 执行脚本
+   python scripts/your_script.py [args]
+   ```
+
+4. **Background Task Execution**:
+   - 长时间运行的任务应使用`run_in_background=true`
+   - 使用conda环境时，必须在命令中包含环境激活: `source ... && python ...`
+
+5. **CSolver 必须开启 using_log 和 using_exp** (CRITICAL):
+   - 所有 CSolver 实例化必须设置 `using_log=True, using_exp=True`
+   - 不开启这两个参数会导致 C++ DDAR 引擎缺少关键推理功能（对数推理、指数推理），结果不完整
+   - 示例: `CSolver(problem=..., using_log=True, using_exp=True)`
+   - **唯一例外**: 明确需要测试关闭这些功能的对比实验
+
+**Memory Update Rules** (Memory 更新铁律):
+- 每次任务完成后，必须更新 `memory/` 目录下对应的文件
+- 每次任务摘要必须写入至少一个对应的 memory 文件；涉及全局流程、约束或工作流变更时，同时更新 `memory/MEMORY.md` 和 `memory/design_docs.md`
+- 新实验完成 → 更新 `memory/completed_tasks.md` 和 `memory/test_results.md`
+- 性能相关实验 → 更新 `memory/csolver_performance.md`
+- 新命令/脚本使用 → 更新 `memory/command_history.md`
+- 新设计决策 → 更新 `memory/design_docs.md`
+- `memory/MEMORY.md` 保持为主索引，关键事实有变化时同步更新
+
+**Task Completion Git Rules**:
+- 完成代码与 memory 更新后，必须检查变更、执行 git commit，并推送到 `origin`
+- 默认流程: `git add ...` → `git commit -m "..."` → `git push origin <current-branch>`
+- 除非用户明确禁止，否则不要只停留在本地未推送状态
+
+**Code-Documentation Sync Rules** (代码文档同步铁律):
+- 修改 pipeline 代码（如 `filter_and_prune_engine.py`）时，必须同步更新 `docs/pipeline_dashboard.md`
+- 修改 pipeline 步骤（增删改）时，dashboard 的总览图、详细说明、漏斗模板都要同步调整
+- 代码中的 dashboard 对齐注释（`# Step 1a/1c/1d/1e`）必须与文档保持一致
+
+**Data Format Reference Rules** (数据格式参考铁律):
+- 处理数据文件或修改 pipeline 数据流时，必须先查阅 `docs/data_formats.md`
+- 新增数据格式时，必须同步更新 `docs/data_formats.md`
+- 修改现有数据格式时，必须检查是否影响下游消费者并更新文档
+
+**Planning Mode Rigor Rules** (Planning 模式严格审问铁律):
+- 在写任何代码之前，在 Planning 模式下无尽地审问我的想法
+- 不要假设任何问题，问问题直到没有假设剩下
+- 必须充分理解需求、现有代码结构、潜在影响后才能开始实现
+
+**Experiment Error Tracking Rules** (实验错误追踪铁律):
+- 在进行任何实验时，对于细小的错误或者数据有误都需要严格检查
+- 所有错误必须详细记录在 `docs/tiny_error_records.md` 文档中
+- 每条记录必须包含：
+  - 日期 (YYYY-MM-DD)
+  - 实验名称
+  - 具体命令
+  - 预期输出（可选）
+  - 实际输出
+  - 是否解决 (✓/✗)
+- 即使是微小的数据不一致也要记录，这有助于追踪系统性问题
 
 ---
 
-## 项目结构
+## Documentation Index (文档索引)
 
-```
-GenesisGeo/
-├── src/newclid/                    # 主源码
-│   ├── __main__.py                 # CLI 入口
-│   ├── api.py                      # GeometricSolver 接口
-│   ├── proof.py                    # 证明状态管理
-│   ├── agent/                      # 推理代理
-│   │   ├── ddarn.py                # DDARN 符号推理
-│   │   ├── lm.py                   # 语言模型代理
-│   │   └── vlm.py                  # 视觉语言模型代理
-│   ├── generation/                 # 数据生成（旧版）
-│   ├── generation_new/             # 数据生成（新版，重构后）
-│   ├── DDAR/                       # C++ 符号引擎
-│   ├── dependencies/               # 依赖图管理
-│   ├── formulations/               # 问题表示
-│   ├── numerical/                  # 数值几何
-│   ├── algebraic_reasoning/        # 代数推理
-│   └── predicates/                 # 几何谓词
-├── scripts/                        # 评估和工具脚本
-├── tests/                          # 测试套件
-├── benchmarks/                     # 基准测试题库
-└── docs/                           # 文档
-```
+### docs/ — 技术文档 (按需查看)
 
----
+| 文档 | 内容 | 何时需要查看 |
+|------|------|-------------|
+| `docs/architecture.md` | 系统架构、核心组件、数据流、问题格式 | 需要理解代码结构或修改核心模块时 |
+| `docs/build_and_commands.md` | 构建、测试、lint、常用命令 | 需要构建项目、运行测试或执行命令时 |
+| `docs/directory_structure.md` | 目录结构、环境配置 | 需要查找文件或了解项目组织时 |
+| `docs/data_formats.md` | 数据格式参考（JSONL/Rule/Problem/中间产物） | 处理数据文件、修改 pipeline 代码、新增数据格式时 **必读** |
+| `docs/pipeline_dashboard.md` | Discovery Pipeline 数据看板（每步逻辑+伪代码+漏斗数据） | 修改 pipeline 代码或分析 pipeline 数据时 **必读** |
+| `docs/ddar_engine.md` | DDAR C++ 引擎技术文档（架构、谓词、定理、AR、Python API） | 修改 DDAR 引擎代码、调试 CSolver、理解符号推理流程时 **必读** |
+| `docs/tiny_error_records.md` | 实验错误追踪记录（日期、命令、预期/实际输出、解决状态） | 遇到实验错误或数据异常时记录；排查历史问题时查看 |
+| `docs/manual/` | Sphinx 用户手册（问题格式、规则定义等） | 需要了解 JGEX 格式或规则语法细节时 |
 
-## 核心模块说明
+### memory/ — 任务记忆 (按需查看)
 
-| 模块 | 用途 | 关键类 |
-|------|------|--------|
-| `api.py` | 求解器接口 | `GeometricSolver`, `GeometricSolverBuilder` |
-| `proof.py` | 证明状态 | `ProofState` |
-| `agent/ddarn.py` | 符号推理 | `DDARNAgent` |
-| `agent/lm.py` | LLM 辅助构造 | `LMAgent` |
-| `generation/` | 数据生成 | `GeometryGenerator` |
-| `generation_new/` | 新数据生成 | `ProblemPipeline`, `ProblemSampler` |
-
----
-
-## 几何问题数据格式
-
-### 问题定义格式（fl_problem）
-
-```
-构造部分 ? 目标
-```
-
-**例子：**
-```
-a b c = triangle a b c; d = free d; e = on_circum e c b d, angle_bisector e a d b ? eqangle b d b e c d c e
-```
-
-### 构造部分结构
-
-构造部分由多个**子句（clause）** 组成，用**分号 `;`** 分隔：
-
-```
-子句1; 子句2; 子句3; ...
-```
-
-每个子句的格式：
-```
-点名 = 构造类型 [参数]
-```
-
-- **点名**：一个或多个点，用空格分隔（如 `a b c` 或 `d`）
-- **构造类型**：可以有多个，用**逗号 `,`** 分隔
-- **参数**：构造所需的参数点
-
-### 解析例子
-
-```
-a b c = triangle a b c; d = free d; e = on_circum e c b d, angle_bisector e a d b ? eqangle b d b e c d c e
-```
-
-| 子句 | 点名 | 构造类型 | 含义 |
-|------|------|----------|------|
-| `a b c = triangle a b c` | a, b, c | triangle | 三个点构成一个三角形 |
-| `d = free d` | d | free | d 是自由点（任意位置） |
-| `e = on_circum e c b d, angle_bisector e a d b` | e | on_circum, angle_bisector | e 在 cbd 外接圆上，且在角 adb 的角平分线上 |
-
-**目标**：`eqangle b d b e c d c e` - 证明 ∠bde = ∠dce
-
-### 谓词（Predicates）
-
-构造语言（如 `triangle`, `on_circum`）会被翻译成谓词语言，用于推理计算。谓词既描述前提条件，也描述目标。
-
-#### 常见谓词
-
-| 谓词 | 参数 | 含义 |
-|------|------|------|
-| `coll a b c` | 3点 | a, b, c 共线 |
-| `para a b c d` | 4点 | AB ∥ CD |
-| `perp a b c d` | 4点 | AB ⊥ CD |
-| `cong a b c d` | 4点 | AB = CD |
-| `cyclic a b c d` | 4点 | a, b, c, d 共圆 |
-| `eqangle a b c d e f g h` | 8点 | ∠(AB,CD) = ∠(EF,GH) |
-| `eqratio a b c d e f g h` | 8点 | AB/CD = EF/GH |
-| `simtri a b c d e f` | 6点 | △ABC ∼ △DEF |
-| `contri a b c d e f` | 6点 | △ABC ≅ △DEF |
-| `midp m a b` | 3点 | m 是 ab 的中点 |
-| `circle o a b c` | 4点 | o 是 abc 外接圆圆心 |
-
-#### 构造到谓词的翻译
-
-构造语言在求解时会翻译成谓词：
-
-```
-构造: e = on_circum e c b d, angle_bisector e a d b
-  ↓ 翻译
-谓词: cyclic b c d e [000]
-      eqangle a d d e d e b d [001]
-```
-
-### LLM 输入/输出格式
-
-#### LLM 输入格式（llm_input_renamed）
-
-```xml
-<problem> 点1 : 前提条件 ; 点2 : 前提条件 ; ... ? 目标 </problem>
-```
-
-每个前提条件格式：`谓词 参数 [编号]`
-
-**例子：**
-```xml
-<problem> a : ; b : ; c : ; d : ; e : cyclic b c d e [000] eqangle a d d e d e b d [001] ? eqangle b d b e c d c e </problem>
-```
-
-#### LLM 输出格式（llm_output_renamed）
-
-```xml
-<proof> 结论1 [编号] 规则 [依赖编号] ; 结论2 [编号] 规则 [依赖编号] ; ... </proof>
-```
-
-**例子：**
-```xml
-<proof> eqangle b d b e c d c e [002] r03 [000] ; </proof>
-```
-
----
-
-## generation_new 模块命名
-
-| 文件 | 类 | 用途 |
-|------|-----|------|
-| `sampler.py` | `ProblemSampler` | 采样几何构造 |
-| `point_naming.py` | `PointNaming` | 点命名管理 |
-| `filter.py` | `GoalFilter` | 目标过滤 |
-| `worker.py` | `ProblemWorker` | 问题处理 |
-| `pipeline.py` | `ProblemPipeline` | 生成流水线 |
-| `constructions.py` | - | 构造类型常量 |
-| `statistics.py` | `Statistics` | 统计信息 |
-| `auxiliary/` | - | 辅助点查找子包 |
+| 文档 | 内容 | 何时需要查看 |
+|------|------|-------------|
+| `memory/MEMORY.md` | **主索引** — 最近更新、关键事实、目录结构 | **每次任务开始时必读** |
+| `memory/completed_tasks.md` | 已完成任务历史 | 需要了解历史上做过什么时 |
+| `memory/design_docs.md` | 设计文档（Rule Reduction 算法、验证问题等） | 涉及设计决策或算法修改时 |
+| `memory/test_results.md` | 测试结果归档 | 需要对比历史测试数据时 |
+| `memory/csolver_performance.md` | CSolver 性能分析与优化记录 | 涉及 CSolver 性能调优时 |
+| `memory/command_history.md` | 重要命令历史记录 | 需要查找之前运行过的命令时 |

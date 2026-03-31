@@ -13,7 +13,7 @@ export RAY_memory_usage_threshold=0.95
 datasets=(
     # "imo_102_requires_aux.txt"
     # "imo_2012_p5.txt"
-    # "dev_imo.txt"
+    # "dev/dev_imo.txt"
     # "imo_2000_p6.txt"
     # "imo_2008_p1.txt"
     # "imo_2004_p1.txt"
@@ -25,8 +25,8 @@ datasets=(
     # "imo_102_requires_aux_less1.txt" 
     # "imo_102_requires_aux_less2.txt"
     # "imo_102_requires_aux_less3.txt"
-    # "dev_jgex.txt" 
-    "hageo_409.txt"
+    # "dev/dev_jgex.txt"
+    "core/hageo_409.txt"
 )
 
 # Decoding configurations (decoding_size beam_size)

@@ -23,8 +23,8 @@ Matcher::Matcher(Problem *prob) : _problem(prob)
 {
     match_similar_triangles();
     match_between();
-    match_equal_angles();
     match_circles();
+    match_equal_angles();
     match_orthocenters();
     // match_perps_paras();
 }
@@ -208,7 +208,9 @@ void Matcher::on_pappus(const Pappus &pappus)
 {
     for (const auto &rotated : pappus.permutations())
     {
-        insert_theorem(Theorem::pappus(rotated));
+        #ifndef DDAR_WEAK
+            insert_theorem(Theorem::pappus(rotated));
+        #endif
     }
 }
 
@@ -238,24 +240,30 @@ void Matcher::on_eqratio(const Coll &left, const Coll &right)
 
     if (left.a() == right.a())
     {
-        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(left, right));
-        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.a(), left.c(), left.b()), Coll(right.a(), right.c(), right.b())));
-        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(left, right));
-        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.a(), left.c(), left.b()), Coll(right.a(), right.c(), right.b())));
+        #ifndef DDAR_WEAK
+            insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(left, right));
+            insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.a(), left.c(), left.b()), Coll(right.a(), right.c(), right.b())));
+            insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(left, right));
+            insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.a(), left.c(), left.b()), Coll(right.a(), right.c(), right.b())));
+        #endif 
     }
     else if (left.b() == right.b())
     {
-        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.b(), left.a(), left.c()), Coll(right.b(), right.a(), right.c())));
-        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.b(), left.c(), left.a()), Coll(right.b(), right.c(), right.a())));
-        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.b(), left.a(), left.c()), Coll(right.b(), right.a(), right.c())));
-        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.b(), left.c(), left.a()), Coll(right.b(), right.c(), right.a())));
+        #ifndef DDAR_WEAK
+            insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.b(), left.a(), left.c()), Coll(right.b(), right.a(), right.c())));
+            insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.b(), left.c(), left.a()), Coll(right.b(), right.c(), right.a())));
+            insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.b(), left.a(), left.c()), Coll(right.b(), right.a(), right.c())));
+            insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.b(), left.c(), left.a()), Coll(right.b(), right.c(), right.a())));
+        #endif 
     }
     else if (left.c() == right.c())
     {
-        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.c(), left.a(), left.b()), Coll(right.c(), right.a(), right.b())));
-        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.c(), left.b(), left.a()), Coll(right.c(), right.b(), right.a())));
-        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.c(), left.a(), left.b()), Coll(right.c(), right.a(), right.b())));
-        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.c(), left.b(), left.a()), Coll(right.c(), right.b(), right.a())));
+        #ifndef DDAR_WEAK
+            insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.c(), left.a(), left.b()), Coll(right.c(), right.a(), right.b())));
+            insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.c(), left.b(), left.a()), Coll(right.c(), right.b(), right.a())));
+            insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.c(), left.a(), left.b()), Coll(right.c(), right.a(), right.b())));
+            insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.c(), left.b(), left.a()), Coll(right.c(), right.b(), right.a())));
+        #endif 
     }
 
     Thales const thales(left, right);
@@ -265,9 +273,13 @@ void Matcher::on_eqratio(const Coll &left, const Coll &right)
     }
     for (const auto &rotated : thales.permutations())
     {
-        insert_theorem(Theorem::thales_para_of_eqratio(rotated));
+        #ifndef DDAR_WEAK
+            insert_theorem(Theorem::thales_para_of_eqratio(rotated));
+        #endif 
     }
-    insert_theorem(Theorem::thales_eqratio_of_para(thales));
+    #ifndef DDAR_WEAK
+        insert_theorem(Theorem::thales_eqratio_of_para(thales));
+    #endif 
 }
 
 void Matcher::match_between()
@@ -498,16 +510,18 @@ void Matcher::on_cyclic(const Cyclic &cyclic)
     {
         #ifndef DDAR_WEAK
             insert_theorem(Theorem::cyclic_of_equal_angles(rotated));
-        #endif
+        #endif 
             insert_theorem(Theorem::cyclic_properties(cyclic));
     }
 }
 
 void Matcher::on_bisector(const Point &pt, const Angle &ang)
 {
-    insert_theorem(Theorem::triangle_bisector_of_eqratio(pt, ang));
-    insert_theorem(Theorem::triangle_bisector_of_equal_angles(pt, ang));
-    insert_theorem(Theorem::incenter(pt, ang));
+    #ifndef DDAR_WEAK
+        insert_theorem(Theorem::triangle_bisector_of_eqratio(pt, ang));
+        insert_theorem(Theorem::triangle_bisector_of_equal_angles(pt, ang));
+        insert_theorem(Theorem::incenter(pt, ang));
+    #endif 
 }
 
 void Matcher::on_eqangle(const Angle &left, const Angle &right)
@@ -590,7 +604,7 @@ void Matcher::match_equal_angles()
 
 void Matcher::on_circumcenter(const CircumCenter &circumcenter)
 {
-    insert_theorem(Theorem::cong_of_circumcenter(circumcenter));
+    insert_theorem(Theorem::cong_of_circumcenter(circumcenter));    
     insert_theorem(Theorem::circumcenter_of_cong(circumcenter));
 }
 
@@ -620,7 +634,9 @@ void Matcher::on_circle(const Point &center, const vector<pair<double, Point>> &
                 {
                     if (pt_c != pt_a && pt_c != pt_b)
                     {
-                        insert_theorem(Theorem::hypotenuse_is_diameter(Midp(center, points[pt_a].second, points[pt_b].second), points[pt_c].second));
+                        #ifndef DDAR_WEAK
+                            insert_theorem(Theorem::hypotenuse_is_diameter(Midp(center, points[pt_a].second, points[pt_b].second), points[pt_c].second));                    
+                        #endif
                     }
                 }
             }
@@ -719,7 +735,9 @@ void Matcher::match_orthocenters()
                     {
                         for (const auto &rotated : ortho.cyclic_rotations())
                         {
-                            insert_theorem(Theorem::orthocenter(rotated));
+                            #ifndef DDAR_WEAK
+                                insert_theorem(Theorem::orthocenter(rotated));                        
+                            #endif
                         }
                     }
                 }

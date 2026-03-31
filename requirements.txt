@@ -1,3 +1,12 @@
+# Full dependency list - for reference only
+# Recommended installation methods:
+#   pip install -e .           # Core engine only (lightweight)
+#   pip install -e ".[viz]"    # Engine + visualization
+#   pip install -e ".[ml]"     # Engine + ML/LLM inference
+#   pip install -e ".[full]"   # All dependencies (backward compatible)
+#
+# See pyproject.toml for dependency group definitions.
+
 numpy>=1.23.5, <2.0
 matplotlib>=3.7.0
 scipy>=1.10.0

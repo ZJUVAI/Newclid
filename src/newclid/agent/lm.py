@@ -33,12 +33,6 @@ from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulat
 from newclid.dependencies.dependency import Dependency
 from newclid.numerical.geometries import PointNum
 from newclid.DDAR.build import DDAR
-from newclid.problem_db import (
-    ProblemDBLookup,
-    ProblemDBRuntime,
-    classify_build_exception,
-    summarize_problem_db_runtime,
-)
 
 if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
@@ -65,23 +59,12 @@ AUX_PREDICATES = [
 ]
 
 class LMAgent(DeductiveAgent):
-    def __init__(
-        self,
-        model_path: list[str],
-        decoding_size: int,
-        beam_size: int,
-        search_depth: int,
-        *,
-        problem_db_runtime: ProblemDBRuntime | None = None,
-        agent_type: str = "lm",
-    ):
+    def __init__(self, model_path: list[str], decoding_size: int, beam_size: int, search_depth: int):
         self.any_new_statement_has_been_added = True
         self.problemJGEX = None
         self.decoding_size = decoding_size
         self.beam_size = beam_size
         self.search_depth = search_depth
-        self.problem_db_runtime = problem_db_runtime
-        self.agent_type = agent_type
         # LLM model
         self.model_path = model_path
         self.models = []
@@ -111,16 +94,16 @@ class LMAgent(DeductiveAgent):
         if not DEBUG_LM_INPUT:
             return
 
-        logger.debug("LM input snapshot: query=%s", query)
-        logger.debug("LM input snapshot: messages=%s", messages)
-        logger.debug("LM input snapshot: text_prompt=%s", text_prompt)
-        logger.debug("LM input snapshot: final_text=%s", final_text)
-        logger.debug("LM input snapshot: model_input_keys=%s", list(model_inputs.keys()))
+        logger.info("LM input snapshot: query=%s", query)
+        logger.info("LM input snapshot: messages=%s", messages)
+        logger.info("LM input snapshot: text_prompt=%s", text_prompt)
+        logger.info("LM input snapshot: final_text=%s", final_text)
+        logger.info("LM input snapshot: model_input_keys=%s", list(model_inputs.keys()))
         if "input_ids" in model_inputs:
-            logger.debug("LM input snapshot: input_ids.shape=%s", tuple(model_inputs["input_ids"].shape))
+            logger.info("LM input snapshot: input_ids.shape=%s", tuple(model_inputs["input_ids"].shape))
         if "attention_mask" in model_inputs:
-            logger.debug("LM input snapshot: attention_mask.shape=%s", tuple(model_inputs["attention_mask"].shape))
-        logger.debug("LM input snapshot: prompt_len=%s", prompt_len)
+            logger.info("LM input snapshot: attention_mask.shape=%s", tuple(model_inputs["attention_mask"].shape))
+        logger.info("LM input snapshot: prompt_len=%s", prompt_len)
 
     def _log_model_output(
         self,
@@ -131,22 +114,11 @@ class LMAgent(DeductiveAgent):
         aux: str | None = None,
     ) -> None:
         if score is not None:
-            logger.debug("LM output [%s]: score=%s", queue_type, score)
+            logger.info("LM output [%s]: score=%s", queue_type, score)
         if aux_dsl is not None:
-            logger.debug("LM output [%s]: aux_dsl=%s", queue_type, aux_dsl)
+            logger.info("LM output [%s]: aux_dsl=%s", queue_type, aux_dsl)
         if aux is not None:
-            logger.debug("LM output [%s]: aux=%s", queue_type, aux)
-
-    @staticmethod
-    def _update_ddar_stats(ddar_stats: dict[str, int], ddar_result: dict[str, Any]) -> None:
-        if ddar_result["status"] == "invalid":
-            if ddar_result.get("error_type") == "engine_error":
-                ddar_stats["remote_engine_invalid"] += 1
-            else:
-                ddar_stats["remote_build_invalid"] += 1
-            return
-        ddar_stats["remote_ddar_calls"] += 1
-        ddar_stats[f"remote_{ddar_result['status']}"] += 1
+            logger.info("LM output [%s]: aux=%s", queue_type, aux)
         
     @torch.no_grad()
     def inference(self, model, tokenizer, query: str, new_point_name: str, response_prefix: str = '<aux>', with_predicate: bool = True):
@@ -238,53 +210,14 @@ class LMAgent(DeductiveAgent):
     def run(self, proof: "ProofState", rules: list[Rule], timeout: int = 3600
         ) -> dict[str, Any]:
         """Run DeductiveAgent until saturation or goal found."""
-        ddar_stats = {
-            "base_calls": 0,
-            "remote_ddar_calls": 0,
-            "remote_solved": 0,
-            "remote_unsolved": 0,
-            "remote_build_invalid": 0,
-            "remote_engine_invalid": 0,
-        }
-
         def infos(is_success, error_msg = None):
             infos: dict[str, Any] = {}
             infos["runtime"] = time.time() - t0
             infos["success"] = is_success
             infos["steps"] = step
-            infos["ddar_stats"] = ddar_stats
-            if self.problem_db_runtime is not None:
-                infos["problem_db_payload"] = self.problem_db_runtime.export_payload()
-                infos["problem_db_stats"] = summarize_problem_db_runtime(self.problem_db_runtime)
             if error_msg:
                 infos["error"] = error_msg
             return infos
-
-        def process_completed_futures(done_futures, new_queues, depth: int):
-            for future in done_futures:
-                ddar_result = ray.get(future)
-                future_meta = future_info[future]
-                if self.problem_db_runtime is not None:
-                    self.problem_db_runtime.record_ddar_result(
-                        future_meta["lookup"],
-                        ddar_result,
-                    )
-                LMAgent._update_ddar_stats(ddar_stats, ddar_result)
-
-                if ddar_result["status"] == "solved":
-                    new_problem = future_meta["problem"]
-                    for task in running_futures:
-                        ray.cancel(task, force=True)
-                    ray.shutdown()
-                    logger.info("Success with problem: %s", new_problem)
-                    return infos(True, str(new_problem))
-
-                if ddar_result["status"] == "unsolved" and depth < self.search_depth - 1:
-                    new_queues[future_meta["queue_idx"]].add(
-                        node=future_meta["problem"],
-                        val=future_meta["prev_score"] + future_meta["score"],
-                    )
-            return None
         
         t0 = time.time()
         step = 0
@@ -294,7 +227,6 @@ class LMAgent(DeductiveAgent):
             if not goal.check_numerical():
                 return infos(False, f"{goal.pretty()} fails numerical check")
         # Run ddar
-        ddar_stats["base_calls"] += 1
         solved = LMAgent.run_ddar_c(proof, rules, t0, timeout)
         # if proofed by ddar, return
         if solved:
@@ -326,14 +258,15 @@ class LMAgent(DeductiveAgent):
                     # j=0: with_predicate, j=1: no_predicate
                     for j, with_predicate in enumerate([True, False]):
                         queue_type = 'with_pred' if with_predicate else 'no_pred'
-
+                        
+                        logger.info(f"!!!")
                         for prev_score, problem in beam_queues[i][j]:
                             if time.time() - t0 > timeout:
                                 ray.shutdown()
                                 return infos(False, 'Timeout')
                             
                             p_dsl = self.problem_to_dsl(problem, proof.defs)
-                            logger.debug("Inferencing on query (%s): %s", queue_type, p_dsl)
+                            logger.info(f"inferencing on query ({queue_type}): {p_dsl}")
                             aux_dsl_dict = self.inference(
                                 self.models[i], self.tokenizers[i], p_dsl, 
                                 self.get_new_point_name(problem), '<aux> x00',
@@ -343,54 +276,50 @@ class LMAgent(DeductiveAgent):
                             for aux_dsl, score in aux_dsl_dict.items():
                                 try:
                                     self._log_model_output(queue_type=queue_type, aux_dsl=aux_dsl, score=score)
-                                    raw_aux_text = aux_dsl[len('<aux> x00'):]
-                                    aux = self.try_dsl_to_constructions(raw_aux_text)
+                                    aux = self.try_dsl_to_constructions(aux_dsl[len('<aux> x00'):])
                                     self._log_model_output(queue_type=queue_type, aux=aux)
                                     if aux:
                                         new_problem = problem.with_more_construction(aux)
-                                        lookup = (
-                                            self.problem_db_runtime.lookup_problem(new_problem)
-                                            if self.problem_db_runtime is not None
-                                            else ProblemDBLookup()
-                                        )
-
-                                        if lookup.hit_category == "solved":
-                                            ray.shutdown()
-                                            logger.info("Cache hit success with problem: %s", new_problem)
-                                            return infos(True, str(new_problem))
-
-                                        if lookup.hit_category == "unsolved":
-                                            if depth < self.search_depth - 1:
-                                                new_queues[j].add(node=new_problem, val=prev_score + score)
-                                            continue
-
-                                        if lookup.hit_category == "invalid":
-                                            continue
-
-                                        future = run_ddar_remote.remote(new_problem, proof.defs, rules_ref, t0, timeout)
-                                        future_info[future] = {
-                                            "problem": new_problem,
-                                            "prev_score": prev_score,
-                                            "score": score,
-                                            "queue_idx": j,
-                                            "lookup": lookup,
-                                        }
+                                        future = run_ddar_remote.remote(new_problem, proof.defs, aux, rules_ref, t0, timeout)
+                                        future_info[future] = (new_problem, prev_score, score, j)
                                         running_futures.append(future)
                                 except Exception as e:
                                     continue
                             
                             # check any done task
                             done, running_futures = ray.wait(running_futures, timeout=0)
-                            future_result = process_completed_futures(done, new_queues, depth)
-                            if future_result is not None:
-                                return future_result
+                            for f in done:
+                                solved = ray.get(f)
+                                if solved is None:
+                                    continue
+                                elif solved:
+                                    new_problem, prev_score, score, queue_idx = future_info[f]
+                                    for task in running_futures:
+                                        ray.cancel(task, force=True)
+                                    ray.shutdown()
+                                    logger.info(f"success with problem: {str(new_problem)}")
+                                    return infos(True, str(new_problem))
+                                elif depth < self.search_depth - 1:
+                                    new_problem, prev_score, score, queue_idx = future_info[f]
+                                    new_queues[queue_idx].add(node=new_problem, val=prev_score+score)
                     
                     # check remaining tasks
                     while running_futures:
                         done, running_futures = ray.wait(running_futures, num_returns=min(1000, len(running_futures)))
-                        future_result = process_completed_futures(done, new_queues, depth)
-                        if future_result is not None:
-                            return future_result
+                        for f in done:
+                            solved = ray.get(f)
+                            if solved is None:
+                                continue
+                            elif solved:
+                                new_problem, prev_score, score, queue_idx = future_info[f]
+                                for task in running_futures:
+                                    ray.cancel(task, force=True)
+                                ray.shutdown()
+                                logger.info(f"success with problem: {str(new_problem)}")
+                                return infos(True, str(new_problem))
+                            elif depth < self.search_depth - 1:
+                                new_problem, prev_score, score, queue_idx = future_info[f]
+                                new_queues[queue_idx].add(node=new_problem, val=prev_score+score)
                     
                     new_beam_queues.append(new_queues)
                 
@@ -622,8 +551,7 @@ class LMAgent(DeductiveAgent):
 
 
 @ray.remote(num_cpus=1)
-def run_ddar_remote(problem, defs, rules: list[Rule], start_time: int, timeout: int = 3600): 
-    eval_start = time.time()
+def run_ddar_remote(problem, defs, aux, rules: list[Rule], start_time: int, timeout: int = 3600): 
     try:
         proof = ProofState.build_problemJGEX(
             problemJGEX=problem,
@@ -632,26 +560,13 @@ def run_ddar_remote(problem, defs, rules: list[Rule], start_time: int, timeout: 
             max_attempts=100,
             problem_path=None,
         )
-    except Exception as exc:
-        return {
-            "status": "invalid",
-            "elapsed_time": time.time() - eval_start,
-            "error_type": classify_build_exception(exc),
-            "error_message": str(exc),
-        }
+    except Exception:
+        return None
     try:
         solved = LMAgent.run_ddar_c(proof, rules, start_time, timeout)
-    except Exception as exc:
-        return {
-            "status": "invalid",
-            "elapsed_time": time.time() - eval_start,
-            "error_type": "engine_error",
-            "error_message": str(exc),
-        }
-    return {
-        "status": "solved" if solved else "unsolved",
-        "elapsed_time": time.time() - eval_start,
-    }
+    except Exception:
+        return None
+    return solved
     
     
 class BeamQueue:
