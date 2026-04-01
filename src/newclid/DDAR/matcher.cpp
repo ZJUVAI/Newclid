@@ -314,6 +314,9 @@ void Matcher::match_between()
 
         for (size_t i = 0; i < candidates.size(); ++i)
         {
+            const Point &a = std::get<1>(candidates[i]);
+            const Point &b = std::get<2>(candidates[i]);
+            insert_theorem(Theorem::eqpoints_of_same_ratio_on_line(p1, p2, a, b));
             for (size_t j = i + 1; j < candidates.size(); ++j)
             {
                 const auto &cand1 = candidates[i];
