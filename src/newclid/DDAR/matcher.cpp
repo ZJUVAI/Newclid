@@ -320,7 +320,8 @@ void Matcher::match_between()
                 const auto &cand2 = candidates[j];
                 double angle1 = std::get<0>(cand1);
                 double angle2 = std::get<0>(cand2);
-                if (Numerical::close_enough(angle1, angle2))
+                // 使用更宽松的精度判断（降低容差 10 倍）
+                if (std::fabs(angle1 - angle2) < 4e-7 || std::fabs(angle1 - angle2) / std::max(std::fabs(angle1), std::fabs(angle2)) < 0.01)
                 {
                     continue;
                 }
