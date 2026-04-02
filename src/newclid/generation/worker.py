@@ -96,22 +96,25 @@ class ProblemWorker:
             )
             try:
                 with time_limit(10):
-                    fl_statement = clauses_generator.generate(
+                    fl_statement, sampling_timings = clauses_generator.generate(
                         length=n_clauses,
                         add_auxiliary=add_auxiliary,
                         max_auxiliary_points=max_auxiliary_points,
                         prune=prune,
                         with_coords=not remove_coords,
+                        return_timings=True
                     )
             except TimeoutError:
                 return [], {}
             generation_time = time.time() - generation_start
 
             # Build solver
+            build_solver_start = time.time()
             solver, solver_builder = ProblemWorker._build_solver(
                 fl_statement,
                 max_attempts=10 if remove_coords else 1,
             )
+            build_solver_time = time.time() - build_solver_start
             if not solver:
                 return [], {}
 
@@ -120,11 +123,12 @@ class ProblemWorker:
                               solver=solver, using_log=True)
 
             # Run solver
+            ddar_start = time.time()
             csolver.run(max_level=max_level)
+            ddar_time = time.time() - ddar_start
 
             # Generate possible goals
-            possible_goals, checkgoals_runtime = ProblemWorker._generate_possible_goals(
-                solver)
+            possible_goals, checkgoals_runtime = ProblemWorker._generate_possible_goals(solver)
 
             # Obtain mapping from clauses to basic statements
             proof_state_temp = ProofState(
@@ -164,8 +168,7 @@ class ProblemWorker:
                     DEADLINE += TIMELIMIT
                     break
                 # find essential_clauses
-                premises, aux = solver.proof.dep_graph.get_premises_and_aux([
-                                                                            goal])
+                premises, aux = solver.proof.dep_graph.get_premises_and_aux([goal])
                 if aux_only > 0 and len(aux) == 0:
                     continue
                 premises = [dep.statement for dep in premises]
@@ -181,8 +184,7 @@ class ProblemWorker:
                         point_names.add(arg.name)
                 predicates = ' '.join(sorted(point_names)) + ' $$ ' \
                     + '; '.join(sorted([statement.to_str() for statement in premises])) + ' $$ ' \
-                    + '; '.join(sorted([statement.to_str()
-                                        for statement in aux]))
+                    + '; '.join(sorted([statement.to_str() for statement in aux]))
                 eq_predicates_goals.setdefault(
                     predicates, []).append((goal, premises, aux))
             group_runtime = time.time() - group_runtime
@@ -217,6 +219,8 @@ class ProblemWorker:
             summary = {
                 'total_time': time.time() - start_time,
                 'generation_time': generation_time,
+                'build_solver_time': build_solver_time,
+                'ddar_time': ddar_time,
                 'runtime': solver.run_infos['runtime'],
                 'checkgoals_runtime': checkgoals_runtime,
                 'process_goal_runtime': process_goal_time,
@@ -228,6 +232,10 @@ class ProblemWorker:
                 'n_proof_steps_raw': [d['n_proof_steps'] for d in generated_data],
                 'n_filtered_samples': 0,  # This value will be updated in generate.py
             }
+
+            # Combine the detailed sampling timing info
+            if 'sampling_timings' in locals() and sampling_timings:
+                summary['sampling_timings'] = sampling_timings
 
             return generated_data, summary
 
@@ -361,22 +369,34 @@ class ProblemWorker:
     def _find_minimal_aux_clauses_new(pointstr2basicstrs, basicstr2pointstrs, solver, solver_builder, goals_str, premises, aux, aux_only, rng):
         """Find minimal auxiliary clause set"""
         results = []
+        timings = {
+            'build_predicates_time': 0.0,
+            'build_solver_time': 0.0,
+            'run_solver_time': 0.0,
+        }
 
         # Step 1: First try solving without aux
+        t0 = time.time()
         proof_state_no_aux = ProofState.build_predicates(
             predicates=premises,
             defsJGEX=solver_builder.defs,
             goals_str=goals_str.copy(),
             rng=np.random.default_rng(solver_builder.seed)
         )
+        timings['build_predicates_time'] = time.time() - t0
+
+        t0 = time.time()
         solver_no_aux = GeometricSolver(
             proof_state_no_aux,
             solver_builder.rules,
             DDARN()
         )
-        csolver_no_aux = CSolver(
-            problem='', solver=solver_no_aux, using_log=True)
+        timings['build_solver_time'] = time.time() - t0
+
+        t0 = time.time()
+        csolver_no_aux = CSolver(problem='', solver=solver_no_aux, using_log=True)
         csolver_no_aux.run()
+        timings['run_solver_time'] = time.time() - t0
 
         for goal in solver_no_aux.goals:
             if goal.check():
@@ -391,42 +411,47 @@ class ProblemWorker:
         if len(aux) == 1:
             # If only one aux, no need to continue
             if len(goals_str) == 0:
-                return results
+                return results, timings
 
             # For remaining goals, excute with all aux to strip extra points
             # that might be introduced in numerical checks
+            t0 = time.time()
             proof_state_all_aux = ProofState.build_predicates(
                 predicates=premises + aux,
                 defsJGEX=solver_builder.defs,
                 goals_str=goals_str.copy(),
                 rng=np.random.default_rng(solver_builder.seed)
             )
+            timings['build_predicates_time'] += time.time() - t0
+
+            t0 = time.time()
             solver_all_aux = GeometricSolver(
                 proof_state_all_aux,
                 solver_builder.rules,
                 DDARN()
             )
+            timings['build_solver_time'] += time.time() - t0
+
             csolver_all_aux = CSolver(
                 problem='', solver=solver_all_aux, using_log=True)
+            t0 = time.time()
             csolver_all_aux.run()
+            timings['run_solver_time'] += time.time() - t0
 
             for goal in solver_all_aux.goals:
                 if goal.check():
                     goals_str.remove(goal.to_str())
-                    results.append(ProblemWorker._extract_proof_info(
-                        solver_all_aux, goal))
+                    results.append(ProblemWorker._extract_proof_info(solver_all_aux, goal))
                 else:
-                    logger.warning(
-                        f"Goal {goal.to_str()} cannot be solved even with all aux")
-            return results
+                    logger.warning(f"Goal {goal.to_str()} cannot be solved even with all aux")
+            return results, timings
 
         if len(goals_str) == 0:
-            return results
+            return results, timings
 
         # Step 2: For remaining goals, try removing aux one by one from back to front
         # Group goals by the minimal aux they need
-        goal_groups = [
-            {"goals": goals_str.copy(), "aux": list(aux), "solvers": {}}]
+        goal_groups = [{"goals": goals_str.copy(), "aux": list(aux), "solvers": {}}]
         premise_strs = set([p.to_str() for p in premises])
         # premise_pointstrs = set()
         # for p in premises:
@@ -471,20 +496,27 @@ class ProblemWorker:
                 #     new_goal_groups.append(group)
                 #     continue
 
+                t0 = time.time()
                 proof_state_test = ProofState.build_predicates(
                     predicates=premises + test_aux,
                     defsJGEX=solver_builder.defs,
                     goals_str=group["goals"],
                     rng=np.random.default_rng(solver_builder.seed)
                 )
+                timings['build_predicates_time'] += time.time() - t0
+
+                t0 = time.time()
                 solver_test = GeometricSolver(
                     proof_state_test,
                     solver_builder.rules,
                     DDARN()
                 )
-                csolver_test = CSolver(
-                    problem='', solver=solver_test, using_log=True)
+                timings['build_solver_time'] += time.time() - t0
+
+                t0 = time.time()
+                csolver_test = CSolver(problem='', solver=solver_test, using_log=True)
                 csolver_test.run()
+                timings['run_solver_time'] += time.time() - t0
 
                 # Check which goals are solved
                 solved_goals = []
@@ -496,8 +528,7 @@ class ProblemWorker:
                             if goal.check():
                                 solved_goals.append(goal_str)
                                 # Save solver for this goal
-                                group["solvers"][goal_str] = (
-                                    solver_test, goal)
+                                group["solvers"][goal_str] = (solver_test, goal)
                             else:
                                 unsolved_goals.append(goal_str)
                             goal_found = True
@@ -533,31 +564,37 @@ class ProblemWorker:
         if len(goals_str) > 0:
             # For remaining goals, excute with all aux to strip extra points
             # that might be introduced in numerical checks
+            t0 = time.time()
             proof_state_all_aux = ProofState.build_predicates(
                 predicates=premises + aux,
                 defsJGEX=solver_builder.defs,
                 goals_str=goals_str.copy(),
                 rng=np.random.default_rng(solver_builder.seed)
             )
+            timings['build_predicates_time'] += time.time() - t0
+
+            t0 = time.time()
             solver_all_aux = GeometricSolver(
                 proof_state_all_aux,
                 solver_builder.rules,
                 DDARN()
             )
-            csolver_all_aux = CSolver(
-                problem='', solver=solver_all_aux, using_log=True)
+            timings['build_solver_time'] += time.time() - t0
+
+            csolver_all_aux = CSolver(problem='', solver=solver_all_aux, using_log=True)
+            t0 = time.time()
             csolver_all_aux.run()
+            timings['run_solver_time'] += time.time() - t0
 
             for goal in solver_all_aux.goals:
-                if goal.check():
+                goal_check_result = goal.check()
+                if goal_check_result:
                     goals_str.remove(goal.to_str())
-                    results.append(ProblemWorker._extract_proof_info(
-                        solver_all_aux, goal))
+                    results.append(ProblemWorker._extract_proof_info(solver_all_aux, goal))
                 else:
-                    logger.warning(
-                        f"Goal {goal.to_str()} cannot be solved even with all aux")
+                    logger.warning(f"Goal {goal.to_str()} cannot be solved even with all aux")
 
-        return results
+        return results, timings
 
     @staticmethod
     def _process_goals_with_same_statement(
@@ -585,7 +622,7 @@ class ProblemWorker:
         # Create RNG for probabilistic filtering
         rng = np.random.default_rng(solver_builder.seed)
         
-        res_list = ProblemWorker._find_minimal_aux_clauses_new(
+        res_list, aux_timings = ProblemWorker._find_minimal_aux_clauses_new(
             pointstr2basicstrs,
             basicstr2pointstrs,
             solver,
@@ -638,6 +675,7 @@ class ProblemWorker:
                 "n_proof_steps": n_proof_steps,
                 "llm_input_renamed": llm_renamed['llm_input'],
                 "llm_output_renamed": llm_renamed['llm_output'],
+                "_timings": {**aux_timings,}
             }
 
             if img:

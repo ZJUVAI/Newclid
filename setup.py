@@ -15,7 +15,10 @@ class DDARBuildCommand(build_ext):
 
     def build_extensions(self):
         """Compile DDAR before building Python extensions"""
-        self._build_ddar()
+        try:
+            self._build_ddar()
+        except Exception as e:
+            print(f"⚠️  DDAR build failed (continuing): {e}")
         super().build_extensions()
 
     def _build_ddar(self):
@@ -108,6 +111,17 @@ ext_modules = [
         "newclid.matchinC",
         ["src/newclid/matchinC.cpp"],
         extra_compile_args=["-O3", "-std=c++14"],
+    ),
+    Pybind11Extension(
+        "newclid.generation.auxiliary",
+        [
+            "src/newclid/generation/auxiliary/geometry.cpp",
+            "src/newclid/generation/auxiliary/line.cpp",
+            "src/newclid/generation/auxiliary/circle.cpp",
+            "src/newclid/generation/auxiliary/utils.cpp",
+            "src/newclid/generation/auxiliary/pybind.cpp",
+        ],
+        extra_compile_args=["-O3", "-std=c++17", "-march=native"],
     ),
 ]
 

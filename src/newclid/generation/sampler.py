@@ -11,6 +11,7 @@ from __future__ import annotations
 import logging
 import random
 import re
+import time
 from typing import Union
 
 import numpy
@@ -33,7 +34,23 @@ from newclid.numerical.distances import (
 
 from newclid.generation.point_naming import PointNaming
 from newclid.generation.constructions import resolve_construction_config
-from newclid.generation.auxiliary import add_potential_points
+from newclid.generation.auxiliary import add_potential_points as _add_potential_points_cpp
+
+
+def add_potential_points(point_names, coords, max_points):
+    """Wrapper that converts C++ output format to Python-compatible format."""
+    result = _add_potential_points_cpp(point_names, coords, max_points)
+    converted = []
+    for coord, construction_strings in result:
+        constructions = []
+        for constr_str in construction_strings:
+            parts = constr_str.split()
+            if len(parts) >= 1:
+                ctype = parts[0]
+                args = parts[1:] if len(parts) > 1 else []
+                constructions.append((ctype, args))
+        converted.append((coord, constructions))
+    return converted
 
 MAX_TRY = 10
 
@@ -394,8 +411,9 @@ class ProblemSampler:
         prune: bool = True,
         prune_topk: int = 1,
         with_coords: bool = True,
-        rename: bool = True
-    ) -> str:
+        rename: bool = True,
+        return_timings: bool = False
+    ) -> Union[str, tuple[str, dict]]:
         """
         Generate geometric clauses.
 
@@ -406,16 +424,21 @@ class ProblemSampler:
             prune_topk: Number of deepest layers to keep when pruning (default 1).
             with_coords: Whether to include coordinate information in output.
             rename: Whether to rename points to standard names (a, b, c, ...).
+            return_timings: Whether to return detailed timing information.
 
         Returns:
             A string of generated clauses separated by semicolons.
+            If return_timings=True, returns (problem_string, timings_dict).
         """
+        timings = {}
+
         self.point_naming = PointNaming()
         self.dep_graph = DependencyGraph(AlgebraicManipulator())
         self.symbols_graph = self.dep_graph.symbols_graph
         self.dag = ClauseDAG()
 
         # Step 1: Sample initial clauses
+        t0 = time.time()
         for clause_set in range(length):
             if clause_set == 0:
                 new_clause_strs = self._sample_clauses(
@@ -442,17 +465,28 @@ class ProblemSampler:
             for clause_str in new_clause_strs:
                 clause = self._parse_clause_str(clause_str)
                 self.dag.add_clause(clause)
+        timings['sampling'] = time.time() - t0
 
         # Step 2: Prune to keep deepest chains
+        t0 = time.time()
         if prune:
             self.dag.prune(topk=prune_topk)
+        timings['prune'] = time.time() - t0
 
         # Step 3: Add auxiliary points
+        t0 = time.time()
         if add_auxiliary:
             self.dag.add_auxiliary_points(max_points=max_auxiliary_points, point_naming=self.point_naming)
+        timings['add_auxiliary'] = time.time() - t0
 
         # Step 4: Convert to problem string
-        return self.dag.to_problem(with_coords=with_coords, rename=rename)
+        t0 = time.time()
+        result = self.dag.to_problem(with_coords=with_coords, rename=rename)
+        timings['to_problem'] = time.time() - t0
+
+        if return_timings:
+            return result, timings
+        return result
 
     def _parse_clause_str(self, clause_str: str) -> Clause:
         """
