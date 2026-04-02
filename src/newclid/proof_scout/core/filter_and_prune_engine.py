@@ -1122,6 +1122,9 @@ class FilterAndPruneEngine:
                 "llm_input_renamed": rec.get("llm_input_renamed", ""),
                 "llm_output_renamed": rec.get("llm_output_renamed", ""),
                 "point_coords": rec.get("point_coords", {}),
+                "eqpoint_original": rec.get("eqpoint_original"),
+                "eqpoint_mapped": rec.get("eqpoint_mapped"),
+                "proposition_rule_merged": rec.get("proposition_rule_merged"),
             })
 
         # Generate signatures
@@ -1160,6 +1163,9 @@ class FilterAndPruneEngine:
                     "llm_input_renamed": item.get("llm_input_renamed", ""),
                     "llm_output_renamed": item.get("llm_output_renamed", ""),
                     "point_coords": item.get("point_coords", {}),
+                    "eqpoint_original": item.get("eqpoint_original"),
+                    "eqpoint_mapped": item.get("eqpoint_mapped"),
+                    "proposition_rule_merged": item.get("proposition_rule_merged"),
                 })
             else:
                 # Track duplicates
