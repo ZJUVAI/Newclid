@@ -618,7 +618,8 @@ class FilterAndPruneEngine:
         self.render_by_rule = render_by_rule
         self.keep_pid_images = keep_pid_images
         self.symmetry_config_path = symmetry_config_path
-        self.skip_predicates = set(p.lower() for p in (skip_predicates if skip_predicates is not None else ["eqpoint", "constline"]))
+        self.skip_predicates = set()
+        # self.skip_predicates = set(p.lower() for p in (skip_predicates if skip_predicates is not None else ["eqpoint", "constline"]))
         self.rule_skip_predicates = set(p.lower() for p in (rule_skip_predicates if rule_skip_predicates is not None else ["aconst", "rconst"]))
         # 硬编码 19 个谓词的对称性配置（优先），外部 JSON 仅作覆盖
         self._symmetry_cfg: Dict[str, Any] = self._build_hardcoded_symmetry_config()
@@ -842,6 +843,171 @@ class FilterAndPruneEngine:
             norm_args.extend(b)
         norm_args.extend(consts)
         return pred, tuple(norm_args)
+
+    # --- Step 3.5a: Simplify trivial eqangle/eqratio predicates ---
+    @staticmethod
+    def _simplify_clause(pred: str, args: List[str]) -> Tuple[str, List[str], bool]:
+        """Simplify a single clause if it's a trivial eqangle/eqratio.
+
+        Rules:
+          eqangle X1 X2 X3 X4 X5 X6 X7 X8:
+            - if {X5,X6} == {X7,X8} → para X1 X2 X3 X4
+            - if {X1,X2} == {X3,X4} → para X5 X6 X7 X8
+          eqratio X1 X2 X3 X4 X5 X6 X7 X8:
+            - if {X5,X6} == {X7,X8} → cong X1 X2 X3 X4
+            - if {X1,X2} == {X3,X4} → cong X5 X6 X7 X8
+
+        Returns: (new_pred, new_args, was_simplified)
+        """
+        if len(args) != 8:
+            return pred, args, False
+
+        if pred == "eqangle":
+            edge1 = frozenset(args[0:2])
+            edge2 = frozenset(args[2:4])
+            edge3 = frozenset(args[4:6])
+            edge4 = frozenset(args[6:8])
+            if edge3 == edge4:
+                return "para", list(args[0:4]), True
+            if edge1 == edge2:
+                return "para", list(args[4:8]), True
+        elif pred == "eqratio":
+            edge1 = frozenset(args[0:2])
+            edge2 = frozenset(args[2:4])
+            edge3 = frozenset(args[4:6])
+            edge4 = frozenset(args[6:8])
+            if edge3 == edge4:
+                return "cong", list(args[0:4]), True
+            if edge1 == edge2:
+                return "cong", list(args[4:8]), True
+
+        return pred, args, False
+
+    def _simplify_trivial_predicates(self, rule_text: str) -> Tuple[str, bool]:
+        """Simplify trivial eqangle/eqratio predicates in a rule text.
+
+        Returns: (simplified_rule_text, was_simplified)
+        """
+        left_parsed, right_parsed = _split_rule_text(rule_text)
+        any_simplified = False
+
+        new_left: List[Tuple[str, List[str]]] = []
+        for pred, args in left_parsed:
+            if not pred:
+                continue
+            new_pred, new_args, simplified = self._simplify_clause(pred, list(args))
+            if simplified:
+                any_simplified = True
+            new_left.append((new_pred, new_args))
+
+        rn, ra = right_parsed
+        new_rn, new_ra = rn, list(ra)
+        if rn:
+            new_rn, new_ra, simplified = self._simplify_clause(rn, list(ra))
+            if simplified:
+                any_simplified = True
+
+        if not any_simplified:
+            return rule_text, False
+
+        left_str = ", ".join(
+            f"{n} " + " ".join(a) if a else n for n, a in new_left if n
+        )
+        right_str = f"{new_rn} " + " ".join(new_ra) if new_rn else ""
+        if left_str and right_str:
+            return f"{left_str} => {right_str}", True
+        if right_str:
+            return f"=> {right_str}", True
+        return left_str, True
+
+    # --- Step 3.5b: eqpoint extraction and analysis ---
+    @staticmethod
+    def _extract_eqpoint_from_proof(llm_output: str) -> List[Tuple[str, str]]:
+        """Extract eqpoint facts from the <proof> section of llm_output_renamed.
+
+        Returns: list of (point1, point2) pairs.
+        """
+        proof_text = _extract_tag_content(llm_output, "proof")
+        if not proof_text:
+            return []
+
+        eqpoint_pairs: List[Tuple[str, str]] = []
+        pattern = re.compile(r'\beqpoint\s+([A-Za-z][A-Za-z0-9_]*)\s+([A-Za-z][A-Za-z0-9_]*)\s+\[\d+\]')
+        for match in pattern.finditer(proof_text):
+            p1, p2 = match.group(1), match.group(2)
+            eqpoint_pairs.append((p1, p2))
+
+        return eqpoint_pairs
+
+    @staticmethod
+    def _map_eqpoint_to_rule(
+        eqpoint_pairs: List[Tuple[str, str]],
+        rename_map: Dict[str, str],
+    ) -> List[Tuple[str, str]]:
+        """Map eqpoint pairs from original point names to rule's canonical names."""
+        mapped: List[Tuple[str, str]] = []
+        for p1, p2 in eqpoint_pairs:
+            r1, r2 = rename_map.get(p1), rename_map.get(p2)
+            if r1 is not None and r2 is not None and r1 != r2:
+                mapped.append((r1, r2))
+        return mapped
+
+    @staticmethod
+    def _build_equivalence_classes(eqpoint_pairs: List[Tuple[str, str]]) -> Dict[str, str]:
+        """Build point equivalence classes via Union-Find.
+
+        Returns: mapping from every point to its representative (lexicographically smallest).
+        """
+        parent: Dict[str, str] = {}
+
+        def find(x: str) -> str:
+            if x not in parent:
+                parent[x] = x
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]  # path halving
+                x = parent[x]
+            return x
+
+        def union(x: str, y: str) -> None:
+            px, py = find(x), find(y)
+            if px != py:
+                if px < py:
+                    parent[py] = px
+                else:
+                    parent[px] = py
+
+        for p1, p2 in eqpoint_pairs:
+            union(p1, p2)
+
+        return {pt: find(pt) for pt in parent}
+
+    def _generate_merged_rule(self, rule_text: str, eqpoint_pairs: List[Tuple[str, str]]) -> str:
+        """Generate a rule variant with eqpoint-equivalent points merged."""
+        if not eqpoint_pairs:
+            return rule_text
+
+        equiv_map = self._build_equivalence_classes(eqpoint_pairs)
+        left_parsed, right_parsed = _split_rule_text(rule_text)
+
+        def replace_args(args: List[str]) -> List[str]:
+            return [equiv_map.get(a, a) if _is_point_token(a) else a for a in args]
+
+        new_left = [(n, replace_args(list(a))) for n, a in left_parsed]
+        new_right = (right_parsed[0], replace_args(list(right_parsed[1])))
+
+        left_str = ", ".join(
+            f"{n} " + " ".join(a) if a else n for n, a in new_left if n
+        )
+        right_str = (
+            f"{new_right[0]} " + " ".join(new_right[1])
+            if new_right[0]
+            else ""
+        )
+        if left_str and right_str:
+            return f"{left_str} => {right_str}"
+        if right_str:
+            return f"=> {right_str}"
+        return left_str
 
     def _canonicalize_rule_with_symmetry(self, rule_text: str) -> str:
         """Step 1e Phase 2 helper: normalize a rule string for dedup.
@@ -1069,6 +1235,33 @@ class FilterAndPruneEngine:
         print(f"[Step 6: rule dump] wrote {len(final_entries)} rules to {rules_path}"
               f" (skipped_predicates={len(skipped_by_pred)}"
               f"{' rule_skip_predicates=' + str(sorted(self.rule_skip_predicates)) if skipped_by_pred else ''})")
+
+        # Write eqpoint-related outputs
+        rules_with_eqpoint = [
+            e for e in final_entries
+            if e.get("eqpoint_mapped") and len(e.get("eqpoint_mapped", [])) > 0
+        ]
+        if rules_with_eqpoint:
+            eqpoint_path = pruned_path.with_name(pruned_path.stem + "_rules_with_eqpoint.json")
+            with open(eqpoint_path, "w", encoding="utf-8") as f:
+                json.dump([{
+                    "rid": e["rid"],
+                    "pid": e["pid"],
+                    "rule": e["norm_rule"],
+                    "eqpoint_mapped": e.get("eqpoint_mapped", []),
+                    "rule_merged": e.get("proposition_rule_merged", ""),
+                } for e in rules_with_eqpoint], f, ensure_ascii=False, indent=2)
+
+            # Write merged rules text
+            merged_path = pruned_path.with_name(pruned_path.stem + "_rules_merged.txt")
+            merged_lines: List[str] = []
+            for e in rules_with_eqpoint:
+                merged_lines.append(e["rid"])
+                merged_lines.append(e.get("proposition_rule_merged", e["norm_rule"]))
+            with open(merged_path, "w", encoding="utf-8") as f:
+                f.write("\n".join(merged_lines) + ("\n" if merged_lines else ""))
+
+            print(f"[Step 6: eqpoint output] wrote {len(rules_with_eqpoint)} rules with eqpoint to {eqpoint_path}")
 
         return len(final_entries), len(skipped_by_pred), final_entries
 
@@ -1353,6 +1546,80 @@ class FilterAndPruneEngine:
         with open(pruned_json, "w", encoding="utf-8") as f:
             json.dump(out_obj, f, ensure_ascii=False, indent=2)
         print(f"[filter+prune] pruned json written: {pruned_json}")
+
+        # ================================================================
+        # Step 3.5a: Simplify Trivial Predicates
+        # ================================================================
+        simplified_count = 0
+        simplification_records: List[Dict[str, Any]] = []
+
+        for rec in out_results:
+            rule = rec.get("proposition_rule")
+            if not rule:
+                continue
+
+            simplified_rule, was_simplified = self._simplify_trivial_predicates(rule)
+            if was_simplified:
+                simplified_count += 1
+                simplification_records.append({
+                    "pid": rec.get("problem_id"),
+                    "original": rule,
+                    "simplified": simplified_rule,
+                })
+                rec["proposition_rule"] = simplified_rule
+                rec["was_simplified"] = True
+
+        print(f"[Step 3.5a: simplify predicates] simplified={simplified_count}/{len(out_results)}")
+
+        if intermediates_dir and simplification_records:
+            with open(intermediates_dir / "step3.5a_simplified_predicates.json", "w", encoding="utf-8") as f:
+                json.dump(simplification_records, f, ensure_ascii=False, indent=2)
+
+        # ================================================================
+        # Step 3.5b: Extract and Map eqpoint
+        # ================================================================
+        eqpoint_count = 0
+        eqpoint_records: List[Dict[str, Any]] = []
+
+        for rec in out_results:
+            llm_output = rec.get("llm_output_renamed", "")
+            rename_map = rec.get("rename_map", {})
+            rule = rec.get("proposition_rule")
+
+            if not llm_output or not rename_map or not rule:
+                continue
+
+            # Extract eqpoint from proof
+            eqpoint_original = self._extract_eqpoint_from_proof(llm_output)
+            if not eqpoint_original:
+                continue
+
+            # Map to rule point names
+            eqpoint_mapped = self._map_eqpoint_to_rule(eqpoint_original, rename_map)
+            if not eqpoint_mapped:
+                continue
+
+            # Generate merged rule
+            merged_rule = self._generate_merged_rule(rule, eqpoint_mapped)
+
+            rec["eqpoint_original"] = eqpoint_original
+            rec["eqpoint_mapped"] = eqpoint_mapped
+            rec["proposition_rule_merged"] = merged_rule
+
+            eqpoint_count += 1
+            eqpoint_records.append({
+                "pid": rec.get("problem_id"),
+                "eqpoint_original": eqpoint_original,
+                "eqpoint_mapped": eqpoint_mapped,
+                "rule": rule,
+                "rule_merged": merged_rule,
+            })
+
+        print(f"[Step 3.5b: eqpoint analysis] rules_with_eqpoint={eqpoint_count}/{len(out_results)}")
+
+        if intermediates_dir and eqpoint_records:
+            with open(intermediates_dir / "step3.5b_eqpoint_analysis.json", "w", encoding="utf-8") as f:
+                json.dump(eqpoint_records, f, ensure_ascii=False, indent=2)
 
         # ================================================================
         # Step 4: Normalization
