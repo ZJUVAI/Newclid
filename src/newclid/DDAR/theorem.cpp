@@ -492,6 +492,17 @@ Theorem Theorem::cong_of_eqpoints(const EqPoint &eq, const Point &p)
     return theorem;
 }
 
+Theorem Theorem::eqpoints_of_same_ratio_on_line(const Point &p1, const Point &p2, const Point &a, const Point &c)
+{
+    Theorem theorem("Same ratio on same line implies equal points", "r109");
+    theorem.add_hypothesis(make_unique<Coll>(Coll(a, p1, c)));
+    theorem.add_hypothesis(make_unique<Coll>(Coll(a, p2, c)));
+    theorem.add_hypothesis(make_unique<Cong>(Cong(Dist(a, p1), Dist(a, p2))));
+    theorem.add_hypothesis(make_unique<Cong>(Cong(Dist(c, p1), Dist(c, p2))));
+    theorem.add_conclusion(make_unique<EqPoint>(EqPoint(p1, p2)));
+    return theorem;
+}
+
 Theorem Theorem::clone() const
 {
     Theorem thm(_name, _rule);

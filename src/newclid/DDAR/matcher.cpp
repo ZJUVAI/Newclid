@@ -314,13 +314,17 @@ void Matcher::match_between()
 
         for (size_t i = 0; i < candidates.size(); ++i)
         {
+            const Point &a = std::get<1>(candidates[i]);
+            const Point &b = std::get<2>(candidates[i]);
+            insert_theorem(Theorem::eqpoints_of_same_ratio_on_line(p1, p2, a, b));
             for (size_t j = i + 1; j < candidates.size(); ++j)
             {
                 const auto &cand1 = candidates[i];
                 const auto &cand2 = candidates[j];
                 double angle1 = std::get<0>(cand1);
                 double angle2 = std::get<0>(cand2);
-                if (Numerical::close_enough(angle1, angle2))
+                // 使用更宽松的精度判断（降低容差 10 倍）
+                if (std::fabs(angle1 - angle2) < 4e-7 || std::fabs(angle1 - angle2) / std::max(std::fabs(angle1), std::fabs(angle2)) < 0.01)
                 {
                     continue;
                 }
