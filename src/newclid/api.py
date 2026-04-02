@@ -177,7 +177,7 @@ class GeometricSolver:
 
 
 class GeometricSolverBuilder:
-    def __init__(self, seed: int = None) -> None:
+    def __init__(self, seed: int = None, allow_coincident_points: bool = True) -> None:
         self.problemJGEX: Optional[ProblemJGEX] = None
         self._defs: Optional[dict[str, DefinitionJGEX]] = None
         self._rules: Optional[list[Rule]] = None
@@ -187,6 +187,7 @@ class GeometricSolverBuilder:
         self.seed = seed or 998244353
         self.problem_path: Optional[Path] = None
         self._premises_data: Optional[dict] = None  # For premises-based loading
+        self.allow_coincident_points = allow_coincident_points
 
     @property
     def defs(self) -> dict[str, DefinitionJGEX]:
@@ -212,6 +213,7 @@ class GeometricSolverBuilder:
                 defsJGEX=self.defs,
                 goals_str=self._premises_data["goals"],
                 rng=np.random.default_rng(self.seed),
+                allow_coincident_points=self.allow_coincident_points,
             )
         elif self.problemJGEX:
             # Path 1: Build from JGEX (existing)
@@ -223,6 +225,7 @@ class GeometricSolverBuilder:
                 problem_path=self.problem_path,
                 rng=np.random.default_rng(self.seed),
                 max_attempts=max_attempts,
+                allow_coincident_points=self.allow_coincident_points,
             )
         else:
             # Path 2: Build from dep_graph (existing)
@@ -233,6 +236,7 @@ class GeometricSolverBuilder:
                 problem_path=self.problem_path,
                 goals=self.goals,
                 defs=self.defs,
+                allow_coincident_points=self.allow_coincident_points,
             )
         if self.deductive_agent is None:
             self.deductive_agent = DDARN()
