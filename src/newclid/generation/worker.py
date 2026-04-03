@@ -85,7 +85,7 @@ class ProblemWorker:
             ) = args
             start_time = time.time()
 
-            TIMELIMIT = 600  # 10分钟
+            TIMELIMIT = 30  # 30 seconds per problem
             DEADLINE = start_time + TIMELIMIT
 
             # geneate fl_statement
@@ -164,9 +164,6 @@ class ProblemWorker:
             group_runtime = time.time()
             eq_predicates_goals = dict()
             for goal in possible_goals:
-                if (time.time() > DEADLINE):
-                    DEADLINE += TIMELIMIT
-                    break
                 # find essential_clauses
                 premises, aux = solver.proof.dep_graph.get_premises_and_aux([goal])
                 if aux_only > 0 and len(aux) == 0:
