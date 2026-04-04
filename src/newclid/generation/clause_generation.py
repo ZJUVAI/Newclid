@@ -180,6 +180,9 @@ class CompoundClauseGen:
         self.defs = defs or DefinitionJGEX.to_dict(
             DefinitionJGEX.parse_txt_file(default_defs_path())
         )
+        # Use time-based seed if not specified
+        if seed is None:
+            seed = int(time.time())
         self.rng = numpy.random.default_rng(seed)
         random.seed(seed)
         self.point_generator = None
