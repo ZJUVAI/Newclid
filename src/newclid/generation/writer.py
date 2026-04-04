@@ -9,6 +9,7 @@ import logging
 import os
 import ray
 import cairosvg
+from datetime import datetime
 
 
 def convert_svg_to_png(svg_path, png_path, width=1024):
@@ -135,7 +136,8 @@ class Writer:
             defs_data: Serialized definitions for drawing
             session_id: Unique session identifier
         """
-        self.output_dir = output_dir
+        self.output_dir = os.path.join(output_dir, datetime.now().strftime("%Y%m%d"))
+        os.makedirs(self.output_dir, exist_ok=True)
         self.path_prefix = path_prefix
         self.img_mode = img_mode
         self.defs_data = defs_data
@@ -200,6 +202,7 @@ class Writer:
             force: If True, wait for all pending tasks and flush immediately
         """
         filename = self.path_prefix + ".jsonl"
+        filename = os.path.join(self.output_dir, os.path.basename(filename))
         imgs_dir = os.path.join(self.output_dir, "imgs")
         imgs_png_dir = os.path.join(self.output_dir, "imgs_png")
         os.makedirs(os.path.dirname(filename), exist_ok=True)
@@ -208,6 +211,7 @@ class Writer:
 
         for data_item in all_data:
             self.data_count += 1
+            data_item.pop("_timings", None)
             if self.img_mode > 0 and "draw_data" in data_item:
                 draw_data = data_item.pop("draw_data")
                 # Submit draw task to Ray
@@ -225,6 +229,7 @@ class Writer:
                 # No image needed, write directly
                 data_item.pop("draw_data", None)
                 self.pending_write_data[self.data_count] = data_item
+            
 
         # Process any completed draw tasks
         self._process_completed_draw_tasks(wait_all=False)

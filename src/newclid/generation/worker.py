@@ -4,19 +4,15 @@ from newclid.generation.filter import GoalFilter
 from newclid.generation.statistics import Statistics, get_first_predicate
 from newclid.proof import ProofState
 from newclid.statement import Statement
-from newclid.formulations.problem import ProblemJGEX
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.formulations.clause import Clause, translate_sentence
-from newclid.dependencies.symbols import Point
+from newclid.dependencies.symbols import Point, Symbol
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.dependencies.dependency import Dependency, IN_PREMISES, NUMERICAL_CHECK
 from newclid.configs import default_defs_path
 from newclid.api import GeometricSolver, GeometricSolverBuilder, CSolver
-from newclid.numerical.draw_figure import draw_with_mapping
-from newclid.numerical.draw_clause_figure import draw_clauses
 import logging
 import re
-import itertools
 import string
 import time
 import signal
@@ -24,7 +20,6 @@ from contextlib import contextmanager
 from collections import defaultdict
 import ray
 import numpy as np
-from copy import deepcopy
 
 from newclid.generation.sampler import ProblemSampler
 logger = logging.getLogger(__name__)
@@ -642,6 +637,7 @@ class ProblemWorker:
             numercial_checked_aux = res['numercial_checked_aux']
             trivial_aux = res['trivial_aux']
             proof_steps = res['proof_steps']
+            name2node = res['name2node']
 
             # llm data generation
             llm_renamed, clauses, mapping, n_premises, n_proof_steps = ProblemWorker.llm_solution_renamed(
@@ -657,6 +653,7 @@ class ProblemWorker:
                 numercial_checked_aux,
                 trivial_aux,
                 proof_steps,
+                name2node
             )
 
             if aux_only == 2 and 'aux' not in llm_renamed['llm_output']:
@@ -739,7 +736,8 @@ class ProblemWorker:
         aux: list[Dependency],
         numercial_checked_aux: list[Dependency],
         trivial_aux: list[Dependency],
-        proof_steps: list[Dependency]
+        proof_steps: list[Dependency],
+        name2node: dict[str, Symbol]
     ):
         """Refactored main method to generate LLM solution with renamed points"""
         try:
@@ -762,18 +760,20 @@ class ProblemWorker:
             # Create point name mapping
             essential_premise_point_names: list[str] = []
             for clause in essential_premise_clauses:
-                for points, bs in clause2basics[clause]:
-                    essential_premise_point_names.extend(points)
+                for _points, bs in clause2basics[clause]:
+                    essential_premise_point_names.extend(_points)
             essential_aux_point_names: list[str] = []
-            for points, bs in essential_aux_basics:
-                essential_aux_point_names.extend(points)
+            for _points, bs in essential_aux_basics:
+                essential_aux_point_names.extend(_points)
             mp = ProblemWorker._create_point_mapping(
                 essential_premise_point_names, essential_aux_point_names
             )
-
+            new_points_with_coords = {}
+            for k, v in mp.items():
+                new_points_with_coords[mp[k]] = (name2node[k].num.x, name2node[k].num.y)
             # Generate each section
             data_problem_clauses = ProblemWorker._generate_problem_clauses_section(
-                mp, essential_premise_clauses, goals
+                mp, essential_premise_clauses, goals, new_points_with_coords
             )
             data_problem = ProblemWorker._generate_problem_predicates_section(
                 mp, dep_idx, clause2basics, essential_premise_clauses, goals
@@ -805,10 +805,10 @@ class ProblemWorker:
             print(f"clause2basics: {clause2basics}")
             print(f"essential_clauses: {essential_premise_clauses}")
             print(f"essential_aux_basics: {essential_aux_basics}")
-            print(
-                f"essential_premise_point_names: {essential_premise_point_names}")
+            print(f"essential_premise_point_names: {essential_premise_point_names}")
             print(f"essential_aux_point_names: {essential_aux_point_names}")
             print(f"mp: {mp}")
+            print(f"point_coords: {new_points_with_coords}")
             raise
 
     @staticmethod
@@ -956,6 +956,7 @@ class ProblemWorker:
         mp: dict[str, str],
         essential_premise_clauses: list[Clause],
         goals: list[Statement],
+        new_points_with_coords: dict[str, tuple[float, float]],
     ) -> str:
         """Generate problem clauses section"""
         dep_graph = DependencyGraph(AlgebraicManipulator())
@@ -968,7 +969,7 @@ class ProblemWorker:
             ).to_str()
             for goal in goals
         ]
-        return '; '.join([str(clause) for clause in renamed_clauses]) + ' ? ' + \
+        return '; '.join([clause.to_str_with_coordinates(new_points_with_coords) for clause in renamed_clauses]) + ' ? ' + \
             '; '.join(renamed_goal_strs)
 
     @staticmethod
