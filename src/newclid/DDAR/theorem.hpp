@@ -145,6 +145,9 @@ public:
     // r108
     static Theorem cong_of_eqpoints(const EqPoint &eq, const Point &p);
 
+    // r109
+    static Theorem eqpoints_of_same_ratio_on_line(const Point &p1, const Point &p2, const Point &a, const Point &c);
+
 private:
     std::string _name;
     std::string _rule;

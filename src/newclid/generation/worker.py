@@ -1,22 +1,18 @@
 from newclid.agent.ddarn import DDARN
 from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulator
-from newclid.generation.goal_filter import GeometryGoalFilter
-from newclid.generation.summary import Summary, get_first_predicate
+from newclid.generation.filter import GoalFilter
+from newclid.generation.statistics import Statistics, get_first_predicate
 from newclid.proof import ProofState
 from newclid.statement import Statement
-from newclid.formulations.problem import ProblemJGEX
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.formulations.clause import Clause, translate_sentence
-from newclid.dependencies.symbols import Point
+from newclid.dependencies.symbols import Point, Symbol
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.dependencies.dependency import Dependency, IN_PREMISES, NUMERICAL_CHECK
 from newclid.configs import default_defs_path
 from newclid.api import GeometricSolver, GeometricSolverBuilder, CSolver
-from newclid.numerical.draw_figure import draw_with_mapping
-from newclid.numerical.draw_clause_figure import draw_clauses
 import logging
 import re
-import itertools
 import string
 import time
 import signal
@@ -24,10 +20,8 @@ from contextlib import contextmanager
 from collections import defaultdict
 import ray
 import numpy as np
-from copy import deepcopy
 
-from newclid.generation.clause_generation import CompoundClauseGen
-from newclid.generation.HA import enhance_text_with_potential_points
+from newclid.generation.sampler import ProblemSampler
 logger = logging.getLogger(__name__)
 
 
@@ -47,19 +41,19 @@ def time_limit(seconds):
         signal.alarm(0)
 
 
-class GeometryProblemWorker:
+class ProblemWorker:
     """
     Worker class to process individual geometry problems.
     This class is designed to be used with Ray for parallel processing.
     """
-    filter = GeometryGoalFilter()
+    filter = GoalFilter()
     defs = DefinitionJGEX.to_dict(
         DefinitionJGEX.parse_txt_file(default_defs_path()))
 
     @ray.remote(num_cpus=1, max_retries=0)
     def ray_process_single_problem(args):
         try:
-            return GeometryProblemWorker._process_single_problem(args)
+            return ProblemWorker._process_single_problem(args)
         except MemoryError as e:
             logging.error(f"⚠️ Worker OOM killed: {e}")
             return [], {'error': 'oom'}
@@ -71,68 +65,65 @@ class GeometryProblemWorker:
     def _process_single_problem(args: tuple) -> tuple[list, dict]:
         """Process a single geometry problem with unique seed."""
         try:
-            pid, seed, n_clauses, max_level, img, aux_only, add_auxiliary, prune, remove_coords = args[:9]
-            # Optional flywheel params (backward compatible)
-            engine = args[9] if len(args) > 9 else "full"
-            custom_rules = args[10] if len(args) > 10 else None
+            (
+                pid,
+                seed,
+                n_clauses,
+                max_level,
+                img,
+                aux_only,
+                add_auxiliary,
+                max_auxiliary_points,
+                prune,
+                remove_coords,
+                construction_config,
+            ) = args
             start_time = time.time()
 
-            TIMELIMIT = 600  # 10分钟
+            TIMELIMIT = 30  # 30 seconds per problem
             DEADLINE = start_time + TIMELIMIT
 
             # geneate fl_statement
-            clauses_generator = CompoundClauseGen(seed=seed)
+            generation_start = time.time()
+            clauses_generator = ProblemSampler(
+                seed=seed,
+                construction_config=construction_config,
+            )
             try:
                 with time_limit(10):
-                    fl_statement = clauses_generator.generate(
+                    fl_statement, sampling_timings = clauses_generator.generate(
                         length=n_clauses,
                         add_auxiliary=add_auxiliary,
+                        max_auxiliary_points=max_auxiliary_points,
                         prune=prune,
-                        remove_coords=remove_coords,
+                        with_coords=not remove_coords,
+                        return_timings=True
                     )
             except TimeoutError:
                 return [], {}
-            # fl_statement, _ = args
-            # seed=42
-            # max_level=500
-            # img = True
-            # aux_only = 0
-            # start_time = time.time()
-            # remove_coords = False
-            # draw_annotations = True
-
-            # print(f"before: {fl_statement}")
-
-            enhance_runtime = time.time()
-            fl_statement = enhance_text_with_potential_points(
-                fl_statement, clauses_generator.point_generator)
-            enhance_runtime = time.time() - enhance_runtime
-
-            # print(f"after: {fl_statement}")
-            # print()
+            generation_time = time.time() - generation_start
 
             # Build solver
-            solver, solver_builder = GeometryProblemWorker._build_solver(
+            build_solver_start = time.time()
+            solver, solver_builder = ProblemWorker._build_solver(
                 fl_statement,
                 max_attempts=10 if remove_coords else 1,
             )
+            build_solver_time = time.time() - build_solver_start
             if not solver:
                 return [], {}
 
             n_clauses = len(fl_statement.split(';'))
             csolver = CSolver(fl_statement, seed=seed,
-                              solver=solver,
-                              using_log=(engine != "weak"),
-                              using_exp=False,
-                              custom_rules=custom_rules,
-                              engine=engine)
+                              solver=solver, using_log=True)
 
             # Run solver
+            ddar_start = time.time()
             csolver.run(max_level=max_level)
+            ddar_time = time.time() - ddar_start
 
             # Generate possible goals
-            possible_goals, checkgoals_runtime = GeometryProblemWorker._generate_possible_goals(
-                solver)
+            possible_goals, checkgoals_runtime = ProblemWorker._generate_possible_goals(solver)
 
             # Obtain mapping from clauses to basic statements
             proof_state_temp = ProofState(
@@ -146,7 +137,7 @@ class GeometryProblemWorker:
                         sentences=clause.sentences,
                     )
                 )
-            clause2basics, clause2args = GeometryProblemWorker._get_all_premise(
+            clause2basics, clause2args = ProblemWorker._get_all_premise(
                 clauses_without_coords, proof_state_temp
             )
             statement_str_idxs = dict()
@@ -168,12 +159,8 @@ class GeometryProblemWorker:
             group_runtime = time.time()
             eq_predicates_goals = dict()
             for goal in possible_goals:
-                if (time.time() > DEADLINE):
-                    DEADLINE += TIMELIMIT
-                    break
                 # find essential_clauses
-                premises, aux = solver.proof.dep_graph.get_premises_and_aux([
-                                                                            goal])
+                premises, aux = solver.proof.dep_graph.get_premises_and_aux([goal])
                 if aux_only > 0 and len(aux) == 0:
                     continue
                 premises = [dep.statement for dep in premises]
@@ -189,8 +176,7 @@ class GeometryProblemWorker:
                         point_names.add(arg.name)
                 predicates = ' '.join(sorted(point_names)) + ' $$ ' \
                     + '; '.join(sorted([statement.to_str() for statement in premises])) + ' $$ ' \
-                    + '; '.join(sorted([statement.to_str()
-                                        for statement in aux]))
+                    + '; '.join(sorted([statement.to_str() for statement in aux]))
                 eq_predicates_goals.setdefault(
                     predicates, []).append((goal, premises, aux))
             group_runtime = time.time() - group_runtime
@@ -204,7 +190,7 @@ class GeometryProblemWorker:
                 goals = [data[0] for data in goal_list]
                 premises = goal_list[0][1]
                 aux = goal_list[0][2]
-                data = GeometryProblemWorker._process_goals_with_same_statement(
+                data = ProblemWorker._process_goals_with_same_statement(
                     clause2basics,
                     clause2args,
                     pointstr2basicstrs,
@@ -221,18 +207,16 @@ class GeometryProblemWorker:
                 generated_data.extend(data)
             process_goal_time = time.time() - process_goal_time
 
-            # Inject per-problem seed into each result
-            for item in generated_data:
-                item["seed"] = seed
-
             # Create summary
             summary = {
                 'total_time': time.time() - start_time,
+                'generation_time': generation_time,
+                'build_solver_time': build_solver_time,
+                'ddar_time': ddar_time,
                 'runtime': solver.run_infos['runtime'],
                 'checkgoals_runtime': checkgoals_runtime,
                 'process_goal_runtime': process_goal_time,
                 'group_runtime': group_runtime,
-                'enhance_runtime': enhance_runtime,
                 'n_samples_raw': len(generated_data),
                 'goals_raw': [re.search(r'\?\s*(\w+)', d['fl_problem']).group(1) for d in generated_data],
                 'first_predicate_raw': [get_first_predicate(d['fl_problem']) for d in generated_data],
@@ -240,6 +224,10 @@ class GeometryProblemWorker:
                 'n_proof_steps_raw': [d['n_proof_steps'] for d in generated_data],
                 'n_filtered_samples': 0,  # This value will be updated in generate.py
             }
+
+            # Combine the detailed sampling timing info
+            if 'sampling_timings' in locals() and sampling_timings:
+                summary['sampling_timings'] = sampling_timings
 
             return generated_data, summary
 
@@ -266,10 +254,10 @@ class GeometryProblemWorker:
     def _generate_possible_goals(solver):
         """Generate possible goals"""
         t = time.time()
-        # GeometryProblemWorker.all_possible_goals_by_ar(solver.proof.dep_graph)
+        # ProblemWorker.all_possible_goals_by_ar(solver.proof.dep_graph)
         possible_goals = [
             goal for goal in solver.proof.dep_graph.conclusions()]
-        possible_goals = GeometryProblemWorker.filter.goal_filter(
+        possible_goals = ProblemWorker.filter.goal_filter(
             possible_goals, solver.proof.dep_graph)
         checkgoals_runtime = time.time() - t
         return possible_goals, checkgoals_runtime
@@ -280,7 +268,7 @@ class GeometryProblemWorker:
             return re.findall(r'[a-z][\d]*', s)
 
         def goal_from_tokens(tokens):
-            if GeometryProblemWorker.filter.naive_goal_filter(tokens[0], tokens[1:], dep_graph):
+            if ProblemWorker.filter.naive_goal_filter(tokens[0], tokens[1:], dep_graph):
                 goal = Statement.from_tokens(tokens, dep_graph)
                 if goal:
                     goal.check()
@@ -373,22 +361,34 @@ class GeometryProblemWorker:
     def _find_minimal_aux_clauses_new(pointstr2basicstrs, basicstr2pointstrs, solver, solver_builder, goals_str, premises, aux, aux_only, rng):
         """Find minimal auxiliary clause set"""
         results = []
+        timings = {
+            'build_predicates_time': 0.0,
+            'build_solver_time': 0.0,
+            'run_solver_time': 0.0,
+        }
 
         # Step 1: First try solving without aux
+        t0 = time.time()
         proof_state_no_aux = ProofState.build_predicates(
             predicates=premises,
             defsJGEX=solver_builder.defs,
             goals_str=goals_str.copy(),
             rng=np.random.default_rng(solver_builder.seed)
         )
+        timings['build_predicates_time'] = time.time() - t0
+
+        t0 = time.time()
         solver_no_aux = GeometricSolver(
             proof_state_no_aux,
             solver_builder.rules,
             DDARN()
         )
-        csolver_no_aux = CSolver(
-            problem='', solver=solver_no_aux, using_log=True, using_exp=False)
+        timings['build_solver_time'] = time.time() - t0
+
+        t0 = time.time()
+        csolver_no_aux = CSolver(problem='', solver=solver_no_aux, using_log=True)
         csolver_no_aux.run()
+        timings['run_solver_time'] = time.time() - t0
 
         for goal in solver_no_aux.goals:
             if goal.check():
@@ -398,47 +398,52 @@ class GeometryProblemWorker:
                 # For aux_only==2, never keep
                 if aux_only == 0 or (aux_only == 1 and rng.random() < 0.1):
                     results.append(
-                        GeometryProblemWorker._extract_proof_info(solver_no_aux, goal))
+                        ProblemWorker._extract_proof_info(solver_no_aux, goal))
 
         if len(aux) == 1:
             # If only one aux, no need to continue
             if len(goals_str) == 0:
-                return results
+                return results, timings
 
             # For remaining goals, excute with all aux to strip extra points
             # that might be introduced in numerical checks
+            t0 = time.time()
             proof_state_all_aux = ProofState.build_predicates(
                 predicates=premises + aux,
                 defsJGEX=solver_builder.defs,
                 goals_str=goals_str.copy(),
                 rng=np.random.default_rng(solver_builder.seed)
             )
+            timings['build_predicates_time'] += time.time() - t0
+
+            t0 = time.time()
             solver_all_aux = GeometricSolver(
                 proof_state_all_aux,
                 solver_builder.rules,
                 DDARN()
             )
+            timings['build_solver_time'] += time.time() - t0
+
             csolver_all_aux = CSolver(
-                problem='', solver=solver_all_aux, using_log=True, using_exp=False)
+                problem='', solver=solver_all_aux, using_log=True)
+            t0 = time.time()
             csolver_all_aux.run()
+            timings['run_solver_time'] += time.time() - t0
 
             for goal in solver_all_aux.goals:
                 if goal.check():
                     goals_str.remove(goal.to_str())
-                    results.append(GeometryProblemWorker._extract_proof_info(
-                        solver_all_aux, goal))
+                    results.append(ProblemWorker._extract_proof_info(solver_all_aux, goal))
                 else:
-                    logger.warning(
-                        f"Goal {goal.to_str()} cannot be solved even with all aux")
-            return results
+                    logger.warning(f"Goal {goal.to_str()} cannot be solved even with all aux")
+            return results, timings
 
         if len(goals_str) == 0:
-            return results
+            return results, timings
 
         # Step 2: For remaining goals, try removing aux one by one from back to front
         # Group goals by the minimal aux they need
-        goal_groups = [
-            {"goals": goals_str.copy(), "aux": list(aux), "solvers": {}}]
+        goal_groups = [{"goals": goals_str.copy(), "aux": list(aux), "solvers": {}}]
         premise_strs = set([p.to_str() for p in premises])
         # premise_pointstrs = set()
         # for p in premises:
@@ -483,20 +488,27 @@ class GeometryProblemWorker:
                 #     new_goal_groups.append(group)
                 #     continue
 
+                t0 = time.time()
                 proof_state_test = ProofState.build_predicates(
                     predicates=premises + test_aux,
                     defsJGEX=solver_builder.defs,
                     goals_str=group["goals"],
                     rng=np.random.default_rng(solver_builder.seed)
                 )
+                timings['build_predicates_time'] += time.time() - t0
+
+                t0 = time.time()
                 solver_test = GeometricSolver(
                     proof_state_test,
                     solver_builder.rules,
                     DDARN()
                 )
-                csolver_test = CSolver(
-                    problem='', solver=solver_test, using_log=True, using_exp=False)
+                timings['build_solver_time'] += time.time() - t0
+
+                t0 = time.time()
+                csolver_test = CSolver(problem='', solver=solver_test, using_log=True)
                 csolver_test.run()
+                timings['run_solver_time'] += time.time() - t0
 
                 # Check which goals are solved
                 solved_goals = []
@@ -508,8 +520,7 @@ class GeometryProblemWorker:
                             if goal.check():
                                 solved_goals.append(goal_str)
                                 # Save solver for this goal
-                                group["solvers"][goal_str] = (
-                                    solver_test, goal)
+                                group["solvers"][goal_str] = (solver_test, goal)
                             else:
                                 unsolved_goals.append(goal_str)
                             goal_found = True
@@ -539,37 +550,43 @@ class GeometryProblemWorker:
                     goals_str.remove(goal_str)
                     # Use saved solver and extract proof information
                     best_solver, best_goal = group["solvers"][goal_str]
-                    results.append(GeometryProblemWorker._extract_proof_info(
+                    results.append(ProblemWorker._extract_proof_info(
                         best_solver, best_goal))
 
         if len(goals_str) > 0:
             # For remaining goals, excute with all aux to strip extra points
             # that might be introduced in numerical checks
+            t0 = time.time()
             proof_state_all_aux = ProofState.build_predicates(
                 predicates=premises + aux,
                 defsJGEX=solver_builder.defs,
                 goals_str=goals_str.copy(),
                 rng=np.random.default_rng(solver_builder.seed)
             )
+            timings['build_predicates_time'] += time.time() - t0
+
+            t0 = time.time()
             solver_all_aux = GeometricSolver(
                 proof_state_all_aux,
                 solver_builder.rules,
                 DDARN()
             )
-            csolver_all_aux = CSolver(
-                problem='', solver=solver_all_aux, using_log=True, using_exp=False)
+            timings['build_solver_time'] += time.time() - t0
+
+            csolver_all_aux = CSolver(problem='', solver=solver_all_aux, using_log=True)
+            t0 = time.time()
             csolver_all_aux.run()
+            timings['run_solver_time'] += time.time() - t0
 
             for goal in solver_all_aux.goals:
-                if goal.check():
+                goal_check_result = goal.check()
+                if goal_check_result:
                     goals_str.remove(goal.to_str())
-                    results.append(GeometryProblemWorker._extract_proof_info(
-                        solver_all_aux, goal))
+                    results.append(ProblemWorker._extract_proof_info(solver_all_aux, goal))
                 else:
-                    logger.warning(
-                        f"Goal {goal.to_str()} cannot be solved even with all aux")
+                    logger.warning(f"Goal {goal.to_str()} cannot be solved even with all aux")
 
-        return results
+        return results, timings
 
     @staticmethod
     def _process_goals_with_same_statement(
@@ -597,7 +614,7 @@ class GeometryProblemWorker:
         # Create RNG for probabilistic filtering
         rng = np.random.default_rng(solver_builder.seed)
         
-        res_list = GeometryProblemWorker._find_minimal_aux_clauses_new(
+        res_list, aux_timings = ProblemWorker._find_minimal_aux_clauses_new(
             pointstr2basicstrs,
             basicstr2pointstrs,
             solver,
@@ -620,9 +637,10 @@ class GeometryProblemWorker:
             numercial_checked_aux = res['numercial_checked_aux']
             trivial_aux = res['trivial_aux']
             proof_steps = res['proof_steps']
+            name2node = res['name2node']
 
             # llm data generation
-            llm_renamed, clauses, mapping, n_premises, n_proof_steps = GeometryProblemWorker.llm_solution_renamed(
+            llm_renamed, clauses, mapping, n_premises, n_proof_steps = ProblemWorker.llm_solution_renamed(
                 clause2basics.copy(),
                 clause2args.copy(),
                 [goal_new],
@@ -635,54 +653,38 @@ class GeometryProblemWorker:
                 numercial_checked_aux,
                 trivial_aux,
                 proof_steps,
+                name2node
             )
 
             if aux_only == 2 and 'aux' not in llm_renamed['llm_output']:
                 continue
 
-            if 'aux' in llm_renamed['llm_output'] and not GeometryProblemWorker.filter.aux_predicates_valid_check(llm_renamed['llm_output']):
+            if 'aux' in llm_renamed['llm_output'] and not ProblemWorker.filter.aux_predicates_valid_check(llm_renamed['llm_output']):
                 continue
 
-            # expected_dsl = problem_to_dsl(ProblemJGEX.from_text(
-            #     llm_renamed['fl_problem']), GeometryProblemWorker.defs)
-            # actual_dsl = llm_renamed['llm_input']
-            # error_msg = (
-            #     f"\n{'='*20} DSL Conversion Mismatch {'='*20}\n"
-            #     f"Problem: {llm_renamed['fl_problem']}\n"
-            #     f"--- [ACTUAL] ---\n{actual_dsl}\n"
-            #     f"--- [EXPECTED] ---\n{expected_dsl}\n"
-            #     f"{'='*50}"
-            # )
-            # assert actual_dsl == expected_dsl, error_msg
-
-            # Extract point coordinates (always, not just when img=True)
-            # Use mapping to rename points consistently with fl_problem/llm_input/llm_output
-            point_coords = {
-                mapping[name]: [float(p.num.x), float(p.num.y)]
-                for name, p in name2node.items()
-                if p.num is not None and name in mapping
-            }
-
             result = {
-                # "n_clauses": n_clauses,
-                # seed is injected by _process_single_problem after collection
                 "n_premises": n_premises,
                 "fl_problem": llm_renamed['fl_problem'],
                 "nl_problem": "",
                 "n_proof_steps": n_proof_steps,
                 "llm_input_renamed": llm_renamed['llm_input'],
                 "llm_output_renamed": llm_renamed['llm_output'],
-                "aux_points": [mapping[str(p.name)] for p in aux_points if str(p.name) in mapping] if aux_points else [],
-                "point_coords": point_coords,  # Always include coordinates
+                "_timings": {**aux_timings,}
             }
 
             if img:
-                # Store drawing metadata for image generation
+                # Store drawing metadata instead of matplotlib figures
+                # to reduce memory usage in Ray workers
+                point_coords = {
+                    name: (p.num.x, p.num.y)
+                    for name, p in name2node.items()
+                }
                 result["draw_data"] = {
                     "clauses": [(c.points, c.sentences) for c in clauses],
                     "mapping": mapping,
                     "goal_tokens": goal_new.to_str().split(' '),
-                    "point_coords": point_coords,  # Reuse top-level field
+                    "point_coords": point_coords,
+                    "seed": solver_builder.seed,
                 }
 
             results.append(result)
@@ -692,7 +694,7 @@ class GeometryProblemWorker:
     def _rediger_new_format(dep, mp, dep_idx) -> str:
         """Generate proof step in new format: statement [id] rule_id [required_statement_ids]"""
         for statement in (dep.statement,) + dep.why:
-            statement_str = GeometryProblemWorker._statement2str_with_mapping(
+            statement_str = ProblemWorker._statement2str_with_mapping(
                 statement, mp)
             if statement_str not in dep_idx:
                 dep_idx[statement_str] = f"{len(dep_idx):03d}"
@@ -716,8 +718,8 @@ class GeometryProblemWorker:
 
         # Generate new format: statement [statement_id] rule_id [premise_ids]
         premise_ids = ' '.join(
-            f"[{dep_idx[GeometryProblemWorker._statement2str_with_mapping(premise, mp)]}]" for premise in dep.why)
-        conclusion_str = GeometryProblemWorker._statement2str_with_mapping(
+            f"[{dep_idx[ProblemWorker._statement2str_with_mapping(premise, mp)]}]" for premise in dep.why)
+        conclusion_str = ProblemWorker._statement2str_with_mapping(
             dep.statement, mp)
         return f"{conclusion_str} [{dep_idx[conclusion_str]}] {rule_id} {premise_ids}".strip()
 
@@ -734,7 +736,8 @@ class GeometryProblemWorker:
         aux: list[Dependency],
         numercial_checked_aux: list[Dependency],
         trivial_aux: list[Dependency],
-        proof_steps: list[Dependency]
+        proof_steps: list[Dependency],
+        name2node: dict[str, Symbol]
     ):
         """Refactored main method to generate LLM solution with renamed points"""
         try:
@@ -742,13 +745,13 @@ class GeometryProblemWorker:
             dep_idx: dict[str, str] = {}
 
             # Get essential premises/points
-            essential_premise_clauses = GeometryProblemWorker._get_essential_premise_clauses(
+            essential_premise_clauses = ProblemWorker._get_essential_premise_clauses(
                 clause2basics,
                 clause2args,
                 [premise.statement.to_str() for premise in premises],
                 set([p.name for p in points]),
             )
-            essential_aux_basics = GeometryProblemWorker._get_aux_basics(
+            essential_aux_basics = ProblemWorker._get_aux_basics(
                 clause2basics,
                 [a.statement.to_str() for a in aux],
                 set([p.name for p in aux_points]),
@@ -757,33 +760,35 @@ class GeometryProblemWorker:
             # Create point name mapping
             essential_premise_point_names: list[str] = []
             for clause in essential_premise_clauses:
-                for points, bs in clause2basics[clause]:
-                    essential_premise_point_names.extend(points)
+                for _points, bs in clause2basics[clause]:
+                    essential_premise_point_names.extend(_points)
             essential_aux_point_names: list[str] = []
-            for points, bs in essential_aux_basics:
-                essential_aux_point_names.extend(points)
-            mp = GeometryProblemWorker._create_point_mapping(
+            for _points, bs in essential_aux_basics:
+                essential_aux_point_names.extend(_points)
+            mp = ProblemWorker._create_point_mapping(
                 essential_premise_point_names, essential_aux_point_names
             )
-
+            new_points_with_coords = {}
+            for k, v in mp.items():
+                new_points_with_coords[mp[k]] = (name2node[k].num.x, name2node[k].num.y)
             # Generate each section
-            data_problem_clauses = GeometryProblemWorker._generate_problem_clauses_section(
-                mp, essential_premise_clauses, goals
+            data_problem_clauses = ProblemWorker._generate_problem_clauses_section(
+                mp, essential_premise_clauses, goals, new_points_with_coords
             )
-            data_problem = GeometryProblemWorker._generate_problem_predicates_section(
+            data_problem = ProblemWorker._generate_problem_predicates_section(
                 mp, dep_idx, clause2basics, essential_premise_clauses, goals
             )
             n_premises = len(dep_idx)
-            data_aux = GeometryProblemWorker._generate_aux_section(
+            data_aux = ProblemWorker._generate_aux_section(
                 mp, dep_idx, essential_aux_basics
             )
-            numerical_check = GeometryProblemWorker._generate_numerical_check_section(
+            numerical_check = ProblemWorker._generate_numerical_check_section(
                 mp, dep_idx, numercial_checked_premises, numercial_checked_aux
             )
-            trivial_check = GeometryProblemWorker._generate_trivial_section(
+            trivial_check = ProblemWorker._generate_trivial_section(
                 mp, dep_idx, trivial_premises, trivial_aux
             )
-            proof = GeometryProblemWorker._generate_proof_section(
+            proof = ProblemWorker._generate_proof_section(
                 mp, dep_idx, proof_steps
             )
 
@@ -800,10 +805,10 @@ class GeometryProblemWorker:
             print(f"clause2basics: {clause2basics}")
             print(f"essential_clauses: {essential_premise_clauses}")
             print(f"essential_aux_basics: {essential_aux_basics}")
-            print(
-                f"essential_premise_point_names: {essential_premise_point_names}")
+            print(f"essential_premise_point_names: {essential_premise_point_names}")
             print(f"essential_aux_point_names: {essential_aux_point_names}")
             print(f"mp: {mp}")
+            print(f"point_coords: {new_points_with_coords}")
             raise
 
     @staticmethod
@@ -835,18 +840,14 @@ class GeometryProblemWorker:
             points2basics: dict[tuple[str, ...],
                                 list[Statement]] = defaultdict(list)
             for constr_sentence in clause.sentences:
-                cdef = GeometryProblemWorker.defs[constr_sentence[0]]
+                cdef = ProblemWorker.defs[constr_sentence[0]]
                 if len(constr_sentence) == len(cdef.declare):
                     mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
                 else:
-                    assert len(constr_sentence) + \
-                        len(clause.points) == len(cdef.declare)
-                    mapping = dict(
-                        zip(cdef.declare[1:], clause.points + constr_sentence[1:]))
+                    assert len(constr_sentence) + len(clause.points) == len(cdef.declare)
+                    mapping = dict(zip(cdef.declare[1:], clause.points + constr_sentence[1:]))
                 for rely_points in cdef.rely.values():
-                    clause2args[clause].update(
-                        set([mapping[p] for p in rely_points])
-                    )
+                    clause2args[clause].update(set([mapping[p] for p in rely_points]))
                 for points, bs in cdef.basics:
                     points = tuple([mapping[x] for x in points])
                     bs_statements = []
@@ -922,8 +923,7 @@ class GeometryProblemWorker:
 
         Only reserve basics that contain auxiliary statements or points.
         """
-        essential_aux_basics: list[tuple[tuple[str, ...],
-                                         tuple[Statement, ...]]] = []
+        essential_aux_basics: list[tuple[tuple[str, ...],tuple[Statement, ...]]] = []
         for clause, basics in clause2basics.items():
             for points, bs in basics:
                 bs_filtered = [
@@ -948,7 +948,7 @@ class GeometryProblemWorker:
         mp: dict[str, str] = {}
         for idx, p in enumerate(essential_premise_point_names + essential_aux_point_names):
             assert p not in mp
-            mp[p] = GeometryProblemWorker._get_apha_geo_solver_var(idx)
+            mp[p] = ProblemWorker._get_apha_geo_solver_var(idx)
         return mp
 
     @staticmethod
@@ -956,6 +956,7 @@ class GeometryProblemWorker:
         mp: dict[str, str],
         essential_premise_clauses: list[Clause],
         goals: list[Statement],
+        new_points_with_coords: dict[str, tuple[float, float]],
     ) -> str:
         """Generate problem clauses section"""
         dep_graph = DependencyGraph(AlgebraicManipulator())
@@ -968,7 +969,7 @@ class GeometryProblemWorker:
             ).to_str()
             for goal in goals
         ]
-        return '; '.join([str(clause) for clause in renamed_clauses]) + ' ? ' + \
+        return '; '.join([clause.to_str_with_coordinates(new_points_with_coords) for clause in renamed_clauses]) + ' ? ' + \
             '; '.join(renamed_goal_strs)
 
     @staticmethod
@@ -1048,7 +1049,7 @@ class GeometryProblemWorker:
     @staticmethod
     def _generate_numerical_check_section(mp, dep_idx, numercial_checked_premises, numercial_checked_aux):
         """Generate numerical check section"""
-        instance = GeometryProblemWorker()
+        instance = ProblemWorker()
         numerical_check_items = []
         # numercial_checked_premises
         for line in numercial_checked_premises:
@@ -1087,7 +1088,7 @@ class GeometryProblemWorker:
     @staticmethod
     def _generate_trivial_section(mp, dep_idx, trivial_premises, trivial_aux):
         """Generate numerical check section"""
-        instance = GeometryProblemWorker()
+        instance = ProblemWorker()
         trivial_items = []
         # trivial_premises
         for line in trivial_premises:
@@ -1131,68 +1132,6 @@ class GeometryProblemWorker:
         for k, line in enumerate(proof_steps):
             if NUMERICAL_CHECK not in line.reason and IN_PREMISES not in line:
                 proof_steps_formatted.append(
-                    GeometryProblemWorker._rediger_new_format(line, mp, dep_idx))
+                    ProblemWorker._rediger_new_format(line, mp, dep_idx))
         proof += " ; ".join(proof_steps_formatted) + " ; </proof>"
         return proof
-
-
-def problem_to_dsl(problem: "ProblemJGEX", defs: dict[str, DefinitionJGEX]) -> str:
-    """Convert the problem to a DSL string."""
-    dep_idx: dict[Statement, str] = {}
-    dep_graph = DependencyGraph(AlgebraicManipulator())
-
-    data_tmp = defaultdict(list)
-    for construction in problem.constructions:
-        group = {}
-        p2deps = defaultdict(list)
-        for constr_sentence in construction.sentences:
-            cdef = defs[constr_sentence[0]]
-            if len(constr_sentence) == len(cdef.declare):
-                mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
-            else:
-                assert len(constr_sentence) + \
-                    len(construction.points) == len(cdef.declare)
-                points = tuple(p.split('@')[0] for p in construction.points)
-                mapping = dict(
-                    zip(cdef.declare[1:], points + constr_sentence[1:]))
-            for points, bs in cdef.basics:
-                points = tuple([mapping[x] for x in points])
-                for p in points:
-                    group[p] = points
-                if len(bs) == 0:
-                    data_tmp[' '.join(points)] = []
-                for b in bs:
-                    statement = Statement.from_tokens(
-                        translate_sentence(mapping, b), dep_graph)
-                    p2deps[points].append(statement)
-                    data_tmp[' '.join(points)].append(statement)
-
-        # points = construction.points
-        # points = [p.split('@')[0] for p in points]
-        # while points:
-        #     p = points[0]
-        #     gr = group[p]
-        #     points = [x for x in points if x not in gr]
-
-        #     deps = []
-        #     for dep in p2deps[gr]:
-        #         deps.append(dep)
-        #     data_tmp[' '.join(gr)] = deps
-
-    # <problem> </problem>
-    data_problem = '<problem> '
-    string_premise = []
-    for k, v in data_tmp.items():
-        tmp_string = k + ' : '
-        for dep in v:
-            if dep not in dep_idx:
-                dep_idx[dep] = f"{len(dep_idx):03d}"
-            tmp_string += dep.to_str() + f' [{dep_idx[dep]}] '
-        string_premise.append(tmp_string)
-    data_problem += ' ; '.join([s.strip() for s in string_premise]) + ' ? '
-    data_problem += ' ; '.join([
-        Statement.from_tokens(goal, dep_graph).to_str()
-        for goal in problem.goals
-    ])
-    data_problem += ' </problem>'
-    return data_problem

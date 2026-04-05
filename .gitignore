@@ -59,6 +59,9 @@ datasets/geometry_clauses*
 core.*
 /core/
 temp/
+experiments/*/data/
+experiments/*/logs/
+experiments/*
 
 # TODO
 TODO.md

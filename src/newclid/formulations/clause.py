@@ -38,6 +38,9 @@ class Clause(NamedTuple):
 
     def __str__(self) -> str:
         return f"{' '.join(p for p in self.points)} = {', '.join(' '.join(s) for s in self.sentences)}"
+    
+    def to_str_with_coordinates(self, points_with_coords: dict[str, tuple[float, float]]) -> str:
+        return f"{' '.join(f'{p}@{points_with_coords.get(p)[0]}_{points_with_coords.get(p)[1]}' for p in self.points)} = {', '.join(' '.join(s) for s in self.sentences)}"
 
 
 def translate_sentence(

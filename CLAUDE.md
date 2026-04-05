@@ -16,6 +16,7 @@ GenesisGeo — 神经-符号几何定理证明器，复现 AlphaGeometry，结�
   → Stage 2: RuleReducer (max_premises过滤 → 泛化度排序 → 贪心淘汰)
   → 输出: extracted_rules.txt (最小基底规则集)
 ```
+```
 
 关键代码:
 - Pipeline 核心: `src/newclid/proof_scout/core/filter_and_prune_engine.py`
@@ -23,6 +24,14 @@ GenesisGeo — 神经-符号几何定理证明器，复现 AlphaGeometry，结�
 - Pipeline 入口脚本: `scripts/discovery_pipeline.py`
 
 详细 pipeline 数据看板: `docs/pipeline_dashboard.md`
+
+| 模块 | 用途 | 关键类 |
+|------|------|--------|
+| `api.py` | 求解器接口 | `GeometricSolver`, `GeometricSolverBuilder` |
+| `proof.py` | 证明状态 | `ProofState` |
+| `agent/ddarn.py` | 符号推理 | `DDARNAgent` |
+| `agent/lm.py` | LLM 辅助构造 | `LMAgent` |
+| `generation/` | 数据生成 | `ProblemPipeline`, `ProblemSampler` |
 
 ---
 
@@ -172,3 +181,17 @@ git checkout GenesisGeo/main -- src/newclid/DDAR/
 | `memory/test_results.md` | 测试结果归档 | 需要对比历史测试数据时 |
 | `memory/csolver_performance.md` | CSolver 性能分析与优化记录 | 涉及 CSolver 性能调优时 |
 | `memory/command_history.md` | 重要命令历史记录 | 需要查找之前运行过的命令时 |
+
+### generation 模块命名
+
+| 文件 | 类 | 用途 |
+|------|-----|------|
+| `sampler.py` | `ProblemSampler` | 采样几何构造 |
+| `point_naming.py` | `PointNaming` | 点命名管理 |
+| `filter.py` | `GoalFilter` | 目标过滤 |
+| `worker.py` | `ProblemWorker` | 问题处理 |
+| `pipeline.py` | `ProblemPipeline` | 生成流水线 |
+| `writer.py` | `Writer` | 数据写入和图像生成 |
+| `constructions.py` | - | 构造类型常量 |
+| `statistics.py` | `Statistics` | 统计信息 |
+| `auxiliary/` | - | 辅助点查找子包 |

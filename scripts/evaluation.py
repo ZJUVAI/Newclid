@@ -12,7 +12,6 @@ from rich.table import Table
 from newclid.agent.lm import LMAgent
 from newclid.api import GeometricSolverBuilder
 from newclid.formulations.problem import ProblemJGEX
-from newclid.generation.problem_worker import GeometryProblemWorker
 
 
 def apply_point_mapping(text: str, mapping: dict[str, str]) -> str:
