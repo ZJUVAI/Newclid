@@ -204,7 +204,8 @@ class ProblemWorker:
                     aux,
                     n_clauses,
                     img,
-                    aux_only
+                    aux_only,
+                    engine,
                 )
                 generated_data.extend(data)
             process_goal_time = time.time() - process_goal_time
@@ -603,7 +604,8 @@ class ProblemWorker:
         aux,
         n_clauses,
         img,
-        aux_only
+        aux_only,
+        engine="full",
     ):
         """Process a single goal"""
 
