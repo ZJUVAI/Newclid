@@ -10,7 +10,7 @@ import ray
 from newclid.agent.agents_interface import DeductiveAgent
 from newclid.formulations.problem import ProblemJGEX
 from newclid.proof import ProofState
-from newclid.search_trace import proof_to_ddar_input
+from newclid.search_trace import build_attempt_key, proof_to_ddar_input
 
 from experiments.single_problem_multi_gpu_eval.search_common import BeamQueue, run_ddar_c, run_ddar_remote
 
@@ -131,12 +131,26 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             future_meta = future_info.pop(future)
 
             if ddar_result["status"] == "invalid":
+                self._trace(
+                    "ddar_result",
+                    attempt_key=future_meta["attempt_key"],
+                    node_id=future_meta["node_id"],
+                    parent_node_id=future_meta["parent_node_id"],
+                    depth=depth,
+                    status=ddar_result["status"],
+                    elapsed_time=ddar_result.get("elapsed_time"),
+                    error_type=ddar_result.get("error_type"),
+                    error_message=ddar_result.get("error_message"),
+                    problem_text=ddar_result.get("problem_text"),
+                    ddar_input=ddar_result.get("ddar_input"),
+                )
                 continue
 
             if ddar_result["status"] == "solved":
                 self._cancel_ddar_futures(running_futures, future_info)
                 self._trace(
                     "ddar_result",
+                    attempt_key=future_meta["attempt_key"],
                     node_id=future_meta["node_id"],
                     parent_node_id=future_meta["parent_node_id"],
                     depth=depth,
@@ -157,6 +171,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
 
             self._trace(
                 "ddar_result",
+                attempt_key=future_meta["attempt_key"],
                 node_id=future_meta["node_id"],
                 parent_node_id=future_meta["parent_node_id"],
                 depth=depth,
@@ -182,6 +197,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     )
                     self._trace(
                         "candidate_transition",
+                        attempt_key=future_meta["attempt_key"],
                         request_id=future_meta["request_id"],
                         parent_node_id=future_meta["parent_node_id"],
                         node_id=future_meta["node_id"],
@@ -298,6 +314,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         logger.debug("Agent base DDAR start")
         self._trace(
             "base_ddar",
+            attempt_key="base:0",
             node_id=0,
             parent_node_id=None,
             depth=-1,
@@ -307,6 +324,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         if self.run_ddar_c(base_proof, rules, t0, timeout):
             self._trace(
                 "ddar_result",
+                attempt_key="base:0",
                 node_id=0,
                 parent_node_id=None,
                 depth=-1,
@@ -326,6 +344,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             )
         self._trace(
             "ddar_result",
+            attempt_key="base:0",
             node_id=0,
             parent_node_id=None,
             depth=-1,
@@ -468,6 +487,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                             except Exception:
                                 self._trace(
                                     "candidate_transition",
+                                    attempt_key=build_attempt_key(request_id, candidate_rank, None),
                                     request_id=request_id,
                                     parent_node_id=parent_node_id,
                                     node_id=None,
@@ -485,6 +505,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                             if not aux:
                                 self._trace(
                                     "candidate_transition",
+                                    attempt_key=build_attempt_key(request_id, candidate_rank, None),
                                     request_id=request_id,
                                     parent_node_id=parent_node_id,
                                     node_id=None,
@@ -504,6 +525,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                             except Exception:
                                 self._trace(
                                     "candidate_transition",
+                                    attempt_key=build_attempt_key(request_id, candidate_rank, None),
                                     request_id=request_id,
                                     parent_node_id=parent_node_id,
                                     node_id=None,
@@ -537,8 +559,10 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
 
                             child_node_id = next_node_id
                             next_node_id += 1
+                            attempt_key = build_attempt_key(request_id, candidate_rank, child_node_id)
                             self._trace(
                                 "candidate_transition",
+                                attempt_key=attempt_key,
                                 request_id=request_id,
                                 parent_node_id=parent_node_id,
                                 node_id=child_node_id,
@@ -553,6 +577,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                             )
                             self._trace(
                                 "ddar_submit",
+                                attempt_key=attempt_key,
                                 node_id=child_node_id,
                                 parent_node_id=parent_node_id,
                                 depth=depth,
@@ -582,6 +607,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                                 "parent_node_id": parent_node_id,
                                 "request_id": request_id,
                                 "candidate_rank": candidate_rank,
+                                "attempt_key": attempt_key,
                                 "raw_aux_text": raw_aux_text,
                                 "translated_aux": aux,
                             }

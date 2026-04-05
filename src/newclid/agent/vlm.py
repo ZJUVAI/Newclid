@@ -44,7 +44,7 @@ from newclid.problem_db import (
     classify_build_exception,
     summarize_problem_db_runtime,
 )
-from newclid.search_trace import proof_to_ddar_input
+from newclid.search_trace import build_attempt_key, proof_to_ddar_input
 
 if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
@@ -359,6 +359,7 @@ class VLMAgent(DeductiveAgent):
                     new_problem = future_meta["problem"]
                     self._trace(
                         "ddar_result",
+                        attempt_key=future_meta["attempt_key"],
                         node_id=future_meta["node_id"],
                         parent_node_id=future_meta["parent_node_id"],
                         depth=depth,
@@ -377,6 +378,7 @@ class VLMAgent(DeductiveAgent):
 
                 self._trace(
                     "ddar_result",
+                    attempt_key=future_meta["attempt_key"],
                     node_id=future_meta["node_id"],
                     parent_node_id=future_meta["parent_node_id"],
                     depth=depth,
@@ -394,6 +396,7 @@ class VLMAgent(DeductiveAgent):
                     )
                     self._trace(
                         "candidate_transition",
+                        attempt_key=future_meta["attempt_key"],
                         request_id=future_meta["request_id"],
                         parent_node_id=future_meta["parent_node_id"],
                         node_id=future_meta["node_id"],
@@ -423,6 +426,7 @@ class VLMAgent(DeductiveAgent):
         base_proof = deepcopy(proof)
         self._trace(
             "base_ddar",
+            attempt_key="base:0",
             node_id=0,
             parent_node_id=None,
             depth=-1,
@@ -435,6 +439,7 @@ class VLMAgent(DeductiveAgent):
         if solved:
             self._trace(
                 "ddar_result",
+                attempt_key="base:0",
                 node_id=0,
                 parent_node_id=None,
                 depth=-1,
@@ -448,6 +453,7 @@ class VLMAgent(DeductiveAgent):
             return infos(True, final_node_id=0)
         self._trace(
             "ddar_result",
+            attempt_key="base:0",
             node_id=0,
             parent_node_id=None,
             depth=-1,
@@ -577,6 +583,7 @@ class VLMAgent(DeductiveAgent):
                                     if not aux_content:
                                         self._trace(
                                             "candidate_transition",
+                                            attempt_key=build_attempt_key(request_id, candidate_rank, None),
                                             request_id=request_id,
                                             parent_node_id=parent_node_id,
                                             node_id=None,
@@ -608,6 +615,7 @@ class VLMAgent(DeductiveAgent):
                                             next_node_id += 1
                                             self._trace(
                                                 "candidate_transition",
+                                                attempt_key=build_attempt_key(request_id, candidate_rank, child_node_id),
                                                 request_id=request_id,
                                                 parent_node_id=parent_node_id,
                                                 node_id=child_node_id,
@@ -644,6 +652,7 @@ class VLMAgent(DeductiveAgent):
                                                 )
                                                 self._trace(
                                                     "candidate_transition",
+                                                    attempt_key=build_attempt_key(request_id, candidate_rank, child_node_id),
                                                     request_id=request_id,
                                                     parent_node_id=parent_node_id,
                                                     node_id=child_node_id,
@@ -661,6 +670,7 @@ class VLMAgent(DeductiveAgent):
                                         if lookup.hit_category == "invalid":
                                             self._trace(
                                                 "candidate_transition",
+                                                attempt_key=build_attempt_key(request_id, candidate_rank, None),
                                                 request_id=request_id,
                                                 parent_node_id=parent_node_id,
                                                 node_id=None,
@@ -677,8 +687,10 @@ class VLMAgent(DeductiveAgent):
 
                                         child_node_id = next_node_id
                                         next_node_id += 1
+                                        attempt_key = build_attempt_key(request_id, candidate_rank, child_node_id)
                                         self._trace(
                                             "candidate_transition",
+                                            attempt_key=attempt_key,
                                             request_id=request_id,
                                             parent_node_id=parent_node_id,
                                             node_id=child_node_id,
@@ -693,6 +705,7 @@ class VLMAgent(DeductiveAgent):
                                         )
                                         self._trace(
                                             "ddar_submit",
+                                            attempt_key=attempt_key,
                                             node_id=child_node_id,
                                             parent_node_id=parent_node_id,
                                             depth=depth,
@@ -710,6 +723,7 @@ class VLMAgent(DeductiveAgent):
                                             "parent_node_id": parent_node_id,
                                             "request_id": request_id,
                                             "candidate_rank": candidate_rank,
+                                            "attempt_key": attempt_key,
                                             "raw_aux_text": aux_content,
                                             "translated_aux": aux,
                                         }
@@ -717,6 +731,7 @@ class VLMAgent(DeductiveAgent):
                                 except Exception:
                                     self._trace(
                                         "candidate_transition",
+                                        attempt_key=build_attempt_key(request_id, candidate_rank, None),
                                         request_id=request_id,
                                         parent_node_id=parent_node_id,
                                         node_id=None,
