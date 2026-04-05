@@ -44,6 +44,7 @@ from newclid.problem_db import (
     classify_build_exception,
     summarize_problem_db_runtime,
 )
+from newclid.search_trace import proof_to_ddar_input
 
 if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
@@ -82,6 +83,7 @@ class VLMAgent(DeductiveAgent):
         *,
         problem_db_runtime: ProblemDBRuntime | None = None,
         agent_type: str = "vlm",
+        trace_writer=None,
     ):
         self.any_new_statement_has_been_added = True
         self.problemJGEX = None
@@ -90,6 +92,7 @@ class VLMAgent(DeductiveAgent):
         self.search_depth = search_depth
         self.problem_db_runtime = problem_db_runtime
         self.agent_type = agent_type
+        self.trace_writer = trace_writer
         # LLM model
         self.model_path = model_path
         self.models = []
@@ -173,6 +176,10 @@ class VLMAgent(DeductiveAgent):
             return
         ddar_stats["remote_ddar_calls"] += 1
         ddar_stats[f"remote_{ddar_result['status']}"] += 1
+
+    def _trace(self, event: str, **payload: Any) -> None:
+        if self.trace_writer is not None:
+            self.trace_writer.log(event, **payload)
         
     @torch.no_grad()
     def inference(self, model, processor, query: str, img_path: str, new_point_name: str, response_prefix: str = '<aux>', with_predicate: bool = True):
@@ -323,12 +330,13 @@ class VLMAgent(DeductiveAgent):
             "remote_engine_invalid": 0,
         }
 
-        def infos(is_success, error_msg = None):
+        def infos(is_success, error_msg = None, final_node_id: int | None = None):
             infos: dict[str, Any] = {}
             infos["runtime"] = time.time() - t0
             infos["success"] = is_success
             infos["steps"] = step
             infos["ddar_stats"] = ddar_stats
+            infos["final_node_id"] = final_node_id
             if self.problem_db_runtime is not None:
                 infos["problem_db_payload"] = self.problem_db_runtime.export_payload()
                 infos["problem_db_stats"] = summarize_problem_db_runtime(self.problem_db_runtime)
@@ -349,16 +357,54 @@ class VLMAgent(DeductiveAgent):
 
                 if ddar_result["status"] == "solved":
                     new_problem = future_meta["problem"]
+                    self._trace(
+                        "ddar_result",
+                        node_id=future_meta["node_id"],
+                        parent_node_id=future_meta["parent_node_id"],
+                        depth=depth,
+                        status=ddar_result["status"],
+                        elapsed_time=ddar_result.get("elapsed_time"),
+                        error_type=ddar_result.get("error_type"),
+                        error_message=ddar_result.get("error_message"),
+                        problem_text=ddar_result.get("problem_text"),
+                        ddar_input=ddar_result.get("ddar_input"),
+                    )
                     for task in running_futures:
                         ray.cancel(task, force=True)
                     ray.shutdown()
                     logger.info("Success with problem: %s", new_problem)
-                    return infos(True, str(new_problem))
+                    return infos(True, str(new_problem), final_node_id=future_meta["node_id"])
 
+                self._trace(
+                    "ddar_result",
+                    node_id=future_meta["node_id"],
+                    parent_node_id=future_meta["parent_node_id"],
+                    depth=depth,
+                    status=ddar_result["status"],
+                    elapsed_time=ddar_result.get("elapsed_time"),
+                    error_type=ddar_result.get("error_type"),
+                    error_message=ddar_result.get("error_message"),
+                    problem_text=ddar_result.get("problem_text"),
+                    ddar_input=ddar_result.get("ddar_input"),
+                )
                 if ddar_result["status"] == "unsolved" and depth < self.search_depth - 1:
                     new_queues[future_meta["queue_idx"]].add(
-                        node=(future_meta["problem"], ddar_result["proof"]),
+                        node=(future_meta["node_id"], future_meta["parent_node_id"], future_meta["problem"], ddar_result["proof"]),
                         val=future_meta["prev_score"] + future_meta["score"],
+                    )
+                    self._trace(
+                        "candidate_transition",
+                        request_id=future_meta["request_id"],
+                        parent_node_id=future_meta["parent_node_id"],
+                        node_id=future_meta["node_id"],
+                        candidate_rank=future_meta["candidate_rank"],
+                        depth=depth,
+                        raw_aux_text=future_meta["raw_aux_text"],
+                        translated_aux=future_meta["translated_aux"],
+                        new_problem_text=str(future_meta["problem"]),
+                        decision="queued_next_depth",
+                        beam_score_before=future_meta["prev_score"],
+                        beam_score_after=future_meta["prev_score"] + future_meta["score"],
                     )
             return None
         
@@ -375,41 +421,75 @@ class VLMAgent(DeductiveAgent):
         # logger.info(f"running first ddar")
         ddar_stats["base_calls"] += 1
         base_proof = deepcopy(proof)
+        self._trace(
+            "base_ddar",
+            node_id=0,
+            parent_node_id=None,
+            depth=-1,
+            problem_text=str(self.problemJGEX),
+            ddar_input=proof_to_ddar_input(base_proof),
+        )
         solved = VLMAgent.run_ddar_c(base_proof, rules, t0, timeout)
         # logger.info(f"finish first ddar")
         # if proofed by ddar, return
         if solved:
-            return infos(True)
+            self._trace(
+                "ddar_result",
+                node_id=0,
+                parent_node_id=None,
+                depth=-1,
+                status="solved",
+                elapsed_time=None,
+                error_type=None,
+                error_message=None,
+                problem_text=str(self.problemJGEX),
+                ddar_input=proof_to_ddar_input(base_proof),
+            )
+            return infos(True, final_node_id=0)
+        self._trace(
+            "ddar_result",
+            node_id=0,
+            parent_node_id=None,
+            depth=-1,
+            status="unsolved",
+            elapsed_time=None,
+            error_type=None,
+            error_message=None,
+            problem_text=str(self.problemJGEX),
+            ddar_input=proof_to_ddar_input(base_proof),
+        )
         # else seek help from llm
-        else:
-            rules_ref = ray.put(rules)
-            future_info = dict()
-            running_futures = []
+        rules_ref = ray.put(rules)
+        future_info = dict()
+        running_futures = []
+        next_node_id = 1
             
-            # Create two BeamQueues for each model: one for with_predicate, one for no_predicate
-            # beam_queues[i][j]: i is the model index, j=0 for with_predicate, j=1 for no_predicate
-            # Each queue stores (problem, proof) tuples
-            beam_queues = []
-            for i in range(len(self.models)):
-                q_with_pred = BeamQueue(max_size=self.beam_size)
-                q_with_pred.add(node=(self.problemJGEX, base_proof), val=0)
-                
-                q_no_pred = BeamQueue(max_size=self.beam_size)
-                q_no_pred.add(node=(self.problemJGEX, base_proof), val=0)
-                
-                beam_queues.append([q_with_pred, q_no_pred])
+        # Create two BeamQueues for each model: one for with_predicate, one for no_predicate
+        # beam_queues[i][j]: i is the model index, j=0 for with_predicate, j=1 for no_predicate
+        # Each queue stores (problem, proof) tuples
+        beam_queues = []
+        for i in range(len(self.models)):
+            q_with_pred = BeamQueue(max_size=self.beam_size)
+            q_with_pred.add(node=(0, None, self.problemJGEX, base_proof), val=0)
+            
+            q_no_pred = BeamQueue(max_size=self.beam_size)
+            q_no_pred.add(node=(0, None, self.problemJGEX, base_proof), val=0)
+            
+            beam_queues.append([q_with_pred, q_no_pred])
 
-            for depth in range(self.search_depth):
-                new_beam_queues = []
+        for depth in range(self.search_depth):
+            frontier_size = sum(len(queue) for pair in beam_queues for queue in pair)
+            self._trace("depth_start", depth=depth, frontier_size=frontier_size)
+            new_beam_queues = []
+
+            for i in range(len(self.models)):
+                new_queues = [BeamQueue(max_size=self.beam_size), BeamQueue(max_size=self.beam_size)]
                 
-                for i in range(len(self.models)):
-                    new_queues = [BeamQueue(max_size=self.beam_size), BeamQueue(max_size=self.beam_size)]
+                # j=0: with_predicate, j=1: no_predicate
+                for j, with_predicate in enumerate([False]):
+                    queue_type = 'with_pred' if with_predicate else 'no_pred'
                     
-                    # j=0: with_predicate, j=1: no_predicate
-                    for j, with_predicate in enumerate([False]):
-                        queue_type = 'with_pred' if with_predicate else 'no_pred'
-                        
-                        for prev_score, (problem, current_proof) in beam_queues[i][j]:
+                    for request_idx, (prev_score, (parent_node_id, grandparent_node_id, problem, current_proof)) in enumerate(beam_queues[i][j]):
                             if time.time() - t0 > timeout:
                                 ray.shutdown()
                                 return infos(False, 'Timeout')
@@ -460,8 +540,32 @@ class VLMAgent(DeductiveAgent):
                                 response_prefix='<aux> x00',
                                 with_predicate=with_predicate
                             )
+                            request_id = f"d{depth}_m{i}_n{request_idx}"
+                            self._trace(
+                                "model_request",
+                                node_id=parent_node_id,
+                                parent_node_id=grandparent_node_id,
+                                depth=depth,
+                                request_id=request_id,
+                                query=p_dsl,
+                                img_path=png_path,
+                                new_point_name=self.get_new_point_name(problem),
+                                response_prefix="<aux> x00",
+                                with_predicate=with_predicate,
+                                decoding_size=self.decoding_size,
+                            )
+                            self._trace(
+                                "model_response",
+                                request_id=request_id,
+                                node_id=parent_node_id,
+                                depth=depth,
+                                outputs=[
+                                    {"rank": rank, "aux_dsl": aux_dsl, "score": score}
+                                    for rank, (aux_dsl, score) in enumerate(aux_dsl_dict.items())
+                                ],
+                            )
                             
-                            for aux_dsl, score in aux_dsl_dict.items():
+                            for candidate_rank, (aux_dsl, score) in enumerate(aux_dsl_dict.items()):
                                 try:
                                     aux_content = aux_dsl[len('<aux> x00'):]
                                     self._log_model_output(
@@ -471,6 +575,20 @@ class VLMAgent(DeductiveAgent):
                                         score=score,
                                     )
                                     if not aux_content:
+                                        self._trace(
+                                            "candidate_transition",
+                                            request_id=request_id,
+                                            parent_node_id=parent_node_id,
+                                            node_id=None,
+                                            candidate_rank=candidate_rank,
+                                            depth=depth,
+                                            raw_aux_text=aux_content,
+                                            translated_aux=None,
+                                            new_problem_text=None,
+                                            decision="parse_failed",
+                                            beam_score_before=prev_score,
+                                            beam_score_after=None,
+                                        )
                                         continue
                                     aux = self.try_dsl_to_constructions(aux_content)
                                     self._log_model_output(
@@ -486,9 +604,25 @@ class VLMAgent(DeductiveAgent):
                                         )
 
                                         if lookup.hit_category == "solved":
+                                            child_node_id = next_node_id
+                                            next_node_id += 1
+                                            self._trace(
+                                                "candidate_transition",
+                                                request_id=request_id,
+                                                parent_node_id=parent_node_id,
+                                                node_id=child_node_id,
+                                                candidate_rank=candidate_rank,
+                                                depth=depth,
+                                                raw_aux_text=aux_content,
+                                                translated_aux=aux,
+                                                new_problem_text=str(new_problem),
+                                                decision="solved_by_cache",
+                                                beam_score_before=prev_score,
+                                                beam_score_after=prev_score + score,
+                                            )
                                             ray.shutdown()
                                             logger.info("Cache hit success with problem: %s", new_problem)
-                                            return infos(True, str(new_problem))
+                                            return infos(True, str(new_problem), final_node_id=child_node_id)
 
                                         if lookup.hit_category == "unsolved":
                                             if depth < self.search_depth - 1:
@@ -502,15 +636,69 @@ class VLMAgent(DeductiveAgent):
                                                     )
                                                 except Exception:
                                                     continue
+                                                child_node_id = next_node_id
+                                                next_node_id += 1
                                                 new_queues[j].add(
-                                                    node=(new_problem, cached_proof),
+                                                    node=(child_node_id, parent_node_id, new_problem, cached_proof),
                                                     val=prev_score + score,
+                                                )
+                                                self._trace(
+                                                    "candidate_transition",
+                                                    request_id=request_id,
+                                                    parent_node_id=parent_node_id,
+                                                    node_id=child_node_id,
+                                                    candidate_rank=candidate_rank,
+                                                    depth=depth,
+                                                    raw_aux_text=aux_content,
+                                                    translated_aux=aux,
+                                                    new_problem_text=str(new_problem),
+                                                    decision="queued_next_depth",
+                                                    beam_score_before=prev_score,
+                                                    beam_score_after=prev_score + score,
                                                 )
                                             continue
 
                                         if lookup.hit_category == "invalid":
+                                            self._trace(
+                                                "candidate_transition",
+                                                request_id=request_id,
+                                                parent_node_id=parent_node_id,
+                                                node_id=None,
+                                                candidate_rank=candidate_rank,
+                                                depth=depth,
+                                                raw_aux_text=aux_content,
+                                                translated_aux=aux,
+                                                new_problem_text=str(new_problem),
+                                                decision="skipped",
+                                                beam_score_before=prev_score,
+                                                beam_score_after=None,
+                                            )
                                             continue
 
+                                        child_node_id = next_node_id
+                                        next_node_id += 1
+                                        self._trace(
+                                            "candidate_transition",
+                                            request_id=request_id,
+                                            parent_node_id=parent_node_id,
+                                            node_id=child_node_id,
+                                            candidate_rank=candidate_rank,
+                                            depth=depth,
+                                            raw_aux_text=aux_content,
+                                            translated_aux=aux,
+                                            new_problem_text=str(new_problem),
+                                            decision="ddar_submitted",
+                                            beam_score_before=prev_score,
+                                            beam_score_after=prev_score + score,
+                                        )
+                                        self._trace(
+                                            "ddar_submit",
+                                            node_id=child_node_id,
+                                            parent_node_id=parent_node_id,
+                                            depth=depth,
+                                            problem_text=str(new_problem),
+                                            ddar_input=None,
+                                        )
                                         future = run_ddar_remote.remote(new_problem, proof.defs, rules_ref, t0, timeout)
                                         future_info[future] = {
                                             "problem": new_problem,
@@ -518,9 +706,29 @@ class VLMAgent(DeductiveAgent):
                                             "score": score,
                                             "queue_idx": j,
                                             "lookup": lookup,
+                                            "node_id": child_node_id,
+                                            "parent_node_id": parent_node_id,
+                                            "request_id": request_id,
+                                            "candidate_rank": candidate_rank,
+                                            "raw_aux_text": aux_content,
+                                            "translated_aux": aux,
                                         }
                                         running_futures.append(future)
                                 except Exception:
+                                    self._trace(
+                                        "candidate_transition",
+                                        request_id=request_id,
+                                        parent_node_id=parent_node_id,
+                                        node_id=None,
+                                        candidate_rank=candidate_rank,
+                                        depth=depth,
+                                        raw_aux_text=aux_dsl[len('<aux> x00'):],
+                                        translated_aux=None,
+                                        new_problem_text=None,
+                                        decision="parse_failed",
+                                        beam_score_before=prev_score,
+                                        beam_score_after=None,
+                                    )
                                     continue
                             
                             # check any done task
@@ -528,20 +736,22 @@ class VLMAgent(DeductiveAgent):
                             future_result = process_completed_futures(done, new_queues, depth)
                             if future_result is not None:
                                 return future_result
-                    
-                    # check remaining tasks
-                    while running_futures:
-                        done, running_futures = ray.wait(running_futures, num_returns=min(1000, len(running_futures)))
-                        future_result = process_completed_futures(done, new_queues, depth)
-                        if future_result is not None:
-                            return future_result
-                    
-                    new_beam_queues.append(new_queues)
                 
-                beam_queues = new_beam_queues
+                # check remaining tasks
+                while running_futures:
+                    done, running_futures = ray.wait(running_futures, num_returns=min(1000, len(running_futures)))
+                    future_result = process_completed_futures(done, new_queues, depth)
+                    if future_result is not None:
+                        return future_result
+                
+                new_beam_queues.append(new_queues)
+            
+            beam_queues = new_beam_queues
+            next_frontier_size = sum(len(queue) for pair in beam_queues for queue in pair)
+            self._trace("depth_end", depth=depth, next_frontier_size=next_frontier_size)
 
-            ray.shutdown()
-            return infos(False, 'Tried but failed.')
+        ray.shutdown()
+        return infos(False, 'Tried but failed.')
 
     def get_new_point_name(self, problem: ProblemJGEX) -> str:
         num_points = sum([len(clause.points) for clause in problem.constructions])
@@ -773,6 +983,8 @@ def run_ddar_remote(problem, defs, rules: list[Rule], start_time: int, timeout: 
             "elapsed_time": time.time() - eval_start,
             "error_type": classify_build_exception(exc),
             "error_message": str(exc),
+            "problem_text": str(problem),
+            "ddar_input": None,
             "proof": None,
         }
     try:
@@ -783,11 +995,15 @@ def run_ddar_remote(problem, defs, rules: list[Rule], start_time: int, timeout: 
             "elapsed_time": time.time() - eval_start,
             "error_type": "engine_error",
             "error_message": str(exc),
+            "problem_text": str(problem),
+            "ddar_input": proof_to_ddar_input(proof),
             "proof": None,
         }
     return {
         "status": "solved" if solved else "unsolved",
         "elapsed_time": time.time() - eval_start,
+        "problem_text": str(problem),
+        "ddar_input": proof_to_ddar_input(proof),
         "proof": proof,
     }
 
