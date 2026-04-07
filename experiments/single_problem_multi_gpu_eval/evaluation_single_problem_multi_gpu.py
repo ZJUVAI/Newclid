@@ -24,7 +24,13 @@ if str(SRC_ROOT) not in sys.path:
 
 from experiments.single_problem_multi_gpu_eval.model_pool import ModelPool
 from newclid.api import GeometricSolverBuilder
-from newclid.profiling import finalize_profiling, merge_profiling_payloads, write_profiling_csv
+from newclid.profiling import (
+    create_detailed_profiling_payload,
+    finalize_detailed_profiling,
+    write_profiling_csv,
+    write_profiling_depth_csv,
+    write_profiling_work_csv,
+)
 from newclid.search_trace import TraceRun
 
 
@@ -130,14 +136,14 @@ def solve_one_problem(
     render_root: Path,
     trace_writer=None,
 ):
-    start_time = time.time()
+    start_perf = time.perf_counter()
     logging.getLogger(__name__).info(
         "solve_one_problem start: problem=%s agent=%s problems_path=%s",
         problem_name,
         agent_type,
         problems_path,
     )
-    build_start = time.time()
+    build_start = time.perf_counter()
     builder = GeometricSolverBuilder().load_problem_from_file(problems_path, problem_name, rename=True)
 
     agent = create_agent(
@@ -151,16 +157,12 @@ def solve_one_problem(
         trace_writer=trace_writer,
     )
     solver = builder.with_deductive_agent(agent).build()
-    entry_build_time_s = time.time() - build_start
+    entry_setup_wall_time_s = time.perf_counter() - build_start
     is_solved = solver.run(timeout=timeout)
-    elapsed_time = time.time() - start_time
-    profiling = finalize_profiling(
-        merge_profiling_payloads(
-            {"build_time_s": entry_build_time_s},
-            solver.run_infos.get("profiling"),
-        ),
-        elapsed_time,
-    )
+    elapsed_time = time.perf_counter() - start_perf
+    profiling = solver.run_infos.get("profiling") or create_detailed_profiling_payload()
+    profiling["entry_setup_wall_time_s"] = float(profiling.get("entry_setup_wall_time_s", 0.0)) + entry_setup_wall_time_s
+    profiling = finalize_detailed_profiling(profiling, elapsed_time)
     solver.run_infos["profiling"] = profiling
     logging.getLogger(__name__).info(
         "solve_one_problem done: problem=%s solved=%s elapsed=%.2fs",
@@ -284,7 +286,8 @@ def solve_problems_single_problem_multi_gpu(
                         len(problem_names),
                         problem_name,
                     )
-                    problem_start = time.time()
+                    problem_start_wall = time.time()
+                    problem_start_perf = time.perf_counter()
                     problem_render_root = visual_render_root / sanitize_problem_name(problem_name)
                     problem_render_root.mkdir(parents=True, exist_ok=True)
                     trace_writer = None
@@ -294,7 +297,7 @@ def solve_problems_single_problem_multi_gpu(
                             problem_name=problem_name,
                             route="evaluation_single_problem_multi_gpu",
                             agent=agent_type,
-                            start_time=problem_start,
+                            start_time=problem_start_wall,
                         )
                         trace_writer.log(
                             "problem_start",
@@ -326,11 +329,14 @@ def solve_problems_single_problem_multi_gpu(
                 except Exception as exc:
                     traceback.print_exc()
                     print(f"Warning: experimental solver crashed on problem '{problem_name}' : ({type(exc)}) {exc}")
-                    elapsed_time = time.time() - problem_start
+                    elapsed_time = time.perf_counter() - problem_start_perf
                     is_solved = False
                     run_infos = {
-                        "profiling": finalize_profiling(
-                            merge_profiling_payloads({"build_time_s": elapsed_time}),
+                        "profiling": finalize_detailed_profiling(
+                            {
+                                **create_detailed_profiling_payload(),
+                                "entry_setup_wall_time_s": elapsed_time,
+                            },
                             elapsed_time,
                         )
                     }
@@ -338,7 +344,7 @@ def solve_problems_single_problem_multi_gpu(
                         trace_writer.log(
                             "problem_end",
                             success=False,
-                            runtime=time.time() - problem_start,
+                            runtime=time.time() - problem_start_wall,
                             final_error=f"{type(exc).__name__}: {exc}",
                             final_node_id=None,
                         )
@@ -356,10 +362,30 @@ def solve_problems_single_problem_multi_gpu(
                             "problem_name": problem_name,
                             "solved": "√" if is_solved else "x",
                             "total_time_s": profiling["total_time_s"],
-                            "build_time_s": profiling["build_time_s"],
-                            "inference_time_s": profiling["inference_time_s"],
-                            "ddar_time_s": profiling["ddar_time_s"],
-                            "other_time_s": profiling["other_time_s"],
+                            "entry_setup_wall_time_s": profiling["entry_setup_wall_time_s"],
+                            "base_ddar_wall_time_s": profiling["base_ddar_wall_time_s"],
+                            "request_build_wall_time_s": profiling["request_build_wall_time_s"],
+                            "gpu_wait_wall_time_s": profiling["gpu_wait_wall_time_s"],
+                            "gpu_result_handle_wall_time_s": profiling["gpu_result_handle_wall_time_s"],
+                            "ddar_submit_wall_time_s": profiling["ddar_submit_wall_time_s"],
+                            "ddar_wait_wall_time_s": profiling["ddar_wait_wall_time_s"],
+                            "ddar_result_handle_wall_time_s": profiling["ddar_result_handle_wall_time_s"],
+                            "scheduler_overhead_wall_time_s": profiling["scheduler_overhead_wall_time_s"],
+                            "other_wall_time_s": profiling["other_wall_time_s"],
+                            "gpu_inference_work_time_s": profiling["gpu_inference_work_time_s"],
+                            "ddar_build_work_time_s": profiling["ddar_build_work_time_s"],
+                            "ddar_engine_work_time_s": profiling["ddar_engine_work_time_s"],
+                            "num_requests": profiling["num_requests"],
+                            "num_candidates_total": profiling["num_candidates_total"],
+                            "num_candidates_parse_failed": profiling["num_candidates_parse_failed"],
+                            "num_candidates_build_failed": profiling["num_candidates_build_failed"],
+                            "num_ddar_submitted": profiling["num_ddar_submitted"],
+                            "num_ddar_invalid": profiling["num_ddar_invalid"],
+                            "max_running_gpu": profiling["max_running_gpu"],
+                            "max_running_ddar": profiling["max_running_ddar"],
+                            "max_prepared_requests": profiling["max_prepared_requests"],
+                            "max_pending_ddar_submit": profiling["max_pending_ddar_submit"],
+                            "depth_rows": profiling.get("depth_rows", []),
                         }
                     )
                 gpu_worker_stats = run_infos.get("gpu_worker_stats")
@@ -405,6 +431,8 @@ def solve_problems_single_problem_multi_gpu(
         print(f"Results saved to {csv_filepath}")
         if enable_profiling:
             profiling_csv_filepath = csv_filepath.with_name(f"{csv_filepath.stem}_profiling.csv")
+            work_csv_filepath = csv_filepath.with_name(f"{csv_filepath.stem}_profiling_work.csv")
+            depth_csv_filepath = csv_filepath.with_name(f"{csv_filepath.stem}_profiling_depth.csv")
             write_profiling_csv(
                 profiling_csv_filepath,
                 dataset_name=filepath.stem,
@@ -413,7 +441,29 @@ def solve_problems_single_problem_multi_gpu(
                 total_time_s=total_time,
                 rows=profiling_rows,
             )
+            write_profiling_work_csv(
+                work_csv_filepath,
+                dataset_name=filepath.stem,
+                solved_count=solved_count,
+                total_problems=total_problems,
+                rows=profiling_rows,
+            )
+            depth_rows = [
+                {
+                    "problem_name": row["problem_name"],
+                    **depth_row,
+                }
+                for row in profiling_rows
+                for depth_row in row.get("depth_rows", [])
+            ]
+            write_profiling_depth_csv(
+                depth_csv_filepath,
+                dataset_name=filepath.stem,
+                rows=depth_rows,
+            )
             print(f"Profiling results saved to {profiling_csv_filepath}")
+            print(f"Profiling work results saved to {work_csv_filepath}")
+            print(f"Profiling depth results saved to {depth_csv_filepath}")
     finally:
         if ray.is_initialized():
             ray.shutdown()

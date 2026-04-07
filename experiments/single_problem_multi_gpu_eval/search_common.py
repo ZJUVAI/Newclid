@@ -118,8 +118,11 @@ def run_ddar_remote(
     *,
     return_proof: bool = False,
 ):
+    # These timings describe work performed inside one remote DDAR task. They
+    # are not main-thread wall-clock timings and can legitimately sum to more
+    # than the end-to-end runtime when many DDAR tasks run in parallel.
     eval_start = time.time()
-    build_time_s = 0.0
+    ddar_build_work_time_s = 0.0
     try:
         build_start = time.time()
         proof = ProofState.build_problemJGEX(
@@ -129,13 +132,13 @@ def run_ddar_remote(
             max_attempts=100,
             problem_path=None,
         )
-        build_time_s = time.time() - build_start
+        ddar_build_work_time_s = time.time() - build_start
     except Exception as exc:
         result = {
             "status": "invalid",
             "elapsed_time": time.time() - eval_start,
-            "build_time_s": time.time() - build_start,
-            "ddar_time_s": 0.0,
+            "ddar_build_work_time_s": time.time() - build_start,
+            "ddar_engine_work_time_s": 0.0,
             "error_type": classify_build_exception(exc),
             "error_message": str(exc),
             "problem_text": str(problem),
@@ -148,13 +151,13 @@ def run_ddar_remote(
     try:
         ddar_start = time.time()
         solved = run_ddar_c(proof, rules, start_time, timeout)
-        ddar_time_s = time.time() - ddar_start
+        ddar_engine_work_time_s = time.time() - ddar_start
     except Exception as exc:
         result = {
             "status": "invalid",
             "elapsed_time": time.time() - eval_start,
-            "build_time_s": build_time_s,
-            "ddar_time_s": time.time() - ddar_start,
+            "ddar_build_work_time_s": ddar_build_work_time_s,
+            "ddar_engine_work_time_s": time.time() - ddar_start,
             "error_type": "engine_error",
             "error_message": str(exc),
             "problem_text": str(problem),
@@ -167,8 +170,8 @@ def run_ddar_remote(
     result = {
         "status": "solved" if solved else "unsolved",
         "elapsed_time": time.time() - eval_start,
-        "build_time_s": build_time_s,
-        "ddar_time_s": ddar_time_s,
+        "ddar_build_work_time_s": ddar_build_work_time_s,
+        "ddar_engine_work_time_s": ddar_engine_work_time_s,
         "problem_text": str(problem),
         "ddar_input": proof_to_ddar_input(proof),
     }

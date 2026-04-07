@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import string
+import time
 from copy import deepcopy
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -74,6 +75,11 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
         self._render_counter += 1
         svg_path = self.render_root / f"{stem}.svg"
         png_path = self.render_root / f"{stem}.png"
+        request_profile: dict[str, float] = {}
+
+        # Draw the symbolic figure first. This isolates the vector-render cost
+        # from the later raster conversion and image post-processing stages.
+        draw_svg_start = time.perf_counter()
         draw_clause_figure(
             current_proof,
             problem,
@@ -81,11 +87,20 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
             current_proof.rng,
             draw_annotations=True,
         )
+        request_profile["draw_svg_wall_time_s"] = time.perf_counter() - draw_svg_start
+
+        # Convert the SVG into the actual prompt image consumed by the VLM.
+        svg_to_png_start = time.perf_counter()
         cairosvg.svg2png(
             url=str(svg_path),
             write_to=str(png_path),
             output_width=self.render_width,
         )
+        request_profile["svg_to_png_wall_time_s"] = time.perf_counter() - svg_to_png_start
+
+        # The model is trained on inverted prompts, so keep the image
+        # post-processing cost separate from the raw rendering work.
+        image_postprocess_start = time.perf_counter()
         with Image.open(png_path) as img:
             if img.mode == "RGBA":
                 r, g, b, a = img.split()
@@ -100,15 +115,23 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
             else:
                 img_out = ImageOps.invert(img.convert("RGB"))
             img_out.save(png_path)
+        request_profile["image_postprocess_wall_time_s"] = time.perf_counter() - image_postprocess_start
+
+        # Building the textual DSL prompt is logically distinct from the image
+        # pipeline and is useful when request preparation becomes CPU-bound.
+        dsl_build_start = time.perf_counter()
+        query = self.problem_to_dsl(problem, current_proof.defs)
+        request_profile["dsl_build_wall_time_s"] = time.perf_counter() - dsl_build_start
 
         return {
             "request_id": request_id,
-            "query": self.problem_to_dsl(problem, current_proof.defs),
+            "query": query,
             "img_path": str(png_path),
             "new_point_name": self.get_new_point_name(problem),
             "response_prefix": "<aux> x00",
             "with_predicate": False,
             "decoding_size": self.decoding_size,
+            "_request_profile": request_profile,
         }
 
     def make_next_state_from_unsolved_ddar(
