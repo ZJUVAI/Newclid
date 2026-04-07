@@ -211,6 +211,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
                     
             live.update(render_table(all_tasks_info, start_time, True))
         live.update(render_table(all_tasks_info, start_time, False))
+    wall_clock_total_time = time.time() - start_time
     ray.shutdown()
     
     # Generate CSV filename based on problems_path and model_path
@@ -242,7 +243,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
     # Calculate summary statistics
     total_problems = len(all_tasks_info)
     solved_count = sum(1 for _, status, _ in all_tasks_info if status == "Success")
-    total_time = sum(elapsed for _, _, elapsed in all_tasks_info if elapsed is not None)
+    total_time = wall_clock_total_time
 
     # Write results to CSV file
     with open(csv_filepath, 'w', newline='', encoding='utf-8') as csvfile:
@@ -266,6 +267,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
             dataset_name=dataset_name,
             solved_count=solved_count,
             total_problems=total_problems,
+            total_time_s=wall_clock_total_time,
             rows=profiling_rows,
         )
         logger.info("Profiling results saved to %s", profiling_csv_filepath)

@@ -65,6 +65,7 @@ def test_write_profiling_csv_outputs_summary_and_rows(tmp_path) -> None:
         dataset_name="demo",
         solved_count=1,
         total_problems=2,
+        total_time_s=6.0,
         rows=rows,
     )
 
@@ -72,6 +73,7 @@ def test_write_profiling_csv_outputs_summary_and_rows(tmp_path) -> None:
         written_rows = list(csv.reader(f))
 
     assert "Dataset: demo, Solved: 1/2" in written_rows[0][0]
+    assert "Total Time: 6.00s" in written_rows[0][0]
     assert "Build Time: 1.50s" in written_rows[0][0]
     assert written_rows[1] == [
         "Problem Name",

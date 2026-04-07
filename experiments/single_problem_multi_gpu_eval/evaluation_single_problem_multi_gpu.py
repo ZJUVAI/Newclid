@@ -410,6 +410,7 @@ def solve_problems_single_problem_multi_gpu(
                 dataset_name=filepath.stem,
                 solved_count=solved_count,
                 total_problems=total_problems,
+                total_time_s=total_time,
                 rows=profiling_rows,
             )
             print(f"Profiling results saved to {profiling_csv_filepath}")

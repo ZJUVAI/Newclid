@@ -65,16 +65,18 @@ def write_profiling_csv(
     dataset_name: str,
     solved_count: int,
     total_problems: int,
+    total_time_s: float | None,
     rows: list[dict[str, Any]],
 ) -> None:
     summary = profiling_summary(rows)
+    display_total_time_s = summary["total_time_s"] if total_time_s is None else float(total_time_s)
     with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
         writer.writerow(
             [
                 (
                     f"Dataset: {dataset_name}, Solved: {solved_count}/{total_problems}, "
-                    f"Total Time: {summary['total_time_s']:.2f}s, "
+                    f"Total Time: {display_total_time_s:.2f}s, "
                     f"Build Time: {summary['build_time_s']:.2f}s, "
                     f"Inference Time: {summary['inference_time_s']:.2f}s, "
                     f"DDAR Time: {summary['ddar_time_s']:.2f}s, "
