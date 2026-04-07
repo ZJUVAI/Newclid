@@ -180,6 +180,7 @@ def solve_problems_single_problem_multi_gpu(
     log_dir: str | None,
     render_root: str | None = None,
     trace_dir: str | None = None,
+    ray_address: str = "local",
 ):
     if not filepath.exists():
         raise FileNotFoundError(f"File {filepath} not found.")
@@ -195,11 +196,14 @@ def solve_problems_single_problem_multi_gpu(
             raise ValueError(f"max_pending_ddar must be positive, got {max_pending_ddar}.")
 
         if not ray.is_initialized():
-            ray.init(
-                dashboard_host="0.0.0.0",
-                ignore_reinit_error=True,
-                num_cpus=num_cpus,
-            )
+            init_kwargs = {
+                "address": ray_address,
+                "dashboard_host": "0.0.0.0",
+                "ignore_reinit_error": True,
+            }
+            if ray_address == "local":
+                init_kwargs["num_cpus"] = num_cpus
+            ray.init(**init_kwargs)
 
         available_gpus = int(ray.available_resources().get("GPU", 0))
         if available_gpus <= 0:
@@ -418,6 +422,12 @@ def main():
         help="Optional directory for per-problem search trace JSONL files.",
     )
     parser.add_argument(
+        "--ray_address",
+        type=str,
+        default="local",
+        help="Ray address to connect to. Use 'local' to force a fresh local runtime, 'auto' to reuse any detected cluster, or an explicit address such as '127.0.0.1:6379'.",
+    )
+    parser.add_argument(
         "--max_workers",
         type=int,
         default=8,
@@ -475,6 +485,7 @@ def main():
         log_dir=args.log_dir,
         render_root=args.render_root,
         trace_dir=args.trace_dir,
+        ray_address=args.ray_address,
     )
 
 
