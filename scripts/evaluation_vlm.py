@@ -57,6 +57,7 @@ def ray_solve_problem(args):
                 problem_name=problem_name,
                 problem_index=pid,
                 start_time=start_time,
+                attempts_path=Path(trace_payload["run_dir"]) / "attempts" / trace_payload["problem_filenames"][pid],
             )
             trace_writer.log(
                 "problem_start",
@@ -168,7 +169,7 @@ def render_table(all_tasks_info, start_time, reorder: bool):
     return table
 
 
-def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding_size: int, beam_size: int, search_depth: int, timeout: int = 3600, agent_type: str = "vlm", log_dir: str = None, problem_db_root: str = "problem_db", enable_problem_db: bool = False, trace_dir: str | None = None):
+def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding_size: int, beam_size: int, search_depth: int, timeout: int = 3600, agent_type: str = "vlm", log_dir: str = None, problem_db_root: str = "problem_db", enable_problem_db: bool = False, trace_dir: str | None = None, ray_address: str = "local"):
     """
     Main function, read the file and execute tasks using Ray.
     """
@@ -185,16 +186,19 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
 
     logger.info("Total problems to solve: %s", len(problem_names))
     logger.info("Using agent: %s", agent_type)
+    logger.info("Using Ray address: %s", ray_address)
 
     # Multi-threaded execution using Ray with limited concurrent tasks
     # Initialize Ray with specified number of CPUs
     if not ray.is_initialized():
-        ray.init(
-            # local_mode=True,
-            # include_dashboard=True, dashboard_host="0.0.0.0", dashboard_port=8265,
-            dashboard_host="0.0.0.0",
-            ignore_reinit_error=True, num_cpus=num_cpus
-        )
+        init_kwargs = {
+            "address": ray_address,
+            "dashboard_host": "0.0.0.0",
+            "ignore_reinit_error": True,
+        }
+        if ray_address == "local":
+            init_kwargs["num_cpus"] = num_cpus
+        ray.init(**init_kwargs)
 
     total_time = 0
     start_time = time.time()
@@ -317,7 +321,9 @@ if __name__ == "__main__":
                         help="Enable problem database cache reads/writes")
     parser.add_argument("--trace_dir", type=str, default=None,
                         help="Optional directory for per-problem search trace JSONL files")
+    parser.add_argument("--ray_address", type=str, default="local",
+                        help="Ray address to connect to. Use 'local' to force a fresh local runtime, 'auto' to reuse any detected cluster, or an explicit address such as '127.0.0.1:6379'.")
     args = parser.parse_args()
 
     problems_path = Path(args.problems_path)
-    solve_problems(problems_path, args.model_path, num_cpus=args.max_workers, decoding_size=args.decoding_size, beam_size=args.beam_size, search_depth=args.search_depth, timeout=args.timeout, agent_type=args.agent, log_dir=args.log_dir, problem_db_root=args.problem_db_root, enable_problem_db=args.enable_problem_db, trace_dir=args.trace_dir)
+    solve_problems(problems_path, args.model_path, num_cpus=args.max_workers, decoding_size=args.decoding_size, beam_size=args.beam_size, search_depth=args.search_depth, timeout=args.timeout, agent_type=args.agent, log_dir=args.log_dir, problem_db_root=args.problem_db_root, enable_problem_db=args.enable_problem_db, trace_dir=args.trace_dir, ray_address=args.ray_address)
