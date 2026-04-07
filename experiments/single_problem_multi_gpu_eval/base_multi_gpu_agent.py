@@ -9,6 +9,7 @@ import ray
 
 from newclid.agent.agents_interface import DeductiveAgent
 from newclid.formulations.problem import ProblemJGEX
+from newclid.profiling import add_profiling_time, create_profiling_payload, finalize_profiling
 from newclid.proof import ProofState
 from newclid.search_trace import build_attempt_key, proof_to_ddar_input
 
@@ -97,15 +98,18 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         t0: float,
         step: int,
         is_success: bool,
+        profiling: dict[str, float],
         error_msg: str | None = None,
         final_node_id: int | None = None,
     ):
         infos: dict[str, Any] = {}
-        infos["runtime"] = time.time() - t0
+        runtime = time.time() - t0
+        infos["runtime"] = runtime
         infos["success"] = is_success
         infos["steps"] = step
         infos["gpu_worker_stats"] = self.model_pool.get_worker_stats()
         infos["final_node_id"] = final_node_id
+        infos["profiling"] = finalize_profiling(profiling, runtime)
         if error_msg:
             infos["error"] = error_msg
         return infos
@@ -124,11 +128,14 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         depth: int,
         t0: float,
         step: int,
+        profiling: dict[str, float],
         proof: ProofState,
     ):
         for future in done_futures:
             ddar_result = ray.get(future)
             future_meta = future_info.pop(future)
+            add_profiling_time(profiling, "build_time_s", ddar_result.get("build_time_s"))
+            add_profiling_time(profiling, "ddar_time_s", ddar_result.get("ddar_time_s"))
 
             if ddar_result["status"] == "invalid":
                 self._trace(
@@ -165,6 +172,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     t0=t0,
                     step=step,
                     is_success=True,
+                    profiling=profiling,
                     error_msg=str(future_meta["problem"]),
                     final_node_id=future_meta["node_id"],
                 )
@@ -221,6 +229,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         depth: int,
         t0: float,
         step: int,
+        profiling: dict[str, float],
         proof: ProofState,
     ):
         if not running_futures:
@@ -241,6 +250,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             depth=depth,
             t0=t0,
             step=step,
+            profiling=profiling,
             proof=proof,
         )
 
@@ -253,6 +263,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         depth: int,
         t0: float,
         step: int,
+        profiling: dict[str, float],
         proof: ProofState,
     ):
         solved_payload = None
@@ -271,6 +282,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 depth=depth,
                 t0=t0,
                 step=step,
+                profiling=profiling,
                 proof=proof,
             )
             if solved_payload is not None:
@@ -299,6 +311,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         t0 = time.time()
         step = 0
         next_node_id = 1
+        profiling = create_profiling_payload()
 
         for goal in proof.goals:
             if not goal.check_numerical():
@@ -307,6 +320,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     t0=t0,
                     step=step,
                     is_success=False,
+                    profiling=profiling,
                     error_msg=f"{goal.pretty()} fails numerical check",
                 )
 
@@ -321,7 +335,10 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             problem_text=str(self.problemJGEX),
             ddar_input=proof_to_ddar_input(base_proof),
         )
-        if self.run_ddar_c(base_proof, rules, t0, timeout):
+        ddar_start = time.time()
+        base_solved = self.run_ddar_c(base_proof, rules, t0, timeout)
+        add_profiling_time(profiling, "ddar_time_s", time.time() - ddar_start)
+        if base_solved:
             self._trace(
                 "ddar_result",
                 attempt_key="base:0",
@@ -340,6 +357,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 t0=t0,
                 step=step,
                 is_success=True,
+                profiling=profiling,
                 final_node_id=0,
             )
         self._trace(
@@ -377,6 +395,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     t0=t0,
                     step=step,
                     is_success=False,
+                    profiling=profiling,
                     error_msg="Timeout",
                 )
 
@@ -452,6 +471,11 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                         len(gpu_results),
                     )
                     for gpu_result in gpu_results:
+                        add_profiling_time(
+                            profiling,
+                            "inference_time_s",
+                            gpu_result.get("inference_time_s"),
+                        )
                         request_id = gpu_result["request_id"]
                         request_state = request_meta[request_id]
                         state = request_state["state"]
@@ -551,6 +575,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                                     depth=depth,
                                     t0=t0,
                                     step=step,
+                                    profiling=profiling,
                                     proof=proof,
                                 )
                                 if solved_payload is not None:
@@ -620,6 +645,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                                 depth=depth,
                                 t0=t0,
                                 step=step,
+                                profiling=profiling,
                                 proof=proof,
                             )
                             if solved_payload is not None:
@@ -633,6 +659,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                         depth=depth,
                         t0=t0,
                         step=step,
+                        profiling=profiling,
                         proof=proof,
                     )
                     if solved_payload is not None:
@@ -653,6 +680,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                         depth=depth,
                         t0=t0,
                         step=step,
+                        profiling=profiling,
                         proof=proof,
                     )
                     if solved_payload is not None:
@@ -666,6 +694,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 depth=depth,
                 t0=t0,
                 step=step,
+                profiling=profiling,
                 proof=proof,
             )
             if solved_payload is not None:
@@ -684,5 +713,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             t0=t0,
             step=step,
             is_success=False,
+            profiling=profiling,
             error_msg="Tried but failed.",
         )

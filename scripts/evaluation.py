@@ -11,6 +11,7 @@ from rich.table import Table
 from newclid.agent.lm import LMAgent
 from newclid.agent.qwen35_text import Qwen35TextAgent
 from newclid.api import GeometricSolverBuilder
+from newclid.profiling import finalize_profiling, merge_profiling_payloads, write_profiling_csv
 from newclid.problem_db import ProblemDBRuntime, ProblemDBWriter
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
@@ -36,6 +37,7 @@ def ray_solve_problem(args):
     pid, problem_name, problems_path, model_path, decoding_size, beam_size, search_depth, timeout, agent_type, problem_db_root, enable_problem_db = args
     start_time = time.time()
     try:
+        build_start = time.time()
         builder = GeometricSolverBuilder().load_problem_from_file(problems_path, problem_name, rename=True)
         problem_db_runtime = None
         if enable_problem_db:
@@ -69,8 +71,16 @@ def ray_solve_problem(args):
             .with_deductive_agent(agent)
             .build()
         )
+        entry_build_time_s = time.time() - build_start
         is_solved = solver.run(timeout=timeout)
         elapsed_time = time.time() - start_time
+        profiling = finalize_profiling(
+            merge_profiling_payloads(
+                {"build_time_s": entry_build_time_s},
+                solver.run_infos.get("profiling"),
+            ),
+            elapsed_time,
+        )
         problem_db_stats = solver.run_infos.get("problem_db_stats")
         ddar_stats = solver.run_infos.get("ddar_stats")
         if problem_db_stats is not None:
@@ -97,6 +107,7 @@ def ray_solve_problem(args):
             is_solved,
             elapsed_time,
             solver.run_infos.get("problem_db_payload"),
+            profiling,
         )
     except Exception as e:
         logger.warning(
@@ -107,7 +118,11 @@ def ray_solve_problem(args):
             exc_info=True,
         )
         elapsed_time = time.time() - start_time 
-        return (pid, problem_name, False, elapsed_time, None)
+        profiling = finalize_profiling(
+            merge_profiling_payloads({"build_time_s": time.time() - start_time}),
+            elapsed_time,
+        )
+        return (pid, problem_name, False, elapsed_time, None, profiling)
 
 def render_table(all_tasks_info, start_time, reorder: bool):
     total_problems = len(all_tasks_info)
@@ -129,7 +144,7 @@ def render_table(all_tasks_info, start_time, reorder: bool):
         table.add_row(problem_name, status, elapsed)
     return table
 
-def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding_size: int, beam_size: int, search_depth: int, timeout: int = 3600, agent_type: str = "lm", log_dir: str = None, problem_db_root: str = "problem_db", enable_problem_db: bool = False):
+def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding_size: int, beam_size: int, search_depth: int, timeout: int = 3600, agent_type: str = "lm", log_dir: str = None, problem_db_root: str = "problem_db", enable_problem_db: bool = False, enable_profiling: bool = False):
     """
     Main function, read the file and execute tasks using Ray.
     """
@@ -160,6 +175,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
     total_time = 0
     start_time = time.time()
     all_tasks_info = []
+    profiling_rows = []
     pending_tasks = []
     problem_db_writer = ProblemDBWriter(problem_db_root, repo_root=Path.cwd()) if enable_problem_db else None
     
@@ -176,10 +192,21 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
             done_tasks, pending_tasks = ray.wait(pending_tasks, num_returns=1, timeout=5)
             # Process completed tasks
             for task in done_tasks:
-                pid, problem_name, is_solved, elapsed_time, problem_db_payload = ray.get(task)
+                pid, problem_name, is_solved, elapsed_time, problem_db_payload, profiling = ray.get(task)
                 if problem_db_writer is not None:
                     problem_db_writer.write_payload(problem_db_payload)
                 all_tasks_info[pid] = (problem_name, "Success" if is_solved else "Failed", elapsed_time)
+                profiling_rows.append(
+                    {
+                        "problem_name": problem_name,
+                        "solved": "√" if is_solved else "x",
+                        "total_time_s": profiling["total_time_s"],
+                        "build_time_s": profiling["build_time_s"],
+                        "inference_time_s": profiling["inference_time_s"],
+                        "ddar_time_s": profiling["ddar_time_s"],
+                        "other_time_s": profiling["other_time_s"],
+                    }
+                )
                 total_time += elapsed_time
                     
             live.update(render_table(all_tasks_info, start_time, True))
@@ -232,6 +259,16 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
             writer.writerow([problem_name, solved, time_str])
     
     logger.info("Results saved to %s", csv_filepath)
+    if enable_profiling:
+        profiling_csv_filepath = csv_filepath.with_name(f"{csv_filepath.stem}_profiling.csv")
+        write_profiling_csv(
+            profiling_csv_filepath,
+            dataset_name=dataset_name,
+            solved_count=solved_count,
+            total_problems=total_problems,
+            rows=profiling_rows,
+        )
+        logger.info("Profiling results saved to %s", profiling_csv_filepath)
             
 
 if __name__ == "__main__":
@@ -252,6 +289,8 @@ if __name__ == "__main__":
                         help="Directory to store the problem database")
     parser.add_argument("--enable_problem_db", action=argparse.BooleanOptionalAction, default=False,
                         help="Enable problem database cache reads/writes")
+    parser.add_argument("--enable_profiling", action=argparse.BooleanOptionalAction, default=False,
+                        help="Write a sidecar profiling CSV with build/inference/DDAR timings")
     args = parser.parse_args()
     
     problems_path = Path(args.problems_path)
@@ -267,4 +306,5 @@ if __name__ == "__main__":
         log_dir=args.log_dir,
         problem_db_root=args.problem_db_root,
         enable_problem_db=args.enable_problem_db,
+        enable_profiling=args.enable_profiling,
     )

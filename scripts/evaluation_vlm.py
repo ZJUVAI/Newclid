@@ -11,6 +11,7 @@ from rich.table import Table
 from newclid.agent.vlm import VLMAgent
 from newclid.agent.qwen35 import Qwen35Agent
 from newclid.api import GeometricSolverBuilder
+from newclid.profiling import finalize_profiling, merge_profiling_payloads, write_profiling_csv
 from newclid.problem_db import ProblemDBRuntime, ProblemDBWriter
 from newclid.search_trace import TraceRun, TraceWriter, sanitize_filename
 
@@ -40,6 +41,7 @@ def ray_solve_problem(args):
     start_time = time.time()
     trace_writer = None
     try:
+        build_start = time.time()
         builder = GeometricSolverBuilder().load_problem_from_file(problems_path, problem_name, rename=True)
         problem_db_runtime = None
         if enable_problem_db:
@@ -94,9 +96,17 @@ def ray_solve_problem(args):
             .with_deductive_agent(agent)
             .build()
         )
+        entry_build_time_s = time.time() - build_start
         # print(f"problem_name: {problem_name}")
         is_solved = solver.run(timeout=timeout)
         elapsed_time = time.time() - start_time
+        profiling = finalize_profiling(
+            merge_profiling_payloads(
+                {"build_time_s": entry_build_time_s},
+                solver.run_infos.get("profiling"),
+            ),
+            elapsed_time,
+        )
         if trace_writer is not None:
             trace_writer.log(
                 "problem_end",
@@ -126,7 +136,7 @@ def ray_solve_problem(args):
                 f"remote_build_invalid={ddar_stats['remote_build_invalid']} "
                 f"remote_engine_invalid={ddar_stats['remote_engine_invalid']}"
             )
-        return (pid, problem_name, is_solved, elapsed_time, solver.run_infos.get("problem_db_payload"))
+        return (pid, problem_name, is_solved, elapsed_time, solver.run_infos.get("problem_db_payload"), profiling)
     except Exception as e:
         if trace_writer is not None:
             trace_writer.log(
@@ -145,7 +155,11 @@ def ray_solve_problem(args):
             exc_info=True,
         )
         elapsed_time = time.time() - start_time
-        return (pid, problem_name, False, elapsed_time, None)
+        profiling = finalize_profiling(
+            merge_profiling_payloads({"build_time_s": time.time() - start_time}),
+            elapsed_time,
+        )
+        return (pid, problem_name, False, elapsed_time, None, profiling)
 
 
 def render_table(all_tasks_info, start_time, reorder: bool):
@@ -169,7 +183,7 @@ def render_table(all_tasks_info, start_time, reorder: bool):
     return table
 
 
-def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding_size: int, beam_size: int, search_depth: int, timeout: int = 3600, agent_type: str = "vlm", log_dir: str = None, problem_db_root: str = "problem_db", enable_problem_db: bool = False, trace_dir: str | None = None, ray_address: str = "local"):
+def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding_size: int, beam_size: int, search_depth: int, timeout: int = 3600, agent_type: str = "vlm", log_dir: str = None, problem_db_root: str = "problem_db", enable_problem_db: bool = False, trace_dir: str | None = None, ray_address: str = "local", enable_profiling: bool = False):
     """
     Main function, read the file and execute tasks using Ray.
     """
@@ -203,6 +217,7 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
     total_time = 0
     start_time = time.time()
     all_tasks_info = []
+    profiling_rows = []
     pending_tasks = []
     problem_db_writer = ProblemDBWriter(problem_db_root, repo_root=Path.cwd()) if enable_problem_db else None
 
@@ -246,10 +261,21 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
             done_tasks, pending_tasks = ray.wait(pending_tasks, num_returns=1, timeout=5)
             # Process completed tasks
             for task in done_tasks:
-                pid, problem_name, is_solved, elapsed_time, problem_db_payload = ray.get(task)
+                pid, problem_name, is_solved, elapsed_time, problem_db_payload, profiling = ray.get(task)
                 if problem_db_writer is not None:
                     problem_db_writer.write_payload(problem_db_payload)
                 all_tasks_info[pid] = (problem_name, "Success" if is_solved else "Failed", elapsed_time)
+                profiling_rows.append(
+                    {
+                        "problem_name": problem_name,
+                        "solved": "√" if is_solved else "x",
+                        "total_time_s": profiling["total_time_s"],
+                        "build_time_s": profiling["build_time_s"],
+                        "inference_time_s": profiling["inference_time_s"],
+                        "ddar_time_s": profiling["ddar_time_s"],
+                        "other_time_s": profiling["other_time_s"],
+                    }
+                )
                 total_time += elapsed_time
 
             live.update(render_table(all_tasks_info, start_time, True))
@@ -299,6 +325,16 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
             writer.writerow([problem_name, solved, time_str])
 
     logger.info("Results saved to %s", csv_filepath)
+    if enable_profiling:
+        profiling_csv_filepath = csv_filepath.with_name(f"{csv_filepath.stem}_profiling.csv")
+        write_profiling_csv(
+            profiling_csv_filepath,
+            dataset_name=dataset_name,
+            solved_count=solved_count,
+            total_problems=total_problems,
+            rows=profiling_rows,
+        )
+        logger.info("Profiling results saved to %s", profiling_csv_filepath)
 
 
 if __name__ == "__main__":
@@ -323,7 +359,9 @@ if __name__ == "__main__":
                         help="Optional directory for per-problem search trace JSONL files")
     parser.add_argument("--ray_address", type=str, default="local",
                         help="Ray address to connect to. Use 'local' to force a fresh local runtime, 'auto' to reuse any detected cluster, or an explicit address such as '127.0.0.1:6379'.")
+    parser.add_argument("--enable_profiling", action=argparse.BooleanOptionalAction, default=False,
+                        help="Write a sidecar profiling CSV with build/inference/DDAR timings")
     args = parser.parse_args()
 
     problems_path = Path(args.problems_path)
-    solve_problems(problems_path, args.model_path, num_cpus=args.max_workers, decoding_size=args.decoding_size, beam_size=args.beam_size, search_depth=args.search_depth, timeout=args.timeout, agent_type=args.agent, log_dir=args.log_dir, problem_db_root=args.problem_db_root, enable_problem_db=args.enable_problem_db, trace_dir=args.trace_dir, ray_address=args.ray_address)
+    solve_problems(problems_path, args.model_path, num_cpus=args.max_workers, decoding_size=args.decoding_size, beam_size=args.beam_size, search_depth=args.search_depth, timeout=args.timeout, agent_type=args.agent, log_dir=args.log_dir, problem_db_root=args.problem_db_root, enable_problem_db=args.enable_problem_db, trace_dir=args.trace_dir, ray_address=args.ray_address, enable_profiling=args.enable_profiling)

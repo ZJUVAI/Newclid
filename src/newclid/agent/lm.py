@@ -39,6 +39,11 @@ from newclid.problem_db import (
     classify_build_exception,
     summarize_problem_db_runtime,
 )
+from newclid.profiling import (
+    add_profiling_time,
+    create_profiling_payload,
+    finalize_profiling,
+)
 
 if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
@@ -246,13 +251,16 @@ class LMAgent(DeductiveAgent):
             "remote_build_invalid": 0,
             "remote_engine_invalid": 0,
         }
+        profiling = create_profiling_payload()
 
         def infos(is_success, error_msg = None):
             infos: dict[str, Any] = {}
-            infos["runtime"] = time.time() - t0
+            runtime = time.time() - t0
+            infos["runtime"] = runtime
             infos["success"] = is_success
             infos["steps"] = step
             infos["ddar_stats"] = ddar_stats
+            infos["profiling"] = finalize_profiling(profiling, runtime)
             if self.problem_db_runtime is not None:
                 infos["problem_db_payload"] = self.problem_db_runtime.export_payload()
                 infos["problem_db_stats"] = summarize_problem_db_runtime(self.problem_db_runtime)
@@ -270,6 +278,8 @@ class LMAgent(DeductiveAgent):
                         ddar_result,
                     )
                 LMAgent._update_ddar_stats(ddar_stats, ddar_result)
+                add_profiling_time(profiling, "build_time_s", ddar_result.get("build_time_s"))
+                add_profiling_time(profiling, "ddar_time_s", ddar_result.get("ddar_time_s"))
 
                 if ddar_result["status"] == "solved":
                     new_problem = future_meta["problem"]
@@ -295,7 +305,9 @@ class LMAgent(DeductiveAgent):
                 return infos(False, f"{goal.pretty()} fails numerical check")
         # Run ddar
         ddar_stats["base_calls"] += 1
+        ddar_start = time.time()
         solved = LMAgent.run_ddar_c(proof, rules, t0, timeout)
+        add_profiling_time(profiling, "ddar_time_s", time.time() - ddar_start)
         # if proofed by ddar, return
         if solved:
             return infos(True)
@@ -334,11 +346,13 @@ class LMAgent(DeductiveAgent):
                             
                             p_dsl = self.problem_to_dsl(problem, proof.defs)
                             logger.debug("Inferencing on query (%s): %s", queue_type, p_dsl)
+                            inference_start = time.time()
                             aux_dsl_dict = self.inference(
                                 self.models[i], self.tokenizers[i], p_dsl, 
                                 self.get_new_point_name(problem), '<aux> x00',
                                 with_predicate=with_predicate
                             )
+                            add_profiling_time(profiling, "inference_time_s", time.time() - inference_start)
                             
                             for aux_dsl, score in aux_dsl_dict.items():
                                 try:
@@ -624,7 +638,9 @@ class LMAgent(DeductiveAgent):
 @ray.remote(num_cpus=1)
 def run_ddar_remote(problem, defs, rules: list[Rule], start_time: int, timeout: int = 3600): 
     eval_start = time.time()
+    build_time_s = 0.0
     try:
+        build_start = time.time()
         proof = ProofState.build_problemJGEX(
             problemJGEX=problem,
             defsJGEX=defs,
@@ -632,25 +648,34 @@ def run_ddar_remote(problem, defs, rules: list[Rule], start_time: int, timeout: 
             max_attempts=100,
             problem_path=None,
         )
+        build_time_s = time.time() - build_start
     except Exception as exc:
         return {
             "status": "invalid",
             "elapsed_time": time.time() - eval_start,
+            "build_time_s": time.time() - build_start,
+            "ddar_time_s": 0.0,
             "error_type": classify_build_exception(exc),
             "error_message": str(exc),
         }
     try:
+        ddar_start = time.time()
         solved = LMAgent.run_ddar_c(proof, rules, start_time, timeout)
+        ddar_time_s = time.time() - ddar_start
     except Exception as exc:
         return {
             "status": "invalid",
             "elapsed_time": time.time() - eval_start,
+            "build_time_s": build_time_s,
+            "ddar_time_s": time.time() - ddar_start,
             "error_type": "engine_error",
             "error_message": str(exc),
         }
     return {
         "status": "solved" if solved else "unsolved",
         "elapsed_time": time.time() - eval_start,
+        "build_time_s": build_time_s,
+        "ddar_time_s": ddar_time_s,
     }
     
     

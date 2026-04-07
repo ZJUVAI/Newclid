@@ -44,6 +44,11 @@ from newclid.problem_db import (
     classify_build_exception,
     summarize_problem_db_runtime,
 )
+from newclid.profiling import (
+    add_profiling_time,
+    create_profiling_payload,
+    finalize_profiling,
+)
 from newclid.search_trace import build_attempt_key, proof_to_ddar_input
 
 if TYPE_CHECKING:
@@ -329,14 +334,17 @@ class VLMAgent(DeductiveAgent):
             "remote_build_invalid": 0,
             "remote_engine_invalid": 0,
         }
+        profiling = create_profiling_payload()
 
         def infos(is_success, error_msg = None, final_node_id: int | None = None):
             infos: dict[str, Any] = {}
-            infos["runtime"] = time.time() - t0
+            runtime = time.time() - t0
+            infos["runtime"] = runtime
             infos["success"] = is_success
             infos["steps"] = step
             infos["ddar_stats"] = ddar_stats
             infos["final_node_id"] = final_node_id
+            infos["profiling"] = finalize_profiling(profiling, runtime)
             if self.problem_db_runtime is not None:
                 infos["problem_db_payload"] = self.problem_db_runtime.export_payload()
                 infos["problem_db_stats"] = summarize_problem_db_runtime(self.problem_db_runtime)
@@ -354,6 +362,8 @@ class VLMAgent(DeductiveAgent):
                         ddar_result,
                     )
                 VLMAgent._update_ddar_stats(ddar_stats, ddar_result)
+                add_profiling_time(profiling, "build_time_s", ddar_result.get("build_time_s"))
+                add_profiling_time(profiling, "ddar_time_s", ddar_result.get("ddar_time_s"))
 
                 if ddar_result["status"] == "solved":
                     new_problem = future_meta["problem"]
@@ -433,7 +443,9 @@ class VLMAgent(DeductiveAgent):
             problem_text=str(self.problemJGEX),
             ddar_input=proof_to_ddar_input(base_proof),
         )
+        ddar_start = time.time()
         solved = VLMAgent.run_ddar_c(base_proof, rules, t0, timeout)
+        add_profiling_time(profiling, "ddar_time_s", time.time() - ddar_start)
         # logger.info(f"finish first ddar")
         # if proofed by ddar, return
         if solved:
@@ -537,6 +549,7 @@ class VLMAgent(DeductiveAgent):
 
                             p_dsl = self.problem_to_dsl(problem, base_proof.defs)
                             logger.debug("Inferencing on query (%s): %s", queue_type, p_dsl)
+                            inference_start = time.time()
                             aux_dsl_dict = self.inference(
                                 model=self.models[i],
                                 processor=self.processors[i],
@@ -546,6 +559,7 @@ class VLMAgent(DeductiveAgent):
                                 response_prefix='<aux> x00',
                                 with_predicate=with_predicate
                             )
+                            add_profiling_time(profiling, "inference_time_s", time.time() - inference_start)
                             request_id = f"d{depth}_m{i}_n{request_idx}"
                             self._trace(
                                 "model_request",
@@ -984,7 +998,9 @@ class VLMAgent(DeductiveAgent):
 @ray.remote(num_cpus=1)
 def run_ddar_remote(problem, defs, rules: list[Rule], start_time: int, timeout: int = 3600): 
     eval_start = time.time()
+    build_time_s = 0.0
     try:
+        build_start = time.time()
         proof = ProofState.build_problemJGEX(
             problemJGEX=problem,
             defsJGEX=defs,
@@ -992,10 +1008,13 @@ def run_ddar_remote(problem, defs, rules: list[Rule], start_time: int, timeout: 
             max_attempts=100,
             problem_path=None,
         )
+        build_time_s = time.time() - build_start
     except Exception as exc:
         return {
             "status": "invalid",
             "elapsed_time": time.time() - eval_start,
+            "build_time_s": time.time() - build_start,
+            "ddar_time_s": 0.0,
             "error_type": classify_build_exception(exc),
             "error_message": str(exc),
             "problem_text": str(problem),
@@ -1003,11 +1022,15 @@ def run_ddar_remote(problem, defs, rules: list[Rule], start_time: int, timeout: 
             "proof": None,
         }
     try:
+        ddar_start = time.time()
         solved = VLMAgent.run_ddar_c(proof, rules, start_time, timeout)
+        ddar_time_s = time.time() - ddar_start
     except Exception as exc:
         return {
             "status": "invalid",
             "elapsed_time": time.time() - eval_start,
+            "build_time_s": build_time_s,
+            "ddar_time_s": time.time() - ddar_start,
             "error_type": "engine_error",
             "error_message": str(exc),
             "problem_text": str(problem),
@@ -1017,6 +1040,8 @@ def run_ddar_remote(problem, defs, rules: list[Rule], start_time: int, timeout: 
     return {
         "status": "solved" if solved else "unsolved",
         "elapsed_time": time.time() - eval_start,
+        "build_time_s": build_time_s,
+        "ddar_time_s": ddar_time_s,
         "problem_text": str(problem),
         "ddar_input": proof_to_ddar_input(proof),
         "proof": proof,

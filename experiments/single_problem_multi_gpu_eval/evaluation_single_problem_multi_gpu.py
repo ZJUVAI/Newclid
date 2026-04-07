@@ -24,6 +24,7 @@ if str(SRC_ROOT) not in sys.path:
 
 from experiments.single_problem_multi_gpu_eval.model_pool import ModelPool
 from newclid.api import GeometricSolverBuilder
+from newclid.profiling import finalize_profiling, merge_profiling_payloads, write_profiling_csv
 from newclid.search_trace import TraceRun
 
 
@@ -136,6 +137,7 @@ def solve_one_problem(
         agent_type,
         problems_path,
     )
+    build_start = time.time()
     builder = GeometricSolverBuilder().load_problem_from_file(problems_path, problem_name, rename=True)
 
     agent = create_agent(
@@ -149,8 +151,17 @@ def solve_one_problem(
         trace_writer=trace_writer,
     )
     solver = builder.with_deductive_agent(agent).build()
+    entry_build_time_s = time.time() - build_start
     is_solved = solver.run(timeout=timeout)
     elapsed_time = time.time() - start_time
+    profiling = finalize_profiling(
+        merge_profiling_payloads(
+            {"build_time_s": entry_build_time_s},
+            solver.run_infos.get("profiling"),
+        ),
+        elapsed_time,
+    )
+    solver.run_infos["profiling"] = profiling
     logging.getLogger(__name__).info(
         "solve_one_problem done: problem=%s solved=%s elapsed=%.2fs",
         problem_name,
@@ -181,6 +192,7 @@ def solve_problems_single_problem_multi_gpu(
     render_root: str | None = None,
     trace_dir: str | None = None,
     ray_address: str = "local",
+    enable_profiling: bool = False,
 ):
     if not filepath.exists():
         raise FileNotFoundError(f"File {filepath} not found.")
@@ -260,6 +272,7 @@ def solve_problems_single_problem_multi_gpu(
         print(f"Worker warmup: {warmup_infos}")
 
         all_tasks_info = [(problem_name, "Pending", 0.0) for problem_name in problem_names]
+        profiling_rows: list[dict[str, object]] = []
         start_time = time.time()
 
         with Live(refresh_per_second=1) as live:
@@ -313,9 +326,14 @@ def solve_problems_single_problem_multi_gpu(
                 except Exception as exc:
                     traceback.print_exc()
                     print(f"Warning: experimental solver crashed on problem '{problem_name}' : ({type(exc)}) {exc}")
-                    elapsed_time = 0.0
+                    elapsed_time = time.time() - problem_start
                     is_solved = False
-                    run_infos = {}
+                    run_infos = {
+                        "profiling": finalize_profiling(
+                            merge_profiling_payloads({"build_time_s": elapsed_time}),
+                            elapsed_time,
+                        )
+                    }
                     if trace_writer is not None:
                         trace_writer.log(
                             "problem_end",
@@ -331,6 +349,19 @@ def solve_problems_single_problem_multi_gpu(
                     "Success" if is_solved else "Failed",
                     elapsed_time,
                 )
+                profiling = run_infos.get("profiling")
+                if profiling is not None:
+                    profiling_rows.append(
+                        {
+                            "problem_name": problem_name,
+                            "solved": "√" if is_solved else "x",
+                            "total_time_s": profiling["total_time_s"],
+                            "build_time_s": profiling["build_time_s"],
+                            "inference_time_s": profiling["inference_time_s"],
+                            "ddar_time_s": profiling["ddar_time_s"],
+                            "other_time_s": profiling["other_time_s"],
+                        }
+                    )
                 gpu_worker_stats = run_infos.get("gpu_worker_stats")
                 if gpu_worker_stats is not None:
                     print(f"[gpu_worker_stats] problem={problem_name} stats={gpu_worker_stats}")
@@ -372,6 +403,16 @@ def solve_problems_single_problem_multi_gpu(
                 ])
 
         print(f"Results saved to {csv_filepath}")
+        if enable_profiling:
+            profiling_csv_filepath = csv_filepath.with_name(f"{csv_filepath.stem}_profiling.csv")
+            write_profiling_csv(
+                profiling_csv_filepath,
+                dataset_name=filepath.stem,
+                solved_count=solved_count,
+                total_problems=total_problems,
+                rows=profiling_rows,
+            )
+            print(f"Profiling results saved to {profiling_csv_filepath}")
     finally:
         if ray.is_initialized():
             ray.shutdown()
@@ -469,6 +510,12 @@ def main():
         default=None,
         help="Upper bound on in-flight DDAR Ray tasks for the current problem. Defaults to 2 * max_workers when omitted.",
     )
+    parser.add_argument(
+        "--enable_profiling",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Write a sidecar profiling CSV with build/inference/DDAR timings.",
+    )
     args = parser.parse_args()
 
     solve_problems_single_problem_multi_gpu(
@@ -486,6 +533,7 @@ def main():
         render_root=args.render_root,
         trace_dir=args.trace_dir,
         ray_address=args.ray_address,
+        enable_profiling=args.enable_profiling,
     )
 
 

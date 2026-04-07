@@ -119,7 +119,9 @@ def run_ddar_remote(
     return_proof: bool = False,
 ):
     eval_start = time.time()
+    build_time_s = 0.0
     try:
+        build_start = time.time()
         proof = ProofState.build_problemJGEX(
             problemJGEX=problem,
             defsJGEX=defs,
@@ -127,10 +129,13 @@ def run_ddar_remote(
             max_attempts=100,
             problem_path=None,
         )
+        build_time_s = time.time() - build_start
     except Exception as exc:
         result = {
             "status": "invalid",
             "elapsed_time": time.time() - eval_start,
+            "build_time_s": time.time() - build_start,
+            "ddar_time_s": 0.0,
             "error_type": classify_build_exception(exc),
             "error_message": str(exc),
             "problem_text": str(problem),
@@ -141,11 +146,15 @@ def run_ddar_remote(
         return result
 
     try:
+        ddar_start = time.time()
         solved = run_ddar_c(proof, rules, start_time, timeout)
+        ddar_time_s = time.time() - ddar_start
     except Exception as exc:
         result = {
             "status": "invalid",
             "elapsed_time": time.time() - eval_start,
+            "build_time_s": build_time_s,
+            "ddar_time_s": time.time() - ddar_start,
             "error_type": "engine_error",
             "error_message": str(exc),
             "problem_text": str(problem),
@@ -158,6 +167,8 @@ def run_ddar_remote(
     result = {
         "status": "solved" if solved else "unsolved",
         "elapsed_time": time.time() - eval_start,
+        "build_time_s": build_time_s,
+        "ddar_time_s": ddar_time_s,
         "problem_text": str(problem),
         "ddar_input": proof_to_ddar_input(proof),
     }
