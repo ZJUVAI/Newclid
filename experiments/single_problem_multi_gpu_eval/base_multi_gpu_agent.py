@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import deque
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -298,6 +299,231 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         running_futures.clear()
         future_info.clear()
 
+    def _prepare_next_request(
+        self,
+        *,
+        frontier_iter,
+        request_index: int,
+        request_meta: dict[str, dict[str, Any]],
+        prepared_requests,
+        proof: ProofState,
+        depth: int,
+    ) -> int | None:
+        try:
+            prev_score, node = next(frontier_iter)
+        except StopIteration:
+            return None
+
+        node_id, parent_node_id, state = node
+        request_id = f"d{depth}_n{request_index}"
+        request = self.build_request(
+            request_id=request_id,
+            state=state,
+            proof=proof,
+            depth=depth,
+        )
+        request["depth"] = depth
+        prepared_requests.append(request)
+        request_meta[request_id] = {
+            "state": state,
+            "prev_score": prev_score,
+            "node_id": node_id,
+            "parent_node_id": parent_node_id,
+        }
+        self._trace(
+            "model_request",
+            node_id=node_id,
+            parent_node_id=parent_node_id,
+            depth=depth,
+            request_id=request_id,
+            query=request.get("query"),
+            img_path=request.get("img_path"),
+            new_point_name=request.get("new_point_name"),
+            response_prefix=request.get("response_prefix"),
+            with_predicate=request.get("with_predicate"),
+            decoding_size=request.get("decoding_size"),
+        )
+        return request_index + 1
+
+    def _handle_gpu_result(
+        self,
+        *,
+        gpu_result: dict[str, Any],
+        request_meta: dict[str, dict[str, Any]],
+        pending_ddar_submit,
+        depth: int,
+        profiling: dict[str, float],
+        next_node_id: int,
+    ) -> int:
+        add_profiling_time(
+            profiling,
+            "inference_time_s",
+            gpu_result.get("inference_time_s"),
+        )
+        request_id = gpu_result["request_id"]
+        request_state = request_meta.pop(request_id)
+        state = request_state["state"]
+        prev_score = request_state["prev_score"]
+        parent_node_id = request_state["node_id"]
+        problem = self.get_problem_from_state(state)
+        outputs = [
+            {
+                "rank": rank,
+                "aux_dsl": aux_dsl,
+                "score": score,
+            }
+            for rank, (aux_dsl, score) in enumerate(gpu_result["aux_dsl_dict"].items())
+        ]
+        self._trace(
+            "model_response",
+            request_id=request_id,
+            node_id=parent_node_id,
+            depth=depth,
+            outputs=outputs,
+        )
+        logger.debug(
+            "Search depth=%d request=%s candidate_count=%d",
+            depth,
+            request_id,
+            len(gpu_result["aux_dsl_dict"]),
+        )
+
+        for candidate_rank, (aux_dsl, score) in enumerate(gpu_result["aux_dsl_dict"].items()):
+            try:
+                raw_aux_text = self.extract_raw_aux_text(aux_dsl)
+                aux = self.try_dsl_to_constructions(raw_aux_text)
+            except Exception:
+                self._trace(
+                    "candidate_transition",
+                    attempt_key=build_attempt_key(request_id, candidate_rank, None),
+                    request_id=request_id,
+                    parent_node_id=parent_node_id,
+                    node_id=None,
+                    candidate_rank=candidate_rank,
+                    depth=depth,
+                    raw_aux_text=self.extract_raw_aux_text(aux_dsl),
+                    translated_aux=None,
+                    new_problem_text=None,
+                    decision="parse_failed",
+                    beam_score_before=prev_score,
+                    beam_score_after=None,
+                )
+                continue
+
+            if not aux:
+                self._trace(
+                    "candidate_transition",
+                    attempt_key=build_attempt_key(request_id, candidate_rank, None),
+                    request_id=request_id,
+                    parent_node_id=parent_node_id,
+                    node_id=None,
+                    candidate_rank=candidate_rank,
+                    depth=depth,
+                    raw_aux_text=raw_aux_text,
+                    translated_aux=None,
+                    new_problem_text=None,
+                    decision="parse_failed",
+                    beam_score_before=prev_score,
+                    beam_score_after=None,
+                )
+                continue
+
+            try:
+                new_problem = problem.with_more_construction(aux)
+            except Exception:
+                self._trace(
+                    "candidate_transition",
+                    attempt_key=build_attempt_key(request_id, candidate_rank, None),
+                    request_id=request_id,
+                    parent_node_id=parent_node_id,
+                    node_id=None,
+                    candidate_rank=candidate_rank,
+                    depth=depth,
+                    raw_aux_text=raw_aux_text,
+                    translated_aux=aux,
+                    new_problem_text=None,
+                    decision="build_failed",
+                    beam_score_before=prev_score,
+                    beam_score_after=None,
+                )
+                continue
+
+            child_node_id = next_node_id
+            next_node_id += 1
+            pending_ddar_submit.append(
+                {
+                    "problem": new_problem,
+                    "state": state,
+                    "prev_score": prev_score,
+                    "score": score,
+                    "node_id": child_node_id,
+                    "parent_node_id": parent_node_id,
+                    "request_id": request_id,
+                    "candidate_rank": candidate_rank,
+                    "attempt_key": build_attempt_key(request_id, candidate_rank, child_node_id),
+                    "raw_aux_text": raw_aux_text,
+                    "translated_aux": aux,
+                }
+            )
+
+        return next_node_id
+
+    def _submit_pending_ddar(
+        self,
+        *,
+        pending_ddar_submit,
+        running_futures: list[Any],
+        future_info: dict[Any, dict[str, Any]],
+        rules_ref,
+        proof: ProofState,
+        depth: int,
+        t0: float,
+        timeout: int,
+    ) -> None:
+        while pending_ddar_submit and len(running_futures) < self.max_pending_ddar:
+            candidate_meta = pending_ddar_submit.popleft()
+            self._trace(
+                "candidate_transition",
+                attempt_key=candidate_meta["attempt_key"],
+                request_id=candidate_meta["request_id"],
+                parent_node_id=candidate_meta["parent_node_id"],
+                node_id=candidate_meta["node_id"],
+                candidate_rank=candidate_meta["candidate_rank"],
+                depth=depth,
+                raw_aux_text=candidate_meta["raw_aux_text"],
+                translated_aux=candidate_meta["translated_aux"],
+                new_problem_text=str(candidate_meta["problem"]),
+                decision="ddar_submitted",
+                beam_score_before=candidate_meta["prev_score"],
+                beam_score_after=candidate_meta["prev_score"] + candidate_meta["score"],
+            )
+            self._trace(
+                "ddar_submit",
+                attempt_key=candidate_meta["attempt_key"],
+                node_id=candidate_meta["node_id"],
+                parent_node_id=candidate_meta["parent_node_id"],
+                depth=depth,
+                problem_text=str(candidate_meta["problem"]),
+                ddar_input=None,
+            )
+            future = run_ddar_remote.remote(
+                candidate_meta["problem"],
+                proof.defs,
+                rules_ref,
+                t0,
+                timeout,
+                return_proof=self.ddar_returns_proof,
+            )
+            logger.debug(
+                "Search depth=%d request=%s queued DDAR future; pending_ddar=%d queued_ddar=%d",
+                depth,
+                candidate_meta["request_id"],
+                len(running_futures) + 1,
+                len(pending_ddar_submit),
+            )
+            future_info[future] = candidate_meta
+            running_futures.append(future)
+
     def run(self, proof: ProofState, rules: list["Rule"], timeout: int = 3600) -> dict[str, Any]:
         logger.info(
             "Agent run start: agent_type=%s decoding_size=%d beam_size=%d search_depth=%d max_pending_ddar=%d timeout=%d",
@@ -399,306 +625,156 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     error_msg="Timeout",
                 )
 
-            requests: list[dict[str, Any]] = []
-            request_meta: dict[str, dict[str, Any]] = {}
-            for idx, (prev_score, node) in enumerate(beam_queue):
-                node_id, parent_node_id, state = node
-                request_id = f"d{depth}_n{idx}"
-                request = self.build_request(
-                    request_id=request_id,
-                    state=state,
-                    proof=proof,
-                    depth=depth,
-                )
-                request["depth"] = depth
-                requests.append(request)
-                request_meta[request_id] = {
-                    "state": state,
-                    "prev_score": prev_score,
-                    "node_id": node_id,
-                    "parent_node_id": parent_node_id,
-                }
-                self._trace(
-                    "model_request",
-                    node_id=node_id,
-                    parent_node_id=parent_node_id,
-                    depth=depth,
-                    request_id=request_id,
-                    query=request.get("query"),
-                    img_path=request.get("img_path"),
-                    new_point_name=request.get("new_point_name"),
-                    response_prefix=request.get("response_prefix"),
-                    with_predicate=request.get("with_predicate"),
-                    decoding_size=request.get("decoding_size"),
-                )
-
-            if not requests:
+            if frontier_size == 0:
                 logger.info("Search depth=%d produced no requests; stopping", depth)
                 break
 
-            logger.debug(
-                "Search depth=%d built requests=%d request_ids=%s",
-                depth,
-                len(requests),
-                [request["request_id"] for request in requests],
-            )
-
-            dispatcher = self.model_pool.create_dispatcher(
-                requests=requests,
-                batch_size=1,
-            )
+            dispatcher = self.model_pool.create_dispatcher()
             next_queue = BeamQueue(max_size=self.beam_size)
+            frontier_iter = iter(beam_queue)
+            prepared_requests = deque()
+            pending_ddar_submit = deque()
+            request_meta: dict[str, dict[str, Any]] = {}
             running_futures: list[Any] = []
             future_info: dict[Any, dict[str, Any]] = {}
+            request_index = 0
+            frontier_exhausted = False
+            request_prefetch_limit = max(1, 2 * len(self.model_pool.workers))
+            ddar_backlog_high_watermark = max(self.max_pending_ddar + 1, 2 * self.max_pending_ddar)
 
-            while dispatcher.has_pending() or running_futures:
+            while True:
+                progress = False
+
+                ddar_before_poll = len(running_futures)
+                solved_payload = self._poll_ddar_futures(
+                    running_futures=running_futures,
+                    future_info=future_info,
+                    next_queue=next_queue,
+                    depth=depth,
+                    t0=t0,
+                    step=step,
+                    profiling=profiling,
+                    proof=proof,
+                )
+                if solved_payload is not None:
+                    dispatcher.cancel_running()
+                    return solved_payload
+                if len(running_futures) != ddar_before_poll:
+                    progress = True
+
+                active_gpu_refs = dispatcher.active_refs()
+                if active_gpu_refs:
+                    done_gpu_refs, _ = ray.wait(
+                        active_gpu_refs,
+                        num_returns=len(active_gpu_refs),
+                        timeout=0,
+                    )
+                    for done_ref in done_gpu_refs:
+                        gpu_result = dispatcher.take_done(done_ref)
+                        next_node_id = self._handle_gpu_result(
+                            gpu_result=gpu_result,
+                            request_meta=request_meta,
+                            pending_ddar_submit=pending_ddar_submit,
+                            depth=depth,
+                            profiling=profiling,
+                            next_node_id=next_node_id,
+                        )
+                        progress = True
+
+                before_submit = len(running_futures)
+                self._submit_pending_ddar(
+                    pending_ddar_submit=pending_ddar_submit,
+                    running_futures=running_futures,
+                    future_info=future_info,
+                    rules_ref=rules_ref,
+                    proof=proof,
+                    depth=depth,
+                    t0=t0,
+                    timeout=timeout,
+                )
+                if len(running_futures) != before_submit:
+                    progress = True
+
+                ddar_backlog = len(pending_ddar_submit) + len(running_futures)
+                while (
+                    not frontier_exhausted
+                    and len(prepared_requests) < request_prefetch_limit
+                    and ddar_backlog <= ddar_backlog_high_watermark
+                ):
+                    next_request_index = self._prepare_next_request(
+                        frontier_iter=frontier_iter,
+                        request_index=request_index,
+                        request_meta=request_meta,
+                        prepared_requests=prepared_requests,
+                        proof=proof,
+                        depth=depth,
+                    )
+                    if next_request_index is None:
+                        frontier_exhausted = True
+                        break
+                    request_index = next_request_index
+                    progress = True
+
+                while (
+                    prepared_requests
+                    and dispatcher.idle_worker_count() > 0
+                    and (len(pending_ddar_submit) + len(running_futures)) <= ddar_backlog_high_watermark
+                ):
+                    dispatcher.enqueue_request(prepared_requests.popleft())
+                    progress = True
+
+                if (
+                    frontier_exhausted
+                    and not prepared_requests
+                    and not dispatcher.has_pending()
+                    and not pending_ddar_submit
+                    and not running_futures
+                ):
+                    break
+
+                if progress:
+                    continue
+
                 wait_refs = dispatcher.active_refs() + running_futures
                 if not wait_refs:
-                    break
-                done_refs, _ = ray.wait(wait_refs, num_returns=1)
+                    continue
+                done_refs, _ = ray.wait(wait_refs, num_returns=1, timeout=1)
+                if not done_refs:
+                    continue
                 done_ref = done_refs[0]
 
                 if dispatcher.owns_ref(done_ref):
-                    logger.debug(
-                        "Search depth=%d received GPU batch result; running_ddar=%d",
-                        depth,
-                        len(running_futures),
-                    )
-                    gpu_results = dispatcher.take_done(done_ref)
-                    logger.debug(
-                        "Search depth=%d GPU batch decoded request_count=%d",
-                        depth,
-                        len(gpu_results),
-                    )
-                    for gpu_result in gpu_results:
-                        add_profiling_time(
-                            profiling,
-                            "inference_time_s",
-                            gpu_result.get("inference_time_s"),
-                        )
-                        request_id = gpu_result["request_id"]
-                        request_state = request_meta[request_id]
-                        state = request_state["state"]
-                        prev_score = request_state["prev_score"]
-                        parent_node_id = request_state["node_id"]
-                        problem = self.get_problem_from_state(state)
-                        outputs = [
-                            {
-                                "rank": rank,
-                                "aux_dsl": aux_dsl,
-                                "score": score,
-                            }
-                            for rank, (aux_dsl, score) in enumerate(gpu_result["aux_dsl_dict"].items())
-                        ]
-                        self._trace(
-                            "model_response",
-                            request_id=request_id,
-                            node_id=parent_node_id,
-                            depth=depth,
-                            outputs=outputs,
-                        )
-                        logger.debug(
-                            "Search depth=%d request=%s candidate_count=%d",
-                            depth,
-                            request_id,
-                            len(gpu_result["aux_dsl_dict"]),
-                        )
-
-                        for candidate_rank, (aux_dsl, score) in enumerate(gpu_result["aux_dsl_dict"].items()):
-                            try:
-                                raw_aux_text = self.extract_raw_aux_text(aux_dsl)
-                                aux = self.try_dsl_to_constructions(raw_aux_text)
-                            except Exception:
-                                self._trace(
-                                    "candidate_transition",
-                                    attempt_key=build_attempt_key(request_id, candidate_rank, None),
-                                    request_id=request_id,
-                                    parent_node_id=parent_node_id,
-                                    node_id=None,
-                                    candidate_rank=candidate_rank,
-                                    depth=depth,
-                                    raw_aux_text=self.extract_raw_aux_text(aux_dsl),
-                                    translated_aux=None,
-                                    new_problem_text=None,
-                                    decision="parse_failed",
-                                    beam_score_before=prev_score,
-                                    beam_score_after=None,
-                                )
-                                continue
-
-                            if not aux:
-                                self._trace(
-                                    "candidate_transition",
-                                    attempt_key=build_attempt_key(request_id, candidate_rank, None),
-                                    request_id=request_id,
-                                    parent_node_id=parent_node_id,
-                                    node_id=None,
-                                    candidate_rank=candidate_rank,
-                                    depth=depth,
-                                    raw_aux_text=raw_aux_text,
-                                    translated_aux=None,
-                                    new_problem_text=None,
-                                    decision="parse_failed",
-                                    beam_score_before=prev_score,
-                                    beam_score_after=None,
-                                )
-                                continue
-
-                            try:
-                                new_problem = problem.with_more_construction(aux)
-                            except Exception:
-                                self._trace(
-                                    "candidate_transition",
-                                    attempt_key=build_attempt_key(request_id, candidate_rank, None),
-                                    request_id=request_id,
-                                    parent_node_id=parent_node_id,
-                                    node_id=None,
-                                    candidate_rank=candidate_rank,
-                                    depth=depth,
-                                    raw_aux_text=raw_aux_text,
-                                    translated_aux=aux,
-                                    new_problem_text=None,
-                                    decision="build_failed",
-                                    beam_score_before=prev_score,
-                                    beam_score_after=None,
-                                )
-                                continue
-
-                            while len(running_futures) >= self.max_pending_ddar:
-                                done, remaining = ray.wait(running_futures, num_returns=1, timeout=1)
-                                running_futures[:] = remaining
-                                solved_payload = self._handle_ddar_done(
-                                    done_futures=done,
-                                    running_futures=running_futures,
-                                    future_info=future_info,
-                                    next_queue=next_queue,
-                                    depth=depth,
-                                    t0=t0,
-                                    step=step,
-                                    profiling=profiling,
-                                    proof=proof,
-                                )
-                                if solved_payload is not None:
-                                    dispatcher.cancel_running()
-                                    return solved_payload
-
-                            child_node_id = next_node_id
-                            next_node_id += 1
-                            attempt_key = build_attempt_key(request_id, candidate_rank, child_node_id)
-                            self._trace(
-                                "candidate_transition",
-                                attempt_key=attempt_key,
-                                request_id=request_id,
-                                parent_node_id=parent_node_id,
-                                node_id=child_node_id,
-                                candidate_rank=candidate_rank,
-                                depth=depth,
-                                raw_aux_text=raw_aux_text,
-                                translated_aux=aux,
-                                new_problem_text=str(new_problem),
-                                decision="ddar_submitted",
-                                beam_score_before=prev_score,
-                                beam_score_after=prev_score + score,
-                            )
-                            self._trace(
-                                "ddar_submit",
-                                attempt_key=attempt_key,
-                                node_id=child_node_id,
-                                parent_node_id=parent_node_id,
-                                depth=depth,
-                                problem_text=str(new_problem),
-                                ddar_input=None,
-                            )
-                            future = run_ddar_remote.remote(
-                                new_problem,
-                                proof.defs,
-                                rules_ref,
-                                t0,
-                                timeout,
-                                return_proof=self.ddar_returns_proof,
-                            )
-                            logger.debug(
-                                "Search depth=%d request=%s queued DDAR future; pending_ddar=%d",
-                                depth,
-                                request_id,
-                                len(running_futures) + 1,
-                            )
-                            future_info[future] = {
-                                "problem": new_problem,
-                                "state": state,
-                                "prev_score": prev_score,
-                                "score": score,
-                                "node_id": child_node_id,
-                                "parent_node_id": parent_node_id,
-                                "request_id": request_id,
-                                "candidate_rank": candidate_rank,
-                                "attempt_key": attempt_key,
-                                "raw_aux_text": raw_aux_text,
-                                "translated_aux": aux,
-                            }
-                            running_futures.append(future)
-
-                            solved_payload = self._poll_ddar_futures(
-                                running_futures=running_futures,
-                                future_info=future_info,
-                                next_queue=next_queue,
-                                depth=depth,
-                                t0=t0,
-                                step=step,
-                                profiling=profiling,
-                                proof=proof,
-                            )
-                            if solved_payload is not None:
-                                dispatcher.cancel_running()
-                                return solved_payload
-
-                    solved_payload = self._poll_ddar_futures(
-                        running_futures=running_futures,
-                        future_info=future_info,
-                        next_queue=next_queue,
+                    gpu_result = dispatcher.take_done(done_ref)
+                    next_node_id = self._handle_gpu_result(
+                        gpu_result=gpu_result,
+                        request_meta=request_meta,
+                        pending_ddar_submit=pending_ddar_submit,
                         depth=depth,
-                        t0=t0,
-                        step=step,
                         profiling=profiling,
-                        proof=proof,
+                        next_node_id=next_node_id,
                     )
-                    if solved_payload is not None:
-                        dispatcher.cancel_running()
-                        return solved_payload
-                else:
-                    logger.debug(
-                        "Search depth=%d received standalone DDAR completion; running_ddar_before_remove=%d",
-                        depth,
-                        len(running_futures),
-                    )
-                    running_futures.remove(done_ref)
-                    solved_payload = self._handle_ddar_done(
-                        done_futures=[done_ref],
-                        running_futures=running_futures,
-                        future_info=future_info,
-                        next_queue=next_queue,
-                        depth=depth,
-                        t0=t0,
-                        step=step,
-                        profiling=profiling,
-                        proof=proof,
-                    )
-                    if solved_payload is not None:
-                        dispatcher.cancel_running()
-                        return solved_payload
+                    continue
 
-            solved_payload = self._drain_ddar_futures(
-                running_futures=running_futures,
-                future_info=future_info,
-                next_queue=next_queue,
-                depth=depth,
-                t0=t0,
-                step=step,
-                profiling=profiling,
-                proof=proof,
-            )
-            if solved_payload is not None:
-                return solved_payload
+                logger.debug(
+                    "Search depth=%d received standalone DDAR completion; running_ddar_before_remove=%d",
+                    depth,
+                    len(running_futures),
+                )
+                running_futures.remove(done_ref)
+                solved_payload = self._handle_ddar_done(
+                    done_futures=[done_ref],
+                    running_futures=running_futures,
+                    future_info=future_info,
+                    next_queue=next_queue,
+                    depth=depth,
+                    t0=t0,
+                    step=step,
+                    profiling=profiling,
+                    proof=proof,
+                )
+                if solved_payload is not None:
+                    dispatcher.cancel_running()
+                    return solved_payload
 
             beam_queue = next_queue
             self._trace("depth_end", depth=depth, next_frontier_size=len(list(beam_queue)))

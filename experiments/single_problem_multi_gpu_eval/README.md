@@ -12,6 +12,7 @@ Current status:
 
 - the architecture in this directory is unified around one shared multi-GPU search core
 - GPU dispatch is fixed to one request per worker call
+- search remains depth-by-depth, but request preparation / GPU inference / DDAR now overlap within a depth
 - this experiment runner does not use `problem_db`
 - the top-level `scripts/evaluation_vlm.py` remains the original per-problem Ray workflow and is separate from this experiment runner
 
@@ -61,9 +62,10 @@ At a high level:
 1. `evaluation_single_problem_multi_gpu.py` starts Ray and creates one GPU worker per GPU for the selected backend.
 2. Problems are processed one by one.
 3. Inside one problem, the agent expands the beam layer by layer.
-4. Candidate generation requests are dispatched across the GPU workers.
-5. Each surviving candidate is checked by DDAR through Ray CPU tasks.
-6. Valid unsolved candidates enter the next beam layer.
+4. Requests for the current depth are prepared on demand instead of rendering the whole layer up front.
+5. Candidate generation requests are dispatched across the GPU workers.
+6. Each surviving candidate is checked by DDAR through Ray CPU tasks.
+7. Valid unsolved candidates enter the next beam layer after the current depth drains.
 
 Important implications:
 
@@ -71,6 +73,7 @@ Important implications:
 - `max_workers` mainly controls DDAR-side CPU concurrency
 - GPU workers always process one request at a time
 - `max_pending_ddar` is the main backpressure knob between generation and validation
+- depth boundaries are still strict; requests from different search depths never mix
 
 ## Entrypoint
 
@@ -125,10 +128,11 @@ It does not change:
 It changes:
 
 - how far GPU generation is allowed to get ahead of DDAR validation
+- when new requests stop being prepared or dispatched because DDAR backlog is too high
 
 Typical symptoms:
 
-- too small: GPU generation pauses often waiting for DDAR completions
+- too small: DDAR becomes a hard bottleneck and GPU workers go idle more often
 - too large: CPU and memory pressure rise because too many DDAR tasks accumulate
 
 ## Logging

@@ -142,31 +142,24 @@ class ModelWorker:
         }
 
     @torch.no_grad()
-    def generate_batch(self, requests: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        results: list[dict[str, Any]] = []
-        for request in requests:
-            # Requests are still decoded one by one inside a worker; batching here
-            # mainly amortizes Ray scheduling and actor-call overhead.
-            inference_start = time.time()
-            aux_dsl_dict = generate_aux_dsl_dict(
-                self.model,
-                self.tokenizer,
-                query=request["query"],
-                new_point_name=request["new_point_name"],
-                decoding_size=request["decoding_size"],
-                response_prefix=request.get("response_prefix", "<aux> x00"),
-                with_predicate=request.get("with_predicate", False),
-            )
-            inference_time_s = time.time() - inference_start
-            self.num_requests += 1
-            results.append(
-                {
-                    "request_id": request["request_id"],
-                    "aux_dsl_dict": aux_dsl_dict,
-                    "inference_time_s": inference_time_s,
-                }
-            )
-        return results
+    def generate_one(self, request: dict[str, Any]) -> dict[str, Any]:
+        inference_start = time.time()
+        aux_dsl_dict = generate_aux_dsl_dict(
+            self.model,
+            self.tokenizer,
+            query=request["query"],
+            new_point_name=request["new_point_name"],
+            decoding_size=request["decoding_size"],
+            response_prefix=request.get("response_prefix", "<aux> x00"),
+            with_predicate=request.get("with_predicate", False),
+        )
+        inference_time_s = time.time() - inference_start
+        self.num_requests += 1
+        return {
+            "request_id": request["request_id"],
+            "aux_dsl_dict": aux_dsl_dict,
+            "inference_time_s": inference_time_s,
+        }
 
     def stats(self) -> dict[str, Any]:
         return {

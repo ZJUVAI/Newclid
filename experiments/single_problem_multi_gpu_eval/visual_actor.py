@@ -183,54 +183,44 @@ class VisionModelWorker:
         }
 
     @torch.no_grad()
-    def generate_batch(self, requests: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def generate_one(self, request: dict[str, Any]) -> dict[str, Any]:
         logger.debug(
-            "VisionModelWorker generate_batch start: agent_kind=%s batch_size=%d request_ids=%s",
+            "VisionModelWorker generate_one start: agent_kind=%s request_id=%s",
             self.agent_kind,
-            len(requests),
-            [request.get("request_id", "<missing>") for request in requests],
+            request.get("request_id", "<missing>"),
         )
-        results: list[dict[str, Any]] = []
-        for request in requests:
-            logger.debug(
-                "VisionModelWorker request start: request_id=%s depth=%s img_path=%s",
-                request.get("request_id"),
-                request.get("depth"),
-                request.get("img_path"),
-            )
-            inference_start = time.time()
-            aux_dsl_dict = generate_visual_aux_dsl_dict(
-                self.model,
-                self.processor,
-                query=request["query"],
-                img_path=request["img_path"],
-                new_point_name=request["new_point_name"],
-                decoding_size=request["decoding_size"],
-                agent_kind=self.agent_kind,
-                response_prefix=request.get("response_prefix", "<aux> x00"),
-                with_predicate=request.get("with_predicate", False),
-            )
-            inference_time_s = time.time() - inference_start
-            self.num_requests += 1
-            logger.debug(
-                "VisionModelWorker request done: request_id=%s candidates=%d total_requests=%d",
-                request.get("request_id"),
-                len(aux_dsl_dict),
-                self.num_requests,
-            )
-            results.append(
-                {
-                    "request_id": request["request_id"],
-                    "aux_dsl_dict": aux_dsl_dict,
-                    "inference_time_s": inference_time_s,
-                }
-            )
         logger.debug(
-            "VisionModelWorker generate_batch done: agent_kind=%s batch_size=%d",
-            self.agent_kind,
-            len(results),
+            "VisionModelWorker request start: request_id=%s depth=%s img_path=%s",
+            request.get("request_id"),
+            request.get("depth"),
+            request.get("img_path"),
         )
-        return results
+        inference_start = time.time()
+        aux_dsl_dict = generate_visual_aux_dsl_dict(
+            self.model,
+            self.processor,
+            query=request["query"],
+            img_path=request["img_path"],
+            new_point_name=request["new_point_name"],
+            decoding_size=request["decoding_size"],
+            agent_kind=self.agent_kind,
+            response_prefix=request.get("response_prefix", "<aux> x00"),
+            with_predicate=request.get("with_predicate", False),
+        )
+        inference_time_s = time.time() - inference_start
+        self.num_requests += 1
+        logger.debug(
+            "VisionModelWorker generate_one done: agent_kind=%s request_id=%s candidates=%d total_requests=%d",
+            self.agent_kind,
+            request.get("request_id"),
+            len(aux_dsl_dict),
+            self.num_requests,
+        )
+        return {
+            "request_id": request["request_id"],
+            "aux_dsl_dict": aux_dsl_dict,
+            "inference_time_s": inference_time_s,
+        }
 
     def stats(self) -> dict[str, Any]:
         return {

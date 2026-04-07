@@ -13,15 +13,15 @@ logger = logging.getLogger(__name__)
 class GenerationDispatcher:
     """Dispatch single generation requests onto GPU workers while preserving backpressure."""
 
-    def __init__(self, workers: list[Any], requests: list[dict[str, Any]]):
+    def __init__(self, workers: list[Any], requests: list[dict[str, Any]] | None = None):
         self.idle_workers = deque(workers)
-        self.pending_requests = deque(requests)
+        self.pending_requests = deque(requests or [])
         self.running: dict[Any, Any] = {}
         self.accept_new_work = True
         logger.debug(
             "GenerationDispatcher init: workers=%d requests=%d pending_requests=%d",
             len(workers),
-            len(requests),
+            len(requests or []),
             len(self.pending_requests),
         )
         self._fill()
@@ -43,23 +43,32 @@ class GenerationDispatcher:
     def has_pending(self) -> bool:
         return bool(self.pending_requests or self.running)
 
+    def idle_worker_count(self) -> int:
+        return len(self.idle_workers)
+
     def active_refs(self) -> list[Any]:
         return list(self.running.keys())
 
     def owns_ref(self, ref: Any) -> bool:
         return ref in self.running
 
-    def take_done(self, ref: Any) -> list[dict[str, Any]]:
+    def enqueue_request(self, request: dict[str, Any]) -> None:
+        if not self.accept_new_work:
+            raise RuntimeError("GenerationDispatcher is not accepting new work")
+        self.pending_requests.append(request)
+        self._fill()
+
+    def take_done(self, ref: Any) -> dict[str, Any]:
         worker = self.running.pop(ref)
-        results = ray.get(ref)
+        result = ray.get(ref)
         logger.debug(
-            "GenerationDispatcher complete: results=%d running_remaining=%d",
-            len(results),
+            "GenerationDispatcher complete: request_id=%s running_remaining=%d",
+            result.get("request_id"),
             len(self.running),
         )
         self.idle_workers.append(worker)
         self._fill()
-        return results
+        return result
 
     def stop_submitting(self) -> None:
         self.accept_new_work = False
@@ -93,15 +102,11 @@ class ModelPool:
 
     def create_dispatcher(
         self,
-        requests: list[dict[str, Any]],
-        batch_size: int | None = None,
+        requests: list[dict[str, Any]] | None = None,
     ) -> GenerationDispatcher:
-        # `batch_size` is kept temporarily for call-site compatibility. This
-        # runner now dispatches exactly one request per worker call.
-        del batch_size
         logger.debug(
             "ModelPool create_dispatcher: requests=%d workers=%d",
-            len(requests),
+            len(requests or []),
             len(self.workers),
         )
         return GenerationDispatcher(self.workers, requests)
