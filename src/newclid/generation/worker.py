@@ -77,6 +77,7 @@ class ProblemWorker:
                 prune,
                 remove_coords,
                 construction_config,
+                fl_statement,
             ) = args
             start_time = time.time()
 
@@ -85,22 +86,24 @@ class ProblemWorker:
 
             # geneate fl_statement
             generation_start = time.time()
-            clauses_generator = ProblemSampler(
-                seed=seed,
-                construction_config=construction_config,
-            )
-            try:
-                with time_limit(10):
-                    fl_statement, sampling_timings = clauses_generator.generate(
-                        length=n_clauses,
-                        add_auxiliary=add_auxiliary,
-                        max_auxiliary_points=max_auxiliary_points,
-                        prune=prune,
-                        with_coords=not remove_coords,
-                        return_timings=True
-                    )
-            except TimeoutError:
-                return [], {}
+            sampling_timings = None
+            if fl_statement is None:
+                clauses_generator = ProblemSampler(
+                    seed=seed,
+                    construction_config=construction_config,
+                )
+                try:
+                    with time_limit(10):
+                        fl_statement, sampling_timings = clauses_generator.generate(
+                            length=n_clauses,
+                            add_auxiliary=add_auxiliary,
+                            max_auxiliary_points=max_auxiliary_points,
+                            prune=prune,
+                            with_coords=not remove_coords,
+                            return_timings=True
+                        )
+                except TimeoutError:
+                    return [], {}
             generation_time = time.time() - generation_start
 
             # Build solver
@@ -207,6 +210,8 @@ class ProblemWorker:
                 generated_data.extend(data)
             process_goal_time = time.time() - process_goal_time
 
+            has_real_aux = any('<aux>' in d.get('llm_output_renamed', '') for d in generated_data)
+
             # Create summary
             summary = {
                 'total_time': time.time() - start_time,
@@ -223,6 +228,8 @@ class ProblemWorker:
                 'n_premises_raw': [d['n_premises'] for d in generated_data],
                 'n_proof_steps_raw': [d['n_proof_steps'] for d in generated_data],
                 'n_filtered_samples': 0,  # This value will be updated in generate.py
+                'has_real_aux': has_real_aux,
+                'fl_statement': fl_statement,
             }
 
             # Combine the detailed sampling timing info

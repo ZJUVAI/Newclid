@@ -39,6 +39,7 @@ class ProblemPipeline:
         prune=True,
         remove_coords=False,
         construction_config=None,
+        use_cache=False,
     ):
         self.n_clauses = n_clauses
         self.n_samples = n_samples
@@ -60,6 +61,18 @@ class ProblemPipeline:
         self.prune = prune
         self.remove_coords = remove_coords
         self.construction_config = construction_config
+        self.use_cache = use_cache
+        self.seed_cache = {}
+        self.cache_file = os.path.join(self.output_dir, "seed_cache.jsonl")
+
+        if self.use_cache and os.path.exists(self.cache_file):
+            with open(self.cache_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    if line.strip():
+                        entry = json.loads(line)
+                        key = (entry["seed"], entry["n_clauses"])
+                        self.seed_cache[key] = entry
+            logging.info("Loaded %d entries from cache", len(self.seed_cache))
 
         # Serialize defs for Ray remote tasks
         defs_data = {k: v._asdict() for k, v in self.defs.items()}
@@ -106,6 +119,16 @@ class ProblemPipeline:
         def task_generator():
             for i in range(10**9):
                 seed = MACHINE_BASE_SEED + i
+                fl_statement = None
+
+                if self.use_cache:
+                    cache_key = (seed, self.n_clauses)
+                    if cache_key in self.seed_cache:
+                        entry = self.seed_cache[cache_key]
+                        if not entry.get("has_real_aux", False):
+                            continue
+                        fl_statement = entry.get("fl_statement")
+
                 yield (
                     i,
                     seed,
@@ -118,6 +141,7 @@ class ProblemPipeline:
                     self.prune,
                     self.remove_coords,
                     self.construction_config,
+                    fl_statement,
                 )
 
         if not ray.is_initialized():
@@ -151,9 +175,24 @@ class ProblemPipeline:
                     logging.error(f"Task failed: {e}")
                     task_success = False
 
-                del pending_tasks[task_id]
+                _, seed = pending_tasks.pop(task_id)
 
                 if task_success:
+                    if self.use_cache:
+                        has_real_aux = summary.get("has_real_aux", False) if summary else False
+                        cache_entry = {
+                            "seed": seed,
+                            "n_clauses": self.n_clauses,
+                            "has_real_aux": has_real_aux,
+                            "fl_statement": summary.get("fl_statement") if has_real_aux else None,
+                        }
+                        cache_key = (seed, self.n_clauses)
+                        if cache_key not in self.seed_cache:
+                            self.seed_cache[cache_key] = cache_entry
+                            os.makedirs(self.output_dir, exist_ok=True)
+                            with open(self.cache_file, "a", encoding="utf-8") as f:
+                                f.write(json.dumps(cache_entry) + "\n")
+
                     all_data_len_raw += len(data)
                     data = self.problem_hash_filter(data, 'llm_input_renamed')
                     if data:
@@ -185,7 +224,7 @@ class ProblemPipeline:
                                 f"ETA: {timedelta(seconds=int(self.n_samples/max(1,self.writer.written_count)*elapsed_time - elapsed_time))}"
                             )
                             last_logged_written = self.writer.written_count
-            for task, s_time in list(pending_tasks.items()):
+            for task, (s_time, _) in list(pending_tasks.items()):
                 if time.time() - s_time > self.timeout:
                     print(f"⚠️ Task {task} timeout. Canceling")
                     ray.cancel(task, force=True)
@@ -193,7 +232,11 @@ class ProblemPipeline:
 
             while len(pending_tasks) < max_pending:
                 task_args = next(task_iterator)
-                pending_tasks[ProblemWorker.ray_process_single_problem.remote(task_args)] = time.time()
+                seed = task_args[1]
+                pending_tasks[ProblemWorker.ray_process_single_problem.remote(task_args)] = (
+                    time.time(),
+                    seed,
+                )
 
         # Cancel any remaining problem generation tasks
         for task in pending_tasks.keys():
@@ -241,8 +284,9 @@ def main():
     parser.add_argument("--max_level", required=False, type=int, default=500,
                         help="Maximum DDAR search depth")
     parser.add_argument("--construction_config", required=False, default=None,
-        help="Optional JSON file defining construction sets and sampler steps",
-    )
+                        help="Optional JSON file defining construction sets and sampler steps",)
+    parser.add_argument("--use_cache", required=False, action="store_true", default=False,
+                        help="Use seed cache to skip seeds without real auxiliary points")
     # Auxiliary point parameters
     parser.add_argument("--add_auxiliary", action=argparse.BooleanOptionalAction, default=True,
                         help="Add auxiliary points (default: enabled)")
@@ -286,6 +330,7 @@ def main():
         prune=args.prune,
         remove_coords=args.remove_coords,
         construction_config=construction_config,
+        use_cache=args.use_cache,
     )
     generator.generate()
 
