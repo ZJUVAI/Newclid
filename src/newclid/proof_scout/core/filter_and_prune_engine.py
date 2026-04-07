@@ -146,6 +146,29 @@ def _extract_aux_points(aux_section: str) -> List[str]:
     return aux_points
 
 
+def _extract_coords_from_fl_problem(fl_problem: str) -> dict:
+    """从 fl_problem 中提取点坐标（新格式：point@x_y）。
+
+    新格式示例：
+      a@0.7177669039616846_-0.1290588213521465 b@-0.10503443932378137_-0.6472485204493951 = triangle a b c
+
+    返回 dict[str, [float, float]]，与旧 point_coords 字段格式一致。
+    """
+    coords = {}
+    # 匹配 word@float_float 格式（坐标可为负数和科学计数法）
+    pattern = re.compile(
+        r'\b([A-Za-z][A-Za-z0-9]*)'   # 点名
+        r'@'
+        r'(-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)'  # x 坐标
+        r'_'
+        r'(-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)'  # y 坐标
+    )
+    for m in pattern.finditer(fl_problem or ""):
+        name, x, y = m.group(1), m.group(2), m.group(3)
+        coords[name] = [float(x), float(y)]
+    return coords
+
+
 def _has_llm_format(record: Dict[str, Any]) -> bool:
     return isinstance(record, dict) and (
         "llm_input_renamed" in record or "llm_output_renamed" in record
@@ -189,6 +212,13 @@ def _convert_llm_record(record: Dict[str, Any], base: str, index: int) -> Dict[s
         "proof": proof_text,
     }
     converted["aux_points"] = aux_points
+
+    # Fallback: 如果 point_coords 缺失或为空，从 fl_problem 中解析坐标
+    if not converted.get("point_coords"):
+        fl_problem = record.get("fl_problem", "")
+        if fl_problem:
+            converted["point_coords"] = _extract_coords_from_fl_problem(fl_problem)
+
     return converted
 
 

@@ -39,7 +39,6 @@ class ProblemPipeline:
         prune=True,
         remove_coords=False,
         construction_config=None,
-        engine="full",
     ):
         self.n_clauses = n_clauses
         self.n_samples = n_samples
@@ -61,7 +60,6 @@ class ProblemPipeline:
         self.prune = prune
         self.remove_coords = remove_coords
         self.construction_config = construction_config
-        self.engine = engine
 
         # Serialize defs for Ray remote tasks
         defs_data = {k: v._asdict() for k, v in self.defs.items()}
@@ -120,7 +118,6 @@ class ProblemPipeline:
                     self.prune,
                     self.remove_coords,
                     self.construction_config,
-                    self.engine,
                 )
 
         if not ray.is_initialized():
@@ -270,9 +267,6 @@ def main():
                         help="Remove coordinate information from final clause output")
     parser.add_argument("--clear", action="store_true", default=False,
                         help="Clear old dataset files before generation")
-    parser.add_argument("--engine", required=False, default="full",
-                        choices=["full", "weak"],
-                        help="DDAR engine mode: full=all rules, weak=basic rules only")
     args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, args.log_level.upper()), force=True)
@@ -292,7 +286,6 @@ def main():
         prune=args.prune,
         remove_coords=args.remove_coords,
         construction_config=construction_config,
-        engine=args.engine,
     )
     generator.generate()
 
