@@ -419,66 +419,24 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         running_futures: list[Any],
         running_prepare_futures: dict[Future[dict[str, Any]], dict[str, Any]],
         profiling: dict[str, Any],
-    ) -> tuple[str | None, Any]:
+    ) -> None:
         wait_start = time.perf_counter()
         if running_prepare_futures:
-            done_futures, _ = futures_wait(
+            futures_wait(
                 tuple(running_prepare_futures.keys()),
                 timeout=0.1,
                 return_when=FIRST_COMPLETED,
             )
-            if done_futures:
-                add_profiling_time(profiling, "wait_wall_time_s", time.perf_counter() - wait_start)
-                return "prepare", next(iter(done_futures))
 
         remaining_timeout_s = max(0.0, 1.0 - (time.perf_counter() - wait_start))
         wait_refs = dispatcher.active_refs() + running_futures
         if not wait_refs:
             if running_prepare_futures:
                 add_profiling_time(profiling, "wait_wall_time_s", time.perf_counter() - wait_start)
-                return "prepare", None
-            return None, None
-        done_refs, _ = ray.wait(wait_refs, num_returns=1, timeout=remaining_timeout_s)
+            return
+        ray.wait(wait_refs, num_returns=1, timeout=remaining_timeout_s)
         add_profiling_time(profiling, "wait_wall_time_s", time.perf_counter() - wait_start)
-        if not done_refs:
-            return None, None
-        done_ref = done_refs[0]
-        if dispatcher.owns_ref(done_ref):
-            return "gpu", done_ref
-        return "ddar", done_ref
-
-    def _process_ddar_completion(
-        self,
-        *,
-        done_ref: Any,
-        running_futures: list[Any],
-        future_info: dict[Any, dict[str, Any]],
-        next_queue: BeamQueue,
-        depth: int,
-        t0: float,
-        step: int,
-        profiling: dict[str, Any],
-        proof: ProofState,
-        perf_t0: float,
-    ):
-        logger.debug(
-            "Search depth=%d received standalone DDAR completion; running_ddar_before_remove=%d",
-            depth,
-            len(running_futures),
-        )
-        running_futures.remove(done_ref)
-        return self._handle_ddar_done(
-            done_futures=[done_ref],
-            running_futures=running_futures,
-            future_info=future_info,
-            next_queue=next_queue,
-            depth=depth,
-            t0=t0,
-            step=step,
-            profiling=profiling,
-            proof=proof,
-            runtime_s=time.perf_counter() - perf_t0,
-        )
+        return
 
     def _handle_gpu_result(
         self,
@@ -948,47 +906,16 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                         continue
 
                     # 7. If no stage made progress, block until either prepare,
-                    # GPU, or DDAR work completes, and charge that delay to one
-                    # unified wait bucket.
-                    event_kind, event_ref = self._wait_for_next_event(
+                    # GPU, or DDAR work completes. The next loop iteration then
+                    # consumes whatever became ready through the normal poll
+                    # path at the top of the loop.
+                    self._wait_for_next_event(
                         dispatcher=dispatcher,
                         running_futures=running_futures,
                         running_prepare_futures=running_prepare_futures,
                         profiling=profiling,
                     )
-                    if event_kind == "prepare":
-                        continue
-                    if event_kind == "gpu":
-                        gpu_result = dispatcher.take_done(event_ref)
-                        next_node_id = self._handle_gpu_result(
-                            gpu_result=gpu_result,
-                            request_meta=request_meta,
-                            pending_ddar_submit=pending_ddar_submit,
-                            depth=depth,
-                            profiling=profiling,
-                            next_node_id=next_node_id,
-                        )
-                        continue
-                    if event_kind == "ddar":
-                        solved_payload = self._process_ddar_completion(
-                            done_ref=event_ref,
-                            running_futures=running_futures,
-                            future_info=future_info,
-                            next_queue=next_queue,
-                            depth=depth,
-                            t0=t0,
-                            step=step,
-                            profiling=profiling,
-                            proof=proof,
-                            perf_t0=perf_t0,
-                        )
-                        if solved_payload is not None:
-                            dispatcher.cancel_running()
-                            self._cleanup_prepare_futures(
-                                running_prepare_futures=running_prepare_futures,
-                                request_meta=request_meta,
-                            )
-                            return solved_payload
+                    continue
 
                 beam_queue = next_queue
                 next_frontier_size = len(list(beam_queue))
