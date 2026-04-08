@@ -6,6 +6,7 @@ from copy import deepcopy
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import cairosvg
 from PIL import Image, ImageOps
 
 from newclid.agent.lm import LMAgent
@@ -74,18 +75,21 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
         del proof
         problem, current_proof = state
         stem = f"d{depth}_{request_id}"
+        svg_path = self.render_root / f"{stem}.svg"
         png_path = self.render_root / f"{stem}.png"
 
         render_start = time.perf_counter()
-        render_dpi = self.render_width / current_proof.fig.get_figwidth()
         draw_clause_figure(
             current_proof,
             problem,
-            str(png_path),
+            str(svg_path),
             current_proof.rng,
             draw_annotations=True,
-            format="png",
-            dpi=render_dpi,
+        )
+        cairosvg.svg2png(
+            url=str(svg_path),
+            write_to=str(png_path),
+            output_width=self.render_width,
         )
 
         # The model is trained on inverted prompts, so keep the image
