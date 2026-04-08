@@ -269,6 +269,7 @@ class LMAgent(DeductiveAgent):
             return infos
 
         def process_completed_futures(done_futures, new_queues, depth: int):
+            handle_start = time.time()
             for future in done_futures:
                 ddar_result = ray.get(future)
                 future_meta = future_info[future]
@@ -278,8 +279,6 @@ class LMAgent(DeductiveAgent):
                         ddar_result,
                     )
                 LMAgent._update_ddar_stats(ddar_stats, ddar_result)
-                add_profiling_time(profiling, "build_time_s", ddar_result.get("build_time_s"))
-                add_profiling_time(profiling, "ddar_time_s", ddar_result.get("ddar_time_s"))
 
                 if ddar_result["status"] == "solved":
                     new_problem = future_meta["problem"]
@@ -287,6 +286,7 @@ class LMAgent(DeductiveAgent):
                         ray.cancel(task, force=True)
                     ray.shutdown()
                     logger.info("Success with problem: %s", new_problem)
+                    add_profiling_time(profiling, "ddar_result_handle_wall_time_s", time.time() - handle_start)
                     return infos(True, str(new_problem))
 
                 if ddar_result["status"] == "unsolved" and depth < self.search_depth - 1:
@@ -294,6 +294,7 @@ class LMAgent(DeductiveAgent):
                         node=future_meta["problem"],
                         val=future_meta["prev_score"] + future_meta["score"],
                     )
+            add_profiling_time(profiling, "ddar_result_handle_wall_time_s", time.time() - handle_start)
             return None
         
         t0 = time.time()
@@ -307,7 +308,7 @@ class LMAgent(DeductiveAgent):
         ddar_stats["base_calls"] += 1
         ddar_start = time.time()
         solved = LMAgent.run_ddar_c(proof, rules, t0, timeout)
-        add_profiling_time(profiling, "ddar_time_s", time.time() - ddar_start)
+        add_profiling_time(profiling, "base_ddar_wall_time_s", time.time() - ddar_start)
         # if proofed by ddar, return
         if solved:
             return infos(True)
@@ -343,16 +344,19 @@ class LMAgent(DeductiveAgent):
                             if time.time() - t0 > timeout:
                                 ray.shutdown()
                                 return infos(False, 'Timeout')
-                            
+                            request_build_start = time.time()
                             p_dsl = self.problem_to_dsl(problem, proof.defs)
+                            new_point_name = self.get_new_point_name(problem)
+                            add_profiling_time(profiling, "request_build_wall_time_s", time.time() - request_build_start)
                             logger.debug("Inferencing on query (%s): %s", queue_type, p_dsl)
                             inference_start = time.time()
                             aux_dsl_dict = self.inference(
                                 self.models[i], self.tokenizers[i], p_dsl, 
-                                self.get_new_point_name(problem), '<aux> x00',
+                                new_point_name, '<aux> x00',
                                 with_predicate=with_predicate
                             )
-                            add_profiling_time(profiling, "inference_time_s", time.time() - inference_start)
+                            add_profiling_time(profiling, "gpu_wait_wall_time_s", time.time() - inference_start)
+                            result_handle_start = time.time()
                             
                             for aux_dsl, score in aux_dsl_dict.items():
                                 try:
@@ -381,7 +385,13 @@ class LMAgent(DeductiveAgent):
                                         if lookup.hit_category == "invalid":
                                             continue
 
+                                        ddar_submit_start = time.time()
                                         future = run_ddar_remote.remote(new_problem, proof.defs, rules_ref, t0, timeout)
+                                        add_profiling_time(
+                                            profiling,
+                                            "ddar_submit_wall_time_s",
+                                            time.time() - ddar_submit_start,
+                                        )
                                         future_info[future] = {
                                             "problem": new_problem,
                                             "prev_score": prev_score,
@@ -392,16 +402,25 @@ class LMAgent(DeductiveAgent):
                                         running_futures.append(future)
                                 except Exception as e:
                                     continue
+                            add_profiling_time(
+                                profiling,
+                                "gpu_result_handle_wall_time_s",
+                                time.time() - result_handle_start,
+                            )
                             
                             # check any done task
+                            ddar_wait_start = time.time()
                             done, running_futures = ray.wait(running_futures, timeout=0)
+                            add_profiling_time(profiling, "ddar_wait_wall_time_s", time.time() - ddar_wait_start)
                             future_result = process_completed_futures(done, new_queues, depth)
                             if future_result is not None:
                                 return future_result
                     
                     # check remaining tasks
                     while running_futures:
+                        ddar_wait_start = time.time()
                         done, running_futures = ray.wait(running_futures, num_returns=min(1000, len(running_futures)))
+                        add_profiling_time(profiling, "ddar_wait_wall_time_s", time.time() - ddar_wait_start)
                         future_result = process_completed_futures(done, new_queues, depth)
                         if future_result is not None:
                             return future_result

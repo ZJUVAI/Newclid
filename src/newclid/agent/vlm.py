@@ -353,6 +353,7 @@ class VLMAgent(DeductiveAgent):
             return infos
 
         def process_completed_futures(done_futures, new_queues, depth: int):
+            handle_start = time.time()
             for future in done_futures:
                 ddar_result = ray.get(future)
                 future_meta = future_info[future]
@@ -362,8 +363,6 @@ class VLMAgent(DeductiveAgent):
                         ddar_result,
                     )
                 VLMAgent._update_ddar_stats(ddar_stats, ddar_result)
-                add_profiling_time(profiling, "build_time_s", ddar_result.get("build_time_s"))
-                add_profiling_time(profiling, "ddar_time_s", ddar_result.get("ddar_time_s"))
 
                 if ddar_result["status"] == "solved":
                     new_problem = future_meta["problem"]
@@ -384,6 +383,7 @@ class VLMAgent(DeductiveAgent):
                         ray.cancel(task, force=True)
                     ray.shutdown()
                     logger.info("Success with problem: %s", new_problem)
+                    add_profiling_time(profiling, "ddar_result_handle_wall_time_s", time.time() - handle_start)
                     return infos(True, str(new_problem), final_node_id=future_meta["node_id"])
 
                 self._trace(
@@ -419,6 +419,7 @@ class VLMAgent(DeductiveAgent):
                         beam_score_before=future_meta["prev_score"],
                         beam_score_after=future_meta["prev_score"] + future_meta["score"],
                     )
+            add_profiling_time(profiling, "ddar_result_handle_wall_time_s", time.time() - handle_start)
             return None
         
         t0 = time.time()
@@ -445,7 +446,7 @@ class VLMAgent(DeductiveAgent):
         )
         ddar_start = time.time()
         solved = VLMAgent.run_ddar_c(base_proof, rules, t0, timeout)
-        add_profiling_time(profiling, "ddar_time_s", time.time() - ddar_start)
+        add_profiling_time(profiling, "base_ddar_wall_time_s", time.time() - ddar_start)
         # logger.info(f"finish first ddar")
         # if proofed by ddar, return
         if solved:
@@ -512,6 +513,7 @@ class VLMAgent(DeductiveAgent):
                                 ray.shutdown()
                                 return infos(False, 'Timeout')
 
+                            request_build_start = time.time()
                             # draw current figure
                             timestamp = int(time.time()*1000)
                             svg_path = os.path.join(image_dir, f"{timestamp}.svg")
@@ -548,6 +550,8 @@ class VLMAgent(DeductiveAgent):
                             # logger.info("finish drawing")         
 
                             p_dsl = self.problem_to_dsl(problem, base_proof.defs)
+                            new_point_name = self.get_new_point_name(problem)
+                            add_profiling_time(profiling, "request_build_wall_time_s", time.time() - request_build_start)
                             logger.debug("Inferencing on query (%s): %s", queue_type, p_dsl)
                             inference_start = time.time()
                             aux_dsl_dict = self.inference(
@@ -555,11 +559,11 @@ class VLMAgent(DeductiveAgent):
                                 processor=self.processors[i],
                                 query=p_dsl,
                                 img_path=png_path,
-                                new_point_name=self.get_new_point_name(problem),
+                                new_point_name=new_point_name,
                                 response_prefix='<aux> x00',
                                 with_predicate=with_predicate
                             )
-                            add_profiling_time(profiling, "inference_time_s", time.time() - inference_start)
+                            add_profiling_time(profiling, "gpu_wait_wall_time_s", time.time() - inference_start)
                             request_id = f"d{depth}_m{i}_n{request_idx}"
                             self._trace(
                                 "model_request",
@@ -569,7 +573,7 @@ class VLMAgent(DeductiveAgent):
                                 request_id=request_id,
                                 query=p_dsl,
                                 img_path=png_path,
-                                new_point_name=self.get_new_point_name(problem),
+                                new_point_name=new_point_name,
                                 response_prefix="<aux> x00",
                                 with_predicate=with_predicate,
                                 decoding_size=self.decoding_size,
@@ -585,6 +589,7 @@ class VLMAgent(DeductiveAgent):
                                 ],
                             )
                             
+                            result_handle_start = time.time()
                             for candidate_rank, (aux_dsl, score) in enumerate(aux_dsl_dict.items()):
                                 try:
                                     aux_content = aux_dsl[len('<aux> x00'):]
@@ -726,7 +731,13 @@ class VLMAgent(DeductiveAgent):
                                             problem_text=str(new_problem),
                                             ddar_input=None,
                                         )
+                                        ddar_submit_start = time.time()
                                         future = run_ddar_remote.remote(new_problem, proof.defs, rules_ref, t0, timeout)
+                                        add_profiling_time(
+                                            profiling,
+                                            "ddar_submit_wall_time_s",
+                                            time.time() - ddar_submit_start,
+                                        )
                                         future_info[future] = {
                                             "problem": new_problem,
                                             "prev_score": prev_score,
@@ -759,16 +770,25 @@ class VLMAgent(DeductiveAgent):
                                         beam_score_after=None,
                                     )
                                     continue
+                            add_profiling_time(
+                                profiling,
+                                "gpu_result_handle_wall_time_s",
+                                time.time() - result_handle_start,
+                            )
                             
                             # check any done task
+                            ddar_wait_start = time.time()
                             done, running_futures = ray.wait(running_futures, timeout=0)
+                            add_profiling_time(profiling, "ddar_wait_wall_time_s", time.time() - ddar_wait_start)
                             future_result = process_completed_futures(done, new_queues, depth)
                             if future_result is not None:
                                 return future_result
                 
                 # check remaining tasks
                 while running_futures:
+                    ddar_wait_start = time.time()
                     done, running_futures = ray.wait(running_futures, num_returns=min(1000, len(running_futures)))
+                    add_profiling_time(profiling, "ddar_wait_wall_time_s", time.time() - ddar_wait_start)
                     future_result = process_completed_futures(done, new_queues, depth)
                     if future_result is not None:
                         return future_result

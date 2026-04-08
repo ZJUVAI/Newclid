@@ -11,7 +11,7 @@ from rich.table import Table
 from newclid.agent.vlm import VLMAgent
 from newclid.agent.qwen35 import Qwen35Agent
 from newclid.api import GeometricSolverBuilder
-from newclid.profiling import finalize_profiling, merge_profiling_payloads, write_profiling_csv
+from newclid.profiling import create_profiling_payload, finalize_profiling, write_profiling_csv
 from newclid.problem_db import ProblemDBRuntime, ProblemDBWriter
 from newclid.search_trace import TraceRun, TraceWriter, sanitize_filename
 
@@ -100,13 +100,9 @@ def ray_solve_problem(args):
         # print(f"problem_name: {problem_name}")
         is_solved = solver.run(timeout=timeout)
         elapsed_time = time.time() - start_time
-        profiling = finalize_profiling(
-            merge_profiling_payloads(
-                {"build_time_s": entry_build_time_s},
-                solver.run_infos.get("profiling"),
-            ),
-            elapsed_time,
-        )
+        profiling = solver.run_infos.get("profiling") or create_profiling_payload()
+        profiling["entry_setup_wall_time_s"] = float(profiling.get("entry_setup_wall_time_s", 0.0)) + entry_build_time_s
+        profiling = finalize_profiling(profiling, elapsed_time)
         if trace_writer is not None:
             trace_writer.log(
                 "problem_end",
@@ -156,7 +152,10 @@ def ray_solve_problem(args):
         )
         elapsed_time = time.time() - start_time
         profiling = finalize_profiling(
-            merge_profiling_payloads({"build_time_s": time.time() - start_time}),
+            {
+                **create_profiling_payload(),
+                "entry_setup_wall_time_s": elapsed_time,
+            },
             elapsed_time,
         )
         return (pid, problem_name, False, elapsed_time, None, profiling)
@@ -270,10 +269,16 @@ def solve_problems(filepath: Path, modelpath: list[str], num_cpus: int, decoding
                         "problem_name": problem_name,
                         "solved": "√" if is_solved else "x",
                         "total_time_s": profiling["total_time_s"],
-                        "build_time_s": profiling["build_time_s"],
-                        "inference_time_s": profiling["inference_time_s"],
-                        "ddar_time_s": profiling["ddar_time_s"],
-                        "other_time_s": profiling["other_time_s"],
+                        "entry_setup_wall_time_s": profiling["entry_setup_wall_time_s"],
+                        "base_ddar_wall_time_s": profiling["base_ddar_wall_time_s"],
+                        "request_build_wall_time_s": profiling["request_build_wall_time_s"],
+                        "gpu_wait_wall_time_s": profiling["gpu_wait_wall_time_s"],
+                        "gpu_result_handle_wall_time_s": profiling["gpu_result_handle_wall_time_s"],
+                        "ddar_submit_wall_time_s": profiling["ddar_submit_wall_time_s"],
+                        "ddar_wait_wall_time_s": profiling["ddar_wait_wall_time_s"],
+                        "ddar_result_handle_wall_time_s": profiling["ddar_result_handle_wall_time_s"],
+                        "scheduler_overhead_wall_time_s": profiling["scheduler_overhead_wall_time_s"],
+                        "other_wall_time_s": profiling["other_wall_time_s"],
                     }
                 )
                 total_time += elapsed_time

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 import logging
 import os
 import re
@@ -25,11 +26,9 @@ if str(SRC_ROOT) not in sys.path:
 from experiments.single_problem_multi_gpu_eval.model_pool import ModelPool
 from newclid.api import GeometricSolverBuilder
 from newclid.profiling import (
-    create_detailed_profiling_payload,
-    finalize_detailed_profiling,
+    create_profiling_payload,
+    finalize_profiling,
     write_profiling_csv,
-    write_profiling_depth_csv,
-    write_profiling_work_csv,
 )
 from newclid.search_trace import TraceRun
 
@@ -160,9 +159,9 @@ def solve_one_problem(
     entry_setup_wall_time_s = time.perf_counter() - build_start
     is_solved = solver.run(timeout=timeout)
     elapsed_time = time.perf_counter() - start_perf
-    profiling = solver.run_infos.get("profiling") or create_detailed_profiling_payload()
+    profiling = solver.run_infos.get("profiling") or create_profiling_payload()
     profiling["entry_setup_wall_time_s"] = float(profiling.get("entry_setup_wall_time_s", 0.0)) + entry_setup_wall_time_s
-    profiling = finalize_detailed_profiling(profiling, elapsed_time)
+    profiling = finalize_profiling(profiling, elapsed_time)
     solver.run_infos["profiling"] = profiling
     logging.getLogger(__name__).info(
         "solve_one_problem done: problem=%s solved=%s elapsed=%.2fs",
@@ -278,129 +277,128 @@ def solve_problems_single_problem_multi_gpu(
         start_time = time.time()
 
         with Live(refresh_per_second=1) as live:
-            for idx, problem_name in enumerate(problem_names):
-                try:
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                for idx, problem_name in enumerate(problem_names):
+                    try:
+                        logging.getLogger(__name__).info(
+                            "Problem loop start: idx=%d/%d problem=%s",
+                            idx + 1,
+                            len(problem_names),
+                            problem_name,
+                        )
+                        problem_start_wall = time.time()
+                        problem_start_perf = time.perf_counter()
+                        problem_render_root = visual_render_root / sanitize_problem_name(problem_name)
+                        problem_render_root.mkdir(parents=True, exist_ok=True)
+                        trace_writer = None
+                        if trace_run is not None:
+                            trace_writer = trace_run.create_problem_writer(
+                                problem_index=idx,
+                                problem_name=problem_name,
+                                route="evaluation_single_problem_multi_gpu",
+                                agent=agent_type,
+                                start_time=problem_start_wall,
+                            )
+                            trace_writer.log(
+                                "problem_start",
+                                dataset_path=str(filepath),
+                                model_path=model_path,
+                            )
+
+                        # Run the actual solve in a background thread so the
+                        # main thread can keep rebuilding the Live table while
+                        # a single problem is being processed.
+                        problem_future = executor.submit(
+                            solve_one_problem,
+                            problem_name=problem_name,
+                            problems_path=filepath,
+                            model_pool=model_pool,
+                            agent_type=agent_type,
+                            decoding_size=decoding_size,
+                            beam_size=beam_size,
+                            search_depth=search_depth,
+                            timeout=timeout,
+                            max_pending_ddar=max_pending_ddar,
+                            render_root=problem_render_root,
+                            trace_writer=trace_writer,
+                        )
+                        while True:
+                            try:
+                                problem_name, is_solved, elapsed_time, run_infos = problem_future.result(timeout=5.0)
+                                break
+                            except FuturesTimeoutError:
+                                live.update(render_table(all_tasks_info, start_time, True))
+
+                        if trace_writer is not None:
+                            trace_writer.log(
+                                "problem_end",
+                                success=is_solved,
+                                runtime=run_infos.get("runtime"),
+                                final_error=run_infos.get("error"),
+                                final_node_id=run_infos.get("final_node_id"),
+                            )
+                            trace_writer.close()
+                    except Exception as exc:
+                        traceback.print_exc()
+                        print(f"Warning: experimental solver crashed on problem '{problem_name}' : ({type(exc)}) {exc}")
+                        elapsed_time = time.perf_counter() - problem_start_perf
+                        is_solved = False
+                        run_infos = {
+                            "profiling": finalize_profiling(
+                                {
+                                    **create_profiling_payload(),
+                                    "entry_setup_wall_time_s": elapsed_time,
+                                },
+                                elapsed_time,
+                            )
+                        }
+                        if trace_writer is not None:
+                            trace_writer.log(
+                                "problem_end",
+                                success=False,
+                                runtime=time.time() - problem_start_wall,
+                                final_error=f"{type(exc).__name__}: {exc}",
+                                final_node_id=None,
+                            )
+                            trace_writer.close()
+
+                    all_tasks_info[idx] = (
+                        problem_name,
+                        "Success" if is_solved else "Failed",
+                        elapsed_time,
+                    )
+                    profiling = run_infos.get("profiling")
+                    if profiling is not None:
+                        profiling_rows.append(
+                            {
+                                "problem_name": problem_name,
+                                "solved": "√" if is_solved else "x",
+                                "total_time_s": profiling["total_time_s"],
+                                "entry_setup_wall_time_s": profiling["entry_setup_wall_time_s"],
+                                "base_ddar_wall_time_s": profiling["base_ddar_wall_time_s"],
+                                "request_build_wall_time_s": profiling["request_build_wall_time_s"],
+                                "gpu_wait_wall_time_s": profiling["gpu_wait_wall_time_s"],
+                                "gpu_result_handle_wall_time_s": profiling["gpu_result_handle_wall_time_s"],
+                                "ddar_submit_wall_time_s": profiling["ddar_submit_wall_time_s"],
+                                "ddar_wait_wall_time_s": profiling["ddar_wait_wall_time_s"],
+                                "ddar_result_handle_wall_time_s": profiling["ddar_result_handle_wall_time_s"],
+                                "scheduler_overhead_wall_time_s": profiling["scheduler_overhead_wall_time_s"],
+                                "other_wall_time_s": profiling["other_wall_time_s"],
+                            }
+                        )
+                    gpu_worker_stats = run_infos.get("gpu_worker_stats")
+                    if gpu_worker_stats is not None:
+                        print(f"[gpu_worker_stats] problem={problem_name} stats={gpu_worker_stats}")
                     logging.getLogger(__name__).info(
-                        "Problem loop start: idx=%d/%d problem=%s",
+                        "Problem loop done: idx=%d/%d problem=%s status=%s elapsed=%.2fs",
                         idx + 1,
                         len(problem_names),
                         problem_name,
+                        "Success" if is_solved else "Failed",
+                        elapsed_time,
                     )
-                    problem_start_wall = time.time()
-                    problem_start_perf = time.perf_counter()
-                    problem_render_root = visual_render_root / sanitize_problem_name(problem_name)
-                    problem_render_root.mkdir(parents=True, exist_ok=True)
-                    trace_writer = None
-                    if trace_run is not None:
-                        trace_writer = trace_run.create_problem_writer(
-                            problem_index=idx,
-                            problem_name=problem_name,
-                            route="evaluation_single_problem_multi_gpu",
-                            agent=agent_type,
-                            start_time=problem_start_wall,
-                        )
-                        trace_writer.log(
-                            "problem_start",
-                            dataset_path=str(filepath),
-                            model_path=model_path,
-                        )
-                    problem_name, is_solved, elapsed_time, run_infos = solve_one_problem(
-                        problem_name=problem_name,
-                        problems_path=filepath,
-                        model_pool=model_pool,
-                        agent_type=agent_type,
-                        decoding_size=decoding_size,
-                        beam_size=beam_size,
-                        search_depth=search_depth,
-                        timeout=timeout,
-                        max_pending_ddar=max_pending_ddar,
-                        render_root=problem_render_root,
-                        trace_writer=trace_writer,
-                    )
-                    if trace_writer is not None:
-                        trace_writer.log(
-                            "problem_end",
-                            success=is_solved,
-                            runtime=run_infos.get("runtime"),
-                            final_error=run_infos.get("error"),
-                            final_node_id=run_infos.get("final_node_id"),
-                        )
-                        trace_writer.close()
-                except Exception as exc:
-                    traceback.print_exc()
-                    print(f"Warning: experimental solver crashed on problem '{problem_name}' : ({type(exc)}) {exc}")
-                    elapsed_time = time.perf_counter() - problem_start_perf
-                    is_solved = False
-                    run_infos = {
-                        "profiling": finalize_detailed_profiling(
-                            {
-                                **create_detailed_profiling_payload(),
-                                "entry_setup_wall_time_s": elapsed_time,
-                            },
-                            elapsed_time,
-                        )
-                    }
-                    if trace_writer is not None:
-                        trace_writer.log(
-                            "problem_end",
-                            success=False,
-                            runtime=time.time() - problem_start_wall,
-                            final_error=f"{type(exc).__name__}: {exc}",
-                            final_node_id=None,
-                        )
-                        trace_writer.close()
-
-                all_tasks_info[idx] = (
-                    problem_name,
-                    "Success" if is_solved else "Failed",
-                    elapsed_time,
-                )
-                profiling = run_infos.get("profiling")
-                if profiling is not None:
-                    profiling_rows.append(
-                        {
-                            "problem_name": problem_name,
-                            "solved": "√" if is_solved else "x",
-                            "total_time_s": profiling["total_time_s"],
-                            "entry_setup_wall_time_s": profiling["entry_setup_wall_time_s"],
-                            "base_ddar_wall_time_s": profiling["base_ddar_wall_time_s"],
-                            "request_build_wall_time_s": profiling["request_build_wall_time_s"],
-                            "gpu_wait_wall_time_s": profiling["gpu_wait_wall_time_s"],
-                            "gpu_result_handle_wall_time_s": profiling["gpu_result_handle_wall_time_s"],
-                            "ddar_submit_wall_time_s": profiling["ddar_submit_wall_time_s"],
-                            "ddar_wait_wall_time_s": profiling["ddar_wait_wall_time_s"],
-                            "ddar_result_handle_wall_time_s": profiling["ddar_result_handle_wall_time_s"],
-                            "scheduler_overhead_wall_time_s": profiling["scheduler_overhead_wall_time_s"],
-                            "other_wall_time_s": profiling["other_wall_time_s"],
-                            "gpu_inference_work_time_s": profiling["gpu_inference_work_time_s"],
-                            "ddar_build_work_time_s": profiling["ddar_build_work_time_s"],
-                            "ddar_engine_work_time_s": profiling["ddar_engine_work_time_s"],
-                            "num_requests": profiling["num_requests"],
-                            "num_candidates_total": profiling["num_candidates_total"],
-                            "num_candidates_parse_failed": profiling["num_candidates_parse_failed"],
-                            "num_candidates_build_failed": profiling["num_candidates_build_failed"],
-                            "num_ddar_submitted": profiling["num_ddar_submitted"],
-                            "num_ddar_invalid": profiling["num_ddar_invalid"],
-                            "max_running_gpu": profiling["max_running_gpu"],
-                            "max_running_ddar": profiling["max_running_ddar"],
-                            "max_prepared_requests": profiling["max_prepared_requests"],
-                            "max_pending_ddar_submit": profiling["max_pending_ddar_submit"],
-                            "depth_rows": profiling.get("depth_rows", []),
-                        }
-                    )
-                gpu_worker_stats = run_infos.get("gpu_worker_stats")
-                if gpu_worker_stats is not None:
-                    print(f"[gpu_worker_stats] problem={problem_name} stats={gpu_worker_stats}")
-                logging.getLogger(__name__).info(
-                    "Problem loop done: idx=%d/%d problem=%s status=%s elapsed=%.2fs",
-                    idx + 1,
-                    len(problem_names),
-                    problem_name,
-                    "Success" if is_solved else "Failed",
-                    elapsed_time,
-                )
-                live.update(render_table(all_tasks_info, start_time, True))
-            live.update(render_table(all_tasks_info, start_time, False))
+                    live.update(render_table(all_tasks_info, start_time, True))
+                live.update(render_table(all_tasks_info, start_time, False))
 
         problems_name = filepath.stem
         path_obj = Path(model_path)
@@ -431,8 +429,6 @@ def solve_problems_single_problem_multi_gpu(
         print(f"Results saved to {csv_filepath}")
         if enable_profiling:
             profiling_csv_filepath = csv_filepath.with_name(f"{csv_filepath.stem}_profiling.csv")
-            work_csv_filepath = csv_filepath.with_name(f"{csv_filepath.stem}_profiling_work.csv")
-            depth_csv_filepath = csv_filepath.with_name(f"{csv_filepath.stem}_profiling_depth.csv")
             write_profiling_csv(
                 profiling_csv_filepath,
                 dataset_name=filepath.stem,
@@ -441,29 +437,7 @@ def solve_problems_single_problem_multi_gpu(
                 total_time_s=total_time,
                 rows=profiling_rows,
             )
-            write_profiling_work_csv(
-                work_csv_filepath,
-                dataset_name=filepath.stem,
-                solved_count=solved_count,
-                total_problems=total_problems,
-                rows=profiling_rows,
-            )
-            depth_rows = [
-                {
-                    "problem_name": row["problem_name"],
-                    **depth_row,
-                }
-                for row in profiling_rows
-                for depth_row in row.get("depth_rows", [])
-            ]
-            write_profiling_depth_csv(
-                depth_csv_filepath,
-                dataset_name=filepath.stem,
-                rows=depth_rows,
-            )
             print(f"Profiling results saved to {profiling_csv_filepath}")
-            print(f"Profiling work results saved to {work_csv_filepath}")
-            print(f"Profiling depth results saved to {depth_csv_filepath}")
     finally:
         if ray.is_initialized():
             ray.shutdown()

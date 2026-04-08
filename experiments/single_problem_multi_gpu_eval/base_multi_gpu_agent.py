@@ -11,12 +11,9 @@ import ray
 from newclid.agent.agents_interface import DeductiveAgent
 from newclid.formulations.problem import ProblemJGEX
 from newclid.profiling import (
-    add_profiling_count,
     add_profiling_time,
-    create_depth_profiling_row,
-    create_detailed_profiling_payload,
-    finalize_detailed_profiling,
-    update_profiling_max,
+    create_profiling_payload,
+    finalize_profiling,
 )
 from newclid.proof import ProofState
 from newclid.search_trace import build_attempt_key, proof_to_ddar_input
@@ -118,7 +115,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         infos["steps"] = step
         infos["gpu_worker_stats"] = self.model_pool.get_worker_stats()
         infos["final_node_id"] = final_node_id
-        infos["profiling"] = finalize_detailed_profiling(profiling, runtime)
+        infos["profiling"] = finalize_profiling(profiling, runtime)
         if error_msg:
             infos["error"] = error_msg
         return infos
@@ -139,23 +136,16 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         step: int,
         profiling: dict[str, Any],
         proof: ProofState,
-        depth_profiling: dict[str, float | int],
         runtime_s: float,
     ):
         # DDAR completions mark the hand-off between the current depth's
-        # validation work and the next depth's frontier. We keep the result
-        # handling cost separate from the DDAR worker-side work times.
+        # validation work and the next depth's frontier.
         handle_start = time.perf_counter()
         for future in done_futures:
             ddar_result = ray.get(future)
             future_meta = future_info.pop(future)
-            add_profiling_time(profiling, "ddar_build_work_time_s", ddar_result.get("ddar_build_work_time_s"))
-            add_profiling_time(profiling, "ddar_engine_work_time_s", ddar_result.get("ddar_engine_work_time_s"))
-            add_profiling_time(depth_profiling, "ddar_build_work_time_s", ddar_result.get("ddar_build_work_time_s"))
-            add_profiling_time(depth_profiling, "ddar_engine_work_time_s", ddar_result.get("ddar_engine_work_time_s"))
 
             if ddar_result["status"] == "invalid":
-                add_profiling_count(profiling, "num_ddar_invalid")
                 self._trace(
                     "ddar_result",
                     attempt_key=future_meta["attempt_key"],
@@ -188,7 +178,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 )
                 handle_elapsed_s = time.perf_counter() - handle_start
                 add_profiling_time(profiling, "ddar_result_handle_wall_time_s", handle_elapsed_s)
-                add_profiling_time(depth_profiling, "ddar_result_handle_wall_time_s", handle_elapsed_s)
                 return self._build_info_payload(
                     t0=t0,
                     step=step,
@@ -242,7 +231,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     )
         handle_elapsed_s = time.perf_counter() - handle_start
         add_profiling_time(profiling, "ddar_result_handle_wall_time_s", handle_elapsed_s)
-        add_profiling_time(depth_profiling, "ddar_result_handle_wall_time_s", handle_elapsed_s)
         return None
 
     def _poll_ddar_futures(
@@ -256,7 +244,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         step: int,
         profiling: dict[str, Any],
         proof: ProofState,
-        depth_profiling: dict[str, float | int],
         runtime_s: float,
     ):
         if not running_futures:
@@ -279,7 +266,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             step=step,
             profiling=profiling,
             proof=proof,
-            depth_profiling=depth_profiling,
             runtime_s=runtime_s,
         )
 
@@ -302,7 +288,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         proof: ProofState,
         depth: int,
         profiling: dict[str, Any],
-        depth_profiling: dict[str, float | int],
     ) -> int | None:
         try:
             prev_score, node = next(frontier_iter)
@@ -321,7 +306,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             proof=proof,
             depth=depth,
         )
-        request_profile = request.pop("_request_profile", {})
+        request.pop("_request_profile", None)
         request["depth"] = depth
         prepared_requests.append(request)
         request_meta[request_id] = {
@@ -346,17 +331,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         )
         prepare_elapsed_s = time.perf_counter() - prepare_start
         add_profiling_time(profiling, "request_build_wall_time_s", prepare_elapsed_s)
-        add_profiling_time(depth_profiling, "request_build_wall_time_s", prepare_elapsed_s)
-        for field in (
-            "draw_svg_wall_time_s",
-            "svg_to_png_wall_time_s",
-            "image_postprocess_wall_time_s",
-            "dsl_build_wall_time_s",
-        ):
-            add_profiling_time(profiling, field, request_profile.get(field))
-            add_profiling_time(depth_profiling, field, request_profile.get(field))
-        add_profiling_count(profiling, "num_requests")
-        add_profiling_count(depth_profiling, "requests_built")
         return request_index + 1
 
     def _handle_gpu_result(
@@ -368,22 +342,11 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         depth: int,
         profiling: dict[str, Any],
         next_node_id: int,
-        depth_profiling: dict[str, float | int],
     ) -> int:
         # This stage is the CPU-side post-processing after a GPU worker returns.
         # If it grows large, the bottleneck is in DSL parsing / construction
         # handling rather than the model's forward pass.
         handle_start = time.perf_counter()
-        add_profiling_time(
-            profiling,
-            "gpu_inference_work_time_s",
-            gpu_result.get("inference_time_s"),
-        )
-        add_profiling_time(
-            depth_profiling,
-            "gpu_inference_work_time_s",
-            gpu_result.get("inference_time_s"),
-        )
         request_id = gpu_result["request_id"]
         request_state = request_meta.pop(request_id)
         state = request_state["state"]
@@ -413,12 +376,10 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         )
 
         for candidate_rank, (aux_dsl, score) in enumerate(gpu_result["aux_dsl_dict"].items()):
-            add_profiling_count(profiling, "num_candidates_total")
             try:
                 raw_aux_text = self.extract_raw_aux_text(aux_dsl)
                 aux = self.try_dsl_to_constructions(raw_aux_text)
             except Exception:
-                add_profiling_count(profiling, "num_candidates_parse_failed")
                 self._trace(
                     "candidate_transition",
                     attempt_key=build_attempt_key(request_id, candidate_rank, None),
@@ -437,7 +398,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 continue
 
             if not aux:
-                add_profiling_count(profiling, "num_candidates_parse_failed")
                 self._trace(
                     "candidate_transition",
                     attempt_key=build_attempt_key(request_id, candidate_rank, None),
@@ -458,7 +418,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             try:
                 new_problem = problem.with_more_construction(aux)
             except Exception:
-                add_profiling_count(profiling, "num_candidates_build_failed")
                 self._trace(
                     "candidate_transition",
                     attempt_key=build_attempt_key(request_id, candidate_rank, None),
@@ -496,7 +455,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
 
         handle_elapsed_s = time.perf_counter() - handle_start
         add_profiling_time(profiling, "gpu_result_handle_wall_time_s", handle_elapsed_s)
-        add_profiling_time(depth_profiling, "gpu_result_handle_wall_time_s", handle_elapsed_s)
         return next_node_id
 
     def _submit_pending_ddar(
@@ -511,7 +469,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         t0: float,
         timeout: int,
         profiling: dict[str, Any],
-        depth_profiling: dict[str, float | int],
     ) -> None:
         # Submitting DDAR work is the backpressure boundary between generation
         # and validation. We measure it separately from the DDAR execution so
@@ -561,13 +518,8 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             )
             future_info[future] = candidate_meta
             running_futures.append(future)
-            add_profiling_count(profiling, "num_ddar_submitted")
-            add_profiling_count(depth_profiling, "ddar_submitted")
-            update_profiling_max(profiling, "max_running_ddar", len(running_futures))
-            update_profiling_max(profiling, "max_pending_ddar_submit", len(pending_ddar_submit))
         submit_elapsed_s = time.perf_counter() - submit_start
         add_profiling_time(profiling, "ddar_submit_wall_time_s", submit_elapsed_s)
-        add_profiling_time(depth_profiling, "ddar_submit_wall_time_s", submit_elapsed_s)
 
     def run(self, proof: ProofState, rules: list["Rule"], timeout: int = 3600) -> dict[str, Any]:
         logger.info(
@@ -583,7 +535,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         perf_t0 = time.perf_counter()
         step = 0
         next_node_id = 1
-        profiling = create_detailed_profiling_payload()
+        profiling = create_profiling_payload()
 
         for goal in proof.goals:
             if not goal.check_numerical():
@@ -658,7 +610,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         for depth in range(self.search_depth):
             step = depth + 1
             frontier_size = len(list(beam_queue))
-            depth_profiling = create_depth_profiling_row(depth=depth, frontier_size=frontier_size)
             self._trace("depth_start", depth=depth, frontier_size=frontier_size)
             logger.info(
                 "Search depth start: depth=%d frontier_size=%d elapsed=%.2fs",
@@ -679,8 +630,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
 
             if frontier_size == 0:
                 logger.info("Search depth=%d produced no requests; stopping", depth)
-                depth_profiling["next_frontier_size"] = 0
-                profiling["depth_rows"].append(depth_profiling)
                 break
 
             dispatcher = self.model_pool.create_dispatcher()
@@ -726,7 +675,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     step=step,
                     profiling=profiling,
                     proof=proof,
-                    depth_profiling=depth_profiling,
                     runtime_s=time.perf_counter() - perf_t0,
                 )
                 if solved_payload is not None:
@@ -753,7 +701,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                             depth=depth,
                             profiling=profiling,
                             next_node_id=next_node_id,
-                            depth_profiling=depth_profiling,
                         )
                         progress = True
 
@@ -770,16 +717,11 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     t0=t0,
                     timeout=timeout,
                     profiling=profiling,
-                    depth_profiling=depth_profiling,
                 )
                 if len(running_futures) != before_submit:
                     progress = True
 
                 ddar_backlog = len(pending_ddar_submit) + len(running_futures)
-                update_profiling_max(profiling, "max_running_gpu", len(dispatcher.active_refs()))
-                update_profiling_max(profiling, "max_running_ddar", len(running_futures))
-                update_profiling_max(profiling, "max_prepared_requests", len(prepared_requests))
-                update_profiling_max(profiling, "max_pending_ddar_submit", len(pending_ddar_submit))
 
                 # 4. Build more requests on demand. This is where VLM figure
                 # rendering happens, so we avoid preparing the whole depth up front.
@@ -796,7 +738,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                         proof=proof,
                         depth=depth,
                         profiling=profiling,
-                        depth_profiling=depth_profiling,
                     )
                     if next_request_index is None:
                         frontier_exhausted = True
@@ -837,11 +778,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     "scheduler_overhead_wall_time_s",
                     max(loop_elapsed_s - accounted_delta, 0.0),
                 )
-                add_profiling_time(
-                    depth_profiling,
-                    "scheduler_overhead_wall_time_s",
-                    max(loop_elapsed_s - accounted_delta, 0.0),
-                )
 
                 if progress:
                     continue
@@ -857,13 +793,11 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 wait_elapsed_s = time.perf_counter() - wait_start
                 if not done_refs:
                     add_profiling_time(profiling, "scheduler_overhead_wall_time_s", wait_elapsed_s)
-                    add_profiling_time(depth_profiling, "scheduler_overhead_wall_time_s", wait_elapsed_s)
                     continue
                 done_ref = done_refs[0]
 
                 if dispatcher.owns_ref(done_ref):
                     add_profiling_time(profiling, "gpu_wait_wall_time_s", wait_elapsed_s)
-                    add_profiling_time(depth_profiling, "gpu_wait_wall_time_s", wait_elapsed_s)
                     gpu_result = dispatcher.take_done(done_ref)
                     next_node_id = self._handle_gpu_result(
                         gpu_result=gpu_result,
@@ -872,12 +806,10 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                         depth=depth,
                         profiling=profiling,
                         next_node_id=next_node_id,
-                        depth_profiling=depth_profiling,
                     )
                     continue
 
                 add_profiling_time(profiling, "ddar_wait_wall_time_s", wait_elapsed_s)
-                add_profiling_time(depth_profiling, "ddar_wait_wall_time_s", wait_elapsed_s)
                 logger.debug(
                     "Search depth=%d received standalone DDAR completion; running_ddar_before_remove=%d",
                     depth,
@@ -894,7 +826,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     step=step,
                     profiling=profiling,
                     proof=proof,
-                    depth_profiling=depth_profiling,
                     runtime_s=time.perf_counter() - perf_t0,
                 )
                 if solved_payload is not None:
@@ -903,8 +834,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
 
             beam_queue = next_queue
             next_frontier_size = len(list(beam_queue))
-            depth_profiling["next_frontier_size"] = next_frontier_size
-            profiling["depth_rows"].append(depth_profiling)
             self._trace("depth_end", depth=depth, next_frontier_size=next_frontier_size)
             logger.info(
                 "Search depth end: depth=%d next_frontier_size=%d",
