@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import csv
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 from newclid.profiling import (
     add_profiling_time,
@@ -11,6 +13,32 @@ from newclid.profiling import (
     merge_profiling_payloads,
     write_profiling_csv,
 )
+from experiments.single_problem_multi_gpu_eval.base_multi_gpu_agent import BaseMultiGPUAgent
+
+
+class _DummyDispatcher:
+    def __init__(self, refs=None):
+        self._refs = [] if refs is None else list(refs)
+
+    def active_refs(self):
+        return list(self._refs)
+
+
+class _DummyAgent(BaseMultiGPUAgent):
+    def seed_state(self, proof, base_proof):
+        return None
+
+    def get_problem_from_state(self, state):
+        return None
+
+    def prepare_request(self, *, request_id, state, proof, depth):
+        return {"request_id": request_id}
+
+    def make_next_state_from_unsolved_ddar(self, *, new_problem, prior_state, ddar_result, proof):
+        return None
+
+    def try_dsl_to_constructions(self, content: str):
+        return None
 
 
 def test_finalize_profiling_computes_other_wall_time() -> None:
@@ -139,3 +167,57 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
         "0.20",
         "0.30",
     ]
+
+
+def test_parallel_prepare_wait_is_attributed_to_prepare_wall_time() -> None:
+    profiling = create_profiling_payload()
+    agent = _DummyAgent(
+        model_pool=None,
+        decoding_size=1,
+        beam_size=1,
+        search_depth=1,
+        agent_type="dummy",
+    )
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(lambda: (time.sleep(0.03), {"request_id": "r1"})[1])
+        running_prepare_futures = {future: {"request_id": "r1", "depth": 0}}
+        agent._wait_for_next_event(
+            dispatcher=_DummyDispatcher(),
+            running_futures=[],
+            running_prepare_futures=running_prepare_futures,
+            profiling=profiling,
+        )
+
+    assert profiling["request_prepare_wall_time_s"] > 0.0
+    assert profiling["wait_wall_time_s"] == 0.0
+
+
+def test_gpu_or_ddar_wait_is_attributed_to_wait_wall_time(monkeypatch) -> None:
+    profiling = create_profiling_payload()
+    agent = _DummyAgent(
+        model_pool=None,
+        decoding_size=1,
+        beam_size=1,
+        search_depth=1,
+        agent_type="dummy",
+    )
+
+    def fake_ray_wait(*args, **kwargs):
+        time.sleep(0.02)
+        return [], []
+
+    monkeypatch.setattr(
+        "experiments.single_problem_multi_gpu_eval.base_multi_gpu_agent.ray.wait",
+        fake_ray_wait,
+    )
+
+    agent._wait_for_next_event(
+        dispatcher=_DummyDispatcher(refs=["gpu-ref"]),
+        running_futures=[],
+        running_prepare_futures={},
+        profiling=profiling,
+    )
+
+    assert profiling["wait_wall_time_s"] > 0.0
+    assert profiling["request_prepare_wall_time_s"] == 0.0

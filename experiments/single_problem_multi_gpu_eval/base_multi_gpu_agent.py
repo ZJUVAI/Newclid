@@ -291,17 +291,12 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         proof: ProofState,
         depth: int,
     ) -> dict[str, Any]:
-        prepare_start = time.perf_counter()
-        request = self.prepare_request(
+        return self.prepare_request(
             request_id=request_id,
             state=state,
             proof=proof,
             depth=depth,
         )
-        request["_prepare_elapsed_s"] = float(request.get("_prepare_elapsed_s", 0.0)) or (
-            time.perf_counter() - prepare_start
-        )
-        return request
 
     def _submit_prepare_request(
         self,
@@ -397,7 +392,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 with_predicate=request.get("with_predicate"),
                 decoding_size=request.get("decoding_size"),
             )
-            add_profiling_time(profiling, "request_prepare_wall_time_s", request.pop("_prepare_elapsed_s", None))
             progressed = True
         return progressed
 
@@ -420,19 +414,35 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         running_prepare_futures: dict[Future[dict[str, Any]], dict[str, Any]],
         profiling: dict[str, Any],
     ) -> None:
+        # In the parallel prepare pipeline, worker runtime is not wall-clock on
+        # the main thread. We only attribute wall time here when the scheduler
+        # is actually blocked waiting for some stage to finish.
         wait_start = time.perf_counter()
-        if running_prepare_futures:
+        wait_refs = dispatcher.active_refs() + running_futures
+
+        # If only prepare work is outstanding, this blocked interval is the
+        # prepare stage on the critical path.
+        if running_prepare_futures and not wait_refs:
             futures_wait(
                 tuple(running_prepare_futures.keys()),
                 timeout=0.1,
                 return_when=FIRST_COMPLETED,
             )
+            add_profiling_time(profiling, "request_prepare_wall_time_s", time.perf_counter() - wait_start)
+            return
+
+        if running_prepare_futures:
+            done_futures, _ = futures_wait(
+                tuple(running_prepare_futures.keys()),
+                timeout=0.1,
+                return_when=FIRST_COMPLETED,
+            )
+            if done_futures:
+                add_profiling_time(profiling, "wait_wall_time_s", time.perf_counter() - wait_start)
+                return
 
         remaining_timeout_s = max(0.0, 1.0 - (time.perf_counter() - wait_start))
-        wait_refs = dispatcher.active_refs() + running_futures
         if not wait_refs:
-            if running_prepare_futures:
-                add_profiling_time(profiling, "wait_wall_time_s", time.perf_counter() - wait_start)
             return
         ray.wait(wait_refs, num_returns=1, timeout=remaining_timeout_s)
         add_profiling_time(profiling, "wait_wall_time_s", time.perf_counter() - wait_start)
