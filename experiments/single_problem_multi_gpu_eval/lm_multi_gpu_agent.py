@@ -24,6 +24,8 @@ class LMMultiGPUAgent(BaseMultiGPUAgent):
         *,
         agent_type: str = "lm_multi_gpu_experiment",
         max_pending_ddar: int = 128,
+        prepare_request_workers: int = 1,
+        prepare_prefetch_limit: int = 1,
         trace_writer=None,
     ):
         super().__init__(
@@ -33,6 +35,8 @@ class LMMultiGPUAgent(BaseMultiGPUAgent):
             search_depth=search_depth,
             agent_type=agent_type,
             max_pending_ddar=max_pending_ddar,
+            prepare_request_workers=prepare_request_workers,
+            prepare_prefetch_limit=prepare_prefetch_limit,
             ddar_returns_proof=False,
             trace_writer=trace_writer,
         )
@@ -44,7 +48,7 @@ class LMMultiGPUAgent(BaseMultiGPUAgent):
     def get_problem_from_state(self, state: ProblemJGEX) -> ProblemJGEX:
         return state
 
-    def build_request(
+    def prepare_request(
         self,
         *,
         request_id: str,

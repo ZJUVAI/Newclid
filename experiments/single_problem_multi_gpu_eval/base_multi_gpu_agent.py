@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait as futures_wait
 import logging
 import time
 from abc import ABC, abstractmethod
@@ -37,6 +38,8 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         *,
         agent_type: str,
         max_pending_ddar: int = 128,
+        prepare_request_workers: int = 1,
+        prepare_prefetch_limit: int = 1,
         ddar_returns_proof: bool = False,
         trace_writer=None,
     ):
@@ -48,6 +51,8 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         self.search_depth = search_depth
         self.agent_type = agent_type
         self.max_pending_ddar = max_pending_ddar
+        self.prepare_request_workers = prepare_request_workers
+        self.prepare_prefetch_limit = prepare_prefetch_limit
         self.ddar_returns_proof = ddar_returns_proof
         self.trace_writer = trace_writer
 
@@ -63,7 +68,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def build_request(
+    def prepare_request(
         self,
         *,
         request_id: str,
@@ -278,60 +283,202 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         running_futures.clear()
         future_info.clear()
 
-    def _prepare_next_request(
+    def _run_prepare_request(
         self,
         *,
+        request_id: str,
+        state: Any,
+        proof: ProofState,
+        depth: int,
+    ) -> dict[str, Any]:
+        prepare_start = time.perf_counter()
+        request = self.prepare_request(
+            request_id=request_id,
+            state=state,
+            proof=proof,
+            depth=depth,
+        )
+        request["_prepare_elapsed_s"] = float(request.get("_prepare_elapsed_s", 0.0)) or (
+            time.perf_counter() - prepare_start
+        )
+        return request
+
+    def _submit_prepare_request(
+        self,
+        *,
+        prepare_executor: ThreadPoolExecutor,
         frontier_iter,
         request_index: int,
         request_meta: dict[str, dict[str, Any]],
-        prepared_requests,
+        running_prepare_futures: dict[Future[dict[str, Any]], dict[str, Any]],
         proof: ProofState,
         depth: int,
-        profiling: dict[str, Any],
     ) -> int | None:
         try:
             prev_score, node = next(frontier_iter)
         except StopIteration:
             return None
 
-        # Request preparation is the CPU-side stage before any GPU work starts.
-        # For VLM runs this includes figure rendering and prompt assembly, which
-        # can dominate runtime even when the model itself is fast.
-        prepare_start = time.perf_counter()
         node_id, parent_node_id, state = node
         request_id = f"d{depth}_n{request_index}"
-        request = self.build_request(
-            request_id=request_id,
-            state=state,
-            proof=proof,
-            depth=depth,
-        )
-        request.pop("_request_profile", None)
-        request["depth"] = depth
-        prepared_requests.append(request)
         request_meta[request_id] = {
             "state": state,
             "prev_score": prev_score,
             "node_id": node_id,
             "parent_node_id": parent_node_id,
-            "request_built_at_perf_s": time.perf_counter(),
         }
-        self._trace(
-            "model_request",
-            node_id=node_id,
-            parent_node_id=parent_node_id,
-            depth=depth,
+        future = prepare_executor.submit(
+            self._run_prepare_request,
             request_id=request_id,
-            query=request.get("query"),
-            img_path=request.get("img_path"),
-            new_point_name=request.get("new_point_name"),
-            response_prefix=request.get("response_prefix"),
-            with_predicate=request.get("with_predicate"),
-            decoding_size=request.get("decoding_size"),
+            state=state,
+            proof=proof,
+            depth=depth,
         )
-        prepare_elapsed_s = time.perf_counter() - prepare_start
-        add_profiling_time(profiling, "request_build_wall_time_s", prepare_elapsed_s)
+        running_prepare_futures[future] = {
+            "request_id": request_id,
+            "node_id": node_id,
+            "parent_node_id": parent_node_id,
+            "depth": depth,
+        }
         return request_index + 1
+
+    def _poll_prepare_futures(
+        self,
+        *,
+        running_prepare_futures: dict[Future[dict[str, Any]], dict[str, Any]],
+        request_meta: dict[str, dict[str, Any]],
+        prepared_requests: deque[dict[str, Any]],
+        profiling: dict[str, Any],
+        block_timeout_s: float = 0.0,
+    ) -> bool:
+        if not running_prepare_futures:
+            return False
+
+        done_futures, _ = futures_wait(
+            tuple(running_prepare_futures.keys()),
+            timeout=block_timeout_s,
+            return_when=FIRST_COMPLETED,
+        )
+        if not done_futures:
+            return False
+
+        progressed = False
+        for future in list(done_futures):
+            future_meta = running_prepare_futures.pop(future)
+            request_id = future_meta["request_id"]
+            request_state = request_meta.get(request_id)
+            try:
+                request = future.result()
+            except Exception as exc:
+                logger.warning(
+                    "Prepare request failed: request_id=%s depth=%s error=%s",
+                    request_id,
+                    future_meta["depth"],
+                    exc,
+                )
+                request_meta.pop(request_id, None)
+                continue
+
+            if request_state is None:
+                continue
+            request["depth"] = future_meta["depth"]
+            request_state["request_built_at_perf_s"] = time.perf_counter()
+            prepared_requests.append(request)
+            self._trace(
+                "model_request",
+                node_id=future_meta["node_id"],
+                parent_node_id=future_meta["parent_node_id"],
+                depth=future_meta["depth"],
+                request_id=request_id,
+                query=request.get("query"),
+                img_path=request.get("img_path"),
+                new_point_name=request.get("new_point_name"),
+                response_prefix=request.get("response_prefix"),
+                with_predicate=request.get("with_predicate"),
+                decoding_size=request.get("decoding_size"),
+            )
+            add_profiling_time(profiling, "request_prepare_wall_time_s", request.pop("_prepare_elapsed_s", None))
+            progressed = True
+        return progressed
+
+    def _cleanup_prepare_futures(
+        self,
+        *,
+        running_prepare_futures: dict[Future[dict[str, Any]], dict[str, Any]],
+        request_meta: dict[str, dict[str, Any]],
+    ) -> None:
+        for future, future_meta in list(running_prepare_futures.items()):
+            future.cancel()
+            request_meta.pop(future_meta["request_id"], None)
+        running_prepare_futures.clear()
+
+    def _wait_for_next_event(
+        self,
+        *,
+        dispatcher,
+        running_futures: list[Any],
+        running_prepare_futures: dict[Future[dict[str, Any]], dict[str, Any]],
+        profiling: dict[str, Any],
+    ) -> tuple[str | None, Any]:
+        wait_start = time.perf_counter()
+        if running_prepare_futures:
+            done_futures, _ = futures_wait(
+                tuple(running_prepare_futures.keys()),
+                timeout=0.1,
+                return_when=FIRST_COMPLETED,
+            )
+            if done_futures:
+                add_profiling_time(profiling, "wait_wall_time_s", time.perf_counter() - wait_start)
+                return "prepare", next(iter(done_futures))
+
+        remaining_timeout_s = max(0.0, 1.0 - (time.perf_counter() - wait_start))
+        wait_refs = dispatcher.active_refs() + running_futures
+        if not wait_refs:
+            if running_prepare_futures:
+                add_profiling_time(profiling, "wait_wall_time_s", time.perf_counter() - wait_start)
+                return "prepare", None
+            return None, None
+        done_refs, _ = ray.wait(wait_refs, num_returns=1, timeout=remaining_timeout_s)
+        add_profiling_time(profiling, "wait_wall_time_s", time.perf_counter() - wait_start)
+        if not done_refs:
+            return None, None
+        done_ref = done_refs[0]
+        if dispatcher.owns_ref(done_ref):
+            return "gpu", done_ref
+        return "ddar", done_ref
+
+    def _process_ddar_completion(
+        self,
+        *,
+        done_ref: Any,
+        running_futures: list[Any],
+        future_info: dict[Any, dict[str, Any]],
+        next_queue: BeamQueue,
+        depth: int,
+        t0: float,
+        step: int,
+        profiling: dict[str, Any],
+        proof: ProofState,
+        perf_t0: float,
+    ):
+        logger.debug(
+            "Search depth=%d received standalone DDAR completion; running_ddar_before_remove=%d",
+            depth,
+            len(running_futures),
+        )
+        running_futures.remove(done_ref)
+        return self._handle_ddar_done(
+            done_futures=[done_ref],
+            running_futures=running_futures,
+            future_info=future_info,
+            next_queue=next_queue,
+            depth=depth,
+            t0=t0,
+            step=step,
+            profiling=profiling,
+            proof=proof,
+            runtime_s=time.perf_counter() - perf_t0,
+        )
 
     def _handle_gpu_result(
         self,
@@ -604,96 +751,215 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         beam_queue = BeamQueue(max_size=self.beam_size)
         beam_queue.add(node=(0, None, self.seed_state(proof, base_proof)), val=0.0)
 
-        # Search stays depth-by-depth to preserve the beam semantics, but
-        # within one depth we pipeline request building, GPU inference, and
-        # DDAR validation so the hardware can overlap useful work.
-        for depth in range(self.search_depth):
-            step = depth + 1
-            frontier_size = len(list(beam_queue))
-            self._trace("depth_start", depth=depth, frontier_size=frontier_size)
-            logger.info(
-                "Search depth start: depth=%d frontier_size=%d elapsed=%.2fs",
-                depth,
-                frontier_size,
-                time.time() - t0,
-            )
-            if time.time() - t0 > timeout:
-                logger.warning("Agent timeout before depth=%d", depth)
-                return self._build_info_payload(
-                    t0=t0,
-                    step=step,
-                    is_success=False,
-                    profiling=profiling,
-                    error_msg="Timeout",
-                    runtime_s=time.perf_counter() - perf_t0,
+        with ThreadPoolExecutor(max_workers=self.prepare_request_workers) as prepare_executor:
+            # Search stays depth-by-depth to preserve the beam semantics. Within
+            # one depth we pipeline request preparation, GPU inference, and DDAR
+            # validation so CPU and GPU resources can overlap useful work.
+            for depth in range(self.search_depth):
+                step = depth + 1
+                frontier_size = len(list(beam_queue))
+                self._trace("depth_start", depth=depth, frontier_size=frontier_size)
+                logger.info(
+                    "Search depth start: depth=%d frontier_size=%d elapsed=%.2fs",
+                    depth,
+                    frontier_size,
+                    time.time() - t0,
                 )
+                if time.time() - t0 > timeout:
+                    logger.warning("Agent timeout before depth=%d", depth)
+                    return self._build_info_payload(
+                        t0=t0,
+                        step=step,
+                        is_success=False,
+                        profiling=profiling,
+                        error_msg="Timeout",
+                        runtime_s=time.perf_counter() - perf_t0,
+                    )
 
-            if frontier_size == 0:
-                logger.info("Search depth=%d produced no requests; stopping", depth)
-                break
+                if frontier_size == 0:
+                    logger.info("Search depth=%d produced no requests; stopping", depth)
+                    break
 
-            dispatcher = self.model_pool.create_dispatcher()
-            next_queue = BeamQueue(max_size=self.beam_size)
-            frontier_iter = iter(beam_queue)
-            prepared_requests = deque()
-            pending_ddar_submit = deque()
-            request_meta: dict[str, dict[str, Any]] = {}
-            running_futures: list[Any] = []
-            future_info: dict[Any, dict[str, Any]] = {}
-            request_index = 0
-            frontier_exhausted = False
-            request_prefetch_limit = max(1, 2 * len(self.model_pool.workers))
-            ddar_backlog_high_watermark = max(self.max_pending_ddar + 1, 2 * self.max_pending_ddar)
+                dispatcher = self.model_pool.create_dispatcher()
+                next_queue = BeamQueue(max_size=self.beam_size)
+                frontier_iter = iter(beam_queue)
+                prepared_requests: deque[dict[str, Any]] = deque()
+                running_prepare_futures: dict[Future[dict[str, Any]], dict[str, Any]] = {}
+                pending_ddar_submit = deque()
+                request_meta: dict[str, dict[str, Any]] = {}
+                running_futures: list[Any] = []
+                future_info: dict[Any, dict[str, Any]] = {}
+                request_index = 0
+                frontier_exhausted = False
+                ddar_backlog_high_watermark = max(self.max_pending_ddar + 1, 2 * self.max_pending_ddar)
 
-            while True:
-                loop_start = time.perf_counter()
-                # Track which wall-clock buckets change inside this loop body so
-                # the remainder can be attributed to scheduler overhead.
-                wall_before = {
-                    field: float(profiling.get(field, 0.0))
-                    for field in (
-                        "request_build_wall_time_s",
-                        "gpu_wait_wall_time_s",
-                        "gpu_result_handle_wall_time_s",
-                        "ddar_submit_wall_time_s",
-                        "ddar_wait_wall_time_s",
-                        "ddar_result_handle_wall_time_s",
+                while True:
+                    loop_start = time.perf_counter()
+                    # Track which wall-clock buckets changed in this loop body
+                    # so any residual bookkeeping can be attributed to scheduler
+                    # overhead rather than useful work.
+                    wall_before = {
+                        field: float(profiling.get(field, 0.0))
+                        for field in (
+                            "request_prepare_wall_time_s",
+                            "wait_wall_time_s",
+                            "gpu_result_handle_wall_time_s",
+                            "ddar_submit_wall_time_s",
+                            "ddar_result_handle_wall_time_s",
+                            "scheduler_overhead_wall_time_s",
+                        )
+                    }
+                    progress = False
+
+                    # 1. Consume finished DDAR tasks first so validated states
+                    # can immediately contribute to the next-depth frontier.
+                    ddar_before_poll = len(running_futures)
+                    solved_payload = self._poll_ddar_futures(
+                        running_futures=running_futures,
+                        future_info=future_info,
+                        next_queue=next_queue,
+                        depth=depth,
+                        t0=t0,
+                        step=step,
+                        profiling=profiling,
+                        proof=proof,
+                        runtime_s=time.perf_counter() - perf_t0,
+                    )
+                    if solved_payload is not None:
+                        dispatcher.cancel_running()
+                        self._cleanup_prepare_futures(
+                            running_prepare_futures=running_prepare_futures,
+                            request_meta=request_meta,
+                        )
+                        return solved_payload
+                    if len(running_futures) != ddar_before_poll:
+                        progress = True
+
+                    # 2. Drain any completed GPU work without blocking so model
+                    # outputs can flow into DDAR as quickly as possible.
+                    active_gpu_refs = dispatcher.active_refs()
+                    if active_gpu_refs:
+                        done_gpu_refs, _ = ray.wait(
+                            active_gpu_refs,
+                            num_returns=len(active_gpu_refs),
+                            timeout=0,
+                        )
+                        for done_ref in done_gpu_refs:
+                            gpu_result = dispatcher.take_done(done_ref)
+                            next_node_id = self._handle_gpu_result(
+                                gpu_result=gpu_result,
+                                request_meta=request_meta,
+                                pending_ddar_submit=pending_ddar_submit,
+                                depth=depth,
+                                profiling=profiling,
+                                next_node_id=next_node_id,
+                            )
+                            progress = True
+
+                    # 3. Submit as many validated DDAR candidates as the current
+                    # backlog limit allows.
+                    before_submit = len(running_futures)
+                    self._submit_pending_ddar(
+                        pending_ddar_submit=pending_ddar_submit,
+                        running_futures=running_futures,
+                        future_info=future_info,
+                        rules_ref=rules_ref,
+                        proof=proof,
+                        depth=depth,
+                        t0=t0,
+                        timeout=timeout,
+                        profiling=profiling,
+                    )
+                    if len(running_futures) != before_submit:
+                        progress = True
+
+                    ddar_backlog = len(pending_ddar_submit) + len(running_futures)
+
+                    # 4. Collect finished prepare tasks so fully-built requests
+                    # can be handed to idle GPU workers.
+                    if self._poll_prepare_futures(
+                        running_prepare_futures=running_prepare_futures,
+                        request_meta=request_meta,
+                        prepared_requests=prepared_requests,
+                        profiling=profiling,
+                    ):
+                        progress = True
+
+                    # 5. Feed any idle GPU workers while DDAR backlog remains
+                    # under control.
+                    while (
+                        prepared_requests
+                        and dispatcher.idle_worker_count() > 0
+                        and (len(pending_ddar_submit) + len(running_futures)) <= ddar_backlog_high_watermark
+                    ):
+                        request = prepared_requests.popleft()
+                        request_meta[request["request_id"]]["gpu_submitted_at_perf_s"] = time.perf_counter()
+                        dispatcher.enqueue_request(request)
+                        progress = True
+
+                    # 6. Launch more prepare work on demand instead of building
+                    # the whole depth eagerly. This keeps CPU work bounded by
+                    # the amount of GPU/DDAR capacity we can actually use.
+                    while (
+                        not frontier_exhausted
+                        and (len(running_prepare_futures) + len(prepared_requests)) < self.prepare_prefetch_limit
+                        and ddar_backlog <= ddar_backlog_high_watermark
+                    ):
+                        next_request_index = self._submit_prepare_request(
+                            prepare_executor=prepare_executor,
+                            frontier_iter=frontier_iter,
+                            request_index=request_index,
+                            request_meta=request_meta,
+                            running_prepare_futures=running_prepare_futures,
+                            proof=proof,
+                            depth=depth,
+                        )
+                        if next_request_index is None:
+                            frontier_exhausted = True
+                            break
+                        request_index = next_request_index
+                        progress = True
+
+                    if (
+                        frontier_exhausted
+                        and not running_prepare_futures
+                        and not prepared_requests
+                        and not dispatcher.has_pending()
+                        and not pending_ddar_submit
+                        and not running_futures
+                    ):
+                        # The next depth only starts after the current depth
+                        # fully drains, so frontier replacement remains
+                        # deterministic.
+                        break
+
+                    loop_elapsed_s = time.perf_counter() - loop_start
+                    accounted_delta = sum(
+                        float(profiling.get(field, 0.0)) - wall_before[field]
+                        for field in wall_before
+                    )
+                    add_profiling_time(
+                        profiling,
                         "scheduler_overhead_wall_time_s",
+                        max(loop_elapsed_s - accounted_delta, 0.0),
                     )
-                }
-                progress = False
 
-                # 1. Consume DDAR completions first so validated states can
-                # immediately contribute to the next-depth frontier.
-                ddar_before_poll = len(running_futures)
-                solved_payload = self._poll_ddar_futures(
-                    running_futures=running_futures,
-                    future_info=future_info,
-                    next_queue=next_queue,
-                    depth=depth,
-                    t0=t0,
-                    step=step,
-                    profiling=profiling,
-                    proof=proof,
-                    runtime_s=time.perf_counter() - perf_t0,
-                )
-                if solved_payload is not None:
-                    dispatcher.cancel_running()
-                    return solved_payload
-                if len(running_futures) != ddar_before_poll:
-                    progress = True
+                    if progress:
+                        continue
 
-                # 2. Consume any ready GPU completions without blocking. This
-                # keeps model outputs flowing into CPU-side parsing and DDAR.
-                active_gpu_refs = dispatcher.active_refs()
-                if active_gpu_refs:
-                    done_gpu_refs, _ = ray.wait(
-                        active_gpu_refs,
-                        num_returns=len(active_gpu_refs),
-                        timeout=0,
+                    # 7. If no stage made progress, block until either prepare,
+                    # GPU, or DDAR work completes, and charge that delay to one
+                    # unified wait bucket.
+                    event_kind, event_ref = self._wait_for_next_event(
+                        dispatcher=dispatcher,
+                        running_futures=running_futures,
+                        running_prepare_futures=running_prepare_futures,
+                        profiling=profiling,
                     )
-                    for done_ref in done_gpu_refs:
-                        gpu_result = dispatcher.take_done(done_ref)
+                    if event_kind == "prepare":
+                        continue
+                    if event_kind == "gpu":
+                        gpu_result = dispatcher.take_done(event_ref)
                         next_node_id = self._handle_gpu_result(
                             gpu_result=gpu_result,
                             request_meta=request_meta,
@@ -702,144 +968,36 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                             profiling=profiling,
                             next_node_id=next_node_id,
                         )
-                        progress = True
+                        continue
+                    if event_kind == "ddar":
+                        solved_payload = self._process_ddar_completion(
+                            done_ref=event_ref,
+                            running_futures=running_futures,
+                            future_info=future_info,
+                            next_queue=next_queue,
+                            depth=depth,
+                            t0=t0,
+                            step=step,
+                            profiling=profiling,
+                            proof=proof,
+                            perf_t0=perf_t0,
+                        )
+                        if solved_payload is not None:
+                            dispatcher.cancel_running()
+                            self._cleanup_prepare_futures(
+                                running_prepare_futures=running_prepare_futures,
+                                request_meta=request_meta,
+                            )
+                            return solved_payload
 
-                # 3. Submit as many validated candidates as allowed by the
-                # DDAR backpressure cap.
-                before_submit = len(running_futures)
-                self._submit_pending_ddar(
-                    pending_ddar_submit=pending_ddar_submit,
-                    running_futures=running_futures,
-                    future_info=future_info,
-                    rules_ref=rules_ref,
-                    proof=proof,
-                    depth=depth,
-                    t0=t0,
-                    timeout=timeout,
-                    profiling=profiling,
-                )
-                if len(running_futures) != before_submit:
-                    progress = True
-
-                ddar_backlog = len(pending_ddar_submit) + len(running_futures)
-
-                # 4. Build more requests on demand. This is where VLM figure
-                # rendering happens, so we avoid preparing the whole depth up front.
-                while (
-                    not frontier_exhausted
-                    and len(prepared_requests) < request_prefetch_limit
-                    and ddar_backlog <= ddar_backlog_high_watermark
-                ):
-                    next_request_index = self._prepare_next_request(
-                        frontier_iter=frontier_iter,
-                        request_index=request_index,
-                        request_meta=request_meta,
-                        prepared_requests=prepared_requests,
-                        proof=proof,
-                        depth=depth,
-                        profiling=profiling,
-                    )
-                    if next_request_index is None:
-                        frontier_exhausted = True
-                        break
-                    request_index = next_request_index
-                    progress = True
-
-                # 5. Feed any idle GPU workers. The queue may pause here when
-                # DDAR backlog is already too deep.
-                while (
-                    prepared_requests
-                    and dispatcher.idle_worker_count() > 0
-                    and (len(pending_ddar_submit) + len(running_futures)) <= ddar_backlog_high_watermark
-                ):
-                    request = prepared_requests.popleft()
-                    request_meta[request["request_id"]]["gpu_submitted_at_perf_s"] = time.perf_counter()
-                    dispatcher.enqueue_request(request)
-                    progress = True
-
-                if (
-                    frontier_exhausted
-                    and not prepared_requests
-                    and not dispatcher.has_pending()
-                    and not pending_ddar_submit
-                    and not running_futures
-                ):
-                    # The next depth only starts after the current depth fully
-                    # drains, so frontier replacement remains deterministic.
-                    break
-
-                loop_elapsed_s = time.perf_counter() - loop_start
-                accounted_delta = sum(
-                    float(profiling.get(field, 0.0)) - wall_before[field]
-                    for field in wall_before
-                )
-                add_profiling_time(
-                    profiling,
-                    "scheduler_overhead_wall_time_s",
-                    max(loop_elapsed_s - accounted_delta, 0.0),
-                )
-
-                if progress:
-                    continue
-
-                # 6. If nothing progressed, block until one GPU or DDAR event
-                # completes. This is the main place where real wait bottlenecks
-                # show up in wall-clock profiling.
-                wait_refs = dispatcher.active_refs() + running_futures
-                if not wait_refs:
-                    continue
-                wait_start = time.perf_counter()
-                done_refs, _ = ray.wait(wait_refs, num_returns=1, timeout=1)
-                wait_elapsed_s = time.perf_counter() - wait_start
-                if not done_refs:
-                    add_profiling_time(profiling, "scheduler_overhead_wall_time_s", wait_elapsed_s)
-                    continue
-                done_ref = done_refs[0]
-
-                if dispatcher.owns_ref(done_ref):
-                    add_profiling_time(profiling, "gpu_wait_wall_time_s", wait_elapsed_s)
-                    gpu_result = dispatcher.take_done(done_ref)
-                    next_node_id = self._handle_gpu_result(
-                        gpu_result=gpu_result,
-                        request_meta=request_meta,
-                        pending_ddar_submit=pending_ddar_submit,
-                        depth=depth,
-                        profiling=profiling,
-                        next_node_id=next_node_id,
-                    )
-                    continue
-
-                add_profiling_time(profiling, "ddar_wait_wall_time_s", wait_elapsed_s)
-                logger.debug(
-                    "Search depth=%d received standalone DDAR completion; running_ddar_before_remove=%d",
+                beam_queue = next_queue
+                next_frontier_size = len(list(beam_queue))
+                self._trace("depth_end", depth=depth, next_frontier_size=next_frontier_size)
+                logger.info(
+                    "Search depth end: depth=%d next_frontier_size=%d",
                     depth,
-                    len(running_futures),
+                    next_frontier_size,
                 )
-                running_futures.remove(done_ref)
-                solved_payload = self._handle_ddar_done(
-                    done_futures=[done_ref],
-                    running_futures=running_futures,
-                    future_info=future_info,
-                    next_queue=next_queue,
-                    depth=depth,
-                    t0=t0,
-                    step=step,
-                    profiling=profiling,
-                    proof=proof,
-                    runtime_s=time.perf_counter() - perf_t0,
-                )
-                if solved_payload is not None:
-                    dispatcher.cancel_running()
-                    return solved_payload
-
-            beam_queue = next_queue
-            next_frontier_size = len(list(beam_queue))
-            self._trace("depth_end", depth=depth, next_frontier_size=next_frontier_size)
-            logger.info(
-                "Search depth end: depth=%d next_frontier_size=%d",
-                depth,
-                next_frontier_size,
-            )
 
         logger.info("Agent run finished without solution")
         return self._build_info_payload(

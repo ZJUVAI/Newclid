@@ -90,6 +90,8 @@ def create_agent(
     beam_size: int,
     search_depth: int,
     max_pending_ddar: int,
+    prepare_request_workers: int,
+    prepare_prefetch_limit: int,
     render_root: Path,
     trace_writer=None,
 ):
@@ -103,6 +105,8 @@ def create_agent(
             search_depth=search_depth,
             agent_type="lm_multi_gpu_experiment",
             max_pending_ddar=max_pending_ddar,
+            prepare_request_workers=prepare_request_workers,
+            prepare_prefetch_limit=prepare_prefetch_limit,
             trace_writer=trace_writer,
         )
     if agent_type in {"vlm", "qwen35"}:
@@ -115,6 +119,8 @@ def create_agent(
             search_depth=search_depth,
             agent_type=f"{agent_type}_multi_gpu_experiment",
             max_pending_ddar=max_pending_ddar,
+            prepare_request_workers=prepare_request_workers,
+            prepare_prefetch_limit=prepare_prefetch_limit,
             render_root=render_root,
             trace_writer=trace_writer,
         )
@@ -132,6 +138,8 @@ def solve_one_problem(
     search_depth: int,
     timeout: int,
     max_pending_ddar: int,
+    prepare_request_workers: int,
+    prepare_prefetch_limit: int,
     render_root: Path,
     trace_writer=None,
 ):
@@ -152,6 +160,8 @@ def solve_one_problem(
         beam_size=beam_size,
         search_depth=search_depth,
         max_pending_ddar=max_pending_ddar,
+        prepare_request_workers=prepare_request_workers,
+        prepare_prefetch_limit=prepare_prefetch_limit,
         render_root=render_root,
         trace_writer=trace_writer,
     )
@@ -189,6 +199,8 @@ def solve_problems_single_problem_multi_gpu(
     timeout: int,
     agent_type: str,
     max_pending_ddar: int | None,
+    prepare_request_workers: int | None,
+    prepare_prefetch_limit: int | None,
     log_dir: str | None,
     render_root: str | None = None,
     trace_dir: str | None = None,
@@ -227,6 +239,18 @@ def solve_problems_single_problem_multi_gpu(
             raise ValueError(
                 f"Requested {num_gpus_for_eval} GPUs, but Ray only reports {available_gpus} GPUs."
             )
+        if prepare_request_workers is None:
+            prepare_request_workers = max(1, 2 * num_gpus_for_eval) if num_gpus_for_eval > 0 else 2
+        if prepare_request_workers <= 0:
+            raise ValueError(
+                f"prepare_request_workers must be positive, got {prepare_request_workers}."
+            )
+        if prepare_prefetch_limit is None:
+            prepare_prefetch_limit = prepare_request_workers
+        if prepare_prefetch_limit <= 0:
+            raise ValueError(
+                f"prepare_prefetch_limit must be positive, got {prepare_prefetch_limit}."
+            )
 
         workers = create_workers(
             agent_type=agent_type,
@@ -261,6 +285,8 @@ def solve_problems_single_problem_multi_gpu(
                     "timeout": timeout,
                     "max_pending_ddar": max_pending_ddar,
                     "num_gpus_for_eval": num_gpus_for_eval,
+                    "prepare_request_workers": prepare_request_workers,
+                    "prepare_prefetch_limit": prepare_prefetch_limit,
                 },
                 repo_root=Path.cwd(),
             )
@@ -270,6 +296,8 @@ def solve_problems_single_problem_multi_gpu(
         print(f"Using {num_gpus_for_eval} GPU workers")
         print("Using fixed single-request GPU dispatch")
         print(f"Using max_pending_ddar={max_pending_ddar}")
+        print(f"Using prepare_request_workers={prepare_request_workers}")
+        print(f"Using prepare_prefetch_limit={prepare_prefetch_limit}")
         print(f"Worker warmup: {warmup_infos}")
 
         all_tasks_info = [(problem_name, "Pending", 0.0) for problem_name in problem_names]
@@ -319,6 +347,8 @@ def solve_problems_single_problem_multi_gpu(
                             search_depth=search_depth,
                             timeout=timeout,
                             max_pending_ddar=max_pending_ddar,
+                            prepare_request_workers=prepare_request_workers,
+                            prepare_prefetch_limit=prepare_prefetch_limit,
                             render_root=problem_render_root,
                             trace_writer=trace_writer,
                         )
@@ -376,11 +406,10 @@ def solve_problems_single_problem_multi_gpu(
                                 "total_time_s": profiling["total_time_s"],
                                 "entry_setup_wall_time_s": profiling["entry_setup_wall_time_s"],
                                 "base_ddar_wall_time_s": profiling["base_ddar_wall_time_s"],
-                                "request_build_wall_time_s": profiling["request_build_wall_time_s"],
-                                "gpu_wait_wall_time_s": profiling["gpu_wait_wall_time_s"],
+                                "request_prepare_wall_time_s": profiling["request_prepare_wall_time_s"],
+                                "wait_wall_time_s": profiling["wait_wall_time_s"],
                                 "gpu_result_handle_wall_time_s": profiling["gpu_result_handle_wall_time_s"],
                                 "ddar_submit_wall_time_s": profiling["ddar_submit_wall_time_s"],
-                                "ddar_wait_wall_time_s": profiling["ddar_wait_wall_time_s"],
                                 "ddar_result_handle_wall_time_s": profiling["ddar_result_handle_wall_time_s"],
                                 "scheduler_overhead_wall_time_s": profiling["scheduler_overhead_wall_time_s"],
                                 "other_wall_time_s": profiling["other_wall_time_s"],
@@ -536,6 +565,18 @@ def main():
         help="Upper bound on in-flight DDAR Ray tasks for the current problem. Defaults to 2 * max_workers when omitted.",
     )
     parser.add_argument(
+        "--prepare_request_workers",
+        type=int,
+        default=None,
+        help="Local ThreadPoolExecutor worker count for parallel request preparation. Defaults to 2 * num_gpus_for_eval.",
+    )
+    parser.add_argument(
+        "--prepare_prefetch_limit",
+        type=int,
+        default=None,
+        help="Maximum combined count of running prepare tasks and ready prepared requests. Defaults to prepare_request_workers.",
+    )
+    parser.add_argument(
         "--enable_profiling",
         action=argparse.BooleanOptionalAction,
         default=False,
@@ -554,6 +595,8 @@ def main():
         timeout=args.timeout,
         agent_type=args.agent,
         max_pending_ddar=args.max_pending_ddar,
+        prepare_request_workers=args.prepare_request_workers,
+        prepare_prefetch_limit=args.prepare_prefetch_limit,
         log_dir=args.log_dir,
         render_root=args.render_root,
         trace_dir=args.trace_dir,

@@ -8,11 +8,10 @@ from typing import Any
 WALL_TIME_FIELDS = (
     "entry_setup_wall_time_s",
     "base_ddar_wall_time_s",
-    "request_build_wall_time_s",
-    "gpu_wait_wall_time_s",
+    "request_prepare_wall_time_s",
+    "wait_wall_time_s",
     "gpu_result_handle_wall_time_s",
     "ddar_submit_wall_time_s",
-    "ddar_wait_wall_time_s",
     "ddar_result_handle_wall_time_s",
     "scheduler_overhead_wall_time_s",
     "total_time_s",
@@ -93,11 +92,10 @@ def write_profiling_csv(
                     f"Total Time: {display_total_time_s:.2f}s, "
                     f"Entry Setup Wall Time: {summary['entry_setup_wall_time_s']:.2f}s, "
                     f"Base DDAR Wall Time: {summary['base_ddar_wall_time_s']:.2f}s, "
-                    f"Request Build Wall Time: {summary['request_build_wall_time_s']:.2f}s, "
-                    f"GPU Wait Wall Time: {summary['gpu_wait_wall_time_s']:.2f}s, "
+                    f"Request Prepare Wall Time: {summary['request_prepare_wall_time_s']:.2f}s, "
+                    f"Wait Wall Time: {summary['wait_wall_time_s']:.2f}s, "
                     f"GPU Result Handle Wall Time: {summary['gpu_result_handle_wall_time_s']:.2f}s, "
                     f"DDAR Submit Wall Time: {summary['ddar_submit_wall_time_s']:.2f}s, "
-                    f"DDAR Wait Wall Time: {summary['ddar_wait_wall_time_s']:.2f}s, "
                     f"DDAR Result Handle Wall Time: {summary['ddar_result_handle_wall_time_s']:.2f}s, "
                     f"Scheduler Overhead Wall Time: {summary['scheduler_overhead_wall_time_s']:.2f}s, "
                     f"Other Wall Time: {summary['other_wall_time_s']:.2f}s"
@@ -111,11 +109,10 @@ def write_profiling_csv(
                 "Total Time (s)",
                 "Entry Setup Wall Time (s)",
                 "Base DDAR Wall Time (s)",
-                "Request Build Wall Time (s)",
-                "GPU Wait Wall Time (s)",
+                "Request Prepare Wall Time (s)",
+                "Wait Wall Time (s)",
                 "GPU Result Handle Wall Time (s)",
                 "DDAR Submit Wall Time (s)",
-                "DDAR Wait Wall Time (s)",
                 "DDAR Result Handle Wall Time (s)",
                 "Scheduler Overhead Wall Time (s)",
                 "Other Wall Time (s)",
@@ -129,11 +126,10 @@ def write_profiling_csv(
                     f"{float(row.get('total_time_s', 0.0)):.2f}",
                     f"{float(row.get('entry_setup_wall_time_s', 0.0)):.2f}",
                     f"{float(row.get('base_ddar_wall_time_s', 0.0)):.2f}",
-                    f"{float(row.get('request_build_wall_time_s', 0.0)):.2f}",
-                    f"{float(row.get('gpu_wait_wall_time_s', 0.0)):.2f}",
+                    f"{float(row.get('request_prepare_wall_time_s', 0.0)):.2f}",
+                    f"{float(row.get('wait_wall_time_s', 0.0)):.2f}",
                     f"{float(row.get('gpu_result_handle_wall_time_s', 0.0)):.2f}",
                     f"{float(row.get('ddar_submit_wall_time_s', 0.0)):.2f}",
-                    f"{float(row.get('ddar_wait_wall_time_s', 0.0)):.2f}",
                     f"{float(row.get('ddar_result_handle_wall_time_s', 0.0)):.2f}",
                     f"{float(row.get('scheduler_overhead_wall_time_s', 0.0)):.2f}",
                     f"{float(row.get('other_wall_time_s', 0.0)):.2f}",

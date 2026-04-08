@@ -457,7 +457,7 @@ class Qwen35Agent(DeductiveAgent):
 
                             p_dsl = self.problem_to_dsl(problem, base_proof.defs)
                             new_point_name = self.get_new_point_name(problem)
-                            add_profiling_time(profiling, "request_build_wall_time_s", time.time() - request_build_start)
+                            add_profiling_time(profiling, "request_prepare_wall_time_s", time.time() - request_build_start)
                             logger.debug("Inferencing on query (%s): %s", queue_type, p_dsl)
                             inference_start = time.time()
                             aux_dsl_dict = self.inference(
@@ -469,7 +469,7 @@ class Qwen35Agent(DeductiveAgent):
                                 response_prefix='<aux> x00',
                                 with_predicate=with_predicate
                             )
-                            add_profiling_time(profiling, "gpu_wait_wall_time_s", time.time() - inference_start)
+                            add_profiling_time(profiling, "wait_wall_time_s", time.time() - inference_start)
                             result_handle_start = time.time()
                             
                             for aux_dsl, score in aux_dsl_dict.items():
@@ -548,7 +548,7 @@ class Qwen35Agent(DeductiveAgent):
                             # check any done task
                             ddar_wait_start = time.time()
                             done, running_futures = ray.wait(running_futures, timeout=0)
-                            add_profiling_time(profiling, "ddar_wait_wall_time_s", time.time() - ddar_wait_start)
+                            add_profiling_time(profiling, "wait_wall_time_s", time.time() - ddar_wait_start)
                             future_result = process_completed_futures(done, new_queues, depth)
                             if future_result is not None:
                                 return future_result
@@ -557,7 +557,7 @@ class Qwen35Agent(DeductiveAgent):
                     while running_futures:
                         ddar_wait_start = time.time()
                         done, running_futures = ray.wait(running_futures, num_returns=min(1000, len(running_futures)))
-                        add_profiling_time(profiling, "ddar_wait_wall_time_s", time.time() - ddar_wait_start)
+                        add_profiling_time(profiling, "wait_wall_time_s", time.time() - ddar_wait_start)
                         future_result = process_completed_futures(done, new_queues, depth)
                         if future_result is not None:
                             return future_result

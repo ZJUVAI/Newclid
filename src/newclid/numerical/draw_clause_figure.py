@@ -32,6 +32,8 @@ def draw_clause_figure(
     save_to: Optional[Union[str, Path]],
     rng: Generator,
     draw_annotations: bool = True,
+    format: Optional[str] = None,
+    dpi: Optional[float] = None,
 ):
     """Draw clauses figure."""
     fig = deepcopy(proof.fig)
@@ -45,7 +47,16 @@ def draw_clause_figure(
         draw_annotations=draw_annotations,
     )
     if save_to is not None:
-        fig.savefig(save_to, format='svg')
+        save_format = format
+        if save_format is None and isinstance(save_to, (str, Path)):
+            suffix = Path(save_to).suffix.lower().lstrip(".")
+            save_format = suffix or None
+        savefig_kwargs = {}
+        if save_format is not None:
+            savefig_kwargs["format"] = save_format
+        if dpi is not None:
+            savefig_kwargs["dpi"] = dpi
+        fig.savefig(save_to, **savefig_kwargs)
 
 def draw_clauses(
     ax: "Axes",
