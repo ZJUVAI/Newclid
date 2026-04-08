@@ -5,7 +5,6 @@ import time
 import logging
 from typing import TYPE_CHECKING, Any, List, Tuple
 from fractions import Fraction
-import re
 from collections import defaultdict
 import heapq
 import string
@@ -20,14 +19,6 @@ from newclid.formulations.definition import DefinitionJGEX
 from newclid.formulations.clause import Clause, translate_sentence
 from newclid.statement import Statement
 from newclid.proof import ProofState
-from newclid.predicates.congruence import Cong
-from newclid.predicates.midpoint import MidPoint
-from newclid.predicates.parallelism import Para
-from newclid.predicates.perpendicularity import Perp
-from newclid.predicates.collinearity import Coll
-from newclid.predicates.cyclic import Cyclic
-from newclid.predicates.equal_angles import EqAngle
-from newclid.predicates.equal_ratios import EqRatio
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulator
 from newclid.dependencies.dependency import Dependency
@@ -38,6 +29,10 @@ from newclid.problem_db import (
     ProblemDBRuntime,
     classify_build_exception,
     summarize_problem_db_runtime,
+)
+from newclid.training.aux_dsl import (
+    translate_dsl_to_construction,
+    try_dsl_to_constructions,
 )
 
 if TYPE_CHECKING:
@@ -413,114 +408,11 @@ class LMAgent(DeductiveAgent):
         return
     
     def try_dsl_to_constructions(self, content):
-        points, premises = content.split(';')[0].split(' : ')
-
-        # points
-        points = points.strip().split()
-        # currently, we only support one point following alphageometry
-        if len(points) == 0 or len(points) > 1:
-            return
-        points = points[0]
-    
-        # premises
-        premises = re.split(r"\s*\[\d+\]", premises) # coll a c e [002] coll b d e [003] => 'coll a c e' , 'coll b d e'
-        premises = [seg.strip() for seg in premises if seg.strip()]
-        # currently, we only support two premises following alphageometry
-        if len(premises) > 2:
-            return 
-            # segments = segments[:2]
-        # TODO: should we support free points?
-        if len(premises) == 0:
-            return f'{points} = free {points}'
-        result_constructions = []
-        for premise in premises:
-            parts = premise.split()
-            if not parts[0].isalpha():
-                return
-            construction = self.translate_dsl_to_construction(points, parts[0], parts[1:])
-            result_constructions.append(construction)
-        return points + ' = ' + ', '.join(result_constructions)
+        return try_dsl_to_constructions(content)
 
     def translate_dsl_to_construction(self, point: str, predicate: str, args: list[str]
         ) -> tuple[str, list[str]]:
-        """ Translate a predicate into construction
-        
-        Args:
-            point: str: name of the new point
-            predicate: str: name of the predicates, e.g., perp, para, etc.
-            args: list[str]: list of predicate args.
-        
-        Return:
-            (predicate, args): translated to constructive predicate.
-        """
-        # Line perpendicularity
-        if predicate == 'perp':
-            return Perp.to_constructive(point, tuple(args))
-
-        # Line parallelism
-        elif predicate == 'para':
-            return Para.to_constructive(point, tuple(args))
-
-        # Congruence/Equal distance
-        elif predicate == 'cong':
-            return Cong.to_constructive(point, tuple(args))
-
-        # Midpoint
-        elif predicate == 'midp':
-            return MidPoint.to_constructive(point, tuple(args))
-
-        # Collinearity
-        elif predicate == 'coll':
-            return Coll.to_constructive(point, tuple(args))
-
-        # Equal angles
-        elif predicate == 'eqangle':
-            def arrange_angle_points(a, b, c, d):
-                if a == c:
-                    return (b, a, d)
-                elif a == d:
-                    return (b, a, c)
-                elif b == c:
-                    return (a, b, d)
-                elif b == d:
-                    return (a, b, c)
-                else:
-                    return None
-
-            a, b, c, d, e, f, g, h = args
-            if(len(set([a, b, c, d, e, f, g, h]))) == 8:
-                if point == h:
-                    res1 = f"on_aline0 {h} {a} {b} {c} {d} {e} {f} {g}"
-                if point == g:
-                    res1 = f"on_aline0 {g} {a} {b} {c} {d} {e} {f} {h}"
-                if point == f:
-                    res1 = f"on_aline0 {f} {c} {d} {a} {b} {g} {h} {e}"
-                if point == e:
-                    res1 = f"on_aline0 {e} {c} {d} {a} {b} {g} {h} {f}"
-                if point == d:
-                    res1 = f"on_aline0 {d} {e} {f} {g} {h} {a} {b} {c}"
-                if point == c:
-                    res1 = f"on_aline0 {c} {e} {f} {g} {h} {a} {b} {d}"
-                if point == b:
-                    res1 = f"on_aline0 {b} {g} {h} {e} {f} {c} {d} {a}"
-                if point == a:
-                    res1 = f"on_aline0 {a} {g} {h} {e} {f} {c} {d} {b}"
-            else:
-                # Handle diagonal line exchange
-                if(len(set([a, b, c, d])) == 4 and len(set([a, b, e, f])) == 3): 
-                    a, b, c, d, e, f, g, h = a, b, e, f, c, d, g, h
-                res1 = EqAngle.to_constructive(point, arrange_angle_points(a, b, c, d) + arrange_angle_points(e, f, g, h))
-            return res1
-            
-        # Cyclic (four points on a circle)
-        elif predicate == 'cyclic':
-            return Cyclic.to_constructive(point, tuple(args))
-
-        elif predicate == 'eqratio':
-            return EqRatio.to_constructive(point, tuple(args))
-
-        # For others, return directly
-        return f"{predicate} {' '.join(args)}"
+        return translate_dsl_to_construction(point, predicate, args)
     
     def problem_to_dsl(self, problem: "ProblemJGEX", defs: dict[str, DefinitionJGEX]) -> str:
         """Convert the problem to a DSL string."""
