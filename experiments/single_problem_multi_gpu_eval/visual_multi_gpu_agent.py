@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 
 import cairosvg
 from PIL import Image, ImageOps
-import ray
 
 from newclid.agent.lm import LMAgent
 from newclid.agent.vlm import VLMAgent
@@ -57,11 +56,11 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
     def base_ddar_proof(self, proof: ProofState) -> ProofState:
         return deepcopy(proof)
 
-    def seed_state(self, proof: ProofState, base_proof: ProofState) -> tuple[ProblemJGEX, object]:
+    def seed_state(self, proof: ProofState, base_proof: ProofState) -> tuple[ProblemJGEX, ProofState]:
         del proof
         return self.problemJGEX, base_proof
 
-    def get_problem_from_state(self, state: tuple[ProblemJGEX, object]) -> ProblemJGEX:
+    def get_problem_from_state(self, state: tuple[ProblemJGEX, ProofState]) -> ProblemJGEX:
         problem, _ = state
         return problem
 
@@ -69,24 +68,17 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
         self,
         *,
         request_id: str,
-        state: tuple[ProblemJGEX, object],
+        state: tuple[ProblemJGEX, ProofState],
         proof: ProofState,
         depth: int,
     ) -> dict[str, object]:
         del proof
-        problem, proof_or_ref = state
+        problem, current_proof = state
         stem = f"d{depth}_{request_id}"
         svg_path = self.render_root / f"{stem}.svg"
         png_path = self.render_root / f"{stem}.png"
 
         render_start = time.perf_counter()
-        proof_fetch_start = time.perf_counter()
-        if isinstance(proof_or_ref, ProofState):
-            current_proof = proof_or_ref
-            proof_fetch_elapsed_s = 0.0
-        else:
-            current_proof = ray.get(proof_or_ref)
-            proof_fetch_elapsed_s = time.perf_counter() - proof_fetch_start
         draw_clause_figure(
             current_proof,
             problem,
@@ -130,9 +122,6 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
             "with_predicate": False,
             "decoding_size": self.decoding_size,
             "_prepare_elapsed_s": time.perf_counter() - render_start,
-            "_prepare_profile": {
-                "prepare_proof_fetch_work_time_s": proof_fetch_elapsed_s,
-            },
         }
 
     def make_next_state_from_unsolved_ddar(
@@ -142,12 +131,12 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
         prior_state,
         ddar_result: dict[str, object],
         proof: ProofState,
-    ) -> tuple[ProblemJGEX, object] | None:
+    ) -> tuple[ProblemJGEX, ProofState] | None:
         del prior_state, proof
-        next_proof_ref = ddar_result.get("proof_ref")
-        if next_proof_ref is None:
+        next_proof = ddar_result.get("proof")
+        if next_proof is None:
             return None
-        return new_problem, next_proof_ref
+        return new_problem, next_proof
 
     def get_new_point_name(self, problem: ProblemJGEX) -> str:
         num_points = sum(len(clause.points) for clause in problem.constructions)

@@ -109,7 +109,6 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "ddar_result_ray_get_wall_time_s": 0.2,
             "ddar_result_next_state_wall_time_s": 0.1,
             "ddar_result_queue_wall_time_s": 0.05,
-            "prepare_proof_fetch_work_time_s": 0.15,
             "scheduler_overhead_wall_time_s": 0.2,
             "other_wall_time_s": 0.3,
         },
@@ -127,7 +126,6 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "ddar_result_ray_get_wall_time_s": 0.05,
             "ddar_result_next_state_wall_time_s": 0.02,
             "ddar_result_queue_wall_time_s": 0.01,
-            "prepare_proof_fetch_work_time_s": 0.04,
             "scheduler_overhead_wall_time_s": 0.1,
             "other_wall_time_s": 0.3,
         },
@@ -149,7 +147,6 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
     assert "Total Time: 7.00s" in written_rows[0][0]
     assert "Request Prepare Wall Time: 1.50s" in written_rows[0][0]
     assert "DDAR Result Ray.get Wall Time: 0.25s" in written_rows[0][0]
-    assert "Prepare Proof Fetch Work Time: 0.19s" in written_rows[0][0]
     assert written_rows[1] == [
         "Problem Name",
         "Solved",
@@ -164,7 +161,6 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
         "DDAR Result Ray.get Wall Time (s)",
         "DDAR Result Next State Wall Time (s)",
         "DDAR Result Queue Wall Time (s)",
-        "Prepare Proof Fetch Work Time (s)",
         "Scheduler Overhead Wall Time (s)",
         "Other Wall Time (s)",
     ]
@@ -182,7 +178,6 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
         "0.20",
         "0.10",
         "0.05",
-        "0.15",
         "0.20",
         "0.30",
     ]
@@ -320,86 +315,3 @@ def test_ddar_result_handle_breaks_out_non_overlapping_substages(monkeypatch) ->
         + profiling["ddar_result_queue_wall_time_s"]
         <= profiling["ddar_result_handle_wall_time_s"]
     )
-
-
-def test_submit_pending_ddar_only_requests_proof_before_last_depth(monkeypatch) -> None:
-    agent = _DummyAgent(
-        model_pool=None,
-        decoding_size=1,
-        beam_size=4,
-        search_depth=3,
-        agent_type="dummy",
-        ddar_returns_proof=True,
-    )
-    profiling = create_profiling_payload()
-    calls = []
-
-    def fake_remote(problem, defs, rules_ref, t0, timeout, *, return_proof):
-        calls.append(return_proof)
-        return object()
-
-    monkeypatch.setattr(
-        "experiments.single_problem_multi_gpu_eval.base_multi_gpu_agent.run_ddar_remote.remote",
-        fake_remote,
-    )
-
-    pending_ddar_submit = deque(
-        [
-            {
-                "problem": "problem",
-                "state": "state",
-                "prev_score": 0.0,
-                "score": 1.0,
-                "node_id": 1,
-                "parent_node_id": 0,
-                "request_id": "r1",
-                "candidate_rank": 0,
-                "attempt_key": "attempt",
-                "raw_aux_text": "aux",
-                "translated_aux": "aux",
-            }
-        ]
-    )
-
-    proof = type("Proof", (), {"defs": {"d": 1}})()
-    agent._submit_pending_ddar(
-        pending_ddar_submit=pending_ddar_submit,
-        running_futures=[],
-        future_info={},
-        rules_ref=object(),
-        proof=proof,
-        depth=0,
-        t0=time.time(),
-        timeout=10,
-        profiling=profiling,
-    )
-    assert calls == [True]
-
-    calls.clear()
-    pending_ddar_submit.append(
-        {
-            "problem": "problem",
-            "state": "state",
-            "prev_score": 0.0,
-            "score": 1.0,
-            "node_id": 1,
-            "parent_node_id": 0,
-            "request_id": "r1",
-            "candidate_rank": 0,
-            "attempt_key": "attempt",
-            "raw_aux_text": "aux",
-            "translated_aux": "aux",
-        }
-    )
-    agent._submit_pending_ddar(
-        pending_ddar_submit=pending_ddar_submit,
-        running_futures=[],
-        future_info={},
-        rules_ref=object(),
-        proof=proof,
-        depth=2,
-        t0=time.time(),
-        timeout=10,
-        profiling=profiling,
-    )
-    assert calls == [False]
