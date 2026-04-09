@@ -18,6 +18,12 @@ WALL_TIME_FIELDS = (
     "other_wall_time_s",
 )
 
+DETAIL_TIME_FIELDS = (
+    "ddar_result_ray_get_wall_time_s",
+    "ddar_result_next_state_wall_time_s",
+    "ddar_result_queue_wall_time_s",
+)
+
 PROFILED_WALL_COMPONENT_FIELDS = tuple(
     field for field in WALL_TIME_FIELDS if field not in {"total_time_s", "other_wall_time_s"}
 )
@@ -26,7 +32,7 @@ PROFILED_WALL_COMPONENT_FIELDS = tuple(
 def create_profiling_payload() -> dict[str, float]:
     return {
         field: 0.0
-        for field in WALL_TIME_FIELDS
+        for field in WALL_TIME_FIELDS + DETAIL_TIME_FIELDS
     }
 
 
@@ -64,10 +70,10 @@ def merge_profiling_payloads(*payloads: dict[str, Any] | None) -> dict[str, floa
 def profiling_summary(rows: list[dict[str, Any]]) -> dict[str, float]:
     summary = {
         field: 0.0
-        for field in WALL_TIME_FIELDS
+        for field in WALL_TIME_FIELDS + DETAIL_TIME_FIELDS
     }
     for row in rows:
-        for field in WALL_TIME_FIELDS:
+        for field in WALL_TIME_FIELDS + DETAIL_TIME_FIELDS:
             summary[field] += float(row.get(field, 0.0))
     return summary
 
@@ -97,6 +103,9 @@ def write_profiling_csv(
                     f"GPU Result Handle Wall Time: {summary['gpu_result_handle_wall_time_s']:.2f}s, "
                     f"DDAR Submit Wall Time: {summary['ddar_submit_wall_time_s']:.2f}s, "
                     f"DDAR Result Handle Wall Time: {summary['ddar_result_handle_wall_time_s']:.2f}s, "
+                    f"DDAR Result Ray.get Wall Time: {summary['ddar_result_ray_get_wall_time_s']:.2f}s, "
+                    f"DDAR Result Next State Wall Time: {summary['ddar_result_next_state_wall_time_s']:.2f}s, "
+                    f"DDAR Result Queue Wall Time: {summary['ddar_result_queue_wall_time_s']:.2f}s, "
                     f"Scheduler Overhead Wall Time: {summary['scheduler_overhead_wall_time_s']:.2f}s, "
                     f"Other Wall Time: {summary['other_wall_time_s']:.2f}s"
                 )
@@ -114,6 +123,9 @@ def write_profiling_csv(
                 "GPU Result Handle Wall Time (s)",
                 "DDAR Submit Wall Time (s)",
                 "DDAR Result Handle Wall Time (s)",
+                "DDAR Result Ray.get Wall Time (s)",
+                "DDAR Result Next State Wall Time (s)",
+                "DDAR Result Queue Wall Time (s)",
                 "Scheduler Overhead Wall Time (s)",
                 "Other Wall Time (s)",
             ]
@@ -131,6 +143,9 @@ def write_profiling_csv(
                     f"{float(row.get('gpu_result_handle_wall_time_s', 0.0)):.2f}",
                     f"{float(row.get('ddar_submit_wall_time_s', 0.0)):.2f}",
                     f"{float(row.get('ddar_result_handle_wall_time_s', 0.0)):.2f}",
+                    f"{float(row.get('ddar_result_ray_get_wall_time_s', 0.0)):.2f}",
+                    f"{float(row.get('ddar_result_next_state_wall_time_s', 0.0)):.2f}",
+                    f"{float(row.get('ddar_result_queue_wall_time_s', 0.0)):.2f}",
                     f"{float(row.get('scheduler_overhead_wall_time_s', 0.0)):.2f}",
                     f"{float(row.get('other_wall_time_s', 0.0)):.2f}",
                 ]

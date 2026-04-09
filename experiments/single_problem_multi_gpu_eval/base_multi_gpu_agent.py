@@ -147,7 +147,13 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         # validation work and the next depth's frontier.
         handle_start = time.perf_counter()
         for future in done_futures:
+            ray_get_start = time.perf_counter()
             ddar_result = ray.get(future)
+            add_profiling_time(
+                profiling,
+                "ddar_result_ray_get_wall_time_s",
+                time.perf_counter() - ray_get_start,
+            )
             future_meta = future_info.pop(future)
 
             if ddar_result["status"] == "invalid":
@@ -207,17 +213,29 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 ddar_input=ddar_result.get("ddar_input"),
             )
             if depth < self.search_depth - 1:
+                next_state_start = time.perf_counter()
                 next_state = self.make_next_state_from_unsolved_ddar(
                     new_problem=future_meta["problem"],
                     prior_state=future_meta["state"],
                     ddar_result=ddar_result,
                     proof=proof,
                 )
+                add_profiling_time(
+                    profiling,
+                    "ddar_result_next_state_wall_time_s",
+                    time.perf_counter() - next_state_start,
+                )
                 if next_state is not None:
                     child_score = future_meta["prev_score"] + future_meta["score"]
+                    queue_start = time.perf_counter()
                     next_queue.add(
                         node=(future_meta["node_id"], future_meta["parent_node_id"], next_state),
                         val=child_score,
+                    )
+                    add_profiling_time(
+                        profiling,
+                        "ddar_result_queue_wall_time_s",
+                        time.perf_counter() - queue_start,
                     )
                     self._trace(
                         "candidate_transition",

@@ -411,6 +411,9 @@ def solve_problems_single_problem_multi_gpu(
                                 "gpu_result_handle_wall_time_s": profiling["gpu_result_handle_wall_time_s"],
                                 "ddar_submit_wall_time_s": profiling["ddar_submit_wall_time_s"],
                                 "ddar_result_handle_wall_time_s": profiling["ddar_result_handle_wall_time_s"],
+                                "ddar_result_ray_get_wall_time_s": profiling["ddar_result_ray_get_wall_time_s"],
+                                "ddar_result_next_state_wall_time_s": profiling["ddar_result_next_state_wall_time_s"],
+                                "ddar_result_queue_wall_time_s": profiling["ddar_result_queue_wall_time_s"],
                                 "scheduler_overhead_wall_time_s": profiling["scheduler_overhead_wall_time_s"],
                                 "other_wall_time_s": profiling["other_wall_time_s"],
                             }

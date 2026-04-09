@@ -3,6 +3,7 @@ from __future__ import annotations
 import csv
 import time
 from concurrent.futures import ThreadPoolExecutor
+from collections import deque
 
 from newclid.profiling import (
     add_profiling_time,
@@ -105,6 +106,9 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "gpu_result_handle_wall_time_s": 0.3,
             "ddar_submit_wall_time_s": 0.1,
             "ddar_result_handle_wall_time_s": 0.4,
+            "ddar_result_ray_get_wall_time_s": 0.2,
+            "ddar_result_next_state_wall_time_s": 0.1,
+            "ddar_result_queue_wall_time_s": 0.05,
             "scheduler_overhead_wall_time_s": 0.2,
             "other_wall_time_s": 0.3,
         },
@@ -119,6 +123,9 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "gpu_result_handle_wall_time_s": 0.2,
             "ddar_submit_wall_time_s": 0.0,
             "ddar_result_handle_wall_time_s": 0.1,
+            "ddar_result_ray_get_wall_time_s": 0.05,
+            "ddar_result_next_state_wall_time_s": 0.02,
+            "ddar_result_queue_wall_time_s": 0.01,
             "scheduler_overhead_wall_time_s": 0.1,
             "other_wall_time_s": 0.3,
         },
@@ -139,6 +146,7 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
     assert "Dataset: demo, Solved: 1/2" in written_rows[0][0]
     assert "Total Time: 7.00s" in written_rows[0][0]
     assert "Request Prepare Wall Time: 1.50s" in written_rows[0][0]
+    assert "DDAR Result Ray.get Wall Time: 0.25s" in written_rows[0][0]
     assert written_rows[1] == [
         "Problem Name",
         "Solved",
@@ -150,6 +158,9 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
         "GPU Result Handle Wall Time (s)",
         "DDAR Submit Wall Time (s)",
         "DDAR Result Handle Wall Time (s)",
+        "DDAR Result Ray.get Wall Time (s)",
+        "DDAR Result Next State Wall Time (s)",
+        "DDAR Result Queue Wall Time (s)",
         "Scheduler Overhead Wall Time (s)",
         "Other Wall Time (s)",
     ]
@@ -164,6 +175,9 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
         "0.30",
         "0.10",
         "0.40",
+        "0.20",
+        "0.10",
+        "0.05",
         "0.20",
         "0.30",
     ]
@@ -221,3 +235,83 @@ def test_gpu_or_ddar_wait_is_attributed_to_wait_wall_time(monkeypatch) -> None:
 
     assert profiling["wait_wall_time_s"] > 0.0
     assert profiling["request_prepare_wall_time_s"] == 0.0
+
+
+def test_ddar_result_handle_breaks_out_non_overlapping_substages(monkeypatch) -> None:
+    profiling = create_profiling_payload()
+    agent = _DummyAgent(
+        model_pool=None,
+        decoding_size=1,
+        beam_size=4,
+        search_depth=2,
+        agent_type="dummy",
+        ddar_returns_proof=True,
+    )
+    done_ref = object()
+    future_info = {
+        done_ref: {
+            "attempt_key": "attempt",
+            "node_id": 1,
+            "parent_node_id": 0,
+            "problem": "problem",
+            "state": "state",
+            "prev_score": 0.5,
+            "score": 1.0,
+            "request_id": "r1",
+            "candidate_rank": 0,
+            "raw_aux_text": "aux",
+            "translated_aux": "aux",
+        }
+    }
+
+    def fake_ray_get(ref):
+        assert ref is done_ref
+        time.sleep(0.01)
+        return {"status": "unsolved", "proof": "proof", "elapsed_time": 0.1, "ddar_input": None}
+
+    monkeypatch.setattr(
+        "experiments.single_problem_multi_gpu_eval.base_multi_gpu_agent.ray.get",
+        fake_ray_get,
+    )
+
+    def fake_next_state(*, new_problem, prior_state, ddar_result, proof):
+        assert new_problem == "problem"
+        assert prior_state == "state"
+        assert ddar_result["proof"] == "proof"
+        time.sleep(0.01)
+        return ("problem", "proof")
+
+    monkeypatch.setattr(agent, "make_next_state_from_unsolved_ddar", fake_next_state)
+
+    class _SlowQueue:
+        def __init__(self):
+            self.items = deque()
+
+        def add(self, node, val):
+            time.sleep(0.01)
+            self.items.append((node, val))
+
+    queue = _SlowQueue()
+    agent._handle_ddar_done(
+        done_futures=[done_ref],
+        running_futures=[],
+        future_info=future_info,
+        next_queue=queue,
+        depth=0,
+        t0=time.time(),
+        step=1,
+        profiling=profiling,
+        proof=None,
+        runtime_s=0.0,
+    )
+
+    assert profiling["ddar_result_handle_wall_time_s"] > 0.0
+    assert profiling["ddar_result_ray_get_wall_time_s"] > 0.0
+    assert profiling["ddar_result_next_state_wall_time_s"] > 0.0
+    assert profiling["ddar_result_queue_wall_time_s"] > 0.0
+    assert (
+        profiling["ddar_result_ray_get_wall_time_s"]
+        + profiling["ddar_result_next_state_wall_time_s"]
+        + profiling["ddar_result_queue_wall_time_s"]
+        <= profiling["ddar_result_handle_wall_time_s"]
+    )
