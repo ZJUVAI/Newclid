@@ -109,6 +109,7 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "ddar_result_ray_get_wall_time_s": 0.2,
             "ddar_result_next_state_wall_time_s": 0.1,
             "ddar_result_queue_wall_time_s": 0.05,
+            "ddar_render_work_time_s": 0.15,
             "scheduler_overhead_wall_time_s": 0.2,
             "other_wall_time_s": 0.3,
         },
@@ -126,6 +127,7 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "ddar_result_ray_get_wall_time_s": 0.05,
             "ddar_result_next_state_wall_time_s": 0.02,
             "ddar_result_queue_wall_time_s": 0.01,
+            "ddar_render_work_time_s": 0.04,
             "scheduler_overhead_wall_time_s": 0.1,
             "other_wall_time_s": 0.3,
         },
@@ -147,6 +149,7 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
     assert "Total Time: 7.00s" in written_rows[0][0]
     assert "Request Prepare Wall Time: 1.50s" in written_rows[0][0]
     assert "DDAR Result Ray.get Wall Time: 0.25s" in written_rows[0][0]
+    assert "DDAR Render Work Time: 0.19s" in written_rows[0][0]
     assert written_rows[1] == [
         "Problem Name",
         "Solved",
@@ -161,6 +164,7 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
         "DDAR Result Ray.get Wall Time (s)",
         "DDAR Result Next State Wall Time (s)",
         "DDAR Result Queue Wall Time (s)",
+        "DDAR Render Work Time (s)",
         "Scheduler Overhead Wall Time (s)",
         "Other Wall Time (s)",
     ]
@@ -178,6 +182,7 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
         "0.20",
         "0.10",
         "0.05",
+        "0.15",
         "0.20",
         "0.30",
     ]
@@ -267,7 +272,13 @@ def test_ddar_result_handle_breaks_out_non_overlapping_substages(monkeypatch) ->
     def fake_ray_get(ref):
         assert ref is done_ref
         time.sleep(0.01)
-        return {"status": "unsolved", "proof": "proof", "elapsed_time": 0.1, "ddar_input": None}
+        return {
+            "status": "unsolved",
+            "proof": "proof",
+            "elapsed_time": 0.1,
+            "ddar_input": None,
+            "ddar_render_work_time_s": 0.25,
+        }
 
     monkeypatch.setattr(
         "experiments.single_problem_multi_gpu_eval.base_multi_gpu_agent.ray.get",
@@ -309,6 +320,7 @@ def test_ddar_result_handle_breaks_out_non_overlapping_substages(monkeypatch) ->
     assert profiling["ddar_result_ray_get_wall_time_s"] > 0.0
     assert profiling["ddar_result_next_state_wall_time_s"] > 0.0
     assert profiling["ddar_result_queue_wall_time_s"] > 0.0
+    assert profiling["ddar_render_work_time_s"] == 0.25
     assert (
         profiling["ddar_result_ray_get_wall_time_s"]
         + profiling["ddar_result_next_state_wall_time_s"]
