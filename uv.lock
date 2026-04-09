@@ -41,15 +41,19 @@ wheels = [
 [[package]]
 name = "adjusttext"
 version = "1.3.0"
-source = { registry = "http://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/" }
+source = { url = "https://github.com/Phlya/adjustText/archive/master.zip" }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
     { name = "scipy" },
 ]
-sdist = { url = "http://mirrors.tuna.tsinghua.edu.cn/pypi/web/packages/4c/d4/6585f3b6fdb75648bca294664af4becc8aa2fb3fb08f4e4e9fd27e10d773/adjusttext-1.3.0.tar.gz", hash = "sha256:4ab75cd4453af4828876ac3e964f2c49be642ea834f0c1f7449558d5f12cbca1", size = 15724, upload-time = "2024-10-31T16:45:36.101Z" }
-wheels = [
-    { url = "http://mirrors.tuna.tsinghua.edu.cn/pypi/web/packages/53/1c/8feedd607cc14c5df9aef74fe3af9a99bf660743b842a9b5b1865326b4aa/adjustText-1.3.0-py3-none-any.whl", hash = "sha256:da23d7b24b6db5ffa039bb136bfa556207365e32f48ac74b07ad26dd485bc691", size = 13154, upload-time = "2024-10-31T16:45:35.227Z" },
+sdist = { hash = "sha256:f849e867129b93303b4baf013539b3b4d10d63ecf3cf7857b66708e8d22abcd3" }
+
+[package.metadata]
+requires-dist = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "scipy" },
 ]
 
 [[package]]
@@ -1963,7 +1967,7 @@ doc = [
 [package.metadata]
 requires-dist = [
     { name = "accelerate" },
-    { name = "adjusttext", specifier = ">=1.3.0" },
+    { name = "adjusttext", url = "https://github.com/Phlya/adjustText/archive/master.zip" },
     { name = "autoapi", marker = "extra == 'doc'" },
     { name = "black", marker = "extra == 'dev'" },
     { name = "cairosvg" },
@@ -1994,7 +1998,7 @@ requires-dist = [
     { name = "sphinx-rtd-theme", marker = "extra == 'doc'" },
     { name = "torch", specifier = "==2.8.0", index = "https://download.pytorch.org/whl/cu126" },
     { name = "torchvision" },
-    { name = "transformers" },
+    { name = "transformers", specifier = "<5.4.0" },
     { name = "vllm", specifier = ">=0.5.1" },
 ]
 provides-extras = ["dev", "doc"]
@@ -3955,8 +3959,8 @@ dependencies = [
     { name = "typing-extensions" },
 ]
 wheels = [
-    { url = "https://download.pytorch.org/whl/cu126/torch-2.8.0%2Bcu126-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:6bf3c0085af4176137f216c39995dede9beda9af1307fd1dee2305f4f351eb42" },
-    { url = "https://download.pytorch.org/whl/cu126/torch-2.8.0%2Bcu126-cp310-cp310-win_amd64.whl", hash = "sha256:3b43acaa40ac87495d858bb1dbe574aaaff4e60e9da6221825ece694fd1d2b80" },
+    { url = "https://download-r2.pytorch.org/whl/cu126/torch-2.8.0%2Bcu126-cp310-cp310-manylinux_2_28_x86_64.whl", hash = "sha256:6bf3c0085af4176137f216c39995dede9beda9af1307fd1dee2305f4f351eb42" },
+    { url = "https://download-r2.pytorch.org/whl/cu126/torch-2.8.0%2Bcu126-cp310-cp310-win_amd64.whl", hash = "sha256:3b43acaa40ac87495d858bb1dbe574aaaff4e60e9da6221825ece694fd1d2b80" },
 ]
 
 [[package]]

@@ -32,8 +32,8 @@ def get_first_predicate(fl_problem: str):
         return None
 
 class Statistics:
-    def __init__(self, prefix: str = ''):
-        self.prefix = prefix
+    def __init__(self, report_path: str = ''):
+        self.report_path = report_path
         self.summaries = []
         self.df = None
         self.total_elapsed_time = 0
@@ -77,7 +77,7 @@ class Statistics:
 
         # Unified command-line output
         print("\n--- Generation Summary ---")
-        print(f"Dataset Prefix: {self.prefix}")
+        print(f"Report: {self.report_path}")
 
         summary_stats = {
             "Total Problems Processed": len(self.df),
@@ -113,8 +113,7 @@ class Statistics:
         print("------------------------\n")
 
         # Detailed report generation
-        report_path = f'{self.prefix}_detailed_report.json'
-        os.makedirs(os.path.dirname(report_path), exist_ok=True)
+        os.makedirs(os.path.dirname(self.report_path), exist_ok=True)
 
         # Create aggregated data instead of raw_data
         aggregated_data = {}
@@ -140,8 +139,8 @@ class Statistics:
         report_data = self._convert_types_for_json(report_data)
 
         try:
-            with open(report_path, 'w') as f:
+            with open(self.report_path, 'w') as f:
                 json.dump(report_data, f, indent=4)
-            logging.info(f"Detailed report saved to {report_path}")
+            logging.info(f"Detailed report saved to {self.report_path}")
         except Exception as e:
             logging.error(f"Failed to save detailed report: {e}")

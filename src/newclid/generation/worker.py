@@ -361,7 +361,6 @@ class ProblemWorker:
             "numercial_checked_aux": numercial_checked_aux,
             "trivial_aux": trivial_aux,
             "proof_steps": proof_steps,
-            "name2node": solver.proof.symbols_graph.name2node.copy(),
         }
 
     @staticmethod
@@ -644,7 +643,6 @@ class ProblemWorker:
             numercial_checked_aux = res['numercial_checked_aux']
             trivial_aux = res['trivial_aux']
             proof_steps = res['proof_steps']
-            name2node = res['name2node']
 
             # llm data generation
             llm_renamed, clauses, mapping, n_premises, n_proof_steps = ProblemWorker.llm_solution_renamed(

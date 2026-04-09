@@ -1,10 +1,9 @@
 import logging
 import os
-import shutil
 import argparse
 import json
 import time
-from datetime import timedelta
+from datetime import timedelta, datetime
 import ray
 import re
 from millify import millify
@@ -18,8 +17,6 @@ from newclid.generation.worker import ProblemWorker
 from newclid.generation.writer import Writer
 
 # logging.basicConfig(level=logging.DEBUG, force=True)
-
-MACHINE_BASE_SEED = 42
 
 
 class ProblemPipeline:
@@ -39,7 +36,8 @@ class ProblemPipeline:
         prune=True,
         remove_coords=False,
         construction_config=None,
-        use_cache=False,
+        seed_cache=False,
+        base_seed=42,
     ):
         self.n_clauses = n_clauses
         self.n_samples = n_samples
@@ -48,12 +46,10 @@ class ProblemPipeline:
         self.max_level = max_level
         self.max_auxiliary_points = max_auxiliary_points
         self.output_dir = output_dir
-        self.path_prefix = os.path.join(
-            self.output_dir, f"geometry_clauses{self.n_clauses}_samples{millify(self.n_samples)}")
+        self.file_prefix = f"geometry_clauses{self.n_clauses}_samples{millify(self.n_samples)}"
         self.hashed_problems = set()
         self.filter = GoalFilter()
-        self.defs = DefinitionJGEX.to_dict(
-            DefinitionJGEX.parse_txt_file(default_defs_path()))
+        self.defs = DefinitionJGEX.to_dict(DefinitionJGEX.parse_txt_file(default_defs_path()))
         self.img = img
         self.aux_only = aux_only
         self.clear = clear
@@ -61,18 +57,19 @@ class ProblemPipeline:
         self.prune = prune
         self.remove_coords = remove_coords
         self.construction_config = construction_config
-        self.use_cache = use_cache
+
+        self.use_seed_cache = seed_cache
+        self.base_seed = base_seed
         self.seed_cache = {}
         self.cache_file = os.path.join(self.output_dir, "seed_cache.jsonl")
-
-        if self.use_cache and os.path.exists(self.cache_file):
+        if self.use_seed_cache and os.path.exists(self.cache_file):
             with open(self.cache_file, "r", encoding="utf-8") as f:
                 for line in f:
                     if line.strip():
                         entry = json.loads(line)
                         key = (entry["seed"], entry["n_clauses"])
                         self.seed_cache[key] = entry
-            logging.info("Loaded %d entries from cache", len(self.seed_cache))
+            logging.info("Loaded %d seeds from cache", len(self.seed_cache))
 
         # Serialize defs for Ray remote tasks
         defs_data = {k: v._asdict() for k, v in self.defs.items()}
@@ -86,12 +83,18 @@ class ProblemPipeline:
         )
 
         # Initialize writer
+        dated_dir = os.path.join(self.output_dir, datetime.now().strftime("%Y%m%d"))
         self.writer = Writer(
-            output_dir=self.output_dir,
-            path_prefix=self.path_prefix,
+            output_dir=dated_dir,
+            file_prefix=self.file_prefix,
             img_mode=self.img,
             defs_data=defs_data,
             session_id=session_id,
+        )
+
+        # Initialize statistics reporter
+        self.summary_reporter = Statistics(
+            report_path=os.path.join(dated_dir, self.file_prefix + "_report.json")
         )
 
     def problem_hash_filter(self, data: list, key: str) -> list[str]:
@@ -106,22 +109,14 @@ class ProblemPipeline:
 
     def generate(self):
         if self.clear:
-            filename = self.path_prefix + ".jsonl"
-            imgs_dir = os.path.join(self.output_dir, "imgs")
-            imgs_png_dir = os.path.join(self.output_dir, "imgs_png")
-            if os.path.exists(filename):
-                os.remove(filename)
-            if os.path.exists(imgs_dir):
-                shutil.rmtree(imgs_dir)
-            if os.path.exists(imgs_png_dir):
-                shutil.rmtree(imgs_png_dir)
+            self.writer.clear()
 
         def task_generator():
             for i in range(10**9):
-                seed = MACHINE_BASE_SEED + i
+                seed = self.base_seed + i
                 fl_statement = None
 
-                if self.use_cache:
+                if self.use_seed_cache:
                     cache_key = (seed, self.n_clauses)
                     if cache_key in self.seed_cache:
                         entry = self.seed_cache[cache_key]
@@ -151,17 +146,13 @@ class ProblemPipeline:
             )
         task_iterator = task_generator()
         max_pending = int(self.n_threads * 1.5)
-        summary_reporter = Statistics(prefix=self.path_prefix)
+        pending_tasks = {}
 
         start_time = time.time()
-        all_data_len = self.writer.data_count
-        all_data_len_raw = self.writer.data_count
-        pending_tasks = {}
         last_logged_written = self.writer.written_count
 
         while self.writer.written_count < self.n_samples:
-            done, _ = ray.wait(list(pending_tasks.keys()),
-                               num_returns=1, timeout=10)
+            done, _ = ray.wait(list(pending_tasks.keys()), num_returns=1, timeout=10)
 
             if done:
                 task_id = done[0]
@@ -178,7 +169,7 @@ class ProblemPipeline:
                 _, seed = pending_tasks.pop(task_id)
 
                 if task_success:
-                    if self.use_cache:
+                    if self.use_seed_cache:
                         has_real_aux = summary.get("has_real_aux", False) if summary else False
                         cache_entry = {
                             "seed": seed,
@@ -193,7 +184,6 @@ class ProblemPipeline:
                             with open(self.cache_file, "a", encoding="utf-8") as f:
                                 f.write(json.dumps(cache_entry) + "\n")
 
-                    all_data_len_raw += len(data)
                     data = self.problem_hash_filter(data, 'llm_input_renamed')
                     if data:
                         summary['n_samples'] = len(data)
@@ -201,11 +191,9 @@ class ProblemPipeline:
                         summary['goals'] = [re.search(r'\?\s*(\w+)', d['fl_problem']).group(1) for d in data]
                         summary['first_predicate'] = [get_first_predicate(d['fl_problem']) for d in data]
                         summary['n_premises'] = [d['n_premises'] for d in data]
-                        summary['n_proof_steps'] = [d['n_proof_steps']
-                                                    for d in data]
+                        summary['n_proof_steps'] = [d['n_proof_steps'] for d in data]
                         self.writer.write_data(data)
-                        all_data_len += summary['n_samples']
-                        summary_reporter.add(summary)
+                        self.summary_reporter.add(summary)
 
                         # Log progress when new data is written to file
                         if self.writer.written_count > last_logged_written:
@@ -217,7 +205,7 @@ class ProblemPipeline:
                                 f"(+{self.writer.written_count - last_logged_written:3d}, pending: {pending_draw}+{pending_write}) "
                                 f"in {elapsed_time:5.0f}s | "
                                 f"Total: {summary['total_time']:3.0f}s = "
-                                f"Gen: {summary['generation_time']:2.0f} + "
+                                f"Gen: {summary['generation_time']:1.0f} + "
                                 f"DDAR: {summary['runtime']:2.0f} + "
                                 f"Proc: {summary['process_goal_runtime']:3.0f} | "
                                 f"Speed: {self.writer.written_count/elapsed_time:3.0f} samp/s | "
@@ -248,11 +236,10 @@ class ProblemPipeline:
         ray.shutdown()
 
         final_elapsed_time = time.time() - start_time
-        summary_reporter.total_elapsed_time = final_elapsed_time
-        summary_reporter.total_samples_generated = self.writer.written_count
-        logging.info(
-            f"Generated {self.writer.written_count} samples successfully in {final_elapsed_time:.2f}s.")
-        summary_reporter.output_report()
+        self.summary_reporter.total_elapsed_time = final_elapsed_time
+        self.summary_reporter.total_samples_generated = self.writer.written_count
+        logging.info(f"Generate {self.writer.written_count} samples in {final_elapsed_time:.2f}s.")
+        self.summary_reporter.output_report()
 
 
 def load_construction_config(config_path: str | None) -> dict | None:
@@ -285,8 +272,10 @@ def main():
                         help="Maximum DDAR search depth")
     parser.add_argument("--construction_config", required=False, default=None,
                         help="Optional JSON file defining construction sets and sampler steps",)
-    parser.add_argument("--use_cache", required=False, action="store_true", default=False,
+    parser.add_argument("--seed_cache", required=False, action="store_true", default=False,
                         help="Use seed cache to skip seeds without real auxiliary points")
+    parser.add_argument("--base_seed", required=False, type=int, default=42,
+                        help="Base seed for problem generation")
     # Auxiliary point parameters
     parser.add_argument("--add_auxiliary", action=argparse.BooleanOptionalAction, default=True,
                         help="Add auxiliary points (default: enabled)")
@@ -330,7 +319,8 @@ def main():
         prune=args.prune,
         remove_coords=args.remove_coords,
         construction_config=construction_config,
-        use_cache=args.use_cache,
+        seed_cache=args.seed_cache,
+        base_seed=args.base_seed,
     )
     generator.generate()
 

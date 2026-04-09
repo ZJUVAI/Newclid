@@ -9,7 +9,6 @@ import logging
 import os
 import ray
 import cairosvg
-from datetime import datetime
 
 
 def convert_svg_to_png(svg_path, png_path, width=1024):
@@ -125,20 +124,20 @@ class Writer:
     Manages pending draw tasks and writes completed data to JSONL files.
     """
 
-    def __init__(self, output_dir: str, path_prefix: str, img_mode: int, defs_data: dict, session_id: str):
+    def __init__(self, output_dir: str, file_prefix: str, img_mode: int, defs_data: dict, session_id: str):
         """
         Initialize writer.
 
         Args:
-            output_dir: Base output directory
-            path_prefix: Path prefix for output files
+            output_dir: Output directory (with date)
+            file_prefix: Filename prefix for output files
             img_mode: Image generation mode (0-3)
             defs_data: Serialized definitions for drawing
             session_id: Unique session identifier
         """
-        self.output_dir = os.path.join(output_dir, datetime.now().strftime("%Y%m%d"))
+        self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
-        self.path_prefix = path_prefix
+        self.file_prefix = file_prefix
         self.img_mode = img_mode
         self.defs_data = defs_data
         self.session_id = session_id
@@ -147,6 +146,19 @@ class Writer:
         self.written_count = 0
         self.pending_draw_tasks = {}  # task_id -> (file_idx, data_item)
         self.pending_write_data = {}  # file_idx -> result_data (completed draw, pending write)
+
+    def clear(self):
+        """Remove existing output files."""
+        import shutil
+        filename = os.path.join(self.output_dir, self.file_prefix + ".jsonl")
+        imgs_dir = os.path.join(self.output_dir, "imgs")
+        imgs_png_dir = os.path.join(self.output_dir, "imgs_png")
+        if os.path.exists(filename):
+            os.remove(filename)
+        if os.path.exists(imgs_dir):
+            shutil.rmtree(imgs_dir)
+        if os.path.exists(imgs_png_dir):
+            shutil.rmtree(imgs_png_dir)
 
     def _process_completed_draw_tasks(self, wait_all: bool = False):
         """Process completed draw tasks and store results."""
@@ -201,8 +213,7 @@ class Writer:
             all_data: List of data items to write
             force: If True, wait for all pending tasks and flush immediately
         """
-        filename = self.path_prefix + ".jsonl"
-        filename = os.path.join(self.output_dir, os.path.basename(filename))
+        filename = os.path.join(self.output_dir, self.file_prefix + ".jsonl")
         imgs_dir = os.path.join(self.output_dir, "imgs")
         imgs_png_dir = os.path.join(self.output_dir, "imgs_png")
         os.makedirs(os.path.dirname(filename), exist_ok=True)
@@ -236,13 +247,13 @@ class Writer:
 
         # Flush completed data periodically or when forced
         should_flush = (
-            len(self.pending_write_data) > 100 or
-            len(self.pending_draw_tasks) > 200 or
+            len(self.pending_write_data) > 1000 or
+            len(self.pending_draw_tasks) > 1000 or
             force
         )
         if should_flush:
             # If many draw tasks pending, wait for some to complete first
-            if len(self.pending_draw_tasks) > 200:
+            if len(self.pending_draw_tasks) > 1000:
                 self._process_completed_draw_tasks(wait_all=True)
             self._flush_completed_data(filename)
 

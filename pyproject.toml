@@ -33,7 +33,7 @@ dependencies = [
     "markupsafe==3.0.2",
     "pyvis",
     "scipy>=1.15",
-    "adjusttext>=1.3.0",
+    "adjusttext @ https://github.com/Phlya/adjustText/archive/master.zip",
     "pandas>=2.3",
     "pybind11",
     "accelerate",
