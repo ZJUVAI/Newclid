@@ -327,6 +327,7 @@ class TraceRun:
         dataset_path: str | Path,
         model_path: str | list[str],
         params: dict[str, Any],
+        run_name: str | None = None,
         repo_root: str | Path | None = None,
     ) -> None:
         dataset_slug = sanitize_filename(Path(dataset_path).stem)
@@ -335,7 +336,9 @@ class TraceRun:
         else:
             model_repr = str(model_path)
         model_slug = sanitize_filename(Path(model_repr).name or model_repr)
-        self.run_id = f"{timestamp_slug()}_{sanitize_filename(route)}_{dataset_slug}_{model_slug}"
+        if run_name is None:
+            run_name = f"{sanitize_filename(route)}_{dataset_slug}_{model_slug}"
+        self.run_id = f"{sanitize_filename(run_name)}_{timestamp_slug()}"
         self.run_dir = Path(root_dir) / self.run_id
         self.problem_dir = self.run_dir / "problems"
         self.attempts_dir = self.run_dir / "attempts"

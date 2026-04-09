@@ -70,6 +70,29 @@ def sanitize_problem_name(problem_name: str) -> str:
     return re.sub(r"[^A-Za-z0-9._-]+", "_", problem_name).strip("_") or "problem"
 
 
+def build_eval_output_stem(
+    *,
+    agent_type: str,
+    problems_path: Path,
+    model_path: str,
+    decoding_size: int,
+    beam_size: int,
+    search_depth: int,
+    gpu_batch_size: int,
+    gpu_batch_timeout_ms: int,
+) -> str:
+    problems_name = problems_path.stem
+    path_obj = Path(model_path)
+    deepest_folder = path_obj.name
+    parent_folder = path_obj.parent.name
+    model_name = f"{parent_folder}_{deepest_folder}" if parent_folder else deepest_folder
+    return (
+        f"eval_single_problem_multi_gpu_{agent_type}_{problems_name}_{model_name}"
+        f"_d{decoding_size}_b{beam_size}_s{search_depth}"
+        f"_gbs{gpu_batch_size}_gbt{gpu_batch_timeout_ms}"
+    )
+
+
 def create_workers(*, agent_type: str, model_path: str, num_gpus_for_eval: int):
     if agent_type == "lm":
         from experiments.single_problem_multi_gpu_eval.lm_actor import ModelWorker
@@ -293,6 +316,16 @@ def solve_problems_single_problem_multi_gpu(
         output_dir.mkdir(parents=True, exist_ok=True)
         visual_render_root = Path(render_root) if render_root else output_dir / "_rendered"
         visual_render_root.mkdir(parents=True, exist_ok=True)
+        output_name_stem = build_eval_output_stem(
+            agent_type=agent_type,
+            problems_path=filepath,
+            model_path=model_path,
+            decoding_size=decoding_size,
+            beam_size=beam_size,
+            search_depth=search_depth,
+            gpu_batch_size=gpu_batch_size,
+            gpu_batch_timeout_ms=gpu_batch_timeout_ms,
+        )
         trace_run = None
         if trace_dir:
             trace_run = TraceRun(
@@ -301,7 +334,9 @@ def solve_problems_single_problem_multi_gpu(
                 agent=agent_type,
                 dataset_path=filepath,
                 model_path=model_path,
+                run_name=output_name_stem,
                 params={
+                    "output_name_stem": output_name_stem,
                     "decoding_size": decoding_size,
                     "beam_size": beam_size,
                     "search_depth": search_depth,
@@ -460,15 +495,7 @@ def solve_problems_single_problem_multi_gpu(
                     live.update(render_table(all_tasks_info, start_time, True))
                 live.update(render_table(all_tasks_info, start_time, False))
 
-        problems_name = filepath.stem
-        path_obj = Path(model_path)
-        deepest_folder = path_obj.name
-        parent_folder = path_obj.parent.name
-        model_name = f"{parent_folder}_{deepest_folder}" if parent_folder else deepest_folder
-        csv_filename = (
-            f"eval_single_problem_multi_gpu_{agent_type}_{problems_name}_{model_name}"
-            f"_d{decoding_size}_b{beam_size}_s{search_depth}.csv"
-        )
+        csv_filename = f"{output_name_stem}.csv"
 
         csv_filepath = output_dir / csv_filename
         total_problems = len(all_tasks_info)

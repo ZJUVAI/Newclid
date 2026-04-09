@@ -203,7 +203,13 @@ CUDA_VISIBLE_DEVICES=0 LOGLEVEL=DEBUG python experiments/single_problem_multi_gp
 Each run writes a CSV named like:
 
 ```text
-eval_single_problem_multi_gpu_<agent>_<dataset>_<model>_d<decoding_size>_b<beam_size>_s<search_depth>.csv
+eval_single_problem_multi_gpu_<agent>_<dataset>_<model>_d<decoding_size>_b<beam_size>_s<search_depth>_gbs<gpu_batch_size>_gbt<gpu_batch_timeout_ms>.csv
+```
+
+When `--trace_dir` is enabled, each run creates a trace directory named like:
+
+```text
+eval_single_problem_multi_gpu_<agent>_<dataset>_<model>_d<decoding_size>_b<beam_size>_s<search_depth>_gbs<gpu_batch_size>_gbt<gpu_batch_timeout_ms>_<timestamp>/
 ```
 
 For visual backends, rendered prompt images are written under:
