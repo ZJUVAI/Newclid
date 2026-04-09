@@ -117,15 +117,18 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
         request_id: str,
         depth: int,
         candidate_rank: int,
+        node_id: int | None,
         state,
     ) -> dict[str, object]:
         del candidate_rank, state
         if depth >= self.search_depth - 1:
             return {}
+        if node_id is None:
+            raise ValueError("node_id is required for remote visual render naming")
         return {
             "render_visual_prompt_remote": True,
             "render_root": str(self.render_root),
-            "render_stem": f"d{depth + 1}_{request_id}",
+            "render_stem": f"d{depth + 1}_{request_id}_{node_id}",
             "render_width": self.render_width,
         }
 

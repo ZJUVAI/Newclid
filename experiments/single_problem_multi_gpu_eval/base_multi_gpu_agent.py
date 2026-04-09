@@ -105,9 +105,10 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         request_id: str,
         depth: int,
         candidate_rank: int,
+        node_id: int | None,
         state: Any,
     ) -> dict[str, Any]:
-        del request_id, depth, candidate_rank, state
+        del request_id, depth, candidate_rank, node_id, state
         return {}
 
     def extract_raw_aux_text(self, aux_dsl: str) -> str:
@@ -661,6 +662,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     request_id=candidate_meta["request_id"],
                     depth=depth,
                     candidate_rank=candidate_meta["candidate_rank"],
+                    node_id=candidate_meta["node_id"],
                     state=candidate_meta["state"],
                 ),
             )
