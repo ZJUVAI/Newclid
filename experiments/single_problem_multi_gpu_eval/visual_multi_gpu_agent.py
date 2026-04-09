@@ -6,13 +6,16 @@ from copy import deepcopy
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import cairosvg
+from PIL import Image, ImageOps
+
 from newclid.agent.lm import LMAgent
 from newclid.agent.vlm import VLMAgent
 from newclid.formulations.problem import ProblemJGEX
+from newclid.numerical.draw_clause_figure import draw_clause_figure
 from newclid.proof import ProofState
 
 from experiments.single_problem_multi_gpu_eval.base_multi_gpu_agent import BaseMultiGPUAgent
-from experiments.single_problem_multi_gpu_eval.search_common import render_visual_prompt
 
 if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
@@ -43,7 +46,7 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
             max_pending_ddar=max_pending_ddar,
             prepare_request_workers=prepare_request_workers,
             prepare_prefetch_limit=prepare_prefetch_limit,
-            ddar_returns_proof=False,
+            ddar_returns_proof=True,
             trace_writer=trace_writer,
         )
         self.render_root = Path(render_root)
@@ -53,11 +56,11 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
     def base_ddar_proof(self, proof: ProofState) -> ProofState:
         return deepcopy(proof)
 
-    def seed_state(self, proof: ProofState, base_proof: ProofState) -> tuple[ProblemJGEX, object]:
+    def seed_state(self, proof: ProofState, base_proof: ProofState) -> tuple[ProblemJGEX, ProofState]:
         del proof
         return self.problemJGEX, base_proof
 
-    def get_problem_from_state(self, state: tuple[ProblemJGEX, object]) -> ProblemJGEX:
+    def get_problem_from_state(self, state: tuple[ProblemJGEX, ProofState]) -> ProblemJGEX:
         problem, _ = state
         return problem
 
@@ -65,31 +68,55 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
         self,
         *,
         request_id: str,
-        state: tuple[ProblemJGEX, object],
+        state: tuple[ProblemJGEX, ProofState],
         proof: ProofState,
         depth: int,
     ) -> dict[str, object]:
-        problem, render_state = state
+        del proof
+        problem, current_proof = state
+        stem = f"d{depth}_{request_id}"
+        svg_path = self.render_root / f"{stem}.svg"
+        png_path = self.render_root / f"{stem}.png"
+
         render_start = time.perf_counter()
-        if isinstance(render_state, ProofState):
-            img_path, _ = render_visual_prompt(
-                proof=render_state,
-                problem=problem,
-                render_root=self.render_root,
-                stem=f"d{depth}_{request_id}",
-                render_width=self.render_width,
-            )
-        else:
-            img_path = render_state
+        draw_clause_figure(
+            current_proof,
+            problem,
+            str(svg_path),
+            current_proof.rng,
+            draw_annotations=True,
+        )
+        cairosvg.svg2png(
+            url=str(svg_path),
+            write_to=str(png_path),
+            output_width=self.render_width,
+        )
+
+        # The model is trained on inverted prompts, so keep the image
+        # post-processing cost separate from the raw rendering work.
+        with Image.open(png_path) as img:
+            if img.mode == "RGBA":
+                r, g, b, a = img.split()
+                rgb_img = Image.merge("RGB", (r, g, b))
+                inverted_rgb = ImageOps.invert(rgb_img)
+                r_inv, g_inv, b_inv = inverted_rgb.split()
+                img_out = Image.merge("RGBA", (r_inv, g_inv, b_inv, a))
+            elif img.mode == "LA":
+                lightness, alpha = img.split()
+                lightness_inv = ImageOps.invert(lightness)
+                img_out = Image.merge("LA", (lightness_inv, alpha))
+            else:
+                img_out = ImageOps.invert(img.convert("RGB"))
+            img_out.save(png_path)
 
         # Building the textual DSL prompt is logically distinct from the image
         # pipeline and is useful when request preparation becomes CPU-bound.
-        query = self.problem_to_dsl(problem, proof.defs)
+        query = self.problem_to_dsl(problem, current_proof.defs)
 
         return {
             "request_id": request_id,
             "query": query,
-            "img_path": str(img_path),
+            "img_path": str(png_path),
             "new_point_name": self.get_new_point_name(problem),
             "response_prefix": "<aux> x00",
             "with_predicate": False,
@@ -104,30 +131,12 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
         prior_state,
         ddar_result: dict[str, object],
         proof: ProofState,
-    ) -> tuple[ProblemJGEX, object] | None:
+    ) -> tuple[ProblemJGEX, ProofState] | None:
         del prior_state, proof
-        next_img_path = ddar_result.get("img_path")
-        if next_img_path is None:
+        next_proof = ddar_result.get("proof")
+        if next_proof is None:
             return None
-        return new_problem, next_img_path
-
-    def ddar_task_kwargs(
-        self,
-        *,
-        request_id: str,
-        depth: int,
-        candidate_rank: int,
-        state,
-    ) -> dict[str, object]:
-        del candidate_rank, state
-        if depth >= self.search_depth - 1:
-            return {}
-        return {
-            "render_visual_prompt_remote": True,
-            "render_root": str(self.render_root),
-            "render_stem": f"d{depth + 1}_{request_id}",
-            "render_width": self.render_width,
-        }
+        return new_problem, next_proof
 
     def get_new_point_name(self, problem: ProblemJGEX) -> str:
         num_points = sum(len(clause.points) for clause in problem.constructions)

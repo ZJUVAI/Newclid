@@ -22,7 +22,6 @@ DETAIL_TIME_FIELDS = (
     "ddar_result_ray_get_wall_time_s",
     "ddar_result_next_state_wall_time_s",
     "ddar_result_queue_wall_time_s",
-    "ddar_render_work_time_s",
 )
 
 PROFILED_WALL_COMPONENT_FIELDS = tuple(
@@ -107,7 +106,6 @@ def write_profiling_csv(
                     f"DDAR Result Ray.get Wall Time: {summary['ddar_result_ray_get_wall_time_s']:.2f}s, "
                     f"DDAR Result Next State Wall Time: {summary['ddar_result_next_state_wall_time_s']:.2f}s, "
                     f"DDAR Result Queue Wall Time: {summary['ddar_result_queue_wall_time_s']:.2f}s, "
-                    f"DDAR Render Work Time: {summary['ddar_render_work_time_s']:.2f}s, "
                     f"Scheduler Overhead Wall Time: {summary['scheduler_overhead_wall_time_s']:.2f}s, "
                     f"Other Wall Time: {summary['other_wall_time_s']:.2f}s"
                 )
@@ -128,7 +126,6 @@ def write_profiling_csv(
                 "DDAR Result Ray.get Wall Time (s)",
                 "DDAR Result Next State Wall Time (s)",
                 "DDAR Result Queue Wall Time (s)",
-                "DDAR Render Work Time (s)",
                 "Scheduler Overhead Wall Time (s)",
                 "Other Wall Time (s)",
             ]
@@ -149,7 +146,6 @@ def write_profiling_csv(
                     f"{float(row.get('ddar_result_ray_get_wall_time_s', 0.0)):.2f}",
                     f"{float(row.get('ddar_result_next_state_wall_time_s', 0.0)):.2f}",
                     f"{float(row.get('ddar_result_queue_wall_time_s', 0.0)):.2f}",
-                    f"{float(row.get('ddar_render_work_time_s', 0.0)):.2f}",
                     f"{float(row.get('scheduler_overhead_wall_time_s', 0.0)):.2f}",
                     f"{float(row.get('other_wall_time_s', 0.0)):.2f}",
                 ]

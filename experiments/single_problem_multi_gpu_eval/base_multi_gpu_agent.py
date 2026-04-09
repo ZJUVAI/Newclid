@@ -99,17 +99,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
     def run_ddar_c(self, proof: ProofState, rules: list["Rule"], start_time: float, timeout: int = 3600) -> bool:
         return run_ddar_c(proof, rules, start_time, timeout)
 
-    def ddar_task_kwargs(
-        self,
-        *,
-        request_id: str,
-        depth: int,
-        candidate_rank: int,
-        state: Any,
-    ) -> dict[str, Any]:
-        del request_id, depth, candidate_rank, state
-        return {}
-
     def extract_raw_aux_text(self, aux_dsl: str) -> str:
         return aux_dsl[len("<aux> x00"):]
 
@@ -164,11 +153,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 profiling,
                 "ddar_result_ray_get_wall_time_s",
                 time.perf_counter() - ray_get_start,
-            )
-            add_profiling_time(
-                profiling,
-                "ddar_render_work_time_s",
-                ddar_result.get("ddar_render_work_time_s"),
             )
             future_meta = future_info.pop(future)
 
@@ -657,12 +641,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 t0,
                 timeout,
                 return_proof=self.ddar_returns_proof,
-                **self.ddar_task_kwargs(
-                    request_id=candidate_meta["request_id"],
-                    depth=depth,
-                    candidate_rank=candidate_meta["candidate_rank"],
-                    state=candidate_meta["state"],
-                ),
             )
             logger.debug(
                 "Search depth=%d request=%s queued DDAR future; pending_ddar=%d queued_ddar=%d",

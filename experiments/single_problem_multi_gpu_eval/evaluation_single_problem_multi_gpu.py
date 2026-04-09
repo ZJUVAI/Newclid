@@ -93,7 +93,6 @@ def create_agent(
     prepare_request_workers: int,
     prepare_prefetch_limit: int,
     render_root: Path,
-    render_width: int,
     trace_writer=None,
 ):
     if agent_type == "lm":
@@ -123,7 +122,6 @@ def create_agent(
             prepare_request_workers=prepare_request_workers,
             prepare_prefetch_limit=prepare_prefetch_limit,
             render_root=render_root,
-            render_width=render_width,
             trace_writer=trace_writer,
         )
     raise ValueError(f"Unsupported agent type: {agent_type}")
@@ -143,7 +141,6 @@ def solve_one_problem(
     prepare_request_workers: int,
     prepare_prefetch_limit: int,
     render_root: Path,
-    render_width: int,
     trace_writer=None,
 ):
     start_perf = time.perf_counter()
@@ -166,7 +163,6 @@ def solve_one_problem(
         prepare_request_workers=prepare_request_workers,
         prepare_prefetch_limit=prepare_prefetch_limit,
         render_root=render_root,
-        render_width=render_width,
         trace_writer=trace_writer,
     )
     solver = builder.with_deductive_agent(agent).build()
@@ -207,7 +203,6 @@ def solve_problems_single_problem_multi_gpu(
     prepare_prefetch_limit: int | None,
     log_dir: str | None,
     render_root: str | None = None,
-    render_width: int = 1024,
     trace_dir: str | None = None,
     ray_address: str = "local",
     enable_profiling: bool = False,
@@ -292,7 +287,6 @@ def solve_problems_single_problem_multi_gpu(
                     "num_gpus_for_eval": num_gpus_for_eval,
                     "prepare_request_workers": prepare_request_workers,
                     "prepare_prefetch_limit": prepare_prefetch_limit,
-                    "render_width": render_width,
                 },
                 repo_root=Path.cwd(),
             )
@@ -304,7 +298,6 @@ def solve_problems_single_problem_multi_gpu(
         print(f"Using max_pending_ddar={max_pending_ddar}")
         print(f"Using prepare_request_workers={prepare_request_workers}")
         print(f"Using prepare_prefetch_limit={prepare_prefetch_limit}")
-        print(f"Using render_width={render_width}")
         print(f"Worker warmup: {warmup_infos}")
 
         all_tasks_info = [(problem_name, "Pending", 0.0) for problem_name in problem_names]
@@ -357,7 +350,6 @@ def solve_problems_single_problem_multi_gpu(
                             prepare_request_workers=prepare_request_workers,
                             prepare_prefetch_limit=prepare_prefetch_limit,
                             render_root=problem_render_root,
-                            render_width=render_width,
                             trace_writer=trace_writer,
                         )
                         while True:
@@ -422,7 +414,6 @@ def solve_problems_single_problem_multi_gpu(
                                 "ddar_result_ray_get_wall_time_s": profiling["ddar_result_ray_get_wall_time_s"],
                                 "ddar_result_next_state_wall_time_s": profiling["ddar_result_next_state_wall_time_s"],
                                 "ddar_result_queue_wall_time_s": profiling["ddar_result_queue_wall_time_s"],
-                                "ddar_render_work_time_s": profiling["ddar_render_work_time_s"],
                                 "scheduler_overhead_wall_time_s": profiling["scheduler_overhead_wall_time_s"],
                                 "other_wall_time_s": profiling["other_wall_time_s"],
                             }
@@ -523,12 +514,6 @@ def main():
         help="Optional directory for rendered visual prompts. Uses <log_dir>/_rendered when omitted.",
     )
     parser.add_argument(
-        "--render_width",
-        type=int,
-        default=1024,
-        help="Rendered visual prompt width in pixels.",
-    )
-    parser.add_argument(
         "--trace_dir",
         type=str,
         default=None,
@@ -617,7 +602,6 @@ def main():
         prepare_prefetch_limit=args.prepare_prefetch_limit,
         log_dir=args.log_dir,
         render_root=args.render_root,
-        render_width=args.render_width,
         trace_dir=args.trace_dir,
         ray_address=args.ray_address,
         enable_profiling=args.enable_profiling,
