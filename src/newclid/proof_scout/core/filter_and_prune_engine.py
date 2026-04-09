@@ -2331,6 +2331,9 @@ class FilterAndPruneEngine:
         print(f"  chunk_size={chunk_size}, inflight_limit={inflight_limit}")
         print(f"  max_workers={mw}")
 
+        # Per-step cumulative timing accumulators
+        t_step1_total = t_step2_total = t_step3_total = t_step4_total = t_step5_total = t_step6_total = 0.0
+
         with open(rules_path, "w", encoding="utf-8") as rules_fh:
             for chunk_idx, chunk in _stream_jsonl_chunks(in_path, chunk_size):
                 t_chunk = time.time()
@@ -2338,7 +2341,9 @@ class FilterAndPruneEngine:
                 global_total += chunk_total
 
                 # Step 1: Filter
+                t0 = time.time()
                 kept_records, n_no_aux, n_pred = self._filter_chunk(chunk)
+                t_step1_total += time.time() - t0
                 global_kept += len(kept_records)
                 global_dropped_no_aux += n_no_aux
                 global_dropped_predicate += n_pred
@@ -2354,7 +2359,9 @@ class FilterAndPruneEngine:
                         idx_src[str(r["problem_id"])] = r
 
                 # Step 2: Graph prune (Ray bounded parallel)
+                t0 = time.time()
                 pruned_map = _ray_prune_chunk_bounded(kept_records, inflight_limit)
+                t_step2_total += time.time() - t0
                 n_pruned = len(pruned_map)
                 n_failed = len(kept_records) - n_pruned
                 global_pruned += n_pruned
@@ -2365,11 +2372,15 @@ class FilterAndPruneEngine:
                     continue
 
                 # Steps 3 + 3.5a + 3.5b: Proposition extraction
+                t0 = time.time()
                 out_results = self._extract_propositions_chunk(pruned_map, idx_src)
+                t_step3_total += time.time() - t0
                 global_propositions += len(out_results)
 
                 # Step 4: Normalization
+                t0 = time.time()
                 normalized_rules, n_skipped, _ = self._normalize_rules(out_results)
+                t_step4_total += time.time() - t0
                 global_skipped_missing += n_skipped
 
                 if not normalized_rules:
@@ -2377,24 +2388,26 @@ class FilterAndPruneEngine:
                     continue
 
                 # Step 5: Dedup (incremental with global hash set)
+                t0 = time.time()
                 entries, _ = self._dedup_rules(
                     normalized_rules, external_seen_hashes=global_seen_hashes
                 )
+                t_step5_total += time.time() - t0
 
                 if not entries:
                     print(f"  [chunk {chunk_idx}] {chunk_total} records, 0 unique rules")
                     continue
 
-                # Step 6: Predicate filter
+                # Step 6: Predicate filter + incremental append to rules.txt
+                t0 = time.time()
                 final_entries = self._apply_rule_skip_predicates(entries)
                 global_skipped_pred += len(entries) - len(final_entries)
-
-                # Step 6: Incremental append to rules.txt
                 for e in final_entries:
                     rules_fh.write(e["rid"] + "\n")
                     rules_fh.write(e["norm_rule"] + "\n")
                     global_rules_written += 1
                 rules_fh.flush()
+                t_step6_total += time.time() - t0
 
                 # Track entries for stats output
                 all_entries_for_stats.extend(final_entries)
@@ -2415,11 +2428,11 @@ class FilterAndPruneEngine:
                         current_seed = seed_val
                         seed_accumulator.setdefault(seed_val, []).append(e)
 
-                elapsed = time.time() - t_chunk
+                chunk_elapsed = time.time() - t_chunk
                 print(
                     f"  [chunk {chunk_idx}] total={chunk_total} kept={len(kept_records)} "
                     f"pruned={n_pruned} rules={len(final_entries)} "
-                    f"cumulative_unique={global_rules_written} ({elapsed:.1f}s)"
+                    f"cumulative_unique={global_rules_written} ({chunk_elapsed:.1f}s)"
                 )
 
         # Flush remaining seed groups
@@ -2465,6 +2478,14 @@ class FilterAndPruneEngine:
         print(f"  Pruned: {global_pruned}, Failed: {global_prune_failed}")
         print(f"  Rules written: {global_rules_written}")
         print(f"  Global unique hashes: {len(global_seen_hashes)}")
+        print(f"  Step timing breakdown:")
+        print(f"    Step 1 (filter):      {t_step1_total:6.1f}s")
+        print(f"    Step 2 (prune/Ray):   {t_step2_total:6.1f}s")
+        print(f"    Step 3 (propositions):{t_step3_total:6.1f}s")
+        print(f"    Step 4 (normalize):   {t_step4_total:6.1f}s")
+        print(f"    Step 5 (dedup):       {t_step5_total:6.1f}s")
+        print(f"    Step 6 (dump):        {t_step6_total:6.1f}s")
+        print(f"    Other (Ray init/IO):  {total_elapsed - t_step1_total - t_step2_total - t_step3_total - t_step4_total - t_step5_total - t_step6_total:6.1f}s")
         print(f"{'='*60}")
 
         return {
@@ -2476,6 +2497,14 @@ class FilterAndPruneEngine:
             "skipped_missing_points": global_skipped_missing,
             "json": str(rules_path),
             "elapsed_seconds": total_elapsed,
+            "step_timing": {
+                "step1_filter": round(t_step1_total, 2),
+                "step2_prune_ray": round(t_step2_total, 2),
+                "step3_propositions": round(t_step3_total, 2),
+                "step4_normalize": round(t_step4_total, 2),
+                "step5_dedup": round(t_step5_total, 2),
+                "step6_dump": round(t_step6_total, 2),
+            },
             "source_data_file": str(intermediates_dir / "step6_rules_stats.json") if intermediates_dir else None,
         }
 
