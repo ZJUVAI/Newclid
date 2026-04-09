@@ -96,6 +96,46 @@ JSONL 合成数据
 入口: `scripts/discovery_pipeline.py` → `run_stage1_extraction()`
 核心: `src/newclid/proof_scout/core/filter_and_prune_engine.py`
 
+### 运行模式
+
+**默认模式** (`run()`): 全量加载到内存，适合 <100K 数据集。使用 `ProcessPoolExecutor` 并行。
+
+**流式模式** (`run_streaming()`): 逐 chunk 处理，适合 10M+ 数据集。使用 Ray 有界并行。
+
+```bash
+# 默认模式
+python scripts/discovery_pipeline.py -i data.jsonl -o output/ --save-intermediates
+
+# 流式模式
+python scripts/discovery_pipeline.py -i data_10M.jsonl -o output/ \
+    --streaming --chunk-size 10000 --inflight-limit 300 --save-intermediates
+
+# 流式 + Stage 1/2 重叠执行
+python scripts/discovery_pipeline.py -i data_10M.jsonl -o output/ \
+    --streaming --overlap-reduction --save-intermediates
+```
+
+**流式模式架构**:
+```
+JSONL file (10M lines)
+  → _stream_jsonl_chunks(chunk_size=10000)  [逐行读取, yield batch]
+    → per chunk:
+      Step 1: _filter_chunk()               [aux + predicate filter]
+      Step 2: _ray_prune_chunk_bounded()     [Ray 有界并行, inflight_limit=300]
+      Step 3: _extract_propositions_chunk()  [命题提取 + 简化 + eqpoint]
+      Step 4: _normalize_rules()            [规范化]
+      Step 5: _dedup_rules(external_seen_hashes)  [增量去重, 全局 hash set]
+      Step 6: append to rules.txt           [增量写入]
+      → (optional) seed boundary → push to IncrementalReducer queue
+```
+
+**关键参数**:
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| `--chunk-size` | 10000 | 每 chunk 记录数，影响内存占用 |
+| `--inflight-limit` | 300 | Ray 同时在飞任务数，影响 CPU 利用率 |
+| `--overlap-reduction` | false | Stage 1+2 重叠执行（通过 IncrementalReducer） |
+
 ### Step 1: 输入过滤
 
 **目的**: 合并两个过滤条件 — (1) 只保留含辅助点的题目；(2) 跳过包含 `skip_predicates` 中谓词的题目

@@ -15,11 +15,17 @@ FilterAndPruneEngine
 from __future__ import annotations
 
 import json
+import logging
 import re
+import threading
+import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import hashlib
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from queue import Queue
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Set, Tuple
+
+logger = logging.getLogger(__name__)
 
 # 仅在工作进程中延迟导入可视化相关库，避免非必须环境依赖
 
@@ -538,6 +544,103 @@ def _worker_prune(rec: Dict[str, Any]) -> Tuple[str, Any]:
         return (pid, rendered_list if rendered_list else None)
     except Exception:
         return (str(rec.get("problem_id")), None)
+
+
+# ========================= Streaming helpers =========================
+
+def _stream_jsonl_chunks(
+    path: Path, chunk_size: int = 10000
+) -> Iterator[Tuple[int, List[Dict[str, Any]]]]:
+    """Yield (chunk_idx, records) by reading JSONL line-by-line.
+
+    Each record is converted via _convert_llm_record.
+    Memory: only one chunk (~chunk_size records) in memory at a time.
+    """
+    base = _sanitize_basename(path)
+    buffer: List[Dict[str, Any]] = []
+    chunk_idx = 0
+    global_idx = 0
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            rec = json.loads(line)
+            if not isinstance(rec, dict) or not _has_llm_format(rec):
+                global_idx += 1
+                continue
+            converted = _convert_llm_record(rec, base, global_idx)
+            buffer.append(converted)
+            global_idx += 1
+            if len(buffer) >= chunk_size:
+                yield (chunk_idx, buffer)
+                buffer = []
+                chunk_idx += 1
+    if buffer:
+        yield (chunk_idx, buffer)
+
+
+def _ray_prune_chunk_bounded(
+    records: List[Dict[str, Any]],
+    inflight_limit: int = 300,
+) -> Dict[str, List[Dict[str, Any]]]:
+    """Prune records using Ray with bounded in-flight tasks.
+
+    Requires ray to be initialized before calling.
+    Returns pruned_map: {pid: [rendered_dict, ...]}.
+    """
+    import ray
+
+    @ray.remote(num_cpus=1, max_retries=0)
+    def _ray_worker_prune(rec: Dict[str, Any]) -> Tuple[str, Any]:
+        try:
+            pid_val = rec.get("problem_id")
+            if pid_val is None:
+                return ("<none>", None)
+            pid = str(pid_val)
+            from newclid.proof_scout.core.graph_pruner import GraphPruner
+            from newclid.proof_scout.core.single_proof_graph import SingleProofGraph
+            pruner = GraphPruner()
+            spg = SingleProofGraph.build_from_result_record(rec, verbose=False)
+            rendered_list = pruner.prune_proof_graph(spg).get(pid, [])
+            return (pid, rendered_list if rendered_list else None)
+        except Exception:
+            return (str(rec.get("problem_id")), None)
+
+    pending: Dict[Any, str] = {}  # ray ref -> pid
+    results: Dict[str, List[Dict[str, Any]]] = {}
+    rec_iter = iter(
+        r for r in records
+        if isinstance(r, dict) and r.get("problem_id") is not None
+    )
+
+    # Initial fill
+    for rec in rec_iter:
+        ref = _ray_worker_prune.remote(rec)
+        pending[ref] = str(rec.get("problem_id"))
+        if len(pending) >= inflight_limit:
+            break
+
+    # Drain + refill loop
+    while pending:
+        done, _ = ray.wait(list(pending.keys()), num_returns=1, timeout=30)
+        for ref in done:
+            try:
+                pid, rendered_list = ray.get(ref)
+                if rendered_list:
+                    results[pid] = rendered_list
+            except Exception:
+                pass
+            del pending[ref]
+
+        # Refill
+        for rec in rec_iter:
+            ref = _ray_worker_prune.remote(rec)
+            pending[ref] = str(rec.get("problem_id"))
+            if len(pending) >= inflight_limit:
+                break
+
+    return results
 
 
 def _worker_render_combined(
@@ -1166,8 +1269,17 @@ class FilterAndPruneEngine:
         return normalized_rules, skipped, skipped_entries
 
     # --- Step 5: Deduplication ---
-    def _dedup_rules(self, normalized_rules: List[Dict[str, Any]]) -> Tuple[List[Dict[str, Any]], Dict[str, List[Tuple[str, str]]]]:
+    def _dedup_rules(
+        self,
+        normalized_rules: List[Dict[str, Any]],
+        *,
+        external_seen_hashes: Optional[Set[str]] = None,
+    ) -> Tuple[List[Dict[str, Any]], Dict[str, List[Tuple[str, str]]]]:
         """Step 5: Deduplicate rules — sort by signature + SHA256 hash dedup.
+
+        Args:
+            external_seen_hashes: If provided, use this set for cross-chunk dedup
+                (hashes are added in-place). Internal dup tracking still works.
 
         Returns: (deduped_entries, norm_dup_map)
         """
@@ -1181,6 +1293,12 @@ class FilterAndPruneEngine:
 
         for item in normalized_rules:
             norm_hash = hashlib.sha256(item["normalized"].encode("utf-8")).hexdigest()
+
+            # Cross-chunk dedup: skip if already seen in a previous chunk
+            if external_seen_hashes is not None:
+                if norm_hash in external_seen_hashes:
+                    continue
+                external_seen_hashes.add(norm_hash)
 
             if norm_hash not in seen_hashes:
                 seen_hashes[norm_hash] = item
@@ -2020,6 +2138,345 @@ class FilterAndPruneEngine:
             "skipped_rules": n_skipped_pred,
             "json": str(pruned_json),
             "images_dir": str(out_base_dir),
+        }
+
+    # ================================================================
+    # Streaming mode: chunk-level processing for large datasets
+    # ================================================================
+
+    def _filter_chunk(
+        self, records: List[Dict[str, Any]]
+    ) -> Tuple[List[Dict[str, Any]], int, int]:
+        """Step 1 per-chunk: filter by aux_points and skip_predicates.
+
+        Returns: (kept_records, n_dropped_no_aux, n_dropped_predicate)
+        """
+        kept: List[Dict[str, Any]] = []
+        n_no_aux = 0
+        n_pred = 0
+        for rec in records:
+            if not isinstance(rec, dict):
+                continue
+            aux_points = rec.get("aux_points")
+            if not aux_points:
+                n_no_aux += 1
+                continue
+            if self.skip_predicates:
+                llm_out = (rec.get("llm_output_renamed") or "").lower()
+                if any(p in llm_out for p in self.skip_predicates):
+                    n_pred += 1
+                    continue
+            kept.append(rec)
+        return kept, n_no_aux, n_pred
+
+    def _extract_propositions_chunk(
+        self,
+        pruned_map: Dict[str, List[Dict[str, Any]]],
+        idx_src: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        """Steps 3 + 3.5a + 3.5b per-chunk: extract propositions, simplify, eqpoint."""
+        out_results: List[Dict[str, Any]] = []
+        for pid, rendered_list in pruned_map.items():
+            src = idx_src.get(pid, {})
+            for sub_idx, rendered in enumerate(rendered_list):
+                sub_pid = f"{pid}_{sub_idx}" if len(rendered_list) > 1 else pid
+                base_rec: Dict[str, Any] = {"problem_id": sub_pid, "rendered": rendered}
+                for k in ("aux_points", "point_lines", "points", "point_rely_on"):
+                    if k in src:
+                        base_rec[k] = src[k]
+                if "aux_points" not in base_rec and isinstance(src.get("aux_points"), list):
+                    base_rec["aux_points"] = src["aux_points"]
+                base_rec["llm_input_renamed"] = src.get("llm_input_renamed", "")
+                base_rec["llm_output_renamed"] = src.get("llm_output_renamed", "")
+                base_rec["point_coords"] = src.get("point_coords", {})
+                base_rec["seed"] = src.get("seed")
+
+                prop = _build_proposition_no_aux(rendered, list(base_rec.get("aux_points", []) or []))
+                if prop:
+                    base_rec["proposition_no_aux"] = prop
+                    try:
+                        rule_text, rename_map = _to_rule_text(
+                            prop.get("premises", []) or [], prop.get("conclusion", "")
+                        )
+                        base_rec["proposition_rule"] = rule_text
+                        base_rec["rename_map"] = rename_map
+                    except Exception:
+                        pass
+                out_results.append(base_rec)
+
+        # Step 3.5a: Simplify trivial predicates
+        for rec in out_results:
+            rule = rec.get("proposition_rule")
+            if not rule:
+                continue
+            simplified_rule, was_simplified = self._simplify_trivial_predicates(rule)
+            if was_simplified:
+                rec["proposition_rule"] = simplified_rule
+
+        # Step 3.5b: Extract and map eqpoint
+        for rec in out_results:
+            llm_output = rec.get("llm_output_renamed", "")
+            rename_map = rec.get("rename_map", {})
+            rule = rec.get("proposition_rule")
+            if not llm_output or not rename_map or not rule:
+                continue
+            eqpoint_original = self._extract_eqpoint_from_proof(llm_output)
+            if not eqpoint_original:
+                continue
+            eqpoint_mapped = self._map_eqpoint_to_rule(eqpoint_original, rename_map)
+            if not eqpoint_mapped:
+                continue
+            merged_rule = self._generate_merged_rule(rule, eqpoint_mapped)
+            rec["eqpoint_original"] = eqpoint_original
+            rec["eqpoint_mapped"] = eqpoint_mapped
+            rec["proposition_rule_merged"] = merged_rule
+
+        return out_results
+
+    def _apply_rule_skip_predicates(
+        self, entries: List[Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
+        """Filter entries by rule_skip_predicates (Step 6 predicate filter)."""
+        if not self.rule_skip_predicates:
+            return entries
+        kept: List[Dict[str, Any]] = []
+        for e in entries:
+            rule_lower = e["norm_rule"].lower()
+            if not any(p in rule_lower for p in self.rule_skip_predicates):
+                kept.append(e)
+        return kept
+
+    def run_streaming(
+        self,
+        input_json: str | Path,
+        output_dir: str | Path,
+        *,
+        chunk_size: int = 10000,
+        inflight_limit: int = 300,
+        save_intermediates: bool = False,
+        save_pruned_json: bool = False,
+        seed_reducer_queue: Optional[Queue] = None,
+    ) -> Dict[str, Any]:
+        """Run the pipeline in streaming mode for large datasets.
+
+        Processes JSONL input in chunks, using Ray for parallel graph pruning
+        and incremental dedup/dump. Memory usage is bounded by chunk_size.
+
+        Args:
+            input_json: Path to input JSONL file.
+            output_dir: Output directory.
+            chunk_size: Records per chunk (default: 10000).
+            inflight_limit: Max in-flight Ray tasks (default: 300).
+            save_intermediates: Save step-level intermediate files.
+            save_pruned_json: Write _pruned.json (default: False for large datasets).
+            seed_reducer_queue: Optional queue for incremental Stage 2 reduction.
+                When provided, completed seed groups are pushed as
+                ("seed_done", seed_val, rules_list) messages.
+        """
+        import ray
+
+        in_path = Path(input_json)
+        if not in_path.exists():
+            raise FileNotFoundError(f"input not found: {in_path}")
+
+        out_dir = Path(output_dir)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+        intermediates_dir = None
+        if save_intermediates:
+            intermediates_dir = out_dir / "intermediates"
+            intermediates_dir.mkdir(parents=True, exist_ok=True)
+
+        # Initialize Ray
+        mw = int(self.max_workers or 100)
+        if not ray.is_initialized():
+            ray.init(
+                ignore_reinit_error=True,
+                num_cpus=mw,
+                _temp_dir="/tmp/ray",
+            )
+            logger.info(f"[streaming] Ray initialized with num_cpus={mw}")
+
+        # Output file paths
+        rules_path = out_dir / (in_path.stem + "_pruned_rules.txt")
+
+        # Global state across chunks
+        global_seen_hashes: Set[str] = set()
+        global_rid_counter = 0
+        global_total = 0
+        global_kept = 0
+        global_dropped_no_aux = 0
+        global_dropped_predicate = 0
+        global_pruned = 0
+        global_prune_failed = 0
+        global_propositions = 0
+        global_rules_written = 0
+        global_skipped_missing = 0
+        global_skipped_pred = 0
+
+        # Seed tracking for incremental group reduction
+        current_seed: Optional[int] = None
+        seed_accumulator: Dict[int, List[Dict[str, Any]]] = {}
+        no_seed_rules: List[Dict[str, Any]] = []
+
+        all_entries_for_stats: List[Dict[str, Any]] = []
+
+        t_start = time.time()
+
+        print(f"\n{'='*60}")
+        print(f"Stage 1: Rule Extraction (STREAMING)")
+        print(f"{'='*60}")
+        print(f"  Input: {in_path}")
+        print(f"  Output: {out_dir}")
+        print(f"  chunk_size={chunk_size}, inflight_limit={inflight_limit}")
+        print(f"  max_workers={mw}")
+
+        with open(rules_path, "w", encoding="utf-8") as rules_fh:
+            for chunk_idx, chunk in _stream_jsonl_chunks(in_path, chunk_size):
+                t_chunk = time.time()
+                chunk_total = len(chunk)
+                global_total += chunk_total
+
+                # Step 1: Filter
+                kept_records, n_no_aux, n_pred = self._filter_chunk(chunk)
+                global_kept += len(kept_records)
+                global_dropped_no_aux += n_no_aux
+                global_dropped_predicate += n_pred
+
+                if not kept_records:
+                    print(f"  [chunk {chunk_idx}] {chunk_total} records, 0 kept, skipping")
+                    continue
+
+                # Build idx_src for this chunk
+                idx_src: Dict[str, Any] = {}
+                for r in kept_records:
+                    if isinstance(r, dict) and r.get("problem_id") is not None:
+                        idx_src[str(r["problem_id"])] = r
+
+                # Step 2: Graph prune (Ray bounded parallel)
+                pruned_map = _ray_prune_chunk_bounded(kept_records, inflight_limit)
+                n_pruned = len(pruned_map)
+                n_failed = len(kept_records) - n_pruned
+                global_pruned += n_pruned
+                global_prune_failed += n_failed
+
+                if not pruned_map:
+                    print(f"  [chunk {chunk_idx}] {chunk_total} records, {len(kept_records)} kept, 0 pruned")
+                    continue
+
+                # Steps 3 + 3.5a + 3.5b: Proposition extraction
+                out_results = self._extract_propositions_chunk(pruned_map, idx_src)
+                global_propositions += len(out_results)
+
+                # Step 4: Normalization
+                normalized_rules, n_skipped, _ = self._normalize_rules(out_results)
+                global_skipped_missing += n_skipped
+
+                if not normalized_rules:
+                    print(f"  [chunk {chunk_idx}] {chunk_total} records, 0 normalized rules")
+                    continue
+
+                # Step 5: Dedup (incremental with global hash set)
+                entries, _ = self._dedup_rules(
+                    normalized_rules, external_seen_hashes=global_seen_hashes
+                )
+
+                if not entries:
+                    print(f"  [chunk {chunk_idx}] {chunk_total} records, 0 unique rules")
+                    continue
+
+                # Step 6: Predicate filter
+                final_entries = self._apply_rule_skip_predicates(entries)
+                global_skipped_pred += len(entries) - len(final_entries)
+
+                # Step 6: Incremental append to rules.txt
+                for e in final_entries:
+                    rules_fh.write(e["rid"] + "\n")
+                    rules_fh.write(e["norm_rule"] + "\n")
+                    global_rules_written += 1
+                rules_fh.flush()
+
+                # Track entries for stats output
+                all_entries_for_stats.extend(final_entries)
+
+                # Seed tracking for incremental group reduction
+                if seed_reducer_queue is not None:
+                    for e in final_entries:
+                        seed_val = e.get("seed")
+                        if seed_val is None:
+                            no_seed_rules.append(e)
+                            continue
+                        if current_seed is not None and seed_val != current_seed:
+                            # Seed boundary detected
+                            if current_seed in seed_accumulator:
+                                seed_reducer_queue.put(
+                                    ("seed_done", current_seed, seed_accumulator.pop(current_seed))
+                                )
+                        current_seed = seed_val
+                        seed_accumulator.setdefault(seed_val, []).append(e)
+
+                elapsed = time.time() - t_chunk
+                print(
+                    f"  [chunk {chunk_idx}] total={chunk_total} kept={len(kept_records)} "
+                    f"pruned={n_pruned} rules={len(final_entries)} "
+                    f"cumulative_unique={global_rules_written} ({elapsed:.1f}s)"
+                )
+
+        # Flush remaining seed groups
+        if seed_reducer_queue is not None:
+            for seed_val, rules in seed_accumulator.items():
+                seed_reducer_queue.put(("seed_done", seed_val, rules))
+            seed_accumulator.clear()
+            # Signal completion
+            seed_reducer_queue.put(("all_done", no_seed_rules))
+
+        # Write step6_rules_stats.json for Stage 2 compatibility
+        if save_intermediates and intermediates_dir:
+            stats_path = intermediates_dir / "step6_rules_stats.json"
+            with open(stats_path, "w", encoding="utf-8") as f:
+                json.dump({
+                    "input_rules_raw": global_propositions,
+                    "output_rules_deduped": global_rules_written,
+                    "skipped_rules_missing_points": global_skipped_missing,
+                    "skipped_rules_predicates": global_skipped_pred,
+                    "rule_skip_predicates": sorted(self.rule_skip_predicates) if self.rule_skip_predicates else [],
+                    "entries": [{
+                        "rid": e.get("rid"),
+                        "pid": e.get("pid"),
+                        "seed": e.get("seed"),
+                        "rule": e.get("norm_rule"),
+                        "rule_original": e.get("rule"),
+                        "llm_input_renamed": e.get("llm_input_renamed", ""),
+                        "llm_output_renamed": e.get("llm_output_renamed", ""),
+                        "point_coords": e.get("point_coords", {}),
+                    } for e in all_entries_for_stats]
+                }, f, indent=2)
+            print(f"[streaming] step6_rules_stats.json saved to {stats_path}")
+
+        ray.shutdown()
+
+        total_elapsed = time.time() - t_start
+        print(f"\n{'='*60}")
+        print(f"Stage 1 (STREAMING) complete in {total_elapsed:.1f}s")
+        print(f"  Total records: {global_total}")
+        print(f"  Kept after filter: {global_kept}")
+        print(f"  Dropped (no aux): {global_dropped_no_aux}")
+        print(f"  Dropped (predicate): {global_dropped_predicate}")
+        print(f"  Pruned: {global_pruned}, Failed: {global_prune_failed}")
+        print(f"  Rules written: {global_rules_written}")
+        print(f"  Global unique hashes: {len(global_seen_hashes)}")
+        print(f"{'='*60}")
+
+        return {
+            "total": global_total,
+            "kept": global_kept,
+            "dropped": global_total - global_kept,
+            "rules": global_rules_written,
+            "skipped_rules": global_skipped_pred,
+            "skipped_missing_points": global_skipped_missing,
+            "json": str(rules_path),
+            "elapsed_seconds": total_elapsed,
+            "source_data_file": str(intermediates_dir / "step6_rules_stats.json") if intermediates_dir else None,
         }
 
 

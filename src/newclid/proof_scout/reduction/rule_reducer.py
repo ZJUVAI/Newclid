@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from collections import defaultdict
 from typing import List, Dict, Any, Optional, Tuple
 import re
+import threading
 from pathlib import Path
 
 from newclid.proof_scout.reduction.generality_scorer import GeneralityScorer
@@ -626,4 +627,148 @@ def _test_subsumption_batch_worker(
     return eliminated
 
 
-__all__ = ["RuleReducer", "RuleWithSource", "load_rules_from_discovery_output"]
+class IncrementalReducer:
+    """Background reducer that processes seed groups as they arrive from Stage 1.
+
+    Usage:
+        queue = Queue()
+        reducer = IncrementalReducer(rule_reducer, queue)
+        reducer.start()
+        # ... Stage 1 pushes ("seed_done", seed, rules) and ("all_done", no_seed_rules) ...
+        result = reducer.join()  # blocks until done
+    """
+
+    def __init__(self, reducer: RuleReducer, queue, *, verbose: bool = True):
+        self.reducer = reducer
+        self.queue = queue
+        self.verbose = verbose
+        self._thread: Optional[threading.Thread] = None
+        self._result: Optional[Dict[str, Any]] = None
+        self._group_survivors: List[RuleWithSource] = []
+        self._group_stats: List[Dict[str, Any]] = []
+        self._total_group_eliminated = 0
+        self._total_group_skipped = 0
+
+    def start(self):
+        import threading
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+
+    def _run(self):
+        """Consume queue messages and reduce seed groups incrementally."""
+        while True:
+            msg = self.queue.get()
+            if msg[0] == "seed_done":
+                _, seed_val, rule_entries = msg
+                self._process_seed_group(seed_val, rule_entries)
+            elif msg[0] == "all_done":
+                _, no_seed_rules = msg
+                self._finalize(no_seed_rules)
+                break
+
+    def _process_seed_group(self, seed_val, rule_entries: list):
+        """Reduce a single seed group."""
+        if not rule_entries:
+            return
+
+        # Convert entries to RuleWithSource
+        rules = _entries_to_rules_with_source(rule_entries)
+        if not rules:
+            return
+
+        if self.verbose:
+            print(f"\n[IncrementalReducer] Seed group {seed_val}: {len(rules)} rules")
+
+        result = self.reducer.reduce(rules)
+        survivors = result.get("basis_rules", [])
+        self._group_survivors.extend(survivors)
+        self._total_group_eliminated += result["stats"]["eliminated_count"]
+        self._total_group_skipped += result["stats"]["skipped_by_premises_count"]
+        self._group_stats.append({
+            "seed": seed_val,
+            "input": result["stats"]["original_count"],
+            "basis": result["stats"]["basis_count"],
+            "eliminated": result["stats"]["eliminated_count"],
+        })
+
+    def _finalize(self, no_seed_entries: list):
+        """Run global reduction on all group survivors + no-seed rules."""
+        no_seed_rules = _entries_to_rules_with_source(no_seed_entries)
+        all_survivors = self._group_survivors + no_seed_rules
+
+        if self.verbose:
+            print(f"\n[IncrementalReducer] Global phase: {len(all_survivors)} survivors")
+
+        if all_survivors:
+            global_result = self.reducer.reduce(all_survivors)
+        else:
+            global_result = {
+                "basis_rules": [],
+                "eliminated_rules": [],
+                "skipped_by_premises": [],
+                "stats": {"original_count": 0, "basis_count": 0,
+                          "eliminated_count": 0, "skipped_by_premises_count": 0,
+                          "reduction_rate": 0, "n_subsumption_tests": 0},
+            }
+
+        self._result = {
+            "basis_rules": global_result["basis_rules"],
+            "eliminated_rules": global_result["eliminated_rules"],
+            "skipped_by_premises": global_result["skipped_by_premises"],
+            "stats": {
+                "original_count": sum(s["input"] for s in self._group_stats) + len(no_seed_rules),
+                "group_phase": {
+                    "n_groups": len(self._group_stats),
+                    "n_no_seed": len(no_seed_rules),
+                    "survivors": len(all_survivors),
+                    "eliminated": self._total_group_eliminated,
+                    "group_details": self._group_stats,
+                },
+                "global_phase": global_result["stats"],
+                "basis_count": global_result["stats"]["basis_count"],
+                "total_eliminated": self._total_group_eliminated + global_result["stats"]["eliminated_count"],
+            },
+        }
+
+    def join(self, timeout=None) -> Optional[Dict[str, Any]]:
+        """Wait for the reducer thread to finish and return results."""
+        if self._thread:
+            self._thread.join(timeout=timeout)
+        return self._result
+
+
+def _entries_to_rules_with_source(entries: list) -> List[RuleWithSource]:
+    """Convert rule entry dicts (from Stage 1 output) to RuleWithSource objects."""
+    rules = []
+    for e in entries:
+        if not isinstance(e, dict):
+            continue
+        rule_text = e.get("norm_rule") or e.get("rule", "")
+        rule_id = e.get("rid", "")
+        llm_input = e.get("llm_input_renamed", "")
+        llm_output = e.get("llm_output_renamed", "")
+        point_coords = e.get("point_coords", {})
+        seed = e.get("seed")
+
+        if not rule_text or not llm_input:
+            continue
+
+        try:
+            premises, goal = _parse_llm_input(llm_input)
+            points = [(name, coords[0], coords[1]) for name, coords in point_coords.items()]
+            rules.append(RuleWithSource(
+                rule_id=rule_id,
+                rule_text=rule_text,
+                points=points,
+                premises=premises,
+                goal=goal,
+                llm_output_renamed=llm_output,
+                seed=seed,
+            ))
+        except Exception:
+            continue
+    return rules
+
+
+__all__ = ["RuleReducer", "RuleWithSource", "IncrementalReducer",
+           "load_rules_from_discovery_output"]

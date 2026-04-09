@@ -6,11 +6,22 @@ Discovery Pipeline - End-to-end rule extraction and reduction.
 Stage 1: FilterAndPruneEngine — filter, prune, extract, normalize, dedup, dump rules
 Stage 2: RuleReducer — greedy subsumption-based rule reduction
 
+Modes:
+  - Default: in-memory pipeline (original run())
+  - Streaming: chunk-based pipeline (run_streaming()) for large datasets (10M+)
+
 Usage:
     # Full pipeline (extraction + reduction)
     python scripts/discovery_pipeline.py \
         -i datasets/synthetic_10k.jsonl \
         -o outputs/experiments/YYYYMMDD_experiment \
+        --save-intermediates
+
+    # Streaming mode (for large datasets)
+    python scripts/discovery_pipeline.py \
+        -i datasets/synthetic_10M.jsonl \
+        -o outputs/experiments/YYYYMMDD_experiment \
+        --streaming --chunk-size 10000 --inflight-limit 300 \
         --save-intermediates
 
     # Extraction only
@@ -32,6 +43,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from queue import Queue
 from typing import Any, Dict, List, Optional
 
 
@@ -48,11 +60,21 @@ def run_stage1_extraction(
     skip_predicates: Optional[List[str]] = None,
     rule_skip_predicates: Optional[List[str]] = None,
     render_images: bool = False,
+    streaming: bool = False,
+    chunk_size: int = 10000,
+    inflight_limit: int = 300,
+    seed_reducer_queue: Optional[Queue] = None,
 ) -> Dict[str, Any]:
     """Stage 1: Extract rules using FilterAndPruneEngine.
 
     Steps 1-6: Input Filter → Graph Prune → Proposition Extract →
                Normalization → Deduplication → Rule Dump
+
+    Args:
+        streaming: Use streaming mode for large datasets.
+        chunk_size: Records per chunk in streaming mode.
+        inflight_limit: Max in-flight Ray tasks in streaming mode.
+        seed_reducer_queue: Queue for incremental Stage 2 reduction (streaming only).
 
     Returns:
         Dict with extraction results and paths to output files.
@@ -61,7 +83,7 @@ def run_stage1_extraction(
 
     start_time = time.time()
     print(f"\n{'='*60}")
-    print(f"Stage 1: Rule Extraction")
+    print(f"Stage 1: Rule Extraction {'(STREAMING)' if streaming else ''}")
     print(f"{'='*60}")
     print(f"  Input: {input_path}")
     print(f"  Output: {output_dir}")
@@ -77,20 +99,42 @@ def run_stage1_extraction(
         engine_kwargs["rule_skip_predicates"] = rule_skip_predicates
 
     engine = FilterAndPruneEngine(**engine_kwargs)
-    result = engine.run(input_path, output_dir, save_intermediates=save_intermediates)
 
-    elapsed = time.time() - start_time
-    print(f"\n[Stage 1] Completed in {elapsed:.1f}s")
-    print(f"  Rules extracted: {result.get('rules', 0)}")
-    print(f"  JSON: {result.get('json', '')}")
+    if streaming:
+        result = engine.run_streaming(
+            input_path, output_dir,
+            chunk_size=chunk_size,
+            inflight_limit=inflight_limit,
+            save_intermediates=save_intermediates,
+            seed_reducer_queue=seed_reducer_queue,
+        )
+        elapsed = time.time() - start_time
+        print(f"\n[Stage 1] Completed in {elapsed:.1f}s (streaming)")
+        print(f"  Rules extracted: {result.get('rules', 0)}")
 
-    return {
-        "stage": "extraction",
-        "elapsed_seconds": elapsed,
-        "stats": result,
-        "rules_file": result.get("json", "").replace(".json", "_rules.txt") if result.get("json") else None,
-        "source_data_file": str(Path(output_dir) / "intermediates" / "step6_rules_stats.json") if save_intermediates else None,
-    }
+        rules_file = result.get("json", "")
+        source_data_file = result.get("source_data_file")
+        return {
+            "stage": "extraction",
+            "elapsed_seconds": elapsed,
+            "stats": result,
+            "rules_file": rules_file,
+            "source_data_file": source_data_file,
+        }
+    else:
+        result = engine.run(input_path, output_dir, save_intermediates=save_intermediates)
+        elapsed = time.time() - start_time
+        print(f"\n[Stage 1] Completed in {elapsed:.1f}s")
+        print(f"  Rules extracted: {result.get('rules', 0)}")
+        print(f"  JSON: {result.get('json', '')}")
+
+        return {
+            "stage": "extraction",
+            "elapsed_seconds": elapsed,
+            "stats": result,
+            "rules_file": result.get("json", "").replace(".json", "_rules.txt") if result.get("json") else None,
+            "source_data_file": str(Path(output_dir) / "intermediates" / "step6_rules_stats.json") if save_intermediates else None,
+        }
 
 
 # ============================================================================
@@ -231,6 +275,10 @@ def run_pipeline(
     skip_predicates: Optional[List[str]] = None,
     rule_skip_predicates: Optional[List[str]] = None,
     render_images: bool = False,
+    # Streaming params
+    streaming: bool = False,
+    chunk_size: int = 10000,
+    inflight_limit: int = 300,
     # Reduction params
     rules_file: Optional[Path] = None,
     source_data_file: Optional[Path] = None,
@@ -241,6 +289,7 @@ def run_pipeline(
     batch_size: int = 10,
     debug: bool = False,
     no_group_reduction: bool = False,
+    overlap_reduction: bool = False,
 ) -> Dict[str, Any]:
     """Run the discovery pipeline.
 
@@ -254,6 +303,9 @@ def run_pipeline(
         skip_predicates: Predicates to filter from input records (default: eqpoint, constline)
         rule_skip_predicates: Predicates to filter from final rules (default: aconst, rconst)
         render_images: Render comparison images
+        streaming: Use streaming mode for large datasets
+        chunk_size: Records per chunk in streaming mode
+        inflight_limit: Max in-flight Ray tasks in streaming mode
         rules_file: Path to rules file (for skip_extraction mode)
         source_data_file: Path to source data file (for skip_extraction mode)
         timeout: Subsumption test timeout
@@ -262,6 +314,7 @@ def run_pipeline(
         max_rules: Max rules to load for reduction
         batch_size: Batch size for reduction
         debug: Enable debug output for reduction
+        overlap_reduction: Overlap Stage 1 + Stage 2 via incremental group reduction
     """
     pipeline_start = time.time()
     output_dir = Path(output_dir)
@@ -271,6 +324,27 @@ def run_pipeline(
         "output_dir": str(output_dir),
         "stages": [],
     }
+
+    # Setup incremental reducer for overlap mode
+    seed_reducer_queue: Optional[Queue] = None
+    incremental_reducer = None
+
+    if streaming and overlap_reduction and not skip_extraction and not skip_reduction:
+        from newclid.proof_scout.reduction import RuleReducer, IncrementalReducer
+
+        seed_reducer_queue = Queue()
+        reducer = RuleReducer(
+            timeout=timeout,
+            seed=seed,
+            max_premises=max_premises,
+            n_workers=1,  # sequential within reducer, Ray handles parallelism
+            batch_size=batch_size,
+            debug=debug,
+            debug_output_dir=output_dir if debug else None,
+        )
+        incremental_reducer = IncrementalReducer(reducer, seed_reducer_queue)
+        incremental_reducer.start()
+        print("[pipeline] Incremental Stage 2 reducer started in background")
 
     # Stage 1: Extraction
     if not skip_extraction:
@@ -285,6 +359,10 @@ def run_pipeline(
             skip_predicates=skip_predicates,
             rule_skip_predicates=rule_skip_predicates,
             render_images=render_images,
+            streaming=streaming,
+            chunk_size=chunk_size,
+            inflight_limit=inflight_limit,
+            seed_reducer_queue=seed_reducer_queue,
         )
         results["stages"].append(stage1)
 
@@ -296,30 +374,65 @@ def run_pipeline(
 
     # Stage 2: Reduction
     if not skip_reduction:
-        if rules_file is None or source_data_file is None:
-            print("Error: --rules and --source-data are required for reduction")
-            print("  (either run extraction first, or provide them explicitly)")
-            sys.exit(1)
+        if incremental_reducer is not None:
+            # Overlap mode: wait for incremental reducer to finish
+            print("\n[pipeline] Waiting for incremental Stage 2 reducer to finish...")
+            reduction_result = incremental_reducer.join(timeout=None)
 
-        if not Path(rules_file).exists():
-            print(f"Error: Rules file not found: {rules_file}")
-            sys.exit(1)
-        if not Path(source_data_file).exists():
-            print(f"Error: Source data file not found: {source_data_file}")
-            sys.exit(1)
+            if reduction_result:
+                elapsed_reduction = time.time() - pipeline_start
 
-        stage2 = run_stage2_reduction(
-            Path(rules_file), Path(source_data_file), output_dir,
-            timeout=timeout,
-            seed=seed,
-            max_premises=max_premises,
-            max_rules=max_rules,
-            n_workers=max_workers,
-            batch_size=batch_size,
-            debug=debug,
-            no_group_reduction=no_group_reduction,
-        )
-        results["stages"].append(stage2)
+                # Save outputs
+                basis_rules = reduction_result.get("basis_rules", [])
+                mp_suffix = f"_maxprem{max_premises}" if max_premises else ""
+                extracted_path = output_dir / f"extracted_rules{mp_suffix}.txt"
+                with open(extracted_path, "w", encoding="utf-8") as f:
+                    for rule in basis_rules:
+                        f.write(f"{rule.rule_id}\n{rule.rule_text}\n")
+
+                stats = reduction_result.get("stats", {})
+                stats["elapsed_seconds"] = elapsed_reduction
+                stats_path = output_dir / f"reduction_stats{mp_suffix}.json"
+                with open(stats_path, "w", encoding="utf-8") as f:
+                    json.dump(stats, f, ensure_ascii=False, indent=2)
+
+                print(f"  Basis: {stats.get('basis_count', 0)}")
+                print(f"  Total eliminated: {stats.get('total_eliminated', 0)}")
+
+                results["stages"].append({
+                    "stage": "reduction (incremental)",
+                    "elapsed_seconds": elapsed_reduction,
+                    "stats": stats,
+                    "extracted_rules_path": str(extracted_path),
+                })
+            else:
+                print("[pipeline] Incremental reducer returned no result")
+        else:
+            # Standard (non-overlap) reduction
+            if rules_file is None or source_data_file is None:
+                print("Error: --rules and --source-data are required for reduction")
+                print("  (either run extraction first, or provide them explicitly)")
+                sys.exit(1)
+
+            if not Path(rules_file).exists():
+                print(f"Error: Rules file not found: {rules_file}")
+                sys.exit(1)
+            if not Path(source_data_file).exists():
+                print(f"Error: Source data file not found: {source_data_file}")
+                sys.exit(1)
+
+            stage2 = run_stage2_reduction(
+                Path(rules_file), Path(source_data_file), output_dir,
+                timeout=timeout,
+                seed=seed,
+                max_premises=max_premises,
+                max_rules=max_rules,
+                n_workers=max_workers,
+                batch_size=batch_size,
+                debug=debug,
+                no_group_reduction=no_group_reduction,
+            )
+            results["stages"].append(stage2)
 
     total_elapsed = time.time() - pipeline_start
     results["total_elapsed_seconds"] = total_elapsed
@@ -354,6 +467,17 @@ def main():
                         help="Comma-separated predicates to filter from rules (default: aconst,rconst)")
     stage1.add_argument("--render-images", action="store_true", help="Render comparison images")
 
+    # Streaming args
+    streaming_grp = parser.add_argument_group("Streaming mode (for large datasets)")
+    streaming_grp.add_argument("--streaming", action="store_true",
+                               help="Use streaming mode (chunk-based + Ray) for large datasets")
+    streaming_grp.add_argument("--chunk-size", type=int, default=10000,
+                               help="Records per chunk in streaming mode (default: 10000)")
+    streaming_grp.add_argument("--inflight-limit", type=int, default=300,
+                               help="Max in-flight Ray tasks in streaming mode (default: 300)")
+    streaming_grp.add_argument("--overlap-reduction", action="store_true",
+                               help="Overlap Stage 1 + Stage 2 via incremental group reduction (streaming only)")
+
     # Stage 2 args
     stage2 = parser.add_argument_group("Stage 2: Reduction")
     stage2.add_argument("--timeout", type=int, default=60, help="Subsumption test timeout (default: 60)")
@@ -382,6 +506,8 @@ def main():
         parser.error("--input is required unless --skip-extraction is set")
     if args.skip_extraction and (args.rules is None or args.source_data is None):
         parser.error("--rules and --source-data are required with --skip-extraction")
+    if args.overlap_reduction and not args.streaming:
+        parser.error("--overlap-reduction requires --streaming")
 
     # Parse predicate lists
     skip_preds = [p.strip() for p in args.skip_predicates.split(",")] if args.skip_predicates else None
@@ -397,6 +523,9 @@ def main():
         skip_predicates=skip_preds,
         rule_skip_predicates=rule_skip_preds,
         render_images=args.render_images,
+        streaming=args.streaming,
+        chunk_size=args.chunk_size,
+        inflight_limit=args.inflight_limit,
         rules_file=args.rules,
         source_data_file=args.source_data,
         timeout=args.timeout,
@@ -406,6 +535,7 @@ def main():
         batch_size=args.batch_size,
         debug=args.debug,
         no_group_reduction=args.no_group_reduction,
+        overlap_reduction=args.overlap_reduction,
     )
 
 
