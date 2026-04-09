@@ -163,6 +163,7 @@ def run_pipeline(
     streaming: bool = False,
     chunk_size: int = 10000,
     inflight_limit: int = 300,
+    overlap_reduction: bool = False,
     # Reduction params
     rules_file: Optional[Path] = None,
     source_data_file: Optional[Path] = None,
@@ -186,6 +187,29 @@ def run_pipeline(
         "stages": [],
     }
 
+    # Setup incremental reducer for overlap mode (CSolver backend)
+    seed_reducer_queue: Optional[Queue] = None
+    incremental_reducer = None
+
+    if streaming and overlap_reduction and not skip_extraction and not skip_reduction:
+        from newclid.proof_scout.reduction import RuleReducer, IncrementalReducer
+
+        seed_reducer_queue = Queue()
+        reducer = RuleReducer(
+            timeout=timeout,
+            seed=seed,
+            max_premises=max_premises,
+            n_workers=1,
+            batch_size=batch_size,
+            debug=debug,
+            debug_output_dir=output_dir if debug else None,
+            solver_type="csolver",
+            engine=engine,
+        )
+        incremental_reducer = IncrementalReducer(reducer, seed_reducer_queue)
+        incremental_reducer.start()
+        print("[pipeline] Incremental Stage 2 reducer (CSolver) started in background")
+
     # Stage 1: Extraction (same as Python pipeline)
     if not skip_extraction:
         if input_path is None:
@@ -202,6 +226,7 @@ def run_pipeline(
             streaming=streaming,
             chunk_size=chunk_size,
             inflight_limit=inflight_limit,
+            seed_reducer_queue=seed_reducer_queue,
         )
         results["stages"].append(stage1)
 
@@ -212,31 +237,64 @@ def run_pipeline(
 
     # Stage 2: Reduction (CSolver)
     if not skip_reduction:
-        if rules_file is None or source_data_file is None:
-            print("Error: --rules and --source-data are required for reduction")
-            print("  (either run extraction first, or provide them explicitly)")
-            sys.exit(1)
+        if incremental_reducer is not None:
+            # Overlap mode: wait for incremental reducer to finish
+            print("\n[pipeline] Waiting for incremental Stage 2 reducer (CSolver) to finish...")
+            reduction_result = incremental_reducer.join(timeout=None)
 
-        if not Path(rules_file).exists():
-            print(f"Error: Rules file not found: {rules_file}")
-            sys.exit(1)
-        if not Path(source_data_file).exists():
-            print(f"Error: Source data file not found: {source_data_file}")
-            sys.exit(1)
+            if reduction_result:
+                elapsed_reduction = time.time() - pipeline_start
+                basis_rules = reduction_result.get("basis_rules", [])
+                mp_suffix = f"_maxprem{max_premises}" if max_premises else ""
+                extracted_path = output_dir / f"extracted_rules{mp_suffix}.txt"
+                with open(extracted_path, "w", encoding="utf-8") as f:
+                    for rule in basis_rules:
+                        f.write(f"{rule.rule_id}\n{rule.rule_text}\n")
 
-        stage2 = run_stage2_reduction_csolver(
-            Path(rules_file), Path(source_data_file), output_dir,
-            timeout=timeout,
-            seed=seed,
-            max_premises=max_premises,
-            max_rules=max_rules,
-            n_workers=max_workers,
-            batch_size=batch_size,
-            debug=debug,
-            no_group_reduction=no_group_reduction,
-            engine=engine,
-        )
-        results["stages"].append(stage2)
+                stats = reduction_result.get("stats", {})
+                stats["elapsed_seconds"] = elapsed_reduction
+                stats["solver_type"] = "csolver"
+                stats_path = output_dir / f"reduction_stats{mp_suffix}.json"
+                with open(stats_path, "w", encoding="utf-8") as f:
+                    json.dump(stats, f, ensure_ascii=False, indent=2)
+
+                print(f"  Basis: {stats.get('basis_count', 0)}")
+                print(f"  Total eliminated: {stats.get('total_eliminated', 0)}")
+
+                results["stages"].append({
+                    "stage": "reduction_csolver (incremental)",
+                    "elapsed_seconds": elapsed_reduction,
+                    "stats": stats,
+                    "extracted_rules_path": str(extracted_path),
+                })
+            else:
+                print("[pipeline] Incremental reducer returned no result")
+        else:
+            if rules_file is None or source_data_file is None:
+                print("Error: --rules and --source-data are required for reduction")
+                print("  (either run extraction first, or provide them explicitly)")
+                sys.exit(1)
+
+            if not Path(rules_file).exists():
+                print(f"Error: Rules file not found: {rules_file}")
+                sys.exit(1)
+            if not Path(source_data_file).exists():
+                print(f"Error: Source data file not found: {source_data_file}")
+                sys.exit(1)
+
+            stage2 = run_stage2_reduction_csolver(
+                Path(rules_file), Path(source_data_file), output_dir,
+                timeout=timeout,
+                seed=seed,
+                max_premises=max_premises,
+                max_rules=max_rules,
+                n_workers=max_workers,
+                batch_size=batch_size,
+                debug=debug,
+                no_group_reduction=no_group_reduction,
+                engine=engine,
+            )
+            results["stages"].append(stage2)
 
     total_elapsed = time.time() - pipeline_start
     results["total_elapsed_seconds"] = total_elapsed
@@ -277,6 +335,8 @@ def main():
                                help="Records per chunk in streaming mode (default: 10000)")
     streaming_grp.add_argument("--inflight-limit", type=int, default=300,
                                help="Max in-flight Ray tasks in streaming mode (default: 300)")
+    streaming_grp.add_argument("--overlap-reduction", action="store_true",
+                               help="Overlap Stage 1 + Stage 2 via incremental group reduction (streaming only)")
 
     stage2 = parser.add_argument_group("Stage 2: Reduction (CSolver)")
     stage2.add_argument("--timeout", type=int, default=60, help="Subsumption test timeout (default: 60)")
@@ -304,6 +364,8 @@ def main():
         parser.error("--input is required unless --skip-extraction is set")
     if args.skip_extraction and (args.rules is None or args.source_data is None):
         parser.error("--rules and --source-data are required with --skip-extraction")
+    if args.overlap_reduction and not args.streaming:
+        parser.error("--overlap-reduction requires --streaming")
 
     skip_preds = [p.strip() for p in args.skip_predicates.split(",")] if args.skip_predicates else None
     rule_skip_preds = [p.strip() for p in args.rule_skip_predicates.split(",")] if args.rule_skip_predicates else None
@@ -321,6 +383,7 @@ def main():
         streaming=args.streaming,
         chunk_size=args.chunk_size,
         inflight_limit=args.inflight_limit,
+        overlap_reduction=args.overlap_reduction,
         rules_file=args.rules,
         source_data_file=args.source_data,
         timeout=args.timeout,
