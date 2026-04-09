@@ -1,4 +1,5 @@
 import logging
+import math
 import os
 import argparse
 import json
@@ -182,6 +183,8 @@ class ProblemPipeline:
 
         start_time = time.time()
         last_logged_written = self.writer.written_count
+        last_logged_time = start_time
+        smoothed_speed = None
 
         while self.writer.written_count < self.n_samples:
             done, _ = ray.wait(list(pending_tasks.keys()), num_returns=1, timeout=10)
@@ -229,7 +232,19 @@ class ProblemPipeline:
 
                         # Log progress when new data is written to file
                         if self.writer.written_count > last_logged_written:
-                            elapsed_time = time.time() - start_time
+                            now = time.time()
+                            elapsed_time = now - start_time
+                            instant_elapsed = max(now - last_logged_time, 1e-6)
+                            instant_written = self.writer.written_count - last_logged_written
+                            instant_speed = instant_written / instant_elapsed
+                            alpha = 1 - math.exp(-instant_elapsed / 500)
+                            smoothed_speed = (
+                                instant_speed
+                                if smoothed_speed is None
+                                else alpha * instant_speed + (1 - alpha) * smoothed_speed
+                            )
+                            remaining = max(0, self.n_samples - self.writer.written_count)
+                            eta_seconds = remaining / max(smoothed_speed, 1e-6)
                             pending_draw = len(self.writer.pending_draw_tasks)
                             pending_write = len(self.writer.pending_write_data)
                             logging.info(
@@ -240,10 +255,11 @@ class ProblemPipeline:
                                 f"Gen: {summary['generation_time']:1.0f} + "
                                 f"DDAR: {summary['runtime']:2.0f} + "
                                 f"Proc: {summary['process_goal_runtime']:3.0f} | "
-                                f"Speed: {self.writer.written_count/elapsed_time:3.0f} samp/s | "
-                                f"ETA: {timedelta(seconds=int(self.n_samples/max(1,self.writer.written_count)*elapsed_time - elapsed_time))}"
+                                f"Speed: {smoothed_speed:3.0f} samp/s | "
+                                f"ETA: {timedelta(seconds=int(eta_seconds))}"
                             )
                             last_logged_written = self.writer.written_count
+                            last_logged_time = now
             for task, (s_time, _) in list(pending_tasks.items()):
                 if time.time() - s_time > self.timeout:
                     print(f"⚠️ Task {task} timeout. Canceling")
