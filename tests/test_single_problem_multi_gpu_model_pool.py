@@ -5,6 +5,7 @@ from unittest.mock import patch
 from pathlib import Path
 
 from experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu import build_eval_output_stem
+from experiments.single_problem_multi_gpu_eval.lm_actor import resolve_model_path
 from experiments.single_problem_multi_gpu_eval.model_pool import GenerationDispatcher, ModelPool
 from experiments.single_problem_multi_gpu_eval import model_pool as model_pool_module
 from newclid.search_trace import TraceRun
@@ -159,3 +160,9 @@ class EvalOutputNamingTests(unittest.TestCase):
 
         self.assertEqual(trace_run.run_id, f"{stem}_20260409T120000Z")
         self.assertEqual(trace_run.run_dir.name, f"{stem}_20260409T120000Z")
+
+
+class ModelPathResolutionTests(unittest.TestCase):
+    def test_resolve_model_path_raises_for_missing_local_like_path(self):
+        with self.assertRaises(FileNotFoundError):
+            resolve_model_path("/tmp/definitely_missing_checkpoint")
