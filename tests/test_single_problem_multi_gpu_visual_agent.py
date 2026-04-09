@@ -135,47 +135,16 @@ def test_ddar_task_kwargs_enable_remote_render_before_last_depth(tmp_path: Path)
         request_id="d0_n1",
         depth=0,
         candidate_rank=0,
-        node_id=8,
         state=None,
     ) == {
         "render_visual_prompt_remote": True,
         "render_root": str(tmp_path),
-        "render_stem": "d1_d0_n1_8",
+        "render_stem": "d1_d0_n1",
         "render_width": 768,
     }
     assert agent.ddar_task_kwargs(
         request_id="d1_n1",
         depth=2,
         candidate_rank=0,
-        node_id=9,
         state=None,
     ) == {}
-
-
-def test_ddar_task_kwargs_use_unique_stems_for_different_nodes(tmp_path: Path) -> None:
-    agent = VisualMultiGPUAgent(
-        model_pool=None,
-        decoding_size=2,
-        beam_size=4,
-        search_depth=3,
-        render_root=tmp_path,
-    )
-
-    kwargs_a = agent.ddar_task_kwargs(
-        request_id="d0_n1",
-        depth=0,
-        candidate_rank=0,
-        node_id=8,
-        state=None,
-    )
-    kwargs_b = agent.ddar_task_kwargs(
-        request_id="d0_n1",
-        depth=0,
-        candidate_rank=1,
-        node_id=9,
-        state=None,
-    )
-
-    assert kwargs_a["render_stem"] == "d1_d0_n1_8"
-    assert kwargs_b["render_stem"] == "d1_d0_n1_9"
-    assert kwargs_a["render_stem"] != kwargs_b["render_stem"]
