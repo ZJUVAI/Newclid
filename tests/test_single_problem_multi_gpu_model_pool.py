@@ -166,3 +166,7 @@ class ModelPathResolutionTests(unittest.TestCase):
     def test_resolve_model_path_raises_for_missing_local_like_path(self):
         with self.assertRaises(FileNotFoundError):
             resolve_model_path("/tmp/definitely_missing_checkpoint")
+
+    def test_resolve_model_path_allows_remote_repo_id(self):
+        with patch("modelscope.snapshot_download", return_value="/tmp/remote-model"):
+            self.assertEqual(resolve_model_path("Qwen/Qwen3-VL-2B-Instruct"), "/tmp/remote-model")

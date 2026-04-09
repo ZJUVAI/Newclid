@@ -28,7 +28,7 @@ def resolve_model_path(path: str) -> str:
         resolved = str(candidate.resolve())
         logger.info("Loading experiment model from local path: %s", resolved)
         return resolved
-    if candidate.is_absolute() or any(sep in path for sep in (os.sep, "/", "\\")):
+    if candidate.is_absolute() or path.startswith(".") or path.startswith("~"):
         raise FileNotFoundError(f"Model path does not exist: {candidate}")
 
     try:
