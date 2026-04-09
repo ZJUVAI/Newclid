@@ -16,6 +16,7 @@ from transformers import AutoProcessor as TransformersAutoProcessor
 from transformers import Qwen3_5ForConditionalGeneration
 from transformers.utils import logging as hf_logging
 
+from experiments.single_problem_multi_gpu_eval.batched_decode import decode_batched_continuations
 from experiments.single_problem_multi_gpu_eval.lm_actor import resolve_model_path
 
 
@@ -55,7 +56,7 @@ def _build_visual_batch_inputs(
     model,
     processor,
     requests: list[dict[str, Any]],
-) -> tuple[dict[str, Any], list[int]]:
+) -> dict[str, Any]:
     base_texts: list[str] = []
     texts: list[str] = []
     images: list[Any] = []
@@ -97,14 +98,6 @@ def _build_visual_batch_inputs(
             videos.append(None)
     if any(video is not None for video in videos):
         raise NotImplementedError("Batched visual generation does not support video inputs.")
-    base_inputs = processor(
-        text=base_texts,
-        images=images,
-        padding=True,
-        return_tensors="pt",
-        do_resize=False,
-    )
-    prompt_lens = base_inputs["attention_mask"].sum(dim=1).tolist()
     model_inputs = processor(
         text=texts,
         images=images,
@@ -112,7 +105,7 @@ def _build_visual_batch_inputs(
         return_tensors="pt",
         do_resize=False,
     ).to(model.device)
-    return model_inputs, prompt_lens
+    return model_inputs
 
 
 def generate_visual_aux_dsl_dict_batch(
@@ -130,7 +123,7 @@ def generate_visual_aux_dsl_dict_batch(
     if any(int(request["decoding_size"]) != decoding_size for request in requests):
         raise ValueError("All requests in a batch must share decoding_size.")
 
-    model_inputs, prompt_lens = _build_visual_batch_inputs(model, processor, requests)
+    model_inputs = _build_visual_batch_inputs(model, processor, requests)
     if agent_kind == "qwen35":
         pad_token_id = processor.tokenizer.pad_token_id
         eos_token_id = processor.tokenizer.encode(" ;", add_special_tokens=False)[0]
@@ -149,15 +142,18 @@ def generate_visual_aux_dsl_dict_batch(
         output_scores=True,
     )
     scores = generated_output.sequences_scores.tolist()
-    sequences = generated_output.sequences
+    rebuilt_outputs = decode_batched_continuations(
+        requests=requests,
+        model_inputs=model_inputs,
+        sequences=generated_output.sequences,
+        decoding_size=decoding_size,
+        decode_batch=lambda batch: processor.batch_decode(batch, skip_special_tokens=True),
+    )
     results: list[dict[str, Any]] = []
-    for index, request in enumerate(requests):
+    for index, (request, aux_dsls) in enumerate(zip(requests, rebuilt_outputs)):
         aux_dsl_dict: dict[str, float] = {}
         start = index * decoding_size
         end = start + decoding_size
-        prompt_len = int(prompt_lens[index])
-        trimmed = [sequence[prompt_len:] for sequence in sequences[start:end]]
-        aux_dsls = processor.batch_decode(trimmed, skip_special_tokens=True)
         for aux_dsl, score in zip(aux_dsls, scores[start:end]):
             aux_dsl_dict[aux_dsl] = float(score)
         results.append(

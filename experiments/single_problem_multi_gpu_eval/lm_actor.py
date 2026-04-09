@@ -11,6 +11,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.utils import logging as hf_logging
 
+from experiments.single_problem_multi_gpu_eval.batched_decode import decode_batched_continuations
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
@@ -101,8 +102,6 @@ def generate_aux_dsl_dict_batch(
         base_text + request.get("response_prefix", "<aux> x00") + " " + request["new_point_name"]
         for base_text, request in zip(base_texts, requests)
     ]
-    base_inputs = tokenizer(base_texts, return_tensors="pt", padding=True)
-    prompt_lens = base_inputs["attention_mask"].sum(dim=1).tolist()
     model_inputs = tokenizer(prompts, return_tensors="pt", padding=True).to(model.device)
     pad_token_id = tokenizer.pad_token_id
     eos_token_id = tokenizer.encode(" ;", add_special_tokens=False)[0]
@@ -118,15 +117,18 @@ def generate_aux_dsl_dict_batch(
         output_scores=True,
     )
     scores = generated_output.sequences_scores.tolist()
-    sequences = generated_output.sequences
+    rebuilt_outputs = decode_batched_continuations(
+        requests=requests,
+        model_inputs=model_inputs,
+        sequences=generated_output.sequences,
+        decoding_size=decoding_size,
+        decode_batch=lambda batch: tokenizer.batch_decode(batch, skip_special_tokens=True),
+    )
     results: list[dict[str, Any]] = []
-    for index, request in enumerate(requests):
+    for index, (request, aux_dsls) in enumerate(zip(requests, rebuilt_outputs)):
         aux_dsl_dict: dict[str, float] = {}
         start = index * decoding_size
         end = start + decoding_size
-        prompt_len = int(prompt_lens[index])
-        trimmed = [sequence[prompt_len:] for sequence in sequences[start:end]]
-        aux_dsls = tokenizer.batch_decode(trimmed, skip_special_tokens=True)
         for aux_dsl, score in zip(aux_dsls, scores[start:end]):
             aux_dsl_dict[aux_dsl] = float(score)
         results.append(
