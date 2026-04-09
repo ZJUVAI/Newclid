@@ -56,6 +56,7 @@ def _build_visual_batch_inputs(
     processor,
     requests: list[dict[str, Any]],
 ) -> tuple[dict[str, Any], list[int]]:
+    base_texts: list[str] = []
     texts: list[str] = []
     images: list[Any] = []
     videos: list[Any] = []
@@ -76,6 +77,7 @@ def _build_visual_batch_inputs(
             tokenize=False,
             add_generation_prompt=True,
         )
+        base_texts.append(text_prompt)
         final_text = text_prompt + request.get("response_prefix", "<aux> x00") + " " + request["new_point_name"]
         if len(image_inputs) != 1:
             raise ValueError(
@@ -95,6 +97,14 @@ def _build_visual_batch_inputs(
             videos.append(None)
     if any(video is not None for video in videos):
         raise NotImplementedError("Batched visual generation does not support video inputs.")
+    base_inputs = processor(
+        text=base_texts,
+        images=images,
+        padding=True,
+        return_tensors="pt",
+        do_resize=False,
+    )
+    prompt_lens = base_inputs["attention_mask"].sum(dim=1).tolist()
     model_inputs = processor(
         text=texts,
         images=images,
@@ -102,7 +112,6 @@ def _build_visual_batch_inputs(
         return_tensors="pt",
         do_resize=False,
     ).to(model.device)
-    prompt_lens = model_inputs["attention_mask"].sum(dim=1).tolist()
     return model_inputs, prompt_lens
 
 

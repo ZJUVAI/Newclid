@@ -42,7 +42,7 @@ def resolve_model_path(path: str) -> str:
     return resolved
 
 
-def _build_prompt(tokenizer, *, query: str, new_point_name: str, response_prefix: str) -> str:
+def _build_base_text(tokenizer, *, query: str) -> str:
     messages = [
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": query},
@@ -53,7 +53,11 @@ def _build_prompt(tokenizer, *, query: str, new_point_name: str, response_prefix
         add_generation_prompt=True,
     )
     text += "<think>\n\n</think>\n\n"
-    return text + response_prefix + " " + new_point_name
+    return text
+
+
+def _build_prompt(tokenizer, *, query: str, new_point_name: str, response_prefix: str) -> str:
+    return _build_base_text(tokenizer, query=query) + response_prefix + " " + new_point_name
 
 
 def _empty_result(request: dict[str, Any], *, error: str, batch_size: int) -> dict[str, Any]:
@@ -86,18 +90,20 @@ def generate_aux_dsl_dict_batch(
     if any(int(request["decoding_size"]) != decoding_size for request in requests):
         raise ValueError("All requests in a batch must share decoding_size.")
 
-    prompts = [
-        _build_prompt(
+    base_texts = [
+        _build_base_text(
             tokenizer,
             query=request["query"],
-            new_point_name=request["new_point_name"],
-            response_prefix=request.get("response_prefix", "<aux> x00"),
         )
         for request in requests
     ]
+    prompts = [
+        base_text + request.get("response_prefix", "<aux> x00") + " " + request["new_point_name"]
+        for base_text, request in zip(base_texts, requests)
+    ]
+    base_inputs = tokenizer(base_texts, return_tensors="pt", padding=True)
+    prompt_lens = base_inputs["attention_mask"].sum(dim=1).tolist()
     model_inputs = tokenizer(prompts, return_tensors="pt", padding=True).to(model.device)
-    attention_mask = model_inputs["attention_mask"]
-    prompt_lens = attention_mask.sum(dim=1).tolist()
     pad_token_id = tokenizer.pad_token_id
     eos_token_id = tokenizer.encode(" ;", add_special_tokens=False)[0]
 
