@@ -19,6 +19,7 @@ import json
 import sys
 import time
 from pathlib import Path
+from queue import Queue
 from typing import Any, Dict, List, Optional
 
 # Reuse Stage 1 from the original pipeline
@@ -158,6 +159,11 @@ def run_pipeline(
     skip_predicates: Optional[List[str]] = None,
     rule_skip_predicates: Optional[List[str]] = None,
     render_images: bool = False,
+    # Streaming params (passed through to Stage 1)
+    streaming: bool = False,
+    chunk_size: int = 10000,
+    inflight_limit: int = 300,
+    # Reduction params
     rules_file: Optional[Path] = None,
     source_data_file: Optional[Path] = None,
     timeout: int = 60,
@@ -193,6 +199,9 @@ def run_pipeline(
             skip_predicates=skip_predicates,
             rule_skip_predicates=rule_skip_predicates,
             render_images=render_images,
+            streaming=streaming,
+            chunk_size=chunk_size,
+            inflight_limit=inflight_limit,
         )
         results["stages"].append(stage1)
 
@@ -261,6 +270,14 @@ def main():
                         help="Comma-separated predicates to filter from rules")
     stage1.add_argument("--render-images", action="store_true", help="Render comparison images")
 
+    streaming_grp = parser.add_argument_group("Streaming mode (for large datasets)")
+    streaming_grp.add_argument("--streaming", action="store_true",
+                               help="Use streaming mode (chunk-based + Ray) for large datasets")
+    streaming_grp.add_argument("--chunk-size", type=int, default=10000,
+                               help="Records per chunk in streaming mode (default: 10000)")
+    streaming_grp.add_argument("--inflight-limit", type=int, default=300,
+                               help="Max in-flight Ray tasks in streaming mode (default: 300)")
+
     stage2 = parser.add_argument_group("Stage 2: Reduction (CSolver)")
     stage2.add_argument("--timeout", type=int, default=60, help="Subsumption test timeout (default: 60)")
     stage2.add_argument("--seed", type=int, default=42, help="Random seed (default: 42)")
@@ -301,6 +318,9 @@ def main():
         skip_predicates=skip_preds,
         rule_skip_predicates=rule_skip_preds,
         render_images=args.render_images,
+        streaming=args.streaming,
+        chunk_size=args.chunk_size,
+        inflight_limit=args.inflight_limit,
         rules_file=args.rules,
         source_data_file=args.source_data,
         timeout=args.timeout,
