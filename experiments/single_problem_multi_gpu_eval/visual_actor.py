@@ -202,12 +202,14 @@ class VisionModelWorker:
             )
         else:
             raise ValueError(f"Unsupported vision agent kind: {agent_kind}")
+        self.processor.tokenizer.padding_side = "left"
         self.num_requests = 0
         self.num_batches = 0
         logger.info(
-            "VisionModelWorker init done: agent_kind=%s model_device=%s",
+            "VisionModelWorker init done: agent_kind=%s model_device=%s padding_side=%s",
             agent_kind,
             next(self.model.parameters()).device,
+            self.processor.tokenizer.padding_side,
         )
 
     def warmup(self) -> dict[str, Any]:
@@ -222,6 +224,7 @@ class VisionModelWorker:
             "model_path": self.model_path,
             "agent_kind": self.agent_kind,
             "device": device,
+            "padding_side": self.processor.tokenizer.padding_side,
         }
 
     @torch.no_grad()

@@ -156,14 +156,22 @@ class ModelWorker:
             resolved_path,
             trust_remote_code=True,
         )
+        self.tokenizer.padding_side = "left"
         self.num_requests = 0
         self.num_batches = 0
+        logger.info(
+            "ModelWorker init done: model_path=%s device=%s padding_side=%s",
+            self.model_path,
+            next(self.model.parameters()).device,
+            self.tokenizer.padding_side,
+        )
 
     def warmup(self) -> dict[str, Any]:
         device = str(next(self.model.parameters()).device)
         return {
             "model_path": self.model_path,
             "device": device,
+            "padding_side": self.tokenizer.padding_side,
         }
 
     @torch.no_grad()
