@@ -117,8 +117,7 @@ class ProblemWorker:
                 return [], {}
 
             n_clauses = len(fl_statement.split(';'))
-            csolver = CSolver(fl_statement, seed=seed,
-                              solver=solver, using_log=True)
+            csolver = CSolver(fl_statement, seed=seed, solver=solver, using_log=True)
 
             # Run solver
             ddar_start = time.time()
@@ -205,7 +204,8 @@ class ProblemWorker:
                     aux,
                     n_clauses,
                     img,
-                    aux_only
+                    aux_only,
+                    seed
                 )
                 generated_data.extend(data)
             process_goal_time = time.time() - process_goal_time
@@ -607,7 +607,8 @@ class ProblemWorker:
         aux,
         n_clauses,
         img,
-        aux_only
+        aux_only,
+        seed
     ):
         """Process a single goal"""
 
@@ -668,6 +669,7 @@ class ProblemWorker:
                 continue
 
             result = {
+                "seed": seed,
                 "n_premises": n_premises,
                 "fl_problem": llm_renamed['fl_problem'],
                 "nl_problem": "",

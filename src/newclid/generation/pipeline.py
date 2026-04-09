@@ -107,9 +107,41 @@ class ProblemPipeline:
                 filtered_data.append(d)
         return filtered_data
 
+    def _resume_from_existing(self):
+        """Resume from existing JSONL file: update base_seed and hashed_problems."""
+        filepath = os.path.join(self.writer.output_dir, self.file_prefix + ".jsonl")
+        if not os.path.exists(filepath):
+            return
+
+        max_seed = -1
+        count = 0
+        with open(filepath, "r", encoding="utf-8") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    entry = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if "llm_input_renamed" in entry:
+                    self.hashed_problems.add(hash(entry["llm_input_renamed"]))
+                if "seed" in entry:
+                    max_seed = max(max_seed, entry["seed"])
+                count += 1
+
+        self.writer.written_count = count
+        if max_seed >= 0:
+            self.base_seed = max_seed + 1
+        logging.info(
+            f"Resumed from existing data: {count} records, "
+            f"new base_seed={self.base_seed}"
+        )
+
     def generate(self):
         if self.clear:
             self.writer.clear()
+        else:
+            self._resume_from_existing()
 
         def task_generator():
             for i in range(10**9):
