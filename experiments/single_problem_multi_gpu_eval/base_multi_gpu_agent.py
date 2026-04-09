@@ -99,9 +99,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
     def run_ddar_c(self, proof: ProofState, rules: list["Rule"], start_time: float, timeout: int = 3600) -> bool:
         return run_ddar_c(proof, rules, start_time, timeout)
 
-    def should_return_ddar_proof(self, depth: int) -> bool:
-        return self.ddar_returns_proof and depth < self.search_depth - 1
-
     def extract_raw_aux_text(self, aux_dsl: str) -> str:
         return aux_dsl[len("<aux> x00"):]
 
@@ -399,10 +396,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 continue
             request["depth"] = future_meta["depth"]
             request_state["request_built_at_perf_s"] = time.perf_counter()
-            request_profile = request.pop("_prepare_profile", None)
-            if isinstance(request_profile, dict):
-                for field, elapsed_s in request_profile.items():
-                    add_profiling_time(profiling, field, elapsed_s)
             prepared_requests.append(request)
             self._trace(
                 "model_request",
@@ -647,7 +640,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 rules_ref,
                 t0,
                 timeout,
-                return_proof=self.should_return_ddar_proof(depth),
+                return_proof=self.ddar_returns_proof,
             )
             logger.debug(
                 "Search depth=%d request=%s queued DDAR future; pending_ddar=%d queued_ddar=%d",
