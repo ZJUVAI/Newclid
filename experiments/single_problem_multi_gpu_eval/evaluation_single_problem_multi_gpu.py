@@ -89,6 +89,8 @@ def create_agent(
     decoding_size: int,
     beam_size: int,
     search_depth: int,
+    gpu_batch_size: int,
+    gpu_batch_timeout_ms: int,
     max_pending_ddar: int,
     prepare_request_workers: int,
     prepare_prefetch_limit: int,
@@ -103,6 +105,8 @@ def create_agent(
             decoding_size=decoding_size,
             beam_size=beam_size,
             search_depth=search_depth,
+            gpu_batch_size=gpu_batch_size,
+            gpu_batch_timeout_ms=gpu_batch_timeout_ms,
             agent_type="lm_multi_gpu_experiment",
             max_pending_ddar=max_pending_ddar,
             prepare_request_workers=prepare_request_workers,
@@ -117,6 +121,8 @@ def create_agent(
             decoding_size=decoding_size,
             beam_size=beam_size,
             search_depth=search_depth,
+            gpu_batch_size=gpu_batch_size,
+            gpu_batch_timeout_ms=gpu_batch_timeout_ms,
             agent_type=f"{agent_type}_multi_gpu_experiment",
             max_pending_ddar=max_pending_ddar,
             prepare_request_workers=prepare_request_workers,
@@ -136,6 +142,8 @@ def solve_one_problem(
     decoding_size: int,
     beam_size: int,
     search_depth: int,
+    gpu_batch_size: int,
+    gpu_batch_timeout_ms: int,
     timeout: int,
     max_pending_ddar: int,
     prepare_request_workers: int,
@@ -159,6 +167,8 @@ def solve_one_problem(
         decoding_size=decoding_size,
         beam_size=beam_size,
         search_depth=search_depth,
+        gpu_batch_size=gpu_batch_size,
+        gpu_batch_timeout_ms=gpu_batch_timeout_ms,
         max_pending_ddar=max_pending_ddar,
         prepare_request_workers=prepare_request_workers,
         prepare_prefetch_limit=prepare_prefetch_limit,
@@ -196,6 +206,8 @@ def solve_problems_single_problem_multi_gpu(
     decoding_size: int,
     beam_size: int,
     search_depth: int,
+    gpu_batch_size: int,
+    gpu_batch_timeout_ms: int,
     timeout: int,
     agent_type: str,
     max_pending_ddar: int | None,
@@ -240,17 +252,28 @@ def solve_problems_single_problem_multi_gpu(
                 f"Requested {num_gpus_for_eval} GPUs, but Ray only reports {available_gpus} GPUs."
             )
         if prepare_request_workers is None:
-            prepare_request_workers = max(1, 2 * num_gpus_for_eval) if num_gpus_for_eval > 0 else 2
+            prepare_request_workers = (
+                max(1, max(2 * num_gpus_for_eval, num_gpus_for_eval * gpu_batch_size))
+                if num_gpus_for_eval > 0
+                else max(2, gpu_batch_size)
+            )
         if prepare_request_workers <= 0:
             raise ValueError(
                 f"prepare_request_workers must be positive, got {prepare_request_workers}."
             )
         if prepare_prefetch_limit is None:
-            prepare_prefetch_limit = prepare_request_workers
+            prepare_prefetch_limit = max(
+                prepare_request_workers,
+                2 * num_gpus_for_eval * gpu_batch_size if num_gpus_for_eval > 0 else gpu_batch_size,
+            )
         if prepare_prefetch_limit <= 0:
             raise ValueError(
                 f"prepare_prefetch_limit must be positive, got {prepare_prefetch_limit}."
             )
+        if gpu_batch_size <= 0:
+            raise ValueError(f"gpu_batch_size must be positive, got {gpu_batch_size}.")
+        if gpu_batch_timeout_ms < 0:
+            raise ValueError(f"gpu_batch_timeout_ms must be non-negative, got {gpu_batch_timeout_ms}.")
 
         workers = create_workers(
             agent_type=agent_type,
@@ -282,6 +305,8 @@ def solve_problems_single_problem_multi_gpu(
                     "decoding_size": decoding_size,
                     "beam_size": beam_size,
                     "search_depth": search_depth,
+                    "gpu_batch_size": gpu_batch_size,
+                    "gpu_batch_timeout_ms": gpu_batch_timeout_ms,
                     "timeout": timeout,
                     "max_pending_ddar": max_pending_ddar,
                     "num_gpus_for_eval": num_gpus_for_eval,
@@ -294,7 +319,8 @@ def solve_problems_single_problem_multi_gpu(
         print(f"Total problems to solve: {len(problem_names)}")
         print(f"Using experimental agent: {agent_type}_multi_gpu_experiment")
         print(f"Using {num_gpus_for_eval} GPU workers")
-        print("Using fixed single-request GPU dispatch")
+        print(f"Using gpu_batch_size={gpu_batch_size}")
+        print(f"Using gpu_batch_timeout_ms={gpu_batch_timeout_ms}")
         print(f"Using max_pending_ddar={max_pending_ddar}")
         print(f"Using prepare_request_workers={prepare_request_workers}")
         print(f"Using prepare_prefetch_limit={prepare_prefetch_limit}")
@@ -345,6 +371,8 @@ def solve_problems_single_problem_multi_gpu(
                             decoding_size=decoding_size,
                             beam_size=beam_size,
                             search_depth=search_depth,
+                            gpu_batch_size=gpu_batch_size,
+                            gpu_batch_timeout_ms=gpu_batch_timeout_ms,
                             timeout=timeout,
                             max_pending_ddar=max_pending_ddar,
                             prepare_request_workers=prepare_request_workers,
@@ -550,6 +578,18 @@ def main():
         help="Number of iterative auxiliary-construction expansion rounds.",
     )
     parser.add_argument(
+        "--gpu_batch_size",
+        type=int,
+        default=1,
+        help="Maximum number of prepared requests grouped into one GPU generate call.",
+    )
+    parser.add_argument(
+        "--gpu_batch_timeout_ms",
+        type=int,
+        default=0,
+        help="Optional wait budget for filling a GPU batch before dispatching a tail batch.",
+    )
+    parser.add_argument(
         "--timeout",
         type=int,
         default=7200,
@@ -595,6 +635,8 @@ def main():
         decoding_size=args.decoding_size,
         beam_size=args.beam_size,
         search_depth=args.search_depth,
+        gpu_batch_size=args.gpu_batch_size,
+        gpu_batch_timeout_ms=args.gpu_batch_timeout_ms,
         timeout=args.timeout,
         agent_type=args.agent,
         max_pending_ddar=args.max_pending_ddar,

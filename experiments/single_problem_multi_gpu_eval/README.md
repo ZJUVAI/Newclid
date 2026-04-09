@@ -11,7 +11,7 @@ This experiment directory contains an isolated evaluation workflow for:
 Current status:
 
 - the architecture in this directory is unified around one shared multi-GPU search core
-- GPU dispatch is fixed to one request per worker call
+- GPU dispatch can batch multiple prepared requests into one worker call
 - search remains depth-by-depth, but request preparation / GPU inference / DDAR now overlap within a depth
 - this experiment runner does not use `problem_db`
 - the top-level `scripts/evaluation_vlm.py` remains the original per-problem Ray workflow and is separate from this experiment runner
@@ -19,7 +19,7 @@ Current status:
 ## Files
 
 - `evaluation_single_problem_multi_gpu.py`: experiment entrypoint
-- `model_pool.py`: GPU worker pool and single-request dispatcher
+- `model_pool.py`: GPU worker pool and batched dispatcher
 - `base_multi_gpu_agent.py`: shared beam-search and DDAR orchestration
 - `lm_actor.py`: GPU-resident text-model worker
 - `visual_actor.py`: GPU-resident vision-model worker shared by `vlm` and `qwen35`
@@ -52,8 +52,8 @@ More concretely:
 - `base_multi_gpu_agent.py` is the shared search chassis. It owns the frontier loop, GPU dispatch coordination, DDAR future scheduling, and success/failure payload construction.
 - `lm_multi_gpu_agent.py` adapts the shared chassis to text-only search state `ProblemJGEX`.
 - `visual_multi_gpu_agent.py` adapts the shared chassis to visual search state `(problem, proof)` so each expansion can render a fresh image.
-- `model_pool.py` manages the resident GPU workers and dispatches one request at a time to each worker.
-- there is no request batching in the current implementation; the historical `batch_size=1` path has been flattened into a single-request queue
+- `model_pool.py` manages the resident GPU workers and dispatches one request batch at a time to each worker.
+- request batching is controlled by `gpu_batch_size`; `gpu_batch_size=1` preserves the historical single-request behavior
 
 ## Execution Flow
 
@@ -63,7 +63,7 @@ At a high level:
 2. Problems are processed one by one.
 3. Inside one problem, the agent expands the beam layer by layer.
 4. Requests for the current depth are prepared on demand instead of rendering the whole layer up front.
-5. Candidate generation requests are dispatched across the GPU workers.
+5. Candidate generation requests are grouped into batches and dispatched across the GPU workers.
 6. Each surviving candidate is checked by DDAR through Ray CPU tasks.
 7. Valid unsolved candidates enter the next beam layer after the current depth drains.
 
@@ -71,7 +71,7 @@ Important implications:
 
 - `num_gpus_for_eval` reduces latency within one problem, not across multiple problems
 - `max_workers` mainly controls DDAR-side CPU concurrency
-- GPU workers always process one request at a time
+- GPU workers always process one actor call at a time, but each call may contain multiple requests
 - `max_pending_ddar` is the main backpressure knob between generation and validation
 - depth boundaries are still strict; requests from different search depths never mix
 
@@ -96,6 +96,8 @@ Supported arguments:
 | `--decoding_size` | `8` | Number of model candidates generated per retained state at one search depth. |
 | `--beam_size` | `64` | Maximum number of candidate states kept between depths. |
 | `--search_depth` | `4` | Number of iterative auxiliary-construction expansion rounds. |
+| `--gpu_batch_size` | `1` | Maximum number of prepared requests grouped into one GPU generate call. |
+| `--gpu_batch_timeout_ms` | `0` | Optional wait budget before dispatching a not-full GPU batch. |
 | `--timeout` | `7200` | Per-problem timeout in seconds. |
 | `--num_gpus_for_eval` | `0` | Number of GPU workers to create. `0` means all GPUs visible to Ray. |
 | `--max_pending_ddar` | `2 * max_workers` | Upper bound on in-flight DDAR tasks for the current problem. |
@@ -109,8 +111,9 @@ Supported arguments:
 Resource knobs:
 
 - `num_gpus_for_eval` controls how many model replicas stay resident
-- GPU dispatch is fixed to one request per worker call
-- `model_pool.py` is intentionally a single-request dispatcher, not a tunable batch scheduler
+- `gpu_batch_size` controls how many prepared requests are combined per GPU generate call
+- `gpu_batch_timeout_ms` controls how long the dispatcher may wait before releasing a tail batch
+- `model_pool.py` is a tunable batch dispatcher
 - `max_workers` and `max_pending_ddar` control DDAR-side throughput and backpressure
 
 If DDAR is the bottleneck, increasing GPUs alone will not help much. In that case, inspect `max_workers` and `max_pending_ddar`.
@@ -173,6 +176,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 LOGLEVEL=WARNING python experiments/single_problem_
   --decoding_size 32 \
   --beam_size 512 \
   --search_depth 4 \
+  --gpu_batch_size 2 \
   --timeout 3600 \
   --num_gpus_for_eval 4
 ```
@@ -189,6 +193,7 @@ CUDA_VISIBLE_DEVICES=0 LOGLEVEL=DEBUG python experiments/single_problem_multi_gp
   --decoding_size 2 \
   --beam_size 4 \
   --search_depth 1 \
+  --gpu_batch_size 1 \
   --timeout 7200 \
   --num_gpus_for_eval 1
 ```

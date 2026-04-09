@@ -36,6 +36,8 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         beam_size: int,
         search_depth: int,
         *,
+        gpu_batch_size: int = 1,
+        gpu_batch_timeout_ms: int = 0,
         agent_type: str,
         max_pending_ddar: int = 128,
         prepare_request_workers: int = 1,
@@ -49,6 +51,8 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         self.decoding_size = decoding_size
         self.beam_size = beam_size
         self.search_depth = search_depth
+        self.gpu_batch_size = gpu_batch_size
+        self.gpu_batch_timeout_ms = gpu_batch_timeout_ms
         self.agent_type = agent_type
         self.max_pending_ddar = max_pending_ddar
         self.prepare_request_workers = prepare_request_workers
@@ -766,7 +770,10 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     logger.info("Search depth=%d produced no requests; stopping", depth)
                     break
 
-                dispatcher = self.model_pool.create_dispatcher()
+                dispatcher = self.model_pool.create_dispatcher(
+                    gpu_batch_size=self.gpu_batch_size,
+                    gpu_batch_timeout_ms=self.gpu_batch_timeout_ms,
+                )
                 next_queue = BeamQueue(max_size=self.beam_size)
                 frontier_iter = iter(beam_queue)
                 prepared_requests: deque[dict[str, Any]] = deque()
@@ -796,6 +803,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                         )
                     }
                     progress = False
+                    dispatcher.tick()
 
                     # 1. Consume finished DDAR tasks first so validated states
                     # can immediately contribute to the next-depth frontier.
@@ -831,15 +839,16 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                             timeout=0,
                         )
                         for done_ref in done_gpu_refs:
-                            gpu_result = dispatcher.take_done(done_ref)
-                            next_node_id = self._handle_gpu_result(
-                                gpu_result=gpu_result,
-                                request_meta=request_meta,
-                                pending_ddar_submit=pending_ddar_submit,
-                                depth=depth,
-                                profiling=profiling,
-                                next_node_id=next_node_id,
-                            )
+                            gpu_results = dispatcher.take_done(done_ref)
+                            for gpu_result in gpu_results:
+                                next_node_id = self._handle_gpu_result(
+                                    gpu_result=gpu_result,
+                                    request_meta=request_meta,
+                                    pending_ddar_submit=pending_ddar_submit,
+                                    depth=depth,
+                                    profiling=profiling,
+                                    next_node_id=next_node_id,
+                                )
                             progress = True
 
                     # 3. Submit as many validated DDAR candidates as the current
@@ -904,6 +913,10 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                             frontier_exhausted = True
                             break
                         request_index = next_request_index
+                        progress = True
+
+                    if frontier_exhausted and not running_prepare_futures and prepared_requests:
+                        dispatcher.flush()
                         progress = True
 
                     if (
