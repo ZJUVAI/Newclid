@@ -26,6 +26,7 @@ if str(SRC_ROOT) not in sys.path:
 from experiments.single_problem_multi_gpu_eval.model_pool import ModelPool
 from newclid.api import GeometricSolverBuilder
 from newclid.profiling import (
+    PROFILE_ROW_FIELDS,
     create_profiling_payload,
     finalize_profiling,
     write_profiling_csv,
@@ -462,25 +463,13 @@ def solve_problems_single_problem_multi_gpu(
                     )
                     profiling = run_infos.get("profiling")
                     if profiling is not None:
-                        profiling_rows.append(
-                            {
-                                "problem_name": problem_name,
-                                "solved": "√" if is_solved else "x",
-                                "total_time_s": profiling["total_time_s"],
-                                "entry_setup_wall_time_s": profiling["entry_setup_wall_time_s"],
-                                "base_ddar_wall_time_s": profiling["base_ddar_wall_time_s"],
-                                "request_prepare_wall_time_s": profiling["request_prepare_wall_time_s"],
-                                "wait_wall_time_s": profiling["wait_wall_time_s"],
-                                "gpu_result_handle_wall_time_s": profiling["gpu_result_handle_wall_time_s"],
-                                "ddar_submit_wall_time_s": profiling["ddar_submit_wall_time_s"],
-                                "ddar_result_handle_wall_time_s": profiling["ddar_result_handle_wall_time_s"],
-                                "ddar_result_ray_get_wall_time_s": profiling["ddar_result_ray_get_wall_time_s"],
-                                "ddar_result_next_state_wall_time_s": profiling["ddar_result_next_state_wall_time_s"],
-                                "ddar_result_queue_wall_time_s": profiling["ddar_result_queue_wall_time_s"],
-                                "scheduler_overhead_wall_time_s": profiling["scheduler_overhead_wall_time_s"],
-                                "other_wall_time_s": profiling["other_wall_time_s"],
-                            }
-                        )
+                        row = {
+                            "problem_name": problem_name,
+                            "solved": "√" if is_solved else "x",
+                        }
+                        for field in PROFILE_ROW_FIELDS + ("avg_gpu_batch_size",):
+                            row[field] = profiling.get(field, 0.0)
+                        profiling_rows.append(row)
                     gpu_worker_stats = run_infos.get("gpu_worker_stats")
                     if gpu_worker_stats is not None:
                         print(f"[gpu_worker_stats] problem={problem_name} stats={gpu_worker_stats}")

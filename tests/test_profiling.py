@@ -6,11 +6,13 @@ from concurrent.futures import ThreadPoolExecutor
 from collections import deque
 
 from newclid.profiling import (
+    CSV_COLUMN_SPECS,
     add_profiling_time,
     create_detailed_profiling_payload,
     create_profiling_payload,
     finalize_detailed_profiling,
     finalize_profiling,
+    increment_profiling_count,
     merge_profiling_payloads,
     write_profiling_csv,
 )
@@ -47,16 +49,20 @@ def test_finalize_profiling_computes_other_wall_time() -> None:
     add_profiling_time(profiling, "entry_setup_wall_time_s", 0.2)
     add_profiling_time(profiling, "base_ddar_wall_time_s", 0.3)
     add_profiling_time(profiling, "request_prepare_wall_time_s", 0.4)
+    add_profiling_time(profiling, "gpu_generate_wall_time_s", 0.2)
     add_profiling_time(profiling, "wait_wall_time_s", 1.2)
     add_profiling_time(profiling, "gpu_result_handle_wall_time_s", 0.6)
     add_profiling_time(profiling, "ddar_submit_wall_time_s", 0.1)
     add_profiling_time(profiling, "ddar_result_handle_wall_time_s", 0.2)
     add_profiling_time(profiling, "scheduler_overhead_wall_time_s", 0.4)
+    increment_profiling_count(profiling, "gpu_batch_submitted_count", 2)
+    increment_profiling_count(profiling, "gpu_batch_size_sum", 6)
 
     finalized = finalize_profiling(profiling, 4.0)
 
     assert finalized["total_time_s"] == 4.0
-    assert abs(finalized["other_wall_time_s"] - 0.6) < 1e-9
+    assert abs(finalized["other_wall_time_s"] - 0.4) < 1e-9
+    assert abs(finalized["avg_gpu_batch_size"] - 3.0) < 1e-9
 
 
 def test_finalize_profiling_clamps_negative_other_wall_time() -> None:
@@ -102,6 +108,16 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "entry_setup_wall_time_s": 0.5,
             "base_ddar_wall_time_s": 0.4,
             "request_prepare_wall_time_s": 1.2,
+            "prepared_request_ready_wall_time_s": 0.4,
+            "prepared_request_queue_wall_time_s": 0.3,
+            "gpu_request_queue_wall_time_s": 0.2,
+            "gpu_batch_round_trip_wall_time_s": 0.6,
+            "gpu_result_ray_get_wall_time_s": 0.1,
+            "gpu_worker_inference_wall_time_s": 0.5,
+            "gpu_input_build_wall_time_s": 0.1,
+            "gpu_generate_wall_time_s": 0.3,
+            "gpu_decode_wall_time_s": 0.08,
+            "gpu_fallback_wall_time_s": 0.02,
             "wait_wall_time_s": 1.6,
             "gpu_result_handle_wall_time_s": 0.3,
             "ddar_submit_wall_time_s": 0.1,
@@ -111,6 +127,19 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "ddar_result_queue_wall_time_s": 0.05,
             "scheduler_overhead_wall_time_s": 0.2,
             "other_wall_time_s": 0.3,
+            "prepare_request_submitted_count": 3,
+            "prepare_request_completed_count": 3,
+            "gpu_request_enqueued_count": 3,
+            "gpu_request_dispatched_count": 3,
+            "gpu_batch_submitted_count": 2,
+            "gpu_batch_completed_count": 2,
+            "gpu_batch_size_sum": 3,
+            "gpu_batch_size_max": 2,
+            "ddar_submitted_count": 4,
+            "ddar_completed_count": 4,
+            "candidate_parse_failed_count": 1,
+            "candidate_build_failed_count": 0,
+            "candidate_queued_next_depth_count": 2,
         },
         {
             "problem_name": "p2",
@@ -119,6 +148,16 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "entry_setup_wall_time_s": 0.2,
             "base_ddar_wall_time_s": 0.1,
             "request_prepare_wall_time_s": 0.3,
+            "prepared_request_ready_wall_time_s": 0.1,
+            "prepared_request_queue_wall_time_s": 0.05,
+            "gpu_request_queue_wall_time_s": 0.07,
+            "gpu_batch_round_trip_wall_time_s": 0.4,
+            "gpu_result_ray_get_wall_time_s": 0.03,
+            "gpu_worker_inference_wall_time_s": 0.35,
+            "gpu_input_build_wall_time_s": 0.08,
+            "gpu_generate_wall_time_s": 0.2,
+            "gpu_decode_wall_time_s": 0.06,
+            "gpu_fallback_wall_time_s": 0.01,
             "wait_wall_time_s": 0.7,
             "gpu_result_handle_wall_time_s": 0.2,
             "ddar_submit_wall_time_s": 0.0,
@@ -128,6 +167,19 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "ddar_result_queue_wall_time_s": 0.01,
             "scheduler_overhead_wall_time_s": 0.1,
             "other_wall_time_s": 0.3,
+            "prepare_request_submitted_count": 2,
+            "prepare_request_completed_count": 2,
+            "gpu_request_enqueued_count": 2,
+            "gpu_request_dispatched_count": 2,
+            "gpu_batch_submitted_count": 1,
+            "gpu_batch_completed_count": 1,
+            "gpu_batch_size_sum": 2,
+            "gpu_batch_size_max": 2,
+            "ddar_submitted_count": 1,
+            "ddar_completed_count": 1,
+            "candidate_parse_failed_count": 0,
+            "candidate_build_failed_count": 1,
+            "candidate_queued_next_depth_count": 1,
         },
     ]
 
@@ -147,40 +199,14 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
     assert "Total Time: 7.00s" in written_rows[0][0]
     assert "Request Prepare Wall Time: 1.50s" in written_rows[0][0]
     assert "DDAR Result Ray.get Wall Time: 0.25s" in written_rows[0][0]
-    assert written_rows[1] == [
-        "Problem Name",
-        "Solved",
-        "Total Time (s)",
-        "Entry Setup Wall Time (s)",
-        "Base DDAR Wall Time (s)",
-        "Request Prepare Wall Time (s)",
-        "Wait Wall Time (s)",
-        "GPU Result Handle Wall Time (s)",
-        "DDAR Submit Wall Time (s)",
-        "DDAR Result Handle Wall Time (s)",
-        "DDAR Result Ray.get Wall Time (s)",
-        "DDAR Result Next State Wall Time (s)",
-        "DDAR Result Queue Wall Time (s)",
-        "Scheduler Overhead Wall Time (s)",
-        "Other Wall Time (s)",
-    ]
-    assert written_rows[2] == [
-        "p1",
-        "√",
-        "5.00",
-        "0.50",
-        "0.40",
-        "1.20",
-        "1.60",
-        "0.30",
-        "0.10",
-        "0.40",
-        "0.20",
-        "0.10",
-        "0.05",
-        "0.20",
-        "0.30",
-    ]
+    assert "Avg GPU Batch Size: 1.67" in written_rows[0][0]
+    assert written_rows[1] == [label for _, label, _ in CSV_COLUMN_SPECS]
+    header_index = {name: idx for idx, (name, _, _) in enumerate(CSV_COLUMN_SPECS)}
+    assert written_rows[2][header_index["problem_name"]] == "p1"
+    assert written_rows[2][header_index["gpu_batch_submitted_count"]] == "2"
+    assert written_rows[2][header_index["avg_gpu_batch_size"]] == "1.50"
+    assert written_rows[3][header_index["problem_name"]] == "p2"
+    assert written_rows[3][header_index["candidate_build_failed_count"]] == "1"
 
 
 def test_parallel_prepare_wait_is_attributed_to_prepare_wall_time() -> None:

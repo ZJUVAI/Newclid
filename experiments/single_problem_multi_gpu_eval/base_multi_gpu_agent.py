@@ -15,6 +15,8 @@ from newclid.profiling import (
     add_profiling_time,
     create_profiling_payload,
     finalize_profiling,
+    increment_profiling_count,
+    update_profiling_max,
 )
 from newclid.proof import ProofState
 from newclid.search_trace import build_attempt_key, proof_to_ddar_input
@@ -159,6 +161,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 time.perf_counter() - ray_get_start,
             )
             future_meta = future_info.pop(future)
+            increment_profiling_count(profiling, "ddar_completed_count")
 
             if ddar_result["status"] == "invalid":
                 self._trace(
@@ -241,6 +244,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                         "ddar_result_queue_wall_time_s",
                         time.perf_counter() - queue_start,
                     )
+                    increment_profiling_count(profiling, "candidate_queued_next_depth_count")
                     self._trace(
                         "candidate_transition",
                         attempt_key=future_meta["attempt_key"],
@@ -356,7 +360,15 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             "node_id": node_id,
             "parent_node_id": parent_node_id,
             "depth": depth,
+            "submitted_at_perf_s": time.perf_counter(),
         }
+        self._trace(
+            "prepare_request_submitted",
+            node_id=node_id,
+            parent_node_id=parent_node_id,
+            depth=depth,
+            request_id=request_id,
+        )
         return request_index + 1
 
     def _poll_prepare_futures(
@@ -399,8 +411,22 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             if request_state is None:
                 continue
             request["depth"] = future_meta["depth"]
-            request_state["request_built_at_perf_s"] = time.perf_counter()
+            request_built_at_perf_s = time.perf_counter()
+            request_state["request_built_at_perf_s"] = request_built_at_perf_s
             prepared_requests.append(request)
+            add_profiling_time(
+                profiling,
+                "prepared_request_ready_wall_time_s",
+                request_built_at_perf_s - future_meta["submitted_at_perf_s"],
+            )
+            increment_profiling_count(profiling, "prepare_request_completed_count")
+            self._trace(
+                "prepare_request_ready",
+                node_id=future_meta["node_id"],
+                parent_node_id=future_meta["parent_node_id"],
+                depth=future_meta["depth"],
+                request_id=request_id,
+            )
             self._trace(
                 "model_request",
                 node_id=future_meta["node_id"],
@@ -470,10 +496,28 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         add_profiling_time(profiling, "wait_wall_time_s", time.perf_counter() - wait_start)
         return
 
+    def _drain_dispatcher_submission_events(self, *, dispatcher, depth: int, profiling: dict[str, Any]) -> None:
+        for event in dispatcher.take_submission_events():
+            increment_profiling_count(profiling, "gpu_batch_submitted_count")
+            increment_profiling_count(profiling, "gpu_request_dispatched_count", len(event.get("request_ids", [])))
+            increment_profiling_count(profiling, "gpu_batch_size_sum", int(event.get("batch_size", 0)))
+            update_profiling_max(profiling, "gpu_batch_size_max", event.get("batch_size"))
+            self._trace(
+                "gpu_batch_submitted",
+                depth=depth,
+                request_ids=event.get("request_ids", []),
+                batch_size=event.get("batch_size"),
+                dispatcher_profile={
+                    "request_queue_time_s_sum": event.get("request_queue_time_s_sum"),
+                    "submitted_at": event.get("submitted_at"),
+                },
+                worker_batch_profile=None,
+            )
+
     def _handle_gpu_result(
         self,
         *,
-        gpu_result: dict[str, Any],
+        gpu_batch_payload: dict[str, Any],
         request_meta: dict[str, dict[str, Any]],
         pending_ddar_submit,
         depth: int,
@@ -484,111 +528,138 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         # If it grows large, the bottleneck is in DSL parsing / construction
         # handling rather than the model's forward pass.
         handle_start = time.perf_counter()
-        request_id = gpu_result["request_id"]
-        request_state = request_meta.pop(request_id)
-        state = request_state["state"]
-        prev_score = request_state["prev_score"]
-        parent_node_id = request_state["node_id"]
-        problem = self.get_problem_from_state(state)
-        outputs = [
-            {
-                "rank": rank,
-                "aux_dsl": aux_dsl,
-                "score": score,
-            }
-            for rank, (aux_dsl, score) in enumerate(gpu_result["aux_dsl_dict"].items())
-        ]
+        dispatcher_profile = gpu_batch_payload.get("dispatcher_profile", {})
+        worker_batch_profile = gpu_batch_payload.get("worker_batch_profile", {})
+        batch_results = list(gpu_batch_payload.get("results", []))
+        batch_size = int(gpu_batch_payload.get("batch_size", len(batch_results)))
+        add_profiling_time(profiling, "gpu_request_queue_wall_time_s", dispatcher_profile.get("request_queue_time_s_sum"))
+        add_profiling_time(profiling, "gpu_batch_round_trip_wall_time_s", dispatcher_profile.get("batch_round_trip_time_s"))
+        add_profiling_time(profiling, "gpu_result_ray_get_wall_time_s", dispatcher_profile.get("batch_result_ray_get_time_s"))
+        add_profiling_time(profiling, "gpu_worker_inference_wall_time_s", worker_batch_profile.get("worker_inference_time_s"))
+        add_profiling_time(profiling, "gpu_input_build_wall_time_s", worker_batch_profile.get("input_build_time_s"))
+        add_profiling_time(profiling, "gpu_generate_wall_time_s", worker_batch_profile.get("generate_time_s"))
+        add_profiling_time(profiling, "gpu_decode_wall_time_s", worker_batch_profile.get("decode_time_s"))
+        add_profiling_time(profiling, "gpu_fallback_wall_time_s", worker_batch_profile.get("fallback_time_s"))
+        increment_profiling_count(profiling, "gpu_batch_completed_count")
+
         self._trace(
-            "model_response",
-            request_id=request_id,
-            node_id=parent_node_id,
+            "gpu_batch_done",
             depth=depth,
-            outputs=outputs,
-        )
-        logger.debug(
-            "Search depth=%d request=%s candidate_count=%d",
-            depth,
-            request_id,
-            len(gpu_result["aux_dsl_dict"]),
+            request_ids=gpu_batch_payload.get("request_ids", []),
+            batch_size=batch_size,
+            dispatcher_profile=dispatcher_profile,
+            worker_batch_profile=worker_batch_profile,
         )
 
-        for candidate_rank, (aux_dsl, score) in enumerate(gpu_result["aux_dsl_dict"].items()):
-            try:
-                raw_aux_text = self.extract_raw_aux_text(aux_dsl)
-                aux = self.try_dsl_to_constructions(raw_aux_text)
-            except Exception:
-                self._trace(
-                    "candidate_transition",
-                    attempt_key=build_attempt_key(request_id, candidate_rank, None),
-                    request_id=request_id,
-                    parent_node_id=parent_node_id,
-                    node_id=None,
-                    candidate_rank=candidate_rank,
-                    depth=depth,
-                    raw_aux_text=self.extract_raw_aux_text(aux_dsl),
-                    translated_aux=None,
-                    new_problem_text=None,
-                    decision="parse_failed",
-                    beam_score_before=prev_score,
-                    beam_score_after=None,
-                )
-                continue
-
-            if not aux:
-                self._trace(
-                    "candidate_transition",
-                    attempt_key=build_attempt_key(request_id, candidate_rank, None),
-                    request_id=request_id,
-                    parent_node_id=parent_node_id,
-                    node_id=None,
-                    candidate_rank=candidate_rank,
-                    depth=depth,
-                    raw_aux_text=raw_aux_text,
-                    translated_aux=None,
-                    new_problem_text=None,
-                    decision="parse_failed",
-                    beam_score_before=prev_score,
-                    beam_score_after=None,
-                )
-                continue
-
-            try:
-                new_problem = problem.with_more_construction(aux)
-            except Exception:
-                self._trace(
-                    "candidate_transition",
-                    attempt_key=build_attempt_key(request_id, candidate_rank, None),
-                    request_id=request_id,
-                    parent_node_id=parent_node_id,
-                    node_id=None,
-                    candidate_rank=candidate_rank,
-                    depth=depth,
-                    raw_aux_text=raw_aux_text,
-                    translated_aux=aux,
-                    new_problem_text=None,
-                    decision="build_failed",
-                    beam_score_before=prev_score,
-                    beam_score_after=None,
-                )
-                continue
-
-            child_node_id = next_node_id
-            next_node_id += 1
-            pending_ddar_submit.append(
+        for gpu_result in batch_results:
+            request_id = gpu_result["request_id"]
+            request_state = request_meta.pop(request_id)
+            state = request_state["state"]
+            prev_score = request_state["prev_score"]
+            parent_node_id = request_state["node_id"]
+            problem = self.get_problem_from_state(state)
+            outputs = [
                 {
-                    "problem": new_problem,
-                    "state": state,
-                    "prev_score": prev_score,
+                    "rank": rank,
+                    "aux_dsl": aux_dsl,
                     "score": score,
-                    "node_id": child_node_id,
-                    "parent_node_id": parent_node_id,
-                    "request_id": request_id,
-                    "candidate_rank": candidate_rank,
-                    "attempt_key": build_attempt_key(request_id, candidate_rank, child_node_id),
-                    "raw_aux_text": raw_aux_text,
-                    "translated_aux": aux,
                 }
+                for rank, (aux_dsl, score) in enumerate(gpu_result["aux_dsl_dict"].items())
+            ]
+            self._trace(
+                "model_response",
+                request_id=request_id,
+                node_id=parent_node_id,
+                depth=depth,
+                outputs=outputs,
             )
+            logger.debug(
+                "Search depth=%d request=%s candidate_count=%d",
+                depth,
+                request_id,
+                len(gpu_result["aux_dsl_dict"]),
+            )
+
+            for candidate_rank, (aux_dsl, score) in enumerate(gpu_result["aux_dsl_dict"].items()):
+                try:
+                    raw_aux_text = self.extract_raw_aux_text(aux_dsl)
+                    aux = self.try_dsl_to_constructions(raw_aux_text)
+                except Exception:
+                    increment_profiling_count(profiling, "candidate_parse_failed_count")
+                    self._trace(
+                        "candidate_transition",
+                        attempt_key=build_attempt_key(request_id, candidate_rank, None),
+                        request_id=request_id,
+                        parent_node_id=parent_node_id,
+                        node_id=None,
+                        candidate_rank=candidate_rank,
+                        depth=depth,
+                        raw_aux_text=self.extract_raw_aux_text(aux_dsl),
+                        translated_aux=None,
+                        new_problem_text=None,
+                        decision="parse_failed",
+                        beam_score_before=prev_score,
+                        beam_score_after=None,
+                    )
+                    continue
+
+                if not aux:
+                    increment_profiling_count(profiling, "candidate_parse_failed_count")
+                    self._trace(
+                        "candidate_transition",
+                        attempt_key=build_attempt_key(request_id, candidate_rank, None),
+                        request_id=request_id,
+                        parent_node_id=parent_node_id,
+                        node_id=None,
+                        candidate_rank=candidate_rank,
+                        depth=depth,
+                        raw_aux_text=raw_aux_text,
+                        translated_aux=None,
+                        new_problem_text=None,
+                        decision="parse_failed",
+                        beam_score_before=prev_score,
+                        beam_score_after=None,
+                    )
+                    continue
+
+                try:
+                    new_problem = problem.with_more_construction(aux)
+                except Exception:
+                    increment_profiling_count(profiling, "candidate_build_failed_count")
+                    self._trace(
+                        "candidate_transition",
+                        attempt_key=build_attempt_key(request_id, candidate_rank, None),
+                        request_id=request_id,
+                        parent_node_id=parent_node_id,
+                        node_id=None,
+                        candidate_rank=candidate_rank,
+                        depth=depth,
+                        raw_aux_text=raw_aux_text,
+                        translated_aux=aux,
+                        new_problem_text=None,
+                        decision="build_failed",
+                        beam_score_before=prev_score,
+                        beam_score_after=None,
+                    )
+                    continue
+
+                child_node_id = next_node_id
+                next_node_id += 1
+                pending_ddar_submit.append(
+                    {
+                        "problem": new_problem,
+                        "state": state,
+                        "prev_score": prev_score,
+                        "score": score,
+                        "node_id": child_node_id,
+                        "parent_node_id": parent_node_id,
+                        "request_id": request_id,
+                        "candidate_rank": candidate_rank,
+                        "attempt_key": build_attempt_key(request_id, candidate_rank, child_node_id),
+                        "raw_aux_text": raw_aux_text,
+                        "translated_aux": aux,
+                    }
+                )
 
         handle_elapsed_s = time.perf_counter() - handle_start
         add_profiling_time(profiling, "gpu_result_handle_wall_time_s", handle_elapsed_s)
@@ -655,6 +726,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             )
             future_info[future] = candidate_meta
             running_futures.append(future)
+            increment_profiling_count(profiling, "ddar_submitted_count")
         submit_elapsed_s = time.perf_counter() - submit_start
         add_profiling_time(profiling, "ddar_submit_wall_time_s", submit_elapsed_s)
 
@@ -804,6 +876,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     }
                     progress = False
                     dispatcher.tick()
+                    self._drain_dispatcher_submission_events(dispatcher=dispatcher, depth=depth, profiling=profiling)
 
                     # 1. Consume finished DDAR tasks first so validated states
                     # can immediately contribute to the next-depth frontier.
@@ -839,16 +912,15 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                             timeout=0,
                         )
                         for done_ref in done_gpu_refs:
-                            gpu_results = dispatcher.take_done(done_ref)
-                            for gpu_result in gpu_results:
-                                next_node_id = self._handle_gpu_result(
-                                    gpu_result=gpu_result,
-                                    request_meta=request_meta,
-                                    pending_ddar_submit=pending_ddar_submit,
-                                    depth=depth,
-                                    profiling=profiling,
-                                    next_node_id=next_node_id,
-                                )
+                            gpu_batch_payload = dispatcher.take_done(done_ref)
+                            next_node_id = self._handle_gpu_result(
+                                gpu_batch_payload=gpu_batch_payload,
+                                request_meta=request_meta,
+                                pending_ddar_submit=pending_ddar_submit,
+                                depth=depth,
+                                profiling=profiling,
+                                next_node_id=next_node_id,
+                            )
                             progress = True
 
                     # 3. Submit as many validated DDAR candidates as the current
@@ -888,8 +960,24 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                         and (len(pending_ddar_submit) + len(running_futures)) <= ddar_backlog_high_watermark
                     ):
                         request = prepared_requests.popleft()
-                        request_meta[request["request_id"]]["gpu_submitted_at_perf_s"] = time.perf_counter()
+                        enqueue_at = time.perf_counter()
+                        request_state = request_meta[request["request_id"]]
+                        add_profiling_time(
+                            profiling,
+                            "prepared_request_queue_wall_time_s",
+                            enqueue_at - request_state.get("request_built_at_perf_s", enqueue_at),
+                        )
+                        request_state["gpu_submitted_at_perf_s"] = enqueue_at
                         dispatcher.enqueue_request(request)
+                        increment_profiling_count(profiling, "gpu_request_enqueued_count")
+                        self._trace(
+                            "gpu_request_enqueued",
+                            request_id=request["request_id"],
+                            node_id=request_state["node_id"],
+                            parent_node_id=request_state["parent_node_id"],
+                            depth=depth,
+                        )
+                        self._drain_dispatcher_submission_events(dispatcher=dispatcher, depth=depth, profiling=profiling)
                         progress = True
 
                     # 6. Launch more prepare work on demand instead of building
@@ -913,10 +1001,12 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                             frontier_exhausted = True
                             break
                         request_index = next_request_index
+                        increment_profiling_count(profiling, "prepare_request_submitted_count")
                         progress = True
 
                     if frontier_exhausted and not running_prepare_futures and prepared_requests:
                         dispatcher.flush()
+                        self._drain_dispatcher_submission_events(dispatcher=dispatcher, depth=depth, profiling=profiling)
                         progress = True
 
                     if (

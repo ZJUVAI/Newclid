@@ -31,9 +31,18 @@ class GenerationDispatcherTests(unittest.TestCase):
     def test_generation_dispatcher_refills_idle_workers(self):
         workers = [_FakeWorker("w0"), _FakeWorker("w1")]
         results = {
-            "w0:r0": [{"request_id": "r0", "aux_dsl_dict": {}, "inference_time_s": 0.1}],
-            "w1:r1": [{"request_id": "r1", "aux_dsl_dict": {}, "inference_time_s": 0.2}],
-            "w0:r2": [{"request_id": "r2", "aux_dsl_dict": {}, "inference_time_s": 0.3}],
+            "w0:r0": {
+                "results": [{"request_id": "r0", "aux_dsl_dict": {}, "inference_time_s": 0.1}],
+                "worker_batch_profile": {"worker_inference_time_s": 0.1, "batch_size": 1},
+            },
+            "w1:r1": {
+                "results": [{"request_id": "r1", "aux_dsl_dict": {}, "inference_time_s": 0.2}],
+                "worker_batch_profile": {"worker_inference_time_s": 0.2, "batch_size": 1},
+            },
+            "w0:r2": {
+                "results": [{"request_id": "r2", "aux_dsl_dict": {}, "inference_time_s": 0.3}],
+                "worker_batch_profile": {"worker_inference_time_s": 0.3, "batch_size": 1},
+            },
         }
 
         with patch.object(model_pool_module.ray, "get", side_effect=lambda ref: results[ref]):
@@ -60,12 +69,34 @@ class GenerationDispatcherTests(unittest.TestCase):
                 first_ref = next(ref for ref in dispatcher.active_refs() if ref.startswith("w0:"))
                 first_result = dispatcher.take_done(first_ref)
 
-                self.assertEqual(first_result[0]["request_id"], "r0")
+                self.assertEqual(first_result["results"][0]["request_id"], "r0")
+                self.assertEqual(first_result["batch_size"], 1)
+                self.assertIn("dispatcher_profile", first_result)
+                self.assertIn("worker_batch_profile", first_result)
                 self.assertEqual(
                     [[request["request_id"] for request in batch] for batch in workers[0].submitted],
                     [["r0"], ["r2"]],
                 )
                 self.assertTrue(dispatcher.has_pending())
+
+    def test_generation_dispatcher_emits_submission_events_for_batched_dispatch(self):
+        workers = [_FakeWorker("w0")]
+        dispatcher = GenerationDispatcher(
+            workers,
+            [
+                {"request_id": "r0"},
+                {"request_id": "r1"},
+            ],
+            gpu_batch_size=2,
+            gpu_batch_timeout_ms=0,
+        )
+
+        events = dispatcher.take_submission_events()
+
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["request_ids"], ["r0", "r1"])
+        self.assertEqual(events[0]["batch_size"], 2)
+        self.assertEqual(dispatcher.take_submission_events(), [])
 
     def test_model_pool_create_dispatcher_accepts_empty_initial_queue(self):
         workers = [_FakeWorker("solo")]
