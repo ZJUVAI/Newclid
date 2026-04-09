@@ -145,7 +145,7 @@ def run_ddar_remote(
             "ddar_input": None,
         }
         if return_proof:
-            result["proof"] = None
+            result["proof_ref"] = None
         return result
 
     try:
@@ -164,7 +164,7 @@ def run_ddar_remote(
             "ddar_input": proof_to_ddar_input(proof),
         }
         if return_proof:
-            result["proof"] = None
+            result["proof_ref"] = None
         return result
 
     result = {
@@ -175,6 +175,6 @@ def run_ddar_remote(
         "problem_text": str(problem),
         "ddar_input": proof_to_ddar_input(proof),
     }
-    if return_proof:
-        result["proof"] = proof
+    if return_proof and not solved:
+        result["proof_ref"] = ray.put(proof)
     return result
