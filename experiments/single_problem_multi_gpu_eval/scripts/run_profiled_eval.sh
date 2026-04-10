@@ -58,19 +58,31 @@ cleanup() {
 }
 trap cleanup EXIT
 
+mark_unavailable() {
+  local path="$1"
+  local message="$2"
+  printf '%s\n' "$message" >"$path"
+}
+
 if command -v mpstat >/dev/null 2>&1; then
   mpstat -P ALL 1 >"$SYSTEM_DIR/mpstat.log" 2>&1 &
   MPSTAT_PID=$!
+else
+  mark_unavailable "$SYSTEM_DIR/mpstat.log" "mpstat unavailable: install sysstat to enable CPU sampling"
 fi
 
 if command -v pidstat >/dev/null 2>&1; then
   pidstat -u -r -w -H 1 >"$SYSTEM_DIR/pidstat.log" 2>&1 &
   PIDSTAT_PID=$!
+else
+  mark_unavailable "$SYSTEM_DIR/pidstat.log" "pidstat unavailable: install sysstat to enable per-process sampling"
 fi
 
 if command -v nvidia-smi >/dev/null 2>&1; then
-  nvidia-smi dmon -s pucm 1 >"$SYSTEM_DIR/nvidia_smi_dmon.log" 2>&1 &
+  nvidia-smi dmon -s pucm -d 1 >"$SYSTEM_DIR/nvidia_smi_dmon.log" 2>&1 &
   NVIDIA_PID=$!
+else
+  mark_unavailable "$SYSTEM_DIR/nvidia_smi_dmon.log" "nvidia-smi unavailable: GPU sampling disabled"
 fi
 
 cat >"$SYSTEM_DIR/meta.json" <<EOF
