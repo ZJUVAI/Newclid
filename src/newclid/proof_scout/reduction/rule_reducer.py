@@ -569,27 +569,48 @@ def load_rules_from_discovery_output(
 
             if is_jsonl:
                 # Assume JSONL (one JSON object per line)
-                # To save memory, only load entries that match rule_map keys
+                # Try two strategies:
+                # 1. If entries have "rid"/"pid" field, use that
+                # 2. Otherwise, match by line number (extract index from rule_id)
                 f.seek(0)
+                line_idx = 0
                 for line in f:
                     line = line.strip()
                     if not line:
                         continue
                     try:
                         entry = json.loads(line)
+                        # Strategy 1: Check if entry has rid/pid
                         rid = entry.get("rid") or entry.get("pid")
-                        if rid in target_rids:
+                        if rid and rid in target_rids:
                             if "rid" not in entry and "pid" in entry:
                                 entry["rid"] = entry["pid"]
                             entries.append(entry)
+                        else:
+                            # Strategy 2: Try to match by line number
+                            # Extract numeric index from rule_id (e.g., "geometry_clauses10_samples10M_seeded:000132" -> 132)
+                            for rule_id in target_rids:
+                                # Try to extract the numeric part
+                                parts = rule_id.split(":")
+                                if len(parts) >= 2:
+                                    try:
+                                        idx = int(parts[-1])
+                                        if idx == line_idx:
+                                            entry["rid"] = rule_id
+                                            entries.append(entry)
+                                            break
+                                    except (ValueError, IndexError):
+                                        pass
+                        line_idx += 1
                     except json.JSONDecodeError:
+                        line_idx += 1
                         continue
     except Exception as e:
         print(f"Error loading source data: {e}")
         return [], failures
 
     # Build rid -> entry mapping
-    entry_map = {entry["rid"]: entry for entry in entries}
+    entry_map = {entry.get("rid"): entry for entry in entries if entry.get("rid")}
 
     # Process each rule
     for rule_id, rule_text in rule_map.items():
@@ -874,20 +895,41 @@ def load_rules_by_ids(
 
             if is_jsonl:
                 # Assume JSONL (one JSON object per line)
-                # Only load entries that match target rule IDs
+                # Try two strategies:
+                # 1. If entries have "rid"/"pid" field, use that
+                # 2. Otherwise, match by line number (extract index from rule_id)
                 f.seek(0)
+                line_idx = 0
                 for line in f:
                     line = line.strip()
                     if not line:
                         continue
                     try:
                         entry = json.loads(line)
+                        # Strategy 1: Check if entry has rid/pid
                         rid = entry.get("rid") or entry.get("pid")
-                        if rid in target_rids:
+                        if rid and rid in target_rids:
                             if "rid" not in entry and "pid" in entry:
                                 entry["rid"] = entry["pid"]
                             entries.append(entry)
+                        else:
+                            # Strategy 2: Try to match by line number
+                            # Extract numeric index from rule_id (e.g., "geometry_clauses10_samples10M_seeded:000132" -> 132)
+                            for rule_id in target_rids:
+                                # Try to extract the numeric part
+                                parts = rule_id.split(":")
+                                if len(parts) >= 2:
+                                    try:
+                                        idx = int(parts[-1])
+                                        if idx == line_idx:
+                                            entry["rid"] = rule_id
+                                            entries.append(entry)
+                                            break
+                                    except (ValueError, IndexError):
+                                        pass
+                        line_idx += 1
                     except json.JSONDecodeError:
+                        line_idx += 1
                         continue
     except Exception as e:
         print(f"Error loading source data: {e}")
