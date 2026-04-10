@@ -49,17 +49,16 @@ flash-attn = [{ requirement = "torch", match-runtime = true }]
 # [tool.uv.extra-build-dependencies]
 # flash-attn = ["torch", "setuptools", "wheel", "ninja", "packaging"]
 
-[tool.uv.extra-build-variables]
-flash-attn = {
-    MAX_JOBS = "10",
-    # FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE",
-    # remove FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE", if you need to compile flash attn from source
-}
+[tool.uv.extra-build-variables."flash-attn"]
+MAX_JOBS = "10"
+# FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE"
+# remove FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE", if you need to compile flash attn from source
 
 
 [project.optional-dependencies]
 dev = ['black', 'ruff', 'pytest', 'pytest-cov', 'pytest-check', 'pytest-mock', 'pre-commit']
 doc = ['numpy', 'sphinx-autoapi', 'autoapi', 'sphinx_rtd_theme', 'sphinx-autodoc-typehints', 'sphinx-autobuild']
+vllm = ['vllm']
 
 
 [[tool.uv.index]]

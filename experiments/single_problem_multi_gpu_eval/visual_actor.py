@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import os
 import time
+from pathlib import Path
 from typing import Any
 
 import cairosvg  # noqa: F401
@@ -56,34 +57,51 @@ def _request_group_key(request: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
+def _build_visual_messages(request: dict[str, Any], *, image: Any | None = None) -> list[dict[str, Any]]:
+    image_input = request["img_path"] if image is None else image
+    return [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {
+            "role": "user",
+            "content": [
+                {"type": "image", "image": image_input},
+                {"type": "text", "text": request["query"]},
+            ],
+        },
+    ]
+
+
+def _build_visual_prompt(processor, request: dict[str, Any]) -> str:
+    text_prompt = processor.apply_chat_template(
+        _build_visual_messages(request),
+        tokenize=False,
+        add_generation_prompt=True,
+    )
+    return text_prompt + request.get("response_prefix", "<aux> x00") + " " + request["new_point_name"]
+
+
+def _resolve_visual_stop_tokens(processor, agent_kind: str) -> tuple[int | None, int | None]:
+    if agent_kind == "qwen35":
+        pad_token_id = processor.tokenizer.pad_token_id
+        eos_token_id = processor.tokenizer.encode(" ;", add_special_tokens=False)[0]
+    else:
+        pad_token_id = 151643
+        eos_token_id = 2587
+    return pad_token_id, eos_token_id
+
+
 def _build_visual_batch_inputs(
     model,
     processor,
     requests: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    base_texts: list[str] = []
     texts: list[str] = []
     images: list[Any] = []
     videos: list[Any] = []
     for request in requests:
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {
-                "role": "user",
-                "content": [
-                    {"type": "image", "image": request["img_path"]},
-                    {"type": "text", "text": request["query"]},
-                ],
-            },
-        ]
+        messages = _build_visual_messages(request)
         image_inputs, video_inputs = process_vision_info(messages, image_patch_size=16)
-        text_prompt = processor.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True,
-        )
-        base_texts.append(text_prompt)
-        final_text = text_prompt + request.get("response_prefix", "<aux> x00") + " " + request["new_point_name"]
+        final_text = _build_visual_prompt(processor, request)
         if len(image_inputs) != 1:
             raise ValueError(
                 f"Expected exactly one image input per visual request, got {len(image_inputs)} "
@@ -131,12 +149,7 @@ def generate_visual_aux_dsl_dict_batch(
     input_build_start = time.perf_counter()
     model_inputs = _build_visual_batch_inputs(model, processor, requests)
     profile["input_build_time_s"] += time.perf_counter() - input_build_start
-    if agent_kind == "qwen35":
-        pad_token_id = processor.tokenizer.pad_token_id
-        eos_token_id = processor.tokenizer.encode(" ;", add_special_tokens=False)[0]
-    else:
-        pad_token_id = 151643
-        eos_token_id = 2587
+    pad_token_id, eos_token_id = _resolve_visual_stop_tokens(processor, agent_kind)
 
     generate_start = time.perf_counter()
     generated_output = model.generate(
@@ -176,12 +189,151 @@ def generate_visual_aux_dsl_dict_batch(
     return results, profile
 
 
+def _load_vllm_modules():
+    try:
+        from vllm import LLM
+    except ImportError as exc:
+        raise ImportError(
+            "vLLM runtime requested but the optional dependency 'vllm' is not installed."
+        ) from exc
+    try:
+        from vllm.sampling_params import BeamSearchParams
+        from vllm.beam_search import get_beam_search_score
+    except ImportError as exc:
+        raise ImportError(
+            "vLLM is installed, but the current version does not expose the beam-search API "
+            "expected by this repo. Expected imports: "
+            "`vllm.sampling_params.BeamSearchParams` and "
+            "`vllm.beam_search.get_beam_search_score`."
+        ) from exc
+    return LLM, BeamSearchParams, get_beam_search_score
+
+
+def _compute_vllm_beam_score(
+    sequence: Any,
+    *,
+    eos_token_id: int | None,
+    get_beam_search_score,
+) -> float:
+    tokens = list(getattr(sequence, "tokens", []) or [])
+    cumulative_logprob = float(getattr(sequence, "cum_logprob", 0.0))
+    if eos_token_id is None:
+        return cumulative_logprob
+    return float(
+        get_beam_search_score(
+            tokens=tokens,
+            cumulative_logprob=cumulative_logprob,
+            eos_token_id=eos_token_id,
+            length_penalty=1.0,
+        )
+    )
+
+
+def _generate_visual_aux_dsl_dict_batch_vllm(
+    llm,
+    processor,
+    requests: list[dict[str, Any]],
+    *,
+    get_beam_search_score,
+    beam_search_params_cls,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    if not requests:
+        return [], _create_worker_batch_profile(batch_size=0)
+    if any(request.get("with_predicate", False) for request in requests):
+        raise NotImplementedError("Batched visual generation currently supports with_predicate=False only.")
+
+    decoding_size = int(requests[0]["decoding_size"])
+    if any(int(request["decoding_size"]) != decoding_size for request in requests):
+        raise ValueError("All requests in a batch must share decoding_size.")
+
+    profile = _create_worker_batch_profile(batch_size=len(requests))
+    input_build_start = time.perf_counter()
+    prompts: list[dict[str, Any]] = []
+    for request in requests:
+        with Image.open(Path(request["img_path"])) as img:
+            prompts.append(
+                {
+                    "prompt": _build_visual_prompt(processor, request),
+                    "multi_modal_data": {"image": img.copy()},
+                }
+            )
+    profile["input_build_time_s"] += time.perf_counter() - input_build_start
+
+    _, eos_token_id = _resolve_visual_stop_tokens(processor, "vlm")
+    beam_params = beam_search_params_cls(
+        beam_width=decoding_size,
+        max_tokens=100,
+        temperature=0.0,
+        ignore_eos=False,
+        stop_token_ids=[eos_token_id] if eos_token_id is not None else None,
+    )
+
+    generate_start = time.perf_counter()
+    beam_outputs = llm.beam_search(prompts, beam_params, use_tqdm=False)
+    profile["generate_time_s"] += time.perf_counter() - generate_start
+
+    decode_start = time.perf_counter()
+    results: list[dict[str, Any]] = []
+    for request, output in zip(requests, beam_outputs):
+        aux_dsl_dict: dict[str, float] = {}
+        for sequence in getattr(output, "sequences", []):
+            text = getattr(sequence, "text", "")
+            aux_dsl = f'{request.get("response_prefix", "<aux> x00")} {request["new_point_name"]}{text}'
+            aux_dsl_dict[aux_dsl] = _compute_vllm_beam_score(
+                sequence,
+                eos_token_id=eos_token_id,
+                get_beam_search_score=get_beam_search_score,
+            )
+        results.append(
+            {
+                "request_id": request["request_id"],
+                "aux_dsl_dict": aux_dsl_dict,
+            }
+        )
+    profile["decode_time_s"] += time.perf_counter() - decode_start
+    return results, profile
+
+
+class _BaseVisionWorker:
+    def _finalize_batch(
+        self,
+        requests: list[dict[str, Any]],
+        results: list[dict[str, Any]],
+        worker_batch_profile: dict[str, Any],
+        *,
+        perf_start: float,
+        inference_start: float,
+    ) -> dict[str, Any]:
+        inference_time_s = time.time() - inference_start
+        worker_batch_profile["worker_inference_time_s"] = time.perf_counter() - perf_start
+        batch_size = len(requests)
+        self.num_requests += batch_size
+        self.num_batches += 1
+        for result in results:
+            result["inference_time_s"] = inference_time_s
+            result["batch_size"] = batch_size
+        return {
+            "results": results,
+            "worker_batch_profile": worker_batch_profile,
+        }
+
+    def stats(self) -> dict[str, Any]:
+        return {
+            "model_path": self.model_path,
+            "agent_kind": self.agent_kind,
+            "num_requests": self.num_requests,
+            "num_batches": self.num_batches,
+            "avg_batch_size": (self.num_requests / self.num_batches) if self.num_batches else 0.0,
+        }
+
+
 @ray.remote(num_cpus=1, num_gpus=1, max_concurrency=1)
-class VisionModelWorker:
+class VisionModelWorker(_BaseVisionWorker):
     def __init__(self, model_path: str, agent_kind: str, torch_seed: int = 123):
         resolved_path = resolve_model_path(model_path)
         self.model_path = resolved_path
         self.agent_kind = agent_kind
+        self.runtime = "transformers"
         self.torch_seed = int(torch_seed)
         torch.manual_seed(self.torch_seed)
         if torch.cuda.is_available():
@@ -228,26 +380,21 @@ class VisionModelWorker:
 
     def warmup(self) -> dict[str, Any]:
         device = str(next(self.model.parameters()).device)
-        logger.debug(
-            "VisionModelWorker warmup: agent_kind=%s model_path=%s device=%s",
-            self.agent_kind,
-            self.model_path,
-            device,
-        )
         return {
             "model_path": self.model_path,
             "agent_kind": self.agent_kind,
             "device": device,
             "padding_side": self.processor.tokenizer.padding_side,
             "torch_seed": self.torch_seed,
+            "runtime": self.runtime,
         }
 
     @torch.no_grad()
     def generate_one(self, request: dict[str, Any]) -> dict[str, Any]:
-        return self.generate_batch([request])[0]
+        return self.generate_batch([request])
 
     @torch.no_grad()
-    def generate_batch(self, requests: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def generate_batch(self, requests: list[dict[str, Any]]) -> dict[str, Any]:
         if not requests:
             return {
                 "results": [],
@@ -261,28 +408,19 @@ class VisionModelWorker:
         )
         inference_start = time.time()
         perf_start = time.perf_counter()
-        try:
-            results, worker_batch_profile = self._generate_batch_with_fallback(requests)
-        finally:
-            inference_time_s = time.time() - inference_start
-        worker_batch_profile["worker_inference_time_s"] = time.perf_counter() - perf_start
-        batch_size = len(requests)
-        self.num_requests += batch_size
-        self.num_batches += 1
-        for result in results:
-            result["inference_time_s"] = inference_time_s
-            result["batch_size"] = batch_size
+        results, worker_batch_profile = self._generate_batch_with_fallback(requests)
         logger.debug(
-            "VisionModelWorker generate_batch done: agent_kind=%s batch_size=%d total_requests=%d total_batches=%d",
+            "VisionModelWorker generate_batch done: agent_kind=%s batch_size=%d",
             self.agent_kind,
-            batch_size,
-            self.num_requests,
-            self.num_batches,
+            len(requests),
         )
-        return {
-            "results": results,
-            "worker_batch_profile": worker_batch_profile,
-        }
+        return self._finalize_batch(
+            requests,
+            results,
+            worker_batch_profile,
+            perf_start=perf_start,
+            inference_start=inference_start,
+        )
 
     def _generate_batch_with_fallback(self, requests: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         grouped: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
@@ -358,11 +496,147 @@ class VisionModelWorker:
             merged_profile["fallback_mode"] = "per_request"
             return all_results, merged_profile
 
-    def stats(self) -> dict[str, Any]:
+
+@ray.remote(num_cpus=1, num_gpus=1, max_concurrency=1)
+class VLLMVisionModelWorker(_BaseVisionWorker):
+    def __init__(
+        self,
+        model_path: str,
+        agent_kind: str,
+        torch_seed: int = 123,
+        *,
+        gpu_memory_utilization: float = 0.90,
+        max_num_seqs: int = 128,
+        enforce_eager: bool = False,
+    ):
+        if agent_kind != "vlm":
+            raise ValueError(f"Unsupported vision agent kind for vLLM runtime: {agent_kind}")
+        resolved_path = resolve_model_path(model_path)
+        self.model_path = resolved_path
+        self.agent_kind = agent_kind
+        self.runtime = "vllm"
+        self.torch_seed = int(torch_seed)
+        self.gpu_memory_utilization = float(gpu_memory_utilization)
+        self.max_num_seqs = int(max_num_seqs)
+        self.enforce_eager = bool(enforce_eager)
+        torch.manual_seed(self.torch_seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(self.torch_seed)
+            torch.cuda.manual_seed_all(self.torch_seed)
+        logger.info(
+            "VLLMVisionModelWorker init start: agent_kind=%s model_path=%s torch_seed=%d gpu_memory_utilization=%.2f max_num_seqs=%d enforce_eager=%s",
+            agent_kind,
+            resolved_path,
+            self.torch_seed,
+            self.gpu_memory_utilization,
+            self.max_num_seqs,
+            self.enforce_eager,
+        )
+        llm_cls, beam_search_params_cls, get_beam_search_score = _load_vllm_modules()
+        self.llm = llm_cls(
+            model=resolved_path,
+            trust_remote_code=True,
+            tensor_parallel_size=1,
+            gpu_memory_utilization=self.gpu_memory_utilization,
+            max_num_seqs=self.max_num_seqs,
+            enforce_eager=self.enforce_eager,
+            limit_mm_per_prompt={"image": 1},
+        )
+        self.beam_search_params_cls = beam_search_params_cls
+        self.get_beam_search_score = get_beam_search_score
+        self.processor = ModelScopeAutoProcessor.from_pretrained("Qwen/Qwen3-VL-2B-Instruct")
+        self.processor.tokenizer.padding_side = "left"
+        self.num_requests = 0
+        self.num_batches = 0
+        logger.info(
+            "VLLMVisionModelWorker init done: agent_kind=%s padding_side=%s torch_seed=%d",
+            agent_kind,
+            self.processor.tokenizer.padding_side,
+            self.torch_seed,
+        )
+
+    def warmup(self) -> dict[str, Any]:
         return {
             "model_path": self.model_path,
             "agent_kind": self.agent_kind,
-            "num_requests": self.num_requests,
-            "num_batches": self.num_batches,
-            "avg_batch_size": (self.num_requests / self.num_batches) if self.num_batches else 0.0,
+            "device": "cuda",
+            "padding_side": self.processor.tokenizer.padding_side,
+            "torch_seed": self.torch_seed,
+            "runtime": self.runtime,
+            "gpu_memory_utilization": self.gpu_memory_utilization,
+            "max_num_seqs": self.max_num_seqs,
+            "enforce_eager": self.enforce_eager,
         }
+
+    def generate_one(self, request: dict[str, Any]) -> dict[str, Any]:
+        return self.generate_batch([request])
+
+    def generate_batch(self, requests: list[dict[str, Any]]) -> dict[str, Any]:
+        if not requests:
+            return {
+                "results": [],
+                "worker_batch_profile": _create_worker_batch_profile(batch_size=0),
+            }
+        logger.debug(
+            "VLLMVisionModelWorker generate_batch start: agent_kind=%s batch_size=%d request_ids=%s",
+            self.agent_kind,
+            len(requests),
+            [request.get("request_id", "<missing>") for request in requests],
+        )
+        inference_start = time.time()
+        perf_start = time.perf_counter()
+        results, worker_batch_profile = self._generate_batch_with_fallback(requests)
+        return self._finalize_batch(
+            requests,
+            results,
+            worker_batch_profile,
+            perf_start=perf_start,
+            inference_start=inference_start,
+        )
+
+    def _generate_batch_with_fallback(self, requests: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        try:
+            return _generate_visual_aux_dsl_dict_batch_vllm(
+                self.llm,
+                self.processor,
+                requests,
+                get_beam_search_score=self.get_beam_search_score,
+                beam_search_params_cls=self.beam_search_params_cls,
+            )
+        except Exception as exc:
+            if len(requests) == 1:
+                logger.exception("vLLM visual generate failed for request_id=%s", requests[0].get("request_id"))
+                profile = _create_worker_batch_profile(batch_size=1)
+                profile["fallback_mode"] = "single_error"
+                return [_empty_result(requests[0], error=str(exc), batch_size=1)], profile
+            if _is_oom_error(exc):
+                logger.warning(
+                    "vLLM visual batched generate hit OOM; splitting batch_size=%d request_ids=%s",
+                    len(requests),
+                    [request.get("request_id") for request in requests],
+                )
+                fallback_start = time.perf_counter()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                midpoint = len(requests) // 2
+                left_results, left_profile = self._generate_batch_with_fallback(requests[:midpoint])
+                right_results, right_profile = self._generate_batch_with_fallback(requests[midpoint:])
+                merged_profile = _merge_worker_batch_profiles(left_profile, right_profile)
+                merged_profile["fallback_time_s"] += time.perf_counter() - fallback_start
+                merged_profile["fallback_mode"] = "oom_split"
+                return left_results + right_results, merged_profile
+            logger.exception(
+                "vLLM visual batched generate failed; falling back to per-request execution for request_ids=%s",
+                [request.get("request_id") for request in requests],
+            )
+            fallback_start = time.perf_counter()
+            all_results: list[dict[str, Any]] = []
+            profiles: list[dict[str, Any]] = []
+            for request in requests:
+                request_results, request_profile = self._generate_batch_with_fallback([request])
+                all_results.extend(request_results)
+                profiles.append(request_profile)
+            merged_profile = _merge_worker_batch_profiles(*profiles)
+            merged_profile["fallback_time_s"] += time.perf_counter() - fallback_start
+            merged_profile["fallback_mode"] = "per_request"
+            return all_results, merged_profile

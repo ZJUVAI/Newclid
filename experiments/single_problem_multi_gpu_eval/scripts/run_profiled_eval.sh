@@ -25,13 +25,18 @@ parser.add_argument("--model_path", required=True)
 parser.add_argument("--decoding_size", type=int, required=True)
 parser.add_argument("--beam_size", type=int, required=True)
 parser.add_argument("--search_depth", type=int, required=True)
+parser.add_argument("--inference_runtime", default="transformers")
 parser.add_argument("--gpu_batch_size", type=int, default=1)
 parser.add_argument("--gpu_batch_timeout_ms", type=int, default=0)
+parser.add_argument("--vllm_gpu_memory_utilization", type=float, default=0.90)
+parser.add_argument("--vllm_max_num_seqs", type=int, default=128)
+parser.add_argument("--vllm_enforce_eager", action="store_true")
 parser.add_argument("--torch_seed", type=int, default=123)
 args, _ = parser.parse_known_args()
 print(
     build_eval_output_stem(
         agent_type=args.agent,
+        inference_runtime=args.inference_runtime,
         problems_path=Path(args.problems_path),
         model_path=args.model_path,
         decoding_size=args.decoding_size,

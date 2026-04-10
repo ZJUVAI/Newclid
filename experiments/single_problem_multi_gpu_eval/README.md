@@ -96,8 +96,12 @@ Supported arguments:
 | `--decoding_size` | `8` | Number of model candidates generated per retained state at one search depth. |
 | `--beam_size` | `64` | Maximum number of candidate states kept between depths. |
 | `--search_depth` | `4` | Number of iterative auxiliary-construction expansion rounds. |
+| `--inference_runtime` | `transformers` | Inference backend for model workers. `vllm` is currently supported only with `--agent vlm`. |
 | `--gpu_batch_size` | `1` | Maximum number of prepared requests grouped into one GPU generate call. |
 | `--gpu_batch_timeout_ms` | `0` | Optional wait budget before dispatching a not-full GPU batch. |
+| `--vllm_gpu_memory_utilization` | `0.90` | GPU memory fraction reserved by each vLLM worker. |
+| `--vllm_max_num_seqs` | `128` | Maximum concurrent sequences configured for each vLLM worker. |
+| `--vllm_enforce_eager` | `False` | Force eager mode inside vLLM for debugging or compatibility. |
 | `--torch_seed` | `123` | Torch RNG seed applied once per GPU worker process. |
 | `--timeout` | `7200` | Per-problem timeout in seconds. |
 | `--num_gpus_for_eval` | `0` | Number of GPU workers to create. `0` means all GPUs visible to Ray. |
@@ -112,6 +116,7 @@ Supported arguments:
 Resource knobs:
 
 - `num_gpus_for_eval` controls how many model replicas stay resident
+- `inference_runtime` controls whether visual workers use `transformers` or `vllm`
 - `gpu_batch_size` controls how many prepared requests are combined per GPU generate call
 - `gpu_batch_timeout_ms` controls how long the dispatcher may wait before releasing a tail batch
 - `model_pool.py` is a tunable batch dispatcher
@@ -172,6 +177,7 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 LOGLEVEL=WARNING python experiments/single_problem_
   --problems_path benchmarks/imo_95.txt \
   --model_path models/vlm_checkpoint \
   --agent vlm \
+  --inference_runtime transformers \
   --log_dir experiments/single_problem_multi_gpu_eval/runs/example_vlm \
   --max_workers 40 \
   --decoding_size 32 \
@@ -179,6 +185,47 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 LOGLEVEL=WARNING python experiments/single_problem_
   --search_depth 4 \
   --gpu_batch_size 2 \
   --timeout 3600 \
+  --num_gpus_for_eval 4
+```
+
+Same budget with the optional `vllm` runtime:
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 LOGLEVEL=WARNING python experiments/single_problem_multi_gpu_eval/evaluation_single_problem_multi_gpu.py \
+  --problems_path benchmarks/imo_95.txt \
+  --model_path models/vlm_checkpoint \
+  --agent vlm \
+  --inference_runtime vllm \
+  --log_dir experiments/single_problem_multi_gpu_eval/runs/example_vlm_vllm \
+  --max_workers 40 \
+  --decoding_size 32 \
+  --beam_size 512 \
+  --search_depth 4 \
+  --gpu_batch_size 4 \
+  --gpu_batch_timeout_ms 100 \
+  --num_gpus_for_eval 4
+```
+
+Install the optional dependency before using `--inference_runtime vllm`:
+
+```bash
+pip install -e ".[vllm]"
+```
+
+Profiled wrapper script with the same `vllm` setup:
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 LOGLEVEL=WARNING bash experiments/single_problem_multi_gpu_eval/scripts/run_profiled_eval.sh \
+  --problems_path benchmarks/imo_95.txt \
+  --model_path models/vlm_checkpoint \
+  --agent vlm \
+  --inference_runtime vllm \
+  --max_workers 40 \
+  --decoding_size 32 \
+  --beam_size 512 \
+  --search_depth 4 \
+  --gpu_batch_size 4 \
+  --gpu_batch_timeout_ms 100 \
   --num_gpus_for_eval 4
 ```
 
@@ -204,13 +251,13 @@ CUDA_VISIBLE_DEVICES=0 LOGLEVEL=DEBUG python experiments/single_problem_multi_gp
 Each run writes a CSV named like:
 
 ```text
-eval_single_problem_multi_gpu_<agent>_<dataset>_<model>_d<decoding_size>_b<beam_size>_s<search_depth>_gbs<gpu_batch_size>_gbt<gpu_batch_timeout_ms>_seed<torch_seed>_<timestamp>.csv
+eval_single_problem_multi_gpu_<agent>_<dataset>_<model>_d<decoding_size>_b<beam_size>_s<search_depth>_rt<inference_runtime>_gbs<gpu_batch_size>_gbt<gpu_batch_timeout_ms>_seed<torch_seed>_<timestamp>.csv
 ```
 
 When `--trace_dir` is enabled, each run creates a trace directory named like:
 
 ```text
-eval_single_problem_multi_gpu_<agent>_<dataset>_<model>_d<decoding_size>_b<beam_size>_s<search_depth>_gbs<gpu_batch_size>_gbt<gpu_batch_timeout_ms>_seed<torch_seed>_<timestamp>/
+eval_single_problem_multi_gpu_<agent>_<dataset>_<model>_d<decoding_size>_b<beam_size>_s<search_depth>_rt<inference_runtime>_gbs<gpu_batch_size>_gbt<gpu_batch_timeout_ms>_seed<torch_seed>_<timestamp>/
 ```
 
 For visual backends, rendered prompt images are written under:
