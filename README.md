@@ -34,8 +34,7 @@ git clone https://github.com/ZJUVAI/GenesisGeo.git
 cd GenesisGeo
 uv venv .venv
 source .venv/bin/activate
-uv pip install -e .
-uv sync
+uv sync --extra full
 ```
 
 ## Data Generation
