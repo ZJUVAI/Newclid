@@ -119,6 +119,13 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
     def extract_raw_aux_text(self, aux_dsl: str) -> str:
         return aux_dsl[len("<aux> x00"):]
 
+    def _child_path_key(self, parent_path_key: tuple[int, ...], candidate_rank: int) -> tuple[int, ...]:
+        return parent_path_key + (candidate_rank,)
+
+    def _path_key_to_request_id(self, *, depth: int, path_key: tuple[int, ...]) -> str:
+        suffix = "root" if not path_key else "-".join(str(rank) for rank in path_key)
+        return f"d{depth}_p{suffix}"
+
     def _build_info_payload(
         self,
         *,
@@ -291,8 +298,14 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     child_score = future_meta["prev_score"] + future_meta["score"]
                     queue_start = time.perf_counter()
                     next_queue.add(
-                        node=(future_meta["node_id"], future_meta["parent_node_id"], next_state),
+                        node=(
+                            future_meta["node_id"],
+                            future_meta["parent_node_id"],
+                            future_meta["path_key"],
+                            next_state,
+                        ),
                         val=child_score,
+                        stable_key=future_meta["path_key"],
                     )
                     add_profiling_time(
                         profiling,
@@ -395,13 +408,14 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         except StopIteration:
             return None
 
-        node_id, parent_node_id, state = node
-        request_id = f"d{depth}_n{request_index}"
+        node_id, parent_node_id, path_key, state = node
+        request_id = self._path_key_to_request_id(depth=depth, path_key=path_key)
         request_meta[request_id] = {
             "state": state,
             "prev_score": prev_score,
             "node_id": node_id,
             "parent_node_id": parent_node_id,
+            "path_key": path_key,
         }
         future = prepare_executor.submit(
             self._run_prepare_request,
@@ -414,6 +428,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             "request_id": request_id,
             "node_id": node_id,
             "parent_node_id": parent_node_id,
+            "path_key": path_key,
             "depth": depth,
             "submitted_at_perf_s": time.perf_counter(),
         }
@@ -612,6 +627,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             state = request_state["state"]
             prev_score = request_state["prev_score"]
             parent_node_id = request_state["node_id"]
+            parent_path_key = request_state["path_key"]
             problem = self.get_problem_from_state(state)
             outputs = [
                 {
@@ -700,6 +716,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
 
                 child_node_id = next_node_id
                 next_node_id += 1
+                child_path_key = self._child_path_key(parent_path_key, candidate_rank)
                 pending_ddar_submit.append(
                     {
                         "problem": new_problem,
@@ -710,6 +727,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                         "parent_node_id": parent_node_id,
                         "request_id": request_id,
                         "candidate_rank": candidate_rank,
+                        "path_key": child_path_key,
                         "attempt_key": build_attempt_key(request_id, candidate_rank, child_node_id),
                         "raw_aux_text": raw_aux_text,
                         "translated_aux": aux,
@@ -868,7 +886,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
 
         rules_ref = ray.put(rules)
         beam_queue = BeamQueue(max_size=self.beam_size)
-        beam_queue.add(node=(0, None, self.seed_state(proof, base_proof)), val=0.0)
+        beam_queue.add(node=(0, None, (), self.seed_state(proof, base_proof)), val=0.0, stable_key=())
 
         with ThreadPoolExecutor(max_workers=self.prepare_request_workers) as prepare_executor:
             # Search stays depth-by-depth to preserve the beam semantics. Within

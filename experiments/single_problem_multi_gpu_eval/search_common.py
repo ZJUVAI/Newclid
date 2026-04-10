@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import heapq
 import time
 from fractions import Fraction
 from typing import TYPE_CHECKING, Any
@@ -22,54 +21,36 @@ class BeamQueue:
     """Keep only the top-k nodes according to their scores."""
 
     def __init__(self, max_size: int = 512):
-        self.queue: list[list[Any]] = []
+        self.queue: list[tuple[float, tuple[int, ...], int, Any]] = []
         self.max_size = max_size
         self.counter = 0
-        self.entry_finder: dict[object, list[Any]] = {}
-        self.REMOVED = object()
 
-    def add(self, node: object, val: float) -> None:
-        if len(self.queue) < self.max_size:
-            entry = [val, self.counter, node]
-            self.counter += 1
-            heapq.heappush(self.queue, entry)
-            self.entry_finder[node] = entry
-            return
+    @staticmethod
+    def _sort_key(entry: tuple[float, tuple[int, ...], int, Any]) -> tuple[float, tuple[int, ...], int]:
+        score, stable_key, insertion_order, _ = entry
+        return (-score, stable_key, insertion_order)
 
-        min_val, _, min_node = self.queue[0]
-        if val > min_val:
-            self.remove(min_node)
-            entry = [val, self.counter, node]
-            self.counter += 1
-            heapq.heappush(self.queue, entry)
-            self.entry_finder[node] = entry
+    def _sorted_entries(self) -> list[tuple[float, tuple[int, ...], int, Any]]:
+        return sorted(self.queue, key=self._sort_key)
 
-    def remove(self, node: object) -> None:
-        entry = self.entry_finder.pop(node, None)
-        if entry:
-            entry[-1] = self.REMOVED
-        self._rebuild_heap()
-
-    def _rebuild_heap(self) -> None:
-        self.queue = [entry for entry in self.queue if entry[-1] is not self.REMOVED]
-        heapq.heapify(self.queue)
+    def add(self, node: object, val: float, *, stable_key: tuple[int, ...]) -> None:
+        self.queue.append((val, stable_key, self.counter, node))
+        self.counter += 1
+        if len(self.queue) > self.max_size:
+            self.queue = self._sorted_entries()[: self.max_size]
 
     def __iter__(self):
-        for val, _, node in self.queue:
-            if node is not self.REMOVED:
-                yield val, node
+        for val, _, _, node in self._sorted_entries():
+            yield val, node
 
     def __len__(self) -> int:
         return len(self.queue)
 
     def map_nodes(self, func) -> None:
-        self.entry_finder = {}
-        for entry in self.queue:
-            node = entry[-1]
-            if node is self.REMOVED:
-                continue
-            entry[-1] = func(node)
-            self.entry_finder[entry[-1]] = entry
+        self.queue = [
+            (val, stable_key, insertion_order, func(node))
+            for val, stable_key, insertion_order, node in self.queue
+        ]
 
 
 def extract_points(proof: ProofState) -> list[tuple[str, Any, Any]]:

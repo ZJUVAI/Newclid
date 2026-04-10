@@ -342,6 +342,21 @@ def test_trace_scheduler_state_logs_on_change() -> None:
     assert payload["running_ddar"] == 1
 
 
+def test_path_key_helpers_produce_stable_child_keys_and_request_ids() -> None:
+    agent = _DummyAgent(
+        model_pool=None,
+        decoding_size=1,
+        beam_size=1,
+        search_depth=1,
+        agent_type="dummy",
+    )
+
+    assert agent._child_path_key((), 25) == (25,)
+    assert agent._child_path_key((25,), 3) == (25, 3)
+    assert agent._path_key_to_request_id(depth=0, path_key=()) == "d0_proot"
+    assert agent._path_key_to_request_id(depth=1, path_key=(25, 3)) == "d1_p25-3"
+
+
 def test_ddar_result_handle_breaks_out_non_overlapping_substages(monkeypatch) -> None:
     profiling = create_profiling_payload()
     agent = _DummyAgent(
@@ -358,6 +373,7 @@ def test_ddar_result_handle_breaks_out_non_overlapping_substages(monkeypatch) ->
             "attempt_key": "attempt",
             "node_id": 1,
             "parent_node_id": 0,
+            "path_key": (0,),
             "problem": "problem",
             "state": "state",
             "prev_score": 0.5,
@@ -392,9 +408,9 @@ def test_ddar_result_handle_breaks_out_non_overlapping_substages(monkeypatch) ->
         def __init__(self):
             self.items = deque()
 
-        def add(self, node, val):
+        def add(self, node, val, *, stable_key):
             time.sleep(0.01)
-            self.items.append((node, val))
+            self.items.append((node, val, stable_key))
 
     queue = _SlowQueue()
     agent._handle_ddar_done(

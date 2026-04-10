@@ -155,12 +155,12 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
             raise ValueError("Visual agent definitions are unavailable for frontier materialization.")
 
         def materialize(node):
-            node_id, parent_node_id, state = node
+            node_id, parent_node_id, path_key, state = node
             problem, current_proof = state
             if current_proof is None:
                 increment_profiling_count(profiling, "next_frontier_proof_built_count")
                 current_proof = build_problem_proof(problem, self._proof_defs)
-            return node_id, parent_node_id, (problem, current_proof)
+            return node_id, parent_node_id, path_key, (problem, current_proof)
 
         next_queue.map_nodes(materialize)
         return next_queue

@@ -61,13 +61,25 @@ def test_visual_agent_materializes_missing_frontier_proofs():
     assert seed_proof is base_proof
 
     next_queue = BeamQueue(max_size=4)
-    next_queue.add(node=(1, 0, (problem, None)), val=1.0)
-    next_queue.add(node=(2, 0, (problem, base_proof)), val=0.5)
+    next_queue.add(node=(1, 0, (0,), (problem, None)), val=1.0, stable_key=(0,))
+    next_queue.add(node=(2, 0, (1,), (problem, base_proof)), val=0.5, stable_key=(1,))
 
     profiling = {}
     materialized_queue = agent.finalize_next_queue(next_queue=next_queue, profiling=profiling)
-    states = [node[2] for _, node in materialized_queue]
+    states = [node[3] for _, node in materialized_queue]
 
     assert len(states) == 2
     assert all(state[1] is not None for state in states)
     assert profiling["next_frontier_proof_built_count"] == 1
+
+
+def test_beam_queue_iterates_in_stable_order_independent_of_add_order():
+    queue = BeamQueue(max_size=4)
+    queue.add(node=("n3",), val=0.5, stable_key=(3,))
+    queue.add(node=("n1",), val=1.0, stable_key=(1,))
+    queue.add(node=("n2",), val=1.0, stable_key=(2,))
+    queue.add(node=("n0",), val=1.0, stable_key=(0,))
+
+    ordered = [node for _, node in queue]
+
+    assert ordered == [("n0",), ("n1",), ("n2",), ("n3",)]
