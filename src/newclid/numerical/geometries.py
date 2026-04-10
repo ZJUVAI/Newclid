@@ -113,8 +113,7 @@ class FormNum(ABC):
     @abstractmethod
     def sample_within(
         self, points: Sequence[PointNum], *, trials: int = 5, rng: Generator
-    ) -> PointNum:
-        ...
+    ) -> PointNum: ...
 
 
 class LineNum(FormNum):
@@ -131,9 +130,7 @@ class LineNum(FormNum):
             a, b, c = coefficients
         elif p1 and p2:
             if p1.close_enough(p2):
-                raise ValueError(
-                    "Unable to determine the line by two points too close"
-                )
+                raise ValueError("Unable to determine the line by two points too close")
             a, b, c = (
                 p1.y - p2.y,
                 p2.x - p1.x,
@@ -233,8 +230,7 @@ class LineNum(FormNum):
 
         if close_enough(center.distance(self), radius):
             center = center.foot(self)
-        a, b = line_circle_intersection(
-            self, CircleNum(center.foot(self), radius))
+        a, b = line_circle_intersection(self, CircleNum(center.foot(self), radius))
 
         result = None
         best = -1.0
@@ -251,8 +247,7 @@ class LineNum(FormNum):
     def angle(self) -> float:
         if nearly_zero(self.coefficients[1]):
             return np.pi / 2
-        res: Any = (self.point_at(x=1) - self.point_at(x=0)
-                    ).angle() % np.pi  # type: ignore
+        res: Any = (self.point_at(x=1) - self.point_at(x=0)).angle() % np.pi  # type: ignore
         if close_enough(res, np.pi):
             return 0.0
         return res
@@ -397,19 +392,17 @@ def line_circle_intersection(line: LineNum, circle: CircleNum) -> tuple[PointNum
         x_p2 = x_p * x_p
         y = solve_quad(1, -2 * q, q * q + x_p2 - r * r)
         if len(y) == 0:
-            raise InvalidIntersectError(
-                "Line & circle are too far to intersect.")
+            raise InvalidIntersectError("Line & circle are too far to intersect.")
         return tuple(PointNum(x, y1) for y1 in y)
 
-     # Line is almost horizontal (a=0, equation degenerates to b y + c = 0), solve for x
+    # Line is almost horizontal (a=0, equation degenerates to b y + c = 0), solve for x
     if close_enough(a, 0):
         y = -c / b
         y_q = y - q
         y_q2 = y_q * y_q
         x = solve_quad(1, -2 * p, p * p + y_q2 - r * r)
         if len(y) == 0:
-            raise InvalidIntersectError(
-                "Line & circle are too far to intersect.")
+            raise InvalidIntersectError("Line & circle are too far to intersect.")
         return tuple(PointNum(x1, y) for x1 in x)
 
     # General case: x = -(b y + c) / a
@@ -478,11 +471,11 @@ def reduce(
         def is_too_close(a: float, b: float) -> bool:
             """判断是否属于『不允许的接近区间』"""
             diff = abs(a - b)
-            if diff <= 1e-9:          # 非常接近，认为是同一个点 → 允许
+            if diff <= 1e-9:  # 非常接近，认为是同一个点 → 允许
                 return False
-            if diff < 1e-7:           # 落在 (1e-9, 1e-7) 之间 → 不允许
+            if diff < 1e-7:  # 落在 (1e-9, 1e-7) 之间 → 不允许
                 return True
-            return False              # 更远 → 不算 close
+            return False  # 更远 → 不算 close
 
         def points_too_close(p1: PointNum, p2: PointNum) -> bool:
             """两个点是否属于『不允许接近但又不是同一个点』的状态"""
@@ -503,6 +496,7 @@ def reduce(
         if best_p:
             return (best_p,)
         raise InvalidReduceError(
-            "All possible intersections are too close to existing points.")
+            "All possible intersections are too close to existing points."
+        )
     else:
         raise NotImplementedError

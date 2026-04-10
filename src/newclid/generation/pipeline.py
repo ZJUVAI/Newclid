@@ -47,10 +47,14 @@ class ProblemPipeline:
         self.max_level = max_level
         self.max_auxiliary_points = max_auxiliary_points
         self.output_dir = output_dir
-        self.file_prefix = f"geometry_clauses{self.n_clauses}_samples{millify(self.n_samples)}"
+        self.file_prefix = (
+            f"geometry_clauses{self.n_clauses}_samples{millify(self.n_samples)}"
+        )
         self.hashed_problems = set()
         self.filter = GoalFilter()
-        self.defs = DefinitionJGEX.to_dict(DefinitionJGEX.parse_txt_file(default_defs_path()))
+        self.defs = DefinitionJGEX.to_dict(
+            DefinitionJGEX.parse_txt_file(default_defs_path())
+        )
         self.img = img
         self.aux_only = aux_only
         self.clear = clear
@@ -173,10 +177,7 @@ class ProblemPipeline:
                 )
 
         if not ray.is_initialized():
-            ray.init(
-                ignore_reinit_error=True,
-                num_cpus=self.n_threads
-            )
+            ray.init(ignore_reinit_error=True, num_cpus=self.n_threads)
         task_iterator = task_generator()
         max_pending = int(self.n_threads * 1.5)
         pending_tasks = {}
@@ -195,7 +196,7 @@ class ProblemPipeline:
                 try:
                     data, summary = ray.get(task_id)
 
-                    if 'error' in summary:
+                    if "error" in summary:
                         task_success = False
                 except Exception as e:
                     logging.error(f"Task failed: {e}")
@@ -205,12 +206,16 @@ class ProblemPipeline:
 
                 if task_success:
                     if self.use_seed_cache:
-                        has_real_aux = summary.get("has_real_aux", False) if summary else False
+                        has_real_aux = (
+                            summary.get("has_real_aux", False) if summary else False
+                        )
                         cache_entry = {
                             "seed": seed,
                             "n_clauses": self.n_clauses,
                             "has_real_aux": has_real_aux,
-                            "fl_statement": summary.get("fl_statement") if has_real_aux else None,
+                            "fl_statement": summary.get("fl_statement")
+                            if has_real_aux
+                            else None,
                         }
                         cache_key = (seed, self.n_clauses)
                         if cache_key not in self.seed_cache:
@@ -219,14 +224,21 @@ class ProblemPipeline:
                             with open(self.cache_file, "a", encoding="utf-8") as f:
                                 f.write(json.dumps(cache_entry) + "\n")
 
-                    data = self.problem_hash_filter(data, 'llm_input_renamed')
+                    data = self.problem_hash_filter(data, "llm_input_renamed")
                     if data:
-                        summary['n_samples'] = len(data)
-                        summary['n_filtered_samples'] = summary['n_samples_raw'] - summary['n_samples']
-                        summary['goals'] = [re.search(r'\?\s*(\w+)', d['fl_problem']).group(1) for d in data]
-                        summary['first_predicate'] = [get_first_predicate(d['fl_problem']) for d in data]
-                        summary['n_premises'] = [d['n_premises'] for d in data]
-                        summary['n_proof_steps'] = [d['n_proof_steps'] for d in data]
+                        summary["n_samples"] = len(data)
+                        summary["n_filtered_samples"] = (
+                            summary["n_samples_raw"] - summary["n_samples"]
+                        )
+                        summary["goals"] = [
+                            re.search(r"\?\s*(\w+)", d["fl_problem"]).group(1)
+                            for d in data
+                        ]
+                        summary["first_predicate"] = [
+                            get_first_predicate(d["fl_problem"]) for d in data
+                        ]
+                        summary["n_premises"] = [d["n_premises"] for d in data]
+                        summary["n_proof_steps"] = [d["n_proof_steps"] for d in data]
                         self.writer.write_data(data)
                         self.summary_reporter.add(summary)
 
@@ -235,15 +247,20 @@ class ProblemPipeline:
                             now = time.time()
                             elapsed_time = now - start_time
                             instant_elapsed = max(now - last_logged_time, 1e-6)
-                            instant_written = self.writer.written_count - last_logged_written
+                            instant_written = (
+                                self.writer.written_count - last_logged_written
+                            )
                             instant_speed = instant_written / instant_elapsed
                             alpha = 1 - math.exp(-instant_elapsed / 500)
                             smoothed_speed = (
                                 instant_speed
                                 if smoothed_speed is None
-                                else alpha * instant_speed + (1 - alpha) * smoothed_speed
+                                else alpha * instant_speed
+                                + (1 - alpha) * smoothed_speed
                             )
-                            remaining = max(0, self.n_samples - self.writer.written_count)
+                            remaining = max(
+                                0, self.n_samples - self.writer.written_count
+                            )
                             eta_seconds = remaining / max(smoothed_speed, 1e-6)
                             pending_draw = len(self.writer.pending_draw_tasks)
                             pending_write = len(self.writer.pending_write_data)
@@ -269,7 +286,9 @@ class ProblemPipeline:
             while len(pending_tasks) < max_pending:
                 task_args = next(task_iterator)
                 seed = task_args[1]
-                pending_tasks[ProblemWorker.ray_process_single_problem.remote(task_args)] = (
+                pending_tasks[
+                    ProblemWorker.ray_process_single_problem.remote(task_args)
+                ] = (
                     time.time(),
                     seed,
                 )
@@ -286,7 +305,9 @@ class ProblemPipeline:
         final_elapsed_time = time.time() - start_time
         self.summary_reporter.total_elapsed_time = final_elapsed_time
         self.summary_reporter.total_samples_generated = self.writer.written_count
-        logging.info(f"Generate {self.writer.written_count} samples in {final_elapsed_time:.2f}s.")
+        logging.info(
+            f"Generate {self.writer.written_count} samples in {final_elapsed_time:.2f}s."
+        )
         self.summary_reporter.output_report()
 
 
@@ -294,7 +315,7 @@ def load_construction_config(config_path: str | None) -> dict | None:
     """Load optional construction config JSON from disk."""
     if not config_path:
         return None
-    with open(config_path, 'r', encoding='utf-8') as f:
+    with open(config_path, "r", encoding="utf-8") as f:
         config = json.load(f)
     if not isinstance(config, dict):
         raise ValueError("Construction config JSON must contain a top-level object.")
@@ -302,52 +323,129 @@ def load_construction_config(config_path: str | None) -> dict | None:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Create problem fl - nl dataset")
+    parser = argparse.ArgumentParser(description="Create problem fl - nl dataset")
     # General parameters
-    parser.add_argument("--log_level", required=False, default="info",
-                        choices=["debug", "info", "warning", "error"],
-                        help="Logging level")
-    parser.add_argument("--n_clauses", required=False, type=int, default=15,
-                        help="Number of clauses in generated problems")
-    parser.add_argument("--n_samples", required=False, type=int, default=10000,
-                        help="Number of samples to generate")
-    parser.add_argument("--n_threads", required=False, type=int, default=10,
-                        help="Number of parallel worker threads")
-    parser.add_argument("--timeout", required=False, type=int, default=3600,
-                        help="Timeout for individual tasks (seconds)")
-    parser.add_argument("--max_level", required=False, type=int, default=500,
-                        help="Maximum DDAR search depth")
-    parser.add_argument("--construction_config", required=False, default=None,
-                        help="Optional JSON file defining construction sets and sampler steps",)
-    parser.add_argument("--seed_cache", required=False, action="store_true", default=False,
-                        help="Use seed cache to skip seeds without real auxiliary points")
-    parser.add_argument("--base_seed", required=False, type=int, default=42,
-                        help="Base seed for problem generation")
+    parser.add_argument(
+        "--log_level",
+        required=False,
+        default="info",
+        choices=["debug", "info", "warning", "error"],
+        help="Logging level",
+    )
+    parser.add_argument(
+        "--n_clauses",
+        required=False,
+        type=int,
+        default=15,
+        help="Number of clauses in generated problems",
+    )
+    parser.add_argument(
+        "--n_samples",
+        required=False,
+        type=int,
+        default=10000,
+        help="Number of samples to generate",
+    )
+    parser.add_argument(
+        "--n_threads",
+        required=False,
+        type=int,
+        default=10,
+        help="Number of parallel worker threads",
+    )
+    parser.add_argument(
+        "--timeout",
+        required=False,
+        type=int,
+        default=3600,
+        help="Timeout for individual tasks (seconds)",
+    )
+    parser.add_argument(
+        "--max_level",
+        required=False,
+        type=int,
+        default=500,
+        help="Maximum DDAR search depth",
+    )
+    parser.add_argument(
+        "--construction_config",
+        required=False,
+        default=None,
+        help="Optional JSON file defining construction sets and sampler steps",
+    )
+    parser.add_argument(
+        "--seed_cache",
+        required=False,
+        action="store_true",
+        default=False,
+        help="Use seed cache to skip seeds without real auxiliary points",
+    )
+    parser.add_argument(
+        "--base_seed",
+        required=False,
+        type=int,
+        default=42,
+        help="Base seed for problem generation",
+    )
     # Auxiliary point parameters
-    parser.add_argument("--add_auxiliary", action=argparse.BooleanOptionalAction, default=True,
-                        help="Add auxiliary points (default: enabled)")
-    parser.add_argument("--max_auxiliary_points", required=False, type=int, default=2,
-                        help="Maximum number of auxiliary points per problem")
-    parser.add_argument("--aux_only", required=False, type=int, default=0, choices=[0, 1, 2],
-                        help="Auxiliary data filter: " \
-                            "0=all data, " \
-                            "1=include data without aux with 0.1 probability, " \
-                            "2=only data with aux")
+    parser.add_argument(
+        "--add_auxiliary",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Add auxiliary points (default: enabled)",
+    )
+    parser.add_argument(
+        "--max_auxiliary_points",
+        required=False,
+        type=int,
+        default=2,
+        help="Maximum number of auxiliary points per problem",
+    )
+    parser.add_argument(
+        "--aux_only",
+        required=False,
+        type=int,
+        default=0,
+        choices=[0, 1, 2],
+        help="Auxiliary data filter: "
+        "0=all data, "
+        "1=include data without aux with 0.1 probability, "
+        "2=only data with aux",
+    )
     # Output parameters
-    parser.add_argument("--dir", required=False, default="./datasets", help="Output directory")
-    parser.add_argument("--img", required=False, type=int, default=0, choices=[0, 1, 2, 3],
-                        help="Image generation mode: " \
-                            "0=no images, " \
-                            "1=with annotations only, " \
-                            "2=without annotations only, " \
-                            "3=both")
-    parser.add_argument("--prune", action=argparse.BooleanOptionalAction, default=True,
-                        help="Prune clauses to preserve only deepest clause chain (default: enabled)")
-    parser.add_argument("--remove_coords", action="store_true", default=False,
-                        help="Remove coordinate information from final clause output")
-    parser.add_argument("--clear", action="store_true", default=False,
-                        help="Clear old dataset files before generation")
+    parser.add_argument(
+        "--dir", required=False, default="./datasets", help="Output directory"
+    )
+    parser.add_argument(
+        "--img",
+        required=False,
+        type=int,
+        default=0,
+        choices=[0, 1, 2, 3],
+        help="Image generation mode: "
+        "0=no images, "
+        "1=with annotations only, "
+        "2=without annotations only, "
+        "3=both",
+    )
+    parser.add_argument(
+        "--prune",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Prune clauses to preserve only deepest clause chain (default: enabled)",
+    )
+    parser.add_argument(
+        "--remove_coords",
+        action="store_true",
+        default=False,
+        help="Remove coordinate information from final clause output",
+    )
+    parser.add_argument(
+        "--clear",
+        action="store_true",
+        default=False,
+        help="Clear old dataset files before generation",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(level=getattr(logging, args.log_level.upper()), force=True)

@@ -158,15 +158,17 @@ class Line(Symbol):
                     while True:
                         merged = False
                         for line in lines:
-                            if not line <= current_points and len(line & current_points) >= 2:
+                            if (
+                                not line <= current_points
+                                and len(line & current_points) >= 2
+                            ):
                                 current_points |= line
                                 merged = True
                         if not merged:
                             break
                     if s <= current_points:
                         break
-                    lines = [line for line in lines if not line <=
-                             current_points]
+                    lines = [line for line in lines if not line <= current_points]
                     lines.append(current_points)
                 return Dependency.mk(statement, "Same Line", why)
                 # return Dependency.mk(statement, "Same Line", [])
@@ -230,7 +232,10 @@ class Circle(Symbol):
                     while True:
                         merged = False
                         for circle in circles:
-                            if not circle <= current_points and len(circle & current_points) >= 3:
+                            if (
+                                not circle <= current_points
+                                and len(circle & current_points) >= 3
+                            ):
                                 current_points |= circle
                                 merged = True
                         if not merged:
@@ -238,7 +243,8 @@ class Circle(Symbol):
                     if s <= current_points:
                         break
                     circles = [
-                        circle for circle in circles if not circle <= current_points]
+                        circle for circle in circles if not circle <= current_points
+                    ]
                     circles.append(current_points)
                 return Dependency.mk(statement, "Same Circle", why)
                 # return target.dep.with_new(statement)

@@ -19,8 +19,7 @@ def _read_jsonl(path):
 def test_problem_db_runtime_and_writer_roundtrip(tmp_path):
     problems_path = tmp_path / "imo_ag_30.txt"
     problems_path.write_text(
-        "IMO 2000 G1\n"
-        "a b c = triangle a b c ? perp a b c a\n",
+        "IMO 2000 G1\na b c = triangle a b c ? perp a b c a\n",
         encoding="utf-8",
     )
 

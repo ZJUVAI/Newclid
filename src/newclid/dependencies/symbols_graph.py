@@ -26,6 +26,7 @@ class SymbolsGraph:
         # Union-Find for segment congruence classes
         self.segment_parent: dict[tuple[str, str], tuple[str, str]] = {}
         self.segment_colors: dict[tuple[str, str], int] = {}
+
     def nodes_of_type(self, t: Type[S]) -> list[S]:
         return self._type2nodes[t]  # type: ignore
 

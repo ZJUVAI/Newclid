@@ -78,7 +78,7 @@ class ProblemJGEX(NamedTuple):
         mp: dict[str, str] = {}
         for construction in self.constructions:
             for point in construction.points:
-                point = point.split('@')[0]
+                point = point.split("@")[0]
                 if point not in mp:
                     mp[point] = chr(ord("a") + len(mp))
         return ProblemJGEX(

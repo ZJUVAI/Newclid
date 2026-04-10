@@ -4,14 +4,24 @@ import logging
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
-from newclid.dependencies.dependency import IN_PREMISES, NUMERICAL_CHECK, TRIVIAL, Dependency
+from newclid.dependencies.dependency import (
+    IN_PREMISES,
+    NUMERICAL_CHECK,
+    TRIVIAL,
+    Dependency,
+)
 from newclid.statement import Statement
 from newclid.dependencies.symbols import Point
 
 if TYPE_CHECKING:
     from newclid.proof import ProofState
 
-def write_proof_steps(proof_state: "ProofState", out_file: Optional[Path] = None, print_output: bool = True) -> None:
+
+def write_proof_steps(
+    proof_state: "ProofState",
+    out_file: Optional[Path] = None,
+    print_output: bool = True,
+) -> None:
     """Output the solution to out_file.
 
     Args:
@@ -66,7 +76,11 @@ def write_proof_steps(proof_state: "ProofState", out_file: Optional[Path] = None
 
     solution += "\n* Proof steps:\n"
     for k, line in enumerate(proof_steps):
-        if NUMERICAL_CHECK not in line.reason and IN_PREMISES not in line and TRIVIAL not in line.reason:
+        if (
+            NUMERICAL_CHECK not in line.reason
+            and IN_PREMISES not in line
+            and TRIVIAL not in line.reason
+        ):
             solution += f"{k:03d}. {rediger(line)}\n"
     solution += "=========================="
     if out_file is None and print_output is True:
