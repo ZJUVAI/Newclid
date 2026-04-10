@@ -157,6 +157,10 @@ class VisualActorVLLMTests(unittest.TestCase):
                 new=types.SimpleNamespace(from_pretrained=lambda path, *args, **kwargs: _processor_factory(path)),
             ),
             mock.patch(
+                "experiments.single_problem_multi_gpu_eval.visual_actor._QWEN3_VL_BASE_PROCESSOR_CACHE",
+                new=Path("/tmp/does-not-exist-qwen-cache"),
+            ),
+            mock.patch(
                 "experiments.single_problem_multi_gpu_eval.visual_actor.torch.cuda.is_available",
                 return_value=False,
             ),
@@ -175,26 +179,30 @@ class VisualActorVLLMTests(unittest.TestCase):
         self.assertIs(worker.llm, llm_holder["llm"])
         self.assertEqual(worker.max_logprobs, 64)
         self.assertEqual(llm_holder["llm"].kwargs["max_logprobs"], 64)
-        self.assertEqual(processor_calls, ["model-path"])
+        self.assertEqual(processor_calls, ["Qwen/Qwen3-VL-2B-Instruct"])
 
-    def test_load_visual_processor_falls_back_to_remote_model(self):
+    def test_load_visual_processor_prefers_cached_base_model(self):
         processor = object()
         calls = []
 
         def _processor_factory(path):
             calls.append(path)
-            if path == "local-path":
-                raise RuntimeError("boom")
             return processor
 
-        with mock.patch(
-            "experiments.single_problem_multi_gpu_eval.visual_actor.ModelScopeAutoProcessor",
-            new=types.SimpleNamespace(from_pretrained=lambda path, *args, **kwargs: _processor_factory(path)),
+        with (
+            mock.patch(
+                "experiments.single_problem_multi_gpu_eval.visual_actor.ModelScopeAutoProcessor",
+                new=types.SimpleNamespace(from_pretrained=lambda path, *args, **kwargs: _processor_factory(path)),
+            ),
+            mock.patch(
+                "experiments.single_problem_multi_gpu_eval.visual_actor._QWEN3_VL_BASE_PROCESSOR_CACHE",
+                new=Path("/tmp"),
+            ),
         ):
-            loaded = _load_visual_processor("local-path")
+            loaded = _load_visual_processor()
 
         self.assertIs(loaded, processor)
-        self.assertEqual(calls, ["local-path", "Qwen/Qwen3-VL-2B-Instruct"])
+        self.assertEqual(calls, ["/tmp"])
 
     def test_extract_vllm_continuation_text_strips_full_prompt_prefix(self):
         processor = _FakeProcessor()
