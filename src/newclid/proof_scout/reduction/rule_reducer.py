@@ -626,6 +626,17 @@ def load_rules_from_discovery_output(
             point_coords = entry.get("point_coords", {})
             seed = entry.get("seed")
 
+            # Fallback: parse point coords from fl_problem if point_coords missing
+            if not point_coords:
+                fl_problem = entry.get("fl_problem", "")
+                if fl_problem:
+                    import re as _re
+                    _coord_re = _re.compile(
+                        r'\b([A-Za-z][A-Za-z0-9]*)@(-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)_(-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)'
+                    )
+                    for m in _coord_re.finditer(fl_problem):
+                        point_coords[m.group(1)] = [float(m.group(2)), float(m.group(3))]
+
             if not llm_input:
                 failures.append((rule_id, rule_text, "Empty llm_input_renamed"))
                 continue
