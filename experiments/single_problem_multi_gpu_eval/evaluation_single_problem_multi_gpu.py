@@ -118,7 +118,7 @@ def create_workers(
             raise ValueError(f"Unsupported inference runtime for agent '{agent_type}': {inference_runtime}")
         from experiments.single_problem_multi_gpu_eval.lm_actor import ModelWorker
 
-        return [ModelWorker.remote(model_path, torch_seed) for _ in range(num_gpus_for_eval)]
+        return [ModelWorker.remote(model_path, torch_seed) for _ in range(num_gpus_for_eval)], None
     if agent_type in {"vlm", "qwen35"}:
         from experiments.single_problem_multi_gpu_eval.visual_actor import (
             VLLMVisionModelWorker,
@@ -126,12 +126,14 @@ def create_workers(
         )
 
         if inference_runtime == "transformers":
-            return [VisionModelWorker.remote(model_path, agent_type, torch_seed) for _ in range(num_gpus_for_eval)]
+            return [VisionModelWorker.remote(model_path, agent_type, torch_seed) for _ in range(num_gpus_for_eval)], None
         if inference_runtime == "vllm":
             if agent_type != "vlm":
                 raise ValueError(f"Unsupported inference runtime for agent '{agent_type}': {inference_runtime}")
-            return [
-                VLLMVisionModelWorker.remote(
+            workers = []
+            warmup_infos = []
+            for _ in range(num_gpus_for_eval):
+                worker = VLLMVisionModelWorker.remote(
                     model_path,
                     agent_type,
                     torch_seed,
@@ -141,8 +143,11 @@ def create_workers(
                     decoding_size=decoding_size,
                     enforce_eager=vllm_enforce_eager,
                 )
-                for _ in range(num_gpus_for_eval)
-            ]
+                workers.append(worker)
+                # Serialize actor init + engine warmup to avoid concurrent
+                # vLLM rendezvous port selection races across replicas.
+                warmup_infos.append(ray.get(worker.warmup.remote()))
+            return workers, warmup_infos
         raise ValueError(f"Unsupported inference runtime: {inference_runtime}")
     raise ValueError(f"Unsupported agent type: {agent_type}")
 
@@ -352,7 +357,7 @@ def solve_problems_single_problem_multi_gpu(
         if gpu_batch_timeout_ms < 0:
             raise ValueError(f"gpu_batch_timeout_ms must be non-negative, got {gpu_batch_timeout_ms}.")
 
-        workers = create_workers(
+        workers, warmup_infos = create_workers(
             agent_type=agent_type,
             model_path=model_path,
             num_gpus_for_eval=num_gpus_for_eval,
@@ -371,7 +376,10 @@ def solve_problems_single_problem_multi_gpu(
             available_gpus,
         )
         model_pool = ModelPool(workers)
-        warmup_infos = model_pool.warmup()
+        if warmup_infos is None:
+            warmup_infos = model_pool.warmup()
+        else:
+            logging.getLogger(__name__).info("Using create_workers warmup infos: %s", warmup_infos)
 
         output_dir = Path(log_dir) if log_dir else Path("results")
         output_dir.mkdir(parents=True, exist_ok=True)

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import csv
+import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -9,6 +11,7 @@ from unittest.mock import patch
 from experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu import (
     build_eval_output_stem,
     build_timestamped_output_stem,
+    create_workers,
     solve_problems_single_problem_multi_gpu,
 )
 from experiments.single_problem_multi_gpu_eval.lm_actor import resolve_model_path
@@ -244,6 +247,80 @@ class EvalOutputNamingTests(unittest.TestCase):
 
 
 class SingleProblemEvalRunnerTests(unittest.TestCase):
+    def test_create_workers_vllm_serializes_actor_startup_with_warmup(self):
+        events: list[tuple[str, int]] = []
+
+        class _FakeWarmupMethod:
+            def __init__(self, worker_idx: int):
+                self.worker_idx = worker_idx
+
+            def remote(self):
+                events.append(("warmup_remote", self.worker_idx))
+                return f"warmup:{self.worker_idx}"
+
+        class _FakeWorkerHandle:
+            def __init__(self, worker_idx: int):
+                self.worker_idx = worker_idx
+                self.warmup = _FakeWarmupMethod(worker_idx)
+
+        class _FakeVLLMWorker:
+            created = 0
+
+            @classmethod
+            def remote(cls, *args, **kwargs):
+                del args, kwargs
+                worker_idx = cls.created
+                cls.created += 1
+                events.append(("create", worker_idx))
+                return _FakeWorkerHandle(worker_idx)
+
+        fake_visual_actor = types.SimpleNamespace(
+            VLLMVisionModelWorker=_FakeVLLMWorker,
+            VisionModelWorker=object,
+        )
+
+        with patch.dict(
+            sys.modules,
+            {"experiments.single_problem_multi_gpu_eval.visual_actor": fake_visual_actor},
+        ):
+            with patch(
+                "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.get",
+                side_effect=lambda ref: {"warmup_ref": ref},
+            ):
+                workers, warmup_infos = create_workers(
+                    agent_type="vlm",
+                    model_path="/tmp/model",
+                    num_gpus_for_eval=3,
+                    decoding_size=32,
+                    gpu_batch_size=4,
+                    torch_seed=42,
+                    inference_runtime="vllm",
+                    vllm_gpu_memory_utilization=0.9,
+                    vllm_max_num_seqs=128,
+                    vllm_enforce_eager=False,
+                )
+
+        self.assertEqual(len(workers), 3)
+        self.assertEqual(
+            warmup_infos,
+            [
+                {"warmup_ref": "warmup:0"},
+                {"warmup_ref": "warmup:1"},
+                {"warmup_ref": "warmup:2"},
+            ],
+        )
+        self.assertEqual(
+            events,
+            [
+                ("create", 0),
+                ("warmup_remote", 0),
+                ("create", 1),
+                ("warmup_remote", 1),
+                ("create", 2),
+                ("warmup_remote", 2),
+            ],
+        )
+
     def test_single_problem_eval_runner_writes_results_without_torch_seed_thread_arg(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -274,7 +351,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                     ):
                         with patch(
                             "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.create_workers",
-                            return_value=fake_workers,
+                            return_value=(fake_workers, None),
                         ):
                             with patch(
                                 "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ModelPool"
