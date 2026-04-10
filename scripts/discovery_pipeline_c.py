@@ -145,6 +145,142 @@ def run_stage2_reduction_csolver(
 
 
 # ============================================================================
+# Chunked Iterative Reduction (CSolver)
+# ============================================================================
+
+def run_chunked_iterative_reduction(
+    rules_file: Path,
+    source_data_file: Path,
+    output_dir: Path,
+    *,
+    timeout: int = 60,
+    seed: int = 42,
+    max_premises: Optional[int] = None,
+    max_rules: Optional[int] = None,
+    group_size: int = 500,
+    iterations: int = 1,
+    chunk_workers: int = 4,
+    batch_size: int = 10,
+    engine: str = "full",
+    filter_only: bool = False,
+    resume: bool = True,
+    solver_type: str = "csolver",
+) -> Dict[str, Any]:
+    """Chunked iterative rule reduction using CSolver.
+
+    1. Load rules from discovery output
+    2. Optionally filter by max_premises
+    3. If filter_only, stop here
+    4. Otherwise run ChunkedIterativeReducer.reduce_iterative()
+    """
+    from newclid.proof_scout.reduction import (
+        ChunkedIterativeReducer,
+        load_rules_from_discovery_output,
+    )
+
+    start_time = time.time()
+    print(f"\n{'='*60}")
+    print(f"Chunked Iterative Reduction ({solver_type})")
+    print(f"{'='*60}")
+    print(f"  Rules: {rules_file}")
+    print(f"  Source data: {source_data_file}")
+    print(f"  Output: {output_dir}")
+    print(f"  group_size={group_size}, iterations={iterations}, "
+          f"chunk_workers={chunk_workers}")
+
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Load rules
+    rules, failures = load_rules_from_discovery_output(
+        rules_file, source_data_file, max_rules=max_rules,
+    )
+    print(f"  Loaded {len(rules)} rules ({len(failures)} failures)")
+
+    if failures:
+        failures_path = output_dir / "conversion_failures.json"
+        with open(failures_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "total_failures": len(failures),
+                "failures": [{"rule_id": r, "rule_text": t, "reason": e} for r, t, e in failures],
+            }, f, ensure_ascii=False, indent=2)
+
+    if not rules:
+        print("\nNo rules to process!")
+        return {"stage": "chunked_reduction", "elapsed_seconds": 0, "stats": {}}
+
+    # Filter by max_premises
+    skipped = []
+    if max_premises is not None:
+        rules, skipped = ChunkedIterativeReducer.filter_by_premises(rules, max_premises)
+        print(f"  Pre-filter: {len(skipped)} rules skipped (premises > {max_premises})")
+        print(f"  Remaining: {len(rules)} rules")
+
+        # Save filtered rules
+        filtered_path = output_dir / "filtered_rules.txt"
+        with open(filtered_path, "w", encoding="utf-8") as f:
+            for rule in rules:
+                f.write(f"{rule.rule_id}\n{rule.rule_text}\n")
+
+        if skipped:
+            skip_path = output_dir / "skipped_by_premises.json"
+            with open(skip_path, "w", encoding="utf-8") as f:
+                json.dump(skipped, f, ensure_ascii=False, indent=2)
+
+    if filter_only:
+        elapsed = time.time() - start_time
+        print(f"\n[Filter only] Done in {elapsed:.1f}s — {len(rules)} rules kept")
+        return {
+            "stage": "chunked_reduction (filter_only)",
+            "elapsed_seconds": elapsed,
+            "stats": {
+                "input_count": len(rules) + len(skipped),
+                "filtered_count": len(rules),
+                "skipped_count": len(skipped),
+            },
+        }
+
+    if not rules:
+        print("\nNo rules remaining after filter!")
+        return {"stage": "chunked_reduction", "elapsed_seconds": 0, "stats": {}}
+
+    # Run chunked iterative reduction
+    reducer = ChunkedIterativeReducer(
+        timeout=timeout,
+        seed=seed,
+        batch_size=batch_size,
+        solver_type=solver_type,
+        engine=engine,
+    )
+
+    survivors, overall_stats = reducer.reduce_iterative(
+        rules,
+        group_size=group_size,
+        iterations=iterations,
+        chunk_workers=chunk_workers,
+        output_dir=output_dir,
+        resume=resume,
+    )
+
+    elapsed = time.time() - start_time
+    overall_stats["elapsed_seconds_total"] = elapsed
+    overall_stats["skipped_by_premises_count"] = len(skipped)
+
+    # Save overall stats
+    stats_path = output_dir / "chunked_reduction_stats.json"
+    with open(stats_path, "w", encoding="utf-8") as f:
+        json.dump(overall_stats, f, ensure_ascii=False, indent=2)
+
+    print(f"\n[Chunked Reduction] Completed in {elapsed:.1f}s")
+    print(f"  Final basis: {len(survivors)} rules")
+
+    return {
+        "stage": "chunked_reduction",
+        "elapsed_seconds": elapsed,
+        "stats": overall_stats,
+    }
+
+
+# ============================================================================
 # Pipeline Orchestrator
 # ============================================================================
 
@@ -358,6 +494,20 @@ def main():
     standalone.add_argument("--rules", type=Path, default=None, help="Path to rules file")
     standalone.add_argument("--source-data", type=Path, default=None, help="Path to step6_rules_stats.json")
 
+    chunked = parser.add_argument_group("Chunked Iterative Reduction")
+    chunked.add_argument("--chunked", action="store_true",
+                         help="Enable chunked iterative reduction mode")
+    chunked.add_argument("--group-size", type=int, default=500,
+                         help="Rules per chunk (default: 500, requires --chunked)")
+    chunked.add_argument("--iterations", type=int, default=1,
+                         help="Number of iterative rounds (default: 1, requires --chunked)")
+    chunked.add_argument("--chunk-workers", type=int, default=4,
+                         help="Parallel workers for chunk reduction (default: 4)")
+    chunked.add_argument("--no-resume", action="store_true",
+                         help="Disable checkpoint resume (default: resume enabled)")
+    chunked.add_argument("--filter-only", action="store_true",
+                         help="Only do max_premises filtering, no reduction")
+
     args = parser.parse_args()
 
     if not args.skip_extraction and args.input is None:
@@ -366,9 +516,36 @@ def main():
         parser.error("--rules and --source-data are required with --skip-extraction")
     if args.overlap_reduction and not args.streaming:
         parser.error("--overlap-reduction requires --streaming")
+    if args.filter_only and not args.chunked:
+        # filter_only can work standalone with --skip-extraction
+        if not args.skip_extraction:
+            parser.error("--filter-only requires --chunked or --skip-extraction with --rules/--source-data")
 
     skip_preds = [p.strip() for p in args.skip_predicates.split(",")] if args.skip_predicates else None
     rule_skip_preds = [p.strip() for p in args.rule_skip_predicates.split(",")] if args.rule_skip_predicates else None
+
+    # Chunked iterative reduction mode
+    if args.chunked or args.filter_only:
+        if args.rules is None or args.source_data is None:
+            parser.error("--rules and --source-data are required with --chunked/--filter-only")
+        run_chunked_iterative_reduction(
+            rules_file=args.rules,
+            source_data_file=args.source_data,
+            output_dir=args.output,
+            timeout=args.timeout,
+            seed=args.seed,
+            max_premises=args.max_premises,
+            max_rules=args.max_rules,
+            group_size=args.group_size,
+            iterations=args.iterations,
+            chunk_workers=args.chunk_workers,
+            batch_size=args.batch_size,
+            engine=args.engine,
+            filter_only=args.filter_only,
+            resume=not args.no_resume,
+            solver_type="csolver",
+        )
+        return
 
     run_pipeline(
         input_path=args.input,

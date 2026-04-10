@@ -770,5 +770,402 @@ def _entries_to_rules_with_source(entries: list) -> List[RuleWithSource]:
     return rules
 
 
+def load_rules_by_ids(
+    rule_ids: List[str],
+    source_data_file: Path,
+) -> Tuple[List[RuleWithSource], List[Tuple[str, str]]]:
+    """Load RuleWithSource objects for specific rule IDs from source data.
+
+    Used for checkpoint resume: read rule_id list from survivors.txt,
+    then restore full RuleWithSource objects from the original source data.
+
+    Args:
+        rule_ids: List of rule IDs to load (e.g., ["r000042", "r000123"])
+        source_data_file: Path to step6_rules_stats.json
+
+    Returns:
+        Tuple of (rules, failures) where failures is [(rule_id, reason), ...]
+    """
+    import json
+
+    with open(source_data_file) as f:
+        source_data = json.load(f)
+
+    entries = source_data.get("entries", [])
+    entry_map = {entry["rid"]: entry for entry in entries}
+
+    rules = []
+    failures = []
+
+    for rule_id in rule_ids:
+        entry = entry_map.get(rule_id)
+        if not entry:
+            failures.append((rule_id, "No source data entry found"))
+            continue
+
+        llm_input = entry.get("llm_input_renamed", "")
+        llm_output = entry.get("llm_output_renamed", "")
+        point_coords = entry.get("point_coords", {})
+        seed = entry.get("seed")
+        rule_text = entry.get("norm_rule") or entry.get("rule", "")
+
+        if not llm_input or not rule_text:
+            failures.append((rule_id, "Empty llm_input_renamed or rule_text"))
+            continue
+
+        try:
+            premises, goal = _parse_llm_input(llm_input)
+            points = [(name, coords[0], coords[1]) for name, coords in point_coords.items()]
+            rules.append(RuleWithSource(
+                rule_id=rule_id,
+                rule_text=rule_text,
+                points=points,
+                premises=premises,
+                goal=goal,
+                llm_output_renamed=llm_output,
+                seed=seed,
+            ))
+        except Exception as e:
+            failures.append((rule_id, str(e)))
+
+    return rules, failures
+
+
+def _reduce_chunk_worker(
+    chunk_rules: List[RuleWithSource],
+    timeout: int,
+    seed: int,
+    max_premises: Optional[int],
+    batch_size: int,
+    solver_type: str,
+    engine: str,
+) -> Dict[str, Any]:
+    """Worker function for parallel chunk reduction.
+
+    Creates its own RuleReducer instance and reduces a chunk independently.
+    """
+    reducer = RuleReducer(
+        timeout=timeout,
+        seed=seed,
+        max_premises=None,  # premises already filtered
+        n_workers=1,  # no nested parallelism
+        batch_size=batch_size,
+        verbose=True,
+        solver_type=solver_type,
+        engine=engine,
+    )
+    return reducer.reduce(chunk_rules)
+
+
+class ChunkedIterativeReducer:
+    """Chunked iterative rule reduction for large rule sets.
+
+    Splits N rules into groups of group_size, reduces each group independently,
+    then merges survivors for the next round. Reduces O(n^2) to ~O(n*G*k).
+    """
+
+    def __init__(
+        self,
+        timeout: int = 60,
+        seed: int = 42,
+        batch_size: int = 10,
+        solver_type: str = "csolver",
+        engine: str = "full",
+        verbose: bool = True,
+    ):
+        self.timeout = timeout
+        self.seed = seed
+        self.batch_size = batch_size
+        self.solver_type = solver_type
+        self.engine = engine
+        self.verbose = verbose
+
+    @staticmethod
+    def filter_by_premises(
+        rules: List[RuleWithSource],
+        max_premises: int,
+    ) -> Tuple[List[RuleWithSource], List[Dict[str, Any]]]:
+        """Filter rules exceeding max_premises.
+
+        Returns:
+            (kept, skipped) where skipped is a list of dicts with rule info.
+        """
+        kept = []
+        skipped = []
+        for rule in rules:
+            if '=>' in rule.rule_text:
+                n_prem = len([c for c in rule.rule_text.split('=>')[0].split(',') if c.strip()])
+            else:
+                n_prem = 0
+            if n_prem <= max_premises:
+                kept.append(rule)
+            else:
+                skipped.append({
+                    "rule_id": rule.rule_id,
+                    "rule_text": rule.rule_text,
+                    "n_premises": n_prem,
+                    "reason": f"Exceeds max_premises={max_premises} (has {n_prem})",
+                })
+        return kept, skipped
+
+    def reduce_one_round(
+        self,
+        rules: List[RuleWithSource],
+        group_size: int,
+        chunk_workers: int = 4,
+    ) -> Tuple[List[RuleWithSource], Dict[str, Any]]:
+        """One round of chunked reduction.
+
+        Splits rules into chunks, reduces each independently (parallel),
+        and merges survivors.
+
+        Returns:
+            (survivors, round_stats)
+        """
+        import math
+        import time as _time
+        from concurrent.futures import ProcessPoolExecutor, as_completed
+
+        n_chunks = math.ceil(len(rules) / group_size)
+        chunks = [rules[i * group_size:(i + 1) * group_size] for i in range(n_chunks)]
+
+        if self.verbose:
+            print(f"  Splitting {len(rules)} rules into {n_chunks} chunks (group_size={group_size})")
+
+        round_start = _time.time()
+        survivors = []
+        chunk_stats = []
+
+        if chunk_workers <= 1 or n_chunks == 1:
+            # Sequential
+            for ci, chunk in enumerate(chunks):
+                if self.verbose:
+                    print(f"\n  --- Chunk {ci}/{n_chunks}: {len(chunk)} rules ---")
+                result = _reduce_chunk_worker(
+                    chunk, self.timeout, self.seed, None,
+                    self.batch_size, self.solver_type, self.engine,
+                )
+                basis = result.get("basis_rules", [])
+                survivors.extend(basis)
+                chunk_stats.append({
+                    "chunk_id": ci,
+                    "input": len(chunk),
+                    "survivors": len(basis),
+                    "eliminated": result["stats"]["eliminated_count"],
+                    "n_tests": result["stats"]["n_subsumption_tests"],
+                })
+        else:
+            # Parallel
+            with ProcessPoolExecutor(max_workers=chunk_workers) as executor:
+                future_to_ci = {}
+                for ci, chunk in enumerate(chunks):
+                    if self.verbose:
+                        print(f"  Submitting chunk {ci}/{n_chunks}: {len(chunk)} rules")
+                    future = executor.submit(
+                        _reduce_chunk_worker,
+                        chunk, self.timeout, self.seed, None,
+                        self.batch_size, self.solver_type, self.engine,
+                    )
+                    future_to_ci[future] = ci
+
+                for future in as_completed(future_to_ci):
+                    ci = future_to_ci[future]
+                    try:
+                        result = future.result()
+                        basis = result.get("basis_rules", [])
+                        survivors.extend(basis)
+                        chunk_stats.append({
+                            "chunk_id": ci,
+                            "input": len(chunks[ci]),
+                            "survivors": len(basis),
+                            "eliminated": result["stats"]["eliminated_count"],
+                            "n_tests": result["stats"]["n_subsumption_tests"],
+                        })
+                        if self.verbose:
+                            print(f"  Chunk {ci} done: {len(chunks[ci])} → {len(basis)} survivors")
+                    except Exception as e:
+                        print(f"  ERROR: Chunk {ci} failed: {e}")
+                        # On failure, keep all rules from this chunk
+                        survivors.extend(chunks[ci])
+                        chunk_stats.append({
+                            "chunk_id": ci,
+                            "input": len(chunks[ci]),
+                            "survivors": len(chunks[ci]),
+                            "eliminated": 0,
+                            "n_tests": 0,
+                            "error": str(e),
+                        })
+
+        # Sort chunk_stats by chunk_id
+        chunk_stats.sort(key=lambda x: x["chunk_id"])
+
+        elapsed = _time.time() - round_start
+        total_eliminated = sum(cs["eliminated"] for cs in chunk_stats)
+        total_tests = sum(cs["n_tests"] for cs in chunk_stats)
+
+        round_stats = {
+            "input_count": len(rules),
+            "survivors_count": len(survivors),
+            "eliminated_count": total_eliminated,
+            "n_chunks": n_chunks,
+            "group_size": group_size,
+            "chunk_workers": chunk_workers,
+            "n_subsumption_tests": total_tests,
+            "elapsed_seconds": elapsed,
+            "chunk_details": chunk_stats,
+        }
+
+        if self.verbose:
+            print(f"\n  Round result: {len(rules)} → {len(survivors)} survivors "
+                  f"(eliminated {total_eliminated}, {elapsed:.1f}s)")
+
+        return survivors, round_stats
+
+    def reduce_iterative(
+        self,
+        rules: List[RuleWithSource],
+        group_size: int,
+        iterations: int = 1,
+        chunk_workers: int = 4,
+        output_dir: Optional[Path] = None,
+        resume: bool = True,
+    ) -> Tuple[List[RuleWithSource], Dict[str, Any]]:
+        """Multi-round iterative chunked reduction.
+
+        Args:
+            rules: Input rules
+            group_size: Rules per chunk
+            iterations: Max number of rounds
+            chunk_workers: Parallel workers for chunk reduction
+            output_dir: Directory to save per-round results (enables resume)
+            resume: If True, check for completed rounds and resume
+
+        Returns:
+            (final_survivors, overall_stats)
+        """
+        import json as _json
+        import time as _time
+
+        overall_start = _time.time()
+        current_rules = rules
+        start_round = 1
+        all_round_stats = []
+
+        # Checkpoint resume
+        if resume and output_dir is not None:
+            last_completed = 0
+            for r in range(1, iterations + 1):
+                round_dir = output_dir / f"round_{r:03d}"
+                survivors_path = round_dir / "survivors.txt"
+                if survivors_path.exists() and survivors_path.stat().st_size > 0:
+                    last_completed = r
+                else:
+                    break
+
+            if last_completed > 0:
+                # Load survivors from last completed round
+                round_dir = output_dir / f"round_{last_completed:03d}"
+                survivors_path = round_dir / "survivors.txt"
+                with open(survivors_path) as f:
+                    lines = [line.strip() for line in f if line.strip()]
+
+                # survivors.txt format: rule_id\nrule_text\n...
+                survivor_ids = [lines[i] for i in range(0, len(lines), 2) if i + 1 < len(lines)]
+
+                # Rebuild RuleWithSource from original rules
+                rule_map = {r.rule_id: r for r in rules}
+                current_rules = [rule_map[rid] for rid in survivor_ids if rid in rule_map]
+
+                # Load accumulated stats
+                for r in range(1, last_completed + 1):
+                    stats_path = output_dir / f"round_{r:03d}" / "stats.json"
+                    if stats_path.exists():
+                        with open(stats_path) as f:
+                            all_round_stats.append(_json.load(f))
+
+                start_round = last_completed + 1
+                if self.verbose:
+                    print(f"[Resume] Found {last_completed} completed round(s), "
+                          f"loaded {len(current_rules)} survivors from round_{last_completed:03d}")
+
+        for round_num in range(start_round, iterations + 1):
+            if self.verbose:
+                print(f"\n{'='*60}")
+                print(f"Round {round_num}/{iterations}: {len(current_rules)} rules")
+                print(f"{'='*60}")
+
+            # If rules fit in one chunk, this is the final round
+            if len(current_rules) <= group_size:
+                if self.verbose:
+                    print(f"  Rules ({len(current_rules)}) <= group_size ({group_size}), "
+                          f"running final single-chunk reduction")
+
+            survivors, round_stats = self.reduce_one_round(
+                current_rules, group_size, chunk_workers,
+            )
+            round_stats["round"] = round_num
+            all_round_stats.append(round_stats)
+
+            # Save round results
+            if output_dir is not None:
+                round_dir = output_dir / f"round_{round_num:03d}"
+                round_dir.mkdir(parents=True, exist_ok=True)
+
+                # Save survivors
+                survivors_path = round_dir / "survivors.txt"
+                with open(survivors_path, "w", encoding="utf-8") as f:
+                    for rule in survivors:
+                        f.write(f"{rule.rule_id}\n{rule.rule_text}\n")
+
+                # Save stats
+                stats_path = round_dir / "stats.json"
+                with open(stats_path, "w", encoding="utf-8") as f:
+                    _json.dump(round_stats, f, ensure_ascii=False, indent=2)
+
+            # Early termination: no rules eliminated this round
+            if len(survivors) == len(current_rules):
+                if self.verbose:
+                    print(f"\n  No rules eliminated in round {round_num}, stopping early")
+                break
+
+            # Early termination: fits in one chunk
+            if len(survivors) <= group_size:
+                if self.verbose:
+                    print(f"\n  Survivors ({len(survivors)}) <= group_size ({group_size}), done")
+                break
+
+            current_rules = survivors
+
+        # Save final result
+        if output_dir is not None:
+            final_path = output_dir / "final_basis_rules.txt"
+            with open(final_path, "w", encoding="utf-8") as f:
+                for rule in survivors:
+                    f.write(f"{rule.rule_id}\n{rule.rule_text}\n")
+            if self.verbose:
+                print(f"\nFinal basis rules saved to {final_path}")
+
+        overall_elapsed = _time.time() - overall_start
+        overall_stats = {
+            "input_count": len(rules),
+            "final_survivors_count": len(survivors),
+            "total_eliminated": len(rules) - len(survivors),
+            "total_rounds": len(all_round_stats),
+            "group_size": group_size,
+            "chunk_workers": chunk_workers,
+            "elapsed_seconds": overall_elapsed,
+            "round_stats": all_round_stats,
+        }
+
+        if self.verbose:
+            print(f"\n{'='*60}")
+            print(f"Iterative reduction complete: {len(rules)} → {len(survivors)} rules "
+                  f"in {len(all_round_stats)} round(s), {overall_elapsed:.1f}s")
+            print(f"{'='*60}")
+
+        return survivors, overall_stats
+
+
 __all__ = ["RuleReducer", "RuleWithSource", "IncrementalReducer",
-           "load_rules_from_discovery_output"]
+           "load_rules_from_discovery_output", "ChunkedIterativeReducer",
+           "load_rules_by_ids"]

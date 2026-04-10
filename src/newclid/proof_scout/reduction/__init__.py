@@ -19,7 +19,9 @@ from newclid.proof_scout.reduction.rule_reducer import (
     RuleReducer,
     RuleWithSource,
     IncrementalReducer,
+    ChunkedIterativeReducer,
     load_rules_from_discovery_output,
+    load_rules_by_ids,
 )
 from newclid.proof_scout.reduction.generality_scorer import GeneralityScorer
 from newclid.proof_scout.reduction.subsumption_tester import SubsumptionTester
@@ -28,7 +30,9 @@ __all__ = [
     "RuleReducer",
     "RuleWithSource",
     "IncrementalReducer",
+    "ChunkedIterativeReducer",
     "GeneralityScorer",
     "SubsumptionTester",
     "load_rules_from_discovery_output",
+    "load_rules_by_ids",
 ]
