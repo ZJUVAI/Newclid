@@ -1,12 +1,15 @@
 from __future__ import annotations
 
+import csv
+import tempfile
 import unittest
-from unittest.mock import patch
 from pathlib import Path
+from unittest.mock import patch
 
 from experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu import (
     build_eval_output_stem,
     build_timestamped_output_stem,
+    solve_problems_single_problem_multi_gpu,
 )
 from experiments.single_problem_multi_gpu_eval.lm_actor import resolve_model_path
 from experiments.single_problem_multi_gpu_eval.model_pool import GenerationDispatcher, ModelPool
@@ -29,6 +32,20 @@ class _FakeWorker:
         self.name = name
         self.submitted: list[list[dict[str, object]]] = []
         self.generate_batch = _FakeGenerateBatch(self)
+
+
+class _FakeLive:
+    def __init__(self, *args, **kwargs):
+        self.last_render = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
+
+    def update(self, renderable):
+        self.last_render = renderable
 
 
 class GenerationDispatcherTests(unittest.TestCase):
@@ -133,7 +150,7 @@ class EvalOutputNamingTests(unittest.TestCase):
         self.assertEqual(
             stem,
             "eval_single_problem_multi_gpu_vlm_imo_2000_p6_vlm_sft50_checkpoint-19194"
-            "_d2_b4_s1_gbs3_gbt250",
+            "_d2_b4_s1_gbs3_gbt250_seed123",
         )
 
     def test_trace_run_id_uses_eval_stem_and_timestamp_suffix(self):
@@ -184,6 +201,95 @@ class EvalOutputNamingTests(unittest.TestCase):
             f"{timestamped_stem}_profiling.csv",
             f"{stem}_{timestamp}_profiling.csv",
         )
+
+
+class SingleProblemEvalRunnerTests(unittest.TestCase):
+    def test_single_problem_eval_runner_writes_results_without_torch_seed_thread_arg(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            benchmark_path = tmp_path / "benchmarks.txt"
+            benchmark_path.write_text("imo_2008_p1b\nproblem body placeholder\n", encoding="utf-8")
+            log_dir = tmp_path / "results"
+            fake_workers = [_FakeWorker("w0")]
+
+            def fake_solve_one_problem(**kwargs):
+                self.assertNotIn("torch_seed", kwargs)
+                return (
+                    kwargs["problem_name"],
+                    True,
+                    1.25,
+                    {
+                        "profiling": {
+                            "entry_setup_wall_time_s": 0.25,
+                            "avg_gpu_batch_size": 1.0,
+                        }
+                    },
+                )
+
+            with patch("experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.is_initialized", side_effect=[False, True]):
+                with patch("experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.init"):
+                    with patch(
+                        "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.available_resources",
+                        return_value={"GPU": 1},
+                    ):
+                        with patch(
+                            "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.create_workers",
+                            return_value=fake_workers,
+                        ):
+                            with patch(
+                                "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ModelPool"
+                            ) as mock_model_pool:
+                                mock_model_pool.return_value.warmup.return_value = [{"device": "cuda:0"}]
+                                with patch(
+                                    "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.solve_one_problem",
+                                    side_effect=fake_solve_one_problem,
+                                ):
+                                    with patch(
+                                        "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.timestamp_slug",
+                                        return_value="20260410T120000Z",
+                                    ):
+                                        with patch(
+                                            "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.Live",
+                                            _FakeLive,
+                                        ):
+                                            with patch(
+                                                "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.write_profiling_csv"
+                                            ) as mock_write_profiling_csv:
+                                                with patch(
+                                                    "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.shutdown"
+                                                ) as mock_ray_shutdown:
+                                                    solve_problems_single_problem_multi_gpu(
+                                                        filepath=benchmark_path,
+                                                        model_path="/tmp/model",
+                                                        num_cpus=2,
+                                                        num_gpus_for_eval=1,
+                                                        decoding_size=32,
+                                                        beam_size=512,
+                                                        search_depth=4,
+                                                        gpu_batch_size=1,
+                                                        gpu_batch_timeout_ms=100,
+                                                        torch_seed=42,
+                                                        timeout=3600,
+                                                        agent_type="vlm",
+                                                        max_pending_ddar=2,
+                                                        prepare_request_workers=2,
+                                                        prepare_prefetch_limit=2,
+                                                        log_dir=str(log_dir),
+                                                        enable_profiling=True,
+                                                    )
+                                                mock_ray_shutdown.assert_called_once()
+                                                mock_write_profiling_csv.assert_called_once()
+
+            csv_path = (
+                log_dir
+                / "eval_single_problem_multi_gpu_vlm_benchmarks_tmp_model"
+                "_d32_b512_s4_gbs1_gbt100_seed42_20260410T120000Z.csv"
+            )
+            self.assertTrue(csv_path.exists())
+            with csv_path.open(newline="", encoding="utf-8") as handle:
+                rows = list(csv.reader(handle))
+            self.assertEqual(rows[1], ["Problem Name", "Solved", "Time (s)"])
+            self.assertEqual(rows[2], ["imo_2008_p1b", "√", "1.25"])
 
 
 class ModelPathResolutionTests(unittest.TestCase):

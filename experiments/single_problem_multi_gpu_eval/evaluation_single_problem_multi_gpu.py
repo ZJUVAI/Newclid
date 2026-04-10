@@ -81,7 +81,7 @@ def build_eval_output_stem(
     search_depth: int,
     gpu_batch_size: int,
     gpu_batch_timeout_ms: int,
-    torch_seed: int,
+    torch_seed: int = 123,
 ) -> str:
     problems_name = problems_path.stem
     path_obj = Path(model_path)
@@ -173,7 +173,6 @@ def solve_one_problem(
     search_depth: int,
     gpu_batch_size: int,
     gpu_batch_timeout_ms: int,
-    torch_seed: int,
     timeout: int,
     max_pending_ddar: int,
     prepare_request_workers: int,

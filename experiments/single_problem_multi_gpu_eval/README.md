@@ -98,6 +98,7 @@ Supported arguments:
 | `--search_depth` | `4` | Number of iterative auxiliary-construction expansion rounds. |
 | `--gpu_batch_size` | `1` | Maximum number of prepared requests grouped into one GPU generate call. |
 | `--gpu_batch_timeout_ms` | `0` | Optional wait budget before dispatching a not-full GPU batch. |
+| `--torch_seed` | `123` | Torch RNG seed applied once per GPU worker process. |
 | `--timeout` | `7200` | Per-problem timeout in seconds. |
 | `--num_gpus_for_eval` | `0` | Number of GPU workers to create. `0` means all GPUs visible to Ray. |
 | `--max_pending_ddar` | `2 * max_workers` | Upper bound on in-flight DDAR tasks for the current problem. |
@@ -203,13 +204,13 @@ CUDA_VISIBLE_DEVICES=0 LOGLEVEL=DEBUG python experiments/single_problem_multi_gp
 Each run writes a CSV named like:
 
 ```text
-eval_single_problem_multi_gpu_<agent>_<dataset>_<model>_d<decoding_size>_b<beam_size>_s<search_depth>_gbs<gpu_batch_size>_gbt<gpu_batch_timeout_ms>.csv
+eval_single_problem_multi_gpu_<agent>_<dataset>_<model>_d<decoding_size>_b<beam_size>_s<search_depth>_gbs<gpu_batch_size>_gbt<gpu_batch_timeout_ms>_seed<torch_seed>_<timestamp>.csv
 ```
 
 When `--trace_dir` is enabled, each run creates a trace directory named like:
 
 ```text
-eval_single_problem_multi_gpu_<agent>_<dataset>_<model>_d<decoding_size>_b<beam_size>_s<search_depth>_gbs<gpu_batch_size>_gbt<gpu_batch_timeout_ms>_<timestamp>/
+eval_single_problem_multi_gpu_<agent>_<dataset>_<model>_d<decoding_size>_b<beam_size>_s<search_depth>_gbs<gpu_batch_size>_gbt<gpu_batch_timeout_ms>_seed<torch_seed>_<timestamp>/
 ```
 
 For visual backends, rendered prompt images are written under:
