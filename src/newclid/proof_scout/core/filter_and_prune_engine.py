@@ -2141,6 +2141,318 @@ class FilterAndPruneEngine:
         }
 
     # ================================================================
+    # Part-based API: run_part1_filter() and run_part2_extract()
+    # ================================================================
+
+    def run_part1_filter(
+        self,
+        input_jsonl: Path,
+        output_jsonl: Path,
+    ) -> Dict[str, Any]:
+        """Execute Step 1 (input filter) only.
+
+        Reads input_jsonl (JSONL format), filters records:
+        - Drops records with empty aux_points
+        - Drops records whose llm_output_renamed contains skip_predicates
+
+        Writes passing records to output_jsonl in JSONL format (one JSON per line).
+        Returns statistics dict.
+        """
+        input_jsonl = Path(input_jsonl)
+        output_jsonl = Path(output_jsonl)
+        if not input_jsonl.exists():
+            raise FileNotFoundError(f"input not found: {input_jsonl}")
+
+        output_jsonl.parent.mkdir(parents=True, exist_ok=True)
+
+        base = _sanitize_basename(input_jsonl)
+        total = 0
+        n_kept = 0
+        n_no_aux = 0
+        n_pred = 0
+
+        with open(input_jsonl, "r", encoding="utf-8") as fin, \
+             open(output_jsonl, "w", encoding="utf-8") as fout:
+            for idx, line in enumerate(fin):
+                line = line.strip()
+                if not line:
+                    continue
+                total += 1
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    n_no_aux += 1  # treat malformed as dropped
+                    continue
+                if not isinstance(rec, dict):
+                    n_no_aux += 1
+                    continue
+                # Convert to internal format (adds problem_id, aux_points, etc.)
+                if _has_llm_format(rec):
+                    rec = _convert_llm_record(rec, base, idx)
+                # Aux filter
+                aux_points = rec.get("aux_points")
+                if not aux_points:
+                    n_no_aux += 1
+                    continue
+                # Predicate filter
+                if self.skip_predicates:
+                    llm_out = (rec.get("llm_output_renamed") or "").lower()
+                    if any(p in llm_out for p in self.skip_predicates):
+                        n_pred += 1
+                        continue
+                json.dump(rec, fout, ensure_ascii=False)
+                fout.write("\n")
+                n_kept += 1
+
+        print(
+            f"[Part 1: input filter] total={total} kept={n_kept} "
+            f"dropped_no_aux={n_no_aux} dropped_predicate={n_pred}"
+            + (f" skip_predicates={sorted(self.skip_predicates)}" if self.skip_predicates else "")
+        )
+        return {
+            "total": total,
+            "kept": n_kept,
+            "dropped_no_aux": n_no_aux,
+            "dropped_predicate": n_pred,
+            "output_jsonl": str(output_jsonl),
+        }
+
+    def run_part2_extract(
+        self,
+        input_jsonl: Path,
+        output_dir: Path,
+        save_intermediates: bool = False,
+    ) -> Dict[str, Any]:
+        """Execute Steps 2-6 (graph prune → rule dump), skipping Step 1.
+
+        input_jsonl can be Part 1's filtered.jsonl or any raw JSONL file.
+        Equivalent to run() but reads pre-filtered JSONL instead of running Step 1.
+
+        Returns statistics dict with 'rules_file' and 'source_data_file' keys.
+        """
+        input_jsonl = Path(input_jsonl)
+        output_dir = Path(output_dir)
+        if not input_jsonl.exists():
+            raise FileNotFoundError(f"input not found: {input_jsonl}")
+
+        # Setup intermediates directory
+        intermediates_dir = None
+        if save_intermediates:
+            intermediates_dir = output_dir / "intermediates"
+            intermediates_dir.mkdir(parents=True, exist_ok=True)
+
+        # Read JSONL records
+        base = _sanitize_basename(input_jsonl)
+        src_results_kept = []
+        with open(input_jsonl, "r", encoding="utf-8") as f:
+            for idx, line in enumerate(f):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    rec = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(rec, dict):
+                    continue
+                # Ensure record is in internal format
+                if _has_llm_format(rec) and "proof" not in rec:
+                    rec = _convert_llm_record(rec, base, idx)
+                src_results_kept.append(rec)
+
+        kept = len(src_results_kept)
+        print(f"[Part 2: extract] loaded {kept} records from {input_jsonl}")
+
+        if kept <= 0:
+            return {"rules": 0, "kept": 0, "rules_file": None, "source_data_file": None}
+
+        pids = [
+            str(r.get("problem_id"))
+            for r in src_results_kept
+            if isinstance(r, dict) and r.get("problem_id") is not None
+        ]
+        idx_src: Dict[str, Any] = {}
+        for r in src_results_kept:
+            if isinstance(r, dict) and r.get("problem_id") is not None:
+                idx_src[str(r["problem_id"])] = r
+
+        # ================================================================
+        # Step 2: Graph prune
+        # ================================================================
+        pruned_map: Dict[str, List[Dict[str, Any]]] = {}
+        mw = int(self.max_workers or 0)
+        if mw > 1:
+            print(f"[Part 2 / Step 2: graph prune] parallel pruning with max_workers={mw}")
+            with ProcessPoolExecutor(max_workers=mw) as ex:
+                futs = [
+                    ex.submit(_worker_prune, rec)
+                    for rec in src_results_kept
+                    if isinstance(rec, dict) and rec.get("problem_id") is not None
+                ]
+                for pid, rendered_list in (f.result() for f in as_completed(futs)):
+                    if rendered_list:
+                        pruned_map[pid] = rendered_list
+        else:
+            print("[Part 2 / Step 2: graph prune] sequential pruning")
+            for rec in src_results_kept:
+                if not isinstance(rec, dict) or rec.get("problem_id") is None:
+                    continue
+                pid, rendered_list = _worker_prune(rec)
+                if rendered_list:
+                    pruned_map[pid] = rendered_list
+
+        flat_rendered_map: Dict[str, Dict[str, Any]] = {}
+        sub_pid_to_orig: Dict[str, str] = {}
+        for pid, rendered_list in pruned_map.items():
+            if len(rendered_list) == 1:
+                flat_rendered_map[pid] = rendered_list[0]
+                sub_pid_to_orig[pid] = pid
+            else:
+                for sub_idx, rendered in enumerate(rendered_list):
+                    sub_pid = f"{pid}_{sub_idx}"
+                    flat_rendered_map[sub_pid] = rendered
+                    sub_pid_to_orig[sub_pid] = pid
+
+        print(
+            f"[Part 2 / Step 2: graph prune] input={len(pids)} "
+            f"pruned={len(pruned_map)} "
+            f"subgraphs={sum(len(rl) for rl in pruned_map.values())} "
+            f"failed={len(pids) - len(pruned_map)}"
+        )
+
+        # ================================================================
+        # Step 3: Proposition extraction
+        # ================================================================
+        out_results: List[Dict[str, Any]] = []
+        for pid in pids:
+            rendered_list = pruned_map.get(pid)
+            if not rendered_list:
+                continue
+            for sub_idx, rendered in enumerate(rendered_list):
+                sub_pid = f"{pid}_{sub_idx}" if len(rendered_list) > 1 else pid
+                base_rec: Dict[str, Any] = {"problem_id": sub_pid, "rendered": rendered}
+                src = idx_src.get(pid, {})
+                for k in ("aux_points", "point_lines", "points", "point_rely_on"):
+                    if k in src:
+                        base_rec[k] = src[k]
+                if "aux_points" not in base_rec and isinstance(src.get("aux_points"), list):
+                    base_rec["aux_points"] = src["aux_points"]
+                base_rec["llm_input_renamed"] = src.get("llm_input_renamed", "")
+                base_rec["llm_output_renamed"] = src.get("llm_output_renamed", "")
+                base_rec["point_coords"] = src.get("point_coords", {})
+                base_rec["seed"] = src.get("seed")
+                prop = _build_proposition_no_aux(
+                    rendered, list(base_rec.get("aux_points", []) or [])
+                )
+                if prop:
+                    base_rec["proposition_no_aux"] = prop
+                    try:
+                        rule_text, rename_map = _to_rule_text(
+                            prop.get("premises", []) or [], prop.get("conclusion", "")
+                        )
+                        base_rec["proposition_rule"] = rule_text
+                        base_rec["rename_map"] = rename_map
+                        base_rec["proposition_no_aux"]["rule_text"] = rule_text
+                    except Exception:
+                        base_rec["proposition_no_aux"].setdefault(
+                            "rule_text", prop.get("text", "")
+                        )
+                out_results.append(base_rec)
+
+        # Step 3.5a: Simplify trivial predicates
+        simplified_count = 0
+        for rec in out_results:
+            rule = rec.get("proposition_rule")
+            if not rule:
+                continue
+            simplified_rule, was_simplified = self._simplify_trivial_predicates(rule)
+            if was_simplified:
+                simplified_count += 1
+                rec["proposition_rule"] = simplified_rule
+                rec["was_simplified"] = True
+        print(f"[Part 2 / Step 3.5a: simplify predicates] simplified={simplified_count}/{len(out_results)}")
+
+        # Step 3.5b: Extract eqpoint
+        eqpoint_count = 0
+        for rec in out_results:
+            llm_output = rec.get("llm_output_renamed", "")
+            rename_map = rec.get("rename_map", {})
+            rule = rec.get("proposition_rule")
+            if not llm_output or not rename_map or not rule:
+                continue
+            eqpoint_original = self._extract_eqpoint_from_proof(llm_output)
+            if not eqpoint_original:
+                continue
+            eqpoint_mapped = self._map_eqpoint_to_rule(eqpoint_original, rename_map)
+            if not eqpoint_mapped:
+                continue
+            merged_rule = self._generate_merged_rule(rule, eqpoint_mapped)
+            rec["eqpoint_original"] = eqpoint_original
+            rec["eqpoint_mapped"] = eqpoint_mapped
+            rec["proposition_rule_merged"] = merged_rule
+            eqpoint_count += 1
+        print(f"[Part 2 / Step 3.5b: eqpoint analysis] rules_with_eqpoint={eqpoint_count}/{len(out_results)}")
+
+        # Write pruned json (needed by _dump_rules)
+        output_dir.mkdir(parents=True, exist_ok=True)
+        out_obj: Dict[str, Any] = {"results": out_results}
+        pruned_json = output_dir / (input_jsonl.stem + "_pruned.json")
+        with open(pruned_json, "w", encoding="utf-8") as f:
+            json.dump(out_obj, f, ensure_ascii=False, indent=2)
+
+        # ================================================================
+        # Step 4: Normalization
+        # ================================================================
+        normalized_rules, skipped_rules, skipped_entries = self._normalize_rules(out_results)
+
+        # ================================================================
+        # Step 5: Deduplication
+        # ================================================================
+        rule_entries, norm_dup_map = self._dedup_rules(normalized_rules)
+
+        # ================================================================
+        # Step 6: Rule dump
+        # ================================================================
+        n_rules, n_skipped_pred, rule_entries = self._dump_rules(
+            rule_entries, norm_dup_map, skipped_entries, pruned_json
+        )
+
+        # Determine output paths (mirrors _dump_rules naming convention)
+        rules_file = pruned_json.with_name(pruned_json.stem + "_rules.txt")
+        source_data_file = None
+        if save_intermediates and intermediates_dir:
+            source_data_file = intermediates_dir / "step6_rules_stats.json"
+            # Save step6 stats for Part 4 consumption
+            with open(source_data_file, "w", encoding="utf-8") as f:
+                json.dump({
+                    "input_rules_raw": len(normalized_rules),
+                    "output_rules_deduped": n_rules,
+                    "skipped_rules_missing_points": skipped_rules,
+                    "skipped_rules_predicates": n_skipped_pred,
+                    "rule_skip_predicates": sorted(self.rule_skip_predicates) if self.rule_skip_predicates else [],
+                    "entries": [{
+                        "rid": e.get("rid"),
+                        "pid": e.get("pid"),
+                        "seed": e.get("seed"),
+                        "rule": e.get("norm_rule"),
+                        "rule_original": e.get("rule"),
+                        "llm_input_renamed": e.get("llm_input_renamed", ""),
+                        "llm_output_renamed": e.get("llm_output_renamed", ""),
+                        "point_coords": e.get("point_coords", {}),
+                    } for e in rule_entries],
+                }, f, ensure_ascii=False, indent=2)
+
+        print(f"[Part 2: extract] done — {n_rules} rules written to {rules_file}")
+        return {
+            "kept": kept,
+            "rules": n_rules,
+            "skipped_rules": n_skipped_pred,
+            "rules_file": str(rules_file),
+            "source_data_file": str(source_data_file) if source_data_file else None,
+            "json": str(pruned_json),
+        }
+
+    # ================================================================
     # Streaming mode: chunk-level processing for large datasets
     # ================================================================
 

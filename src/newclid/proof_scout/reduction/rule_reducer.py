@@ -982,16 +982,18 @@ def _reduce_chunk_worker(
     batch_size: int,
     solver_type: str,
     engine: str,
+    n_workers: int = 1,
 ) -> Dict[str, Any]:
-    """Worker function for parallel chunk reduction.
+    """Worker function for serial chunk reduction with intra-chunk parallelism.
 
     Creates its own RuleReducer instance and reduces a chunk independently.
+    n_workers controls parallelism within the subsumption test (intra-chunk).
     """
     reducer = RuleReducer(
         timeout=timeout,
         seed=seed,
         max_premises=None,  # premises already filtered
-        n_workers=1,  # no nested parallelism
+        n_workers=n_workers,
         batch_size=batch_size,
         verbose=True,
         solver_type=solver_type,
@@ -1055,89 +1057,46 @@ class ChunkedIterativeReducer:
         self,
         rules: List[RuleWithSource],
         group_size: int,
-        chunk_workers: int = 4,
+        n_workers: int = 1,
     ) -> Tuple[List[RuleWithSource], Dict[str, Any]]:
         """One round of chunked reduction.
 
-        Splits rules into chunks, reduces each independently (parallel),
-        and merges survivors.
+        Splits rules into chunks, reduces each sequentially (chunks are processed
+        one at a time), with intra-chunk parallelism controlled by n_workers.
 
         Returns:
             (survivors, round_stats)
         """
         import math
         import time as _time
-        from concurrent.futures import ProcessPoolExecutor, as_completed
 
         n_chunks = math.ceil(len(rules) / group_size)
         chunks = [rules[i * group_size:(i + 1) * group_size] for i in range(n_chunks)]
 
         if self.verbose:
-            print(f"  Splitting {len(rules)} rules into {n_chunks} chunks (group_size={group_size})")
+            print(f"  Splitting {len(rules)} rules into {n_chunks} chunks (group_size={group_size}, n_workers={n_workers})")
 
         round_start = _time.time()
         survivors = []
         chunk_stats = []
 
-        if chunk_workers <= 1 or n_chunks == 1:
-            # Sequential
-            for ci, chunk in enumerate(chunks):
-                if self.verbose:
-                    print(f"\n  --- Chunk {ci}/{n_chunks}: {len(chunk)} rules ---")
-                result = _reduce_chunk_worker(
-                    chunk, self.timeout, self.seed, None,
-                    self.batch_size, self.solver_type, self.engine,
-                )
-                basis = result.get("basis_rules", [])
-                survivors.extend(basis)
-                chunk_stats.append({
-                    "chunk_id": ci,
-                    "input": len(chunk),
-                    "survivors": len(basis),
-                    "eliminated": result["stats"]["eliminated_count"],
-                    "n_tests": result["stats"]["n_subsumption_tests"],
-                })
-        else:
-            # Parallel
-            with ProcessPoolExecutor(max_workers=chunk_workers) as executor:
-                future_to_ci = {}
-                for ci, chunk in enumerate(chunks):
-                    if self.verbose:
-                        print(f"  Submitting chunk {ci}/{n_chunks}: {len(chunk)} rules")
-                    future = executor.submit(
-                        _reduce_chunk_worker,
-                        chunk, self.timeout, self.seed, None,
-                        self.batch_size, self.solver_type, self.engine,
-                    )
-                    future_to_ci[future] = ci
-
-                for future in as_completed(future_to_ci):
-                    ci = future_to_ci[future]
-                    try:
-                        result = future.result()
-                        basis = result.get("basis_rules", [])
-                        survivors.extend(basis)
-                        chunk_stats.append({
-                            "chunk_id": ci,
-                            "input": len(chunks[ci]),
-                            "survivors": len(basis),
-                            "eliminated": result["stats"]["eliminated_count"],
-                            "n_tests": result["stats"]["n_subsumption_tests"],
-                        })
-                        if self.verbose:
-                            print(f"  Chunk {ci} done: {len(chunks[ci])} → {len(basis)} survivors")
-                    except Exception as e:
-                        print(f"  ERROR: Chunk {ci} failed: {e}")
-                        # On failure, keep all rules from this chunk
-                        survivors.extend(chunks[ci])
-                        chunk_stats.append({
-                            "chunk_id": ci,
-                            "input": len(chunks[ci]),
-                            "survivors": len(chunks[ci]),
-                            "eliminated": 0,
-                            "n_tests": 0,
-                            "error": str(e),
-                        })
+        # Serial over chunks; intra-chunk parallelism via n_workers
+        for ci, chunk in enumerate(chunks):
+            if self.verbose:
+                print(f"\n  --- Chunk {ci}/{n_chunks}: {len(chunk)} rules ---")
+            result = _reduce_chunk_worker(
+                chunk, self.timeout, self.seed, None,
+                self.batch_size, self.solver_type, self.engine, n_workers,
+            )
+            basis = result.get("basis_rules", [])
+            survivors.extend(basis)
+            chunk_stats.append({
+                "chunk_id": ci,
+                "input": len(chunk),
+                "survivors": len(basis),
+                "eliminated": result["stats"]["eliminated_count"],
+                "n_tests": result["stats"]["n_subsumption_tests"],
+            })
 
         # Sort chunk_stats by chunk_id
         chunk_stats.sort(key=lambda x: x["chunk_id"])
@@ -1152,7 +1111,7 @@ class ChunkedIterativeReducer:
             "eliminated_count": total_eliminated,
             "n_chunks": n_chunks,
             "group_size": group_size,
-            "chunk_workers": chunk_workers,
+            "n_workers": n_workers,
             "n_subsumption_tests": total_tests,
             "elapsed_seconds": elapsed,
             "chunk_details": chunk_stats,
@@ -1169,7 +1128,7 @@ class ChunkedIterativeReducer:
         rules: List[RuleWithSource],
         group_size: int,
         iterations: int = 1,
-        chunk_workers: int = 4,
+        n_workers: int = 1,
         output_dir: Optional[Path] = None,
         resume: bool = True,
     ) -> Tuple[List[RuleWithSource], Dict[str, Any]]:
@@ -1179,7 +1138,7 @@ class ChunkedIterativeReducer:
             rules: Input rules
             group_size: Rules per chunk
             iterations: Max number of rounds
-            chunk_workers: Parallel workers for chunk reduction
+            n_workers: Intra-chunk parallel workers for subsumption tests
             output_dir: Directory to save per-round results (enables resume)
             resume: If True, check for completed rounds and resume
 
@@ -1244,7 +1203,7 @@ class ChunkedIterativeReducer:
                           f"running final single-chunk reduction")
 
             survivors, round_stats = self.reduce_one_round(
-                current_rules, group_size, chunk_workers,
+                current_rules, group_size, n_workers,
             )
             round_stats["round"] = round_num
             all_round_stats.append(round_stats)
@@ -1295,7 +1254,7 @@ class ChunkedIterativeReducer:
             "total_eliminated": len(rules) - len(survivors),
             "total_rounds": len(all_round_stats),
             "group_size": group_size,
-            "chunk_workers": chunk_workers,
+            "n_workers": n_workers,
             "elapsed_seconds": overall_elapsed,
             "round_stats": all_round_stats,
         }

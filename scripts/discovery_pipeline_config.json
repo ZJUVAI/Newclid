@@ -1,0 +1,69 @@
+{
+  "_comment": "Discovery Pipeline configuration. Run with: python scripts/discovery_pipeline.py [--config path/to/config.json]",
+
+  "global": {
+    "output_dir": "outputs/experiments/20260411_01_example",
+    "save_intermediates": false
+  },
+
+  "part1_filter": {
+    "enabled": true,
+    "input": "path/to/input.jsonl",
+    "output": null,
+    "_comment_output": "null = auto: {output_dir}/part1/filtered.jsonl",
+    "skip_predicates": []
+  },
+
+  "part2_extract": {
+    "enabled": true,
+    "input": null,
+    "_comment_input": "null = use Part 1 output",
+    "output": null,
+    "_comment_output": "null = auto: {output_dir}/part2/",
+    "max_workers": 30,
+    "rule_skip_predicates": ["aconst", "rconst"],
+    "streaming": {
+      "enabled": false,
+      "chunk_size": 10000,
+      "inflight_limit": 300
+    }
+  },
+
+  "part3_max_premises": {
+    "enabled": true,
+    "input": null,
+    "_comment_input": "null = use Part 2 output (rules.txt)",
+    "output": null,
+    "_comment_output": "null = auto: {output_dir}/part3/filtered_rules.txt",
+    "max_premises": null,
+    "_comment_max_premises": "null = skip this part (no filtering)"
+  },
+
+  "part4_reduction": {
+    "enabled": true,
+    "input": null,
+    "_comment_input": "null = use Part 3 output (or Part 2 if Part 3 disabled/skipped)",
+    "output": null,
+    "_comment_output": "null = auto: {output_dir}/part4/extracted_rules.txt",
+    "engine": "full",
+    "timeout": 60,
+    "n_workers": 4,
+    "_comment_n_workers": "Controls intra-group/intra-chunk parallelism for all sub-flows",
+    "batch_size": 10,
+    "debug": false,
+    "seed_reduction": {
+      "enabled": false,
+      "_comment": "Group-then-global reduction; requires rules to have seed field. Groups processed serially, intra-group uses n_workers."
+    },
+    "chunk_reduction": {
+      "enabled": false,
+      "group_size": 500,
+      "iterations": 1,
+      "_comment": "Chunked iterative reduction. Chunks processed serially, intra-chunk uses n_workers."
+    },
+    "global_reduction": {
+      "enabled": true,
+      "_comment": "Full greedy subsumption on all rules; uses n_workers."
+    }
+  }
+}

@@ -1,40 +1,26 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Discovery Pipeline - End-to-end rule extraction and reduction.
+Discovery Pipeline — unified config-based rule extraction and reduction.
 
-Stage 1: FilterAndPruneEngine — filter, prune, extract, normalize, dedup, dump rules
-Stage 2: RuleReducer — greedy subsumption-based rule reduction
-
-Modes:
-  - Default: in-memory pipeline (original run())
-  - Streaming: chunk-based pipeline (run_streaming()) for large datasets (10M+)
+Replaces the old discovery_pipeline.py (Python solver) and discovery_pipeline_c.py
+(CSolver). All stages now use CSolver for subsumption testing.
 
 Usage:
-    # Full pipeline (extraction + reduction)
-    python scripts/discovery_pipeline.py \
-        -i datasets/synthetic_10k.jsonl \
-        -o outputs/experiments/YYYYMMDD_experiment \
-        --save-intermediates
+    python scripts/discovery_pipeline.py
+    python scripts/discovery_pipeline.py --config scripts/discovery_pipeline_config.json
 
-    # Streaming mode (for large datasets)
-    python scripts/discovery_pipeline.py \
-        -i datasets/synthetic_10M.jsonl \
-        -o outputs/experiments/YYYYMMDD_experiment \
-        --streaming --chunk-size 10000 --inflight-limit 300 \
-        --save-intermediates
+The pipeline consists of 4 Parts:
 
-    # Extraction only
-    python scripts/discovery_pipeline.py \
-        -i datasets/synthetic_10k.jsonl \
-        -o outputs/experiments/YYYYMMDD_experiment \
-        --skip-reduction --save-intermediates
+    Part 1: Input filter      — drop records without aux_points / matching skip_predicates
+    Part 2: Extract rules     — graph prune → proposition → normalization → dedup → dump
+    Part 3: max_premises      — filter rules exceeding max_premises (skipped if null)
+    Part 4: Reduction         — seed / chunk / global subsumption-based rule reduction
 
-    # Reduction only (from existing extraction output)
-    python scripts/discovery_pipeline.py \
-        -o outputs/experiments/YYYYMMDD_experiment \
-        --skip-extraction \
-        --rules <rules.txt> --source-data <step6_rules_stats.json>
+Each Part can be independently enabled/disabled and accepts custom input/output paths.
+When a Part is disabled, the next enabled Part inherits the previous Part's output.
+
+Config schema: scripts/discovery_pipeline_config.json (see for full example).
 """
 from __future__ import annotations
 
@@ -43,536 +29,496 @@ import json
 import sys
 import time
 from pathlib import Path
-from queue import Queue
 from typing import Any, Dict, List, Optional
 
 
 # ============================================================================
-# Stage 1: Rule Extraction
+# Config loading and validation
 # ============================================================================
 
-def run_stage1_extraction(
-    input_path: Path,
-    output_dir: Path,
-    *,
-    max_workers: int = 30,
-    save_intermediates: bool = False,
-    skip_predicates: Optional[List[str]] = None,
-    rule_skip_predicates: Optional[List[str]] = None,
-    render_images: bool = False,
-    streaming: bool = False,
-    chunk_size: int = 10000,
-    inflight_limit: int = 300,
-    seed_reducer_queue: Optional[Queue] = None,
-) -> Dict[str, Any]:
-    """Stage 1: Extract rules using FilterAndPruneEngine.
+def load_config(config_path: Path) -> Dict[str, Any]:
+    """Load and validate the pipeline config JSON."""
+    with open(config_path, "r", encoding="utf-8") as f:
+        raw = f.read()
+    # Strip C-style comment lines (lines starting with //) before parsing
+    lines = [ln for ln in raw.splitlines() if not ln.strip().startswith("//")]
+    cfg = json.loads("\n".join(lines))
 
-    Steps 1-6: Input Filter → Graph Prune → Proposition Extract →
-               Normalization → Deduplication → Rule Dump
+    # Strip _comment keys recursively (they are documentation only)
+    def strip_comments(obj):
+        if isinstance(obj, dict):
+            return {k: strip_comments(v) for k, v in obj.items() if not k.startswith("_comment")}
+        if isinstance(obj, list):
+            return [strip_comments(i) for i in obj]
+        return obj
 
-    Args:
-        streaming: Use streaming mode for large datasets.
-        chunk_size: Records per chunk in streaming mode.
-        inflight_limit: Max in-flight Ray tasks in streaming mode.
-        seed_reducer_queue: Queue for incremental Stage 2 reduction (streaming only).
+    return strip_comments(cfg)
 
-    Returns:
-        Dict with extraction results and paths to output files.
+
+def _resolve_output(cfg_output: Optional[str], output_dir: Path, subdir: str, filename: str) -> Path:
+    """Resolve a Part's output path.
+
+    If cfg_output is specified, use it directly.
+    Otherwise default to output_dir/subdir/filename.
     """
+    if cfg_output:
+        return Path(cfg_output)
+    return output_dir / subdir / filename
+
+
+# ============================================================================
+# Part 1: Input filter
+# ============================================================================
+
+def run_part1(cfg: Dict[str, Any], output_dir: Path) -> Optional[Path]:
+    """Run Part 1 (input filter). Returns path to filtered.jsonl, or None if disabled."""
+    p1 = cfg.get("part1_filter", {})
+    if not p1.get("enabled", True):
+        print("[Part 1] Disabled, skipping.")
+        return None
+
+    input_path = p1.get("input")
+    if not input_path:
+        print("Error: part1_filter.input is required when Part 1 is enabled", file=sys.stderr)
+        sys.exit(1)
+    input_path = Path(input_path)
+
+    output_path = _resolve_output(p1.get("output"), output_dir, "part1", "filtered.jsonl")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    skip_predicates = p1.get("skip_predicates") or []
+
+    print(f"\n{'='*60}")
+    print(f"Part 1: Input Filter")
+    print(f"{'='*60}")
+    print(f"  Input:  {input_path}")
+    print(f"  Output: {output_path}")
+
     from newclid.proof_scout.core.filter_and_prune_engine import FilterAndPruneEngine
 
-    start_time = time.time()
-    print(f"\n{'='*60}")
-    print(f"Stage 1: Rule Extraction {'(STREAMING)' if streaming else ''}")
-    print(f"{'='*60}")
-    print(f"  Input: {input_path}")
-    print(f"  Output: {output_dir}")
-
-    engine_kwargs = dict(
-        max_workers=max_workers,
-        render_by_rule=render_images,
+    engine = FilterAndPruneEngine(
+        skip_predicates=skip_predicates if skip_predicates else None,
+        render_by_rule=False,
         keep_pid_images=False,
     )
-    if skip_predicates is not None:
-        engine_kwargs["skip_predicates"] = skip_predicates
-    if rule_skip_predicates is not None:
-        engine_kwargs["rule_skip_predicates"] = rule_skip_predicates
+    stats = engine.run_part1_filter(input_path, output_path)
 
-    engine = FilterAndPruneEngine(**engine_kwargs)
+    print(f"[Part 1] Done — {stats['kept']}/{stats['total']} records kept → {output_path}")
+    return output_path
 
-    if streaming:
+
+# ============================================================================
+# Part 2: Graph prune + rule extraction
+# ============================================================================
+
+def run_part2(
+    cfg: Dict[str, Any],
+    output_dir: Path,
+    prev_output: Optional[Path],
+) -> Optional[Path]:
+    """Run Part 2 (extract rules). Returns path to rules.txt, or None if disabled."""
+    p2 = cfg.get("part2_extract", {})
+    if not p2.get("enabled", True):
+        print("[Part 2] Disabled, skipping.")
+        return None
+
+    # Determine input
+    input_path_cfg = p2.get("input")
+    if input_path_cfg:
+        input_path = Path(input_path_cfg)
+    elif prev_output is not None:
+        input_path = prev_output
+    else:
+        print("Error: part2_extract.input is required (no previous Part output available)", file=sys.stderr)
+        sys.exit(1)
+
+    part2_dir = _resolve_output(p2.get("output"), output_dir, "part2", ".")
+    if part2_dir.suffix:  # user gave a file path; use its parent as dir
+        part2_dir = part2_dir.parent
+    part2_dir.mkdir(parents=True, exist_ok=True)
+
+    max_workers = p2.get("max_workers", 30)
+    rule_skip_predicates = p2.get("rule_skip_predicates") or []
+    save_intermediates = cfg.get("global", {}).get("save_intermediates", False)
+
+    streaming_cfg = p2.get("streaming", {})
+    use_streaming = streaming_cfg.get("enabled", False)
+
+    print(f"\n{'='*60}")
+    print(f"Part 2: Rule Extraction {'(STREAMING)' if use_streaming else ''}")
+    print(f"{'='*60}")
+    print(f"  Input:  {input_path}")
+    print(f"  Output: {part2_dir}")
+
+    from newclid.proof_scout.core.filter_and_prune_engine import FilterAndPruneEngine
+
+    engine = FilterAndPruneEngine(
+        max_workers=max_workers,
+        rule_skip_predicates=rule_skip_predicates if rule_skip_predicates else None,
+        render_by_rule=False,
+        keep_pid_images=False,
+    )
+
+    if use_streaming:
+        chunk_size = streaming_cfg.get("chunk_size", 10000)
+        inflight_limit = streaming_cfg.get("inflight_limit", 300)
         result = engine.run_streaming(
-            input_path, output_dir,
+            input_path, part2_dir,
             chunk_size=chunk_size,
             inflight_limit=inflight_limit,
             save_intermediates=save_intermediates,
-            seed_reducer_queue=seed_reducer_queue,
         )
-        elapsed = time.time() - start_time
-        print(f"\n[Stage 1] Completed in {elapsed:.1f}s (streaming)")
-        print(f"  Rules extracted: {result.get('rules', 0)}")
-
-        rules_file = result.get("json", "")
-        source_data_file = result.get("source_data_file")
-        return {
-            "stage": "extraction",
-            "elapsed_seconds": elapsed,
-            "stats": result,
-            "rules_file": rules_file,
-            "source_data_file": source_data_file,
-        }
+        rules_file_str = result.get("json", "")
+        if rules_file_str:
+            # streaming output: {stem}_pruned_rules.txt (same dir)
+            rules_file = Path(rules_file_str).with_name(
+                Path(rules_file_str).stem + "_rules.txt"
+            ) if not rules_file_str.endswith("_rules.txt") else Path(rules_file_str)
+        else:
+            rules_file = None
     else:
-        result = engine.run(input_path, output_dir, save_intermediates=save_intermediates)
-        elapsed = time.time() - start_time
-        print(f"\n[Stage 1] Completed in {elapsed:.1f}s")
-        print(f"  Rules extracted: {result.get('rules', 0)}")
-        print(f"  JSON: {result.get('json', '')}")
+        result = engine.run_part2_extract(
+            input_path, part2_dir,
+            save_intermediates=save_intermediates,
+        )
+        rules_file_str = result.get("rules_file")
+        rules_file = Path(rules_file_str) if rules_file_str else None
 
-        return {
-            "stage": "extraction",
-            "elapsed_seconds": elapsed,
-            "stats": result,
-            "rules_file": result.get("json", "").replace(".json", "_rules.txt") if result.get("json") else None,
-            "source_data_file": str(Path(output_dir) / "intermediates" / "step6_rules_stats.json") if save_intermediates else None,
-        }
+    if rules_file and rules_file.exists():
+        print(f"[Part 2] Done — {result.get('rules', 0)} rules → {rules_file}")
+    else:
+        print("[Part 2] Warning: no rules_file produced")
+
+    return rules_file
 
 
 # ============================================================================
-# Stage 2: Rule Reduction
+# Part 3: max_premises filter
 # ============================================================================
 
-def run_stage2_reduction(
-    rules_file: Path,
-    source_data_file: Path,
+def run_part3(
+    cfg: Dict[str, Any],
     output_dir: Path,
-    *,
-    timeout: int = 60,
-    seed: int = 42,
-    max_premises: Optional[int] = None,
-    max_rules: Optional[int] = None,
-    n_workers: int = 1,
-    batch_size: int = 10,
-    debug: bool = False,
-    no_group_reduction: bool = False,
-) -> Dict[str, Any]:
-    """Stage 2: Reduce rules via greedy subsumption.
+    prev_output: Optional[Path],
+) -> Optional[Path]:
+    """Run Part 3 (max_premises filter). Returns filtered_rules.txt path, or None."""
+    p3 = cfg.get("part3_max_premises", {})
 
-    Returns:
-        Dict with reduction results and paths to output files.
-    """
-    from newclid.proof_scout.reduction import RuleReducer, load_rules_from_discovery_output
+    # If max_premises is null, skip this Part entirely
+    max_premises = p3.get("max_premises")
+    if not p3.get("enabled", True) or max_premises is None:
+        reason = "disabled" if not p3.get("enabled", True) else "max_premises is null"
+        print(f"[Part 3] Skipped ({reason}).")
+        return None
 
-    start_time = time.time()
+    # Determine input
+    input_path_cfg = p3.get("input")
+    if input_path_cfg:
+        input_path = Path(input_path_cfg)
+    elif prev_output is not None:
+        input_path = prev_output
+    else:
+        print("Error: part3_max_premises.input is required (no previous Part output available)", file=sys.stderr)
+        sys.exit(1)
+
+    output_path = _resolve_output(p3.get("output"), output_dir, "part3", "filtered_rules.txt")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
     print(f"\n{'='*60}")
-    print(f"Stage 2: Rule Reduction")
+    print(f"Part 3: max_premises Filter (max_premises={max_premises})")
     print(f"{'='*60}")
-    print(f"  Rules: {rules_file}")
-    print(f"  Source data: {source_data_file}")
-    print(f"  Output: {output_dir}")
+    print(f"  Input:  {input_path}")
+    print(f"  Output: {output_path}")
 
     # Load rules
-    rules, failures = load_rules_from_discovery_output(
-        rules_file, source_data_file, max_rules=max_rules,
-    )
-    print(f"  Loaded {len(rules)} rules ({len(failures)} failures)")
+    with open(input_path, "r", encoding="utf-8") as f:
+        lines = [ln.strip() for ln in f if ln.strip()]
 
-    if failures:
-        failures_path = output_dir / "r0_conversion_failures.json"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        with open(failures_path, "w", encoding="utf-8") as f:
-            json.dump({
-                "total_failures": len(failures),
-                "failures": [{"rule_id": r, "rule_text": t, "reason": e} for r, t, e in failures],
-            }, f, ensure_ascii=False, indent=2)
-        print(f"  Failures saved to {failures_path}")
+    # Parse rule_id / rule_text pairs and count premises
+    kept_lines = []
+    skipped = 0
+    for i in range(0, len(lines), 2):
+        if i + 1 >= len(lines):
+            break
+        rule_id = lines[i]
+        rule_text = lines[i + 1]
+        # Count premises: number of comma-separated items before '=>'
+        if "=>" in rule_text:
+            n_prem = len([c for c in rule_text.split("=>")[0].split(",") if c.strip()])
+        else:
+            n_prem = 0
+        if n_prem <= max_premises:
+            kept_lines.append(rule_id)
+            kept_lines.append(rule_text)
+        else:
+            skipped += 1
 
-    if not rules:
-        print("\n[Stage 2] No rules to reduce!")
-        return {"stage": "reduction", "elapsed_seconds": 0, "stats": {}}
+    n_kept = len(kept_lines) // 2
+    print(f"[Part 3] {n_kept} kept, {skipped} skipped (premises > {max_premises})")
 
-    # Run reduction
-    reducer = RuleReducer(
-        timeout=timeout,
-        seed=seed,
-        max_premises=max_premises,
-        n_workers=n_workers,
-        batch_size=batch_size,
-        debug=debug,
-        debug_output_dir=output_dir if debug else None,
-    )
-    # Run reduction — use seed-based group reduction if seed info is available
-    has_seed = any(r.seed is not None for r in rules)
-    if has_seed and not no_group_reduction:
-        print(f"\n[Stage 2] Using seed-based group reduction ({sum(1 for r in rules if r.seed is not None)}/{len(rules)} rules have seed)")
-        result = reducer.reduce_by_seed(rules)
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write("\n".join(kept_lines))
+        if kept_lines:
+            f.write("\n")
+
+    print(f"[Part 3] Done → {output_path}")
+    return output_path
+
+
+# ============================================================================
+# Part 4: Reduction
+# ============================================================================
+
+def _load_rules_for_reduction(
+    rules_file: Path,
+    source_data_file: Optional[Path],
+) -> tuple:
+    """Load rules from rules_file + optional source_data_file."""
+    from newclid.proof_scout.reduction import load_rules_from_discovery_output
+
+    if source_data_file and source_data_file.exists():
+        rules, failures = load_rules_from_discovery_output(rules_file, source_data_file)
     else:
-        if not has_seed:
-            print("\n[Stage 2] No seed info found, using global reduction only")
-        else:
-            print("\n[Stage 2] Group reduction disabled, using global reduction only")
-        result = reducer.reduce(rules)
-
-    elapsed = time.time() - start_time
-
-    # Save outputs
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    # Save extracted_rules.txt (basis rules)
-    basis_rules = result.get("basis_rules", [])
-    mp_suffix = f"_maxprem{max_premises}" if max_premises else ""
-    extracted_path = output_dir / f"extracted_rules{mp_suffix}.txt"
-    with open(extracted_path, "w", encoding="utf-8") as f:
-        for rule in basis_rules:
-            f.write(f"{rule.rule_id}\n{rule.rule_text}\n")
-    print(f"  Basis rules saved to {extracted_path}")
-
-    # Save eliminated rules
-    eliminated = result.get("eliminated_rules", [])
-    if eliminated:
-        elim_path = output_dir / f"eliminated_rules{mp_suffix}.json"
-        with open(elim_path, "w", encoding="utf-8") as f:
-            json.dump(eliminated, f, ensure_ascii=False, indent=2)
-
-    # Save skipped by premises
-    skipped = result.get("skipped_by_premises", [])
-    if skipped:
-        skip_path = output_dir / f"skipped_by_premises{mp_suffix}.json"
-        with open(skip_path, "w", encoding="utf-8") as f:
-            json.dump(skipped, f, ensure_ascii=False, indent=2)
-
-    # Save stats
-    stats = result.get("stats", {})
-    stats["elapsed_seconds"] = elapsed
-    stats_path = output_dir / f"reduction_stats{mp_suffix}.json"
-    with open(stats_path, "w", encoding="utf-8") as f:
-        json.dump(stats, f, ensure_ascii=False, indent=2)
-
-    print(f"\n[Stage 2] Completed in {elapsed:.1f}s")
-    print(f"  Basis: {stats.get('basis_count', 0)}")
-    print(f"  Eliminated: {stats.get('eliminated_count', 0)}")
-    print(f"  Subsumption tests: {stats.get('n_subsumption_tests', 0)}")
-
-    return {
-        "stage": "reduction",
-        "elapsed_seconds": elapsed,
-        "stats": stats,
-        "extracted_rules_path": str(extracted_path),
-    }
+        # No source data: load rules without RuleWithSource metadata
+        # (points/premises parsed from llm_input_renamed will be empty)
+        rules, failures = load_rules_from_discovery_output(
+            rules_file,
+            source_data_file if source_data_file else rules_file,  # fallback: won't match
+        )
+    return rules, failures
 
 
-# ============================================================================
-# Pipeline Orchestrator
-# ============================================================================
-
-def run_pipeline(
-    *,
-    input_path: Optional[Path] = None,
+def run_part4(
+    cfg: Dict[str, Any],
     output_dir: Path,
-    max_workers: int = 30,
-    save_intermediates: bool = False,
-    skip_extraction: bool = False,
-    skip_reduction: bool = False,
-    skip_predicates: Optional[List[str]] = None,
-    rule_skip_predicates: Optional[List[str]] = None,
-    render_images: bool = False,
-    # Streaming params
-    streaming: bool = False,
-    chunk_size: int = 10000,
-    inflight_limit: int = 300,
-    # Reduction params
-    rules_file: Optional[Path] = None,
+    prev_output: Optional[Path],
     source_data_file: Optional[Path] = None,
-    timeout: int = 60,
-    seed: int = 42,
-    max_premises: Optional[int] = None,
-    max_rules: Optional[int] = None,
-    batch_size: int = 10,
-    debug: bool = False,
-    no_group_reduction: bool = False,
-    overlap_reduction: bool = False,
-) -> Dict[str, Any]:
-    """Run the discovery pipeline.
+) -> Optional[Path]:
+    """Run Part 4 (reduction). Returns extracted_rules.txt path, or None."""
+    p4 = cfg.get("part4_reduction", {})
+    if not p4.get("enabled", True):
+        print("[Part 4] Disabled, skipping.")
+        return None
 
-    Args:
-        input_path: Input JSONL file (required unless skip_extraction)
-        output_dir: Output directory
-        max_workers: Parallel workers for both Stage 1 and Stage 2
-        save_intermediates: Save intermediate results for each step
-        skip_extraction: Skip Stage 1 (use existing rules_file/source_data_file)
-        skip_reduction: Skip Stage 2
-        skip_predicates: Predicates to filter from input records (default: eqpoint, constline)
-        rule_skip_predicates: Predicates to filter from final rules (default: aconst, rconst)
-        render_images: Render comparison images
-        streaming: Use streaming mode for large datasets
-        chunk_size: Records per chunk in streaming mode
-        inflight_limit: Max in-flight Ray tasks in streaming mode
-        rules_file: Path to rules file (for skip_extraction mode)
-        source_data_file: Path to source data file (for skip_extraction mode)
-        timeout: Subsumption test timeout
-        seed: Random seed
-        max_premises: Max premises for reduction pre-filter
-        max_rules: Max rules to load for reduction
-        batch_size: Batch size for reduction
-        debug: Enable debug output for reduction
-        overlap_reduction: Overlap Stage 1 + Stage 2 via incremental group reduction
-    """
-    pipeline_start = time.time()
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # Determine input
+    input_path_cfg = p4.get("input")
+    if input_path_cfg:
+        input_path = Path(input_path_cfg)
+    elif prev_output is not None:
+        input_path = prev_output
+    else:
+        print("Error: part4_reduction.input is required (no previous Part output available)", file=sys.stderr)
+        sys.exit(1)
 
-    results: Dict[str, Any] = {
-        "output_dir": str(output_dir),
-        "stages": [],
-    }
+    output_path = _resolve_output(p4.get("output"), output_dir, "part4", "extracted_rules.txt")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Setup incremental reducer for overlap mode
-    seed_reducer_queue: Optional[Queue] = None
-    incremental_reducer = None
+    engine = p4.get("engine", "full")
+    timeout = p4.get("timeout", 60)
+    n_workers = p4.get("n_workers", 4)
+    batch_size = p4.get("batch_size", 10)
+    debug = p4.get("debug", False)
 
-    if streaming and overlap_reduction and not skip_extraction and not skip_reduction:
-        from newclid.proof_scout.reduction import RuleReducer, IncrementalReducer
+    seed_red_cfg = p4.get("seed_reduction", {})
+    chunk_red_cfg = p4.get("chunk_reduction", {})
+    global_red_cfg = p4.get("global_reduction", {})
 
-        seed_reducer_queue = Queue()
-        reducer = RuleReducer(
-            timeout=timeout,
-            seed=seed,
-            max_premises=max_premises,
-            n_workers=1,  # sequential within reducer, Ray handles parallelism
-            batch_size=batch_size,
-            debug=debug,
-            debug_output_dir=output_dir if debug else None,
-        )
-        incremental_reducer = IncrementalReducer(reducer, seed_reducer_queue)
-        incremental_reducer.start()
-        print("[pipeline] Incremental Stage 2 reducer started in background")
-
-    # Stage 1: Extraction
-    if not skip_extraction:
-        if input_path is None:
-            print("Error: --input is required when not using --skip-extraction")
-            sys.exit(1)
-
-        stage1 = run_stage1_extraction(
-            input_path, output_dir,
-            max_workers=max_workers,
-            save_intermediates=save_intermediates,
-            skip_predicates=skip_predicates,
-            rule_skip_predicates=rule_skip_predicates,
-            render_images=render_images,
-            streaming=streaming,
-            chunk_size=chunk_size,
-            inflight_limit=inflight_limit,
-            seed_reducer_queue=seed_reducer_queue,
-        )
-        results["stages"].append(stage1)
-
-        # Auto-detect rules file and source data for Stage 2
-        if rules_file is None and stage1.get("rules_file"):
-            rules_file = Path(stage1["rules_file"])
-        if source_data_file is None and stage1.get("source_data_file"):
-            source_data_file = Path(stage1["source_data_file"])
-
-    # Stage 2: Reduction
-    if not skip_reduction:
-        if incremental_reducer is not None:
-            # Overlap mode: wait for incremental reducer to finish
-            print("\n[pipeline] Waiting for incremental Stage 2 reducer to finish...")
-            reduction_result = incremental_reducer.join(timeout=None)
-
-            if reduction_result:
-                elapsed_reduction = time.time() - pipeline_start
-
-                # Save outputs
-                basis_rules = reduction_result.get("basis_rules", [])
-                mp_suffix = f"_maxprem{max_premises}" if max_premises else ""
-                extracted_path = output_dir / f"extracted_rules{mp_suffix}.txt"
-                with open(extracted_path, "w", encoding="utf-8") as f:
-                    for rule in basis_rules:
-                        f.write(f"{rule.rule_id}\n{rule.rule_text}\n")
-
-                stats = reduction_result.get("stats", {})
-                stats["elapsed_seconds"] = elapsed_reduction
-                stats_path = output_dir / f"reduction_stats{mp_suffix}.json"
-                with open(stats_path, "w", encoding="utf-8") as f:
-                    json.dump(stats, f, ensure_ascii=False, indent=2)
-
-                print(f"  Basis: {stats.get('basis_count', 0)}")
-                print(f"  Total eliminated: {stats.get('total_eliminated', 0)}")
-
-                results["stages"].append({
-                    "stage": "reduction (incremental)",
-                    "elapsed_seconds": elapsed_reduction,
-                    "stats": stats,
-                    "extracted_rules_path": str(extracted_path),
-                })
-            else:
-                print("[pipeline] Incremental reducer returned no result")
-        else:
-            # Standard (non-overlap) reduction
-            if rules_file is None or source_data_file is None:
-                print("Error: --rules and --source-data are required for reduction")
-                print("  (either run extraction first, or provide them explicitly)")
-                sys.exit(1)
-
-            if not Path(rules_file).exists():
-                print(f"Error: Rules file not found: {rules_file}")
-                sys.exit(1)
-            if not Path(source_data_file).exists():
-                print(f"Error: Source data file not found: {source_data_file}")
-                sys.exit(1)
-
-            stage2 = run_stage2_reduction(
-                Path(rules_file), Path(source_data_file), output_dir,
-                timeout=timeout,
-                seed=seed,
-                max_premises=max_premises,
-                max_rules=max_rules,
-                n_workers=max_workers,
-                batch_size=batch_size,
-                debug=debug,
-                no_group_reduction=no_group_reduction,
-            )
-            results["stages"].append(stage2)
-
-    total_elapsed = time.time() - pipeline_start
-    results["total_elapsed_seconds"] = total_elapsed
+    seed_reduction_enabled = seed_red_cfg.get("enabled", False)
+    chunk_reduction_enabled = chunk_red_cfg.get("enabled", False)
+    global_reduction_enabled = global_red_cfg.get("enabled", True)
 
     print(f"\n{'='*60}")
-    print(f"Pipeline complete in {total_elapsed:.1f}s")
-    print(f"Output: {output_dir}")
+    print(f"Part 4: Reduction")
     print(f"{'='*60}")
+    print(f"  Input:  {input_path}")
+    print(f"  Output: {output_path}")
+    print(f"  engine={engine}, timeout={timeout}, n_workers={n_workers}, batch_size={batch_size}")
+    print(f"  seed_reduction={seed_reduction_enabled}, chunk_reduction={chunk_reduction_enabled}, "
+          f"global_reduction={global_reduction_enabled}")
 
-    return results
-
-
-# ============================================================================
-# Chunked Iterative Reduction (Python solver)
-# ============================================================================
-
-def _run_chunked_iterative_reduction(
-    rules_file: Path,
-    source_data_file: Path,
-    output_dir: Path,
-    *,
-    timeout: int = 60,
-    seed: int = 42,
-    max_premises: Optional[int] = None,
-    max_rules: Optional[int] = None,
-    group_size: int = 500,
-    iterations: int = 1,
-    chunk_workers: int = 4,
-    batch_size: int = 10,
-    filter_only: bool = False,
-    resume: bool = True,
-    solver_type: str = "python",
-) -> Dict[str, Any]:
-    """Chunked iterative rule reduction (Python solver version).
-
-    Identical logic to discovery_pipeline_c.run_chunked_iterative_reduction
-    but defaults to solver_type="python".
-    """
     from newclid.proof_scout.reduction import (
+        RuleReducer,
         ChunkedIterativeReducer,
         load_rules_from_discovery_output,
     )
 
-    start_time = time.time()
-    print(f"\n{'='*60}")
-    print(f"Chunked Iterative Reduction ({solver_type})")
-    print(f"{'='*60}")
-    print(f"  Rules: {rules_file}")
-    print(f"  Source data: {source_data_file}")
-    print(f"  Output: {output_dir}")
-    print(f"  group_size={group_size}, iterations={iterations}, "
-          f"chunk_workers={chunk_workers}")
-
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     # Load rules
-    rules, failures = load_rules_from_discovery_output(
-        rules_file, source_data_file, max_rules=max_rules,
-    )
+    if source_data_file and source_data_file.exists():
+        rules, failures = load_rules_from_discovery_output(input_path, source_data_file)
+    else:
+        # Try to find step6_rules_stats.json near the rules file
+        candidate = input_path.parent / "intermediates" / "step6_rules_stats.json"
+        if candidate.exists():
+            rules, failures = load_rules_from_discovery_output(input_path, candidate)
+            source_data_file = candidate
+        else:
+            # No source data available — load will likely produce empty rules
+            print(f"  Warning: no source_data_file found; reduction may produce empty results")
+            rules, failures = load_rules_from_discovery_output(input_path, input_path)
+
     print(f"  Loaded {len(rules)} rules ({len(failures)} failures)")
 
     if failures:
-        failures_path = output_dir / "conversion_failures.json"
-        with open(failures_path, "w", encoding="utf-8") as f:
+        fail_path = output_path.parent / "load_failures.json"
+        with open(fail_path, "w", encoding="utf-8") as f:
             json.dump({
                 "total_failures": len(failures),
                 "failures": [{"rule_id": r, "rule_text": t, "reason": e} for r, t, e in failures],
             }, f, ensure_ascii=False, indent=2)
 
     if not rules:
-        print("\nNo rules to process!")
-        return {"stage": "chunked_reduction", "elapsed_seconds": 0, "stats": {}}
+        print("[Part 4] No rules to reduce!")
+        # Write empty output
+        with open(output_path, "w", encoding="utf-8") as f:
+            pass
+        return output_path
 
-    # Filter by max_premises
-    skipped = []
-    if max_premises is not None:
-        rules, skipped = ChunkedIterativeReducer.filter_by_premises(rules, max_premises)
-        print(f"  Pre-filter: {len(skipped)} rules skipped (premises > {max_premises})")
-        print(f"  Remaining: {len(rules)} rules")
+    # Validate seed_reduction precondition
+    if seed_reduction_enabled:
+        has_seed = any(r.seed is not None for r in rules)
+        if not has_seed:
+            print(
+                "Error: seed_reduction.enabled=true but no rules have a seed field. "
+                "Aborting to prevent silent incorrect results.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
-        filtered_path = output_dir / "filtered_rules.txt"
-        with open(filtered_path, "w", encoding="utf-8") as f:
-            for rule in rules:
-                f.write(f"{rule.rule_id}\n{rule.rule_text}\n")
+    current_rules = list(rules)
 
-        if skipped:
-            skip_path = output_dir / "skipped_by_premises.json"
-            with open(skip_path, "w", encoding="utf-8") as f:
-                json.dump(skipped, f, ensure_ascii=False, indent=2)
+    # --- Seed reduction ---
+    if seed_reduction_enabled:
+        print(f"\n[Part 4 / seed_reduction] {len(current_rules)} rules")
+        reducer = RuleReducer(
+            timeout=timeout,
+            n_workers=n_workers,
+            batch_size=batch_size,
+            debug=debug,
+            debug_output_dir=output_path.parent if debug else None,
+            solver_type="csolver",
+            engine=engine,
+        )
+        result = reducer.reduce_by_seed(current_rules)
+        current_rules = result["basis_rules"]
+        print(f"[Part 4 / seed_reduction] {len(rules)} → {len(current_rules)} rules")
 
-    if filter_only:
-        elapsed = time.time() - start_time
-        print(f"\n[Filter only] Done in {elapsed:.1f}s — {len(rules)} rules kept")
-        return {
-            "stage": "chunked_reduction (filter_only)",
-            "elapsed_seconds": elapsed,
-            "stats": {
-                "input_count": len(rules) + len(skipped),
-                "filtered_count": len(rules),
-                "skipped_count": len(skipped),
-            },
-        }
+    # --- Chunk reduction ---
+    if chunk_reduction_enabled:
+        group_size = chunk_red_cfg.get("group_size", 500)
+        iterations = chunk_red_cfg.get("iterations", 1)
+        print(f"\n[Part 4 / chunk_reduction] {len(current_rules)} rules, "
+              f"group_size={group_size}, iterations={iterations}, n_workers={n_workers}")
 
-    if not rules:
-        print("\nNo rules remaining after filter!")
-        return {"stage": "chunked_reduction", "elapsed_seconds": 0, "stats": {}}
+        chunk_dir = output_path.parent / "chunk_reduction"
+        chunk_dir.mkdir(parents=True, exist_ok=True)
 
-    reducer = ChunkedIterativeReducer(
-        timeout=timeout,
-        seed=seed,
-        batch_size=batch_size,
-        solver_type=solver_type,
-        engine="full",
-    )
+        cir = ChunkedIterativeReducer(
+            timeout=timeout,
+            batch_size=batch_size,
+            solver_type="csolver",
+            engine=engine,
+        )
+        current_rules, chunk_stats = cir.reduce_iterative(
+            current_rules,
+            group_size=group_size,
+            iterations=iterations,
+            n_workers=n_workers,
+            output_dir=chunk_dir,
+            resume=False,  # no resume in new pipeline; use Part 4 input for resume
+        )
+        print(f"[Part 4 / chunk_reduction] → {len(current_rules)} rules")
 
-    survivors, overall_stats = reducer.reduce_iterative(
-        rules,
-        group_size=group_size,
-        iterations=iterations,
-        chunk_workers=chunk_workers,
-        output_dir=output_dir,
-        resume=resume,
-    )
+    # --- Global reduction ---
+    if global_reduction_enabled:
+        print(f"\n[Part 4 / global_reduction] {len(current_rules)} rules")
+        reducer = RuleReducer(
+            timeout=timeout,
+            n_workers=n_workers,
+            batch_size=batch_size,
+            debug=debug,
+            debug_output_dir=output_path.parent if debug else None,
+            solver_type="csolver",
+            engine=engine,
+        )
+        result = reducer.reduce(current_rules)
+        current_rules = result["basis_rules"]
+        stats = result["stats"]
+        print(f"[Part 4 / global_reduction] → {len(current_rules)} rules "
+              f"(eliminated {stats.get('eliminated_count', 0)}, "
+              f"tests {stats.get('n_subsumption_tests', 0)})")
 
-    elapsed = time.time() - start_time
-    overall_stats["elapsed_seconds_total"] = elapsed
-    overall_stats["skipped_by_premises_count"] = len(skipped)
+    # Write output
+    with open(output_path, "w", encoding="utf-8") as f:
+        for rule in current_rules:
+            f.write(f"{rule.rule_id}\n{rule.rule_text}\n")
 
-    stats_path = output_dir / "chunked_reduction_stats.json"
-    with open(stats_path, "w", encoding="utf-8") as f:
-        json.dump(overall_stats, f, ensure_ascii=False, indent=2)
+    print(f"\n[Part 4] Done — {len(current_rules)} rules → {output_path}")
+    return output_path
 
-    print(f"\n[Chunked Reduction] Completed in {elapsed:.1f}s")
-    print(f"  Final basis: {len(survivors)} rules")
+
+# ============================================================================
+# Pipeline orchestrator
+# ============================================================================
+
+def run_pipeline(config_path: Path) -> Dict[str, Any]:
+    """Load config and run all 4 Parts sequentially."""
+    cfg = load_config(config_path)
+
+    global_cfg = cfg.get("global", {})
+    output_dir = Path(global_cfg.get("output_dir", "outputs/experiments/pipeline_output"))
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    pipeline_start = time.time()
+    print(f"\n{'='*60}")
+    print(f"Discovery Pipeline")
+    print(f"{'='*60}")
+    print(f"  Config:     {config_path}")
+    print(f"  Output dir: {output_dir}")
+
+    # Track the last produced output to chain Parts
+    last_output: Optional[Path] = None
+    source_data_file: Optional[Path] = None  # step6_rules_stats.json from Part 2
+
+    # Part 1
+    p1_out = run_part1(cfg, output_dir)
+    if p1_out is not None:
+        last_output = p1_out
+
+    # Part 2
+    p2_out = run_part2(cfg, output_dir, last_output)
+    if p2_out is not None:
+        last_output = p2_out
+        # Try to locate step6_rules_stats.json alongside Part 2 output
+        candidate = p2_out.parent / "intermediates" / "step6_rules_stats.json"
+        if candidate.exists():
+            source_data_file = candidate
+
+    # Part 3
+    p3_out = run_part3(cfg, output_dir, last_output)
+    if p3_out is not None:
+        last_output = p3_out
+
+    # Part 4
+    p4_out = run_part4(cfg, output_dir, last_output, source_data_file=source_data_file)
+    if p4_out is not None:
+        last_output = p4_out
+
+    total_elapsed = time.time() - pipeline_start
+
+    print(f"\n{'='*60}")
+    print(f"Pipeline complete in {total_elapsed:.1f}s")
+    print(f"Output: {output_dir}")
+    if last_output:
+        print(f"Final output: {last_output}")
+    print(f"{'='*60}")
 
     return {
-        "stage": "chunked_reduction",
-        "elapsed_seconds": elapsed,
-        "stats": overall_stats,
+        "output_dir": str(output_dir),
+        "total_elapsed_seconds": total_elapsed,
+        "part1_output": str(p1_out) if p1_out else None,
+        "part2_output": str(p2_out) if p2_out else None,
+        "part3_output": str(p3_out) if p3_out else None,
+        "part4_output": str(p4_out) if p4_out else None,
     }
 
 
@@ -582,131 +528,31 @@ def _run_chunked_iterative_reduction(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Discovery Pipeline — rule extraction and reduction",
+        description="Discovery Pipeline — unified config-based rule extraction and reduction",
         formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Run with default config
+  python scripts/discovery_pipeline.py
+
+  # Run with custom config
+  python scripts/discovery_pipeline.py --config my_config.json
+        """,
     )
-
-    # Stage 1 args
-    stage1 = parser.add_argument_group("Stage 1: Extraction")
-    stage1.add_argument("-i", "--input", type=Path, default=None, help="Input JSONL file")
-    stage1.add_argument("-o", "--output", type=Path, required=True, help="Output directory")
-    stage1.add_argument("--max-workers", type=int, default=30, help="Parallel workers (default: 30)")
-    stage1.add_argument("--save-intermediates", action="store_true", help="Save intermediate results")
-    stage1.add_argument("--skip-predicates", type=str, default=None,
-                        help="Comma-separated predicates to filter from input (default: eqpoint,constline)")
-    stage1.add_argument("--rule-skip-predicates", type=str, default=None,
-                        help="Comma-separated predicates to filter from rules (default: aconst,rconst)")
-    stage1.add_argument("--render-images", action="store_true", help="Render comparison images")
-
-    # Streaming args
-    streaming_grp = parser.add_argument_group("Streaming mode (for large datasets)")
-    streaming_grp.add_argument("--streaming", action="store_true",
-                               help="Use streaming mode (chunk-based + Ray) for large datasets")
-    streaming_grp.add_argument("--chunk-size", type=int, default=10000,
-                               help="Records per chunk in streaming mode (default: 10000)")
-    streaming_grp.add_argument("--inflight-limit", type=int, default=300,
-                               help="Max in-flight Ray tasks in streaming mode (default: 300)")
-    streaming_grp.add_argument("--overlap-reduction", action="store_true",
-                               help="Overlap Stage 1 + Stage 2 via incremental group reduction (streaming only)")
-
-    # Stage 2 args
-    stage2 = parser.add_argument_group("Stage 2: Reduction")
-    stage2.add_argument("--timeout", type=int, default=60, help="Subsumption test timeout (default: 60)")
-    stage2.add_argument("--seed", type=int, default=42, help="Random seed (default: 42)")
-    stage2.add_argument("--max-premises", type=int, default=None, help="Max premises for reduction pre-filter")
-    stage2.add_argument("--max-rules", type=int, default=None, help="Max rules to load (for testing)")
-    stage2.add_argument("--batch-size", type=int, default=10, help="Reduction batch size (default: 10)")
-    stage2.add_argument("--debug", action="store_true", help="Enable debug output for reduction")
-    stage2.add_argument("--no-group-reduction", action="store_true",
-                        help="Disable seed-based group reduction (use global reduction only)")
-
-    # Skip flags
-    skip = parser.add_argument_group("Skip flags")
-    skip.add_argument("--skip-extraction", action="store_true", help="Skip Stage 1 (use --rules/--source-data)")
-    skip.add_argument("--skip-reduction", action="store_true", help="Skip Stage 2")
-
-    # Standalone reduction inputs
-    standalone = parser.add_argument_group("Standalone reduction (with --skip-extraction)")
-    standalone.add_argument("--rules", type=Path, default=None, help="Path to rules file")
-    standalone.add_argument("--source-data", type=Path, default=None, help="Path to step6_rules_stats.json")
-
-    chunked = parser.add_argument_group("Chunked Iterative Reduction")
-    chunked.add_argument("--chunked", action="store_true",
-                         help="Enable chunked iterative reduction mode")
-    chunked.add_argument("--group-size", type=int, default=500,
-                         help="Rules per chunk (default: 500, requires --chunked)")
-    chunked.add_argument("--iterations", type=int, default=1,
-                         help="Number of iterative rounds (default: 1, requires --chunked)")
-    chunked.add_argument("--chunk-workers", type=int, default=4,
-                         help="Parallel workers for chunk reduction (default: 4)")
-    chunked.add_argument("--no-resume", action="store_true",
-                         help="Disable checkpoint resume (default: resume enabled)")
-    chunked.add_argument("--filter-only", action="store_true",
-                         help="Only do max_premises filtering, no reduction")
-
+    parser.add_argument(
+        "--config", "-c",
+        type=Path,
+        default=Path(__file__).parent / "discovery_pipeline_config.json",
+        help="Path to pipeline config JSON (default: scripts/discovery_pipeline_config.json)",
+    )
     args = parser.parse_args()
 
-    # Validate
-    if not args.skip_extraction and args.input is None:
-        parser.error("--input is required unless --skip-extraction is set")
-    if args.skip_extraction and (args.rules is None or args.source_data is None):
-        parser.error("--rules and --source-data are required with --skip-extraction")
-    if args.overlap_reduction and not args.streaming:
-        parser.error("--overlap-reduction requires --streaming")
-    if args.filter_only and not args.chunked:
-        if not args.skip_extraction:
-            parser.error("--filter-only requires --chunked or --skip-extraction with --rules/--source-data")
+    if not args.config.exists():
+        print(f"Error: config file not found: {args.config}", file=sys.stderr)
+        print(f"  Create it at {args.config} using discovery_pipeline_config.json as template.")
+        sys.exit(1)
 
-    # Parse predicate lists
-    skip_preds = [p.strip() for p in args.skip_predicates.split(",")] if args.skip_predicates else None
-    rule_skip_preds = [p.strip() for p in args.rule_skip_predicates.split(",")] if args.rule_skip_predicates else None
-
-    # Chunked iterative reduction mode
-    if args.chunked or args.filter_only:
-        if args.rules is None or args.source_data is None:
-            parser.error("--rules and --source-data are required with --chunked/--filter-only")
-        _run_chunked_iterative_reduction(
-            rules_file=args.rules,
-            source_data_file=args.source_data,
-            output_dir=args.output,
-            timeout=args.timeout,
-            seed=args.seed,
-            max_premises=args.max_premises,
-            max_rules=args.max_rules,
-            group_size=args.group_size,
-            iterations=args.iterations,
-            chunk_workers=args.chunk_workers,
-            batch_size=args.batch_size,
-            filter_only=args.filter_only,
-            resume=not args.no_resume,
-            solver_type="python",
-        )
-        return
-
-    run_pipeline(
-        input_path=args.input,
-        output_dir=args.output,
-        max_workers=args.max_workers,
-        save_intermediates=args.save_intermediates,
-        skip_extraction=args.skip_extraction,
-        skip_reduction=args.skip_reduction,
-        skip_predicates=skip_preds,
-        rule_skip_predicates=rule_skip_preds,
-        render_images=args.render_images,
-        streaming=args.streaming,
-        chunk_size=args.chunk_size,
-        inflight_limit=args.inflight_limit,
-        rules_file=args.rules,
-        source_data_file=args.source_data,
-        timeout=args.timeout,
-        seed=args.seed,
-        max_premises=args.max_premises,
-        max_rules=args.max_rules,
-        batch_size=args.batch_size,
-        debug=args.debug,
-        no_group_reduction=args.no_group_reduction,
-        overlap_reduction=args.overlap_reduction,
-    )
+    run_pipeline(args.config)
 
 
 if __name__ == "__main__":
