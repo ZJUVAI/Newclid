@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import Image from 'next/image';
 import definitionEntries from '@/lib/legacy-definitions.json';
 import { formatStatement } from '@/lib/format-statement';
 
@@ -14,7 +13,7 @@ function loadCatalog(dir) {
     .filter((file) => file.endsWith('.png'))
     .map((file) => ({
       slug: file.replace(/\.png$/, ''),
-      image: `/images/defs/${file}`,
+      image: `${process.env.NEXT_PUBLIC_BASE_PATH}/images/defs/${file}`,
       fallbackTitle: toTitle(file.replace(/\.png$/, '')),
     }))
     .sort((a, b) => a.fallbackTitle.localeCompare(b.fallbackTitle));
@@ -53,7 +52,7 @@ export default function DefinitionsPage() {
         <div className="reference-grid reference-grid-dense">
           {catalog.map((item) => (
             <section key={item.slug} className="reference-card">
-              <Image src={item.image} alt={item.title} width={400} height={200} style={{ width: '100%', height: 'auto' }} />
+              <img src={item.image} alt={item.title} />
               <p className="catalog-meta">{item.section ?? 'Definitions'}</p>
               <h3>{item.title}</h3>
               {item.description ? <p>{item.description}</p> : null}

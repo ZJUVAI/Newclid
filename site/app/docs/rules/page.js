@@ -1,6 +1,5 @@
 import fs from 'fs';
 import path from 'path';
-import Image from 'next/image';
 import ruleEntries from '@/lib/legacy-rules.json';
 import { formatStatement } from '@/lib/format-statement';
 
@@ -12,7 +11,7 @@ function loadCatalog(dir) {
       const slug = file.replace(/\.png$/, '');
       return {
         slug,
-        image: `/images/rules/${file}`,
+        image: `${process.env.NEXT_PUBLIC_BASE_PATH}/images/rules/${file}`,
         fallbackTitle: slug.toUpperCase(),
       };
     })
@@ -52,7 +51,7 @@ export default function RulesPage() {
         <div className="reference-grid reference-grid-dense">
           {catalog.map((rule) => (
             <section key={rule.slug} className="reference-card">
-              <Image src={rule.image} alt={rule.title} width={400} height={200} style={{ width: '100%', height: 'auto' }} />
+              <img src={rule.image} alt={rule.title} />
               <p className="catalog-meta">{rule.section ?? 'Rules'}</p>
               <h3>{rule.title}</h3>
               {rule.statement ? (
