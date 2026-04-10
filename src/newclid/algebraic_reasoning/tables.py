@@ -79,6 +79,7 @@ def _fix_width(s: Any, width: int, align: Literal["right", "left", "center"] = "
     s = str(s)
     return " " * (width - len(s)) + s
 
+
 def report(eqdict: EqDict):
     table_str = ">>>>>>>>>table begins\n"
     maxlv = 0
@@ -103,7 +104,7 @@ def report(eqdict: EqDict):
                 if rightv != listv_right[-1]:
                     table_str += " + "
             except KeyError:
-                table_str += f"{_fix_width('', len(str(rightv))+maxlcoef+3)}"
+                table_str += f"{_fix_width('', len(str(rightv)) + maxlcoef + 3)}"
                 if rightv != listv_right[-1]:
                     table_str += "   "
         table_str += "\n"
@@ -127,35 +128,35 @@ class Table:
     def possible_pairs(self):
         def e2str(e: SumCV) -> str:
             return ",".join(sorted([f"{v}:{c}" for v, c in e.items()]))
-            
+
         e2v = {}
         all_e = []
         for v, e in self.v2e.items():
             e_str = e2str(e)
-            if not v.startswith('line'):
+            if not v.startswith("line"):
                 if e2str(e) not in e2v:
                     e2v[e_str] = []
                     all_e.append(e)
                 e2v[e_str].append(v)
         for v, e in self.v2e.items():
             e_str = e2str(e)
-            if v.startswith('line'):
-                vars = v[5:-1].split('-')
+            if v.startswith("line"):
+                vars = v[5:-1].split("-")
                 for i, v1 in enumerate(vars[:-1]):
                     for v2 in vars[i + 1 :]:
                         if e2str(e) not in e2v:
                             e2v[e_str] = []
-                        if v1+v2 not in e2v[e_str]:
-                            e2v[e_str].append(v1+v2)
+                        if v1 + v2 not in e2v[e_str]:
+                            e2v[e_str].append(v1 + v2)
         for e in e2v.keys():
             e2v[e] = sorted(e2v[e])
 
         e2v_pairs2 = {}
-        diffe2v_pairs2 = {'0': []}
+        diffe2v_pairs2 = {"0": []}
         for e in e2v.keys():
             e2v_pairs2[e] = []
             for i, v1 in enumerate(e2v[e][:-1]):
-                for v2 in e2v[e][i + 1:]:
+                for v2 in e2v[e][i + 1 :]:
                     e2v_pairs2[e].append((v1, v2))
             # diffe2v_pairs2['0'].extend(e2v_pairs2[e])
 
@@ -175,13 +176,13 @@ class Table:
         for e in diffe2v_pairs2.keys():
             diffe2v_pairs2[e] = list(diffe2v_pairs2[e])
             for i, (v1, v2) in enumerate(diffe2v_pairs2[e][:-1]):
-                for v3, v4 in diffe2v_pairs2[e][i + 1:]:
+                for v3, v4 in diffe2v_pairs2[e][i + 1 :]:
                     if v1 == v3 or v1 == v4 or v2 == v3 or v2 == v4:
                         continue
                     e2v_pairs4.add((v1, v2, v3, v4))
                     # if e == '0':
                     #     e2v_pairs4.append((v1, v2, v4, v3))
-                        
+
         return e2v, e2v_pairs2, e2v_pairs4
 
     def add_free(self, v: str) -> None:

@@ -1,7 +1,7 @@
 from newclid.agent.ddarn import DDARN
 from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulator
 from newclid.generation.filter import GoalFilter
-from newclid.generation.statistics import Statistics, get_first_predicate
+from newclid.generation.statistics import get_first_predicate
 from newclid.proof import ProofState
 from newclid.statement import Statement
 from newclid.formulations.definition import DefinitionJGEX
@@ -22,6 +22,7 @@ import ray
 import numpy as np
 
 from newclid.generation.sampler import ProblemSampler
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,6 +34,7 @@ class TimeoutError(Exception):
 def time_limit(seconds):
     def handler(signum, frame):
         raise TimeoutError("Timed out")
+
     signal.signal(signal.SIGALRM, handler)
     signal.alarm(seconds)
     try:
@@ -46,9 +48,9 @@ class ProblemWorker:
     Worker class to process individual geometry problems.
     This class is designed to be used with Ray for parallel processing.
     """
+
     filter = GoalFilter()
-    defs = DefinitionJGEX.to_dict(
-        DefinitionJGEX.parse_txt_file(default_defs_path()))
+    defs = DefinitionJGEX.to_dict(DefinitionJGEX.parse_txt_file(default_defs_path()))
 
     @ray.remote(num_cpus=1, max_retries=0)
     def ray_process_single_problem(args):
@@ -56,10 +58,10 @@ class ProblemWorker:
             return ProblemWorker._process_single_problem(args)
         except MemoryError as e:
             logging.error(f"⚠️ Worker OOM killed: {e}")
-            return [], {'error': 'oom'}
+            return [], {"error": "oom"}
         except Exception as e:
             logging.error(f"Worker error: {e}")
-            return [], {'error': str(e)}
+            return [], {"error": str(e)}
 
     @staticmethod
     def _process_single_problem(args: tuple) -> tuple[list, dict]:
@@ -100,7 +102,7 @@ class ProblemWorker:
                             max_auxiliary_points=max_auxiliary_points,
                             prune=prune,
                             with_coords=not remove_coords,
-                            return_timings=True
+                            return_timings=True,
                         )
                 except TimeoutError:
                     return [], {}
@@ -116,7 +118,7 @@ class ProblemWorker:
             if not solver:
                 return [], {}
 
-            n_clauses = len(fl_statement.split(';'))
+            n_clauses = len(fl_statement.split(";"))
             csolver = CSolver(fl_statement, seed=seed, solver=solver, using_log=True)
 
             # Run solver
@@ -125,7 +127,9 @@ class ProblemWorker:
             ddar_time = time.time() - ddar_start
 
             # Generate possible goals
-            possible_goals, checkgoals_runtime = ProblemWorker._generate_possible_goals(solver)
+            possible_goals, checkgoals_runtime = ProblemWorker._generate_possible_goals(
+                solver
+            )
 
             # Obtain mapping from clauses to basic statements
             proof_state_temp = ProofState(
@@ -135,7 +139,7 @@ class ProblemWorker:
             for clause in solver_builder.problemJGEX.constructions:
                 clauses_without_coords.append(
                     Clause(
-                        points=tuple(p.split('@')[0] for p in clause.points),
+                        points=tuple(p.split("@")[0] for p in clause.points),
                         sentences=clause.sentences,
                     )
                 )
@@ -150,8 +154,7 @@ class ProblemWorker:
                     for b in basics:
                         b_str = b.to_str()
                         if b_str not in statement_str_idxs:
-                            statement_str_idxs[b_str] = len(
-                                statement_str_idxs)
+                            statement_str_idxs[b_str] = len(statement_str_idxs)
                         for pname in points:
                             pointstr2basicstrs[pname].add(b_str)
                             basicstr2pointstrs[b_str].add(pname)
@@ -166,8 +169,10 @@ class ProblemWorker:
                 if aux_only > 0 and len(aux) == 0:
                     continue
                 premises = [dep.statement for dep in premises]
-                aux = sorted([dep.statement for dep in aux],
-                             key=lambda s: statement_str_idxs[s.to_str()])
+                aux = sorted(
+                    [dep.statement for dep in aux],
+                    key=lambda s: statement_str_idxs[s.to_str()],
+                )
                 point_names = set()
                 for premise in premises:
                     for arg in premise.args:
@@ -176,18 +181,23 @@ class ProblemWorker:
                 for arg in goal.args:
                     if isinstance(arg, Point):
                         point_names.add(arg.name)
-                predicates = ' '.join(sorted(point_names)) + ' $$ ' \
-                    + '; '.join(sorted([statement.to_str() for statement in premises])) + ' $$ ' \
-                    + '; '.join(sorted([statement.to_str() for statement in aux]))
-                eq_predicates_goals.setdefault(
-                    predicates, []).append((goal, premises, aux))
+                predicates = (
+                    " ".join(sorted(point_names))
+                    + " $$ "
+                    + "; ".join(sorted([statement.to_str() for statement in premises]))
+                    + " $$ "
+                    + "; ".join(sorted([statement.to_str() for statement in aux]))
+                )
+                eq_predicates_goals.setdefault(predicates, []).append(
+                    (goal, premises, aux)
+                )
             group_runtime = time.time() - group_runtime
 
             # then, process goal groups
             process_goal_time = time.time()
             generated_data = []
             for _, goal_list in eq_predicates_goals.items():
-                if (time.time() > DEADLINE):
+                if time.time() > DEADLINE:
                     break
                 goals = [data[0] for data in goal_list]
                 premises = goal_list[0][1]
@@ -205,42 +215,50 @@ class ProblemWorker:
                     n_clauses,
                     img,
                     aux_only,
-                    seed
+                    seed,
                 )
                 generated_data.extend(data)
             process_goal_time = time.time() - process_goal_time
 
-            has_real_aux = any('<aux>' in d.get('llm_output_renamed', '') for d in generated_data)
+            has_real_aux = any(
+                "<aux>" in d.get("llm_output_renamed", "") for d in generated_data
+            )
 
             # Create summary
             summary = {
-                'total_time': time.time() - start_time,
-                'generation_time': generation_time,
-                'build_solver_time': build_solver_time,
-                'ddar_time': ddar_time,
-                'runtime': solver.run_infos['runtime'],
-                'checkgoals_runtime': checkgoals_runtime,
-                'process_goal_runtime': process_goal_time,
-                'group_runtime': group_runtime,
-                'n_samples_raw': len(generated_data),
-                'goals_raw': [re.search(r'\?\s*(\w+)', d['fl_problem']).group(1) for d in generated_data],
-                'first_predicate_raw': [get_first_predicate(d['fl_problem']) for d in generated_data],
-                'n_premises_raw': [d['n_premises'] for d in generated_data],
-                'n_proof_steps_raw': [d['n_proof_steps'] for d in generated_data],
-                'n_filtered_samples': 0,  # This value will be updated in generate.py
-                'has_real_aux': has_real_aux,
-                'fl_statement': fl_statement,
+                "total_time": time.time() - start_time,
+                "generation_time": generation_time,
+                "build_solver_time": build_solver_time,
+                "ddar_time": ddar_time,
+                "runtime": solver.run_infos["runtime"],
+                "checkgoals_runtime": checkgoals_runtime,
+                "process_goal_runtime": process_goal_time,
+                "group_runtime": group_runtime,
+                "n_samples_raw": len(generated_data),
+                "goals_raw": [
+                    re.search(r"\?\s*(\w+)", d["fl_problem"]).group(1)
+                    for d in generated_data
+                ],
+                "first_predicate_raw": [
+                    get_first_predicate(d["fl_problem"]) for d in generated_data
+                ],
+                "n_premises_raw": [d["n_premises"] for d in generated_data],
+                "n_proof_steps_raw": [d["n_proof_steps"] for d in generated_data],
+                "n_filtered_samples": 0,  # This value will be updated in generate.py
+                "has_real_aux": has_real_aux,
+                "fl_statement": fl_statement,
             }
 
             # Combine the detailed sampling timing info
-            if 'sampling_timings' in locals() and sampling_timings:
-                summary['sampling_timings'] = sampling_timings
+            if "sampling_timings" in locals() and sampling_timings:
+                summary["sampling_timings"] = sampling_timings
 
             return generated_data, summary
 
         except Exception as e:
             logging.info(f"Error generating problem: {e}")
             import traceback
+
             traceback.print_exc()
             return [], {}
 
@@ -262,17 +280,17 @@ class ProblemWorker:
         """Generate possible goals"""
         t = time.time()
         # ProblemWorker.all_possible_goals_by_ar(solver.proof.dep_graph)
-        possible_goals = [
-            goal for goal in solver.proof.dep_graph.conclusions()]
+        possible_goals = [goal for goal in solver.proof.dep_graph.conclusions()]
         possible_goals = ProblemWorker.filter.goal_filter(
-            possible_goals, solver.proof.dep_graph)
+            possible_goals, solver.proof.dep_graph
+        )
         checkgoals_runtime = time.time() - t
         return possible_goals, checkgoals_runtime
 
     @staticmethod
     def all_possible_goals_by_ar(dep_graph: DependencyGraph) -> list[Statement]:
         def extract_points(s):
-            return re.findall(r'[a-z][\d]*', s)
+            return re.findall(r"[a-z][\d]*", s)
 
         def goal_from_tokens(tokens):
             if ProblemWorker.filter.naive_goal_filter(tokens[0], tokens[1:], dep_graph):
@@ -281,9 +299,10 @@ class ProblemWorker:
                     goal.check()
 
         points_name = sorted(
-            [p.name for p in dep_graph.symbols_graph.nodes_of_type(Point)])
+            [p.name for p in dep_graph.symbols_graph.nodes_of_type(Point)]
+        )
         for i, p in enumerate(points_name):
-            for q in points_name[i + 1:]:
+            for q in points_name[i + 1 :]:
                 ar = dep_graph.ar
                 if (p + q) not in ar.atable.v2e:
                     ar.atable.add_free(p + q)
@@ -297,21 +316,27 @@ class ProblemWorker:
             for v1, v2 in e2v_pairs2[e]:
                 try:
                     v1, v2 = extract_points(v1), extract_points(v2)
-                    goal_from_tokens(tuple(['para'] + list(v1 + v2)))
-                    goal_from_tokens(tuple(['perp'] + list(v1 + v2)))
-                    goal_from_tokens(tuple(['acompute'] + list(v1 + v2)))
+                    goal_from_tokens(tuple(["para"] + list(v1 + v2)))
+                    goal_from_tokens(tuple(["perp"] + list(v1 + v2)))
+                    goal_from_tokens(tuple(["acompute"] + list(v1 + v2)))
                 except Exception as e:
                     logging.warning(
-                        f"Error in goal_from_tokens: {e} para/perp for {v1}, {v2}")
+                        f"Error in goal_from_tokens: {e} para/perp for {v1}, {v2}"
+                    )
                     continue
         for v1, v2, v3, v4 in e2v_pairs4:
             try:
-                v1, v2, v3, v4 = extract_points(v1), extract_points(
-                    v2), extract_points(v3), extract_points(v4)
-                goal_from_tokens(tuple(['eqangle'] + list(v1 + v2 + v3 + v4)))
+                v1, v2, v3, v4 = (
+                    extract_points(v1),
+                    extract_points(v2),
+                    extract_points(v3),
+                    extract_points(v4),
+                )
+                goal_from_tokens(tuple(["eqangle"] + list(v1 + v2 + v3 + v4)))
             except Exception as e:
                 logging.warning(
-                    f"Error in goal_from_tokens: {e} for eqangle {v1}, {v2}, {v3}, {v4}")
+                    f"Error in goal_from_tokens: {e} for eqangle {v1}, {v2}, {v3}, {v4}"
+                )
                 continue
 
         e2v, e2v_pairs2, e2v_pairs4 = ar.rtable.possible_pairs()
@@ -319,12 +344,15 @@ class ProblemWorker:
             for v1, v2 in e2v_pairs2[e]:
                 try:
                     goal_from_tokens(
-                        tuple(['cong'] + v1[2:-1].split(',') + v2[2:-1].split(',')))
+                        tuple(["cong"] + v1[2:-1].split(",") + v2[2:-1].split(","))
+                    )
                     goal_from_tokens(
-                        tuple(['rcompute'] + v1[2:-1].split(',') + v2[2:-1].split(',')))
+                        tuple(["rcompute"] + v1[2:-1].split(",") + v2[2:-1].split(","))
+                    )
                 except Exception as e:
                     logging.warning(
-                        f"Error in goal_from_tokens: {e} cong for {v1}, {v2}")
+                        f"Error in goal_from_tokens: {e} cong for {v1}, {v2}"
+                    )
                     continue
         # for v1, v2, v3, v4 in e2v_pairs4:
         #     try:
@@ -364,13 +392,23 @@ class ProblemWorker:
         }
 
     @staticmethod
-    def _find_minimal_aux_clauses_new(pointstr2basicstrs, basicstr2pointstrs, solver, solver_builder, goals_str, premises, aux, aux_only, rng):
+    def _find_minimal_aux_clauses_new(
+        pointstr2basicstrs,
+        basicstr2pointstrs,
+        solver,
+        solver_builder,
+        goals_str,
+        premises,
+        aux,
+        aux_only,
+        rng,
+    ):
         """Find minimal auxiliary clause set"""
         results = []
         timings = {
-            'build_predicates_time': 0.0,
-            'build_solver_time': 0.0,
-            'run_solver_time': 0.0,
+            "build_predicates_time": 0.0,
+            "build_solver_time": 0.0,
+            "run_solver_time": 0.0,
         }
 
         # Step 1: First try solving without aux
@@ -379,22 +417,20 @@ class ProblemWorker:
             predicates=premises,
             defsJGEX=solver_builder.defs,
             goals_str=goals_str.copy(),
-            rng=np.random.default_rng(solver_builder.seed)
+            rng=np.random.default_rng(solver_builder.seed),
         )
-        timings['build_predicates_time'] = time.time() - t0
+        timings["build_predicates_time"] = time.time() - t0
 
         t0 = time.time()
         solver_no_aux = GeometricSolver(
-            proof_state_no_aux,
-            solver_builder.rules,
-            DDARN()
+            proof_state_no_aux, solver_builder.rules, DDARN()
         )
-        timings['build_solver_time'] = time.time() - t0
+        timings["build_solver_time"] = time.time() - t0
 
         t0 = time.time()
-        csolver_no_aux = CSolver(problem='', solver=solver_no_aux, using_log=True)
+        csolver_no_aux = CSolver(problem="", solver=solver_no_aux, using_log=True)
         csolver_no_aux.run()
-        timings['run_solver_time'] = time.time() - t0
+        timings["run_solver_time"] = time.time() - t0
 
         for goal in solver_no_aux.goals:
             if goal.check():
@@ -404,7 +440,8 @@ class ProblemWorker:
                 # For aux_only==2, never keep
                 if aux_only == 0 or (aux_only == 1 and rng.random() < 0.1):
                     results.append(
-                        ProblemWorker._extract_proof_info(solver_no_aux, goal))
+                        ProblemWorker._extract_proof_info(solver_no_aux, goal)
+                    )
 
         if len(aux) == 1:
             # If only one aux, no need to continue
@@ -418,30 +455,31 @@ class ProblemWorker:
                 predicates=premises + aux,
                 defsJGEX=solver_builder.defs,
                 goals_str=goals_str.copy(),
-                rng=np.random.default_rng(solver_builder.seed)
+                rng=np.random.default_rng(solver_builder.seed),
             )
-            timings['build_predicates_time'] += time.time() - t0
+            timings["build_predicates_time"] += time.time() - t0
 
             t0 = time.time()
             solver_all_aux = GeometricSolver(
-                proof_state_all_aux,
-                solver_builder.rules,
-                DDARN()
+                proof_state_all_aux, solver_builder.rules, DDARN()
             )
-            timings['build_solver_time'] += time.time() - t0
+            timings["build_solver_time"] += time.time() - t0
 
-            csolver_all_aux = CSolver(
-                problem='', solver=solver_all_aux, using_log=True)
+            csolver_all_aux = CSolver(problem="", solver=solver_all_aux, using_log=True)
             t0 = time.time()
             csolver_all_aux.run()
-            timings['run_solver_time'] += time.time() - t0
+            timings["run_solver_time"] += time.time() - t0
 
             for goal in solver_all_aux.goals:
                 if goal.check():
                     goals_str.remove(goal.to_str())
-                    results.append(ProblemWorker._extract_proof_info(solver_all_aux, goal))
+                    results.append(
+                        ProblemWorker._extract_proof_info(solver_all_aux, goal)
+                    )
                 else:
-                    logger.warning(f"Goal {goal.to_str()} cannot be solved even with all aux")
+                    logger.warning(
+                        f"Goal {goal.to_str()} cannot be solved even with all aux"
+                    )
             return results, timings
 
         if len(goals_str) == 0:
@@ -450,7 +488,7 @@ class ProblemWorker:
         # Step 2: For remaining goals, try removing aux one by one from back to front
         # Group goals by the minimal aux they need
         goal_groups = [{"goals": goals_str.copy(), "aux": list(aux), "solvers": {}}]
-        premise_strs = set([p.to_str() for p in premises])
+        # premise_strs = set([p.to_str() for p in premises])
         # premise_pointstrs = set()
         # for p in premises:
         #     for arg in p.args:
@@ -462,7 +500,7 @@ class ProblemWorker:
 
             for group in goal_groups:
                 # Try without this aux for all goals in this group
-                test_aux = group["aux"][:i] + group["aux"][i+1:]
+                test_aux = group["aux"][:i] + group["aux"][i + 1 :]
 
                 # # Check if the aux set is valid w.r.t rely_on
                 # flag = True
@@ -499,22 +537,20 @@ class ProblemWorker:
                     predicates=premises + test_aux,
                     defsJGEX=solver_builder.defs,
                     goals_str=group["goals"],
-                    rng=np.random.default_rng(solver_builder.seed)
+                    rng=np.random.default_rng(solver_builder.seed),
                 )
-                timings['build_predicates_time'] += time.time() - t0
+                timings["build_predicates_time"] += time.time() - t0
 
                 t0 = time.time()
                 solver_test = GeometricSolver(
-                    proof_state_test,
-                    solver_builder.rules,
-                    DDARN()
+                    proof_state_test, solver_builder.rules, DDARN()
                 )
-                timings['build_solver_time'] += time.time() - t0
+                timings["build_solver_time"] += time.time() - t0
 
                 t0 = time.time()
-                csolver_test = CSolver(problem='', solver=solver_test, using_log=True)
+                csolver_test = CSolver(problem="", solver=solver_test, using_log=True)
                 csolver_test.run()
-                timings['run_solver_time'] += time.time() - t0
+                timings["run_solver_time"] += time.time() - t0
 
                 # Check which goals are solved
                 solved_goals = []
@@ -535,17 +571,29 @@ class ProblemWorker:
 
                 # Split into groups based on whether they can be solved without this aux
                 if len(solved_goals) > 0:
-                    new_goal_groups.append({
-                        "goals": solved_goals,
-                        "aux": test_aux,
-                        "solvers": {g: group["solvers"][g] for g in solved_goals if g in group["solvers"]}
-                    })
+                    new_goal_groups.append(
+                        {
+                            "goals": solved_goals,
+                            "aux": test_aux,
+                            "solvers": {
+                                g: group["solvers"][g]
+                                for g in solved_goals
+                                if g in group["solvers"]
+                            },
+                        }
+                    )
                 if len(unsolved_goals) > 0:
-                    new_goal_groups.append({
-                        "goals": unsolved_goals,
-                        "aux": group["aux"],
-                        "solvers": {g: group["solvers"][g] for g in unsolved_goals if g in group["solvers"]}
-                    })
+                    new_goal_groups.append(
+                        {
+                            "goals": unsolved_goals,
+                            "aux": group["aux"],
+                            "solvers": {
+                                g: group["solvers"][g]
+                                for g in unsolved_goals
+                                if g in group["solvers"]
+                            },
+                        }
+                    )
 
             goal_groups = new_goal_groups
 
@@ -556,8 +604,9 @@ class ProblemWorker:
                     goals_str.remove(goal_str)
                     # Use saved solver and extract proof information
                     best_solver, best_goal = group["solvers"][goal_str]
-                    results.append(ProblemWorker._extract_proof_info(
-                        best_solver, best_goal))
+                    results.append(
+                        ProblemWorker._extract_proof_info(best_solver, best_goal)
+                    )
 
         if len(goals_str) > 0:
             # For remaining goals, excute with all aux to strip extra points
@@ -567,30 +616,32 @@ class ProblemWorker:
                 predicates=premises + aux,
                 defsJGEX=solver_builder.defs,
                 goals_str=goals_str.copy(),
-                rng=np.random.default_rng(solver_builder.seed)
+                rng=np.random.default_rng(solver_builder.seed),
             )
-            timings['build_predicates_time'] += time.time() - t0
+            timings["build_predicates_time"] += time.time() - t0
 
             t0 = time.time()
             solver_all_aux = GeometricSolver(
-                proof_state_all_aux,
-                solver_builder.rules,
-                DDARN()
+                proof_state_all_aux, solver_builder.rules, DDARN()
             )
-            timings['build_solver_time'] += time.time() - t0
+            timings["build_solver_time"] += time.time() - t0
 
-            csolver_all_aux = CSolver(problem='', solver=solver_all_aux, using_log=True)
+            csolver_all_aux = CSolver(problem="", solver=solver_all_aux, using_log=True)
             t0 = time.time()
             csolver_all_aux.run()
-            timings['run_solver_time'] += time.time() - t0
+            timings["run_solver_time"] += time.time() - t0
 
             for goal in solver_all_aux.goals:
                 goal_check_result = goal.check()
                 if goal_check_result:
                     goals_str.remove(goal.to_str())
-                    results.append(ProblemWorker._extract_proof_info(solver_all_aux, goal))
+                    results.append(
+                        ProblemWorker._extract_proof_info(solver_all_aux, goal)
+                    )
                 else:
-                    logger.warning(f"Goal {goal.to_str()} cannot be solved even with all aux")
+                    logger.warning(
+                        f"Goal {goal.to_str()} cannot be solved even with all aux"
+                    )
 
         return results, timings
 
@@ -608,7 +659,7 @@ class ProblemWorker:
         n_clauses,
         img,
         aux_only,
-        seed
+        seed,
     ):
         """Process a single goal"""
 
@@ -620,7 +671,7 @@ class ProblemWorker:
 
         # Create RNG for probabilistic filtering
         rng = np.random.default_rng(solver_builder.seed)
-        
+
         res_list, aux_timings = ProblemWorker._find_minimal_aux_clauses_new(
             pointstr2basicstrs,
             basicstr2pointstrs,
@@ -630,66 +681,73 @@ class ProblemWorker:
             premises,
             aux,
             aux_only,
-            rng
+            rng,
         )
 
         for res in res_list:
-            goal_new = res['goal']
-            points = res['points']
-            premises = res['premises']
-            numercial_checked_premises = res['numercial_checked_premises']
-            trivial_premises = res['trivial_premises']
-            aux_points = res['aux_points']
-            aux = res['aux']
-            numercial_checked_aux = res['numercial_checked_aux']
-            trivial_aux = res['trivial_aux']
-            proof_steps = res['proof_steps']
+            goal_new = res["goal"]
+            points = res["points"]
+            premises = res["premises"]
+            numercial_checked_premises = res["numercial_checked_premises"]
+            trivial_premises = res["trivial_premises"]
+            aux_points = res["aux_points"]
+            aux = res["aux"]
+            numercial_checked_aux = res["numercial_checked_aux"]
+            trivial_aux = res["trivial_aux"]
+            proof_steps = res["proof_steps"]
 
             # llm data generation
-            llm_renamed, clauses, mapping, n_premises, n_proof_steps = ProblemWorker.llm_solution_renamed(
-                clause2basics.copy(),
-                clause2args.copy(),
-                [goal_new],
-                points,
-                premises,
-                numercial_checked_premises,
-                trivial_premises,
-                aux_points,
-                aux,
-                numercial_checked_aux,
-                trivial_aux,
-                proof_steps,
-                name2node
+            llm_renamed, clauses, mapping, n_premises, n_proof_steps = (
+                ProblemWorker.llm_solution_renamed(
+                    clause2basics.copy(),
+                    clause2args.copy(),
+                    [goal_new],
+                    points,
+                    premises,
+                    numercial_checked_premises,
+                    trivial_premises,
+                    aux_points,
+                    aux,
+                    numercial_checked_aux,
+                    trivial_aux,
+                    proof_steps,
+                    name2node,
+                )
             )
 
-            if aux_only == 2 and 'aux' not in llm_renamed['llm_output']:
+            if aux_only == 2 and "aux" not in llm_renamed["llm_output"]:
                 continue
 
-            if 'aux' in llm_renamed['llm_output'] and not ProblemWorker.filter.aux_predicates_valid_check(llm_renamed['llm_output']):
+            if "aux" in llm_renamed[
+                "llm_output"
+            ] and not ProblemWorker.filter.aux_predicates_valid_check(
+                llm_renamed["llm_output"]
+            ):
                 continue
 
             result = {
                 "seed": seed,
                 "n_premises": n_premises,
-                "fl_problem": llm_renamed['fl_problem'],
+                "fl_problem": llm_renamed["fl_problem"],
                 "nl_problem": "",
                 "n_proof_steps": n_proof_steps,
-                "llm_input_renamed": llm_renamed['llm_input'],
-                "llm_output_renamed": llm_renamed['llm_output'],
-                "_timings": {**aux_timings,}
+                "llm_input_renamed": llm_renamed["llm_input"],
+                "llm_output_renamed": llm_renamed["llm_output"],
+                "_timings": {
+                    **aux_timings,
+                },
             }
 
             if img:
                 # Store drawing metadata instead of matplotlib figures
                 # to reduce memory usage in Ray workers
                 point_coords = {
-                    name: (p.num.x, p.num.y)
-                    for name, p in name2node.items()
+                    name: (p.num.x, p.num.y) for name, p in name2node.items()
                 }
                 result["draw_data"] = {
                     "clauses": [(c.points, c.sentences) for c in clauses],
                     "mapping": mapping,
-                    "goal_tokens": goal_new.to_str().split(' '),
+                    "goal_tokens": goal_new.to_str().split(" "),
                     "point_coords": point_coords,
                     "seed": solver_builder.seed,
                 }
@@ -701,8 +759,7 @@ class ProblemWorker:
     def _rediger_new_format(dep, mp, dep_idx) -> str:
         """Generate proof step in new format: statement [id] rule_id [required_statement_ids]"""
         for statement in (dep.statement,) + dep.why:
-            statement_str = ProblemWorker._statement2str_with_mapping(
-                statement, mp)
+            statement_str = ProblemWorker._statement2str_with_mapping(statement, mp)
             if statement_str not in dep_idx:
                 dep_idx[statement_str] = f"{len(dep_idx):03d}"
 
@@ -718,16 +775,17 @@ class ProblemWorker:
             rule_id = "r98"
         elif "Same Line" in reason:
             rule_id = "r97"
-        elif reason and ' ' in reason:
+        elif reason and " " in reason:
             rule_id = reason.split()[0]
         else:
             rule_id = reason if reason else "unknown"
 
         # Generate new format: statement [statement_id] rule_id [premise_ids]
-        premise_ids = ' '.join(
-            f"[{dep_idx[ProblemWorker._statement2str_with_mapping(premise, mp)]}]" for premise in dep.why)
-        conclusion_str = ProblemWorker._statement2str_with_mapping(
-            dep.statement, mp)
+        premise_ids = " ".join(
+            f"[{dep_idx[ProblemWorker._statement2str_with_mapping(premise, mp)]}]"
+            for premise in dep.why
+        )
+        conclusion_str = ProblemWorker._statement2str_with_mapping(dep.statement, mp)
         return f"{conclusion_str} [{dep_idx[conclusion_str]}] {rule_id} {premise_ids}".strip()
 
     @staticmethod
@@ -744,7 +802,7 @@ class ProblemWorker:
         numercial_checked_aux: list[Dependency],
         trivial_aux: list[Dependency],
         proof_steps: list[Dependency],
-        name2node: dict[str, Symbol]
+        name2node: dict[str, Symbol],
     ):
         """Refactored main method to generate LLM solution with renamed points"""
         try:
@@ -795,19 +853,24 @@ class ProblemWorker:
             trivial_check = ProblemWorker._generate_trivial_section(
                 mp, dep_idx, trivial_premises, trivial_aux
             )
-            proof = ProblemWorker._generate_proof_section(
-                mp, dep_idx, proof_steps
-            )
+            proof = ProblemWorker._generate_proof_section(mp, dep_idx, proof_steps)
 
             # Assemble result
-            return {
-                "fl_problem": data_problem_clauses,
-                "llm_input": data_problem,
-                "llm_output": data_aux + numerical_check + trivial_check + proof,
-            }, essential_premise_clauses, mp, n_premises, len(proof_steps)
+            return (
+                {
+                    "fl_problem": data_problem_clauses,
+                    "llm_input": data_problem,
+                    "llm_output": data_aux + numerical_check + trivial_check + proof,
+                },
+                essential_premise_clauses,
+                mp,
+                n_premises,
+                len(proof_steps),
+            )
 
-        except Exception as e:
+        except Exception:
             import traceback
+
             traceback.print_exc()
             print(f"clause2basics: {clause2basics}")
             print(f"essential_clauses: {essential_premise_clauses}")
@@ -827,7 +890,7 @@ class ProblemWorker:
 
     @staticmethod
     def _statement2str_with_mapping(statement: Statement, mp):
-        statement_args_str = statement.to_str().split(' ')[1:]
+        statement_args_str = statement.to_str().split(" ")[1:]
         res = []
         for arg, arg_str in zip(statement.args, statement_args_str):
             if isinstance(arg, Point):
@@ -839,20 +902,25 @@ class ProblemWorker:
         return " ".join(res)
 
     @staticmethod
-    def _get_all_premise(clauses: list[Clause], proof_state: ProofState) -> tuple[dict[Clause, list], dict[Clause, set]]:
+    def _get_all_premise(
+        clauses: list[Clause], proof_state: ProofState
+    ) -> tuple[dict[Clause, list], dict[Clause, set]]:
         """Get all premises from the problem constructions"""
         clause2basics: dict[Clause, list] = defaultdict(list)
         clause2args: dict[Clause, set] = defaultdict(set)
         for clause in clauses:
-            points2basics: dict[tuple[str, ...],
-                                list[Statement]] = defaultdict(list)
+            points2basics: dict[tuple[str, ...], list[Statement]] = defaultdict(list)
             for constr_sentence in clause.sentences:
                 cdef = ProblemWorker.defs[constr_sentence[0]]
                 if len(constr_sentence) == len(cdef.declare):
                     mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
                 else:
-                    assert len(constr_sentence) + len(clause.points) == len(cdef.declare)
-                    mapping = dict(zip(cdef.declare[1:], clause.points + constr_sentence[1:]))
+                    assert len(constr_sentence) + len(clause.points) == len(
+                        cdef.declare
+                    )
+                    mapping = dict(
+                        zip(cdef.declare[1:], clause.points + constr_sentence[1:])
+                    )
                 for rely_points in cdef.rely.values():
                     clause2args[clause].update(set([mapping[p] for p in rely_points]))
                 for points, bs in cdef.basics:
@@ -860,7 +928,8 @@ class ProblemWorker:
                     bs_statements = []
                     for b in bs:
                         statement = Statement.from_tokens(
-                            translate_sentence(mapping, b), proof_state.dep_graph)
+                            translate_sentence(mapping, b), proof_state.dep_graph
+                        )
                         bs_statements.append(statement)
                     points2basics[points].extend(bs_statements)
             for points, bs_statements in points2basics.items():
@@ -909,10 +978,7 @@ class ProblemWorker:
             else:
                 for p in clause.points:
                     if p in essential_point_names:
-                        free_clause = Clause(
-                            points=(p,),
-                            sentences=(('free', p),)
-                        )
+                        free_clause = Clause(points=(p,), sentences=(("free", p),))
                         essential_premise_clauses.append(free_clause)
                         new_free_points.append((free_clause, p))
         for free_clause, p in new_free_points:
@@ -930,12 +996,11 @@ class ProblemWorker:
 
         Only reserve basics that contain auxiliary statements or points.
         """
-        essential_aux_basics: list[tuple[tuple[str, ...],tuple[Statement, ...]]] = []
+        essential_aux_basics: list[tuple[tuple[str, ...], tuple[Statement, ...]]] = []
         for clause, basics in clause2basics.items():
             for points, bs in basics:
                 bs_filtered = [
-                    statement for statement in bs
-                    if statement.to_str() in aux_strs
+                    statement for statement in bs if statement.to_str() in aux_strs
                 ]
                 if len(bs_filtered) > 0 or any(p in aux_point_names for p in points):
                     essential_aux_basics.append(
@@ -953,7 +1018,9 @@ class ProblemWorker:
     ) -> dict[str, str]:
         """Create point name mapping"""
         mp: dict[str, str] = {}
-        for idx, p in enumerate(essential_premise_point_names + essential_aux_point_names):
+        for idx, p in enumerate(
+            essential_premise_point_names + essential_aux_point_names
+        ):
             assert p not in mp
             mp[p] = ProblemWorker._get_apha_geo_solver_var(idx)
         return mp
@@ -967,17 +1034,24 @@ class ProblemWorker:
     ) -> str:
         """Generate problem clauses section"""
         dep_graph = DependencyGraph(AlgebraicManipulator())
-        renamed_clauses = [clause.renamed(mp)
-                           for clause in essential_premise_clauses]
+        renamed_clauses = [clause.renamed(mp) for clause in essential_premise_clauses]
         renamed_goal_strs = [
             Statement.from_tokens(
-                translate_sentence(mp, goal.to_str().split(' ')),
+                translate_sentence(mp, goal.to_str().split(" ")),
                 dep_graph,
             ).to_str()
             for goal in goals
         ]
-        return '; '.join([clause.to_str_with_coordinates(new_points_with_coords) for clause in renamed_clauses]) + ' ? ' + \
-            '; '.join(renamed_goal_strs)
+        return (
+            "; ".join(
+                [
+                    clause.to_str_with_coordinates(new_points_with_coords)
+                    for clause in renamed_clauses
+                ]
+            )
+            + " ? "
+            + "; ".join(renamed_goal_strs)
+        )
 
     @staticmethod
     def _generate_problem_predicates_section(
@@ -997,31 +1071,39 @@ class ProblemWorker:
                 for b in bs:
                     # leverage preparsing in Statement.from_tokens to ensure format
                     statement_str = Statement.from_tokens(
-                        translate_sentence(mp, b.to_str().split(' ')),
+                        translate_sentence(mp, b.to_str().split(" ")),
                         dep_graph,
                     ).to_str()
                     assert statement_str not in dep_idx
                     if statement_str not in dep_idx:
                         dep_idx[statement_str] = f"{len(dep_idx):03d}"
                     predicate_strs_with_idx.append(
-                        f"{statement_str} [{dep_idx[statement_str]}]")
+                        f"{statement_str} [{dep_idx[statement_str]}]"
+                    )
                 if len(predicate_strs_with_idx) > 0:
                     renamed_basic_strs_with_idx.append(
-                        ' '.join([mp[p] for p in points]) + ' : ' +
-                        ' '.join(predicate_strs_with_idx)
+                        " ".join([mp[p] for p in points])
+                        + " : "
+                        + " ".join(predicate_strs_with_idx)
                     )
                 else:
                     renamed_basic_strs_with_idx.append(
-                        ' '.join([mp[p] for p in points]) + ' :')
+                        " ".join([mp[p] for p in points]) + " :"
+                    )
         renamed_goal_strs = [
             Statement.from_tokens(
-                translate_sentence(mp, goal.to_str().split(' ')),
+                translate_sentence(mp, goal.to_str().split(" ")),
                 dep_graph,
             ).to_str()
             for goal in goals
         ]
-        return '<problem> ' + ' ; '.join(renamed_basic_strs_with_idx) + ' ? ' + \
-            '; '.join(renamed_goal_strs) + ' </problem>'
+        return (
+            "<problem> "
+            + " ; ".join(renamed_basic_strs_with_idx)
+            + " ? "
+            + "; ".join(renamed_goal_strs)
+            + " </problem>"
+        )
 
     @staticmethod
     def _generate_aux_section(
@@ -1037,57 +1119,66 @@ class ProblemWorker:
             for b in bs:
                 # leverage preparsing in Statement.from_tokens to ensure format
                 statement_str = Statement.from_tokens(
-                    translate_sentence(mp, b.to_str().split(' ')),
+                    translate_sentence(mp, b.to_str().split(" ")),
                     dep_graph,
                 ).to_str()
                 assert statement_str not in dep_idx
                 if statement_str not in dep_idx:
                     dep_idx[statement_str] = f"{len(dep_idx):03d}"
                 predicate_strs_with_idx.append(
-                    f"{statement_str} [{dep_idx[statement_str]}]")
+                    f"{statement_str} [{dep_idx[statement_str]}]"
+                )
             renamed_basic_strs_with_idx.append(
-                'x00 ' + ' '.join([mp[p] for p in points]) + ' : ' +
-                ' '.join(predicate_strs_with_idx)
+                "x00 "
+                + " ".join([mp[p] for p in points])
+                + " : "
+                + " ".join(predicate_strs_with_idx)
             )
         if len(renamed_basic_strs_with_idx) == 0:
-            return ''
-        return '<aux> ' + ' ; '.join(renamed_basic_strs_with_idx) + ' ; </aux> '
+            return ""
+        return "<aux> " + " ; ".join(renamed_basic_strs_with_idx) + " ; </aux> "
 
     @staticmethod
-    def _generate_numerical_check_section(mp, dep_idx, numercial_checked_premises, numercial_checked_aux):
+    def _generate_numerical_check_section(
+        mp, dep_idx, numercial_checked_premises, numercial_checked_aux
+    ):
         """Generate numerical check section"""
         instance = ProblemWorker()
         numerical_check_items = []
         # numercial_checked_premises
         for line in numercial_checked_premises:
-            statement_str = instance._statement2str_with_mapping(
-                line.statement, mp)
+            statement_str = instance._statement2str_with_mapping(line.statement, mp)
             if statement_str not in dep_idx:
                 dep_idx[statement_str] = f"{len(dep_idx):03d}"
         sorted_numercial_checked_premises = sorted(
-            numercial_checked_premises, key=lambda line: dep_idx[instance._statement2str_with_mapping(line.statement, mp)])
+            numercial_checked_premises,
+            key=lambda line: dep_idx[
+                instance._statement2str_with_mapping(line.statement, mp)
+            ],
+        )
         for line in sorted_numercial_checked_premises:
-            statement_str = instance._statement2str_with_mapping(
-                line.statement, mp)
-            numerical_check_items.append(
-                f"{statement_str} [{dep_idx[statement_str]}]")
+            statement_str = instance._statement2str_with_mapping(line.statement, mp)
+            numerical_check_items.append(f"{statement_str} [{dep_idx[statement_str]}]")
         # numercial_checked_premises
         for line in numercial_checked_aux:
-            statement_str = instance._statement2str_with_mapping(
-                line.statement, mp)
+            statement_str = instance._statement2str_with_mapping(line.statement, mp)
             if statement_str not in dep_idx:
                 dep_idx[statement_str] = f"{len(dep_idx):03d}"
         sorted_numercial_checked_aux = sorted(
-            numercial_checked_aux, key=lambda line: dep_idx[instance._statement2str_with_mapping(line.statement, mp)])
+            numercial_checked_aux,
+            key=lambda line: dep_idx[
+                instance._statement2str_with_mapping(line.statement, mp)
+            ],
+        )
         for line in sorted_numercial_checked_aux:
-            statement_str = instance._statement2str_with_mapping(
-                line.statement, mp)
-            numerical_check_items.append(
-                f"{statement_str} [{dep_idx[statement_str]}]")
+            statement_str = instance._statement2str_with_mapping(line.statement, mp)
+            numerical_check_items.append(f"{statement_str} [{dep_idx[statement_str]}]")
         if len(numerical_check_items) > 0:
-            numerical_check = "<numerical_check> " + \
-                " ; ".join(numerical_check_items) + \
-                " ; </numerical_check> "
+            numerical_check = (
+                "<numerical_check> "
+                + " ; ".join(numerical_check_items)
+                + " ; </numerical_check> "
+            )
         else:
             numerical_check = ""
         return numerical_check
@@ -1099,34 +1190,34 @@ class ProblemWorker:
         trivial_items = []
         # trivial_premises
         for line in trivial_premises:
-            statement_str = instance._statement2str_with_mapping(
-                line.statement, mp)
+            statement_str = instance._statement2str_with_mapping(line.statement, mp)
             if statement_str not in dep_idx:
                 dep_idx[statement_str] = f"{len(dep_idx):03d}"
         sorted_trivial_premises = sorted(
-            trivial_premises, key=lambda line: dep_idx[instance._statement2str_with_mapping(line.statement, mp)])
+            trivial_premises,
+            key=lambda line: dep_idx[
+                instance._statement2str_with_mapping(line.statement, mp)
+            ],
+        )
         for line in sorted_trivial_premises:
-            statement_str = instance._statement2str_with_mapping(
-                line.statement, mp)
-            trivial_items.append(
-                f"{statement_str} [{dep_idx[statement_str]}]")
+            statement_str = instance._statement2str_with_mapping(line.statement, mp)
+            trivial_items.append(f"{statement_str} [{dep_idx[statement_str]}]")
         # trivial_premises
         for line in trivial_aux:
-            statement_str = instance._statement2str_with_mapping(
-                line.statement, mp)
+            statement_str = instance._statement2str_with_mapping(line.statement, mp)
             if statement_str not in dep_idx:
                 dep_idx[statement_str] = f"{len(dep_idx):03d}"
         sorted_trivial_aux = sorted(
-            trivial_aux, key=lambda line: dep_idx[instance._statement2str_with_mapping(line.statement, mp)])
+            trivial_aux,
+            key=lambda line: dep_idx[
+                instance._statement2str_with_mapping(line.statement, mp)
+            ],
+        )
         for line in sorted_trivial_aux:
-            statement_str = instance._statement2str_with_mapping(
-                line.statement, mp)
-            trivial_items.append(
-                f"{statement_str} [{dep_idx[statement_str]}]")
+            statement_str = instance._statement2str_with_mapping(line.statement, mp)
+            trivial_items.append(f"{statement_str} [{dep_idx[statement_str]}]")
         if len(trivial_items) > 0:
-            trivial = "<trivial> " + \
-                " ; ".join(trivial_items) + \
-                " ; </trivial> "
+            trivial = "<trivial> " + " ; ".join(trivial_items) + " ; </trivial> "
         else:
             trivial = ""
         return trivial
@@ -1139,6 +1230,7 @@ class ProblemWorker:
         for k, line in enumerate(proof_steps):
             if NUMERICAL_CHECK not in line.reason and IN_PREMISES not in line:
                 proof_steps_formatted.append(
-                    ProblemWorker._rediger_new_format(line, mp, dep_idx))
+                    ProblemWorker._rediger_new_format(line, mp, dep_idx)
+                )
         proof += " ; ".join(proof_steps_formatted) + " ; </proof>"
         return proof

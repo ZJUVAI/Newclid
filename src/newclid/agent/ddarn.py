@@ -27,8 +27,10 @@ class DDARN(DeductiveAgent):
         self.rule_buffer: list[Rule] = []
         self.application_buffer: list[Dependency] = []
         self.any_new_statement_has_been_added = True
-  
-    def run(self, proof: "ProofState", rules: list[Rule], timeout: int = 3600) -> dict[str, Any]:
+
+    def run(
+        self, proof: "ProofState", rules: list[Rule], timeout: int = 3600
+    ) -> dict[str, Any]:
         """Run DeductiveAgent until saturation or goal found."""
         infos: dict[str, Any] = {}
         for goal in proof.goals:

@@ -25,14 +25,14 @@ class Statement:
         self.args: tuple[Any, ...] = args
         self.dep_graph = dep_graph
         self._hash = None
-    
+
     def __getstate__(self):
         state = self.__dict__.copy()
         return state
 
     def __setstate__(self, state):
         self.__dict__.update(state)
-        if '_hash' not in self.__dict__:
+        if "_hash" not in self.__dict__:
             self._hash = None
 
     def check(self) -> bool:
@@ -62,7 +62,7 @@ class Statement:
         if res is not None:
             self.dep_graph.hyper_graph[self] = res
         return res
-    
+
     def to_str(self) -> str:
         return self.predicate.to_str(self)
 
@@ -70,7 +70,7 @@ class Statement:
         return self.predicate.to_repr(self)
 
     def __hash__(self) -> int:
-        if not hasattr(self, '_hash') or self._hash is None:
+        if not hasattr(self, "_hash") or self._hash is None:
             self._hash = hash(repr(self))
         return self._hash
 

@@ -1,3 +1,5 @@
+"""Shared test fixtures and utilities."""
+
 from newclid.api import GeometricSolver, GeometricSolverBuilder
 from newclid.numerical.distances import PointTooCloseError, PointTooFarError
 
@@ -5,18 +7,10 @@ from newclid.numerical.distances import PointTooCloseError, PointTooFarError
 def build_until_works(
     builder: GeometricSolverBuilder, max_attempts: int = 100
 ) -> GeometricSolver:
-    solver = None
-    attemps = 0
-    err = None
-    while solver is None and attemps < max_attempts:
-        attemps += 1
+    """Build a solver, retrying on random point placement failures."""
+    for attempt in range(1, max_attempts + 1):
         try:
-            solver = builder.build()
-        except (PointTooFarError, PointTooCloseError) as e:
-            solver = None
-            err = e
-
-    if solver is None:
-        raise Exception("Failed to build after %s attempts", max_attempts) from err
-
-    return solver
+            return builder.build()
+        except (PointTooFarError, PointTooCloseError):
+            continue
+    raise RuntimeError(f"Failed to build solver after {max_attempts} attempts")

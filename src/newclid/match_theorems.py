@@ -1,7 +1,6 @@
 """Implements theorem matching functions for the Deductive Database (DD)."""
 
 import itertools
-import logging
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Generator, Optional
@@ -19,6 +18,7 @@ if TYPE_CHECKING:
     from newclid.dependencies.dependency_graph import DependencyGraph
 
 from newclid import matchinC
+
 
 class Matcher:
     def __init__(
@@ -43,8 +43,10 @@ class Matcher:
                 json.dump({}, f)
         self.cache = {}
         self.rule_match_time = {}
-        
-    def apply_theorem(self, theorem: "Rule", mapping: dict[str, str]) -> Optional[set[Dependency]]:
+
+    def apply_theorem(
+        self, theorem: "Rule", mapping: dict[str, str]
+    ) -> Optional[set[Dependency]]:
         res: set[Dependency] = set()
         why: list[Statement] = []
         reason = theorem.descrption
@@ -67,7 +69,10 @@ class Matcher:
                 translate_sentence(mapping, conclusion), self.dep_graph
             )
             # assert conclusion_statement.check_numerical()
-            if conclusion_statement is None or not conclusion_statement.check_numerical():
+            if (
+                conclusion_statement is None
+                or not conclusion_statement.check_numerical()
+            ):
                 continue
             dep = Dependency.mk(conclusion_statement, reason, tuple(why))
             res.add(dep)
@@ -97,8 +102,10 @@ class Matcher:
                     new_points.append(p)
                     premise_points.append(p)
             if new_points:
-                mappings =  [{v: p for v, p in zip(new_points, point_list)}
-                        for point_list in itertools.product(points, repeat=len(new_points))]
+                mappings = [
+                    {v: p for v, p in zip(new_points, point_list)}
+                    for point_list in itertools.product(points, repeat=len(new_points))
+                ]
                 result.append(mappings)
             else:
                 # 如果没有新点，返回空的映射
@@ -115,9 +122,14 @@ class Matcher:
             statement_list = self.dep_graph.numerical_checked_eqangle
         if premise[0] == "eqratio":
             statement_list = self.dep_graph.numerical_checked_eqratio
-        point_coors = [(p.num.x, p.num.y) for p in self.dep_graph.symbols_graph.nodes_of_type(Point)]
+        point_coors = [
+            (p.num.x, p.num.y)
+            for p in self.dep_graph.symbols_graph.nodes_of_type(Point)
+        ]
         list_premises = [list(premise) for premise in premises]
-        mappings = matchinC.mapping_eq_theorem(list_premises, point_coors, statement_list)
+        mappings = matchinC.mapping_eq_theorem(
+            list_premises, point_coors, statement_list
+        )
 
         for mapping in mappings:
             why = []
@@ -126,8 +138,8 @@ class Matcher:
                 mapping[key] = points[mapping[key]]
             for premise in premises:
                 s = Statement.from_tokens(
-                        translate_sentence(mapping, premise), self.dep_graph
-                    )
+                    translate_sentence(mapping, premise), self.dep_graph
+                )
                 if s is None or not s.check_numerical():
                     flag = True
                     break
@@ -136,29 +148,29 @@ class Matcher:
                 continue
             for conclusion in theorem.conclusions:
                 s = Statement.from_tokens(
-                        translate_sentence(mapping, conclusion), self.dep_graph
-                    )
+                    translate_sentence(mapping, conclusion), self.dep_graph
+                )
                 if s is None or not s.check_numerical():
                     continue
                 dep = Dependency.mk(s, theorem.descrption, tuple(why))
                 res.add(dep)
-                
+
         return res
-    
+
     def cache_midp_premise_theorem(self, theorem, points):
         statement_list = self.dep_graph.numerical_checked_midp
         res: set[Dependency] = set()
         premise = theorem.premises[0]
         variables = theorem.variables()
         variables_in_premise = set(premise[1:])
-        variables_not_in_premise= list(set(variables) - variables_in_premise)
+        variables_not_in_premise = list(set(variables) - variables_in_premise)
         for statement in statement_list:
             # args = [p.name for p in statement.args]
             args = statement
             assert len(args) == 3
             args_permutation = {
                 (args[0], args[1], args[2]),
-                (args[0], args[2], args[1])
+                (args[0], args[2], args[1]),
             }
             for args in args_permutation:
                 mapping = {}
@@ -171,10 +183,12 @@ class Matcher:
                         break
                 if not flag:
                     continue
-                    
+
                 for extra_mapping in (
-                    {v: p for v, p in zip(variables_not_in_premise, point_list)} 
-                    for point_list in itertools.product(points, repeat=len(variables_not_in_premise))
+                    {v: p for v, p in zip(variables_not_in_premise, point_list)}
+                    for point_list in itertools.product(
+                        points, repeat=len(variables_not_in_premise)
+                    )
                 ):
                     mapping.update(extra_mapping)
                     # logging.info(f"{theorem} mapping {mapping=}")
@@ -182,7 +196,7 @@ class Matcher:
                     if new_conclusions:
                         res.update(new_conclusions)
         return res
-    
+
     def cache_simtri_premise_theorem(self, theorem, points):
         statement_list = None
         res: set[Dependency] = set()
@@ -193,7 +207,7 @@ class Matcher:
         elif premise[0] == "simtrir":
             statement_list = self.dep_graph.numerical_checked_simtrir
         variables_in_premise = set(premise[1:])
-        variables_not_in_premise= list(set(variables) - variables_in_premise)
+        variables_not_in_premise = list(set(variables) - variables_in_premise)
         for statement in statement_list:
             # args = [p.name for p in statement.args]
             args = statement
@@ -210,7 +224,7 @@ class Matcher:
                 (args[4], args[3], args[5], args[1], args[0], args[2]),
                 (args[4], args[5], args[3], args[1], args[2], args[0]),
                 (args[5], args[3], args[4], args[2], args[0], args[1]),
-                (args[5], args[4], args[3], args[2], args[1], args[0])
+                (args[5], args[4], args[3], args[2], args[1], args[0]),
             }
             for args in args_permutation:
                 mapping = {}
@@ -223,10 +237,12 @@ class Matcher:
                         break
                 if not flag:
                     continue
-                    
+
                 for extra_mapping in (
-                    {v: p for v, p in zip(variables_not_in_premise, point_list)} 
-                    for point_list in itertools.product(points, repeat=len(variables_not_in_premise))
+                    {v: p for v, p in zip(variables_not_in_premise, point_list)}
+                    for point_list in itertools.product(
+                        points, repeat=len(variables_not_in_premise)
+                    )
                 ):
                     mapping.update(extra_mapping)
                     # logging.info(f"{theorem} mapping {mapping=}")
@@ -235,9 +251,12 @@ class Matcher:
                         res.update(new_conclusions)
         return res
 
-    def cache_normal_theorem(self, theorem : "Rule", points):
+    def cache_normal_theorem(self, theorem: "Rule", points):
         premises = theorem.premises
-        point_ids = [(p.num.x, p.num.y) for p in self.dep_graph.symbols_graph.nodes_of_type(Point)]
+        point_ids = [
+            (p.num.x, p.num.y)
+            for p in self.dep_graph.symbols_graph.nodes_of_type(Point)
+        ]
         list_premises = [list(premise) for premise in premises]
         mappings = matchinC.mapping_normal_theorem(list_premises, point_ids)
         res: set[Dependency] = set()
@@ -249,8 +268,8 @@ class Matcher:
                 mapping[key] = points[mapping[key]]
             for premise in premises:
                 s = Statement.from_tokens(
-                        translate_sentence(mapping, premise), self.dep_graph
-                    )
+                    translate_sentence(mapping, premise), self.dep_graph
+                )
                 if s is None or not s.check_numerical():
                     flag = True
                     break
@@ -259,15 +278,15 @@ class Matcher:
                 continue
             for conclusion in theorem.conclusions:
                 s = Statement.from_tokens(
-                        translate_sentence(mapping, conclusion), self.dep_graph
-                    )
+                    translate_sentence(mapping, conclusion), self.dep_graph
+                )
                 if s is None or not s.check_numerical():
                     continue
                 dep = Dependency.mk(s, theorem.descrption, tuple(why))
                 res.add(dep)
-                
+
         return res
-    
+
     def cache_simtri_conclusion_theorem(self, theorem: "Rule", points):
         statement_list = None
         res: set[Dependency] = set()
@@ -278,7 +297,7 @@ class Matcher:
         elif conclusion[0] == "simtrir":
             statement_list = self.dep_graph.numerical_checked_simtrir
         variables_in_premise = set(conclusion[1:])
-        variables_not_in_premise= list(set(variables) - variables_in_premise)
+        variables_not_in_premise = list(set(variables) - variables_in_premise)
         for statement in statement_list:
             # args = [p.name for p in statement.args]
             args = statement
@@ -295,7 +314,7 @@ class Matcher:
                 (args[4], args[3], args[5], args[1], args[0], args[2]),
                 (args[4], args[5], args[3], args[1], args[2], args[0]),
                 (args[5], args[3], args[4], args[2], args[0], args[1]),
-                (args[5], args[4], args[3], args[2], args[1], args[0])
+                (args[5], args[4], args[3], args[2], args[1], args[0]),
             }
             for args in args_permutation:
                 mapping = {}
@@ -308,10 +327,12 @@ class Matcher:
                         break
                 if not flag:
                     continue
-                    
+
                 for extra_mapping in (
-                    {v: p for v, p in zip(variables_not_in_premise, point_list)} 
-                    for point_list in itertools.product(points, repeat=len(variables_not_in_premise))
+                    {v: p for v, p in zip(variables_not_in_premise, point_list)}
+                    for point_list in itertools.product(
+                        points, repeat=len(variables_not_in_premise)
+                    )
                 ):
                     mapping.update(extra_mapping)
                     # logging.info(f"{theorem} mapping {mapping=}")
@@ -319,7 +340,7 @@ class Matcher:
                     if new_conclusions:
                         res.update(new_conclusions)
         return res
-    
+
     def cache_eq_conclusion_theorem(self, theorem, points):
         statement_list = None
         res: set[Dependency] = set()
@@ -329,9 +350,14 @@ class Matcher:
             statement_list = self.dep_graph.numerical_checked_eqangle
         if premise[0] == "eqratio":
             statement_list = self.dep_graph.numerical_checked_eqratio
-        point_coors = [(p.num.x, p.num.y) for p in self.dep_graph.symbols_graph.nodes_of_type(Point)]
-        list_premises = [premise]+[list(premise) for premise in premises]
-        mappings = matchinC.mapping_eq_theorem(list_premises, point_coors, statement_list)
+        point_coors = [
+            (p.num.x, p.num.y)
+            for p in self.dep_graph.symbols_graph.nodes_of_type(Point)
+        ]
+        list_premises = [premise] + [list(premise) for premise in premises]
+        mappings = matchinC.mapping_eq_theorem(
+            list_premises, point_coors, statement_list
+        )
 
         for mapping in mappings:
             why = []
@@ -340,8 +366,8 @@ class Matcher:
                 mapping[key] = points[mapping[key]]
             for premise in premises:
                 s = Statement.from_tokens(
-                        translate_sentence(mapping, premise), self.dep_graph
-                    )
+                    translate_sentence(mapping, premise), self.dep_graph
+                )
                 if s is None or not s.check_numerical():
                     flag = True
                     break
@@ -350,23 +376,23 @@ class Matcher:
                 continue
             for conclusion in theorem.conclusions:
                 s = Statement.from_tokens(
-                        translate_sentence(mapping, conclusion), self.dep_graph
-                    )
+                    translate_sentence(mapping, conclusion), self.dep_graph
+                )
                 if s is None or not s.check_numerical():
                     continue
                 dep = Dependency.mk(s, theorem.descrption, tuple(why))
                 res.add(dep)
-                
+
         return res
 
     def cache_theorem(self, theorem: "Rule"):
         start_time = time.time()
-        
+
         # file_cache = None
         # write = False
         # read = False
         # mappings: list[dict[str, str]] = []
-        
+
         # if self.runtime_cache_path is not None:
         #     with open(self.runtime_cache_path) as f:
         #         file_cache = json.load(f)
@@ -378,10 +404,10 @@ class Matcher:
         #     else:
         #         file_cache["matcher"][str(theorem)] = mappings
         #         write = True
-        
+
         self.cache[theorem] = ()
         points = [p.name for p in self.dep_graph.symbols_graph.nodes_of_type(Point)]
-        
+
         # logging.debug(
         #     f"{theorem} matching cache : before {len(self.cache[theorem])=} {read=} {write=} {len(mappings)=}"
         # )
@@ -390,15 +416,21 @@ class Matcher:
         #         new_conclusions = self.apply_theorem(theorem, mapping)
         #         if new_conclusions:
         #             res.update(new_conclusions)
-        if theorem.conclusions[0][0] == 'simtri' or theorem.conclusions[0][0] == 'simtrir':
+        if (
+            theorem.conclusions[0][0] == "simtri"
+            or theorem.conclusions[0][0] == "simtrir"
+        ):
             res = self.cache_simtri_conclusion_theorem(theorem, points)
-        elif theorem.premises[0][0] == 'simtri' or theorem.premises[0][0] == 'simtrir':
+        elif theorem.premises[0][0] == "simtri" or theorem.premises[0][0] == "simtrir":
             res = self.cache_simtri_premise_theorem(theorem, points)
-        elif theorem.premises[0][0] == 'eqangle' or theorem.premises[0][0] == 'eqratio':
+        elif theorem.premises[0][0] == "eqangle" or theorem.premises[0][0] == "eqratio":
             res = self.cache_eq_premise_theorem(theorem, points)
-        elif theorem.conclusions[0][0] == 'eqangle' or theorem.conclusions[0][0] == 'eqratio':
+        elif (
+            theorem.conclusions[0][0] == "eqangle"
+            or theorem.conclusions[0][0] == "eqratio"
+        ):
             res = self.cache_eq_conclusion_theorem(theorem, points)
-        elif theorem.premises[0][0] == 'midp':
+        elif theorem.premises[0][0] == "midp":
             res = self.cache_midp_premise_theorem(theorem, points)
         else:
             res = self.cache_normal_theorem(theorem, points)
@@ -413,7 +445,7 @@ class Matcher:
         # logging.debug(
         #     f"{theorem} matching cache : now {len(self.cache[theorem])=} {read=} {write=} {len(mappings)=}"
         # )
-        
+
         # record cache time
         elapsed_time = time.time() - start_time
         rule_name = theorem.descrption
@@ -424,8 +456,7 @@ class Matcher:
     def get_rule_match_time_stats(self) -> dict[str, float]:
         """get the statistics of rule match time"""
         return self.rule_match_time.copy()
-    
+
     def reset_rule_match_time_stats(self):
         """Reset the rule match time statistics."""
         self.rule_match_time = {}
-

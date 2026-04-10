@@ -36,7 +36,7 @@ class Cong(Predicate):
             if a == b:
                 return None
             segs.append((a, b))
-        segs.sort(key = lambda pair: [cls.custom_key(arg) for arg in pair])
+        segs.sort(key=lambda pair: [cls.custom_key(arg) for arg in pair])
         points: list[str] = []
         for a, b in segs:
             points.append(a)
@@ -139,7 +139,6 @@ class Cong(Predicate):
         segment_colors: Optional[dict[tuple[str, str], int]] = None,
         figure_sizes: list = [],
         draw_annotations: bool = True,
-        
     ):
         # Draw original segments
         for i in range(0, len(args), 2):
@@ -154,7 +153,7 @@ class Cong(Predicate):
             segment_parent = graph.segment_parent
         if segment_colors is None:
             segment_colors = graph.segment_colors
-        
+
         def find_root(segment: tuple[str, str]) -> tuple[str, str]:
             """Find root with path compression"""
             if segment not in segment_parent:
@@ -163,14 +162,14 @@ class Cong(Predicate):
             if segment_parent[segment] != segment:
                 segment_parent[segment] = find_root(segment_parent[segment])
             return segment_parent[segment]
-        
+
         def union_segments(seg1: tuple[str, str], seg2: tuple[str, str]):
             """Union two segments"""
             root1 = find_root(seg1)
             root2 = find_root(seg2)
             if root1 != root2:
                 segment_parent[root2] = root1
-        
+
         # Collect current segments and normalize them
         current_segments = []
         for i in range(0, len(args), 2):
@@ -178,11 +177,11 @@ class Cong(Predicate):
             current_segments.append(
                 (p1.name, p2.name) if p1.name <= p2.name else (p2.name, p1.name)
             )
-        
+
         # Union all current segments together
         for i in range(1, len(current_segments)):
             union_segments(current_segments[0], current_segments[i])
-        
+
         # Find the root and assign color if needed
         root = find_root(current_segments[0])
         if root not in segment_colors:
@@ -191,28 +190,28 @@ class Cong(Predicate):
             color_index = getattr(ax, "cong_color")
             segment_colors[root] = color_index
         color_index = segment_colors[root]
-        
+
         # Find all segments in the same equivalence class and draw marks
         root = find_root(current_segments[0])
         equivalent_segments = []
         for seg in segment_parent:
             if find_root(seg) == root:
                 equivalent_segments.append(seg)
-        
+
         # Draw congruence marks for all equivalent segments
         for seg_key in equivalent_segments:
             p1_name, p2_name = seg_key
             p1 = graph.name2node[p1_name]
             p2 = graph.name2node[p2_name]
-            
+
             # Calculate segment midpoint
             mid = (p1.num + p2.num) * 0.5
-            
+
             # Calculate segment direction and perpendicular vectors
             direction = p2.num - p1.num
             direction = direction / abs(direction)
             perpendicular = direction.rot90()
-            
+
             # Get current axis limits to determine figure size
             if len(figure_sizes) > 0:
                 figure_size = figure_sizes[0]
@@ -223,29 +222,29 @@ class Cong(Predicate):
                 figure_height = ylim[1] - ylim[0]
                 figure_size = max(figure_width, figure_height)
                 figure_sizes.append(figure_size)
-            
+
             # Set slash parameters proportional to figure size
             slash_length = figure_size * 0.015  # 1.5% of figure size
-            slash_gap = figure_size * 0.006     # 0.6% of figure size
-            
+            slash_gap = figure_size * 0.006  # 0.6% of figure size
+
             # Calculate slash positions
             slash1_start = mid - direction * slash_gap - perpendicular * slash_length
             slash1_end = mid - direction * slash_gap + perpendicular * slash_length
             slash2_start = mid + direction * slash_gap - perpendicular * slash_length
             slash2_end = mid + direction * slash_gap + perpendicular * slash_length
-            
+
             # Draw slashes
             draw_segment_num(
                 ax,
                 slash1_start,
                 slash1_end,
                 color=PALETTE[color_index % len(PALETTE)],
-                lw=1.2
+                lw=1.2,
             )
             draw_segment_num(
                 ax,
                 slash2_start,
                 slash2_end,
                 color=PALETTE[color_index % len(PALETTE)],
-                lw=1.2
+                lw=1.2,
             )

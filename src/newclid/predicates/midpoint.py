@@ -25,7 +25,7 @@ class MidPoint(Predicate):
         if len(set(args)) != 3:
             return None
         m, a, b = args
-        a, b = sorted((a, b), key = cls.custom_key)
+        a, b = sorted((a, b), key=cls.custom_key)
         return (m, a, b)
 
     @classmethod
@@ -45,7 +45,7 @@ class MidPoint(Predicate):
     def to_constructive(cls, point: str, args: tuple[str, ...]) -> str:
         a, b, c = args
         return f"midpoint {a} {b} {c}"
-    
+
     @classmethod
     def pretty(cls, statement: Statement) -> str:
         args: tuple[Point, ...] = statement.args
@@ -54,6 +54,11 @@ class MidPoint(Predicate):
 
     @classmethod
     def draw(
-        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True
+        cls,
+        ax: Axes,
+        args: tuple[Any, ...],
+        dep_graph: DependencyGraph,
+        rng: Generator,
+        draw_annotations: bool = True,
     ):
         draw_segment(ax, args[1], args[2])
