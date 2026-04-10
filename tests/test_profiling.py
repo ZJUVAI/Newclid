@@ -22,9 +22,25 @@ from experiments.single_problem_multi_gpu_eval.base_multi_gpu_agent import BaseM
 class _DummyDispatcher:
     def __init__(self, refs=None):
         self._refs = [] if refs is None else list(refs)
+        self._pending = 0
+        self._idle = 0
 
     def active_refs(self):
         return list(self._refs)
+
+    def pending_request_count(self):
+        return self._pending
+
+    def idle_worker_count(self):
+        return self._idle
+
+
+class _TraceWriter:
+    def __init__(self):
+        self.records = []
+
+    def log(self, event, **payload):
+        self.records.append((event, payload))
 
 
 class _DummyAgent(BaseMultiGPUAgent):
@@ -122,6 +138,8 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "gpu_result_handle_wall_time_s": 0.3,
             "ddar_submit_wall_time_s": 0.1,
             "ddar_result_handle_wall_time_s": 0.4,
+            "ddar_build_work_time_s": 0.12,
+            "ddar_engine_work_time_s": 0.22,
             "ddar_result_ray_get_wall_time_s": 0.2,
             "ddar_result_next_state_wall_time_s": 0.1,
             "ddar_result_queue_wall_time_s": 0.05,
@@ -162,6 +180,8 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "gpu_result_handle_wall_time_s": 0.2,
             "ddar_submit_wall_time_s": 0.0,
             "ddar_result_handle_wall_time_s": 0.1,
+            "ddar_build_work_time_s": 0.04,
+            "ddar_engine_work_time_s": 0.06,
             "ddar_result_ray_get_wall_time_s": 0.05,
             "ddar_result_next_state_wall_time_s": 0.02,
             "ddar_result_queue_wall_time_s": 0.01,
@@ -198,11 +218,14 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
     assert "Dataset: demo, Solved: 1/2" in written_rows[0][0]
     assert "Total Time: 7.00s" in written_rows[0][0]
     assert "Request Prepare Wall Time: 1.50s" in written_rows[0][0]
+    assert "DDAR Build Work Time: 0.16s" in written_rows[0][0]
+    assert "DDAR Engine Work Time: 0.28s" in written_rows[0][0]
     assert "DDAR Result Ray.get Wall Time: 0.25s" in written_rows[0][0]
     assert "Avg GPU Batch Size: 1.67" in written_rows[0][0]
     assert written_rows[1] == [label for _, label, _ in CSV_COLUMN_SPECS]
     header_index = {name: idx for idx, (name, _, _) in enumerate(CSV_COLUMN_SPECS)}
     assert written_rows[2][header_index["problem_name"]] == "p1"
+    assert written_rows[2][header_index["ddar_build_work_time_s"]] == "0.12"
     assert written_rows[2][header_index["gpu_batch_submitted_count"]] == "2"
     assert written_rows[2][header_index["avg_gpu_batch_size"]] == "1.50"
     assert written_rows[3][header_index["problem_name"]] == "p2"
@@ -261,6 +284,44 @@ def test_gpu_or_ddar_wait_is_attributed_to_wait_wall_time(monkeypatch) -> None:
 
     assert profiling["wait_wall_time_s"] > 0.0
     assert profiling["request_prepare_wall_time_s"] == 0.0
+
+
+def test_trace_scheduler_state_logs_on_change() -> None:
+    trace_writer = _TraceWriter()
+    agent = _DummyAgent(
+        model_pool=None,
+        decoding_size=1,
+        beam_size=1,
+        search_depth=1,
+        agent_type="dummy",
+        trace_writer=trace_writer,
+    )
+    dispatcher = _DummyDispatcher(refs=["gpu-ref"])
+    dispatcher._pending = 2
+    dispatcher._idle = 3
+    running_prepare_futures = {"f0": {"request_id": "r0"}}
+    prepared_requests = deque([{"request_id": "r1"}])
+    pending_ddar_submit = deque([{"attempt_key": "a0"}])
+    running_futures = ["ddar-ref"]
+
+    agent._trace_scheduler_state(
+        depth=0,
+        dispatcher=dispatcher,
+        running_prepare_futures=running_prepare_futures,
+        prepared_requests=prepared_requests,
+        pending_ddar_submit=pending_ddar_submit,
+        running_futures=running_futures,
+        frontier_exhausted=False,
+        force=True,
+    )
+
+    assert trace_writer.records
+    event, payload = trace_writer.records[0]
+    assert event == "scheduler_state"
+    assert payload["running_prepare"] == 1
+    assert payload["pending_gpu_requests"] == 2
+    assert payload["active_gpu_batches"] == 1
+    assert payload["running_ddar"] == 1
 
 
 def test_ddar_result_handle_breaks_out_non_overlapping_substages(monkeypatch) -> None:

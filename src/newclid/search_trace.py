@@ -160,6 +160,8 @@ class AttemptAggregator:
             attempt["attempt_key"] = attempt_key
             attempt["ddar_status"] = record.get("status")
             attempt["ddar_elapsed_time"] = record.get("elapsed_time")
+            attempt["ddar_build_work_time_s"] = record.get("ddar_build_work_time_s")
+            attempt["ddar_engine_work_time_s"] = record.get("ddar_engine_work_time_s")
             attempt["ddar_input"] = record.get("ddar_input")
             attempt["problem_text"] = record.get("problem_text")
             attempt["error_type"] = record.get("error_type")
@@ -221,6 +223,8 @@ class AttemptAggregator:
             "decision": None,
             "ddar_status": None,
             "ddar_elapsed_time": None,
+            "ddar_build_work_time_s": None,
+            "ddar_engine_work_time_s": None,
             "ddar_input": record.get("ddar_input"),
             "problem_text": record.get("problem_text"),
             "error_type": record.get("error_type"),
@@ -260,6 +264,8 @@ class AttemptAggregator:
             "decision": record.get("decision"),
             "ddar_status": None,
             "ddar_elapsed_time": None,
+            "ddar_build_work_time_s": None,
+            "ddar_engine_work_time_s": None,
             "ddar_input": None,
             "problem_text": record.get("new_problem_text"),
             "error_type": record.get("error_type"),

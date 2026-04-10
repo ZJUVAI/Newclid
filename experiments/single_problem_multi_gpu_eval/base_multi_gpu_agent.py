@@ -61,6 +61,9 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         self.prepare_prefetch_limit = prepare_prefetch_limit
         self.ddar_returns_proof = ddar_returns_proof
         self.trace_writer = trace_writer
+        self._scheduler_trace_interval_s = 0.5
+        self._last_scheduler_trace_at = 0.0
+        self._last_scheduler_trace_state: dict[str, Any] | None = None
 
     def step(self, proof: ProofState, rules: list["Rule"]) -> bool:
         return True
@@ -135,6 +138,42 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         if self.trace_writer is not None:
             self.trace_writer.log(event, **payload)
 
+    def _trace_scheduler_state(
+        self,
+        *,
+        depth: int,
+        dispatcher,
+        running_prepare_futures: dict[Future[dict[str, Any]], dict[str, Any]],
+        prepared_requests: deque[dict[str, Any]],
+        pending_ddar_submit: deque[dict[str, Any]],
+        running_futures: list[Any],
+        frontier_exhausted: bool,
+        force: bool = False,
+    ) -> None:
+        if self.trace_writer is None:
+            return
+        now = time.perf_counter()
+        state = {
+            "depth": depth,
+            "running_prepare": len(running_prepare_futures),
+            "prepared_requests": len(prepared_requests),
+            "pending_gpu_requests": dispatcher.pending_request_count(),
+            "active_gpu_batches": len(dispatcher.active_refs()),
+            "idle_gpu_workers": dispatcher.idle_worker_count(),
+            "pending_ddar_submit": len(pending_ddar_submit),
+            "running_ddar": len(running_futures),
+            "frontier_exhausted": frontier_exhausted,
+        }
+        if (
+            not force
+            and self._last_scheduler_trace_state == state
+            and (now - self._last_scheduler_trace_at) < self._scheduler_trace_interval_s
+        ):
+            return
+        self._last_scheduler_trace_state = dict(state)
+        self._last_scheduler_trace_at = now
+        self._trace("scheduler_state", **state)
+
     def _handle_ddar_done(
         self,
         *,
@@ -162,6 +201,8 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             )
             future_meta = future_info.pop(future)
             increment_profiling_count(profiling, "ddar_completed_count")
+            add_profiling_time(profiling, "ddar_build_work_time_s", ddar_result.get("ddar_build_work_time_s"))
+            add_profiling_time(profiling, "ddar_engine_work_time_s", ddar_result.get("ddar_engine_work_time_s"))
 
             if ddar_result["status"] == "invalid":
                 self._trace(
@@ -172,6 +213,8 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     depth=depth,
                     status=ddar_result["status"],
                     elapsed_time=ddar_result.get("elapsed_time"),
+                    ddar_build_work_time_s=ddar_result.get("ddar_build_work_time_s"),
+                    ddar_engine_work_time_s=ddar_result.get("ddar_engine_work_time_s"),
                     error_type=ddar_result.get("error_type"),
                     error_message=ddar_result.get("error_message"),
                     problem_text=ddar_result.get("problem_text"),
@@ -189,6 +232,8 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     depth=depth,
                     status=ddar_result["status"],
                     elapsed_time=ddar_result.get("elapsed_time"),
+                    ddar_build_work_time_s=ddar_result.get("ddar_build_work_time_s"),
+                    ddar_engine_work_time_s=ddar_result.get("ddar_engine_work_time_s"),
                     error_type=ddar_result.get("error_type"),
                     error_message=ddar_result.get("error_message"),
                     problem_text=ddar_result.get("problem_text"),
@@ -214,6 +259,8 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 depth=depth,
                 status=ddar_result["status"],
                 elapsed_time=ddar_result.get("elapsed_time"),
+                ddar_build_work_time_s=ddar_result.get("ddar_build_work_time_s"),
+                ddar_engine_work_time_s=ddar_result.get("ddar_engine_work_time_s"),
                 error_type=ddar_result.get("error_type"),
                 error_message=ddar_result.get("error_message"),
                 problem_text=ddar_result.get("problem_text"),
@@ -745,6 +792,8 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         step = 0
         next_node_id = 1
         profiling = create_profiling_payload()
+        self._last_scheduler_trace_at = 0.0
+        self._last_scheduler_trace_state = None
 
         for goal in proof.goals:
             if not goal.check_numerical():
@@ -857,6 +906,16 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 request_index = 0
                 frontier_exhausted = False
                 ddar_backlog_high_watermark = max(self.max_pending_ddar + 1, 2 * self.max_pending_ddar)
+                self._trace_scheduler_state(
+                    depth=depth,
+                    dispatcher=dispatcher,
+                    running_prepare_futures=running_prepare_futures,
+                    prepared_requests=prepared_requests,
+                    pending_ddar_submit=pending_ddar_submit,
+                    running_futures=running_futures,
+                    frontier_exhausted=frontier_exhausted,
+                    force=True,
+                )
 
                 while True:
                     loop_start = time.perf_counter()
@@ -875,6 +934,15 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                         )
                     }
                     progress = False
+                    self._trace_scheduler_state(
+                        depth=depth,
+                        dispatcher=dispatcher,
+                        running_prepare_futures=running_prepare_futures,
+                        prepared_requests=prepared_requests,
+                        pending_ddar_submit=pending_ddar_submit,
+                        running_futures=running_futures,
+                        frontier_exhausted=frontier_exhausted,
+                    )
                     dispatcher.tick()
                     self._drain_dispatcher_submission_events(dispatcher=dispatcher, depth=depth, profiling=profiling)
 
@@ -1022,6 +1090,16 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                         # deterministic.
                         break
 
+                    self._trace_scheduler_state(
+                        depth=depth,
+                        dispatcher=dispatcher,
+                        running_prepare_futures=running_prepare_futures,
+                        prepared_requests=prepared_requests,
+                        pending_ddar_submit=pending_ddar_submit,
+                        running_futures=running_futures,
+                        frontier_exhausted=frontier_exhausted,
+                    )
+
                     loop_elapsed_s = time.perf_counter() - loop_start
                     accounted_delta = sum(
                         float(profiling.get(field, 0.0)) - wall_before[field]
@@ -1049,6 +1127,16 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     continue
 
                 beam_queue = next_queue
+                self._trace_scheduler_state(
+                    depth=depth,
+                    dispatcher=dispatcher,
+                    running_prepare_futures=running_prepare_futures,
+                    prepared_requests=prepared_requests,
+                    pending_ddar_submit=pending_ddar_submit,
+                    running_futures=running_futures,
+                    frontier_exhausted=True,
+                    force=True,
+                )
                 next_frontier_size = len(list(beam_queue))
                 self._trace("depth_end", depth=depth, next_frontier_size=next_frontier_size)
                 logger.info(

@@ -131,6 +131,9 @@ class GenerationDispatcher:
     def idle_worker_count(self) -> int:
         return len(self.idle_workers)
 
+    def pending_request_count(self) -> int:
+        return len(self.pending_requests)
+
     def active_refs(self) -> list[Any]:
         return list(self.running.keys())
 

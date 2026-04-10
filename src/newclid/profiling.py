@@ -29,6 +29,8 @@ WALL_TIME_FIELDS = (
 )
 
 DETAIL_TIME_FIELDS = (
+    "ddar_build_work_time_s",
+    "ddar_engine_work_time_s",
     "ddar_result_ray_get_wall_time_s",
     "ddar_result_next_state_wall_time_s",
     "ddar_result_queue_wall_time_s",
@@ -73,6 +75,8 @@ CSV_COLUMN_SPECS = (
     ("gpu_result_handle_wall_time_s", "GPU Result Handle Wall Time (s)", "float"),
     ("ddar_submit_wall_time_s", "DDAR Submit Wall Time (s)", "float"),
     ("ddar_result_handle_wall_time_s", "DDAR Result Handle Wall Time (s)", "float"),
+    ("ddar_build_work_time_s", "DDAR Build Work Time (s)", "float"),
+    ("ddar_engine_work_time_s", "DDAR Engine Work Time (s)", "float"),
     ("ddar_result_ray_get_wall_time_s", "DDAR Result Ray.get Wall Time (s)", "float"),
     ("ddar_result_next_state_wall_time_s", "DDAR Result Next State Wall Time (s)", "float"),
     ("ddar_result_queue_wall_time_s", "DDAR Result Queue Wall Time (s)", "float"),
@@ -214,6 +218,8 @@ def write_profiling_csv(
                     f"GPU Result Handle Wall Time: {summary['gpu_result_handle_wall_time_s']:.2f}s, "
                     f"DDAR Submit Wall Time: {summary['ddar_submit_wall_time_s']:.2f}s, "
                     f"DDAR Result Handle Wall Time: {summary['ddar_result_handle_wall_time_s']:.2f}s, "
+                    f"DDAR Build Work Time: {summary['ddar_build_work_time_s']:.2f}s, "
+                    f"DDAR Engine Work Time: {summary['ddar_engine_work_time_s']:.2f}s, "
                     f"DDAR Result Ray.get Wall Time: {summary['ddar_result_ray_get_wall_time_s']:.2f}s, "
                     f"DDAR Result Next State Wall Time: {summary['ddar_result_next_state_wall_time_s']:.2f}s, "
                     f"DDAR Result Queue Wall Time: {summary['ddar_result_queue_wall_time_s']:.2f}s, "
