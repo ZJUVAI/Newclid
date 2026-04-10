@@ -1922,27 +1922,18 @@ wheels = [
 name = "newclid"
 source = { editable = "." }
 dependencies = [
-    { name = "accelerate" },
     { name = "adjusttext" },
     { name = "cairosvg" },
-    { name = "deepspeed" },
-    { name = "flash-attn" },
     { name = "httpx", extra = ["socks"] },
-    { name = "liger-kernel" },
     { name = "markupsafe" },
     { name = "matplotlib" },
     { name = "millify" },
-    { name = "ms-swift" },
     { name = "numpy" },
     { name = "pandas" },
     { name = "pybind11" },
     { name = "pyvis" },
     { name = "ray", extra = ["default"] },
     { name = "scipy" },
-    { name = "torch" },
-    { name = "torchvision" },
-    { name = "transformers" },
-    { name = "vllm" },
 ]
 
 [package.optional-dependencies]
@@ -1957,30 +1948,63 @@ dev = [
 ]
 doc = [
     { name = "autoapi" },
-    { name = "numpy" },
     { name = "sphinx-autoapi" },
     { name = "sphinx-autobuild" },
     { name = "sphinx-autodoc-typehints" },
     { name = "sphinx-rtd-theme" },
 ]
+full = [
+    { name = "accelerate" },
+    { name = "autoapi" },
+    { name = "black" },
+    { name = "deepspeed" },
+    { name = "flash-attn" },
+    { name = "liger-kernel" },
+    { name = "ms-swift" },
+    { name = "pre-commit" },
+    { name = "pytest" },
+    { name = "pytest-check" },
+    { name = "pytest-cov" },
+    { name = "pytest-mock" },
+    { name = "ruff" },
+    { name = "sphinx-autoapi" },
+    { name = "sphinx-autobuild" },
+    { name = "sphinx-autodoc-typehints" },
+    { name = "sphinx-rtd-theme" },
+    { name = "torch" },
+    { name = "torchvision" },
+    { name = "transformers" },
+    { name = "vllm" },
+]
+gpu = [
+    { name = "accelerate" },
+    { name = "deepspeed" },
+    { name = "flash-attn" },
+    { name = "liger-kernel" },
+    { name = "ms-swift" },
+    { name = "torch" },
+    { name = "torchvision" },
+    { name = "transformers" },
+    { name = "vllm" },
+]
 
 [package.metadata]
 requires-dist = [
-    { name = "accelerate" },
+    { name = "accelerate", marker = "extra == 'gpu'" },
     { name = "adjusttext", url = "https://github.com/Phlya/adjustText/archive/master.zip" },
     { name = "autoapi", marker = "extra == 'doc'" },
     { name = "black", marker = "extra == 'dev'" },
     { name = "cairosvg" },
-    { name = "deepspeed", specifier = "<0.19" },
-    { name = "flash-attn" },
+    { name = "deepspeed", marker = "extra == 'gpu'", specifier = "<0.19" },
+    { name = "flash-attn", marker = "extra == 'gpu'" },
     { name = "httpx", extras = ["socks"] },
-    { name = "liger-kernel" },
+    { name = "liger-kernel", marker = "extra == 'gpu'" },
     { name = "markupsafe", specifier = "==3.0.2" },
     { name = "matplotlib", specifier = ">=3.7.0" },
     { name = "millify" },
-    { name = "ms-swift" },
+    { name = "ms-swift", marker = "extra == 'gpu'" },
+    { name = "newclid", extras = ["dev", "doc", "gpu"], marker = "extra == 'full'" },
     { name = "numpy" },
-    { name = "numpy", marker = "extra == 'doc'" },
     { name = "pandas", specifier = ">=2.3" },
     { name = "pre-commit", marker = "extra == 'dev'" },
     { name = "pybind11" },
@@ -1996,12 +2020,12 @@ requires-dist = [
     { name = "sphinx-autobuild", marker = "extra == 'doc'" },
     { name = "sphinx-autodoc-typehints", marker = "extra == 'doc'" },
     { name = "sphinx-rtd-theme", marker = "extra == 'doc'" },
-    { name = "torch", specifier = "==2.8.0", index = "https://download.pytorch.org/whl/cu126" },
-    { name = "torchvision" },
-    { name = "transformers", specifier = "<5.4.0" },
-    { name = "vllm", specifier = ">=0.5.1" },
+    { name = "torch", marker = "extra == 'gpu'", specifier = "==2.8.0", index = "https://download.pytorch.org/whl/cu126" },
+    { name = "torchvision", marker = "extra == 'gpu'" },
+    { name = "transformers", marker = "extra == 'gpu'", specifier = "<5.4.0" },
+    { name = "vllm", marker = "extra == 'gpu'", specifier = ">=0.5.1" },
 ]
-provides-extras = ["dev", "doc"]
+provides-extras = ["dev", "gpu", "doc", "full"]
 
 [[package]]
 name = "ninja"
