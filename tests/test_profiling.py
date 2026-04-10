@@ -70,6 +70,7 @@ def test_finalize_profiling_computes_other_wall_time() -> None:
     add_profiling_time(profiling, "gpu_result_handle_wall_time_s", 0.6)
     add_profiling_time(profiling, "ddar_submit_wall_time_s", 0.1)
     add_profiling_time(profiling, "ddar_result_handle_wall_time_s", 0.2)
+    add_profiling_time(profiling, "next_frontier_finalize_wall_time_s", 0.3)
     add_profiling_time(profiling, "scheduler_overhead_wall_time_s", 0.4)
     increment_profiling_count(profiling, "gpu_batch_submitted_count", 2)
     increment_profiling_count(profiling, "gpu_batch_size_sum", 6)
@@ -77,7 +78,7 @@ def test_finalize_profiling_computes_other_wall_time() -> None:
     finalized = finalize_profiling(profiling, 4.0)
 
     assert finalized["total_time_s"] == 4.0
-    assert abs(finalized["other_wall_time_s"] - 0.4) < 1e-9
+    assert abs(finalized["other_wall_time_s"] - 0.1) < 1e-9
     assert abs(finalized["avg_gpu_batch_size"] - 3.0) < 1e-9
 
 
@@ -102,6 +103,15 @@ def test_merge_profiling_payloads_accumulates_wall_stages_only() -> None:
     assert merged["wait_wall_time_s"] == 5.0
     assert merged["total_time_s"] == 0.0
     assert merged["other_wall_time_s"] == 0.0
+
+
+def test_merge_profiling_payloads_accumulates_new_frontier_count() -> None:
+    merged = merge_profiling_payloads(
+        {"next_frontier_proof_built_count": 2},
+        {"next_frontier_proof_built_count": 3},
+    )
+
+    assert merged["next_frontier_proof_built_count"] == 5.0
 
 
 def test_detailed_helpers_alias_wall_only_payload() -> None:
@@ -143,6 +153,7 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "ddar_result_ray_get_wall_time_s": 0.2,
             "ddar_result_next_state_wall_time_s": 0.1,
             "ddar_result_queue_wall_time_s": 0.05,
+            "next_frontier_finalize_wall_time_s": 0.15,
             "scheduler_overhead_wall_time_s": 0.2,
             "other_wall_time_s": 0.3,
             "prepare_request_submitted_count": 3,
@@ -158,6 +169,7 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "candidate_parse_failed_count": 1,
             "candidate_build_failed_count": 0,
             "candidate_queued_next_depth_count": 2,
+            "next_frontier_proof_built_count": 2,
         },
         {
             "problem_name": "p2",
@@ -185,6 +197,7 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "ddar_result_ray_get_wall_time_s": 0.05,
             "ddar_result_next_state_wall_time_s": 0.02,
             "ddar_result_queue_wall_time_s": 0.01,
+            "next_frontier_finalize_wall_time_s": 0.05,
             "scheduler_overhead_wall_time_s": 0.1,
             "other_wall_time_s": 0.3,
             "prepare_request_submitted_count": 2,
@@ -200,6 +213,7 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "candidate_parse_failed_count": 0,
             "candidate_build_failed_count": 1,
             "candidate_queued_next_depth_count": 1,
+            "next_frontier_proof_built_count": 1,
         },
     ]
 
@@ -221,15 +235,19 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
     assert "DDAR Build Work Time: 0.16s" in written_rows[0][0]
     assert "DDAR Engine Work Time: 0.28s" in written_rows[0][0]
     assert "DDAR Result Ray.get Wall Time: 0.25s" in written_rows[0][0]
+    assert "Next Frontier Finalize Wall Time: 0.20s" in written_rows[0][0]
     assert "Avg GPU Batch Size: 1.67" in written_rows[0][0]
+    assert "Next Frontier Proof Built: 3" in written_rows[0][0]
     assert written_rows[1] == [label for _, label, _ in CSV_COLUMN_SPECS]
     header_index = {name: idx for idx, (name, _, _) in enumerate(CSV_COLUMN_SPECS)}
     assert written_rows[2][header_index["problem_name"]] == "p1"
     assert written_rows[2][header_index["ddar_build_work_time_s"]] == "0.12"
+    assert written_rows[2][header_index["next_frontier_finalize_wall_time_s"]] == "0.15"
     assert written_rows[2][header_index["gpu_batch_submitted_count"]] == "2"
     assert written_rows[2][header_index["avg_gpu_batch_size"]] == "1.50"
     assert written_rows[3][header_index["problem_name"]] == "p2"
     assert written_rows[3][header_index["candidate_build_failed_count"]] == "1"
+    assert written_rows[3][header_index["next_frontier_proof_built_count"]] == "1"
 
 
 def test_parallel_prepare_wait_is_attributed_to_prepare_wall_time() -> None:

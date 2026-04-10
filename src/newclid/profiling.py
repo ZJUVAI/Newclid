@@ -23,6 +23,7 @@ WALL_TIME_FIELDS = (
     "gpu_result_handle_wall_time_s",
     "ddar_submit_wall_time_s",
     "ddar_result_handle_wall_time_s",
+    "next_frontier_finalize_wall_time_s",
     "scheduler_overhead_wall_time_s",
     "total_time_s",
     "other_wall_time_s",
@@ -50,6 +51,7 @@ COUNT_FIELDS = (
     "candidate_parse_failed_count",
     "candidate_build_failed_count",
     "candidate_queued_next_depth_count",
+    "next_frontier_proof_built_count",
 )
 
 PROFILE_ROW_FIELDS = WALL_TIME_FIELDS + DETAIL_TIME_FIELDS + COUNT_FIELDS
@@ -80,6 +82,7 @@ CSV_COLUMN_SPECS = (
     ("ddar_result_ray_get_wall_time_s", "DDAR Result Ray.get Wall Time (s)", "float"),
     ("ddar_result_next_state_wall_time_s", "DDAR Result Next State Wall Time (s)", "float"),
     ("ddar_result_queue_wall_time_s", "DDAR Result Queue Wall Time (s)", "float"),
+    ("next_frontier_finalize_wall_time_s", "Next Frontier Finalize Wall Time (s)", "float"),
     ("scheduler_overhead_wall_time_s", "Scheduler Overhead Wall Time (s)", "float"),
     ("other_wall_time_s", "Other Wall Time (s)", "float"),
     ("prepare_request_submitted_count", "Prepare Request Submitted Count", "int"),
@@ -96,6 +99,7 @@ CSV_COLUMN_SPECS = (
     ("candidate_parse_failed_count", "Candidate Parse Failed Count", "int"),
     ("candidate_build_failed_count", "Candidate Build Failed Count", "int"),
     ("candidate_queued_next_depth_count", "Candidate Queued Next Depth Count", "int"),
+    ("next_frontier_proof_built_count", "Next Frontier Proof Built Count", "int"),
 )
 
 PROFILED_WALL_COMPONENT_FIELDS = tuple(
@@ -223,6 +227,7 @@ def write_profiling_csv(
                     f"DDAR Result Ray.get Wall Time: {summary['ddar_result_ray_get_wall_time_s']:.2f}s, "
                     f"DDAR Result Next State Wall Time: {summary['ddar_result_next_state_wall_time_s']:.2f}s, "
                     f"DDAR Result Queue Wall Time: {summary['ddar_result_queue_wall_time_s']:.2f}s, "
+                    f"Next Frontier Finalize Wall Time: {summary['next_frontier_finalize_wall_time_s']:.2f}s, "
                     f"Scheduler Overhead Wall Time: {summary['scheduler_overhead_wall_time_s']:.2f}s, "
                     f"Other Wall Time: {summary['other_wall_time_s']:.2f}s, "
                     f"Avg GPU Batch Size: {summary['avg_gpu_batch_size']:.2f}, "
@@ -238,7 +243,8 @@ def write_profiling_csv(
                     f"DDAR Completed: {int(summary['ddar_completed_count'])}, "
                     f"Candidate Parse Failed: {int(summary['candidate_parse_failed_count'])}, "
                     f"Candidate Build Failed: {int(summary['candidate_build_failed_count'])}, "
-                    f"Candidate Queued Next Depth: {int(summary['candidate_queued_next_depth_count'])}"
+                    f"Candidate Queued Next Depth: {int(summary['candidate_queued_next_depth_count'])}, "
+                    f"Next Frontier Proof Built: {int(summary['next_frontier_proof_built_count'])}"
                 )
             ]
         )
