@@ -300,7 +300,7 @@ def run_part4(
         print("[Part 4] Disabled, skipping.")
         return None
 
-    # Determine input
+    # Determine input (rules.txt)
     input_path_cfg = p4.get("input")
     if input_path_cfg:
         input_path = Path(input_path_cfg)
@@ -309,6 +309,17 @@ def run_part4(
     else:
         print("Error: part4_reduction.input is required (no previous Part output available)", file=sys.stderr)
         sys.exit(1)
+
+    # Determine source_data (JSONL or step6_rules_stats.json with llm_input_renamed)
+    # Priority: config > passed-in argument > auto-detect near rules file
+    source_data_cfg = p4.get("source_data")
+    if source_data_cfg:
+        source_data_file = Path(source_data_cfg)
+    elif source_data_file is None:
+        # Auto-detect: look for step6_rules_stats.json alongside the rules file
+        candidate = input_path.parent / "intermediates" / "step6_rules_stats.json"
+        if candidate.exists():
+            source_data_file = candidate
 
     output_path = _resolve_output(p4.get("output"), output_dir, "part4", "extracted_rules.txt")
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -330,8 +341,9 @@ def run_part4(
     print(f"\n{'='*60}")
     print(f"Part 4: Reduction")
     print(f"{'='*60}")
-    print(f"  Input:  {input_path}")
-    print(f"  Output: {output_path}")
+    print(f"  Input (rules):  {input_path}")
+    print(f"  Source data:    {source_data_file or '(none — will fail if rules need llm_input)'}")
+    print(f"  Output:         {output_path}")
     print(f"  engine={engine}, timeout={timeout}, n_workers={n_workers}, batch_size={batch_size}")
     print(f"  seed_reduction={seed_reduction_enabled}, chunk_reduction={chunk_reduction_enabled}, "
           f"global_reduction={global_reduction_enabled}")
@@ -346,15 +358,9 @@ def run_part4(
     if source_data_file and source_data_file.exists():
         rules, failures = load_rules_from_discovery_output(input_path, source_data_file)
     else:
-        # Try to find step6_rules_stats.json near the rules file
-        candidate = input_path.parent / "intermediates" / "step6_rules_stats.json"
-        if candidate.exists():
-            rules, failures = load_rules_from_discovery_output(input_path, candidate)
-            source_data_file = candidate
-        else:
-            # No source data available — load will likely produce empty rules
-            print(f"  Warning: no source_data_file found; reduction may produce empty results")
-            rules, failures = load_rules_from_discovery_output(input_path, input_path)
+        print(f"  Error: source_data not found. Set part4_reduction.source_data in config to the "
+              f"original JSONL or step6_rules_stats.json file.", file=sys.stderr)
+        sys.exit(1)
 
     print(f"  Loaded {len(rules)} rules ({len(failures)} failures)")
 
