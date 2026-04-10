@@ -178,14 +178,20 @@ def generate_visual_aux_dsl_dict_batch(
 
 @ray.remote(num_cpus=1, num_gpus=1, max_concurrency=1)
 class VisionModelWorker:
-    def __init__(self, model_path: str, agent_kind: str):
+    def __init__(self, model_path: str, agent_kind: str, torch_seed: int = 123):
         resolved_path = resolve_model_path(model_path)
         self.model_path = resolved_path
         self.agent_kind = agent_kind
+        self.torch_seed = int(torch_seed)
+        torch.manual_seed(self.torch_seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(self.torch_seed)
+            torch.cuda.manual_seed_all(self.torch_seed)
         logger.info(
-            "VisionModelWorker init start: agent_kind=%s model_path=%s",
+            "VisionModelWorker init start: agent_kind=%s model_path=%s torch_seed=%d",
             agent_kind,
             resolved_path,
+            self.torch_seed,
         )
         if agent_kind == "vlm":
             self.model = Qwen3VLForConditionalGeneration.from_pretrained(
@@ -213,10 +219,11 @@ class VisionModelWorker:
         self.num_requests = 0
         self.num_batches = 0
         logger.info(
-            "VisionModelWorker init done: agent_kind=%s model_device=%s padding_side=%s",
+            "VisionModelWorker init done: agent_kind=%s model_device=%s padding_side=%s torch_seed=%d",
             agent_kind,
             next(self.model.parameters()).device,
             self.processor.tokenizer.padding_side,
+            self.torch_seed,
         )
 
     def warmup(self) -> dict[str, Any]:
@@ -232,6 +239,7 @@ class VisionModelWorker:
             "agent_kind": self.agent_kind,
             "device": device,
             "padding_side": self.processor.tokenizer.padding_side,
+            "torch_seed": self.torch_seed,
         }
 
     @torch.no_grad()

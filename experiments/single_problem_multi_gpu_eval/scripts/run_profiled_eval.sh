@@ -27,6 +27,7 @@ parser.add_argument("--beam_size", type=int, required=True)
 parser.add_argument("--search_depth", type=int, required=True)
 parser.add_argument("--gpu_batch_size", type=int, default=1)
 parser.add_argument("--gpu_batch_timeout_ms", type=int, default=0)
+parser.add_argument("--torch_seed", type=int, default=123)
 args, _ = parser.parse_known_args()
 print(
     build_eval_output_stem(
@@ -38,6 +39,7 @@ print(
         search_depth=args.search_depth,
         gpu_batch_size=args.gpu_batch_size,
         gpu_batch_timeout_ms=args.gpu_batch_timeout_ms,
+        torch_seed=args.torch_seed,
     )
 )
 PY

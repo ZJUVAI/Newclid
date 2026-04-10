@@ -187,9 +187,14 @@ def generate_aux_dsl_dict_batch(
 class ModelWorker:
     """Keep one LM replica resident on one GPU for repeated generation calls."""
 
-    def __init__(self, model_path: str):
+    def __init__(self, model_path: str, torch_seed: int = 123):
         resolved_path = resolve_model_path(model_path)
         self.model_path = resolved_path
+        self.torch_seed = int(torch_seed)
+        torch.manual_seed(self.torch_seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(self.torch_seed)
+            torch.cuda.manual_seed_all(self.torch_seed)
         self.model = AutoModelForCausalLM.from_pretrained(
             resolved_path,
             torch_dtype="auto",
@@ -205,10 +210,11 @@ class ModelWorker:
         self.num_requests = 0
         self.num_batches = 0
         logger.info(
-            "ModelWorker init done: model_path=%s device=%s padding_side=%s",
+            "ModelWorker init done: model_path=%s device=%s padding_side=%s torch_seed=%d",
             self.model_path,
             next(self.model.parameters()).device,
             self.tokenizer.padding_side,
+            self.torch_seed,
         )
 
     def warmup(self) -> dict[str, Any]:
@@ -217,6 +223,7 @@ class ModelWorker:
             "model_path": self.model_path,
             "device": device,
             "padding_side": self.tokenizer.padding_side,
+            "torch_seed": self.torch_seed,
         }
 
     @torch.no_grad()

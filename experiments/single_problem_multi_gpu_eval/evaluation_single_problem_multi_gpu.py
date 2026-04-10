@@ -81,6 +81,7 @@ def build_eval_output_stem(
     search_depth: int,
     gpu_batch_size: int,
     gpu_batch_timeout_ms: int,
+    torch_seed: int,
 ) -> str:
     problems_name = problems_path.stem
     path_obj = Path(model_path)
@@ -90,7 +91,7 @@ def build_eval_output_stem(
     return (
         f"eval_single_problem_multi_gpu_{agent_type}_{problems_name}_{model_name}"
         f"_d{decoding_size}_b{beam_size}_s{search_depth}"
-        f"_gbs{gpu_batch_size}_gbt{gpu_batch_timeout_ms}"
+        f"_gbs{gpu_batch_size}_gbt{gpu_batch_timeout_ms}_seed{torch_seed}"
     )
 
 
@@ -98,15 +99,15 @@ def build_timestamped_output_stem(output_name_stem: str, timestamp: str) -> str:
     return f"{output_name_stem}_{timestamp}"
 
 
-def create_workers(*, agent_type: str, model_path: str, num_gpus_for_eval: int):
+def create_workers(*, agent_type: str, model_path: str, num_gpus_for_eval: int, torch_seed: int):
     if agent_type == "lm":
         from experiments.single_problem_multi_gpu_eval.lm_actor import ModelWorker
 
-        return [ModelWorker.remote(model_path) for _ in range(num_gpus_for_eval)]
+        return [ModelWorker.remote(model_path, torch_seed) for _ in range(num_gpus_for_eval)]
     if agent_type in {"vlm", "qwen35"}:
         from experiments.single_problem_multi_gpu_eval.visual_actor import VisionModelWorker
 
-        return [VisionModelWorker.remote(model_path, agent_type) for _ in range(num_gpus_for_eval)]
+        return [VisionModelWorker.remote(model_path, agent_type, torch_seed) for _ in range(num_gpus_for_eval)]
     raise ValueError(f"Unsupported agent type: {agent_type}")
 
 
@@ -172,6 +173,7 @@ def solve_one_problem(
     search_depth: int,
     gpu_batch_size: int,
     gpu_batch_timeout_ms: int,
+    torch_seed: int,
     timeout: int,
     max_pending_ddar: int,
     prepare_request_workers: int,
@@ -307,6 +309,7 @@ def solve_problems_single_problem_multi_gpu(
             agent_type=agent_type,
             model_path=model_path,
             num_gpus_for_eval=num_gpus_for_eval,
+            torch_seed=torch_seed,
         )
         logging.getLogger(__name__).info(
             "Created workers: agent=%s requested_gpus=%d visible_gpus=%d",
@@ -330,6 +333,7 @@ def solve_problems_single_problem_multi_gpu(
             search_depth=search_depth,
             gpu_batch_size=gpu_batch_size,
             gpu_batch_timeout_ms=gpu_batch_timeout_ms,
+            torch_seed=torch_seed,
         )
         run_timestamp = timestamp_slug()
         timestamped_output_stem = build_timestamped_output_stem(output_name_stem, run_timestamp)
@@ -351,6 +355,7 @@ def solve_problems_single_problem_multi_gpu(
                     "search_depth": search_depth,
                     "gpu_batch_size": gpu_batch_size,
                     "gpu_batch_timeout_ms": gpu_batch_timeout_ms,
+                    "torch_seed": torch_seed,
                     "timeout": timeout,
                     "max_pending_ddar": max_pending_ddar,
                     "num_gpus_for_eval": num_gpus_for_eval,
@@ -365,6 +370,7 @@ def solve_problems_single_problem_multi_gpu(
         print(f"Using {num_gpus_for_eval} GPU workers")
         print(f"Using gpu_batch_size={gpu_batch_size}")
         print(f"Using gpu_batch_timeout_ms={gpu_batch_timeout_ms}")
+        print(f"Using torch_seed={torch_seed}")
         print(f"Using max_pending_ddar={max_pending_ddar}")
         print(f"Using prepare_request_workers={prepare_request_workers}")
         print(f"Using prepare_prefetch_limit={prepare_prefetch_limit}")
@@ -614,6 +620,12 @@ def main():
         help="Optional wait budget for filling a GPU batch before dispatching a tail batch.",
     )
     parser.add_argument(
+        "--torch_seed",
+        type=int,
+        default=123,
+        help="Torch RNG seed applied once per GPU worker process.",
+    )
+    parser.add_argument(
         "--timeout",
         type=int,
         default=7200,
@@ -661,6 +673,7 @@ def main():
         search_depth=args.search_depth,
         gpu_batch_size=args.gpu_batch_size,
         gpu_batch_timeout_ms=args.gpu_batch_timeout_ms,
+        torch_seed=args.torch_seed,
         timeout=args.timeout,
         agent_type=args.agent,
         max_pending_ddar=args.max_pending_ddar,
