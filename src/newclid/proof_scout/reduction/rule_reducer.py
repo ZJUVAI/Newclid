@@ -532,10 +532,35 @@ def load_rules_from_discovery_output(
         rule_map[rule_id] = rule_text
 
     # Load source data file
-    with open(source_data_file) as f:
-        source_data = json.load(f)
-
-    entries = source_data.get("entries", [])
+    entries = []
+    try:
+        with open(source_data_file) as f:
+            # Try to detect if it's JSON or JSONL
+            first_char = f.read(1)
+            f.seek(0)
+            if first_char == '{':
+                # Standard JSON
+                source_data = json.load(f)
+                entries = source_data.get("entries", [])
+            else:
+                # Assume JSONL (one JSON object per line)
+                # To save memory, only load entries that match rule_map keys
+                target_rids = set(rule_map.keys())
+                for line in f:
+                    if not line.strip():
+                        continue
+                    try:
+                        entry = json.loads(line)
+                        if entry.get("rid") in target_rids:
+                            entries.append(entry)
+                        elif entry.get("pid") in target_rids: # Handle pid as rid
+                            entry["rid"] = entry["pid"]
+                            entries.append(entry)
+                    except json.JSONDecodeError:
+                        continue
+    except Exception as e:
+        print(f"Error loading source data: {e}")
+        return [], failures
 
     # Build rid -> entry mapping
     entry_map = {entry["rid"]: entry for entry in entries}
@@ -781,17 +806,44 @@ def load_rules_by_ids(
 
     Args:
         rule_ids: List of rule IDs to load (e.g., ["r000042", "r000123"])
-        source_data_file: Path to step6_rules_stats.json
+        source_data_file: Path to step6_rules_stats.json or JSONL file
 
     Returns:
         Tuple of (rules, failures) where failures is [(rule_id, reason), ...]
     """
     import json
 
-    with open(source_data_file) as f:
-        source_data = json.load(f)
+    # Load source data file (supports both JSON and JSONL)
+    entries = []
+    target_rids = set(rule_ids)
+    try:
+        with open(source_data_file) as f:
+            # Try to detect if it's JSON or JSONL
+            first_char = f.read(1)
+            f.seek(0)
+            if first_char == '{':
+                # Standard JSON
+                source_data = json.load(f)
+                entries = source_data.get("entries", [])
+            else:
+                # Assume JSONL (one JSON object per line)
+                # Only load entries that match target rule IDs
+                for line in f:
+                    if not line.strip():
+                        continue
+                    try:
+                        entry = json.loads(line)
+                        if entry.get("rid") in target_rids:
+                            entries.append(entry)
+                        elif entry.get("pid") in target_rids:  # Handle pid as rid
+                            entry["rid"] = entry["pid"]
+                            entries.append(entry)
+                    except json.JSONDecodeError:
+                        continue
+    except Exception as e:
+        print(f"Error loading source data: {e}")
+        return [], [(rid, str(e)) for rid in rule_ids]
 
-    entries = source_data.get("entries", [])
     entry_map = {entry["rid"]: entry for entry in entries}
 
     rules = []
