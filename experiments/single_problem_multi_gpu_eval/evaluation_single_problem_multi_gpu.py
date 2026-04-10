@@ -238,6 +238,7 @@ def solve_problems_single_problem_multi_gpu(
     search_depth: int,
     gpu_batch_size: int,
     gpu_batch_timeout_ms: int,
+    torch_seed: int,
     timeout: int,
     agent_type: str,
     max_pending_ddar: int | None,
