@@ -531,30 +531,56 @@ def load_rules_from_discovery_output(
         rule_text = lines[i + 1]
         rule_map[rule_id] = rule_text
 
-    # Load source data file
+    # Load source data file (supports both JSON and JSONL)
     entries = []
+    target_rids = set(rule_map.keys())
     try:
         with open(source_data_file) as f:
-            # Try to detect if it's JSON or JSONL
-            first_char = f.read(1)
+            # More robust detection: read the first line
+            first_line = f.readline()
+            if not first_line:
+                return [], failures
+
             f.seek(0)
-            if first_char == '{':
+            is_jsonl = False
+            try:
+                data = json.loads(first_line)
+                # If first line is a valid JSON object AND it's not the whole file
+                # (or if it doesn't have the "entries" key which is our JSON convention)
+                if isinstance(data, dict) and "entries" not in data:
+                    is_jsonl = True
+            except json.JSONDecodeError:
+                # If first line is not valid JSON, it might be a multi-line JSON or something else
+                # Fallback to standard json.load which will handle multi-line formatted JSON
+                is_jsonl = False
+
+            if not is_jsonl:
                 # Standard JSON
-                source_data = json.load(f)
-                entries = source_data.get("entries", [])
-            else:
+                try:
+                    source_data = json.load(f)
+                    entries = source_data.get("entries", [])
+                except json.JSONDecodeError as e:
+                    if "Extra data" in str(e):
+                        # Fallback to JSONL if we see extra data
+                        f.seek(0)
+                        is_jsonl = True
+                    else:
+                        raise e
+
+            if is_jsonl:
                 # Assume JSONL (one JSON object per line)
                 # To save memory, only load entries that match rule_map keys
-                target_rids = set(rule_map.keys())
+                f.seek(0)
                 for line in f:
-                    if not line.strip():
+                    line = line.strip()
+                    if not line:
                         continue
                     try:
                         entry = json.loads(line)
-                        if entry.get("rid") in target_rids:
-                            entries.append(entry)
-                        elif entry.get("pid") in target_rids: # Handle pid as rid
-                            entry["rid"] = entry["pid"]
+                        rid = entry.get("rid") or entry.get("pid")
+                        if rid in target_rids:
+                            if "rid" not in entry and "pid" in entry:
+                                entry["rid"] = entry["pid"]
                             entries.append(entry)
                     except json.JSONDecodeError:
                         continue
@@ -818,25 +844,48 @@ def load_rules_by_ids(
     target_rids = set(rule_ids)
     try:
         with open(source_data_file) as f:
-            # Try to detect if it's JSON or JSONL
-            first_char = f.read(1)
+            # More robust detection: read the first line
+            first_line = f.readline()
+            if not first_line:
+                return [], [(rid, "Empty source data file") for rid in rule_ids]
+
             f.seek(0)
-            if first_char == '{':
+            is_jsonl = False
+            try:
+                data = json.loads(first_line)
+                # If first line is a valid JSON object AND it doesn't have "entries" key
+                if isinstance(data, dict) and "entries" not in data:
+                    is_jsonl = True
+            except json.JSONDecodeError:
+                is_jsonl = False
+
+            if not is_jsonl:
                 # Standard JSON
-                source_data = json.load(f)
-                entries = source_data.get("entries", [])
-            else:
+                try:
+                    source_data = json.load(f)
+                    entries = source_data.get("entries", [])
+                except json.JSONDecodeError as e:
+                    if "Extra data" in str(e):
+                        # Fallback to JSONL if we see extra data
+                        f.seek(0)
+                        is_jsonl = True
+                    else:
+                        raise e
+
+            if is_jsonl:
                 # Assume JSONL (one JSON object per line)
                 # Only load entries that match target rule IDs
+                f.seek(0)
                 for line in f:
-                    if not line.strip():
+                    line = line.strip()
+                    if not line:
                         continue
                     try:
                         entry = json.loads(line)
-                        if entry.get("rid") in target_rids:
-                            entries.append(entry)
-                        elif entry.get("pid") in target_rids:  # Handle pid as rid
-                            entry["rid"] = entry["pid"]
+                        rid = entry.get("rid") or entry.get("pid")
+                        if rid in target_rids:
+                            if "rid" not in entry and "pid" in entry:
+                                entry["rid"] = entry["pid"]
                             entries.append(entry)
                     except json.JSONDecodeError:
                         continue
