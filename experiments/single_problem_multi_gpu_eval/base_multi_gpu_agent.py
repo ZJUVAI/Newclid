@@ -108,6 +108,14 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
     def run_ddar_c(self, proof: ProofState, rules: list["Rule"], start_time: float, timeout: int = 3600) -> bool:
         return run_ddar_c(proof, rules, start_time, timeout)
 
+    def finalize_next_queue(
+        self,
+        *,
+        next_queue: BeamQueue,
+        profiling: dict[str, Any],
+    ) -> BeamQueue:
+        return next_queue
+
     def extract_raw_aux_text(self, aux_dsl: str) -> str:
         return aux_dsl[len("<aux> x00"):]
 
@@ -1126,7 +1134,16 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     )
                     continue
 
-                beam_queue = next_queue
+                finalize_start = time.perf_counter()
+                beam_queue = self.finalize_next_queue(
+                    next_queue=next_queue,
+                    profiling=profiling,
+                )
+                add_profiling_time(
+                    profiling,
+                    "next_frontier_finalize_wall_time_s",
+                    time.perf_counter() - finalize_start,
+                )
                 self._trace_scheduler_state(
                     depth=depth,
                     dispatcher=dispatcher,

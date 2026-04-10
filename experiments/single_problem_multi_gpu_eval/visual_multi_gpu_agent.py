@@ -4,7 +4,7 @@ import string
 import time
 from copy import deepcopy
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import cairosvg
 from PIL import Image, ImageOps
@@ -12,10 +12,12 @@ from PIL import Image, ImageOps
 from newclid.agent.lm import LMAgent
 from newclid.agent.vlm import VLMAgent
 from newclid.formulations.problem import ProblemJGEX
+from newclid.profiling import increment_profiling_count
 from newclid.numerical.draw_clause_figure import draw_clause_figure
 from newclid.proof import ProofState
 
 from experiments.single_problem_multi_gpu_eval.base_multi_gpu_agent import BaseMultiGPUAgent
+from experiments.single_problem_multi_gpu_eval.search_common import BeamQueue, build_problem_proof
 
 if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
@@ -50,21 +52,23 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
             max_pending_ddar=max_pending_ddar,
             prepare_request_workers=prepare_request_workers,
             prepare_prefetch_limit=prepare_prefetch_limit,
-            ddar_returns_proof=True,
+            ddar_returns_proof=False,
             trace_writer=trace_writer,
         )
         self.render_root = Path(render_root)
         self.render_root.mkdir(parents=True, exist_ok=True)
         self.render_width = render_width
+        self._proof_defs: dict[str, Any] | None = None
 
     def base_ddar_proof(self, proof: ProofState) -> ProofState:
         return deepcopy(proof)
 
-    def seed_state(self, proof: ProofState, base_proof: ProofState) -> tuple[ProblemJGEX, ProofState]:
+    def seed_state(self, proof: ProofState, base_proof: ProofState) -> tuple[ProblemJGEX, ProofState | None]:
         del proof
+        self._proof_defs = base_proof.defs
         return self.problemJGEX, base_proof
 
-    def get_problem_from_state(self, state: tuple[ProblemJGEX, ProofState]) -> ProblemJGEX:
+    def get_problem_from_state(self, state: tuple[ProblemJGEX, ProofState | None]) -> ProblemJGEX:
         problem, _ = state
         return problem
 
@@ -72,12 +76,14 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
         self,
         *,
         request_id: str,
-        state: tuple[ProblemJGEX, ProofState],
+        state: tuple[ProblemJGEX, ProofState | None],
         proof: ProofState,
         depth: int,
     ) -> dict[str, object]:
         del proof
         problem, current_proof = state
+        if current_proof is None:
+            raise ValueError("Visual frontier state is missing the materialized proof for request preparation.")
         stem = f"d{depth}_{request_id}"
         svg_path = self.render_root / f"{stem}.svg"
         png_path = self.render_root / f"{stem}.png"
@@ -135,12 +141,29 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
         prior_state,
         ddar_result: dict[str, object],
         proof: ProofState,
-    ) -> tuple[ProblemJGEX, ProofState] | None:
-        del prior_state, proof
-        next_proof = ddar_result.get("proof")
-        if next_proof is None:
-            return None
-        return new_problem, next_proof
+    ) -> tuple[ProblemJGEX, ProofState | None] | None:
+        del prior_state, ddar_result, proof
+        return new_problem, None
+
+    def finalize_next_queue(
+        self,
+        *,
+        next_queue: BeamQueue,
+        profiling: dict[str, Any],
+    ) -> BeamQueue:
+        if self._proof_defs is None:
+            raise ValueError("Visual agent definitions are unavailable for frontier materialization.")
+
+        def materialize(node):
+            node_id, parent_node_id, state = node
+            problem, current_proof = state
+            if current_proof is None:
+                increment_profiling_count(profiling, "next_frontier_proof_built_count")
+                current_proof = build_problem_proof(problem, self._proof_defs)
+            return node_id, parent_node_id, (problem, current_proof)
+
+        next_queue.map_nodes(materialize)
+        return next_queue
 
     def get_new_point_name(self, problem: ProblemJGEX) -> str:
         num_points = sum(len(clause.points) for clause in problem.constructions)

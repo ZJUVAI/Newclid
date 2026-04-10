@@ -9,10 +9,10 @@ import numpy as np
 import ray
 
 from newclid.DDAR.build import DDAR
+from newclid.ddar_build_input import build_ddar_input
 from newclid.numerical.geometries import PointNum
 from newclid.problem_db import classify_build_exception
 from newclid.proof import ProofState
-from newclid.search_trace import proof_to_ddar_input
 
 if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
@@ -62,6 +62,15 @@ class BeamQueue:
     def __len__(self) -> int:
         return len(self.queue)
 
+    def map_nodes(self, func) -> None:
+        self.entry_finder = {}
+        for entry in self.queue:
+            node = entry[-1]
+            if node is self.REMOVED:
+                continue
+            entry[-1] = func(node)
+            self.entry_finder[entry[-1]] = entry
+
 
 def extract_points(proof: ProofState) -> list[tuple[str, Any, Any]]:
     points: list[tuple[str, Any, Any]] = []
@@ -108,6 +117,16 @@ def run_ddar_c(proof: ProofState, rules: list["Rule"], start_time: float, timeou
     return solved
 
 
+def build_problem_proof(problem, defs, *, max_attempts: int = 100) -> ProofState:
+    return ProofState.build_problemJGEX(
+        problemJGEX=problem,
+        defsJGEX=defs,
+        rng=np.random.default_rng(998244353),
+        max_attempts=max_attempts,
+        problem_path=None,
+    )
+
+
 @ray.remote(num_cpus=1)
 def run_ddar_remote(
     problem,
@@ -125,12 +144,12 @@ def run_ddar_remote(
     ddar_build_work_time_s = 0.0
     try:
         build_start = time.time()
-        proof = ProofState.build_problemJGEX(
-            problemJGEX=problem,
-            defsJGEX=defs,
-            rng=np.random.default_rng(998244353),
+        points, premises, goals = build_ddar_input(
+            problem,
+            defs,
+            np.random.default_rng(998244353),
             max_attempts=100,
-            problem_path=None,
+            only_useful_points=False,
         )
         ddar_build_work_time_s = time.time() - build_start
     except Exception as exc:
@@ -150,7 +169,8 @@ def run_ddar_remote(
 
     try:
         ddar_start = time.time()
-        solved = run_ddar_c(proof, rules, start_time, timeout)
+        del rules, start_time, timeout
+        solved, _ = DDAR.run_ddar("", points, premises, goals, 500, True, True)
         ddar_engine_work_time_s = time.time() - ddar_start
     except Exception as exc:
         result = {
@@ -161,7 +181,11 @@ def run_ddar_remote(
             "error_type": "engine_error",
             "error_message": str(exc),
             "problem_text": str(problem),
-            "ddar_input": proof_to_ddar_input(proof),
+            "ddar_input": {
+                "points": points,
+                "premises": premises,
+                "goals": goals,
+            },
         }
         if return_proof:
             result["proof"] = None
@@ -173,8 +197,12 @@ def run_ddar_remote(
         "ddar_build_work_time_s": ddar_build_work_time_s,
         "ddar_engine_work_time_s": ddar_engine_work_time_s,
         "problem_text": str(problem),
-        "ddar_input": proof_to_ddar_input(proof),
+        "ddar_input": {
+            "points": points,
+            "premises": premises,
+            "goals": goals,
+        },
     }
     if return_proof:
-        result["proof"] = proof
+        result["proof"] = build_problem_proof(problem, defs)
     return result
