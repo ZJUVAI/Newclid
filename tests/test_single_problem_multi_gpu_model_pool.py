@@ -4,7 +4,10 @@ import unittest
 from unittest.mock import patch
 from pathlib import Path
 
-from experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu import build_eval_output_stem
+from experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu import (
+    build_eval_output_stem,
+    build_timestamped_output_stem,
+)
 from experiments.single_problem_multi_gpu_eval.lm_actor import resolve_model_path
 from experiments.single_problem_multi_gpu_eval.model_pool import GenerationDispatcher, ModelPool
 from experiments.single_problem_multi_gpu_eval import model_pool as model_pool_module
@@ -144,22 +147,43 @@ class EvalOutputNamingTests(unittest.TestCase):
             gpu_batch_size=1,
             gpu_batch_timeout_ms=0,
         )
+        timestamp = "20260409T120000Z"
 
-        with patch("newclid.search_trace.timestamp_slug", return_value="20260409T120000Z"):
-            with patch("newclid.search_trace.get_git_commit", return_value="deadbeef"):
-                trace_run = TraceRun(
-                    Path("/tmp/traces"),
-                    route="evaluation_single_problem_multi_gpu",
-                    agent="lm",
-                    dataset_path=Path("benchmarks/imo_2004_p1.txt"),
-                    model_path="models/sft34/checkpoint-25750",
-                    params={"output_name_stem": stem},
-                    run_name=stem,
-                    repo_root=Path.cwd(),
-                )
+        with patch("newclid.search_trace.get_git_commit", return_value="deadbeef"):
+            trace_run = TraceRun(
+                Path("/tmp/traces"),
+                route="evaluation_single_problem_multi_gpu",
+                agent="lm",
+                dataset_path=Path("benchmarks/imo_2004_p1.txt"),
+                model_path="models/sft34/checkpoint-25750",
+                params={"output_name_stem": stem},
+                run_name=stem,
+                run_timestamp=timestamp,
+                repo_root=Path.cwd(),
+            )
 
-        self.assertEqual(trace_run.run_id, f"{stem}_20260409T120000Z")
-        self.assertEqual(trace_run.run_dir.name, f"{stem}_20260409T120000Z")
+        self.assertEqual(trace_run.run_id, f"{stem}_{timestamp}")
+        self.assertEqual(trace_run.run_dir.name, f"{stem}_{timestamp}")
+
+    def test_build_timestamped_output_stem_reuses_trace_timestamp_suffix(self):
+        stem = "eval_single_problem_multi_gpu_vlm_imo_2008_p1b_model_d32_b512_s4_gbs4_gbt100"
+        timestamp = "20260410T120000Z"
+
+        self.assertEqual(
+            build_timestamped_output_stem(stem, timestamp),
+            f"{stem}_{timestamp}",
+        )
+
+    def test_csv_and_profiling_names_align_with_trace_timestamp(self):
+        stem = "eval_single_problem_multi_gpu_vlm_imo_2008_p1b_model_d32_b512_s4_gbs4_gbt100"
+        timestamp = "20260410T120000Z"
+        timestamped_stem = build_timestamped_output_stem(stem, timestamp)
+
+        self.assertEqual(f"{timestamped_stem}.csv", f"{stem}_{timestamp}.csv")
+        self.assertEqual(
+            f"{timestamped_stem}_profiling.csv",
+            f"{stem}_{timestamp}_profiling.csv",
+        )
 
 
 class ModelPathResolutionTests(unittest.TestCase):

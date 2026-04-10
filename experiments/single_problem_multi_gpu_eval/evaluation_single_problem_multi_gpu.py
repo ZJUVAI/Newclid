@@ -31,7 +31,7 @@ from newclid.profiling import (
     finalize_profiling,
     write_profiling_csv,
 )
-from newclid.search_trace import TraceRun
+from newclid.search_trace import TraceRun, timestamp_slug
 
 
 LOGLEVEL = os.environ.get("LOGLEVEL", "WARNING").upper()
@@ -92,6 +92,10 @@ def build_eval_output_stem(
         f"_d{decoding_size}_b{beam_size}_s{search_depth}"
         f"_gbs{gpu_batch_size}_gbt{gpu_batch_timeout_ms}"
     )
+
+
+def build_timestamped_output_stem(output_name_stem: str, timestamp: str) -> str:
+    return f"{output_name_stem}_{timestamp}"
 
 
 def create_workers(*, agent_type: str, model_path: str, num_gpus_for_eval: int):
@@ -327,6 +331,8 @@ def solve_problems_single_problem_multi_gpu(
             gpu_batch_size=gpu_batch_size,
             gpu_batch_timeout_ms=gpu_batch_timeout_ms,
         )
+        run_timestamp = timestamp_slug()
+        timestamped_output_stem = build_timestamped_output_stem(output_name_stem, run_timestamp)
         trace_run = None
         if trace_dir:
             trace_run = TraceRun(
@@ -336,8 +342,10 @@ def solve_problems_single_problem_multi_gpu(
                 dataset_path=filepath,
                 model_path=model_path,
                 run_name=output_name_stem,
+                run_timestamp=run_timestamp,
                 params={
                     "output_name_stem": output_name_stem,
+                    "timestamped_output_name_stem": timestamped_output_stem,
                     "decoding_size": decoding_size,
                     "beam_size": beam_size,
                     "search_depth": search_depth,
@@ -484,7 +492,7 @@ def solve_problems_single_problem_multi_gpu(
                     live.update(render_table(all_tasks_info, start_time, True))
                 live.update(render_table(all_tasks_info, start_time, False))
 
-        csv_filename = f"{output_name_stem}.csv"
+        csv_filename = f"{timestamped_output_stem}.csv"
 
         csv_filepath = output_dir / csv_filename
         total_problems = len(all_tasks_info)
@@ -504,7 +512,7 @@ def solve_problems_single_problem_multi_gpu(
 
         print(f"Results saved to {csv_filepath}")
         if enable_profiling:
-            profiling_csv_filepath = csv_filepath.with_name(f"{csv_filepath.stem}_profiling.csv")
+            profiling_csv_filepath = csv_filepath.with_name(f"{timestamped_output_stem}_profiling.csv")
             write_profiling_csv(
                 profiling_csv_filepath,
                 dataset_name=filepath.stem,
