@@ -498,174 +498,469 @@ def _parse_llm_input(llm_input: str) -> Tuple[List[Tuple[str, List[str]]], Tuple
     return premises, goal
 
 
+
+def _parse_rule_map(rules_file, max_rules=None):
+    """Parse rules.txt into an ordered {rule_id: rule_text} dict."""
+    rule_map = {}
+    with open(rules_file) as f:
+        lines = [line.rstrip("\n") for line in f]
+    i = 0
+    while i + 1 < len(lines):
+        rule_id = lines[i].strip()
+        rule_text = lines[i + 1].strip()
+        i += 2
+        if not rule_id or not rule_text:
+            continue
+        rule_map[rule_id] = rule_text
+        if max_rules and len(rule_map) >= max_rules:
+            break
+    return rule_map
+
+
+def _build_line_idx_map(rule_map):
+    """Build line_idx -> [rule_ids] reverse map for O(1) lookup during JSONL scan.
+
+    Rule IDs of the form "base:NNNNNN" encode a 0-indexed line number.
+    Multiple rules can share the same line index (e.g. multiple sub-graphs
+    from the same source problem).
+    """
+    idx_map = {}
+    for rule_id in rule_map:
+        parts = rule_id.split(":")
+        if len(parts) >= 2:
+            try:
+                idx = int(parts[-1])
+                idx_map.setdefault(idx, []).append(rule_id)
+            except (ValueError, IndexError):
+                pass
+    return idx_map
+
+
+def _entry_to_rule_with_source(rule_id, rule_text, entry):
+    """Build a RuleWithSource from a source data entry dict.
+
+    Only extracts the fields needed (llm_input_renamed, point_coords / fl_problem, seed).
+    Returns None if the entry cannot be converted (e.g. empty llm_input).
+    """
+    import re as _re
+
+    llm_input = entry.get("llm_input_renamed", "")
+    llm_output = entry.get("llm_output_renamed", "")
+    point_coords = dict(entry.get("point_coords") or {})
+    seed = entry.get("seed")
+
+    # Fallback: parse point coords from fl_problem when point_coords missing
+    if not point_coords:
+        fl_problem = entry.get("fl_problem", "")
+        if fl_problem:
+            _coord_re = _re.compile(
+                r'\b([A-Za-z][A-Za-z0-9]*)@'
+                r'(-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)'
+                r'_'
+                r'(-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)'
+            )
+            for m in _coord_re.finditer(fl_problem):
+                point_coords[m.group(1)] = [float(m.group(2)), float(m.group(3))]
+
+    if not llm_input:
+        return None
+
+    try:
+        premises, goal = _parse_llm_input(llm_input)
+        points = [(name, coords[0], coords[1]) for name, coords in point_coords.items()]
+        return RuleWithSource(
+            rule_id=rule_id,
+            rule_text=rule_text,
+            points=points,
+            premises=premises,
+            goal=goal,
+            llm_output_renamed=llm_output,
+            seed=seed,
+        )
+    except Exception:
+        return None
+
+
+def _scan_jsonl_for_rules(source_data_file, rule_map):
+    """Scan a JSONL source file once and return matching entries.
+
+    Strategy 1: explicit rid/pid field in JSONL entry.
+    Strategy 2: line-number matching via pre-built reverse index (O(1) per line,
+                vs old O(N_rules) per line).
+
+    Returns:
+        entry_map: {rule_id -> slim_entry_dict} keeping only fields needed
+                   for RuleWithSource construction.
+    """
+    import json as _json
+
+    KEEP_FIELDS = {"llm_input_renamed", "llm_output_renamed", "point_coords", "fl_problem", "seed", "rid", "pid"}
+
+    entry_map = {}
+    target_rids = set(rule_map.keys())
+
+    with open(source_data_file) as f:
+        first_line = f.readline()
+        if not first_line:
+            return entry_map
+
+        f.seek(0)
+        is_jsonl = False
+        try:
+            data = _json.loads(first_line)
+            if isinstance(data, dict) and "entries" not in data:
+                is_jsonl = True
+        except _json.JSONDecodeError:
+            is_jsonl = False
+
+        if not is_jsonl:
+            # Standard JSON with "entries" list
+            try:
+                source_data = _json.load(f)
+                for entry in source_data.get("entries", []):
+                    rid = entry.get("rid") or entry.get("pid")
+                    if rid and rid in target_rids:
+                        slim = {k: entry[k] for k in KEEP_FIELDS if k in entry}
+                        slim["rid"] = rid
+                        entry_map[rid] = slim
+                return entry_map
+            except _json.JSONDecodeError as e:
+                if "Extra data" not in str(e):
+                    raise
+                f.seek(0)
+                is_jsonl = True
+
+        if is_jsonl:
+            # Pre-build line_idx -> [rule_ids] reverse map (O(N_rules), very fast)
+            line_idx_map = _build_line_idx_map(rule_map)
+
+            line_idx = 0
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = _json.loads(line)
+                except _json.JSONDecodeError:
+                    line_idx += 1
+                    continue
+
+                # Strategy 1: explicit rid/pid field
+                rid = entry.get("rid") or entry.get("pid")
+                if rid and rid in target_rids:
+                    slim = {k: entry[k] for k in KEEP_FIELDS if k in entry}
+                    slim["rid"] = rid
+                    entry_map[rid] = slim
+                else:
+                    # Strategy 2: line-number lookup (O(1))
+                    for rule_id in line_idx_map.get(line_idx, []):
+                        if rule_id not in entry_map:
+                            slim = {k: entry[k] for k in KEEP_FIELDS if k in entry}
+                            slim["rid"] = rule_id
+                            entry_map[rule_id] = slim
+
+                line_idx += 1
+
+    return entry_map
+
+
 def load_rules_from_discovery_output(
-    rules_file: Path,
-    source_data_file: Path,
-    max_rules: Optional[int] = None,
-) -> Tuple[List[RuleWithSource], List[Tuple[str, str, str]]]:
+    rules_file,
+    source_data_file,
+    max_rules=None,
+):
     """Load rules from discovery pipeline output.
 
     Args:
         rules_file: Path to *_pruned_rules.txt (format: rule_id\\nrule_text\\n...)
-        source_data_file: Path to step6_rules_stats.json with llm_input_renamed and point_coords
-        max_rules: Maximum number of rules to load (for testing)
+        source_data_file: Path to step6_rules_stats.json or raw JSONL with
+                          llm_input_renamed and point_coords / fl_problem.
+        max_rules: Maximum number of rules to load (for testing).
 
     Returns:
-        Tuple of (rules, failures) where failures is a list of (rule_id, rule_text, error_reason)
+        (rules, failures) where failures is [(rule_id, rule_text, reason), ...]
     """
-    import json
-
     rules = []
     failures = []
 
-    # Load rules file
-    with open(rules_file) as f:
-        lines = [line.strip() for line in f if line.strip()]
+    rule_map = _parse_rule_map(rules_file, max_rules)
 
-    # Parse rule_id and rule_text pairs
-    rule_map = {}
-    for i in range(0, len(lines), 2):
-        if i + 1 >= len(lines):
-            break
-        rule_id = lines[i]
-        rule_text = lines[i + 1]
-        rule_map[rule_id] = rule_text
-
-    # Load source data file (supports both JSON and JSONL)
-    entries = []
-    target_rids = set(rule_map.keys())
     try:
-        with open(source_data_file) as f:
-            # More robust detection: read the first line
-            first_line = f.readline()
-            if not first_line:
-                return [], failures
-
-            f.seek(0)
-            is_jsonl = False
-            try:
-                data = json.loads(first_line)
-                # If first line is a valid JSON object AND it's not the whole file
-                # (or if it doesn't have the "entries" key which is our JSON convention)
-                if isinstance(data, dict) and "entries" not in data:
-                    is_jsonl = True
-            except json.JSONDecodeError:
-                # If first line is not valid JSON, it might be a multi-line JSON or something else
-                # Fallback to standard json.load which will handle multi-line formatted JSON
-                is_jsonl = False
-
-            if not is_jsonl:
-                # Standard JSON
-                try:
-                    source_data = json.load(f)
-                    entries = source_data.get("entries", [])
-                except json.JSONDecodeError as e:
-                    if "Extra data" in str(e):
-                        # Fallback to JSONL if we see extra data
-                        f.seek(0)
-                        is_jsonl = True
-                    else:
-                        raise e
-
-            if is_jsonl:
-                # Assume JSONL (one JSON object per line)
-                # Try two strategies:
-                # 1. If entries have "rid"/"pid" field, use that
-                # 2. Otherwise, match by line number (extract index from rule_id)
-                f.seek(0)
-                line_idx = 0
-                for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        entry = json.loads(line)
-                        # Strategy 1: Check if entry has rid/pid
-                        rid = entry.get("rid") or entry.get("pid")
-                        if rid and rid in target_rids:
-                            if "rid" not in entry and "pid" in entry:
-                                entry["rid"] = entry["pid"]
-                            entries.append(entry)
-                        else:
-                            # Strategy 2: Try to match by line number
-                            # Extract numeric index from rule_id (e.g., "geometry_clauses10_samples10M_seeded:000132" -> 132)
-                            for rule_id in target_rids:
-                                # Try to extract the numeric part
-                                parts = rule_id.split(":")
-                                if len(parts) >= 2:
-                                    try:
-                                        idx = int(parts[-1])
-                                        if idx == line_idx:
-                                            entry["rid"] = rule_id
-                                            entries.append(entry)
-                                            break
-                                    except (ValueError, IndexError):
-                                        pass
-                        line_idx += 1
-                    except json.JSONDecodeError:
-                        line_idx += 1
-                        continue
+        entry_map = _scan_jsonl_for_rules(source_data_file, rule_map)
     except Exception as e:
         print(f"Error loading source data: {e}")
         return [], failures
 
-    # Build rid -> entry mapping
-    entry_map = {entry.get("rid"): entry for entry in entries if entry.get("rid")}
-
-    # Process each rule
     for rule_id, rule_text in rule_map.items():
-        try:
-            # Get source data entry
-            entry = entry_map.get(rule_id)
-            if not entry:
-                failures.append((rule_id, rule_text, "No source data entry found"))
-                continue
-
-            llm_input = entry.get("llm_input_renamed", "")
-            llm_output = entry.get("llm_output_renamed", "")
-            point_coords = entry.get("point_coords", {})
-            seed = entry.get("seed")
-
-            # Fallback: parse point coords from fl_problem if point_coords missing
-            if not point_coords:
-                fl_problem = entry.get("fl_problem", "")
-                if fl_problem:
-                    import re as _re
-                    _coord_re = _re.compile(
-                        r'\b([A-Za-z][A-Za-z0-9]*)@(-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)_(-?[0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)'
-                    )
-                    for m in _coord_re.finditer(fl_problem):
-                        point_coords[m.group(1)] = [float(m.group(2)), float(m.group(3))]
-
-            if not llm_input:
-                failures.append((rule_id, rule_text, "Empty llm_input_renamed"))
-                continue
-
-            # Parse llm_input to get premises and goal
-            premises, goal = _parse_llm_input(llm_input)
-
-            # Convert point_coords to points list
-            points = [(name, coords[0], coords[1]) for name, coords in point_coords.items()]
-
-            # Create RuleWithSource
-            rules.append(RuleWithSource(
-                rule_id=rule_id,
-                rule_text=rule_text,
-                points=points,
-                premises=premises,
-                goal=goal,
-                llm_output_renamed=llm_output,
-                seed=seed,
-            ))
-
-            if max_rules and len(rules) >= max_rules:
-                break
-
-        except Exception as e:
-            failures.append((rule_id, rule_text, str(e)))
-            print(f"Warning: Failed to process {rule_id}: {e}")
+        entry = entry_map.get(rule_id)
+        if not entry:
+            failures.append((rule_id, rule_text, "No source data entry found"))
+            continue
+        rule = _entry_to_rule_with_source(rule_id, rule_text, entry)
+        if rule is None:
+            failures.append((rule_id, rule_text, "Empty llm_input_renamed or parse error"))
+            continue
+        rules.append(rule)
+        if max_rules and len(rules) >= max_rules:
+            break
 
     return rules, failures
+
+
+def stream_chunked_reduce_from_files(
+    rules_file,
+    source_data_file,
+    group_size,
+    reducer_cfg,
+    output_dir=None,
+    verbose=True,
+):
+    """Streaming chunk reduction: scan source JSONL once, reduce rules chunk-by-chunk.
+
+    Unlike load_rules_from_discovery_output + ChunkedIterativeReducer, this
+    function never loads all rules into memory at once:
+
+      1. Parse rules.txt -> rule_map + line_idx reverse map (small, fits in RAM)
+      2. Scan source JSONL exactly once line-by-line
+      3. As rules are matched, accumulate into a chunk of `group_size`
+      4. When chunk is full (or JSONL exhausted), run reduce() on that chunk
+      5. Collect survivors across all chunks
+      6. Optionally run a final global reduce on survivors
+
+    Args:
+        rules_file: Path to rules.txt
+        source_data_file: Path to source JSONL or step6_rules_stats.json
+        group_size: Max rules per chunk
+        reducer_cfg: Dict with keys: timeout, n_workers, batch_size, solver_type,
+                     engine, debug, debug_output_dir, global_reduction (bool)
+        output_dir: If set, save per-chunk survivors and final result here
+        verbose: Print progress
+
+    Returns:
+        (final_survivors, stats)
+    """
+    import json as _json
+    import time as _time
+
+    KEEP_FIELDS = {"llm_input_renamed", "llm_output_renamed", "point_coords", "fl_problem", "seed", "rid", "pid"}
+
+    timeout = reducer_cfg.get("timeout", 60)
+    n_workers = reducer_cfg.get("n_workers", 1)
+    batch_size = reducer_cfg.get("batch_size", 10)
+    solver_type = reducer_cfg.get("solver_type", "csolver")
+    engine = reducer_cfg.get("engine", "full")
+    debug = reducer_cfg.get("debug", False)
+    debug_output_dir = reducer_cfg.get("debug_output_dir")
+    do_global = reducer_cfg.get("global_reduction", True)
+
+    def make_reducer():
+        return RuleReducer(
+            timeout=timeout,
+            n_workers=n_workers,
+            batch_size=batch_size,
+            solver_type=solver_type,
+            engine=engine,
+            debug=debug,
+            debug_output_dir=debug_output_dir,
+            verbose=verbose,
+        )
+
+    t_start = _time.time()
+    rules_file = Path(rules_file)
+    source_data_file = Path(source_data_file)
+
+    # Step 1: parse rules file (small — just rule_id/rule_text pairs)
+    rule_map = _parse_rule_map(rules_file)
+    n_total_rules = len(rule_map)
+    if verbose:
+        print(f"[stream_chunk_reduce] {n_total_rules} rules from {rules_file}")
+
+    # Build reverse maps for matching
+    line_idx_map = _build_line_idx_map(rule_map)   # line_idx -> [rule_ids]
+
+    if output_dir:
+        output_dir = Path(output_dir)
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Detect JSON vs JSONL
+    with open(source_data_file) as f:
+        first_line = f.readline()
+    is_jsonl = False
+    if first_line:
+        try:
+            d = _json.loads(first_line)
+            if isinstance(d, dict) and "entries" not in d:
+                is_jsonl = True
+        except _json.JSONDecodeError:
+            is_jsonl = False
+
+    # For standard JSON, fall back to full load
+    if not is_jsonl:
+        if verbose:
+            print(f"[stream_chunk_reduce] source is JSON, loading all entries...")
+        rules, failures = load_rules_from_discovery_output(rules_file, source_data_file)
+        if verbose:
+            print(f"[stream_chunk_reduce] loaded {len(rules)} rules, {len(failures)} failures")
+        reducer = make_reducer()
+        result = reducer.reduce(rules)
+        survivors = result["basis_rules"]
+        stats = {
+            "input_count": len(rules),
+            "final_survivors_count": len(survivors),
+            "elapsed_seconds": _time.time() - t_start,
+            "mode": "json_fullload",
+        }
+        if output_dir:
+            with open(output_dir / "final_basis_rules.txt", "w") as f:
+                for r in survivors:
+                    f.write(f"{r.rule_id}\n{r.rule_text}\n")
+        return survivors, stats
+
+    # Step 2: streaming JSONL scan + chunk reduction
+    if verbose:
+        print(f"[stream_chunk_reduce] streaming JSONL scan, group_size={group_size}, "
+              f"n_workers={n_workers}")
+
+    all_survivors = []
+    chunk_stats_list = []
+    chunk_idx = 0
+    current_chunk = []
+    n_matched = 0
+    n_failures = 0
+    matched_rids = set()  # avoid duplicate rules from same line
+
+    def flush_chunk():
+        nonlocal chunk_idx
+        if not current_chunk:
+            return
+        ci = chunk_idx
+        chunk_idx += 1
+        if verbose:
+            print(f"\n  [chunk {ci}] {len(current_chunk)} rules -> reducing...")
+        t0 = _time.time()
+        r = make_reducer()
+        result = r.reduce(current_chunk)
+        basis = result["basis_rules"]
+        elapsed = _time.time() - t0
+        all_survivors.extend(basis)
+        cs = {
+            "chunk_id": ci,
+            "input": len(current_chunk),
+            "survivors": len(basis),
+            "eliminated": result["stats"]["eliminated_count"],
+            "n_tests": result["stats"]["n_subsumption_tests"],
+            "elapsed_seconds": elapsed,
+        }
+        chunk_stats_list.append(cs)
+        if verbose:
+            print(f"  [chunk {ci}] {len(current_chunk)} -> {len(basis)} survivors ({elapsed:.1f}s)")
+        if output_dir:
+            chunk_dir = output_dir / f"chunk_{ci:04d}"
+            chunk_dir.mkdir(parents=True, exist_ok=True)
+            with open(chunk_dir / "survivors.txt", "w") as fh:
+                for rule in basis:
+                    fh.write(f"{rule.rule_id}\n{rule.rule_text}\n")
+            import json as _j
+            with open(chunk_dir / "stats.json", "w") as fh:
+                _j.dump(cs, fh, indent=2)
+
+    with open(source_data_file) as f:
+        line_idx = 0
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                entry = _json.loads(line)
+            except _json.JSONDecodeError:
+                line_idx += 1
+                continue
+
+            # Strategy 1: explicit rid/pid
+            entry_rid = entry.get("rid") or entry.get("pid")
+            if entry_rid and entry_rid in rule_map and entry_rid not in matched_rids:
+                candidate_rids = [entry_rid]
+            else:
+                # Strategy 2: line-number lookup (O(1))
+                candidate_rids = [
+                    rid for rid in line_idx_map.get(line_idx, [])
+                    if rid not in matched_rids
+                ]
+
+            for rule_id in candidate_rids:
+                rule_text = rule_map.get(rule_id)
+                if not rule_text:
+                    continue
+                slim = {k: entry[k] for k in KEEP_FIELDS if k in entry}
+                rule = _entry_to_rule_with_source(rule_id, rule_text, slim)
+                if rule is None:
+                    n_failures += 1
+                    continue
+                current_chunk.append(rule)
+                matched_rids.add(rule_id)
+                n_matched += 1
+
+                if len(current_chunk) >= group_size:
+                    flush_chunk()
+                    current_chunk = []
+
+            line_idx += 1
+
+    # Flush remaining
+    if current_chunk:
+        flush_chunk()
+        current_chunk = []
+
+    n_unmatched = n_total_rules - n_matched - n_failures
+    if verbose:
+        print(f"\n[stream_chunk_reduce] scan complete: {n_matched} matched, "
+              f"{n_failures} parse errors, {n_unmatched} unmatched in JSONL")
+        print(f"  {len(all_survivors)} survivors from {chunk_idx} chunks")
+
+    # Step 3: optional global reduction on survivors
+    if do_global and len(all_survivors) > 1:
+        if verbose:
+            print(f"\n[stream_chunk_reduce] global reduction on {len(all_survivors)} survivors...")
+        t0 = _time.time()
+        r = make_reducer()
+        global_result = r.reduce(all_survivors)
+        final_survivors = global_result["basis_rules"]
+        global_elapsed = _time.time() - t0
+        if verbose:
+            print(f"[stream_chunk_reduce] global: {len(all_survivors)} -> {len(final_survivors)} "
+                  f"({global_elapsed:.1f}s)")
+    else:
+        final_survivors = all_survivors
+
+    total_elapsed = _time.time() - t_start
+
+    if output_dir:
+        with open(output_dir / "final_basis_rules.txt", "w") as fh:
+            for rule in final_survivors:
+                fh.write(f"{rule.rule_id}\n{rule.rule_text}\n")
+        import json as _j
+        overall = {
+            "input_count": n_total_rules,
+            "matched": n_matched,
+            "n_chunks": chunk_idx,
+            "survivors_after_chunks": len(all_survivors),
+            "final_survivors": len(final_survivors),
+            "elapsed_seconds": total_elapsed,
+            "chunk_stats": chunk_stats_list,
+        }
+        with open(output_dir / "stream_chunk_stats.json", "w") as fh:
+            _j.dump(overall, fh, indent=2)
+
+    return final_survivors, {
+        "input_count": n_total_rules,
+        "matched": n_matched,
+        "n_chunks": chunk_idx,
+        "survivors_after_chunks": len(all_survivors),
+        "final_survivors_count": len(final_survivors),
+        "elapsed_seconds": total_elapsed,
+        "chunk_stats": chunk_stats_list,
+        "mode": "streaming_jsonl",
+    }
 
 
 def _test_subsumption_batch_worker(

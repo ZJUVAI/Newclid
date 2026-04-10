@@ -354,7 +354,48 @@ def run_part4(
         load_rules_from_discovery_output,
     )
 
-    # Load rules
+    # Streaming chunk reduction: skip full load, go directly to stream path
+    streaming_load = chunk_reduction_enabled and chunk_red_cfg.get("streaming_load", False)
+    if streaming_load:
+        if source_data_file is None or not source_data_file.exists():
+            print("Error: chunk_reduction.streaming_load=true requires source_data in config",
+                  file=sys.stderr)
+            sys.exit(1)
+        if seed_reduction_enabled:
+            print("Error: seed_reduction cannot be combined with streaming_load", file=sys.stderr)
+            sys.exit(1)
+        # Run streaming chunk reduction (includes optional global reduction inside)
+        group_size = chunk_red_cfg.get("group_size", 500)
+        chunk_dir = output_path.parent / "chunk_reduction"
+        chunk_dir.mkdir(parents=True, exist_ok=True)
+        print(f"\n[Part 4 / chunk_reduction (streaming)] group_size={group_size}, "
+              f"n_workers={n_workers}, global_reduction={global_reduction_enabled}")
+        from newclid.proof_scout.reduction import stream_chunked_reduce_from_files
+        reducer_cfg_dict = {
+            "timeout": timeout,
+            "n_workers": n_workers,
+            "batch_size": batch_size,
+            "solver_type": "csolver",
+            "engine": engine,
+            "debug": debug,
+            "debug_output_dir": output_path.parent if debug else None,
+            "global_reduction": global_reduction_enabled,
+        }
+        final_rules, stream_stats = stream_chunked_reduce_from_files(
+            rules_file=input_path,
+            source_data_file=source_data_file,
+            group_size=group_size,
+            reducer_cfg=reducer_cfg_dict,
+            output_dir=chunk_dir,
+        )
+        print(f"[Part 4 / streaming] → {len(final_rules)} rules")
+        with open(output_path, "w", encoding="utf-8") as f:
+            for rule in final_rules:
+                f.write(f"{rule.rule_id}\n{rule.rule_text}\n")
+        print(f"\n[Part 4] Done — {len(final_rules)} rules → {output_path}")
+        return output_path
+
+    # Standard mode: load all rules into memory first
     if source_data_file and source_data_file.exists():
         rules, failures = load_rules_from_discovery_output(input_path, source_data_file)
     else:
@@ -412,27 +453,59 @@ def run_part4(
     if chunk_reduction_enabled:
         group_size = chunk_red_cfg.get("group_size", 500)
         iterations = chunk_red_cfg.get("iterations", 1)
-        print(f"\n[Part 4 / chunk_reduction] {len(current_rules)} rules, "
-              f"group_size={group_size}, iterations={iterations}, n_workers={n_workers}")
+        streaming_load = chunk_red_cfg.get("streaming_load", False)
 
         chunk_dir = output_path.parent / "chunk_reduction"
         chunk_dir.mkdir(parents=True, exist_ok=True)
 
-        cir = ChunkedIterativeReducer(
-            timeout=timeout,
-            batch_size=batch_size,
-            solver_type="csolver",
-            engine=engine,
-        )
-        current_rules, chunk_stats = cir.reduce_iterative(
-            current_rules,
-            group_size=group_size,
-            iterations=iterations,
-            n_workers=n_workers,
-            output_dir=chunk_dir,
-            resume=False,  # no resume in new pipeline; use Part 4 input for resume
-        )
-        print(f"[Part 4 / chunk_reduction] → {len(current_rules)} rules")
+        if streaming_load:
+            # Streaming mode: scan JSONL once, reduce chunk-by-chunk without loading all rules
+            if source_data_file is None or not source_data_file.exists():
+                print("Error: chunk_reduction.streaming_load=true requires source_data_file",
+                      file=sys.stderr)
+                sys.exit(1)
+            print(f"\n[Part 4 / chunk_reduction (streaming)] group_size={group_size}, "
+                  f"n_workers={n_workers}")
+            from newclid.proof_scout.reduction import stream_chunked_reduce_from_files
+            reducer_cfg = {
+                "timeout": timeout,
+                "n_workers": n_workers,
+                "batch_size": batch_size,
+                "solver_type": "csolver",
+                "engine": engine,
+                "debug": debug,
+                "debug_output_dir": output_path.parent if debug else None,
+                "global_reduction": global_reduction_enabled,
+            }
+            current_rules, stream_stats = stream_chunked_reduce_from_files(
+                rules_file=input_path,
+                source_data_file=source_data_file,
+                group_size=group_size,
+                reducer_cfg=reducer_cfg,
+                output_dir=chunk_dir,
+            )
+            print(f"[Part 4 / chunk_reduction (streaming)] → {len(current_rules)} rules")
+            # Global reduction already done inside streaming if enabled; skip below
+            global_reduction_enabled = False
+        else:
+            # Standard mode: rules already loaded into current_rules
+            print(f"\n[Part 4 / chunk_reduction] {len(current_rules)} rules, "
+                  f"group_size={group_size}, iterations={iterations}, n_workers={n_workers}")
+            cir = ChunkedIterativeReducer(
+                timeout=timeout,
+                batch_size=batch_size,
+                solver_type="csolver",
+                engine=engine,
+            )
+            current_rules, chunk_stats = cir.reduce_iterative(
+                current_rules,
+                group_size=group_size,
+                iterations=iterations,
+                n_workers=n_workers,
+                output_dir=chunk_dir,
+                resume=False,
+            )
+            print(f"[Part 4 / chunk_reduction] → {len(current_rules)} rules")
 
     # --- Global reduction ---
     if global_reduction_enabled:

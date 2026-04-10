@@ -62,6 +62,8 @@
       "enabled": false,
       "group_size": 500,
       "iterations": 1,
+      "streaming_load": false,
+      "_comment_streaming_load": "true = scan source JSONL once, reduce chunk-by-chunk without loading all rules into memory. Recommended for large datasets (>100K rules). Requires source_data. Cannot combine with seed_reduction. global_reduction runs at end of streaming pass when global_reduction.enabled=true.",
       "_comment": "Chunked iterative reduction for large rule sets. Chunks processed serially; intra-chunk subsumption tests use n_workers."
     },
     "global_reduction": {
