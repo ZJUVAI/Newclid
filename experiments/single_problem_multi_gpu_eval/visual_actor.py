@@ -228,6 +228,10 @@ def _effective_vllm_max_num_seqs(configured_max_num_seqs: int, *, gpu_batch_size
     return max(int(configured_max_num_seqs), int(gpu_batch_size) * int(decoding_size))
 
 
+def _effective_vllm_max_logprobs(*, decoding_size: int, configured_max_logprobs: int = 20) -> int:
+    return max(int(configured_max_logprobs), 2 * int(decoding_size))
+
+
 def _compute_vllm_beam_score(
     sequence: Any,
     *,
@@ -575,6 +579,7 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
             gpu_batch_size=self.gpu_batch_size,
             decoding_size=self.decoding_size,
         )
+        self.max_logprobs = _effective_vllm_max_logprobs(decoding_size=self.decoding_size)
         self.enforce_eager = bool(enforce_eager)
         self.vllm_distributed_executor_backend = "uni"
         torch.manual_seed(self.torch_seed)
@@ -582,13 +587,14 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
             torch.cuda.manual_seed(self.torch_seed)
             torch.cuda.manual_seed_all(self.torch_seed)
         logger.info(
-            "VLLMVisionModelWorker init start: agent_kind=%s model_path=%s torch_seed=%d gpu_memory_utilization=%.2f configured_max_num_seqs=%d effective_max_num_seqs=%d gpu_batch_size=%d decoding_size=%d enforce_eager=%s",
+            "VLLMVisionModelWorker init start: agent_kind=%s model_path=%s torch_seed=%d gpu_memory_utilization=%.2f configured_max_num_seqs=%d effective_max_num_seqs=%d max_logprobs=%d gpu_batch_size=%d decoding_size=%d enforce_eager=%s",
             agent_kind,
             resolved_path,
             self.torch_seed,
             self.gpu_memory_utilization,
             self.configured_max_num_seqs,
             self.max_num_seqs,
+            self.max_logprobs,
             self.gpu_batch_size,
             self.decoding_size,
             self.enforce_eager,
@@ -601,6 +607,7 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
             distributed_executor_backend=self.vllm_distributed_executor_backend,
             gpu_memory_utilization=self.gpu_memory_utilization,
             max_num_seqs=self.max_num_seqs,
+            max_logprobs=self.max_logprobs,
             enforce_eager=self.enforce_eager,
             limit_mm_per_prompt={"image": 1},
         )
@@ -630,6 +637,7 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
             "gpu_memory_utilization": self.gpu_memory_utilization,
             "configured_max_num_seqs": self.configured_max_num_seqs,
             "max_num_seqs": self.max_num_seqs,
+            "max_logprobs": self.max_logprobs,
             "gpu_batch_size": self.gpu_batch_size,
             "decoding_size": self.decoding_size,
             "enforce_eager": self.enforce_eager,

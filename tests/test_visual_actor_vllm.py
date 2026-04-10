@@ -5,6 +5,7 @@ import types
 import unittest
 from pathlib import Path
 import sys
+from unittest import mock
 
 from PIL import Image
 
@@ -34,7 +35,9 @@ sys.modules.setdefault("transformers.utils", fake_transformers_utils)
 sys.modules.setdefault("transformers.utils.logging", fake_transformers_utils_logging)
 
 from experiments.single_problem_multi_gpu_eval.visual_actor import (
+    VLLMVisionModelWorker,
     _extract_vllm_continuation_text,
+    _effective_vllm_max_logprobs,
     _effective_vllm_max_num_seqs,
     _generate_visual_aux_dsl_dict_batch_vllm,
 )
@@ -92,6 +95,11 @@ class _FakeLLM:
         return self.outputs
 
 
+class _InitCaptureLLM:
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+
 class _FakeBeamSearchParams:
     def __init__(self, beam_width: int, max_tokens: int, ignore_eos: bool = False, temperature: float = 0.0):
         self.beam_width = beam_width
@@ -110,6 +118,58 @@ class VisualActorVLLMTests(unittest.TestCase):
             _effective_vllm_max_num_seqs(256, gpu_batch_size=4, decoding_size=32),
             256,
         )
+
+    def test_effective_vllm_max_logprobs_matches_strict_beam_requirement(self):
+        self.assertEqual(_effective_vllm_max_logprobs(decoding_size=1), 20)
+        self.assertEqual(_effective_vllm_max_logprobs(decoding_size=8), 20)
+        self.assertEqual(_effective_vllm_max_logprobs(decoding_size=32), 64)
+
+    def test_vllm_worker_init_passes_effective_max_logprobs_to_llm(self):
+        llm_holder = {}
+
+        def _llm_factory(**kwargs):
+            llm = _InitCaptureLLM(**kwargs)
+            llm_holder["llm"] = llm
+            return llm
+
+        processor = types.SimpleNamespace(tokenizer=types.SimpleNamespace(padding_side=None))
+        worker_cls = VLLMVisionModelWorker.__ray_metadata__.modified_class
+        with (
+            mock.patch(
+                "experiments.single_problem_multi_gpu_eval.visual_actor.resolve_model_path",
+                side_effect=lambda path: path,
+            ),
+            mock.patch(
+                "experiments.single_problem_multi_gpu_eval.visual_actor._load_vllm_modules",
+                return_value=(
+                    _llm_factory,
+                    _FakeBeamSearchParams,
+                    lambda **kwargs: kwargs["cumulative_logprob"],
+                ),
+            ),
+            mock.patch(
+                "experiments.single_problem_multi_gpu_eval.visual_actor.ModelScopeAutoProcessor",
+                new=types.SimpleNamespace(from_pretrained=lambda *args, **kwargs: processor),
+            ),
+            mock.patch(
+                "experiments.single_problem_multi_gpu_eval.visual_actor.torch.cuda.is_available",
+                return_value=False,
+            ),
+        ):
+            worker = worker_cls(
+                "model-path",
+                "vlm",
+                42,
+                gpu_memory_utilization=0.9,
+                max_num_seqs=128,
+                gpu_batch_size=4,
+                decoding_size=32,
+                enforce_eager=False,
+            )
+
+        self.assertIs(worker.llm, llm_holder["llm"])
+        self.assertEqual(worker.max_logprobs, 64)
+        self.assertEqual(llm_holder["llm"].kwargs["max_logprobs"], 64)
 
     def test_extract_vllm_continuation_text_strips_full_prompt_prefix(self):
         processor = _FakeProcessor()
