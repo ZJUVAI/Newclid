@@ -137,6 +137,18 @@ def _build_visual_batch_inputs(
     return model_inputs
 
 
+def _load_visual_processor(resolved_path: str):
+    try:
+        return ModelScopeAutoProcessor.from_pretrained(resolved_path)
+    except Exception:
+        logger.warning(
+            "Failed to load VLM processor from local model path %s; falling back to Qwen/Qwen3-VL-2B-Instruct",
+            resolved_path,
+            exc_info=True,
+        )
+        return ModelScopeAutoProcessor.from_pretrained("Qwen/Qwen3-VL-2B-Instruct")
+
+
 def generate_visual_aux_dsl_dict_batch(
     model,
     processor,
@@ -404,7 +416,7 @@ class VisionModelWorker(_BaseVisionWorker):
                 device_map="auto",
                 attn_implementation="flash_attention_2",
             )
-            self.processor = ModelScopeAutoProcessor.from_pretrained("Qwen/Qwen3-VL-2B-Instruct")
+            self.processor = _load_visual_processor(resolved_path)
         elif agent_kind == "qwen35":
             self.model = Qwen3_5ForConditionalGeneration.from_pretrained(
                 resolved_path,
@@ -613,7 +625,7 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
         )
         self.beam_search_params_cls = beam_search_params_cls
         self.get_beam_search_score = get_beam_search_score
-        self.processor = ModelScopeAutoProcessor.from_pretrained("Qwen/Qwen3-VL-2B-Instruct")
+        self.processor = _load_visual_processor(resolved_path)
         self.processor.tokenizer.padding_side = "left"
         self.num_requests = 0
         self.num_batches = 0

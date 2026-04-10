@@ -40,6 +40,7 @@ from experiments.single_problem_multi_gpu_eval.visual_actor import (
     _effective_vllm_max_logprobs,
     _effective_vllm_max_num_seqs,
     _generate_visual_aux_dsl_dict_batch_vllm,
+    _load_visual_processor,
 )
 
 
@@ -126,6 +127,7 @@ class VisualActorVLLMTests(unittest.TestCase):
 
     def test_vllm_worker_init_passes_effective_max_logprobs_to_llm(self):
         llm_holder = {}
+        processor_calls = []
 
         def _llm_factory(**kwargs):
             llm = _InitCaptureLLM(**kwargs)
@@ -133,6 +135,9 @@ class VisualActorVLLMTests(unittest.TestCase):
             return llm
 
         processor = types.SimpleNamespace(tokenizer=types.SimpleNamespace(padding_side=None))
+        def _processor_factory(path):
+            processor_calls.append(path)
+            return processor
         worker_cls = VLLMVisionModelWorker.__ray_metadata__.modified_class
         with (
             mock.patch(
@@ -149,7 +154,7 @@ class VisualActorVLLMTests(unittest.TestCase):
             ),
             mock.patch(
                 "experiments.single_problem_multi_gpu_eval.visual_actor.ModelScopeAutoProcessor",
-                new=types.SimpleNamespace(from_pretrained=lambda *args, **kwargs: processor),
+                new=types.SimpleNamespace(from_pretrained=lambda path, *args, **kwargs: _processor_factory(path)),
             ),
             mock.patch(
                 "experiments.single_problem_multi_gpu_eval.visual_actor.torch.cuda.is_available",
@@ -170,6 +175,26 @@ class VisualActorVLLMTests(unittest.TestCase):
         self.assertIs(worker.llm, llm_holder["llm"])
         self.assertEqual(worker.max_logprobs, 64)
         self.assertEqual(llm_holder["llm"].kwargs["max_logprobs"], 64)
+        self.assertEqual(processor_calls, ["model-path"])
+
+    def test_load_visual_processor_falls_back_to_remote_model(self):
+        processor = object()
+        calls = []
+
+        def _processor_factory(path):
+            calls.append(path)
+            if path == "local-path":
+                raise RuntimeError("boom")
+            return processor
+
+        with mock.patch(
+            "experiments.single_problem_multi_gpu_eval.visual_actor.ModelScopeAutoProcessor",
+            new=types.SimpleNamespace(from_pretrained=lambda path, *args, **kwargs: _processor_factory(path)),
+        ):
+            loaded = _load_visual_processor("local-path")
+
+        self.assertIs(loaded, processor)
+        self.assertEqual(calls, ["local-path", "Qwen/Qwen3-VL-2B-Instruct"])
 
     def test_extract_vllm_continuation_text_strips_full_prompt_prefix(self):
         processor = _FakeProcessor()
