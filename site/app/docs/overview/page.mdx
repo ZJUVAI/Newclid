@@ -1,0 +1,37 @@
+export const metadata = {
+  title: 'Overview',
+};
+
+# Overview
+
+GenesisGeo is a neuro-symbolic geometry theorem proving system. Olympiad geometry is not solved well by pattern matching alone, nor by unconstrained neural text generation. The project treats geometry as a meeting point between **visual grounding**, **formal symbolic state**, and **search over useful constructions**.
+
+<div className="mdx-callout">
+GenesisGeo extends the Newclid and DDAR line of work, drawing motivation from AlphaGeometry. The goal is not merely to output an answer, but to recover machine-checkable proof structure over olympiad-style geometric statements.
+</div>
+
+## What the system captures
+
+Geometry problems require coordinating several kinds of information:
+
+- a diagram or visual arrangement
+- a formal statement with definitions and constraints
+- latent auxiliary constructions that are often necessary for a proof
+- a proof trace consistent under exact symbolic checking
+
+GenesisGeo combines a symbolic engine with learned components and large-scale synthetic supervision so that difficult geometry can be approached as a sequence of structured decisions.
+
+## Core ingredients
+
+### Visual intuition
+
+Olympiad geometry often depends on recognizing structure that is easy for a human to see and hard to recover from text alone: symmetric layouts, hidden intersections, circles suggested by angle patterns, or the likely usefulness of an auxiliary line.
+
+### Symbolic discipline
+
+The symbolic side keeps the proof state explicit. Statements are represented in a formal language, dependencies are tracked, and successful results can be traced back into coherent proof steps.
+
+### Synthetic supervision
+
+Large amounts of generated geometry data make it possible to train the neural components on structured reasoning signals rather than only on small hand-authored benchmark sets. This is essential because olympiad geometry data is scarce and difficult to annotate at scale.
+

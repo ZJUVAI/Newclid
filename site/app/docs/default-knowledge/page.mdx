@@ -1,0 +1,40 @@
+export const metadata = {
+  title: 'Default Knowledge',
+};
+
+# Default Knowledge
+
+The project separates a geometry problem from the prior geometric knowledge available to the solver. That prior knowledge lives in two files: **definitions** and **rules**.
+
+## Definitions
+
+Definitions are the construction vocabulary. They specify how new objects are introduced and what immediate symbolic facts those constructions entail.
+
+Each definition packages three things:
+
+- a geometric operation
+- the logical facts that operation guarantees
+- a way to realize the construction numerically
+
+Primitives include `free`, `foot`, `eq_triangle`, `incenter`, `angle_bisector`, and many intersection-style constructions. Together they define the space of configurations the system can state and generate.
+
+A definition is more than syntax sugar. It is the bridge between symbolic geometry and concrete buildable diagrams — the numerical sketch routine ensures that a formally stated problem is actually realizable.
+
+## Rules
+
+Rules are the deduction side. They say how one set of true predicates licenses another. Each rule has a label, a formal statement, and a short geometric explanation.
+
+Rules cover moves such as:
+
+- using equal angles to infer cyclicity (r03, r04)
+- using midpoint structure to infer parallel lines (r06)
+- using angle bisectors to infer ratio relations (r11, r12)
+- recovering isosceles facts from equal angles or equal sides (r13, r14)
+
+Some rules from the historical inventory are no longer in the active set because algebraic reasoning (AR) now subsumes them. The knowledge base is not static — it evolves with the solver architecture.
+
+<div className="mdx-callout">
+Definitions and rules function like a declared geometry curriculum. They specify what the system already knows before it starts proving the target theorem.
+</div>
+
+See the [Definitions](/docs/definitions) and [Rules](/docs/rules) pages for the full catalogs with diagrams and formal statements.

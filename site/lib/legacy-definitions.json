@@ -1,0 +1,610 @@
+[
+  {
+    "slug": "angle_bisector",
+    "title": "angle_bisector x a b c",
+    "section": "Legacy definitions",
+    "description": "From non-collinear points a, b, c, creates x in the internal bisector of angle abc, with vertex at b.",
+    "statement": "abx=xbc (eqangle b a b x b x b c).",
+    "construction": "Line"
+  },
+  {
+    "slug": "angle_mirror",
+    "title": "angle_mirror x a b c",
+    "section": "Legacy definitions",
+    "description": "From non-collinear points a, b, c, creates x on the opposite side of bc with respect to a in a way that angle abx doubles angle abc. (Compare to on_aline0 x a b c d e f g below.)",
+    "statement": "abc=cbx (eqangle b a b c b c b x).",
+    "construction": "Ray"
+  },
+  {
+    "slug": "circle",
+    "title": "circle x a b c",
+    "section": "Legacy definitions",
+    "description": "From non-collinear points a, b, c, creates x the center of the circle through a, b, c.",
+    "statement": "xa=xb and xb=xc (cong x a x b, cong x b x c)",
+    "construction": "Point"
+  },
+  {
+    "slug": "circumcenter",
+    "title": "circumcenter x a b c",
+    "section": "Legacy definitions",
+    "description": "",
+    "statement": "",
+    "construction": ""
+  },
+  {
+    "slug": "eq_quadrangle",
+    "title": "eq_quadrangle a b c d",
+    "section": "Legacy definitions",
+    "description": "From nothings, adds four points in a quadrilateral abcd with two opposing sides (AD and BC) of same length.",
+    "statement": "ad=bc (cong d a b c)",
+    "construction": "Points"
+  },
+  {
+    "slug": "iso_trapezoid",
+    "title": "iso_trapezoid a b c d",
+    "section": "Legacy definitions",
+    "description": "From nothing, adds four points on a trapezoid abcd with parallel opposing sides ab and cd and non-parallel opposing sides ad and bc of same length. Adds the congruence statement that ad=bc and the parallel statement that ab//cd.",
+    "statement": "ab//cd and ad=bc (para d c a b, cong d a b c)",
+    "construction": "Points"
+  },
+  {
+    "slug": "eq_triangle",
+    "title": "eq_triangle x b c",
+    "section": "Legacy definitions",
+    "description": "From two different points b, c, adds a third point x such that the triangle xbc is equilateral.",
+    "statement": "xb=bx and bc=cx xbc = bcx and cxb = xbc (cong x b b c, cong b c c x; eqangle b x b c c b c x, eqangle x c x b b x b c)",
+    "construction": "Point"
+  },
+  {
+    "slug": "eqangle2",
+    "title": "eqangle2 x a b c",
+    "section": "Legacy definitions",
+    "description": "From three non-collinear points a, b, c, adds a third point x such that the quadrilateral abcx has two opposite angles that are congruent, bax and bcx.",
+    "statement": "bax = xcb (eqangle a b a x c x c b)",
+    "construction": "Point (Locus could be hyperbola.)"
+  },
+  {
+    "slug": "eqdia_quadrangle",
+    "title": "eqdia_quadrangle a b c d",
+    "section": "Legacy definitions",
+    "description": "From nothing, adds four points on a quadrilateral abcd with the two diagonals of same length.",
+    "statement": "bd=ac (cong d b a c)",
+    "construction": "Points"
+  },
+  {
+    "slug": "eqdistance",
+    "title": "eqdistance x a b c",
+    "section": "Legacy definitions",
+    "description": "From two different points b, c, and with a base point a (that can be either b or c itself), adds x such that the distance from x to a is equal to the distance from b to c.",
+    "statement": "ax=bc (cong x a b c)",
+    "construction": "Circle"
+  },
+  {
+    "slug": "foot",
+    "title": "foot x a b c",
+    "section": "Legacy definitions",
+    "description": "From three non-collinear points a, b, c, adds x that is the perpendicular projection of a onto line bc.",
+    "statement": "x,b,c collinear axperpendicular bc (coll x b c, perp x a b c)",
+    "construction": "Point"
+  },
+  {
+    "slug": "free",
+    "title": "free a",
+    "section": "Legacy definitions",
+    "description": "From nothing, adds point a with random coordinates.",
+    "statement": "No statement added",
+    "construction": "Point"
+  },
+  {
+    "slug": "incenter",
+    "title": "incenter x a b c",
+    "section": "Legacy definitions",
+    "description": "From three non-collinear points a, b, c, adds x the incenter of the triangle abc. It acknowledges the fact that it is the intersection of the three internal bisectors of the angles of the triangle.",
+    "statement": "bax=xac acx=xcb cbx=xba (eqangle a b a x a x a c, eqangle c a c x c x c b, eqangle b c b x b x b a)",
+    "construction": "Point"
+  },
+  {
+    "slug": "incenter2",
+    "title": "incenter2 x y z i a b c",
+    "section": "Legacy definitions",
+    "description": "From three non-collinear points a, b, c, adds i, the incenter of the triangle abc, as well as x, y, and z, the tangent points of the incircle with sides bc, ac, and ab, respectively. It acknowledges the fact that the incenter is the intersection of the three internal bisectors of the angles of the triangle, and that a radius of a circle and the tangent line are perpendicular at the point of tangency.",
+    "statement": "bax=xac acx=xcb cbx=xba x,b,c collinear ixperpendicular bc y,c,a collinear iyperpendicular ca z,a,b collinear izperpendicular ab ix=iy, iy=iz (eqangle a b a i a i a c, eqangle c a c i c i c b, eqangle b c b i b i b a, coll x b c, perp i x b c, coll y c a, perp i y c a, coll z a b, perp i z a b, cong i x i y, cong i y i z)",
+    "construction": "Points"
+  },
+  {
+    "slug": "excenter",
+    "title": "excenter x a b c",
+    "section": "Legacy definitions",
+    "description": "From three non-collinear points a, b, c, adds x the excenter of triangle abc in a way that the corresponding excircle is externally tangent to side bc. Symbolically, it works exactly as the incenter construction because the angle constructions in DD do not differentiate the two bisectors of an angle crossing.",
+    "statement": "bax=xac acx=xcb cbx=xba (eqangle a b a x a x a c, eqangle c a c x c x c b, eqangle b c b x b x b a)",
+    "construction": "Point"
+  },
+  {
+    "slug": "excenter2",
+    "title": "excenter2 x y z i a b c",
+    "section": "Legacy definitions",
+    "description": "From three non-collinear points a, b, c, adds i, the excenter of the triangle abc in a way that the corresponding excircle is externally tangent to side bc. It also adds x, y, and z, the tangent points of the incircle with the lines containing sides bc, ac, and ab, respectively. Symbolically, it works exactly as the incenter construction because the angle constructions in DD do not differentiate the two bisectors of an angle crossing.",
+    "statement": "bax=xac acx=xcb cbx=xba x,b,c collinear ixperpendicular bc y,c,a collinear iyperpendicular ca z,a,b collinear izperpendicular ab ix=iy, iy=iz (eqangle a b a i a i a c, eqangle c a c i c i c b, eqangle b c b i b i b a, coll x b c, perp i x b c, coll y c a, perp i y c a, coll z a b, perp i z a b, cong i x i y, cong i y i z)",
+    "construction": "Points"
+  },
+  {
+    "slug": "centroid",
+    "title": "centroid x y z i a b c",
+    "section": "Legacy definitions",
+    "description": "From three non-collinear points a, b, c, adds i, the centroid of the triangle. It also adds x, y, and z, the midpoints of sides bc, ac, and ab, respectively.",
+    "statement": "x,b,c collinear bx=xc y,c,a collinear cy=ya z,a,b collinear az=zb a,i,x collinear b,i,y collinear c,i,z collinear (coll x b c, cong x b x c, coll y c a, cong y c y a, coll z a b, cong z a z b, coll a x i, coll b y i, coll c z i)",
+    "construction": "Points"
+  },
+  {
+    "slug": "ninepoints",
+    "title": "ninepoints x y z i a b c",
+    "section": "Legacy definitions",
+    "description": "From three non-collinear points a, b, c, adds x, y, and z, the midpoints of sides bc, ac, and ab, respectively. It also adds i, the center of the circle going through x, y, and z, which is also the nine points circle of the triangle abc.",
+    "statement": "x,b,c collinear bx=xc y,c,a collinear cy=ya z,a,b collinear az=zb xi=iy yi=iz (coll x b c, cong x b x c, coll y c a, cong y c y a, coll z a b, cong z a z b, cong i x i y, cong i y i z)",
+    "construction": "Points"
+  },
+  {
+    "slug": "intersection_cc",
+    "title": "intersection_cc x o w a",
+    "section": "Legacy definitions",
+    "description": "From three non-colinear points, o, w, and a, adds x, the other intersection of the circle of center o through a and the circle of center w through a.",
+    "statement": "oa=ox wa=wx (cong o a o x, cong w a w x)",
+    "construction": "Point"
+  },
+  {
+    "slug": "intersection_lc",
+    "title": "intersection_lc x a o b",
+    "section": "Legacy definitions",
+    "description": "From three points, a, o, and b, b different from both a and o, such that bo is not perpendicular to ba (to avoid the situation of a line tangent to a circle at b), adds point x, the second intersection of line ab with the circle of center o going through b.",
+    "statement": "x, a, b collinear ob=ox (coll x a b, cong o b o x)",
+    "construction": "Point"
+  },
+  {
+    "slug": "intersection_ll",
+    "title": "intersection_ll x a b c d",
+    "section": "Legacy definitions",
+    "description": "From four points a, b, c, d, such that lines ab and cd are not parallel and such that they do are not all collinear, build point x on the intersection of lines ab and cd.",
+    "statement": "x, a, b collinear x, c, d collinear (coll x a b, coll x c d)",
+    "construction": "Point"
+  },
+  {
+    "slug": "intersection_lp",
+    "title": "intersection_lp x a b c m n",
+    "section": "Legacy definitions",
+    "description": "From five points a, b, c, m, and n, such that lines ab and mn are not parallel, and that c is neither on line ab nor on line mn, builds x, the intersection of line ab with the line through c that is parallel to mn.",
+    "statement": "x, a, b collinear cxparallel mn (coll x a b, para c x m n)",
+    "construction": "Point"
+  },
+  {
+    "slug": "intersection_lt",
+    "title": "intersection_lt x a b c d e",
+    "section": "Legacy definitions",
+    "description": "From five points a, b, c, d, and e, such that lines ab and de are not perpendicular and c is not on line ab, build x, the intersection of line ab and the line through c perpendicular to de.",
+    "statement": "x, a, b collinear cxperpendicular de (coll x a b, perp x c d e)",
+    "construction": "Point"
+  },
+  {
+    "slug": "intersection_pp",
+    "title": "intersection_pp x a b c d e f",
+    "section": "Legacy definitions",
+    "description": "From six points, a, b, c, d, e, f, such that a and d are different and that lines bc and ef are not parallel, builds point x in the intersection of the line through a parallel to bc and the line through d parallel to ef.",
+    "statement": "xaparallel bc xdparallel ef (para x a b c, para x d e f)",
+    "construction": "Point"
+  },
+  {
+    "slug": "intersection_tt",
+    "title": "intersection_tt x a b c d e f",
+    "section": "Legacy definitions",
+    "description": "From six points, a, b, c, d, e, f, such that a and d are different and lines bc and ef are not parallel, build point x in the intersection of the line through a perpendicular to bc and the line through d perpendicular to ef.",
+    "statement": "xaperpendicular bc xdperpendicular ef (perp x a b c, perp x d e f)",
+    "construction": "Point"
+  },
+  {
+    "slug": "iso_triangle",
+    "title": "iso_triangle a b c",
+    "section": "Legacy definitions",
+    "description": "From nothing, creates the three vertices a, b, c of an isosceles triangle with ab=ac. (Compare to iso_triangle0 a b c below).",
+    "statement": "ab= ac abc=bca (cong a b a c, eqangle b a b c c b c a)",
+    "construction": "Points"
+  },
+  {
+    "slug": "lc_tangent",
+    "title": "lc_tangent x a o",
+    "section": "Legacy definitions",
+    "description": "From two different points a, o, builds x, a point on the line perpendicular to ao through a (the line tangent to the circle of center o through a, with tangent point a). It is equivalent to on_tline x a a o (see on_tline below).",
+    "statement": "ax perpendicular ao (perp a x a o)",
+    "construction": "Line"
+  },
+  {
+    "slug": "midpoint",
+    "title": "midpoint x a b",
+    "section": "Legacy definitions",
+    "description": "From a pair of points a, b, that are different, builds x, the midpoint of a and b. The original version of AlphaGeometry did not return midpoint as a predicate, resulting in solutions where a midpoint construction would have to be recovered as a predicate during the proof. We fixed that.",
+    "statement": "x midpoint of ab (midp x a b)",
+    "construction": "Point"
+  },
+  {
+    "slug": "mirror",
+    "title": "mirror x a b",
+    "section": "Legacy definitions",
+    "description": "From two points a, b that are different, builds x, the reflection of point a with respect to point b (so that b is the midpoint of ax).",
+    "statement": "x, a, b collinear ba=bx (coll x a b, cong b a b x)",
+    "construction": "Point"
+  },
+  {
+    "slug": "nsquare",
+    "title": "nsquare x a b",
+    "section": "Legacy definitions",
+    "description": "Given two distinct points a, b, builds x such that the triangle xab is an isosceles right triangle.",
+    "statement": "xa=ab xaperpendicular ab (cong x a a b, perp x a a b)",
+    "construction": "Point"
+  },
+  {
+    "slug": "on_aline",
+    "title": "on_aline x a b c d e",
+    "section": "Legacy definitions",
+    "description": "From five points a, b, c, d, e, such that c, d, e are non-collinear, adds point x in a way that the angle bax is the same as the angle edc (up to a rotation and a translation). It transfers the angle measure between lines with the vertices specified (compare to on_aline0 x a b c d e f g below).",
+    "statement": "xab= cde (eqangle a x a b d c d e)",
+    "construction": "Line"
+  },
+  {
+    "slug": "on_bline",
+    "title": "on_bline x a b",
+    "section": "Legacy definitions",
+    "description": "Given two distinct points a, b, builds x a point on the perpendicular bisector of the segment ab. (Compare to iso_triangle_vertex x b c and to iso_triangle_vertex_angle x b c below).",
+    "statement": "xa=xb xab= abx (cong x a x b, eqangle a x a b b a b x)",
+    "construction": "Line"
+  },
+  {
+    "slug": "on_circle",
+    "title": "on_circle x o a",
+    "section": "Legacy definitions",
+    "description": "From two distinct points o, a, builds x a point on the circle of center o through a. Equivalent to eqdistance x a a o (see eqdistance x a b c above).",
+    "statement": "ox=oa (cong o x o a)",
+    "construction": "Circle"
+  },
+  {
+    "slug": "on_line",
+    "title": "on_line x a b",
+    "section": "Legacy definitions",
+    "description": "From two distinct point a, b, builds x another point on the line ab.",
+    "statement": "x, a, b collinear (coll x a b)",
+    "construction": "Line"
+  },
+  {
+    "slug": "on_pline",
+    "title": "on_pline x a b c",
+    "section": "Legacy definitions",
+    "description": "From three non-colinear points a, b, c, with b different from c, builds x on the line parallel to bc through a. (Compare to the simpler on_pline0 x a b c below).",
+    "statement": "xaparallel bc (para x a b c)",
+    "construction": "Line"
+  },
+  {
+    "slug": "on_tline",
+    "title": "on_tline x a b c",
+    "section": "Legacy definitions",
+    "description": "From three points a, b, c, with b different from c, builds x on the line through a perpendicular to bc.",
+    "statement": "xaperpendicular bc (perp x a b c)",
+    "construction": "Line"
+  },
+  {
+    "slug": "orthocenter",
+    "title": "orthocenter x a b c",
+    "section": "Legacy definitions",
+    "description": "From three non-collinear points a, b, and c, builds x the orthocenter of the triangle abc.",
+    "statement": "xaperpendicular bc xbperpendicular ac xbperpendicular ab (perp x a b c, perp x b c a; perp x c a b)",
+    "construction": "Point"
+  },
+  {
+    "slug": "parallelogram",
+    "title": "parallelogram a b c x",
+    "section": "Legacy definitions",
+    "description": "From three non-collinear points a, b, and c, builds x such that abcx is a parallelogram.",
+    "statement": "abparallel cx axparallel bc ab=cx ax=bc (para a b c x, para a x b c; cong a b c x, cong a x b c)",
+    "construction": "Point"
+  },
+  {
+    "slug": "pentagon",
+    "title": "pentagon a b c d e",
+    "section": "Legacy definitions",
+    "description": "From nothing, creates five points a, b, c, d, e. The coordinates are a random conformal deformation (isometry combined with scaling) of a random inscribed convex pentagon.",
+    "statement": "No statement added",
+    "construction": "Points"
+  },
+  {
+    "slug": "psquare",
+    "title": "psquare x a b",
+    "section": "Legacy definitions",
+    "description": "From two points a, b that are distinct, builds x the image of b under a rotation of 90 degrees around a.",
+    "statement": "ax=ab axperpendicular ab (cong x a a b, perp x a a b)",
+    "construction": "Point"
+  },
+  {
+    "slug": "quadrangle",
+    "title": "quadrangle a b c d",
+    "section": "Legacy definitions",
+    "description": "From nothing, creates four points, a, b, c, d which are vertices of a random convex quadrilateral.",
+    "statement": "No statement added",
+    "construction": "Points"
+  },
+  {
+    "slug": "r_trapezoid",
+    "title": "r_trapezoid a b c d",
+    "section": "Legacy definitions",
+    "description": "From nothing, creates a, b, c, d, the four vertices of a trapezoid with parallel sides ab and cd, and a right angle at a.",
+    "statement": "abparallel cd abperpendicular ad (para a b c d, perp a b a d)",
+    "construction": "Points"
+  },
+  {
+    "slug": "r_triangle",
+    "title": "r_triangle a b c",
+    "section": "Legacy definitions",
+    "description": "From nothing, creates a, b, c the vertices of a right triangle with a right angle at a.",
+    "statement": "abperpendicular ac (perp a b a c)",
+    "construction": "Points"
+  },
+  {
+    "slug": "rectangle",
+    "title": "rectangle a b c d",
+    "section": "Legacy definitions",
+    "description": "From nothing, creates a, b, c, d the four vertices rectangle abcd.",
+    "statement": "abperpendicular bc abparallel cd adparallel bc baperpendicular ad ab=cd ad=bc ac=bd (perp a b b c, para a b c d, para a d b c, perp a b a d, cong a b c d, cong a d b c, cong a c b d)",
+    "construction": "Points"
+  },
+  {
+    "slug": "reflect",
+    "title": "reflect x a b c",
+    "section": "Legacy definitions",
+    "description": "From three non-collinear points a, b, c, in particular with b different from c, builds x the reflection of a by the line bc.",
+    "statement": "ab=bx ac=cx bcperpendicular ax (cong b a b x, cong c a c x; perp b c a x)",
+    "construction": "Point"
+  },
+  {
+    "slug": "risos",
+    "title": "risos a b c",
+    "section": "Legacy definitions",
+    "description": "From nothing, builds a, b, c such that the triangle abc is an isosceles right triangle with a right angle at a.",
+    "statement": "abperpendicular ac ab=ac abc=bca (perp a b a c, cong a b a c; eqangle b a b c c b c a)",
+    "construction": "Points"
+  },
+  {
+    "slug": "segment",
+    "title": "segment a b",
+    "section": "Legacy definitions",
+    "description": "From nothing, adds two points a, b, with random coordinates.",
+    "statement": "No statement added",
+    "construction": "Points"
+  },
+  {
+    "slug": "shift",
+    "title": "shift x b c d",
+    "section": "Legacy definitions",
+    "description": "From three points b, c, d, with b different from d (prevents the building of two points with the same coordinates), build x, the translation of b by the vector from d to c.",
+    "statement": "bx=cd cx=bd (cong x b c d, cong x c b d)",
+    "construction": "Point"
+  },
+  {
+    "slug": "square",
+    "title": "square a b x y",
+    "section": "Legacy definitions",
+    "description": "From two points a, b, with a different from b, builds x, y, the other two vertices of a square with side ab.",
+    "statement": "abperpendicular bx ab=bx abparallel xy ayparallel bx ayperpendicular yx bx=xy xy=ya axperpendicular by ax=by (perp a b b x, cong a b b x, para a b x y, para a y b x, perp a y y x, cong b x x y, cong x y y a, perp a x b y, cong a x b y)",
+    "construction": "Points"
+  },
+  {
+    "slug": "isquare",
+    "title": "isquare a b c d",
+    "section": "Legacy definitions",
+    "description": "From nothing, creates the four vertices of a square abcd.",
+    "statement": "abperpendicular bc ab=bc abparallel cd adparallel bc adperpendicular dc bc=cd cd=da acperpendicular bd ac=bd (perp a b b c, cong a b b c, para a b c d, para a d b c, perp a d d c, cong b c c d, cong c d d a, perp a c b d, cong a c b d)",
+    "construction": "Points"
+  },
+  {
+    "slug": "trapezoid",
+    "title": "trapezoid a b c d",
+    "section": "Legacy definitions",
+    "description": "From nothing, creates four vertices of a trapezoid abcd, with ab parallel to cd.",
+    "statement": "abparallel cd (para a b c d)",
+    "construction": "Points"
+  },
+  {
+    "slug": "triangle",
+    "title": "triangle a b c",
+    "section": "Legacy definitions",
+    "description": "From nothing, creates three points a, b, and c, with random coordinates.",
+    "statement": "No statement added",
+    "construction": "Points"
+  },
+  {
+    "slug": "triangle12",
+    "title": "triangle12 a b c",
+    "section": "Legacy definitions",
+    "description": "From nothing, builds the three vertices a, b, c of a triangle such that the proportion ab:ac is 1:2. The current statement of this definition was changed with respect to the original one to adapt to the new formulation of the rconst predicate.",
+    "statement": "ab/ac=1/2 (rconst a b a c 1/2)",
+    "construction": "Points"
+  },
+  {
+    "slug": "2l1c",
+    "title": "2l1c x y z i a b c o",
+    "section": "Legacy definitions",
+    "description": "Given three points o, a, b, with b in the center through a of center o, and c a point not in the line ab, builds i, the center of a circle tangent to the circle centered at o through a, to the line ac and to the line bc. It also builds the tangency points x to ac, y to bc and z to the circle of center o through a.",
+    "statement": "x, a, c collinear y, b, c collinear i, o, z collinear oa=oz ix=iy iy=iz ixperpendicular ac iyperpendicular bc (coll x a c, coll y b c, coll i o z, cong o a o z, cong i y i z, perp i x a c, perp i y b c)",
+    "construction": "Points"
+  },
+  {
+    "slug": "e5128",
+    "title": "e5128 x y a b c d",
+    "section": "Legacy definitions",
+    "description": "Given four points a, b, c, d, with bc=cd and bc perpendicular to ba, builds y the midpoint of ab and x the intersection of line dy and the circle centered at c through b. It transfers the angle bad to axy in a specific way. It was created specifically for problem complete_015_7_Book_00EE_06_E051-28.gex in the jgex_ag_231 problem database, for which we do not have the original statement.",
+    "statement": "bc=cx y,a,b collinear x,y,d collinear bad=axy (cong c b c x, coll y a b, coll x y d, eqangle a b a d x a x y)",
+    "construction": "Points"
+  },
+  {
+    "slug": "3peq",
+    "title": "3peq x y z a b c",
+    "section": "Legacy definitions",
+    "description": "Given three non-collinear points a, b, c, builds points x on the extended side ab, y in the extended side ac, and z on the extended side bc of triangle abc in a way that z is the midpoint of xy. It was created specifically for problem complete_010_Other_Auxiliary_ye_aux_think.gex in the jgex_ag_231 problem database, for which we do not have the original statement.",
+    "statement": "z,b,c collinear x,a,b collinear y,a,c collinear x,y,z collinear xz=yz (coll z b c, coll x a b, coll y a c, coll x y z, cong z x z y)",
+    "construction": "Points"
+  },
+  {
+    "slug": "trisect",
+    "title": "trisect x y a b c",
+    "section": "Legacy definitions",
+    "description": "From three non-collinear point a, b, c, builds x, y, the points on segment ac that trisect the angle abc.",
+    "statement": "x, a, c collinear y, a, c collinear abx=xby xby=ybc (coll x a c, coll y a c, eqangle b a b x b x b y, eqangle b x b y b y b c)",
+    "construction": "Points"
+  },
+  {
+    "slug": "trisegment",
+    "title": "trisegment x y a b",
+    "section": "Legacy definitions",
+    "description": "Given two different points a, b, builds x, y the two points trisecting the segment ab.",
+    "statement": "x, a, b collinear y, a, b collinear ax=xy xy=yb (coll x a b, coll y a b, cong x a x y, cong y x y b)",
+    "construction": "Points"
+  },
+  {
+    "slug": "on_dia",
+    "title": "on_dia x a b",
+    "section": "Legacy definitions",
+    "description": "Given two different points a, b, builds x a point such that the triangle axb is a right triangle with a right angle at x.",
+    "statement": "xaperpendicular xb (perp x a x b)",
+    "construction": "Circle"
+  },
+  {
+    "slug": "ieq_triangle",
+    "title": "ieq_triangle a b c",
+    "section": "Legacy definitions",
+    "description": "From nothing, creates the three vertices of an equilateral triangle abc.",
+    "statement": "ab=bc bc=ca bac=acb acb=cba (cong a b b c, cong b c c a, eqangle a b a c c a c b, eqangle c a c b b c b a)",
+    "construction": "Points"
+  },
+  {
+    "slug": "cc_tangent",
+    "title": "cc_tangent x y z i o a w b",
+    "section": "Legacy definitions",
+    "description": "From four points o, a, w, b, such that o is neither a nor w, and such that w and b are distinct, builds x, y, z, i on a pair of lines xy and zi that are simultaneously tangent to both the circle of center o through a and the circle of center w through b. x and z are the tangent points on the circle centered at o through a, and y and i are the tangent points on the circle centered at w through b.",
+    "statement": "ox=oa wy=wb oxperpendicular xy wyperpendicular yx oz=oa wi=wb ozperpendicular zi wiperpendicular iz (cong o x o a, cong w y w b, perp x o x y, perp y w y x, cong o z o a, cong w i w b, perp z o z i, perp i w i z)",
+    "construction": "Points"
+  },
+  {
+    "slug": "eqangle3",
+    "title": "eqangle3 x a b d e f",
+    "section": "Legacy definitions",
+    "description": "From five points a, b, d, e, f disposed in a way that a is distinct from b and d, e, f form a non-degenerate triangle, builds x the vertex of an angle in such a way that the angles axb and edf are the same (up to a rotation and a translation).",
+    "statement": "axb=edf (eqangle x a x b d e d f)",
+    "construction": "Circle"
+  },
+  {
+    "slug": "tangent",
+    "title": "tangent x y a o b",
+    "section": "Legacy definitions",
+    "description": "From three different points a, b, c, builds x and y, the points of tangency of the two lines through a tangent to the circle of center o through b.",
+    "statement": "ox=ob axperpendicular ox oy=ob ayperpendicular yo (cong o x o b, perp a x o x, cong o y o b, perp a y o y)",
+    "construction": "Points"
+  },
+  {
+    "slug": "on_circum",
+    "title": "on_circum x a b c",
+    "section": "Legacy definitions",
+    "description": "From three non-collinear points a, b, and c, builds x a point on the circle through a, b, and c.",
+    "statement": "x, a, b, c concyclic (cyclic a b c x)",
+    "construction": "Point"
+  },
+  {
+    "slug": "on_pline0",
+    "title": "on_pline0 x a b c",
+    "section": "New Definitions",
+    "description": "From three points a, b, c, with b different from c, builds x on the line parallel to bc through a. (Compare to on_pline x a b c above). This definition was created to allow for the addition of a parallel statement on overlapping lines, by dismissing the restriction of a, b, c being non-collinear, without which r28 would be a rule that could not occur.",
+    "statement": "xaparallel bc (para x a b c)",
+    "construction": "Line"
+  },
+  {
+    "slug": "iso_triangle0",
+    "title": "iso_triangle0 a b c",
+    "section": "New Definitions",
+    "description": "From nothing, creates the three vertices a, b, c of an isosceles triangle with ab=ac. It was created as a simplified version of iso_triangle a b c above, without adding the statement about the equality of base angles, which should come from rule r13.",
+    "statement": "ab= ac (cong a b a c)",
+    "construction": "Points"
+  },
+  {
+    "slug": "iso_triangle_vertex",
+    "title": "iso_triangle_vertex x b c",
+    "section": "New Definitions",
+    "description": "From two points b, c that are distinct, builds a, the vertex of an isosceles triangle with base bc. It was created for explicitly creating isosceles triangles from a given base, but it is also a simplified version of on_bline x a b above, without adding the statement about the equality of base angles, which should come from rule r13. There is also a definition adding only the statement about the equality of the angles below (see iso_triangle_vertex_angle x b c ).",
+    "statement": "xb = xc (cong x b x c)",
+    "construction": "Line"
+  },
+  {
+    "slug": "iso_triangle_vertex_angle",
+    "title": "iso_triangle_vertex_angle x b c",
+    "section": "New Definitions",
+    "description": "From two points b, c that are distinct, builds a, the vertex of an isosceles triangle with base bc. It was created for explicitly creating isosceles triangles from a given base, but it is also a simplified version of on_bline x a b above, only adding the statement about the equality of base angles. The segment congruence statement in the on_bline definition should come from rule r14. Compare also to iso_triangle_vertex x b c above.",
+    "statement": "xbc=bcx (eqangle x b b c b c x c)",
+    "construction": "Line"
+  },
+  {
+    "slug": "on_aline0",
+    "title": "on_aline0 x a b c d e f g",
+    "section": "New Definitions",
+    "description": "From seven points a, b, c, d, e, f, g, with the constraint that a, b, c, and d do not lie all on the same line, build x such that the angle formed at the intersection of lines ef and gx is the same (up to a rotation and a translation) to the angle formed at the intersection between lines ab and cd. This definition was created as a base general case for the creation of congruent angles. Indeed, angle_mirror x a b c is equivalent to on_aline0 x b a b c b c b, and on_aline x a b c d e is equivalent to on_aline0 x d e d c a b a.",
+    "statement": "angle (ab times cd)=angle (ef times gx) (eqangle a b c d e f g x)",
+    "construction": "Line"
+  },
+  {
+    "slug": "eqratio",
+    "title": "eqratio x a b c d e f g",
+    "section": "New Definitions",
+    "description": "From seven points a, b, c, d, e, f, g, builds x, a point such that ab/cd=ef/gx. This definition was created to allow for the explicit prescription of eqratio statements on problems.",
+    "statement": "ab/cd=ef/gx (eqratio a b c d e f g x)",
+    "construction": "Circle"
+  },
+  {
+    "slug": "eqratio6",
+    "title": "eqratio6 x a c e f g h",
+    "section": "New Definitions",
+    "description": "From six points a, c, e, f, g, h, builds x, a point such that ax/cx=ef/gh. This definition was created to allow a common case for prescription of eqratio statements, when the new point shows up twice in the ratio equality (particularly common when subdividing a segment).",
+    "statement": "ax/cx=ef/gh (eqratio a x c x e f g h)",
+    "construction": "Line if ef=gh, Circle otherwise"
+  },
+  {
+    "slug": "rconst",
+    "title": "rconst a b c x r",
+    "section": "New Definitions",
+    "description": "Given three points a, b, c such that a is different from b, and a fraction r, builds x a point such that ab/cx=r. r should be entered as a fraction m/n, m, n two integers separated by \"/\". This definition was created to allow for the prescription of pairs of segments satisfying a given constant ratio.",
+    "statement": "ab/cx=r=m/n (rconst a b c x r)",
+    "construction": "Circle"
+  },
+  {
+    "slug": "rconst2",
+    "title": "rconst2 x a b r",
+    "section": "New Definitions",
+    "description": "Given two points a, b that are distinct, and a fraction r, builds x a point such that ax/bx=r. r should be entered as a fraction m/n, m, n two integers separated by \"/\". This definition was created to cover a different case of prescription of segments satisfying a constant ratio, in this case when the new point connects the segment which ratio we are taking. It is typically used to split a given segment into two pieces with the given ratio.",
+    "statement": "ax/bx=r=m/n (rconst x a x b r)",
+    "construction": "Line if r=1/1, Circle otherwise"
+  },
+  {
+    "slug": "aconst",
+    "title": "aconst a b c x r",
+    "section": "New Definitions",
+    "description": "Given three points a, b, c, with a, b distinct, and an angle r, builds x a point such that the angle from line ab to line cx taken in the conterclockwise direction is r. r should be entered either as a fraction in radians in the form mpi/n, m, n two integers separated by \"pi/\", or in degrees in the from Ro, R an integer followed by the letter \"o\". This definition was created to allow for the insertion of a prescribed angle between two lines without fixing the intersection of the lines. It was necessary for the effectivity of the aconst predicate.",
+    "statement": "angle (ab times cx)=r (aconst a b c x r)",
+    "construction": "Line"
+  },
+  {
+    "slug": "s_angle",
+    "title": "s_angle a b x y",
+    "section": "New Definitions",
+    "description": "Given two points a, b that are distinct, and an angle y, builds x a point such that the angle from line ab to line bx taken in the conterclockwise direction is y. y should be entered either as a fraction in radians in the form mpi/n, m, n two integers separated by \"pi/\", or in degrees in the from Ro, R an integer followed by the letter \"o\". This definition was created to allow for the insertion of a prescribed angle between two lines with a fixed vertex. It is a modification of the previous s_angle definition in accordance to the aconst predicate.",
+    "statement": "abx=y (aconst a b b x y)",
+    "construction": "Line"
+  },
+  {
+    "slug": "lconst",
+    "title": "lconst x a l",
+    "section": "New Definitions",
+    "description": "From a point a, builds x with an integer distance l from a to x. This definition was created as an entry point to add the manipulation of lengths to DDAR.",
+    "statement": "x, a, b, c concyclic (lconst x a l)",
+    "construction": "Circle"
+  }
+]
