@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import Image from 'next/image';
 import ruleEntries from '@/lib/legacy-rules.json';
 import { formatStatement } from '@/lib/format-statement';
 
@@ -51,7 +52,7 @@ export default function RulesPage() {
         <div className="reference-grid reference-grid-dense">
           {catalog.map((rule) => (
             <section key={rule.slug} className="reference-card">
-              <img src={rule.image} alt={rule.title} />
+              <Image src={rule.image} alt={rule.title} width={400} height={200} style={{ width: '100%', height: 'auto' }} />
               <p className="catalog-meta">{rule.section ?? 'Rules'}</p>
               <h3>{rule.title}</h3>
               {rule.statement ? (
