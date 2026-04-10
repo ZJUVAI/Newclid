@@ -11,6 +11,14 @@ import ray
 logger = logging.getLogger(__name__)
 
 
+def _request_group_key(request: dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        request.get("with_predicate", False),
+        request.get("decoding_size"),
+        request.get("response_prefix", "<aux> x00"),
+    )
+
+
 class GenerationDispatcher:
     """Dispatch batched generation requests onto GPU workers while preserving backpressure."""
 
@@ -27,12 +35,8 @@ class GenerationDispatcher:
         if gpu_batch_timeout_ms < 0:
             raise ValueError(f"gpu_batch_timeout_ms must be non-negative, got {gpu_batch_timeout_ms}.")
         self.idle_workers = deque(workers)
-        self.pending_requests = deque(requests or [])
-        self.pending_enqueued_at: dict[str, float] = {
-            request["request_id"]: time.perf_counter()
-            for request in requests or []
-            if "request_id" in request
-        }
+        self.pending_groups: dict[tuple[Any, ...], deque[dict[str, Any]]] = {}
+        self.pending_enqueued_at: dict[str, float] = {}
         self.request_dispatched_at: dict[str, float] = {}
         self.running: dict[Any, dict[str, Any]] = {}
         self.completed_submission_events: deque[dict[str, Any]] = deque()
@@ -40,20 +44,30 @@ class GenerationDispatcher:
         self.allow_partial_batches = gpu_batch_timeout_ms == 0
         self.gpu_batch_size = gpu_batch_size
         self.gpu_batch_timeout_s = gpu_batch_timeout_ms / 1000.0
+        for request in requests or []:
+            self._enqueue_pending_request(request)
         logger.debug(
             "GenerationDispatcher init: workers=%d requests=%d pending_requests=%d batch_size=%d timeout_ms=%d",
             len(workers),
             len(requests or []),
-            len(self.pending_requests),
+            self._pending_group_count(),
             self.gpu_batch_size,
             gpu_batch_timeout_ms,
         )
         self._fill()
 
-    def _peek_oldest_wait_s(self) -> float | None:
-        if not self.pending_requests:
-            return None
-        request_id = self.pending_requests[0].get("request_id")
+    def _enqueue_pending_request(self, request: dict[str, Any]) -> None:
+        group_key = _request_group_key(request)
+        self.pending_groups.setdefault(group_key, deque()).append(request)
+        request_id = request.get("request_id")
+        if request_id is not None:
+            self.pending_enqueued_at[request_id] = time.perf_counter()
+
+    def _pending_group_count(self) -> int:
+        return sum(len(group) for group in self.pending_groups.values())
+
+    def _peek_request_wait_s(self, request: dict[str, Any]) -> float:
+        request_id = request.get("request_id")
         if request_id is None:
             return 0.0
         enqueued_at = self.pending_enqueued_at.get(request_id)
@@ -61,35 +75,56 @@ class GenerationDispatcher:
             return 0.0
         return time.perf_counter() - enqueued_at
 
-    def _can_submit_partial_batch(self) -> bool:
-        if not self.pending_requests:
-            return False
-        if self.allow_partial_batches:
-            return True
-        if len(self.pending_requests) >= self.gpu_batch_size:
-            return True
-        oldest_wait_s = self._peek_oldest_wait_s()
-        return oldest_wait_s is not None and oldest_wait_s >= self.gpu_batch_timeout_s
+    def _oldest_request_wait_s(self) -> float | None:
+        oldest_wait_s: float | None = None
+        for group in self.pending_groups.values():
+            if not group:
+                continue
+            wait_s = self._peek_request_wait_s(group[0])
+            if oldest_wait_s is None or wait_s > oldest_wait_s:
+                oldest_wait_s = wait_s
+        return oldest_wait_s
+
+    def _select_group_key(self) -> tuple[Any, ...] | None:
+        best_group_key: tuple[Any, ...] | None = None
+        best_ready_size = -1
+        best_oldest_wait_s = -1.0
+        for group_key, group in self.pending_groups.items():
+            if not group:
+                continue
+            group_size = len(group)
+            ready_size = min(group_size, self.gpu_batch_size)
+            oldest_wait_s = self._peek_request_wait_s(group[0])
+            can_submit = (
+                self.allow_partial_batches
+                or group_size >= self.gpu_batch_size
+                or oldest_wait_s >= self.gpu_batch_timeout_s
+            )
+            if not can_submit:
+                continue
+            if ready_size > best_ready_size or (
+                ready_size == best_ready_size and oldest_wait_s > best_oldest_wait_s
+            ):
+                best_group_key = group_key
+                best_ready_size = ready_size
+                best_oldest_wait_s = oldest_wait_s
+        return best_group_key
 
     def _build_batch(self) -> list[dict[str, Any]]:
-        if not self.pending_requests:
+        if not self.pending_groups:
             return []
-        if len(self.pending_requests) < self.gpu_batch_size and not self._can_submit_partial_batch():
+        group_key = self._select_group_key()
+        if group_key is None:
             return []
-        batch_size = min(len(self.pending_requests), self.gpu_batch_size)
-        batch: list[dict[str, Any]] = []
-        for _ in range(batch_size):
-            request = self.pending_requests.popleft()
-            request_id = request.get("request_id")
-            if request_id is not None:
-                self.pending_enqueued_at.pop(request_id, None)
-            batch.append(request)
+        group = self.pending_groups[group_key]
+        batch_size = min(len(group), self.gpu_batch_size)
+        batch = [group.popleft() for _ in range(batch_size)]
+        if not group:
+            self.pending_groups.pop(group_key, None)
         return batch
 
     def _fill(self) -> None:
-        # Keep issuing work until either all workers are busy or all queued
-        # requests have been submitted.
-        while self.accept_new_work and self.pending_requests and self.idle_workers:
+        while self.accept_new_work and self.pending_groups and self.idle_workers:
             batch = self._build_batch()
             if not batch:
                 return
@@ -104,7 +139,7 @@ class GenerationDispatcher:
                     self.request_dispatched_at[request_id] = submit_time
             logger.debug(
                 "GenerationDispatcher submit: remaining_requests=%d running=%d batch_size=%d request_ids=%s",
-                len(self.pending_requests),
+                self._pending_group_count(),
                 len(self.running) + 1,
                 len(batch),
                 request_ids,
@@ -126,13 +161,13 @@ class GenerationDispatcher:
             )
 
     def has_pending(self) -> bool:
-        return bool(self.pending_requests or self.running)
+        return bool(self.pending_groups or self.running)
 
     def idle_worker_count(self) -> int:
         return len(self.idle_workers)
 
     def pending_request_count(self) -> int:
-        return len(self.pending_requests)
+        return self._pending_group_count()
 
     def active_refs(self) -> list[Any]:
         return list(self.running.keys())
@@ -143,10 +178,7 @@ class GenerationDispatcher:
     def enqueue_request(self, request: dict[str, Any]) -> None:
         if not self.accept_new_work:
             raise RuntimeError("GenerationDispatcher is not accepting new work")
-        self.pending_requests.append(request)
-        request_id = request.get("request_id")
-        if request_id is not None:
-            self.pending_enqueued_at[request_id] = time.perf_counter()
+        self._enqueue_pending_request(request)
         self._fill()
 
     def take_done(self, ref: Any) -> list[dict[str, Any]]:
@@ -205,7 +237,7 @@ class GenerationDispatcher:
 
     def stop_submitting(self) -> None:
         self.accept_new_work = False
-        self.pending_requests.clear()
+        self.pending_groups.clear()
         self.pending_enqueued_at.clear()
         logger.debug("GenerationDispatcher stop_submitting")
 

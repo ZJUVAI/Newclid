@@ -105,6 +105,8 @@ def create_workers(
     agent_type: str,
     model_path: str,
     num_gpus_for_eval: int,
+    decoding_size: int,
+    gpu_batch_size: int,
     torch_seed: int,
     inference_runtime: str,
     vllm_gpu_memory_utilization: float,
@@ -135,6 +137,8 @@ def create_workers(
                     torch_seed,
                     gpu_memory_utilization=vllm_gpu_memory_utilization,
                     max_num_seqs=vllm_max_num_seqs,
+                    gpu_batch_size=gpu_batch_size,
+                    decoding_size=decoding_size,
                     enforce_eager=vllm_enforce_eager,
                 )
                 for _ in range(num_gpus_for_eval)
@@ -318,11 +322,18 @@ def solve_problems_single_problem_multi_gpu(
                 f"Requested {num_gpus_for_eval} GPUs, but Ray only reports {available_gpus} GPUs."
             )
         if prepare_request_workers is None:
-            prepare_request_workers = (
-                max(1, max(2 * num_gpus_for_eval, num_gpus_for_eval * gpu_batch_size))
-                if num_gpus_for_eval > 0
-                else max(2, gpu_batch_size)
-            )
+            if inference_runtime == "vllm" and agent_type == "vlm":
+                prepare_request_workers = (
+                    max(1, max(2 * num_gpus_for_eval, num_gpus_for_eval * gpu_batch_size))
+                    if num_gpus_for_eval > 0
+                    else max(2, gpu_batch_size)
+                )
+            else:
+                prepare_request_workers = (
+                    max(1, max(2 * num_gpus_for_eval, num_gpus_for_eval * gpu_batch_size))
+                    if num_gpus_for_eval > 0
+                    else max(2, gpu_batch_size)
+                )
         if prepare_request_workers <= 0:
             raise ValueError(
                 f"prepare_request_workers must be positive, got {prepare_request_workers}."
@@ -345,6 +356,8 @@ def solve_problems_single_problem_multi_gpu(
             agent_type=agent_type,
             model_path=model_path,
             num_gpus_for_eval=num_gpus_for_eval,
+            decoding_size=decoding_size,
+            gpu_batch_size=gpu_batch_size,
             torch_seed=torch_seed,
             inference_runtime=inference_runtime,
             vllm_gpu_memory_utilization=vllm_gpu_memory_utilization,
@@ -418,8 +431,10 @@ def solve_problems_single_problem_multi_gpu(
         print(f"Using torch_seed={torch_seed}")
         print(f"Using inference_runtime={inference_runtime}")
         if inference_runtime == "vllm":
+            effective_vllm_max_num_seqs = max(vllm_max_num_seqs, gpu_batch_size * decoding_size)
             print(f"Using vllm_gpu_memory_utilization={vllm_gpu_memory_utilization}")
             print(f"Using vllm_max_num_seqs={vllm_max_num_seqs}")
+            print(f"Using effective_vllm_max_num_seqs={effective_vllm_max_num_seqs}")
             print(f"Using vllm_enforce_eager={vllm_enforce_eager}")
         print(f"Using max_pending_ddar={max_pending_ddar}")
         print(f"Using prepare_request_workers={prepare_request_workers}")

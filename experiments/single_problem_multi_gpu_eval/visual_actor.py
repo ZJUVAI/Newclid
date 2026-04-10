@@ -33,6 +33,13 @@ hf_logging.set_verbosity_error()
 
 AUX_PREDICATES: list[str] = []
 
+_TRITON_LIBCUDA_CANDIDATE_DIRS = (
+    "/usr/lib/x86_64-linux-gnu",
+    "/usr/lib64",
+    "/usr/lib",
+    "/lib/x86_64-linux-gnu",
+)
+
 
 def _empty_result(request: dict[str, Any], *, error: str, batch_size: int) -> dict[str, Any]:
     return {
@@ -190,12 +197,20 @@ def generate_visual_aux_dsl_dict_batch(
 
 
 def _load_vllm_modules():
+    os.environ["VLLM_ENABLE_V1_MULTIPROCESSING"] = "0"
+    if "TRITON_LIBCUDA_PATH" not in os.environ:
+        for candidate_dir in _TRITON_LIBCUDA_CANDIDATE_DIRS:
+            if os.path.exists(os.path.join(candidate_dir, "libcuda.so.1")):
+                os.environ["TRITON_LIBCUDA_PATH"] = candidate_dir
+                break
     try:
         from vllm import LLM
+        import vllm.envs as vllm_envs
     except ImportError as exc:
         raise ImportError(
             "vLLM runtime requested but the optional dependency 'vllm' is not installed."
         ) from exc
+    vllm_envs.VLLM_ENABLE_V1_MULTIPROCESSING = False
     try:
         from vllm.sampling_params import BeamSearchParams
         from vllm.beam_search import get_beam_search_score
@@ -207,6 +222,10 @@ def _load_vllm_modules():
             "`vllm.beam_search.get_beam_search_score`."
         ) from exc
     return LLM, BeamSearchParams, get_beam_search_score
+
+
+def _effective_vllm_max_num_seqs(configured_max_num_seqs: int, *, gpu_batch_size: int, decoding_size: int) -> int:
+    return max(int(configured_max_num_seqs), int(gpu_batch_size) * int(decoding_size))
 
 
 def _compute_vllm_beam_score(
@@ -227,6 +246,25 @@ def _compute_vllm_beam_score(
             length_penalty=1.0,
         )
     )
+
+
+def _extract_vllm_continuation_text(processor, sequence: Any) -> str:
+    full_text = getattr(sequence, "text", "") or ""
+    orig_prompt = getattr(sequence, "orig_prompt", None) or {}
+    decoder_prompt = orig_prompt.get("decoder_prompt", orig_prompt)
+    prompt_text = decoder_prompt.get("prompt")
+    if isinstance(prompt_text, str) and full_text.startswith(prompt_text):
+        return full_text[len(prompt_text) :]
+
+    prompt_token_ids = list(decoder_prompt.get("prompt_token_ids", []) or [])
+    sequence_tokens = list(getattr(sequence, "tokens", []) or [])
+    if prompt_token_ids and len(sequence_tokens) >= len(prompt_token_ids):
+        continuation_tokens = sequence_tokens[len(prompt_token_ids) :]
+        if continuation_tokens:
+            return processor.tokenizer.decode(continuation_tokens, skip_special_tokens=True)
+        return ""
+
+    return full_text
 
 
 def _generate_visual_aux_dsl_dict_batch_vllm(
@@ -250,6 +288,15 @@ def _generate_visual_aux_dsl_dict_batch_vllm(
     input_build_start = time.perf_counter()
     prompts: list[dict[str, Any]] = []
     for request in requests:
+        if "image" in request:
+            image = request["image"]
+            prompts.append(
+                {
+                    "prompt": _build_visual_prompt(processor, request),
+                    "multi_modal_data": {"image": image.copy()},
+                }
+            )
+            continue
         with Image.open(Path(request["img_path"])) as img:
             prompts.append(
                 {
@@ -265,7 +312,6 @@ def _generate_visual_aux_dsl_dict_batch_vllm(
         max_tokens=100,
         temperature=0.0,
         ignore_eos=False,
-        stop_token_ids=[eos_token_id] if eos_token_id is not None else None,
     )
 
     generate_start = time.perf_counter()
@@ -277,8 +323,10 @@ def _generate_visual_aux_dsl_dict_batch_vllm(
     for request, output in zip(requests, beam_outputs):
         aux_dsl_dict: dict[str, float] = {}
         for sequence in getattr(output, "sequences", []):
-            text = getattr(sequence, "text", "")
+            text = _extract_vllm_continuation_text(processor, sequence)
             aux_dsl = f'{request.get("response_prefix", "<aux> x00")} {request["new_point_name"]}{text}'
+            if aux_dsl in aux_dsl_dict:
+                continue
             aux_dsl_dict[aux_dsl] = _compute_vllm_beam_score(
                 sequence,
                 eos_token_id=eos_token_id,
@@ -507,6 +555,8 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
         *,
         gpu_memory_utilization: float = 0.90,
         max_num_seqs: int = 128,
+        gpu_batch_size: int = 1,
+        decoding_size: int = 1,
         enforce_eager: bool = False,
     ):
         if agent_kind != "vlm":
@@ -517,19 +567,30 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
         self.runtime = "vllm"
         self.torch_seed = int(torch_seed)
         self.gpu_memory_utilization = float(gpu_memory_utilization)
-        self.max_num_seqs = int(max_num_seqs)
+        self.configured_max_num_seqs = int(max_num_seqs)
+        self.gpu_batch_size = int(gpu_batch_size)
+        self.decoding_size = int(decoding_size)
+        self.max_num_seqs = _effective_vllm_max_num_seqs(
+            self.configured_max_num_seqs,
+            gpu_batch_size=self.gpu_batch_size,
+            decoding_size=self.decoding_size,
+        )
         self.enforce_eager = bool(enforce_eager)
+        self.vllm_distributed_executor_backend = "uni"
         torch.manual_seed(self.torch_seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed(self.torch_seed)
             torch.cuda.manual_seed_all(self.torch_seed)
         logger.info(
-            "VLLMVisionModelWorker init start: agent_kind=%s model_path=%s torch_seed=%d gpu_memory_utilization=%.2f max_num_seqs=%d enforce_eager=%s",
+            "VLLMVisionModelWorker init start: agent_kind=%s model_path=%s torch_seed=%d gpu_memory_utilization=%.2f configured_max_num_seqs=%d effective_max_num_seqs=%d gpu_batch_size=%d decoding_size=%d enforce_eager=%s",
             agent_kind,
             resolved_path,
             self.torch_seed,
             self.gpu_memory_utilization,
+            self.configured_max_num_seqs,
             self.max_num_seqs,
+            self.gpu_batch_size,
+            self.decoding_size,
             self.enforce_eager,
         )
         llm_cls, beam_search_params_cls, get_beam_search_score = _load_vllm_modules()
@@ -537,6 +598,7 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
             model=resolved_path,
             trust_remote_code=True,
             tensor_parallel_size=1,
+            distributed_executor_backend=self.vllm_distributed_executor_backend,
             gpu_memory_utilization=self.gpu_memory_utilization,
             max_num_seqs=self.max_num_seqs,
             enforce_eager=self.enforce_eager,
@@ -548,15 +610,17 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
         self.processor.tokenizer.padding_side = "left"
         self.num_requests = 0
         self.num_batches = 0
+        self._warmup_profile: dict[str, Any] | None = None
         logger.info(
-            "VLLMVisionModelWorker init done: agent_kind=%s padding_side=%s torch_seed=%d",
+            "VLLMVisionModelWorker init done: agent_kind=%s padding_side=%s torch_seed=%d distributed_executor_backend=%s",
             agent_kind,
             self.processor.tokenizer.padding_side,
             self.torch_seed,
+            self.vllm_distributed_executor_backend,
         )
 
     def warmup(self) -> dict[str, Any]:
-        return {
+        info = {
             "model_path": self.model_path,
             "agent_kind": self.agent_kind,
             "device": "cuda",
@@ -564,9 +628,46 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
             "torch_seed": self.torch_seed,
             "runtime": self.runtime,
             "gpu_memory_utilization": self.gpu_memory_utilization,
+            "configured_max_num_seqs": self.configured_max_num_seqs,
             "max_num_seqs": self.max_num_seqs,
+            "gpu_batch_size": self.gpu_batch_size,
+            "decoding_size": self.decoding_size,
             "enforce_eager": self.enforce_eager,
+            "distributed_executor_backend": self.vllm_distributed_executor_backend,
         }
+        if self._warmup_profile is None:
+            self._warmup_profile = self._run_warmup_request()
+        info["warmup_profile"] = dict(self._warmup_profile)
+        return info
+
+    def _run_warmup_request(self) -> dict[str, Any]:
+        warmup_request = {
+            "request_id": "__warmup__",
+            "query": "Construct one auxiliary point.",
+            "new_point_name": "a",
+            "response_prefix": "<aux> x00",
+            "with_predicate": False,
+            "decoding_size": 1,
+        }
+        try:
+            generate_start = time.perf_counter()
+            _generate_visual_aux_dsl_dict_batch_vllm(
+                self.llm,
+                self.processor,
+                [{**warmup_request, "img_path": "__warmup__", "image": Image.new("RGB", (32, 32), color="white")}],
+                get_beam_search_score=self.get_beam_search_score,
+                beam_search_params_cls=self.beam_search_params_cls,
+            )
+            return {
+                "status": "ok",
+                "elapsed_s": time.perf_counter() - generate_start,
+            }
+        except Exception as exc:
+            logger.warning("vLLM warmup request failed: %s", exc)
+            return {
+                "status": "error",
+                "error": str(exc),
+            }
 
     def generate_one(self, request: dict[str, Any]) -> dict[str, Any]:
         return self.generate_batch([request])

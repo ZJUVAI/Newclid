@@ -119,6 +119,44 @@ class GenerationDispatcherTests(unittest.TestCase):
         self.assertEqual(events[0]["batch_size"], 2)
         self.assertEqual(dispatcher.take_submission_events(), [])
 
+    def test_generation_dispatcher_groups_only_compatible_requests(self):
+        workers = [_FakeWorker("w0")]
+        dispatcher = GenerationDispatcher(
+            workers,
+            [
+                {"request_id": "r0", "decoding_size": 2, "response_prefix": "<aux> x00"},
+                {"request_id": "r1", "decoding_size": 4, "response_prefix": "<aux> x00"},
+                {"request_id": "r2", "decoding_size": 2, "response_prefix": "<aux> x00"},
+            ],
+            gpu_batch_size=2,
+            gpu_batch_timeout_ms=0,
+        )
+
+        self.assertEqual(
+            [[request["request_id"] for request in batch] for batch in workers[0].submitted],
+            [["r0", "r2"]],
+        )
+        self.assertEqual(dispatcher.pending_request_count(), 1)
+
+    def test_generation_dispatcher_prefers_largest_ready_group(self):
+        workers = [_FakeWorker("w0")]
+        dispatcher = GenerationDispatcher(
+            workers,
+            [
+                {"request_id": "r0", "decoding_size": 2, "response_prefix": "<aux> x00"},
+                {"request_id": "r1", "decoding_size": 2, "response_prefix": "<aux> x00"},
+                {"request_id": "r2", "decoding_size": 3, "response_prefix": "<aux> x00"},
+            ],
+            gpu_batch_size=2,
+            gpu_batch_timeout_ms=0,
+        )
+
+        self.assertEqual(
+            [[request["request_id"] for request in batch] for batch in workers[0].submitted],
+            [["r0", "r1"]],
+        )
+        self.assertEqual(dispatcher.pending_request_count(), 1)
+
     def test_model_pool_create_dispatcher_accepts_empty_initial_queue(self):
         workers = [_FakeWorker("solo")]
         pool = ModelPool(workers)
@@ -138,6 +176,7 @@ class EvalOutputNamingTests(unittest.TestCase):
     def test_build_eval_output_stem_includes_gpu_batch_params(self):
         stem = build_eval_output_stem(
             agent_type="vlm",
+            inference_runtime="transformers",
             problems_path=Path("benchmarks/imo_2000_p6.txt"),
             model_path="models/vlm_sft50/checkpoint-19194",
             decoding_size=2,
@@ -150,12 +189,13 @@ class EvalOutputNamingTests(unittest.TestCase):
         self.assertEqual(
             stem,
             "eval_single_problem_multi_gpu_vlm_imo_2000_p6_vlm_sft50_checkpoint-19194"
-            "_d2_b4_s1_gbs3_gbt250_seed123",
+            "_d2_b4_s1_rttransformers_gbs3_gbt250_seed123",
         )
 
     def test_trace_run_id_uses_eval_stem_and_timestamp_suffix(self):
         stem = build_eval_output_stem(
             agent_type="lm",
+            inference_runtime="transformers",
             problems_path=Path("benchmarks/imo_2004_p1.txt"),
             model_path="models/sft34/checkpoint-25750",
             decoding_size=8,
@@ -269,6 +309,10 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                                                         gpu_batch_size=1,
                                                         gpu_batch_timeout_ms=100,
                                                         torch_seed=42,
+                                                        inference_runtime="transformers",
+                                                        vllm_gpu_memory_utilization=0.9,
+                                                        vllm_max_num_seqs=128,
+                                                        vllm_enforce_eager=False,
                                                         timeout=3600,
                                                         agent_type="vlm",
                                                         max_pending_ddar=2,
@@ -283,7 +327,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
             csv_path = (
                 log_dir
                 / "eval_single_problem_multi_gpu_vlm_benchmarks_tmp_model"
-                "_d32_b512_s4_gbs1_gbt100_seed42_20260410T120000Z.csv"
+                "_d32_b512_s4_rttransformers_gbs1_gbt100_seed42_20260410T120000Z.csv"
             )
             self.assertTrue(csv_path.exists())
             with csv_path.open(newline="", encoding="utf-8") as handle:
