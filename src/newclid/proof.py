@@ -8,6 +8,10 @@ import logging
 
 from matplotlib import patches
 
+from newclid.construction_validation import (
+    build_construction_mapping,
+    validate_construction_new_points,
+)
 from newclid.formulations.clause import Clause, translate_sentence
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.dependencies.symbols import Point
@@ -78,21 +82,15 @@ class ProofState:
         construction_points: set[Point] = set()
         existing_points = list(self.symbols_graph.nodes_of_type(Point))
         existing_point_names = list(p.name for p in existing_points)
+        point_names = validate_construction_new_points(
+            construction,
+            self.defs,
+            existing_point_names,
+        )
 
         for constr_sentence in construction.sentences:
             cdef = self.defs[constr_sentence[0]]
-            if len(constr_sentence) == len(cdef.declare):
-                mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
-            else:
-                assert len(constr_sentence) + len(construction.points) == len(
-                    cdef.declare
-                )
-                mapping = dict(
-                    zip(cdef.declare[1:], construction.points + constr_sentence[1:])
-                )
-            for point in cdef.points:
-                if mapping[point] in existing_point_names:
-                    raise Exception(f"The new point {mapping[point]} is already used. existing points: {existing_point_names}. construction: {construction}")
+            mapping = build_construction_mapping(construction, constr_sentence, cdef)
 
             for premise in cdef.require.sentences:
                 if len(premise) == 0:
@@ -121,21 +119,16 @@ class ProofState:
             for n in cdef.numerics:
                 numerics.append(tuple(mapping[a] if a in mapping else a for a in n))
 
-        point_names: list[str] = []
         fix_point_postions: list[Optional[PointNum]] = []
         for s in construction.points:
             if "@" in s:
-                name, pos = atomize(s, "@")
-                point_names.append(name)
+                _, pos = atomize(s, "@")
                 x, y = atomize(pos, "_")
                 fix_point_postions.append(PointNum(x, y))
             else:
-                point_names.append(s)
                 fix_point_postions.append(None)
         new_points = self.symbols_graph.names2points(point_names)
         for p in new_points:
-            if p in existing_points:
-                raise Exception(f"The new points is already used. existing points: {existing_points}. construction: {construction}")
             p.clause = construction
 
         # draw

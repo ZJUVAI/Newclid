@@ -5,6 +5,10 @@ from typing import Optional
 from newclid.algebraic_reasoning.algebraic_manipulator import (
     AlgebraicManipulator,
 )
+from newclid.construction_validation import (
+    build_construction_mapping,
+    validate_construction_new_points,
+)
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.dependencies.symbols import Point
 from newclid.formulations.clause import translate_sentence
@@ -44,17 +48,18 @@ def build_ddar_input(
 
         try:
             for construction in problemJGEX.constructions:
+                validate_construction_new_points(
+                    construction,
+                    defs,
+                    point_nums.keys(),
+                )
                 existing_nums = list(point_nums.values())
                 construction_arg_nums: list[PointNum] = []
                 numerics: list[tuple[str, ...]] = []
 
                 for constr_sentence in construction.sentences:
                     cdef = defs[constr_sentence[0]]
-                    if len(constr_sentence) == len(cdef.declare):
-                        mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
-                    else:
-                        assert len(constr_sentence) + len(construction.points) == len(cdef.declare)
-                        mapping = dict(zip(cdef.declare[1:], construction.points + constr_sentence[1:]))
+                    mapping = build_construction_mapping(construction, constr_sentence, cdef)
 
                     for arg in cdef.args:
                         name = mapping[arg]

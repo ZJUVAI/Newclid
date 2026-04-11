@@ -154,16 +154,33 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
         if self._proof_defs is None:
             raise ValueError("Visual agent definitions are unavailable for frontier materialization.")
 
-        def materialize(node):
+        materialized_queue = BeamQueue(max_size=next_queue.max_size)
+        for val, stable_key, _, node in next_queue.iter_entries():
             node_id, parent_node_id, path_key, state = node
             problem, current_proof = state
             if current_proof is None:
+                try:
+                    current_proof = build_problem_proof(problem, self._proof_defs)
+                except Exception as exc:
+                    increment_profiling_count(profiling, "next_frontier_proof_build_failed_count")
+                    self._trace(
+                        "next_frontier_proof_build_failed",
+                        node_id=node_id,
+                        parent_node_id=parent_node_id,
+                        path_key=path_key,
+                        problem_text=str(problem),
+                        error_type=type(exc).__name__,
+                        error_message=str(exc),
+                    )
+                    continue
                 increment_profiling_count(profiling, "next_frontier_proof_built_count")
-                current_proof = build_problem_proof(problem, self._proof_defs)
-            return node_id, parent_node_id, path_key, (problem, current_proof)
+            materialized_queue.add(
+                node=(node_id, parent_node_id, path_key, (problem, current_proof)),
+                val=val,
+                stable_key=stable_key,
+            )
 
-        next_queue.map_nodes(materialize)
-        return next_queue
+        return materialized_queue
 
     def get_new_point_name(self, problem: ProblemJGEX) -> str:
         num_points = sum(len(clause.points) for clause in problem.constructions)

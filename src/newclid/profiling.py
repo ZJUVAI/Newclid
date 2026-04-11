@@ -52,6 +52,7 @@ COUNT_FIELDS = (
     "candidate_build_failed_count",
     "candidate_queued_next_depth_count",
     "next_frontier_proof_built_count",
+    "next_frontier_proof_build_failed_count",
 )
 
 PROFILE_ROW_FIELDS = WALL_TIME_FIELDS + DETAIL_TIME_FIELDS + COUNT_FIELDS
@@ -100,6 +101,7 @@ CSV_COLUMN_SPECS = (
     ("candidate_build_failed_count", "Candidate Build Failed Count", "int"),
     ("candidate_queued_next_depth_count", "Candidate Queued Next Depth Count", "int"),
     ("next_frontier_proof_built_count", "Next Frontier Proof Built Count", "int"),
+    ("next_frontier_proof_build_failed_count", "Next Frontier Proof Build Failed Count", "int"),
 )
 
 PROFILED_WALL_COMPONENT_FIELDS = tuple(
@@ -244,7 +246,8 @@ def write_profiling_csv(
                     f"Candidate Parse Failed: {int(summary['candidate_parse_failed_count'])}, "
                     f"Candidate Build Failed: {int(summary['candidate_build_failed_count'])}, "
                     f"Candidate Queued Next Depth: {int(summary['candidate_queued_next_depth_count'])}, "
-                    f"Next Frontier Proof Built: {int(summary['next_frontier_proof_built_count'])}"
+                    f"Next Frontier Proof Built: {int(summary['next_frontier_proof_built_count'])}, "
+                    f"Next Frontier Proof Build Failed: {int(summary['next_frontier_proof_build_failed_count'])}"
                 )
             ]
         )

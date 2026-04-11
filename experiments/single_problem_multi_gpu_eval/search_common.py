@@ -43,6 +43,9 @@ class BeamQueue:
         for val, _, _, node in self._sorted_entries():
             yield val, node
 
+    def iter_entries(self):
+        yield from self._sorted_entries()
+
     def __len__(self) -> int:
         return len(self.queue)
 
