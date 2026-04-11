@@ -496,8 +496,8 @@ void Matcher::on_bisector(const Point &pt, const Angle &ang)
     #ifndef DDAR_WEAK
         insert_theorem(Theorem::triangle_bisector_of_eqratio(pt, ang));
         insert_theorem(Theorem::triangle_bisector_of_equal_angles(pt, ang));
+        insert_theorem(Theorem::incenter(pt, ang));
     #endif
-    insert_theorem(Theorem::incenter(pt, ang));
 }
 
 void Matcher::on_eqangle(const Angle &left, const Angle &right)
