@@ -31,6 +31,9 @@ parser.add_argument("--gpu_batch_timeout_ms", type=int, default=0)
 parser.add_argument("--vllm_gpu_memory_utilization", type=float, default=0.90)
 parser.add_argument("--vllm_max_num_seqs", type=int, default=128)
 parser.add_argument("--vllm_enforce_eager", action="store_true")
+parser.add_argument("--vllm_generation_mode", default="beam")
+parser.add_argument("--vllm_sampling_temperature", type=float, default=0.8)
+parser.add_argument("--vllm_sampling_top_p", type=float, default=0.95)
 parser.add_argument("--torch_seed", type=int, default=123)
 args, _ = parser.parse_known_args()
 print(
@@ -45,6 +48,7 @@ print(
         gpu_batch_size=args.gpu_batch_size,
         gpu_batch_timeout_ms=args.gpu_batch_timeout_ms,
         torch_seed=args.torch_seed,
+        vllm_generation_mode=args.vllm_generation_mode,
     )
 )
 PY

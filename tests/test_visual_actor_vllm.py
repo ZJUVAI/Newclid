@@ -40,6 +40,7 @@ from experiments.single_problem_multi_gpu_eval.visual_actor import (
     _effective_vllm_max_logprobs,
     _effective_vllm_max_num_seqs,
     _generate_visual_aux_dsl_dict_batch_vllm,
+    _generate_visual_aux_dsl_dict_batch_vllm_sampling,
     _load_visual_processor,
 )
 
@@ -95,6 +96,19 @@ class _FakeLLM:
         )
         return self.outputs
 
+    def generate(self, prompts, params, use_tqdm=False):
+        self.calls.append(
+            {
+                "prompts": prompts,
+                "n": params.n,
+                "temperature": params.temperature,
+                "top_p": params.top_p,
+                "logprobs": params.logprobs,
+                "use_tqdm": use_tqdm,
+            }
+        )
+        return self.outputs
+
 
 class _InitCaptureLLM:
     def __init__(self, **kwargs):
@@ -107,6 +121,40 @@ class _FakeBeamSearchParams:
         self.max_tokens = max_tokens
         self.ignore_eos = ignore_eos
         self.temperature = temperature
+
+
+class _FakeSamplingParams:
+    def __init__(
+        self,
+        n: int,
+        max_tokens: int,
+        temperature: float,
+        top_p: float,
+        logprobs: int,
+        stop_token_ids=None,
+        ignore_eos: bool = False,
+        detokenize: bool = True,
+    ):
+        self.n = n
+        self.max_tokens = max_tokens
+        self.temperature = temperature
+        self.top_p = top_p
+        self.logprobs = logprobs
+        self.stop_token_ids = stop_token_ids
+        self.ignore_eos = ignore_eos
+        self.detokenize = detokenize
+
+
+class _FakeCompletionOutput:
+    def __init__(self, text: str, cumulative_logprob: float, token_ids: list[int]):
+        self.text = text
+        self.cumulative_logprob = cumulative_logprob
+        self.token_ids = token_ids
+
+
+class _FakeRequestOutput:
+    def __init__(self, outputs):
+        self.outputs = outputs
 
 
 class VisualActorVLLMTests(unittest.TestCase):
@@ -124,6 +172,10 @@ class VisualActorVLLMTests(unittest.TestCase):
         self.assertEqual(_effective_vllm_max_logprobs(decoding_size=1), 20)
         self.assertEqual(_effective_vllm_max_logprobs(decoding_size=8), 20)
         self.assertEqual(_effective_vllm_max_logprobs(decoding_size=32), 64)
+        self.assertEqual(
+            _effective_vllm_max_logprobs(decoding_size=32, generation_mode="sample"),
+            20,
+        )
 
     def test_vllm_worker_init_passes_effective_max_logprobs_to_llm(self):
         llm_holder = {}
@@ -149,6 +201,7 @@ class VisualActorVLLMTests(unittest.TestCase):
                 return_value=(
                     _llm_factory,
                     _FakeBeamSearchParams,
+                    _FakeSamplingParams,
                     lambda **kwargs: kwargs["cumulative_logprob"],
                 ),
             ),
@@ -180,6 +233,57 @@ class VisualActorVLLMTests(unittest.TestCase):
         self.assertEqual(worker.max_logprobs, 64)
         self.assertEqual(llm_holder["llm"].kwargs["max_logprobs"], 64)
         self.assertEqual(processor_calls, ["Qwen/Qwen3-VL-2B-Instruct"])
+
+    def test_vllm_worker_init_in_sample_mode_uses_lower_logprob_cap(self):
+        llm_holder = {}
+
+        def _llm_factory(**kwargs):
+            llm = _InitCaptureLLM(**kwargs)
+            llm_holder["llm"] = llm
+            return llm
+
+        processor = types.SimpleNamespace(tokenizer=types.SimpleNamespace(padding_side=None))
+        worker_cls = VLLMVisionModelWorker.__ray_metadata__.modified_class
+        with (
+            mock.patch(
+                "experiments.single_problem_multi_gpu_eval.visual_actor.resolve_model_path",
+                side_effect=lambda path: path,
+            ),
+            mock.patch(
+                "experiments.single_problem_multi_gpu_eval.visual_actor._load_vllm_modules",
+                return_value=(
+                    _llm_factory,
+                    _FakeBeamSearchParams,
+                    _FakeSamplingParams,
+                    lambda **kwargs: kwargs["cumulative_logprob"],
+                ),
+            ),
+            mock.patch(
+                "experiments.single_problem_multi_gpu_eval.visual_actor._load_visual_processor",
+                return_value=processor,
+            ),
+            mock.patch(
+                "experiments.single_problem_multi_gpu_eval.visual_actor.torch.cuda.is_available",
+                return_value=False,
+            ),
+        ):
+            worker = worker_cls(
+                "model-path",
+                "vlm",
+                42,
+                gpu_memory_utilization=0.9,
+                max_num_seqs=128,
+                gpu_batch_size=4,
+                decoding_size=32,
+                enforce_eager=False,
+                generation_mode="sample",
+                sampling_temperature=0.7,
+                sampling_top_p=0.9,
+            )
+
+        self.assertEqual(worker.max_logprobs, 20)
+        self.assertEqual(llm_holder["llm"].kwargs["max_logprobs"], 20)
+        self.assertEqual(worker.generation_mode, "sample")
 
     def test_load_visual_processor_prefers_cached_base_model(self):
         processor = object()
@@ -286,6 +390,55 @@ class VisualActorVLLMTests(unittest.TestCase):
             )
             self.assertEqual(profile["batch_size"], 1)
             self.assertEqual(llm.calls[0]["beam_width"], 3)
+
+    def test_vllm_sampling_result_dedupes_and_ranks_by_score(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            image_path = Path(tmpdir) / "input.png"
+            Image.new("RGB", (8, 8), color="white").save(image_path)
+
+            llm = _FakeLLM(
+                [
+                    _FakeRequestOutput(
+                        [
+                            _FakeCompletionOutput(" foo", -3.0, [11, 12]),
+                            _FakeCompletionOutput(" bar", -1.0, [21]),
+                            _FakeCompletionOutput(" foo", -1.5, [11, 12]),
+                        ]
+                    )
+                ]
+            )
+            requests = [
+                {
+                    "request_id": "r0",
+                    "img_path": str(image_path),
+                    "query": "Construct one auxiliary point.",
+                    "new_point_name": "a",
+                    "response_prefix": "<aux> x00",
+                    "with_predicate": False,
+                    "decoding_size": 3,
+                }
+            ]
+
+            results, profile = _generate_visual_aux_dsl_dict_batch_vllm_sampling(
+                llm,
+                _FakeProcessor(),
+                requests,
+                sampling_params_cls=_FakeSamplingParams,
+                temperature=0.8,
+                top_p=0.95,
+            )
+
+            self.assertEqual(
+                list(results[0]["aux_dsl_dict"].items()),
+                [
+                    ("<aux> x00 a foo", -0.75),
+                    ("<aux> x00 a bar", -1.0),
+                ],
+            )
+            self.assertEqual(profile["batch_size"], 1)
+            self.assertEqual(llm.calls[0]["n"], 3)
+            self.assertEqual(llm.calls[0]["temperature"], 0.8)
+            self.assertEqual(llm.calls[0]["top_p"], 0.95)
 
 
 if __name__ == "__main__":

@@ -83,16 +83,20 @@ def build_eval_output_stem(
     gpu_batch_size: int,
     gpu_batch_timeout_ms: int,
     torch_seed: int = 123,
+    vllm_generation_mode: str = "beam",
 ) -> str:
     problems_name = problems_path.stem
     path_obj = Path(model_path)
     deepest_folder = path_obj.name
     parent_folder = path_obj.parent.name
     model_name = f"{parent_folder}_{deepest_folder}" if parent_folder else deepest_folder
+    runtime_suffix = f"_rt{inference_runtime}"
+    if inference_runtime == "vllm":
+        runtime_suffix += f"_gm{vllm_generation_mode}"
     return (
         f"eval_single_problem_multi_gpu_{agent_type}_{problems_name}_{model_name}"
         f"_d{decoding_size}_b{beam_size}_s{search_depth}"
-        f"_rt{inference_runtime}_gbs{gpu_batch_size}_gbt{gpu_batch_timeout_ms}_seed{torch_seed}"
+        f"{runtime_suffix}_gbs{gpu_batch_size}_gbt{gpu_batch_timeout_ms}_seed{torch_seed}"
     )
 
 
@@ -112,6 +116,9 @@ def create_workers(
     vllm_gpu_memory_utilization: float,
     vllm_max_num_seqs: int,
     vllm_enforce_eager: bool,
+    vllm_generation_mode: str,
+    vllm_sampling_temperature: float,
+    vllm_sampling_top_p: float,
 ):
     if agent_type == "lm":
         if inference_runtime != "transformers":
@@ -142,6 +149,9 @@ def create_workers(
                     gpu_batch_size=gpu_batch_size,
                     decoding_size=decoding_size,
                     enforce_eager=vllm_enforce_eager,
+                    generation_mode=vllm_generation_mode,
+                    sampling_temperature=vllm_sampling_temperature,
+                    sampling_top_p=vllm_sampling_top_p,
                 )
                 workers.append(worker)
                 # Serialize actor init + engine warmup to avoid concurrent
@@ -283,6 +293,9 @@ def solve_problems_single_problem_multi_gpu(
     vllm_gpu_memory_utilization: float,
     vllm_max_num_seqs: int,
     vllm_enforce_eager: bool,
+    vllm_generation_mode: str,
+    vllm_sampling_temperature: float,
+    vllm_sampling_top_p: float,
     timeout: int,
     agent_type: str,
     max_pending_ddar: int | None,
@@ -368,6 +381,9 @@ def solve_problems_single_problem_multi_gpu(
             vllm_gpu_memory_utilization=vllm_gpu_memory_utilization,
             vllm_max_num_seqs=vllm_max_num_seqs,
             vllm_enforce_eager=vllm_enforce_eager,
+            vllm_generation_mode=vllm_generation_mode,
+            vllm_sampling_temperature=vllm_sampling_temperature,
+            vllm_sampling_top_p=vllm_sampling_top_p,
         )
         logging.getLogger(__name__).info(
             "Created workers: agent=%s requested_gpus=%d visible_gpus=%d",
@@ -396,6 +412,7 @@ def solve_problems_single_problem_multi_gpu(
             gpu_batch_size=gpu_batch_size,
             gpu_batch_timeout_ms=gpu_batch_timeout_ms,
             torch_seed=torch_seed,
+            vllm_generation_mode=vllm_generation_mode,
         )
         run_timestamp = timestamp_slug()
         timestamped_output_stem = build_timestamped_output_stem(output_name_stem, run_timestamp)
@@ -422,6 +439,9 @@ def solve_problems_single_problem_multi_gpu(
                     "vllm_gpu_memory_utilization": vllm_gpu_memory_utilization,
                     "vllm_max_num_seqs": vllm_max_num_seqs,
                     "vllm_enforce_eager": vllm_enforce_eager,
+                    "vllm_generation_mode": vllm_generation_mode,
+                    "vllm_sampling_temperature": vllm_sampling_temperature,
+                    "vllm_sampling_top_p": vllm_sampling_top_p,
                     "timeout": timeout,
                     "max_pending_ddar": max_pending_ddar,
                     "num_gpus_for_eval": num_gpus_for_eval,
@@ -444,6 +464,10 @@ def solve_problems_single_problem_multi_gpu(
             print(f"Using vllm_max_num_seqs={vllm_max_num_seqs}")
             print(f"Using effective_vllm_max_num_seqs={effective_vllm_max_num_seqs}")
             print(f"Using vllm_enforce_eager={vllm_enforce_eager}")
+            print(f"Using vllm_generation_mode={vllm_generation_mode}")
+            if vllm_generation_mode == "sample":
+                print(f"Using vllm_sampling_temperature={vllm_sampling_temperature}")
+                print(f"Using vllm_sampling_top_p={vllm_sampling_top_p}")
         print(f"Using max_pending_ddar={max_pending_ddar}")
         print(f"Using prepare_request_workers={prepare_request_workers}")
         print(f"Using prepare_prefetch_limit={prepare_prefetch_limit}")
@@ -718,6 +742,25 @@ def main():
         help="Force eager mode inside vLLM for debugging or compatibility workarounds.",
     )
     parser.add_argument(
+        "--vllm_generation_mode",
+        type=str,
+        choices=("beam", "sample"),
+        default="beam",
+        help="vLLM generation path. 'beam' keeps strict beam search; 'sample' uses non-strict sampling with n=decoding_size.",
+    )
+    parser.add_argument(
+        "--vllm_sampling_temperature",
+        type=float,
+        default=0.8,
+        help="Sampling temperature used when --vllm_generation_mode=sample.",
+    )
+    parser.add_argument(
+        "--vllm_sampling_top_p",
+        type=float,
+        default=0.95,
+        help="Sampling top-p used when --vllm_generation_mode=sample.",
+    )
+    parser.add_argument(
         "--torch_seed",
         type=int,
         default=123,
@@ -776,6 +819,9 @@ def main():
         vllm_gpu_memory_utilization=args.vllm_gpu_memory_utilization,
         vllm_max_num_seqs=args.vllm_max_num_seqs,
         vllm_enforce_eager=args.vllm_enforce_eager,
+        vllm_generation_mode=args.vllm_generation_mode,
+        vllm_sampling_temperature=args.vllm_sampling_temperature,
+        vllm_sampling_top_p=args.vllm_sampling_top_p,
         timeout=args.timeout,
         agent_type=args.agent,
         max_pending_ddar=args.max_pending_ddar,

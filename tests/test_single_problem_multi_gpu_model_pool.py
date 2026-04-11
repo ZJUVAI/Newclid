@@ -298,6 +298,9 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                     vllm_gpu_memory_utilization=0.9,
                     vllm_max_num_seqs=128,
                     vllm_enforce_eager=False,
+                    vllm_generation_mode="beam",
+                    vllm_sampling_temperature=0.8,
+                    vllm_sampling_top_p=0.95,
                 )
 
         self.assertEqual(len(workers), 3)
@@ -390,6 +393,9 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                                                         vllm_gpu_memory_utilization=0.9,
                                                         vllm_max_num_seqs=128,
                                                         vllm_enforce_eager=False,
+                                                        vllm_generation_mode="beam",
+                                                        vllm_sampling_temperature=0.8,
+                                                        vllm_sampling_top_p=0.95,
                                                         timeout=3600,
                                                         agent_type="vlm",
                                                         max_pending_ddar=2,

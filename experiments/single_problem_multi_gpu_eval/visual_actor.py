@@ -226,23 +226,32 @@ def _load_vllm_modules():
     vllm_envs.VLLM_ENABLE_V1_MULTIPROCESSING = False
     try:
         from vllm.sampling_params import BeamSearchParams
+        from vllm.sampling_params import SamplingParams
         from vllm.beam_search import get_beam_search_score
     except ImportError as exc:
         raise ImportError(
             "vLLM is installed, but the current version does not expose the beam-search API "
             "expected by this repo. Expected imports: "
-            "`vllm.sampling_params.BeamSearchParams` and "
+            "`vllm.sampling_params.BeamSearchParams`, "
+            "`vllm.sampling_params.SamplingParams`, and "
             "`vllm.beam_search.get_beam_search_score`."
         ) from exc
-    return LLM, BeamSearchParams, get_beam_search_score
+    return LLM, BeamSearchParams, SamplingParams, get_beam_search_score
 
 
 def _effective_vllm_max_num_seqs(configured_max_num_seqs: int, *, gpu_batch_size: int, decoding_size: int) -> int:
     return max(int(configured_max_num_seqs), int(gpu_batch_size) * int(decoding_size))
 
 
-def _effective_vllm_max_logprobs(*, decoding_size: int, configured_max_logprobs: int = 20) -> int:
-    return max(int(configured_max_logprobs), 2 * int(decoding_size))
+def _effective_vllm_max_logprobs(
+    *,
+    decoding_size: int,
+    generation_mode: str = "beam",
+    configured_max_logprobs: int = 20,
+) -> int:
+    if generation_mode == "beam":
+        return max(int(configured_max_logprobs), 2 * int(decoding_size))
+    return int(configured_max_logprobs)
 
 
 def _compute_vllm_beam_score(
@@ -284,6 +293,46 @@ def _extract_vllm_continuation_text(processor, sequence: Any) -> str:
     return full_text
 
 
+def _build_vllm_prompts(processor, requests: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    prompts: list[dict[str, Any]] = []
+    for request in requests:
+        if "image" in request:
+            image = request["image"]
+            prompts.append(
+                {
+                    "prompt": _build_visual_prompt(processor, request),
+                    "multi_modal_data": {"image": image.copy()},
+                }
+            )
+            continue
+        with Image.open(Path(request["img_path"])) as img:
+            prompts.append(
+                {
+                    "prompt": _build_visual_prompt(processor, request),
+                    "multi_modal_data": {"image": img.copy()},
+                }
+            )
+    return prompts
+
+
+def _normalize_vllm_generate_score(
+    token_ids: list[int] | tuple[int, ...] | None,
+    cumulative_logprob: float | None,
+    *,
+    eos_token_id: int | None,
+) -> float:
+    if cumulative_logprob is None:
+        return float("-inf")
+    tokens = list(token_ids or [])
+    if not tokens:
+        return float(cumulative_logprob)
+    effective_len = len(tokens)
+    if eos_token_id is not None and tokens[-1] == eos_token_id:
+        effective_len -= 1
+    effective_len = max(effective_len, 1)
+    return float(cumulative_logprob) / float(effective_len)
+
+
 def _generate_visual_aux_dsl_dict_batch_vllm(
     llm,
     processor,
@@ -303,24 +352,7 @@ def _generate_visual_aux_dsl_dict_batch_vllm(
 
     profile = _create_worker_batch_profile(batch_size=len(requests))
     input_build_start = time.perf_counter()
-    prompts: list[dict[str, Any]] = []
-    for request in requests:
-        if "image" in request:
-            image = request["image"]
-            prompts.append(
-                {
-                    "prompt": _build_visual_prompt(processor, request),
-                    "multi_modal_data": {"image": image.copy()},
-                }
-            )
-            continue
-        with Image.open(Path(request["img_path"])) as img:
-            prompts.append(
-                {
-                    "prompt": _build_visual_prompt(processor, request),
-                    "multi_modal_data": {"image": img.copy()},
-                }
-            )
+    prompts = _build_vllm_prompts(processor, requests)
     profile["input_build_time_s"] += time.perf_counter() - input_build_start
 
     _, eos_token_id = _resolve_visual_stop_tokens(processor, "vlm")
@@ -353,6 +385,76 @@ def _generate_visual_aux_dsl_dict_batch_vllm(
             {
                 "request_id": request["request_id"],
                 "aux_dsl_dict": aux_dsl_dict,
+            }
+        )
+    profile["decode_time_s"] += time.perf_counter() - decode_start
+    return results, profile
+
+
+def _generate_visual_aux_dsl_dict_batch_vllm_sampling(
+    llm,
+    processor,
+    requests: list[dict[str, Any]],
+    *,
+    sampling_params_cls,
+    temperature: float,
+    top_p: float,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    if not requests:
+        return [], _create_worker_batch_profile(batch_size=0)
+    if any(request.get("with_predicate", False) for request in requests):
+        raise NotImplementedError("Batched visual generation currently supports with_predicate=False only.")
+
+    decoding_size = int(requests[0]["decoding_size"])
+    if any(int(request["decoding_size"]) != decoding_size for request in requests):
+        raise ValueError("All requests in a batch must share decoding_size.")
+
+    profile = _create_worker_batch_profile(batch_size=len(requests))
+    input_build_start = time.perf_counter()
+    prompts = _build_vllm_prompts(processor, requests)
+    profile["input_build_time_s"] += time.perf_counter() - input_build_start
+
+    _, eos_token_id = _resolve_visual_stop_tokens(processor, "vlm")
+    sampling_params = sampling_params_cls(
+        n=decoding_size,
+        max_tokens=100,
+        temperature=float(temperature),
+        top_p=float(top_p),
+        logprobs=0,
+        stop_token_ids=None if eos_token_id is None else [eos_token_id],
+        ignore_eos=False,
+        detokenize=True,
+    )
+
+    generate_start = time.perf_counter()
+    request_outputs = llm.generate(prompts, sampling_params, use_tqdm=False)
+    profile["generate_time_s"] += time.perf_counter() - generate_start
+
+    decode_start = time.perf_counter()
+    results: list[dict[str, Any]] = []
+    for request, output in zip(requests, request_outputs):
+        scored_candidates: dict[str, float] = {}
+        for completion in getattr(output, "outputs", []):
+            text = getattr(completion, "text", "") or ""
+            aux_dsl = f'{request.get("response_prefix", "<aux> x00")} {request["new_point_name"]}{text}'
+            score = _normalize_vllm_generate_score(
+                getattr(completion, "token_ids", None),
+                getattr(completion, "cumulative_logprob", None),
+                eos_token_id=eos_token_id,
+            )
+            prev_score = scored_candidates.get(aux_dsl)
+            if prev_score is None or score > prev_score:
+                scored_candidates[aux_dsl] = score
+        ranked_aux_dsl_dict = dict(
+            sorted(
+                scored_candidates.items(),
+                key=lambda item: (-item[1], item[0]),
+            )
+        )
+        results.append(
+            {
+                "request_id": request["request_id"],
+                "aux_dsl_dict": ranked_aux_dsl_dict,
             }
         )
     profile["decode_time_s"] += time.perf_counter() - decode_start
@@ -575,9 +677,14 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
         gpu_batch_size: int = 1,
         decoding_size: int = 1,
         enforce_eager: bool = False,
+        generation_mode: str = "beam",
+        sampling_temperature: float = 0.8,
+        sampling_top_p: float = 0.95,
     ):
         if agent_kind != "vlm":
             raise ValueError(f"Unsupported vision agent kind for vLLM runtime: {agent_kind}")
+        if generation_mode not in {"beam", "sample"}:
+            raise ValueError(f"Unsupported vLLM generation mode: {generation_mode}")
         resolved_path = resolve_model_path(model_path)
         self.model_path = resolved_path
         self.agent_kind = agent_kind
@@ -587,12 +694,18 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
         self.configured_max_num_seqs = int(max_num_seqs)
         self.gpu_batch_size = int(gpu_batch_size)
         self.decoding_size = int(decoding_size)
+        self.generation_mode = generation_mode
+        self.sampling_temperature = float(sampling_temperature)
+        self.sampling_top_p = float(sampling_top_p)
         self.max_num_seqs = _effective_vllm_max_num_seqs(
             self.configured_max_num_seqs,
             gpu_batch_size=self.gpu_batch_size,
             decoding_size=self.decoding_size,
         )
-        self.max_logprobs = _effective_vllm_max_logprobs(decoding_size=self.decoding_size)
+        self.max_logprobs = _effective_vllm_max_logprobs(
+            decoding_size=self.decoding_size,
+            generation_mode=self.generation_mode,
+        )
         self.enforce_eager = bool(enforce_eager)
         self.vllm_distributed_executor_backend = "uni"
         torch.manual_seed(self.torch_seed)
@@ -600,7 +713,7 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
             torch.cuda.manual_seed(self.torch_seed)
             torch.cuda.manual_seed_all(self.torch_seed)
         logger.info(
-            "VLLMVisionModelWorker init start: agent_kind=%s model_path=%s torch_seed=%d gpu_memory_utilization=%.2f configured_max_num_seqs=%d effective_max_num_seqs=%d max_logprobs=%d gpu_batch_size=%d decoding_size=%d enforce_eager=%s",
+            "VLLMVisionModelWorker init start: agent_kind=%s model_path=%s torch_seed=%d gpu_memory_utilization=%.2f configured_max_num_seqs=%d effective_max_num_seqs=%d max_logprobs=%d gpu_batch_size=%d decoding_size=%d enforce_eager=%s generation_mode=%s sampling_temperature=%.3f sampling_top_p=%.3f",
             agent_kind,
             resolved_path,
             self.torch_seed,
@@ -611,8 +724,11 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
             self.gpu_batch_size,
             self.decoding_size,
             self.enforce_eager,
+            self.generation_mode,
+            self.sampling_temperature,
+            self.sampling_top_p,
         )
-        llm_cls, beam_search_params_cls, get_beam_search_score = _load_vllm_modules()
+        llm_cls, beam_search_params_cls, sampling_params_cls, get_beam_search_score = _load_vllm_modules()
         self.llm = llm_cls(
             model=resolved_path,
             trust_remote_code=True,
@@ -625,6 +741,7 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
             limit_mm_per_prompt={"image": 1},
         )
         self.beam_search_params_cls = beam_search_params_cls
+        self.sampling_params_cls = sampling_params_cls
         self.get_beam_search_score = get_beam_search_score
         self.processor = _load_visual_processor()
         self.processor.tokenizer.padding_side = "left"
@@ -654,6 +771,9 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
             "gpu_batch_size": self.gpu_batch_size,
             "decoding_size": self.decoding_size,
             "enforce_eager": self.enforce_eager,
+            "generation_mode": self.generation_mode,
+            "sampling_temperature": self.sampling_temperature,
+            "sampling_top_p": self.sampling_top_p,
             "distributed_executor_backend": self.vllm_distributed_executor_backend,
         }
         if self._warmup_profile is None:
@@ -672,12 +792,14 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
         }
         try:
             generate_start = time.perf_counter()
-            _generate_visual_aux_dsl_dict_batch_vllm(
-                self.llm,
-                self.processor,
-                [{**warmup_request, "img_path": "__warmup__", "image": Image.new("RGB", (32, 32), color="white")}],
-                get_beam_search_score=self.get_beam_search_score,
-                beam_search_params_cls=self.beam_search_params_cls,
+            self._generate_batch_core(
+                [
+                    {
+                        **warmup_request,
+                        "img_path": "__warmup__",
+                        "image": Image.new("RGB", (32, 32), color="white"),
+                    }
+                ]
             )
             return {
                 "status": "ok",
@@ -718,13 +840,7 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
 
     def _generate_batch_with_fallback(self, requests: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         try:
-            return _generate_visual_aux_dsl_dict_batch_vllm(
-                self.llm,
-                self.processor,
-                requests,
-                get_beam_search_score=self.get_beam_search_score,
-                beam_search_params_cls=self.beam_search_params_cls,
-            )
+            return self._generate_batch_core(requests)
         except Exception as exc:
             if len(requests) == 1:
                 logger.exception("vLLM visual generate failed for request_id=%s", requests[0].get("request_id"))
@@ -762,3 +878,21 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
             merged_profile["fallback_time_s"] += time.perf_counter() - fallback_start
             merged_profile["fallback_mode"] = "per_request"
             return all_results, merged_profile
+
+    def _generate_batch_core(self, requests: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        if self.generation_mode == "beam":
+            return _generate_visual_aux_dsl_dict_batch_vllm(
+                self.llm,
+                self.processor,
+                requests,
+                get_beam_search_score=self.get_beam_search_score,
+                beam_search_params_cls=self.beam_search_params_cls,
+            )
+        return _generate_visual_aux_dsl_dict_batch_vllm_sampling(
+            self.llm,
+            self.processor,
+            requests,
+            sampling_params_cls=self.sampling_params_cls,
+            temperature=self.sampling_temperature,
+            top_p=self.sampling_top_p,
+        )
