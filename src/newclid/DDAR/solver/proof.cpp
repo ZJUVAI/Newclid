@@ -8,6 +8,8 @@
 #include <vector>
 #include <optional>
 #include <cassert>
+#include <sstream>
+#include <iomanip>
 
 using namespace std;
 
@@ -46,7 +48,17 @@ void Proof::initial()
             _depth = 0;
             return;
         }
-        throw runtime_error("尝试添加错误的仅数值检验命题");
+        std::string err_message = "尝试添加错误的仅数值检验命题:";
+        err_message += _statement->to_string();
+        err_message += "  points:";
+        for (const auto &pt : _statement->points())
+        {
+            std::ostringstream oss;
+            oss << std::fixed << std::setprecision(15);
+            oss << " (" << pt.name() << ", " << pt.num().x() << ", " << pt.num().y() << ")";
+            err_message += oss.str();
+        }
+        throw runtime_error(err_message);
     }
     if (_statement->trivial())
     {
@@ -113,7 +125,7 @@ const unique_ptr<Statement> &Proof::statement() const
 
 void Proof::print_equations() const
 {
-    const_cast<Proof*>(this)->ensure_equations_initialized();
+    const_cast<Proof *>(this)->ensure_equations_initialized();
     cout << "Proof Equations for statement: " << _statement->to_string() << endl;
     for (const auto &eq : _eqn_dist)
     {

@@ -12,6 +12,7 @@ public:
 
     static int sign(double x);
 
+private:
     static constexpr double ATOM = 1e-8;
     static constexpr double REL_TOL = 0.001;
 };

@@ -40,8 +40,25 @@ bool Coll::check_nondegen() const
 
 bool Coll::check_equations() const
 {
-    double const lhs = ((_b.x() - _a.x()) * (_c.y() - _a.y()));
-    double const rhs = ((_c.x() - _a.x()) * (_b.y() - _a.y()));
+    // 使用归一化处理提高数值稳定性
+    // 选择 x 坐标的中位数点作为参考点，避免极端值导致的精度损失
+    Point ref_a = _a;
+    Point ref_b = _b;
+    Point ref_c = _c;
+
+    // 按 x 坐标排序，选择中位数点作为参考
+    if (ref_a.x() > ref_b.x()) std::swap(ref_a, ref_b);
+    if (ref_a.x() > ref_c.x()) std::swap(ref_a, ref_c);
+    if (ref_b.x() > ref_c.x()) std::swap(ref_b, ref_c);
+    // 现在 ref_b 是 x 坐标中位数点，作为参考点
+
+    // 以 ref_b 为参考点，计算叉积
+    double const bx = ref_b.x();
+    double const by = ref_b.y();
+
+    double const lhs = ((ref_a.x() - bx) * (ref_c.y() - by));
+    double const rhs = ((ref_c.x() - bx) * (ref_a.y() - by));
+
     return Numerical::close_enough(lhs, rhs);
 }
 

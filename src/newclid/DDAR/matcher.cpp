@@ -23,8 +23,8 @@ Matcher::Matcher(Problem *prob) : _problem(prob)
 {
     match_similar_triangles();
     match_between();
-    match_circles();
     match_equal_angles();
+    match_circles();
     match_orthocenters();
     // match_perps_paras();
 }
@@ -208,9 +208,7 @@ void Matcher::on_pappus(const Pappus &pappus)
 {
     for (const auto &rotated : pappus.permutations())
     {
-        #ifndef DDAR_WEAK
-            insert_theorem(Theorem::pappus(rotated));
-        #endif
+        insert_theorem(Theorem::pappus(rotated));
     }
 }
 
@@ -240,30 +238,24 @@ void Matcher::on_eqratio(const Coll &left, const Coll &right)
 
     if (left.a() == right.a())
     {
-        #ifndef DDAR_WEAK
-            insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(left, right));
-            insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.a(), left.c(), left.b()), Coll(right.a(), right.c(), right.b())));
-            insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(left, right));
-            insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.a(), left.c(), left.b()), Coll(right.a(), right.c(), right.b())));
-        #endif 
+        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(left, right));
+        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.a(), left.c(), left.b()), Coll(right.a(), right.c(), right.b())));
+        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(left, right));
+        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.a(), left.c(), left.b()), Coll(right.a(), right.c(), right.b())));
     }
     else if (left.b() == right.b())
     {
-        #ifndef DDAR_WEAK
-            insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.b(), left.a(), left.c()), Coll(right.b(), right.a(), right.c())));
-            insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.b(), left.c(), left.a()), Coll(right.b(), right.c(), right.a())));
-            insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.b(), left.a(), left.c()), Coll(right.b(), right.a(), right.c())));
-            insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.b(), left.c(), left.a()), Coll(right.b(), right.c(), right.a())));
-        #endif 
+        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.b(), left.a(), left.c()), Coll(right.b(), right.a(), right.c())));
+        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.b(), left.c(), left.a()), Coll(right.b(), right.c(), right.a())));
+        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.b(), left.a(), left.c()), Coll(right.b(), right.a(), right.c())));
+        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.b(), left.c(), left.a()), Coll(right.b(), right.c(), right.a())));
     }
     else if (left.c() == right.c())
     {
-        #ifndef DDAR_WEAK
-            insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.c(), left.a(), left.b()), Coll(right.c(), right.a(), right.b())));
-            insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.c(), left.b(), left.a()), Coll(right.c(), right.b(), right.a())));
-            insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.c(), left.a(), left.b()), Coll(right.c(), right.a(), right.b())));
-            insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.c(), left.b(), left.a()), Coll(right.c(), right.b(), right.a())));
-        #endif 
+        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.c(), left.a(), left.b()), Coll(right.c(), right.a(), right.b())));
+        insert_theorem(Theorem::thales_para_of_eqratio_with_common_point(Coll(left.c(), left.b(), left.a()), Coll(right.c(), right.b(), right.a())));
+        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.c(), left.a(), left.b()), Coll(right.c(), right.a(), right.b())));
+        insert_theorem(Theorem::thales_eqratio_of_para_with_common_point(Coll(left.c(), left.b(), left.a()), Coll(right.c(), right.b(), right.a())));
     }
 
     Thales const thales(left, right);
@@ -273,13 +265,9 @@ void Matcher::on_eqratio(const Coll &left, const Coll &right)
     }
     for (const auto &rotated : thales.permutations())
     {
-        #ifndef DDAR_WEAK
-            insert_theorem(Theorem::thales_para_of_eqratio(rotated));
-        #endif 
+        insert_theorem(Theorem::thales_para_of_eqratio(rotated));
     }
-    #ifndef DDAR_WEAK
-        insert_theorem(Theorem::thales_eqratio_of_para(thales));
-    #endif 
+    insert_theorem(Theorem::thales_eqratio_of_para(thales));
 }
 
 void Matcher::match_between()
@@ -331,38 +319,12 @@ void Matcher::match_between()
             insert_theorem(Theorem::eqpoints_of_same_ratio_on_line(p1, p2, a, b));
             for (size_t j = i + 1; j < candidates.size(); ++j)
             {
-                const auto &cand1 = candidates[i];
-                const auto &cand2 = candidates[j];
-                double angle1 = std::get<0>(cand1);
-                double angle2 = std::get<0>(cand2);
-                // 使用更宽松的精度判断（降低容差 10 倍）
-                if (std::fabs(angle1 - angle2) < 4e-7 || std::fabs(angle1 - angle2) / std::max(std::fabs(angle1), std::fabs(angle2)) < 0.01)
+                const Point &c = std::get<1>(candidates[j]);
+                const Point &d = std::get<2>(candidates[j]);
+                if (Coll(a, b, d).check_numerically())
                 {
                     continue;
                 }
-                const Point &a = std::get<1>(cand1);
-                const Point &b = std::get<2>(cand1);
-                const Point &c = std::get<1>(cand2);
-                const Point &d = std::get<2>(cand2);
-
-                // Symmetric collinearity pre-check for NColl(a, b, d)
-                // to avoid order-dependent numerical check failures
-                {
-                    double cross = (b.x() - a.x()) * (d.y() - a.y())
-                                 - (d.x() - a.x()) * (b.y() - a.y());
-                    double ab2 = (b.x()-a.x())*(b.x()-a.x()) + (b.y()-a.y())*(b.y()-a.y());
-                    double ad2 = (d.x()-a.x())*(d.x()-a.x()) + (d.y()-a.y())*(d.y()-a.y());
-                    double bd2 = (d.x()-b.x())*(d.x()-b.x()) + (d.y()-b.y())*(d.y()-b.y());
-                    double max_side2 = std::max({ab2, ad2, bd2});
-                    // |cross|^2 / max_side^4 is order-independent; skip if near-collinear
-                    // Using REL_TOL = 0.001 (same as Numerical::REL_TOL)
-                    constexpr double rel_tol = 0.001;
-                    if (cross * cross < rel_tol * rel_tol * max_side2 * max_side2)
-                    {
-                        continue;
-                    }
-                }
-
                 insert_theorem(Theorem::eqpoints_of_same_intersections(p1, p2, a, b, c, d));
             }
         }
@@ -512,18 +474,16 @@ void Matcher::on_cyclic(const Cyclic &cyclic)
 {
     for (const auto &rotated : cyclic.permutation())
     {
-            insert_theorem(Theorem::cyclic_of_equal_angles(rotated));
-            insert_theorem(Theorem::cyclic_properties(cyclic));
+        insert_theorem(Theorem::cyclic_of_equal_angles(rotated));
+        insert_theorem(Theorem::cyclic_properties(cyclic));
     }
 }
 
 void Matcher::on_bisector(const Point &pt, const Angle &ang)
 {
-    #ifndef DDAR_WEAK
-        insert_theorem(Theorem::triangle_bisector_of_eqratio(pt, ang));
-        insert_theorem(Theorem::triangle_bisector_of_equal_angles(pt, ang));
-        insert_theorem(Theorem::incenter(pt, ang));
-    #endif 
+    insert_theorem(Theorem::triangle_bisector_of_eqratio(pt, ang));
+    insert_theorem(Theorem::triangle_bisector_of_equal_angles(pt, ang));
+    insert_theorem(Theorem::incenter(pt, ang));
 }
 
 void Matcher::on_eqangle(const Angle &left, const Angle &right)
@@ -558,7 +518,7 @@ void Matcher::match_equal_angles()
     {
         return;
     }
-    
+
     sort(angles.begin(), angles.end(),
          [](const item_type &a, const item_type &b)
          {
@@ -606,7 +566,7 @@ void Matcher::match_equal_angles()
 
 void Matcher::on_circumcenter(const CircumCenter &circumcenter)
 {
-    insert_theorem(Theorem::cong_of_circumcenter(circumcenter));    
+    insert_theorem(Theorem::cong_of_circumcenter(circumcenter));
     insert_theorem(Theorem::circumcenter_of_cong(circumcenter));
 }
 
@@ -616,11 +576,9 @@ void Matcher::on_quadrangle_circumcenter(const Point &center, const Cyclic &cyc)
     insert_theorem(Theorem::cong_of_circumcenter_of_cyclic({center, Triangle(cyc.b(), cyc.c(), cyc.d())}, cyc.a()));
     insert_theorem(Theorem::cong_of_circumcenter_of_cyclic({center, Triangle(cyc.c(), cyc.d(), cyc.a())}, cyc.b()));
     insert_theorem(Theorem::cong_of_circumcenter_of_cyclic({center, Triangle(cyc.d(), cyc.a(), cyc.b())}, cyc.c()));
-    #ifndef DDAR_WEAK
-        insert_theorem(Theorem::center_of_cyclic_of_cong_of_cong(cyc, center));
-        insert_theorem(Theorem::center_of_cyclic_of_cong_of_cong(Cyclic(cyc.a(), cyc.c(), cyc.b(), cyc.d()), center));
-        insert_theorem(Theorem::center_of_cyclic_of_cong_of_cong(Cyclic(cyc.a(), cyc.d(), cyc.b(), cyc.c()), center));
-    #endif
+    insert_theorem(Theorem::center_of_cyclic_of_cong_of_cong(cyc, center));
+    insert_theorem(Theorem::center_of_cyclic_of_cong_of_cong(Cyclic(cyc.a(), cyc.c(), cyc.b(), cyc.d()), center));
+    insert_theorem(Theorem::center_of_cyclic_of_cong_of_cong(Cyclic(cyc.a(), cyc.d(), cyc.b(), cyc.c()), center));
 }
 
 void Matcher::on_circle(const Point &center, const vector<pair<double, Point>> &points)
@@ -636,9 +594,7 @@ void Matcher::on_circle(const Point &center, const vector<pair<double, Point>> &
                 {
                     if (pt_c != pt_a && pt_c != pt_b)
                     {
-                        #ifndef DDAR_WEAK
-                            insert_theorem(Theorem::hypotenuse_is_diameter(Midp(center, points[pt_a].second, points[pt_b].second), points[pt_c].second));                    
-                        #endif
+                        insert_theorem(Theorem::hypotenuse_is_diameter(Midp(center, points[pt_a].second, points[pt_b].second), points[pt_c].second));
                     }
                 }
             }
@@ -737,9 +693,7 @@ void Matcher::match_orthocenters()
                     {
                         for (const auto &rotated : ortho.cyclic_rotations())
                         {
-                            #ifndef DDAR_WEAK
-                                insert_theorem(Theorem::orthocenter(rotated));                        
-                            #endif
+                            insert_theorem(Theorem::orthocenter(rotated));
                         }
                     }
                 }
@@ -823,12 +777,20 @@ static vector<string> new_vars(const Stmt &stmt, const Mapping &mapping)
     {
         bool known = false;
         for (const auto &kv : mapping)
-            if (kv.first == arg) { known = true; break; }
+            if (kv.first == arg)
+            {
+                known = true;
+                break;
+            }
         if (!known)
         {
             bool dup = false;
             for (const auto &v : vars)
-                if (v == arg) { dup = true; break; }
+                if (v == arg)
+                {
+                    dup = true;
+                    break;
+                }
             if (!dup)
                 vars.push_back(arg);
         }
@@ -858,7 +820,8 @@ static bool check_stmt_numerically(const Stmt &stmt, const Mapping &mapping, Pro
     try
     {
         auto s = problem->create_statement(stmt.first, real_args);
-        if (!s) return false;
+        if (!s)
+            return false;
         return s->check_numerically();
     }
     catch (...)
@@ -924,11 +887,11 @@ void CustomTheoremMatcher::match_rule(const CustomRule &rule)
 {
     // 按新变量数量升序排列前提，优先匹配约束强的
     vector<Stmt> sorted_premises = rule.premises;
-    sort(sorted_premises.begin(), sorted_premises.end(), [](const Stmt &a, const Stmt &b) {
+    sort(sorted_premises.begin(), sorted_premises.end(), [](const Stmt &a, const Stmt &b)
+         {
         set<string> sa(a.second.begin(), a.second.end());
         set<string> sb(b.second.begin(), b.second.end());
-        return sa.size() < sb.size();
-    });
+        return sa.size() < sb.size(); });
 
     Mapping current;
     vector<Mapping> mappings;
@@ -956,10 +919,15 @@ void CustomTheoremMatcher::match_rule(const CustomRule &rule)
                 else
                     real_args.push_back(arg);
             }
-            try {
+            try
+            {
                 auto s = _problem->create_statement(stmt.first, real_args);
-                if (s) thm.add_hypothesis(move(s));
-            } catch (...) {}
+                if (s)
+                    thm.add_hypothesis(move(s));
+            }
+            catch (...)
+            {
+            }
         }
 
         // 添加结论
@@ -974,10 +942,15 @@ void CustomTheoremMatcher::match_rule(const CustomRule &rule)
                 else
                     real_args.push_back(arg);
             }
-            try {
+            try
+            {
                 auto s = _problem->create_statement(stmt.first, real_args);
-                if (s) thm.add_conclusion(move(s));
-            } catch (...) {}
+                if (s)
+                    thm.add_conclusion(move(s));
+            }
+            catch (...)
+            {
+            }
         }
 
         if (thm.check_numerically())
