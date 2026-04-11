@@ -23,7 +23,7 @@ if str(REPO_ROOT) not in sys.path:
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from experiments.single_problem_multi_gpu_eval.model_pool import ModelPool
+from experiments.single_problem_multi_gpu_eval.model_pool import ModelPool, WorkerHandleWrapper
 from newclid.api import GeometricSolverBuilder
 from newclid.profiling import (
     PROFILE_ROW_FIELDS,
@@ -125,7 +125,14 @@ def create_workers(
             raise ValueError(f"Unsupported inference runtime for agent '{agent_type}': {inference_runtime}")
         from experiments.single_problem_multi_gpu_eval.lm_actor import ModelWorker
 
-        return [ModelWorker.remote(model_path, torch_seed) for _ in range(num_gpus_for_eval)], None
+        return [
+            WorkerHandleWrapper(
+                ModelWorker.remote(model_path, torch_seed, worker_slot),
+                worker_trace_id=f"gpu:{worker_slot}",
+                worker_device=f"cuda:{worker_slot}",
+            )
+            for worker_slot in range(num_gpus_for_eval)
+        ], None
     if agent_type in {"vlm", "qwen35"}:
         from experiments.single_problem_multi_gpu_eval.visual_actor import (
             VLLMVisionModelWorker,
@@ -133,17 +140,25 @@ def create_workers(
         )
 
         if inference_runtime == "transformers":
-            return [VisionModelWorker.remote(model_path, agent_type, torch_seed) for _ in range(num_gpus_for_eval)], None
+            return [
+                WorkerHandleWrapper(
+                    VisionModelWorker.remote(model_path, agent_type, torch_seed, worker_slot),
+                    worker_trace_id=f"gpu:{worker_slot}",
+                    worker_device=f"cuda:{worker_slot}",
+                )
+                for worker_slot in range(num_gpus_for_eval)
+            ], None
         if inference_runtime == "vllm":
             if agent_type != "vlm":
                 raise ValueError(f"Unsupported inference runtime for agent '{agent_type}': {inference_runtime}")
             workers = []
             warmup_infos = []
-            for _ in range(num_gpus_for_eval):
-                worker = VLLMVisionModelWorker.remote(
+            for worker_slot in range(num_gpus_for_eval):
+                worker_handle = VLLMVisionModelWorker.remote(
                     model_path,
                     agent_type,
                     torch_seed,
+                    worker_slot,
                     gpu_memory_utilization=vllm_gpu_memory_utilization,
                     max_num_seqs=vllm_max_num_seqs,
                     gpu_batch_size=gpu_batch_size,
@@ -152,6 +167,11 @@ def create_workers(
                     generation_mode=vllm_generation_mode,
                     sampling_temperature=vllm_sampling_temperature,
                     sampling_top_p=vllm_sampling_top_p,
+                )
+                worker = WorkerHandleWrapper(
+                    worker_handle,
+                    worker_trace_id=f"gpu:{worker_slot}",
+                    worker_device=f"cuda:{worker_slot}",
                 )
                 workers.append(worker)
                 # Serialize actor init + engine warmup to avoid concurrent

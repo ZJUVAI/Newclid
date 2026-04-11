@@ -187,10 +187,13 @@ def generate_aux_dsl_dict_batch(
 class ModelWorker:
     """Keep one LM replica resident on one GPU for repeated generation calls."""
 
-    def __init__(self, model_path: str, torch_seed: int = 123):
+    def __init__(self, model_path: str, torch_seed: int = 123, worker_slot: int = 0):
         resolved_path = resolve_model_path(model_path)
         self.model_path = resolved_path
         self.torch_seed = int(torch_seed)
+        self.worker_slot = int(worker_slot)
+        self.worker_id = f"gpu:{self.worker_slot}"
+        self.device_label = f"cuda:{self.worker_slot}"
         torch.manual_seed(self.torch_seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed(self.torch_seed)
@@ -210,11 +213,12 @@ class ModelWorker:
         self.num_requests = 0
         self.num_batches = 0
         logger.info(
-            "ModelWorker init done: model_path=%s device=%s padding_side=%s torch_seed=%d",
+            "ModelWorker init done: model_path=%s device=%s padding_side=%s torch_seed=%d worker_id=%s",
             self.model_path,
             next(self.model.parameters()).device,
             self.tokenizer.padding_side,
             self.torch_seed,
+            self.worker_id,
         )
 
     def warmup(self) -> dict[str, Any]:
@@ -224,6 +228,8 @@ class ModelWorker:
             "device": device,
             "padding_side": self.tokenizer.padding_side,
             "torch_seed": self.torch_seed,
+            "worker_id": self.worker_id,
+            "worker_slot": self.worker_slot,
         }
 
     @torch.no_grad()
@@ -235,7 +241,11 @@ class ModelWorker:
         if not requests:
             return {
                 "results": [],
-                "worker_batch_profile": _create_worker_batch_profile(batch_size=0),
+                "worker_batch_profile": {
+                    **_create_worker_batch_profile(batch_size=0),
+                    "gpu_worker_id": self.worker_id,
+                    "gpu_device": self.device_label,
+                },
             }
         inference_start = time.time()
         perf_start = time.perf_counter()
@@ -243,7 +253,12 @@ class ModelWorker:
             results, worker_batch_profile = self._generate_batch_with_fallback(requests)
         finally:
             inference_time_s = time.time() - inference_start
+        worker_finished_at_unix_s = time.time()
         worker_batch_profile["worker_inference_time_s"] = time.perf_counter() - perf_start
+        worker_batch_profile["gpu_worker_id"] = self.worker_id
+        worker_batch_profile["gpu_device"] = self.device_label
+        worker_batch_profile["worker_started_at_unix_s"] = inference_start
+        worker_batch_profile["worker_finished_at_unix_s"] = worker_finished_at_unix_s
         batch_size = len(requests)
         self.num_requests += batch_size
         self.num_batches += 1
@@ -299,6 +314,9 @@ class ModelWorker:
     def stats(self) -> dict[str, Any]:
         return {
             "model_path": self.model_path,
+            "worker_id": self.worker_id,
+            "worker_slot": self.worker_slot,
+            "device": self.device_label,
             "num_requests": self.num_requests,
             "num_batches": self.num_batches,
             "avg_batch_size": (self.num_requests / self.num_batches) if self.num_batches else 0.0,

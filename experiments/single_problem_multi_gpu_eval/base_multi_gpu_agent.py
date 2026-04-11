@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import deque
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait as futures_wait
 import logging
+import threading
 import time
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any
@@ -189,6 +190,30 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         self._last_scheduler_trace_at = now
         self._trace("scheduler_state", **state)
 
+    def _trace_ddar_result(self, *, depth: int, future_meta: dict[str, Any], ddar_result: dict[str, Any]) -> None:
+        self._trace(
+            "ddar_result",
+            attempt_key=future_meta["attempt_key"],
+            node_id=future_meta["node_id"],
+            parent_node_id=future_meta["parent_node_id"],
+            depth=depth,
+            status=ddar_result.get("status"),
+            elapsed_time=ddar_result.get("elapsed_time"),
+            ddar_build_work_time_s=ddar_result.get("ddar_build_work_time_s"),
+            ddar_engine_work_time_s=ddar_result.get("ddar_engine_work_time_s"),
+            ddar_worker_id=ddar_result.get("ddar_worker_id"),
+            ddar_started_at_unix_s=ddar_result.get("ddar_started_at_unix_s"),
+            ddar_finished_at_unix_s=ddar_result.get("ddar_finished_at_unix_s"),
+            ddar_build_started_at_unix_s=ddar_result.get("ddar_build_started_at_unix_s"),
+            ddar_build_finished_at_unix_s=ddar_result.get("ddar_build_finished_at_unix_s"),
+            ddar_engine_started_at_unix_s=ddar_result.get("ddar_engine_started_at_unix_s"),
+            ddar_engine_finished_at_unix_s=ddar_result.get("ddar_engine_finished_at_unix_s"),
+            error_type=ddar_result.get("error_type"),
+            error_message=ddar_result.get("error_message"),
+            problem_text=ddar_result.get("problem_text"),
+            ddar_input=ddar_result.get("ddar_input"),
+        )
+
     def _handle_ddar_done(
         self,
         *,
@@ -220,40 +245,12 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             add_profiling_time(profiling, "ddar_engine_work_time_s", ddar_result.get("ddar_engine_work_time_s"))
 
             if ddar_result["status"] == "invalid":
-                self._trace(
-                    "ddar_result",
-                    attempt_key=future_meta["attempt_key"],
-                    node_id=future_meta["node_id"],
-                    parent_node_id=future_meta["parent_node_id"],
-                    depth=depth,
-                    status=ddar_result["status"],
-                    elapsed_time=ddar_result.get("elapsed_time"),
-                    ddar_build_work_time_s=ddar_result.get("ddar_build_work_time_s"),
-                    ddar_engine_work_time_s=ddar_result.get("ddar_engine_work_time_s"),
-                    error_type=ddar_result.get("error_type"),
-                    error_message=ddar_result.get("error_message"),
-                    problem_text=ddar_result.get("problem_text"),
-                    ddar_input=ddar_result.get("ddar_input"),
-                )
+                self._trace_ddar_result(depth=depth, future_meta=future_meta, ddar_result=ddar_result)
                 continue
 
             if ddar_result["status"] == "solved":
                 self._cancel_ddar_futures(running_futures, future_info)
-                self._trace(
-                    "ddar_result",
-                    attempt_key=future_meta["attempt_key"],
-                    node_id=future_meta["node_id"],
-                    parent_node_id=future_meta["parent_node_id"],
-                    depth=depth,
-                    status=ddar_result["status"],
-                    elapsed_time=ddar_result.get("elapsed_time"),
-                    ddar_build_work_time_s=ddar_result.get("ddar_build_work_time_s"),
-                    ddar_engine_work_time_s=ddar_result.get("ddar_engine_work_time_s"),
-                    error_type=ddar_result.get("error_type"),
-                    error_message=ddar_result.get("error_message"),
-                    problem_text=ddar_result.get("problem_text"),
-                    ddar_input=ddar_result.get("ddar_input"),
-                )
+                self._trace_ddar_result(depth=depth, future_meta=future_meta, ddar_result=ddar_result)
                 handle_elapsed_s = time.perf_counter() - handle_start
                 add_profiling_time(profiling, "ddar_result_handle_wall_time_s", handle_elapsed_s)
                 return self._build_info_payload(
@@ -266,21 +263,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     runtime_s=runtime_s,
                 )
 
-            self._trace(
-                "ddar_result",
-                attempt_key=future_meta["attempt_key"],
-                node_id=future_meta["node_id"],
-                parent_node_id=future_meta["parent_node_id"],
-                depth=depth,
-                status=ddar_result["status"],
-                elapsed_time=ddar_result.get("elapsed_time"),
-                ddar_build_work_time_s=ddar_result.get("ddar_build_work_time_s"),
-                ddar_engine_work_time_s=ddar_result.get("ddar_engine_work_time_s"),
-                error_type=ddar_result.get("error_type"),
-                error_message=ddar_result.get("error_message"),
-                problem_text=ddar_result.get("problem_text"),
-                ddar_input=ddar_result.get("ddar_input"),
-            )
+            self._trace_ddar_result(depth=depth, future_meta=future_meta, ddar_result=ddar_result)
             if depth < self.search_depth - 1:
                 next_state_start = time.perf_counter()
                 next_state = self.make_next_state_from_unsolved_ddar(
@@ -385,12 +368,22 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         proof: ProofState,
         depth: int,
     ) -> dict[str, Any]:
-        return self.prepare_request(
+        prepare_started_at_unix_s = time.time()
+        request = self.prepare_request(
             request_id=request_id,
             state=state,
             proof=proof,
             depth=depth,
         )
+        prepare_finished_at_unix_s = time.time()
+        return {
+            "request": request,
+            "trace": {
+                "prepare_worker_id": threading.current_thread().name,
+                "prepare_started_at_unix_s": prepare_started_at_unix_s,
+                "prepare_finished_at_unix_s": prepare_finished_at_unix_s,
+            },
+        }
 
     def _submit_prepare_request(
         self,
@@ -467,7 +460,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             request_id = future_meta["request_id"]
             request_state = request_meta.get(request_id)
             try:
-                request = future.result()
+                prepare_payload = future.result()
             except Exception as exc:
                 logger.warning(
                     "Prepare request failed: request_id=%s depth=%s error=%s",
@@ -480,6 +473,8 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
 
             if request_state is None:
                 continue
+            request = prepare_payload["request"]
+            prepare_trace = dict(prepare_payload.get("trace", {}))
             request["depth"] = future_meta["depth"]
             request_built_at_perf_s = time.perf_counter()
             request_state["request_built_at_perf_s"] = request_built_at_perf_s
@@ -491,11 +486,20 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             )
             increment_profiling_count(profiling, "prepare_request_completed_count")
             self._trace(
+                "prepare_request_started",
+                node_id=future_meta["node_id"],
+                parent_node_id=future_meta["parent_node_id"],
+                depth=future_meta["depth"],
+                request_id=request_id,
+                **prepare_trace,
+            )
+            self._trace(
                 "prepare_request_ready",
                 node_id=future_meta["node_id"],
                 parent_node_id=future_meta["parent_node_id"],
                 depth=future_meta["depth"],
                 request_id=request_id,
+                **prepare_trace,
             )
             self._trace(
                 "model_request",
@@ -577,9 +581,12 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 depth=depth,
                 request_ids=event.get("request_ids", []),
                 batch_size=event.get("batch_size"),
+                gpu_worker_id=event.get("gpu_worker_id"),
+                gpu_device=event.get("gpu_device"),
                 dispatcher_profile={
                     "request_queue_time_s_sum": event.get("request_queue_time_s_sum"),
                     "submitted_at": event.get("submitted_at"),
+                    "submitted_at_unix_s": event.get("submitted_at_unix_s"),
                 },
                 worker_batch_profile=None,
             )
@@ -617,6 +624,8 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             depth=depth,
             request_ids=gpu_batch_payload.get("request_ids", []),
             batch_size=batch_size,
+            gpu_worker_id=worker_batch_profile.get("gpu_worker_id") or dispatcher_profile.get("gpu_worker_id"),
+            gpu_device=worker_batch_profile.get("gpu_device") or dispatcher_profile.get("gpu_device"),
             dispatcher_profile=dispatcher_profile,
             worker_batch_profile=worker_batch_profile,
         )
@@ -758,6 +767,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         while pending_ddar_submit and len(running_futures) < self.max_pending_ddar:
             candidate_meta = pending_ddar_submit.popleft()
             candidate_meta["ddar_submitted_at_perf_s"] = time.perf_counter()
+            candidate_meta["ddar_submitted_at_unix_s"] = time.time()
             self._trace(
                 "candidate_transition",
                 attempt_key=candidate_meta["attempt_key"],
@@ -781,6 +791,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 depth=depth,
                 problem_text=str(candidate_meta["problem"]),
                 ddar_input=None,
+                ddar_submitted_at_unix_s=candidate_meta["ddar_submitted_at_unix_s"],
             )
             future = run_ddar_remote.remote(
                 candidate_meta["problem"],
@@ -843,9 +854,23 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             problem_text=str(self.problemJGEX),
             ddar_input=proof_to_ddar_input(base_proof),
         )
+        base_ddar_started_at_unix_s = time.time()
         ddar_start = time.perf_counter()
         base_solved = self.run_ddar_c(base_proof, rules, t0, timeout)
-        add_profiling_time(profiling, "base_ddar_wall_time_s", time.perf_counter() - ddar_start)
+        base_ddar_elapsed_s = time.perf_counter() - ddar_start
+        add_profiling_time(profiling, "base_ddar_wall_time_s", base_ddar_elapsed_s)
+        base_ddar_finished_at_unix_s = time.time()
+        base_ddar_trace = {
+            "ddar_worker_id": "ddar:base_main",
+            "ddar_started_at_unix_s": base_ddar_started_at_unix_s,
+            "ddar_finished_at_unix_s": base_ddar_finished_at_unix_s,
+            "ddar_build_work_time_s": 0.0,
+            "ddar_engine_work_time_s": base_ddar_finished_at_unix_s - base_ddar_started_at_unix_s,
+            "ddar_build_started_at_unix_s": base_ddar_started_at_unix_s,
+            "ddar_build_finished_at_unix_s": base_ddar_started_at_unix_s,
+            "ddar_engine_started_at_unix_s": base_ddar_started_at_unix_s,
+            "ddar_engine_finished_at_unix_s": base_ddar_finished_at_unix_s,
+        }
         if base_solved:
             self._trace(
                 "ddar_result",
@@ -859,6 +884,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 error_message=None,
                 problem_text=str(self.problemJGEX),
                 ddar_input=proof_to_ddar_input(base_proof),
+                **base_ddar_trace,
             )
             logger.info("Agent base DDAR solved problem before search")
             return self._build_info_payload(
@@ -881,6 +907,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             error_message=None,
             problem_text=str(self.problemJGEX),
             ddar_input=proof_to_ddar_input(base_proof),
+            **base_ddar_trace,
         )
         logger.debug("Agent base DDAR unsolved; entering search")
 
@@ -888,7 +915,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         beam_queue = BeamQueue(max_size=self.beam_size)
         beam_queue.add(node=(0, None, (), self.seed_state(proof, base_proof)), val=0.0, stable_key=())
 
-        with ThreadPoolExecutor(max_workers=self.prepare_request_workers) as prepare_executor:
+        with ThreadPoolExecutor(max_workers=self.prepare_request_workers, thread_name_prefix="prepare") as prepare_executor:
             # Search stays depth-by-depth to preserve the beam semantics. Within
             # one depth we pipeline request preparation, GPU inference, and DDAR
             # validation so CPU and GPU resources can overlap useful work.

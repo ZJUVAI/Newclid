@@ -471,8 +471,13 @@ class _BaseVisionWorker:
         perf_start: float,
         inference_start: float,
     ) -> dict[str, Any]:
-        inference_time_s = time.time() - inference_start
+        worker_finished_at_unix_s = time.time()
+        inference_time_s = worker_finished_at_unix_s - inference_start
         worker_batch_profile["worker_inference_time_s"] = time.perf_counter() - perf_start
+        worker_batch_profile["gpu_worker_id"] = self.worker_id
+        worker_batch_profile["gpu_device"] = self.device_label
+        worker_batch_profile["worker_started_at_unix_s"] = inference_start
+        worker_batch_profile["worker_finished_at_unix_s"] = worker_finished_at_unix_s
         batch_size = len(requests)
         self.num_requests += batch_size
         self.num_batches += 1
@@ -488,6 +493,9 @@ class _BaseVisionWorker:
         return {
             "model_path": self.model_path,
             "agent_kind": self.agent_kind,
+            "worker_id": self.worker_id,
+            "worker_slot": self.worker_slot,
+            "device": self.device_label,
             "num_requests": self.num_requests,
             "num_batches": self.num_batches,
             "avg_batch_size": (self.num_requests / self.num_batches) if self.num_batches else 0.0,
@@ -496,21 +504,25 @@ class _BaseVisionWorker:
 
 @ray.remote(num_cpus=1, num_gpus=1, max_concurrency=1)
 class VisionModelWorker(_BaseVisionWorker):
-    def __init__(self, model_path: str, agent_kind: str, torch_seed: int = 123):
+    def __init__(self, model_path: str, agent_kind: str, torch_seed: int = 123, worker_slot: int = 0):
         resolved_path = resolve_model_path(model_path)
         self.model_path = resolved_path
         self.agent_kind = agent_kind
         self.runtime = "transformers"
         self.torch_seed = int(torch_seed)
+        self.worker_slot = int(worker_slot)
+        self.worker_id = f"gpu:{self.worker_slot}"
+        self.device_label = f"cuda:{self.worker_slot}"
         torch.manual_seed(self.torch_seed)
         if torch.cuda.is_available():
             torch.cuda.manual_seed(self.torch_seed)
             torch.cuda.manual_seed_all(self.torch_seed)
         logger.info(
-            "VisionModelWorker init start: agent_kind=%s model_path=%s torch_seed=%d",
+            "VisionModelWorker init start: agent_kind=%s model_path=%s torch_seed=%d worker_id=%s",
             agent_kind,
             resolved_path,
             self.torch_seed,
+            self.worker_id,
         )
         if agent_kind == "vlm":
             self.model = Qwen3VLForConditionalGeneration.from_pretrained(
@@ -538,11 +550,12 @@ class VisionModelWorker(_BaseVisionWorker):
         self.num_requests = 0
         self.num_batches = 0
         logger.info(
-            "VisionModelWorker init done: agent_kind=%s model_device=%s padding_side=%s torch_seed=%d",
+            "VisionModelWorker init done: agent_kind=%s model_device=%s padding_side=%s torch_seed=%d worker_id=%s",
             agent_kind,
             next(self.model.parameters()).device,
             self.processor.tokenizer.padding_side,
             self.torch_seed,
+            self.worker_id,
         )
 
     def warmup(self) -> dict[str, Any]:
@@ -554,6 +567,8 @@ class VisionModelWorker(_BaseVisionWorker):
             "padding_side": self.processor.tokenizer.padding_side,
             "torch_seed": self.torch_seed,
             "runtime": self.runtime,
+            "worker_id": self.worker_id,
+            "worker_slot": self.worker_slot,
         }
 
     @torch.no_grad()
@@ -565,7 +580,11 @@ class VisionModelWorker(_BaseVisionWorker):
         if not requests:
             return {
                 "results": [],
-                "worker_batch_profile": _create_worker_batch_profile(batch_size=0),
+                "worker_batch_profile": {
+                    **_create_worker_batch_profile(batch_size=0),
+                    "gpu_worker_id": self.worker_id,
+                    "gpu_device": self.device_label,
+                },
             }
         logger.debug(
             "VisionModelWorker generate_batch start: agent_kind=%s batch_size=%d request_ids=%s",
@@ -671,6 +690,7 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
         model_path: str,
         agent_kind: str,
         torch_seed: int = 123,
+        worker_slot: int = 0,
         *,
         gpu_memory_utilization: float = 0.90,
         max_num_seqs: int = 128,
@@ -690,6 +710,9 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
         self.agent_kind = agent_kind
         self.runtime = "vllm"
         self.torch_seed = int(torch_seed)
+        self.worker_slot = int(worker_slot)
+        self.worker_id = f"gpu:{self.worker_slot}"
+        self.device_label = f"cuda:{self.worker_slot}"
         self.gpu_memory_utilization = float(gpu_memory_utilization)
         self.configured_max_num_seqs = int(max_num_seqs)
         self.gpu_batch_size = int(gpu_batch_size)
@@ -713,7 +736,7 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
             torch.cuda.manual_seed(self.torch_seed)
             torch.cuda.manual_seed_all(self.torch_seed)
         logger.info(
-            "VLLMVisionModelWorker init start: agent_kind=%s model_path=%s torch_seed=%d gpu_memory_utilization=%.2f configured_max_num_seqs=%d effective_max_num_seqs=%d max_logprobs=%d gpu_batch_size=%d decoding_size=%d enforce_eager=%s generation_mode=%s sampling_temperature=%.3f sampling_top_p=%.3f",
+            "VLLMVisionModelWorker init start: agent_kind=%s model_path=%s torch_seed=%d gpu_memory_utilization=%.2f configured_max_num_seqs=%d effective_max_num_seqs=%d max_logprobs=%d gpu_batch_size=%d decoding_size=%d enforce_eager=%s generation_mode=%s sampling_temperature=%.3f sampling_top_p=%.3f worker_id=%s",
             agent_kind,
             resolved_path,
             self.torch_seed,
@@ -727,6 +750,7 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
             self.generation_mode,
             self.sampling_temperature,
             self.sampling_top_p,
+            self.worker_id,
         )
         llm_cls, beam_search_params_cls, sampling_params_cls, get_beam_search_score = _load_vllm_modules()
         self.llm = llm_cls(
@@ -749,11 +773,12 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
         self.num_batches = 0
         self._warmup_profile: dict[str, Any] | None = None
         logger.info(
-            "VLLMVisionModelWorker init done: agent_kind=%s padding_side=%s torch_seed=%d distributed_executor_backend=%s",
+            "VLLMVisionModelWorker init done: agent_kind=%s padding_side=%s torch_seed=%d distributed_executor_backend=%s worker_id=%s",
             agent_kind,
             self.processor.tokenizer.padding_side,
             self.torch_seed,
             self.vllm_distributed_executor_backend,
+            self.worker_id,
         )
 
     def warmup(self) -> dict[str, Any]:
@@ -775,6 +800,8 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
             "sampling_temperature": self.sampling_temperature,
             "sampling_top_p": self.sampling_top_p,
             "distributed_executor_backend": self.vllm_distributed_executor_backend,
+            "worker_id": self.worker_id,
+            "worker_slot": self.worker_slot,
         }
         if self._warmup_profile is None:
             self._warmup_profile = self._run_warmup_request()
@@ -819,7 +846,11 @@ class VLLMVisionModelWorker(_BaseVisionWorker):
         if not requests:
             return {
                 "results": [],
-                "worker_batch_profile": _create_worker_batch_profile(batch_size=0),
+                "worker_batch_profile": {
+                    **_create_worker_batch_profile(batch_size=0),
+                    "gpu_worker_id": self.worker_id,
+                    "gpu_device": self.device_label,
+                },
             }
         logger.debug(
             "VLLMVisionModelWorker generate_batch start: agent_kind=%s batch_size=%d request_ids=%s",

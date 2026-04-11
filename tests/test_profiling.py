@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import csv
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from collections import deque
 
 from newclid.profiling import (
@@ -342,6 +342,55 @@ def test_trace_scheduler_state_logs_on_change() -> None:
     assert payload["running_ddar"] == 1
 
 
+def test_poll_prepare_futures_traces_real_prepare_worker_metadata() -> None:
+    trace_writer = _TraceWriter()
+    profiling = create_profiling_payload()
+    agent = _DummyAgent(
+        model_pool=None,
+        decoding_size=1,
+        beam_size=1,
+        search_depth=1,
+        agent_type="dummy",
+        trace_writer=trace_writer,
+    )
+    future = Future()
+    future.set_result(
+        {
+            "request": {"request_id": "d0_proot"},
+            "trace": {
+                "prepare_worker_id": "prepare_0",
+                "prepare_started_at_unix_s": 10.0,
+                "prepare_finished_at_unix_s": 10.3,
+            },
+        }
+    )
+    running_prepare_futures = {
+        future: {
+            "request_id": "d0_proot",
+            "node_id": 0,
+            "parent_node_id": None,
+            "depth": 0,
+            "submitted_at_perf_s": time.perf_counter() - 0.05,
+        }
+    }
+    request_meta = {"d0_proot": {"state": None}}
+    prepared_requests = deque()
+
+    progressed = agent._poll_prepare_futures(
+        running_prepare_futures=running_prepare_futures,
+        request_meta=request_meta,
+        prepared_requests=prepared_requests,
+        profiling=profiling,
+    )
+
+    assert progressed is True
+    assert prepared_requests[0]["request_id"] == "d0_proot"
+    assert trace_writer.records[0][0] == "prepare_request_started"
+    assert trace_writer.records[0][1]["prepare_worker_id"] == "prepare_0"
+    assert trace_writer.records[1][0] == "prepare_request_ready"
+    assert trace_writer.records[1][1]["prepare_finished_at_unix_s"] == 10.3
+
+
 def test_path_key_helpers_produce_stable_child_keys_and_request_ids() -> None:
     agent = _DummyAgent(
         model_pool=None,
@@ -388,7 +437,21 @@ def test_ddar_result_handle_breaks_out_non_overlapping_substages(monkeypatch) ->
     def fake_ray_get(ref):
         assert ref is done_ref
         time.sleep(0.01)
-        return {"status": "unsolved", "proof": "proof", "elapsed_time": 0.1, "ddar_input": None}
+        return {
+            "status": "unsolved",
+            "proof": "proof",
+            "elapsed_time": 0.1,
+            "ddar_input": None,
+            "ddar_build_work_time_s": 0.02,
+            "ddar_engine_work_time_s": 0.03,
+            "ddar_worker_id": "127.0.0.1:9999",
+            "ddar_started_at_unix_s": 20.0,
+            "ddar_finished_at_unix_s": 20.1,
+            "ddar_build_started_at_unix_s": 20.0,
+            "ddar_build_finished_at_unix_s": 20.02,
+            "ddar_engine_started_at_unix_s": 20.02,
+            "ddar_engine_finished_at_unix_s": 20.05,
+        }
 
     monkeypatch.setattr(
         "experiments.single_problem_multi_gpu_eval.base_multi_gpu_agent.ray.get",
@@ -436,3 +499,42 @@ def test_ddar_result_handle_breaks_out_non_overlapping_substages(monkeypatch) ->
         + profiling["ddar_result_queue_wall_time_s"]
         <= profiling["ddar_result_handle_wall_time_s"]
     )
+
+
+def test_trace_ddar_result_includes_worker_timestamps() -> None:
+    trace_writer = _TraceWriter()
+    agent = _DummyAgent(
+        model_pool=None,
+        decoding_size=1,
+        beam_size=1,
+        search_depth=1,
+        agent_type="dummy",
+        trace_writer=trace_writer,
+    )
+
+    agent._trace_ddar_result(
+        depth=2,
+        future_meta={"attempt_key": "a0", "node_id": 1, "parent_node_id": 0},
+        ddar_result={
+            "status": "unsolved",
+            "elapsed_time": 0.1,
+            "ddar_build_work_time_s": 0.02,
+            "ddar_engine_work_time_s": 0.03,
+            "ddar_worker_id": "127.0.0.1:4321",
+            "ddar_started_at_unix_s": 30.0,
+            "ddar_finished_at_unix_s": 30.1,
+            "ddar_build_started_at_unix_s": 30.0,
+            "ddar_build_finished_at_unix_s": 30.02,
+            "ddar_engine_started_at_unix_s": 30.02,
+            "ddar_engine_finished_at_unix_s": 30.05,
+            "ddar_input": None,
+            "problem_text": "problem",
+            "error_type": None,
+            "error_message": None,
+        },
+    )
+
+    event, payload = trace_writer.records[0]
+    assert event == "ddar_result"
+    assert payload["ddar_worker_id"] == "127.0.0.1:4321"
+    assert payload["ddar_engine_finished_at_unix_s"] == 30.05

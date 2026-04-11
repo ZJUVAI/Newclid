@@ -120,6 +120,7 @@ class GenerationDispatcherTests(unittest.TestCase):
         self.assertEqual(len(events), 1)
         self.assertEqual(events[0]["request_ids"], ["r0", "r1"])
         self.assertEqual(events[0]["batch_size"], 2)
+        self.assertEqual(events[0]["gpu_worker_id"], "w0")
         self.assertEqual(dispatcher.take_submission_events(), [])
 
     def test_generation_dispatcher_groups_only_compatible_requests(self):
@@ -304,6 +305,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                 )
 
         self.assertEqual(len(workers), 3)
+        self.assertEqual([worker.worker_trace_id for worker in workers], ["gpu:0", "gpu:1", "gpu:2"])
         self.assertEqual(
             warmup_infos,
             [

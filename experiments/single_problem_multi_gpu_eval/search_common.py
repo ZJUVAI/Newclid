@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import time
 from fractions import Fraction
 from typing import TYPE_CHECKING, Any
@@ -125,6 +126,8 @@ def run_ddar_remote(
     # are not main-thread wall-clock timings and can legitimately sum to more
     # than the end-to-end runtime when many DDAR tasks run in parallel.
     eval_start = time.time()
+    ddar_worker_id = f"{ray.util.get_node_ip_address()}:{os.getpid()}"
+    ddar_started_at_unix_s = eval_start
     ddar_build_work_time_s = 0.0
     try:
         build_start = time.time()
@@ -135,12 +138,21 @@ def run_ddar_remote(
             max_attempts=100,
             only_useful_points=False,
         )
-        ddar_build_work_time_s = time.time() - build_start
+        ddar_build_finished_at_unix_s = time.time()
+        ddar_build_work_time_s = ddar_build_finished_at_unix_s - build_start
     except Exception as exc:
+        ddar_finished_at_unix_s = time.time()
         result = {
             "status": "invalid",
-            "elapsed_time": time.time() - eval_start,
-            "ddar_build_work_time_s": time.time() - build_start,
+            "elapsed_time": ddar_finished_at_unix_s - eval_start,
+            "ddar_worker_id": ddar_worker_id,
+            "ddar_started_at_unix_s": ddar_started_at_unix_s,
+            "ddar_finished_at_unix_s": ddar_finished_at_unix_s,
+            "ddar_build_started_at_unix_s": build_start,
+            "ddar_build_finished_at_unix_s": ddar_finished_at_unix_s,
+            "ddar_engine_started_at_unix_s": None,
+            "ddar_engine_finished_at_unix_s": None,
+            "ddar_build_work_time_s": ddar_finished_at_unix_s - build_start,
             "ddar_engine_work_time_s": 0.0,
             "error_type": classify_build_exception(exc),
             "error_message": str(exc),
@@ -155,13 +167,22 @@ def run_ddar_remote(
         ddar_start = time.time()
         del rules, start_time, timeout
         solved, _ = DDAR.run_ddar("", points, premises, goals, 500, True, True)
-        ddar_engine_work_time_s = time.time() - ddar_start
+        ddar_engine_finished_at_unix_s = time.time()
+        ddar_engine_work_time_s = ddar_engine_finished_at_unix_s - ddar_start
     except Exception as exc:
+        ddar_finished_at_unix_s = time.time()
         result = {
             "status": "invalid",
-            "elapsed_time": time.time() - eval_start,
+            "elapsed_time": ddar_finished_at_unix_s - eval_start,
+            "ddar_worker_id": ddar_worker_id,
+            "ddar_started_at_unix_s": ddar_started_at_unix_s,
+            "ddar_finished_at_unix_s": ddar_finished_at_unix_s,
+            "ddar_build_started_at_unix_s": build_start,
+            "ddar_build_finished_at_unix_s": ddar_build_finished_at_unix_s,
+            "ddar_engine_started_at_unix_s": ddar_start,
+            "ddar_engine_finished_at_unix_s": ddar_finished_at_unix_s,
             "ddar_build_work_time_s": ddar_build_work_time_s,
-            "ddar_engine_work_time_s": time.time() - ddar_start,
+            "ddar_engine_work_time_s": ddar_finished_at_unix_s - ddar_start,
             "error_type": "engine_error",
             "error_message": str(exc),
             "problem_text": str(problem),
@@ -175,9 +196,17 @@ def run_ddar_remote(
             result["proof"] = None
         return result
 
+    ddar_finished_at_unix_s = time.time()
     result = {
         "status": "solved" if solved else "unsolved",
-        "elapsed_time": time.time() - eval_start,
+        "elapsed_time": ddar_finished_at_unix_s - eval_start,
+        "ddar_worker_id": ddar_worker_id,
+        "ddar_started_at_unix_s": ddar_started_at_unix_s,
+        "ddar_finished_at_unix_s": ddar_finished_at_unix_s,
+        "ddar_build_started_at_unix_s": build_start,
+        "ddar_build_finished_at_unix_s": ddar_build_finished_at_unix_s,
+        "ddar_engine_started_at_unix_s": ddar_start,
+        "ddar_engine_finished_at_unix_s": ddar_engine_finished_at_unix_s,
         "ddar_build_work_time_s": ddar_build_work_time_s,
         "ddar_engine_work_time_s": ddar_engine_work_time_s,
         "problem_text": str(problem),

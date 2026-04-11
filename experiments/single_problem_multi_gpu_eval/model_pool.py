@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import deque
+from dataclasses import dataclass
 import logging
 import time
 from typing import Any
@@ -9,6 +10,16 @@ import ray
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class WorkerHandleWrapper:
+    handle: Any
+    worker_trace_id: str
+    worker_device: str | None = None
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.handle, name)
 
 
 def _request_group_key(request: dict[str, Any]) -> tuple[Any, ...]:
@@ -130,6 +141,7 @@ class GenerationDispatcher:
                 return
             worker = self.idle_workers.popleft()
             submit_time = time.perf_counter()
+            submit_time_unix_s = time.time()
             request_ids = [request.get("request_id", "<missing>") for request in batch]
             request_queue_time_s_sum = 0.0
             for request_id in request_ids:
@@ -149,14 +161,20 @@ class GenerationDispatcher:
                 "request_ids": request_ids,
                 "batch_size": len(batch),
                 "submitted_at": submit_time,
+                "submitted_at_unix_s": submit_time_unix_s,
                 "request_queue_time_s_sum": request_queue_time_s_sum,
+                "gpu_worker_id": getattr(worker, "worker_trace_id", getattr(worker, "name", None)),
+                "gpu_device": getattr(worker, "worker_device", None),
             }
             self.completed_submission_events.append(
                 {
                     "request_ids": request_ids,
                     "batch_size": len(batch),
                     "submitted_at": submit_time,
+                    "submitted_at_unix_s": submit_time_unix_s,
                     "request_queue_time_s_sum": request_queue_time_s_sum,
+                    "gpu_worker_id": getattr(worker, "worker_trace_id", getattr(worker, "name", None)),
+                    "gpu_device": getattr(worker, "worker_device", None),
                 }
             )
 
@@ -212,6 +230,9 @@ class GenerationDispatcher:
                 "request_queue_time_s_sum": running_meta["request_queue_time_s_sum"],
                 "batch_round_trip_time_s": done_time - running_meta["submitted_at"],
                 "batch_result_ray_get_time_s": ray_get_elapsed_s,
+                "submitted_at_unix_s": running_meta["submitted_at_unix_s"],
+                "gpu_worker_id": running_meta["gpu_worker_id"],
+                "gpu_device": running_meta["gpu_device"],
                 "batch_oldest_request_wait_time_s": max(
                     (
                         done_time - running_meta["submitted_at"] + running_meta["request_queue_time_s_sum"]
