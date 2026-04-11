@@ -512,9 +512,7 @@ void Matcher::on_cyclic(const Cyclic &cyclic)
 {
     for (const auto &rotated : cyclic.permutation())
     {
-        #ifndef DDAR_WEAK
             insert_theorem(Theorem::cyclic_of_equal_angles(rotated));
-        #endif 
             insert_theorem(Theorem::cyclic_properties(cyclic));
     }
 }
