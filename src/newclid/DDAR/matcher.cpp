@@ -319,19 +319,12 @@ void Matcher::match_between()
             insert_theorem(Theorem::eqpoints_of_same_ratio_on_line(p1, p2, a, b));
             for (size_t j = i + 1; j < candidates.size(); ++j)
             {
-                const auto &cand1 = candidates[i];
-                const auto &cand2 = candidates[j];
-                double angle1 = std::get<0>(cand1);
-                double angle2 = std::get<0>(cand2);
-                // 使用更宽松的精度判断（降低容差 10 倍）
-                if (std::fabs(angle1 - angle2) < 4e-7 || std::fabs(angle1 - angle2) / std::max(std::fabs(angle1), std::fabs(angle2)) < 0.01)
+                const Point &c = std::get<1>(candidates[j]);
+                const Point &d = std::get<2>(candidates[j]);
+                if (Coll(a, b, d).check_numerically())
                 {
                     continue;
                 }
-                const Point &a = std::get<1>(cand1);
-                const Point &b = std::get<2>(cand1);
-                const Point &c = std::get<1>(cand2);
-                const Point &d = std::get<2>(cand2);
                 insert_theorem(Theorem::eqpoints_of_same_intersections(p1, p2, a, b, c, d));
             }
         }
@@ -525,7 +518,7 @@ void Matcher::match_equal_angles()
     {
         return;
     }
-    
+
     sort(angles.begin(), angles.end(),
          [](const item_type &a, const item_type &b)
          {
@@ -784,12 +777,20 @@ static vector<string> new_vars(const Stmt &stmt, const Mapping &mapping)
     {
         bool known = false;
         for (const auto &kv : mapping)
-            if (kv.first == arg) { known = true; break; }
+            if (kv.first == arg)
+            {
+                known = true;
+                break;
+            }
         if (!known)
         {
             bool dup = false;
             for (const auto &v : vars)
-                if (v == arg) { dup = true; break; }
+                if (v == arg)
+                {
+                    dup = true;
+                    break;
+                }
             if (!dup)
                 vars.push_back(arg);
         }
@@ -819,7 +820,8 @@ static bool check_stmt_numerically(const Stmt &stmt, const Mapping &mapping, Pro
     try
     {
         auto s = problem->create_statement(stmt.first, real_args);
-        if (!s) return false;
+        if (!s)
+            return false;
         return s->check_numerically();
     }
     catch (...)
@@ -885,11 +887,11 @@ void CustomTheoremMatcher::match_rule(const CustomRule &rule)
 {
     // 按新变量数量升序排列前提，优先匹配约束强的
     vector<Stmt> sorted_premises = rule.premises;
-    sort(sorted_premises.begin(), sorted_premises.end(), [](const Stmt &a, const Stmt &b) {
+    sort(sorted_premises.begin(), sorted_premises.end(), [](const Stmt &a, const Stmt &b)
+         {
         set<string> sa(a.second.begin(), a.second.end());
         set<string> sb(b.second.begin(), b.second.end());
-        return sa.size() < sb.size();
-    });
+        return sa.size() < sb.size(); });
 
     Mapping current;
     vector<Mapping> mappings;
@@ -917,10 +919,15 @@ void CustomTheoremMatcher::match_rule(const CustomRule &rule)
                 else
                     real_args.push_back(arg);
             }
-            try {
+            try
+            {
                 auto s = _problem->create_statement(stmt.first, real_args);
-                if (s) thm.add_hypothesis(move(s));
-            } catch (...) {}
+                if (s)
+                    thm.add_hypothesis(move(s));
+            }
+            catch (...)
+            {
+            }
         }
 
         // 添加结论
@@ -935,10 +942,15 @@ void CustomTheoremMatcher::match_rule(const CustomRule &rule)
                 else
                     real_args.push_back(arg);
             }
-            try {
+            try
+            {
                 auto s = _problem->create_statement(stmt.first, real_args);
-                if (s) thm.add_conclusion(move(s));
-            } catch (...) {}
+                if (s)
+                    thm.add_conclusion(move(s));
+            }
+            catch (...)
+            {
+            }
         }
 
         if (thm.check_numerically())
