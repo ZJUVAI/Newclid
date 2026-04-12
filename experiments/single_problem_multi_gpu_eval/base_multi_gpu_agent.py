@@ -618,6 +618,45 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         add_profiling_time(profiling, "gpu_decode_wall_time_s", worker_batch_profile.get("decode_time_s"))
         add_profiling_time(profiling, "gpu_fallback_wall_time_s", worker_batch_profile.get("fallback_time_s"))
         increment_profiling_count(profiling, "gpu_batch_completed_count")
+        increment_profiling_count(profiling, "gpu_request_completed_count", batch_size)
+        increment_profiling_count(profiling, "gpu_prompt_token_count_sum", worker_batch_profile.get("prompt_token_count_sum"))
+        update_profiling_max(profiling, "gpu_prompt_token_count_max", worker_batch_profile.get("prompt_token_count_max"))
+        increment_profiling_count(
+            profiling,
+            "gpu_generated_token_count_sum",
+            worker_batch_profile.get("generated_token_count_sum"),
+        )
+        update_profiling_max(
+            profiling,
+            "gpu_generated_token_count_max",
+            worker_batch_profile.get("generated_token_count_max"),
+        )
+        increment_profiling_count(
+            profiling,
+            "gpu_generated_sequence_count",
+            worker_batch_profile.get("generated_sequence_count"),
+        )
+        increment_profiling_count(profiling, "gpu_raw_candidate_count", worker_batch_profile.get("raw_candidate_count_sum"))
+        increment_profiling_count(
+            profiling,
+            "gpu_unique_candidate_count",
+            worker_batch_profile.get("unique_candidate_count_sum"),
+        )
+        increment_profiling_count(
+            profiling,
+            "gpu_duplicate_candidate_count",
+            worker_batch_profile.get("duplicate_candidate_count_sum"),
+        )
+        add_profiling_time(
+            profiling,
+            "gpu_first_token_latency_sum_s",
+            worker_batch_profile.get("first_token_latency_sum_s"),
+        )
+        increment_profiling_count(
+            profiling,
+            "gpu_first_token_latency_count",
+            worker_batch_profile.get("first_token_latency_count"),
+        )
 
         self._trace(
             "gpu_batch_done",
@@ -646,12 +685,16 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 }
                 for rank, (aux_dsl, score) in enumerate(gpu_result["aux_dsl_dict"].items())
             ]
+            request_profile = dict(gpu_result.get("request_profile") or {})
             self._trace(
                 "model_response",
                 request_id=request_id,
                 node_id=parent_node_id,
                 depth=depth,
                 outputs=outputs,
+                request_profile=request_profile,
+                inference_time_s=gpu_result.get("inference_time_s"),
+                batch_size=gpu_result.get("batch_size"),
             )
             logger.debug(
                 "Search depth=%d request=%s candidate_count=%d",
@@ -702,6 +745,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     )
                     continue
 
+                increment_profiling_count(profiling, "candidate_parse_success_count")
                 try:
                     new_problem = problem.with_more_construction(aux)
                 except Exception:
@@ -723,6 +767,7 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                     )
                     continue
 
+                increment_profiling_count(profiling, "candidate_build_success_count")
                 child_node_id = next_node_id
                 next_node_id += 1
                 child_path_key = self._child_path_key(parent_path_key, candidate_rank)

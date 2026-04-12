@@ -19,6 +19,10 @@ from transformers.utils import logging as hf_logging
 
 from experiments.single_problem_multi_gpu_eval.batched_decode import decode_batched_continuations
 from experiments.single_problem_multi_gpu_eval.lm_actor import (
+    _accumulate_request_profile,
+    _build_request_profile,
+    _count_generated_tokens,
+    _count_prompt_tokens,
     _create_worker_batch_profile,
     _merge_worker_batch_profiles,
     resolve_model_path,
@@ -99,6 +103,39 @@ def _resolve_visual_stop_tokens(processor, agent_kind: str) -> tuple[int | None,
         pad_token_id = 151643
         eos_token_id = 2587
     return pad_token_id, eos_token_id
+
+
+def _extract_vllm_prompt_token_ids_from_output(output: Any) -> list[int]:
+    prompt_token_ids = list(getattr(output, "prompt_token_ids", []) or [])
+    if prompt_token_ids:
+        return prompt_token_ids
+    for sequence in getattr(output, "sequences", []) or []:
+        orig_prompt = getattr(sequence, "orig_prompt", None) or {}
+        decoder_prompt = orig_prompt.get("decoder_prompt", orig_prompt)
+        prompt_token_ids = list(decoder_prompt.get("prompt_token_ids", []) or [])
+        if prompt_token_ids:
+            return prompt_token_ids
+    for completion in getattr(output, "outputs", []) or []:
+        prompt_token_ids = list(getattr(completion, "prompt_token_ids", []) or [])
+        if prompt_token_ids:
+            return prompt_token_ids
+    return []
+
+
+def _extract_vllm_first_token_latency_s(output: Any) -> float | None:
+    candidates = [getattr(output, "metrics", None)]
+    candidates.extend(getattr(output, "outputs", []) or [])
+    candidates.extend(getattr(output, "sequences", []) or [])
+    for candidate in candidates:
+        metrics = getattr(candidate, "metrics", candidate)
+        arrival_time = getattr(metrics, "arrival_time", None)
+        first_token_time = getattr(metrics, "first_token_time", None)
+        if arrival_time is None or first_token_time is None:
+            continue
+        latency = float(first_token_time) - float(arrival_time)
+        if latency >= 0.0:
+            return latency
+    return None
 
 
 def _build_visual_batch_inputs(
@@ -184,6 +221,16 @@ def generate_visual_aux_dsl_dict_batch(
     )
     profile["generate_time_s"] += time.perf_counter() - generate_start
     scores = generated_output.sequences_scores.tolist()
+    prompt_token_counts = _count_prompt_tokens(model_inputs)
+    generated_token_counts = [
+        _count_generated_tokens(
+            sequence.tolist(),
+            prompt_token_count=prompt_token_counts[index // decoding_size],
+            pad_token_id=pad_token_id,
+            eos_token_id=eos_token_id,
+        )
+        for index, sequence in enumerate(generated_output.sequences)
+    ]
     decode_start = time.perf_counter()
     rebuilt_outputs = decode_batched_continuations(
         requests=requests,
@@ -200,10 +247,18 @@ def generate_visual_aux_dsl_dict_batch(
         end = start + decoding_size
         for aux_dsl, score in zip(aux_dsls, scores[start:end]):
             aux_dsl_dict[aux_dsl] = float(score)
+        request_profile = _build_request_profile(
+            prompt_token_count=prompt_token_counts[index],
+            generated_token_counts=generated_token_counts[start:end],
+            raw_candidate_count=len(aux_dsls),
+            unique_candidate_count=len(aux_dsl_dict),
+        )
+        _accumulate_request_profile(profile, request_profile)
         results.append(
             {
                 "request_id": request["request_id"],
                 "aux_dsl_dict": aux_dsl_dict,
+                "request_profile": request_profile,
             }
         )
     return results, profile
@@ -371,9 +426,22 @@ def _generate_visual_aux_dsl_dict_batch_vllm(
     results: list[dict[str, Any]] = []
     for request, output in zip(requests, beam_outputs):
         aux_dsl_dict: dict[str, float] = {}
+        prompt_token_ids = _extract_vllm_prompt_token_ids_from_output(output)
+        prompt_token_count = len(prompt_token_ids)
+        sequence_token_counts: list[int] = []
+        raw_candidate_count = 0
         for sequence in getattr(output, "sequences", []):
+            raw_candidate_count += 1
             text = _extract_vllm_continuation_text(processor, sequence)
             aux_dsl = f'{request.get("response_prefix", "<aux> x00")} {request["new_point_name"]}{text}'
+            sequence_token_counts.append(
+                _count_generated_tokens(
+                    list(getattr(sequence, "tokens", []) or []),
+                    prompt_token_count=prompt_token_count,
+                    pad_token_id=None,
+                    eos_token_id=eos_token_id,
+                )
+            )
             if aux_dsl in aux_dsl_dict:
                 continue
             aux_dsl_dict[aux_dsl] = _compute_vllm_beam_score(
@@ -381,10 +449,19 @@ def _generate_visual_aux_dsl_dict_batch_vllm(
                 eos_token_id=eos_token_id,
                 get_beam_search_score=get_beam_search_score,
             )
+        request_profile = _build_request_profile(
+            prompt_token_count=prompt_token_count,
+            generated_token_counts=sequence_token_counts,
+            raw_candidate_count=raw_candidate_count,
+            unique_candidate_count=len(aux_dsl_dict),
+            first_token_latency_s=_extract_vllm_first_token_latency_s(output),
+        )
+        _accumulate_request_profile(profile, request_profile)
         results.append(
             {
                 "request_id": request["request_id"],
                 "aux_dsl_dict": aux_dsl_dict,
+                "request_profile": request_profile,
             }
         )
     profile["decode_time_s"] += time.perf_counter() - decode_start
@@ -434,9 +511,19 @@ def _generate_visual_aux_dsl_dict_batch_vllm_sampling(
     results: list[dict[str, Any]] = []
     for request, output in zip(requests, request_outputs):
         scored_candidates: dict[str, float] = {}
+        prompt_token_count = len(_extract_vllm_prompt_token_ids_from_output(output))
+        sequence_token_counts: list[int] = []
         for completion in getattr(output, "outputs", []):
             text = getattr(completion, "text", "") or ""
             aux_dsl = f'{request.get("response_prefix", "<aux> x00")} {request["new_point_name"]}{text}'
+            sequence_token_counts.append(
+                _count_generated_tokens(
+                    list(getattr(completion, "token_ids", []) or []),
+                    prompt_token_count=0,
+                    pad_token_id=None,
+                    eos_token_id=eos_token_id,
+                )
+            )
             score = _normalize_vllm_generate_score(
                 getattr(completion, "token_ids", None),
                 getattr(completion, "cumulative_logprob", None),
@@ -451,10 +538,19 @@ def _generate_visual_aux_dsl_dict_batch_vllm_sampling(
                 key=lambda item: (-item[1], item[0]),
             )
         )
+        request_profile = _build_request_profile(
+            prompt_token_count=prompt_token_count,
+            generated_token_counts=sequence_token_counts,
+            raw_candidate_count=len(getattr(output, "outputs", []) or []),
+            unique_candidate_count=len(ranked_aux_dsl_dict),
+            first_token_latency_s=_extract_vllm_first_token_latency_s(output),
+        )
+        _accumulate_request_profile(profile, request_profile)
         results.append(
             {
                 "request_id": request["request_id"],
                 "aux_dsl_dict": ranked_aux_dsl_dict,
+                "request_profile": request_profile,
             }
         )
     profile["decode_time_s"] += time.perf_counter() - decode_start

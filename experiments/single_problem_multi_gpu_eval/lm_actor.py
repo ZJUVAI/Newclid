@@ -86,6 +86,16 @@ def _create_worker_batch_profile(*, batch_size: int) -> dict[str, Any]:
         "decode_time_s": 0.0,
         "fallback_time_s": 0.0,
         "worker_inference_time_s": 0.0,
+        "prompt_token_count_sum": 0,
+        "prompt_token_count_max": 0,
+        "generated_token_count_sum": 0,
+        "generated_token_count_max": 0,
+        "generated_sequence_count": 0,
+        "raw_candidate_count_sum": 0,
+        "unique_candidate_count_sum": 0,
+        "duplicate_candidate_count_sum": 0,
+        "first_token_latency_sum_s": 0.0,
+        "first_token_latency_count": 0,
         "fallback_mode": "none",
     }
 
@@ -103,13 +113,106 @@ def _merge_worker_batch_profiles(*profiles: dict[str, Any]) -> dict[str, Any]:
             "decode_time_s",
             "fallback_time_s",
             "worker_inference_time_s",
+            "prompt_token_count_sum",
+            "generated_token_count_sum",
+            "generated_sequence_count",
+            "raw_candidate_count_sum",
+            "unique_candidate_count_sum",
+            "duplicate_candidate_count_sum",
+            "first_token_latency_sum_s",
+            "first_token_latency_count",
         ):
             merged[field] += float(profile.get(field, 0.0))
+        for field in (
+            "prompt_token_count_max",
+            "generated_token_count_max",
+        ):
+            merged[field] = max(float(merged.get(field, 0.0)), float(profile.get(field, 0.0)))
         mode = str(profile.get("fallback_mode", "none"))
         if mode != "none":
             fallback_modes.append(mode)
     merged["fallback_mode"] = "+".join(fallback_modes) if fallback_modes else "none"
     return merged
+
+
+def _count_prompt_tokens(model_inputs: dict[str, Any]) -> list[int]:
+    attention_mask = model_inputs.get("attention_mask")
+    if attention_mask is not None:
+        return [int(value) for value in attention_mask.sum(dim=1).tolist()]
+    input_ids = model_inputs.get("input_ids")
+    if input_ids is None:
+        return []
+    return [int(input_ids.shape[1])] * int(input_ids.shape[0])
+
+
+def _count_generated_tokens(
+    sequence_token_ids: list[int],
+    *,
+    prompt_token_count: int,
+    pad_token_id: int | None,
+    eos_token_id: int | None,
+) -> int:
+    if prompt_token_count > 0 and len(sequence_token_ids) >= prompt_token_count:
+        continuation = list(sequence_token_ids[prompt_token_count:])
+    else:
+        continuation = list(sequence_token_ids)
+    if pad_token_id is not None:
+        while continuation and continuation[-1] == pad_token_id:
+            continuation.pop()
+    if eos_token_id is not None and continuation and continuation[-1] == eos_token_id:
+        continuation.pop()
+    return len(continuation)
+
+
+def _build_request_profile(
+    *,
+    prompt_token_count: int,
+    generated_token_counts: list[int],
+    raw_candidate_count: int,
+    unique_candidate_count: int,
+    first_token_latency_s: float | None = None,
+) -> dict[str, Any]:
+    generated_token_count_sum = sum(int(count) for count in generated_token_counts)
+    generated_sequence_count = len(generated_token_counts)
+    duplicate_candidate_count = max(int(raw_candidate_count) - int(unique_candidate_count), 0)
+    request_profile = {
+        "prompt_token_count": int(prompt_token_count),
+        "generated_token_count_sum": int(generated_token_count_sum),
+        "generated_token_count_max": max(generated_token_counts, default=0),
+        "generated_sequence_count": int(generated_sequence_count),
+        "raw_candidate_count": int(raw_candidate_count),
+        "unique_candidate_count": int(unique_candidate_count),
+        "duplicate_candidate_count": int(duplicate_candidate_count),
+        "avg_generated_tokens_per_sequence": (
+            float(generated_token_count_sum) / float(generated_sequence_count)
+            if generated_sequence_count
+            else 0.0
+        ),
+    }
+    if first_token_latency_s is not None:
+        request_profile["first_token_latency_s"] = float(first_token_latency_s)
+    return request_profile
+
+
+def _accumulate_request_profile(worker_batch_profile: dict[str, Any], request_profile: dict[str, Any]) -> None:
+    worker_batch_profile["prompt_token_count_sum"] += int(request_profile.get("prompt_token_count", 0))
+    worker_batch_profile["prompt_token_count_max"] = max(
+        int(worker_batch_profile.get("prompt_token_count_max", 0)),
+        int(request_profile.get("prompt_token_count", 0)),
+    )
+    worker_batch_profile["generated_token_count_sum"] += int(request_profile.get("generated_token_count_sum", 0))
+    worker_batch_profile["generated_token_count_max"] = max(
+        int(worker_batch_profile.get("generated_token_count_max", 0)),
+        int(request_profile.get("generated_token_count_max", 0)),
+    )
+    worker_batch_profile["generated_sequence_count"] += int(request_profile.get("generated_sequence_count", 0))
+    worker_batch_profile["raw_candidate_count_sum"] += int(request_profile.get("raw_candidate_count", 0))
+    worker_batch_profile["unique_candidate_count_sum"] += int(request_profile.get("unique_candidate_count", 0))
+    worker_batch_profile["duplicate_candidate_count_sum"] += int(request_profile.get("duplicate_candidate_count", 0))
+    first_token_latency_s = request_profile.get("first_token_latency_s")
+    if first_token_latency_s is not None:
+        worker_batch_profile["first_token_latency_sum_s"] += float(first_token_latency_s)
+        worker_batch_profile["first_token_latency_count"] += 1
 
 
 def generate_aux_dsl_dict_batch(
@@ -158,6 +261,16 @@ def generate_aux_dsl_dict_batch(
     )
     profile["generate_time_s"] += time.perf_counter() - generate_start
     scores = generated_output.sequences_scores.tolist()
+    prompt_token_counts = _count_prompt_tokens(model_inputs)
+    generated_token_counts = [
+        _count_generated_tokens(
+            sequence.tolist(),
+            prompt_token_count=prompt_token_counts[index // decoding_size],
+            pad_token_id=pad_token_id,
+            eos_token_id=eos_token_id,
+        )
+        for index, sequence in enumerate(generated_output.sequences)
+    ]
     decode_start = time.perf_counter()
     rebuilt_outputs = decode_batched_continuations(
         requests=requests,
@@ -174,10 +287,18 @@ def generate_aux_dsl_dict_batch(
         end = start + decoding_size
         for aux_dsl, score in zip(aux_dsls, scores[start:end]):
             aux_dsl_dict[aux_dsl] = float(score)
+        request_profile = _build_request_profile(
+            prompt_token_count=prompt_token_counts[index],
+            generated_token_counts=generated_token_counts[start:end],
+            raw_candidate_count=len(aux_dsls),
+            unique_candidate_count=len(aux_dsl_dict),
+        )
+        _accumulate_request_profile(profile, request_profile)
         results.append(
             {
                 "request_id": request["request_id"],
                 "aux_dsl_dict": aux_dsl_dict,
+                "request_profile": request_profile,
             }
         )
     return results, profile

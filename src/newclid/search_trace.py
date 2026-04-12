@@ -86,6 +86,7 @@ class AttemptAggregator:
         self.writer = writer
         self.request_context: dict[str, dict[str, Any]] = {}
         self.request_outputs: dict[str, list[dict[str, Any]]] = {}
+        self.request_profiles: dict[str, dict[str, Any]] = {}
         self.pending_attempts: dict[str, dict[str, Any]] = {}
         self.node_to_attempt_key: dict[int, str] = {}
 
@@ -107,6 +108,13 @@ class AttemptAggregator:
 
         if event == "model_response":
             self.request_outputs[record["request_id"]] = list(record.get("outputs", []))
+            self.request_profiles[record["request_id"]] = dict(record.get("request_profile") or {})
+            self.request_context.setdefault(record["request_id"], {}).update(
+                {
+                    "inference_time_s": record.get("inference_time_s"),
+                    "batch_size": record.get("batch_size"),
+                }
+            )
             return
 
         if event == "base_ddar":
@@ -239,6 +247,7 @@ class AttemptAggregator:
         request = self.request_context.get(request_id, {})
         output = {}
         outputs = self.request_outputs.get(request_id, [])
+        request_profile = self.request_profiles.get(request_id, {})
         if candidate_rank is not None and 0 <= candidate_rank < len(outputs):
             output = outputs[candidate_rank]
         return {
@@ -254,6 +263,17 @@ class AttemptAggregator:
             "query": request.get("query"),
             "img_path": request.get("img_path"),
             "new_point_name": request.get("new_point_name"),
+            "request_inference_time_s": request.get("inference_time_s"),
+            "request_batch_size": request.get("batch_size"),
+            "prompt_token_count": request_profile.get("prompt_token_count"),
+            "generated_token_count_sum": request_profile.get("generated_token_count_sum"),
+            "generated_token_count_max": request_profile.get("generated_token_count_max"),
+            "generated_sequence_count": request_profile.get("generated_sequence_count"),
+            "raw_candidate_count": request_profile.get("raw_candidate_count"),
+            "unique_candidate_count": request_profile.get("unique_candidate_count"),
+            "duplicate_candidate_count": request_profile.get("duplicate_candidate_count"),
+            "avg_generated_tokens_per_sequence": request_profile.get("avg_generated_tokens_per_sequence"),
+            "first_token_latency_s": request_profile.get("first_token_latency_s"),
             "raw_aux_text": record.get("raw_aux_text"),
             "translated_aux": record.get("translated_aux"),
             "aux_dsl": output.get("aux_dsl"),

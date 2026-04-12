@@ -66,20 +66,38 @@ def test_finalize_profiling_computes_other_wall_time() -> None:
     add_profiling_time(profiling, "base_ddar_wall_time_s", 0.3)
     add_profiling_time(profiling, "request_prepare_wall_time_s", 0.4)
     add_profiling_time(profiling, "gpu_generate_wall_time_s", 0.2)
+    add_profiling_time(profiling, "gpu_first_token_latency_sum_s", 0.3)
     add_profiling_time(profiling, "wait_wall_time_s", 1.2)
     add_profiling_time(profiling, "gpu_result_handle_wall_time_s", 0.6)
     add_profiling_time(profiling, "ddar_submit_wall_time_s", 0.1)
     add_profiling_time(profiling, "ddar_result_handle_wall_time_s", 0.2)
     add_profiling_time(profiling, "next_frontier_finalize_wall_time_s", 0.3)
     add_profiling_time(profiling, "scheduler_overhead_wall_time_s", 0.4)
+    increment_profiling_count(profiling, "gpu_request_completed_count", 3)
     increment_profiling_count(profiling, "gpu_batch_submitted_count", 2)
     increment_profiling_count(profiling, "gpu_batch_size_sum", 6)
+    increment_profiling_count(profiling, "gpu_prompt_token_count_sum", 30)
+    increment_profiling_count(profiling, "gpu_generated_token_count_sum", 12)
+    increment_profiling_count(profiling, "gpu_generated_sequence_count", 6)
+    increment_profiling_count(profiling, "gpu_raw_candidate_count", 6)
+    increment_profiling_count(profiling, "gpu_unique_candidate_count", 5)
+    increment_profiling_count(profiling, "candidate_parse_success_count", 4)
+    increment_profiling_count(profiling, "candidate_build_success_count", 3)
+    increment_profiling_count(profiling, "gpu_first_token_latency_count", 3)
 
     finalized = finalize_profiling(profiling, 4.0)
 
     assert finalized["total_time_s"] == 4.0
     assert abs(finalized["other_wall_time_s"] - 0.1) < 1e-9
     assert abs(finalized["avg_gpu_batch_size"] - 3.0) < 1e-9
+    assert abs(finalized["avg_prompt_tokens_per_request"] - 10.0) < 1e-9
+    assert abs(finalized["avg_generated_tokens_per_request"] - 4.0) < 1e-9
+    assert abs(finalized["avg_generated_tokens_per_sequence"] - 2.0) < 1e-9
+    assert abs(finalized["generated_tokens_per_gpu_generate_s"] - 60.0) < 1e-9
+    assert abs(finalized["candidate_unique_ratio"] - (5 / 6)) < 1e-9
+    assert abs(finalized["candidate_parse_success_rate"] - 0.8) < 1e-9
+    assert abs(finalized["candidate_build_success_rate"] - 0.75) < 1e-9
+    assert abs(finalized["avg_first_token_latency_s"] - 0.1) < 1e-9
 
 
 def test_finalize_profiling_clamps_negative_other_wall_time() -> None:
@@ -160,14 +178,27 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "prepare_request_completed_count": 3,
             "gpu_request_enqueued_count": 3,
             "gpu_request_dispatched_count": 3,
+            "gpu_request_completed_count": 3,
             "gpu_batch_submitted_count": 2,
             "gpu_batch_completed_count": 2,
             "gpu_batch_size_sum": 3,
             "gpu_batch_size_max": 2,
             "ddar_submitted_count": 4,
             "ddar_completed_count": 4,
+            "gpu_prompt_token_count_sum": 30,
+            "gpu_prompt_token_count_max": 12,
+            "gpu_generated_token_count_sum": 15,
+            "gpu_generated_token_count_max": 6,
+            "gpu_generated_sequence_count": 3,
+            "gpu_raw_candidate_count": 3,
+            "gpu_unique_candidate_count": 2,
+            "gpu_duplicate_candidate_count": 1,
             "candidate_parse_failed_count": 1,
+            "candidate_parse_success_count": 1,
             "candidate_build_failed_count": 0,
+            "candidate_build_success_count": 1,
+            "gpu_first_token_latency_sum_s": 0.2,
+            "gpu_first_token_latency_count": 2,
             "candidate_queued_next_depth_count": 2,
             "next_frontier_proof_built_count": 2,
         },
@@ -204,14 +235,27 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
             "prepare_request_completed_count": 2,
             "gpu_request_enqueued_count": 2,
             "gpu_request_dispatched_count": 2,
+            "gpu_request_completed_count": 2,
             "gpu_batch_submitted_count": 1,
             "gpu_batch_completed_count": 1,
             "gpu_batch_size_sum": 2,
             "gpu_batch_size_max": 2,
             "ddar_submitted_count": 1,
             "ddar_completed_count": 1,
+            "gpu_prompt_token_count_sum": 10,
+            "gpu_prompt_token_count_max": 5,
+            "gpu_generated_token_count_sum": 4,
+            "gpu_generated_token_count_max": 2,
+            "gpu_generated_sequence_count": 2,
+            "gpu_raw_candidate_count": 2,
+            "gpu_unique_candidate_count": 2,
+            "gpu_duplicate_candidate_count": 0,
             "candidate_parse_failed_count": 0,
+            "candidate_parse_success_count": 2,
             "candidate_build_failed_count": 1,
+            "candidate_build_success_count": 1,
+            "gpu_first_token_latency_sum_s": 0.0,
+            "gpu_first_token_latency_count": 0,
             "candidate_queued_next_depth_count": 1,
             "next_frontier_proof_built_count": 1,
         },
@@ -237,6 +281,9 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
     assert "DDAR Result Ray.get Wall Time: 0.25s" in written_rows[0][0]
     assert "Next Frontier Finalize Wall Time: 0.20s" in written_rows[0][0]
     assert "Avg GPU Batch Size: 1.67" in written_rows[0][0]
+    assert "GPU Prompt Tokens: 40" in written_rows[0][0]
+    assert "GPU Generated Tokens: 19" in written_rows[0][0]
+    assert "Generated Tokens / GPU Generate Second: 38.00" in written_rows[0][0]
     assert "Next Frontier Proof Built: 3" in written_rows[0][0]
     assert written_rows[1] == [label for _, label, _ in CSV_COLUMN_SPECS]
     header_index = {name: idx for idx, (name, _, _) in enumerate(CSV_COLUMN_SPECS)}
@@ -245,6 +292,8 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
     assert written_rows[2][header_index["next_frontier_finalize_wall_time_s"]] == "0.15"
     assert written_rows[2][header_index["gpu_batch_submitted_count"]] == "2"
     assert written_rows[2][header_index["avg_gpu_batch_size"]] == "1.50"
+    assert written_rows[2][header_index["avg_prompt_tokens_per_request"]] == "10.00"
+    assert written_rows[2][header_index["candidate_unique_ratio"]] == "0.67"
     assert written_rows[3][header_index["problem_name"]] == "p2"
     assert written_rows[3][header_index["candidate_build_failed_count"]] == "1"
     assert written_rows[3][header_index["next_frontier_proof_built_count"]] == "1"

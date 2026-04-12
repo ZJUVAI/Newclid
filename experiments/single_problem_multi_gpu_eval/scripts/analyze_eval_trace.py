@@ -205,6 +205,82 @@ def summarize_occupancy(rows: list[dict[str, Any]]) -> dict[str, float]:
     }
 
 
+def summarize_candidate_metrics(
+    *,
+    problem_events: list[dict[str, Any]],
+    attempts: list[dict[str, Any]],
+) -> dict[str, float]:
+    request_profiles: dict[str, dict[str, float]] = {}
+    gpu_generate_time_s = 0.0
+    for event in problem_events:
+        if event.get("event") != "gpu_batch_done":
+            continue
+        worker_batch_profile = dict(event.get("worker_batch_profile") or {})
+        gpu_generate_time_s += float(worker_batch_profile.get("generate_time_s", 0.0))
+
+    parse_success_count = 0
+    build_success_count = 0
+    for attempt in attempts:
+        if attempt.get("attempt_type") != "candidate":
+            continue
+        request_id = attempt.get("request_id")
+        if request_id is not None and request_id not in request_profiles:
+            request_profiles[str(request_id)] = {
+                "prompt_token_count": float(attempt.get("prompt_token_count") or 0.0),
+                "generated_token_count_sum": float(attempt.get("generated_token_count_sum") or 0.0),
+                "generated_sequence_count": float(attempt.get("generated_sequence_count") or 0.0),
+                "raw_candidate_count": float(attempt.get("raw_candidate_count") or 0.0),
+                "unique_candidate_count": float(attempt.get("unique_candidate_count") or 0.0),
+                "duplicate_candidate_count": float(attempt.get("duplicate_candidate_count") or 0.0),
+                "first_token_latency_s": float(attempt.get("first_token_latency_s") or 0.0),
+                "first_token_latency_observed": 1.0 if attempt.get("first_token_latency_s") is not None else 0.0,
+            }
+        decision = str(attempt.get("decision"))
+        if decision != "parse_failed":
+            parse_success_count += 1
+        if decision not in {"parse_failed", "build_failed"}:
+            build_success_count += 1
+
+    request_count = float(len(request_profiles))
+    prompt_token_count_sum = sum(item["prompt_token_count"] for item in request_profiles.values())
+    generated_token_count_sum = sum(item["generated_token_count_sum"] for item in request_profiles.values())
+    generated_sequence_count = sum(item["generated_sequence_count"] for item in request_profiles.values())
+    raw_candidate_count = sum(item["raw_candidate_count"] for item in request_profiles.values())
+    unique_candidate_count = sum(item["unique_candidate_count"] for item in request_profiles.values())
+    duplicate_candidate_count = sum(item["duplicate_candidate_count"] for item in request_profiles.values())
+    first_token_latency_sum_s = sum(item["first_token_latency_s"] for item in request_profiles.values())
+    first_token_latency_count = sum(item["first_token_latency_observed"] for item in request_profiles.values())
+
+    return {
+        "request_count": request_count,
+        "prompt_token_count_sum": prompt_token_count_sum,
+        "generated_token_count_sum": generated_token_count_sum,
+        "generated_sequence_count": generated_sequence_count,
+        "raw_candidate_count": raw_candidate_count,
+        "unique_candidate_count": unique_candidate_count,
+        "duplicate_candidate_count": duplicate_candidate_count,
+        "parse_success_count": float(parse_success_count),
+        "build_success_count": float(build_success_count),
+        "avg_prompt_tokens_per_request": prompt_token_count_sum / request_count if request_count else 0.0,
+        "avg_generated_tokens_per_request": generated_token_count_sum / request_count if request_count else 0.0,
+        "avg_generated_tokens_per_sequence": (
+            generated_token_count_sum / generated_sequence_count if generated_sequence_count else 0.0
+        ),
+        "candidate_unique_ratio": unique_candidate_count / raw_candidate_count if raw_candidate_count else 0.0,
+        "candidate_parse_success_rate": unique_candidate_count and (parse_success_count / unique_candidate_count) or 0.0,
+        "candidate_build_success_rate": parse_success_count and (build_success_count / parse_success_count) or 0.0,
+        "generated_tokens_per_gpu_generate_s": (
+            generated_token_count_sum / gpu_generate_time_s if gpu_generate_time_s else 0.0
+        ),
+        "valid_candidates_per_gpu_generate_s": (
+            build_success_count / gpu_generate_time_s if gpu_generate_time_s else 0.0
+        ),
+        "avg_first_token_latency_s": (
+            first_token_latency_sum_s / first_token_latency_count if first_token_latency_count else 0.0
+        ),
+    }
+
+
 def analyze_run_dir(run_dir: Path) -> dict[str, Any]:
     problem_events = load_problem_events(run_dir)
     attempts = load_attempts(run_dir)
@@ -287,6 +363,7 @@ def analyze_run_dir(run_dir: Path) -> dict[str, Any]:
     candidate_attempts = [attempt for attempt in attempts if attempt.get("attempt_type") == "candidate"]
     ddar_build_times = [float(item["ddar_build_work_time_s"]) for item in candidate_attempts if item.get("ddar_build_work_time_s") is not None]
     ddar_engine_times = [float(item["ddar_engine_work_time_s"]) for item in candidate_attempts if item.get("ddar_engine_work_time_s") is not None]
+    candidate_metrics = summarize_candidate_metrics(problem_events=problem_events, attempts=attempts)
 
     return {
         "summary": {
@@ -301,6 +378,7 @@ def analyze_run_dir(run_dir: Path) -> dict[str, Any]:
                 "build": summarize_latency(ddar_build_times),
                 "engine": summarize_latency(ddar_engine_times),
             },
+            "candidate_metrics": candidate_metrics,
         },
         "occupancy_rows": occupancy_rows,
         "latency_rows": latency_rows,
@@ -318,6 +396,10 @@ def build_stdout_summary(summary: dict[str, Any]) -> str:
         f"ddar_idle_fraction={summary['ddar_idle_fraction']:.3f}",
         f"ddar_build_mean_s={summary['ddar_work']['build']['mean_s']:.4f}",
         f"ddar_engine_mean_s={summary['ddar_work']['engine']['mean_s']:.4f}",
+        f"avg_prompt_tokens_per_request={summary['candidate_metrics']['avg_prompt_tokens_per_request']:.2f}",
+        f"avg_generated_tokens_per_sequence={summary['candidate_metrics']['avg_generated_tokens_per_sequence']:.2f}",
+        f"candidate_unique_ratio={summary['candidate_metrics']['candidate_unique_ratio']:.3f}",
+        f"valid_candidates_per_gpu_generate_s={summary['candidate_metrics']['valid_candidates_per_gpu_generate_s']:.4f}",
     ]
     return "\n".join(lines)
 

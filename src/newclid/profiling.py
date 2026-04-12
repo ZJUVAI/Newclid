@@ -35,6 +35,7 @@ DETAIL_TIME_FIELDS = (
     "ddar_result_ray_get_wall_time_s",
     "ddar_result_next_state_wall_time_s",
     "ddar_result_queue_wall_time_s",
+    "gpu_first_token_latency_sum_s",
 )
 
 COUNT_FIELDS = (
@@ -42,20 +43,49 @@ COUNT_FIELDS = (
     "prepare_request_completed_count",
     "gpu_request_enqueued_count",
     "gpu_request_dispatched_count",
+    "gpu_request_completed_count",
     "gpu_batch_submitted_count",
     "gpu_batch_completed_count",
     "gpu_batch_size_sum",
-    "gpu_batch_size_max",
     "ddar_submitted_count",
     "ddar_completed_count",
+    "gpu_prompt_token_count_sum",
+    "gpu_generated_token_count_sum",
+    "gpu_generated_sequence_count",
+    "gpu_raw_candidate_count",
+    "gpu_unique_candidate_count",
+    "gpu_duplicate_candidate_count",
+    "gpu_first_token_latency_count",
     "candidate_parse_failed_count",
+    "candidate_parse_success_count",
     "candidate_build_failed_count",
+    "candidate_build_success_count",
     "candidate_queued_next_depth_count",
     "next_frontier_proof_built_count",
     "next_frontier_proof_build_failed_count",
 )
 
-PROFILE_ROW_FIELDS = WALL_TIME_FIELDS + DETAIL_TIME_FIELDS + COUNT_FIELDS
+MAX_FIELDS = (
+    "gpu_batch_size_max",
+    "gpu_prompt_token_count_max",
+    "gpu_generated_token_count_max",
+)
+
+DERIVED_FIELDS = (
+    "avg_gpu_batch_size",
+    "avg_prompt_tokens_per_request",
+    "avg_generated_tokens_per_request",
+    "avg_generated_tokens_per_sequence",
+    "generated_tokens_per_gpu_generate_s",
+    "unique_candidates_per_gpu_generate_s",
+    "valid_candidates_per_gpu_generate_s",
+    "candidate_unique_ratio",
+    "candidate_parse_success_rate",
+    "candidate_build_success_rate",
+    "avg_first_token_latency_s",
+)
+
+PROFILE_ROW_FIELDS = WALL_TIME_FIELDS + DETAIL_TIME_FIELDS + COUNT_FIELDS + MAX_FIELDS
 
 CSV_COLUMN_SPECS = (
     ("problem_name", "Problem Name", "text"),
@@ -90,6 +120,7 @@ CSV_COLUMN_SPECS = (
     ("prepare_request_completed_count", "Prepare Request Completed Count", "int"),
     ("gpu_request_enqueued_count", "GPU Request Enqueued Count", "int"),
     ("gpu_request_dispatched_count", "GPU Request Dispatched Count", "int"),
+    ("gpu_request_completed_count", "GPU Request Completed Count", "int"),
     ("gpu_batch_submitted_count", "GPU Batch Submitted Count", "int"),
     ("gpu_batch_completed_count", "GPU Batch Completed Count", "int"),
     ("gpu_batch_size_sum", "GPU Batch Size Sum", "int"),
@@ -97,9 +128,31 @@ CSV_COLUMN_SPECS = (
     ("avg_gpu_batch_size", "Avg GPU Batch Size", "float"),
     ("ddar_submitted_count", "DDAR Submitted Count", "int"),
     ("ddar_completed_count", "DDAR Completed Count", "int"),
+    ("gpu_prompt_token_count_sum", "GPU Prompt Token Count Sum", "int"),
+    ("gpu_prompt_token_count_max", "GPU Prompt Token Count Max", "int"),
+    ("gpu_generated_token_count_sum", "GPU Generated Token Count Sum", "int"),
+    ("gpu_generated_token_count_max", "GPU Generated Token Count Max", "int"),
+    ("gpu_generated_sequence_count", "GPU Generated Sequence Count", "int"),
+    ("gpu_raw_candidate_count", "GPU Raw Candidate Count", "int"),
+    ("gpu_unique_candidate_count", "GPU Unique Candidate Count", "int"),
+    ("gpu_duplicate_candidate_count", "GPU Duplicate Candidate Count", "int"),
+    ("avg_prompt_tokens_per_request", "Avg Prompt Tokens Per Request", "float"),
+    ("avg_generated_tokens_per_request", "Avg Generated Tokens Per Request", "float"),
+    ("avg_generated_tokens_per_sequence", "Avg Generated Tokens Per Sequence", "float"),
+    ("generated_tokens_per_gpu_generate_s", "Generated Tokens Per GPU Generate Second", "float"),
+    ("unique_candidates_per_gpu_generate_s", "Unique Candidates Per GPU Generate Second", "float"),
+    ("valid_candidates_per_gpu_generate_s", "Valid Candidates Per GPU Generate Second", "float"),
+    ("candidate_unique_ratio", "Candidate Unique Ratio", "float"),
     ("candidate_parse_failed_count", "Candidate Parse Failed Count", "int"),
+    ("candidate_parse_success_count", "Candidate Parse Success Count", "int"),
+    ("candidate_parse_success_rate", "Candidate Parse Success Rate", "float"),
     ("candidate_build_failed_count", "Candidate Build Failed Count", "int"),
+    ("candidate_build_success_count", "Candidate Build Success Count", "int"),
+    ("candidate_build_success_rate", "Candidate Build Success Rate", "float"),
     ("candidate_queued_next_depth_count", "Candidate Queued Next Depth Count", "int"),
+    ("gpu_first_token_latency_sum_s", "GPU First Token Latency Sum (s)", "float"),
+    ("gpu_first_token_latency_count", "GPU First Token Latency Count", "int"),
+    ("avg_first_token_latency_s", "Avg First Token Latency (s)", "float"),
     ("next_frontier_proof_built_count", "Next Frontier Proof Built Count", "int"),
     ("next_frontier_proof_build_failed_count", "Next Frontier Proof Build Failed Count", "int"),
 )
@@ -112,7 +165,7 @@ PROFILED_WALL_COMPONENT_FIELDS = tuple(
 def create_profiling_payload() -> dict[str, float]:
     return {
         field: 0.0
-        for field in PROFILE_ROW_FIELDS
+        for field in PROFILE_ROW_FIELDS + DERIVED_FIELDS
     }
 
 
@@ -146,6 +199,65 @@ def finalize_profiling(profiling: dict[str, Any], total_time_s: float | int) -> 
         if batch_completed
         else 0.0
     )
+    request_completed = float(profiling.get("gpu_request_completed_count", 0.0))
+    generated_sequence_count = float(profiling.get("gpu_generated_sequence_count", 0.0))
+    generated_token_count_sum = float(profiling.get("gpu_generated_token_count_sum", 0.0))
+    unique_candidate_count = float(profiling.get("gpu_unique_candidate_count", 0.0))
+    raw_candidate_count = float(profiling.get("gpu_raw_candidate_count", 0.0))
+    parse_success_count = float(profiling.get("candidate_parse_success_count", 0.0))
+    build_success_count = float(profiling.get("candidate_build_success_count", 0.0))
+    gpu_generate_wall_time_s = float(profiling.get("gpu_generate_wall_time_s", 0.0))
+    first_token_latency_count = float(profiling.get("gpu_first_token_latency_count", 0.0))
+    profiling["avg_prompt_tokens_per_request"] = (
+        float(profiling.get("gpu_prompt_token_count_sum", 0.0)) / request_completed
+        if request_completed
+        else 0.0
+    )
+    profiling["avg_generated_tokens_per_request"] = (
+        generated_token_count_sum / request_completed
+        if request_completed
+        else 0.0
+    )
+    profiling["avg_generated_tokens_per_sequence"] = (
+        generated_token_count_sum / generated_sequence_count
+        if generated_sequence_count
+        else 0.0
+    )
+    profiling["generated_tokens_per_gpu_generate_s"] = (
+        generated_token_count_sum / gpu_generate_wall_time_s
+        if gpu_generate_wall_time_s
+        else 0.0
+    )
+    profiling["unique_candidates_per_gpu_generate_s"] = (
+        unique_candidate_count / gpu_generate_wall_time_s
+        if gpu_generate_wall_time_s
+        else 0.0
+    )
+    profiling["valid_candidates_per_gpu_generate_s"] = (
+        build_success_count / gpu_generate_wall_time_s
+        if gpu_generate_wall_time_s
+        else 0.0
+    )
+    profiling["candidate_unique_ratio"] = (
+        unique_candidate_count / raw_candidate_count
+        if raw_candidate_count
+        else 0.0
+    )
+    profiling["candidate_parse_success_rate"] = (
+        parse_success_count / unique_candidate_count
+        if unique_candidate_count
+        else 0.0
+    )
+    profiling["candidate_build_success_rate"] = (
+        build_success_count / parse_success_count
+        if parse_success_count
+        else 0.0
+    )
+    profiling["avg_first_token_latency_s"] = (
+        float(profiling.get("gpu_first_token_latency_sum_s", 0.0)) / first_token_latency_count
+        if first_token_latency_count
+        else 0.0
+    )
     return profiling
 
 
@@ -160,8 +272,8 @@ def merge_profiling_payloads(*payloads: dict[str, Any] | None) -> dict[str, floa
             continue
         for field in PROFILED_WALL_COMPONENT_FIELDS:
             add_profiling_time(merged, field, payload.get(field))
-        for field in DETAIL_TIME_FIELDS + COUNT_FIELDS:
-            if field == "gpu_batch_size_max":
+        for field in DETAIL_TIME_FIELDS + COUNT_FIELDS + MAX_FIELDS:
+            if field in MAX_FIELDS:
                 update_profiling_max(merged, field, payload.get(field))
             else:
                 add_profiling_time(merged, field, payload.get(field))
@@ -171,21 +283,15 @@ def merge_profiling_payloads(*payloads: dict[str, Any] | None) -> dict[str, floa
 def profiling_summary(rows: list[dict[str, Any]]) -> dict[str, float]:
     summary = {
         field: 0.0
-        for field in PROFILE_ROW_FIELDS
+        for field in PROFILE_ROW_FIELDS + DERIVED_FIELDS
     }
     for row in rows:
-        for field in WALL_TIME_FIELDS + DETAIL_TIME_FIELDS + COUNT_FIELDS:
-            if field == "gpu_batch_size_max":
+        for field in WALL_TIME_FIELDS + DETAIL_TIME_FIELDS + COUNT_FIELDS + MAX_FIELDS:
+            if field in MAX_FIELDS:
                 summary[field] = max(summary[field], float(row.get(field, 0.0)))
             else:
                 summary[field] += float(row.get(field, 0.0))
-    batch_completed = float(summary.get("gpu_batch_submitted_count", 0.0))
-    summary["avg_gpu_batch_size"] = (
-        float(summary.get("gpu_batch_size_sum", 0.0)) / batch_completed
-        if batch_completed
-        else 0.0
-    )
-    return summary
+    return finalize_profiling(summary, float(summary.get("total_time_s", 0.0)))
 
 
 def write_profiling_csv(
@@ -237,14 +343,25 @@ def write_profiling_csv(
                     f"Prepare Requests Completed: {int(summary['prepare_request_completed_count'])}, "
                     f"GPU Requests Enqueued: {int(summary['gpu_request_enqueued_count'])}, "
                     f"GPU Requests Dispatched: {int(summary['gpu_request_dispatched_count'])}, "
+                    f"GPU Requests Completed: {int(summary['gpu_request_completed_count'])}, "
                     f"GPU Batches Submitted: {int(summary['gpu_batch_submitted_count'])}, "
                     f"GPU Batches Completed: {int(summary['gpu_batch_completed_count'])}, "
                     f"GPU Batch Size Sum: {int(summary['gpu_batch_size_sum'])}, "
                     f"GPU Batch Size Max: {int(summary['gpu_batch_size_max'])}, "
                     f"DDAR Submitted: {int(summary['ddar_submitted_count'])}, "
                     f"DDAR Completed: {int(summary['ddar_completed_count'])}, "
+                    f"GPU Prompt Tokens: {int(summary['gpu_prompt_token_count_sum'])}, "
+                    f"GPU Generated Tokens: {int(summary['gpu_generated_token_count_sum'])}, "
+                    f"GPU Generated Sequences: {int(summary['gpu_generated_sequence_count'])}, "
+                    f"GPU Unique Candidates: {int(summary['gpu_unique_candidate_count'])}, "
+                    f"Candidate Unique Ratio: {summary['candidate_unique_ratio']:.2f}, "
                     f"Candidate Parse Failed: {int(summary['candidate_parse_failed_count'])}, "
+                    f"Candidate Parse Success: {int(summary['candidate_parse_success_count'])}, "
                     f"Candidate Build Failed: {int(summary['candidate_build_failed_count'])}, "
+                    f"Candidate Build Success: {int(summary['candidate_build_success_count'])}, "
+                    f"Generated Tokens / GPU Generate Second: {summary['generated_tokens_per_gpu_generate_s']:.2f}, "
+                    f"Valid Candidates / GPU Generate Second: {summary['valid_candidates_per_gpu_generate_s']:.2f}, "
+                    f"Avg First Token Latency: {summary['avg_first_token_latency_s']:.2f}s, "
                     f"Candidate Queued Next Depth: {int(summary['candidate_queued_next_depth_count'])}, "
                     f"Next Frontier Proof Built: {int(summary['next_frontier_proof_built_count'])}, "
                     f"Next Frontier Proof Build Failed: {int(summary['next_frontier_proof_build_failed_count'])}"
