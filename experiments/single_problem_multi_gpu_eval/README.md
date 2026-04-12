@@ -13,8 +13,9 @@ Current status:
 - the architecture in this directory is unified around one shared multi-GPU search core
 - GPU dispatch can batch multiple prepared requests into one worker call
 - search remains depth-by-depth, but request preparation / GPU inference / DDAR now overlap within a depth
+- worker-level tracing supports gantt visualization for prepare, GPU, and DDAR work
+- profiling captures candidate quality and token-efficiency metrics for GPU generation
 - this experiment runner does not use `problem_db`
-- the top-level `scripts/evaluation_vlm.py` remains the original per-problem Ray workflow and is separate from this experiment runner
 
 ## Files
 
@@ -26,8 +27,10 @@ Current status:
 - `lm_multi_gpu_agent.py`: LM-specific experiment agent adapter
 - `visual_multi_gpu_agent.py`: VLM/Qwen3.5-vision experiment agent adapter
 - `search_common.py`: shared queue and DDAR helpers
-- `scripts/eval_qwen3_17b_text_single_problem_multi_gpu.sh`: reference script for text runs
-- `scripts/compare_dev_imo_sft34.sh`: comparison script for original vs experiment LM evaluation
+- `scripts/run_profiled_eval.sh`: profiled eval wrapper
+- `scripts/run_profiled_eval_and_plot_gantt.sh`: one-click eval + gantt wrapper
+- `scripts/plot_worker_gantt.py`: worker gantt renderer
+- `scripts/analyze_eval_trace.py`: trace summarizer
 
 ## Architecture
 
@@ -47,34 +50,6 @@ The code is organized in three layers:
    - `visual_actor.py` + `visual_multi_gpu_agent.py`
    - backend-specific prompt construction, model loading, rendering, and candidate generation
 
-More concretely:
-
-- `base_multi_gpu_agent.py` is the shared search chassis. It owns the frontier loop, GPU dispatch coordination, DDAR future scheduling, and success/failure payload construction.
-- `lm_multi_gpu_agent.py` adapts the shared chassis to text-only search state `ProblemJGEX`.
-- `visual_multi_gpu_agent.py` adapts the shared chassis to visual search state `(problem, proof)` so each expansion can render a fresh image.
-- `model_pool.py` manages the resident GPU workers and dispatches one request batch at a time to each worker.
-- request batching is controlled by `gpu_batch_size`; `gpu_batch_size=1` preserves the historical single-request behavior
-
-## Execution Flow
-
-At a high level:
-
-1. `evaluation_single_problem_multi_gpu.py` starts Ray and creates one GPU worker per GPU for the selected backend.
-2. Problems are processed one by one.
-3. Inside one problem, the agent expands the beam layer by layer.
-4. Requests for the current depth are prepared on demand instead of rendering the whole layer up front.
-5. Candidate generation requests are grouped into batches and dispatched across the GPU workers.
-6. Each surviving candidate is checked by DDAR through Ray CPU tasks.
-7. Valid unsolved candidates enter the next beam layer after the current depth drains.
-
-Important implications:
-
-- `num_gpus_for_eval` reduces latency within one problem, not across multiple problems
-- `max_workers` mainly controls DDAR-side CPU concurrency
-- GPU workers always process one actor call at a time, but each call may contain multiple requests
-- `max_pending_ddar` is the main backpressure knob between generation and validation
-- depth boundaries are still strict; requests from different search depths never mix
-
 ## Entrypoint
 
 Main command:
@@ -92,81 +67,49 @@ Supported arguments:
 | `--agent` | `lm` | Backend to run: `lm`, `vlm`, or `qwen35`. |
 | `--log_dir` | `results` | Directory for the output CSV. |
 | `--render_root` | `<log_dir>/_rendered` | Directory for rendered visual prompts. Used by `vlm` and `qwen35`. |
+| `--trace_dir` | disabled | Optional directory for per-problem trace JSONL files. |
+| `--ray_address` | `local` | Ray address. Use `local` for a fresh local runtime. |
 | `--max_workers` | `8` | CPU budget for Ray, mainly affecting DDAR concurrency. |
 | `--decoding_size` | `8` | Number of model candidates generated per retained state at one search depth. |
 | `--beam_size` | `64` | Maximum number of candidate states kept between depths. |
 | `--search_depth` | `4` | Number of iterative auxiliary-construction expansion rounds. |
-| `--inference_runtime` | `transformers` | Inference backend for model workers. `vllm` is currently supported only with `--agent vlm`. |
 | `--gpu_batch_size` | `1` | Maximum number of prepared requests grouped into one GPU generate call. |
 | `--gpu_batch_timeout_ms` | `0` | Optional wait budget before dispatching a not-full GPU batch. |
-| `--vllm_gpu_memory_utilization` | `0.90` | GPU memory fraction reserved by each vLLM worker. |
-| `--vllm_max_num_seqs` | `128` | Maximum concurrent sequences configured for each vLLM worker. |
-| `--vllm_enforce_eager` | `False` | Force eager mode inside vLLM for debugging or compatibility. |
 | `--torch_seed` | `123` | Torch RNG seed applied once per GPU worker process. |
 | `--timeout` | `7200` | Per-problem timeout in seconds. |
 | `--num_gpus_for_eval` | `0` | Number of GPU workers to create. `0` means all GPUs visible to Ray. |
 | `--max_pending_ddar` | `2 * max_workers` | Upper bound on in-flight DDAR tasks for the current problem. |
+| `--prepare_request_workers` | `2 * num_gpus_for_eval` | Local thread count for request preparation when omitted. |
+| `--prepare_prefetch_limit` | derived | Upper bound on running + ready prepared requests when omitted. |
+| `--enable_profiling` | `False` | Write a sidecar profiling CSV with build/inference/DDAR timings and candidate quality metrics. |
 
 ## Parameter Relationships
 
 - `decoding_size` controls generation breadth per retained state
 - `beam_size` controls how many validated states survive
 - `search_depth` controls how many rounds of expansion happen
-
-Resource knobs:
-
 - `num_gpus_for_eval` controls how many model replicas stay resident
-- `inference_runtime` controls whether visual workers use `transformers` or `vllm`
 - `gpu_batch_size` controls how many prepared requests are combined per GPU generate call
 - `gpu_batch_timeout_ms` controls how long the dispatcher may wait before releasing a tail batch
-- `model_pool.py` is a tunable batch dispatcher
 - `max_workers` and `max_pending_ddar` control DDAR-side throughput and backpressure
 
 If DDAR is the bottleneck, increasing GPUs alone will not help much. In that case, inspect `max_workers` and `max_pending_ddar`.
 
-## `max_pending_ddar`
+## Trace And Profiling
 
-`max_pending_ddar` limits how many candidate validations can be in flight at once.
+When `--trace_dir` is enabled, each run writes per-problem JSONL traces containing:
 
-It does not change:
+- prepare/GPU/DDAR worker timestamps
+- request-level model response metadata
+- attempt-level candidate and DDAR outcomes
 
-- how many candidates the model proposes
-- beam width
-- number of GPU workers
+When `--enable_profiling` is enabled, the sidecar CSV includes:
 
-It changes:
-
-- how far GPU generation is allowed to get ahead of DDAR validation
-- when new requests stop being prepared or dispatched because DDAR backlog is too high
-
-Typical symptoms:
-
-- too small: DDAR becomes a hard bottleneck and GPU workers go idle more often
-- too large: CPU and memory pressure rise because too many DDAR tasks accumulate
-
-## Logging
-
-The runner uses standard Python logging with:
-
-```text
-%(asctime)s %(levelname)s %(name)s: %(message)s
-```
-
-Set:
-
-```bash
-LOGLEVEL=DEBUG
-```
-
-to see detailed progress from:
-
-- runner startup and problem loop boundaries
-- worker warmup
-- request dispatch and completion
-- search-depth transitions
-- vision worker request start/end
-
-Ray may prepend actor/pid information to some worker logs.
+- wall-time breakdowns for prepare/GPU/DDAR stages
+- token and sequence statistics per GPU request
+- unique/duplicate candidate counts
+- parse/build success rates
+- generated-tokens-per-GPU-generate-second and valid-candidates-per-GPU-generate-second
 
 ## Examples
 
@@ -177,55 +120,14 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 LOGLEVEL=WARNING python experiments/single_problem_
   --problems_path benchmarks/imo_95.txt \
   --model_path models/vlm_checkpoint \
   --agent vlm \
-  --inference_runtime transformers \
   --log_dir experiments/single_problem_multi_gpu_eval/runs/example_vlm \
   --max_workers 40 \
   --decoding_size 32 \
   --beam_size 512 \
   --search_depth 4 \
   --gpu_batch_size 2 \
+  --gpu_batch_timeout_ms 100 \
   --timeout 3600 \
-  --num_gpus_for_eval 4
-```
-
-Same budget with the optional `vllm` runtime:
-
-```bash
-CUDA_VISIBLE_DEVICES=0,1,2,3 LOGLEVEL=WARNING python experiments/single_problem_multi_gpu_eval/evaluation_single_problem_multi_gpu.py \
-  --problems_path benchmarks/imo_95.txt \
-  --model_path models/vlm_checkpoint \
-  --agent vlm \
-  --inference_runtime vllm \
-  --log_dir experiments/single_problem_multi_gpu_eval/runs/example_vlm_vllm \
-  --max_workers 40 \
-  --decoding_size 32 \
-  --beam_size 512 \
-  --search_depth 4 \
-  --gpu_batch_size 4 \
-  --gpu_batch_timeout_ms 100 \
-  --num_gpus_for_eval 4
-```
-
-Install the optional dependency before using `--inference_runtime vllm`:
-
-```bash
-pip install -e ".[vllm]"
-```
-
-Profiled wrapper script with the same `vllm` setup:
-
-```bash
-CUDA_VISIBLE_DEVICES=0,1,2,3 LOGLEVEL=WARNING bash experiments/single_problem_multi_gpu_eval/scripts/run_profiled_eval.sh \
-  --problems_path benchmarks/imo_95.txt \
-  --model_path models/vlm_checkpoint \
-  --agent vlm \
-  --inference_runtime vllm \
-  --max_workers 40 \
-  --decoding_size 32 \
-  --beam_size 512 \
-  --search_depth 4 \
-  --gpu_batch_size 4 \
-  --gpu_batch_timeout_ms 100 \
   --num_gpus_for_eval 4
 ```
 
@@ -246,18 +148,53 @@ CUDA_VISIBLE_DEVICES=0 LOGLEVEL=DEBUG python experiments/single_problem_multi_gp
   --num_gpus_for_eval 1
 ```
 
+Profiled run with trace analysis:
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 LOGLEVEL=WARNING bash experiments/single_problem_multi_gpu_eval/scripts/run_profiled_eval.sh \
+  --problems_path benchmarks/imo_95.txt \
+  --model_path models/vlm_checkpoint \
+  --agent vlm \
+  --max_workers 40 \
+  --decoding_size 32 \
+  --beam_size 512 \
+  --search_depth 4 \
+  --gpu_batch_size 2 \
+  --gpu_batch_timeout_ms 100 \
+  --num_gpus_for_eval 4
+```
+
+One-click profiled run plus worker gantt:
+
+```bash
+bash experiments/single_problem_multi_gpu_eval/scripts/run_profiled_eval_and_plot_gantt.sh \
+  --problem 0 \
+  -- --problems_path benchmarks/imo_2008_p1b.txt \
+     --model_path /path/to/checkpoint \
+     --agent vlm \
+     --max_workers 40 \
+     --decoding_size 32 \
+     --beam_size 512 \
+     --search_depth 4 \
+     --timeout 3600 \
+     --num_gpus_for_eval 4 \
+     --gpu_batch_size 2 \
+     --gpu_batch_timeout_ms 100 \
+     --torch_seed 42
+```
+
 ## Output
 
 Each run writes a CSV named like:
 
 ```text
-eval_single_problem_multi_gpu_<agent>_<dataset>_<model>_d<decoding_size>_b<beam_size>_s<search_depth>_rt<inference_runtime>_gbs<gpu_batch_size>_gbt<gpu_batch_timeout_ms>_seed<torch_seed>_<timestamp>.csv
+eval_single_problem_multi_gpu_<agent>_<dataset>_<model>_d<decoding_size>_b<beam_size>_s<search_depth>_gbs<gpu_batch_size>_gbt<gpu_batch_timeout_ms>_seed<torch_seed>_<timestamp>.csv
 ```
 
 When `--trace_dir` is enabled, each run creates a trace directory named like:
 
 ```text
-eval_single_problem_multi_gpu_<agent>_<dataset>_<model>_d<decoding_size>_b<beam_size>_s<search_depth>_rt<inference_runtime>_gbs<gpu_batch_size>_gbt<gpu_batch_timeout_ms>_seed<torch_seed>_<timestamp>/
+eval_single_problem_multi_gpu_<agent>_<dataset>_<model>_d<decoding_size>_b<beam_size>_s<search_depth>_gbs<gpu_batch_size>_gbt<gpu_batch_timeout_ms>_seed<torch_seed>_<timestamp>/
 ```
 
 For visual backends, rendered prompt images are written under:

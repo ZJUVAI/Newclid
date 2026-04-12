@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import csv
-import sys
 import tempfile
 import types
 import unittest
@@ -180,7 +179,6 @@ class EvalOutputNamingTests(unittest.TestCase):
     def test_build_eval_output_stem_includes_gpu_batch_params(self):
         stem = build_eval_output_stem(
             agent_type="vlm",
-            inference_runtime="transformers",
             problems_path=Path("benchmarks/imo_2000_p6.txt"),
             model_path="models/vlm_sft50/checkpoint-19194",
             decoding_size=2,
@@ -193,13 +191,12 @@ class EvalOutputNamingTests(unittest.TestCase):
         self.assertEqual(
             stem,
             "eval_single_problem_multi_gpu_vlm_imo_2000_p6_vlm_sft50_checkpoint-19194"
-            "_d2_b4_s1_rttransformers_gbs3_gbt250_seed123",
+            "_d2_b4_s1_gbs3_gbt250_seed123",
         )
 
     def test_trace_run_id_uses_eval_stem_and_timestamp_suffix(self):
         stem = build_eval_output_stem(
             agent_type="lm",
-            inference_runtime="transformers",
             problems_path=Path("benchmarks/imo_2004_p1.txt"),
             model_path="models/sft34/checkpoint-25750",
             decoding_size=8,
@@ -248,83 +245,34 @@ class EvalOutputNamingTests(unittest.TestCase):
 
 
 class SingleProblemEvalRunnerTests(unittest.TestCase):
-    def test_create_workers_vllm_serializes_actor_startup_with_warmup(self):
-        events: list[tuple[str, int]] = []
+    def test_create_workers_wraps_visual_workers_with_trace_metadata(self):
+        created: list[tuple[str, int, int]] = []
 
-        class _FakeWarmupMethod:
-            def __init__(self, worker_idx: int):
-                self.worker_idx = worker_idx
-
-            def remote(self):
-                events.append(("warmup_remote", self.worker_idx))
-                return f"warmup:{self.worker_idx}"
-
-        class _FakeWorkerHandle:
-            def __init__(self, worker_idx: int):
-                self.worker_idx = worker_idx
-                self.warmup = _FakeWarmupMethod(worker_idx)
-
-        class _FakeVLLMWorker:
-            created = 0
-
+        class _FakeVisionModelWorker:
             @classmethod
-            def remote(cls, *args, **kwargs):
-                del args, kwargs
-                worker_idx = cls.created
-                cls.created += 1
-                events.append(("create", worker_idx))
-                return _FakeWorkerHandle(worker_idx)
+            def remote(cls, model_path: str, agent_type: str, torch_seed: int, worker_slot: int):
+                created.append((model_path, torch_seed, worker_slot))
+                return f"worker:{agent_type}:{worker_slot}"
 
-        fake_visual_actor = types.SimpleNamespace(
-            VLLMVisionModelWorker=_FakeVLLMWorker,
-            VisionModelWorker=object,
-        )
+        fake_visual_actor = types.SimpleNamespace(VisionModelWorker=_FakeVisionModelWorker)
 
         with patch.dict(
-            sys.modules,
+            "sys.modules",
             {"experiments.single_problem_multi_gpu_eval.visual_actor": fake_visual_actor},
         ):
-            with patch(
-                "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.get",
-                side_effect=lambda ref: {"warmup_ref": ref},
-            ):
-                workers, warmup_infos = create_workers(
-                    agent_type="vlm",
-                    model_path="/tmp/model",
-                    num_gpus_for_eval=3,
-                    decoding_size=32,
-                    gpu_batch_size=4,
-                    torch_seed=42,
-                    inference_runtime="vllm",
-                    vllm_gpu_memory_utilization=0.9,
-                    vllm_max_num_seqs=128,
-                    vllm_enforce_eager=False,
-                    vllm_generation_mode="beam",
-                    vllm_sampling_temperature=0.8,
-                    vllm_sampling_top_p=0.95,
-                )
+            workers, warmup_infos = create_workers(
+                agent_type="vlm",
+                model_path="/tmp/model",
+                num_gpus_for_eval=3,
+                torch_seed=42,
+            )
 
+        self.assertEqual(created, [("/tmp/model", 42, 0), ("/tmp/model", 42, 1), ("/tmp/model", 42, 2)])
         self.assertEqual(len(workers), 3)
+        self.assertEqual([worker.handle for worker in workers], ["worker:vlm:0", "worker:vlm:1", "worker:vlm:2"])
         self.assertEqual([worker.worker_trace_id for worker in workers], ["gpu:0", "gpu:1", "gpu:2"])
-        self.assertEqual(
-            warmup_infos,
-            [
-                {"warmup_ref": "warmup:0"},
-                {"warmup_ref": "warmup:1"},
-                {"warmup_ref": "warmup:2"},
-            ],
-        )
-        self.assertEqual(
-            events,
-            [
-                ("create", 0),
-                ("warmup_remote", 0),
-                ("create", 1),
-                ("warmup_remote", 1),
-                ("create", 2),
-                ("warmup_remote", 2),
-            ],
-        )
+        self.assertEqual([worker.worker_device for worker in workers], ["cuda:0", "cuda:1", "cuda:2"])
+        self.assertIsNone(warmup_infos)
 
     def test_single_problem_eval_runner_writes_results_without_torch_seed_thread_arg(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -391,13 +339,6 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                                                         gpu_batch_size=1,
                                                         gpu_batch_timeout_ms=100,
                                                         torch_seed=42,
-                                                        inference_runtime="transformers",
-                                                        vllm_gpu_memory_utilization=0.9,
-                                                        vllm_max_num_seqs=128,
-                                                        vllm_enforce_eager=False,
-                                                        vllm_generation_mode="beam",
-                                                        vllm_sampling_temperature=0.8,
-                                                        vllm_sampling_top_p=0.95,
                                                         timeout=3600,
                                                         agent_type="vlm",
                                                         max_pending_ddar=2,
@@ -412,7 +353,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
             csv_path = (
                 log_dir
                 / "eval_single_problem_multi_gpu_vlm_benchmarks_tmp_model"
-                "_d32_b512_s4_rttransformers_gbs1_gbt100_seed42_20260410T120000Z.csv"
+                "_d32_b512_s4_gbs1_gbt100_seed42_20260410T120000Z.csv"
             )
             self.assertTrue(csv_path.exists())
             with csv_path.open(newline="", encoding="utf-8") as handle:

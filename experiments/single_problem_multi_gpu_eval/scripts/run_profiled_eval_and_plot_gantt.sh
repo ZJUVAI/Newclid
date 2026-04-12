@@ -27,8 +27,7 @@ example:
        --num_gpus_for_eval 4 \
        --gpu_batch_size 2 \
        --gpu_batch_timeout_ms 100 \
-       --torch_seed 42 \
-       --inference_runtime transformers
+       --torch_seed 42
 EOF
   exit 1
 }
@@ -102,16 +101,13 @@ parser.add_argument("--model_path", required=True)
 parser.add_argument("--decoding_size", type=int, required=True)
 parser.add_argument("--beam_size", type=int, required=True)
 parser.add_argument("--search_depth", type=int, required=True)
-parser.add_argument("--inference_runtime", default="transformers")
 parser.add_argument("--gpu_batch_size", type=int, default=1)
 parser.add_argument("--gpu_batch_timeout_ms", type=int, default=0)
-parser.add_argument("--vllm_generation_mode", default="beam")
 parser.add_argument("--torch_seed", type=int, default=123)
 args, _ = parser.parse_known_args()
 print(
     build_eval_output_stem(
         agent_type=args.agent,
-        inference_runtime=args.inference_runtime,
         problems_path=Path(args.problems_path),
         model_path=args.model_path,
         decoding_size=args.decoding_size,
@@ -120,7 +116,6 @@ print(
         gpu_batch_size=args.gpu_batch_size,
         gpu_batch_timeout_ms=args.gpu_batch_timeout_ms,
         torch_seed=args.torch_seed,
-        vllm_generation_mode=args.vllm_generation_mode,
     )
 )
 PY

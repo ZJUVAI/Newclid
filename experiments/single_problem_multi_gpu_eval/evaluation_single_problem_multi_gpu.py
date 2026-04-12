@@ -74,7 +74,6 @@ def sanitize_problem_name(problem_name: str) -> str:
 def build_eval_output_stem(
     *,
     agent_type: str,
-    inference_runtime: str,
     problems_path: Path,
     model_path: str,
     decoding_size: int,
@@ -83,20 +82,16 @@ def build_eval_output_stem(
     gpu_batch_size: int,
     gpu_batch_timeout_ms: int,
     torch_seed: int = 123,
-    vllm_generation_mode: str = "beam",
 ) -> str:
     problems_name = problems_path.stem
     path_obj = Path(model_path)
     deepest_folder = path_obj.name
     parent_folder = path_obj.parent.name
     model_name = f"{parent_folder}_{deepest_folder}" if parent_folder else deepest_folder
-    runtime_suffix = f"_rt{inference_runtime}"
-    if inference_runtime == "vllm":
-        runtime_suffix += f"_gm{vllm_generation_mode}"
     return (
         f"eval_single_problem_multi_gpu_{agent_type}_{problems_name}_{model_name}"
         f"_d{decoding_size}_b{beam_size}_s{search_depth}"
-        f"{runtime_suffix}_gbs{gpu_batch_size}_gbt{gpu_batch_timeout_ms}_seed{torch_seed}"
+        f"_gbs{gpu_batch_size}_gbt{gpu_batch_timeout_ms}_seed{torch_seed}"
     )
 
 
@@ -109,20 +104,9 @@ def create_workers(
     agent_type: str,
     model_path: str,
     num_gpus_for_eval: int,
-    decoding_size: int,
-    gpu_batch_size: int,
     torch_seed: int,
-    inference_runtime: str,
-    vllm_gpu_memory_utilization: float,
-    vllm_max_num_seqs: int,
-    vllm_enforce_eager: bool,
-    vllm_generation_mode: str,
-    vllm_sampling_temperature: float,
-    vllm_sampling_top_p: float,
 ):
     if agent_type == "lm":
-        if inference_runtime != "transformers":
-            raise ValueError(f"Unsupported inference runtime for agent '{agent_type}': {inference_runtime}")
         from experiments.single_problem_multi_gpu_eval.lm_actor import ModelWorker
 
         return [
@@ -134,51 +118,16 @@ def create_workers(
             for worker_slot in range(num_gpus_for_eval)
         ], None
     if agent_type in {"vlm", "qwen35"}:
-        from experiments.single_problem_multi_gpu_eval.visual_actor import (
-            VLLMVisionModelWorker,
-            VisionModelWorker,
-        )
+        from experiments.single_problem_multi_gpu_eval.visual_actor import VisionModelWorker
 
-        if inference_runtime == "transformers":
-            return [
-                WorkerHandleWrapper(
-                    VisionModelWorker.remote(model_path, agent_type, torch_seed, worker_slot),
-                    worker_trace_id=f"gpu:{worker_slot}",
-                    worker_device=f"cuda:{worker_slot}",
-                )
-                for worker_slot in range(num_gpus_for_eval)
-            ], None
-        if inference_runtime == "vllm":
-            if agent_type != "vlm":
-                raise ValueError(f"Unsupported inference runtime for agent '{agent_type}': {inference_runtime}")
-            workers = []
-            warmup_infos = []
-            for worker_slot in range(num_gpus_for_eval):
-                worker_handle = VLLMVisionModelWorker.remote(
-                    model_path,
-                    agent_type,
-                    torch_seed,
-                    worker_slot,
-                    gpu_memory_utilization=vllm_gpu_memory_utilization,
-                    max_num_seqs=vllm_max_num_seqs,
-                    gpu_batch_size=gpu_batch_size,
-                    decoding_size=decoding_size,
-                    enforce_eager=vllm_enforce_eager,
-                    generation_mode=vllm_generation_mode,
-                    sampling_temperature=vllm_sampling_temperature,
-                    sampling_top_p=vllm_sampling_top_p,
-                )
-                worker = WorkerHandleWrapper(
-                    worker_handle,
-                    worker_trace_id=f"gpu:{worker_slot}",
-                    worker_device=f"cuda:{worker_slot}",
-                )
-                workers.append(worker)
-                # Serialize actor init + engine warmup to avoid concurrent
-                # vLLM rendezvous port selection races across replicas.
-                warmup_infos.append(ray.get(worker.warmup.remote()))
-            return workers, warmup_infos
-        raise ValueError(f"Unsupported inference runtime: {inference_runtime}")
+        return [
+            WorkerHandleWrapper(
+                VisionModelWorker.remote(model_path, agent_type, torch_seed, worker_slot),
+                worker_trace_id=f"gpu:{worker_slot}",
+                worker_device=f"cuda:{worker_slot}",
+            )
+            for worker_slot in range(num_gpus_for_eval)
+        ], None
     raise ValueError(f"Unsupported agent type: {agent_type}")
 
 
@@ -309,13 +258,6 @@ def solve_problems_single_problem_multi_gpu(
     gpu_batch_size: int,
     gpu_batch_timeout_ms: int,
     torch_seed: int,
-    inference_runtime: str,
-    vllm_gpu_memory_utilization: float,
-    vllm_max_num_seqs: int,
-    vllm_enforce_eager: bool,
-    vllm_generation_mode: str,
-    vllm_sampling_temperature: float,
-    vllm_sampling_top_p: float,
     timeout: int,
     agent_type: str,
     max_pending_ddar: int | None,
@@ -360,18 +302,11 @@ def solve_problems_single_problem_multi_gpu(
                 f"Requested {num_gpus_for_eval} GPUs, but Ray only reports {available_gpus} GPUs."
             )
         if prepare_request_workers is None:
-            if inference_runtime == "vllm" and agent_type == "vlm":
-                prepare_request_workers = (
-                    max(1, max(2 * num_gpus_for_eval, num_gpus_for_eval * gpu_batch_size))
-                    if num_gpus_for_eval > 0
-                    else max(2, gpu_batch_size)
-                )
-            else:
-                prepare_request_workers = (
-                    max(1, max(2 * num_gpus_for_eval, num_gpus_for_eval * gpu_batch_size))
-                    if num_gpus_for_eval > 0
-                    else max(2, gpu_batch_size)
-                )
+            prepare_request_workers = (
+                max(1, max(2 * num_gpus_for_eval, num_gpus_for_eval * gpu_batch_size))
+                if num_gpus_for_eval > 0
+                else max(2, gpu_batch_size)
+            )
         if prepare_request_workers <= 0:
             raise ValueError(
                 f"prepare_request_workers must be positive, got {prepare_request_workers}."
@@ -394,16 +329,7 @@ def solve_problems_single_problem_multi_gpu(
             agent_type=agent_type,
             model_path=model_path,
             num_gpus_for_eval=num_gpus_for_eval,
-            decoding_size=decoding_size,
-            gpu_batch_size=gpu_batch_size,
             torch_seed=torch_seed,
-            inference_runtime=inference_runtime,
-            vllm_gpu_memory_utilization=vllm_gpu_memory_utilization,
-            vllm_max_num_seqs=vllm_max_num_seqs,
-            vllm_enforce_eager=vllm_enforce_eager,
-            vllm_generation_mode=vllm_generation_mode,
-            vllm_sampling_temperature=vllm_sampling_temperature,
-            vllm_sampling_top_p=vllm_sampling_top_p,
         )
         logging.getLogger(__name__).info(
             "Created workers: agent=%s requested_gpus=%d visible_gpus=%d",
@@ -423,7 +349,6 @@ def solve_problems_single_problem_multi_gpu(
         visual_render_root.mkdir(parents=True, exist_ok=True)
         output_name_stem = build_eval_output_stem(
             agent_type=agent_type,
-            inference_runtime=inference_runtime,
             problems_path=filepath,
             model_path=model_path,
             decoding_size=decoding_size,
@@ -432,7 +357,6 @@ def solve_problems_single_problem_multi_gpu(
             gpu_batch_size=gpu_batch_size,
             gpu_batch_timeout_ms=gpu_batch_timeout_ms,
             torch_seed=torch_seed,
-            vllm_generation_mode=vllm_generation_mode,
         )
         run_timestamp = timestamp_slug()
         timestamped_output_stem = build_timestamped_output_stem(output_name_stem, run_timestamp)
@@ -455,13 +379,6 @@ def solve_problems_single_problem_multi_gpu(
                     "gpu_batch_size": gpu_batch_size,
                     "gpu_batch_timeout_ms": gpu_batch_timeout_ms,
                     "torch_seed": torch_seed,
-                    "inference_runtime": inference_runtime,
-                    "vllm_gpu_memory_utilization": vllm_gpu_memory_utilization,
-                    "vllm_max_num_seqs": vllm_max_num_seqs,
-                    "vllm_enforce_eager": vllm_enforce_eager,
-                    "vllm_generation_mode": vllm_generation_mode,
-                    "vllm_sampling_temperature": vllm_sampling_temperature,
-                    "vllm_sampling_top_p": vllm_sampling_top_p,
                     "timeout": timeout,
                     "max_pending_ddar": max_pending_ddar,
                     "num_gpus_for_eval": num_gpus_for_eval,
@@ -477,17 +394,6 @@ def solve_problems_single_problem_multi_gpu(
         print(f"Using gpu_batch_size={gpu_batch_size}")
         print(f"Using gpu_batch_timeout_ms={gpu_batch_timeout_ms}")
         print(f"Using torch_seed={torch_seed}")
-        print(f"Using inference_runtime={inference_runtime}")
-        if inference_runtime == "vllm":
-            effective_vllm_max_num_seqs = max(vllm_max_num_seqs, gpu_batch_size * decoding_size)
-            print(f"Using vllm_gpu_memory_utilization={vllm_gpu_memory_utilization}")
-            print(f"Using vllm_max_num_seqs={vllm_max_num_seqs}")
-            print(f"Using effective_vllm_max_num_seqs={effective_vllm_max_num_seqs}")
-            print(f"Using vllm_enforce_eager={vllm_enforce_eager}")
-            print(f"Using vllm_generation_mode={vllm_generation_mode}")
-            if vllm_generation_mode == "sample":
-                print(f"Using vllm_sampling_temperature={vllm_sampling_temperature}")
-                print(f"Using vllm_sampling_top_p={vllm_sampling_top_p}")
         print(f"Using max_pending_ddar={max_pending_ddar}")
         print(f"Using prepare_request_workers={prepare_request_workers}")
         print(f"Using prepare_prefetch_limit={prepare_prefetch_limit}")
@@ -725,13 +631,6 @@ def main():
         help="Number of iterative auxiliary-construction expansion rounds.",
     )
     parser.add_argument(
-        "--inference_runtime",
-        type=str,
-        choices=("transformers", "vllm"),
-        default="transformers",
-        help="Inference backend for model workers. 'vllm' is currently supported only for --agent vlm.",
-    )
-    parser.add_argument(
         "--gpu_batch_size",
         type=int,
         default=1,
@@ -742,43 +641,6 @@ def main():
         type=int,
         default=0,
         help="Optional wait budget for filling a GPU batch before dispatching a tail batch.",
-    )
-    parser.add_argument(
-        "--vllm_gpu_memory_utilization",
-        type=float,
-        default=0.90,
-        help="GPU memory fraction reserved by each vLLM worker.",
-    )
-    parser.add_argument(
-        "--vllm_max_num_seqs",
-        type=int,
-        default=128,
-        help="Maximum concurrent sequences configured for each vLLM worker.",
-    )
-    parser.add_argument(
-        "--vllm_enforce_eager",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help="Force eager mode inside vLLM for debugging or compatibility workarounds.",
-    )
-    parser.add_argument(
-        "--vllm_generation_mode",
-        type=str,
-        choices=("beam", "sample"),
-        default="beam",
-        help="vLLM generation path. 'beam' keeps strict beam search; 'sample' uses non-strict sampling with n=decoding_size.",
-    )
-    parser.add_argument(
-        "--vllm_sampling_temperature",
-        type=float,
-        default=0.8,
-        help="Sampling temperature used when --vllm_generation_mode=sample.",
-    )
-    parser.add_argument(
-        "--vllm_sampling_top_p",
-        type=float,
-        default=0.95,
-        help="Sampling top-p used when --vllm_generation_mode=sample.",
     )
     parser.add_argument(
         "--torch_seed",
@@ -835,13 +697,6 @@ def main():
         gpu_batch_size=args.gpu_batch_size,
         gpu_batch_timeout_ms=args.gpu_batch_timeout_ms,
         torch_seed=args.torch_seed,
-        inference_runtime=args.inference_runtime,
-        vllm_gpu_memory_utilization=args.vllm_gpu_memory_utilization,
-        vllm_max_num_seqs=args.vllm_max_num_seqs,
-        vllm_enforce_eager=args.vllm_enforce_eager,
-        vllm_generation_mode=args.vllm_generation_mode,
-        vllm_sampling_temperature=args.vllm_sampling_temperature,
-        vllm_sampling_top_p=args.vllm_sampling_top_p,
         timeout=args.timeout,
         agent_type=args.agent,
         max_pending_ddar=args.max_pending_ddar,
