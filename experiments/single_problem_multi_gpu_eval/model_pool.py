@@ -199,7 +199,7 @@ class GenerationDispatcher:
         self._enqueue_pending_request(request)
         self._fill()
 
-    def take_done(self, ref: Any) -> list[dict[str, Any]]:
+    def take_done(self, ref: Any) -> dict[str, Any]:
         running_meta = self.running.pop(ref)
         ray_get_start = time.perf_counter()
         result = ray.get(ref)

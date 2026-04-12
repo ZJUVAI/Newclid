@@ -261,7 +261,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
             "sys.modules",
             {"experiments.single_problem_multi_gpu_eval.visual_actor": fake_visual_actor},
         ):
-            workers, warmup_infos = create_workers(
+            workers = create_workers(
                 agent_type="vlm",
                 model_path="/tmp/model",
                 num_gpus_for_eval=3,
@@ -273,7 +273,6 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
         self.assertEqual([worker.handle for worker in workers], ["worker:vlm:0", "worker:vlm:1", "worker:vlm:2"])
         self.assertEqual([worker.worker_trace_id for worker in workers], ["gpu:0", "gpu:1", "gpu:2"])
         self.assertEqual([worker.worker_device for worker in workers], ["cuda:0", "cuda:1", "cuda:2"])
-        self.assertIsNone(warmup_infos)
 
     def test_single_problem_eval_runner_writes_results_without_torch_seed_thread_arg(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -305,7 +304,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                     ):
                         with patch(
                             "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.create_workers",
-                            return_value=(fake_workers, None),
+                            return_value=fake_workers,
                         ):
                             with patch(
                                 "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ModelPool"
@@ -426,7 +425,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                     ):
                         with patch(
                             "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.create_workers",
-                            return_value=(fake_workers, None),
+                            return_value=fake_workers,
                         ):
                             with patch(
                                 "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ModelPool"
