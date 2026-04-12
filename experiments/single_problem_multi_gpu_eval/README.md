@@ -49,6 +49,7 @@ The code is organized in three layers:
    - `lm_actor.py` + `lm_multi_gpu_agent.py`
    - `visual_actor.py` + `visual_multi_gpu_agent.py`
    - backend-specific prompt construction, model loading, rendering, and candidate generation
+   - worker actors expose batch generation only; for one-request debugging use `gpu_batch_size=1`
 
 ## Entrypoint
 
@@ -102,6 +103,7 @@ When `--enable_trace` is enabled, each run writes per-problem JSONL traces conta
 - prepare/GPU/DDAR worker timestamps
 - attempt-level candidate and DDAR outcomes
 - enough worker-level timing fields to render the gantt chart
+- the analysis script derives candidate-quality summaries from `attempts/` records rather than a separate `model_response` event
 
 When `--enable_profiling` is enabled, the sidecar CSV includes:
 

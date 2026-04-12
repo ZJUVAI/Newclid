@@ -19,8 +19,6 @@ logger = logging.getLogger(__name__)
 hf_logging.disable_progress_bar()
 hf_logging.set_verbosity_error()
 
-AUX_PREDICATES: list[str] = []
-
 
 def resolve_model_path(path: str) -> str:
     candidate = Path(path).expanduser()
@@ -57,10 +55,6 @@ def _build_base_text(tokenizer, *, query: str) -> str:
     )
     text += "<think>\n\n</think>\n\n"
     return text
-
-
-def _build_prompt(tokenizer, *, query: str, new_point_name: str, response_prefix: str) -> str:
-    return _build_base_text(tokenizer, query=query) + response_prefix + " " + new_point_name
 
 
 def _empty_result(request: dict[str, Any], *, error: str, batch_size: int) -> dict[str, Any]:
@@ -346,19 +340,17 @@ class ModelWorker:
         device = str(next(self.model.parameters()).device)
         return {
             "model_path": self.model_path,
+            "agent_kind": "lm",
             "device": device,
             "padding_side": self.tokenizer.padding_side,
             "torch_seed": self.torch_seed,
+            "runtime": "transformers",
             "worker_id": self.worker_id,
             "worker_slot": self.worker_slot,
         }
 
     @torch.no_grad()
-    def generate_one(self, request: dict[str, Any]) -> dict[str, Any]:
-        return self.generate_batch([request])[0]
-
-    @torch.no_grad()
-    def generate_batch(self, requests: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    def generate_batch(self, requests: list[dict[str, Any]]) -> dict[str, Any]:
         if not requests:
             return {
                 "results": [],
@@ -435,6 +427,7 @@ class ModelWorker:
     def stats(self) -> dict[str, Any]:
         return {
             "model_path": self.model_path,
+            "agent_kind": "lm",
             "worker_id": self.worker_id,
             "worker_slot": self.worker_slot,
             "device": self.device_label,

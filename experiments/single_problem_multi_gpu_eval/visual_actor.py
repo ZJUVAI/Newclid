@@ -34,8 +34,6 @@ logger = logging.getLogger(__name__)
 hf_logging.disable_progress_bar()
 hf_logging.set_verbosity_error()
 
-AUX_PREDICATES: list[str] = []
-
 _QWEN3_VL_BASE_PROCESSOR_REPO = "Qwen/Qwen3-VL-2B-Instruct"
 _QWEN3_VL_BASE_PROCESSOR_CACHE = (
     Path.home() / ".cache" / "modelscope" / "hub" / "models" / "Qwen" / "Qwen3-VL-2B-Instruct"
@@ -330,10 +328,6 @@ class VisionModelWorker(_BaseVisionWorker):
             "worker_id": self.worker_id,
             "worker_slot": self.worker_slot,
         }
-
-    @torch.no_grad()
-    def generate_one(self, request: dict[str, Any]) -> dict[str, Any]:
-        return self.generate_batch([request])
 
     @torch.no_grad()
     def generate_batch(self, requests: list[dict[str, Any]]) -> dict[str, Any]:

@@ -370,7 +370,6 @@ def analyze_run_dir(run_dir: Path) -> dict[str, Any]:
                 "prepare_request_ready": depth_counts[depth]["prepare_request_ready"],
                 "gpu_batch_submitted": depth_counts[depth]["gpu_batch_submitted"],
                 "gpu_batch_done": depth_counts[depth]["gpu_batch_done"],
-                "model_response": depth_counts[depth]["model_response"],
                 "ddar_submit": depth_counts[depth]["ddar_submit"],
                 "ddar_result": depth_counts[depth]["ddar_result"],
             }

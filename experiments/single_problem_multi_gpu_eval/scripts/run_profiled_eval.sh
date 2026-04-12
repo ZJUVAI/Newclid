@@ -10,7 +10,7 @@ ROOT_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
 cd "$ROOT_DIR"
 
 COMMIT_ID="$(git rev-parse HEAD)"
-RESULT_ROOT="${RESULT_ROOT:-results/profiling/vlm_sft44_4gpu_new_${COMMIT_ID}}"
+RESULT_ROOT="${RESULT_ROOT:-results/profiling/single_problem_multi_gpu_${COMMIT_ID}}"
 mkdir -p "$RESULT_ROOT/logs" "$RESULT_ROOT/system_metrics" "$RESULT_ROOT/analysis"
 
 RUN_STEM="$(python - "$@" <<'PY'

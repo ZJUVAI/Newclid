@@ -52,6 +52,7 @@ def test_analyze_run_dir_summarizes_occupancy_and_latency(tmp_path: Path) -> Non
     assert summary["ddar_work"]["build"]["mean_s"] == 0.2
     assert summary["ddar_work"]["engine"]["mean_s"] == 0.8
     assert analysis["depth_rows"][0]["ddar_submit"] == 1
+    assert "model_response" not in analysis["depth_rows"][0]
 
 
 def test_analyze_run_dir_dedupes_duplicate_attempt_records(tmp_path: Path) -> None:
