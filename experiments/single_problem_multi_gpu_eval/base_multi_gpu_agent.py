@@ -20,7 +20,7 @@ from newclid.profiling import (
     update_profiling_max,
 )
 from newclid.proof import ProofState
-from newclid.search_trace import build_attempt_key, proof_to_ddar_input
+from newclid.search_trace import build_attempt_key
 
 from experiments.single_problem_multi_gpu_eval.search_common import BeamQueue, run_ddar_c, run_ddar_remote
 
@@ -166,29 +166,9 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
         frontier_exhausted: bool,
         force: bool = False,
     ) -> None:
-        if self.trace_writer is None:
-            return
-        now = time.perf_counter()
-        state = {
-            "depth": depth,
-            "running_prepare": len(running_prepare_futures),
-            "prepared_requests": len(prepared_requests),
-            "pending_gpu_requests": dispatcher.pending_request_count(),
-            "active_gpu_batches": len(dispatcher.active_refs()),
-            "idle_gpu_workers": dispatcher.idle_worker_count(),
-            "pending_ddar_submit": len(pending_ddar_submit),
-            "running_ddar": len(running_futures),
-            "frontier_exhausted": frontier_exhausted,
-        }
-        if (
-            not force
-            and self._last_scheduler_trace_state == state
-            and (now - self._last_scheduler_trace_at) < self._scheduler_trace_interval_s
-        ):
-            return
-        self._last_scheduler_trace_state = dict(state)
-        self._last_scheduler_trace_at = now
-        self._trace("scheduler_state", **state)
+        del depth, dispatcher, running_prepare_futures, prepared_requests
+        del pending_ddar_submit, running_futures, frontier_exhausted, force
+        return
 
     def _trace_ddar_result(self, *, depth: int, future_meta: dict[str, Any], ddar_result: dict[str, Any]) -> None:
         self._trace(
@@ -210,8 +190,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             ddar_engine_finished_at_unix_s=ddar_result.get("ddar_engine_finished_at_unix_s"),
             error_type=ddar_result.get("error_type"),
             error_message=ddar_result.get("error_message"),
-            problem_text=ddar_result.get("problem_text"),
-            ddar_input=ddar_result.get("ddar_input"),
         )
 
     def _handle_ddar_done(
@@ -304,9 +282,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                         node_id=future_meta["node_id"],
                         candidate_rank=future_meta["candidate_rank"],
                         depth=depth,
-                        raw_aux_text=future_meta["raw_aux_text"],
-                        translated_aux=future_meta["translated_aux"],
-                        new_problem_text=str(future_meta["problem"]),
                         decision="queued_next_depth",
                         beam_score_before=future_meta["prev_score"],
                         beam_score_after=child_score,
@@ -486,33 +461,12 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             )
             increment_profiling_count(profiling, "prepare_request_completed_count")
             self._trace(
-                "prepare_request_started",
-                node_id=future_meta["node_id"],
-                parent_node_id=future_meta["parent_node_id"],
-                depth=future_meta["depth"],
-                request_id=request_id,
-                **prepare_trace,
-            )
-            self._trace(
                 "prepare_request_ready",
                 node_id=future_meta["node_id"],
                 parent_node_id=future_meta["parent_node_id"],
                 depth=future_meta["depth"],
                 request_id=request_id,
                 **prepare_trace,
-            )
-            self._trace(
-                "model_request",
-                node_id=future_meta["node_id"],
-                parent_node_id=future_meta["parent_node_id"],
-                depth=future_meta["depth"],
-                request_id=request_id,
-                query=request.get("query"),
-                img_path=request.get("img_path"),
-                new_point_name=request.get("new_point_name"),
-                response_prefix=request.get("response_prefix"),
-                with_predicate=request.get("with_predicate"),
-                decoding_size=request.get("decoding_size"),
             )
             progressed = True
         return progressed
@@ -583,12 +537,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 batch_size=event.get("batch_size"),
                 gpu_worker_id=event.get("gpu_worker_id"),
                 gpu_device=event.get("gpu_device"),
-                dispatcher_profile={
-                    "request_queue_time_s_sum": event.get("request_queue_time_s_sum"),
-                    "submitted_at": event.get("submitted_at"),
-                    "submitted_at_unix_s": event.get("submitted_at_unix_s"),
-                },
-                worker_batch_profile=None,
             )
 
     def _handle_gpu_result(
@@ -665,8 +613,14 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             batch_size=batch_size,
             gpu_worker_id=worker_batch_profile.get("gpu_worker_id") or dispatcher_profile.get("gpu_worker_id"),
             gpu_device=worker_batch_profile.get("gpu_device") or dispatcher_profile.get("gpu_device"),
-            dispatcher_profile=dispatcher_profile,
-            worker_batch_profile=worker_batch_profile,
+            worker_batch_profile={
+                "gpu_worker_id": worker_batch_profile.get("gpu_worker_id") or dispatcher_profile.get("gpu_worker_id"),
+                "gpu_device": worker_batch_profile.get("gpu_device") or dispatcher_profile.get("gpu_device"),
+                "worker_started_at_unix_s": worker_batch_profile.get("worker_started_at_unix_s"),
+                "worker_finished_at_unix_s": worker_batch_profile.get("worker_finished_at_unix_s"),
+                "worker_inference_time_s": worker_batch_profile.get("worker_inference_time_s"),
+                "generate_time_s": worker_batch_profile.get("generate_time_s"),
+            },
         )
 
         for gpu_result in batch_results:
@@ -677,25 +631,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             parent_node_id = request_state["node_id"]
             parent_path_key = request_state["path_key"]
             problem = self.get_problem_from_state(state)
-            outputs = [
-                {
-                    "rank": rank,
-                    "aux_dsl": aux_dsl,
-                    "score": score,
-                }
-                for rank, (aux_dsl, score) in enumerate(gpu_result["aux_dsl_dict"].items())
-            ]
-            request_profile = dict(gpu_result.get("request_profile") or {})
-            self._trace(
-                "model_response",
-                request_id=request_id,
-                node_id=parent_node_id,
-                depth=depth,
-                outputs=outputs,
-                request_profile=request_profile,
-                inference_time_s=gpu_result.get("inference_time_s"),
-                batch_size=gpu_result.get("batch_size"),
-            )
             logger.debug(
                 "Search depth=%d request=%s candidate_count=%d",
                 depth,
@@ -717,9 +652,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                         node_id=None,
                         candidate_rank=candidate_rank,
                         depth=depth,
-                        raw_aux_text=self.extract_raw_aux_text(aux_dsl),
-                        translated_aux=None,
-                        new_problem_text=None,
                         decision="parse_failed",
                         beam_score_before=prev_score,
                         beam_score_after=None,
@@ -736,9 +668,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                         node_id=None,
                         candidate_rank=candidate_rank,
                         depth=depth,
-                        raw_aux_text=raw_aux_text,
-                        translated_aux=None,
-                        new_problem_text=None,
                         decision="parse_failed",
                         beam_score_before=prev_score,
                         beam_score_after=None,
@@ -758,9 +687,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                         node_id=None,
                         candidate_rank=candidate_rank,
                         depth=depth,
-                        raw_aux_text=raw_aux_text,
-                        translated_aux=aux,
-                        new_problem_text=None,
                         decision="build_failed",
                         beam_score_before=prev_score,
                         beam_score_after=None,
@@ -783,8 +709,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                         "candidate_rank": candidate_rank,
                         "path_key": child_path_key,
                         "attempt_key": build_attempt_key(request_id, candidate_rank, child_node_id),
-                        "raw_aux_text": raw_aux_text,
-                        "translated_aux": aux,
                     }
                 )
 
@@ -821,9 +745,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 node_id=candidate_meta["node_id"],
                 candidate_rank=candidate_meta["candidate_rank"],
                 depth=depth,
-                raw_aux_text=candidate_meta["raw_aux_text"],
-                translated_aux=candidate_meta["translated_aux"],
-                new_problem_text=str(candidate_meta["problem"]),
                 decision="ddar_submitted",
                 beam_score_before=candidate_meta["prev_score"],
                 beam_score_after=candidate_meta["prev_score"] + candidate_meta["score"],
@@ -834,8 +755,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 node_id=candidate_meta["node_id"],
                 parent_node_id=candidate_meta["parent_node_id"],
                 depth=depth,
-                problem_text=str(candidate_meta["problem"]),
-                ddar_input=None,
                 ddar_submitted_at_unix_s=candidate_meta["ddar_submitted_at_unix_s"],
             )
             future = run_ddar_remote.remote(
@@ -896,8 +815,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             node_id=0,
             parent_node_id=None,
             depth=-1,
-            problem_text=str(self.problemJGEX),
-            ddar_input=proof_to_ddar_input(base_proof),
         )
         base_ddar_started_at_unix_s = time.time()
         ddar_start = time.perf_counter()
@@ -927,8 +844,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
                 elapsed_time=None,
                 error_type=None,
                 error_message=None,
-                problem_text=str(self.problemJGEX),
-                ddar_input=proof_to_ddar_input(base_proof),
                 **base_ddar_trace,
             )
             logger.info("Agent base DDAR solved problem before search")
@@ -950,8 +865,6 @@ class BaseMultiGPUAgent(DeductiveAgent, ABC):
             elapsed_time=None,
             error_type=None,
             error_message=None,
-            problem_text=str(self.problemJGEX),
-            ddar_input=proof_to_ddar_input(base_proof),
             **base_ddar_trace,
         )
         logger.debug("Agent base DDAR unsolved; entering search")

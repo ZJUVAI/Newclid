@@ -94,67 +94,20 @@ CSV_COLUMN_SPECS = (
     ("entry_setup_wall_time_s", "Entry Setup Wall Time (s)", "float"),
     ("base_ddar_wall_time_s", "Base DDAR Wall Time (s)", "float"),
     ("request_prepare_wall_time_s", "Request Prepare Wall Time (s)", "float"),
-    ("prepared_request_ready_wall_time_s", "Prepared Request Ready Wall Time (s)", "float"),
-    ("prepared_request_queue_wall_time_s", "Prepared Request Queue Wall Time (s)", "float"),
-    ("gpu_request_queue_wall_time_s", "GPU Request Queue Wall Time (s)", "float"),
     ("gpu_batch_round_trip_wall_time_s", "GPU Batch Round Trip Wall Time (s)", "float"),
-    ("gpu_result_ray_get_wall_time_s", "GPU Result Ray.get Wall Time (s)", "float"),
     ("gpu_worker_inference_wall_time_s", "GPU Worker Inference Wall Time (s)", "float"),
-    ("gpu_input_build_wall_time_s", "GPU Input Build Wall Time (s)", "float"),
     ("gpu_generate_wall_time_s", "GPU Generate Wall Time (s)", "float"),
-    ("gpu_decode_wall_time_s", "GPU Decode Wall Time (s)", "float"),
-    ("gpu_fallback_wall_time_s", "GPU Fallback Wall Time (s)", "float"),
     ("wait_wall_time_s", "Wait Wall Time (s)", "float"),
-    ("gpu_result_handle_wall_time_s", "GPU Result Handle Wall Time (s)", "float"),
-    ("ddar_submit_wall_time_s", "DDAR Submit Wall Time (s)", "float"),
-    ("ddar_result_handle_wall_time_s", "DDAR Result Handle Wall Time (s)", "float"),
     ("ddar_build_work_time_s", "DDAR Build Work Time (s)", "float"),
     ("ddar_engine_work_time_s", "DDAR Engine Work Time (s)", "float"),
-    ("ddar_result_ray_get_wall_time_s", "DDAR Result Ray.get Wall Time (s)", "float"),
-    ("ddar_result_next_state_wall_time_s", "DDAR Result Next State Wall Time (s)", "float"),
-    ("ddar_result_queue_wall_time_s", "DDAR Result Queue Wall Time (s)", "float"),
-    ("next_frontier_finalize_wall_time_s", "Next Frontier Finalize Wall Time (s)", "float"),
     ("scheduler_overhead_wall_time_s", "Scheduler Overhead Wall Time (s)", "float"),
     ("other_wall_time_s", "Other Wall Time (s)", "float"),
-    ("prepare_request_submitted_count", "Prepare Request Submitted Count", "int"),
-    ("prepare_request_completed_count", "Prepare Request Completed Count", "int"),
-    ("gpu_request_enqueued_count", "GPU Request Enqueued Count", "int"),
-    ("gpu_request_dispatched_count", "GPU Request Dispatched Count", "int"),
-    ("gpu_request_completed_count", "GPU Request Completed Count", "int"),
-    ("gpu_batch_submitted_count", "GPU Batch Submitted Count", "int"),
     ("gpu_batch_completed_count", "GPU Batch Completed Count", "int"),
-    ("gpu_batch_size_sum", "GPU Batch Size Sum", "int"),
-    ("gpu_batch_size_max", "GPU Batch Size Max", "int"),
     ("avg_gpu_batch_size", "Avg GPU Batch Size", "float"),
-    ("ddar_submitted_count", "DDAR Submitted Count", "int"),
     ("ddar_completed_count", "DDAR Completed Count", "int"),
-    ("gpu_prompt_token_count_sum", "GPU Prompt Token Count Sum", "int"),
-    ("gpu_prompt_token_count_max", "GPU Prompt Token Count Max", "int"),
-    ("gpu_generated_token_count_sum", "GPU Generated Token Count Sum", "int"),
-    ("gpu_generated_token_count_max", "GPU Generated Token Count Max", "int"),
-    ("gpu_generated_sequence_count", "GPU Generated Sequence Count", "int"),
-    ("gpu_raw_candidate_count", "GPU Raw Candidate Count", "int"),
-    ("gpu_unique_candidate_count", "GPU Unique Candidate Count", "int"),
-    ("gpu_duplicate_candidate_count", "GPU Duplicate Candidate Count", "int"),
-    ("avg_prompt_tokens_per_request", "Avg Prompt Tokens Per Request", "float"),
-    ("avg_generated_tokens_per_request", "Avg Generated Tokens Per Request", "float"),
-    ("avg_generated_tokens_per_sequence", "Avg Generated Tokens Per Sequence", "float"),
-    ("generated_tokens_per_gpu_generate_s", "Generated Tokens Per GPU Generate Second", "float"),
-    ("unique_candidates_per_gpu_generate_s", "Unique Candidates Per GPU Generate Second", "float"),
-    ("valid_candidates_per_gpu_generate_s", "Valid Candidates Per GPU Generate Second", "float"),
-    ("candidate_unique_ratio", "Candidate Unique Ratio", "float"),
-    ("candidate_parse_failed_count", "Candidate Parse Failed Count", "int"),
-    ("candidate_parse_success_count", "Candidate Parse Success Count", "int"),
     ("candidate_parse_success_rate", "Candidate Parse Success Rate", "float"),
-    ("candidate_build_failed_count", "Candidate Build Failed Count", "int"),
-    ("candidate_build_success_count", "Candidate Build Success Count", "int"),
     ("candidate_build_success_rate", "Candidate Build Success Rate", "float"),
     ("candidate_queued_next_depth_count", "Candidate Queued Next Depth Count", "int"),
-    ("gpu_first_token_latency_sum_s", "GPU First Token Latency Sum (s)", "float"),
-    ("gpu_first_token_latency_count", "GPU First Token Latency Count", "int"),
-    ("avg_first_token_latency_s", "Avg First Token Latency (s)", "float"),
-    ("next_frontier_proof_built_count", "Next Frontier Proof Built Count", "int"),
-    ("next_frontier_proof_build_failed_count", "Next Frontier Proof Build Failed Count", "int"),
 )
 
 PROFILED_WALL_COMPONENT_FIELDS = tuple(
@@ -316,55 +269,20 @@ def write_profiling_csv(
                     f"Entry Setup Wall Time: {summary['entry_setup_wall_time_s']:.2f}s, "
                     f"Base DDAR Wall Time: {summary['base_ddar_wall_time_s']:.2f}s, "
                     f"Request Prepare Wall Time: {summary['request_prepare_wall_time_s']:.2f}s, "
-                    f"Prepared Request Ready Wall Time: {summary['prepared_request_ready_wall_time_s']:.2f}s, "
-                    f"Prepared Request Queue Wall Time: {summary['prepared_request_queue_wall_time_s']:.2f}s, "
-                    f"GPU Request Queue Wall Time: {summary['gpu_request_queue_wall_time_s']:.2f}s, "
                     f"GPU Batch Round Trip Wall Time: {summary['gpu_batch_round_trip_wall_time_s']:.2f}s, "
-                    f"GPU Result Ray.get Wall Time: {summary['gpu_result_ray_get_wall_time_s']:.2f}s, "
                     f"GPU Worker Inference Wall Time: {summary['gpu_worker_inference_wall_time_s']:.2f}s, "
-                    f"GPU Input Build Wall Time: {summary['gpu_input_build_wall_time_s']:.2f}s, "
                     f"GPU Generate Wall Time: {summary['gpu_generate_wall_time_s']:.2f}s, "
-                    f"GPU Decode Wall Time: {summary['gpu_decode_wall_time_s']:.2f}s, "
-                    f"GPU Fallback Wall Time: {summary['gpu_fallback_wall_time_s']:.2f}s, "
                     f"Wait Wall Time: {summary['wait_wall_time_s']:.2f}s, "
-                    f"GPU Result Handle Wall Time: {summary['gpu_result_handle_wall_time_s']:.2f}s, "
-                    f"DDAR Submit Wall Time: {summary['ddar_submit_wall_time_s']:.2f}s, "
-                    f"DDAR Result Handle Wall Time: {summary['ddar_result_handle_wall_time_s']:.2f}s, "
                     f"DDAR Build Work Time: {summary['ddar_build_work_time_s']:.2f}s, "
                     f"DDAR Engine Work Time: {summary['ddar_engine_work_time_s']:.2f}s, "
-                    f"DDAR Result Ray.get Wall Time: {summary['ddar_result_ray_get_wall_time_s']:.2f}s, "
-                    f"DDAR Result Next State Wall Time: {summary['ddar_result_next_state_wall_time_s']:.2f}s, "
-                    f"DDAR Result Queue Wall Time: {summary['ddar_result_queue_wall_time_s']:.2f}s, "
-                    f"Next Frontier Finalize Wall Time: {summary['next_frontier_finalize_wall_time_s']:.2f}s, "
                     f"Scheduler Overhead Wall Time: {summary['scheduler_overhead_wall_time_s']:.2f}s, "
                     f"Other Wall Time: {summary['other_wall_time_s']:.2f}s, "
-                    f"Avg GPU Batch Size: {summary['avg_gpu_batch_size']:.2f}, "
-                    f"Prepare Requests Submitted: {int(summary['prepare_request_submitted_count'])}, "
-                    f"Prepare Requests Completed: {int(summary['prepare_request_completed_count'])}, "
-                    f"GPU Requests Enqueued: {int(summary['gpu_request_enqueued_count'])}, "
-                    f"GPU Requests Dispatched: {int(summary['gpu_request_dispatched_count'])}, "
-                    f"GPU Requests Completed: {int(summary['gpu_request_completed_count'])}, "
-                    f"GPU Batches Submitted: {int(summary['gpu_batch_submitted_count'])}, "
                     f"GPU Batches Completed: {int(summary['gpu_batch_completed_count'])}, "
-                    f"GPU Batch Size Sum: {int(summary['gpu_batch_size_sum'])}, "
-                    f"GPU Batch Size Max: {int(summary['gpu_batch_size_max'])}, "
-                    f"DDAR Submitted: {int(summary['ddar_submitted_count'])}, "
+                    f"Avg GPU Batch Size: {summary['avg_gpu_batch_size']:.2f}, "
                     f"DDAR Completed: {int(summary['ddar_completed_count'])}, "
-                    f"GPU Prompt Tokens: {int(summary['gpu_prompt_token_count_sum'])}, "
-                    f"GPU Generated Tokens: {int(summary['gpu_generated_token_count_sum'])}, "
-                    f"GPU Generated Sequences: {int(summary['gpu_generated_sequence_count'])}, "
-                    f"GPU Unique Candidates: {int(summary['gpu_unique_candidate_count'])}, "
-                    f"Candidate Unique Ratio: {summary['candidate_unique_ratio']:.2f}, "
-                    f"Candidate Parse Failed: {int(summary['candidate_parse_failed_count'])}, "
-                    f"Candidate Parse Success: {int(summary['candidate_parse_success_count'])}, "
-                    f"Candidate Build Failed: {int(summary['candidate_build_failed_count'])}, "
-                    f"Candidate Build Success: {int(summary['candidate_build_success_count'])}, "
-                    f"Generated Tokens / GPU Generate Second: {summary['generated_tokens_per_gpu_generate_s']:.2f}, "
-                    f"Valid Candidates / GPU Generate Second: {summary['valid_candidates_per_gpu_generate_s']:.2f}, "
-                    f"Avg First Token Latency: {summary['avg_first_token_latency_s']:.2f}s, "
+                    f"Candidate Parse Success Rate: {summary['candidate_parse_success_rate']:.2f}, "
+                    f"Candidate Build Success Rate: {summary['candidate_build_success_rate']:.2f}, "
                     f"Candidate Queued Next Depth: {int(summary['candidate_queued_next_depth_count'])}, "
-                    f"Next Frontier Proof Built: {int(summary['next_frontier_proof_built_count'])}, "
-                    f"Next Frontier Proof Build Failed: {int(summary['next_frontier_proof_build_failed_count'])}"
                 )
             ]
         )

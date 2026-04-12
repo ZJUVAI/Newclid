@@ -168,7 +168,6 @@ class VisualMultiGPUAgent(BaseMultiGPUAgent):
                         node_id=node_id,
                         parent_node_id=parent_node_id,
                         path_key=path_key,
-                        problem_text=str(problem),
                         error_type=type(exc).__name__,
                         error_message=str(exc),
                     )

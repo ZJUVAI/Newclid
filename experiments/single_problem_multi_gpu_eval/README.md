@@ -67,7 +67,7 @@ Supported arguments:
 | `--agent` | `lm` | Backend to run: `lm`, `vlm`, or `qwen35`. |
 | `--log_dir` | `results` | Directory for the output CSV. |
 | `--render_root` | `<log_dir>/_rendered` | Directory for rendered visual prompts. Used by `vlm` and `qwen35`. |
-| `--trace_dir` | disabled | Optional directory for per-problem trace JSONL files. |
+| `--enable_trace` | `False` | Write per-problem trace JSONL files under `<log_dir>/<run_id>/`. |
 | `--ray_address` | `local` | Ray address. Use `local` for a fresh local runtime. |
 | `--max_workers` | `8` | CPU budget for Ray, mainly affecting DDAR concurrency. |
 | `--decoding_size` | `8` | Number of model candidates generated per retained state at one search depth. |
@@ -97,19 +97,17 @@ If DDAR is the bottleneck, increasing GPUs alone will not help much. In that cas
 
 ## Trace And Profiling
 
-When `--trace_dir` is enabled, each run writes per-problem JSONL traces containing:
+When `--enable_trace` is enabled, each run writes per-problem JSONL traces containing:
 
 - prepare/GPU/DDAR worker timestamps
-- request-level model response metadata
 - attempt-level candidate and DDAR outcomes
+- enough worker-level timing fields to render the gantt chart
 
 When `--enable_profiling` is enabled, the sidecar CSV includes:
 
 - wall-time breakdowns for prepare/GPU/DDAR stages
-- token and sequence statistics per GPU request
-- unique/duplicate candidate counts
-- parse/build success rates
-- generated-tokens-per-GPU-generate-second and valid-candidates-per-GPU-generate-second
+- GPU batching effectiveness
+- DDAR throughput and candidate parse/build success rates
 
 ## Examples
 
@@ -191,7 +189,7 @@ Each run writes a CSV named like:
 eval_single_problem_multi_gpu_<agent>_<dataset>_<model>_d<decoding_size>_b<beam_size>_s<search_depth>_gbs<gpu_batch_size>_gbt<gpu_batch_timeout_ms>_seed<torch_seed>_<timestamp>.csv
 ```
 
-When `--trace_dir` is enabled, each run creates a trace directory named like:
+When `--enable_trace` is enabled, each run creates a trace directory named like:
 
 ```text
 eval_single_problem_multi_gpu_<agent>_<dataset>_<model>_d<decoding_size>_b<beam_size>_s<search_depth>_gbs<gpu_batch_size>_gbt<gpu_batch_timeout_ms>_seed<torch_seed>_<timestamp>/

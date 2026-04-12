@@ -103,7 +103,7 @@ EOF
 
 python experiments/single_problem_multi_gpu_eval/evaluation_single_problem_multi_gpu.py \
   --log_dir "$RESULT_ROOT" \
-  --trace_dir "$RESULT_ROOT" \
+  --enable_trace \
   --enable_profiling \
   "$@" | tee "$LOG_PATH"
 

@@ -276,27 +276,30 @@ def test_write_profiling_csv_outputs_wall_summary_and_rows(tmp_path) -> None:
     assert "Dataset: demo, Solved: 1/2" in written_rows[0][0]
     assert "Total Time: 7.00s" in written_rows[0][0]
     assert "Request Prepare Wall Time: 1.50s" in written_rows[0][0]
+    assert "GPU Batch Round Trip Wall Time: 1.00s" in written_rows[0][0]
+    assert "GPU Worker Inference Wall Time: 0.85s" in written_rows[0][0]
+    assert "GPU Generate Wall Time: 0.50s" in written_rows[0][0]
     assert "DDAR Build Work Time: 0.16s" in written_rows[0][0]
     assert "DDAR Engine Work Time: 0.28s" in written_rows[0][0]
-    assert "DDAR Result Ray.get Wall Time: 0.25s" in written_rows[0][0]
-    assert "Next Frontier Finalize Wall Time: 0.20s" in written_rows[0][0]
+    assert "Wait Wall Time: 2.30s" in written_rows[0][0]
+    assert "Scheduler Overhead Wall Time: 0.30s" in written_rows[0][0]
+    assert "GPU Batches Completed: 3" in written_rows[0][0]
     assert "Avg GPU Batch Size: 1.67" in written_rows[0][0]
-    assert "GPU Prompt Tokens: 40" in written_rows[0][0]
-    assert "GPU Generated Tokens: 19" in written_rows[0][0]
-    assert "Generated Tokens / GPU Generate Second: 38.00" in written_rows[0][0]
-    assert "Next Frontier Proof Built: 3" in written_rows[0][0]
+    assert "DDAR Completed: 5" in written_rows[0][0]
+    assert "Candidate Parse Success Rate: 0.75" in written_rows[0][0]
+    assert "Candidate Build Success Rate: 0.67" in written_rows[0][0]
+    assert "Candidate Queued Next Depth: 3" in written_rows[0][0]
     assert written_rows[1] == [label for _, label, _ in CSV_COLUMN_SPECS]
     header_index = {name: idx for idx, (name, _, _) in enumerate(CSV_COLUMN_SPECS)}
     assert written_rows[2][header_index["problem_name"]] == "p1"
     assert written_rows[2][header_index["ddar_build_work_time_s"]] == "0.12"
-    assert written_rows[2][header_index["next_frontier_finalize_wall_time_s"]] == "0.15"
-    assert written_rows[2][header_index["gpu_batch_submitted_count"]] == "2"
+    assert written_rows[2][header_index["gpu_batch_completed_count"]] == "2"
     assert written_rows[2][header_index["avg_gpu_batch_size"]] == "1.50"
-    assert written_rows[2][header_index["avg_prompt_tokens_per_request"]] == "10.00"
-    assert written_rows[2][header_index["candidate_unique_ratio"]] == "0.67"
+    assert written_rows[2][header_index["candidate_parse_success_rate"]] == "0.50"
+    assert written_rows[2][header_index["candidate_build_success_rate"]] == "1.00"
     assert written_rows[3][header_index["problem_name"]] == "p2"
-    assert written_rows[3][header_index["candidate_build_failed_count"]] == "1"
-    assert written_rows[3][header_index["next_frontier_proof_built_count"]] == "1"
+    assert written_rows[3][header_index["candidate_build_success_rate"]] == "0.50"
+    assert written_rows[3][header_index["candidate_queued_next_depth_count"]] == "1"
 
 
 def test_parallel_prepare_wait_is_attributed_to_prepare_wall_time() -> None:
@@ -353,7 +356,7 @@ def test_gpu_or_ddar_wait_is_attributed_to_wait_wall_time(monkeypatch) -> None:
     assert profiling["request_prepare_wall_time_s"] == 0.0
 
 
-def test_trace_scheduler_state_logs_on_change() -> None:
+def test_trace_scheduler_state_is_not_emitted_in_formal_trace_mode() -> None:
     trace_writer = _TraceWriter()
     agent = _DummyAgent(
         model_pool=None,
@@ -382,13 +385,7 @@ def test_trace_scheduler_state_logs_on_change() -> None:
         force=True,
     )
 
-    assert trace_writer.records
-    event, payload = trace_writer.records[0]
-    assert event == "scheduler_state"
-    assert payload["running_prepare"] == 1
-    assert payload["pending_gpu_requests"] == 2
-    assert payload["active_gpu_batches"] == 1
-    assert payload["running_ddar"] == 1
+    assert trace_writer.records == []
 
 
 def test_poll_prepare_futures_traces_real_prepare_worker_metadata() -> None:
@@ -434,10 +431,10 @@ def test_poll_prepare_futures_traces_real_prepare_worker_metadata() -> None:
 
     assert progressed is True
     assert prepared_requests[0]["request_id"] == "d0_proot"
-    assert trace_writer.records[0][0] == "prepare_request_started"
+    assert len(trace_writer.records) == 1
+    assert trace_writer.records[0][0] == "prepare_request_ready"
     assert trace_writer.records[0][1]["prepare_worker_id"] == "prepare_0"
-    assert trace_writer.records[1][0] == "prepare_request_ready"
-    assert trace_writer.records[1][1]["prepare_finished_at_unix_s"] == 10.3
+    assert trace_writer.records[0][1]["prepare_finished_at_unix_s"] == 10.3
 
 
 def test_path_key_helpers_produce_stable_child_keys_and_request_ids() -> None:

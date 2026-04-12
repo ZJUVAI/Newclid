@@ -361,6 +361,121 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
             self.assertEqual(rows[1], ["Problem Name", "Solved", "Time (s)"])
             self.assertEqual(rows[2], ["imo_2008_p1b", "√", "1.25"])
 
+    def test_single_problem_eval_runner_writes_trace_under_log_dir_when_enabled(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            benchmark_path = tmp_path / "benchmarks.txt"
+            benchmark_path.write_text("imo_2008_p1b\nproblem body placeholder\n", encoding="utf-8")
+            log_dir = tmp_path / "results"
+            fake_workers = [_FakeWorker("w0")]
+
+            def fake_solve_one_problem(**kwargs):
+                trace_writer = kwargs["trace_writer"]
+                self.assertIsNotNone(trace_writer)
+                trace_writer.log(
+                    "prepare_request_ready",
+                    depth=0,
+                    request_id="d0_proot",
+                    prepare_worker_id="prepare_0",
+                    prepare_started_at_unix_s=10.0,
+                    prepare_finished_at_unix_s=10.3,
+                )
+                trace_writer.log(
+                    "gpu_batch_done",
+                    depth=0,
+                    request_ids=["d0_proot"],
+                    batch_size=1,
+                    worker_batch_profile={
+                        "gpu_worker_id": "gpu:0",
+                        "worker_started_at_unix_s": 11.0,
+                        "worker_finished_at_unix_s": 11.5,
+                    },
+                )
+                trace_writer.log(
+                    "ddar_result",
+                    depth=0,
+                    attempt_key="d0_proot:0",
+                    ddar_worker_id="127.0.0.1:9999",
+                    ddar_started_at_unix_s=12.0,
+                    ddar_finished_at_unix_s=12.4,
+                    ddar_build_started_at_unix_s=12.0,
+                    ddar_build_finished_at_unix_s=12.1,
+                    ddar_engine_started_at_unix_s=12.1,
+                    ddar_engine_finished_at_unix_s=12.3,
+                    status="unsolved",
+                    elapsed_time=0.4,
+                )
+                return (
+                    kwargs["problem_name"],
+                    True,
+                    1.25,
+                    {
+                        "profiling": {
+                            "entry_setup_wall_time_s": 0.25,
+                            "avg_gpu_batch_size": 1.0,
+                        }
+                    },
+                )
+
+            with patch("experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.is_initialized", side_effect=[False, True]):
+                with patch("experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.init"):
+                    with patch(
+                        "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.available_resources",
+                        return_value={"GPU": 1},
+                    ):
+                        with patch(
+                            "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.create_workers",
+                            return_value=(fake_workers, None),
+                        ):
+                            with patch(
+                                "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ModelPool"
+                            ) as mock_model_pool:
+                                mock_model_pool.return_value.warmup.return_value = [{"device": "cuda:0"}]
+                                with patch(
+                                    "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.solve_one_problem",
+                                    side_effect=fake_solve_one_problem,
+                                ):
+                                    with patch(
+                                        "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.timestamp_slug",
+                                        return_value="20260410T120000Z",
+                                    ):
+                                        with patch("newclid.search_trace.get_git_commit", return_value="deadbeef"):
+                                            with patch(
+                                                "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.Live",
+                                                _FakeLive,
+                                            ):
+                                                with patch(
+                                                    "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.shutdown"
+                                                ):
+                                                    solve_problems_single_problem_multi_gpu(
+                                                        filepath=benchmark_path,
+                                                        model_path="/tmp/model",
+                                                        num_cpus=2,
+                                                        num_gpus_for_eval=1,
+                                                        decoding_size=32,
+                                                        beam_size=512,
+                                                        search_depth=4,
+                                                        gpu_batch_size=1,
+                                                        gpu_batch_timeout_ms=100,
+                                                        torch_seed=42,
+                                                        timeout=3600,
+                                                        agent_type="vlm",
+                                                        max_pending_ddar=2,
+                                                        prepare_request_workers=2,
+                                                        prepare_prefetch_limit=2,
+                                                        log_dir=str(log_dir),
+                                                        enable_trace=True,
+                                                    )
+
+            trace_run_dir = (
+                log_dir
+                / "eval_single_problem_multi_gpu_vlm_benchmarks_tmp_model"
+                "_d32_b512_s4_gbs1_gbt100_seed42_20260410T120000Z"
+            )
+            self.assertTrue((trace_run_dir / "run_meta.json").exists())
+            self.assertTrue((trace_run_dir / "problems" / "0000_imo_2008_p1b.jsonl").exists())
+            self.assertTrue((trace_run_dir / "attempts" / "0000_imo_2008_p1b.jsonl").exists())
+
 
 class ModelPathResolutionTests(unittest.TestCase):
     def test_resolve_model_path_raises_for_missing_local_like_path(self):

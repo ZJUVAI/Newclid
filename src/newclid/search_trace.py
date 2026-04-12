@@ -84,39 +84,11 @@ class AttemptWriter:
 class AttemptAggregator:
     def __init__(self, writer: AttemptWriter) -> None:
         self.writer = writer
-        self.request_context: dict[str, dict[str, Any]] = {}
-        self.request_outputs: dict[str, list[dict[str, Any]]] = {}
-        self.request_profiles: dict[str, dict[str, Any]] = {}
         self.pending_attempts: dict[str, dict[str, Any]] = {}
         self.node_to_attempt_key: dict[int, str] = {}
 
     def process(self, record: dict[str, Any]) -> None:
         event = record["event"]
-        if event == "model_request":
-            self.request_context[record["request_id"]] = {
-                "query": record.get("query"),
-                "img_path": record.get("img_path"),
-                "new_point_name": record.get("new_point_name"),
-                "response_prefix": record.get("response_prefix"),
-                "with_predicate": record.get("with_predicate"),
-                "decoding_size": record.get("decoding_size"),
-                "node_id": record.get("node_id"),
-                "parent_node_id": record.get("parent_node_id"),
-                "depth": record.get("depth"),
-            }
-            return
-
-        if event == "model_response":
-            self.request_outputs[record["request_id"]] = list(record.get("outputs", []))
-            self.request_profiles[record["request_id"]] = dict(record.get("request_profile") or {})
-            self.request_context.setdefault(record["request_id"], {}).update(
-                {
-                    "inference_time_s": record.get("inference_time_s"),
-                    "batch_size": record.get("batch_size"),
-                }
-            )
-            return
-
         if event == "base_ddar":
             attempt_key = record.get("attempt_key") or build_attempt_key(None, None, record.get("node_id"))
             attempt = self._base_attempt(record)
@@ -140,7 +112,6 @@ class AttemptAggregator:
                         **self._candidate_attempt(record),
                         "ddar_status": attempt.get("ddar_status"),
                         "ddar_elapsed_time": attempt.get("ddar_elapsed_time"),
-                        "ddar_input": attempt.get("ddar_input"),
                         "error_type": attempt.get("error_type"),
                         "error_message": attempt.get("error_message"),
                     }
@@ -170,8 +141,6 @@ class AttemptAggregator:
             attempt["ddar_elapsed_time"] = record.get("elapsed_time")
             attempt["ddar_build_work_time_s"] = record.get("ddar_build_work_time_s")
             attempt["ddar_engine_work_time_s"] = record.get("ddar_engine_work_time_s")
-            attempt["ddar_input"] = record.get("ddar_input")
-            attempt["problem_text"] = record.get("problem_text")
             attempt["error_type"] = record.get("error_type")
             attempt["error_message"] = record.get("error_message")
             if attempt.get("attempt_type") == "base_ddar":
@@ -215,17 +184,13 @@ class AttemptAggregator:
         return {
             **self._common_fields(record),
             "attempt_type": "base_ddar",
+            "attempt_key": record.get("attempt_key") or build_attempt_key(None, None, record.get("node_id")),
             "attempt_id": record.get("node_id"),
             "node_id": record.get("node_id"),
             "parent_node_id": record.get("parent_node_id"),
             "depth": record.get("depth"),
             "request_id": None,
             "candidate_rank": None,
-            "query": None,
-            "img_path": None,
-            "new_point_name": None,
-            "raw_aux_text": None,
-            "translated_aux": None,
             "beam_score_before": None,
             "beam_score_after": None,
             "status": None,
@@ -234,8 +199,6 @@ class AttemptAggregator:
             "ddar_elapsed_time": None,
             "ddar_build_work_time_s": None,
             "ddar_engine_work_time_s": None,
-            "ddar_input": record.get("ddar_input"),
-            "problem_text": record.get("problem_text"),
             "error_type": record.get("error_type"),
             "error_message": record.get("error_message"),
         }
@@ -245,40 +208,16 @@ class AttemptAggregator:
         candidate_rank = record.get("candidate_rank")
         node_id = record.get("node_id")
         attempt_key = record.get("attempt_key") or build_attempt_key(request_id, candidate_rank, node_id)
-        request = self.request_context.get(request_id, {})
-        output = {}
-        outputs = self.request_outputs.get(request_id, [])
-        request_profile = self.request_profiles.get(request_id, {})
-        if candidate_rank is not None and 0 <= candidate_rank < len(outputs):
-            output = outputs[candidate_rank]
         return {
             **self._common_fields(record),
             "attempt_type": "candidate",
             "attempt_key": attempt_key,
             "attempt_id": node_id,
             "node_id": node_id,
-            "parent_node_id": record.get("parent_node_id", request.get("node_id")),
-            "depth": record.get("depth", request.get("depth")),
+            "parent_node_id": record.get("parent_node_id"),
+            "depth": record.get("depth"),
             "request_id": request_id,
             "candidate_rank": candidate_rank,
-            "query": request.get("query"),
-            "img_path": request.get("img_path"),
-            "new_point_name": request.get("new_point_name"),
-            "request_inference_time_s": request.get("inference_time_s"),
-            "request_batch_size": request.get("batch_size"),
-            "prompt_token_count": request_profile.get("prompt_token_count"),
-            "generated_token_count_sum": request_profile.get("generated_token_count_sum"),
-            "generated_token_count_max": request_profile.get("generated_token_count_max"),
-            "generated_sequence_count": request_profile.get("generated_sequence_count"),
-            "raw_candidate_count": request_profile.get("raw_candidate_count"),
-            "unique_candidate_count": request_profile.get("unique_candidate_count"),
-            "duplicate_candidate_count": request_profile.get("duplicate_candidate_count"),
-            "avg_generated_tokens_per_sequence": request_profile.get("avg_generated_tokens_per_sequence"),
-            "first_token_latency_s": request_profile.get("first_token_latency_s"),
-            "raw_aux_text": record.get("raw_aux_text"),
-            "translated_aux": record.get("translated_aux"),
-            "aux_dsl": output.get("aux_dsl"),
-            "model_score": output.get("score"),
             "beam_score_before": record.get("beam_score_before"),
             "beam_score_after": record.get("beam_score_after"),
             "status": record.get("decision"),
@@ -287,8 +226,6 @@ class AttemptAggregator:
             "ddar_elapsed_time": None,
             "ddar_build_work_time_s": None,
             "ddar_engine_work_time_s": None,
-            "ddar_input": None,
-            "problem_text": record.get("new_problem_text"),
             "error_type": record.get("error_type"),
             "error_message": record.get("error_message"),
         }

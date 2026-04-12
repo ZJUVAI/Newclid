@@ -265,8 +265,8 @@ def solve_problems_single_problem_multi_gpu(
     prepare_prefetch_limit: int | None,
     log_dir: str | None,
     render_root: str | None = None,
-    trace_dir: str | None = None,
     ray_address: str = "local",
+    enable_trace: bool = False,
     enable_profiling: bool = False,
 ):
     if not filepath.exists():
@@ -361,9 +361,9 @@ def solve_problems_single_problem_multi_gpu(
         run_timestamp = timestamp_slug()
         timestamped_output_stem = build_timestamped_output_stem(output_name_stem, run_timestamp)
         trace_run = None
-        if trace_dir:
+        if enable_trace:
             trace_run = TraceRun(
-                trace_dir,
+                output_dir,
                 route="evaluation_single_problem_multi_gpu",
                 agent=agent_type,
                 dataset_path=filepath,
@@ -398,6 +398,8 @@ def solve_problems_single_problem_multi_gpu(
         print(f"Using prepare_request_workers={prepare_request_workers}")
         print(f"Using prepare_prefetch_limit={prepare_prefetch_limit}")
         print(f"Worker warmup: {warmup_infos}")
+        if trace_run is not None:
+            print(f"Trace run directory: {trace_run.run_dir}")
 
         all_tasks_info = [(problem_name, "Pending", 0.0) for problem_name in problem_names]
         profiling_rows: list[dict[str, object]] = []
@@ -595,10 +597,10 @@ def main():
         help="Optional directory for rendered visual prompts. Uses <log_dir>/_rendered when omitted.",
     )
     parser.add_argument(
-        "--trace_dir",
-        type=str,
-        default=None,
-        help="Optional directory for per-problem search trace JSONL files.",
+        "--enable_trace",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Write per-problem trace JSONL files under <log_dir>/<run_id>/.",
     )
     parser.add_argument(
         "--ray_address",
@@ -682,7 +684,7 @@ def main():
         "--enable_profiling",
         action=argparse.BooleanOptionalAction,
         default=False,
-        help="Write a sidecar profiling CSV with build/inference/DDAR timings.",
+        help="Write a sidecar profiling CSV with summary build/inference/DDAR timings.",
     )
     args = parser.parse_args()
 
@@ -704,8 +706,8 @@ def main():
         prepare_prefetch_limit=args.prepare_prefetch_limit,
         log_dir=args.log_dir,
         render_root=args.render_root,
-        trace_dir=args.trace_dir,
         ray_address=args.ray_address,
+        enable_trace=args.enable_trace,
         enable_profiling=args.enable_profiling,
     )
 

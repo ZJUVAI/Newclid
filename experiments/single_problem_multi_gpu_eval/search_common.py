@@ -156,8 +156,6 @@ def run_ddar_remote(
             "ddar_engine_work_time_s": 0.0,
             "error_type": classify_build_exception(exc),
             "error_message": str(exc),
-            "problem_text": str(problem),
-            "ddar_input": None,
         }
         if return_proof:
             result["proof"] = None
@@ -185,12 +183,6 @@ def run_ddar_remote(
             "ddar_engine_work_time_s": ddar_finished_at_unix_s - ddar_start,
             "error_type": "engine_error",
             "error_message": str(exc),
-            "problem_text": str(problem),
-            "ddar_input": {
-                "points": points,
-                "premises": premises,
-                "goals": goals,
-            },
         }
         if return_proof:
             result["proof"] = None
@@ -209,12 +201,6 @@ def run_ddar_remote(
         "ddar_engine_finished_at_unix_s": ddar_engine_finished_at_unix_s,
         "ddar_build_work_time_s": ddar_build_work_time_s,
         "ddar_engine_work_time_s": ddar_engine_work_time_s,
-        "problem_text": str(problem),
-        "ddar_input": {
-            "points": points,
-            "premises": premises,
-            "goals": goals,
-        },
     }
     if return_proof:
         result["proof"] = build_problem_proof(problem, defs)
