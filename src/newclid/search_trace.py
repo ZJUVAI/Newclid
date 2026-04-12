@@ -184,14 +184,15 @@ class AttemptAggregator:
             if record.get("status") == "solved":
                 attempt["decision"] = "solved"
                 self.writer.write(attempt)
+                return
             elif record.get("status") == "invalid":
                 attempt["decision"] = "invalid"
                 self.writer.write(attempt)
+                return
             else:
                 attempt["decision"] = "unsolved"
                 self.pending_attempts[attempt_key] = attempt
                 return
-            self.writer.write(attempt)
 
     def close(self) -> None:
         for attempt_key in sorted(self.pending_attempts):

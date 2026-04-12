@@ -72,6 +72,28 @@ def load_attempts(run_dir: Path) -> list[dict[str, Any]]:
     return attempts
 
 
+def dedupe_attempts(attempts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    deduped: dict[tuple[Any, ...], dict[str, Any]] = {}
+    ordered_keys: list[tuple[Any, ...]] = []
+    for attempt in attempts:
+        attempt_type = attempt.get("attempt_type")
+        if attempt_type == "candidate":
+            key = ("candidate", attempt.get("attempt_key"))
+        elif attempt_type == "base_ddar":
+            key = ("base_ddar", attempt.get("attempt_key") or attempt.get("node_id"))
+        else:
+            key = (
+                attempt_type,
+                attempt.get("attempt_key"),
+                attempt.get("attempt_id"),
+                attempt.get("node_id"),
+            )
+        if key not in deduped:
+            ordered_keys.append(key)
+        deduped[key] = attempt
+    return [deduped[key] for key in ordered_keys]
+
+
 def build_scheduler_occupancy_rows(problem_events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     scheduler_events = sorted(
         (event for event in problem_events if event.get("event") == "scheduler_state"),
@@ -283,7 +305,7 @@ def summarize_candidate_metrics(
 
 def analyze_run_dir(run_dir: Path) -> dict[str, Any]:
     problem_events = load_problem_events(run_dir)
-    attempts = load_attempts(run_dir)
+    attempts = dedupe_attempts(load_attempts(run_dir))
 
     prepare_submitted: dict[str, float] = {}
     gpu_submitted: dict[str, float] = {}

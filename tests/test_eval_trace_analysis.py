@@ -52,3 +52,57 @@ def test_analyze_run_dir_summarizes_occupancy_and_latency(tmp_path: Path) -> Non
     assert summary["ddar_work"]["build"]["mean_s"] == 0.2
     assert summary["ddar_work"]["engine"]["mean_s"] == 0.8
     assert analysis["depth_rows"][0]["ddar_submit"] == 1
+
+
+def test_analyze_run_dir_dedupes_duplicate_attempt_records(tmp_path: Path) -> None:
+    run_dir = tmp_path / "run"
+    _write_jsonl(
+        run_dir / "problems" / "0000_demo.jsonl",
+        [
+            {"event": "gpu_batch_done", "elapsed_s": 1.0, "worker_batch_profile": {"generate_time_s": 2.0}},
+        ],
+    )
+    _write_jsonl(
+        run_dir / "attempts" / "0000_demo.jsonl",
+        [
+            {
+                "attempt_type": "candidate",
+                "attempt_key": "a0",
+                "request_id": "r0",
+                "decision": "invalid",
+                "prompt_token_count": 10,
+                "generated_token_count_sum": 6,
+                "generated_sequence_count": 2,
+                "raw_candidate_count": 2,
+                "unique_candidate_count": 1,
+                "duplicate_candidate_count": 1,
+                "first_token_latency_s": 0.5,
+                "ddar_build_work_time_s": 0.2,
+                "ddar_engine_work_time_s": 0.8,
+            },
+            {
+                "attempt_type": "candidate",
+                "attempt_key": "a0",
+                "request_id": "r0",
+                "decision": "invalid",
+                "prompt_token_count": 10,
+                "generated_token_count_sum": 6,
+                "generated_sequence_count": 2,
+                "raw_candidate_count": 2,
+                "unique_candidate_count": 1,
+                "duplicate_candidate_count": 1,
+                "first_token_latency_s": 0.5,
+                "ddar_build_work_time_s": 0.2,
+                "ddar_engine_work_time_s": 0.8,
+            },
+        ],
+    )
+
+    analysis = analyze_run_dir(run_dir)
+    metrics = analysis["summary"]["candidate_metrics"]
+
+    assert metrics["request_count"] == 1
+    assert metrics["build_success_count"] == 1
+    assert metrics["generated_token_count_sum"] == 6
+    assert metrics["valid_candidates_per_gpu_generate_s"] == 0.5
+    assert analysis["summary"]["ddar_work"]["build"]["count"] == 1
