@@ -10,7 +10,7 @@ import cairosvg
 from PIL import Image, ImageOps
 
 from newclid.agent.base import BaseAgent
-from newclid.agent.search_core import (
+from newclid.agent.runtime.search_runtime import (
     get_new_point_name,
     problem_to_visual_dsl,
     run_ddar_on_proof,

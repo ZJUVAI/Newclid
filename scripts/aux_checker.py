@@ -25,7 +25,7 @@ from newclid.formulations.definition import DefinitionJGEX
 from newclid import GeometricSolverBuilder, GeometricSolver
 from newclid.predicates import NAME_TO_PREDICATE
 # 从lm.py导入LMAgent类，确保使用最新版本
-from newclid.agent.search_core import try_dsl_to_constructions
+from newclid.agent.runtime.search_runtime import try_dsl_to_constructions
 
 class AuxChecker:
     """AuxChecker - 综合aux验证工具"""

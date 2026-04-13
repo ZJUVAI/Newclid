@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import ray
 
-from newclid.agent import base_multi_gpu as _impl
+from newclid.agent.base import BaseAgent
 
-BaseMultiGPUAgent = _impl.BaseMultiGPUAgent
+BaseMultiGPUAgent = BaseAgent
 
 __all__ = [
     "BaseMultiGPUAgent",
