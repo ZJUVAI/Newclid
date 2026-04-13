@@ -152,7 +152,7 @@ python scripts/evaluation.py \
 ### VLM
 
 ```bash
-python scripts/evaluation_vlm.py \
+python scripts/evaluation.py \
   --problems_path benchmarks/hageo_409_full.txt \
   --model_path /path/to/checkpoint \
   --agent vlm \
@@ -166,7 +166,7 @@ python scripts/evaluation_vlm.py \
 ### Qwen3.5 Multimodal
 
 ```bash
-python scripts/evaluation_vlm.py \
+python scripts/evaluation.py \
   --problems_path benchmarks/dev_imo.txt \
   --model_path /path/to/checkpoint \
   --agent qwen35 \

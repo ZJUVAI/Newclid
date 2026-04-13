@@ -113,7 +113,7 @@ for dataset in "${EVAL_DATASETS[@]}"; do
     for config in "${EVAL_CONFIGS[@]}"; do
         read -r decoding_size beam_size <<< "$config"
 
-        cmd="python $REPO_ROOT/scripts/evaluation_vlm.py \
+        cmd="python $REPO_ROOT/scripts/evaluation.py \
             --problems_path $REPO_ROOT/benchmarks/$dataset \
             --model_path $CHECKPOINT_PATH \
             --log_dir $LOG_DIR \
@@ -121,7 +121,8 @@ for dataset in "${EVAL_DATASETS[@]}"; do
             --decoding_size $decoding_size \
             --beam_size $beam_size \
             --search_depth $EVAL_SEARCH_DEPTH \
-            --timeout $EVAL_TIMEOUT"
+            --timeout $EVAL_TIMEOUT \
+            --agent vlm"
 
         echo ""
         echo "  Evaluating: $dataset (d${decoding_size}_b${beam_size})"
