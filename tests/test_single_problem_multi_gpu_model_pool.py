@@ -8,11 +8,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 import experiments.single_problem_multi_gpu_eval.lm_actor as lm_actor_module
-from experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu import (
+import newclid.evaluation.runner as eval_runner_module
+from newclid.evaluation.output import (
     build_eval_output_stem,
     build_timestamped_output_stem,
-    create_workers,
-    solve_problems_single_problem_multi_gpu,
 )
 from experiments.single_problem_multi_gpu_eval.lm_actor import resolve_model_path
 from experiments.single_problem_multi_gpu_eval.model_pool import GenerationDispatcher, ModelPool
@@ -259,9 +258,9 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
 
         with patch.dict(
             "sys.modules",
-            {"experiments.single_problem_multi_gpu_eval.visual_actor": fake_visual_actor},
+            {"newclid.evaluation.multi_gpu.visual_actor": fake_visual_actor},
         ):
-            workers = create_workers(
+            workers = eval_runner_module.create_workers(
                 agent_type="vlm",
                 model_path="/tmp/model",
                 num_gpus_for_eval=3,
@@ -296,39 +295,39 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                     },
                 )
 
-            with patch("experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.is_initialized", side_effect=[False, True]):
-                with patch("experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.init"):
+            with patch("newclid.evaluation.runner.ray.is_initialized", side_effect=[False, True]):
+                with patch("newclid.evaluation.runner.ray.init"):
                     with patch(
-                        "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.available_resources",
+                        "newclid.evaluation.runner.ray.available_resources",
                         return_value={"GPU": 1},
                     ):
                         with patch(
-                            "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.create_workers",
+                            "newclid.evaluation.runner.create_workers",
                             return_value=fake_workers,
                         ):
                             with patch(
-                                "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ModelPool"
+                                "newclid.evaluation.runner.ModelPool"
                             ) as mock_model_pool:
                                 mock_model_pool.return_value.warmup.return_value = [{"device": "cuda:0"}]
                                 with patch(
-                                    "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.solve_one_problem",
+                                    "newclid.evaluation.runner.solve_one_problem",
                                     side_effect=fake_solve_one_problem,
                                 ):
                                     with patch(
-                                        "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.timestamp_slug",
+                                        "newclid.evaluation.runner.timestamp_slug",
                                         return_value="20260410T120000Z",
                                     ):
                                         with patch(
-                                            "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.Live",
+                                            "newclid.evaluation.runner.Live",
                                             _FakeLive,
                                         ):
                                             with patch(
-                                                "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.write_profiling_csv"
+                                                "newclid.evaluation.runner.write_profiling_csv"
                                             ) as mock_write_profiling_csv:
                                                 with patch(
-                                                    "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.shutdown"
+                                                    "newclid.evaluation.runner.ray.shutdown"
                                                 ) as mock_ray_shutdown:
-                                                    solve_problems_single_problem_multi_gpu(
+                                                    eval_runner_module.solve_problems_single_problem_multi_gpu(
                                                         filepath=benchmark_path,
                                                         model_path="/tmp/model",
                                                         num_cpus=2,
@@ -417,37 +416,37 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                     },
                 )
 
-            with patch("experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.is_initialized", side_effect=[False, True]):
-                with patch("experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.init"):
+            with patch("newclid.evaluation.runner.ray.is_initialized", side_effect=[False, True]):
+                with patch("newclid.evaluation.runner.ray.init"):
                     with patch(
-                        "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.available_resources",
+                        "newclid.evaluation.runner.ray.available_resources",
                         return_value={"GPU": 1},
                     ):
                         with patch(
-                            "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.create_workers",
+                            "newclid.evaluation.runner.create_workers",
                             return_value=fake_workers,
                         ):
                             with patch(
-                                "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ModelPool"
+                                "newclid.evaluation.runner.ModelPool"
                             ) as mock_model_pool:
                                 mock_model_pool.return_value.warmup.return_value = [{"device": "cuda:0"}]
                                 with patch(
-                                    "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.solve_one_problem",
+                                    "newclid.evaluation.runner.solve_one_problem",
                                     side_effect=fake_solve_one_problem,
                                 ):
                                     with patch(
-                                        "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.timestamp_slug",
+                                        "newclid.evaluation.runner.timestamp_slug",
                                         return_value="20260410T120000Z",
                                     ):
                                         with patch("newclid.search_trace.get_git_commit", return_value="deadbeef"):
                                             with patch(
-                                                "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.Live",
+                                                "newclid.evaluation.runner.Live",
                                                 _FakeLive,
                                             ):
                                                 with patch(
-                                                    "experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu.ray.shutdown"
+                                                    "newclid.evaluation.runner.ray.shutdown"
                                                 ):
-                                                    solve_problems_single_problem_multi_gpu(
+                                                    eval_runner_module.solve_problems_single_problem_multi_gpu(
                                                         filepath=benchmark_path,
                                                         model_path="/tmp/model",
                                                         num_cpus=2,

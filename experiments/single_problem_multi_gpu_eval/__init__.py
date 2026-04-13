@@ -1,6 +1,6 @@
-"""Experimental single-problem multi-GPU evaluation workflow."""
+"""Compatibility exports for the single-problem multi-GPU evaluation workflow."""
 
-from experiments.single_problem_multi_gpu_eval.model_pool import GenerationDispatcher, ModelPool
+from newclid.evaluation.multi_gpu.model_pool import GenerationDispatcher, ModelPool
 
 __all__ = [
     "GenerationDispatcher",
