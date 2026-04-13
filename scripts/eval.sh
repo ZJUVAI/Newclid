@@ -21,8 +21,6 @@ MAX_WORKERS="${MAX_WORKERS:-40}"
 SEARCH_DEPTH="${SEARCH_DEPTH:-4}"
 TIMEOUT="${TIMEOUT:-3600}"
 AGENT="${AGENT:-lm}"
-ENABLE_PROBLEM_DB="${ENABLE_PROBLEM_DB:-false}"
-PROBLEM_DB_ROOT="${PROBLEM_DB_ROOT:-problem_db}"
 
 CUDA_DEVICES="${CUDA_DEVICES:-0,1,2,3}"
 RAY_MEMORY_USAGE_THRESHOLD="${RAY_MEMORY_USAGE_THRESHOLD:-0.95}"
@@ -326,14 +324,7 @@ for checkpoint in "${CHECKPOINT_ITEMS[@]}"; do
                 --search_depth "$SEARCH_DEPTH"
                 --timeout "$TIMEOUT"
                 --agent "$AGENT"
-                --problem_db_root "$PROBLEM_DB_ROOT"
             )
-
-            if [ "$ENABLE_PROBLEM_DB" = true ]; then
-                EVAL_ARGS+=(--enable_problem_db)
-            else
-                EVAL_ARGS+=(--no-enable_problem_db)
-            fi
 
             echo "Dataset    : $dataset_name"
             echo "DatasetPath: $dataset_path"

@@ -691,13 +691,6 @@ def main():
         default=False,
         help="Write a sidecar profiling CSV with summary build/inference/DDAR timings.",
     )
-    parser.add_argument("--problem_db_root", type=str, default=None, help=argparse.SUPPRESS)
-    parser.add_argument(
-        "--enable_problem_db",
-        action=argparse.BooleanOptionalAction,
-        default=False,
-        help=argparse.SUPPRESS,
-    )
     args = parser.parse_args()
 
     solve_problems_single_problem_multi_gpu(
