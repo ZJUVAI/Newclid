@@ -4,13 +4,11 @@ from typing import TYPE_CHECKING, Any
 from newclid.dependencies.dependency import Dependency
 from newclid.dependencies.symbols import Circle, Point
 from newclid.numerical import close_enough
-from newclid.numerical.draw_figure import draw_circle, draw_circle_num
+from newclid.numerical.draw_figure import draw_circle_num
 from newclid.numerical.geometries import CircleNum
 from newclid.predicates.predicate import Predicate
 from matplotlib.axes import Axes
 from numpy.random import Generator
-
-from newclid.tools import notNone
 
 
 if TYPE_CHECKING:
@@ -28,7 +26,7 @@ class Cyclic(Predicate):
     def preparse(cls, args: tuple[str, ...]):
         if len(args) <= 3 or len(args) != len(set(args)):
             return None
-        return tuple(sorted(args, key = cls.custom_key))
+        return tuple(sorted(args, key=cls.custom_key))
 
     @classmethod
     def parse(cls, args: tuple[str, ...], dep_graph: DependencyGraph):
@@ -77,7 +75,12 @@ class Cyclic(Predicate):
 
     @classmethod
     def draw(
-        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True
+        cls,
+        ax: Axes,
+        args: tuple[Any, ...],
+        dep_graph: DependencyGraph,
+        rng: Generator,
+        draw_annotations: bool = True,
     ):
         if draw_annotations:
             c_num = CircleNum(

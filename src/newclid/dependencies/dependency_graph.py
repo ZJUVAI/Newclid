@@ -1,13 +1,11 @@
 from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Collection, Optional, Set
-import numpy as np
 from newclid.dependencies.dependency import IN_PREMISES, NUMERICAL_CHECK, TRIVIAL
 from newclid.dependencies.symbols import Point
 from newclid.dependencies.symbols_graph import SymbolsGraph
 from pyvis.network import Network  # type: ignore
 from newclid.statement import Statement
-from newclid.predicates import NAME_TO_PREDICATE
 from . import geometry
 from collections import deque
 
@@ -22,7 +20,7 @@ if TYPE_CHECKING:
 
 
 def goal_filter(name: str, args: tuple[str]) -> bool:
-    if name == 'eqratio' or name == 'eqangle':
+    if name == "eqratio" or name == "eqangle":
         seg_1 = {args[0], args[1]}
         seg_2 = {args[2], args[3]}
         seg_3 = {args[4], args[5]}
@@ -70,8 +68,7 @@ class DependencyGraph:
 
         midpoints = geometry.findmidp(point_coords, ratio_ids)
         for midp in midpoints:
-            tokens = (points[midp[0]].name,
-                      points[midp[1]].name, points[midp[2]].name)
+            tokens = (points[midp[0]].name, points[midp[1]].name, points[midp[2]].name)
             self.numerical_checked_midp.append(tokens)
 
         eqratios = geometry.findeq(point_coords, ratio_ids)
@@ -80,23 +77,31 @@ class DependencyGraph:
 
         simtris, simtrirs = geometry.findsimitri(point_coords, eqratios)
         for simtri in simtris:
-            tokens = (points[simtri[0]].name, points[simtri[1]].name, points[simtri[2]].name,
-                      points[simtri[3]].name, points[simtri[4]].name, points[simtri[5]].name)
+            tokens = (
+                points[simtri[0]].name,
+                points[simtri[1]].name,
+                points[simtri[2]].name,
+                points[simtri[3]].name,
+                points[simtri[4]].name,
+                points[simtri[5]].name,
+            )
             self.numerical_checked_simtri.append(tokens)
         for simtrir in simtrirs:
-            tokens = (points[simtrir[0]].name, points[simtrir[1]].name, points[simtrir[2]].name,
-                      points[simtrir[3]].name, points[simtrir[4]].name, points[simtrir[5]].name)
+            tokens = (
+                points[simtrir[0]].name,
+                points[simtrir[1]].name,
+                points[simtrir[2]].name,
+                points[simtrir[3]].name,
+                points[simtrir[4]].name,
+                points[simtrir[5]].name,
+            )
             self.numerical_checked_simtrir.append(tokens)
 
-        self.numerical_checked_eqangle = list(
-            set(self.numerical_checked_eqangle))
-        self.numerical_checked_eqratio = list(
-            set(self.numerical_checked_eqratio))
+        self.numerical_checked_eqangle = list(set(self.numerical_checked_eqangle))
+        self.numerical_checked_eqratio = list(set(self.numerical_checked_eqratio))
         self.numerical_checked_midp = list(set(self.numerical_checked_midp))
-        self.numerical_checked_simtri = list(
-            set(self.numerical_checked_simtri))
-        self.numerical_checked_simtrir = list(
-            set(self.numerical_checked_simtrir))
+        self.numerical_checked_simtri = list(set(self.numerical_checked_simtri))
+        self.numerical_checked_simtrir = list(set(self.numerical_checked_simtrir))
 
     def has_edge(self, dep: Dependency):
         return (
@@ -174,7 +179,7 @@ class DependencyGraph:
         while queue:
             q = queue.popleft()
             for p in q.clause.points:
-                p_name = p.split('@')[0]
+                p_name = p.split("@")[0]
                 p_point = self.symbols_graph.names2points([p_name])[0]
                 if p_point not in possible_points:
                     possible_points.add(p_point)
@@ -208,7 +213,9 @@ class DependencyGraph:
             if reason == IN_PREMISES:
                 (aux if is_aux else premises).append(line)
             elif reason == NUMERICAL_CHECK:
-                (numerical_checked_aux if is_aux else numerical_checked_premises).append(line)
+                (
+                    numerical_checked_aux if is_aux else numerical_checked_premises
+                ).append(line)
             elif reason == TRIVIAL:
                 (trivial_aux if is_aux else trivial_premises).append(line)
             else:
@@ -241,7 +248,7 @@ class DependencyGraph:
 
             dep = self.hyper_graph[stmt]
 
-            if not dep.why:       # 顶层
+            if not dep.why:  # 顶层
                 if dep.reason == IN_PREMISES:
                     top_premises.add(dep)
                 return
@@ -265,7 +272,7 @@ class DependencyGraph:
         while queue:
             q = queue.popleft()
             for p in q.clause.points:
-                p_name = p.split('@')[0]
+                p_name = p.split("@")[0]
                 p_point = self.symbols_graph.names2points([p_name])[0]
                 if p_point not in points:
                     points.add(p_point)
@@ -280,8 +287,7 @@ class DependencyGraph:
 
         for dep in top_premises:
             uses_aux = any(
-                isinstance(p, Point) and p not in points
-                for p in dep.statement.args
+                isinstance(p, Point) and p not in points for p in dep.statement.args
             )
 
             if not uses_aux:
@@ -316,8 +322,7 @@ class DependencyGraph:
             if boring_statement(dep.statement):
                 continue
             for premise in dep.why:
-                add_edge(net, premise.pretty(),
-                         dep.statement.pretty())  # type: ignore
+                add_edge(net, premise.pretty(), dep.statement.pretty())  # type: ignore
         net.options.layout = {  # type: ignore
             "hierarchical": {
                 "enabled": True,

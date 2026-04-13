@@ -1,0 +1,77 @@
+export const metadata = {
+  title: 'Problem Language',
+};
+
+# Problem Language
+
+Geometry problems in GenesisGeo are not stored as natural-language paragraphs, but as structured constructions, predicates, and goals. Symbolic proof search needs objects it can match, extend, and verify precisely.
+
+## Problem format
+
+A problem has the form:
+
+```
+constructions ? goal
+```
+
+Constructions are clauses separated by semicolons. Each clause introduces one or more points:
+
+```
+point_names = construction_type [args]
+```
+
+Multiple construction types for the same point are separated by commas.
+
+### Example
+
+```
+a b c = triangle a b c; d = free d; e = on_circum e c b d, angle_bisector e a d b ? eqangle b d b e c d c e
+```
+
+| Clause | Points | Meaning |
+| --- | --- | --- |
+| `a b c = triangle a b c` | a, b, c | Triangle ABC |
+| `d = free d` | d | D is a free point |
+| `e = on_circum e c b d, angle_bisector e a d b` | e | E on circumcircle of CBD and angle bisector of ∠ADB |
+
+**Goal:** `eqangle b d b e c d c e` — prove ∠BDE = ∠DCE
+
+## Predicates
+
+Constructions are translated into predicates for symbolic reasoning:
+
+| Predicate | Args | Meaning |
+| --- | --- | --- |
+| `coll a b c` | 3 | A, B, C collinear |
+| `para a b c d` | 4 | AB ∥ CD |
+| `perp a b c d` | 4 | AB ⊥ CD |
+| `cong a b c d` | 4 | AB = CD |
+| `cyclic a b c d` | 4 | A, B, C, D concyclic |
+| `eqangle a b c d e f g h` | 8 | ∠(AB,CD) = ∠(EF,GH) |
+| `eqratio a b c d e f g h` | 8 | AB/CD = EF/GH |
+| `midp m a b` | 3 | M is midpoint of AB |
+| `circle o a b c` | 4 | O is circumcenter of △ABC |
+
+## LLM input/output format
+
+The LLM receives a renamed problem in XML:
+
+```xml
+<problem> a : ; b : ; c : ; d : ; e : cyclic b c d e [000] eqangle a d d e d e b d [001] ? eqangle b d b e c d c e </problem>
+```
+
+And outputs a proof trace:
+
+```xml
+<proof> eqangle b d b e c d c e [002] r03 [000] ; </proof>
+```
+
+Each step has the form: `conclusion [id] rule [dep_ids]`.
+
+<div className="mdx-callout">
+The language separates construction from deduction. Definitions build the world. Predicates describe true facts in that world. Rules turn known facts into new ones.
+</div>
+
+## Why formalization is hard
+
+Not every olympiad problem translates cleanly into a formal geometry builder. A formal statement must also be numerically realizable, and the order of constructions must permit an actual diagram to be built. Formalization is partly about mathematical faithfulness and partly about geometric constructibility.

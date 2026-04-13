@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from newclid.statement import Statement
     from newclid.dependencies.dependency_graph import DependencyGraph
 
+
 class ConstantRatio(Predicate):
     """rconst A B C D r -
     Represent that AB / CD = r
@@ -34,8 +35,8 @@ class ConstantRatio(Predicate):
         if a == b or c == d:
             return None
         f = str_to_fraction(r)
-        a, b = sorted((a, b), key = lambda pair: [cls.custom_key(arg) for arg in pair])
-        c, d = sorted((c, d), key = lambda pair: [cls.custom_key(arg) for arg in pair])
+        a, b = sorted((a, b), key=lambda pair: [cls.custom_key(arg) for arg in pair])
+        c, d = sorted((c, d), key=lambda pair: [cls.custom_key(arg) for arg in pair])
         if cls.compare((a, b), (c, d)) > 0:
             a, b, c, d = c, d, a, b
             f = 1 / f
@@ -97,9 +98,16 @@ class ConstantRatio(Predicate):
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
         a, b, c, d, r = args
         return (a.name, b.name, c.name, d.name, fraction_to_ratio(r))  # type: ignore
-    
+
     @classmethod
-    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True):
+    def draw(
+        cls,
+        ax: Axes,
+        args: tuple[Any, ...],
+        dep_graph: DependencyGraph,
+        rng: Generator,
+        draw_annotations: bool = True,
+    ):
         draw_segment(ax, args[0], args[1])
         draw_segment(ax, args[2], args[3])
 

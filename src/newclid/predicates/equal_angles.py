@@ -5,7 +5,6 @@ from matplotlib.axes import Axes
 import numpy as np
 import logging
 
-from newclid.dependencies.symbols import Line
 from newclid.numerical import close_enough
 from newclid.numerical.draw_figure import PALETTE, draw_angle, draw_segment
 from newclid.predicates.predicate import Predicate
@@ -36,11 +35,15 @@ class EqAngle(Predicate):
     def preparse(cls, args: tuple[str, ...]):
         a, b, c, d, e, f, g, h = args
         if a == b or c == d or e == f or g == h:
-            return 
-        if cls.compare(a, b) > 0: a, b = b, a
-        if cls.compare(c, d) > 0: c, d = d, c
-        if cls.compare(e, f) > 0: e, f = f, e
-        if cls.compare(g, h) > 0: g, h = h, g
+            return
+        if cls.compare(a, b) > 0:
+            a, b = b, a
+        if cls.compare(c, d) > 0:
+            c, d = d, c
+        if cls.compare(e, f) > 0:
+            e, f = f, e
+        if cls.compare(g, h) > 0:
+            g, h = h, g
 
         g1a = (a, b, c, d)
         g1b = (e, f, g, h)
@@ -54,11 +57,11 @@ class EqAngle(Predicate):
             groups2 = g2a + g2b
         else:
             groups2 = g2b + g2a
-        groups1 = groups1 if cls.compare(groups1, groups2) <= 0 else groups2  
+        groups1 = groups1 if cls.compare(groups1, groups2) <= 0 else groups2
         a, b, c, d, e, f, g, h = groups1
         groups2 = (a, b, e, f, c, d, g, h)
-        return groups1 if cls.compare(groups1, groups2) <= 0 else groups2  
-        
+        return groups1 if cls.compare(groups1, groups2) <= 0 else groups2
+
         # groups: list[tuple[str, str, str, str]] = []
         # groups1: list[tuple[str, str, str, str]] = []
         # if len(args) % 4:
@@ -124,7 +127,7 @@ class EqAngle(Predicate):
     def check(cls, statement: Statement) -> bool:
         try:
             eqs, table = cls._prep_ar(statement)
-        except Exception as e:
+        except Exception:
             return False
         return all(table.expr_delta(eq) for eq in eqs)
 
@@ -171,7 +174,12 @@ class EqAngle(Predicate):
 
     @classmethod
     def draw(
-        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True
+        cls,
+        ax: Axes,
+        args: tuple[Any, ...],
+        dep_graph: DependencyGraph,
+        rng: Generator,
+        draw_annotations: bool = True,
     ):
         setattr(ax, "angle_color", (getattr(ax, "angle_color", 0) + 1) % len(PALETTE))
         color = PALETTE[ax.angle_color]  # type: ignore
@@ -179,7 +187,9 @@ class EqAngle(Predicate):
             ori_args = list(args)
             args = tuple(ori_args[0:2] + ori_args[4:6] + ori_args[2:4] + ori_args[6:8])
         if len(set(args[0:4])) > 3 or len(set(args[4:8])) > 3:
-            logging.error(f"Cannot draw angle with more than 3 distinct points: {args[0:4]}, {args[4:8]}")
+            logging.error(
+                f"Cannot draw angle with more than 3 distinct points: {args[0:4]}, {args[4:8]}"
+            )
         for i in range(0, len(args), 4):
             if args[i] == args[i + 2] or args[i] == args[i + 3]:
                 point0 = args[i]

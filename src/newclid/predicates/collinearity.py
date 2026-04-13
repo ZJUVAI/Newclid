@@ -4,10 +4,9 @@ from typing import TYPE_CHECKING, Any, Optional
 from matplotlib.axes import Axes
 from newclid.dependencies.dependency import NUMERICAL_CHECK, Dependency
 from newclid.dependencies.symbols import Line, Point
-from newclid.numerical.draw_figure import draw_line, draw_segment
+from newclid.numerical.draw_figure import draw_segment
 from newclid.numerical.geometries import LineNum
 from newclid.predicates.predicate import Predicate
-from newclid.tools import notNone
 from numpy.random import Generator
 
 if TYPE_CHECKING:
@@ -25,7 +24,7 @@ class Coll(Predicate):
     def preparse(cls, args: tuple[str, ...]):
         if len(args) <= 2 or len(args) != len(set(args)):
             return None
-        return tuple(sorted(args, key = cls.custom_key))
+        return tuple(sorted(args, key=cls.custom_key))
 
     @classmethod
     def parse(cls, args: tuple[str, ...], dep_graph: DependencyGraph):
@@ -39,7 +38,7 @@ class Coll(Predicate):
         points: tuple[Point, ...] = tuple(statement.args)
         try:
             line = LineNum(points[0].num, points[1].num)
-        except Exception as e:
+        except Exception:
             return False
         return all(line.point_at(p.num.x, p.num.y) is not None for p in points[2:])
 
@@ -47,9 +46,8 @@ class Coll(Predicate):
     def check(cls, statement: Statement) -> bool:
         try:
             return Line.check_coll(statement.args)
-        except Exception as e:
+        except Exception:
             return False
-        
 
     @classmethod
     def why(cls, statement: Statement) -> Dependency:
@@ -81,7 +79,12 @@ class Coll(Predicate):
 
     @classmethod
     def draw(
-        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True
+        cls,
+        ax: Axes,
+        args: tuple[Any, ...],
+        dep_graph: DependencyGraph,
+        rng: Generator,
+        draw_annotations: bool = True,
     ):
         for k in range(len(args) - 1):
             draw_segment(ax, args[k], args[k + 1])

@@ -1,0 +1,492 @@
+[
+  {
+    "slug": "r00",
+    "title": "r00 : Perpendiculars give parallel",
+    "section": "Legacy rules",
+    "statement": "AB perpendicular CD CD perpendicular EF ABE non-collinear => AB parallel EF",
+    "description": "Two lines AB, EF, that are orthogonal to a same line CD are parallel to one another. This rule is not in the final rules.txt file because it is covered by AR."
+  },
+  {
+    "slug": "r01",
+    "title": "r01 : Definition of circle",
+    "section": "Legacy rules",
+    "statement": "|OA|=|OB|=|OC|=|OD| => ABCD on a circle",
+    "description": "Four points A, B, C, D equidistant from a center O all lie on a same circle. (One side of the definition of a circle.)"
+  },
+  {
+    "slug": "r02",
+    "title": "r02 : Parallel from inclination",
+    "section": "Legacy rules",
+    "statement": "angle (AB times PQ)=angle (CD times PQ) => AB parallel CD",
+    "description": "If two lines AB and CD define the same angle with respect to a fixed transverse line PQ, they are parallel. This rule is not in the final rules.txt file because it is covered by AR."
+  },
+  {
+    "slug": "r03",
+    "title": "r03 : Arc determines internal angles",
+    "section": "Legacy rules",
+    "statement": "ABPQ on a circle => angle (PA times PB)=angle (QA times QB)",
+    "description": "Two angles with the vertices P, Q on a circle that determine the same arc AB on that same circle are congruent."
+  },
+  {
+    "slug": "r04",
+    "title": "r04 : Congruent angles are in a circle",
+    "section": "Legacy rules",
+    "statement": "angle (PA times PB)=angle (QA times QB) ABPQ non-collinear => ABPQ on a circle",
+    "description": "Reverse direction of r03: If P, Q are vertices of congruent angles, and A and B are the intersections of the legs of the angles with vertices P and Q, there is a circle through A, B, P, and Q."
+  },
+  {
+    "slug": "r05",
+    "title": "r05 : Same arc same chord",
+    "section": "Legacy rules",
+    "statement": "ABCPQR on a circle angle (CA times CB)=angle (RP times RQ) => |AB|=|PQ|",
+    "description": "From r03, two congruent angles on a circle determine arcs on that circle of the same length. This rule says that arcs of the same length determine chords of the same length on the same circle."
+  },
+  {
+    "slug": "r06",
+    "title": "r06 : Base of half triangle",
+    "section": "Legacy rules",
+    "statement": "E midpoint of AB F midpoint of AC => EF parallel BC",
+    "description": "The line connecting the midpoints of two sides of a triangle is parallel to the third side of the same triangle. (This is a special instance of Thales' Theorem with \"midpoint\" predicates)."
+  },
+  {
+    "slug": "r07",
+    "title": "r07 : Thales Theorem I",
+    "section": "Legacy rules",
+    "statement": "ABparallel CD OAC collinear OBD collinear OAB non-collinear => OA/OC=OB/OD AO/AC=BO/BD OC/AC=OD/BD",
+    "description": "This is an instance of Thales's theorem, saying that two parallel lines AB and CD cut by two intersecting transverse lines AC and BD, will determine a collection of proportional segments. The original statement of this rule did not have the non-degeneracy condition ncoll O A B as a hypothesis."
+  },
+  {
+    "slug": "r08",
+    "title": "r08 : Right triangles common angle I",
+    "section": "Legacy rules",
+    "statement": "AB perpendicular CD and EF perpendicular GH => angle (AB times EF) = angle (CD times GH)",
+    "description": "This rule says that if two right triangles share an acute angle, the third angles of both triangles are congruent, as a consequence of the theorem for the sum of angles of a triangle being 180^deg. This rule is not in the final rules.txt file because it is covered by AR."
+  },
+  {
+    "slug": "r09",
+    "title": "r09 : Sum of angles of a triangle",
+    "section": "Legacy rules",
+    "statement": "angle (AB times CD)=angle (MN times PQ) angle (CD times EF)=angle (PQ times RU) => angle (AB times EF)=angle (MN times RU)",
+    "description": "This rule says that if two triangles have two pairs of congruent angles, the third pair of angles will be congruent as well. It is a non-numerical version of the statement that the angles of a triangle always add to a given constant. This rule is not in the final rules.txt file because it is covered by AR."
+  },
+  {
+    "slug": "r10",
+    "title": "r10 : Ratio cancellation",
+    "section": "Legacy rules",
+    "statement": "AB/CD = MN/PQ and CD/EF = PQ/RU => AB/EF = MN/RU",
+    "description": "This is a simple algebraic fact: if you multiply the two equalities from the hypothesis together, there will be a cancellation of numerators and denominators giving you the consequence. This rule is not in the final rules.txt file because it is covered by AR."
+  },
+  {
+    "slug": "r11",
+    "title": "r11 : Bisector theorem I",
+    "section": "Legacy rules",
+    "statement": "DB/DC = AB/AC DBC collinear ABC non-collinear => angle (AB times AD)=angle (AD times AC)",
+    "description": "One direction of the bisector theorem: if a line through a vertex of a triangle cuts the opposite side into two segments that are in proportion as the neighboring sides of the triangle, the line bisects the angle at the vertex it cuts."
+  },
+  {
+    "slug": "r12",
+    "title": "r12 : Bisector theorem II",
+    "section": "Legacy rules",
+    "statement": "angle (AB times AD) = angle (AD times AC) DBC collinear ABC non-collinear => DB/DC = AB/AC",
+    "description": "Opposite direction of the bisector theorem: the internal bisector of a vertex of a triangle divides the opposite side into two segments that are in proportion to the neighboring sides of the triangle."
+  },
+  {
+    "slug": "r13",
+    "title": "r13 : Isosceles triangle equal angles",
+    "section": "Legacy rules",
+    "statement": "|OA|=|OB| OAB non-collinear => angle (OA times AB) = angle (AB times OB)",
+    "description": "The theorem says that the base angles of an isosceles triangle are congruent."
+  },
+  {
+    "slug": "r14",
+    "title": "r14 : Equal base angles imply isosceles",
+    "section": "Legacy rules",
+    "statement": "angle (AO times AB) = angle (BA times BO) OAB non-collinear => |OA|=|OB|",
+    "description": "This is the reverse direction of r13, saying that if the base angles of a triangle are congruent, the triangle is isosceles."
+  },
+  {
+    "slug": "r15",
+    "title": "r15 : Arc determines inscribed angles (tangent)",
+    "section": "Legacy rules",
+    "statement": "O center of circle ABC OA perpendicular AX => angle (AX times AB) = angle (CA times CB)",
+    "description": "This rule corresponds to r03 in the case the arc is determined by a tangent line. An inscribed angle determining that same arc will be congruent to the angle determining that arc with one leg being the tangent line at the vertex of the arc."
+  },
+  {
+    "slug": "r16",
+    "title": "r16 : Same arc giving tangent",
+    "section": "Legacy rules",
+    "statement": "O center of circle ABC angle (AX times AB)=angle (CA times CB) => OAperpendicular AX",
+    "description": "Reverse direction of r15: if two angles with vertices on a circle see the same arc, but one vertex is also an extremal point of the arc, a leg of the angle through this extremal point is the tangent to the circle at that same point."
+  },
+  {
+    "slug": "r17",
+    "title": "r17 : Central angle vs inscribed angle I",
+    "section": "Legacy rules",
+    "statement": "O center of circle ABC M midpoint of BC => angle (AB times AC)=angle (OB times OM)",
+    "description": "This rule implies that the central angle doubles the inscribed angle when both determine the same arc in a circle. It mentions \"bisects the chord\" as an hypotheis instead of \"halves the angle\" because midpoint of a segment is a predicate, while bisector of an angle is not."
+  },
+  {
+    "slug": "r18",
+    "title": "r18 : Central angle vs inscribed angle II",
+    "section": "Legacy rules",
+    "statement": "O center of circle ABC MBC collinear angle (AB times AC)=angle (OB times OM) => M midpoint of BC",
+    "description": "This is the other direction of rule r17. It also has a statement about the bisection of a chord in the circle. Specifically, it says that if a central angle has the same measure as a given inscribed angle on a circle, it will cut the chord corresponding to that angle in half."
+  },
+  {
+    "slug": "r19",
+    "title": "r19 : Hypothenuse is diameter",
+    "section": "Legacy rules",
+    "statement": "ABperpendicular BC M midpoint ofAC => |AM|=|BM|",
+    "description": "This rule says that the hypothenuse of a right triangle is a diameter of its circumcircle, or that the midpoint of the hypothenuse is the circumcenter of the right triangle."
+  },
+  {
+    "slug": "r20",
+    "title": "r20 : Diameter is hypotenuse",
+    "section": "Legacy rules",
+    "statement": "O center of the circle ABC OAC collinear => AB perpendicular BC",
+    "description": "This theorem is the reverse direction of r19. It says that if two points are the edges of the diameter of a circle, and at the same time are vertices of an inscribed triangle, the triangle has a right angle at the third vertex."
+  },
+  {
+    "slug": "r21",
+    "title": "r21 : Cyclic trapezoid",
+    "section": "Legacy rules",
+    "statement": "ABCD on a circle AB parallel CD => angle (AD times CD) = angle (CD times CB)",
+    "description": "This rule says that a cyclic trapezoid is isosceles (refering specifically to the congruence of the angles on a base)."
+  },
+  {
+    "slug": "r22",
+    "title": "r22 : Bisector Construction",
+    "section": "Legacy rules",
+    "statement": "M midpoint of AB OMperpendicular AB => |OA|=|OB|",
+    "description": "This rule says that the perpendicular line through the midpoint of the segment is the perpendicular bisector of the segment (the locus of all equidistant points to the vertices of the segment)."
+  },
+  {
+    "slug": "r23",
+    "title": "r23 : Bisector is perpendicular",
+    "section": "Legacy rules",
+    "statement": "|AP|=|BP| and |AQ|=|BQ| => ABperpendicular PQ",
+    "description": "This rule is the reverse direction of r22. It says that the locus of the points that are equidistant to the two vertices of a segment AB is a straight line perpendicular to AB."
+  },
+  {
+    "slug": "r24",
+    "title": "r24 : Cyclic kite",
+    "section": "Legacy rules",
+    "statement": "|AP|=|BP| |AQ|=|BQ| ABPQ on a circle => PAperpendicular AQ",
+    "description": "This theorem says that a cyclic kite is always formed by two symmetric right triangles."
+  },
+  {
+    "slug": "r25",
+    "title": "r25 : Diagonals of parallelogram I",
+    "section": "Legacy rules",
+    "statement": "M midpoint of AB M midpoint of CD => AC parallel BD",
+    "description": "If two segments intersect at their common midpoint, the vertices of the segments are the vertices of a parallelogram."
+  },
+  {
+    "slug": "r26",
+    "title": "r26 : Diagonals of parallelogram II",
+    "section": "Legacy rules",
+    "statement": "M midpoint of AB AC parallel BD AD parallel BC ABD non-collinear => M midpoint of CD",
+    "description": "The other direction of the previous rule, it says the diagonals of a parallelogram meet at their common midpoint. The original statement of this rule did not have the non-degeneracy condition ncoll A B D as a hypothesis."
+  },
+  {
+    "slug": "r27",
+    "title": "r27 : Thales theorem II",
+    "section": "Legacy rules",
+    "statement": "OA/AC=OB/BD OAC collinear OBD collinear ABC non-collinear A to the same side of O to C as B to O to D => ABparallel CD",
+    "description": "This is another instance of Thales theorem, one saying that if two points C and D split to legs of a triangle on the same ratio, the line CD will be parallel to the base of the triangle."
+  },
+  {
+    "slug": "r28",
+    "title": "r28 : Overlapping parallels",
+    "section": "Legacy rules",
+    "statement": "AB parallel AC => ABC collinear",
+    "description": "This rule encompasses the fact that two intersecting parallel lines are actually the same."
+  },
+  {
+    "slug": "r29",
+    "title": "r29 : Midpoint is an eqratio",
+    "section": "Legacy rules",
+    "statement": "M midpoint of AB N midpoint of CD => MA/AB = NC/CD",
+    "description": "This rule exists to help the solver process the fact that is obvious to humans: midpoints split segments in the same ratio (1:2)."
+  },
+  {
+    "slug": "r30",
+    "title": "r30 : Right triangles common angle II",
+    "section": "Legacy rules",
+    "statement": "angle (AB times PQ)=angle (CD times UV) PQperpendicular UV => ABperpendicular CD",
+    "description": "This rule is the reverse direction of rule r08 (as can be seen by renaming Q->E, P->F, U->H, and V->G), and it is also a consequence of two triangles sharing a same vertex. This rule is not in the final rules.txt file because it is covered by AR."
+  },
+  {
+    "slug": "r31",
+    "title": "r31 : Denominator cancelling",
+    "section": "Legacy rules",
+    "statement": "AB/PQ = CD/UV and |PQ| = |UV| => |AB| = |CD|",
+    "description": "This rule simply eliminates equal denominators in an equality of ratios. This rule is not in the final rules.txt file because it is covered by AR."
+  },
+  {
+    "slug": "r32",
+    "title": "r32 : SSS Triangle congruence",
+    "section": "Legacy rules",
+    "statement": "|AB| = |PQ| |BC| = |QR| |CA| = |RP| => triangle ABC congruent ^ ast triangle PQR",
+    "description": "This rule covers the congruence case for two triangles when both have corresponding equal sides. The * in the congruence sign denotes the matching function checks both for triangles that have the same vertex orientation and a different one. This rule has been replaced by rules r64 and r65 to prevent hiding the orientation checking inside the matching funtion."
+  },
+  {
+    "slug": "r33",
+    "title": "r33 : SAS Triangle congruence",
+    "section": "Legacy rules",
+    "statement": "|AB| = |PQ| |BC| = |QR| angle (BA times BC) = angle (QP times QR) => triangle ABC congruent ^ asttriangle PQR",
+    "description": "This rule covers the congruence case for two triangles when both have two corresponding equal sides and an equal angle between them. The * in the congruence sign denotes the matching function checks both for triangles that have the same vertex orientation and a different one. This rule has been replaced by rules r66 and r67 to prevent hiding the orientation checking inside the matching funtion."
+  },
+  {
+    "slug": "r34",
+    "title": "r34 : AA Similarity of triangles (direct)",
+    "section": "Legacy rules",
+    "statement": "angle (BA times BC) = angle (QP times QR) angle (CA times CB) = angle (RP times RQ) triangle ABC has the same orientation as triangle PQR => triangle ABC similar triangle PQR",
+    "description": "This is a similarity condition for a pair of triangles: that of two pairs of congruent angles between the triangles (angle-angle similarity). This rule covers the case of direct similarity, that is, both triangles have the same orientation of vertices. The original statement of this rule did not have the orientation check sameclock A B C P Q R as an explicit hypothesis, it was done in the background."
+  },
+  {
+    "slug": "r35",
+    "title": "r35 : AA Similarity of triangles (reverse)",
+    "section": "Legacy rules",
+    "statement": "angle (BA times BC) = angle (QR times QP) angle (CA times CB) = angle (RQ times RP) triangle ABC has the same orientation as triangle PRQ => triangle ABC similar(reverse) triangle PQR",
+    "description": "This is a similarity condition for a pair of triangles: that of two pairs of congruent angles between the triangles (angle-angle similarity). This rule covers the case of reverse similarity, that is, the triangles have reversed orientation for the vertices. The original statement of this rule did not have the orientation check sameclock A B C P R Q as an explicit hypothesis, it was done in the background."
+  },
+  {
+    "slug": "r36",
+    "title": "r36 : ASA Congruence of triangles (direct)",
+    "section": "Legacy rules",
+    "statement": "angle (BA times BC) = angle (QP times QR) angle (CA times CB) = angle (RP times RQ) |AB| = |PQ| ABC non-collinear => triangle ABC congruent triangle PQR",
+    "description": "This rule covers the congruence case for two triangles when both have two corresponding equal angles and an equal side. This rule covers the case of direct congruence, that is, both triangles have the same orientation of vertices."
+  },
+  {
+    "slug": "r37",
+    "title": "r37 : ASA Congruence of triangles (reverse)",
+    "section": "Legacy rules",
+    "statement": "angle (BA times BC) = angle (QP times QR) angle (CA times CB) = angle (RP times RQ) |AB| = |PQ| ABC non-collinear => triangle ABC congruent(reverse) triangle PQR",
+    "description": "This rule covers the congruence case for two triangles when both have two corresponding equal angles and an equal side. This rule covers the case of reverse congruence, that is, both triangles have the opposite orientation for the vertices."
+  },
+  {
+    "slug": "r38",
+    "title": "r38 : SSS Triangle similarity (original)",
+    "section": "Legacy rules",
+    "statement": "BA/BC = QP/QR CA/CB = RP/RQ ABC non-collinear => triangle ABC similar ^ ast triangle PQR",
+    "description": "This rule covers the similarity case for two triangles when both have corresponding proportional sides. The * in the similarity sign denotes the matching function checks both for triangles that have the same vertex orientation and a different one. This rule has been replaced by rules r60 and r61 to prevent hiding the orientation checking inside the matching funtion."
+  },
+  {
+    "slug": "r39",
+    "title": "r39 : SAS Triangle similarity (original)",
+    "section": "Legacy rules",
+    "statement": "BA/BC = QP/QR angle (BA times BC) rangle = angle (QP times QR) ABC non-collinear => triangle ABC similar ^ ast triangle PQR",
+    "description": "This rule covers the similarity case for two triangles when both have a corresponding pair of proportional sides, with an equal angle between them. The * in the similarity sign denotes the matching function checks both for triangles that have the same vertex orientation and a different one. This rule has been replaced by rules r62 and r63 to prevent hiding the orientation checking inside the matching funtion."
+  },
+  {
+    "slug": "r40",
+    "title": "r40 : Similarity without scaling",
+    "section": "Legacy rules",
+    "statement": "BA/BC = QP/QR CA/CB = RP/RQ ABC non-collinear |AB| = |PQ| => triangle ABC congruent ^ ast triangle PQR",
+    "description": "This rule encompasses the fact that if the ratio of similarity of two similar triangles is one (they have corresponding congruent sides), the triangles are congruent. This rule has been replaced by rules r68 and r69 to prevent hiding the orientation checking inside the matching funtion."
+  },
+  {
+    "slug": "r41",
+    "title": "r41 : Thales theorem III",
+    "section": "Legacy rules",
+    "statement": "ABparallel CD MAD collinear NBC collinear MA/MD=NB/NC M to the same side of A to D as N to B to C => MNparallel A B",
+    "description": "This is still another instance of Thales theorem, one that saying that if two transverse lines cross three lines, two of which are parallel, with proportional pairs of segments in the proper configuration, the third line crossed is also parallel to the other two."
+  },
+  {
+    "slug": "r42",
+    "title": "r42 : Thales theorem IV",
+    "section": "Legacy rules",
+    "statement": "ABparallel CD MAD collinear NBC collinear MNparallel AB ABC non-collinear => MA/MD=NB/NC",
+    "description": "This is probably the most common version of Thales theorem: if three parallel lines are cut by two other lines, there is a corresponding pair of proportional segments determined by the intersection points. It is the other direction of the theorem in rule r41. The original version of this rule did not contain the non-degeneracy condition ncoll a b c as a hypothesis."
+  },
+  {
+    "slug": "r43",
+    "title": "r43 : Orthocenter theorem",
+    "section": "New rules",
+    "statement": "ABperpendicular CD and ACperpendicular BD => ADperpendicular BC",
+    "description": "This rule says that the three heights of a triangle meet at a single point (the orthocenter)."
+  },
+  {
+    "slug": "r44",
+    "title": "r44 : Pappus's theorem",
+    "section": "New rules",
+    "statement": "ABC collinear PQR collinear XAQ collinear XPB collinear YAR collinear YPC collinear ZBR collinear ZCQ collinear => XYZ collinear",
+    "description": "This rule is Pappus's hexagon theorem."
+  },
+  {
+    "slug": "r45",
+    "title": "r45 : Simson's line theorem",
+    "section": "New rules",
+    "statement": "ABCP on a circle ALC collinear PLperpendicular AC MBC collinear PMperpendicular BC NAB collinear PNperpendicular AB => LMN collinear",
+    "description": "This rule is Simson's line theorem: The orthogonal projections of a point on the circumcircle of a triangle onto its three sides lie on a same line (Simson's line)."
+  },
+  {
+    "slug": "r46",
+    "title": "r46 : Incenter theorem",
+    "section": "New rules",
+    "statement": "angle (AB times AX)=angle (AX times AC) angle (BA times BX)=angle (BX times BC) ABC non-collinear => angle (CB times CX)=angle (CX times CA)",
+    "description": "The three bisectors of a triangle meet at a single point (the incenter)."
+  },
+  {
+    "slug": "r47",
+    "title": "r47 : Circumcenter theorem",
+    "section": "New rules",
+    "statement": "M midpoint of AB XMperpendicular AB N midpoint of BC XNperpendicular BC P midpoint of CA => XPperpendicular CA",
+    "description": "The three perpendicular bisectors of the sides of a triangle meet at a single point (the circumcenter)."
+  },
+  {
+    "slug": "r48",
+    "title": "r48 : Centroid theorem",
+    "section": "New rules",
+    "statement": "M midpoint of AB MXC collinear N midpoint of BC NXC collinear P midpoint of CA => XPB collinear",
+    "description": "The three medians of a triangle meet at a single point (the centroid)."
+  },
+  {
+    "slug": "r49",
+    "title": "r49 : Recognize center of cyclic (circle)",
+    "section": "New rules",
+    "statement": "O center of the circle ABC ABCD on a circle => OA= OD",
+    "description": "This rule gives an information that is immediate for humans, but previously undetected to the solver: if three points lie on a circle with a known center, and there is a fourth point on that circle, the distance of the center of the circle to this fourth point is the same as to other points in a circle."
+  },
+  {
+    "slug": "r50",
+    "title": "r50 : Recognize center of cyclic (cong)",
+    "section": "New rules",
+    "statement": "ABCD on a circle OA=OB OC=OD AB notparallel CD => OA=OC",
+    "description": "The intersection of the bisectors of two segments of points that lie on a circle is the center of the circle (if the bisectors do not overlap)."
+  },
+  {
+    "slug": "r51",
+    "title": "r51 : Midpoint splits in two",
+    "section": "New rules",
+    "statement": "M midpoint of AB => MA/AB=1/2",
+    "description": "This rule converts a symbolic statement (M is the midpoint of AB) into an algebraic one (the ratio between AM and AB is 1:2). This allows AR to process information from midpoints."
+  },
+  {
+    "slug": "r52",
+    "title": "r52 : Properties of similar triangles (Direct)",
+    "section": "New rules",
+    "statement": "triangle ABC similar triangle PQR => angle (BA times BC)=angle (QP times QR) BA/BC=QP/QR",
+    "description": "This rule was created to explicitate the definition of what a similar triangle is, by going from the pure statement that two triangles are similar to spilling out the corresponding statements about the proportion of the lengths of the sides and the equivalence of angles on both triangles. This rule covers the case where the vertices of both triangles have the same orientation, and is the reverse direction of rule r62."
+  },
+  {
+    "slug": "r53",
+    "title": "r53 : Properties of similar triangles (Reverse)",
+    "section": "New rules",
+    "statement": "triangle ABC similar(reverse) triangle PQR => angle (BA times BC)=angle (QR times QP) BA/BC=QP/QR",
+    "description": "This rule was created to explicitate the definition of what a similar triangle is, by going from the pure statement that two triangles are similar to spilling out the corresponding statements about the proportion of the lengths of the sides and the equivalence of angles on both triangles. This rule covers the case where the vertices of both triangles have the opposite orientation, and is the reverse direction of rule r63."
+  },
+  {
+    "slug": "r54",
+    "title": "r54 : Definition of midpoint",
+    "section": "New rules",
+    "statement": "MA=MB MAB collinear => M midpoint of AB",
+    "description": "This rule was created to detect midpoints by their defining axiomatic properties. It solidifies midp as a predicate."
+  },
+  {
+    "slug": "r55",
+    "title": "r55 : Properties of midpoint (cong)",
+    "section": "New rules",
+    "statement": "M midpoint of AB => MA=MB",
+    "description": "This rule extracts from the midp predicate the property that the midpoint is equidistant from the extremes of the segment. This was done previously inside the definition of a midpoint. Our change makes this implication explicit."
+  },
+  {
+    "slug": "r56",
+    "title": "r56 : Properties of midpoint (coll)",
+    "section": "New rules",
+    "statement": "M midpoint of AB => MAB collinear",
+    "description": "This rule extracts symbolically from the midp predicate the property that the midpoint is on the line of the segment. This was done previously inside the definition of a midpoint. Our change makes this implication explicit."
+  },
+  {
+    "slug": "r57",
+    "title": "r57 : Pythagoras theorem",
+    "section": "New rules",
+    "statement": "triangle ABC is a right triangle with hypotenuse BC => Missing information from Pythagoras theorem",
+    "description": "This rule behaves differently from the others, as both directions of Pythagoras theorem are checked at the same time. If we have a right triangle ABC, it will verify what conditions are already in the proof state. If the proof state symbolically knows the three lengths of the sides, and they satisfy that the sum of the squares of the lengths of the legs is equal to the square of the hypothenuse, it will add the proper orthogonal relation to the proof state. If the proof state has a perpendicular statement and two lengths of sides of the correspoding right triangle, it will add the lconst predicate corresponding to the missing length. The operation does not solve the algebra, it verifies if enough information exists and if that is the case it numerically gets the missing side when using the famous formula."
+  },
+  {
+    "slug": "r58",
+    "title": "r58 : Same chord same arc I",
+    "section": "New rules",
+    "statement": "ABCPQR on a circle AB=PQ triangle CAB has the same orientation as triangle RPQ C to the same side of A to B as R to P to Q => angle (CA times CB)=angle (RP times RQ)",
+    "description": "This is one of the rules that gives the opposite direction of r05, giving conditions for inscribed angles on a circle defining chords of the same length to have the same measure. It has to consider two different configurations to account for complications of using full angles. The other configuration is given in r59."
+  },
+  {
+    "slug": "r59",
+    "title": "r59 : Same chord same arc II",
+    "section": "New rules",
+    "statement": "ABCPQR on a circle AB=PQ triangle CBA has the same orientation as triangle RPQ C not to the same side of A to B as R to P to Q => angle (CA times CB)=angle (RP times RQ)",
+    "description": "This is one of the rules that gives the opposite direction of r05, giving conditions for inscribed angles on a circle defining chords of the same length to have the same measure. It has to consider two different configurations to account for complications of using full angles. The other configuration is given in r58."
+  },
+  {
+    "slug": "r60",
+    "title": "r60 : SSS Similarity of triangles (Direct)",
+    "section": "New rules",
+    "statement": "BA/BC=QP/QR CA/CB=RP/RQ triangle ABC has the same orientation as triangle PQR => triangle ABC similar triangle PQR",
+    "description": "This rule covers the similarity case for two triangles when both have corresponding proportional sides and have the same orientation. This rule, together with r61, replaces the original r38."
+  },
+  {
+    "slug": "r61",
+    "title": "r61 : SSS Similarity of triangles (Reverse)",
+    "section": "New rules",
+    "statement": "BA/BC=QP/QR CA/CB=RP/RQ triangle ABC has the same orientation as triangle PRQ => triangle ABC similar(reverse) triangle PQR",
+    "description": "This rule covers the similarity case for two triangles when both have corresponding proportional sides and have opposite orientations. This rule, together with r60, replaces the original r38."
+  },
+  {
+    "slug": "r62",
+    "title": "r62 : SAS Similarity of triangles (Direct)",
+    "section": "New rules",
+    "statement": "BA/BC=QP/QR angle (BA times BC)=angle (QP times QR) triangle ABC has the same orientation as triangle PQR => triangle ABC similar triangle PQR",
+    "description": "This rule covers the similarity case for two triangles when both have a corresponding pair of proportional sides, with an equal angle between them, and have the same orientation. This rule, together with r63, replaces the original r39."
+  },
+  {
+    "slug": "r63",
+    "title": "r63 : SAS Similarity of triangles (Reverse)",
+    "section": "New rules",
+    "statement": "BA/BC=QP/QR angle (BA times BC)=angle (QR times QP) triangle ABC has the same orientation as triangle PRQ => triangle ABC similar(reverse) triangle PQR",
+    "description": "This rule covers the similarity case for two triangles when both have a corresponding pair of proportional sides, with an equal angle between them, and have opposite orientations. This rule, together with r62, replaces the original r39."
+  },
+  {
+    "slug": "r64",
+    "title": "r64 : SSS Congruence of triangles (Direct)",
+    "section": "New rules",
+    "statement": "AB=PQ BC=QR AC=RP ABC non-collinear triangle ABC has the same orientation as triangle PQR => triangle ABC congruent triangle PQR",
+    "description": "This rule covers the congruence case for two triangles when both have corresponding equal sides, and have the same orientation. This rule, together with r65, replaces the original r32."
+  },
+  {
+    "slug": "r65",
+    "title": "r65 : SSS Congruence of triangles (Reverse)",
+    "section": "New rules",
+    "statement": "AB=PQ BC=QR AC=RP ABC non-collinear triangle ABC has the same orientation as triangle PRQ => triangle ABC congruent(reverse) triangle PQR",
+    "description": "This rule covers the congruence case for two triangles when both have corresponding equal sides, and have opposite orientations. This rule, together with r64, replaces the original r32."
+  },
+  {
+    "slug": "r66",
+    "title": "r66 : SAS Congruence of triangles (Direct)",
+    "section": "New rules",
+    "statement": "AB=PQ BC=QR angle (BA times BC)=angle (QP times QR) ABC non-collinear triangle ABC has the same orientation as triangle PQR => triangle ABC congruent triangle PQR",
+    "description": "This rule covers the congruence case for two triangles when both have a pair of corresponding equal sides, and a congruent angle between them, and have the same orientation. This rule, together with r67, replaces the original r33."
+  },
+  {
+    "slug": "r67",
+    "title": "r67 : SAS Congruence of triangles (Reverse)",
+    "section": "New rules",
+    "statement": "AB=PQ BC=QR angle (BA times BC)=angle (QP times QR) ABC non-collinear triangle ABC has the same orientation as triangle PRQ => triangle ABC congruent(reverse) triangle PQR",
+    "description": "This rule covers the congruence case for two triangles when both have a pair of corresponding equal sides, and a congruent angle between them, and have opposite orientations. This rule, together with r66, replaces the original r33."
+  },
+  {
+    "slug": "r68",
+    "title": "r68 : Similarity without scaling (Direct)",
+    "section": "New rules",
+    "statement": "AB/BC=PQ/QR AC/BC=PR/QR ABC non-collinear AB=PQ triangle ABC has the same orientation as triangle PQR => triangle ABC congruent triangle PQR",
+    "description": "This rule encompasses the fact that if the ratio of similarity of two similar triangles is one (they have corresponding congruent sides), the triangles are congruent. It considers the case when triangles have the same orientation. This rule, together with r69, replaces the original r40."
+  },
+  {
+    "slug": "r69",
+    "title": "r69 : Similarity without scaling (Reverse)",
+    "section": "New rules",
+    "statement": "AB/BC=PQ/QR AC/BC=PR/QR ABC non-collinear AB=PQ triangle ABC has the same orientation as triangle PRQ => triangle ABC congruent(reverse) triangle PQR",
+    "description": "This rule encompasses the fact that if the ratio of similarity of two similar triangles is one (they have corresponding congruent sides), the triangles are congruent. It considers the case when triangles have opposite orientation. This rule, together with r68, replaces the original r40."
+  }
+]

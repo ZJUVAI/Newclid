@@ -10,7 +10,6 @@ if TYPE_CHECKING:
 
 
 class Secant(Predicate):
-
     NAME = "secant"
 
     @classmethod
@@ -25,13 +24,12 @@ class Secant(Predicate):
     ) -> Optional[tuple[Any, ...]]:
         preparse = cls.preparse(args)
         return (
-            tuple(dep_graph.symbols_graph.names2points(
-                preparse)) if preparse else None
+            tuple(dep_graph.symbols_graph.names2points(preparse)) if preparse else None
         )
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
-        args: tuple[Point, ...] = statement.args
+        # args: tuple[Point, ...] = statement.args
         return True
 
     @classmethod
@@ -42,7 +40,6 @@ class Secant(Predicate):
 
 
 class ConstLine(Predicate):
-
     NAME = "constline"
 
     @classmethod
@@ -57,13 +54,12 @@ class ConstLine(Predicate):
     ) -> Optional[tuple[Any, ...]]:
         preparse = cls.preparse(args)
         return (
-            tuple(dep_graph.symbols_graph.names2points(
-                preparse)) if preparse else None
+            tuple(dep_graph.symbols_graph.names2points(preparse)) if preparse else None
         )
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
-        args: tuple[Point, ...] = statement.args
+        # args: tuple[Point, ...] = statement.args
         return True
 
     @classmethod
@@ -74,7 +70,6 @@ class ConstLine(Predicate):
 
 
 class EqPoint(Predicate):
-
     NAME = "eqpoint"
 
     @classmethod
@@ -89,13 +84,12 @@ class EqPoint(Predicate):
     ) -> Optional[tuple[Any, ...]]:
         preparse = cls.preparse(args)
         return (
-            tuple(dep_graph.symbols_graph.names2points(
-                preparse)) if preparse else None
+            tuple(dep_graph.symbols_graph.names2points(preparse)) if preparse else None
         )
 
     @classmethod
     def check_numerical(cls, statement: Statement) -> bool:
-        args: tuple[Point, ...] = statement.args
+        # args: tuple[Point, ...] = statement.args
         return True
 
     @classmethod

@@ -1,5 +1,6 @@
 from __future__ import annotations
 import os
+
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 import logging
 from pathlib import Path
@@ -16,7 +17,9 @@ logger = logging.getLogger(__name__)
 hf_logging.disable_progress_bar()
 hf_logging.set_verbosity_error()
 
-DEBUG_QWEN35_TEXT_INPUT = os.environ.get("NEWCLID_DEBUG_QWEN35_TEXT_INPUT", "").lower() in {
+DEBUG_QWEN35_TEXT_INPUT = os.environ.get(
+    "NEWCLID_DEBUG_QWEN35_TEXT_INPUT", ""
+).lower() in {
     "1",
     "true",
     "yes",
@@ -99,11 +102,19 @@ class Qwen35TextAgent:
         logger.debug("Qwen35Text input snapshot: messages=%s", messages)
         logger.debug("Qwen35Text input snapshot: text_prompt=%s", text_prompt)
         logger.debug("Qwen35Text input snapshot: final_text=%s", final_text)
-        logger.debug("Qwen35Text input snapshot: model_input_keys=%s", list(model_inputs.keys()))
+        logger.debug(
+            "Qwen35Text input snapshot: model_input_keys=%s", list(model_inputs.keys())
+        )
         if "input_ids" in model_inputs:
-            logger.debug("Qwen35Text input snapshot: input_ids.shape=%s", tuple(model_inputs["input_ids"].shape))
+            logger.debug(
+                "Qwen35Text input snapshot: input_ids.shape=%s",
+                tuple(model_inputs["input_ids"].shape),
+            )
         if "attention_mask" in model_inputs:
-            logger.debug("Qwen35Text input snapshot: attention_mask.shape=%s", tuple(model_inputs["attention_mask"].shape))
+            logger.debug(
+                "Qwen35Text input snapshot: attention_mask.shape=%s",
+                tuple(model_inputs["attention_mask"].shape),
+            )
         logger.debug("Qwen35Text input snapshot: prompt_len=%s", prompt_len)
 
     def _log_model_output(
@@ -122,7 +133,15 @@ class Qwen35TextAgent:
             logger.debug("Qwen35Text output [%s]: aux=%s", queue_type, aux)
 
     @torch.no_grad()
-    def inference(self, model, tokenizer, query: str, new_point_name: str, response_prefix: str = '<aux>', with_predicate: bool = True):
+    def inference(
+        self,
+        model,
+        tokenizer,
+        query: str,
+        new_point_name: str,
+        response_prefix: str = "<aux>",
+        with_predicate: bool = True,
+    ):
         aux_dsl_dict = {}
         messages = [
             {"role": "system", "content": "You are a helpful assistant."},
@@ -136,14 +155,23 @@ class Qwen35TextAgent:
         prompt_inputs = tokenizer([text], return_tensors="pt")
         prompt_len = prompt_inputs.input_ids.shape[1]
         pad_token_id = tokenizer.pad_token_id
-        eos_token_id = tokenizer.encode(' ;', add_special_tokens=False)[0]
+        eos_token_id = tokenizer.encode(" ;", add_special_tokens=False)[0]
 
         if with_predicate and len(AUX_PREDICATES) > 0:
             beams_per_predicate = self.decoding_size // len(AUX_PREDICATES)
             if beams_per_predicate:
                 for aux_predicate_str in AUX_PREDICATES:
-                    prompt_with_predicate = text + response_prefix + ' ' + new_point_name + ' : ' + aux_predicate_str
-                    model_inputs = tokenizer([prompt_with_predicate], return_tensors="pt")
+                    prompt_with_predicate = (
+                        text
+                        + response_prefix
+                        + " "
+                        + new_point_name
+                        + " : "
+                        + aux_predicate_str
+                    )
+                    model_inputs = tokenizer(
+                        [prompt_with_predicate], return_tensors="pt"
+                    )
                     self._log_input_snapshot(
                         query=query,
                         messages=messages,
@@ -165,13 +193,15 @@ class Qwen35TextAgent:
                     )
                     scores = generated_output.sequences_scores
                     output_sequences = generated_output.sequences[:, prompt_len:]
-                    aux_dsls = tokenizer.batch_decode(output_sequences, skip_special_tokens=True)
+                    aux_dsls = tokenizer.batch_decode(
+                        output_sequences, skip_special_tokens=True
+                    )
                     for aux_dsl, score in zip(aux_dsls, scores):
                         score = score.item()
                         aux_dsl_dict[aux_dsl] = score
 
         if not with_predicate:
-            prompt_no_predicate = text + response_prefix + ' ' + new_point_name
+            prompt_no_predicate = text + response_prefix + " " + new_point_name
             model_inputs = tokenizer([prompt_no_predicate], return_tensors="pt")
             self._log_input_snapshot(
                 query=query,
@@ -194,7 +224,9 @@ class Qwen35TextAgent:
             )
             scores = generated_output.sequences_scores
             output_sequences = generated_output.sequences[:, prompt_len:]
-            aux_dsls = tokenizer.batch_decode(output_sequences, skip_special_tokens=True)
+            aux_dsls = tokenizer.batch_decode(
+                output_sequences, skip_special_tokens=True
+            )
             for aux_dsl, score in zip(aux_dsls, scores):
                 score = score.item()
                 aux_dsl_dict[aux_dsl] = score

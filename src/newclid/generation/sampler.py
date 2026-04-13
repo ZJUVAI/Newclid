@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import logging
 import random
-import re
 import time
 from typing import Union
 
@@ -34,7 +33,9 @@ from newclid.numerical.distances import (
 
 from newclid.generation.point_naming import PointNaming
 from newclid.generation.constructions import resolve_construction_config
-from newclid.generation.auxiliary import add_potential_points as _add_potential_points_cpp
+from newclid.generation.auxiliary import (
+    add_potential_points as _add_potential_points_cpp,
+)
 
 
 def add_potential_points(point_names, coords, max_points):
@@ -51,6 +52,7 @@ def add_potential_points(point_names, coords, max_points):
                 constructions.append((ctype, args))
         converted.append((coord, constructions))
     return converted
+
 
 MAX_TRY = 10
 
@@ -73,14 +75,16 @@ class ClauseNode:
         self.clause = clause
         self.points = self._extract_point_names()
         self.construction_deps = self._extract_construction_deps()
-        self.rely_on_points = set().union(*self.construction_deps) if self.construction_deps else set()
+        self.rely_on_points = (
+            set().union(*self.construction_deps) if self.construction_deps else set()
+        )
         self.children: list[ClauseNode] = []
         self.parents: list[ClauseNode] = []
         self.depth: int = 0
 
     def _extract_point_names(self) -> set[str]:
         """Extract point names (without coordinates) from clause points."""
-        return {p.split('@')[0] for p in self.clause.points}
+        return {p.split("@")[0] for p in self.clause.points}
 
     def _extract_construction_deps(self) -> list[set[str]]:
         """
@@ -96,9 +100,11 @@ class ClauseNode:
                 deps.append(set())
                 continue
             # Extract point names from sentence arguments (skip construction name)
-            sentence_points = {s for s in sentence[1:] if s and s[0].isalpha() and not s[0].isdigit()}
+            sentence_points = {
+                s for s in sentence[1:] if s and s[0].isalpha() and not s[0].isdigit()
+            }
             # Filter out angle values like "45o"
-            sentence_points = {p for p in sentence_points if not p.endswith('o')}
+            sentence_points = {p for p in sentence_points if not p.endswith("o")}
             # Dependency points are those not defined by this clause
             dep_points = sentence_points - self.points
             deps.append(dep_points)
@@ -149,17 +155,20 @@ class ClauseDAG:
 
         # Extract coordinates and update point mappings
         for p in clause.points:
-            point_name = p.split('@')[0]
-            if '@' in p:
-                parts = p.split('@')
+            point_name = p.split("@")[0]
+            if "@" in p:
+                parts = p.split("@")
                 try:
-                    if len(parts) >= 2 and '_' in parts[1]:
+                    if len(parts) >= 2 and "_" in parts[1]:
                         # Format: name@x_y
-                        x_str, y_str = parts[1].split('_')
+                        x_str, y_str = parts[1].split("_")
                         self.point_coords[point_name] = (float(x_str), float(y_str))
                     elif len(parts) >= 3:
                         # Format: name@x@y
-                        self.point_coords[point_name] = (float(parts[1]), float(parts[2]))
+                        self.point_coords[point_name] = (
+                            float(parts[1]),
+                            float(parts[2]),
+                        )
                 except (ValueError, IndexError):
                     pass
             self.point_to_node[point_name] = node
@@ -186,8 +195,7 @@ class ClauseDAG:
 
         # Find leaf nodes in the top k layers (depth >= min_keep_depth)
         target_leaves = [
-            n for n in self.nodes
-            if n.depth >= min_keep_depth and not n.children
+            n for n in self.nodes if n.depth >= min_keep_depth and not n.children
         ]
 
         if not target_leaves:
@@ -227,7 +235,9 @@ class ClauseDAG:
         for node in self.nodes:
             node.children = [c for c in node.children if c in keep_nodes]
 
-    def add_auxiliary_points(self, max_points: int = 2, point_naming: PointNaming = None) -> None:
+    def add_auxiliary_points(
+        self, max_points: int = 2, point_naming: PointNaming = None
+    ) -> None:
         """
         Add potential auxiliary points to the DAG.
 
@@ -355,11 +365,11 @@ class ClauseDAG:
                 clause_strs.append(str(renamed_clause))
             else:
                 # Remove coordinates from points
-                points_str = ' '.join(old_to_new[p] for p in sorted(node.points))
-                sentences_str = ', '.join(' '.join(s) for s in renamed_clause.sentences)
+                points_str = " ".join(old_to_new[p] for p in sorted(node.points))
+                sentences_str = ", ".join(" ".join(s) for s in renamed_clause.sentences)
                 clause_strs.append(f"{points_str} = {sentences_str}")
 
-        return '; '.join(clause_strs)
+        return "; ".join(clause_strs)
 
 
 class ProblemSampler:
@@ -412,7 +422,7 @@ class ProblemSampler:
         prune_topk: int = 1,
         with_coords: bool = True,
         rename: bool = True,
-        return_timings: bool = False
+        return_timings: bool = False,
     ) -> Union[str, tuple[str, dict]]:
         """
         Generate geometric clauses.
@@ -465,24 +475,26 @@ class ProblemSampler:
             for clause_str in new_clause_strs:
                 clause = self._parse_clause_str(clause_str)
                 self.dag.add_clause(clause)
-        timings['sampling'] = time.time() - t0
+        timings["sampling"] = time.time() - t0
 
         # Step 2: Prune to keep deepest chains
         t0 = time.time()
         if prune:
             self.dag.prune(topk=prune_topk)
-        timings['prune'] = time.time() - t0
+        timings["prune"] = time.time() - t0
 
         # Step 3: Add auxiliary points
         t0 = time.time()
         if add_auxiliary:
-            self.dag.add_auxiliary_points(max_points=max_auxiliary_points, point_naming=self.point_naming)
-        timings['add_auxiliary'] = time.time() - t0
+            self.dag.add_auxiliary_points(
+                max_points=max_auxiliary_points, point_naming=self.point_naming
+            )
+        timings["add_auxiliary"] = time.time() - t0
 
         # Step 4: Convert to problem string
         t0 = time.time()
         result = self.dag.to_problem(with_coords=with_coords, rename=rename)
-        timings['to_problem'] = time.time() - t0
+        timings["to_problem"] = time.time() - t0
 
         if return_timings:
             return result, timings
@@ -498,7 +510,7 @@ class ProblemSampler:
         Returns:
             Parsed Clause object.
         """
-        parts = clause_str.split('=')
+        parts = clause_str.split("=")
         if len(parts) != 2:
             raise ValueError(f"Invalid clause string: {clause_str}")
 
@@ -506,7 +518,7 @@ class ProblemSampler:
         points = tuple(points_part.strip().split())
 
         sentences = []
-        for c in constructions_part.strip().split(','):
+        for c in constructions_part.strip().split(","):
             tokens = c.strip().split()
             if tokens:
                 sentences.append(tuple(tokens))
@@ -541,7 +553,7 @@ class ProblemSampler:
                     args_mappings,
                     numeric_list,
                     construction_points,
-                    num_points
+                    num_points,
                 ) = self._select_construction_types(
                     construction_type_candidates,
                     num_construction_types,
@@ -608,7 +620,9 @@ class ProblemSampler:
                     construction_def,
                     self.point_naming.defined_points,
                 )
-                if not self._validate_construction_requirements(construction_def, args_mapping):
+                if not self._validate_construction_requirements(
+                    construction_def, args_mapping
+                ):
                     continue
 
                 numerics = self._extract_numerics(construction_def, args_mapping)
@@ -622,7 +636,13 @@ class ProblemSampler:
                 construction_points.update(new_construction_points)
                 break
 
-        return selected_construction_types, args_mappings, numeric_list, construction_points, num_points
+        return (
+            selected_construction_types,
+            args_mappings,
+            numeric_list,
+            construction_points,
+            num_points,
+        )
 
     def _build_clause_strings(
         self,
@@ -644,16 +664,27 @@ class ProblemSampler:
                 self.point_naming.define_points(new_points)
 
                 construction_strs: list[str] = []
-                for construction, mapping in zip(selected_construction_types, args_mappings):
+                for construction, mapping in zip(
+                    selected_construction_types, args_mappings
+                ):
                     mapping.update(
-                        dict(zip(self.construction_defs[construction].points, new_points)))
-                    construction_strs.append(
-                        self._format_construction_text(self.construction_defs[construction], mapping)
+                        dict(
+                            zip(self.construction_defs[construction].points, new_points)
+                        )
                     )
-                    self._validate_construction_basics(self.construction_defs[construction], mapping)
+                    construction_strs.append(
+                        self._format_construction_text(
+                            self.construction_defs[construction], mapping
+                        )
+                    )
+                    self._validate_construction_basics(
+                        self.construction_defs[construction], mapping
+                    )
 
                 new_point_strs = self._format_points_with_coords(new_points)
-                clause_str = ' '.join(new_point_strs) + " = " + ', '.join(construction_strs)
+                clause_str = (
+                    " ".join(new_point_strs) + " = " + ", ".join(construction_strs)
+                )
                 clause_strs.append(clause_str)
 
             except Exception as e:
@@ -672,7 +703,8 @@ class ProblemSampler:
                 if len(premise) == 0:
                     continue
                 statement = Statement.from_tokens(
-                    translate_sentence(mapping, premise), self.dep_graph)
+                    translate_sentence(mapping, premise), self.dep_graph
+                )
                 if statement is None or not statement.check_numerical():
                     return False
             return True
@@ -686,7 +718,8 @@ class ProblemSampler:
             for basic_statement in construction_def.basics:
                 for t in basic_statement.sentences:
                     Statement.from_tokens(
-                        translate_sentence(mapping, t), self.dep_graph)
+                        translate_sentence(mapping, t), self.dep_graph
+                    )
             return True
         except Exception as e:
             logging.warning(f"Error processing construction basics: {e}")
@@ -696,8 +729,7 @@ class ProblemSampler:
         """Extract numerical constraints from construction definition."""
         numerics = []
         for n in construction_def.numerics:
-            numerics.append(
-                tuple(mapping[a] if a in mapping else a for a in n))
+            numerics.append(tuple(mapping[a] if a in mapping else a for a in n))
         return numerics
 
     def _extract_construction_points(self, construction_def, mapping) -> set[Point]:
@@ -711,10 +743,13 @@ class ProblemSampler:
     def _format_points_with_coords(self, point_names: list[str]) -> list[str]:
         """Format point names with their coordinates."""
         points = self.symbols_graph.names2points(point_names)
-        return [f'{p.name}@{p.num.x}_{p.num.y}' for p in points]
+        return [f"{p.name}@{p.num.x}_{p.num.y}" for p in points]
 
-    def _draw_diagram(self, new_points: list[str], numerics: list, construction_points: set[Point]):
+    def _draw_diagram(
+        self, new_points: list[str], numerics: list, construction_points: set[Point]
+    ):
         """Draw diagram and validate point positions."""
+
         def draw_fn() -> tuple[PointNum, ...]:
             to_be_intersected: list[ObjNum] = []
             for n in numerics:
@@ -743,7 +778,9 @@ class ProblemSampler:
 
         # Check point distances
         _existing_numerical_points = [p.num for p in _existing_points]
-        if check_too_close_numerical(_new_numerical_point, _existing_numerical_points, round=-1.0):
+        if check_too_close_numerical(
+            _new_numerical_point, _existing_numerical_points, round=-1.0
+        ):
             raise PointTooCloseError()
         if check_too_far_numerical(_new_numerical_point, _existing_numerical_points):
             raise PointTooFarError()
@@ -761,7 +798,7 @@ class ProblemSampler:
         mapping: dict[str, str] = {}
 
         # Calculate number of points needed
-        if construction_def.declare[0] == 's_angle':
+        if construction_def.declare[0] == "s_angle":
             n_needed = len(construction_def.args) - 1
             args_to_map = construction_def.args[:-1]
         else:
@@ -773,8 +810,8 @@ class ProblemSampler:
         mapping.update(dict(zip(args_to_map, points)))
 
         # Handle special angle case
-        if construction_def.declare[0] == 's_angle':
-            mapping[construction_def.args[-1]] = f'{random.choice(range(15, 180, 15))}o'
+        if construction_def.declare[0] == "s_angle":
+            mapping[construction_def.args[-1]] = f"{random.choice(range(15, 180, 15))}o"
 
         return mapping
 
@@ -796,17 +833,21 @@ def main():
     # 1. ClauseDAG 测试
     print("=== ClauseDAG 测试 ===")
     dag = ClauseDAG()
-    dag.add_clause(Clause(('a@0_0', 'b@1_0', 'c@0.5_1'), (('triangle', 'a', 'b', 'c'),)))
-    dag.add_clause(Clause(('d@0.5_0',), (('midpoint', 'd', 'a', 'b'),)))
-    dag.add_clause(Clause(('e@0.25_0.5',), (('midpoint', 'e', 'a', 'c'),)))
-    dag.add_clause(Clause(('f@0.375_0.25',), (('midpoint', 'f', 'd', 'e'),)))
+    dag.add_clause(
+        Clause(("a@0_0", "b@1_0", "c@0.5_1"), (("triangle", "a", "b", "c"),))
+    )
+    dag.add_clause(Clause(("d@0.5_0",), (("midpoint", "d", "a", "b"),)))
+    dag.add_clause(Clause(("e@0.25_0.5",), (("midpoint", "e", "a", "c"),)))
+    dag.add_clause(Clause(("f@0.375_0.25",), (("midpoint", "f", "d", "e"),)))
     print(f"节点: {len(dag.nodes)}, 深度: {dag.get_max_depth()}")
     print(f"问题: {dag.to_problem(rename=True)}\n")
 
     # 2. 单个问题
     print("=== 单个问题 ===")
     sampler = ProblemSampler(seed=seed)
-    result = sampler.generate(length=length, add_auxiliary=True, prune=True, with_coords=False)
+    result = sampler.generate(
+        length=length, add_auxiliary=True, prune=True, with_coords=False
+    )
     print(result)
     print(f"节点: {len(sampler.dag.nodes)}, 深度: {sampler.dag.get_max_depth()}\n")
 
@@ -825,7 +866,7 @@ def main():
             point_counts.append(len(s.dag.get_all_points()))
 
     elapsed = time.time() - start
-    print(f"耗时: {elapsed:.2f}s, 速度: {n_samples/elapsed:.1f}题/秒\n")
+    print(f"耗时: {elapsed:.2f}s, 速度: {n_samples / elapsed:.1f}题/秒\n")
 
     # 深度分布 (排序 + barchart)
     print("深度分布:")
