@@ -7,7 +7,6 @@ from fractions import Fraction
 
 
 from newclid.agent.ddarn import DDARN
-from newclid.agent.lm import LMAgent
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.ddar_build_input import build_ddar_input
 from newclid.dependencies.dependency_graph import DependencyGraph

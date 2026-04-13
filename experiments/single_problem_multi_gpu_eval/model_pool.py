@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from newclid.evaluation.multi_gpu import model_pool as _impl
+from newclid.agent.runtime import model_pool as _impl
 
 GenerationDispatcher = _impl.GenerationDispatcher
 ModelPool = _impl.ModelPool

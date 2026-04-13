@@ -9,7 +9,6 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.utils import logging as hf_logging
 
-from newclid.agent.lm import LMAgent, AUX_PREDICATES
 from newclid.problem_db import ProblemDBRuntime
 
 
@@ -46,7 +45,7 @@ def _resolve_model_path(path: str) -> str:
     return resolved
 
 
-class Qwen35TextAgent(LMAgent):
+class Qwen35TextAgent:
     def __init__(
         self,
         model_path: list[str],
@@ -201,3 +200,4 @@ class Qwen35TextAgent(LMAgent):
                 aux_dsl_dict[aux_dsl] = score
 
         return aux_dsl_dict
+AUX_PREDICATES: list[str] = []

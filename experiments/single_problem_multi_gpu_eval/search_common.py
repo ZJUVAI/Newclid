@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from newclid.evaluation.multi_gpu.search_common import (
+from newclid.agent.runtime.search_runtime import (
     BeamQueue,
     build_problem_proof,
     extract_goals,

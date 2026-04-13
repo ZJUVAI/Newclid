@@ -10,12 +10,10 @@ if str(REPO_ROOT) not in sys.path:
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from newclid.evaluation.output import (
+from scripts.evaluation import (
     build_eval_output_stem,
     build_timestamped_output_stem,
     sanitize_problem_name,
-)
-from newclid.evaluation.runner import (
     create_workers,
     main,
     solve_one_problem,

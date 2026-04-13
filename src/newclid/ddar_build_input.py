@@ -27,8 +27,9 @@ from newclid.numerical.geometries import (
     reduce as _geo_reduce,
 )
 from newclid.numerical.sketch import sketch
+from newclid.proof import ConstructionError
 from newclid.statement import Statement
-from newclid.tools import atomize
+from newclid.tools import atomize, notNone
 
 
 def build_ddar_input(
@@ -45,6 +46,7 @@ def build_ddar_input(
     for _ in range(max_attempts):
         point_nums: dict[str, PointNum] = {}
         raw_premises: list[tuple[str, list[str]]] = []
+        temp_dep_graph = DependencyGraph(AlgebraicManipulator())
 
         try:
             for construction in problemJGEX.constructions:
@@ -60,6 +62,20 @@ def build_ddar_input(
                 for constr_sentence in construction.sentences:
                     cdef = defs[constr_sentence[0]]
                     mapping = build_construction_mapping(construction, constr_sentence, cdef)
+
+                    for premise in cdef.require.sentences:
+                        if len(premise) == 0:
+                            continue
+                        statement = notNone(
+                            Statement.from_tokens(
+                                translate_sentence(mapping, premise),
+                                temp_dep_graph,
+                            )
+                        )
+                        if not statement.check_numerical():
+                            raise ConstructionError(
+                                "Requirement check_numerical failed. " + str(construction)
+                            )
 
                     for arg in cdef.args:
                         name = mapping[arg]
@@ -112,6 +128,10 @@ def build_ddar_input(
                 if check_too_far_numerical(new_nums, existing_nums):
                     raise PointTooFarError()
 
+                for name in point_names:
+                    pt = temp_dep_graph.symbols_graph.new_node(Point, name, None)
+                    pt.num = point_nums[name]
+
             raw_goals: list[tuple[str, list[str]]] = []
             useful_points: set[str] = set()
             for goal_tokens in problemJGEX.goals:
@@ -123,11 +143,6 @@ def build_ddar_input(
                 for a in args:
                     if a and a[0].isalpha():
                         useful_points.add(a)
-
-            temp_dep_graph = DependencyGraph(AlgebraicManipulator())
-            for name in point_nums.keys():
-                pt = temp_dep_graph.symbols_graph.new_node(Point, name, None)
-                pt.num = point_nums[name]
 
             for goal_tokens in problemJGEX.goals:
                 goal_stmt = Statement.from_tokens(goal_tokens, temp_dep_graph)

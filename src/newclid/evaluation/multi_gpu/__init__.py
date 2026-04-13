@@ -1,6 +1,10 @@
-"""Shared multi-GPU evaluation runtime helpers."""
+"""Compatibility exports for the single-problem multi-GPU runtime."""
 
-from newclid.evaluation.multi_gpu.model_pool import GenerationDispatcher, ModelPool, WorkerHandleWrapper
+from newclid.evaluation.multi_gpu.model_pool import (
+    GenerationDispatcher,
+    ModelPool,
+    WorkerHandleWrapper,
+)
 
 __all__ = [
     "GenerationDispatcher",

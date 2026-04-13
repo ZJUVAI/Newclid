@@ -25,7 +25,7 @@ from newclid.formulations.definition import DefinitionJGEX
 from newclid import GeometricSolverBuilder, GeometricSolver
 from newclid.predicates import NAME_TO_PREDICATE
 # 从lm.py导入LMAgent类，确保使用最新版本
-from newclid.agent.lm import LMAgent
+from newclid.agent.search_core import try_dsl_to_constructions
 
 class AuxChecker:
     """AuxChecker - 综合aux验证工具"""
@@ -39,9 +39,6 @@ class AuxChecker:
         self.seed = seed
         self.max_attempts = max_attempts
         self.defs = DefinitionJGEX.to_dict(DefinitionJGEX.parse_txt_file(default_defs_path()))
-        # 创建LMAgent实例来调用translate函数
-        # 使用空的模型路径，因为我们只需要调用translate方法
-        self.lm_agent = LMAgent(model_path=[], decoding_size=1, beam_size=1, search_depth=1)
     def extract_aux_from_llm_output(self, llm_output: str):
         """从LLM输出中提取aux部分的内容"""
         aux_pattern = r'<aux>\s*(.*?)\s*</aux>'
@@ -159,7 +156,7 @@ class AuxChecker:
                                         preparsed_aux_premise = aux_premise_parts[0] + ' ' + ' '.join(preparsed)
                                         preparsed_premises.append(preparsed_aux_premise)
                                 # 使用lm.py的函数进行翻译
-                                aux_clauses = self.lm_agent.try_dsl_to_constructions(aux_content)
+                                aux_clauses = try_dsl_to_constructions(aux_content)
                                 if aux_clauses is None:
                                     continue
                                 aux_constructions = aux_clauses.split(" = ")[1].split(", ")

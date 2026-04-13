@@ -1,8 +1,9 @@
-"""Formal evaluation entrypoints and helpers."""
+"""Compatibility exports for the evaluation entrypoints."""
 
 from newclid.evaluation.output import (
     build_eval_output_stem,
     build_timestamped_output_stem,
+    normalize_agent_type,
     sanitize_problem_name,
 )
 from newclid.evaluation.runner import (
@@ -15,6 +16,7 @@ from newclid.evaluation.runner import (
 __all__ = [
     "build_eval_output_stem",
     "build_timestamped_output_stem",
+    "normalize_agent_type",
     "sanitize_problem_name",
     "create_workers",
     "main",

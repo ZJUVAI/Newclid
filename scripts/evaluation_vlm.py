@@ -8,8 +8,10 @@ if str(REPO_ROOT) not in sys.path:
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
 
-from newclid.evaluation.runner import main
+from scripts.evaluation import main
 
 
 if __name__ == "__main__":
+    if "--agent" not in sys.argv[1:]:
+        sys.argv.extend(["--agent", "vlm"])
     main()

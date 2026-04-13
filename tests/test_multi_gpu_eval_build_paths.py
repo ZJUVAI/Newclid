@@ -32,6 +32,12 @@ def _bad_reused_point_problem() -> ProblemJGEX:
     )
 
 
+def _bad_requirement_problem() -> ProblemJGEX:
+    return ProblemJGEX.from_text(
+        "a b c = triangle a b c; d = on_line d a b; e = on_pline e d a b"
+    )
+
+
 def test_build_ddar_input_matches_full_build_for_all_points():
     defs = _load_defs()
     problem = ProblemJGEX.from_text("a b c = triangle a b c")
@@ -78,6 +84,36 @@ def test_full_build_rejects_reused_existing_point_name():
         assert "already used" in str(exc)
     else:
         raise AssertionError("Expected full proof build to reject reused point names")
+
+
+def test_build_ddar_input_rejects_requirement_numerical_failure():
+    defs = _load_defs()
+    problem = _bad_requirement_problem()
+
+    try:
+        build_ddar_input(
+            problem,
+            defs,
+            np.random.default_rng(998244353),
+            max_attempts=3,
+            only_useful_points=False,
+        )
+    except Exception as exc:
+        assert "Requirement check_numerical failed" in str(exc)
+    else:
+        raise AssertionError("Expected build_ddar_input to reject invalid construction requirements")
+
+
+def test_full_build_rejects_requirement_numerical_failure():
+    defs = _load_defs()
+    problem = _bad_requirement_problem()
+
+    try:
+        build_problem_proof(problem, defs, max_attempts=3)
+    except Exception as exc:
+        assert "Requirement check_numerical failed" in str(exc)
+    else:
+        raise AssertionError("Expected full proof build to reject invalid construction requirements")
 
 
 def test_visual_agent_materializes_missing_frontier_proofs():
