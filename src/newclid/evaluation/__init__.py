@@ -6,12 +6,6 @@ from newclid.evaluation.output import (
     normalize_agent_type,
     sanitize_problem_name,
 )
-from newclid.evaluation.runner import (
-    create_workers,
-    main,
-    solve_one_problem,
-    solve_problems_single_problem_multi_gpu,
-)
 
 __all__ = [
     "build_eval_output_stem",
@@ -23,3 +17,16 @@ __all__ = [
     "solve_one_problem",
     "solve_problems_single_problem_multi_gpu",
 ]
+
+
+def __getattr__(name: str):
+    if name in {
+        "create_workers",
+        "main",
+        "solve_one_problem",
+        "solve_problems_single_problem_multi_gpu",
+    }:
+        from newclid.evaluation import runner as runner_module
+
+        return getattr(runner_module, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

@@ -12,8 +12,34 @@ from pathlib import Path
 import re
 
 import ray
-from rich.live import Live
-from rich.table import Table
+
+try:
+    from rich.live import Live
+    from rich.table import Table
+except ImportError:
+    class Table:  # type: ignore[no-redef]
+        def __init__(self):
+            self.columns: list[tuple[str, str | None, bool]] = []
+            self.rows: list[tuple[str, ...]] = []
+
+        def add_column(self, header: str, justify: str | None = None, no_wrap: bool = False):
+            self.columns.append((header, justify, no_wrap))
+
+        def add_row(self, *values: str):
+            self.rows.append(tuple(values))
+
+    class Live:  # type: ignore[no-redef]
+        def __init__(self, *args, **kwargs):
+            self.renderable = None
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def update(self, renderable):
+            self.renderable = renderable
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]

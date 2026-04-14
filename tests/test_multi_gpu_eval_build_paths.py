@@ -22,7 +22,13 @@ class _DummyModelPool:
 
 
 def _load_defs():
-    defs_path = Path(__file__).resolve().parents[1] / "src" / "newclid" / "default_configs" / "defs.txt"
+    defs_path = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "newclid"
+        / "default_configs"
+        / "defs.txt"
+    )
     return DefinitionJGEX.to_dict(DefinitionJGEX.parse_txt_file(defs_path))
 
 
@@ -101,7 +107,9 @@ def test_build_ddar_input_rejects_requirement_numerical_failure():
     except Exception as exc:
         assert "Requirement check_numerical failed" in str(exc)
     else:
-        raise AssertionError("Expected build_ddar_input to reject invalid construction requirements")
+        raise AssertionError(
+            "Expected build_ddar_input to reject invalid construction requirements"
+        )
 
 
 def test_full_build_rejects_requirement_numerical_failure():
@@ -113,7 +121,9 @@ def test_full_build_rejects_requirement_numerical_failure():
     except Exception as exc:
         assert "Requirement check_numerical failed" in str(exc)
     else:
-        raise AssertionError("Expected full proof build to reject invalid construction requirements")
+        raise AssertionError(
+            "Expected full proof build to reject invalid construction requirements"
+        )
 
 
 def test_visual_agent_materializes_missing_frontier_proofs():
@@ -137,7 +147,9 @@ def test_visual_agent_materializes_missing_frontier_proofs():
     next_queue.add(node=(2, 0, (1,), (problem, base_proof)), val=0.5, stable_key=(1,))
 
     profiling = {}
-    materialized_queue = agent.finalize_next_queue(next_queue=next_queue, profiling=profiling)
+    materialized_queue = agent.finalize_next_queue(
+        next_queue=next_queue, profiling=profiling
+    )
     states = [node[3] for _, node in materialized_queue]
 
     assert len(states) == 2
@@ -165,7 +177,9 @@ def test_visual_agent_skips_invalid_frontier_node_during_materialization():
     next_queue.add(node=(2, 0, (1,), (bad_problem, None)), val=0.5, stable_key=(1,))
 
     profiling = {}
-    materialized_queue = agent.finalize_next_queue(next_queue=next_queue, profiling=profiling)
+    materialized_queue = agent.finalize_next_queue(
+        next_queue=next_queue, profiling=profiling
+    )
     nodes = [node for _, node in materialized_queue]
 
     assert len(nodes) == 1

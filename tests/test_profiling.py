@@ -53,7 +53,9 @@ class _DummyAgent(BaseAgent):
     def prepare_request(self, *, request_id, state, proof, depth):
         return {"request_id": request_id}
 
-    def make_next_state_from_unsolved_ddar(self, *, new_problem, prior_state, ddar_result, proof):
+    def make_next_state_from_unsolved_ddar(
+        self, *, new_problem, prior_state, ddar_result, proof
+    ):
         return None
 
     def try_dsl_to_constructions(self, content: str):

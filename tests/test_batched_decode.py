@@ -32,7 +32,9 @@ class BatchedDecodeTests(unittest.TestCase):
             model_inputs=model_inputs,
             sequences=sequences,
             decoding_size=2,
-            decode_batch=lambda batch: [decoded[tuple(item.tolist())] for item in batch],
+            decode_batch=lambda batch: [
+                decoded[tuple(item.tolist())] for item in batch
+            ],
         )
 
         self.assertEqual(
@@ -49,8 +51,12 @@ class BatchedDecodeTests(unittest.TestCase):
             ],
         )
 
-    def test_decode_batched_continuations_uses_padded_input_width_not_per_sample_prompt_length(self):
-        requests = [{"request_id": "r0", "response_prefix": "<aux> x00", "new_point_name": "p"}]
+    def test_decode_batched_continuations_uses_padded_input_width_not_per_sample_prompt_length(
+        self,
+    ):
+        requests = [
+            {"request_id": "r0", "response_prefix": "<aux> x00", "new_point_name": "p"}
+        ]
         model_inputs = {"input_ids": np.zeros((1, 8), dtype=np.int64)}
         # The tokens before index 8 simulate left-padded prompt content; only
         # the continuation after index 8 should be decoded.
@@ -70,7 +76,9 @@ class BatchedDecodeTests(unittest.TestCase):
         )
 
     def test_decode_batched_continuations_preserves_beam_order(self):
-        requests = [{"request_id": "r0", "response_prefix": "<aux> x00", "new_point_name": "p"}]
+        requests = [
+            {"request_id": "r0", "response_prefix": "<aux> x00", "new_point_name": "p"}
+        ]
         model_inputs = {"input_ids": np.zeros((1, 4), dtype=np.int64)}
         sequences = [
             np.array([0, 0, 0, 0, 41]),
@@ -83,7 +91,9 @@ class BatchedDecodeTests(unittest.TestCase):
             model_inputs=model_inputs,
             sequences=sequences,
             decoding_size=3,
-            decode_batch=lambda batch: [f" : candidate_{item.tolist()[0]} ;" for item in batch],
+            decode_batch=lambda batch: [
+                f" : candidate_{item.tolist()[0]} ;" for item in batch
+            ],
         )
 
         self.assertEqual(

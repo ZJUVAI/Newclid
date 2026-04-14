@@ -50,7 +50,9 @@ def try_dsl_to_constructions(content: str) -> str | None:
     point = point_names[0]
 
     premise_segments = re.split(r"\s*\[\d+\]", premises)
-    premise_segments = [segment.strip() for segment in premise_segments if segment.strip()]
+    premise_segments = [
+        segment.strip() for segment in premise_segments if segment.strip()
+    ]
     if len(premise_segments) > 2:
         return None
     if not premise_segments:
@@ -81,7 +83,10 @@ def translate_dsl_to_construction(point: str, predicate: str, args: list[str]) -
     if predicate == "eqratio":
         return EqRatio.to_constructive(point, tuple(args))
     if predicate == "eqangle":
-        def arrange_angle_points(a: str, b: str, c: str, d: str) -> tuple[str, str, str] | None:
+
+        def arrange_angle_points(
+            a: str, b: str, c: str, d: str
+        ) -> tuple[str, str, str] | None:
             if a == c:
                 return (b, a, d)
             if a == d:
@@ -120,7 +125,9 @@ def translate_dsl_to_construction(point: str, predicate: str, args: list[str]) -
     return f"{predicate} {' '.join(args)}"
 
 
-def _problem_to_dsl(problem: ProblemJGEX, defs: dict[str, DefinitionJGEX], *, include_empty_basics: bool) -> str:
+def _problem_to_dsl(
+    problem: ProblemJGEX, defs: dict[str, DefinitionJGEX], *, include_empty_basics: bool
+) -> str:
     dep_idx: dict[Statement, str] = {}
     dep_graph = DependencyGraph(AlgebraicManipulator())
     grouped_statements: dict[str, list[Statement]] = defaultdict(list)
@@ -141,7 +148,9 @@ def _problem_to_dsl(problem: ProblemJGEX, defs: dict[str, DefinitionJGEX], *, in
                 if include_empty_basics and not basics:
                     grouped_statements[" ".join(resolved_points)] = []
                 for basic in basics:
-                    statement = Statement.from_tokens(translate_sentence(mapping, basic), dep_graph)
+                    statement = Statement.from_tokens(
+                        translate_sentence(mapping, basic), dep_graph
+                    )
                     grouped_statements[" ".join(resolved_points)].append(statement)
 
         if not include_empty_basics:
@@ -149,8 +158,14 @@ def _problem_to_dsl(problem: ProblemJGEX, defs: dict[str, DefinitionJGEX], *, in
             while remaining_points:
                 point = remaining_points[0]
                 group = point_groups[point]
-                remaining_points = [candidate for candidate in remaining_points if candidate not in group]
-                grouped_statements.setdefault(" ".join(group), grouped_statements.get(" ".join(group), []))
+                remaining_points = [
+                    candidate
+                    for candidate in remaining_points
+                    if candidate not in group
+                ]
+                grouped_statements.setdefault(
+                    " ".join(group), grouped_statements.get(" ".join(group), [])
+                )
 
     problem_parts: list[str] = []
     for key, statements in grouped_statements.items():
@@ -162,7 +177,13 @@ def _problem_to_dsl(problem: ProblemJGEX, defs: dict[str, DefinitionJGEX], *, in
         problem_parts.append(rendered.strip())
 
     goals = [Statement.from_tokens(goal, dep_graph).to_str() for goal in problem.goals]
-    return "<problem> " + " ; ".join(problem_parts) + " ? " + " ; ".join(goals) + " </problem>"
+    return (
+        "<problem> "
+        + " ; ".join(problem_parts)
+        + " ? "
+        + " ; ".join(goals)
+        + " </problem>"
+    )
 
 
 def problem_to_text_dsl(problem: ProblemJGEX, defs: dict[str, DefinitionJGEX]) -> str:
@@ -225,7 +246,9 @@ class BeamQueue:
         self.counter = 0
 
     @staticmethod
-    def _sort_key(entry: tuple[float, tuple[int, ...], int, Any]) -> tuple[float, tuple[int, ...], int]:
+    def _sort_key(
+        entry: tuple[float, tuple[int, ...], int, Any],
+    ) -> tuple[float, tuple[int, ...], int]:
         score, stable_key, insertion_order, _ = entry
         return (-score, stable_key, insertion_order)
 
@@ -255,7 +278,9 @@ class BeamQueue:
         ]
 
 
-def run_ddar_c(proof: ProofState, rules: list["Rule"], start_time: float, timeout: int = 3600) -> bool:
+def run_ddar_c(
+    proof: ProofState, rules: list["Rule"], start_time: float, timeout: int = 3600
+) -> bool:
     del rules, start_time, timeout
     return run_ddar_on_proof(proof)
 

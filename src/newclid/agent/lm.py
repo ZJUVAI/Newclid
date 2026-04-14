@@ -97,12 +97,22 @@ class LMAgent(BaseAgent):
     def try_dsl_to_constructions(self, content: str):
         return try_dsl_to_constructions(content)
 
-    def translate_dsl_to_construction(self, point: str, predicate: str, args: list[str]):
+    def translate_dsl_to_construction(
+        self, point: str, predicate: str, args: list[str]
+    ):
         return translate_dsl_to_construction(point, predicate, args)
 
-    def problem_to_dsl(self, problem: ProblemJGEX, defs: dict[str, DefinitionJGEX]) -> str:
+    def problem_to_dsl(
+        self, problem: ProblemJGEX, defs: dict[str, DefinitionJGEX]
+    ) -> str:
         return problem_to_text_dsl(problem, defs)
 
-    def run_ddar_c(self, proof: ProofState, rules: list["Rule"], start_time: float, timeout: int = 3600) -> bool:
+    def run_ddar_c(
+        self,
+        proof: ProofState,
+        rules: list["Rule"],
+        start_time: float,
+        timeout: int = 3600,
+    ) -> bool:
         del rules, start_time, timeout
         return run_ddar_on_proof(proof)

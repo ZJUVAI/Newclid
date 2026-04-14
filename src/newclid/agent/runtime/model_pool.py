@@ -44,7 +44,9 @@ class GenerationDispatcher:
         if gpu_batch_size <= 0:
             raise ValueError(f"gpu_batch_size must be positive, got {gpu_batch_size}.")
         if gpu_batch_timeout_ms < 0:
-            raise ValueError(f"gpu_batch_timeout_ms must be non-negative, got {gpu_batch_timeout_ms}.")
+            raise ValueError(
+                f"gpu_batch_timeout_ms must be non-negative, got {gpu_batch_timeout_ms}."
+            )
         self.idle_workers = deque(workers)
         self.pending_groups: dict[tuple[Any, ...], deque[dict[str, Any]]] = {}
         self.pending_enqueued_at: dict[str, float] = {}
@@ -163,7 +165,9 @@ class GenerationDispatcher:
                 "submitted_at": submit_time,
                 "submitted_at_unix_s": submit_time_unix_s,
                 "request_queue_time_s_sum": request_queue_time_s_sum,
-                "gpu_worker_id": getattr(worker, "worker_trace_id", getattr(worker, "name", None)),
+                "gpu_worker_id": getattr(
+                    worker, "worker_trace_id", getattr(worker, "name", None)
+                ),
                 "gpu_device": getattr(worker, "worker_device", None),
             }
             self.completed_submission_events.append(
@@ -173,7 +177,9 @@ class GenerationDispatcher:
                     "submitted_at": submit_time,
                     "submitted_at_unix_s": submit_time_unix_s,
                     "request_queue_time_s_sum": request_queue_time_s_sum,
-                    "gpu_worker_id": getattr(worker, "worker_trace_id", getattr(worker, "name", None)),
+                    "gpu_worker_id": getattr(
+                        worker, "worker_trace_id", getattr(worker, "name", None)
+                    ),
                     "gpu_device": getattr(worker, "worker_device", None),
                 }
             )
@@ -235,7 +241,9 @@ class GenerationDispatcher:
                 "gpu_device": running_meta["gpu_device"],
                 "batch_oldest_request_wait_time_s": max(
                     (
-                        done_time - running_meta["submitted_at"] + running_meta["request_queue_time_s_sum"]
+                        done_time
+                        - running_meta["submitted_at"]
+                        + running_meta["request_queue_time_s_sum"]
                     )
                     / max(running_meta["batch_size"], 1),
                     0.0,

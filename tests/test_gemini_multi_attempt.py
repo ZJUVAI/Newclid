@@ -47,10 +47,15 @@ def test_aux_block_to_constructions_supports_multiple_points() -> None:
         """
     )
 
-    assert json.loads(_run_python(code)) == "e = on_line e a b; q = on_line q a c, on_pline q p a b"
+    assert (
+        json.loads(_run_python(code))
+        == "e = on_line e a b; q = on_line q a c, on_pline q p a b"
+    )
 
 
-def test_load_problem_names_supports_dataset_and_single_selection(tmp_path: Path) -> None:
+def test_load_problem_names_supports_dataset_and_single_selection(
+    tmp_path: Path,
+) -> None:
     problems_path = tmp_path / "tiny.txt"
     problems_path.write_text(
         "p1\na b c = triangle a b c ? coll a b c\n"
