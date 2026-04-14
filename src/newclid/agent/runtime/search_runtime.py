@@ -27,12 +27,28 @@ from newclid.predicates.equal_ratios import EqRatio
 from newclid.predicates.midpoint import MidPoint
 from newclid.predicates.parallelism import Para
 from newclid.predicates.perpendicularity import Perp
-from newclid.problem_db import classify_build_exception
 from newclid.proof import ProofState
 from newclid.statement import Statement
 
 if TYPE_CHECKING:
     from newclid.formulations.rule import Rule
+
+
+def classify_build_exception(exc: Exception) -> str:
+    message = str(exc)
+    if "InvalidIntersectError" in message:
+        return "build_numerical_error"
+    if "InvalidReduceError" in message:
+        return "build_reduce_error"
+    if "PointTooCloseError" in message:
+        return "build_point_too_close"
+    if "PointTooFarError" in message:
+        return "build_point_too_far"
+    if "ConstructionError" in message:
+        return "build_requirement_error"
+    if "ValueError" in message:
+        return "build_definition_error"
+    return "build_definition_error"
 
 
 def get_new_point_name(problem: ProblemJGEX) -> str:

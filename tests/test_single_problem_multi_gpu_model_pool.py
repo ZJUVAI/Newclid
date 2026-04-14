@@ -583,4 +583,3 @@ class ModelPathResolutionTests(unittest.TestCase):
             self.assertEqual(
                 resolve_model_path("Qwen/Qwen3-VL-2B-Instruct"), "/tmp/remote-model"
             )
-

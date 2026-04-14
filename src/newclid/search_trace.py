@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -8,7 +9,6 @@ from pathlib import Path
 from typing import Any
 
 from newclid.numerical.geometries import PointNum
-from newclid.problem_db import get_git_commit
 
 
 def utc_now_iso() -> str:
@@ -23,6 +23,21 @@ def sanitize_filename(value: str) -> str:
     cleaned = "".join(ch if ch.isalnum() or ch in "._-" else "_" for ch in value)
     cleaned = cleaned.strip("._")
     return cleaned or "item"
+
+
+def get_git_commit(repo_root: str | Path | None = None) -> str:
+    cwd = Path(repo_root or ".")
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except Exception:
+        return "unknown"
+    return result.stdout.strip() or "unknown"
 
 
 def build_attempt_key(
