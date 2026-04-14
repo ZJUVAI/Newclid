@@ -52,7 +52,7 @@ export default function DefinitionsPage() {
         <div className="reference-grid reference-grid-dense">
           {catalog.map((item) => (
             <section key={item.slug} className="reference-card">
-              <img src={item.image} alt={item.title} />
+              <img src={item.image} alt={item.title} loading="lazy" width={200} height={200} />
               <p className="catalog-meta">{item.section ?? 'Definitions'}</p>
               <h3>{item.title}</h3>
               {item.description ? <p>{item.description}</p> : null}

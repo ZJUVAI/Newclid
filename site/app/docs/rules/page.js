@@ -51,7 +51,7 @@ export default function RulesPage() {
         <div className="reference-grid reference-grid-dense">
           {catalog.map((rule) => (
             <section key={rule.slug} className="reference-card">
-              <img src={rule.image} alt={rule.title} />
+              <img src={rule.image} alt={rule.title} loading="lazy" width={200} height={200} />
               <p className="catalog-meta">{rule.section ?? 'Rules'}</p>
               <h3>{rule.title}</h3>
               {rule.statement ? (
