@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from experiments.single_problem_multi_gpu_eval.search_common import (
+from newclid.evaluation.multi_gpu.search_common import (
     BeamQueue,
     build_problem_proof,
     extract_goals,
     extract_points,
     extract_premises,
 )
-from experiments.single_problem_multi_gpu_eval.visual_multi_gpu_agent import VisualMultiGPUAgent
+from newclid.agent.vlm import VLMAgent
 from newclid.ddar_build_input import build_ddar_input
 from newclid.formulations.definition import DefinitionJGEX
 from newclid.formulations.problem import ProblemJGEX
@@ -121,7 +121,7 @@ def test_visual_agent_materializes_missing_frontier_proofs():
     problem = ProblemJGEX.from_text("a b c = triangle a b c")
     base_proof = build_problem_proof(problem, defs)
 
-    agent = VisualMultiGPUAgent(
+    agent = VLMAgent(
         model_pool=_DummyModelPool(),
         decoding_size=1,
         beam_size=4,
@@ -151,7 +151,7 @@ def test_visual_agent_skips_invalid_frontier_node_during_materialization():
     bad_problem = _bad_reused_point_problem()
     base_proof = build_problem_proof(problem, defs)
 
-    agent = VisualMultiGPUAgent(
+    agent = VLMAgent(
         model_pool=_DummyModelPool(),
         decoding_size=1,
         beam_size=4,

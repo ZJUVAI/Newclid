@@ -7,15 +7,15 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import experiments.single_problem_multi_gpu_eval.lm_actor as lm_actor_module
 import scripts.evaluation as eval_runner_module
 from scripts.evaluation import (
     build_eval_output_stem,
     build_timestamped_output_stem,
 )
-from experiments.single_problem_multi_gpu_eval.lm_actor import resolve_model_path
-from experiments.single_problem_multi_gpu_eval.model_pool import GenerationDispatcher, ModelPool
-from experiments.single_problem_multi_gpu_eval import model_pool as model_pool_module
+import newclid.evaluation.multi_gpu.lm_actor as lm_actor_module
+from newclid.evaluation.multi_gpu.lm_actor import resolve_model_path
+from newclid.evaluation.multi_gpu.model_pool import GenerationDispatcher, ModelPool
+from newclid.evaluation.multi_gpu import model_pool as model_pool_module
 from newclid.search_trace import TraceRun
 
 

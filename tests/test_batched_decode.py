@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from experiments.single_problem_multi_gpu_eval.batched_decode import decode_batched_continuations
+from newclid.evaluation.multi_gpu.batched_decode import decode_batched_continuations
 
 
 class BatchedDecodeTests(unittest.TestCase):

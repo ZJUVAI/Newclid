@@ -16,7 +16,7 @@ from newclid.profiling import (
     merge_profiling_payloads,
     write_profiling_csv,
 )
-from experiments.single_problem_multi_gpu_eval.base_multi_gpu_agent import BaseMultiGPUAgent
+from newclid.agent.base import BaseAgent
 
 
 class _DummyDispatcher:
@@ -43,7 +43,7 @@ class _TraceWriter:
         self.records.append((event, payload))
 
 
-class _DummyAgent(BaseMultiGPUAgent):
+class _DummyAgent(BaseAgent):
     def seed_state(self, proof, base_proof):
         return None
 
@@ -341,7 +341,7 @@ def test_gpu_or_ddar_wait_is_attributed_to_wait_wall_time(monkeypatch) -> None:
         return [], []
 
     monkeypatch.setattr(
-        "experiments.single_problem_multi_gpu_eval.base_multi_gpu_agent.ray.wait",
+        "newclid.agent.base.ray.wait",
         fake_ray_wait,
     )
 
@@ -500,7 +500,7 @@ def test_ddar_result_handle_breaks_out_non_overlapping_substages(monkeypatch) ->
         }
 
     monkeypatch.setattr(
-        "experiments.single_problem_multi_gpu_eval.base_multi_gpu_agent.ray.get",
+        "newclid.agent.base.ray.get",
         fake_ray_get,
     )
 
