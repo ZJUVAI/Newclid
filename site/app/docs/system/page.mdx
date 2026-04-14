@@ -1,0 +1,44 @@
+export const metadata = {
+  title: 'System',
+};
+
+# System
+
+GenesisGeo combines a symbolic deduction engine with learned reasoning components. The architecture has explicit boundaries between what is *suggested* and what is *verified*.
+
+## Pipeline
+
+### 1. Problem representation
+
+A geometry problem is expressed in a formal language built from definitions, predicates, and a goal statement. This gives the solver a symbolic object to manipulate rather than a raw natural-language description.
+
+### 2. Proof state
+
+The proof state is the main symbolic workspace. It stores discovered statements, symbols, dependencies, and the material required to write the final proof. Deductions accumulate here and traceability is preserved.
+
+### 3. Deduction engine
+
+The symbolic core derives new facts from known ones through rules, matching, and algebraic reasoning. It confirms proof steps, rejects invalid proposals, and recovers a dependency path from premises to goal.
+
+### 4. Neural guidance
+
+Learned components help where formal search is weakest: prioritization, auxiliary construction proposal, and multimodal interpretation. The search space of plausible geometric constructions is enormous — one extra point can change everything.
+
+### 5. Proof writing
+
+After the goal is reached, the dependency structure is traversed to recover a clean proof path. The symbolic engine records why each statement was introduced, making it possible to write proof steps back out in a coherent order.
+
+## Layer summary
+
+| Layer | Role |
+| --- | --- |
+| Visual and neural | Suggests what may be geometrically useful |
+| Symbolic state | Represents what is already known |
+| Deduction engine | Derives new true statements |
+| Proof writing | Turns success into an interpretable proof |
+
+## Relation to Newclid and DDAR
+
+GenesisGeo builds on the Newclid and DDAR lineage, preserving the idea that geometry should be solved through explicit state, symbolic rules, and dependency-aware proof construction. The contribution is in extending that stack toward stronger data generation, faster symbolic execution, and multimodal neural support.
+
+The key separation: neural components are allowed to be suggestive and heuristic; symbolic components are required to be explicit and checkable. Proof output remains connected to formal dependencies rather than free-form explanation.

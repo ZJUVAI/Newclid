@@ -12,7 +12,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -23,6 +22,7 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+_build
 
 # Virtual env
 pyvenv.cfg
@@ -31,13 +31,22 @@ share/
 venv/
 .venv/
 
+# Node / frontend
+node_modules/
+.next/
+out/
+
 # Models
 ag_ckpt_vocab/
 models/
 
+# Keep model info file but ignore checkpoints
+!models/ckpts_info.md
+
 # IDEs
 .idea/
 .vscode/
+.claude/
 
 # Coverage data
 .coverage
@@ -48,12 +57,15 @@ run_results/
 src/newclid/generation/dataset/
 src/newclid/test.py
 results/
+!site/app/results/
 datasets/
 core*
 temp/
-experiments/*/data/
-experiments/*/logs/
 experiments/*
+outputs/
+tests_output
+exp/
+run.log
 
 # TODO
 TODO.md
@@ -64,29 +76,5 @@ TODO.md
 # local env
 .conda/
 
-# local files
-run.log
-
-# Local scripts
-benchmark.py
-
-tests_output
-exp/
-
-individual_rules_out
-_build
-
 # Documentation
 docs/source
-
-# New output and model directories
-outputs/
-models/ckpts/
-
-# Keep model info file but ignore checkpoints
-!models/ckpts_info.md
-
-tests-exp/*
-!tests-exp/*.ggb
-!tests-exp/*.ggb
-!tests-exp/runtime_cache.json

@@ -50,7 +50,7 @@ Angle::Angle(Point p1, Point p2, Point p3, Point p4) : _left_pt(p1), _vertex_pt(
 
 bool Angle::check_nondegen() const
 {
-    return !_vertex_pt.is_close(_left_pt) && !_vertex_pt.is_close(_right_pt) && !Coll(_left_pt, _vertex_pt, _right_pt).check_numerically();
+    return _left_pt != _right_pt && !_vertex_pt.is_close(_left_pt) && !_vertex_pt.is_close(_right_pt) && !Coll(_left_pt, _vertex_pt, _right_pt).check_numerically();
 }
 
 Slope Angle::left_side() const
@@ -70,14 +70,23 @@ double Angle::dot_product() const
 }
 
 double Angle::angle() const
-{
-    double a1 = Slope(_vertex_pt, _left_pt).angle();
-    double a2 = Slope(_vertex_pt, _right_pt).angle();
-    double ang = a2 - a1;
-    if (ang < 0)
-    {
+{    
+    double dx1 = _left_pt.x() - _vertex_pt.x();
+    double dy1 = _left_pt.y() - _vertex_pt.y();
+    double dx2 = _right_pt.x() - _vertex_pt.x();
+    double dy2 = _right_pt.y() - _vertex_pt.y();
+
+    double dot   = dx1 * dx2 + dy1 * dy2;
+    double cross = dx1 * dy2 - dy1 * dx2;
+
+    double ang = std::atan2(cross, dot);
+    if (ang < 0.0) {
         ang += M_PI;
     }
+    if (std::abs(cross) < 1e-14 && std::abs(dot) < 1e-14) {
+        return 0.0;
+    }
+
     return ang;
 }
 

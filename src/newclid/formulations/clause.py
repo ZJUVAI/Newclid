@@ -32,12 +32,24 @@ class Clause(NamedTuple):
     def renamed(self, mp: dict[str, str]) -> Clause:
         return Clause(
             # tuple(mp[p] if p in mp else p for p in self.points),
-            tuple(mp[p.split('@')[0]] + '@' + p.split('@')[1] if '@' in p and p.split('@')[0] in mp else mp[p] if p in mp else p for p in self.points),
+            tuple(
+                mp[p.split("@")[0]] + "@" + p.split("@")[1]
+                if "@" in p and p.split("@")[0] in mp
+                else mp[p]
+                if p in mp
+                else p
+                for p in self.points
+            ),
             tuple(translate_sentence(mp, s) for s in self.sentences),
         )
 
     def __str__(self) -> str:
         return f"{' '.join(p for p in self.points)} = {', '.join(' '.join(s) for s in self.sentences)}"
+
+    def to_str_with_coordinates(
+        self, points_with_coords: dict[str, tuple[float, float]]
+    ) -> str:
+        return f"{' '.join(f'{p}@{points_with_coords.get(p)[0]}_{points_with_coords.get(p)[1]}' for p in self.points)} = {', '.join(' '.join(s) for s in self.sentences)}"
 
 
 def translate_sentence(

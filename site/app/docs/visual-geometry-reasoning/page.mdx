@@ -1,0 +1,45 @@
+export const metadata = {
+  title: 'Visual Geometry Reasoning',
+};
+
+# Visual Geometry Reasoning
+
+Geometry is unusual among theorem proving domains because the human mode of understanding is rarely purely symbolic. A person solving an olympiad problem reads the statement, sketches a diagram, notices alignments or symmetries, imagines additional points, and only then settles into explicit proof steps. GenesisGeo is motivated by the gap between that workflow and traditional text-only formal reasoning pipelines.
+
+## Why text alone is insufficient
+
+A purely textual theorem prover can manipulate statements accurately, but it may miss the structural cues that make a proof discoverable. In geometry, those cues often include:
+
+- likely auxiliary points suggested by symmetry
+- circles implied by angle equalities or equal distances
+- parallel or perpendicular relationships that are diagrammatically salient
+- special configurations such as incenter, orthocenter, or midpoint constructions
+
+Many olympiad problems are not difficult because the final proof rule is obscure — they are difficult because the right intermediate construction is hard to guess.
+
+<div className="mdx-callout">
+Multimodal reasoning matters precisely because geometry sits at the boundary of formal proof and visual structure. GenesisGeo is not just a stronger theorem prover, but an experiment in giving formal reasoning systems better geometric priors.
+</div>
+
+## What multimodality means here
+
+Multimodality here is not only about attaching an image encoder to a language model. It is about using visual information to constrain and prioritize reasoning:
+
+- interpreting a geometric diagram as evidence about the likely configuration
+- training on image-text-formal triples instead of text alone
+- treating diagram understanding as an aid to proposing useful auxiliary constructions
+- letting symbolic verification remain the final authority over correctness
+
+Visual signals can suggest, but they do not certify. The symbolic engine remains responsible for proof validity.
+
+## Why geometry is a good testbed
+
+Geometry demands all of the following at once:
+
+- compositional formal language
+- long-horizon search
+- latent intermediate objects
+- grounded spatial intuition
+- exact proof checking
+
+That combination is rarer in mainstream theorem proving benchmarks, making geometry a compact environment for studying how learned models and symbolic systems can cooperate.

@@ -26,6 +26,8 @@ def notNone(x: Optional[T]) -> T:
 
 def get_quotient(v: Any) -> Fraction:
     v = float(v)
+    if abs(v) < 1e-6:
+        v = float(0)
     n = v
     d = 1
     while not close_enough(n, round(n)):
@@ -75,7 +77,7 @@ def fraction_to_ratio(f: Fraction):
 
 def fraction_to_angle(f: Fraction):
     n, d = f.numerator, f.denominator
-    return f"{n%d}pi/{d}"
+    return f"{n % d}pi/{d}"
 
 
 def reshape(to_reshape: Sequence[T], n: int) -> Generator[tuple[T, ...], None, None]:

@@ -1,0 +1,43 @@
+export const metadata = {
+  title: 'Data Generation',
+};
+
+# Data Generation
+
+Difficult geometry reasoning needs far more structured supervision than hand-curated olympiad sets can provide. Synthetic generation is a core research contribution, not just a utility.
+
+## Why synthetic generation matters
+
+IMO-style benchmark sets are too small to serve as the only training signal for a neural component that must learn formal geometry patterns, auxiliary constructions, and proof-sensitive reasoning. Synthetic data provides:
+
+- scale (1M+ problems)
+- controllable structure
+- proof traces
+- repeated exposure to reusable geometric motifs
+
+This is especially important for multimodal reasoning: the model needs examples where text, diagrams, and formal state are aligned at large scale.
+
+## What is generated
+
+Each generated sample couples:
+
+- a formal construction process
+- a set of symbolic statements and goals
+- numerical geometry used to validate and render the instance
+- the proof-side structure needed for supervision
+
+Numerical coordinates are not merely for drawing figures. They also validate non-degeneracy conditions and ensure that a formally stated problem is actually realizable as a geometry instance.
+
+## Auxiliary points
+
+Auxiliary constructions are often the real bottleneck in olympiad geometry. A large generated corpus exposes the model to many situations where hidden points, intersections, or derived objects are necessary for proof success — more informative than training on final theorem statements alone.
+
+## Proof traces
+
+Proof traces provide intermediate structure:
+
+- which facts became available
+- which rule applications mattered
+- how a successful proof decomposes into steps
+
+This makes the data useful for learning search behavior and proof-sensitive heuristics, not just solved/unsolved classification.

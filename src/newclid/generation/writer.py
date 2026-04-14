@@ -18,18 +18,23 @@ def convert_svg_to_png(svg_path, png_path, width=1024):
         os.makedirs(output_dir, exist_ok=True)
 
     try:
-        cairosvg.svg2png(
-            url=svg_path,
-            write_to=png_path,
-            output_width=width
-        )
+        cairosvg.svg2png(url=svg_path, write_to=png_path, output_width=width)
     except Exception as e:
         raise RuntimeError(
-            f"Failed to convert '{svg_path}' to PNG. Error: {str(e)}") from e
+            f"Failed to convert '{svg_path}' to PNG. Error: {str(e)}"
+        ) from e
 
 
 @ray.remote(num_cpus=0.5)
-def draw_figure_task(draw_data: dict, defs_data: dict, imgs_dir: str, imgs_png_dir: str, file_idx: int, session_id: str, img_mode: int):
+def draw_figure_task(
+    draw_data: dict,
+    defs_data: dict,
+    imgs_dir: str,
+    imgs_png_dir: str,
+    file_idx: int,
+    session_id: str,
+    img_mode: int,
+):
     """
     Ray remote task for drawing figures.
 
@@ -46,7 +51,9 @@ def draw_figure_task(draw_data: dict, defs_data: dict, imgs_dir: str, imgs_png_d
         Tuple of (file_idx, paths_update, error)
     """
     try:
-        from newclid.algebraic_reasoning.algebraic_manipulator import AlgebraicManipulator
+        from newclid.algebraic_reasoning.algebraic_manipulator import (
+            AlgebraicManipulator,
+        )
         from newclid.dependencies.dependency_graph import DependencyGraph
         from newclid.dependencies.symbols import Point
         from newclid.numerical.geometries import PointNum
@@ -56,7 +63,8 @@ def draw_figure_task(draw_data: dict, defs_data: dict, imgs_dir: str, imgs_png_d
         from newclid.formulations.clause import Clause
         from newclid.formulations.definition import DefinitionJGEX
         import matplotlib
-        matplotlib.use('Agg')
+
+        matplotlib.use("Agg")
         import matplotlib.pyplot as plt
         import numpy as np
 
@@ -71,8 +79,10 @@ def draw_figure_task(draw_data: dict, defs_data: dict, imgs_dir: str, imgs_png_d
             dep_graph.symbols_graph.name2node[name] = point
 
         # Rebuild Clause objects from (points, sentences) tuples
-        clauses = [Clause(points=tuple(c[0]), sentences=tuple(tuple(s) for s in c[1]))
-                   for c in draw_data["clauses"]]
+        clauses = [
+            Clause(points=tuple(c[0]), sentences=tuple(tuple(s) for s in c[1]))
+            for c in draw_data["clauses"]
+        ]
 
         # Rebuild goal Statement
         goal = Statement.from_tokens(tuple(draw_data["goal_tokens"]), dep_graph)
@@ -82,11 +92,11 @@ def draw_figure_task(draw_data: dict, defs_data: dict, imgs_dir: str, imgs_png_d
         # Determine which images to generate based on img_mode
         draw_configs = []
         if img_mode == 1:
-            draw_configs = [('', True)]
+            draw_configs = [("", True)]
         elif img_mode == 2:
-            draw_configs = [('_no_annotations', False)]
+            draw_configs = [("_no_annotations", False)]
         elif img_mode == 3:
-            draw_configs = [('', True), ('_no_annotations', False)]
+            draw_configs = [("", True), ("_no_annotations", False)]
 
         for suffix, annotations in draw_configs:
             file_name = f"{session_id}_{file_idx}{suffix}"
@@ -105,15 +115,16 @@ def draw_figure_task(draw_data: dict, defs_data: dict, imgs_dir: str, imgs_png_d
                 draw_data["mapping"],
                 annotations,
             )
-            fig.savefig(svg_path, format='svg')
+            fig.savefig(svg_path, format="svg")
             plt.close(fig)
             convert_svg_to_png(svg_path, png_path)
 
-            paths_update[f'image_path{suffix}'] = png_path
+            paths_update[f"image_path{suffix}"] = png_path
 
         return file_idx, paths_update, None
-    except Exception as e:
+    except Exception:
         import traceback
+
         return file_idx, {}, traceback.format_exc()
 
 
@@ -124,19 +135,27 @@ class Writer:
     Manages pending draw tasks and writes completed data to JSONL files.
     """
 
-    def __init__(self, output_dir: str, path_prefix: str, img_mode: int, defs_data: dict, session_id: str):
+    def __init__(
+        self,
+        output_dir: str,
+        file_prefix: str,
+        img_mode: int,
+        defs_data: dict,
+        session_id: str,
+    ):
         """
         Initialize writer.
 
         Args:
-            output_dir: Base output directory
-            path_prefix: Path prefix for output files
+            output_dir: Output directory (with date)
+            file_prefix: Filename prefix for output files
             img_mode: Image generation mode (0-3)
             defs_data: Serialized definitions for drawing
             session_id: Unique session identifier
         """
         self.output_dir = output_dir
-        self.path_prefix = path_prefix
+        os.makedirs(self.output_dir, exist_ok=True)
+        self.file_prefix = file_prefix
         self.img_mode = img_mode
         self.defs_data = defs_data
         self.session_id = session_id
@@ -145,6 +164,20 @@ class Writer:
         self.written_count = 0
         self.pending_draw_tasks = {}  # task_id -> (file_idx, data_item)
         self.pending_write_data = {}  # file_idx -> result_data (completed draw, pending write)
+
+    def clear(self):
+        """Remove existing output files."""
+        import shutil
+
+        filename = os.path.join(self.output_dir, self.file_prefix + ".jsonl")
+        imgs_dir = os.path.join(self.output_dir, "imgs")
+        imgs_png_dir = os.path.join(self.output_dir, "imgs_png")
+        if os.path.exists(filename):
+            os.remove(filename)
+        if os.path.exists(imgs_dir):
+            shutil.rmtree(imgs_dir)
+        if os.path.exists(imgs_png_dir):
+            shutil.rmtree(imgs_png_dir)
 
     def _process_completed_draw_tasks(self, wait_all: bool = False):
         """Process completed draw tasks and store results."""
@@ -158,7 +191,7 @@ class Writer:
             done_tasks, _ = ray.wait(
                 list(self.pending_draw_tasks.keys()),
                 num_returns=len(self.pending_draw_tasks),
-                timeout=0
+                timeout=0,
             )
 
         # Process each completed task
@@ -181,11 +214,11 @@ class Writer:
 
         # Sort by file_idx and write in order
         sorted_indices = sorted(self.pending_write_data.keys())
-        with open(filename, 'a', encoding='utf-8') as f:
+        with open(filename, "a", encoding="utf-8") as f:
             for idx in sorted_indices:
                 result_data = self.pending_write_data[idx]
                 json.dump(result_data, f, ensure_ascii=False)
-                f.write('\n')
+                f.write("\n")
         written = len(self.pending_write_data)
         self.written_count += written
         self.pending_write_data.clear()
@@ -199,7 +232,7 @@ class Writer:
             all_data: List of data items to write
             force: If True, wait for all pending tasks and flush immediately
         """
-        filename = self.path_prefix + ".jsonl"
+        filename = os.path.join(self.output_dir, self.file_prefix + ".jsonl")
         imgs_dir = os.path.join(self.output_dir, "imgs")
         imgs_png_dir = os.path.join(self.output_dir, "imgs_png")
         os.makedirs(os.path.dirname(filename), exist_ok=True)
@@ -208,6 +241,7 @@ class Writer:
 
         for data_item in all_data:
             self.data_count += 1
+            data_item.pop("_timings", None)
             if self.img_mode > 0 and "draw_data" in data_item:
                 draw_data = data_item.pop("draw_data")
                 # Submit draw task to Ray
@@ -218,7 +252,7 @@ class Writer:
                     imgs_png_dir,
                     self.data_count,
                     self.session_id,
-                    self.img_mode
+                    self.img_mode,
                 )
                 self.pending_draw_tasks[task_id] = (self.data_count, data_item)
             else:
@@ -231,13 +265,13 @@ class Writer:
 
         # Flush completed data periodically or when forced
         should_flush = (
-            len(self.pending_write_data) > 100 or
-            len(self.pending_draw_tasks) > 200 or
-            force
+            len(self.pending_write_data) > 1000
+            or len(self.pending_draw_tasks) > 1000
+            or force
         )
         if should_flush:
             # If many draw tasks pending, wait for some to complete first
-            if len(self.pending_draw_tasks) > 200:
+            if len(self.pending_draw_tasks) > 1000:
                 self._process_completed_draw_tasks(wait_all=True)
             self._flush_completed_data(filename)
 

@@ -5,6 +5,7 @@ from abc import ABC
 from typing import TYPE_CHECKING, Optional, TypeVar, Union
 from typing_extensions import Self
 
+from newclid.numerical import nearly_zero
 from newclid.numerical.geometries import CircleNum, LineNum, PointNum
 from newclid.dependencies.dependency import Dependency
 
@@ -158,15 +159,17 @@ class Line(Symbol):
                     while True:
                         merged = False
                         for line in lines:
-                            if not line <= current_points and len(line & current_points) >= 2:
+                            if (
+                                not line <= current_points
+                                and len(line & current_points) >= 2
+                            ):
                                 current_points |= line
                                 merged = True
                         if not merged:
                             break
                     if s <= current_points:
                         break
-                    lines = [line for line in lines if not line <=
-                             current_points]
+                    lines = [line for line in lines if not line <= current_points]
                     lines.append(current_points)
                 return Dependency.mk(statement, "Same Line", why)
                 # return Dependency.mk(statement, "Same Line", [])
@@ -210,7 +213,41 @@ class Circle(Symbol):
         )
         c.points = s
         points = list(c.points)
-        c.num = CircleNum(p1=points[0].num, p2=points[1].num, p3=points[2].num)
+
+        # 选择三个彼此距离合适的点，避免数值误差
+        # 策略：贪心选择，确保每对点之间都有足够距离
+        p1 = points[0]
+        p2 = None
+        for p in points[1:]:
+            if not p1.num.close_enough(p.num):
+                p2 = p
+                break
+        if p2 is None:
+            p2 = points[-1]
+
+        p3 = None
+        for p in points:
+            if p == p1 or p == p2:
+                continue
+            # 检查与前两个点的距离都足够远
+            if not p1.num.close_enough(p.num) and not p2.num.close_enough(p.num):
+                # 检查不共线：计算叉积
+                v1 = p2.num - p1.num
+                v2 = p.num - p1.num
+                cross = v1.x * v2.y - v1.y * v2.x
+                if not nearly_zero(cross):
+                    p3 = p
+                    break
+        if p3 is None:
+            # 回退到默认选择
+            for p in points:
+                if p != p1 and p != p2:
+                    p3 = p
+                    break
+        if p3 is None:
+            p3 = points[-1]
+
+        c.num = CircleNum(p1=p1.num, p2=p2.num, p3=p3.num)
         c.merge(merge)
 
     @classmethod
@@ -230,7 +267,10 @@ class Circle(Symbol):
                     while True:
                         merged = False
                         for circle in circles:
-                            if not circle <= current_points and len(circle & current_points) >= 3:
+                            if (
+                                not circle <= current_points
+                                and len(circle & current_points) >= 3
+                            ):
                                 current_points |= circle
                                 merged = True
                         if not merged:
@@ -238,7 +278,8 @@ class Circle(Symbol):
                     if s <= current_points:
                         break
                     circles = [
-                        circle for circle in circles if not circle <= current_points]
+                        circle for circle in circles if not circle <= current_points
+                    ]
                     circles.append(current_points)
                 return Dependency.mk(statement, "Same Circle", why)
                 # return target.dep.with_new(statement)

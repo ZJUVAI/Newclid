@@ -1,0 +1,42 @@
+export const metadata = {
+  title: 'Problem Collections',
+};
+
+# Problem Collections
+
+GenesisGeo is evaluated on several problem collections. They differ in size and in what kind of evidence they provide.
+
+## IMO-AG-30
+
+30 olympiad geometry problems from IMO 2000–2022, translated into the formal language. This is the original AlphaGeometry benchmark. It is small and prestigious — best treated as a flagship benchmark rather than a complete characterization of system behavior.
+
+GenesisGeo solves **29/30** on this benchmark.
+
+## IMO-95
+
+95 problems from IMO competitions and shortlists. Provides broader coverage than IMO-AG-30 across more formalization styles and difficulty levels.
+
+GenesisGeo solves **63/95** on this benchmark.
+
+## HAGeo-409
+
+409 hard geometry problems from USAMO, USATST, and international olympiads. This is the largest evaluation set and the most informative about practical coverage and generalization.
+
+GenesisGeo solves **278/409** on this benchmark.
+
+## JGEX-AG-231
+
+An AlphaGeometry-era benchmark of shorter formal geometry problems. Useful for measuring solver breadth and engineering stability.
+
+## Examples collection
+
+A curated set for diagnosing the engine:
+
+- simple theorem checks
+- feature regression tests
+- known configurations (orthocenter, Euler line, etc.)
+- stress tests for specific proof behaviors
+
+Theorem provers often fail in highly local ways. A broad public score can hide a broken rule or a regression in proof tracing. Curated examples expose those issues directly.
+
+See the [Results](/results) page for per-problem listings.

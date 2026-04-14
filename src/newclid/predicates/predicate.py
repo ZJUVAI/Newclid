@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from newclid.statement import Statement
 
 
-
 class Predicate(ABC):
     """
     When the args are passed in functions other than parse and to_tokens,
@@ -66,6 +65,7 @@ class Predicate(ABC):
             res += repr(a) + ","
         res += "]"
         return res
+
     @classmethod
     def to_str(cls, statement: Statement) -> str:
         res = cls.NAME
@@ -90,10 +90,14 @@ class Predicate(ABC):
 
     @classmethod
     def draw(
-        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True
-    ):
-        ...
-    
+        cls,
+        ax: Axes,
+        args: tuple[Any, ...],
+        dep_graph: DependencyGraph,
+        rng: Generator,
+        draw_annotations: bool = True,
+    ): ...
+
     @classmethod
     def custom_key(cls, s):
         if len(s) == 1:
