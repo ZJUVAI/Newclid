@@ -21,6 +21,8 @@ MAX_WORKERS="${MAX_WORKERS:-40}"
 SEARCH_DEPTH="${SEARCH_DEPTH:-4}"
 TIMEOUT="${TIMEOUT:-3600}"
 AGENT="${AGENT:-lm}"
+GPU_BATCH_SIZE="${GPU_BATCH_SIZE:-2}"
+GPU_BATCH_TIMEOUT_MS="${GPU_BATCH_TIMEOUT_MS:-100}"
 ENABLE_TRACE="${ENABLE_TRACE:-false}"
 ENABLE_PROFILING="${ENABLE_PROFILING:-false}"
 
@@ -171,13 +173,13 @@ eval_output_stem() {
     local model_path="$2"
     local decoding_size="$3"
     local beam_size="$4"
-    python - "$dataset" "$model_path" "$decoding_size" "$beam_size" "$SEARCH_DEPTH" "$AGENT" <<'PY'
+    python - "$dataset" "$model_path" "$decoding_size" "$beam_size" "$SEARCH_DEPTH" "$AGENT" "$GPU_BATCH_SIZE" "$GPU_BATCH_TIMEOUT_MS" <<'PY'
 from pathlib import Path
 import sys
 
 from scripts.evaluation import build_eval_output_stem
 
-dataset, model_path, decoding_size, beam_size, search_depth, agent = sys.argv[1:]
+dataset, model_path, decoding_size, beam_size, search_depth, agent, gpu_batch_size, gpu_batch_timeout_ms = sys.argv[1:]
 print(
     build_eval_output_stem(
         agent_type=agent,
@@ -186,8 +188,8 @@ print(
         decoding_size=int(decoding_size),
         beam_size=int(beam_size),
         search_depth=int(search_depth),
-        gpu_batch_size=1,
-        gpu_batch_timeout_ms=0,
+        gpu_batch_size=int(gpu_batch_size),
+        gpu_batch_timeout_ms=int(gpu_batch_timeout_ms),
         torch_seed=123,
     )
 )
@@ -304,6 +306,7 @@ echo "Configs    : $EVAL_CONFIGS"
 echo "Checkpoints: $CHECKPOINTS"
 echo "Workers    : $MAX_WORKERS"
 echo "Agent      : $AGENT"
+echo "GPU Batch  : size=$GPU_BATCH_SIZE timeout_ms=$GPU_BATCH_TIMEOUT_MS"
 echo "Trace      : $ENABLE_TRACE"
 echo "Profiling  : $ENABLE_PROFILING"
 if [ "$REPORT_TO_ENABLED" = true ]; then
@@ -347,6 +350,8 @@ for checkpoint in "${CHECKPOINT_ITEMS[@]}"; do
                 --decoding_size "$decoding_size"
                 --beam_size "$beam_size"
                 --search_depth "$SEARCH_DEPTH"
+                --gpu_batch_size "$GPU_BATCH_SIZE"
+                --gpu_batch_timeout_ms "$GPU_BATCH_TIMEOUT_MS"
                 --timeout "$TIMEOUT"
                 --agent "$AGENT"
             )
@@ -356,6 +361,7 @@ for checkpoint in "${CHECKPOINT_ITEMS[@]}"; do
             echo "Dataset    : $dataset_name"
             echo "DatasetPath: $dataset_path"
             echo "Config     : decoding_size=$decoding_size beam_size=$beam_size search_depth=$SEARCH_DEPTH"
+            echo "GPU Batch  : size=$GPU_BATCH_SIZE timeout_ms=$GPU_BATCH_TIMEOUT_MS"
             echo "CSV Stem   : $output_stem"
             echo "Eval Log   : $eval_log"
             echo "------------------------------------------"
