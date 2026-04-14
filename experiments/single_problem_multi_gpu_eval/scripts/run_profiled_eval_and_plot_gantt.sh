@@ -92,7 +92,7 @@ export RESULT_ROOT
 RUN_STEM="$(python - "$@" <<'PY'
 import argparse
 from pathlib import Path
-from experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu import build_eval_output_stem
+from scripts.evaluation import build_eval_output_stem
 
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument("--agent", required=True)
@@ -150,7 +150,7 @@ fi
 
 PLOT_CMD=(
   python
-  experiments/single_problem_multi_gpu_eval/scripts/plot_worker_gantt.py
+  scripts/plot_worker_gantt.py
   --run_dir "$LATEST_RUN_DIR"
   --problem "$PLOT_PROBLEM"
   --output "$PLOT_OUTPUT"

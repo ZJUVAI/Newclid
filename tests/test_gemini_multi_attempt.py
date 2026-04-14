@@ -26,7 +26,7 @@ def test_extract_aux_block_returns_first_block() -> None:
     code = textwrap.dedent(
         """
         import json
-        from experiments.test_frontier_models.run_gemini_multi_attempt import extract_aux_block
+        from scripts.run_gemini_multi_attempt import extract_aux_block
 
         text = "noise <aux> e : coll e a b ; </aux> trailing <aux> x : coll x a c ; </aux>"
         print(json.dumps(extract_aux_block(text)))
@@ -40,7 +40,7 @@ def test_aux_block_to_constructions_supports_multiple_points() -> None:
     code = textwrap.dedent(
         """
         import json
-        from experiments.test_frontier_models.run_gemini_multi_attempt import aux_block_to_constructions
+        from scripts.run_gemini_multi_attempt import aux_block_to_constructions
 
         aux_text = "e : coll e a b ; q : coll q a c para p q a b ;"
         print(json.dumps(aux_block_to_constructions(aux_text)))
@@ -66,7 +66,7 @@ def test_load_problem_names_supports_dataset_and_single_selection(
         f"""
         import json
         from pathlib import Path
-        from experiments.test_frontier_models.run_gemini_multi_attempt import load_problem_names
+        from scripts.run_gemini_multi_attempt import load_problem_names
 
         problems_path = Path({str(problems_path)!r})
         print(json.dumps({{
@@ -89,8 +89,8 @@ def test_run_problem_stops_after_first_success(tmp_path: Path) -> None:
         import json
         from pathlib import Path
 
-        import experiments.test_frontier_models.run_gemini_multi_attempt as module
-        from experiments.test_frontier_models.run_gemini_multi_attempt import (
+        import scripts.run_gemini_multi_attempt as module
+        from scripts.run_gemini_multi_attempt import (
             AttemptResult,
             ProblemContext,
             run_problem,

@@ -16,7 +16,7 @@ mkdir -p "$RESULT_ROOT/logs" "$RESULT_ROOT/system_metrics" "$RESULT_ROOT/analysi
 RUN_STEM="$(python - "$@" <<'PY'
 import argparse
 from pathlib import Path
-from experiments.single_problem_multi_gpu_eval.evaluation_single_problem_multi_gpu import build_eval_output_stem
+from scripts.evaluation import build_eval_output_stem
 
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument("--agent", required=True)
@@ -101,7 +101,7 @@ PY
 }
 EOF
 
-python experiments/single_problem_multi_gpu_eval/evaluation_single_problem_multi_gpu.py \
+python scripts/evaluation.py \
   --log_dir "$RESULT_ROOT" \
   --enable_trace \
   --enable_profiling \
@@ -119,6 +119,6 @@ print(candidates[-1])
 PY
 )"
 
-python experiments/single_problem_multi_gpu_eval/scripts/analyze_eval_trace.py \
+python scripts/analyze_eval_trace.py \
   --run_dir "$LATEST_RUN_DIR" \
   --output_dir "$ANALYSIS_DIR" | tee "$ANALYSIS_DIR/summary.txt"
