@@ -5,18 +5,11 @@
 export function formatStatement(text) {
   if (!text) return '';
   return text
-    .replace(/perpendicular/g, '⊥')
-    .replace(/parallel/g, '∥')
-    .replace(/\bnon-collinear\b/g, 'non-collinear')
-    .replace(/\bcollinear\b/g, 'collinear')
-    .replace(/\bmidpoint of\b/g, 'midpoint of')
-    .replace(/\btimes\b/g, '×')
-    .replace(/\bon a circle\b/g, 'on circle')
-    .replace(/\bcenter of\b/g, 'center of')
-    .replace(/=>/g, '⟹')
-    .replace(/\bangle\b/g, '∠')
-    .replace(/\bsimilar\b/g, '∼')
-    .replace(/\bcongruent\b/g, '≅')
-    .replace(/\^deg\b/g, '°')
-    .replace(/\bsim\b/g, '∼');
+    .replace(/perpendicular/g, '\u22A5')
+    .replace(/parallel/g, '\u2225')
+    .replace(/=>/g, '\u27F9')
+    .replace(/\bangle\b/g, '\u2220')
+    .replace(/\bsimilar\b/g, '\u223C')
+    .replace(/\bcongruent\b/g, '\u2245')
+    .replace(/\^deg\b/g, '\u00B0');
 }

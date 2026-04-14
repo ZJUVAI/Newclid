@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { homeCards, siteMeta } from '@/lib/site-data';
+import { homeCards, siteMeta, benchmarkResults } from '@/lib/site-data';
 
 export default function HomePage() {
   return (
@@ -22,6 +22,16 @@ export default function HomePage() {
             Read Paper
           </a>
         </div>
+      </section>
+
+      <section className="benchmark-strip">
+        {benchmarkResults.map((b) => (
+          <div key={b.label} className="benchmark-item">
+            <span>{b.label}</span>
+            <strong>{b.value}</strong>
+            <p>{b.note}</p>
+          </div>
+        ))}
       </section>
 
       <section className="card-grid-section card-grid-spaced">
