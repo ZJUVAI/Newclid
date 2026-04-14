@@ -175,12 +175,12 @@ eval_output_stem() {
 from pathlib import Path
 import sys
 
-from scripts.evaluation import build_eval_output_stem, normalize_agent_type
+from scripts.evaluation import build_eval_output_stem
 
 dataset, model_path, decoding_size, beam_size, search_depth, agent = sys.argv[1:]
 print(
     build_eval_output_stem(
-        agent_type=normalize_agent_type(agent),
+        agent_type=agent,
         problems_path=Path(dataset),
         model_path=model_path,
         decoding_size=int(decoding_size),
