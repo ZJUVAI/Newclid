@@ -4,9 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
-import logging
-
-from matplotlib import patches
 
 from newclid.construction_validation import (
     build_construction_mapping,
@@ -15,7 +12,7 @@ from newclid.construction_validation import (
 from newclid.formulations.clause import Clause, translate_sentence
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.dependencies.symbols import Point
-from newclid.numerical.draw_figure import init_figure, draw_segment
+from newclid.numerical.draw_figure import init_figure
 from newclid.numerical.geometries import (
     InvalidIntersectError,
     InvalidReduceError,
@@ -101,8 +98,10 @@ class ProofState:
                     )
                 )
                 if not statement.check_numerical():
-                    raise ConstructionError("Requirement check_numerical failed. " + str(construction))
-                
+                    raise ConstructionError(
+                        "Requirement check_numerical failed. " + str(construction)
+                    )
+
             for arg in cdef.args:
                 if mapping[arg] in existing_point_names:
                     construction_points.add(self.symbols_graph.name2node[mapping[arg]])
@@ -113,7 +112,7 @@ class ProofState:
                         Statement.from_tokens(
                             translate_sentence(mapping, t), self.dep_graph
                         )
-                    ) 
+                    )
                     adds.append(Dependency.mk(statement, IN_PREMISES, ()))
 
             for n in cdef.numerics:
@@ -137,19 +136,24 @@ class ProofState:
             for n in numerics:
                 args: list[Union[PointNum, str]] = []
                 for t in n[1:]:
-                    if str.isalpha(t[0]): # a1 => a                      
+                    if str.isalpha(t[0]):  # a1 => a
                         args.append(self.symbols_graph.names2points([t])[0].num)
                     else:
                         args.append(t)
                 to_be_intersected += sketch(n[0], tuple(args), self.rng)
 
             return reduce(
-                to_be_intersected, [p.num for p in existing_points], [p.num for p in construction_points], rng=self.rng
+                to_be_intersected,
+                [p.num for p in existing_points],
+                [p.num for p in construction_points],
+                rng=self.rng,
             )
 
         if None in fix_point_postions:
             new_numerical_point = draw_fn()
-            for p, num, num0 in zip(new_points, new_numerical_point, fix_point_postions):
+            for p, num, num0 in zip(
+                new_points, new_numerical_point, fix_point_postions
+            ):
                 p.num = num0 or num
         else:
             for p, num in zip(new_points, fix_point_postions):
@@ -183,9 +187,7 @@ class ProofState:
             if len(constr_sentence) == len(cdef.declare):
                 mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
             else:
-                if len(constr_sentence) + len(construction.points) != len(
-                    cdef.declare
-                ):
+                if len(constr_sentence) + len(construction.points) != len(cdef.declare):
                     raise ValueError("Construction definition length mismatch.")
                 mapping = dict(
                     zip(cdef.declare[1:], construction.points + constr_sentence[1:])
@@ -259,7 +261,7 @@ class ProofState:
             raise Exception(f"Build failed too many times, last error: {repr(err)}")
 
         return proof
-    
+
     @classmethod
     def build_predicates(
         cls,
@@ -280,8 +282,7 @@ class ProofState:
         for statement in predicates:
             new_statement = notNone(
                 Statement.from_tokens(
-                    tuple(statement.to_str().split()),
-                    proof.dep_graph
+                    tuple(statement.to_str().split()), proof.dep_graph
                 )
             )
             adds.append(Dependency.mk(new_statement, IN_PREMISES, ()))
@@ -289,9 +290,11 @@ class ProofState:
         new_points = proof.symbols_graph.names2points([p.name for p in old_points])
         for p_old, p_new in zip(old_points, new_points):
             p_new.num = p_old.num
-            p_new.rely_on = set(proof.symbols_graph.names2points([p.name for p in p_old.rely_on]))
+            p_new.rely_on = set(
+                proof.symbols_graph.names2points([p.name for p in p_old.rely_on])
+            )
             p_new.clause = p_old.clause
-        
+
         for add in adds:
             if not add.statement.check_numerical():
                 raise ValueError(
@@ -308,7 +311,6 @@ class ProofState:
             ]
 
         return proof
-            
 
     def match_theorem(self, theorem: Rule) -> list[Dependency]:
         return list(self.matcher.match_theorem(theorem))

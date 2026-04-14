@@ -7,15 +7,14 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import experiments.single_problem_multi_gpu_eval.lm_actor as lm_actor_module
 import scripts.evaluation as eval_runner_module
 from scripts.evaluation import (
     build_eval_output_stem,
     build_timestamped_output_stem,
 )
-from experiments.single_problem_multi_gpu_eval.lm_actor import resolve_model_path
-from experiments.single_problem_multi_gpu_eval.model_pool import GenerationDispatcher, ModelPool
-from experiments.single_problem_multi_gpu_eval import model_pool as model_pool_module
+from newclid.agent.runtime.model_pool import GenerationDispatcher, ModelPool
+from newclid.agent.runtime import model_pool as model_pool_module
+from newclid.agent.runtime.model_resolution import resolve_model_path
 from newclid.search_trace import TraceRun
 
 
@@ -55,21 +54,42 @@ class GenerationDispatcherTests(unittest.TestCase):
         workers = [_FakeWorker("w0"), _FakeWorker("w1")]
         results = {
             "w0:r0": {
-                "results": [{"request_id": "r0", "aux_dsl_dict": {}, "inference_time_s": 0.1}],
-                "worker_batch_profile": {"worker_inference_time_s": 0.1, "batch_size": 1},
+                "results": [
+                    {"request_id": "r0", "aux_dsl_dict": {}, "inference_time_s": 0.1}
+                ],
+                "worker_batch_profile": {
+                    "worker_inference_time_s": 0.1,
+                    "batch_size": 1,
+                },
             },
             "w1:r1": {
-                "results": [{"request_id": "r1", "aux_dsl_dict": {}, "inference_time_s": 0.2}],
-                "worker_batch_profile": {"worker_inference_time_s": 0.2, "batch_size": 1},
+                "results": [
+                    {"request_id": "r1", "aux_dsl_dict": {}, "inference_time_s": 0.2}
+                ],
+                "worker_batch_profile": {
+                    "worker_inference_time_s": 0.2,
+                    "batch_size": 1,
+                },
             },
             "w0:r2": {
-                "results": [{"request_id": "r2", "aux_dsl_dict": {}, "inference_time_s": 0.3}],
-                "worker_batch_profile": {"worker_inference_time_s": 0.3, "batch_size": 1},
+                "results": [
+                    {"request_id": "r2", "aux_dsl_dict": {}, "inference_time_s": 0.3}
+                ],
+                "worker_batch_profile": {
+                    "worker_inference_time_s": 0.3,
+                    "batch_size": 1,
+                },
             },
         }
 
-        with patch.object(model_pool_module.ray, "get", side_effect=lambda ref: results[ref]):
-            with patch.object(model_pool_module.ray, "cancel", side_effect=lambda ref, force=False: None):
+        with patch.object(
+            model_pool_module.ray, "get", side_effect=lambda ref: results[ref]
+        ):
+            with patch.object(
+                model_pool_module.ray,
+                "cancel",
+                side_effect=lambda ref, force=False: None,
+            ):
                 dispatcher = GenerationDispatcher(
                     workers,
                     [
@@ -80,16 +100,24 @@ class GenerationDispatcherTests(unittest.TestCase):
                 )
 
                 self.assertEqual(
-                    [[request["request_id"] for request in batch] for batch in workers[0].submitted],
+                    [
+                        [request["request_id"] for request in batch]
+                        for batch in workers[0].submitted
+                    ],
                     [["r0"]],
                 )
                 self.assertEqual(
-                    [[request["request_id"] for request in batch] for batch in workers[1].submitted],
+                    [
+                        [request["request_id"] for request in batch]
+                        for batch in workers[1].submitted
+                    ],
                     [["r1"]],
                 )
                 self.assertEqual(dispatcher.idle_worker_count(), 0)
 
-                first_ref = next(ref for ref in dispatcher.active_refs() if ref.startswith("w0:"))
+                first_ref = next(
+                    ref for ref in dispatcher.active_refs() if ref.startswith("w0:")
+                )
                 first_result = dispatcher.take_done(first_ref)
 
                 self.assertEqual(first_result["results"][0]["request_id"], "r0")
@@ -97,7 +125,10 @@ class GenerationDispatcherTests(unittest.TestCase):
                 self.assertIn("dispatcher_profile", first_result)
                 self.assertIn("worker_batch_profile", first_result)
                 self.assertEqual(
-                    [[request["request_id"] for request in batch] for batch in workers[0].submitted],
+                    [
+                        [request["request_id"] for request in batch]
+                        for batch in workers[0].submitted
+                    ],
                     [["r0"], ["r2"]],
                 )
                 self.assertTrue(dispatcher.has_pending())
@@ -127,16 +158,31 @@ class GenerationDispatcherTests(unittest.TestCase):
         dispatcher = GenerationDispatcher(
             workers,
             [
-                {"request_id": "r0", "decoding_size": 2, "response_prefix": "<aux> x00"},
-                {"request_id": "r1", "decoding_size": 4, "response_prefix": "<aux> x00"},
-                {"request_id": "r2", "decoding_size": 2, "response_prefix": "<aux> x00"},
+                {
+                    "request_id": "r0",
+                    "decoding_size": 2,
+                    "response_prefix": "<aux> x00",
+                },
+                {
+                    "request_id": "r1",
+                    "decoding_size": 4,
+                    "response_prefix": "<aux> x00",
+                },
+                {
+                    "request_id": "r2",
+                    "decoding_size": 2,
+                    "response_prefix": "<aux> x00",
+                },
             ],
             gpu_batch_size=2,
             gpu_batch_timeout_ms=0,
         )
 
         self.assertEqual(
-            [[request["request_id"] for request in batch] for batch in workers[0].submitted],
+            [
+                [request["request_id"] for request in batch]
+                for batch in workers[0].submitted
+            ],
             [["r0", "r2"]],
         )
         self.assertEqual(dispatcher.pending_request_count(), 1)
@@ -146,16 +192,31 @@ class GenerationDispatcherTests(unittest.TestCase):
         dispatcher = GenerationDispatcher(
             workers,
             [
-                {"request_id": "r0", "decoding_size": 2, "response_prefix": "<aux> x00"},
-                {"request_id": "r1", "decoding_size": 2, "response_prefix": "<aux> x00"},
-                {"request_id": "r2", "decoding_size": 3, "response_prefix": "<aux> x00"},
+                {
+                    "request_id": "r0",
+                    "decoding_size": 2,
+                    "response_prefix": "<aux> x00",
+                },
+                {
+                    "request_id": "r1",
+                    "decoding_size": 2,
+                    "response_prefix": "<aux> x00",
+                },
+                {
+                    "request_id": "r2",
+                    "decoding_size": 3,
+                    "response_prefix": "<aux> x00",
+                },
             ],
             gpu_batch_size=2,
             gpu_batch_timeout_ms=0,
         )
 
         self.assertEqual(
-            [[request["request_id"] for request in batch] for batch in workers[0].submitted],
+            [
+                [request["request_id"] for request in batch]
+                for batch in workers[0].submitted
+            ],
             [["r0", "r1"]],
         )
         self.assertEqual(dispatcher.pending_request_count(), 1)
@@ -170,7 +231,10 @@ class GenerationDispatcherTests(unittest.TestCase):
         dispatcher.enqueue_request({"request_id": "r0"})
         self.assertTrue(dispatcher.has_pending())
         self.assertEqual(
-            [[request["request_id"] for request in batch] for batch in workers[0].submitted],
+            [
+                [request["request_id"] for request in batch]
+                for batch in workers[0].submitted
+            ],
             [["r0"]],
         )
 
@@ -250,11 +314,15 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
 
         class _FakeVisionModelWorker:
             @classmethod
-            def remote(cls, model_path: str, agent_type: str, torch_seed: int, worker_slot: int):
+            def remote(
+                cls, model_path: str, agent_type: str, torch_seed: int, worker_slot: int
+            ):
                 created.append((model_path, torch_seed, worker_slot))
                 return f"worker:{agent_type}:{worker_slot}"
 
-        fake_visual_actor = types.SimpleNamespace(VisionModelWorker=_FakeVisionModelWorker)
+        fake_visual_actor = types.SimpleNamespace(
+            VisionModelWorker=_FakeVisionModelWorker
+        )
 
         with patch.dict(
             "sys.modules",
@@ -267,17 +335,31 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                 torch_seed=42,
             )
 
-        self.assertEqual(created, [("/tmp/model", 42, 0), ("/tmp/model", 42, 1), ("/tmp/model", 42, 2)])
+        self.assertEqual(
+            created,
+            [("/tmp/model", 42, 0), ("/tmp/model", 42, 1), ("/tmp/model", 42, 2)],
+        )
         self.assertEqual(len(workers), 3)
-        self.assertEqual([worker.handle for worker in workers], ["worker:vlm:0", "worker:vlm:1", "worker:vlm:2"])
-        self.assertEqual([worker.worker_trace_id for worker in workers], ["gpu:0", "gpu:1", "gpu:2"])
-        self.assertEqual([worker.worker_device for worker in workers], ["cuda:0", "cuda:1", "cuda:2"])
+        self.assertEqual(
+            [worker.handle for worker in workers],
+            ["worker:vlm:0", "worker:vlm:1", "worker:vlm:2"],
+        )
+        self.assertEqual(
+            [worker.worker_trace_id for worker in workers], ["gpu:0", "gpu:1", "gpu:2"]
+        )
+        self.assertEqual(
+            [worker.worker_device for worker in workers], ["cuda:0", "cuda:1", "cuda:2"]
+        )
 
-    def test_single_problem_eval_runner_writes_results_without_torch_seed_thread_arg(self):
+    def test_single_problem_eval_runner_writes_results_without_torch_seed_thread_arg(
+        self,
+    ):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             benchmark_path = tmp_path / "benchmarks.txt"
-            benchmark_path.write_text("imo_2008_p1b\nproblem body placeholder\n", encoding="utf-8")
+            benchmark_path.write_text(
+                "imo_2008_p1b\nproblem body placeholder\n", encoding="utf-8"
+            )
             log_dir = tmp_path / "results"
             fake_workers = [_FakeWorker("w0")]
 
@@ -295,7 +377,9 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                     },
                 )
 
-            with patch("scripts.evaluation.ray.is_initialized", side_effect=[False, True]):
+            with patch(
+                "scripts.evaluation.ray.is_initialized", side_effect=[False, True]
+            ):
                 with patch("scripts.evaluation.ray.init"):
                     with patch(
                         "scripts.evaluation.ray.available_resources",
@@ -308,7 +392,9 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                             with patch(
                                 "scripts.evaluation.ModelPool"
                             ) as mock_model_pool:
-                                mock_model_pool.return_value.warmup.return_value = [{"device": "cuda:0"}]
+                                mock_model_pool.return_value.warmup.return_value = [
+                                    {"device": "cuda:0"}
+                                ]
                                 with patch(
                                     "scripts.evaluation.solve_one_problem",
                                     side_effect=fake_solve_one_problem,
@@ -350,8 +436,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                                                 mock_write_profiling_csv.assert_called_once()
 
             csv_path = (
-                log_dir
-                / "eval_single_problem_multi_gpu_vlm_benchmarks_tmp_model"
+                log_dir / "eval_single_problem_multi_gpu_vlm_benchmarks_tmp_model"
                 "_d32_b512_s4_gbs1_gbt100_seed42_20260410T120000Z.csv"
             )
             self.assertTrue(csv_path.exists())
@@ -364,7 +449,9 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             benchmark_path = tmp_path / "benchmarks.txt"
-            benchmark_path.write_text("imo_2008_p1b\nproblem body placeholder\n", encoding="utf-8")
+            benchmark_path.write_text(
+                "imo_2008_p1b\nproblem body placeholder\n", encoding="utf-8"
+            )
             log_dir = tmp_path / "results"
             fake_workers = [_FakeWorker("w0")]
 
@@ -416,7 +503,9 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                     },
                 )
 
-            with patch("scripts.evaluation.ray.is_initialized", side_effect=[False, True]):
+            with patch(
+                "scripts.evaluation.ray.is_initialized", side_effect=[False, True]
+            ):
                 with patch("scripts.evaluation.ray.init"):
                     with patch(
                         "scripts.evaluation.ray.available_resources",
@@ -429,7 +518,9 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                             with patch(
                                 "scripts.evaluation.ModelPool"
                             ) as mock_model_pool:
-                                mock_model_pool.return_value.warmup.return_value = [{"device": "cuda:0"}]
+                                mock_model_pool.return_value.warmup.return_value = [
+                                    {"device": "cuda:0"}
+                                ]
                                 with patch(
                                     "scripts.evaluation.solve_one_problem",
                                     side_effect=fake_solve_one_problem,
@@ -438,7 +529,10 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                                         "scripts.evaluation.timestamp_slug",
                                         return_value="20260410T120000Z",
                                     ):
-                                        with patch("newclid.search_trace.get_git_commit", return_value="deadbeef"):
+                                        with patch(
+                                            "newclid.search_trace.get_git_commit",
+                                            return_value="deadbeef",
+                                        ):
                                             with patch(
                                                 "scripts.evaluation.Live",
                                                 _FakeLive,
@@ -467,13 +561,16 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                                                     )
 
             trace_run_dir = (
-                log_dir
-                / "eval_single_problem_multi_gpu_vlm_benchmarks_tmp_model"
+                log_dir / "eval_single_problem_multi_gpu_vlm_benchmarks_tmp_model"
                 "_d32_b512_s4_gbs1_gbt100_seed42_20260410T120000Z"
             )
             self.assertTrue((trace_run_dir / "run_meta.json").exists())
-            self.assertTrue((trace_run_dir / "problems" / "0000_imo_2008_p1b.jsonl").exists())
-            self.assertTrue((trace_run_dir / "attempts" / "0000_imo_2008_p1b.jsonl").exists())
+            self.assertTrue(
+                (trace_run_dir / "problems" / "0000_imo_2008_p1b.jsonl").exists()
+            )
+            self.assertTrue(
+                (trace_run_dir / "attempts" / "0000_imo_2008_p1b.jsonl").exists()
+            )
 
 
 class ModelPathResolutionTests(unittest.TestCase):
@@ -483,32 +580,6 @@ class ModelPathResolutionTests(unittest.TestCase):
 
     def test_resolve_model_path_allows_remote_repo_id(self):
         with patch("modelscope.snapshot_download", return_value="/tmp/remote-model"):
-            self.assertEqual(resolve_model_path("Qwen/Qwen3-VL-2B-Instruct"), "/tmp/remote-model")
-
-
-class LMWorkerMetadataTests(unittest.TestCase):
-    def test_lm_worker_warmup_and_stats_match_visual_schema(self):
-        worker = object.__new__(lm_actor_module.ModelWorker.__ray_actor_class__)
-        worker.model_path = "/tmp/model"
-        worker.torch_seed = 42
-        worker.worker_id = "gpu:0"
-        worker.worker_slot = 0
-        worker.device_label = "cuda:0"
-        worker.num_requests = 3
-        worker.num_batches = 2
-        worker.tokenizer = types.SimpleNamespace(padding_side="left")
-
-        class _FakeParameter:
-            device = "cuda:0"
-
-        worker.model = types.SimpleNamespace(parameters=lambda: iter([_FakeParameter()]))
-
-        warmup = worker.warmup()
-        stats = worker.stats()
-
-        self.assertEqual(warmup["agent_kind"], "lm")
-        self.assertEqual(warmup["runtime"], "transformers")
-        self.assertEqual(warmup["worker_id"], "gpu:0")
-        self.assertEqual(stats["agent_kind"], "lm")
-        self.assertEqual(stats["worker_slot"], 0)
-        self.assertEqual(stats["avg_batch_size"], 1.5)
+            self.assertEqual(
+                resolve_model_path("Qwen/Qwen3-VL-2B-Instruct"), "/tmp/remote-model"
+            )

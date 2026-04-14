@@ -68,12 +68,16 @@ class VLMAgent(BaseAgent):
     def base_ddar_proof(self, proof: ProofState) -> ProofState:
         return deepcopy(proof)
 
-    def seed_state(self, proof: ProofState, base_proof: ProofState) -> tuple[ProblemJGEX, ProofState | None]:
+    def seed_state(
+        self, proof: ProofState, base_proof: ProofState
+    ) -> tuple[ProblemJGEX, ProofState | None]:
         del proof
         self._proof_defs = base_proof.defs
         return self.problemJGEX, base_proof
 
-    def get_problem_from_state(self, state: tuple[ProblemJGEX, ProofState | None]) -> ProblemJGEX:
+    def get_problem_from_state(
+        self, state: tuple[ProblemJGEX, ProofState | None]
+    ) -> ProblemJGEX:
         problem, _ = state
         return problem
 
@@ -88,7 +92,9 @@ class VLMAgent(BaseAgent):
         del proof
         problem, current_proof = state
         if current_proof is None:
-            raise ValueError("Visual frontier state is missing the materialized proof for request preparation.")
+            raise ValueError(
+                "Visual frontier state is missing the materialized proof for request preparation."
+            )
         stem = f"d{depth}_{request_id}"
         svg_path = self.render_root / f"{stem}.svg"
         png_path = self.render_root / f"{stem}.png"
@@ -157,7 +163,9 @@ class VLMAgent(BaseAgent):
         profiling: dict[str, Any],
     ) -> BeamQueue:
         if self._proof_defs is None:
-            raise ValueError("Visual agent definitions are unavailable for frontier materialization.")
+            raise ValueError(
+                "Visual agent definitions are unavailable for frontier materialization."
+            )
 
         materialized_queue = BeamQueue(max_size=next_queue.max_size)
         for val, stable_key, _, node in next_queue.iter_entries():
@@ -167,7 +175,9 @@ class VLMAgent(BaseAgent):
                 try:
                     current_proof = build_problem_proof(problem, self._proof_defs)
                 except Exception as exc:
-                    increment_profiling_count(profiling, "next_frontier_proof_build_failed_count")
+                    increment_profiling_count(
+                        profiling, "next_frontier_proof_build_failed_count"
+                    )
                     self._trace(
                         "next_frontier_proof_build_failed",
                         node_id=node_id,
@@ -197,12 +207,20 @@ class VLMAgent(BaseAgent):
     def try_dsl_to_constructions(self, content: str):
         return try_dsl_to_constructions(content)
 
-    def translate_dsl_to_construction(self, point: str, predicate: str, args: list[str]):
+    def translate_dsl_to_construction(
+        self, point: str, predicate: str, args: list[str]
+    ):
         return translate_dsl_to_construction(point, predicate, args)
 
     def problem_to_dsl(self, problem: ProblemJGEX, defs) -> str:
         return problem_to_visual_dsl(problem, defs)
 
-    def run_ddar_c(self, proof: ProofState, rules: list["Rule"], start_time: float, timeout: int = 3600) -> bool:
+    def run_ddar_c(
+        self,
+        proof: ProofState,
+        rules: list["Rule"],
+        start_time: float,
+        timeout: int = 3600,
+    ) -> bool:
         del rules, start_time, timeout
         return run_ddar_on_proof(proof)

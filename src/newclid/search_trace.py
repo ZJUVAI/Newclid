@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import time
 from datetime import datetime, timezone
@@ -8,7 +9,6 @@ from pathlib import Path
 from typing import Any
 
 from newclid.numerical.geometries import PointNum
-from newclid.problem_db import get_git_commit
 
 
 def utc_now_iso() -> str:
@@ -25,7 +25,24 @@ def sanitize_filename(value: str) -> str:
     return cleaned or "item"
 
 
-def build_attempt_key(request_id: str | None, candidate_rank: int | None, node_id: int | None) -> str:
+def get_git_commit(repo_root: str | Path | None = None) -> str:
+    cwd = Path(repo_root or ".")
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except Exception:
+        return "unknown"
+    return result.stdout.strip() or "unknown"
+
+
+def build_attempt_key(
+    request_id: str | None, candidate_rank: int | None, node_id: int | None
+) -> str:
     if request_id is not None and candidate_rank is not None:
         return f"{request_id}:{candidate_rank}"
     if node_id is not None:
@@ -90,7 +107,9 @@ class AttemptAggregator:
     def process(self, record: dict[str, Any]) -> None:
         event = record["event"]
         if event == "base_ddar":
-            attempt_key = record.get("attempt_key") or build_attempt_key(None, None, record.get("node_id"))
+            attempt_key = record.get("attempt_key") or build_attempt_key(
+                None, None, record.get("node_id")
+            )
             attempt = self._base_attempt(record)
             attempt["attempt_key"] = attempt_key
             self.pending_attempts[attempt_key] = attempt
@@ -101,7 +120,12 @@ class AttemptAggregator:
 
         if event == "candidate_transition":
             attempt = self.pending_attempts.pop(
-                record.get("attempt_key") or build_attempt_key(record.get("request_id"), record.get("candidate_rank"), record.get("node_id")),
+                record.get("attempt_key")
+                or build_attempt_key(
+                    record.get("request_id"),
+                    record.get("candidate_rank"),
+                    record.get("node_id"),
+                ),
                 None,
             )
             if attempt is None:
@@ -184,7 +208,8 @@ class AttemptAggregator:
         return {
             **self._common_fields(record),
             "attempt_type": "base_ddar",
-            "attempt_key": record.get("attempt_key") or build_attempt_key(None, None, record.get("node_id")),
+            "attempt_key": record.get("attempt_key")
+            or build_attempt_key(None, None, record.get("node_id")),
             "attempt_id": record.get("node_id"),
             "node_id": record.get("node_id"),
             "parent_node_id": record.get("parent_node_id"),
@@ -207,7 +232,9 @@ class AttemptAggregator:
         request_id = record.get("request_id")
         candidate_rank = record.get("candidate_rank")
         node_id = record.get("node_id")
-        attempt_key = record.get("attempt_key") or build_attempt_key(request_id, candidate_rank, node_id)
+        attempt_key = record.get("attempt_key") or build_attempt_key(
+            request_id, candidate_rank, node_id
+        )
         return {
             **self._common_fields(record),
             "attempt_type": "candidate",

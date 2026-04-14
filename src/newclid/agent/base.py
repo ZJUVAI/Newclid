@@ -1,7 +1,12 @@
 from __future__ import annotations
 
 from collections import deque
-from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait as futures_wait
+from concurrent.futures import (
+    FIRST_COMPLETED,
+    Future,
+    ThreadPoolExecutor,
+    wait as futures_wait,
+)
 import logging
 import threading
 import time
@@ -106,7 +111,13 @@ class BaseAgent(DeductiveAgent, ABC):
     def base_ddar_proof(self, proof: ProofState) -> ProofState:
         return proof
 
-    def run_ddar_c(self, proof: ProofState, rules: list["Rule"], start_time: float, timeout: int = 3600) -> bool:
+    def run_ddar_c(
+        self,
+        proof: ProofState,
+        rules: list["Rule"],
+        start_time: float,
+        timeout: int = 3600,
+    ) -> bool:
         return run_ddar_c(proof, rules, start_time, timeout)
 
     def finalize_next_queue(
@@ -118,9 +129,11 @@ class BaseAgent(DeductiveAgent, ABC):
         return next_queue
 
     def extract_raw_aux_text(self, aux_dsl: str) -> str:
-        return aux_dsl[len("<aux> x00"):]
+        return aux_dsl[len("<aux> x00") :]
 
-    def _child_path_key(self, parent_path_key: tuple[int, ...], candidate_rank: int) -> tuple[int, ...]:
+    def _child_path_key(
+        self, parent_path_key: tuple[int, ...], candidate_rank: int
+    ) -> tuple[int, ...]:
         return parent_path_key + (candidate_rank,)
 
     def _path_key_to_request_id(self, *, depth: int, path_key: tuple[int, ...]) -> str:
@@ -170,7 +183,9 @@ class BaseAgent(DeductiveAgent, ABC):
         del pending_ddar_submit, running_futures, frontier_exhausted, force
         return
 
-    def _trace_ddar_result(self, *, depth: int, future_meta: dict[str, Any], ddar_result: dict[str, Any]) -> None:
+    def _trace_ddar_result(
+        self, *, depth: int, future_meta: dict[str, Any], ddar_result: dict[str, Any]
+    ) -> None:
         self._trace(
             "ddar_result",
             attempt_key=future_meta["attempt_key"],
@@ -184,10 +199,18 @@ class BaseAgent(DeductiveAgent, ABC):
             ddar_worker_id=ddar_result.get("ddar_worker_id"),
             ddar_started_at_unix_s=ddar_result.get("ddar_started_at_unix_s"),
             ddar_finished_at_unix_s=ddar_result.get("ddar_finished_at_unix_s"),
-            ddar_build_started_at_unix_s=ddar_result.get("ddar_build_started_at_unix_s"),
-            ddar_build_finished_at_unix_s=ddar_result.get("ddar_build_finished_at_unix_s"),
-            ddar_engine_started_at_unix_s=ddar_result.get("ddar_engine_started_at_unix_s"),
-            ddar_engine_finished_at_unix_s=ddar_result.get("ddar_engine_finished_at_unix_s"),
+            ddar_build_started_at_unix_s=ddar_result.get(
+                "ddar_build_started_at_unix_s"
+            ),
+            ddar_build_finished_at_unix_s=ddar_result.get(
+                "ddar_build_finished_at_unix_s"
+            ),
+            ddar_engine_started_at_unix_s=ddar_result.get(
+                "ddar_engine_started_at_unix_s"
+            ),
+            ddar_engine_finished_at_unix_s=ddar_result.get(
+                "ddar_engine_finished_at_unix_s"
+            ),
             error_type=ddar_result.get("error_type"),
             error_message=ddar_result.get("error_message"),
         )
@@ -219,18 +242,32 @@ class BaseAgent(DeductiveAgent, ABC):
             )
             future_meta = future_info.pop(future)
             increment_profiling_count(profiling, "ddar_completed_count")
-            add_profiling_time(profiling, "ddar_build_work_time_s", ddar_result.get("ddar_build_work_time_s"))
-            add_profiling_time(profiling, "ddar_engine_work_time_s", ddar_result.get("ddar_engine_work_time_s"))
+            add_profiling_time(
+                profiling,
+                "ddar_build_work_time_s",
+                ddar_result.get("ddar_build_work_time_s"),
+            )
+            add_profiling_time(
+                profiling,
+                "ddar_engine_work_time_s",
+                ddar_result.get("ddar_engine_work_time_s"),
+            )
 
             if ddar_result["status"] == "invalid":
-                self._trace_ddar_result(depth=depth, future_meta=future_meta, ddar_result=ddar_result)
+                self._trace_ddar_result(
+                    depth=depth, future_meta=future_meta, ddar_result=ddar_result
+                )
                 continue
 
             if ddar_result["status"] == "solved":
                 self._cancel_ddar_futures(running_futures, future_info)
-                self._trace_ddar_result(depth=depth, future_meta=future_meta, ddar_result=ddar_result)
+                self._trace_ddar_result(
+                    depth=depth, future_meta=future_meta, ddar_result=ddar_result
+                )
                 handle_elapsed_s = time.perf_counter() - handle_start
-                add_profiling_time(profiling, "ddar_result_handle_wall_time_s", handle_elapsed_s)
+                add_profiling_time(
+                    profiling, "ddar_result_handle_wall_time_s", handle_elapsed_s
+                )
                 return self._build_info_payload(
                     t0=t0,
                     step=step,
@@ -241,7 +278,9 @@ class BaseAgent(DeductiveAgent, ABC):
                     runtime_s=runtime_s,
                 )
 
-            self._trace_ddar_result(depth=depth, future_meta=future_meta, ddar_result=ddar_result)
+            self._trace_ddar_result(
+                depth=depth, future_meta=future_meta, ddar_result=ddar_result
+            )
             if depth < self.search_depth - 1:
                 next_state_start = time.perf_counter()
                 next_state = self.make_next_state_from_unsolved_ddar(
@@ -273,7 +312,9 @@ class BaseAgent(DeductiveAgent, ABC):
                         "ddar_result_queue_wall_time_s",
                         time.perf_counter() - queue_start,
                     )
-                    increment_profiling_count(profiling, "candidate_queued_next_depth_count")
+                    increment_profiling_count(
+                        profiling, "candidate_queued_next_depth_count"
+                    )
                     self._trace(
                         "candidate_transition",
                         attempt_key=future_meta["attempt_key"],
@@ -287,7 +328,9 @@ class BaseAgent(DeductiveAgent, ABC):
                         beam_score_after=child_score,
                     )
         handle_elapsed_s = time.perf_counter() - handle_start
-        add_profiling_time(profiling, "ddar_result_handle_wall_time_s", handle_elapsed_s)
+        add_profiling_time(
+            profiling, "ddar_result_handle_wall_time_s", handle_elapsed_s
+        )
         return None
 
     def _poll_ddar_futures(
@@ -326,7 +369,9 @@ class BaseAgent(DeductiveAgent, ABC):
             runtime_s=runtime_s,
         )
 
-    def _cancel_ddar_futures(self, running_futures: list[Any], future_info: dict[Any, dict[str, Any]]) -> None:
+    def _cancel_ddar_futures(
+        self, running_futures: list[Any], future_info: dict[Any, dict[str, Any]]
+    ) -> None:
         for future in running_futures:
             try:
                 ray.cancel(future, force=True)
@@ -504,7 +549,11 @@ class BaseAgent(DeductiveAgent, ABC):
                 timeout=0.1,
                 return_when=FIRST_COMPLETED,
             )
-            add_profiling_time(profiling, "request_prepare_wall_time_s", time.perf_counter() - wait_start)
+            add_profiling_time(
+                profiling,
+                "request_prepare_wall_time_s",
+                time.perf_counter() - wait_start,
+            )
             return
 
         if running_prepare_futures:
@@ -514,22 +563,36 @@ class BaseAgent(DeductiveAgent, ABC):
                 return_when=FIRST_COMPLETED,
             )
             if done_futures:
-                add_profiling_time(profiling, "wait_wall_time_s", time.perf_counter() - wait_start)
+                add_profiling_time(
+                    profiling, "wait_wall_time_s", time.perf_counter() - wait_start
+                )
                 return
 
         remaining_timeout_s = max(0.0, 1.0 - (time.perf_counter() - wait_start))
         if not wait_refs:
             return
         ray.wait(wait_refs, num_returns=1, timeout=remaining_timeout_s)
-        add_profiling_time(profiling, "wait_wall_time_s", time.perf_counter() - wait_start)
+        add_profiling_time(
+            profiling, "wait_wall_time_s", time.perf_counter() - wait_start
+        )
         return
 
-    def _drain_dispatcher_submission_events(self, *, dispatcher, depth: int, profiling: dict[str, Any]) -> None:
+    def _drain_dispatcher_submission_events(
+        self, *, dispatcher, depth: int, profiling: dict[str, Any]
+    ) -> None:
         for event in dispatcher.take_submission_events():
             increment_profiling_count(profiling, "gpu_batch_submitted_count")
-            increment_profiling_count(profiling, "gpu_request_dispatched_count", len(event.get("request_ids", [])))
-            increment_profiling_count(profiling, "gpu_batch_size_sum", int(event.get("batch_size", 0)))
-            update_profiling_max(profiling, "gpu_batch_size_max", event.get("batch_size"))
+            increment_profiling_count(
+                profiling,
+                "gpu_request_dispatched_count",
+                len(event.get("request_ids", [])),
+            )
+            increment_profiling_count(
+                profiling, "gpu_batch_size_sum", int(event.get("batch_size", 0))
+            )
+            update_profiling_max(
+                profiling, "gpu_batch_size_max", event.get("batch_size")
+            )
             self._trace(
                 "gpu_batch_submitted",
                 depth=depth,
@@ -557,18 +620,58 @@ class BaseAgent(DeductiveAgent, ABC):
         worker_batch_profile = gpu_batch_payload.get("worker_batch_profile", {})
         batch_results = list(gpu_batch_payload.get("results", []))
         batch_size = int(gpu_batch_payload.get("batch_size", len(batch_results)))
-        add_profiling_time(profiling, "gpu_request_queue_wall_time_s", dispatcher_profile.get("request_queue_time_s_sum"))
-        add_profiling_time(profiling, "gpu_batch_round_trip_wall_time_s", dispatcher_profile.get("batch_round_trip_time_s"))
-        add_profiling_time(profiling, "gpu_result_ray_get_wall_time_s", dispatcher_profile.get("batch_result_ray_get_time_s"))
-        add_profiling_time(profiling, "gpu_worker_inference_wall_time_s", worker_batch_profile.get("worker_inference_time_s"))
-        add_profiling_time(profiling, "gpu_input_build_wall_time_s", worker_batch_profile.get("input_build_time_s"))
-        add_profiling_time(profiling, "gpu_generate_wall_time_s", worker_batch_profile.get("generate_time_s"))
-        add_profiling_time(profiling, "gpu_decode_wall_time_s", worker_batch_profile.get("decode_time_s"))
-        add_profiling_time(profiling, "gpu_fallback_wall_time_s", worker_batch_profile.get("fallback_time_s"))
+        add_profiling_time(
+            profiling,
+            "gpu_request_queue_wall_time_s",
+            dispatcher_profile.get("request_queue_time_s_sum"),
+        )
+        add_profiling_time(
+            profiling,
+            "gpu_batch_round_trip_wall_time_s",
+            dispatcher_profile.get("batch_round_trip_time_s"),
+        )
+        add_profiling_time(
+            profiling,
+            "gpu_result_ray_get_wall_time_s",
+            dispatcher_profile.get("batch_result_ray_get_time_s"),
+        )
+        add_profiling_time(
+            profiling,
+            "gpu_worker_inference_wall_time_s",
+            worker_batch_profile.get("worker_inference_time_s"),
+        )
+        add_profiling_time(
+            profiling,
+            "gpu_input_build_wall_time_s",
+            worker_batch_profile.get("input_build_time_s"),
+        )
+        add_profiling_time(
+            profiling,
+            "gpu_generate_wall_time_s",
+            worker_batch_profile.get("generate_time_s"),
+        )
+        add_profiling_time(
+            profiling,
+            "gpu_decode_wall_time_s",
+            worker_batch_profile.get("decode_time_s"),
+        )
+        add_profiling_time(
+            profiling,
+            "gpu_fallback_wall_time_s",
+            worker_batch_profile.get("fallback_time_s"),
+        )
         increment_profiling_count(profiling, "gpu_batch_completed_count")
         increment_profiling_count(profiling, "gpu_request_completed_count", batch_size)
-        increment_profiling_count(profiling, "gpu_prompt_token_count_sum", worker_batch_profile.get("prompt_token_count_sum"))
-        update_profiling_max(profiling, "gpu_prompt_token_count_max", worker_batch_profile.get("prompt_token_count_max"))
+        increment_profiling_count(
+            profiling,
+            "gpu_prompt_token_count_sum",
+            worker_batch_profile.get("prompt_token_count_sum"),
+        )
+        update_profiling_max(
+            profiling,
+            "gpu_prompt_token_count_max",
+            worker_batch_profile.get("prompt_token_count_max"),
+        )
         increment_profiling_count(
             profiling,
             "gpu_generated_token_count_sum",
@@ -584,7 +687,11 @@ class BaseAgent(DeductiveAgent, ABC):
             "gpu_generated_sequence_count",
             worker_batch_profile.get("generated_sequence_count"),
         )
-        increment_profiling_count(profiling, "gpu_raw_candidate_count", worker_batch_profile.get("raw_candidate_count_sum"))
+        increment_profiling_count(
+            profiling,
+            "gpu_raw_candidate_count",
+            worker_batch_profile.get("raw_candidate_count_sum"),
+        )
         increment_profiling_count(
             profiling,
             "gpu_unique_candidate_count",
@@ -611,14 +718,24 @@ class BaseAgent(DeductiveAgent, ABC):
             depth=depth,
             request_ids=gpu_batch_payload.get("request_ids", []),
             batch_size=batch_size,
-            gpu_worker_id=worker_batch_profile.get("gpu_worker_id") or dispatcher_profile.get("gpu_worker_id"),
-            gpu_device=worker_batch_profile.get("gpu_device") or dispatcher_profile.get("gpu_device"),
+            gpu_worker_id=worker_batch_profile.get("gpu_worker_id")
+            or dispatcher_profile.get("gpu_worker_id"),
+            gpu_device=worker_batch_profile.get("gpu_device")
+            or dispatcher_profile.get("gpu_device"),
             worker_batch_profile={
-                "gpu_worker_id": worker_batch_profile.get("gpu_worker_id") or dispatcher_profile.get("gpu_worker_id"),
-                "gpu_device": worker_batch_profile.get("gpu_device") or dispatcher_profile.get("gpu_device"),
-                "worker_started_at_unix_s": worker_batch_profile.get("worker_started_at_unix_s"),
-                "worker_finished_at_unix_s": worker_batch_profile.get("worker_finished_at_unix_s"),
-                "worker_inference_time_s": worker_batch_profile.get("worker_inference_time_s"),
+                "gpu_worker_id": worker_batch_profile.get("gpu_worker_id")
+                or dispatcher_profile.get("gpu_worker_id"),
+                "gpu_device": worker_batch_profile.get("gpu_device")
+                or dispatcher_profile.get("gpu_device"),
+                "worker_started_at_unix_s": worker_batch_profile.get(
+                    "worker_started_at_unix_s"
+                ),
+                "worker_finished_at_unix_s": worker_batch_profile.get(
+                    "worker_finished_at_unix_s"
+                ),
+                "worker_inference_time_s": worker_batch_profile.get(
+                    "worker_inference_time_s"
+                ),
                 "generate_time_s": worker_batch_profile.get("generate_time_s"),
             },
         )
@@ -638,7 +755,9 @@ class BaseAgent(DeductiveAgent, ABC):
                 len(gpu_result["aux_dsl_dict"]),
             )
 
-            for candidate_rank, (aux_dsl, score) in enumerate(gpu_result["aux_dsl_dict"].items()):
+            for candidate_rank, (aux_dsl, score) in enumerate(
+                gpu_result["aux_dsl_dict"].items()
+            ):
                 try:
                     raw_aux_text = self.extract_raw_aux_text(aux_dsl)
                     aux = self.try_dsl_to_constructions(raw_aux_text)
@@ -708,7 +827,9 @@ class BaseAgent(DeductiveAgent, ABC):
                         "request_id": request_id,
                         "candidate_rank": candidate_rank,
                         "path_key": child_path_key,
-                        "attempt_key": build_attempt_key(request_id, candidate_rank, child_node_id),
+                        "attempt_key": build_attempt_key(
+                            request_id, candidate_rank, child_node_id
+                        ),
                     }
                 )
 
@@ -778,7 +899,9 @@ class BaseAgent(DeductiveAgent, ABC):
         submit_elapsed_s = time.perf_counter() - submit_start
         add_profiling_time(profiling, "ddar_submit_wall_time_s", submit_elapsed_s)
 
-    def run(self, proof: ProofState, rules: list["Rule"], timeout: int = 3600) -> dict[str, Any]:
+    def run(
+        self, proof: ProofState, rules: list["Rule"], timeout: int = 3600
+    ) -> dict[str, Any]:
         logger.info(
             "Agent run start: agent_type=%s decoding_size=%d beam_size=%d search_depth=%d max_pending_ddar=%d timeout=%d",
             self.agent_type,
@@ -798,7 +921,9 @@ class BaseAgent(DeductiveAgent, ABC):
 
         for goal in proof.goals:
             if not goal.check_numerical():
-                logger.warning("Agent run abort: goal failed numerical check: %s", goal.pretty())
+                logger.warning(
+                    "Agent run abort: goal failed numerical check: %s", goal.pretty()
+                )
                 return self._build_info_payload(
                     t0=t0,
                     step=step,
@@ -827,7 +952,8 @@ class BaseAgent(DeductiveAgent, ABC):
             "ddar_started_at_unix_s": base_ddar_started_at_unix_s,
             "ddar_finished_at_unix_s": base_ddar_finished_at_unix_s,
             "ddar_build_work_time_s": 0.0,
-            "ddar_engine_work_time_s": base_ddar_finished_at_unix_s - base_ddar_started_at_unix_s,
+            "ddar_engine_work_time_s": base_ddar_finished_at_unix_s
+            - base_ddar_started_at_unix_s,
             "ddar_build_started_at_unix_s": base_ddar_started_at_unix_s,
             "ddar_build_finished_at_unix_s": base_ddar_started_at_unix_s,
             "ddar_engine_started_at_unix_s": base_ddar_started_at_unix_s,
@@ -871,9 +997,15 @@ class BaseAgent(DeductiveAgent, ABC):
 
         rules_ref = ray.put(rules)
         beam_queue = BeamQueue(max_size=self.beam_size)
-        beam_queue.add(node=(0, None, (), self.seed_state(proof, base_proof)), val=0.0, stable_key=())
+        beam_queue.add(
+            node=(0, None, (), self.seed_state(proof, base_proof)),
+            val=0.0,
+            stable_key=(),
+        )
 
-        with ThreadPoolExecutor(max_workers=self.prepare_request_workers, thread_name_prefix="prepare") as prepare_executor:
+        with ThreadPoolExecutor(
+            max_workers=self.prepare_request_workers, thread_name_prefix="prepare"
+        ) as prepare_executor:
             # Search stays depth-by-depth to preserve the beam semantics. Within
             # one depth we pipeline request preparation, GPU inference, and DDAR
             # validation so CPU and GPU resources can overlap useful work.
@@ -909,14 +1041,18 @@ class BaseAgent(DeductiveAgent, ABC):
                 next_queue = BeamQueue(max_size=self.beam_size)
                 frontier_iter = iter(beam_queue)
                 prepared_requests: deque[dict[str, Any]] = deque()
-                running_prepare_futures: dict[Future[dict[str, Any]], dict[str, Any]] = {}
+                running_prepare_futures: dict[
+                    Future[dict[str, Any]], dict[str, Any]
+                ] = {}
                 pending_ddar_submit = deque()
                 request_meta: dict[str, dict[str, Any]] = {}
                 running_futures: list[Any] = []
                 future_info: dict[Any, dict[str, Any]] = {}
                 request_index = 0
                 frontier_exhausted = False
-                ddar_backlog_high_watermark = max(self.max_pending_ddar + 1, 2 * self.max_pending_ddar)
+                ddar_backlog_high_watermark = max(
+                    self.max_pending_ddar + 1, 2 * self.max_pending_ddar
+                )
                 self._trace_scheduler_state(
                     depth=depth,
                     dispatcher=dispatcher,
@@ -955,7 +1091,9 @@ class BaseAgent(DeductiveAgent, ABC):
                         frontier_exhausted=frontier_exhausted,
                     )
                     dispatcher.tick()
-                    self._drain_dispatcher_submission_events(dispatcher=dispatcher, depth=depth, profiling=profiling)
+                    self._drain_dispatcher_submission_events(
+                        dispatcher=dispatcher, depth=depth, profiling=profiling
+                    )
 
                     # 1. Consume finished DDAR tasks first so validated states
                     # can immediately contribute to the next-depth frontier.
@@ -1036,7 +1174,8 @@ class BaseAgent(DeductiveAgent, ABC):
                     while (
                         prepared_requests
                         and dispatcher.idle_worker_count() > 0
-                        and (len(pending_ddar_submit) + len(running_futures)) <= ddar_backlog_high_watermark
+                        and (len(pending_ddar_submit) + len(running_futures))
+                        <= ddar_backlog_high_watermark
                     ):
                         request = prepared_requests.popleft()
                         enqueue_at = time.perf_counter()
@@ -1044,11 +1183,14 @@ class BaseAgent(DeductiveAgent, ABC):
                         add_profiling_time(
                             profiling,
                             "prepared_request_queue_wall_time_s",
-                            enqueue_at - request_state.get("request_built_at_perf_s", enqueue_at),
+                            enqueue_at
+                            - request_state.get("request_built_at_perf_s", enqueue_at),
                         )
                         request_state["gpu_submitted_at_perf_s"] = enqueue_at
                         dispatcher.enqueue_request(request)
-                        increment_profiling_count(profiling, "gpu_request_enqueued_count")
+                        increment_profiling_count(
+                            profiling, "gpu_request_enqueued_count"
+                        )
                         self._trace(
                             "gpu_request_enqueued",
                             request_id=request["request_id"],
@@ -1056,7 +1198,9 @@ class BaseAgent(DeductiveAgent, ABC):
                             parent_node_id=request_state["parent_node_id"],
                             depth=depth,
                         )
-                        self._drain_dispatcher_submission_events(dispatcher=dispatcher, depth=depth, profiling=profiling)
+                        self._drain_dispatcher_submission_events(
+                            dispatcher=dispatcher, depth=depth, profiling=profiling
+                        )
                         progress = True
 
                     # 6. Launch more prepare work on demand instead of building
@@ -1064,7 +1208,8 @@ class BaseAgent(DeductiveAgent, ABC):
                     # the amount of GPU/DDAR capacity we can actually use.
                     while (
                         not frontier_exhausted
-                        and (len(running_prepare_futures) + len(prepared_requests)) < self.prepare_prefetch_limit
+                        and (len(running_prepare_futures) + len(prepared_requests))
+                        < self.prepare_prefetch_limit
                         and ddar_backlog <= ddar_backlog_high_watermark
                     ):
                         next_request_index = self._submit_prepare_request(
@@ -1080,12 +1225,20 @@ class BaseAgent(DeductiveAgent, ABC):
                             frontier_exhausted = True
                             break
                         request_index = next_request_index
-                        increment_profiling_count(profiling, "prepare_request_submitted_count")
+                        increment_profiling_count(
+                            profiling, "prepare_request_submitted_count"
+                        )
                         progress = True
 
-                    if frontier_exhausted and not running_prepare_futures and prepared_requests:
+                    if (
+                        frontier_exhausted
+                        and not running_prepare_futures
+                        and prepared_requests
+                    ):
                         dispatcher.flush()
-                        self._drain_dispatcher_submission_events(dispatcher=dispatcher, depth=depth, profiling=profiling)
+                        self._drain_dispatcher_submission_events(
+                            dispatcher=dispatcher, depth=depth, profiling=profiling
+                        )
                         progress = True
 
                     if (
@@ -1158,7 +1311,9 @@ class BaseAgent(DeductiveAgent, ABC):
                     force=True,
                 )
                 next_frontier_size = len(list(beam_queue))
-                self._trace("depth_end", depth=depth, next_frontier_size=next_frontier_size)
+                self._trace(
+                    "depth_end", depth=depth, next_frontier_size=next_frontier_size
+                )
                 logger.info(
                     "Search depth end: depth=%d next_frontier_size=%d",
                     depth,

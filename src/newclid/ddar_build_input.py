@@ -61,7 +61,9 @@ def build_ddar_input(
 
                 for constr_sentence in construction.sentences:
                     cdef = defs[constr_sentence[0]]
-                    mapping = build_construction_mapping(construction, constr_sentence, cdef)
+                    mapping = build_construction_mapping(
+                        construction, constr_sentence, cdef
+                    )
 
                     for premise in cdef.require.sentences:
                         if len(premise) == 0:
@@ -74,7 +76,8 @@ def build_ddar_input(
                         )
                         if not statement.check_numerical():
                             raise ConstructionError(
-                                "Requirement check_numerical failed. " + str(construction)
+                                "Requirement check_numerical failed. "
+                                + str(construction)
                             )
 
                     for arg in cdef.args:
@@ -88,7 +91,9 @@ def build_ddar_input(
                         for t in bs.sentences:
                             translated = translate_sentence(mapping, t)
                             if translated:
-                                raw_premises.append((translated[0], list(translated[1:])))
+                                raw_premises.append(
+                                    (translated[0], list(translated[1:]))
+                                )
 
                     for n in cdef.numerics:
                         numerics.append(tuple(mapping.get(a, a) for a in n))
@@ -115,7 +120,9 @@ def build_ddar_input(
                             else:
                                 args.append(t)
                         to_be_intersected += sketch(n[0], tuple(args), rng)
-                    new_nums = _geo_reduce(to_be_intersected, existing_nums, construction_arg_nums, rng=rng)
+                    new_nums = _geo_reduce(
+                        to_be_intersected, existing_nums, construction_arg_nums, rng=rng
+                    )
                     for name, num, fixed in zip(point_names, new_nums, fix_positions):
                         point_nums[name] = fixed if fixed is not None else num
                 else:
@@ -152,7 +159,11 @@ def build_ddar_input(
                     raise ValueError(f"Goal {goal_stmt.pretty()} fails numerical check")
 
             point_names = useful_points if only_useful_points else point_nums.keys()
-            points = [(name, num.x, num.y) for name, num in point_nums.items() if name in point_names]
+            points = [
+                (name, num.x, num.y)
+                for name, num in point_nums.items()
+                if name in point_names
+            ]
             return points, raw_premises, raw_goals
 
         except (

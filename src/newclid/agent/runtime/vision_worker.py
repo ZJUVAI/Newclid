@@ -17,6 +17,7 @@ from transformers import Qwen3_5ForConditionalGeneration
 from transformers.utils import logging as hf_logging
 
 from newclid.agent.runtime.batched_decode import decode_batched_continuations
+from newclid.agent.runtime.model_resolution import resolve_model_path
 from newclid.agent.runtime.text_worker import (
     _accumulate_request_profile,
     _build_request_profile,
@@ -24,7 +25,6 @@ from newclid.agent.runtime.text_worker import (
     _count_prompt_tokens,
     _create_worker_batch_profile,
     _merge_worker_batch_profiles,
-    resolve_model_path,
 )
 
 
@@ -36,11 +36,19 @@ hf_logging.set_verbosity_error()
 
 _QWEN3_VL_BASE_PROCESSOR_REPO = "Qwen/Qwen3-VL-2B-Instruct"
 _QWEN3_VL_BASE_PROCESSOR_CACHE = (
-    Path.home() / ".cache" / "modelscope" / "hub" / "models" / "Qwen" / "Qwen3-VL-2B-Instruct"
+    Path.home()
+    / ".cache"
+    / "modelscope"
+    / "hub"
+    / "models"
+    / "Qwen"
+    / "Qwen3-VL-2B-Instruct"
 )
 
 
-def _empty_result(request: dict[str, Any], *, error: str, batch_size: int) -> dict[str, Any]:
+def _empty_result(
+    request: dict[str, Any], *, error: str, batch_size: int
+) -> dict[str, Any]:
     return {
         "request_id": request["request_id"],
         "aux_dsl_dict": {},
@@ -82,10 +90,17 @@ def _build_visual_prompt(processor, request: dict[str, Any]) -> str:
         tokenize=False,
         add_generation_prompt=True,
     )
-    return text_prompt + request.get("response_prefix", "<aux> x00") + " " + request["new_point_name"]
+    return (
+        text_prompt
+        + request.get("response_prefix", "<aux> x00")
+        + " "
+        + request["new_point_name"]
+    )
 
 
-def _resolve_visual_stop_tokens(processor, agent_kind: str) -> tuple[int | None, int | None]:
+def _resolve_visual_stop_tokens(
+    processor, agent_kind: str
+) -> tuple[int | None, int | None]:
     if agent_kind == "qwen35_vl":
         pad_token_id = processor.tokenizer.pad_token_id
         eos_token_id = processor.tokenizer.encode(" ;", add_special_tokens=False)[0]
@@ -124,7 +139,9 @@ def _build_visual_batch_inputs(
         else:
             videos.append(None)
     if any(video is not None for video in videos):
-        raise NotImplementedError("Batched visual generation does not support video inputs.")
+        raise NotImplementedError(
+            "Batched visual generation does not support video inputs."
+        )
     return processor(
         text=texts,
         images=images,
@@ -153,7 +170,9 @@ def generate_visual_aux_dsl_dict_batch(
     if not requests:
         return [], _create_worker_batch_profile(batch_size=0)
     if any(request.get("with_predicate", False) for request in requests):
-        raise NotImplementedError("Batched visual generation currently supports with_predicate=False only.")
+        raise NotImplementedError(
+            "Batched visual generation currently supports with_predicate=False only."
+        )
     decoding_size = int(requests[0]["decoding_size"])
     if any(int(request["decoding_size"]) != decoding_size for request in requests):
         raise ValueError("All requests in a batch must share decoding_size.")
@@ -193,7 +212,9 @@ def generate_visual_aux_dsl_dict_batch(
         model_inputs=model_inputs,
         sequences=generated_output.sequences,
         decoding_size=decoding_size,
-        decode_batch=lambda batch: processor.batch_decode(batch, skip_special_tokens=True),
+        decode_batch=lambda batch: processor.batch_decode(
+            batch, skip_special_tokens=True
+        ),
     )
     profile["decode_time_s"] += time.perf_counter() - decode_start
     results: list[dict[str, Any]] = []
@@ -232,7 +253,9 @@ class _BaseVisionWorker:
     ) -> dict[str, Any]:
         worker_finished_at_unix_s = time.time()
         inference_time_s = worker_finished_at_unix_s - inference_start
-        worker_batch_profile["worker_inference_time_s"] = time.perf_counter() - perf_start
+        worker_batch_profile["worker_inference_time_s"] = (
+            time.perf_counter() - perf_start
+        )
         worker_batch_profile["gpu_worker_id"] = self.worker_id
         worker_batch_profile["gpu_device"] = self.device_label
         worker_batch_profile["worker_started_at_unix_s"] = inference_start
@@ -257,13 +280,21 @@ class _BaseVisionWorker:
             "device": self.device_label,
             "num_requests": self.num_requests,
             "num_batches": self.num_batches,
-            "avg_batch_size": (self.num_requests / self.num_batches) if self.num_batches else 0.0,
+            "avg_batch_size": (self.num_requests / self.num_batches)
+            if self.num_batches
+            else 0.0,
         }
 
 
 @ray.remote(num_cpus=1, num_gpus=1, max_concurrency=1)
 class VisionModelWorker(_BaseVisionWorker):
-    def __init__(self, model_path: str, agent_kind: str, torch_seed: int = 123, worker_slot: int = 0):
+    def __init__(
+        self,
+        model_path: str,
+        agent_kind: str,
+        torch_seed: int = 123,
+        worker_slot: int = 0,
+    ):
         resolved_path = resolve_model_path(model_path)
         self.model_path = resolved_path
         self.agent_kind = agent_kind
@@ -362,7 +393,9 @@ class VisionModelWorker(_BaseVisionWorker):
             inference_start=inference_start,
         )
 
-    def _generate_batch_with_fallback(self, requests: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    def _generate_batch_with_fallback(
+        self, requests: list[dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         grouped: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
         order: list[tuple[Any, str]] = []
         for request in requests:
@@ -373,7 +406,9 @@ class VisionModelWorker(_BaseVisionWorker):
         grouped_results: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
         grouped_profiles: dict[tuple[Any, ...], dict[str, Any]] = {}
         for group_key, group_requests in grouped.items():
-            group_results, group_profile = self._generate_group_with_fallback(group_requests)
+            group_results, group_profile = self._generate_group_with_fallback(
+                group_requests
+            )
             grouped_results[group_key] = group_results
             grouped_profiles[group_key] = group_profile
 
@@ -386,7 +421,9 @@ class VisionModelWorker(_BaseVisionWorker):
             _merge_worker_batch_profiles(*grouped_profiles.values()),
         )
 
-    def _generate_group_with_fallback(self, requests: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    def _generate_group_with_fallback(
+        self, requests: list[dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         try:
             return generate_visual_aux_dsl_dict_batch(
                 self.model,
@@ -403,7 +440,9 @@ class VisionModelWorker(_BaseVisionWorker):
                 )
                 profile = _create_worker_batch_profile(batch_size=1)
                 profile["fallback_mode"] = "single_error"
-                return [_empty_result(requests[0], error=str(exc), batch_size=1)], profile
+                return [
+                    _empty_result(requests[0], error=str(exc), batch_size=1)
+                ], profile
             if _is_oom_error(exc):
                 logger.warning(
                     "Visual batched generate hit OOM; splitting batch_size=%d request_ids=%s",
@@ -414,10 +453,18 @@ class VisionModelWorker(_BaseVisionWorker):
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
                 midpoint = len(requests) // 2
-                left_results, left_profile = self._generate_group_with_fallback(requests[:midpoint])
-                right_results, right_profile = self._generate_group_with_fallback(requests[midpoint:])
-                merged_profile = _merge_worker_batch_profiles(left_profile, right_profile)
-                merged_profile["fallback_time_s"] += time.perf_counter() - fallback_start
+                left_results, left_profile = self._generate_group_with_fallback(
+                    requests[:midpoint]
+                )
+                right_results, right_profile = self._generate_group_with_fallback(
+                    requests[midpoint:]
+                )
+                merged_profile = _merge_worker_batch_profiles(
+                    left_profile, right_profile
+                )
+                merged_profile["fallback_time_s"] += (
+                    time.perf_counter() - fallback_start
+                )
                 merged_profile["fallback_mode"] = "oom_split"
                 return left_results + right_results, merged_profile
             logger.exception(
@@ -428,7 +475,9 @@ class VisionModelWorker(_BaseVisionWorker):
             all_results: list[dict[str, Any]] = []
             profiles: list[dict[str, Any]] = []
             for request in requests:
-                request_results, request_profile = self._generate_group_with_fallback([request])
+                request_results, request_profile = self._generate_group_with_fallback(
+                    [request]
+                )
                 all_results.extend(request_results)
                 profiles.append(request_profile)
             merged_profile = _merge_worker_batch_profiles(*profiles)

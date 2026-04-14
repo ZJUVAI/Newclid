@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import os
 import time
-from pathlib import Path
 from typing import Any
 
 import ray
@@ -12,35 +11,13 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.utils import logging as hf_logging
 
 from newclid.agent.runtime.batched_decode import decode_batched_continuations
+from newclid.agent.runtime.model_resolution import resolve_model_path
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 logger = logging.getLogger(__name__)
 hf_logging.disable_progress_bar()
 hf_logging.set_verbosity_error()
-
-
-def resolve_model_path(path: str) -> str:
-    candidate = Path(path).expanduser()
-    if candidate.exists():
-        resolved = str(candidate.resolve())
-        logger.info("Loading experiment model from local path: %s", resolved)
-        return resolved
-    if candidate.is_absolute() or path.startswith(".") or path.startswith("~"):
-        raise FileNotFoundError(f"Model path does not exist: {candidate}")
-
-    try:
-        from modelscope import snapshot_download
-    except ImportError as exc:
-        raise ImportError(
-            "modelscope is required to load remote model ids like "
-            f"'{path}'. Install it or pass a local model path."
-        ) from exc
-
-    logger.info("Downloading/loading experiment model via ModelScope: %s", path)
-    resolved = snapshot_download(path)
-    logger.info("Resolved experiment model id %s to local path: %s", path, resolved)
-    return resolved
 
 
 def _build_base_text(tokenizer, *, query: str, agent_kind: str) -> str:
@@ -58,7 +35,9 @@ def _build_base_text(tokenizer, *, query: str, agent_kind: str) -> str:
     return text
 
 
-def _empty_result(request: dict[str, Any], *, error: str, batch_size: int) -> dict[str, Any]:
+def _empty_result(
+    request: dict[str, Any], *, error: str, batch_size: int
+) -> dict[str, Any]:
     return {
         "request_id": request["request_id"],
         "aux_dsl_dict": {},
@@ -122,7 +101,9 @@ def _merge_worker_batch_profiles(*profiles: dict[str, Any]) -> dict[str, Any]:
             "prompt_token_count_max",
             "generated_token_count_max",
         ):
-            merged[field] = max(float(merged.get(field, 0.0)), float(profile.get(field, 0.0)))
+            merged[field] = max(
+                float(merged.get(field, 0.0)), float(profile.get(field, 0.0))
+            )
         mode = str(profile.get("fallback_mode", "none"))
         if mode != "none":
             fallback_modes.append(mode)
@@ -169,7 +150,9 @@ def _build_request_profile(
 ) -> dict[str, Any]:
     generated_token_count_sum = sum(int(count) for count in generated_token_counts)
     generated_sequence_count = len(generated_token_counts)
-    duplicate_candidate_count = max(int(raw_candidate_count) - int(unique_candidate_count), 0)
+    duplicate_candidate_count = max(
+        int(raw_candidate_count) - int(unique_candidate_count), 0
+    )
     request_profile = {
         "prompt_token_count": int(prompt_token_count),
         "generated_token_count_sum": int(generated_token_count_sum),
@@ -189,24 +172,40 @@ def _build_request_profile(
     return request_profile
 
 
-def _accumulate_request_profile(worker_batch_profile: dict[str, Any], request_profile: dict[str, Any]) -> None:
-    worker_batch_profile["prompt_token_count_sum"] += int(request_profile.get("prompt_token_count", 0))
+def _accumulate_request_profile(
+    worker_batch_profile: dict[str, Any], request_profile: dict[str, Any]
+) -> None:
+    worker_batch_profile["prompt_token_count_sum"] += int(
+        request_profile.get("prompt_token_count", 0)
+    )
     worker_batch_profile["prompt_token_count_max"] = max(
         int(worker_batch_profile.get("prompt_token_count_max", 0)),
         int(request_profile.get("prompt_token_count", 0)),
     )
-    worker_batch_profile["generated_token_count_sum"] += int(request_profile.get("generated_token_count_sum", 0))
+    worker_batch_profile["generated_token_count_sum"] += int(
+        request_profile.get("generated_token_count_sum", 0)
+    )
     worker_batch_profile["generated_token_count_max"] = max(
         int(worker_batch_profile.get("generated_token_count_max", 0)),
         int(request_profile.get("generated_token_count_max", 0)),
     )
-    worker_batch_profile["generated_sequence_count"] += int(request_profile.get("generated_sequence_count", 0))
-    worker_batch_profile["raw_candidate_count_sum"] += int(request_profile.get("raw_candidate_count", 0))
-    worker_batch_profile["unique_candidate_count_sum"] += int(request_profile.get("unique_candidate_count", 0))
-    worker_batch_profile["duplicate_candidate_count_sum"] += int(request_profile.get("duplicate_candidate_count", 0))
+    worker_batch_profile["generated_sequence_count"] += int(
+        request_profile.get("generated_sequence_count", 0)
+    )
+    worker_batch_profile["raw_candidate_count_sum"] += int(
+        request_profile.get("raw_candidate_count", 0)
+    )
+    worker_batch_profile["unique_candidate_count_sum"] += int(
+        request_profile.get("unique_candidate_count", 0)
+    )
+    worker_batch_profile["duplicate_candidate_count_sum"] += int(
+        request_profile.get("duplicate_candidate_count", 0)
+    )
     first_token_latency_s = request_profile.get("first_token_latency_s")
     if first_token_latency_s is not None:
-        worker_batch_profile["first_token_latency_sum_s"] += float(first_token_latency_s)
+        worker_batch_profile["first_token_latency_sum_s"] += float(
+            first_token_latency_s
+        )
         worker_batch_profile["first_token_latency_count"] += 1
 
 
@@ -221,7 +220,9 @@ def generate_aux_dsl_dict_batch(
         return [], _create_worker_batch_profile(batch_size=0)
 
     if any(request.get("with_predicate", False) for request in requests):
-        raise NotImplementedError("Batched generation currently supports with_predicate=False only.")
+        raise NotImplementedError(
+            "Batched generation currently supports with_predicate=False only."
+        )
 
     decoding_size = int(requests[0]["decoding_size"])
     if any(int(request["decoding_size"]) != decoding_size for request in requests):
@@ -238,10 +239,15 @@ def generate_aux_dsl_dict_batch(
         for request in requests
     ]
     prompts = [
-        base_text + request.get("response_prefix", "<aux> x00") + " " + request["new_point_name"]
+        base_text
+        + request.get("response_prefix", "<aux> x00")
+        + " "
+        + request["new_point_name"]
         for base_text, request in zip(base_texts, requests)
     ]
-    model_inputs = tokenizer(prompts, return_tensors="pt", padding=True).to(model.device)
+    model_inputs = tokenizer(prompts, return_tensors="pt", padding=True).to(
+        model.device
+    )
     profile["input_build_time_s"] += time.perf_counter() - input_build_start
     pad_token_id = tokenizer.pad_token_id
     eos_token_id = tokenizer.encode(" ;", add_special_tokens=False)[0]
@@ -275,7 +281,9 @@ def generate_aux_dsl_dict_batch(
         model_inputs=model_inputs,
         sequences=generated_output.sequences,
         decoding_size=decoding_size,
-        decode_batch=lambda batch: tokenizer.batch_decode(batch, skip_special_tokens=True),
+        decode_batch=lambda batch: tokenizer.batch_decode(
+            batch, skip_special_tokens=True
+        ),
     )
     profile["decode_time_s"] += time.perf_counter() - decode_start
     results: list[dict[str, Any]] = []
@@ -306,7 +314,13 @@ def generate_aux_dsl_dict_batch(
 class ModelWorker:
     """Keep one LM replica resident on one GPU for repeated generation calls."""
 
-    def __init__(self, model_path: str, agent_kind: str = "lm", torch_seed: int = 123, worker_slot: int = 0):
+    def __init__(
+        self,
+        model_path: str,
+        agent_kind: str = "lm",
+        torch_seed: int = 123,
+        worker_slot: int = 0,
+    ):
         resolved_path = resolve_model_path(model_path)
         self.model_path = resolved_path
         self.agent_kind = agent_kind
@@ -373,7 +387,9 @@ class ModelWorker:
         finally:
             inference_time_s = time.time() - inference_start
         worker_finished_at_unix_s = time.time()
-        worker_batch_profile["worker_inference_time_s"] = time.perf_counter() - perf_start
+        worker_batch_profile["worker_inference_time_s"] = (
+            time.perf_counter() - perf_start
+        )
         worker_batch_profile["gpu_worker_id"] = self.worker_id
         worker_batch_profile["gpu_device"] = self.device_label
         worker_batch_profile["worker_started_at_unix_s"] = inference_start
@@ -389,7 +405,9 @@ class ModelWorker:
             "worker_batch_profile": worker_batch_profile,
         }
 
-    def _generate_batch_with_fallback(self, requests: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    def _generate_batch_with_fallback(
+        self, requests: list[dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         try:
             return generate_aux_dsl_dict_batch(
                 self.model,
@@ -399,10 +417,15 @@ class ModelWorker:
             )
         except Exception as exc:
             if len(requests) == 1:
-                logger.exception("LM generate failed for request_id=%s", requests[0].get("request_id"))
+                logger.exception(
+                    "LM generate failed for request_id=%s",
+                    requests[0].get("request_id"),
+                )
                 profile = _create_worker_batch_profile(batch_size=1)
                 profile["fallback_mode"] = "single_error"
-                return [_empty_result(requests[0], error=str(exc), batch_size=1)], profile
+                return [
+                    _empty_result(requests[0], error=str(exc), batch_size=1)
+                ], profile
             if _is_oom_error(exc):
                 logger.warning(
                     "LM batched generate hit OOM; splitting batch_size=%d request_ids=%s",
@@ -413,10 +436,18 @@ class ModelWorker:
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
                 midpoint = len(requests) // 2
-                left_results, left_profile = self._generate_batch_with_fallback(requests[:midpoint])
-                right_results, right_profile = self._generate_batch_with_fallback(requests[midpoint:])
-                merged_profile = _merge_worker_batch_profiles(left_profile, right_profile)
-                merged_profile["fallback_time_s"] += time.perf_counter() - fallback_start
+                left_results, left_profile = self._generate_batch_with_fallback(
+                    requests[:midpoint]
+                )
+                right_results, right_profile = self._generate_batch_with_fallback(
+                    requests[midpoint:]
+                )
+                merged_profile = _merge_worker_batch_profiles(
+                    left_profile, right_profile
+                )
+                merged_profile["fallback_time_s"] += (
+                    time.perf_counter() - fallback_start
+                )
                 merged_profile["fallback_mode"] = "oom_split"
                 return left_results + right_results, merged_profile
             logger.exception(
@@ -427,7 +458,9 @@ class ModelWorker:
             all_results: list[dict[str, Any]] = []
             profiles: list[dict[str, Any]] = []
             for request in requests:
-                request_results, request_profile = self._generate_batch_with_fallback([request])
+                request_results, request_profile = self._generate_batch_with_fallback(
+                    [request]
+                )
                 all_results.extend(request_results)
                 profiles.append(request_profile)
             merged_profile = _merge_worker_batch_profiles(*profiles)
@@ -445,5 +478,7 @@ class ModelWorker:
             "device": self.device_label,
             "num_requests": self.num_requests,
             "num_batches": self.num_batches,
-            "avg_batch_size": (self.num_requests / self.num_batches) if self.num_batches else 0.0,
+            "avg_batch_size": (self.num_requests / self.num_batches)
+            if self.num_batches
+            else 0.0,
         }

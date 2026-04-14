@@ -111,40 +111,49 @@ CSV_COLUMN_SPECS = (
 )
 
 PROFILED_WALL_COMPONENT_FIELDS = tuple(
-    field for field in WALL_TIME_FIELDS if field not in {"total_time_s", "other_wall_time_s"}
+    field
+    for field in WALL_TIME_FIELDS
+    if field not in {"total_time_s", "other_wall_time_s"}
 )
 
 
 def create_profiling_payload() -> dict[str, float]:
-    return {
-        field: 0.0
-        for field in PROFILE_ROW_FIELDS + DERIVED_FIELDS
-    }
+    return {field: 0.0 for field in PROFILE_ROW_FIELDS + DERIVED_FIELDS}
 
 
 def create_detailed_profiling_payload() -> dict[str, float]:
     return create_profiling_payload()
 
 
-def add_profiling_time(profiling: dict[str, Any], field: str, elapsed_s: float | int | None) -> None:
+def add_profiling_time(
+    profiling: dict[str, Any], field: str, elapsed_s: float | int | None
+) -> None:
     if elapsed_s is None:
         return
     profiling[field] = profiling.get(field, 0.0) + float(elapsed_s)
 
 
-def increment_profiling_count(profiling: dict[str, Any], field: str, amount: int | float = 1) -> None:
+def increment_profiling_count(
+    profiling: dict[str, Any], field: str, amount: int | float = 1
+) -> None:
     profiling[field] = profiling.get(field, 0.0) + amount
 
 
-def update_profiling_max(profiling: dict[str, Any], field: str, value: float | int | None) -> None:
+def update_profiling_max(
+    profiling: dict[str, Any], field: str, value: float | int | None
+) -> None:
     if value is None:
         return
     profiling[field] = max(float(profiling.get(field, 0.0)), float(value))
 
 
-def finalize_profiling(profiling: dict[str, Any], total_time_s: float | int) -> dict[str, Any]:
+def finalize_profiling(
+    profiling: dict[str, Any], total_time_s: float | int
+) -> dict[str, Any]:
     profiling["total_time_s"] = float(total_time_s)
-    accounted = sum(float(profiling.get(field, 0.0)) for field in PROFILED_WALL_COMPONENT_FIELDS)
+    accounted = sum(
+        float(profiling.get(field, 0.0)) for field in PROFILED_WALL_COMPONENT_FIELDS
+    )
     profiling["other_wall_time_s"] = max(float(total_time_s) - accounted, 0.0)
     batch_completed = float(profiling.get("gpu_batch_submitted_count", 0.0))
     profiling["avg_gpu_batch_size"] = (
@@ -154,22 +163,24 @@ def finalize_profiling(profiling: dict[str, Any], total_time_s: float | int) -> 
     )
     request_completed = float(profiling.get("gpu_request_completed_count", 0.0))
     generated_sequence_count = float(profiling.get("gpu_generated_sequence_count", 0.0))
-    generated_token_count_sum = float(profiling.get("gpu_generated_token_count_sum", 0.0))
+    generated_token_count_sum = float(
+        profiling.get("gpu_generated_token_count_sum", 0.0)
+    )
     unique_candidate_count = float(profiling.get("gpu_unique_candidate_count", 0.0))
     raw_candidate_count = float(profiling.get("gpu_raw_candidate_count", 0.0))
     parse_success_count = float(profiling.get("candidate_parse_success_count", 0.0))
     build_success_count = float(profiling.get("candidate_build_success_count", 0.0))
     gpu_generate_wall_time_s = float(profiling.get("gpu_generate_wall_time_s", 0.0))
-    first_token_latency_count = float(profiling.get("gpu_first_token_latency_count", 0.0))
+    first_token_latency_count = float(
+        profiling.get("gpu_first_token_latency_count", 0.0)
+    )
     profiling["avg_prompt_tokens_per_request"] = (
         float(profiling.get("gpu_prompt_token_count_sum", 0.0)) / request_completed
         if request_completed
         else 0.0
     )
     profiling["avg_generated_tokens_per_request"] = (
-        generated_token_count_sum / request_completed
-        if request_completed
-        else 0.0
+        generated_token_count_sum / request_completed if request_completed else 0.0
     )
     profiling["avg_generated_tokens_per_sequence"] = (
         generated_token_count_sum / generated_sequence_count
@@ -192,29 +203,26 @@ def finalize_profiling(profiling: dict[str, Any], total_time_s: float | int) -> 
         else 0.0
     )
     profiling["candidate_unique_ratio"] = (
-        unique_candidate_count / raw_candidate_count
-        if raw_candidate_count
-        else 0.0
+        unique_candidate_count / raw_candidate_count if raw_candidate_count else 0.0
     )
     profiling["candidate_parse_success_rate"] = (
-        parse_success_count / unique_candidate_count
-        if unique_candidate_count
-        else 0.0
+        parse_success_count / unique_candidate_count if unique_candidate_count else 0.0
     )
     profiling["candidate_build_success_rate"] = (
-        build_success_count / parse_success_count
-        if parse_success_count
-        else 0.0
+        build_success_count / parse_success_count if parse_success_count else 0.0
     )
     profiling["avg_first_token_latency_s"] = (
-        float(profiling.get("gpu_first_token_latency_sum_s", 0.0)) / first_token_latency_count
+        float(profiling.get("gpu_first_token_latency_sum_s", 0.0))
+        / first_token_latency_count
         if first_token_latency_count
         else 0.0
     )
     return profiling
 
 
-def finalize_detailed_profiling(profiling: dict[str, Any], total_time_s: float | int) -> dict[str, Any]:
+def finalize_detailed_profiling(
+    profiling: dict[str, Any], total_time_s: float | int
+) -> dict[str, Any]:
     return finalize_profiling(profiling, total_time_s)
 
 
@@ -234,10 +242,7 @@ def merge_profiling_payloads(*payloads: dict[str, Any] | None) -> dict[str, floa
 
 
 def profiling_summary(rows: list[dict[str, Any]]) -> dict[str, float]:
-    summary = {
-        field: 0.0
-        for field in PROFILE_ROW_FIELDS + DERIVED_FIELDS
-    }
+    summary = {field: 0.0 for field in PROFILE_ROW_FIELDS + DERIVED_FIELDS}
     for row in rows:
         for field in WALL_TIME_FIELDS + DETAIL_TIME_FIELDS + COUNT_FIELDS + MAX_FIELDS:
             if field in MAX_FIELDS:
@@ -257,7 +262,9 @@ def write_profiling_csv(
     rows: list[dict[str, Any]],
 ) -> None:
     summary = profiling_summary(rows)
-    display_total_time_s = summary["total_time_s"] if total_time_s is None else float(total_time_s)
+    display_total_time_s = (
+        summary["total_time_s"] if total_time_s is None else float(total_time_s)
+    )
     summary["total_time_s"] = display_total_time_s
     with open(csv_path, "w", newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
