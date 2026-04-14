@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import os
 import time
-from pathlib import Path
 from typing import Any
 
 import ray
@@ -12,35 +11,13 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from transformers.utils import logging as hf_logging
 
 from newclid.agent.runtime.batched_decode import decode_batched_continuations
+from newclid.agent.runtime.model_resolution import resolve_model_path
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
 logger = logging.getLogger(__name__)
 hf_logging.disable_progress_bar()
 hf_logging.set_verbosity_error()
-
-
-def resolve_model_path(path: str) -> str:
-    candidate = Path(path).expanduser()
-    if candidate.exists():
-        resolved = str(candidate.resolve())
-        logger.info("Loading experiment model from local path: %s", resolved)
-        return resolved
-    if candidate.is_absolute() or path.startswith(".") or path.startswith("~"):
-        raise FileNotFoundError(f"Model path does not exist: {candidate}")
-
-    try:
-        from modelscope import snapshot_download
-    except ImportError as exc:
-        raise ImportError(
-            "modelscope is required to load remote model ids like "
-            f"'{path}'. Install it or pass a local model path."
-        ) from exc
-
-    logger.info("Downloading/loading experiment model via ModelScope: %s", path)
-    resolved = snapshot_download(path)
-    logger.info("Resolved experiment model id %s to local path: %s", path, resolved)
-    return resolved
 
 
 def _build_base_text(tokenizer, *, query: str, agent_kind: str) -> str:

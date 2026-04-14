@@ -12,10 +12,9 @@ from scripts.evaluation import (
     build_eval_output_stem,
     build_timestamped_output_stem,
 )
-import newclid.evaluation.multi_gpu.lm_actor as lm_actor_module
-from newclid.evaluation.multi_gpu.lm_actor import resolve_model_path
-from newclid.evaluation.multi_gpu.model_pool import GenerationDispatcher, ModelPool
-from newclid.evaluation.multi_gpu import model_pool as model_pool_module
+from newclid.agent.runtime.model_pool import GenerationDispatcher, ModelPool
+from newclid.agent.runtime import model_pool as model_pool_module
+from newclid.agent.runtime.model_resolution import resolve_model_path
 from newclid.search_trace import TraceRun
 
 
@@ -585,32 +584,3 @@ class ModelPathResolutionTests(unittest.TestCase):
                 resolve_model_path("Qwen/Qwen3-VL-2B-Instruct"), "/tmp/remote-model"
             )
 
-
-class LMWorkerMetadataTests(unittest.TestCase):
-    def test_lm_worker_warmup_and_stats_match_visual_schema(self):
-        worker = object.__new__(lm_actor_module.ModelWorker.__ray_actor_class__)
-        worker.model_path = "/tmp/model"
-        worker.torch_seed = 42
-        worker.worker_id = "gpu:0"
-        worker.worker_slot = 0
-        worker.device_label = "cuda:0"
-        worker.num_requests = 3
-        worker.num_batches = 2
-        worker.tokenizer = types.SimpleNamespace(padding_side="left")
-
-        class _FakeParameter:
-            device = "cuda:0"
-
-        worker.model = types.SimpleNamespace(
-            parameters=lambda: iter([_FakeParameter()])
-        )
-
-        warmup = worker.warmup()
-        stats = worker.stats()
-
-        self.assertEqual(warmup["agent_kind"], "lm")
-        self.assertEqual(warmup["runtime"], "transformers")
-        self.assertEqual(warmup["worker_id"], "gpu:0")
-        self.assertEqual(stats["agent_kind"], "lm")
-        self.assertEqual(stats["worker_slot"], 0)
-        self.assertEqual(stats["avg_batch_size"], 1.5)

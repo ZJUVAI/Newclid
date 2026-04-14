@@ -17,6 +17,7 @@ from transformers import Qwen3_5ForConditionalGeneration
 from transformers.utils import logging as hf_logging
 
 from newclid.agent.runtime.batched_decode import decode_batched_continuations
+from newclid.agent.runtime.model_resolution import resolve_model_path
 from newclid.agent.runtime.text_worker import (
     _accumulate_request_profile,
     _build_request_profile,
@@ -24,7 +25,6 @@ from newclid.agent.runtime.text_worker import (
     _count_prompt_tokens,
     _create_worker_batch_profile,
     _merge_worker_batch_profiles,
-    resolve_model_path,
 )
 
 
