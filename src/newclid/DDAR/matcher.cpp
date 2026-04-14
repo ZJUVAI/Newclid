@@ -16,6 +16,8 @@
 #include <map>
 #include <unordered_map>
 #include <functional>
+#include <iomanip>
+#include <cmath>
 
 using namespace std;
 
@@ -26,7 +28,7 @@ Matcher::Matcher(Problem *prob) : _problem(prob)
     match_equal_angles();
     match_circles();
     match_orthocenters();
-    // match_perps_paras();
+    match_perps_paras();
 }
 
 vector<tuple<double, double, Triangle>> Matcher::all_triangles()
@@ -96,9 +98,11 @@ void Matcher::match_similar_triangles()
     sort(triangles.begin(), triangles.end(),
          [](const item_type &a, const item_type &b)
          {
-             if (!Numerical::close_enough(get<0>(a), get<0>(b)))
+             double ratio1_a = get<0>(a);
+             double ratio1_b = get<0>(b);
+             if (fabs(ratio1_a - ratio1_b) >= 1e-8)
              {
-                 return get<0>(a) < get<0>(b);
+                 return ratio1_a < ratio1_b;
              }
              else
              {
@@ -490,7 +494,7 @@ void Matcher::on_eqangle(const Angle &left, const Angle &right)
 {
     // _stmts.push_back(make_unique<EqAngle>(left, right));
     // ∠ABD = ∠ACD
-    if (left.left() == right.left() && left.right() == right.right() && left.left() < left.right() && left.vertex() < left.left() && right.vertex() < right.left())
+    if (left.left() == right.left() && left.right() == right.right() && left.left() < left.right())
     {
         on_cyclic({left.vertex(), right.vertex(), left.left(), left.right()});
     }

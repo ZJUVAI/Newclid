@@ -26,6 +26,8 @@ def notNone(x: Optional[T]) -> T:
 
 def get_quotient(v: Any) -> Fraction:
     v = float(v)
+    if abs(v) < 1e-6:
+        v = float(0)
     n = v
     d = 1
     while not close_enough(n, round(n)):
