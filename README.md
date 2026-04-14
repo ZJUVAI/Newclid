@@ -169,7 +169,7 @@ python scripts/evaluation.py \
 python scripts/evaluation.py \
   --problems_path benchmarks/dev_imo.txt \
   --model_path /path/to/checkpoint \
-  --agent qwen35 \
+  --agent qwen35_vl \
   --max_workers 40 \
   --decoding_size 32 \
   --beam_size 512 \

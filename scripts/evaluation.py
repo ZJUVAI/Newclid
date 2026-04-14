@@ -81,7 +81,6 @@ def build_eval_output_stem(
     gpu_batch_timeout_ms: int,
     torch_seed: int = 123,
 ) -> str:
-    agent_type = normalize_agent_type(agent_type)
     problems_name = problems_path.stem
     path_obj = Path(model_path)
     deepest_folder = path_obj.name
@@ -96,12 +95,6 @@ def build_eval_output_stem(
 
 def build_timestamped_output_stem(output_name_stem: str, timestamp: str) -> str:
     return f"{output_name_stem}_{timestamp}"
-
-
-def normalize_agent_type(agent_type: str) -> str:
-    if agent_type == "qwen35":
-        return "qwen35_vl"
-    return agent_type
 
 
 def configure_logging(*, force: bool = False) -> None:
@@ -140,7 +133,6 @@ def create_workers(
     num_gpus_for_eval: int,
     torch_seed: int,
 ):
-    agent_type = normalize_agent_type(agent_type)
     if agent_type in {"lm", "qwen35_text"}:
         from newclid.agent.runtime.text_worker import ModelWorker
 
@@ -181,7 +173,6 @@ def create_agent(
     render_root: Path,
     trace_writer=None,
 ):
-    agent_type = normalize_agent_type(agent_type)
     if agent_type in {"lm", "qwen35_text"}:
         return LMAgent(
             model_pool=model_pool,
@@ -232,7 +223,6 @@ def solve_one_problem(
     render_root: Path,
     trace_writer=None,
 ):
-    agent_type = normalize_agent_type(agent_type)
     start_perf = time.perf_counter()
     logging.getLogger(__name__).info(
         "solve_one_problem start: problem=%s agent=%s problems_path=%s",
@@ -302,7 +292,6 @@ def solve_problems_single_problem_multi_gpu(
     enable_trace: bool = False,
     enable_profiling: bool = False,
 ):
-    agent_type = normalize_agent_type(agent_type)
     if not filepath.exists():
         raise FileNotFoundError(f"File {filepath} not found.")
 
@@ -612,7 +601,7 @@ def main():
         "--agent",
         type=str,
         default="lm",
-        choices=["lm", "vlm", "qwen35_text", "qwen35_vl", "qwen35"],
+        choices=["lm", "vlm", "qwen35_text", "qwen35_vl"],
         help="Agent backend to use for single-problem multi-GPU evaluation.",
     )
     parser.add_argument(
