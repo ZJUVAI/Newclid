@@ -21,12 +21,14 @@ MAX_WORKERS="${MAX_WORKERS:-40}"
 SEARCH_DEPTH="${SEARCH_DEPTH:-4}"
 TIMEOUT="${TIMEOUT:-3600}"
 AGENT="${AGENT:-lm}"
+ENABLE_TRACE="${ENABLE_TRACE:-false}"
+ENABLE_PROFILING="${ENABLE_PROFILING:-false}"
 
 CUDA_DEVICES="${CUDA_DEVICES:-0,1,2,3}"
 RAY_MEMORY_USAGE_THRESHOLD="${RAY_MEMORY_USAGE_THRESHOLD:-0.95}"
 
 REPORT_TO="${REPORT_TO:-}"
-SWANLAB_PROJECT="${SWANLAB_PROJECT:-genesisgeo}"
+SWANLAB_PROJECT="${SWANLAB_PROJECT:-GenesisGeo}"
 SWANLAB_WORKSPACE="${SWANLAB_WORKSPACE:-}"
 SWANLAB_EXP_NAME="${SWANLAB_EXP_NAME:-${MODEL_NAME}_eval}"
 SWANLAB_MODE="${SWANLAB_MODE:-cloud}"
@@ -141,6 +143,27 @@ dataset_stem_from_arg() {
 
     dataset_name="$(basename "$dataset")"
     printf '%s\n' "${dataset_name%.txt}"
+}
+
+append_boolean_optional_arg() {
+    local -n target_args_ref="$1"
+    local flag_name="$2"
+    local raw_value="$3"
+    local normalized_value
+
+    normalized_value="$(printf '%s' "$raw_value" | tr '[:upper:]' '[:lower:]')"
+    case "$normalized_value" in
+        1|true|yes|on)
+            target_args_ref+=("--$flag_name")
+            ;;
+        0|false|no|off|'')
+            target_args_ref+=("--no-$flag_name")
+            ;;
+        *)
+            echo "Error: invalid boolean value '$raw_value' for $flag_name" >&2
+            exit 1
+            ;;
+    esac
 }
 
 eval_output_stem() {
@@ -281,6 +304,8 @@ echo "Configs    : $EVAL_CONFIGS"
 echo "Checkpoints: $CHECKPOINTS"
 echo "Workers    : $MAX_WORKERS"
 echo "Agent      : $AGENT"
+echo "Trace      : $ENABLE_TRACE"
+echo "Profiling  : $ENABLE_PROFILING"
 if [ "$REPORT_TO_ENABLED" = true ]; then
     echo "Report To  : $REPORT_TO"
 fi
@@ -325,6 +350,8 @@ for checkpoint in "${CHECKPOINT_ITEMS[@]}"; do
                 --timeout "$TIMEOUT"
                 --agent "$AGENT"
             )
+            append_boolean_optional_arg EVAL_ARGS "enable_trace" "$ENABLE_TRACE"
+            append_boolean_optional_arg EVAL_ARGS "enable_profiling" "$ENABLE_PROFILING"
 
             echo "Dataset    : $dataset_name"
             echo "DatasetPath: $dataset_path"
