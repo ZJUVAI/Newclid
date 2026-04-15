@@ -18,7 +18,7 @@ from newclid.formulations.definition import DefinitionJGEX
 from newclid.formulations.problem import ProblemJGEX
 from newclid.formulations.rule import Rule
 from newclid.numerical.geometries import PointNum
-from newclid.problem_db import classify_build_exception
+from newclid.agent.runtime.search_runtime import classify_build_exception
 from newclid.proof import ProofState
 from newclid.training.aux_dsl import extract_aux_body, normalize_aux_text, try_dsl_to_constructions
 

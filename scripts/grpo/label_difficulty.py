@@ -9,9 +9,6 @@ import time
 from pathlib import Path
 from typing import Any
 
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-
 from newclid.training.grpo_rewards import AuxEvaluationResult, AuxRewardEvaluator
 
 
@@ -35,6 +32,10 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
 
 class CompletionGenerator:
     def __init__(self, model_path: str, max_new_tokens: int = 160) -> None:
+        import torch
+        from transformers import AutoModelForCausalLM, AutoTokenizer
+
+        self._torch = torch
         self.model = AutoModelForCausalLM.from_pretrained(
             model_path,
             torch_dtype="auto",
@@ -56,34 +57,34 @@ class CompletionGenerator:
         )
         return prompt + "<think>\n\n</think>\n\n"
 
-    @torch.no_grad()
     def generate_greedy(self, query: str) -> str:
-        prompt = self._build_prompt(query)
-        inputs = self.tokenizer([prompt], return_tensors="pt").to(self.model.device)
-        output = self.model.generate(
-            **inputs,
-            max_new_tokens=self.max_new_tokens,
-            do_sample=False,
-            pad_token_id=self.tokenizer.pad_token_id,
-        )
-        generated = output[:, inputs.input_ids.shape[1] :]
-        return self.tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
+        with self._torch.no_grad():
+            prompt = self._build_prompt(query)
+            inputs = self.tokenizer([prompt], return_tensors="pt").to(self.model.device)
+            output = self.model.generate(
+                **inputs,
+                max_new_tokens=self.max_new_tokens,
+                do_sample=False,
+                pad_token_id=self.tokenizer.pad_token_id,
+            )
+            generated = output[:, inputs.input_ids.shape[1] :]
+            return self.tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
 
-    @torch.no_grad()
     def generate_sample(self, query: str, num_samples: int, temperature: float, top_p: float) -> list[str]:
-        prompt = self._build_prompt(query)
-        inputs = self.tokenizer([prompt], return_tensors="pt").to(self.model.device)
-        output = self.model.generate(
-            **inputs,
-            max_new_tokens=self.max_new_tokens,
-            do_sample=True,
-            temperature=temperature,
-            top_p=top_p,
-            num_return_sequences=num_samples,
-            pad_token_id=self.tokenizer.pad_token_id,
-        )
-        generated = output[:, inputs.input_ids.shape[1] :]
-        return self.tokenizer.batch_decode(generated, skip_special_tokens=True)
+        with self._torch.no_grad():
+            prompt = self._build_prompt(query)
+            inputs = self.tokenizer([prompt], return_tensors="pt").to(self.model.device)
+            output = self.model.generate(
+                **inputs,
+                max_new_tokens=self.max_new_tokens,
+                do_sample=True,
+                temperature=temperature,
+                top_p=top_p,
+                num_return_sequences=num_samples,
+                pad_token_id=self.tokenizer.pad_token_id,
+            )
+            generated = output[:, inputs.input_ids.shape[1] :]
+            return self.tokenizer.batch_decode(generated, skip_special_tokens=True)
 
 
 def aggregate_difficulty_metrics(
