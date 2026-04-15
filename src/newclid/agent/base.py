@@ -213,6 +213,8 @@ class BaseAgent(DeductiveAgent, ABC):
             ),
             error_type=ddar_result.get("error_type"),
             error_message=ddar_result.get("error_message"),
+            raw_aux_text=future_meta.get("raw_aux_text"),
+            construction_text=future_meta.get("construction_text"),
         )
 
     def _handle_ddar_done(
@@ -326,6 +328,8 @@ class BaseAgent(DeductiveAgent, ABC):
                         decision="queued_next_depth",
                         beam_score_before=future_meta["prev_score"],
                         beam_score_after=child_score,
+                        raw_aux_text=future_meta.get("raw_aux_text"),
+                        construction_text=future_meta.get("construction_text"),
                     )
         handle_elapsed_s = time.perf_counter() - handle_start
         add_profiling_time(
@@ -758,8 +762,8 @@ class BaseAgent(DeductiveAgent, ABC):
             for candidate_rank, (aux_dsl, score) in enumerate(
                 gpu_result["aux_dsl_dict"].items()
             ):
+                raw_aux_text = self.extract_raw_aux_text(aux_dsl)
                 try:
-                    raw_aux_text = self.extract_raw_aux_text(aux_dsl)
                     aux = self.try_dsl_to_constructions(raw_aux_text)
                 except Exception:
                     increment_profiling_count(profiling, "candidate_parse_failed_count")
@@ -774,6 +778,8 @@ class BaseAgent(DeductiveAgent, ABC):
                         decision="parse_failed",
                         beam_score_before=prev_score,
                         beam_score_after=None,
+                        raw_aux_text=raw_aux_text,
+                        construction_text=None,
                     )
                     continue
 
@@ -790,6 +796,8 @@ class BaseAgent(DeductiveAgent, ABC):
                         decision="parse_failed",
                         beam_score_before=prev_score,
                         beam_score_after=None,
+                        raw_aux_text=raw_aux_text,
+                        construction_text=None,
                     )
                     continue
 
@@ -809,6 +817,8 @@ class BaseAgent(DeductiveAgent, ABC):
                         decision="build_failed",
                         beam_score_before=prev_score,
                         beam_score_after=None,
+                        raw_aux_text=raw_aux_text,
+                        construction_text=aux,
                     )
                     continue
 
@@ -830,6 +840,8 @@ class BaseAgent(DeductiveAgent, ABC):
                         "attempt_key": build_attempt_key(
                             request_id, candidate_rank, child_node_id
                         ),
+                        "raw_aux_text": raw_aux_text,
+                        "construction_text": aux,
                     }
                 )
 
@@ -869,6 +881,8 @@ class BaseAgent(DeductiveAgent, ABC):
                 decision="ddar_submitted",
                 beam_score_before=candidate_meta["prev_score"],
                 beam_score_after=candidate_meta["prev_score"] + candidate_meta["score"],
+                raw_aux_text=candidate_meta.get("raw_aux_text"),
+                construction_text=candidate_meta.get("construction_text"),
             )
             self._trace(
                 "ddar_submit",
@@ -877,6 +891,8 @@ class BaseAgent(DeductiveAgent, ABC):
                 parent_node_id=candidate_meta["parent_node_id"],
                 depth=depth,
                 ddar_submitted_at_unix_s=candidate_meta["ddar_submitted_at_unix_s"],
+                raw_aux_text=candidate_meta.get("raw_aux_text"),
+                construction_text=candidate_meta.get("construction_text"),
             )
             future = run_ddar_remote.remote(
                 candidate_meta["problem"],
