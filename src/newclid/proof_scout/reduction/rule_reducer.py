@@ -1517,6 +1517,7 @@ class ChunkedIterativeReducer:
         solver_type: str = "csolver",
         engine: str = "full",
         verbose: bool = True,
+        use_ray: bool = False,
     ):
         self.timeout = timeout
         self.seed = seed
@@ -1524,6 +1525,7 @@ class ChunkedIterativeReducer:
         self.solver_type = solver_type
         self.engine = engine
         self.verbose = verbose
+        self.use_ray = use_ray
 
     @staticmethod
     def filter_by_premises(
@@ -1561,8 +1563,9 @@ class ChunkedIterativeReducer:
     ) -> Tuple[List[RuleWithSource], Dict[str, Any]]:
         """One round of chunked reduction.
 
-        Splits rules into chunks, reduces each sequentially (chunks are processed
-        one at a time), with intra-chunk parallelism controlled by n_workers.
+        Splits rules into chunks, reduces each chunk. When use_ray=True, chunks
+        are processed in parallel as Ray tasks. Otherwise, chunks are processed
+        sequentially with intra-chunk parallelism controlled by n_workers.
 
         Returns:
             (survivors, round_stats)
@@ -1573,15 +1576,76 @@ class ChunkedIterativeReducer:
         n_chunks = math.ceil(len(rules) / group_size)
         chunks = [rules[i * group_size:(i + 1) * group_size] for i in range(n_chunks)]
 
+        mode_str = "Ray parallel chunks" if self.use_ray else f"serial chunks (n_workers={n_workers})"
         if self.verbose:
-            print(f"  Splitting {len(rules)} rules into {n_chunks} chunks (group_size={group_size}, n_workers={n_workers})")
+            print(f"  Splitting {len(rules)} rules into {n_chunks} chunks "
+                  f"(group_size={group_size}, mode={mode_str})")
 
         round_start = _time.time()
         survivors = []
         chunk_stats = []
 
-        # Serial over chunks; intra-chunk parallelism via n_workers
-        for ci, chunk in enumerate(chunks):
+        if self.use_ray:
+            # Ray parallel: all chunks processed concurrently
+            import ray
+            from newclid.proof_scout.reduction.ray_workers import reduce_chunk_worker_ray
+
+            if self.verbose:
+                print(f"  Submitting {n_chunks} chunks as Ray tasks...")
+
+            # Submit all chunks as Ray tasks
+            futures = []
+            for ci, chunk in enumerate(chunks):
+                future = reduce_chunk_worker_ray.remote(
+                    ci,
+                    chunk,
+                    self.timeout,
+                    self.seed,
+                    self.batch_size,
+                    self.solver_type,
+                    self.engine,
+                    self.verbose,
+                )
+                futures.append((ci, future))
+
+            if self.verbose:
+                print(f"  All {len(futures)} chunk tasks submitted. Waiting for results...")
+
+            # Collect results as they complete
+            remaining = futures
+            completed = 0
+            while remaining:
+                ready_futures = [f for _, f in remaining]
+                done, _ = ray.wait(ready_futures, num_returns=1)
+                done_ref = done[0]
+
+                # Find which chunk corresponds to this future
+                for idx, (ci, f) in enumerate(remaining):
+                    if f == done_ref:
+                        chunk_idx = ci
+                        remaining.pop(idx)
+                        break
+
+                result = ray.get(done_ref)
+                completed += 1
+
+                survivors.extend(result["basis_rules"])
+                chunk_stats.append({
+                    "chunk_idx": chunk_idx,
+                    "input": result["stats"]["original_count"],
+                    "basis": result["stats"]["basis_count"],
+                    "eliminated": result["stats"]["eliminated_count"],
+                    "time": result.get("time", 0),
+                })
+
+                if self.verbose:
+                    print(f"  [{completed}/{n_chunks}] Chunk {chunk_idx}: "
+                          f"{result['stats']['original_count']} → {result['stats']['basis_count']} rules "
+                          f"({result.get('time', 0):.1f}s)")
+
+        else:
+            # Serial over chunks; intra-chunk parallelism via n_workers
+            for ci, chunk in enumerate(chunks):
             if self.verbose:
                 print(f"\n  --- Chunk {ci}/{n_chunks}: {len(chunk)} rules ---")
             result = _reduce_chunk_worker(

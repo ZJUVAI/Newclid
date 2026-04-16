@@ -507,6 +507,7 @@ def run_part4(
                 batch_size=batch_size,
                 solver_type="csolver",
                 engine=engine,
+                use_ray=use_ray,
             )
             current_rules, chunk_stats = cir.reduce_iterative(
                 current_rules,

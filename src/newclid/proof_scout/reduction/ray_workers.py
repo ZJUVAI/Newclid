@@ -136,6 +136,75 @@ else:
     test_subsumption_batch_worker_ray = _test_subsumption_batch_worker_ray
 
 
+def _reduce_chunk_worker_ray(
+    chunk_idx: int,
+    chunk_rules: List,
+    timeout: int,
+    seed: int,
+    batch_size: int,
+    solver_type: str,
+    engine: str,
+    verbose: bool,
+) -> Dict[str, Any]:
+    """Ray worker for reducing a single chunk.
+
+    This function is designed to be called by Ray as a remote task.
+    Each chunk is processed independently in parallel.
+
+    Args:
+        chunk_idx: Chunk index for tracking
+        chunk_rules: List of RuleWithSource objects in this chunk
+        timeout: Timeout in seconds for each subsumption test
+        seed: Random seed for reproducibility
+        batch_size: Progress reporting granularity
+        solver_type: "python" or "csolver"
+        engine: DDAR engine variant ("full" or "weak")
+        verbose: Print progress messages
+
+    Returns:
+        Dict with reduction results for this chunk
+    """
+    import time as _time
+    from newclid.proof_scout.reduction.rule_reducer import RuleReducer
+
+    if verbose:
+        print(f"[Ray Worker] Processing chunk {chunk_idx}: {len(chunk_rules)} rules")
+
+    chunk_start = _time.time()
+
+    # Create a reducer with n_workers=1 (no nested parallelism within chunk)
+    reducer = RuleReducer(
+        timeout=timeout,
+        seed=seed,
+        batch_size=batch_size,
+        solver_type=solver_type,
+        engine=engine,
+        verbose=verbose,
+        n_workers=1,  # Sequential within each chunk
+        use_ray=False,  # No nested Ray within chunk
+    )
+
+    result = reducer.reduce(chunk_rules)
+    chunk_time = _time.time() - chunk_start
+
+    if verbose:
+        print(f"[Ray Worker] Chunk {chunk_idx} done: "
+              f"{len(chunk_rules)} → {result['stats']['basis_count']} rules "
+              f"({chunk_time:.1f}s)")
+
+    # Add chunk metadata to result
+    result["chunk_idx"] = chunk_idx
+    result["time"] = chunk_time
+
+    return result
+
+
+if ray is not None:
+    reduce_chunk_worker_ray = ray.remote(_reduce_chunk_worker_ray)
+else:
+    reduce_chunk_worker_ray = _reduce_chunk_worker_ray
+
+
 def serialize_rule(rule) -> Dict[str, Any]:
     """Serialize a RuleWithSource object to a dict for Ray transmission.
 
