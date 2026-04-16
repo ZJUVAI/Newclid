@@ -72,7 +72,7 @@ class VLMCompletionGenerator:
         reqs = [self._InferRequest(messages=self._build_messages(q)) for q in queries]
 
         greedy_cfg = self._RequestConfig(temperature=0.0, n=1, max_tokens=self.max_new_tokens)
-        greedy_results = self.engine.infer(reqs, greedy_cfg)
+        greedy_results = self.engine.infer(reqs, greedy_cfg, use_tqdm=False)
         greedy_outputs = [
             r.choices[0].message.content if r and r.choices else ""
             for r in greedy_results
@@ -81,7 +81,7 @@ class VLMCompletionGenerator:
         sample_cfg = self._RequestConfig(
             temperature=temperature, top_p=top_p, n=num_samples, max_tokens=self.max_new_tokens
         )
-        sample_results = self.engine.infer(reqs, sample_cfg)
+        sample_results = self.engine.infer(reqs, sample_cfg, use_tqdm=False)
         sampled_outputs = [
             [c.message.content for c in r.choices] if r and r.choices else []
             for r in sample_results
