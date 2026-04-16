@@ -1,0 +1,16 @@
+imo_shortlist_2004_g8
+a b d = triangle a b d; c = on_circum c a b d; e = on_line e a d, on_line e b c; f = on_line f a c, on_line f b d; m = midpoint m c d; n = on_circum n a b m, eqratio6 n a b a m b m ? coll e f n
+imo_shortlist_2006_g2
+a b c d = trapezoid a b c d; k = on_line k a b; l = on_line l c d, eqratio6 l d c a k b k; p = eqangle3 p a b c d b, on_line p k l; q = eqangle3 q c d b c a, on_line q k l ? cyclic p q b c
+thales_reverse
+a b c d = trapezoid a b c d; k = on_line k a b; l = eqratio6 l d c a k b k, on_line l c d; o = on_line o k l, on_line o a d ? coll o b c
+obm_1fase_2001_p2
+a b = segment a b; c = s_angle b a c 140o, s_angle a b c 60o; e = on_tline e c a c, eqdistance e c a c; d = s_angle c e d 40o, on_tline d c c b ? aconst d b a c 11pi/36
+obm_1fase_2001_p9
+a b = segment a b; c = s_angle a b c 108o, eqdistance c b b a; d = s_angle b c d 108o, eqdistance d c c b; e = s_angle c d e 108o, eqdistance e d d c; f = eqdistance f a a b, eqdistance f b a b ? aconst c d f c 7pi/30
+obm_1fase_2001_p9_hint
+a b = segment a b; c = s_angle a b c 108o, eqdistance c b b a; d = s_angle b c d 108o, eqdistance d c c b; e = s_angle c d e 108o, eqdistance e d d c; f = eqdistance f a a b, eqdistance f b a b; o = circle o a b c ? cong a b a e
+obm_1fase_2006_p15
+a b c = triangle a b c; d = eqdistance d a a c, eqdistance d c c a; e = eqdistance e a a b, eqdistance e b b a; f = midpoint f a e; g = midpoint g a c ? rconst b d f g 2/1
+obm_1fase_2008_p16
+a c = segment a c; d = s_angle c a d 25o, s_angle a c d 135o; b = s_angle c a b 160o, s_angle a c b 20o ? aconst d b b c 5pi/18

@@ -30,7 +30,7 @@ class EqRatio(Predicate):
 
     @classmethod
     def preparse(cls, args: tuple[str, ...]):
-        return EqAngle.preparse(args)    
+        return EqAngle.preparse(args)
 
     @classmethod
     def parse(cls, args: tuple[str, ...], dep_graph: DependencyGraph):
@@ -121,10 +121,15 @@ class EqRatio(Predicate):
             f"{a.pretty_name}{b.pretty_name}:{c.pretty_name}{d.pretty_name}"
             for a, b, c, d in reshape(args, 4)
         )
-    
+
     @classmethod
     def draw(
-        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True
+        cls,
+        ax: Axes,
+        args: tuple[Any, ...],
+        dep_graph: DependencyGraph,
+        rng: Generator,
+        draw_annotations: bool = True,
     ):
         for i in range(0, len(args), 2):
             draw_segment(ax, args[i], args[i + 1])
@@ -157,9 +162,22 @@ class EqRatio3(Predicate):
             return None
         groups = ((a, b), (c, d), (m, n))
         groups1 = ((b, a), (d, c), (n, m))
-        sorted_groups = sorted(groups, key=lambda pair: [cls.custom_key(arg) for arg in pair])
-        sorted_groups1 = sorted(groups1, key=lambda pair: [cls.custom_key(arg) for arg in pair])
-        return sum(min(sorted_groups, sorted_groups1, key = lambda pair: [[cls.custom_key(arg[0]), cls.custom_key(arg[1])] for arg in pair]), ())
+        sorted_groups = sorted(
+            groups, key=lambda pair: [cls.custom_key(arg) for arg in pair]
+        )
+        sorted_groups1 = sorted(
+            groups1, key=lambda pair: [cls.custom_key(arg) for arg in pair]
+        )
+        return sum(
+            min(
+                sorted_groups,
+                sorted_groups1,
+                key=lambda pair: [
+                    [cls.custom_key(arg[0]), cls.custom_key(arg[1])] for arg in pair
+                ],
+            ),
+            (),
+        )
 
     @classmethod
     def parse(cls, args: tuple[str, ...], dep_graph: DependencyGraph):

@@ -1,0 +1,19 @@
+{
+  "name": "genesisgeo-site",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@mdx-js/loader": "^3.1.0",
+    "@mdx-js/react": "^3.1.0",
+    "@next/mdx": "^13.5.6",
+    "katex": "^0.16.45",
+    "next": "13.5.6",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  }
+}

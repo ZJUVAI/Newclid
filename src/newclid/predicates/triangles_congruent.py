@@ -52,7 +52,7 @@ class ContriClock(Predicate):
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
         return tuple(p.name for p in args)
-    
+
     @classmethod
     def pretty(cls, statement: Statement) -> str:
         args: tuple[Point, ...] = statement.args
@@ -61,7 +61,12 @@ class ContriClock(Predicate):
 
     @classmethod
     def draw(
-        cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True
+        cls,
+        ax: Axes,
+        args: tuple[Any, ...],
+        dep_graph: DependencyGraph,
+        rng: Generator,
+        draw_annotations: bool = True,
     ):
         draw_segment(ax, args[0], args[1], ls="dashed")
         draw_segment(ax, args[1], args[2], ls="dashed")
@@ -69,6 +74,7 @@ class ContriClock(Predicate):
         draw_segment(ax, args[0 + 3], args[1 + 3], ls="dashed")
         draw_segment(ax, args[1 + 3], args[2 + 3], ls="dashed")
         draw_segment(ax, args[0 + 3], args[2 + 3], ls="dashed")
+
 
 class ContriReflect(Predicate):
     """contrir A B C P Q R -
@@ -107,13 +113,13 @@ class ContriReflect(Predicate):
     @classmethod
     def to_tokens(cls, args: tuple[Any, ...]) -> tuple[str, ...]:
         return tuple(p.name for p in args)
-    
+
     @classmethod
     def pretty(cls, statement: Statement) -> str:
         args: tuple[Point, ...] = statement.args
         a, b, c, p, q, r = args
         return f"▲{a.pretty_name}{b.pretty_name}{c.pretty_name} ≡ ▲{p.pretty_name}{q.pretty_name}{r.pretty_name}"
-    
+
     @classmethod
     def draw(
         cls,

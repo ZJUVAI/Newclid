@@ -76,8 +76,6 @@ class Para(Predicate):
 
     @classmethod
     def why(cls, statement: Statement) -> Dependency:
-        if repr(statement) == 'para[h,m,l,m,]':
-            flag = True
         eqs, table = cls._prep_ar(statement)
         why: list[Dependency] = []
         for eq in eqs:
@@ -134,7 +132,7 @@ class Para(Predicate):
             fig_height = ylim[1] - ylim[0]
             fig_size = min(fig_width, fig_height)
             offset_factor = 0.3 * fig_size / 10.0  # Scale with figure size
-            
+
             if d.x < 0.0:
                 d = -offset_factor * d
             else:

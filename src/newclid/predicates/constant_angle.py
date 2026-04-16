@@ -36,8 +36,8 @@ class ConstantAngle(Predicate):
         a, b, c, d, y = args
         if a == b or c == d:
             return None
-        a, b = sorted((a, b), key = cls.custom_key)
-        c, d = sorted((c, d), key = cls.custom_key)
+        a, b = sorted((a, b), key=cls.custom_key)
+        c, d = sorted((c, d), key=cls.custom_key)
         f = str_to_fraction(y)
         if cls.compare((a, b), (c, d)) > 0:
             a, b, c, d = c, d, a, b
@@ -110,9 +110,16 @@ class ConstantAngle(Predicate):
         args: tuple[Point, Point, Point, Point, Fraction] = statement.args
         a, b, c, d, y = args
         return f"∠({a.pretty_name}{b.pretty_name},{c.pretty_name}{d.pretty_name}) = {fraction_to_angle(y)}"
-        
+
     @classmethod
-    def draw(cls, ax: Axes, args: tuple[Any, ...], dep_graph: DependencyGraph, rng: Generator, draw_annotations: bool = True):
+    def draw(
+        cls,
+        ax: Axes,
+        args: tuple[Any, ...],
+        dep_graph: DependencyGraph,
+        rng: Generator,
+        draw_annotations: bool = True,
+    ):
         draw_segment(ax, args[0], args[1])
         draw_segment(ax, args[2], args[3])
 
@@ -127,8 +134,8 @@ class ACompute(Predicate):
         a, b, c, d = args
         if a == b or c == d:
             return None
-        a, b = sorted((a, b), key = lambda pair: [cls.custom_key(arg) for arg in pair])
-        c, d = sorted((c, d), key = lambda pair: [cls.custom_key(arg) for arg in pair])
+        a, b = sorted((a, b), key=lambda pair: [cls.custom_key(arg) for arg in pair])
+        c, d = sorted((c, d), key=lambda pair: [cls.custom_key(arg) for arg in pair])
         return (a, b, c, d)
 
     @classmethod

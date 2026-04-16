@@ -4,14 +4,15 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional, Union
-import logging
 
-from matplotlib import patches
-
+from newclid.construction_validation import (
+    build_construction_mapping,
+    validate_construction_new_points,
+)
 from newclid.formulations.clause import Clause, translate_sentence
 from newclid.dependencies.dependency_graph import DependencyGraph
 from newclid.dependencies.symbols import Point
-from newclid.numerical.draw_figure import init_figure, draw_segment
+from newclid.numerical.draw_figure import init_figure
 from newclid.numerical.geometries import (
     InvalidIntersectError,
     InvalidReduceError,
@@ -58,7 +59,6 @@ class ProofState:
         problem_path: Optional[Path] = None,
         goals: Optional[list[Statement]] = None,
         defs: dict[str, DefinitionJGEX],
-        allow_coincident_points: bool = True,
     ):
         self.dep_graph = dep_graph or DependencyGraph(AlgebraicManipulator())
         self.symbols_graph = self.dep_graph.symbols_graph
@@ -71,7 +71,6 @@ class ProofState:
 
         self.fig = init_figure()
         self.defs = defs
-        self.allow_coincident_points = allow_coincident_points
 
     def add_construction(self, construction: Clause):
         """Add a new clause of construction, e.g. a new excenter."""
@@ -80,21 +79,15 @@ class ProofState:
         construction_points: set[Point] = set()
         existing_points = list(self.symbols_graph.nodes_of_type(Point))
         existing_point_names = list(p.name for p in existing_points)
+        point_names = validate_construction_new_points(
+            construction,
+            self.defs,
+            existing_point_names,
+        )
 
         for constr_sentence in construction.sentences:
             cdef = self.defs[constr_sentence[0]]
-            if len(constr_sentence) == len(cdef.declare):
-                mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
-            else:
-                assert len(constr_sentence) + len(construction.points) == len(
-                    cdef.declare
-                )
-                mapping = dict(
-                    zip(cdef.declare[1:], construction.points + constr_sentence[1:])
-                )
-            for point in cdef.points:
-                if mapping[point] in existing_point_names:
-                    raise Exception(f"The new point {mapping[point]} is already used. existing points: {existing_point_names}. construction: {construction}")
+            mapping = build_construction_mapping(construction, constr_sentence, cdef)
 
             for premise in cdef.require.sentences:
                 if len(premise) == 0:
@@ -105,8 +98,10 @@ class ProofState:
                     )
                 )
                 if not statement.check_numerical():
-                    raise ConstructionError("Requirement check_numerical failed. " + str(construction))
-                
+                    raise ConstructionError(
+                        "Requirement check_numerical failed. " + str(construction)
+                    )
+
             for arg in cdef.args:
                 if mapping[arg] in existing_point_names:
                     construction_points.add(self.symbols_graph.name2node[mapping[arg]])
@@ -117,27 +112,22 @@ class ProofState:
                         Statement.from_tokens(
                             translate_sentence(mapping, t), self.dep_graph
                         )
-                    ) 
+                    )
                     adds.append(Dependency.mk(statement, IN_PREMISES, ()))
 
             for n in cdef.numerics:
                 numerics.append(tuple(mapping[a] if a in mapping else a for a in n))
 
-        point_names: list[str] = []
         fix_point_postions: list[Optional[PointNum]] = []
         for s in construction.points:
             if "@" in s:
-                name, pos = atomize(s, "@")
-                point_names.append(name)
+                _, pos = atomize(s, "@")
                 x, y = atomize(pos, "_")
                 fix_point_postions.append(PointNum(x, y))
             else:
-                point_names.append(s)
                 fix_point_postions.append(None)
         new_points = self.symbols_graph.names2points(point_names)
         for p in new_points:
-            if p in existing_points:
-                raise Exception(f"The new points is already used. existing points: {existing_points}. construction: {construction}")
             p.clause = construction
 
         # draw
@@ -146,19 +136,24 @@ class ProofState:
             for n in numerics:
                 args: list[Union[PointNum, str]] = []
                 for t in n[1:]:
-                    if str.isalpha(t[0]): # a1 => a                      
+                    if str.isalpha(t[0]):  # a1 => a
                         args.append(self.symbols_graph.names2points([t])[0].num)
                     else:
                         args.append(t)
                 to_be_intersected += sketch(n[0], tuple(args), self.rng)
 
             return reduce(
-                to_be_intersected, [p.num for p in existing_points], [p.num for p in construction_points], rng=self.rng
+                to_be_intersected,
+                [p.num for p in existing_points],
+                [p.num for p in construction_points],
+                rng=self.rng,
             )
 
         if None in fix_point_postions:
             new_numerical_point = draw_fn()
-            for p, num, num0 in zip(new_points, new_numerical_point, fix_point_postions):
+            for p, num, num0 in zip(
+                new_points, new_numerical_point, fix_point_postions
+            ):
                 p.num = num0 or num
         else:
             for p, num in zip(new_points, fix_point_postions):
@@ -167,8 +162,7 @@ class ProofState:
 
         # check two things
         existing_numerical_points = [p.num for p in existing_points]
-        round_threshold = 1e-10 if self.allow_coincident_points else -1.0
-        if check_too_close_numerical(new_numerical_point, existing_numerical_points, round=round_threshold):
+        if check_too_close_numerical(new_numerical_point, existing_numerical_points):
             raise PointTooCloseError()
         if check_too_far_numerical(new_numerical_point, existing_numerical_points):
             raise PointTooFarError()
@@ -193,9 +187,7 @@ class ProofState:
             if len(constr_sentence) == len(cdef.declare):
                 mapping = dict(zip(cdef.declare[1:], constr_sentence[1:]))
             else:
-                if len(constr_sentence) + len(construction.points) != len(
-                    cdef.declare
-                ):
+                if len(constr_sentence) + len(construction.points) != len(cdef.declare):
                     raise ValueError("Construction definition length mismatch.")
                 mapping = dict(
                     zip(cdef.declare[1:], construction.points + constr_sentence[1:])
@@ -225,7 +217,6 @@ class ProofState:
         max_attempts: int,
         *,
         rng: "Generator",
-        allow_coincident_points: bool = True,
     ) -> ProofState:
         """Build a problem into a Proof state object."""
 
@@ -233,7 +224,7 @@ class ProofState:
         for _ in range(max_attempts):
             # Search for coordinates that checks premises conditions numerically.
             try:
-                proof = ProofState(rng=rng, defs=defsJGEX, allow_coincident_points=allow_coincident_points)
+                proof = ProofState(rng=rng, defs=defsJGEX)
                 for construction in problemJGEX.constructions:
                     proof.add_construction(construction)
                 if problem_path:
@@ -270,7 +261,7 @@ class ProofState:
             raise Exception(f"Build failed too many times, last error: {repr(err)}")
 
         return proof
-    
+
     @classmethod
     def build_predicates(
         cls,
@@ -279,10 +270,9 @@ class ProofState:
         goals_str: list[str] | None = None,
         *,
         rng: "Generator",
-        allow_coincident_points: bool = True,
     ) -> ProofState:
         """Build a proof state from given predicates and points."""
-        proof = ProofState(rng=rng, defs=defsJGEX, allow_coincident_points=allow_coincident_points)
+        proof = ProofState(rng=rng, defs=defsJGEX)
         adds: list[Dependency] = []
 
         old_points = predicates[0].dep_graph.symbols_graph.nodes_of_type(Point)
@@ -292,8 +282,7 @@ class ProofState:
         for statement in predicates:
             new_statement = notNone(
                 Statement.from_tokens(
-                    tuple(statement.to_str().split()),
-                    proof.dep_graph
+                    tuple(statement.to_str().split()), proof.dep_graph
                 )
             )
             adds.append(Dependency.mk(new_statement, IN_PREMISES, ()))
@@ -301,9 +290,11 @@ class ProofState:
         new_points = proof.symbols_graph.names2points([p.name for p in old_points])
         for p_old, p_new in zip(old_points, new_points):
             p_new.num = p_old.num
-            p_new.rely_on = set(proof.symbols_graph.names2points([p.name for p in p_old.rely_on]))
+            p_new.rely_on = set(
+                proof.symbols_graph.names2points([p.name for p in p_old.rely_on])
+            )
             p_new.clause = p_old.clause
-        
+
         for add in adds:
             if not add.statement.check_numerical():
                 raise ValueError(
@@ -320,76 +311,6 @@ class ProofState:
             ]
 
         return proof
-    
-    @classmethod
-    def build_premises(
-        cls,
-        points: list[tuple[str, float, float]],
-        premises: list[tuple[str, list[str]]],
-        defsJGEX: dict[str, DefinitionJGEX],
-        goals_str: list[tuple[str, list[str]]],
-        *,
-        rng: "Generator",
-        allow_coincident_points: bool = True,
-    ) -> ProofState:
-        """Build a proof state directly from points, premises, and goals.
-
-        Unlike build_problemJGEX, this does NOT go through JGEX clause-based
-        construction. All points are treated as free points with given coordinates.
-
-        Args:
-            points: [(name, x, y), ...] - all points with numerical coordinates
-            premises: [(predicate, [arg1, arg2, ...]), ...] - all premises
-            defsJGEX: definition dictionary
-            goals_str: [(predicate, [arg1, arg2, ...]), ...] - goals to prove
-            rng: random number generator
-
-        Returns:
-            ProofState with all points, premises, and goals loaded
-        """
-        proof = ProofState(rng=rng, defs=defsJGEX, allow_coincident_points=allow_coincident_points)
-        adds: list[Dependency] = []
-
-        # 1. Create Point nodes in symbols_graph
-        for name, x, y in points:
-            proof.symbols_graph.new_node(Point, name)
-
-        # 2. Set coordinates, clause, rely_on for each point
-        new_points = proof.symbols_graph.names2points([p[0] for p in points])
-        for (name, x, y), p_new in zip(points, new_points):
-            p_new.num = PointNum(x, y)
-            p_new.rely_on = set()
-            # Free point clause: same as JGEX "a : ;" → Clause(points=(name,), sentences=())
-            p_new.clause = Clause(points=(name,), sentences=())
-
-        # 3. Create Statement objects from premises
-        for pred_name, args in premises:
-            tokens = (pred_name, *args)
-            new_statement = notNone(
-                Statement.from_tokens(tokens, proof.dep_graph)
-            )
-            adds.append(Dependency.mk(new_statement, IN_PREMISES, ()))
-
-        # 4. Add premises to dependency graph with numerical validation
-        for add in adds:
-            if not add.statement.check_numerical():
-                raise ValueError(
-                    f"Numerical check failed for premise: {add.statement.to_str()}"
-                )
-            add.add()
-
-        proof.matcher.update()
-
-        # 5. Create goal statements
-        if goals_str:
-            proof.goals = []
-            for pred_name, args in goals_str:
-                tokens = (pred_name, *args)
-                goal_stmt = notNone(Statement.from_tokens(tokens, proof.dep_graph))
-                proof.goals.append(goal_stmt)
-
-        return proof
-            
 
     def match_theorem(self, theorem: Rule) -> list[Dependency]:
         return list(self.matcher.match_theorem(theorem))

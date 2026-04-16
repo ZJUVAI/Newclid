@@ -31,31 +31,31 @@ class GoalFilter:
         Returns:
             True if the goal passes the filter, False otherwise.
         """
-        if goal_name == 'cong':
+        if goal_name == "cong":
             return self._naive_cong_filter(goal_args, dep_graph)
-        elif goal_name == 'para':
+        elif goal_name == "para":
             return self._naive_para_filter(goal_args, dep_graph)
-        elif goal_name == 'coll':
+        elif goal_name == "coll":
             return True
-        elif goal_name == 'perp':
+        elif goal_name == "perp":
             return True
-        elif goal_name == 'cyclic':
+        elif goal_name == "cyclic":
             return True
-        elif goal_name == 'eqratio':
+        elif goal_name == "eqratio":
             return self._naive_eqratio_filter(goal_args, dep_graph)
-        elif goal_name == 'eqangle':
+        elif goal_name == "eqangle":
             return self._naive_eqangle_filter(goal_args, dep_graph)
-        elif goal_name == 'acompute':
+        elif goal_name == "acompute":
             return True
-        elif goal_name == 'aconst':
+        elif goal_name == "aconst":
             return self._naive_aconst_filter(goal_args, dep_graph)
-        elif goal_name == 'rcompute':
+        elif goal_name == "rcompute":
             return True
-        elif goal_name == 'rconst':
+        elif goal_name == "rconst":
             return self._naive_rconst_filter(goal_args, dep_graph)
-        elif goal_name == 'simtri' or goal_name == 'simtrir':
+        elif goal_name == "simtri" or goal_name == "simtrir":
             return self._naive_simtri_filter(goal_args, dep_graph)
-        elif goal_name == 'contri' or goal_name == 'contrir':
+        elif goal_name == "contri" or goal_name == "contrir":
             return self._naive_contri_filter(goal_args, dep_graph)
         return False
 
@@ -79,10 +79,10 @@ class GoalFilter:
         tri_2 = {args[3], args[4], args[5]}
         if tri_1 == tri_2:
             return False
-        sm = Statement.from_tokens(['contri'] + args, dep_graph)
+        sm = Statement.from_tokens(["contri"] + args, dep_graph)
         if sm.check():
             return False
-        sm = Statement.from_tokens(['contrir'] + args, dep_graph)
+        sm = Statement.from_tokens(["contrir"] + args, dep_graph)
         if sm.check():
             return False
         return True
@@ -129,15 +129,15 @@ class GoalFilter:
             [args[4], args[5], args[6], args[7]],
         ]
         for arg_set in parallel_sets:
-            sm = Statement.from_tokens(['acompute'] + arg_set, dep_graph)
+            sm = Statement.from_tokens(["acompute"] + arg_set, dep_graph)
             if sm and sm.check():
                 return False
         for arg_set in parallel_sets:
-            sm = Statement.from_tokens(['para'] + arg_set, dep_graph)
+            sm = Statement.from_tokens(["para"] + arg_set, dep_graph)
             if sm.check():
                 return False
         for arg_set in parallel_sets:
-            sm = Statement.from_tokens(['perp'] + arg_set, dep_graph)
+            sm = Statement.from_tokens(["perp"] + arg_set, dep_graph)
             if sm.check():
                 return False
 
@@ -170,14 +170,14 @@ class GoalFilter:
             [args[4], args[5], args[6], args[7]],
         ]
         for arg_set in sets:
-            sm = Statement.from_tokens(['cong'] + arg_set, dep_graph)
+            sm = Statement.from_tokens(["cong"] + arg_set, dep_graph)
             if sm.check():
                 return False
-            for ratio in ('1/1',):
-                sm = Statement.from_tokens(['rconst'] + arg_set + [ratio], dep_graph)
+            for ratio in ("1/1",):
+                sm = Statement.from_tokens(["rconst"] + arg_set + [ratio], dep_graph)
                 if sm.check():
                     return False
-            sm = Statement.from_tokens(['rcompute'] + arg_set, dep_graph)
+            sm = Statement.from_tokens(["rcompute"] + arg_set, dep_graph)
             if sm.check():
                 return False
 
@@ -185,13 +185,13 @@ class GoalFilter:
 
     def _naive_rconst_filter(self, args: list, dep_graph) -> bool:
         """Filter: reject rconst with ratio 1/1."""
-        if args[-1] == '1/1':
+        if args[-1] == "1/1":
             return False
         return True
 
     def _naive_aconst_filter(self, args: list, dep_graph) -> bool:
         """Filter: reject aconst with common angles."""
-        if args[-1] in ('0pi/1', '1pi/2', '1pi/1', '1pi/3', '2pi/3', '1pi/4', '3pi/4'):
+        if args[-1] in ("0pi/1", "1pi/2", "1pi/1", "1pi/3", "2pi/3", "1pi/4", "3pi/4"):
             return False
         return True
 
@@ -206,6 +206,7 @@ class GoalFilter:
         Returns:
             Filtered list of valid goals.
         """
+
         def group_equivalent_predicates(goals, predicate_type):
             """Group equivalent predicate goals together."""
             predicate_groups = []
@@ -215,12 +216,16 @@ class GoalFilter:
                 args = [arg.name for arg in goal.args]
                 found_group = False
 
-                for i, (group, goal_group) in enumerate(zip(predicate_groups, goal_groups)):
+                for i, (group, goal_group) in enumerate(
+                    zip(predicate_groups, goal_groups)
+                ):
                     for existing_pair in group:
                         sm1 = Statement.from_tokens(
-                            [predicate_type] + args[:4] + existing_pair, dep_graph)
+                            [predicate_type] + args[:4] + existing_pair, dep_graph
+                        )
                         sm2 = Statement.from_tokens(
-                            [predicate_type] + args[4:] + existing_pair, dep_graph)
+                            [predicate_type] + args[4:] + existing_pair, dep_graph
+                        )
                         if sm1.check() or sm2.check():
                             found_group = True
                             if args[:4] not in group:
@@ -243,7 +248,9 @@ class GoalFilter:
             args2 = [arg.name for arg in p2.args]
             statements = [
                 Statement.from_tokens(
-                    [token_type, args1[i], args1[i + 1], args2[i], args2[i + 1]], dep_graph)
+                    [token_type, args1[i], args1[i + 1], args2[i], args2[i + 1]],
+                    dep_graph,
+                )
                 for i in range(0, len(args1), 2)
             ]
             return all(sm.check() for sm in statements)
@@ -251,7 +258,10 @@ class GoalFilter:
         def remove_duplicates(goals, equivalence_fn, token_type):
             unique_goals = []
             for goal in goals:
-                if not any(equivalence_fn(existing_goal, goal, token_type) for existing_goal in unique_goals):
+                if not any(
+                    equivalence_fn(existing_goal, goal, token_type)
+                    for existing_goal in unique_goals
+                ):
                     unique_goals.append(goal)
             return unique_goals
 
@@ -285,22 +295,27 @@ class GoalFilter:
 
         # Separate goals by type
         eqangle_goals = [
-            goal for goal in possible_goals
-            if goal.predicate.NAME == 'eqangle'
+            goal for goal in possible_goals if goal.predicate.NAME == "eqangle"
         ]
 
         eqratio_goals = [
-            goal for goal in possible_goals
-            if goal.predicate.NAME == 'eqratio'
+            goal for goal in possible_goals if goal.predicate.NAME == "eqratio"
         ]
 
         other_goals = [
-            goal for goal in possible_goals
-            if goal.predicate.NAME not in (
-                'eqangle', 'eqratio', 'eqratio3',
-                'ncoll', 'midp',
-                'acompute', 'rcompute',
-                'sameside', 'sameclock',
+            goal
+            for goal in possible_goals
+            if goal.predicate.NAME
+            not in (
+                "eqangle",
+                "eqratio",
+                "eqratio3",
+                "ncoll",
+                "midp",
+                "acompute",
+                "rcompute",
+                "sameside",
+                "sameclock",
             )
         ]
 
@@ -316,6 +331,7 @@ class GoalFilter:
         Returns:
             True if all auxiliary predicates are valid.
         """
+
         def is_valid(statement: str, valid_predicates: set) -> bool:
             prefix_match = re.match(r"(x00 \w+)\s*:\s*(.*)", statement)
             if prefix_match:
@@ -329,12 +345,20 @@ class GoalFilter:
                         return False
             return True
 
-        valid_aux_predicates = {'perp', 'para', 'cong', 'coll', 'eqangle', 'cyclic', 'midp'}
+        valid_aux_predicates = {
+            "perp",
+            "para",
+            "cong",
+            "coll",
+            "eqangle",
+            "cyclic",
+            "midp",
+        }
         aux_match = re.match(r"<aux>\s*(.*)\s*</aux>", llm_output)
 
         if aux_match:
             aux_content = aux_match.group(1)
-            for content_item in aux_content.split(';'):
+            for content_item in aux_content.split(";"):
                 content_item = content_item.strip()
                 if content_item:
                     if not is_valid(content_item, valid_aux_predicates):
