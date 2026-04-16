@@ -54,9 +54,11 @@
     "batch_size": 10,
     "_comment_batch_size": "Progress reporting granularity: print a progress log line every N rules processed. Does NOT affect reduction algorithm or parallelism.",
     "debug": false,
+    "use_ray": false,
+    "_comment_use_ray": "Enable Ray distributed parallelism. When true: seed groups are processed in parallel (100 groups = 100 concurrent tasks), chunk reduction is parallelized, and subsumption tests use Ray instead of ProcessPoolExecutor. Requires Ray to be installed.",
     "seed_reduction": {
       "enabled": false,
-      "_comment": "Group-then-global reduction by seed field. Requires rules to have a seed field (error if none do). Groups processed serially; intra-group subsumption tests use n_workers."
+      "_comment": "Group-then-global reduction by seed field. Requires rules to have a seed field (error if none do). When use_ray=true, groups processed in parallel; otherwise serial with intra-group parallelism using n_workers."
     },
     "chunk_reduction": {
       "enabled": false,
@@ -64,11 +66,11 @@
       "iterations": 1,
       "streaming_load": false,
       "_comment_streaming_load": "true = scan source JSONL once, reduce chunk-by-chunk without loading all rules into memory. Recommended for large datasets (>100K rules). Requires source_data. Cannot combine with seed_reduction. global_reduction runs at end of streaming pass when global_reduction.enabled=true.",
-      "_comment": "Chunked iterative reduction for large rule sets. Chunks processed serially; intra-chunk subsumption tests use n_workers."
+      "_comment": "Chunked iterative reduction for large rule sets. When use_ray=true, chunks processed in parallel; otherwise serial with intra-chunk parallelism using n_workers."
     },
     "global_reduction": {
       "enabled": true,
-      "_comment": "Full greedy subsumption on all (remaining) rules. Uses n_workers for parallel subsumption tests."
+      "_comment": "Full greedy subsumption on all (remaining) rules. Uses n_workers for parallel subsumption tests (or Ray if use_ray=true)."
     }
   }
 }

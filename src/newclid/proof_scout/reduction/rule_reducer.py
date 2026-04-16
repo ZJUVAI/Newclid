@@ -341,7 +341,7 @@ class RuleReducer:
             },
         }
 
-    def reduce_by_seed(self, rules: List[RuleWithSource]) -> Dict[str, Any]:
+    def reduce_by_seed(self, rules: List[RuleWithSource], use_ray: bool = False) -> Dict[str, Any]:
         """Seed-grouped reduction: reduce within each seed group independently.
 
         1. Group rules by seed
@@ -351,6 +351,12 @@ class RuleReducer:
         Global reduction is NOT performed here — the caller (pipeline) is
         responsible for running chunk_reduction / global_reduction on the
         survivors if desired.
+
+        Args:
+            rules: List of RuleWithSource objects
+            use_ray: If True, use Ray to parallelize across seed groups.
+                Each seed group becomes a Ray task processed concurrently.
+                If False, seed groups are processed sequentially (original behavior).
 
         Returns:
             Dict with basis_rules (group survivors), eliminated_rules, and stats.
@@ -366,9 +372,11 @@ class RuleReducer:
 
         if self.verbose:
             print(f"\n{'='*60}")
+            mode_str = "Ray parallel" if use_ray else "sequential"
             print(f"[reduce_by_seed] {len(rules)} rules, "
                   f"{len(seed_groups)} seed groups, "
-                  f"{len(no_seed_rules)} rules without seed")
+                  f"{len(no_seed_rules)} rules without seed "
+                  f"(mode: {mode_str})")
             print(f"{'='*60}")
 
         # Group reduction
@@ -379,23 +387,91 @@ class RuleReducer:
         total_group_eliminated = 0
         total_group_skipped = 0
 
-        for seed_val, group_rules in sorted(seed_groups.items()):
-            if self.verbose:
-                print(f"\n--- Seed group {seed_val}: {len(group_rules)} rules ---")
+        if use_ray:
+            # Ray parallel: all seed groups processed concurrently
+            import ray
+            from newclid.proof_scout.reduction.ray_workers import reduce_seed_group_worker
 
-            result = self.reduce(group_rules)
-            group_survivors.extend(result["basis_rules"])
-            all_eliminated.extend(result["eliminated_rules"])
-            all_skipped.extend(result["skipped_by_premises"])
-            total_group_eliminated += result["stats"]["eliminated_count"]
-            total_group_skipped += result["stats"]["skipped_by_premises_count"]
-            group_stats.append({
-                "seed": seed_val,
-                "input": result["stats"]["original_count"],
-                "basis": result["stats"]["basis_count"],
-                "eliminated": result["stats"]["eliminated_count"],
-                "skipped_premises": result["stats"]["skipped_by_premises_count"],
-            })
+            if self.verbose:
+                print(f"  Submitting {len(seed_groups)} seed groups as Ray tasks...")
+
+            # Submit all seed groups as Ray tasks
+            futures = []
+            seed_vals = []
+            for seed_val, group_rules in sorted(seed_groups.items()):
+                if self.verbose:
+                    print(f"  Submitting seed group {seed_val}: {len(group_rules)} rules")
+                future = reduce_seed_group_worker.remote(
+                    seed_val,
+                    group_rules,
+                    self.timeout,
+                    self.seed,
+                    self.solver_type,
+                    self.engine,
+                    self.max_premises,
+                    self.verbose,
+                )
+                futures.append(future)
+                seed_vals.append(seed_val)
+
+            if self.verbose:
+                print(f"  All {len(futures)} tasks submitted. Waiting for results...")
+
+            # Collect results as they complete using ray.wait for progress tracking
+            remaining = list(zip(seed_vals, futures))
+            completed = 0
+            while remaining:
+                # Wait for the next task to complete
+                ready_futures = [f for _, f in remaining]
+                done, _ = ray.wait(ready_futures, num_returns=1)
+                done_ref = done[0]
+
+                # Find which seed_val corresponds to this future
+                for idx, (sv, f) in enumerate(remaining):
+                    if f == done_ref:
+                        seed_val = sv
+                        remaining.pop(idx)
+                        break
+
+                result = ray.get(done_ref)
+                completed += 1
+
+                group_survivors.extend(result["basis_rules"])
+                all_eliminated.extend(result["eliminated_rules"])
+                all_skipped.extend(result["skipped_by_premises"])
+                total_group_eliminated += result["stats"]["eliminated_count"]
+                total_group_skipped += result["stats"]["skipped_by_premises_count"]
+                group_stats.append({
+                    "seed": seed_val,
+                    "input": result["stats"]["original_count"],
+                    "basis": result["stats"]["basis_count"],
+                    "eliminated": result["stats"]["eliminated_count"],
+                    "skipped_premises": result["stats"]["skipped_by_premises_count"],
+                })
+
+                if self.verbose:
+                    print(f"  [{completed}/{len(seed_vals)}] Seed group {seed_val}: "
+                          f"{result['stats']['original_count']} → {result['stats']['basis_count']} rules")
+
+        else:
+            # Sequential: original behavior
+            for seed_val, group_rules in sorted(seed_groups.items()):
+                if self.verbose:
+                    print(f"\n--- Seed group {seed_val}: {len(group_rules)} rules ---")
+
+                result = self.reduce(group_rules)
+                group_survivors.extend(result["basis_rules"])
+                all_eliminated.extend(result["eliminated_rules"])
+                all_skipped.extend(result["skipped_by_premises"])
+                total_group_eliminated += result["stats"]["eliminated_count"]
+                total_group_skipped += result["stats"]["skipped_by_premises_count"]
+                group_stats.append({
+                    "seed": seed_val,
+                    "input": result["stats"]["original_count"],
+                    "basis": result["stats"]["basis_count"],
+                    "eliminated": result["stats"]["eliminated_count"],
+                    "skipped_premises": result["stats"]["skipped_by_premises_count"],
+                })
 
         # Add no-seed rules directly to survivors
         group_survivors.extend(no_seed_rules)

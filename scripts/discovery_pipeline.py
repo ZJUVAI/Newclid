@@ -337,6 +337,7 @@ def run_part4(
     seed_reduction_enabled = seed_red_cfg.get("enabled", False)
     chunk_reduction_enabled = chunk_red_cfg.get("enabled", False)
     global_reduction_enabled = global_red_cfg.get("enabled", True)
+    use_ray = p4.get("use_ray", False)
 
     print(f"\n{'='*60}")
     print(f"Part 4: Reduction")
@@ -345,6 +346,7 @@ def run_part4(
     print(f"  Source data:    {source_data_file or '(none — will fail if rules need llm_input)'}")
     print(f"  Output:         {output_path}")
     print(f"  engine={engine}, timeout={timeout}, n_workers={n_workers}, batch_size={batch_size}")
+    print(f"  use_ray={use_ray}")
     print(f"  seed_reduction={seed_reduction_enabled}, chunk_reduction={chunk_reduction_enabled}, "
           f"global_reduction={global_reduction_enabled}")
 
@@ -436,6 +438,14 @@ def run_part4(
     # --- Seed reduction ---
     if seed_reduction_enabled:
         print(f"\n[Part 4 / seed_reduction] {len(current_rules)} rules")
+
+        if use_ray:
+            # Ray mode: init Ray if not already running, then parallel seed groups
+            import ray
+            if not ray.is_initialized():
+                ray.init(ignore_reinit_error=True)
+                print(f"  Ray initialized: {ray.cluster_resources()}")
+
         reducer = RuleReducer(
             timeout=timeout,
             n_workers=n_workers,
@@ -445,7 +455,7 @@ def run_part4(
             solver_type="csolver",
             engine=engine,
         )
-        result = reducer.reduce_by_seed(current_rules)
+        result = reducer.reduce_by_seed(current_rules, use_ray=use_ray)
         current_rules = result["basis_rules"]
         print(f"[Part 4 / seed_reduction] {len(rules)} → {len(current_rules)} rules")
 
