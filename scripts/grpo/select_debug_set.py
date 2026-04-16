@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from collections import Counter
 from pathlib import Path
@@ -33,6 +34,12 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
         handle.write("\n")
+
+
+def _row_id(row: dict[str, Any]) -> str:
+    if "sample_id" in row:
+        return str(row["sample_id"])
+    return hashlib.sha256(row["query"].encode()).hexdigest()
 
 
 def _is_preferred(row: dict[str, Any]) -> bool:
@@ -79,10 +86,10 @@ def _take_matching(
     for row in source:
         if len(taken) >= limit:
             break
-        if row["sample_id"] in used_ids:
+        if _row_id(row) in used_ids:
             continue
         if predicate(row):
-            used_ids.add(row["sample_id"])
+            used_ids.add(_row_id(row))
             selected.append(row)
             taken.append(row)
     return taken
@@ -144,12 +151,12 @@ def select_debug_rows(rows: list[dict[str, Any]], target_size: int) -> tuple[lis
     for row in source:
         if len(selected) >= target_size:
             break
-        if row["sample_id"] in used_ids:
+        if _row_id(row) in used_ids:
             continue
         goal_predicate = row.get("goal_predicate")
         if goal_predicate and goal_counter[goal_predicate] >= goal_cap:
             continue
-        used_ids.add(row["sample_id"])
+        used_ids.add(_row_id(row))
         selected.append(row)
         if goal_predicate:
             goal_counter[goal_predicate] += 1
