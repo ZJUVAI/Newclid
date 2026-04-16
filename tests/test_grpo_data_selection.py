@@ -30,6 +30,7 @@ class TestGRPODataSelection(unittest.TestCase):
     def setUp(self):
         self.analyze_dataset = load_module("scripts/analyze_dataset.py", "analyze_dataset")
         self.build_candidate_pool = load_module("scripts/grpo/build_candidate_pool.py", "build_candidate_pool")
+        self.prefilter_candidate_pool = load_module("scripts/grpo/prefilter_candidate_pool.py", "prefilter_candidate_pool")
         self.label_difficulty = load_module("scripts/grpo/label_difficulty.py", "label_difficulty")
         self.select_debug_set = load_module("scripts/grpo/select_debug_set.py", "select_debug_set")
 
@@ -40,6 +41,7 @@ class TestGRPODataSelection(unittest.TestCase):
             "llm_input_renamed": query,
             "llm_output_renamed": output,
             "fl_problem": "a b c d = quadrangle a b c d ? eqratio a b c d",
+            "n_premises": 6,
         }
         annotation = self.analyze_dataset.annotate_record(record, "sample:0")
         self.assertEqual(annotation["sample_id"], "sample:0")
@@ -49,6 +51,9 @@ class TestGRPODataSelection(unittest.TestCase):
         self.assertEqual(annotation["goal_predicate"], "eqratio")
         self.assertIn("ratio_family", annotation["predicate_family_tags"])
         self.assertIn("parallel_perp_family", annotation["predicate_family_tags"])
+        self.assertEqual(annotation["n_premises"], 6)
+        self.assertEqual(annotation["problem_predicate_count"], 2)
+        self.assertEqual(annotation["problem_clause_count"], 1)
 
     def test_annotation_counts_on_real_dataset(self):
         annotations, summary = self.analyze_dataset.annotate_jsonl(
@@ -69,6 +74,9 @@ class TestGRPODataSelection(unittest.TestCase):
                 "aux_points_total": 1,
                 "goal_predicate": "eqratio",
                 "predicate_family_tags": ["ratio_family"],
+                "n_premises": 7,
+                "problem_predicate_count": 5,
+                "problem_clause_count": 3,
             },
             {
                 "sample_id": "b",
@@ -85,7 +93,114 @@ class TestGRPODataSelection(unittest.TestCase):
         pool, summary = self.build_candidate_pool.build_candidate_pool(rows)
         self.assertEqual(len(pool), 1)
         self.assertEqual(pool[0]["response"], "<aux> a </aux>")
+        self.assertEqual(pool[0]["n_premises"], 7)
+        self.assertEqual(pool[0]["problem_predicate_count"], 5)
+        self.assertEqual(pool[0]["problem_clause_count"], 3)
         self.assertEqual(summary["dropped_no_aux"], 1)
+
+    def test_prefilter_candidate_pool_dedupes_and_prefers_multi_aux(self):
+        rows = [
+            {
+                "sample_id": "a1",
+                "query": "dup-query",
+                "fl_problem": "p",
+                "response": "<aux> a </aux>",
+                "goal_predicate": "eqratio",
+                "predicate_family_tags": ["ratio_family"],
+                "aux_segment_count": 1,
+                "aux_points_total": 1,
+                "n_premises": 3,
+                "problem_predicate_count": 2,
+                "problem_clause_count": 3,
+            },
+            {
+                "sample_id": "a2",
+                "query": "dup-query",
+                "fl_problem": "p",
+                "response": "<aux> a2 </aux>",
+                "goal_predicate": "eqratio",
+                "predicate_family_tags": ["ratio_family"],
+                "aux_segment_count": 2,
+                "aux_points_total": 2,
+                "n_premises": 8,
+                "problem_predicate_count": 2,
+                "problem_clause_count": 3,
+            },
+            {
+                "sample_id": "b",
+                "query": "q-b",
+                "fl_problem": "p",
+                "response": "<aux> b </aux>",
+                "goal_predicate": "eqangle",
+                "predicate_family_tags": ["angle_family"],
+                "aux_segment_count": 2,
+                "aux_points_total": 2,
+                "n_premises": 8,
+                "problem_predicate_count": 4,
+                "problem_clause_count": 6,
+            },
+            {
+                "sample_id": "c",
+                "query": "q-c",
+                "fl_problem": "p",
+                "response": "<aux> c </aux>",
+                "goal_predicate": "perp",
+                "predicate_family_tags": ["parallel_perp_family"],
+                "aux_segment_count": 2,
+                "aux_points_total": 2,
+                "n_premises": 6,
+                "problem_predicate_count": 4,
+                "problem_clause_count": 6,
+            },
+            {
+                "sample_id": "d",
+                "query": "q-d",
+                "fl_problem": "p",
+                "response": "<aux> d </aux>",
+                "goal_predicate": "cyclic",
+                "predicate_family_tags": ["circle_family"],
+                "aux_segment_count": 1,
+                "aux_points_total": 1,
+                "n_premises": 2,
+                "problem_predicate_count": 1,
+                "problem_clause_count": 2,
+            },
+        ]
+        selected, report = self.prefilter_candidate_pool.prefilter_candidate_pool(
+            rows,
+            target_size=3,
+            seed=7,
+        )
+        self.assertEqual(len(selected), 3)
+        self.assertEqual(len({row["query"] for row in selected}), 3)
+        self.assertEqual(report["exact_duplicate_queries_removed"], 1)
+        self.assertGreaterEqual(
+            sum(1 for row in selected if row["aux_segment_count"] >= 2 or row["aux_points_total"] >= 2),
+            2,
+        )
+
+    def test_prefilter_candidate_pool_is_deterministic(self):
+        rows = []
+        for idx in range(12):
+            rows.append(
+                {
+                    "sample_id": f"id-{idx}",
+                    "query": f"query-{idx}",
+                    "fl_problem": "p",
+                    "response": f"<aux> {idx} </aux>",
+                    "goal_predicate": "eqratio" if idx < 6 else "eqangle",
+                    "predicate_family_tags": ["ratio_family"] if idx < 6 else ["angle_family"],
+                    "aux_segment_count": 2 if idx % 2 == 0 else 1,
+                    "aux_points_total": 2 if idx % 2 == 0 else 1,
+                    "n_premises": 8 if idx % 3 == 0 else 5,
+                    "problem_predicate_count": 4,
+                    "problem_clause_count": 6,
+                }
+            )
+        first, first_report = self.prefilter_candidate_pool.prefilter_candidate_pool(rows, target_size=6, seed=11)
+        second, second_report = self.prefilter_candidate_pool.prefilter_candidate_pool(rows, target_size=6, seed=11)
+        self.assertEqual(first, second)
+        self.assertEqual(first_report, second_report)
 
     def test_aggregate_difficulty_metrics(self):
         sample = {
@@ -186,6 +301,9 @@ class TestGRPODataSelection(unittest.TestCase):
                     "aux_points_total": 1,
                     "goal_predicate": "eqratio",
                     "predicate_family_tags": ["ratio_family"],
+                    "n_premises": 4,
+                    "problem_predicate_count": 2,
+                    "problem_clause_count": 3,
                 }
             ]
             with annotations_path.open("w", encoding="utf-8") as handle:

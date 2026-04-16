@@ -42,6 +42,19 @@ def tokenize_predicates(problem_text: str) -> list[str]:
     return predicates
 
 
+def extract_problem_predicate_count(problem_text: str) -> int:
+    return len(tokenize_predicates(problem_text))
+
+
+def extract_problem_clause_count(fl_problem: str) -> int:
+    if not fl_problem:
+        return 0
+    construction_part = fl_problem.split("?", 1)[0].strip()
+    if not construction_part:
+        return 0
+    return sum(1 for clause in construction_part.split(";") if clause.strip())
+
+
 def extract_goal_predicate(fl_problem: str) -> str | None:
     if not fl_problem or "?" not in fl_problem:
         return None
@@ -102,6 +115,9 @@ def annotate_record(record: dict[str, Any], sample_id: str) -> dict[str, Any]:
         "aux_points_total": aux_points_total,
         "goal_predicate": extract_goal_predicate(fl_problem),
         "predicate_family_tags": extract_predicate_family_tags(problem_text, fl_problem),
+        "n_premises": record.get("n_premises"),
+        "problem_predicate_count": extract_problem_predicate_count(problem_text),
+        "problem_clause_count": extract_problem_clause_count(fl_problem),
     }
 
 

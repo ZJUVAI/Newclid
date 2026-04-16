@@ -49,6 +49,9 @@ def build_candidate_pool(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any
             "predicate_family_tags": row.get("predicate_family_tags", []),
             "aux_segment_count": row.get("aux_segment_count", 0),
             "aux_points_total": row.get("aux_points_total", 0),
+            "n_premises": row.get("n_premises"),
+            "problem_predicate_count": row.get("problem_predicate_count", 0),
+            "problem_clause_count": row.get("problem_clause_count", 0),
         }
         kept.append(kept_row)
         if kept_row["goal_predicate"]:
