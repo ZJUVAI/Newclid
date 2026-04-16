@@ -36,10 +36,20 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
 class VLMCompletionGenerator:
     """VLM-compatible completion generator using SWIFT inference."""
 
-    def __init__(self, model_path: str, model_type: str = "qwen3_vl", max_new_tokens: int = 160) -> None:
+    def __init__(
+        self,
+        model_path: str,
+        model_type: str = "qwen3_vl",
+        max_new_tokens: int = 160,
+        max_batch_size: int = 16,
+    ) -> None:
         from swift.infer_engine import InferRequest, RequestConfig, TransformersEngine
 
-        self.engine = TransformersEngine(model=model_path, model_type=model_type)
+        self.engine = TransformersEngine(
+            model=model_path,
+            model_type=model_type,
+            max_batch_size=max_batch_size,
+        )
         self.max_new_tokens = max_new_tokens
         self._InferRequest = InferRequest
         self._RequestConfig = RequestConfig
@@ -227,7 +237,11 @@ def main() -> None:
     if args.num_shards > 1:
         rows = _shard_rows(rows, args.shard_index, args.num_shards)
 
-    generator = VLMCompletionGenerator(args.model_path, args.model_type)
+    generator = VLMCompletionGenerator(
+        args.model_path,
+        args.model_type,
+        max_batch_size=args.batch_size,
+    )
     evaluator = AuxRewardEvaluator()
     labeled = label_difficulty(
         rows,
