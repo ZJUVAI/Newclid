@@ -614,7 +614,8 @@ PotentialPoints foot(
 PotentialPoints add_potential_points(
     const std::vector<std::string>& point_names,
     const std::unordered_map<std::string, Point>& coords,
-    int max_points) {
+    int max_points,
+    uint32_t seed) {
 
     PotentialPoints result;
     std::vector<Point> existing_coords;
@@ -623,8 +624,7 @@ PotentialPoints add_potential_points(
     }
 
     // Step 1: Randomly select construction types (matching Python behavior)
-    std::random_device rd;
-    std::mt19937 gen(rd());
+    std::mt19937 gen(seed);
 
     std::vector<int> all_types = {0, 1, 2, 3, 4, 5};
     std::shuffle(all_types.begin(), all_types.end(), gen);
