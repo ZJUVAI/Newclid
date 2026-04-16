@@ -42,9 +42,10 @@ from newclid.formulations.rule import Rule
 PROJECT_ROOT = Path(__file__).parent.parent
 
 BENCHMARKS: Dict[str, Path] = {
-    "hageo_409": PROJECT_ROOT / "benchmarks" / "core" / "hageo_409.txt",
-    "imo_95": PROJECT_ROOT / "benchmarks" / "extended" / "imo_95.txt",
-    "jgex_ag_231": PROJECT_ROOT / "benchmarks" / "extended" / "jgex_ag_231.txt",
+    "hageo_409": PROJECT_ROOT / "benchmarks" / "hageo_409.txt",
+    "imo_30": PROJECT_ROOT / "benchmarks" / "imo_ag_30.txt",
+    "imo_95": PROJECT_ROOT / "benchmarks" / "imo_95.txt",
+    "jgex_231": PROJECT_ROOT / "benchmarks" / "jgex_ag_231.txt",
 }
 
 GENERATIVE_RULE_PATTERNS: Set[Tuple[str, str]] = {
@@ -242,8 +243,8 @@ def solve_single_problem_csolver(
     try:
         from newclid.api import CSolver
 
-        use_log = engine != "weak"
-        use_exp = engine != "weak"
+        use_log = True
+        use_exp = True
 
         csolver = CSolver(
             problem=problem_text,
@@ -497,7 +498,7 @@ def main():
     # baseline
     bp = sub.add_parser("baseline", help="Compute CSolver baseline")
     bp.add_argument("--output", type=Path, required=True)
-    bp.add_argument("--benchmarks", type=str, default="hageo_409,jgex_ag_231")
+    bp.add_argument("--benchmarks", type=str, default="imo_30,imo_95,hageo_409,jgex_231")
     bp.add_argument("--workers", type=int, default=30)
     bp.add_argument("--timeout", type=int, default=600)
     bp.add_argument("--skip", type=Path, default=None, help="File with problem IDs to skip")
@@ -509,7 +510,7 @@ def main():
     ep.add_argument("--rules", type=Path, required=True)
     ep.add_argument("--baseline-cache", type=Path, required=True)
     ep.add_argument("--output", type=Path, required=True)
-    ep.add_argument("--benchmarks", type=str, default="hageo_409,jgex_ag_231")
+    ep.add_argument("--benchmarks", type=str, default="imo_30,imo_95,hageo_409,jgex_231")
     ep.add_argument("--workers", type=int, default=30)
     ep.add_argument("--timeout", type=int, default=600)
     ep.add_argument("--skip", type=Path, default=None, help="File with problem IDs to skip")
