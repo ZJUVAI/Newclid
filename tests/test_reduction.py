@@ -371,30 +371,27 @@ def test_reduce_by_seed_consistency():
     result = reducer.reduce_by_seed(rules)
 
     stats = result["stats"]
-    group_phase = stats["group_phase"]
-    global_phase = stats["global_phase"]
 
     print(f"\nResults:")
     print(f"  Original count: {stats['original_count']}")
-    print(f"  Group phase survivors: {group_phase['survivors']}")
-    print(f"  Global phase input: {global_phase['original_count']}")
-    print(f"  Final basis: {stats['basis_count']}")
+    print(f"  Groups: {stats['n_groups']}")
+    print(f"  No-seed rules: {stats['n_no_seed']}")
+    print(f"  Final basis (group survivors): {stats['basis_count']}")
+    print(f"  Eliminated: {stats['eliminated_count']}")
 
     # Check consistency
-    survivors_match = group_phase['survivors'] == global_phase['original_count']
     has_basis = stats['basis_count'] > 0
     no_zero_groups = all(g['basis'] > 0 or g['input'] == g['skipped_premises']
-                         for g in group_phase['group_details'])
+                         for g in stats['group_details'])
 
-    passed = survivors_match and has_basis and no_zero_groups
+    passed = has_basis and no_zero_groups
     print(f"\nreduce_by_seed Consistency: {'PASSED' if passed else 'FAILED'}")
-    print(f"  Group survivors == global input: {survivors_match}")
     print(f"  Has final basis rules: {has_basis}")
     print(f"  No groups with basis=0 (unless all skipped): {no_zero_groups}")
 
     if not no_zero_groups:
         print(f"  ERROR: Some groups have basis=0 (race condition bug!)")
-        for g in group_phase['group_details']:
+        for g in stats['group_details']:
             if g['basis'] == 0 and g['input'] != g['skipped_premises']:
                 print(f"    Seed {g['seed']}: input={g['input']}, basis={g['basis']}, eliminated={g['eliminated']}")
 

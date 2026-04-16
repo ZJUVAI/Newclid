@@ -342,15 +342,18 @@ class RuleReducer:
         }
 
     def reduce_by_seed(self, rules: List[RuleWithSource]) -> Dict[str, Any]:
-        """Two-level reduction: group reduction by seed, then global reduction.
+        """Seed-grouped reduction: reduce within each seed group independently.
 
         1. Group rules by seed
         2. Within each group: max_premises pre-filter → generality sort → greedy elimination
-        3. Collect survivors from all groups
-        4. Global reduction on survivors (same as reduce())
+        3. Collect survivors from all groups (+ no-seed rules passed through)
+
+        Global reduction is NOT performed here — the caller (pipeline) is
+        responsible for running chunk_reduction / global_reduction on the
+        survivors if desired.
 
         Returns:
-            Dict with group_stats, global_result, and combined stats.
+            Dict with basis_rules (group survivors), eliminated_rules, and stats.
         """
         # Group rules by seed
         seed_groups: Dict[Any, List[RuleWithSource]] = defaultdict(list)
@@ -368,8 +371,10 @@ class RuleReducer:
                   f"{len(no_seed_rules)} rules without seed")
             print(f"{'='*60}")
 
-        # Phase 1: Group reduction
+        # Group reduction
         group_survivors: List[RuleWithSource] = []
+        all_eliminated: List[Dict[str, Any]] = []
+        all_skipped: List[Dict[str, Any]] = []
         group_stats: List[Dict[str, Any]] = []
         total_group_eliminated = 0
         total_group_skipped = 0
@@ -380,6 +385,8 @@ class RuleReducer:
 
             result = self.reduce(group_rules)
             group_survivors.extend(result["basis_rules"])
+            all_eliminated.extend(result["eliminated_rules"])
+            all_skipped.extend(result["skipped_by_premises"])
             total_group_eliminated += result["stats"]["eliminated_count"]
             total_group_skipped += result["stats"]["skipped_by_premises_count"]
             group_stats.append({
@@ -390,42 +397,29 @@ class RuleReducer:
                 "skipped_premises": result["stats"]["skipped_by_premises_count"],
             })
 
-        # Add no-seed rules directly to global pool
+        # Add no-seed rules directly to survivors
         group_survivors.extend(no_seed_rules)
 
         if self.verbose:
             print(f"\n{'='*60}")
-            print(f"[reduce_by_seed] Group phase done: "
+            print(f"[reduce_by_seed] Done: "
                   f"{len(rules)} → {len(group_survivors)} survivors "
                   f"(eliminated {total_group_eliminated}, "
                   f"skipped {total_group_skipped})")
-            print(f"[reduce_by_seed] Starting global reduction...")
             print(f"{'='*60}")
 
-        # Phase 2: Global reduction on survivors
-        global_result = self.reduce(group_survivors)
-
-        # Combined stats
         return {
-            "basis_rules": global_result["basis_rules"],
-            "eliminated_rules": global_result["eliminated_rules"],
-            "skipped_by_premises": global_result["skipped_by_premises"],
+            "basis_rules": group_survivors,
+            "eliminated_rules": all_eliminated,
+            "skipped_by_premises": all_skipped,
             "stats": {
                 "original_count": len(rules),
-                "group_phase": {
-                    "n_groups": len(seed_groups),
-                    "n_no_seed": len(no_seed_rules),
-                    "survivors": len(group_survivors),
-                    "eliminated": total_group_eliminated,
-                    "skipped_premises": total_group_skipped,
-                    "group_details": group_stats,
-                },
-                "global_phase": global_result["stats"],
-                "basis_count": global_result["stats"]["basis_count"],
-                "total_eliminated": total_group_eliminated + global_result["stats"]["eliminated_count"],
-                "total_reduction_rate": (
-                    1 - global_result["stats"]["basis_count"] / len(rules)
-                ) if rules else 0,
+                "n_groups": len(seed_groups),
+                "n_no_seed": len(no_seed_rules),
+                "basis_count": len(group_survivors),
+                "eliminated_count": total_group_eliminated,
+                "skipped_premises_count": total_group_skipped,
+                "group_details": group_stats,
             },
         }
 
