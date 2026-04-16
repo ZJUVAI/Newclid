@@ -34,7 +34,7 @@ class VLMCompletionGenerator:
     """VLM-compatible completion generator using SWIFT inference."""
 
     def __init__(self, model_path: str, model_type: str = "qwen3_vl", max_new_tokens: int = 160) -> None:
-        from swift.infer import InferRequest, RequestConfig, TransformersEngine
+        from swift.infer_engine import InferRequest, RequestConfig, TransformersEngine
 
         self.engine = TransformersEngine(model=model_path, model_type=model_type)
         self.max_new_tokens = max_new_tokens
