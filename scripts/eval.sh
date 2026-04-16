@@ -19,6 +19,7 @@ CHECKPOINTS="${CHECKPOINTS:-latest}"
 
 MAX_WORKERS="${MAX_WORKERS:-40}"
 SEARCH_DEPTH="${SEARCH_DEPTH:-4}"
+SEARCH_VERSION="${SEARCH_VERSION:-v1}"
 TIMEOUT="${TIMEOUT:-3600}"
 AGENT="${AGENT:-lm}"
 GPU_BATCH_SIZE="${GPU_BATCH_SIZE:-2}"
@@ -173,16 +174,17 @@ eval_output_stem() {
     local model_path="$2"
     local decoding_size="$3"
     local beam_size="$4"
-    python - "$dataset" "$model_path" "$decoding_size" "$beam_size" "$SEARCH_DEPTH" "$AGENT" "$GPU_BATCH_SIZE" "$GPU_BATCH_TIMEOUT_MS" <<'PY'
+    python - "$dataset" "$model_path" "$decoding_size" "$beam_size" "$SEARCH_DEPTH" "$SEARCH_VERSION" "$AGENT" "$GPU_BATCH_SIZE" "$GPU_BATCH_TIMEOUT_MS" <<'PY'
 from pathlib import Path
 import sys
 
 from scripts.evaluation import build_eval_output_stem
 
-dataset, model_path, decoding_size, beam_size, search_depth, agent, gpu_batch_size, gpu_batch_timeout_ms = sys.argv[1:]
+dataset, model_path, decoding_size, beam_size, search_depth, search_version, agent, gpu_batch_size, gpu_batch_timeout_ms = sys.argv[1:]
 print(
     build_eval_output_stem(
         agent_type=agent,
+        search_version=search_version,
         problems_path=Path(dataset),
         model_path=model_path,
         decoding_size=int(decoding_size),
@@ -240,6 +242,7 @@ init_swanlab_run_if_needed() {
         --checkpoints "$CHECKPOINTS" \
         --eval_configs "$EVAL_CONFIGS" \
         --agent "$AGENT" \
+        --search_version "$SEARCH_VERSION" \
         --max_workers "$MAX_WORKERS" \
         --search_depth "$SEARCH_DEPTH" \
         --timeout "$TIMEOUT")"
@@ -284,6 +287,7 @@ upload_eval_to_swanlab() {
         --model_name "$MODEL_NAME" \
         --model_path "$model_path" \
         --agent "$AGENT" \
+        --search_version "$SEARCH_VERSION" \
         --decoding_size "$decoding_size" \
         --beam_size "$beam_size" \
         --search_depth "$SEARCH_DEPTH" \
@@ -306,6 +310,7 @@ echo "Configs    : $EVAL_CONFIGS"
 echo "Checkpoints: $CHECKPOINTS"
 echo "Workers    : $MAX_WORKERS"
 echo "Agent      : $AGENT"
+echo "Search Ver : $SEARCH_VERSION"
 echo "GPU Batch  : size=$GPU_BATCH_SIZE timeout_ms=$GPU_BATCH_TIMEOUT_MS"
 echo "Trace      : $ENABLE_TRACE"
 echo "Profiling  : $ENABLE_PROFILING"
@@ -354,6 +359,7 @@ for checkpoint in "${CHECKPOINT_ITEMS[@]}"; do
                 --gpu_batch_timeout_ms "$GPU_BATCH_TIMEOUT_MS"
                 --timeout "$TIMEOUT"
                 --agent "$AGENT"
+                --search_version "$SEARCH_VERSION"
             )
             append_boolean_optional_arg EVAL_ARGS "enable_trace" "$ENABLE_TRACE"
             append_boolean_optional_arg EVAL_ARGS "enable_profiling" "$ENABLE_PROFILING"
@@ -361,6 +367,7 @@ for checkpoint in "${CHECKPOINT_ITEMS[@]}"; do
             echo "Dataset    : $dataset_name"
             echo "DatasetPath: $dataset_path"
             echo "Config     : decoding_size=$decoding_size beam_size=$beam_size search_depth=$SEARCH_DEPTH"
+            echo "Search Ver : $SEARCH_VERSION"
             echo "GPU Batch  : size=$GPU_BATCH_SIZE timeout_ms=$GPU_BATCH_TIMEOUT_MS"
             echo "CSV Stem   : $output_stem"
             echo "Eval Log   : $eval_log"
