@@ -6,6 +6,7 @@ This directory contains the data-selection, reward, and launch helpers for GRPO-
 
 - `plugin.py`: registers `aux_reward` for SWIFT.
 - `../analyze_dataset.py`: annotates JSONL rows with aux structure, goal predicate, predicate family tags, and lightweight complexity fields.
+- `analyze_selected_dataset.py`: analyzes the final selected GRPO training JSONL after `select_debug_set.py`.
 - `build_candidate_pool.py`: keeps only rows with real aux targets and emits a candidate pool summary.
 - `prefilter_candidate_pool.py`: applies a cheap streaming prefilter to large candidate pools before model-based difficulty labeling.
 - `label_difficulty.py`: text-model difficulty labeling with offline generation plus reward evaluation.
@@ -181,6 +182,23 @@ The output rows contain exactly:
 - `query`
 - `fl_problem`
 - `response`
+
+You can analyze the selected dataset without reintroducing selection metadata:
+
+```bash
+python scripts/grpo/analyze_selected_dataset.py \
+  datasets/grpo/grpo_train_selected.jsonl \
+  --annotations-output datasets/grpo/grpo_train_selected_annotated.jsonl \
+  --summary-output datasets/grpo/grpo_train_selected_summary.json
+```
+
+This script recomputes the same derived geometry statistics directly from `query`, `fl_problem`, and `response`, including:
+
+- goal predicate distribution
+- predicate family distribution
+- aux segment / aux point distributions
+- problem predicate count distribution
+- problem clause count distribution
 
 ## Fast Path From Existing SFT Data
 

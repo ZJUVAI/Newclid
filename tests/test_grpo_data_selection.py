@@ -29,6 +29,10 @@ class StubEvaluator:
 class TestGRPODataSelection(unittest.TestCase):
     def setUp(self):
         self.analyze_dataset = load_module("scripts/analyze_dataset.py", "analyze_dataset")
+        self.analyze_selected_dataset = load_module(
+            "scripts/grpo/analyze_selected_dataset.py",
+            "analyze_selected_dataset",
+        )
         self.build_candidate_pool = load_module("scripts/grpo/build_candidate_pool.py", "build_candidate_pool")
         self.prefilter_candidate_pool = load_module("scripts/grpo/prefilter_candidate_pool.py", "prefilter_candidate_pool")
         self.label_difficulty = load_module("scripts/grpo/label_difficulty.py", "label_difficulty")
@@ -97,6 +101,59 @@ class TestGRPODataSelection(unittest.TestCase):
         self.assertEqual(pool[0]["problem_predicate_count"], 5)
         self.assertEqual(pool[0]["problem_clause_count"], 3)
         self.assertEqual(summary["dropped_no_aux"], 1)
+
+    def test_selected_dataset_annotation_helpers(self):
+        record = {
+            "query": "<problem> a : ; b : perp a b b c [001] ; ? eqratio a b c d </problem>",
+            "fl_problem": "a b c d = quadrangle a b c d ? eqratio a b c d",
+            "response": "<aux> x00 g : coll a b g [002] ; h : perp g h a b [003] ; </aux>",
+        }
+        annotation = self.analyze_selected_dataset.annotate_record(record, "selected:0")
+        self.assertEqual(annotation["sample_id"], "selected:0")
+        self.assertTrue(annotation["has_aux"])
+        self.assertEqual(annotation["aux_segment_count"], 2)
+        self.assertEqual(annotation["aux_points_total"], 2)
+        self.assertEqual(annotation["goal_predicate"], "eqratio")
+        self.assertIn("ratio_family", annotation["predicate_family_tags"])
+        self.assertIn("parallel_perp_family", annotation["predicate_family_tags"])
+        self.assertEqual(annotation["problem_predicate_count"], 2)
+        self.assertEqual(annotation["problem_clause_count"], 1)
+
+    def test_selected_dataset_summary_handles_invalid_aux_rows(self):
+        rows = [
+            {
+                "sample_id": "a",
+                "query": "<problem> ? eqratio a b c d </problem>",
+                "fl_problem": "a b c d = quadrangle a b c d ? eqratio a b c d",
+                "response": "<aux> x00 g : coll a b g [002] ; </aux>",
+                "has_aux": True,
+                "aux_segment_count": 1,
+                "aux_points_total": 1,
+                "goal_predicate": "eqratio",
+                "predicate_family_tags": ["ratio_family"],
+                "problem_predicate_count": 1,
+                "problem_clause_count": 1,
+            },
+            {
+                "sample_id": "b",
+                "query": "<problem> ? perp a b c d </problem>",
+                "fl_problem": "a b c d = quadrangle a b c d; e = midpoint e a c ? perp a b c d",
+                "response": "<proof> no aux here </proof>",
+                "has_aux": False,
+                "aux_segment_count": 0,
+                "aux_points_total": 0,
+                "goal_predicate": "perp",
+                "predicate_family_tags": ["parallel_perp_family"],
+                "problem_predicate_count": 1,
+                "problem_clause_count": 2,
+            },
+        ]
+        summary = self.analyze_selected_dataset.summarize_annotations(rows)
+        self.assertEqual(summary["total_rows"], 2)
+        self.assertEqual(summary["aux_rows"], 1)
+        self.assertEqual(summary["goal_predicate_distribution"], {"eqratio": 1, "perp": 1})
+        self.assertEqual(summary["aux_segment_count_distribution"], {1: 1})
+        self.assertEqual(summary["problem_clause_count_distribution"], {1: 1, 2: 1})
 
     def test_prefilter_candidate_pool_dedupes_and_prefers_multi_aux(self):
         rows = [
@@ -346,6 +403,38 @@ class TestGRPODataSelection(unittest.TestCase):
 
             self.assertTrue(output_path.exists())
             self.assertTrue(summary_path.exists())
+
+    def test_file_round_trip_for_selected_dataset_analysis(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+            input_path = tmp_path / "selected.jsonl"
+            annotations_path = tmp_path / "annotations.jsonl"
+            summary_path = tmp_path / "summary.json"
+            rows = [
+                {
+                    "query": "<problem> ? eqratio a b c d </problem>",
+                    "fl_problem": "a b c d = quadrangle a b c d ? eqratio a b c d",
+                    "response": "<aux> x00 g : coll a b g [002] ; </aux>",
+                },
+                {
+                    "query": "<problem> ? perp a b c d </problem>",
+                    "fl_problem": "a b c d = quadrangle a b c d; e = midpoint e a c ? perp a b c d",
+                    "response": "<proof> no aux here </proof>",
+                },
+            ]
+            with input_path.open("w", encoding="utf-8") as handle:
+                for row in rows:
+                    handle.write(json.dumps(row))
+                    handle.write("\n")
+
+            annotations, summary = self.analyze_selected_dataset.analyze_jsonl(input_path)
+            self.analyze_selected_dataset.write_jsonl(annotations_path, annotations)
+            self.analyze_selected_dataset.write_json(summary_path, summary)
+
+            self.assertTrue(annotations_path.exists())
+            self.assertTrue(summary_path.exists())
+            self.assertEqual(summary["total_rows"], 2)
+            self.assertEqual(summary["aux_rows"], 1)
 
 
 if __name__ == "__main__":
