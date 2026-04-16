@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from newclid.training.grpo_rewards import AuxRewardEvaluator
+from tqdm import tqdm
 
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -104,7 +105,8 @@ def label_difficulty(
     valid_key = f"valid_at_{num_samples}"
     fmt_key = f"format_valid_at_{num_samples}"
 
-    for batch_start in range(0, len(rows), batch_size):
+    total_batches = (len(rows) + batch_size - 1) // batch_size
+    for batch_start in tqdm(range(0, len(rows), batch_size), total=total_batches, desc="Labeling difficulty"):
         batch = rows[batch_start : batch_start + batch_size]
         queries = [r["query"] for r in batch]
         fl_problems = [r["fl_problem"] for r in batch]

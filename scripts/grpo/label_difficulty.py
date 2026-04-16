@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from newclid.training.grpo_rewards import AuxEvaluationResult, AuxRewardEvaluator
+from tqdm import tqdm
 
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -128,7 +129,7 @@ def label_difficulty(
     top_p: float,
 ) -> list[dict[str, Any]]:
     labeled_rows = []
-    for row in rows:
+    for row in tqdm(rows, desc="Labeling difficulty"):
         started = time.time()
         greedy_completion = generator.generate_greedy(row["query"])
         sampled_completions = generator.generate_sample(

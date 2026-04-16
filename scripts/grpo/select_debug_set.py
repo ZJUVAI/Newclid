@@ -10,6 +10,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from tqdm import tqdm
+
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
     rows = []
@@ -59,7 +61,7 @@ def filter_goldilocks(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]],
         "preferred_rows": 0,
         "fallback_rows": 0,
     }
-    for row in rows:
+    for row in tqdm(rows, desc="Filtering goldilocks rows"):
         if row.get("greedy_success") and row.get("pass_at_16", 0.0) >= 0.90:
             stats["removed_mastered"] += 1
             continue
@@ -133,7 +135,7 @@ def select_debug_rows(rows: list[dict[str, Any]], target_size: int) -> tuple[lis
     all_families = sorted(
         {tag for row in source for tag in row.get("predicate_family_tags", [])}
     )
-    for family in all_families:
+    for family in tqdm(all_families, desc="Balancing predicate families"):
         need = max(0, family_target - family_counter[family])
         taken = _take_matching(
             selected,
@@ -148,7 +150,7 @@ def select_debug_rows(rows: list[dict[str, Any]], target_size: int) -> tuple[lis
                 family_counter[tag] += 1
 
     goal_counter = Counter(row.get("goal_predicate") for row in selected if row.get("goal_predicate"))
-    for row in source:
+    for row in tqdm(source, desc="Filling remaining selected rows"):
         if len(selected) >= target_size:
             break
         if _row_id(row) in used_ids:

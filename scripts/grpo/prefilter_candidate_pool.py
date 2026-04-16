@@ -11,6 +11,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from tqdm import tqdm
+
 
 AUX_BUCKET_WEIGHTS = {
     "multi_aux": 0.60,
@@ -205,7 +207,7 @@ def prefilter_candidate_pool(
     distinct_rows = 0
     duplicate_rows = 0
 
-    for row in rows:
+    for row in tqdm(rows, desc="Scanning pool for quotas"):
         qhash = query_hash(row["query"])
         query_counts[qhash] += 1
         if query_counts[qhash] == 1:
@@ -219,7 +221,7 @@ def prefilter_candidate_pool(
     seen_counts: Counter[tuple[str, str, str]] = Counter()
     used_queries: set[str] = set()
 
-    for row in rows:
+    for row in tqdm(rows, desc="Reservoir sampling buckets"):
         qhash = query_hash(row["query"])
         if qhash in used_queries:
             continue
@@ -241,7 +243,7 @@ def prefilter_candidate_pool(
 
     selected_hashes = {query_hash(row["query"]) for row in selected}
     fallback_candidates = []
-    for row in rows:
+    for row in tqdm(rows, desc="Collecting fallback candidates"):
         qhash = query_hash(row["query"])
         if qhash in selected_hashes:
             continue

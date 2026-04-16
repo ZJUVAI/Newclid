@@ -9,6 +9,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from tqdm import tqdm
+
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
     rows = []
@@ -29,7 +31,7 @@ def build_candidate_pool(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any
     segment_counter = Counter()
     points_counter = Counter()
 
-    for row in rows:
+    for row in tqdm(rows, desc="Building candidate pool"):
         if not row.get("has_aux"):
             dropped_no_aux += 1
             continue
