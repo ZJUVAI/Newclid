@@ -101,6 +101,9 @@ class BaseAgent(DeductiveAgent, ABC):
         prior_state: Any,
         ddar_result: dict[str, Any],
         proof: ProofState,
+        request: dict[str, Any],
+        aux_dsl: str,
+        raw_aux_text: str,
     ) -> Any | None:
         raise NotImplementedError
 
@@ -128,8 +131,13 @@ class BaseAgent(DeductiveAgent, ABC):
     ) -> BeamQueue:
         return next_queue
 
-    def extract_raw_aux_text(self, aux_dsl: str) -> str:
-        return aux_dsl[len("<aux> x00") :]
+    def extract_raw_aux_text(
+        self, aux_dsl: str, *, request: dict[str, Any]
+    ) -> str:
+        response_prefix = str(request.get("response_prefix", "<aux> x00"))
+        if aux_dsl.startswith(response_prefix):
+            return aux_dsl[len(response_prefix) :]
+        return aux_dsl
 
     def _child_path_key(
         self, parent_path_key: tuple[int, ...], candidate_rank: int
@@ -290,6 +298,9 @@ class BaseAgent(DeductiveAgent, ABC):
                     prior_state=future_meta["state"],
                     ddar_result=ddar_result,
                     proof=proof,
+                    request=future_meta["request"],
+                    aux_dsl=future_meta["aux_dsl"],
+                    raw_aux_text=future_meta["raw_aux_text"],
                 )
                 add_profiling_time(
                     profiling,
@@ -433,6 +444,7 @@ class BaseAgent(DeductiveAgent, ABC):
             "node_id": node_id,
             "parent_node_id": parent_node_id,
             "path_key": path_key,
+            "request": None,
         }
         future = prepare_executor.submit(
             self._run_prepare_request,
@@ -502,6 +514,7 @@ class BaseAgent(DeductiveAgent, ABC):
             request["depth"] = future_meta["depth"]
             request_built_at_perf_s = time.perf_counter()
             request_state["request_built_at_perf_s"] = request_built_at_perf_s
+            request_state["request"] = request
             prepared_requests.append(request)
             add_profiling_time(
                 profiling,
@@ -747,6 +760,12 @@ class BaseAgent(DeductiveAgent, ABC):
         for gpu_result in batch_results:
             request_id = gpu_result["request_id"]
             request_state = request_meta.pop(request_id)
+            request = request_state["request"]
+            if request is None:
+                logger.warning(
+                    "GPU result missing prepared request context: request_id=%s", request_id
+                )
+                continue
             state = request_state["state"]
             prev_score = request_state["prev_score"]
             parent_node_id = request_state["node_id"]
@@ -762,7 +781,7 @@ class BaseAgent(DeductiveAgent, ABC):
             for candidate_rank, (aux_dsl, score) in enumerate(
                 gpu_result["aux_dsl_dict"].items()
             ):
-                raw_aux_text = self.extract_raw_aux_text(aux_dsl)
+                raw_aux_text = self.extract_raw_aux_text(aux_dsl, request=request)
                 try:
                     aux = self.try_dsl_to_constructions(raw_aux_text)
                 except Exception:
@@ -830,6 +849,7 @@ class BaseAgent(DeductiveAgent, ABC):
                     {
                         "problem": new_problem,
                         "state": state,
+                        "request": request,
                         "prev_score": prev_score,
                         "score": score,
                         "node_id": child_node_id,
@@ -840,6 +860,7 @@ class BaseAgent(DeductiveAgent, ABC):
                         "attempt_key": build_attempt_key(
                             request_id, candidate_rank, child_node_id
                         ),
+                        "aux_dsl": aux_dsl,
                         "raw_aux_text": raw_aux_text,
                         "construction_text": aux,
                     }
