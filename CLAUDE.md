@@ -38,9 +38,9 @@ GenesisGeo — 神经-符号几何定理证明器，复现 AlphaGeometry，结�
 ## Important Notes (铁律)
 
 **Git Workflow Rules**:
-- **Push**: 只推送到 `origin` 远端仓库，除非有特殊说明
-- **GenesisGeo 远端**: 仅用于拉取信息、对齐引擎开发进度，不进行推送
-- 示例: `git push origin <branch>` ✓ | `git push GenesisGeo <branch>` ✗
+- **Push**: 任务完成后必须同时推送到 `origin` 和 `GenesisGeo` 两个远端的 `discovery` 分支
+- **GenesisGeo 远端**: 除用于拉取信息外，也需要推送 `discovery` 分支以保持同步
+- 示例: `git push origin discovery` ✓ | `git push GenesisGeo discovery` ✓
 
 **DDAR Code Synchronization**: When there are differences in the DDAR directory (`src/newclid/DDAR/`), always use the version from the GenesisGeo remote repository as the authoritative source, unless explicitly stated otherwise. To sync:
 
@@ -66,7 +66,7 @@ git checkout GenesisGeo/main -- src/newclid/DDAR/
 - 所有 AI 编程工具在开始处理仓库任务前，必须先阅读 `CLAUDE.md`
 - 在执行具体任务前，必须根据任务范围按需索引并阅读相关文档与 memory 文件，至少包括对应模块文档和 `memory/MEMORY.md`
 - 完成任务后，必须按 `Memory Update Rules` 将本次任务摘要整理到 `memory/` 目录下对应文件
-- 完成 memory 更新后，必须执行 git 提交，并直接推送到 `origin` 当前分支，无需再次征求用户确认
+- 完成 memory 更新后，必须执行 git 提交，并直接推送到 `origin` 和 `GenesisGeo` 两个远端的 `discovery` 分支，无需再次征求用户确认
 
 **Experiment Directory Rules** (实验目录铁律):
 1. 每次实验必须在 `outputs/experiments/` 下创建子目录
@@ -123,8 +123,8 @@ git checkout GenesisGeo/main -- src/newclid/DDAR/
 - `memory/MEMORY.md` 保持为主索引，关键事实有变化时同步更新
 
 **Task Completion Git Rules**:
-- 完成代码与 memory 更新后，必须检查变更、执行 git commit，并推送到 `origin`
-- 默认流程: `git add ...` → `git commit -m "..."` → `git push origin <current-branch>`
+- 完成代码与 memory 更新后，必须检查变更、执行 git commit，并同时推送到两个远端
+- 默认流程: `git add ...` → `git commit -m "..."` → `git push origin discovery` → `git push GenesisGeo discovery`
 - 除非用户明确禁止，否则不要只停留在本地未推送状态
 
 **Code-Documentation Sync Rules** (代码文档同步铁律):
