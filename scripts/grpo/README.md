@@ -97,9 +97,9 @@ The current implementation does four things:
    - `40%` for `single_aux`
 
    Then, inside each aux bucket, it splits the budget again by premise complexity:
-   - `40%` for `p8_plus`
-   - `40%` for `p5_7`
-   - `20%` for `p0_4`
+   - `60%` for `p8_plus`
+   - `30%` for `p5_7`
+   - `10%` for `p0_4`
 
    For each `(aux_shape, premise_bucket)` slice, the quota is divided as evenly as possible across all available families in that slice.
 

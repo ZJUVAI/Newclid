@@ -202,6 +202,34 @@ class TestGRPODataSelection(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(first_report, second_report)
 
+    def test_compute_bucket_quotas_prioritizes_high_premise_rows(self):
+        bucket_counts = {
+            ("multi_aux", "p8_plus", "angle_family"): 10,
+            ("multi_aux", "p5_7", "angle_family"): 10,
+            ("multi_aux", "p0_4", "angle_family"): 10,
+            ("single_aux", "p8_plus", "ratio_family"): 10,
+            ("single_aux", "p5_7", "ratio_family"): 10,
+            ("single_aux", "p0_4", "ratio_family"): 10,
+        }
+        quotas = self.prefilter_candidate_pool.compute_bucket_quotas(bucket_counts, target_size=20)
+
+        self.assertGreater(
+            quotas[("multi_aux", "p8_plus", "angle_family")],
+            quotas[("multi_aux", "p5_7", "angle_family")],
+        )
+        self.assertGreater(
+            quotas[("multi_aux", "p5_7", "angle_family")],
+            quotas[("multi_aux", "p0_4", "angle_family")],
+        )
+        self.assertGreater(
+            quotas[("single_aux", "p8_plus", "ratio_family")],
+            quotas[("single_aux", "p5_7", "ratio_family")],
+        )
+        self.assertGreater(
+            quotas[("single_aux", "p5_7", "ratio_family")],
+            quotas[("single_aux", "p0_4", "ratio_family")],
+        )
+
     def test_aggregate_difficulty_metrics(self):
         sample = {
             "sample_id": "id",

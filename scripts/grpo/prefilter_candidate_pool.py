@@ -18,9 +18,9 @@ AUX_BUCKET_WEIGHTS = {
 }
 
 PREMISE_BUCKET_WEIGHTS = {
-    "p8_plus": 0.40,
-    "p5_7": 0.40,
-    "p0_4": 0.20,
+    "p8_plus": 0.60,
+    "p5_7": 0.30,
+    "p0_4": 0.10,
 }
 
 GOAL_CAP_RATIO = 0.20
