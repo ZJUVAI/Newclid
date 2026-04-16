@@ -91,6 +91,16 @@ docs/source
 outputs/
 models/ckpts/
 
+# Temp scripts and archives
+tmp/
+
+# Local-only directories (single-machine usage)
+datasets/
+memory/
+
+# Claude Code local config
+.claude/
+
 # Synthetic datasets (large files)
 outputs/datasets/
 datasets/synthetic_*
