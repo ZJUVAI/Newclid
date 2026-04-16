@@ -32,7 +32,7 @@ GenesisGeo is a neuro-symbolic system that proves geometry theorems by combining
 ```bash
 git clone https://github.com/ZJUVAI/GenesisGeo.git
 cd GenesisGeo
-uv venv .venv
+uv venv
 source .venv/bin/activate
 uv sync --extra full
 ```
@@ -153,7 +153,7 @@ python scripts/evaluation.py \
 
 ```bash
 python scripts/evaluation.py \
-  --problems_path benchmarks/hageo_409_full.txt \
+  --problems_path benchmarks/hageo_409.txt \
   --model_path /path/to/checkpoint \
   --agent vlm \
   --max_workers 40 \
@@ -182,7 +182,13 @@ python scripts/evaluation.py \
 |------|-------------|
 | `benchmarks/imo_ag_30.txt` | IMO-AG-30 (30 problems) |
 | `benchmarks/imo_95.txt` | IMO-95 (95 problems) |
-| `benchmarks/hageo_409_full.txt` | HAGeo-409 (409 problems) |
+| `benchmarks/hageo_409.txt` | HAGeo-409 (409 problems) |
+| `benchmarks/jgex_ag_231.txt` | JGEX-AG-231 (231 problems) |
+| `benchmarks/dev_imo.txt` | Small IMO development subset |
+| `benchmarks/dev_jgex.txt` | Small JGEX development subset |
+| `benchmarks/examples.txt` | Mixed example and debugging problems |
+| `benchmarks/larger_imo_eval.txt` | Extended IMO-style evaluation set |
+| `benchmarks/testing_minimal_rules.txt` | Minimal regression checks for individual rules |
 
 ## Project Structure
 
