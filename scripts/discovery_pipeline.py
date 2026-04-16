@@ -454,6 +454,7 @@ def run_part4(
             debug_output_dir=output_path.parent if debug else None,
             solver_type="csolver",
             engine=engine,
+            use_ray=use_ray,
         )
         result = reducer.reduce_by_seed(current_rules, use_ray=use_ray)
         current_rules = result["basis_rules"]
@@ -528,6 +529,7 @@ def run_part4(
             debug_output_dir=output_path.parent if debug else None,
             solver_type="csolver",
             engine=engine,
+            use_ray=use_ray,
         )
         result = reducer.reduce(current_rules)
         current_rules = result["basis_rules"]

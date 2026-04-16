@@ -80,6 +80,7 @@ class RuleReducer:
         debug_output_dir: Optional[Path] = None,
         solver_type: str = "python",
         engine: str = "full",
+        use_ray: bool = False,
     ):
         """Initialize RuleReducer.
 
@@ -95,6 +96,7 @@ class RuleReducer:
                 and debug=True, proof steps are printed to stdout
             solver_type: "python" for DirectSolver (DDARN), "csolver" for CSolver (C++ DDAR)
             engine: DDAR engine variant ("full" or "weak"), only used when solver_type="csolver"
+            use_ray: Use Ray for distributed parallelism instead of ProcessPoolExecutor
         """
         self.timeout = timeout
         self.seed = seed
@@ -106,6 +108,7 @@ class RuleReducer:
         self.debug_output_dir = Path(debug_output_dir) if debug_output_dir else None
         self.solver_type = solver_type
         self.engine = engine
+        self.use_ray = use_ray
 
         proof_output_file = None
         if debug and self.debug_output_dir is not None:
@@ -208,7 +211,12 @@ class RuleReducer:
 
         # Step 3: Greedy elimination
         if self.verbose:
-            mode = "parallel (serial state)" if self.n_workers > 1 else "sequential"
+            if self.use_ray and self.n_workers > 1:
+                mode = "Ray pipeline parallel"
+            elif self.n_workers > 1:
+                mode = "parallel (serial state)"
+            else:
+                mode = "sequential"
             print(f"Step 3: Greedy elimination ({mode})...")
 
         active_flags = [True] * len(sorted_rules)
@@ -218,7 +226,123 @@ class RuleReducer:
         # Get batch_size from instance or use default
         batch_size = getattr(self, 'batch_size', 10)
 
-        if self.n_workers > 1:
+        if self.use_ray and self.n_workers > 1:
+            # Ray pipeline parallel: submit multiple rules concurrently
+            # Use ray.wait() to process results as they complete without blocking
+            import ray
+            from newclid.proof_scout.reduction.ray_workers import test_subsumption_batch_worker_ray, serialize_rule
+
+            if self.verbose:
+                print(f"  Using Ray with {self.n_workers} workers (pipeline parallel, progress every {batch_size} rules)")
+
+            # Pipeline control: limit in-flight tasks to n_workers * 2
+            max_in_flight = self.n_workers * 2
+            pending_futures = []  # List of (rule_i_index, future)
+            processed_count = 0
+
+            for i, rule_i in enumerate(sorted_rules):
+                if not active_flags[i]:
+                    continue
+
+                # Build target rules based on CURRENT active_flags
+                target_rules = []
+                target_indices = []
+                for j in range(len(sorted_rules)):
+                    if active_flags[j] and j != i:
+                        target_rules.append(sorted_rules[j])
+                        target_indices.append(j)
+
+                if not target_rules:
+                    continue
+
+                # Serialize rules for Ray transmission
+                rule_i_data = serialize_rule(rule_i)
+                target_rules_data = [serialize_rule(r) for r in target_rules]
+
+                # Submit task
+                future = test_subsumption_batch_worker_ray.remote(
+                    rule_i_data,
+                    target_rules_data,
+                    self.timeout,
+                    self.seed,
+                    self.solver_type,
+                    self.engine,
+                )
+                pending_futures.append((i, rule_i, target_indices, future))
+
+                # Pipeline control: if we have too many in-flight tasks, wait for one to complete
+                while len(pending_futures) >= max_in_flight:
+                    # Wait for the next task to complete
+                    ready_futures = [f for _, _, _, f in pending_futures]
+                    done, _ = ray.wait(ready_futures, num_returns=1)
+                    done_ref = done[0]
+
+                    # Find and process the completed task
+                    for idx, (rule_idx, rule_obj, targets, f) in enumerate(pending_futures):
+                        if f == done_ref:
+                            pending_futures.pop(idx)
+                            eliminated_ids = ray.get(done_ref)
+                            n_tests += len(targets)
+                            processed_count += 1
+
+                            # Update active_flags
+                            for rule_id in eliminated_ids:
+                                for j, rule_j in enumerate(sorted_rules):
+                                    if rule_j.rule_id == rule_id and active_flags[j]:
+                                        active_flags[j] = False
+                                        eliminated_rules.append({
+                                            "rule_id": rule_j.rule_id,
+                                            "rule_text": rule_j.rule_text,
+                                            "subsumed_by": rule_obj.rule_id,
+                                            "reason": f"Subsumed by {rule_obj.rule_id}",
+                                        })
+
+                                        if self.verbose:
+                                            print(f"    Eliminated {rule_j.rule_id} (subsumed by {rule_obj.rule_id})")
+                                        break
+
+                            # Progress reporting
+                            if self.verbose and processed_count % batch_size == 0:
+                                n_active = sum(active_flags)
+                                print(f"  Progress: {processed_count}/{len(sorted_rules)} rules processed, "
+                                      f"{n_active} active, {n_tests} tests, {len(pending_futures)} in-flight")
+                            break
+
+            # Wait for remaining tasks
+            while pending_futures:
+                ready_futures = [f for _, _, _, f in pending_futures]
+                done, _ = ray.wait(ready_futures, num_returns=1)
+                done_ref = done[0]
+
+                for idx, (rule_idx, rule_obj, targets, f) in enumerate(pending_futures):
+                    if f == done_ref:
+                        pending_futures.pop(idx)
+                        eliminated_ids = ray.get(done_ref)
+                        n_tests += len(targets)
+                        processed_count += 1
+
+                        for rule_id in eliminated_ids:
+                            for j, rule_j in enumerate(sorted_rules):
+                                if rule_j.rule_id == rule_id and active_flags[j]:
+                                    active_flags[j] = False
+                                    eliminated_rules.append({
+                                        "rule_id": rule_j.rule_id,
+                                        "rule_text": rule_j.rule_text,
+                                        "subsumed_by": rule_obj.rule_id,
+                                        "reason": f"Subsumed by {rule_obj.rule_id}",
+                                    })
+
+                                    if self.verbose:
+                                        print(f"    Eliminated {rule_j.rule_id} (subsumed by {rule_obj.rule_id})")
+                                    break
+
+                        if self.verbose and processed_count % batch_size == 0:
+                            n_active = sum(active_flags)
+                            print(f"  Progress: {processed_count}/{len(sorted_rules)} rules processed, "
+                                  f"{n_active} active, {n_tests} tests")
+                        break
+
+        elif self.n_workers > 1:
             # Parallel execution with serial state updates to avoid race conditions
             # Each rule_i is processed sequentially so active_flags stays consistent,
             # but the subsumption tests for rule_i vs all targets run in parallel.
