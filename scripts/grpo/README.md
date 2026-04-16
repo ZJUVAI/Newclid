@@ -74,11 +74,54 @@ python scripts/grpo/build_candidate_pool.py \
 
 ### 3. Prefilter large pools
 
-This stage is meant to reduce a large pool before model-based labeling. It removes exact duplicate queries and balances sampling over:
+This stage is meant to reduce a large pool before model-based labeling. The goal is not to find the final training set directly, but to cheaply build a smaller, more diverse candidate pool for the expensive difficulty-labeling step.
 
-- aux shape: `multi_aux` vs `single_aux`
-- premise complexity: `p8_plus`, `p5_7`, `p0_4`
-- primary goal/predicate family
+The current implementation does four things:
+
+1. Exact-query deduplication.
+   Only the first occurrence of each `query` is counted when building the pool statistics, so repeated prompts do not dominate the sample budget.
+
+2. Assign each row to a 3D bucket.
+   Every sample is bucketed by:
+   - aux shape
+     `multi_aux` if `aux_segment_count >= 2` or `aux_points_total >= 2`, otherwise `single_aux`
+   - premise complexity
+     `p8_plus` if `n_premises >= 8`, `p5_7` if `n_premises >= 5`, otherwise `p0_4`
+     if `n_premises` is missing, the script falls back to `problem_clause_count`
+   - primary family
+     inferred from `goal_predicate` first, then from the first `predicate_family_tags` entry, otherwise `other_family`
+
+3. Allocate per-bucket quotas before sampling.
+   The script first splits the global `target_size` by aux shape:
+   - `60%` for `multi_aux`
+   - `40%` for `single_aux`
+
+   Then, inside each aux bucket, it splits the budget again by premise complexity:
+   - `40%` for `p8_plus`
+   - `40%` for `p5_7`
+   - `20%` for `p0_4`
+
+   For each `(aux_shape, premise_bucket)` slice, the quota is divided as evenly as possible across all available families in that slice.
+
+4. Sample with reservoir selection, then fill shortages.
+   For buckets that have enough rows, the script uses reservoir sampling so the result stays deterministic under a fixed `--seed` while remaining stream-friendly for large datasets.
+   If some buckets do not have enough rows to meet their quota, the script does a fallback fill from the remaining rows until `target_size` is reached.
+
+During the fallback fill, the script also applies a per-goal cap:
+
+- `goal_cap = 20% * target_size`
+
+This cap is enforced on `goal_predicate` so one goal type does not completely take over the final prefiltered pool.
+
+The output report records:
+
+- distinct-query count before sampling
+- exact duplicate count removed
+- target quota for each bucket
+- actual bucket counts after sampling
+- per-bucket shortages
+- selected goal-predicate distribution
+- how many fallback rows were skipped due to the goal cap
 
 ```bash
 python scripts/grpo/prefilter_candidate_pool.py \
