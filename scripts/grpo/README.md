@@ -11,6 +11,7 @@ This directory contains the data-selection, reward, and launch helpers for GRPO-
 - `prefilter_candidate_pool.py`: applies a cheap streaming prefilter to large candidate pools before model-based difficulty labeling.
 - `label_difficulty.py`: text-model difficulty labeling with offline generation plus reward evaluation.
 - `label_difficulty_vlm.py`: VLM-compatible difficulty labeling with batch inference and multi-GPU support.
+- `select_grpo_dataset.sh`: one-click wrapper for the full dataset-selection pipeline.
 - `select_debug_set.py`: filters mastered/dead rows and builds the final GRPO subset.
 - `prepare_grpo_aux_dataset.py`: converts existing JSONL data into `query/fl_problem/response` rows for aux-only GRPO and drops rows without `<aux>...</aux>`.
 - `train_grpo.sh`: GRPO launch template built on top of `swift rlhf`.
@@ -200,6 +201,48 @@ This script recomputes the same derived geometry statistics directly from `query
 - aux segment / aux point distributions
 - problem predicate count distribution
 - problem clause count distribution
+
+### One-Click Dataset Selection
+
+If you want to run the whole selection chain in one command, use:
+
+```bash
+INPUT_PATH=datasets/raw.jsonl \
+MODEL_PATH=/path/to/checkpoint \
+OUTPUT_DIR=datasets/grpo_pipeline \
+LABELER=text \
+bash scripts/grpo/select_grpo_dataset.sh
+```
+
+The wrapper runs:
+
+```text
+analyze_dataset.py
+-> build_candidate_pool.py
+-> prefilter_candidate_pool.py
+-> label_difficulty.py / label_difficulty_vlm.py
+-> select_debug_set.py
+-> analyze_selected_dataset.py
+```
+
+Useful environment variables:
+
+- `INPUT_PATH`: source JSONL with `llm_input_renamed`, `llm_output_renamed`, and `fl_problem`
+- `MODEL_PATH`: checkpoint used for offline difficulty labeling
+- `OUTPUT_DIR`: directory for all intermediate and final artifacts
+- `LABELER`: `text` or `vlm`
+- `PREFILTER_TARGET_SIZE`: defaults to `50000`
+- `FINAL_TARGET_SIZE`: defaults to `2000`
+- `SEED`: defaults to `998244353`
+- `LABEL_NUM_SAMPLES`: defaults to `16`
+- `LABEL_TEMPERATURE`: defaults to `0.8`
+- `LABEL_TOP_P`: defaults to `0.95`
+
+Main outputs:
+
+- `grpo_train_selected.jsonl`: final training dataset
+- `grpo_train_report.json`: selection report from `select_debug_set.py`
+- `grpo_train_selected_summary.json`: recomputed stats for the final dataset
 
 ## Fast Path From Existing SFT Data
 
