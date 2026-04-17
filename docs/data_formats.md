@@ -185,6 +185,42 @@ bisect a b c                    ← Line 5: 数值约束
 
 ---
 
+## 5.1 Divide-and-Conquer Reduction Output
+
+Part 4 的 Divide-and-Conquer 规约阶段输出目录结构：
+
+```
+part4/
+  divide_conquer_reduction/
+    phase1_chunks/
+      chunk_0000.json   # 每个初始 chunk 的规约结果
+      chunk_0001.json
+      ...
+    phase2_merges/
+      merge_0001.json   # 每次两两合并的详细统计
+      merge_0002.json
+      ...
+    final_stats.json    # 最终统计汇总
+```
+
+### `final_stats.json` Schema
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `input_count` | int | 输入规则总数 |
+| `basis_count` | int | 最终基底规则数 |
+| `eliminated_count` | int | 被淘汰规则数 |
+| `reduction_rate` | float | 淘汰率 |
+| `phase1.n_chunks` | int | Phase 1 分块数 |
+| `phase1.chunk_size` | int | 每块大小 |
+| `phase1.elapsed_seconds` | float | Phase 1 耗时 |
+| `phase2.n_merges` | int | Phase 2 合并次数 |
+| `phase2.elapsed_seconds` | float | Phase 2 耗时 |
+| `n_subsumption_tests` | int | 总 subsumption 测试次数 |
+| `elapsed_seconds` | float | 总耗时 |
+
+---
+
 ## 6. 冗余分析与统一建议
 
 ### 6.1 `fl_problem` vs `llm_input_renamed`

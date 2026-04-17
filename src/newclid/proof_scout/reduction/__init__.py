@@ -19,22 +19,20 @@ from newclid.proof_scout.reduction.rule_reducer import (
     RuleReducer,
     RuleWithSource,
     IncrementalReducer,
-    ChunkedIterativeReducer,
     load_rules_from_discovery_output,
     load_rules_by_ids,
-    stream_chunked_reduce_from_files,
 )
 from newclid.proof_scout.reduction.generality_scorer import GeneralityScorer
 from newclid.proof_scout.reduction.subsumption_tester import SubsumptionTester
+from newclid.proof_scout.reduction.divide_conquer_reducer import DivideConquerReducer
 
 __all__ = [
     "RuleReducer",
     "RuleWithSource",
     "IncrementalReducer",
-    "ChunkedIterativeReducer",
+    "DivideConquerReducer",
     "GeneralityScorer",
     "SubsumptionTester",
     "load_rules_from_discovery_output",
     "load_rules_by_ids",
-    "stream_chunked_reduce_from_files",
 ]

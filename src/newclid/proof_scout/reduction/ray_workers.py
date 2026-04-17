@@ -223,3 +223,88 @@ def serialize_rule(rule) -> Dict[str, Any]:
         "llm_output_renamed": rule.llm_output_renamed,
         "seed": rule.seed,
     }
+
+
+# ============================================================================
+# Divide-and-Conquer merge support: Actor + fine-grained worker
+# ============================================================================
+
+if ray is not None:
+    @ray.remote
+    class ActiveStateActor:
+        """Ray Actor maintaining mutable active state for merge reduction.
+
+        Tracks which rules in chunk A and chunk B are still active (not subsumed).
+        Multiple Ray tasks can concurrently call mark_inactive_* methods.
+        """
+
+        def __init__(self, n_rules_a: int, n_rules_b: int):
+            self.active_a = [True] * n_rules_a
+            self.active_b = [True] * n_rules_b
+
+        def mark_inactive_A(self, index: int) -> None:
+            self.active_a[index] = False
+
+        def mark_inactive_B(self, index: int) -> None:
+            self.active_b[index] = False
+
+        def get_active_A(self) -> List[bool]:
+            return list(self.active_a)
+
+        def get_active_B(self) -> List[bool]:
+            return list(self.active_b)
+else:
+    ActiveStateActor = None  # type: ignore[assignment,misc]
+
+
+def _test_and_update_worker(
+    rule_strong_data: Dict[str, Any],
+    rules_weak_data: List[Dict[str, Any]],
+    active_state_actor,
+    target_side: str,
+    timeout: int,
+    seed: int,
+    solver_type: str,
+    engine: str,
+) -> None:
+    """Test if rule_strong subsumes any rules_weak and update Actor state.
+
+    For each subsumed rule, calls actor.mark_inactive_{A|B}(index).
+
+    Args:
+        rule_strong_data: Serialized strong rule
+        rules_weak_data: List of serialized weak rules
+        active_state_actor: Ray Actor reference for shared state
+        target_side: 'A' or 'B' — which side to mark inactive
+        timeout: Subsumption test timeout
+        seed: Random seed
+        solver_type: 'csolver' or 'python'
+        engine: DDAR engine variant
+    """
+    from newclid.proof_scout.reduction.rule_reducer import RuleWithSource
+
+    rule_strong = RuleWithSource(**rule_strong_data)
+
+    if solver_type == "csolver":
+        from newclid.proof_scout.reduction.subsumption_tester import SubsumptionTesterCSolver
+        tester = SubsumptionTesterCSolver(timeout=timeout, seed=seed, engine=engine)
+    else:
+        from newclid.proof_scout.reduction.subsumption_tester import SubsumptionTester
+        tester = SubsumptionTester(timeout=timeout, seed=seed)
+
+    for idx, rule_weak_data in enumerate(rules_weak_data):
+        try:
+            rule_weak = RuleWithSource(**rule_weak_data)
+            if tester.test_subsumption(rule_strong, rule_weak):
+                if target_side == "B":
+                    active_state_actor.mark_inactive_B.remote(idx)
+                else:
+                    active_state_actor.mark_inactive_A.remote(idx)
+        except Exception:
+            pass
+
+
+if ray is not None:
+    test_and_update_worker_ray = ray.remote(_test_and_update_worker)
+else:
+    test_and_update_worker_ray = _test_and_update_worker

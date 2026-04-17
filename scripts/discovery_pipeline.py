@@ -15,7 +15,7 @@ The pipeline consists of 4 Parts:
     Part 1: Input filter      — drop records without aux_points / matching skip_predicates
     Part 2: Extract rules     — graph prune → proposition → normalization → dedup → dump
     Part 3: max_premises      — filter rules exceeding max_premises (skipped if null)
-    Part 4: Reduction         — seed / chunk / global subsumption-based rule reduction
+    Part 4: Reduction         — seed / divide-and-conquer subsumption-based rule reduction
 
 Each Part can be independently enabled/disabled and accepts custom input/output paths.
 When a Part is disabled, the next enabled Part inherits the previous Part's output.
@@ -457,12 +457,10 @@ def run_part4(
     debug = p4.get("debug", False)
 
     seed_red_cfg = p4.get("seed_reduction", {})
-    chunk_red_cfg = p4.get("chunk_reduction", {})
-    global_red_cfg = p4.get("global_reduction", {})
+    dc_red_cfg = p4.get("divide_conquer_reduction", {})
 
     seed_reduction_enabled = seed_red_cfg.get("enabled", False)
-    chunk_reduction_enabled = chunk_red_cfg.get("enabled", False)
-    global_reduction_enabled = global_red_cfg.get("enabled", True)
+    dc_reduction_enabled = dc_red_cfg.get("enabled", True)
 
     print(f"\n{'='*60}")
     print(f"Part 4: Reduction")
@@ -471,8 +469,7 @@ def run_part4(
     print(f"  Source data:    {source_data_file or '(none — will fail if rules need llm_input)'}")
     print(f"  Output:         {output_path}")
     print(f"  engine={engine}, timeout={timeout}, n_workers={n_workers}, batch_size={batch_size}")
-    print(f"  seed_reduction={seed_reduction_enabled}, chunk_reduction={chunk_reduction_enabled}, "
-          f"global_reduction={global_reduction_enabled}")
+    print(f"  seed_reduction={seed_reduction_enabled}, divide_conquer_reduction={dc_reduction_enabled}")
 
     # Initialize Ray unconditionally
     import ray
@@ -482,80 +479,9 @@ def run_part4(
 
     from newclid.proof_scout.reduction import (
         RuleReducer,
-        ChunkedIterativeReducer,
+        DivideConquerReducer,
         load_rules_from_discovery_output,
     )
-
-    # Streaming chunk reduction: skip full load, go directly to stream path
-    streaming_load = chunk_reduction_enabled and chunk_red_cfg.get("streaming_load", False)
-    if streaming_load:
-        if source_data_file is None or not source_data_file.exists():
-            print("Error: chunk_reduction.streaming_load=true requires source_data in config",
-                  file=sys.stderr)
-            sys.exit(1)
-        if seed_reduction_enabled:
-            print("Error: seed_reduction cannot be combined with streaming_load", file=sys.stderr)
-            sys.exit(1)
-        # Run streaming chunk reduction (includes optional global reduction inside)
-        stage_start = time.time()
-        group_size = chunk_red_cfg.get("group_size", 500)
-        chunk_dir = output_path.parent / "chunk_reduction"
-        chunk_dir.mkdir(parents=True, exist_ok=True)
-        print(f"\n[Part 4 / chunk_reduction (streaming)] group_size={group_size}, "
-              f"n_workers={n_workers}, global_reduction={global_reduction_enabled}")
-        from newclid.proof_scout.reduction import stream_chunked_reduce_from_files
-        reducer_cfg_dict = {
-            "timeout": timeout,
-            "n_workers": n_workers,
-            "batch_size": batch_size,
-            "solver_type": "csolver",
-            "engine": engine,
-            "debug": debug,
-            "debug_output_dir": output_path.parent if debug else None,
-            "global_reduction": global_reduction_enabled,
-        }
-        final_rules, stream_stats = stream_chunked_reduce_from_files(
-            rules_file=input_path,
-            source_data_file=source_data_file,
-            group_size=group_size,
-            reducer_cfg=reducer_cfg_dict,
-            output_dir=chunk_dir,
-        )
-        stage_elapsed = time.time() - stage_start
-        stage_timing["chunk_reduction_streaming"] = round(stage_elapsed, 2)
-        print(f"[Part 4 / streaming] → {len(final_rules)} rules")
-        with open(output_path, "w", encoding="utf-8") as f:
-            for rule in final_rules:
-                f.write(f"{rule.rule_id}\n{rule.rule_text}\n")
-
-        # Save streaming stats summary
-        streaming_summary_path = chunk_dir / "chunk_reduction_summary.json"
-        with open(streaming_summary_path, "w", encoding="utf-8") as f:
-            json.dump(stream_stats, f, ensure_ascii=False, indent=2)
-
-        total_elapsed = time.time() - start_time
-        print(f"\n[Part 4] Done — {len(final_rules)} rules → {output_path}")
-
-        stats = {
-            "input_path": str(input_path),
-            "output_path": str(output_path),
-            "source_data_path": str(source_data_file) if source_data_file else None,
-            "input_count": stream_stats.get("input_count", 0),
-            "output_count": len(final_rules),
-            "elapsed_seconds": round(total_elapsed, 2),
-            "stage_timing": stage_timing,
-            "chunk_reduction": {
-                "enabled": True,
-                "streaming_load": True,
-                "group_size": group_size,
-                "input_count": stream_stats.get("input_count", 0),
-                "final_survivors_count": len(final_rules),
-                "total_eliminated": stream_stats.get("input_count", 0) - len(final_rules),
-                "elapsed_seconds": round(stage_elapsed, 2),
-                "details_dir": str(chunk_dir.relative_to(output_dir)),
-            },
-        }
-        return output_path, stats
 
     # Standard mode: load all rules into memory first
     load_start = time.time()
@@ -611,8 +537,7 @@ def run_part4(
 
     # Stats collectors
     seed_red_stats = None
-    chunk_red_stats = None
-    global_red_stats = None
+    dc_red_stats = None
 
     # --- Seed reduction ---
     if seed_reduction_enabled:
@@ -691,95 +616,46 @@ def run_part4(
             "details_file": str(details_path.relative_to(output_dir)),
         }
 
-    # --- Chunk reduction (standard mode; streaming_load handled earlier) ---
-    if chunk_reduction_enabled:
+    # --- Divide-and-Conquer reduction ---
+    if dc_reduction_enabled:
         stage_start = time.time()
-        group_size = chunk_red_cfg.get("group_size", 500)
-        iterations = chunk_red_cfg.get("iterations", 1)
+        min_chunk_size = dc_red_cfg.get("min_chunk_size", 50)
+        dc_output_dir = output_path.parent / "divide_conquer_reduction"
 
-        chunk_dir = output_path.parent / "chunk_reduction"
-        chunk_dir.mkdir(parents=True, exist_ok=True)
-
-        print(f"\n[Part 4 / chunk_reduction] {len(current_rules)} rules, "
-              f"group_size={group_size}, iterations={iterations}, n_workers={n_workers}")
-        cir = ChunkedIterativeReducer(
+        print(f"\n[Part 4 / divide_conquer_reduction] {len(current_rules)} rules, "
+              f"min_chunk_size={min_chunk_size}, n_workers={n_workers}")
+        dc_reducer = DivideConquerReducer(
             timeout=timeout,
-            batch_size=batch_size,
+            seed=42,
             solver_type="csolver",
             engine=engine,
-            use_ray=True,
-        )
-        chunk_input_count = len(current_rules)
-        current_rules, chunk_overall_stats = cir.reduce_iterative(
-            current_rules,
-            group_size=group_size,
-            iterations=iterations,
-            n_workers=n_workers,
-            output_dir=chunk_dir,
-            resume=False,
-        )
-        stage_elapsed = time.time() - stage_start
-        stage_timing["chunk_reduction"] = round(stage_elapsed, 2)
-        print(f"[Part 4 / chunk_reduction] → {len(current_rules)} rules ({stage_elapsed:.1f}s)")
-
-        # Save chunk reduction summary
-        summary_path = chunk_dir / "chunk_reduction_summary.json"
-        with open(summary_path, "w", encoding="utf-8") as f:
-            json.dump(chunk_overall_stats, f, ensure_ascii=False, indent=2)
-
-        # Summary stats
-        chunk_red_stats = {
-            "enabled": True,
-            "streaming_load": False,
-            "total_rounds": chunk_overall_stats.get("total_rounds", iterations),
-            "group_size": group_size,
-            "input_count": chunk_input_count,
-            "final_survivors_count": len(current_rules),
-            "total_eliminated": chunk_input_count - len(current_rules),
-            "elapsed_seconds": round(stage_elapsed, 2),
-            "details_dir": str(chunk_dir.relative_to(output_dir)),
-        }
-
-    # --- Global reduction ---
-    if global_reduction_enabled:
-        stage_start = time.time()
-        global_input_count = len(current_rules)
-        print(f"\n[Part 4 / global_reduction] {global_input_count} rules")
-        reducer = RuleReducer(
-            timeout=timeout,
+            min_chunk_size=min_chunk_size,
             n_workers=n_workers,
             batch_size=batch_size,
-            debug=debug,
-            debug_output_dir=output_path.parent if debug else None,
-            solver_type="csolver",
-            engine=engine,
-            use_ray=True,
+            verbose=True,
+            output_dir=dc_output_dir,
         )
-        global_result = reducer.reduce(current_rules)
-        current_rules = global_result["basis_rules"]
-        g_stats = global_result["stats"]
+        dc_input_count = len(current_rules)
+        dc_result = dc_reducer.reduce(current_rules)
+        current_rules = dc_result["basis_rules"]
+        dc_stats_raw = dc_result["stats"]
         stage_elapsed = time.time() - stage_start
-        stage_timing["global_reduction"] = round(stage_elapsed, 2)
-        print(f"[Part 4 / global_reduction] → {len(current_rules)} rules "
-              f"(eliminated {g_stats.get('eliminated_count', 0)}, "
-              f"tests {g_stats.get('n_subsumption_tests', 0)}, {stage_elapsed:.1f}s)")
+        stage_timing["divide_conquer_reduction"] = round(stage_elapsed, 2)
+        print(f"[Part 4 / divide_conquer_reduction] → {len(current_rules)} rules "
+              f"(eliminated {dc_stats_raw.get('eliminated_count', 0)}, "
+              f"tests {dc_stats_raw.get('n_subsumption_tests', 0)}, {stage_elapsed:.1f}s)")
 
-        # Save detailed stats
-        global_details_path = output_path.parent / "global_reduction_stats.json"
-        stats_with_time = {**g_stats, "elapsed_seconds": round(stage_elapsed, 2)}
-        with open(global_details_path, "w", encoding="utf-8") as f:
-            json.dump(stats_with_time, f, ensure_ascii=False, indent=2)
-
-        # Summary stats
-        global_red_stats = {
+        dc_red_stats = {
             "enabled": True,
-            "input_count": global_input_count,
+            "input_count": dc_input_count,
             "basis_count": len(current_rules),
-            "eliminated_count": global_input_count - len(current_rules),
-            "reduction_rate": g_stats.get("reduction_rate", 0.0),
-            "n_subsumption_tests": g_stats.get("n_subsumption_tests", 0),
+            "eliminated_count": dc_input_count - len(current_rules),
+            "reduction_rate": dc_stats_raw.get("reduction_rate", 0.0),
+            "n_subsumption_tests": dc_stats_raw.get("n_subsumption_tests", 0),
+            "phase1": dc_stats_raw.get("phase1", {}),
+            "phase2": dc_stats_raw.get("phase2", {}),
             "elapsed_seconds": round(stage_elapsed, 2),
-            "details_file": str(global_details_path.relative_to(output_dir)),
+            "details_dir": str(dc_output_dir.relative_to(output_dir)),
         }
 
     # Write output
@@ -800,8 +676,7 @@ def run_part4(
         "elapsed_seconds": round(total_elapsed, 2),
         "stage_timing": stage_timing,
         "seed_reduction": seed_red_stats,
-        "chunk_reduction": chunk_red_stats,
-        "global_reduction": global_red_stats,
+        "divide_conquer_reduction": dc_red_stats,
     }
     return output_path, stats
 
