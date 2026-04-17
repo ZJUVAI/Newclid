@@ -369,6 +369,53 @@ class TestGRPODataSelection(unittest.TestCase):
         self.assertEqual(report["removed_mastered"], 1)
         self.assertEqual(report["removed_all_invalid"], 1)
 
+    def test_select_debug_rows_accepts_pass_at_8(self):
+        rows = [
+            {
+                "sample_id": "mastered",
+                "query": "q0",
+                "fl_problem": "p0",
+                "response": "r0",
+                "greedy_success": True,
+                "pass_at_8": 1.0,
+                "all_invalid": False,
+                "goal_predicate": "eqratio",
+                "predicate_family_tags": ["ratio_family"],
+                "aux_segment_count": 1,
+                "aux_points_total": 1,
+            },
+            {
+                "sample_id": "keep1",
+                "query": "q1",
+                "fl_problem": "p1",
+                "response": "r1",
+                "greedy_success": False,
+                "pass_at_8": 0.25,
+                "all_invalid": False,
+                "goal_predicate": "eqratio",
+                "predicate_family_tags": ["ratio_family"],
+                "aux_segment_count": 2,
+                "aux_points_total": 2,
+            },
+            {
+                "sample_id": "keep2",
+                "query": "q2",
+                "fl_problem": "p2",
+                "response": "r2",
+                "greedy_success": False,
+                "pass_at_8": 0.5,
+                "all_invalid": False,
+                "goal_predicate": "perp",
+                "predicate_family_tags": ["parallel_perp_family"],
+                "aux_segment_count": 1,
+                "aux_points_total": 1,
+            },
+        ]
+        final_rows, report = self.select_debug_set.select_debug_rows(rows, target_size=2)
+        self.assertEqual(len(final_rows), 2)
+        self.assertEqual(report["pass_key"], "pass_at_8")
+        self.assertEqual(report["removed_mastered"], 1)
+
     def test_file_round_trip_for_candidate_pool(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)

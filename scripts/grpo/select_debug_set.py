@@ -44,33 +44,47 @@ def _row_id(row: dict[str, Any]) -> str:
     return hashlib.sha256(row["query"].encode()).hexdigest()
 
 
-def _is_preferred(row: dict[str, Any]) -> bool:
-    return 0.15 <= row["pass_at_16"] <= 0.60
+def _resolve_pass_key(rows: list[dict[str, Any]]) -> str:
+    for row in rows:
+        pass_keys = sorted(
+            (key for key in row.keys() if key.startswith("pass_at_")),
+            key=lambda key: int(key.split("_")[-1]),
+            reverse=True,
+        )
+        if pass_keys:
+            return pass_keys[0]
+    raise KeyError("No pass_at_* field found in difficulty-labeled rows")
 
 
-def _is_fallback(row: dict[str, Any]) -> bool:
-    return 0.10 <= row["pass_at_16"] <= 0.80
+def _is_preferred(row: dict[str, Any], pass_key: str) -> bool:
+    return 0.15 <= row[pass_key] <= 0.60
+
+
+def _is_fallback(row: dict[str, Any], pass_key: str) -> bool:
+    return 0.10 <= row[pass_key] <= 0.80
 
 
 def filter_goldilocks(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, int]]:
     preferred = []
     fallback = []
+    pass_key = _resolve_pass_key(rows)
     stats = {
+        "pass_key": pass_key,
         "removed_mastered": 0,
         "removed_all_invalid": 0,
         "preferred_rows": 0,
         "fallback_rows": 0,
     }
     for row in tqdm(rows, desc="Filtering goldilocks rows"):
-        if row.get("greedy_success") and row.get("pass_at_16", 0.0) >= 0.90:
+        if row.get("greedy_success") and row.get(pass_key, 0.0) >= 0.90:
             stats["removed_mastered"] += 1
             continue
         if row.get("all_invalid"):
             stats["removed_all_invalid"] += 1
             continue
-        if _is_preferred(row):
+        if _is_preferred(row, pass_key):
             preferred.append(row)
-        elif _is_fallback(row):
+        elif _is_fallback(row, pass_key):
             fallback.append(row)
     stats["preferred_rows"] = len(preferred)
     stats["fallback_rows"] = len(fallback)
