@@ -75,12 +75,42 @@ class TestGRPODataSelection(unittest.TestCase):
         self.assertEqual(annotation["problem_predicate_count"], 2)
         self.assertEqual(annotation["problem_clause_count"], 1)
 
-    def test_annotation_counts_on_real_dataset(self):
-        annotations, summary = self.analyze_dataset.annotate_jsonl(
-            Path("datasets/test_new_construction/geometry_clauses10_samples10.jsonl")
+    def test_annotation_counts_on_generated_dataset(self):
+        rows = [
+            {
+                "llm_input_renamed": "<problem> a : ; b : perp a b b c [001] ; ? eqratio a b c d </problem>",
+                "llm_output_renamed": "<aux> x00 g : coll a b g [002] ; </aux><proof>...</proof>",
+                "fl_problem": "a b c d = quadrangle a b c d ? eqratio a b c d",
+                "n_premises": 6,
+            },
+            {
+                "llm_input_renamed": "<problem> a : ; b : para a b b c [001] ; ? perp a b c d </problem>",
+                "llm_output_renamed": "<proof> no aux here </proof>",
+                "fl_problem": "a b c d = quadrangle a b c d ? perp a b c d",
+                "n_premises": 4,
+            },
+            {
+                "llm_input_renamed": "<problem> a : ; b : cong a b c d [001] ; ? eqangle a b c d e f g h </problem>",
+                "llm_output_renamed": "<aux> x00 e : coll a b e [002] ; f : perp e f a b [003] ; </aux>",
+                "fl_problem": "a b c d = quadrangle a b c d ? eqangle a b c d e f g h",
+                "n_premises": 5,
+            },
+        ]
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            input_path = Path(tmp_dir) / "annotate.jsonl"
+            input_path.write_text(
+                "\n".join(json.dumps(row) for row in rows) + "\n",
+                encoding="utf-8",
+            )
+            annotations, summary = self.analyze_dataset.annotate_jsonl(input_path)
+
+        self.assertEqual(len(annotations), 3)
+        self.assertEqual(summary["aux_rows"], 2)
+        self.assertEqual(
+            summary["goal_predicate_distribution"],
+            {"eqratio": 1, "perp": 1, "eqangle": 1},
         )
-        self.assertEqual(len(annotations), 110)
-        self.assertEqual(summary["aux_rows"], 34)
 
     def test_candidate_pool_keeps_only_valid_aux_rows(self):
         rows = [
