@@ -131,9 +131,7 @@ class BaseAgent(DeductiveAgent, ABC):
     ) -> BeamQueue:
         return next_queue
 
-    def extract_raw_aux_text(
-        self, aux_dsl: str, *, request: dict[str, Any]
-    ) -> str:
+    def extract_raw_aux_text(self, aux_dsl: str, *, request: dict[str, Any]) -> str:
         response_prefix = str(request.get("response_prefix", "<aux> x00"))
         if aux_dsl.startswith(response_prefix):
             return aux_dsl[len(response_prefix) :]
@@ -763,7 +761,8 @@ class BaseAgent(DeductiveAgent, ABC):
             request = request_state["request"]
             if request is None:
                 logger.warning(
-                    "GPU result missing prepared request context: request_id=%s", request_id
+                    "GPU result missing prepared request context: request_id=%s",
+                    request_id,
                 )
                 continue
             state = request_state["state"]

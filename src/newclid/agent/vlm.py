@@ -75,7 +75,10 @@ class VLMAgent(BaseAgent):
 
     def seed_state(
         self, proof: ProofState, base_proof: ProofState
-    ) -> tuple[ProblemJGEX, ProofState | None] | tuple[ProblemJGEX, ProofState | None, str]:
+    ) -> (
+        tuple[ProblemJGEX, ProofState | None]
+        | tuple[ProblemJGEX, ProofState | None, str]
+    ):
         del proof
         self._proof_defs = base_proof.defs
         self._root_problem_dsl = self.problem_to_dsl(self.problemJGEX, base_proof.defs)
@@ -114,7 +117,9 @@ class VLMAgent(BaseAgent):
                 "Visual frontier state is missing the materialized proof for request preparation."
             )
         if query is None:
-            raise ValueError("Root VLM query is unavailable during request preparation.")
+            raise ValueError(
+                "Root VLM query is unavailable during request preparation."
+            )
         stem = f"d{depth}_{request_id}"
         svg_path = self.render_root / f"{stem}.svg"
         png_path = self.render_root / f"{stem}.png"
@@ -171,7 +176,11 @@ class VLMAgent(BaseAgent):
         request: dict[str, Any],
         aux_dsl: str,
         raw_aux_text: str,
-    ) -> tuple[ProblemJGEX, ProofState | None] | tuple[ProblemJGEX, ProofState | None, str] | None:
+    ) -> (
+        tuple[ProblemJGEX, ProofState | None]
+        | tuple[ProblemJGEX, ProofState | None, str]
+        | None
+    ):
         del ddar_result, proof, request, raw_aux_text
         if self.search_version == "v2":
             return new_problem, None, aux_dsl[len("<aux>") :]

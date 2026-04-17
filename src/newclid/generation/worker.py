@@ -406,7 +406,13 @@ class ProblemWorker:
         aux: list[Statement],
         essential_point_names: set[str],
         aux_point_names: set[str],
-    ) -> tuple[dict[Clause, list], list[Clause], list[Statement], list[tuple], list[list[Statement]]]:
+    ) -> tuple[
+        dict[Clause, list],
+        list[Clause],
+        list[Statement],
+        list[tuple],
+        list[list[Statement]],
+    ]:
         """Expand proof-level premise/aux statements into final exported units."""
         expanded_clause2basics = clause2basics.copy()
         essential_premise_clauses = ProblemWorker._get_essential_premise_clauses(
@@ -535,7 +541,11 @@ class ProblemWorker:
         # Step 2: For remaining goals, try removing aux one by one from back to front
         # Group goals by the minimal aux they need
         goal_groups = [
-            {"goals": goals_str.copy(), "aux_groups": list(expanded_aux_groups), "solvers": {}}
+            {
+                "goals": goals_str.copy(),
+                "aux_groups": list(expanded_aux_groups),
+                "solvers": {},
+            }
         ]
         # premise_strs = set([p.to_str() for p in premises])
         # premise_pointstrs = set()
@@ -549,9 +559,7 @@ class ProblemWorker:
 
             for group in goal_groups:
                 # Try without this aux for all goals in this group
-                test_aux_groups = (
-                    group["aux_groups"][:i] + group["aux_groups"][i + 1 :]
-                )
+                test_aux_groups = group["aux_groups"][:i] + group["aux_groups"][i + 1 :]
 
                 # # Check if the aux set is valid w.r.t rely_on
                 # flag = True

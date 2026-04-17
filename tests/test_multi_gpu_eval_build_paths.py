@@ -163,9 +163,7 @@ def test_visual_agent_materializes_missing_frontier_proofs():
 def test_text_agent_v2_uses_root_query_and_accumulates_prefix():
     defs = _load_defs()
     problem = ProblemJGEX.from_text("a b c = triangle a b c")
-    next_problem = ProblemJGEX.from_text(
-        "a b c = triangle a b c; d = on_line d a b"
-    )
+    next_problem = ProblemJGEX.from_text("a b c = triangle a b c; d = on_line d a b")
     base_proof = build_problem_proof(problem, defs)
 
     agent = LMAgent(
@@ -210,9 +208,7 @@ def test_text_agent_v2_uses_root_query_and_accumulates_prefix():
 def test_visual_agent_v2_uses_root_query_and_preserves_aux_prefix_during_materialization():
     defs = _load_defs()
     problem = ProblemJGEX.from_text("a b c = triangle a b c")
-    next_problem = ProblemJGEX.from_text(
-        "a b c = triangle a b c; d = on_line d a b"
-    )
+    next_problem = ProblemJGEX.from_text("a b c = triangle a b c; d = on_line d a b")
     base_proof = build_problem_proof(problem, defs)
 
     agent = VLMAgent(
@@ -234,7 +230,9 @@ def test_visual_agent_v2_uses_root_query_and_preserves_aux_prefix_during_materia
         del url, output_width
         Image.new("RGB", (8, 8), color=(255, 255, 255)).save(write_to)
 
-    with patch("newclid.agent.vlm.draw_clause_figure", side_effect=_fake_draw_clause_figure):
+    with patch(
+        "newclid.agent.vlm.draw_clause_figure", side_effect=_fake_draw_clause_figure
+    ):
         with patch("newclid.agent.vlm.cairosvg.svg2png", side_effect=_fake_svg2png):
             request = agent.prepare_request(
                 request_id="d0_proot",
@@ -267,7 +265,9 @@ def test_visual_agent_v2_uses_root_query_and_preserves_aux_prefix_during_materia
     assert states[0][1] is not None
     assert states[0][2] == " d x00 d : coll a b d [000] ;"
 
-    with patch("newclid.agent.vlm.draw_clause_figure", side_effect=_fake_draw_clause_figure):
+    with patch(
+        "newclid.agent.vlm.draw_clause_figure", side_effect=_fake_draw_clause_figure
+    ):
         with patch("newclid.agent.vlm.cairosvg.svg2png", side_effect=_fake_svg2png):
             next_request = agent.prepare_request(
                 request_id="d1_p0",

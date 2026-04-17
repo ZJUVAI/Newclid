@@ -1,6 +1,7 @@
 #pragma once
 
 #include "circle.h"
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <array>

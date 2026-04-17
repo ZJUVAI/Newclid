@@ -264,7 +264,9 @@ class ClauseDAG:
         coords = self.point_coords.copy()
 
         # Call the new add_potential_points function
-        potential_points = add_potential_points(point_names, coords, max_points, seed=self.seed)
+        potential_points = add_potential_points(
+            point_names, coords, max_points, seed=self.seed
+        )
 
         # Directly create Clause and add to DAG
         for coord, constructions in potential_points:
