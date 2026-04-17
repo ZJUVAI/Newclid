@@ -67,15 +67,78 @@ def _resolve_output(cfg_output: Optional[str], output_dir: Path, subdir: str, fi
 
 
 # ============================================================================
+# Pipeline Summary
+# ============================================================================
+
+class PipelineSummary:
+    """Pipeline execution summary collector."""
+
+    def __init__(self, output_dir: Path):
+        self.output_dir = output_dir
+        self.start_time = time.time()
+        self.parts = {}
+        self.initial_seed_count = None
+
+    def record_part(self, part_name: str, enabled: bool, stats: Optional[Dict] = None):
+        """Record a Part's execution status and stats."""
+        self.parts[part_name] = {
+            "enabled": enabled,
+            "executed": stats is not None,
+            "stats": stats or {}
+        }
+
+    def set_initial_seed_count(self, count: int):
+        """Record unique seed count from initial data."""
+        self.initial_seed_count = count
+
+    def save(self):
+        """Write summary to pipeline_summary.json."""
+        summary = {
+            "pipeline_start": time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(self.start_time)),
+            "total_elapsed_seconds": round(time.time() - self.start_time, 1),
+            "initial_seed_count": self.initial_seed_count,
+            "parts": self.parts
+        }
+        output_path = self.output_dir / "pipeline_summary.json"
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(summary, f, ensure_ascii=False, indent=2)
+        print(f"\n[Pipeline Summary] → {output_path}")
+
+
+def _count_unique_seeds(jsonl_path: Path) -> int:
+    """Count unique seeds in JSONL file."""
+    seeds = set()
+    with open(jsonl_path, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+                seed = record.get("seed")
+                if seed is not None:
+                    seeds.add(seed)
+            except json.JSONDecodeError:
+                continue
+    return len(seeds)
+
+
+# ============================================================================
 # Part 1: Input filter
 # ============================================================================
 
-def run_part1(cfg: Dict[str, Any], output_dir: Path) -> Optional[Path]:
-    """Run Part 1 (input filter). Returns path to filtered.jsonl, or None if disabled."""
+def run_part1(cfg: Dict[str, Any], output_dir: Path) -> tuple:
+    """Run Part 1 (input filter).
+
+    Returns:
+        (output_path, stats_dict): output path is None if disabled;
+        stats_dict is None if disabled, otherwise contains execution stats.
+    """
     p1 = cfg.get("part1_filter", {})
     if not p1.get("enabled", True):
         print("[Part 1] Disabled, skipping.")
-        return None
+        return None, None
+
+    start_time = time.time()
 
     input_path = p1.get("input")
     if not input_path:
@@ -101,10 +164,21 @@ def run_part1(cfg: Dict[str, Any], output_dir: Path) -> Optional[Path]:
         render_by_rule=False,
         keep_pid_images=False,
     )
-    stats = engine.run_part1_filter(input_path, output_path)
+    engine_stats = engine.run_part1_filter(input_path, output_path)
 
-    print(f"[Part 1] Done — {stats['kept']}/{stats['total']} records kept → {output_path}")
-    return output_path
+    elapsed = time.time() - start_time
+    print(f"[Part 1] Done — {engine_stats['kept']}/{engine_stats['total']} records kept → {output_path}")
+
+    stats = {
+        "input_path": str(input_path),
+        "output_path": str(output_path),
+        "input_count": engine_stats.get("total", 0),
+        "output_count": engine_stats.get("kept", 0),
+        "dropped_no_aux": engine_stats.get("dropped_no_aux", 0),
+        "dropped_predicate": engine_stats.get("dropped_predicate", 0),
+        "elapsed_seconds": round(elapsed, 2),
+    }
+    return output_path, stats
 
 
 # ============================================================================
@@ -115,12 +189,19 @@ def run_part2(
     cfg: Dict[str, Any],
     output_dir: Path,
     prev_output: Optional[Path],
-) -> Optional[Path]:
-    """Run Part 2 (extract rules). Returns path to rules.txt, or None if disabled."""
+) -> tuple:
+    """Run Part 2 (extract rules).
+
+    Returns:
+        (output_path, stats_dict): output path is None if disabled;
+        stats_dict is None if disabled, otherwise contains execution stats.
+    """
     p2 = cfg.get("part2_extract", {})
     if not p2.get("enabled", True):
         print("[Part 2] Disabled, skipping.")
-        return None
+        return None, None
+
+    start_time = time.time()
 
     # Determine input
     input_path_cfg = p2.get("input")
@@ -137,7 +218,7 @@ def run_part2(
         part2_dir = part2_dir.parent
     part2_dir.mkdir(parents=True, exist_ok=True)
 
-    max_workers = p2.get("max_workers", 30)
+    n_workers = cfg.get("global", {}).get("n_workers", 30)
     rule_skip_predicates = p2.get("rule_skip_predicates") or []
     save_intermediates = cfg.get("global", {}).get("save_intermediates", False)
 
@@ -149,11 +230,12 @@ def run_part2(
     print(f"{'='*60}")
     print(f"  Input:  {input_path}")
     print(f"  Output: {part2_dir}")
+    print(f"  n_workers: {n_workers}")
 
     from newclid.proof_scout.core.filter_and_prune_engine import FilterAndPruneEngine
 
     engine = FilterAndPruneEngine(
-        max_workers=max_workers,
+        max_workers=n_workers,
         rule_skip_predicates=rule_skip_predicates if rule_skip_predicates else None,
         render_by_rule=False,
         keep_pid_images=False,
@@ -184,12 +266,31 @@ def run_part2(
         rules_file_str = result.get("rules_file")
         rules_file = Path(rules_file_str) if rules_file_str else None
 
+    elapsed = time.time() - start_time
+
     if rules_file and rules_file.exists():
         print(f"[Part 2] Done — {result.get('rules', 0)} rules → {rules_file}")
     else:
         print("[Part 2] Warning: no rules_file produced")
 
-    return rules_file
+    stats = {
+        "input_path": str(input_path),
+        "output_path": str(rules_file) if rules_file else None,
+        "input_count": result.get("kept", 0),
+        "output_count": result.get("rules", 0),
+        "skipped_rules": result.get("skipped_rules", 0),
+        "elapsed_seconds": round(elapsed, 2),
+    }
+
+    # Add step_timing if available
+    if "step_timing" in result:
+        stats["step_timing"] = result["step_timing"]
+
+    # Add source_data_file if available
+    if "source_data_file" in result:
+        stats["source_data_file"] = result["source_data_file"]
+
+    return rules_file, stats
 
 
 # ============================================================================
@@ -200,8 +301,13 @@ def run_part3(
     cfg: Dict[str, Any],
     output_dir: Path,
     prev_output: Optional[Path],
-) -> Optional[Path]:
-    """Run Part 3 (max_premises filter). Returns filtered_rules.txt path, or None."""
+) -> tuple:
+    """Run Part 3 (max_premises filter).
+
+    Returns:
+        (output_path, stats_dict): output path is None if disabled/skipped;
+        stats_dict is None if disabled/skipped, otherwise contains execution stats.
+    """
     p3 = cfg.get("part3_max_premises", {})
 
     # If max_premises is null, skip this Part entirely
@@ -209,7 +315,9 @@ def run_part3(
     if not p3.get("enabled", True) or max_premises is None:
         reason = "disabled" if not p3.get("enabled", True) else "max_premises is null"
         print(f"[Part 3] Skipped ({reason}).")
-        return None
+        return None, None
+
+    start_time = time.time()
 
     # Determine input
     input_path_cfg = p3.get("input")
@@ -254,6 +362,7 @@ def run_part3(
             skipped += 1
 
     n_kept = len(kept_lines) // 2
+    elapsed = time.time() - start_time
     print(f"[Part 3] {n_kept} kept, {skipped} skipped (premises > {max_premises})")
 
     with open(output_path, "w", encoding="utf-8") as f:
@@ -262,7 +371,16 @@ def run_part3(
             f.write("\n")
 
     print(f"[Part 3] Done → {output_path}")
-    return output_path
+
+    stats = {
+        "input_path": str(input_path),
+        "output_path": str(output_path),
+        "input_count": len(lines) // 2,
+        "output_count": n_kept,
+        "max_premises": max_premises,
+        "elapsed_seconds": round(elapsed, 2),
+    }
+    return output_path, stats
 
 
 # ============================================================================
@@ -293,12 +411,20 @@ def run_part4(
     output_dir: Path,
     prev_output: Optional[Path],
     source_data_file: Optional[Path] = None,
-) -> Optional[Path]:
-    """Run Part 4 (reduction). Returns extracted_rules.txt path, or None."""
+) -> tuple:
+    """Run Part 4 (reduction).
+
+    Returns:
+        (output_path, stats_dict): output path is None if disabled;
+        stats_dict is None if disabled, otherwise contains execution stats.
+    """
     p4 = cfg.get("part4_reduction", {})
     if not p4.get("enabled", True):
         print("[Part 4] Disabled, skipping.")
-        return None
+        return None, None
+
+    start_time = time.time()
+    stage_timing = {}
 
     # Determine input (rules.txt)
     input_path_cfg = p4.get("input")
@@ -326,7 +452,7 @@ def run_part4(
 
     engine = p4.get("engine", "full")
     timeout = p4.get("timeout", 60)
-    n_workers = p4.get("n_workers", 4)
+    n_workers = cfg.get("global", {}).get("n_workers", 30)
     batch_size = p4.get("batch_size", 10)
     debug = p4.get("debug", False)
 
@@ -337,7 +463,6 @@ def run_part4(
     seed_reduction_enabled = seed_red_cfg.get("enabled", False)
     chunk_reduction_enabled = chunk_red_cfg.get("enabled", False)
     global_reduction_enabled = global_red_cfg.get("enabled", True)
-    use_ray = p4.get("use_ray", False)
 
     print(f"\n{'='*60}")
     print(f"Part 4: Reduction")
@@ -346,9 +471,14 @@ def run_part4(
     print(f"  Source data:    {source_data_file or '(none — will fail if rules need llm_input)'}")
     print(f"  Output:         {output_path}")
     print(f"  engine={engine}, timeout={timeout}, n_workers={n_workers}, batch_size={batch_size}")
-    print(f"  use_ray={use_ray}")
     print(f"  seed_reduction={seed_reduction_enabled}, chunk_reduction={chunk_reduction_enabled}, "
           f"global_reduction={global_reduction_enabled}")
+
+    # Initialize Ray unconditionally
+    import ray
+    if not ray.is_initialized():
+        ray.init(ignore_reinit_error=True)
+        print(f"  Ray initialized: {ray.cluster_resources()}")
 
     from newclid.proof_scout.reduction import (
         RuleReducer,
@@ -367,6 +497,7 @@ def run_part4(
             print("Error: seed_reduction cannot be combined with streaming_load", file=sys.stderr)
             sys.exit(1)
         # Run streaming chunk reduction (includes optional global reduction inside)
+        stage_start = time.time()
         group_size = chunk_red_cfg.get("group_size", 500)
         chunk_dir = output_path.parent / "chunk_reduction"
         chunk_dir.mkdir(parents=True, exist_ok=True)
@@ -390,14 +521,44 @@ def run_part4(
             reducer_cfg=reducer_cfg_dict,
             output_dir=chunk_dir,
         )
+        stage_elapsed = time.time() - stage_start
+        stage_timing["chunk_reduction_streaming"] = round(stage_elapsed, 2)
         print(f"[Part 4 / streaming] → {len(final_rules)} rules")
         with open(output_path, "w", encoding="utf-8") as f:
             for rule in final_rules:
                 f.write(f"{rule.rule_id}\n{rule.rule_text}\n")
+
+        # Save streaming stats summary
+        streaming_summary_path = chunk_dir / "chunk_reduction_summary.json"
+        with open(streaming_summary_path, "w", encoding="utf-8") as f:
+            json.dump(stream_stats, f, ensure_ascii=False, indent=2)
+
+        total_elapsed = time.time() - start_time
         print(f"\n[Part 4] Done — {len(final_rules)} rules → {output_path}")
-        return output_path
+
+        stats = {
+            "input_path": str(input_path),
+            "output_path": str(output_path),
+            "source_data_path": str(source_data_file) if source_data_file else None,
+            "input_count": stream_stats.get("input_count", 0),
+            "output_count": len(final_rules),
+            "elapsed_seconds": round(total_elapsed, 2),
+            "stage_timing": stage_timing,
+            "chunk_reduction": {
+                "enabled": True,
+                "streaming_load": True,
+                "group_size": group_size,
+                "input_count": stream_stats.get("input_count", 0),
+                "final_survivors_count": len(final_rules),
+                "total_eliminated": stream_stats.get("input_count", 0) - len(final_rules),
+                "elapsed_seconds": round(stage_elapsed, 2),
+                "details_dir": str(chunk_dir.relative_to(output_dir)),
+            },
+        }
+        return output_path, stats
 
     # Standard mode: load all rules into memory first
+    load_start = time.time()
     if source_data_file and source_data_file.exists():
         rules, failures = load_rules_from_discovery_output(input_path, source_data_file)
     else:
@@ -405,7 +566,9 @@ def run_part4(
               f"original JSONL or step6_rules_stats.json file.", file=sys.stderr)
         sys.exit(1)
 
-    print(f"  Loaded {len(rules)} rules ({len(failures)} failures)")
+    load_elapsed = time.time() - load_start
+    stage_timing["load_rules"] = round(load_elapsed, 2)
+    print(f"  Loaded {len(rules)} rules ({len(failures)} failures) in {load_elapsed:.1f}s")
 
     if failures:
         fail_path = output_path.parent / "load_failures.json"
@@ -420,7 +583,17 @@ def run_part4(
         # Write empty output
         with open(output_path, "w", encoding="utf-8") as f:
             pass
-        return output_path
+        total_elapsed = time.time() - start_time
+        stats = {
+            "input_path": str(input_path),
+            "output_path": str(output_path),
+            "source_data_path": str(source_data_file) if source_data_file else None,
+            "input_count": 0,
+            "output_count": 0,
+            "elapsed_seconds": round(total_elapsed, 2),
+            "stage_timing": stage_timing,
+        }
+        return output_path, stats
 
     # Validate seed_reduction precondition
     if seed_reduction_enabled:
@@ -434,17 +607,17 @@ def run_part4(
             sys.exit(1)
 
     current_rules = list(rules)
+    initial_count = len(current_rules)
+
+    # Stats collectors
+    seed_red_stats = None
+    chunk_red_stats = None
+    global_red_stats = None
 
     # --- Seed reduction ---
     if seed_reduction_enabled:
+        stage_start = time.time()
         print(f"\n[Part 4 / seed_reduction] {len(current_rules)} rules")
-
-        if use_ray:
-            # Ray mode: init Ray if not already running, then parallel seed groups
-            import ray
-            if not ray.is_initialized():
-                ray.init(ignore_reinit_error=True)
-                print(f"  Ray initialized: {ray.cluster_resources()}")
 
         reducer = RuleReducer(
             timeout=timeout,
@@ -454,74 +627,124 @@ def run_part4(
             debug_output_dir=output_path.parent if debug else None,
             solver_type="csolver",
             engine=engine,
-            use_ray=use_ray,
+            use_ray=True,
         )
-        result = reducer.reduce_by_seed(current_rules, use_ray=use_ray)
-        current_rules = result["basis_rules"]
-        print(f"[Part 4 / seed_reduction] {len(rules)} → {len(current_rules)} rules")
+        seed_result = reducer.reduce_by_seed(current_rules, use_ray=True)
+        seed_input_count = len(current_rules)
+        current_rules = seed_result["basis_rules"]
+        stage_elapsed = time.time() - stage_start
+        stage_timing["seed_reduction"] = round(stage_elapsed, 2)
+        print(f"[Part 4 / seed_reduction] {seed_input_count} → {len(current_rules)} rules "
+              f"({stage_elapsed:.1f}s)")
 
-    # --- Chunk reduction ---
+        # Collect detailed group stats
+        seed_stats_raw = seed_result.get("stats", {})
+        group_details = seed_stats_raw.get("group_details", [])
+        n_groups = seed_stats_raw.get("n_groups", len(group_details))
+        n_no_seed = seed_stats_raw.get("n_no_seed", 0)
+
+        # Compute averages from group_details (field names: seed, input, basis, eliminated, skipped_premises)
+        if group_details:
+            avg_input = sum(g.get("input", 0) for g in group_details) / len(group_details)
+            avg_basis = sum(g.get("basis", 0) for g in group_details) / len(group_details)
+            avg_rate = sum(
+                (g.get("basis", 0) / g["input"]) if g.get("input", 0) > 0 else 0
+                for g in group_details
+            ) / len(group_details)
+        else:
+            avg_input = 0
+            avg_basis = 0
+            avg_rate = 0
+
+        # Add reduction_rate to each group
+        for g in group_details:
+            if g.get("input", 0) > 0:
+                g["reduction_rate"] = round(g.get("eliminated", 0) / g["input"], 3)
+            else:
+                g["reduction_rate"] = 0.0
+
+        # Save detailed group stats
+        details_path = output_path.parent / "seed_reduction_details.json"
+        with open(details_path, "w", encoding="utf-8") as f:
+            json.dump({
+                "elapsed_seconds": round(stage_elapsed, 2),
+                "n_groups": n_groups,
+                "n_no_seed": n_no_seed,
+                "avg_input_per_seed": round(avg_input, 1),
+                "avg_basis_per_seed": round(avg_basis, 1),
+                "avg_reduction_rate": round(avg_rate, 3),
+                "group_details": group_details,
+            }, f, ensure_ascii=False, indent=2)
+
+        # Summary stats (without full group_details)
+        seed_red_stats = {
+            "enabled": True,
+            "n_groups": n_groups,
+            "n_no_seed": n_no_seed,
+            "input_count": seed_input_count,
+            "basis_count": len(current_rules),
+            "eliminated_count": seed_input_count - len(current_rules),
+            "avg_input_per_seed": round(avg_input, 1),
+            "avg_basis_per_seed": round(avg_basis, 1),
+            "avg_reduction_rate": round(avg_rate, 3),
+            "elapsed_seconds": round(stage_elapsed, 2),
+            "details_file": str(details_path.relative_to(output_dir)),
+        }
+
+    # --- Chunk reduction (standard mode; streaming_load handled earlier) ---
     if chunk_reduction_enabled:
+        stage_start = time.time()
         group_size = chunk_red_cfg.get("group_size", 500)
         iterations = chunk_red_cfg.get("iterations", 1)
-        streaming_load = chunk_red_cfg.get("streaming_load", False)
 
         chunk_dir = output_path.parent / "chunk_reduction"
         chunk_dir.mkdir(parents=True, exist_ok=True)
 
-        if streaming_load:
-            # Streaming mode: scan JSONL once, reduce chunk-by-chunk without loading all rules
-            if source_data_file is None or not source_data_file.exists():
-                print("Error: chunk_reduction.streaming_load=true requires source_data_file",
-                      file=sys.stderr)
-                sys.exit(1)
-            print(f"\n[Part 4 / chunk_reduction (streaming)] group_size={group_size}, "
-                  f"n_workers={n_workers}")
-            from newclid.proof_scout.reduction import stream_chunked_reduce_from_files
-            reducer_cfg = {
-                "timeout": timeout,
-                "n_workers": n_workers,
-                "batch_size": batch_size,
-                "solver_type": "csolver",
-                "engine": engine,
-                "debug": debug,
-                "debug_output_dir": output_path.parent if debug else None,
-                "global_reduction": global_reduction_enabled,
-            }
-            current_rules, stream_stats = stream_chunked_reduce_from_files(
-                rules_file=input_path,
-                source_data_file=source_data_file,
-                group_size=group_size,
-                reducer_cfg=reducer_cfg,
-                output_dir=chunk_dir,
-            )
-            print(f"[Part 4 / chunk_reduction (streaming)] → {len(current_rules)} rules")
-            # Global reduction already done inside streaming if enabled; skip below
-            global_reduction_enabled = False
-        else:
-            # Standard mode: rules already loaded into current_rules
-            print(f"\n[Part 4 / chunk_reduction] {len(current_rules)} rules, "
-                  f"group_size={group_size}, iterations={iterations}, n_workers={n_workers}")
-            cir = ChunkedIterativeReducer(
-                timeout=timeout,
-                batch_size=batch_size,
-                solver_type="csolver",
-                engine=engine,
-                use_ray=use_ray,
-            )
-            current_rules, chunk_stats = cir.reduce_iterative(
-                current_rules,
-                group_size=group_size,
-                iterations=iterations,
-                n_workers=n_workers,
-                output_dir=chunk_dir,
-                resume=False,
-            )
-            print(f"[Part 4 / chunk_reduction] → {len(current_rules)} rules")
+        print(f"\n[Part 4 / chunk_reduction] {len(current_rules)} rules, "
+              f"group_size={group_size}, iterations={iterations}, n_workers={n_workers}")
+        cir = ChunkedIterativeReducer(
+            timeout=timeout,
+            batch_size=batch_size,
+            solver_type="csolver",
+            engine=engine,
+            use_ray=True,
+        )
+        chunk_input_count = len(current_rules)
+        current_rules, chunk_overall_stats = cir.reduce_iterative(
+            current_rules,
+            group_size=group_size,
+            iterations=iterations,
+            n_workers=n_workers,
+            output_dir=chunk_dir,
+            resume=False,
+        )
+        stage_elapsed = time.time() - stage_start
+        stage_timing["chunk_reduction"] = round(stage_elapsed, 2)
+        print(f"[Part 4 / chunk_reduction] → {len(current_rules)} rules ({stage_elapsed:.1f}s)")
+
+        # Save chunk reduction summary
+        summary_path = chunk_dir / "chunk_reduction_summary.json"
+        with open(summary_path, "w", encoding="utf-8") as f:
+            json.dump(chunk_overall_stats, f, ensure_ascii=False, indent=2)
+
+        # Summary stats
+        chunk_red_stats = {
+            "enabled": True,
+            "streaming_load": False,
+            "total_rounds": chunk_overall_stats.get("total_rounds", iterations),
+            "group_size": group_size,
+            "input_count": chunk_input_count,
+            "final_survivors_count": len(current_rules),
+            "total_eliminated": chunk_input_count - len(current_rules),
+            "elapsed_seconds": round(stage_elapsed, 2),
+            "details_dir": str(chunk_dir.relative_to(output_dir)),
+        }
 
     # --- Global reduction ---
     if global_reduction_enabled:
-        print(f"\n[Part 4 / global_reduction] {len(current_rules)} rules")
+        stage_start = time.time()
+        global_input_count = len(current_rules)
+        print(f"\n[Part 4 / global_reduction] {global_input_count} rules")
         reducer = RuleReducer(
             timeout=timeout,
             n_workers=n_workers,
@@ -530,22 +753,57 @@ def run_part4(
             debug_output_dir=output_path.parent if debug else None,
             solver_type="csolver",
             engine=engine,
-            use_ray=use_ray,
+            use_ray=True,
         )
-        result = reducer.reduce(current_rules)
-        current_rules = result["basis_rules"]
-        stats = result["stats"]
+        global_result = reducer.reduce(current_rules)
+        current_rules = global_result["basis_rules"]
+        g_stats = global_result["stats"]
+        stage_elapsed = time.time() - stage_start
+        stage_timing["global_reduction"] = round(stage_elapsed, 2)
         print(f"[Part 4 / global_reduction] → {len(current_rules)} rules "
-              f"(eliminated {stats.get('eliminated_count', 0)}, "
-              f"tests {stats.get('n_subsumption_tests', 0)})")
+              f"(eliminated {g_stats.get('eliminated_count', 0)}, "
+              f"tests {g_stats.get('n_subsumption_tests', 0)}, {stage_elapsed:.1f}s)")
+
+        # Save detailed stats
+        global_details_path = output_path.parent / "global_reduction_stats.json"
+        stats_with_time = {**g_stats, "elapsed_seconds": round(stage_elapsed, 2)}
+        with open(global_details_path, "w", encoding="utf-8") as f:
+            json.dump(stats_with_time, f, ensure_ascii=False, indent=2)
+
+        # Summary stats
+        global_red_stats = {
+            "enabled": True,
+            "input_count": global_input_count,
+            "basis_count": len(current_rules),
+            "eliminated_count": global_input_count - len(current_rules),
+            "reduction_rate": g_stats.get("reduction_rate", 0.0),
+            "n_subsumption_tests": g_stats.get("n_subsumption_tests", 0),
+            "elapsed_seconds": round(stage_elapsed, 2),
+            "details_file": str(global_details_path.relative_to(output_dir)),
+        }
 
     # Write output
     with open(output_path, "w", encoding="utf-8") as f:
         for rule in current_rules:
             f.write(f"{rule.rule_id}\n{rule.rule_text}\n")
 
-    print(f"\n[Part 4] Done — {len(current_rules)} rules → {output_path}")
-    return output_path
+    total_elapsed = time.time() - start_time
+    print(f"\n[Part 4] Done — {len(current_rules)} rules → {output_path} ({total_elapsed:.1f}s)")
+
+    # Build final stats dict
+    stats = {
+        "input_path": str(input_path),
+        "output_path": str(output_path),
+        "source_data_path": str(source_data_file) if source_data_file else None,
+        "input_count": initial_count,
+        "output_count": len(current_rules),
+        "elapsed_seconds": round(total_elapsed, 2),
+        "stage_timing": stage_timing,
+        "seed_reduction": seed_red_stats,
+        "chunk_reduction": chunk_red_stats,
+        "global_reduction": global_red_stats,
+    }
+    return output_path, stats
 
 
 # ============================================================================
@@ -561,6 +819,7 @@ def run_pipeline(config_path: Path) -> Dict[str, Any]:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     pipeline_start = time.time()
+    summary = PipelineSummary(output_dir)
     print(f"\n{'='*60}")
     print(f"Discovery Pipeline")
     print(f"{'='*60}")
@@ -572,30 +831,63 @@ def run_pipeline(config_path: Path) -> Dict[str, Any]:
     source_data_file: Optional[Path] = None  # step6_rules_stats.json from Part 2
 
     # Part 1
-    p1_out = run_part1(cfg, output_dir)
+    p1_out, p1_stats = run_part1(cfg, output_dir)
+    summary.record_part(
+        "part1_filter",
+        cfg.get("part1_filter", {}).get("enabled", True),
+        p1_stats,
+    )
     if p1_out is not None:
         last_output = p1_out
+        # Count unique seeds in initial filtered data
+        try:
+            seed_count = _count_unique_seeds(p1_out)
+            summary.set_initial_seed_count(seed_count)
+            print(f"[Pipeline] Initial unique seed count: {seed_count}")
+        except Exception as e:
+            print(f"[Pipeline] Warning: failed to count unique seeds: {e}")
 
     # Part 2
-    p2_out = run_part2(cfg, output_dir, last_output)
+    p2_out, p2_stats = run_part2(cfg, output_dir, last_output)
+    summary.record_part(
+        "part2_extract",
+        cfg.get("part2_extract", {}).get("enabled", True),
+        p2_stats,
+    )
     if p2_out is not None:
         last_output = p2_out
         # Try to locate step6_rules_stats.json alongside Part 2 output
         candidate = p2_out.parent / "intermediates" / "step6_rules_stats.json"
         if candidate.exists():
             source_data_file = candidate
+        # Or use source_data_file from Part 2 stats if provided
+        if p2_stats and p2_stats.get("source_data_file"):
+            source_data_file = Path(p2_stats["source_data_file"])
 
     # Part 3
-    p3_out = run_part3(cfg, output_dir, last_output)
+    p3_out, p3_stats = run_part3(cfg, output_dir, last_output)
+    summary.record_part(
+        "part3_max_premises",
+        cfg.get("part3_max_premises", {}).get("enabled", True),
+        p3_stats,
+    )
     if p3_out is not None:
         last_output = p3_out
 
     # Part 4
-    p4_out = run_part4(cfg, output_dir, last_output, source_data_file=source_data_file)
+    p4_out, p4_stats = run_part4(cfg, output_dir, last_output, source_data_file=source_data_file)
+    summary.record_part(
+        "part4_reduction",
+        cfg.get("part4_reduction", {}).get("enabled", True),
+        p4_stats,
+    )
     if p4_out is not None:
         last_output = p4_out
 
     total_elapsed = time.time() - pipeline_start
+
+    # Save pipeline summary
+    summary.save()
 
     print(f"\n{'='*60}")
     print(f"Pipeline complete in {total_elapsed:.1f}s")

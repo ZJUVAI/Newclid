@@ -1,29 +1,24 @@
 {
-  "_comment": "Discovery Pipeline configuration. Run with: python scripts/discovery_pipeline.py [--config path/to/config.json]",
-
   "global": {
-    "output_dir": "outputs/experiments/20260411_01_example",
-    "save_intermediates": false
+    "output_dir": "outputs/experiments/20260417_01_new_pipeline",
+    "save_intermediates": true,
+    "n_workers": 50
   },
 
   "part1_filter": {
     "enabled": true,
-    "input": "path/to/input.jsonl",
+    "input": "outputs/datasets/c10s1mweak/20260416/geometry_clauses10_samples100k.jsonl",
     "output": null,
-    "_comment_output": "null = auto: {output_dir}/part1/filtered.jsonl",
     "skip_predicates": []
   },
 
   "part2_extract": {
     "enabled": true,
     "input": null,
-    "_comment_input": "null = use Part 1 output",
     "output": null,
-    "_comment_output": "null = auto: {output_dir}/part2/",
-    "max_workers": 30,
     "rule_skip_predicates": ["aconst", "rconst"],
     "streaming": {
-      "enabled": false,
+      "enabled": true,
       "chunk_size": 10000,
       "inflight_limit": 300
     }
@@ -32,45 +27,30 @@
   "part3_max_premises": {
     "enabled": true,
     "input": null,
-    "_comment_input": "null = use Part 2 output (rules.txt)",
     "output": null,
-    "_comment_output": "null = auto: {output_dir}/part3/filtered_rules.txt",
-    "max_premises": null,
-    "_comment_max_premises": "null = skip this part (no filtering)"
+    "max_premises": 7
   },
 
   "part4_reduction": {
     "enabled": true,
     "input": null,
-    "_comment_input": "null = use Part 3 output (or Part 2 if Part 3 disabled/skipped). When running Part 4 standalone, set this to the rules.txt path.",
     "source_data": null,
-    "_comment_source_data": "Path to original JSONL or step6_rules_stats.json containing llm_input_renamed + point_coords. Required when Part 1/2 are disabled. null = auto-detect from {input.parent}/intermediates/step6_rules_stats.json (only works if Part 2 ran with save_intermediates=true in the same output_dir).",
     "output": null,
-    "_comment_output": "null = auto: {output_dir}/part4/extracted_rules.txt",
     "engine": "full",
     "timeout": 60,
-    "n_workers": 4,
-    "_comment_n_workers": "Controls intra-group/intra-chunk parallelism for all sub-flows (seed/chunk/global reduction)",
     "batch_size": 10,
-    "_comment_batch_size": "Progress reporting granularity: print a progress log line every N rules processed. Does NOT affect reduction algorithm or parallelism.",
-    "debug": false,
-    "use_ray": false,
-    "_comment_use_ray": "Enable Ray distributed parallelism. When true: seed groups are processed in parallel (100 groups = 100 concurrent tasks), chunk reduction is parallelized, and subsumption tests use Ray instead of ProcessPoolExecutor. Requires Ray to be installed.",
+    "debug": true,
     "seed_reduction": {
-      "enabled": false,
-      "_comment": "Group-then-global reduction by seed field. Requires rules to have a seed field (error if none do). When use_ray=true, groups processed in parallel; otherwise serial with intra-group parallelism using n_workers."
+      "enabled": true
     },
     "chunk_reduction": {
-      "enabled": false,
-      "group_size": 500,
+      "enabled": true,
+      "group_size": 100,
       "iterations": 1,
-      "streaming_load": false,
-      "_comment_streaming_load": "true = scan source JSONL once, reduce chunk-by-chunk without loading all rules into memory. Recommended for large datasets (>100K rules). Requires source_data. Cannot combine with seed_reduction. global_reduction runs at end of streaming pass when global_reduction.enabled=true.",
-      "_comment": "Chunked iterative reduction for large rule sets. When use_ray=true, chunks processed in parallel; otherwise serial with intra-chunk parallelism using n_workers."
+      "streaming_load": false
     },
     "global_reduction": {
-      "enabled": true,
-      "_comment": "Full greedy subsumption on all (remaining) rules. Uses n_workers for parallel subsumption tests (or Ray if use_ray=true)."
+      "enabled": true
     }
   }
 }
