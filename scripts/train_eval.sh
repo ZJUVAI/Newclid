@@ -57,7 +57,7 @@ swift sft \
 
 # Dataset options
 datasets=(
-    # "dev_jgex.txt" 
+    # "dev_jgex.txt"
     # "dev_imo.txt"
     # "imo_102_requires_aux.txt"
 )
@@ -83,36 +83,36 @@ echo "=================================="
 for checkpoint in "${checkpoints[@]}"; do
     echo "Processing checkpoint: $checkpoint"
     echo "=================================="
-    
+
     # Loop through all datasets
     for dataset in "${datasets[@]}"; do
         # Loop through all configurations
         for config in "${configs[@]}"; do
             # Split configuration parameters
             read -r decoding_size beam_size <<< "$config"
-            
+
             # Build complete command
-            cmd="python scripts/evaluation.py --problems_path problems_datasets/$dataset --model_path ./models/$model_dir/$checkpoint --log_dir $LOG_DIR --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth 4 --agent lm"
-            
+            cmd="python scripts/evaluation.py --problems_path benchmarks/$dataset --model_path ./models/$model_dir/$checkpoint --log_dir $LOG_DIR --max_workers 40 --decoding_size $decoding_size --beam_size $beam_size --search_depth 4 --agent lm"
+
             # Print current command to execute
             echo "Executing command:"
             echo "$cmd"
             echo "----------------------------------"
-            
+
             # Execute command
             eval "$cmd"
-            
+
             # Check command execution status
             if [ $? -eq 0 ]; then
                 echo "✓ Command executed successfully"
             else
                 echo "✗ Command execution failed"
             fi
-            
+
             echo "=================================="
         done
     done
-    
+
     echo "Completed checkpoint: $checkpoint"
     echo "=================================="
 done

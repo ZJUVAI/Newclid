@@ -1,6 +1,5 @@
 import os
 
-
 problems = [
     "translated_imo_2000_p1",
     "translated_imo_2000_p6",
