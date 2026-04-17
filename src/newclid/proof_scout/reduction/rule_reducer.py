@@ -1631,10 +1631,11 @@ class ChunkedIterativeReducer:
 
                 survivors.extend(result["basis_rules"])
                 chunk_stats.append({
-                    "chunk_idx": chunk_idx,
+                    "chunk_id": chunk_idx,
                     "input": result["stats"]["original_count"],
-                    "basis": result["stats"]["basis_count"],
+                    "survivors": result["stats"]["basis_count"],
                     "eliminated": result["stats"]["eliminated_count"],
+                    "n_tests": result["stats"].get("n_subsumption_tests", 0),
                     "time": result.get("time", 0),
                 })
 
@@ -1646,21 +1647,21 @@ class ChunkedIterativeReducer:
         else:
             # Serial over chunks; intra-chunk parallelism via n_workers
             for ci, chunk in enumerate(chunks):
-            if self.verbose:
-                print(f"\n  --- Chunk {ci}/{n_chunks}: {len(chunk)} rules ---")
-            result = _reduce_chunk_worker(
-                chunk, self.timeout, self.seed, None,
-                self.batch_size, self.solver_type, self.engine, n_workers,
-            )
-            basis = result.get("basis_rules", [])
-            survivors.extend(basis)
-            chunk_stats.append({
-                "chunk_id": ci,
-                "input": len(chunk),
-                "survivors": len(basis),
-                "eliminated": result["stats"]["eliminated_count"],
-                "n_tests": result["stats"]["n_subsumption_tests"],
-            })
+                if self.verbose:
+                    print(f"\n  --- Chunk {ci}/{n_chunks}: {len(chunk)} rules ---")
+                result = _reduce_chunk_worker(
+                    chunk, self.timeout, self.seed, None,
+                    self.batch_size, self.solver_type, self.engine, n_workers,
+                )
+                basis = result.get("basis_rules", [])
+                survivors.extend(basis)
+                chunk_stats.append({
+                    "chunk_id": ci,
+                    "input": len(chunk),
+                    "survivors": len(basis),
+                    "eliminated": result["stats"]["eliminated_count"],
+                    "n_tests": result["stats"]["n_subsumption_tests"],
+                })
 
         # Sort chunk_stats by chunk_id
         chunk_stats.sort(key=lambda x: x["chunk_id"])
