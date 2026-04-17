@@ -19,24 +19,40 @@ class StubEvaluator:
     def evaluate(self, completion, fl_problem):
         mapping = {
             "greedy_good": AuxEvaluationResult("aux1", True, True, "solved", None, 1.0),
-            "sample_solved": AuxEvaluationResult("aux2", True, True, "solved", None, 1.0),
-            "sample_unsolved": AuxEvaluationResult("aux3", True, True, "unsolved", None, 0.25),
-            "sample_invalid": AuxEvaluationResult("aux4", True, False, "build_invalid", "build_definition_error", -0.25),
+            "sample_solved": AuxEvaluationResult(
+                "aux2", True, True, "solved", None, 1.0
+            ),
+            "sample_unsolved": AuxEvaluationResult(
+                "aux3", True, True, "unsolved", None, 0.25
+            ),
+            "sample_invalid": AuxEvaluationResult(
+                "aux4", True, False, "build_invalid", "build_definition_error", -0.25
+            ),
         }
         return mapping[completion]
 
 
 class TestGRPODataSelection(unittest.TestCase):
     def setUp(self):
-        self.analyze_dataset = load_module("scripts/analyze_dataset.py", "analyze_dataset")
+        self.analyze_dataset = load_module(
+            "scripts/analyze_dataset.py", "analyze_dataset"
+        )
         self.analyze_selected_dataset = load_module(
             "scripts/grpo/analyze_selected_dataset.py",
             "analyze_selected_dataset",
         )
-        self.build_candidate_pool = load_module("scripts/grpo/build_candidate_pool.py", "build_candidate_pool")
-        self.prefilter_candidate_pool = load_module("scripts/grpo/prefilter_candidate_pool.py", "prefilter_candidate_pool")
-        self.label_difficulty = load_module("scripts/grpo/label_difficulty.py", "label_difficulty")
-        self.select_debug_set = load_module("scripts/grpo/select_debug_set.py", "select_debug_set")
+        self.build_candidate_pool = load_module(
+            "scripts/grpo/build_candidate_pool.py", "build_candidate_pool"
+        )
+        self.prefilter_candidate_pool = load_module(
+            "scripts/grpo/prefilter_candidate_pool.py", "prefilter_candidate_pool"
+        )
+        self.label_difficulty = load_module(
+            "scripts/grpo/label_difficulty.py", "label_difficulty"
+        )
+        self.select_debug_set = load_module(
+            "scripts/grpo/select_debug_set.py", "select_debug_set"
+        )
 
     def test_annotation_helpers(self):
         query = "<problem> a : ; b : perp a b b c [001] ; ? eqratio a b c d </problem>"
@@ -151,7 +167,9 @@ class TestGRPODataSelection(unittest.TestCase):
         summary = self.analyze_selected_dataset.summarize_annotations(rows)
         self.assertEqual(summary["total_rows"], 2)
         self.assertEqual(summary["aux_rows"], 1)
-        self.assertEqual(summary["goal_predicate_distribution"], {"eqratio": 1, "perp": 1})
+        self.assertEqual(
+            summary["goal_predicate_distribution"], {"eqratio": 1, "perp": 1}
+        )
         self.assertEqual(summary["aux_segment_count_distribution"], {1: 1})
         self.assertEqual(summary["problem_clause_count_distribution"], {1: 1, 2: 1})
 
@@ -232,7 +250,11 @@ class TestGRPODataSelection(unittest.TestCase):
         self.assertEqual(len({row["query"] for row in selected}), 3)
         self.assertEqual(report["exact_duplicate_queries_removed"], 1)
         self.assertGreaterEqual(
-            sum(1 for row in selected if row["aux_segment_count"] >= 2 or row["aux_points_total"] >= 2),
+            sum(
+                1
+                for row in selected
+                if row["aux_segment_count"] >= 2 or row["aux_points_total"] >= 2
+            ),
             2,
         )
 
@@ -246,7 +268,9 @@ class TestGRPODataSelection(unittest.TestCase):
                     "fl_problem": "p",
                     "response": f"<aux> {idx} </aux>",
                     "goal_predicate": "eqratio" if idx < 6 else "eqangle",
-                    "predicate_family_tags": ["ratio_family"] if idx < 6 else ["angle_family"],
+                    "predicate_family_tags": ["ratio_family"]
+                    if idx < 6
+                    else ["angle_family"],
                     "aux_segment_count": 2 if idx % 2 == 0 else 1,
                     "aux_points_total": 2 if idx % 2 == 0 else 1,
                     "n_premises": 8 if idx % 3 == 0 else 5,
@@ -254,8 +278,12 @@ class TestGRPODataSelection(unittest.TestCase):
                     "problem_clause_count": 6,
                 }
             )
-        first, first_report = self.prefilter_candidate_pool.prefilter_candidate_pool(rows, target_size=6, seed=11)
-        second, second_report = self.prefilter_candidate_pool.prefilter_candidate_pool(rows, target_size=6, seed=11)
+        first, first_report = self.prefilter_candidate_pool.prefilter_candidate_pool(
+            rows, target_size=6, seed=11
+        )
+        second, second_report = self.prefilter_candidate_pool.prefilter_candidate_pool(
+            rows, target_size=6, seed=11
+        )
         self.assertEqual(first, second)
         self.assertEqual(first_report, second_report)
 
@@ -268,7 +296,9 @@ class TestGRPODataSelection(unittest.TestCase):
             ("single_aux", "p5_7", "ratio_family"): 10,
             ("single_aux", "p0_4", "ratio_family"): 10,
         }
-        quotas = self.prefilter_candidate_pool.compute_bucket_quotas(bucket_counts, target_size=20)
+        quotas = self.prefilter_candidate_pool.compute_bucket_quotas(
+            bucket_counts, target_size=20
+        )
 
         self.assertGreater(
             quotas[("multi_aux", "p8_plus", "angle_family")],
@@ -297,7 +327,12 @@ class TestGRPODataSelection(unittest.TestCase):
         result = self.label_difficulty.aggregate_difficulty_metrics(
             sample=sample,
             greedy_completion="greedy_good",
-            sampled_completions=["sample_solved", "sample_unsolved", "sample_invalid", "sample_unsolved"],
+            sampled_completions=[
+                "sample_solved",
+                "sample_unsolved",
+                "sample_invalid",
+                "sample_unsolved",
+            ],
             evaluator=StubEvaluator(),
         )
         self.assertTrue(result["greedy_success"])
@@ -363,9 +398,13 @@ class TestGRPODataSelection(unittest.TestCase):
                 "aux_points_total": 1,
             },
         ]
-        final_rows, report = self.select_debug_set.select_debug_rows(rows, target_size=2)
+        final_rows, report = self.select_debug_set.select_debug_rows(
+            rows, target_size=2
+        )
         self.assertEqual(len(final_rows), 2)
-        self.assertEqual(sorted(final_rows[0].keys()), ["fl_problem", "query", "response"])
+        self.assertEqual(
+            sorted(final_rows[0].keys()), ["fl_problem", "query", "response"]
+        )
         self.assertEqual(report["removed_mastered"], 1)
         self.assertEqual(report["removed_all_invalid"], 1)
 
@@ -411,7 +450,9 @@ class TestGRPODataSelection(unittest.TestCase):
                 "aux_points_total": 1,
             },
         ]
-        final_rows, report = self.select_debug_set.select_debug_rows(rows, target_size=2)
+        final_rows, report = self.select_debug_set.select_debug_rows(
+            rows, target_size=2
+        )
         self.assertEqual(len(final_rows), 2)
         self.assertEqual(report["pass_key"], "pass_at_8")
         self.assertEqual(report["removed_mastered"], 1)
@@ -474,7 +515,9 @@ class TestGRPODataSelection(unittest.TestCase):
                     handle.write(json.dumps(row))
                     handle.write("\n")
 
-            annotations, summary = self.analyze_selected_dataset.analyze_jsonl(input_path)
+            annotations, summary = self.analyze_selected_dataset.analyze_jsonl(
+                input_path
+            )
             self.analyze_selected_dataset.write_jsonl(annotations_path, annotations)
             self.analyze_selected_dataset.write_json(summary_path, summary)
 

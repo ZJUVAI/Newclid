@@ -38,7 +38,9 @@ class TestGRPORewards(unittest.TestCase):
             extract_first_tagged_aux_block(SAMPLE_COMPLETION),
             "<aux> i : cong a i b c [012] eqangle a b a i a i a c [013] ; </aux>",
         )
-        self.assertIsNone(extract_first_tagged_aux_block("<proof> no aux here </proof>"))
+        self.assertIsNone(
+            extract_first_tagged_aux_block("<proof> no aux here </proof>")
+        )
         self.assertEqual(
             try_dsl_to_constructions(body),
             "i = eqdistance i a b c, angle_bisector i c a b",
@@ -67,7 +69,9 @@ class TestGRPORewards(unittest.TestCase):
     def test_reward_returns_build_invalid(self):
         evaluator = AuxRewardEvaluator(build_max_attempts=100)
 
-        result = evaluator.evaluate("<aux> x00 a : coll b c a [001] ; </aux>", SAMPLE_FL_PROBLEM)
+        result = evaluator.evaluate(
+            "<aux> x00 a : coll b c a [001] ; </aux>", SAMPLE_FL_PROBLEM
+        )
 
         self.assertTrue(result.format_ok)
         self.assertFalse(result.build_ok)
@@ -86,7 +90,9 @@ class TestGRPORewards(unittest.TestCase):
 
     def test_reward_returns_engine_error_when_ddar_crashes(self):
         evaluator = AuxRewardEvaluator(build_max_attempts=100)
-        with mock.patch.object(evaluator, "_run_ddar", side_effect=RuntimeError("ddar crashed")):
+        with mock.patch.object(
+            evaluator, "_run_ddar", side_effect=RuntimeError("ddar crashed")
+        ):
             result = evaluator.evaluate(SAMPLE_COMPLETION, SAMPLE_FL_PROBLEM)
 
         self.assertTrue(result.format_ok)
@@ -96,7 +102,9 @@ class TestGRPORewards(unittest.TestCase):
 
     def test_reward_caches_problem_aux_pairs(self):
         evaluator = AuxRewardEvaluator()
-        with mock.patch.object(evaluator, "_evaluate_uncached", wraps=evaluator._evaluate_uncached) as wrapped:
+        with mock.patch.object(
+            evaluator, "_evaluate_uncached", wraps=evaluator._evaluate_uncached
+        ) as wrapped:
             first = evaluator.evaluate("<aux> broken </aux>", SAMPLE_FL_PROBLEM)
             second = evaluator.evaluate("<aux> broken </aux>", SAMPLE_FL_PROBLEM)
 
@@ -105,7 +113,9 @@ class TestGRPORewards(unittest.TestCase):
 
     def test_prepare_grpo_aux_dataset(self):
         script_path = Path("scripts/grpo/prepare_grpo_aux_dataset.py")
-        spec = importlib.util.spec_from_file_location("prepare_grpo_aux_dataset", script_path)
+        spec = importlib.util.spec_from_file_location(
+            "prepare_grpo_aux_dataset", script_path
+        )
         module = importlib.util.module_from_spec(spec)
         self.assertIsNotNone(spec.loader)
         spec.loader.exec_module(module)
@@ -142,7 +152,9 @@ class TestGRPORewards(unittest.TestCase):
 
     def test_prepare_grpo_aux_dataset_drops_rows_without_aux(self):
         script_path = Path("scripts/grpo/prepare_grpo_aux_dataset.py")
-        spec = importlib.util.spec_from_file_location("prepare_grpo_aux_dataset", script_path)
+        spec = importlib.util.spec_from_file_location(
+            "prepare_grpo_aux_dataset", script_path
+        )
         module = importlib.util.module_from_spec(spec)
         self.assertIsNotNone(spec.loader)
         spec.loader.exec_module(module)
@@ -202,7 +214,9 @@ class TestGRPORewards(unittest.TestCase):
         reward_cls = rewards_module.orms["aux_reward"]
         self.assertTrue(issubclass(reward_cls, DummyORM))
         reward = reward_cls()
-        self.assertEqual(reward(["<aux> broken </aux>"], fl_problem=SAMPLE_FL_PROBLEM), [-1.0])
+        self.assertEqual(
+            reward(["<aux> broken </aux>"], fl_problem=SAMPLE_FL_PROBLEM), [-1.0]
+        )
 
 
 if __name__ == "__main__":

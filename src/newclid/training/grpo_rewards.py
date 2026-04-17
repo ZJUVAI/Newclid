@@ -20,10 +20,16 @@ from newclid.formulations.rule import Rule
 from newclid.numerical.geometries import PointNum
 from newclid.agent.runtime.search_runtime import classify_build_exception
 from newclid.proof import ProofState
-from newclid.training.aux_dsl import extract_aux_body, normalize_aux_text, try_dsl_to_constructions
+from newclid.training.aux_dsl import (
+    extract_aux_body,
+    normalize_aux_text,
+    try_dsl_to_constructions,
+)
 
 logger = logging.getLogger(__name__)
-_PROBLEM_BLOCK_RE = re.compile(r"<problem>\s*(.*?)\s*</problem>", re.DOTALL | re.IGNORECASE)
+_PROBLEM_BLOCK_RE = re.compile(
+    r"<problem>\s*(.*?)\s*</problem>", re.DOTALL | re.IGNORECASE
+)
 
 
 @dataclass(frozen=True)
@@ -126,7 +132,9 @@ class AuxRewardEvaluator:
         if cached is not None:
             return cached
 
-        result = self._evaluate_uncached(aux_body=aux_body, normalized_aux=normalized_aux, problem_dsl=problem_dsl)
+        result = self._evaluate_uncached(
+            aux_body=aux_body, normalized_aux=normalized_aux, problem_dsl=problem_dsl
+        )
         with self._cache_lock:
             self._cache[key] = result
         return result
@@ -267,5 +275,7 @@ class AuxReward:
 
         rewards = []
         for completion, sample_problem_text in zip(completions, problem_texts):
-            rewards.append(self.evaluator.evaluate(completion, sample_problem_text).reward)
+            rewards.append(
+                self.evaluator.evaluate(completion, sample_problem_text).reward
+            )
         return rewards
