@@ -469,12 +469,7 @@ class DivideConquerReducer:
                 print(f"[Phase 2] ✓ Complete: {self._phase2_completed}/{self._phase2_total} merges | "
                       f"Reduced: {reduced} rules | Elapsed: {elapsed:.1f}s")
             else:
-                # ETA = (total - completed) * (elapsed / completed)
-                avg_time_per_merge = elapsed / self._phase2_completed
-                remaining_merges = self._phase2_total - self._phase2_completed
-                eta = avg_time_per_merge * remaining_merges
-
                 print(f"[Phase 2] Progress: {self._phase2_completed}/{self._phase2_total} merges "
-                      f"({pct:.1f}%) | Reduced: {reduced} rules | Elapsed: {elapsed:.1f}s | ETA: ~{eta:.0f}s")
+                      f"({pct:.1f}%) | Reduced: {reduced} rules | Elapsed: {elapsed:.1f}s")
 
             self._last_phase2_progress_pct = pct
