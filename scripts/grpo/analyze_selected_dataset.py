@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 from collections import Counter
 from pathlib import Path
@@ -12,13 +13,18 @@ from typing import Any
 from tqdm import tqdm
 
 from newclid.training.aux_dsl import extract_first_tagged_aux_block
-from scripts.analyze_dataset import (
-    extract_goal_predicate,
-    extract_predicate_family_tags,
-    extract_problem_clause_count,
-    extract_problem_predicate_count,
-    extract_problem_text,
-)
+
+_ANALYZE_DATASET_PATH = Path(__file__).resolve().parents[1] / "analyze_dataset.py"
+_ANALYZE_DATASET_SPEC = importlib.util.spec_from_file_location("analyze_dataset", _ANALYZE_DATASET_PATH)
+assert _ANALYZE_DATASET_SPEC is not None and _ANALYZE_DATASET_SPEC.loader is not None
+_ANALYZE_DATASET = importlib.util.module_from_spec(_ANALYZE_DATASET_SPEC)
+_ANALYZE_DATASET_SPEC.loader.exec_module(_ANALYZE_DATASET)
+
+extract_goal_predicate = _ANALYZE_DATASET.extract_goal_predicate
+extract_predicate_family_tags = _ANALYZE_DATASET.extract_predicate_family_tags
+extract_problem_clause_count = _ANALYZE_DATASET.extract_problem_clause_count
+extract_problem_predicate_count = _ANALYZE_DATASET.extract_problem_predicate_count
+extract_problem_text = _ANALYZE_DATASET.extract_problem_text
 
 
 def extract_aux_structure(response: str) -> tuple[bool, int, int]:
