@@ -2,7 +2,7 @@ import os
 import json
 from pathlib import Path
 from PIL import Image, ImageOps
-from tqdm import tqdm
+from scripts._tqdm import tqdm
 
 # ================= 配置路径 =================
 # 从环境变量读取最大并行任务数，默认为 None (自动使用所有CPU核心)

@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from newclid.training.grpo_rewards import AuxEvaluationResult, AuxRewardEvaluator
-from tqdm import tqdm
+from scripts._tqdm import tqdm
 
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -71,7 +71,9 @@ class CompletionGenerator:
             generated = output[:, inputs.input_ids.shape[1] :]
             return self.tokenizer.batch_decode(generated, skip_special_tokens=True)[0]
 
-    def generate_sample(self, query: str, num_samples: int, temperature: float, top_p: float) -> list[str]:
+    def generate_sample(
+        self, query: str, num_samples: int, temperature: float, top_p: float
+    ) -> list[str]:
         with self._torch.no_grad():
             prompt = self._build_prompt(query)
             inputs = self.tokenizer([prompt], return_tensors="pt").to(self.model.device)
@@ -95,12 +97,19 @@ def aggregate_difficulty_metrics(
     evaluator: AuxRewardEvaluator,
 ) -> dict[str, Any]:
     greedy_result = evaluator.evaluate(greedy_completion, sample["fl_problem"])
-    sampled_results = [evaluator.evaluate(completion, sample["fl_problem"]) for completion in sampled_completions]
+    sampled_results = [
+        evaluator.evaluate(completion, sample["fl_problem"])
+        for completion in sampled_completions
+    ]
 
     ddar_valid_count = sum(1 for result in sampled_results if result.build_ok)
-    ddar_solved_count = sum(1 for result in sampled_results if result.ddar_status == "solved")
+    ddar_solved_count = sum(
+        1 for result in sampled_results if result.ddar_status == "solved"
+    )
     format_valid_count = sum(1 for result in sampled_results if result.format_ok)
-    normalized_aux_values = [result.normalized_aux for result in sampled_results if result.normalized_aux]
+    normalized_aux_values = [
+        result.normalized_aux for result in sampled_results if result.normalized_aux
+    ]
     unique_aux_count = len(set(normalized_aux_values))
     duplicate_aux_ratio = 0.0
     if sampled_results:
@@ -110,7 +119,9 @@ def aggregate_difficulty_metrics(
         **sample,
         "greedy_success": greedy_result.ddar_status == "solved",
         "greedy_status": greedy_result.ddar_status,
-        "pass_at_16": ddar_solved_count / len(sampled_results) if sampled_results else 0.0,
+        "pass_at_16": ddar_solved_count / len(sampled_results)
+        if sampled_results
+        else 0.0,
         "ddar_valid_count": ddar_valid_count,
         "ddar_solved_count": ddar_solved_count,
         "format_valid_count": format_valid_count,
@@ -138,8 +149,12 @@ def label_difficulty(
             temperature=temperature,
             top_p=top_p,
         )
-        labeled = aggregate_difficulty_metrics(row, greedy_completion, sampled_completions, evaluator)
-        labeled["avg_eval_time"] = (time.time() - started) / (1 + len(sampled_completions))
+        labeled = aggregate_difficulty_metrics(
+            row, greedy_completion, sampled_completions, evaluator
+        )
+        labeled["avg_eval_time"] = (time.time() - started) / (
+            1 + len(sampled_completions)
+        )
         labeled_rows.append(labeled)
     return labeled_rows
 
@@ -154,7 +169,12 @@ def main() -> None:
         default="models/auxsweep02/checkpoint-39184",
         help="Model checkpoint to use for offline labeling",
     )
-    parser.add_argument("--num-samples", type=int, default=16, help="Number of sampled completions per prompt")
+    parser.add_argument(
+        "--num-samples",
+        type=int,
+        default=16,
+        help="Number of sampled completions per prompt",
+    )
     parser.add_argument("--temperature", type=float, default=0.8)
     parser.add_argument("--top-p", type=float, default=0.95)
     args = parser.parse_args()

@@ -9,7 +9,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from tqdm import tqdm
+from scripts._tqdm import tqdm
 
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -22,7 +22,9 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def build_candidate_pool(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def build_candidate_pool(
+    rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     kept = []
     dropped_no_aux = 0
     dropped_missing_fields = 0
@@ -35,7 +37,11 @@ def build_candidate_pool(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any
         if not row.get("has_aux"):
             dropped_no_aux += 1
             continue
-        if not row.get("query") or not row.get("fl_problem") or not row.get("response_aux"):
+        if (
+            not row.get("query")
+            or not row.get("fl_problem")
+            or not row.get("response_aux")
+        ):
             dropped_missing_fields += 1
             continue
         if row.get("aux_segment_count", 0) < 1 or row.get("aux_points_total", 0) < 1:
@@ -93,7 +99,9 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("input", type=Path, help="Annotated JSONL from analyze_dataset.py")
+    parser.add_argument(
+        "input", type=Path, help="Annotated JSONL from analyze_dataset.py"
+    )
     parser.add_argument("output", type=Path, help="Candidate pool JSONL output")
     parser.add_argument(
         "--summary-output",

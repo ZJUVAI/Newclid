@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from newclid.training.grpo_rewards import AuxRewardEvaluator
-from tqdm import tqdm
+from scripts._tqdm import tqdm
 
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -71,7 +71,9 @@ class VLMCompletionGenerator:
         """Batch inference: returns (greedy_outputs, sampled_outputs_per_query)."""
         reqs = [self._InferRequest(messages=self._build_messages(q)) for q in queries]
 
-        greedy_cfg = self._RequestConfig(temperature=0.0, n=1, max_tokens=self.max_new_tokens)
+        greedy_cfg = self._RequestConfig(
+            temperature=0.0, n=1, max_tokens=self.max_new_tokens
+        )
         greedy_results = self.engine.infer(reqs, greedy_cfg, use_tqdm=False)
         greedy_outputs = [
             r.choices[0].message.content if r and r.choices else ""
@@ -79,7 +81,10 @@ class VLMCompletionGenerator:
         ]
 
         sample_cfg = self._RequestConfig(
-            temperature=temperature, top_p=top_p, n=num_samples, max_tokens=self.max_new_tokens
+            temperature=temperature,
+            top_p=top_p,
+            n=num_samples,
+            max_tokens=self.max_new_tokens,
         )
         sample_results = self.engine.infer(reqs, sample_cfg, use_tqdm=False)
         sampled_outputs = [
@@ -106,7 +111,9 @@ def label_difficulty(
     fmt_key = f"format_valid_at_{num_samples}"
 
     total_batches = (len(rows) + batch_size - 1) // batch_size
-    for batch_start in tqdm(range(0, len(rows), batch_size), total=total_batches, desc="Labeling difficulty"):
+    for batch_start in tqdm(
+        range(0, len(rows), batch_size), total=total_batches, desc="Labeling difficulty"
+    ):
         batch = rows[batch_start : batch_start + batch_size]
         queries = [r["query"] for r in batch]
         fl_problems = [r["fl_problem"] for r in batch]
@@ -117,23 +124,27 @@ def label_difficulty(
 
         for i, row in enumerate(batch):
             greedy_result = evaluator.evaluate(greedy_outputs[i], fl_problems[i])
-            sampled_results = [evaluator.evaluate(c, fl_problems[i]) for c in sampled_outputs[i]]
+            sampled_results = [
+                evaluator.evaluate(c, fl_problems[i]) for c in sampled_outputs[i]
+            ]
 
             n = len(sampled_results) or 1
             valid_count = sum(1 for r in sampled_results if r.build_ok)
             solved_count = sum(1 for r in sampled_results if r.ddar_status == "solved")
             fmt_count = sum(1 for r in sampled_results if r.format_ok)
 
-            labeled_rows.append({
-                **row,
-                "greedy_success": greedy_result.ddar_status == "solved",
-                "greedy_build_ok": greedy_result.build_ok,
-                "greedy_format_ok": greedy_result.format_ok,
-                pass_key: solved_count / n,
-                valid_key: valid_count / n,
-                fmt_key: fmt_count / n,
-                "all_invalid": valid_count == 0,
-            })
+            labeled_rows.append(
+                {
+                    **row,
+                    "greedy_success": greedy_result.ddar_status == "solved",
+                    "greedy_build_ok": greedy_result.build_ok,
+                    "greedy_format_ok": greedy_result.format_ok,
+                    pass_key: solved_count / n,
+                    valid_key: valid_count / n,
+                    fmt_key: fmt_count / n,
+                    "all_invalid": valid_count == 0,
+                }
+            )
 
         idx = batch_start + len(batch)
         elapsed = time.perf_counter() - start_time
@@ -149,7 +160,9 @@ def label_difficulty(
     return labeled_rows
 
 
-def _shard_rows(rows: list[dict[str, Any]], shard_index: int, num_shards: int) -> list[dict[str, Any]]:
+def _shard_rows(
+    rows: list[dict[str, Any]], shard_index: int, num_shards: int
+) -> list[dict[str, Any]]:
     return [r for i, r in enumerate(rows) if i % num_shards == shard_index]
 
 
@@ -186,18 +199,30 @@ def run_workers(args: argparse.Namespace) -> None:
         env = os.environ.copy()
         env["CUDA_VISIBLE_DEVICES"] = str(i)
         cmd = [
-            sys.executable, __file__,
-            str(shard_inputs[i]), str(shard_outputs[i]),
-            "--model-path", args.model_path,
-            "--model-type", args.model_type,
-            "--num-samples", str(args.num_samples),
-            "--temperature", str(args.temperature),
-            "--top-p", str(args.top_p),
-            "--batch-size", str(args.batch_size),
-            "--shard-index", str(i),
-            "--num-shards", "1",  # already pre-sharded
+            sys.executable,
+            __file__,
+            str(shard_inputs[i]),
+            str(shard_outputs[i]),
+            "--model-path",
+            args.model_path,
+            "--model-type",
+            args.model_type,
+            "--num-samples",
+            str(args.num_samples),
+            "--temperature",
+            str(args.temperature),
+            "--top-p",
+            str(args.top_p),
+            "--batch-size",
+            str(args.batch_size),
+            "--shard-index",
+            str(i),
+            "--num-shards",
+            "1",  # already pre-sharded
         ]
-        print(f"[worker {i}] CUDA_VISIBLE_DEVICES={i} launching ({len(load_jsonl(shard_inputs[i]))} rows)")
+        print(
+            f"[worker {i}] CUDA_VISIBLE_DEVICES={i} launching ({len(load_jsonl(shard_inputs[i]))} rows)"
+        )
         procs.append(subprocess.Popen(cmd, env=env))
 
     for i, p in enumerate(procs):
@@ -221,11 +246,17 @@ def main() -> None:
     parser.add_argument("output", type=Path, help="Difficulty labels JSONL")
     parser.add_argument("--model-path", type=str, required=True)
     parser.add_argument("--model-type", type=str, default="qwen3_vl")
-    parser.add_argument("--num-samples", type=int, default=16, help="Sampled completions per prompt")
+    parser.add_argument(
+        "--num-samples", type=int, default=16, help="Sampled completions per prompt"
+    )
     parser.add_argument("--temperature", type=float, default=0.8)
     parser.add_argument("--top-p", type=float, default=0.95)
-    parser.add_argument("--batch-size", type=int, default=8, help="Rows per inference batch")
-    parser.add_argument("--workers", type=int, default=1, help="Number of GPU workers (one per GPU)")
+    parser.add_argument(
+        "--batch-size", type=int, default=8, help="Rows per inference batch"
+    )
+    parser.add_argument(
+        "--workers", type=int, default=1, help="Number of GPU workers (one per GPU)"
+    )
     # Internal sharding args used by worker subprocesses
     parser.add_argument("--shard-index", type=int, default=0)
     parser.add_argument("--num-shards", type=int, default=1)

@@ -10,12 +10,14 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from tqdm import tqdm
+from scripts._tqdm import tqdm
 
 from newclid.training.aux_dsl import extract_first_tagged_aux_block
 
 _ANALYZE_DATASET_PATH = Path(__file__).resolve().parents[1] / "analyze_dataset.py"
-_ANALYZE_DATASET_SPEC = importlib.util.spec_from_file_location("analyze_dataset", _ANALYZE_DATASET_PATH)
+_ANALYZE_DATASET_SPEC = importlib.util.spec_from_file_location(
+    "analyze_dataset", _ANALYZE_DATASET_PATH
+)
 assert _ANALYZE_DATASET_SPEC is not None and _ANALYZE_DATASET_SPEC.loader is not None
 _ANALYZE_DATASET = importlib.util.module_from_spec(_ANALYZE_DATASET_SPEC)
 _ANALYZE_DATASET_SPEC.loader.exec_module(_ANALYZE_DATASET)
@@ -63,7 +65,9 @@ def annotate_record(record: dict[str, Any], sample_id: str) -> dict[str, Any]:
         "aux_segment_count": aux_segment_count,
         "aux_points_total": aux_points_total,
         "goal_predicate": extract_goal_predicate(fl_problem),
-        "predicate_family_tags": extract_predicate_family_tags(problem_text, fl_problem),
+        "predicate_family_tags": extract_predicate_family_tags(
+            problem_text, fl_problem
+        ),
         "problem_predicate_count": extract_problem_predicate_count(problem_text),
         "problem_clause_count": extract_problem_clause_count(fl_problem),
     }
@@ -72,7 +76,9 @@ def annotate_record(record: dict[str, Any], sample_id: str) -> dict[str, Any]:
 def summarize_annotations(annotations: list[dict[str, Any]]) -> dict[str, Any]:
     total = len(annotations)
     aux_rows = sum(1 for item in annotations if item["has_aux"])
-    goal_counter = Counter(item["goal_predicate"] for item in annotations if item["goal_predicate"])
+    goal_counter = Counter(
+        item["goal_predicate"] for item in annotations if item["goal_predicate"]
+    )
     family_counter = Counter()
     segment_counter = Counter()
     points_counter = Counter()

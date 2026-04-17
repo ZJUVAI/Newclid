@@ -11,7 +11,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from tqdm import tqdm
+from scripts._tqdm import tqdm
 
 
 AUX_BUCKET_WEIGHTS = {
@@ -136,7 +136,8 @@ def compute_bucket_quotas(
 
         for prem_bucket, prem_target in premise_totals.items():
             family_keys = sorted(
-                key for key, count in bucket_counts.items()
+                key
+                for key, count in bucket_counts.items()
                 if count > 0 and key[0] == aux_bucket and key[1] == prem_bucket
             )
             if not family_keys or prem_target <= 0:
@@ -176,7 +177,9 @@ def _fill_with_cap(
     used_queries: set[str],
 ) -> tuple[list[dict[str, Any]], int]:
     goal_cap = max(1, int(target_size * GOAL_CAP_RATIO))
-    goal_counts = Counter(row.get("goal_predicate") for row in selected if row.get("goal_predicate"))
+    goal_counts = Counter(
+        row.get("goal_predicate") for row in selected if row.get("goal_predicate")
+    )
     skipped_for_cap = 0
     for row in candidates:
         if len(selected) >= target_size:
@@ -263,7 +266,9 @@ def prefilter_candidate_pool(
     selected = selected[: min(target_size, distinct_rows)]
 
     final_bucket_counts = Counter(prefilter_key(row) for row in selected)
-    final_goal_counts = Counter(row.get("goal_predicate") for row in selected if row.get("goal_predicate"))
+    final_goal_counts = Counter(
+        row.get("goal_predicate") for row in selected if row.get("goal_predicate")
+    )
 
     report = {
         "input_rows": len(rows),
@@ -271,9 +276,15 @@ def prefilter_candidate_pool(
         "exact_duplicate_queries_removed": duplicate_rows,
         "target_size": target_size,
         "selected_rows": len(selected),
-        "bucket_counts_before": {"|".join(key): count for key, count in sorted(bucket_counts.items())},
-        "bucket_quota_targets": {"|".join(key): count for key, count in sorted(quotas.items())},
-        "bucket_counts_after": {"|".join(key): count for key, count in sorted(final_bucket_counts.items())},
+        "bucket_counts_before": {
+            "|".join(key): count for key, count in sorted(bucket_counts.items())
+        },
+        "bucket_quota_targets": {
+            "|".join(key): count for key, count in sorted(quotas.items())
+        },
+        "bucket_counts_after": {
+            "|".join(key): count for key, count in sorted(final_bucket_counts.items())
+        },
         "bucket_shortages": shortages,
         "selected_goal_predicate_distribution": dict(final_goal_counts.most_common()),
         "skipped_for_goal_cap": skipped_for_cap,
@@ -285,13 +296,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path, help="Candidate pool JSONL")
     parser.add_argument("output", type=Path, help="Prefiltered candidate pool JSONL")
-    parser.add_argument("--report-output", type=Path, default=None, help="Optional JSON report path")
+    parser.add_argument(
+        "--report-output", type=Path, default=None, help="Optional JSON report path"
+    )
     parser.add_argument("--target-size", type=int, default=50000)
     parser.add_argument("--seed", type=int, default=998244353)
     args = parser.parse_args()
 
     rows = load_jsonl(args.input)
-    selected, report = prefilter_candidate_pool(rows, target_size=args.target_size, seed=args.seed)
+    selected, report = prefilter_candidate_pool(
+        rows, target_size=args.target_size, seed=args.seed
+    )
     write_jsonl(args.output, selected)
     if args.report_output is not None:
         write_json(args.report_output, report)

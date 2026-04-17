@@ -10,7 +10,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-from tqdm import tqdm
+from scripts._tqdm import tqdm
 
 from newclid.training.aux_dsl import extract_first_tagged_aux_block
 
@@ -23,7 +23,9 @@ PREDICATE_FAMILIES = {
 }
 
 PREDICATE_PATTERN = re.compile(r"\b([a-z_]+)\b")
-PROBLEM_BLOCK_PATTERN = re.compile(r"<problem>\s*(.*?)\s*</problem>", re.DOTALL | re.IGNORECASE)
+PROBLEM_BLOCK_PATTERN = re.compile(
+    r"<problem>\s*(.*?)\s*</problem>", re.DOTALL | re.IGNORECASE
+)
 
 
 def extract_problem_text(llm_input: str) -> str:
@@ -114,7 +116,9 @@ def annotate_record(record: dict[str, Any], sample_id: str) -> dict[str, Any]:
         "aux_segment_count": aux_segment_count,
         "aux_points_total": aux_points_total,
         "goal_predicate": extract_goal_predicate(fl_problem),
-        "predicate_family_tags": extract_predicate_family_tags(problem_text, fl_problem),
+        "predicate_family_tags": extract_predicate_family_tags(
+            problem_text, fl_problem
+        ),
         "n_premises": record.get("n_premises"),
         "problem_predicate_count": extract_problem_predicate_count(problem_text),
         "problem_clause_count": extract_problem_clause_count(fl_problem),
@@ -124,7 +128,9 @@ def annotate_record(record: dict[str, Any], sample_id: str) -> dict[str, Any]:
 def summarize_annotations(annotations: list[dict[str, Any]]) -> dict[str, Any]:
     total = len(annotations)
     aux_rows = sum(1 for item in annotations if item["has_aux"])
-    goal_counter = Counter(item["goal_predicate"] for item in annotations if item["goal_predicate"])
+    goal_counter = Counter(
+        item["goal_predicate"] for item in annotations if item["goal_predicate"]
+    )
     family_counter = Counter()
     segment_counter = Counter()
     points_counter = Counter()
@@ -151,7 +157,9 @@ def annotate_jsonl(input_path: Path) -> tuple[list[dict[str, Any]], dict[str, An
     with input_path.open("r", encoding="utf-8") as handle:
         total_lines = sum(1 for _ in handle)
     with input_path.open("r", encoding="utf-8") as handle:
-        for index, line in enumerate(tqdm(handle, total=total_lines, desc="Annotating")):
+        for index, line in enumerate(
+            tqdm(handle, total=total_lines, desc="Annotating")
+        ):
             line = line.strip()
             if not line:
                 continue

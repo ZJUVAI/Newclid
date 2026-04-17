@@ -10,7 +10,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from tqdm import tqdm
+from scripts._tqdm import tqdm
 
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -64,7 +64,9 @@ def _is_fallback(row: dict[str, Any], pass_key: str) -> bool:
     return 0.10 <= row[pass_key] <= 0.80
 
 
-def filter_goldilocks(rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, int]]:
+def filter_goldilocks(
+    rows: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
     preferred = []
     fallback = []
     pass_key = _resolve_pass_key(rows)
@@ -111,7 +113,9 @@ def _take_matching(
     return taken
 
 
-def select_debug_rows(rows: list[dict[str, Any]], target_size: int) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def select_debug_rows(
+    rows: list[dict[str, Any]], target_size: int
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     preferred, fallback, filter_stats = filter_goldilocks(rows)
     source = preferred + fallback
     selected: list[dict[str, Any]] = []
@@ -163,7 +167,9 @@ def select_debug_rows(rows: list[dict[str, Any]], target_size: int) -> tuple[lis
             for tag in row.get("predicate_family_tags", []):
                 family_counter[tag] += 1
 
-    goal_counter = Counter(row.get("goal_predicate") for row in selected if row.get("goal_predicate"))
+    goal_counter = Counter(
+        row.get("goal_predicate") for row in selected if row.get("goal_predicate")
+    )
     for row in tqdm(source, desc="Filling remaining selected rows"):
         if len(selected) >= target_size:
             break
