@@ -132,9 +132,6 @@ class ProblemWorker:
             )
 
             # Obtain mapping from clauses to basic statements
-            proof_state_temp = ProofState(
-                rng=np.random.default_rng(seed), defs=solver_builder.defs
-            )
             clauses_without_coords: list[Clause] = []
             for clause in solver_builder.problemJGEX.constructions:
                 clauses_without_coords.append(
@@ -144,7 +141,7 @@ class ProblemWorker:
                     )
                 )
             clause2basics, clause2args = ProblemWorker._get_all_premise(
-                clauses_without_coords, proof_state_temp
+                clauses_without_coords, solver.proof
             )
             statement_str_idxs = dict()
             pointstr2basicstrs = defaultdict(set)
@@ -392,14 +389,63 @@ class ProblemWorker:
         }
 
     @staticmethod
+    def _flatten_statement_groups(
+        statement_groups: list[list[Statement]],
+    ) -> list[Statement]:
+        """Flatten grouped statements into one list."""
+        flattened: list[Statement] = []
+        for group in statement_groups:
+            flattened.extend(group)
+        return flattened
+
+    @staticmethod
+    def _expand_final_premises_and_aux(
+        clause2basics: dict[Clause, list],
+        clause2args: dict[Clause, set],
+        premises: list[Statement],
+        aux: list[Statement],
+        essential_point_names: set[str],
+        aux_point_names: set[str],
+    ) -> tuple[dict[Clause, list], list[Clause], list[Statement], list[tuple], list[list[Statement]]]:
+        """Expand proof-level premise/aux statements into final exported units."""
+        expanded_clause2basics = clause2basics.copy()
+        essential_premise_clauses = ProblemWorker._get_essential_premise_clauses(
+            expanded_clause2basics,
+            clause2args,
+            [premise.to_str() for premise in premises],
+            essential_point_names.copy(),
+        )
+        expanded_premises: list[Statement] = []
+        for clause in essential_premise_clauses:
+            for _, basics in expanded_clause2basics[clause]:
+                expanded_premises.extend(basics)
+
+        essential_aux_basics = ProblemWorker._get_aux_basics(
+            expanded_clause2basics,
+            [statement.to_str() for statement in aux],
+            aux_point_names.copy(),
+        )
+        expanded_aux_groups = [
+            list(basics) for _, basics in essential_aux_basics if len(basics) > 0
+        ]
+
+        return (
+            expanded_clause2basics,
+            essential_premise_clauses,
+            expanded_premises,
+            essential_aux_basics,
+            expanded_aux_groups,
+        )
+
+    @staticmethod
     def _find_minimal_aux_clauses_new(
         pointstr2basicstrs,
         basicstr2pointstrs,
         solver,
         solver_builder,
         goals_str,
-        premises,
-        aux,
+        expanded_premises,
+        expanded_aux_groups,
         aux_only,
         rng,
     ):
@@ -414,7 +460,7 @@ class ProblemWorker:
         # Step 1: First try solving without aux
         t0 = time.time()
         proof_state_no_aux = ProofState.build_predicates(
-            predicates=premises,
+            predicates=expanded_premises,
             defsJGEX=solver_builder.defs,
             goals_str=goals_str.copy(),
             rng=np.random.default_rng(solver_builder.seed),
@@ -443,7 +489,7 @@ class ProblemWorker:
                         ProblemWorker._extract_proof_info(solver_no_aux, goal)
                     )
 
-        if len(aux) == 1:
+        if len(expanded_aux_groups) == 1:
             # If only one aux, no need to continue
             if len(goals_str) == 0:
                 return results, timings
@@ -452,7 +498,8 @@ class ProblemWorker:
             # that might be introduced in numerical checks
             t0 = time.time()
             proof_state_all_aux = ProofState.build_predicates(
-                predicates=premises + aux,
+                predicates=expanded_premises
+                + ProblemWorker._flatten_statement_groups(expanded_aux_groups),
                 defsJGEX=solver_builder.defs,
                 goals_str=goals_str.copy(),
                 rng=np.random.default_rng(solver_builder.seed),
@@ -487,7 +534,9 @@ class ProblemWorker:
 
         # Step 2: For remaining goals, try removing aux one by one from back to front
         # Group goals by the minimal aux they need
-        goal_groups = [{"goals": goals_str.copy(), "aux": list(aux), "solvers": {}}]
+        goal_groups = [
+            {"goals": goals_str.copy(), "aux_groups": list(expanded_aux_groups), "solvers": {}}
+        ]
         # premise_strs = set([p.to_str() for p in premises])
         # premise_pointstrs = set()
         # for p in premises:
@@ -495,12 +544,14 @@ class ProblemWorker:
         #         if isinstance(arg, Point):
         #             premise_pointstrs.add(arg.name)
 
-        for i in range(len(aux) - 1, -1, -1):
+        for i in range(len(expanded_aux_groups) - 1, -1, -1):
             new_goal_groups = []
 
             for group in goal_groups:
                 # Try without this aux for all goals in this group
-                test_aux = group["aux"][:i] + group["aux"][i + 1 :]
+                test_aux_groups = (
+                    group["aux_groups"][:i] + group["aux_groups"][i + 1 :]
+                )
 
                 # # Check if the aux set is valid w.r.t rely_on
                 # flag = True
@@ -534,7 +585,8 @@ class ProblemWorker:
 
                 t0 = time.time()
                 proof_state_test = ProofState.build_predicates(
-                    predicates=premises + test_aux,
+                    predicates=expanded_premises
+                    + ProblemWorker._flatten_statement_groups(test_aux_groups),
                     defsJGEX=solver_builder.defs,
                     goals_str=group["goals"],
                     rng=np.random.default_rng(solver_builder.seed),
@@ -574,7 +626,7 @@ class ProblemWorker:
                     new_goal_groups.append(
                         {
                             "goals": solved_goals,
-                            "aux": test_aux,
+                            "aux_groups": test_aux_groups,
                             "solvers": {
                                 g: group["solvers"][g]
                                 for g in solved_goals
@@ -586,7 +638,7 @@ class ProblemWorker:
                     new_goal_groups.append(
                         {
                             "goals": unsolved_goals,
-                            "aux": group["aux"],
+                            "aux_groups": group["aux_groups"],
                             "solvers": {
                                 g: group["solvers"][g]
                                 for g in unsolved_goals
@@ -613,7 +665,8 @@ class ProblemWorker:
             # that might be introduced in numerical checks
             t0 = time.time()
             proof_state_all_aux = ProofState.build_predicates(
-                predicates=premises + aux,
+                predicates=expanded_premises
+                + ProblemWorker._flatten_statement_groups(expanded_aux_groups),
                 defsJGEX=solver_builder.defs,
                 goals_str=goals_str.copy(),
                 rng=np.random.default_rng(solver_builder.seed),
@@ -672,14 +725,46 @@ class ProblemWorker:
         # Create RNG for probabilistic filtering
         rng = np.random.default_rng(solver_builder.seed)
 
+        # Expand proof-level premises/aux into the same clause/basic view used by
+        # llm_solution_renamed() when exporting the final fl_problem and <aux>.
+        # _find_minimal_aux_clauses_new() must reason over this expanded view,
+        # otherwise Step 1/Step 2 would still be checking a goal against the
+        # minimal proof premises instead of the final serialized sample.
+        essential_point_names = set()
+        for statement in premises:
+            for arg in statement.args:
+                if isinstance(arg, Point):
+                    essential_point_names.add(arg.name)
+        for goal in goals:
+            for arg in goal.args:
+                if isinstance(arg, Point):
+                    essential_point_names.add(arg.name)
+
+        aux_point_names = set()
+        for statement in aux:
+            for arg in statement.args:
+                if isinstance(arg, Point):
+                    aux_point_names.add(arg.name)
+
+        _, _, expanded_premises, _, expanded_aux_groups = (
+            ProblemWorker._expand_final_premises_and_aux(
+                clause2basics,
+                clause2args,
+                premises,
+                aux,
+                essential_point_names,
+                aux_point_names,
+            )
+        )
+
         res_list, aux_timings = ProblemWorker._find_minimal_aux_clauses_new(
             pointstr2basicstrs,
             basicstr2pointstrs,
             solver,
             solver_builder,
             [goal.to_str() for goal in goals],
-            premises,
-            aux,
+            expanded_premises,
+            expanded_aux_groups,
             aux_only,
             rng,
         )
@@ -810,22 +895,25 @@ class ProblemWorker:
             dep_idx: dict[str, str] = {}
 
             # Get essential premises/points
-            essential_premise_clauses = ProblemWorker._get_essential_premise_clauses(
+            (
+                expanded_clause2basics,
+                essential_premise_clauses,
+                _expanded_premises,
+                essential_aux_basics,
+                _expanded_aux_groups,
+            ) = ProblemWorker._expand_final_premises_and_aux(
                 clause2basics,
                 clause2args,
-                [premise.statement.to_str() for premise in premises],
+                [premise.statement for premise in premises],
+                [a.statement for a in aux],
                 set([p.name for p in points]),
-            )
-            essential_aux_basics = ProblemWorker._get_aux_basics(
-                clause2basics,
-                [a.statement.to_str() for a in aux],
                 set([p.name for p in aux_points]),
             )
 
             # Create point name mapping
             essential_premise_point_names: list[str] = []
             for clause in essential_premise_clauses:
-                for _points, bs in clause2basics[clause]:
+                for _points, bs in expanded_clause2basics[clause]:
                     essential_premise_point_names.extend(_points)
             essential_aux_point_names: list[str] = []
             for _points, bs in essential_aux_basics:
@@ -841,7 +929,7 @@ class ProblemWorker:
                 mp, essential_premise_clauses, goals, new_points_with_coords
             )
             data_problem = ProblemWorker._generate_problem_predicates_section(
-                mp, dep_idx, clause2basics, essential_premise_clauses, goals
+                mp, dep_idx, expanded_clause2basics, essential_premise_clauses, goals
             )
             n_premises = len(dep_idx)
             data_aux = ProblemWorker._generate_aux_section(
@@ -873,12 +961,16 @@ class ProblemWorker:
 
             traceback.print_exc()
             print(f"clause2basics: {clause2basics}")
-            print(f"essential_clauses: {essential_premise_clauses}")
-            print(f"essential_aux_basics: {essential_aux_basics}")
-            print(f"essential_premise_point_names: {essential_premise_point_names}")
-            print(f"essential_aux_point_names: {essential_aux_point_names}")
-            print(f"mp: {mp}")
-            print(f"point_coords: {new_points_with_coords}")
+            print(f"essential_clauses: {locals().get('essential_premise_clauses')}")
+            print(f"essential_aux_basics: {locals().get('essential_aux_basics')}")
+            print(
+                f"essential_premise_point_names: {locals().get('essential_premise_point_names')}"
+            )
+            print(
+                f"essential_aux_point_names: {locals().get('essential_aux_point_names')}"
+            )
+            print(f"mp: {locals().get('mp')}")
+            print(f"point_coords: {locals().get('new_points_with_coords')}")
             raise
 
     @staticmethod
