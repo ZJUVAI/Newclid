@@ -40,7 +40,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = ['black', 'ruff', 'pytest', 'pytest-cov', 'pytest-check', 'pytest-mock', 'pre-commit']
 gpu = ['torch==2.8.0', 'torchvision', 'transformers<5.4.0', 'accelerate',
-       'flash-attn', 'ms-swift', 'deepspeed<0.19', 'vllm>=0.5.1', 'liger_kernel']
+       'flash-attn', 'ms-swift', 'deepspeed<0.19', 'vllm>=0.5.1', 'liger_kernel',
+       'qwen-vl-utils']
 doc = ['sphinx-autoapi', 'autoapi', 'sphinx_rtd_theme', 'sphinx-autodoc-typehints', 'sphinx-autobuild']
 full = ['newclid[gpu,dev,doc]']
 
