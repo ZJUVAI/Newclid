@@ -74,6 +74,17 @@ class DivideConquerReducer:
         self._merge_counter = 0
         self._next_chunk_id = 0
 
+        # Progress tracking
+        self._phase1_total = 0
+        self._phase1_completed = 0
+        self._phase2_total = 0
+        self._phase2_completed = 0
+        self._last_phase1_progress_pct = 0
+        self._last_phase2_progress_pct = 0
+        self._phase1_start_time: Optional[float] = None
+        self._phase2_start_time: Optional[float] = None
+        self._input_count = 0
+
     def reduce(self, rules: List[Any]) -> Dict[str, Any]:
         """Main entry point for divide-and-conquer reduction."""
         start_time = time.time()
@@ -139,9 +150,10 @@ class DivideConquerReducer:
         self._save_final_stats(stats)
 
         if self.verbose:
+            reduction_pct = (len(rules) - len(basis_rules)) / len(rules) * 100 if rules else 0.0
             print(
                 f"[DivideConquerReducer] Done: {len(rules)} → {len(basis_rules)} rules "
-                f"({total_elapsed:.1f}s)"
+                f"({total_elapsed:.1f}s, {reduction_pct:.1f}% reduction)"
             )
 
         return {
@@ -169,13 +181,22 @@ class DivideConquerReducer:
         if not rules:
             return ChunkMeta(chunk_id=self._allocate_chunk_id(), rule_ids=[]), 0.0, 0.0
 
-        # Submit all Phase 1 tasks upfront
+        # Initialize progress tracking
+        self._input_count = len(rules)
         chunk_size = self._compute_chunk_size(len(rules))
         chunks_data = [rules[i:i + chunk_size] for i in range(0, len(rules), chunk_size)]
+
+        self._phase1_total = len(chunks_data)
+        self._phase2_total = len(chunks_data) - 1  # n chunks → n-1 merges
+        self._phase1_completed = 0
+        self._phase2_completed = 0
+        self._last_phase1_progress_pct = 0
+        self._last_phase2_progress_pct = 0
 
         if self.verbose:
             print(f"[Phase 1] Submitting {len(chunks_data)} chunks (size={chunk_size})")
 
+        # Submit all Phase 1 tasks upfront
         phase1_remaining = []
         for idx, chunk_rules in enumerate(chunks_data):
             future = reduce_chunk_worker_ray.remote(
@@ -189,6 +210,7 @@ class DivideConquerReducer:
         active_merge_info = None  # (chunk_A, chunk_B, merge_id)
 
         phase1_start = time.time()
+        self._phase1_start_time = phase1_start
         phase1_end = None
         phase2_start = None
         phase2_end = None
@@ -210,8 +232,10 @@ class DivideConquerReducer:
                             chunk_meta = self._process_phase1_result(chunk_idx, input_count, result)
                             merge_queue.append(chunk_meta)
                             phase1_remaining.pop(i)
-                            if self.verbose:
-                                print(f"[Phase 1] Chunk {chunk_idx} done: {input_count} → {len(chunk_meta.rule_ids)} rules")
+
+                            # Update progress
+                            self._phase1_completed += 1
+                            self._log_phase1_progress(merge_queue)
                             break
 
                     # Mark Phase 1 end when last chunk completes
@@ -229,8 +253,10 @@ class DivideConquerReducer:
                     merge_queue.append(merged_chunk)
                     active_merge_future = None
                     active_merge_info = None
-                    if self.verbose:
-                        print(f"[Phase 2] Merge {merge_id} done: {len(merged_chunk.rule_ids)} rules")
+
+                    # Update progress
+                    self._phase2_completed += 1
+                    self._log_phase2_progress(merge_queue)
 
             # 3. Start new merge if idle and queue >= 2
             if active_merge_future is None and len(merge_queue) >= 2:
@@ -241,11 +267,12 @@ class DivideConquerReducer:
 
                 if phase2_start is None:
                     phase2_start = time.time()
+                    self._phase2_start_time = phase2_start
+                    if self.verbose:
+                        print("[Phase 2] Started (2 chunks ready for merge)")
 
                 active_merge_future = self._submit_merge_task(chunk_A, chunk_B)
                 active_merge_info = (chunk_A, chunk_B, merge_id)
-                if self.verbose:
-                    print(f"[Phase 2] Starting merge {merge_id}: chunks {chunk_A.chunk_id} + {chunk_B.chunk_id}")
 
             # 4. Block until any event if nothing was ready
             if not something_ready:
@@ -400,3 +427,54 @@ class DivideConquerReducer:
         out_path = self.output_dir / "final_stats.json"
         with open(out_path, "w", encoding="utf-8") as f:
             json.dump(stats, f, ensure_ascii=False, indent=2)
+
+    def _log_phase1_progress(self, merge_queue: List[ChunkMeta]) -> None:
+        """Log Phase 1 progress at 10% intervals."""
+        if not self.verbose:
+            return
+
+        pct = int(100 * self._phase1_completed / self._phase1_total)
+        # Log at 10% intervals or when complete
+        if pct >= self._last_phase1_progress_pct + 10 or self._phase1_completed == self._phase1_total:
+            # Calculate reduced rules: input - current basis
+            current_basis = sum(len(c.rule_ids) for c in merge_queue)
+            reduced = self._input_count - current_basis
+            elapsed = time.time() - self._phase1_start_time
+
+            if self._phase1_completed == self._phase1_total:
+                print(f"[Phase 1] ✓ Complete: {self._phase1_completed}/{self._phase1_total} chunks | "
+                      f"Reduced: {reduced} rules | Elapsed: {elapsed:.1f}s")
+            else:
+                print(f"[Phase 1] Progress: {self._phase1_completed}/{self._phase1_total} chunks "
+                      f"({pct:.1f}%) | Reduced: {reduced} rules | Elapsed: {elapsed:.1f}s")
+
+            self._last_phase1_progress_pct = pct
+
+    def _log_phase2_progress(self, merge_queue: List[ChunkMeta]) -> None:
+        """Log Phase 2 progress at 10% intervals with ETA."""
+        if not self.verbose:
+            return
+
+        pct = int(100 * self._phase2_completed / self._phase2_total)
+        # Log at 10% intervals or when complete
+        if pct >= self._last_phase2_progress_pct + 10 or self._phase2_completed == self._phase2_total:
+            # Calculate reduced rules
+            current_basis = sum(len(c.rule_ids) for c in merge_queue)
+            reduced = self._input_count - current_basis
+
+            # Calculate elapsed and ETA
+            elapsed = time.time() - self._phase2_start_time
+
+            if self._phase2_completed == self._phase2_total:
+                print(f"[Phase 2] ✓ Complete: {self._phase2_completed}/{self._phase2_total} merges | "
+                      f"Reduced: {reduced} rules | Elapsed: {elapsed:.1f}s")
+            else:
+                # ETA = (total - completed) * (elapsed / completed)
+                avg_time_per_merge = elapsed / self._phase2_completed
+                remaining_merges = self._phase2_total - self._phase2_completed
+                eta = avg_time_per_merge * remaining_merges
+
+                print(f"[Phase 2] Progress: {self._phase2_completed}/{self._phase2_total} merges "
+                      f"({pct:.1f}%) | Reduced: {reduced} rules | Elapsed: {elapsed:.1f}s | ETA: ~{eta:.0f}s")
+
+            self._last_phase2_progress_pct = pct
