@@ -1,0 +1,39 @@
+{
+  "global": {
+    "output_dir": "outputs/experiments/20260417_02_subsumption_fix",
+    "save_intermediates": true,
+    "n_workers": 50
+  },
+
+  "part1_filter": {
+    "enabled": false
+  },
+
+  "part2_extract": {
+    "enabled": false
+  },
+
+  "part3_max_premises": {
+    "enabled": false
+  },
+
+  "part4_reduction": {
+    "enabled": true,
+    "input": "outputs/experiments/20260417_01_new_pipeline/part3/filtered_rules.txt",
+    "source_data": "outputs/experiments/20260417_01_new_pipeline/part2/intermediates/step6_rules_stats.json",
+    "output": null,
+    "engine": "full",
+    "timeout": 60,
+    "batch_size": 10,
+    "debug": true,
+    "seed_reduction": {
+      "enabled": true
+    },
+    "chunk_reduction": {
+      "enabled": false
+    },
+    "global_reduction": {
+      "enabled": false
+    }
+  }
+}

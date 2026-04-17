@@ -230,13 +230,19 @@ class GeometricSolverBuilder:
 class CSolver:
     def __init__(
         self,
-        problem: str,
+        problem: str = None,
         problem_name: str = "anonymity",
         seed: int = 123,
         solver: GeometricSolver = None,
         using_log: bool = False,
         using_exp: bool = False,
         light: bool = False,
+        # Direct data path parameters
+        points: List[Tuple[str, Any, Any]] = None,
+        premises: List[Tuple[str, List[str]]] = None,
+        goals: List[Tuple[str, List[str]]] = None,
+        # Compatibility parameter (accepted but ignored)
+        engine: str = None,
     ):
         self.problem = problem
         self.problem_name = problem_name
@@ -249,7 +255,15 @@ class CSolver:
         self.goals: List[Tuple[str, List[str]]] = []
         self.useful_points: List[str] = []
 
-        if light:
+        # Path 1: Direct data path (new)
+        if points is not None:
+            self.solver = None
+            self.points = list(points)
+            self.premises = list(premises) if premises is not None else []
+            self.goals = list(goals) if goals is not None else []
+            self.useful_points = [p[0] for p in self.points]
+        # Path 2: Light mode (existing)
+        elif light:
             # 轻量化路径：跳过 dep_graph、Matcher、rely 等符号推理开销
             self.solver = None
             problemJGEX = ProblemJGEX.from_text(self.problem)
@@ -264,9 +278,14 @@ class CSolver:
                 for a in args:
                     if a and a not in self.useful_points:
                         self.useful_points.append(a)
+        # Path 3: Full path (existing, with error checking)
         else:
-            # 完整路径
             if solver is None:
+                if not problem:
+                    raise ValueError(
+                        "CSolver requires 'problem' text when no 'solver', "
+                        "'points', or 'light=True' is provided."
+                    )
                 self.solver = (
                     GeometricSolverBuilder(self.seed)
                     .load_problem_from_txt(self.problem)
