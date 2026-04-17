@@ -308,3 +308,80 @@ if ray is not None:
     test_and_update_worker_ray = ray.remote(_test_and_update_worker)
 else:
     test_and_update_worker_ray = _test_and_update_worker
+
+
+def _merge_two_chunks_worker(
+    rules_a_data: List[Dict],
+    rules_b_data: List[Dict],
+    timeout: int,
+    seed: int,
+    solver_type: str,
+    engine: str,
+    batch_size: int,
+) -> Dict[str, Any]:
+    """Performs a complete two-chunk merge using ActiveStateActor internally.
+
+    Args:
+        rules_a_data: Serialized rules from chunk A
+        rules_b_data: Serialized rules from chunk B
+        timeout: Timeout for subsumption tests
+        seed: Random seed
+        solver_type: "python" or "csolver"
+        engine: DDAR engine variant
+        batch_size: Batch size for parallel testing
+
+    Returns:
+        Dict with active_a, active_b, test counts, and elapsed_seconds
+    """
+    import time as _time
+    merge_start = _time.time()
+
+    actor = ActiveStateActor.remote(len(rules_a_data), len(rules_b_data))
+
+    # Step 1: Test A against B
+    futures = []
+    for rule_a_data in rules_a_data:
+        futures.append(
+            test_and_update_worker_ray.remote(
+                rule_a_data, rules_b_data, actor, "B", timeout, seed, solver_type, engine
+            )
+        )
+        if len(futures) >= batch_size:
+            ray.get(futures)
+            futures = []
+    if futures:
+        ray.get(futures)
+
+    # Step 2: Test surviving B against A
+    active_b = ray.get(actor.get_active_B.remote())
+    surviving_b_data = [rules_b_data[i] for i, active in enumerate(active_b) if active]
+
+    futures = []
+    for rule_b_data in surviving_b_data:
+        futures.append(
+            test_and_update_worker_ray.remote(
+                rule_b_data, rules_a_data, actor, "A", timeout, seed, solver_type, engine
+            )
+        )
+        if len(futures) >= batch_size:
+            ray.get(futures)
+            futures = []
+    if futures:
+        ray.get(futures)
+
+    n_tests_step1 = len(rules_a_data) * len(rules_b_data)
+    n_tests_step2 = len(surviving_b_data) * len(rules_a_data)
+
+    return {
+        "active_a": ray.get(actor.get_active_A.remote()),
+        "active_b": ray.get(actor.get_active_B.remote()),
+        "n_tests_step1": n_tests_step1,
+        "n_tests_step2": n_tests_step2,
+        "elapsed_seconds": round(_time.time() - merge_start, 2),
+    }
+
+
+if ray is not None:
+    merge_two_chunks_ray = ray.remote(_merge_two_chunks_worker)
+else:
+    merge_two_chunks_ray = _merge_two_chunks_worker

@@ -17,7 +17,6 @@ Replaces the old Chunk Reduction + Global Reduction with a unified two-phase app
 from __future__ import annotations
 
 import json
-import math
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -26,6 +25,7 @@ from typing import Any, Dict, List, Optional
 import ray
 
 from newclid.proof_scout.reduction.ray_workers import (
+    merge_two_chunks_ray,
     reduce_chunk_worker_ray,
     serialize_rule,
 )
@@ -109,18 +109,7 @@ class DivideConquerReducer:
         if self.verbose:
             print(f"[DivideConquerReducer] Starting with {len(rules)} rules")
 
-        phase1_start = time.time()
-        chunks = self._phase1_initial_chunking(rules)
-        phase1_elapsed = time.time() - phase1_start
-
-        phase2_start = time.time()
-        if not chunks:
-            final_chunk = ChunkMeta(chunk_id=self._allocate_chunk_id(), rule_ids=[])
-        elif len(chunks) == 1:
-            final_chunk = chunks[0]
-        else:
-            final_chunk = self._phase2_merge_reduction(chunks)
-        phase2_elapsed = time.time() - phase2_start
+        final_chunk, phase1_elapsed, phase2_elapsed = self._pipelined_reduce(rules)
 
         basis_rules = [self.global_rules_dict[rid] for rid in final_chunk.rule_ids]
         total_tests = sum(item.get("n_subsumption_tests", 0) for item in self.phase1_stats)
@@ -133,7 +122,7 @@ class DivideConquerReducer:
             "eliminated_count": len(rules) - len(basis_rules),
             "reduction_rate": (len(rules) - len(basis_rules)) / len(rules) if rules else 0.0,
             "phase1": {
-                "n_chunks": len(chunks),
+                "n_chunks": len(self.phase1_stats),
                 "chunk_size": self._compute_chunk_size(len(rules)),
                 "elapsed_seconds": round(phase1_elapsed, 2),
                 "chunk_details": self.phase1_stats,
@@ -171,188 +160,210 @@ class DivideConquerReducer:
         self._next_chunk_id += 1
         return chunk_id
 
-    def _phase1_initial_chunking(self, rules: List[Any]) -> List[ChunkMeta]:
-        """Split rules into chunks and reduce each chunk independently."""
+    def _pipelined_reduce(self, rules: List[Any]) -> tuple[ChunkMeta, float, float]:
+        """Pipelined Phase 1 and Phase 2 reduction.
+
+        Returns:
+            (final_chunk, phase1_elapsed, phase2_elapsed)
+        """
+        if not rules:
+            return ChunkMeta(chunk_id=self._allocate_chunk_id(), rule_ids=[]), 0.0, 0.0
+
+        # Submit all Phase 1 tasks upfront
         chunk_size = self._compute_chunk_size(len(rules))
-        chunks = [
-            rules[i:i + chunk_size]
-            for i in range(0, len(rules), chunk_size)
-        ]
+        chunks_data = [rules[i:i + chunk_size] for i in range(0, len(rules), chunk_size)]
 
         if self.verbose:
-            print(
-                f"[DivideConquerReducer/Phase1] {len(rules)} rules → {len(chunks)} chunks "
-                f"(chunk_size={chunk_size})"
-            )
+            print(f"[Phase 1] Submitting {len(chunks_data)} chunks (size={chunk_size})")
 
-        futures = []
-        for chunk_idx, chunk_rules in enumerate(chunks):
+        phase1_remaining = []
+        for idx, chunk_rules in enumerate(chunks_data):
             future = reduce_chunk_worker_ray.remote(
-                chunk_idx,
-                chunk_rules,
-                self.timeout,
-                self.seed,
-                self.batch_size,
-                self.solver_type,
-                self.engine,
-                self.verbose,
+                idx, chunk_rules, self.timeout, self.seed, self.batch_size,
+                self.solver_type, self.engine, self.verbose
             )
-            futures.append((chunk_idx, len(chunk_rules), future))
+            phase1_remaining.append((idx, len(chunk_rules), future))
 
-        phase1_chunks: List[ChunkMeta] = []
-        remaining = list(futures)
-        while remaining:
-            ready_refs = [ref for _, _, ref in remaining]
-            done, _ = ray.wait(ready_refs, num_returns=1)
-            done_ref = done[0]
+        merge_queue: List[ChunkMeta] = []
+        active_merge_future = None
+        active_merge_info = None  # (chunk_A, chunk_B, merge_id)
 
-            for idx, (chunk_idx, input_count, ref) in enumerate(remaining):
-                if ref != done_ref:
-                    continue
-                remaining.pop(idx)
-                result = ray.get(done_ref)
-                basis_rules = result.get("basis_rules", [])
-                basis_ids = [rule.rule_id for rule in basis_rules]
-                phase1_chunks.append(ChunkMeta(chunk_id=chunk_idx, rule_ids=basis_ids))
-                self.eliminated_rules.extend(result.get("eliminated_rules", []))
+        phase1_start = time.time()
+        phase1_end = None
+        phase2_start = None
+        phase2_end = None
 
-                chunk_stats = {
-                    "chunk_id": chunk_idx,
-                    "input_count": input_count,
-                    "basis_count": len(basis_ids),
-                    "eliminated_count": input_count - len(basis_ids),
-                    "n_subsumption_tests": result.get("stats", {}).get("n_subsumption_tests", 0),
-                    "elapsed_seconds": round(result.get("time", 0), 2),
-                    "rule_ids": basis_ids,
-                }
-                self.phase1_stats.append(chunk_stats)
-                self._save_phase1_chunk(chunk_stats)
-                break
+        while phase1_remaining or len(merge_queue) > 1 or active_merge_future is not None:
+            something_ready = False
 
-        phase1_chunks.sort(key=lambda chunk: chunk.chunk_id)
-        self.phase1_stats.sort(key=lambda item: item["chunk_id"])
-        self._next_chunk_id = max((chunk.chunk_id for chunk in phase1_chunks), default=-1) + 1
-        return phase1_chunks
+            # 1. Non-blocking check: any Phase 1 chunk done?
+            if phase1_remaining:
+                refs = [ref for _, _, ref in phase1_remaining]
+                done, _ = ray.wait(refs, num_returns=1, timeout=0)
+                if done:
+                    something_ready = True
+                    done_ref = done[0]
+                    # Find which chunk completed
+                    for i, (chunk_idx, input_count, ref) in enumerate(phase1_remaining):
+                        if ref == done_ref:
+                            result = ray.get(done_ref)
+                            chunk_meta = self._process_phase1_result(chunk_idx, input_count, result)
+                            merge_queue.append(chunk_meta)
+                            phase1_remaining.pop(i)
+                            if self.verbose:
+                                print(f"[Phase 1] Chunk {chunk_idx} done: {input_count} → {len(chunk_meta.rule_ids)} rules")
+                            break
 
-    def _phase2_merge_reduction(self, chunks: List[ChunkMeta]) -> ChunkMeta:
-        """Merge chunks pairwise until one chunk remains."""
-        merge_queue = list(chunks)
+                    # Mark Phase 1 end when last chunk completes
+                    if not phase1_remaining and phase1_end is None:
+                        phase1_end = time.time()
 
-        if self.verbose:
-            print(f"[DivideConquerReducer/Phase2] Starting with {len(merge_queue)} chunks")
+            # 2. Non-blocking check: active merge done?
+            if active_merge_future is not None:
+                done, _ = ray.wait([active_merge_future], timeout=0)
+                if done:
+                    something_ready = True
+                    result = ray.get(active_merge_future)
+                    chunk_A, chunk_B, merge_id = active_merge_info
+                    merged_chunk = self._process_merge_result(chunk_A, chunk_B, merge_id, result)
+                    merge_queue.append(merged_chunk)
+                    active_merge_future = None
+                    active_merge_info = None
+                    if self.verbose:
+                        print(f"[Phase 2] Merge {merge_id} done: {len(merged_chunk.rule_ids)} rules")
 
-        while len(merge_queue) > 1:
-            chunk_a = merge_queue.pop(0)
-            chunk_b = merge_queue.pop(0)
-            merged_chunk = self._merge_two_chunks(chunk_a, chunk_b)
-            merge_queue.append(merged_chunk)
+            # 3. Start new merge if idle and queue >= 2
+            if active_merge_future is None and len(merge_queue) >= 2:
+                chunk_A = merge_queue.pop(0)
+                chunk_B = merge_queue.pop(0)
+                merge_id = self._merge_counter
+                self._merge_counter += 1
 
-            if self.verbose:
-                print(
-                    f"[DivideConquerReducer/Phase2] Queue size: {len(merge_queue)} "
-                    f"after merge {self._merge_counter}"
-                )
+                if phase2_start is None:
+                    phase2_start = time.time()
 
-        return merge_queue[0]
+                active_merge_future = self._submit_merge_task(chunk_A, chunk_B)
+                active_merge_info = (chunk_A, chunk_B, merge_id)
+                if self.verbose:
+                    print(f"[Phase 2] Starting merge {merge_id}: chunks {chunk_A.chunk_id} + {chunk_B.chunk_id}")
 
-    def _merge_two_chunks(self, chunk_a: ChunkMeta, chunk_b: ChunkMeta) -> ChunkMeta:
-        """Merge two already-reduced chunks."""
-        from newclid.proof_scout.reduction.ray_workers import (
-            ActiveStateActor,
-            test_and_update_worker_ray,
-        )
+            # 4. Block until any event if nothing was ready
+            if not something_ready:
+                all_refs = [ref for _, _, ref in phase1_remaining]
+                if active_merge_future is not None:
+                    all_refs.append(active_merge_future)
+                if all_refs:
+                    ray.wait(all_refs, num_returns=1)
 
-        self._merge_counter += 1
-        merge_id = self._merge_counter
+        # Mark Phase 2 end
+        if phase2_start is not None:
+            phase2_end = time.time()
 
-        rules_a = [self.global_rules_dict[rid] for rid in chunk_a.rule_ids]
-        rules_b = [self.global_rules_dict[rid] for rid in chunk_b.rule_ids]
-        rules_a_data = [serialize_rule(rule) for rule in rules_a]
-        rules_b_data = [serialize_rule(rule) for rule in rules_b]
+        # Handle edge cases
+        if phase1_end is None:
+            phase1_end = time.time()
+        if phase2_start is None:
+            phase2_start = phase1_end
+        if phase2_end is None:
+            phase2_end = phase2_start
 
-        if self.verbose:
-            print(
-                f"[DivideConquerReducer/merge {merge_id}] "
-                f"chunk {chunk_a.chunk_id} ({len(rules_a)}) + "
-                f"chunk {chunk_b.chunk_id} ({len(rules_b)})"
-            )
+        phase1_elapsed = phase1_end - phase1_start
+        phase2_elapsed = phase2_end - phase2_start
 
-        merge_start = time.time()
-        actor = ActiveStateActor.remote(len(rules_a), len(rules_b))
+        final_chunk = merge_queue[0] if merge_queue else ChunkMeta(chunk_id=self._allocate_chunk_id(), rule_ids=[])
+        return final_chunk, phase1_elapsed, phase2_elapsed
 
-        futures_step1 = [
-            test_and_update_worker_ray.remote(
-                rule_a_data,
-                rules_b_data,
-                actor,
-                "B",
-                self.timeout,
-                self.seed,
-                self.solver_type,
-                self.engine,
-            )
-            for rule_a_data in rules_a_data
-        ]
-        ray.get(futures_step1)
-        active_b = ray.get(actor.get_active_B.remote())
+    def _process_phase1_result(self, chunk_idx: int, input_count: int, result: Dict[str, Any]) -> ChunkMeta:
+        """Process Phase 1 chunk reduction result."""
+        basis_rules = result.get("basis_rules", [])
+        eliminated_rules = result.get("eliminated_rules", [])
+        stats = result.get("stats", {})
 
-        surviving_b_indices = [idx for idx, is_active in enumerate(active_b) if is_active]
-        surviving_b_data = [rules_b_data[idx] for idx in surviving_b_indices]
-        futures_step2 = [
-            test_and_update_worker_ray.remote(
-                rule_b_data,
-                rules_a_data,
-                actor,
-                "A",
-                self.timeout,
-                self.seed,
-                self.solver_type,
-                self.engine,
-            )
-            for rule_b_data in surviving_b_data
-        ]
-        if futures_step2:
-            ray.get(futures_step2)
+        # Extract rule IDs
+        basis_rule_ids = [r.rule_id for r in basis_rules]
 
-        active_a = ray.get(actor.get_active_A.remote())
-        active_b = ray.get(actor.get_active_B.remote())
-
-        merged_rule_ids = [
-            chunk_a.rule_ids[idx]
-            for idx, is_active in enumerate(active_a)
-            if is_active
-        ]
-        merged_rule_ids.extend(
-            chunk_b.rule_ids[idx]
-            for idx, is_active in enumerate(active_b)
-            if is_active
-        )
-
-        eliminated_a = [chunk_a.rule_ids[idx] for idx, is_active in enumerate(active_a) if not is_active]
-        eliminated_b = [chunk_b.rule_ids[idx] for idx, is_active in enumerate(active_b) if not is_active]
-        for rule_id in eliminated_a:
+        # Record eliminated rules
+        for elim_entry in eliminated_rules:
             self.eliminated_rules.append({
-                "rule_id": rule_id,
-                "rule_text": self.global_rules_dict[rule_id].rule_text,
-                "subsumed_by": f"merge_{merge_id}",
-                "reason": f"Eliminated during merge {merge_id} against chunk {chunk_b.chunk_id}",
-            })
-        for rule_id in eliminated_b:
-            self.eliminated_rules.append({
-                "rule_id": rule_id,
-                "rule_text": self.global_rules_dict[rule_id].rule_text,
-                "subsumed_by": f"merge_{merge_id}",
-                "reason": f"Eliminated during merge {merge_id} against chunk {chunk_a.chunk_id}",
+                "rule_id": elim_entry["rule_id"],
+                "eliminated_by": "phase1_chunk",
+                "chunk_id": chunk_idx,
+                "subsumed_by": elim_entry.get("subsumed_by"),
             })
 
-        n_tests_step1 = len(rules_a) * len(rules_b)
-        n_tests_step2 = len(surviving_b_indices) * len(rules_a)
+        # Save stats
+        chunk_stats = {
+            "chunk_id": chunk_idx,
+            "input_count": input_count,
+            "basis_count": len(basis_rule_ids),
+            "eliminated_count": len(eliminated_rules),
+            "n_subsumption_tests": stats.get("n_subsumption_tests", 0),
+            "elapsed_seconds": result.get("time", 0),
+            "basis_rule_ids": basis_rule_ids,
+        }
+        self.phase1_stats.append(chunk_stats)
+        self._save_phase1_chunk(chunk_stats)
+
+        return ChunkMeta(chunk_id=self._allocate_chunk_id(), rule_ids=basis_rule_ids)
+
+    def _submit_merge_task(self, chunk_A: ChunkMeta, chunk_B: ChunkMeta):
+        """Submit a merge task to Ray."""
+        rules_a_data = [serialize_rule(self.global_rules_dict[rid]) for rid in chunk_A.rule_ids]
+        rules_b_data = [serialize_rule(self.global_rules_dict[rid]) for rid in chunk_B.rule_ids]
+
+        return merge_two_chunks_ray.remote(
+            rules_a_data,
+            rules_b_data,
+            self.timeout,
+            self.seed,
+            self.solver_type,
+            self.engine,
+            self.batch_size,
+        )
+
+    def _process_merge_result(
+        self, chunk_A: ChunkMeta, chunk_B: ChunkMeta, merge_id: int, result: Dict[str, Any]
+    ) -> ChunkMeta:
+        """Process Phase 2 merge result."""
+        active_a = result["active_a"]
+        active_b = result["active_b"]
+        n_tests_step1 = result["n_tests_step1"]
+        n_tests_step2 = result["n_tests_step2"]
+        elapsed_seconds = result.get("elapsed_seconds", 0)
+
+        rules_a_ids = chunk_A.rule_ids
+        rules_b_ids = chunk_B.rule_ids
+
+        # Collect eliminated rules
+        eliminated_a = [rules_a_ids[i] for i, active in enumerate(active_a) if not active]
+        eliminated_b = [rules_b_ids[i] for i, active in enumerate(active_b) if not active]
+
+        for rid in eliminated_a:
+            self.eliminated_rules.append({
+                "rule_id": rid,
+                "eliminated_by": "phase2_merge",
+                "merge_id": merge_id,
+                "eliminated_from": "chunk_a",
+            })
+        for rid in eliminated_b:
+            self.eliminated_rules.append({
+                "rule_id": rid,
+                "eliminated_by": "phase2_merge",
+                "merge_id": merge_id,
+                "eliminated_from": "chunk_b",
+            })
+
+        # Merged rule IDs
+        merged_rule_ids = [rules_a_ids[i] for i, active in enumerate(active_a) if active]
+        merged_rule_ids += [rules_b_ids[i] for i, active in enumerate(active_b) if active]
+
+        # Save stats
         merge_stats = {
             "merge_id": merge_id,
-            "chunk_a_id": chunk_a.chunk_id,
-            "chunk_b_id": chunk_b.chunk_id,
-            "input_a_count": len(rules_a),
-            "input_b_count": len(rules_b),
+            "chunk_a_id": chunk_A.chunk_id,
+            "chunk_b_id": chunk_B.chunk_id,
+            "input_a_count": len(rules_a_ids),
+            "input_b_count": len(rules_b_ids),
             "surviving_a_count": sum(active_a),
             "surviving_b_count": sum(active_b),
             "basis_count": len(merged_rule_ids),
@@ -361,7 +372,7 @@ class DivideConquerReducer:
             "n_subsumption_tests": n_tests_step1 + n_tests_step2,
             "step1_tests": n_tests_step1,
             "step2_tests": n_tests_step2,
-            "elapsed_seconds": round(time.time() - merge_start, 2),
+            "elapsed_seconds": elapsed_seconds,
             "merged_rule_ids": merged_rule_ids,
         }
         self.phase2_stats.append(merge_stats)
