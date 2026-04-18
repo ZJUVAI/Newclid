@@ -111,15 +111,12 @@ class SubsumptionTesterCSolver(SubsumptionTester):
         try:
             from newclid.api import CSolver
 
-            use_log = self.engine != "weak"
-            use_exp = self.engine != "weak"
-
             csolver = CSolver(
                 points=rule_weak.points,
                 premises=rule_weak.premises,
                 goals=[rule_weak.goal],
-                using_log=use_log,
-                using_exp=use_exp,
+                using_log=True,
+                using_exp=True,
                 engine=self.engine,
             )
             custom_rule = _to_pipe_format(rule_strong.rule_id, rule_strong.rule_text)
