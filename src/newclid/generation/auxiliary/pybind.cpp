@@ -35,11 +35,12 @@ PYBIND11_MODULE(auxiliary, m) {
     m.def("add_potential_points",
         [](const std::vector<std::string>& point_names,
            const std::unordered_map<std::string, std::array<double, 2>>& coords_dict,
-           int max_points = 2) {
+           int max_points = 2,
+           uint32_t seed = 0) {
             auto coords = dict_to_coords(coords_dict);
-            return auxiliary_c::add_potential_points(point_names, coords, max_points);
+            return auxiliary_c::add_potential_points(point_names, coords, max_points, seed);
         },
-        py::arg("point_names"), py::arg("coords"), py::arg("max_points") = 2);
+        py::arg("point_names"), py::arg("coords"), py::arg("max_points") = 2, py::arg("seed") = 0);
 
     m.def("lines_cpp",
         [](const std::vector<std::string>& point_names,

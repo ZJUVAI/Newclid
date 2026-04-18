@@ -243,6 +243,7 @@ class EvalOutputNamingTests(unittest.TestCase):
     def test_build_eval_output_stem_includes_gpu_batch_params(self):
         stem = build_eval_output_stem(
             agent_type="vlm",
+            search_version="v1",
             problems_path=Path("benchmarks/imo_2000_p6.txt"),
             model_path="models/vlm_sft50/checkpoint-19194",
             decoding_size=2,
@@ -255,12 +256,13 @@ class EvalOutputNamingTests(unittest.TestCase):
         self.assertEqual(
             stem,
             "eval_single_problem_multi_gpu_vlm_imo_2000_p6_vlm_sft50_checkpoint-19194"
-            "_d2_b4_s1_gbs3_gbt250_seed123",
+            "_sv1_d2_b4_s1_gbs3_gbt250_seed123",
         )
 
     def test_trace_run_id_uses_eval_stem_and_timestamp_suffix(self):
         stem = build_eval_output_stem(
             agent_type="lm",
+            search_version="v1",
             problems_path=Path("benchmarks/imo_2004_p1.txt"),
             model_path="models/sft34/checkpoint-25750",
             decoding_size=8,
@@ -288,7 +290,7 @@ class EvalOutputNamingTests(unittest.TestCase):
         self.assertEqual(trace_run.run_dir.name, f"{stem}_{timestamp}")
 
     def test_build_timestamped_output_stem_reuses_trace_timestamp_suffix(self):
-        stem = "eval_single_problem_multi_gpu_vlm_imo_2008_p1b_model_d32_b512_s4_gbs4_gbt100"
+        stem = "eval_single_problem_multi_gpu_vlm_imo_2008_p1b_model_sv2_d32_b512_s4_gbs4_gbt100"
         timestamp = "20260410T120000Z"
 
         self.assertEqual(
@@ -297,7 +299,7 @@ class EvalOutputNamingTests(unittest.TestCase):
         )
 
     def test_csv_and_profiling_names_align_with_trace_timestamp(self):
-        stem = "eval_single_problem_multi_gpu_vlm_imo_2008_p1b_model_d32_b512_s4_gbs4_gbt100"
+        stem = "eval_single_problem_multi_gpu_vlm_imo_2008_p1b_model_sv2_d32_b512_s4_gbs4_gbt100"
         timestamp = "20260410T120000Z"
         timestamped_stem = build_timestamped_output_stem(stem, timestamp)
 
@@ -309,6 +311,44 @@ class EvalOutputNamingTests(unittest.TestCase):
 
 
 class SingleProblemEvalRunnerTests(unittest.TestCase):
+    def test_create_agent_passes_search_version_to_text_agent(self):
+        with patch("scripts.evaluation.LMAgent") as mock_lm_agent:
+            eval_runner_module.create_agent(
+                agent_type="lm",
+                search_version="v2",
+                model_pool="pool",
+                decoding_size=8,
+                beam_size=16,
+                search_depth=2,
+                gpu_batch_size=1,
+                gpu_batch_timeout_ms=0,
+                max_pending_ddar=4,
+                prepare_request_workers=2,
+                prepare_prefetch_limit=2,
+                render_root=Path("/tmp/render-root"),
+            )
+
+        self.assertEqual(mock_lm_agent.call_args.kwargs["search_version"], "v2")
+
+    def test_create_agent_passes_search_version_to_visual_agent(self):
+        with patch("scripts.evaluation.VLMAgent") as mock_vlm_agent:
+            eval_runner_module.create_agent(
+                agent_type="vlm",
+                search_version="v2",
+                model_pool="pool",
+                decoding_size=8,
+                beam_size=16,
+                search_depth=2,
+                gpu_batch_size=1,
+                gpu_batch_timeout_ms=0,
+                max_pending_ddar=4,
+                prepare_request_workers=2,
+                prepare_prefetch_limit=2,
+                render_root=Path("/tmp/render-root"),
+            )
+
+        self.assertEqual(mock_vlm_agent.call_args.kwargs["search_version"], "v2")
+
     def test_create_workers_wraps_visual_workers_with_trace_metadata(self):
         created: list[tuple[str, int, int]] = []
 
@@ -426,6 +466,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                                                         torch_seed=42,
                                                         timeout=3600,
                                                         agent_type="vlm",
+                                                        search_version="v2",
                                                         max_pending_ddar=2,
                                                         prepare_request_workers=2,
                                                         prepare_prefetch_limit=2,
@@ -437,7 +478,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
 
             csv_path = (
                 log_dir / "eval_single_problem_multi_gpu_vlm_benchmarks_tmp_model"
-                "_d32_b512_s4_gbs1_gbt100_seed42_20260410T120000Z.csv"
+                "_sv2_d32_b512_s4_gbs1_gbt100_seed42_20260410T120000Z.csv"
             )
             self.assertTrue(csv_path.exists())
             with csv_path.open(newline="", encoding="utf-8") as handle:
@@ -553,6 +594,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                                                         torch_seed=42,
                                                         timeout=3600,
                                                         agent_type="vlm",
+                                                        search_version="v1",
                                                         max_pending_ddar=2,
                                                         prepare_request_workers=2,
                                                         prepare_prefetch_limit=2,
@@ -562,7 +604,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
 
             trace_run_dir = (
                 log_dir / "eval_single_problem_multi_gpu_vlm_benchmarks_tmp_model"
-                "_d32_b512_s4_gbs1_gbt100_seed42_20260410T120000Z"
+                "_sv1_d32_b512_s4_gbs1_gbt100_seed42_20260410T120000Z"
             )
             self.assertTrue((trace_run_dir / "run_meta.json").exists())
             self.assertTrue(

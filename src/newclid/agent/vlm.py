@@ -42,6 +42,7 @@ class VLMAgent(BaseAgent):
         max_pending_ddar: int = 128,
         prepare_request_workers: int = 1,
         prepare_prefetch_limit: int = 1,
+        search_version: str = "v1",
         render_root: str | Path = "temp/single_problem_multi_gpu_eval_images",
         render_width: int = 1024,
         trace_writer=None,
@@ -60,40 +61,64 @@ class VLMAgent(BaseAgent):
             ddar_returns_proof=False,
             trace_writer=trace_writer,
         )
+        if search_version not in {"v1", "v2"}:
+            raise ValueError(f"Unsupported search_version: {search_version}")
+        self.search_version = search_version
         self.render_root = Path(render_root)
         self.render_root.mkdir(parents=True, exist_ok=True)
         self.render_width = render_width
         self._proof_defs: dict[str, Any] | None = None
+        self._root_problem_dsl: str | None = None
 
     def base_ddar_proof(self, proof: ProofState) -> ProofState:
         return deepcopy(proof)
 
     def seed_state(
         self, proof: ProofState, base_proof: ProofState
-    ) -> tuple[ProblemJGEX, ProofState | None]:
+    ) -> (
+        tuple[ProblemJGEX, ProofState | None]
+        | tuple[ProblemJGEX, ProofState | None, str]
+    ):
         del proof
         self._proof_defs = base_proof.defs
+        self._root_problem_dsl = self.problem_to_dsl(self.problemJGEX, base_proof.defs)
+        if self.search_version == "v2":
+            return self.problemJGEX, base_proof, ""
         return self.problemJGEX, base_proof
 
     def get_problem_from_state(
-        self, state: tuple[ProblemJGEX, ProofState | None]
+        self,
+        state: tuple[ProblemJGEX, ProofState | None]
+        | tuple[ProblemJGEX, ProofState | None, str],
     ) -> ProblemJGEX:
-        problem, _ = state
+        problem = state[0]
         return problem
 
     def prepare_request(
         self,
         *,
         request_id: str,
-        state: tuple[ProblemJGEX, ProofState | None],
+        state: tuple[ProblemJGEX, ProofState | None]
+        | tuple[ProblemJGEX, ProofState | None, str],
         proof: ProofState,
         depth: int,
     ) -> dict[str, object]:
         del proof
-        problem, current_proof = state
+        if self.search_version == "v2":
+            problem, current_proof, aux_prefix = state
+            query = self._root_problem_dsl
+            response_prefix = f"<aux>{aux_prefix} x00"
+        else:
+            problem, current_proof = state
+            query = self.problem_to_dsl(problem, current_proof.defs)
+            response_prefix = "<aux> x00"
         if current_proof is None:
             raise ValueError(
                 "Visual frontier state is missing the materialized proof for request preparation."
+            )
+        if query is None:
+            raise ValueError(
+                "Root VLM query is unavailable during request preparation."
             )
         stem = f"d{depth}_{request_id}"
         svg_path = self.render_root / f"{stem}.svg"
@@ -130,16 +155,12 @@ class VLMAgent(BaseAgent):
                 img_out = ImageOps.invert(img.convert("RGB"))
             img_out.save(png_path)
 
-        # Building the textual DSL prompt is logically distinct from the image
-        # pipeline and is useful when request preparation becomes CPU-bound.
-        query = self.problem_to_dsl(problem, current_proof.defs)
-
         return {
             "request_id": request_id,
             "query": query,
             "img_path": str(png_path),
             "new_point_name": self.get_new_point_name(problem),
-            "response_prefix": "<aux> x00",
+            "response_prefix": response_prefix,
             "with_predicate": False,
             "decoding_size": self.decoding_size,
             "_prepare_elapsed_s": time.perf_counter() - render_start,
@@ -152,8 +173,18 @@ class VLMAgent(BaseAgent):
         prior_state,
         ddar_result: dict[str, object],
         proof: ProofState,
-    ) -> tuple[ProblemJGEX, ProofState | None] | None:
-        del prior_state, ddar_result, proof
+        request: dict[str, Any],
+        aux_dsl: str,
+        raw_aux_text: str,
+    ) -> (
+        tuple[ProblemJGEX, ProofState | None]
+        | tuple[ProblemJGEX, ProofState | None, str]
+        | None
+    ):
+        del ddar_result, proof, request, raw_aux_text
+        if self.search_version == "v2":
+            return new_problem, None, aux_dsl[len("<aux>") :]
+        del prior_state, aux_dsl
         return new_problem, None
 
     def finalize_next_queue(
@@ -170,7 +201,11 @@ class VLMAgent(BaseAgent):
         materialized_queue = BeamQueue(max_size=next_queue.max_size)
         for val, stable_key, _, node in next_queue.iter_entries():
             node_id, parent_node_id, path_key, state = node
-            problem, current_proof = state
+            if self.search_version == "v2":
+                problem, current_proof, aux_prefix = state
+            else:
+                problem, current_proof = state
+                aux_prefix = None
             if current_proof is None:
                 try:
                     current_proof = build_problem_proof(problem, self._proof_defs)
@@ -188,8 +223,12 @@ class VLMAgent(BaseAgent):
                     )
                     continue
                 increment_profiling_count(profiling, "next_frontier_proof_built_count")
+            if self.search_version == "v2":
+                next_state = (problem, current_proof, aux_prefix)
+            else:
+                next_state = (problem, current_proof)
             materialized_queue.add(
-                node=(node_id, parent_node_id, path_key, (problem, current_proof)),
+                node=(node_id, parent_node_id, path_key, next_state),
                 val=val,
                 stable_key=stable_key,
             )

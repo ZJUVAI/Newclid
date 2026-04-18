@@ -38,9 +38,9 @@ from newclid.generation.auxiliary import (
 )
 
 
-def add_potential_points(point_names, coords, max_points):
+def add_potential_points(point_names, coords, max_points, seed=0):
     """Wrapper that converts C++ output format to Python-compatible format."""
-    result = _add_potential_points_cpp(point_names, coords, max_points)
+    result = _add_potential_points_cpp(point_names, coords, max_points, seed)
     converted = []
     for coord, construction_strings in result:
         constructions = []
@@ -119,8 +119,9 @@ class ClauseDAG:
     pruning functionality to keep only the deepest construction chains.
     """
 
-    def __init__(self):
+    def __init__(self, seed: int = 0):
         """Initialize an empty ClauseDAG."""
+        self.seed = seed
         self.nodes: list[ClauseNode] = []
         self.point_to_node: dict[str, ClauseNode] = {}
         self.point_coords: dict[str, tuple[float, float]] = {}
@@ -263,7 +264,9 @@ class ClauseDAG:
         coords = self.point_coords.copy()
 
         # Call the new add_potential_points function
-        potential_points = add_potential_points(point_names, coords, max_points)
+        potential_points = add_potential_points(
+            point_names, coords, max_points, seed=self.seed
+        )
 
         # Directly create Clause and add to DAG
         for coord, constructions in potential_points:
@@ -404,6 +407,7 @@ class ProblemSampler:
         )
         self.rng = numpy.random.default_rng(seed)
         random.seed(seed)
+        self.seed = seed if seed is not None else 0
         self.point_naming: PointNaming = None
         self.symbols_graph = None
         self.dep_graph: DependencyGraph = None
@@ -445,7 +449,7 @@ class ProblemSampler:
         self.point_naming = PointNaming()
         self.dep_graph = DependencyGraph(AlgebraicManipulator())
         self.symbols_graph = self.dep_graph.symbols_graph
-        self.dag = ClauseDAG()
+        self.dag = ClauseDAG(seed=self.seed)
 
         # Step 1: Sample initial clauses
         t0 = time.time()

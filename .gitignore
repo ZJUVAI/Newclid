@@ -66,6 +66,7 @@ outputs/
 tests_output
 exp/
 run.log
+logs/
 
 # TODO
 TODO.md

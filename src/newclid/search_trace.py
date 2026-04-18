@@ -136,6 +136,12 @@ class AttemptAggregator:
                         **self._candidate_attempt(record),
                         "ddar_status": attempt.get("ddar_status"),
                         "ddar_elapsed_time": attempt.get("ddar_elapsed_time"),
+                        "raw_aux_text": record.get(
+                            "raw_aux_text", attempt.get("raw_aux_text")
+                        ),
+                        "construction_text": record.get(
+                            "construction_text", attempt.get("construction_text")
+                        ),
                         "error_type": attempt.get("error_type"),
                         "error_message": attempt.get("error_message"),
                     }
@@ -224,6 +230,8 @@ class AttemptAggregator:
             "ddar_elapsed_time": None,
             "ddar_build_work_time_s": None,
             "ddar_engine_work_time_s": None,
+            "raw_aux_text": None,
+            "construction_text": None,
             "error_type": record.get("error_type"),
             "error_message": record.get("error_message"),
         }
@@ -253,6 +261,8 @@ class AttemptAggregator:
             "ddar_elapsed_time": None,
             "ddar_build_work_time_s": None,
             "ddar_engine_work_time_s": None,
+            "raw_aux_text": record.get("raw_aux_text"),
+            "construction_text": record.get("construction_text"),
             "error_type": record.get("error_type"),
             "error_message": record.get("error_message"),
         }

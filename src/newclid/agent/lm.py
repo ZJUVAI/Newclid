@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import string
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from newclid.agent.base import BaseAgent
 from newclid.agent.runtime.search_runtime import (
@@ -33,6 +33,7 @@ class LMAgent(BaseAgent):
         max_pending_ddar: int = 128,
         prepare_request_workers: int = 1,
         prepare_prefetch_limit: int = 1,
+        search_version: str = "v1",
         trace_writer=None,
     ):
         super().__init__(
@@ -49,28 +50,52 @@ class LMAgent(BaseAgent):
             ddar_returns_proof=False,
             trace_writer=trace_writer,
         )
+        if search_version not in {"v1", "v2"}:
+            raise ValueError(f"Unsupported search_version: {search_version}")
+        self.search_version = search_version
+        self._root_problem_dsl: str | None = None
 
-    def seed_state(self, proof: ProofState, base_proof: ProofState) -> ProblemJGEX:
-        del proof, base_proof
+    def seed_state(
+        self, proof: ProofState, base_proof: ProofState
+    ) -> ProblemJGEX | tuple[ProblemJGEX, str]:
+        del proof
+        self._root_problem_dsl = self.problem_to_dsl(self.problemJGEX, base_proof.defs)
+        if self.search_version == "v2":
+            return self.problemJGEX, ""
         return self.problemJGEX
 
-    def get_problem_from_state(self, state: ProblemJGEX) -> ProblemJGEX:
+    def get_problem_from_state(
+        self, state: ProblemJGEX | tuple[ProblemJGEX, str]
+    ) -> ProblemJGEX:
+        if self.search_version == "v2":
+            problem, _ = state
+            return problem
         return state
 
     def prepare_request(
         self,
         *,
         request_id: str,
-        state: ProblemJGEX,
+        state: ProblemJGEX | tuple[ProblemJGEX, str],
         proof: ProofState,
         depth: int,
     ) -> dict[str, object]:
         del depth
+        if self.search_version == "v2":
+            problem, aux_prefix = state
+            query = self._root_problem_dsl
+            response_prefix = f"<aux>{aux_prefix} x00"
+        else:
+            problem = state
+            query = self.problem_to_dsl(problem, proof.defs)
+            response_prefix = "<aux> x00"
+        if query is None:
+            raise ValueError("Root LM query is unavailable during request preparation.")
         return {
             "request_id": request_id,
-            "query": self.problem_to_dsl(state, proof.defs),
-            "new_point_name": self.get_new_point_name(state),
-            "response_prefix": "<aux> x00",
+            "query": query,
+            "new_point_name": self.get_new_point_name(problem),
+            "response_prefix": response_prefix,
             "with_predicate": False,
             "decoding_size": self.decoding_size,
         }
@@ -82,8 +107,15 @@ class LMAgent(BaseAgent):
         prior_state,
         ddar_result: dict[str, object],
         proof: ProofState,
-    ) -> ProblemJGEX:
-        del prior_state, ddar_result, proof
+        request: dict[str, Any],
+        aux_dsl: str,
+        raw_aux_text: str,
+    ) -> ProblemJGEX | tuple[ProblemJGEX, str]:
+        del ddar_result, proof, raw_aux_text
+        if self.search_version == "v2":
+            del request
+            return new_problem, aux_dsl[len("<aux>") :]
+        del prior_state, request, aux_dsl
         return new_problem
 
     def get_new_point_name(self, problem: ProblemJGEX) -> str:

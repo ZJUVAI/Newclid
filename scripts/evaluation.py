@@ -72,6 +72,7 @@ def sanitize_problem_name(problem_name: str) -> str:
 def build_eval_output_stem(
     *,
     agent_type: str,
+    search_version: str,
     problems_path: Path,
     model_path: str,
     decoding_size: int,
@@ -88,6 +89,7 @@ def build_eval_output_stem(
     model_name = f"{parent_folder}_{deepest_folder}" if parent_folder else deepest_folder
     return (
         f"eval_single_problem_multi_gpu_{agent_type}_{problems_name}_{model_name}"
+        f"_sv{search_version[-1]}"
         f"_d{decoding_size}_b{beam_size}_s{search_depth}"
         f"_gbs{gpu_batch_size}_gbt{gpu_batch_timeout_ms}_seed{torch_seed}"
     )
@@ -172,6 +174,7 @@ def create_workers(
 def create_agent(
     *,
     agent_type: str,
+    search_version: str,
     model_pool: ModelPool,
     decoding_size: int,
     beam_size: int,
@@ -196,6 +199,7 @@ def create_agent(
             max_pending_ddar=max_pending_ddar,
             prepare_request_workers=prepare_request_workers,
             prepare_prefetch_limit=prepare_prefetch_limit,
+            search_version=search_version,
             trace_writer=trace_writer,
         )
     if agent_type in {"vlm", "qwen35_vl"}:
@@ -210,6 +214,7 @@ def create_agent(
             max_pending_ddar=max_pending_ddar,
             prepare_request_workers=prepare_request_workers,
             prepare_prefetch_limit=prepare_prefetch_limit,
+            search_version=search_version,
             render_root=render_root,
             trace_writer=trace_writer,
         )
@@ -222,6 +227,7 @@ def solve_one_problem(
     problems_path: Path,
     model_pool: ModelPool,
     agent_type: str,
+    search_version: str,
     decoding_size: int,
     beam_size: int,
     search_depth: int,
@@ -246,6 +252,7 @@ def solve_one_problem(
 
     agent = create_agent(
         agent_type=agent_type,
+        search_version=search_version,
         model_pool=model_pool,
         decoding_size=decoding_size,
         beam_size=beam_size,
@@ -294,6 +301,7 @@ def solve_problems_single_problem_multi_gpu(
     torch_seed: int,
     timeout: int,
     agent_type: str,
+    search_version: str,
     max_pending_ddar: int | None,
     prepare_request_workers: int | None,
     prepare_prefetch_limit: int | None,
@@ -380,6 +388,7 @@ def solve_problems_single_problem_multi_gpu(
         visual_render_root.mkdir(parents=True, exist_ok=True)
         output_name_stem = build_eval_output_stem(
             agent_type=agent_type,
+            search_version=search_version,
             problems_path=filepath,
             model_path=model_path,
             decoding_size=decoding_size,
@@ -411,6 +420,7 @@ def solve_problems_single_problem_multi_gpu(
                     "gpu_batch_timeout_ms": gpu_batch_timeout_ms,
                     "torch_seed": torch_seed,
                     "timeout": timeout,
+                    "search_version": search_version,
                     "max_pending_ddar": max_pending_ddar,
                     "num_gpus_for_eval": num_gpus_for_eval,
                     "prepare_request_workers": prepare_request_workers,
@@ -421,6 +431,7 @@ def solve_problems_single_problem_multi_gpu(
 
         print(f"Total problems to solve: {len(problem_names)}")
         print(f"Using agent: {agent_type}")
+        print(f"Using search_version={search_version}")
         print(f"Using {num_gpus_for_eval} GPU workers")
         print(f"Using gpu_batch_size={gpu_batch_size}")
         print(f"Using gpu_batch_timeout_ms={gpu_batch_timeout_ms}")
@@ -474,6 +485,7 @@ def solve_problems_single_problem_multi_gpu(
                             problems_path=filepath,
                             model_pool=model_pool,
                             agent_type=agent_type,
+                            search_version=search_version,
                             decoding_size=decoding_size,
                             beam_size=beam_size,
                             search_depth=search_depth,
@@ -664,15 +676,22 @@ def main():
         help="Number of iterative auxiliary-construction expansion rounds.",
     )
     parser.add_argument(
+        "--search_version",
+        type=str,
+        default="v1",
+        choices=["v1", "v2"],
+        help="Search/prompt variant for auxiliary construction expansion.",
+    )
+    parser.add_argument(
         "--gpu_batch_size",
         type=int,
-        default=1,
+        default=2,
         help="Maximum number of prepared requests grouped into one GPU generate call.",
     )
     parser.add_argument(
         "--gpu_batch_timeout_ms",
         type=int,
-        default=0,
+        default=100,
         help="Optional wait budget for filling a GPU batch before dispatching a tail batch.",
     )
     parser.add_argument(
@@ -732,6 +751,7 @@ def main():
         torch_seed=args.torch_seed,
         timeout=args.timeout,
         agent_type=args.agent,
+        search_version=args.search_version,
         max_pending_ddar=args.max_pending_ddar,
         prepare_request_workers=args.prepare_request_workers,
         prepare_prefetch_limit=args.prepare_prefetch_limit,

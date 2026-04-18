@@ -19,14 +19,19 @@ CHECKPOINTS="${CHECKPOINTS:-latest}"
 
 MAX_WORKERS="${MAX_WORKERS:-40}"
 SEARCH_DEPTH="${SEARCH_DEPTH:-4}"
+SEARCH_VERSION="${SEARCH_VERSION:-v1}"
 TIMEOUT="${TIMEOUT:-3600}"
 AGENT="${AGENT:-lm}"
+GPU_BATCH_SIZE="${GPU_BATCH_SIZE:-2}"
+GPU_BATCH_TIMEOUT_MS="${GPU_BATCH_TIMEOUT_MS:-100}"
+ENABLE_TRACE="${ENABLE_TRACE:-false}"
+ENABLE_PROFILING="${ENABLE_PROFILING:-false}"
 
 CUDA_DEVICES="${CUDA_DEVICES:-0,1,2,3}"
 RAY_MEMORY_USAGE_THRESHOLD="${RAY_MEMORY_USAGE_THRESHOLD:-0.95}"
 
 REPORT_TO="${REPORT_TO:-}"
-SWANLAB_PROJECT="${SWANLAB_PROJECT:-genesisgeo}"
+SWANLAB_PROJECT="${SWANLAB_PROJECT:-GenesisGeo}"
 SWANLAB_WORKSPACE="${SWANLAB_WORKSPACE:-}"
 SWANLAB_EXP_NAME="${SWANLAB_EXP_NAME:-${MODEL_NAME}_eval}"
 SWANLAB_MODE="${SWANLAB_MODE:-cloud}"
@@ -143,28 +148,50 @@ dataset_stem_from_arg() {
     printf '%s\n' "${dataset_name%.txt}"
 }
 
+append_boolean_optional_arg() {
+    local -n target_args_ref="$1"
+    local flag_name="$2"
+    local raw_value="$3"
+    local normalized_value
+
+    normalized_value="$(printf '%s' "$raw_value" | tr '[:upper:]' '[:lower:]')"
+    case "$normalized_value" in
+        1|true|yes|on)
+            target_args_ref+=("--$flag_name")
+            ;;
+        0|false|no|off|'')
+            target_args_ref+=("--no-$flag_name")
+            ;;
+        *)
+            echo "Error: invalid boolean value '$raw_value' for $flag_name" >&2
+            exit 1
+            ;;
+    esac
+}
+
 eval_output_stem() {
     local dataset="$1"
     local model_path="$2"
     local decoding_size="$3"
     local beam_size="$4"
-    python - "$dataset" "$model_path" "$decoding_size" "$beam_size" "$SEARCH_DEPTH" "$AGENT" <<'PY'
+    python - "$dataset" "$model_path" "$decoding_size" "$beam_size" "$SEARCH_DEPTH" "$SEARCH_VERSION" "$AGENT" "$GPU_BATCH_SIZE" "$GPU_BATCH_TIMEOUT_MS" <<'PY'
 from pathlib import Path
 import sys
 
-from scripts.evaluation import build_eval_output_stem, normalize_agent_type
+from scripts.evaluation import build_eval_output_stem
 
-dataset, model_path, decoding_size, beam_size, search_depth, agent = sys.argv[1:]
+dataset, model_path, decoding_size, beam_size, search_depth, search_version, agent, gpu_batch_size, gpu_batch_timeout_ms = sys.argv[1:]
 print(
     build_eval_output_stem(
-        agent_type=normalize_agent_type(agent),
+        agent_type=agent,
+        search_version=search_version,
         problems_path=Path(dataset),
         model_path=model_path,
         decoding_size=int(decoding_size),
         beam_size=int(beam_size),
         search_depth=int(search_depth),
-        gpu_batch_size=1,
-        gpu_batch_timeout_ms=0,
+        gpu_batch_size=int(gpu_batch_size),
+        gpu_batch_timeout_ms=int(gpu_batch_timeout_ms),
         torch_seed=123,
     )
 )
@@ -215,6 +242,7 @@ init_swanlab_run_if_needed() {
         --checkpoints "$CHECKPOINTS" \
         --eval_configs "$EVAL_CONFIGS" \
         --agent "$AGENT" \
+        --search_version "$SEARCH_VERSION" \
         --max_workers "$MAX_WORKERS" \
         --search_depth "$SEARCH_DEPTH" \
         --timeout "$TIMEOUT")"
@@ -259,6 +287,7 @@ upload_eval_to_swanlab() {
         --model_name "$MODEL_NAME" \
         --model_path "$model_path" \
         --agent "$AGENT" \
+        --search_version "$SEARCH_VERSION" \
         --decoding_size "$decoding_size" \
         --beam_size "$beam_size" \
         --search_depth "$SEARCH_DEPTH" \
@@ -281,6 +310,10 @@ echo "Configs    : $EVAL_CONFIGS"
 echo "Checkpoints: $CHECKPOINTS"
 echo "Workers    : $MAX_WORKERS"
 echo "Agent      : $AGENT"
+echo "Search Ver : $SEARCH_VERSION"
+echo "GPU Batch  : size=$GPU_BATCH_SIZE timeout_ms=$GPU_BATCH_TIMEOUT_MS"
+echo "Trace      : $ENABLE_TRACE"
+echo "Profiling  : $ENABLE_PROFILING"
 if [ "$REPORT_TO_ENABLED" = true ]; then
     echo "Report To  : $REPORT_TO"
 fi
@@ -322,13 +355,20 @@ for checkpoint in "${CHECKPOINT_ITEMS[@]}"; do
                 --decoding_size "$decoding_size"
                 --beam_size "$beam_size"
                 --search_depth "$SEARCH_DEPTH"
+                --gpu_batch_size "$GPU_BATCH_SIZE"
+                --gpu_batch_timeout_ms "$GPU_BATCH_TIMEOUT_MS"
                 --timeout "$TIMEOUT"
                 --agent "$AGENT"
+                --search_version "$SEARCH_VERSION"
             )
+            append_boolean_optional_arg EVAL_ARGS "enable_trace" "$ENABLE_TRACE"
+            append_boolean_optional_arg EVAL_ARGS "enable_profiling" "$ENABLE_PROFILING"
 
             echo "Dataset    : $dataset_name"
             echo "DatasetPath: $dataset_path"
             echo "Config     : decoding_size=$decoding_size beam_size=$beam_size search_depth=$SEARCH_DEPTH"
+            echo "Search Ver : $SEARCH_VERSION"
+            echo "GPU Batch  : size=$GPU_BATCH_SIZE timeout_ms=$GPU_BATCH_TIMEOUT_MS"
             echo "CSV Stem   : $output_stem"
             echo "Eval Log   : $eval_log"
             echo "------------------------------------------"

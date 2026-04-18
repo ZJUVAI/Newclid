@@ -1,13 +1,14 @@
 import os
 
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
-from pathlib import Path
-import time
 import argparse
+import time
+from collections import OrderedDict, defaultdict
 from datetime import datetime
+from pathlib import Path
+
 import matplotlib.pyplot as plt
 import numpy as np
-from collections import defaultdict, OrderedDict
 
 # from newclid.agent.lm import LMAgent
 from newclid.api import GeometricSolverBuilder

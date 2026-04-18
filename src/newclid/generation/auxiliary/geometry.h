@@ -1,6 +1,7 @@
 #pragma once
 
 #include "circle.h"
+#include <cstdint>
 #include <string>
 #include <vector>
 #include <array>
@@ -22,7 +23,8 @@ using PotentialPoints = std::vector<PotentialPoint>;
 PotentialPoints add_potential_points(
     const std::vector<std::string>& point_names,
     const std::unordered_map<std::string, Point>& coords,
-    int max_points);
+    int max_points,
+    uint32_t seed = 0);
 
 // Intersection functions (internal)
 PotentialPoints intersection_between_lines(

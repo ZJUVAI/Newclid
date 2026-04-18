@@ -19,7 +19,7 @@ BASELINES = {
     "imo_ag_30.txt": 15,
     "imo_95.txt": 0,
     "jgex_ag_231.txt": 203,
-    "hageo_409_full.txt": 103,
+    "hageo_409.txt": 103,
 }
 
 

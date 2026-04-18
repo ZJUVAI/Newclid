@@ -105,6 +105,30 @@ class BatchedDecodeTests(unittest.TestCase):
             ],
         )
 
+    def test_decode_batched_continuations_preserves_nondefault_response_prefix(self):
+        requests = [
+            {
+                "request_id": "r0",
+                "response_prefix": "<aux> a x00",
+                "new_point_name": "q",
+            }
+        ]
+        model_inputs = {"input_ids": np.zeros((1, 4), dtype=np.int64)}
+        sequences = [np.array([0, 0, 0, 0, 51, 52])]
+
+        outputs = decode_batched_continuations(
+            requests=requests,
+            model_inputs=model_inputs,
+            sequences=sequences,
+            decoding_size=1,
+            decode_batch=lambda batch: [" r : coll a b q [001] ;"],
+        )
+
+        self.assertEqual(
+            outputs,
+            [["<aux> a x00 q r : coll a b q [001] ;"]],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
