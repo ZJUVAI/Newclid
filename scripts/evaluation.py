@@ -5,6 +5,7 @@ import csv
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 import logging
 import os
+import socket
 import sys
 import time
 import traceback
@@ -105,6 +106,82 @@ def configure_logging(*, force: bool = False) -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         force=force,
     )
+
+
+def reserve_port_across_hosts(hosts: list[str], max_attempts: int = 128) -> int:
+    unique_hosts: list[str] = []
+    for host in hosts:
+        if host and host not in unique_hosts:
+            unique_hosts.append(host)
+    if not unique_hosts:
+        raise ValueError("reserve_port_across_hosts requires at least one host.")
+
+    primary_host = unique_hosts[0]
+    last_error: OSError | None = None
+    for _ in range(max_attempts):
+        sockets: list[socket.socket] = []
+        try:
+            primary_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            primary_socket.bind((primary_host, 0))
+            port = int(primary_socket.getsockname()[1])
+            sockets.append(primary_socket)
+            for host in unique_hosts[1:]:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.bind((host, port))
+                sockets.append(sock)
+            return port
+        except OSError as exc:
+            last_error = exc
+        finally:
+            for sock in sockets:
+                sock.close()
+    raise RuntimeError(
+        f"Failed to reserve a shared free port across hosts {unique_hosts} after {max_attempts} attempts."
+    ) from last_error
+
+
+def reserve_unused_agent_ports(count: int) -> list[int]:
+    from ray._private.services import get_node_ip_address
+
+    node_ip = get_node_ip_address()
+    candidate_hosts = [node_ip]
+    if node_ip != "127.0.0.1":
+        candidate_hosts.append("127.0.0.1")
+    return [reserve_port_across_hosts(candidate_hosts) for _ in range(count)]
+
+
+def ray_init_with_explicit_agent_ports(init_kwargs: dict[str, object]) -> None:
+    # Ray still starts a dashboard agent even when include_dashboard=False.
+    # On this machine the auto-selected gRPC agent port has been colliding
+    # with lingering listeners on 127.0.0.1, so choose explicit free ports.
+    from ray._private.parameter import RayParams
+
+    (
+        metrics_agent_port,
+        dashboard_agent_listen_port,
+        runtime_env_agent_port,
+    ) = reserve_unused_agent_ports(3)
+    logger = logging.getLogger(__name__)
+    logger.info(
+        "ray.init local port override: metrics_agent_port=%d dashboard_agent_listen_port=%d runtime_env_agent_port=%d",
+        metrics_agent_port,
+        dashboard_agent_listen_port,
+        runtime_env_agent_port,
+    )
+
+    original_init = RayParams.__init__
+
+    def patched_init(self, *args, **kwargs):
+        kwargs.setdefault("metrics_agent_port", metrics_agent_port)
+        kwargs.setdefault("dashboard_agent_listen_port", dashboard_agent_listen_port)
+        kwargs.setdefault("runtime_env_agent_port", runtime_env_agent_port)
+        return original_init(self, *args, **kwargs)
+
+    RayParams.__init__ = patched_init
+    try:
+        ray.init(**init_kwargs)
+    finally:
+        RayParams.__init__ = original_init
 
 
 def render_table(all_tasks_info, start_time, reorder: bool):
@@ -327,12 +404,16 @@ def solve_problems_single_problem_multi_gpu(
         if not ray.is_initialized():
             init_kwargs = {
                 "address": ray_address,
-                "dashboard_host": "0.0.0.0",
                 "ignore_reinit_error": True,
             }
             if ray_address == "local":
                 init_kwargs["num_cpus"] = num_cpus
-            ray.init(**init_kwargs)
+                # Local eval does not rely on the Ray dashboard, and disabling it
+                # avoids startup failures when the dashboard agent cannot bind.
+                init_kwargs["include_dashboard"] = False
+                ray_init_with_explicit_agent_ports(init_kwargs)
+            else:
+                ray.init(**init_kwargs)
 
         available_gpus = int(ray.available_resources().get("GPU", 0))
         if available_gpus <= 0:
