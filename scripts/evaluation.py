@@ -144,6 +144,17 @@ def create_workers(
             )
             for worker_slot in range(num_gpus_for_eval)
         ]
+    if agent_type == "qwen3_vl_text":
+        from newclid.agent.runtime.vision_worker import Qwen3VLTextWorker
+
+        return [
+            WorkerHandleWrapper(
+                Qwen3VLTextWorker.remote(model_path, agent_type, torch_seed, worker_slot),
+                worker_trace_id=f"gpu:{worker_slot}",
+                worker_device=f"cuda:{worker_slot}",
+            )
+            for worker_slot in range(num_gpus_for_eval)
+        ]
     if agent_type in {"vlm", "qwen35_vl"}:
         from newclid.agent.runtime.vision_worker import VisionModelWorker
 
@@ -173,7 +184,7 @@ def create_agent(
     render_root: Path,
     trace_writer=None,
 ):
-    if agent_type in {"lm", "qwen35_text"}:
+    if agent_type in {"lm", "qwen35_text", "qwen3_vl_text"}:
         return LMAgent(
             model_pool=model_pool,
             decoding_size=decoding_size,
@@ -601,7 +612,7 @@ def main():
         "--agent",
         type=str,
         default="lm",
-        choices=["lm", "vlm", "qwen35_text", "qwen35_vl"],
+        choices=["lm", "vlm", "qwen35_text", "qwen35_vl", "qwen3_vl_text"],
         help="Agent backend to use for single-problem multi-GPU evaluation.",
     )
     parser.add_argument(

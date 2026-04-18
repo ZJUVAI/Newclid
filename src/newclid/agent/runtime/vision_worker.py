@@ -84,9 +84,35 @@ def _build_visual_messages(request: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
+def _build_text_only_messages(request: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": request["query"]},
+            ],
+        },
+    ]
+
+
 def _build_visual_prompt(processor, request: dict[str, Any]) -> str:
     text_prompt = processor.apply_chat_template(
         _build_visual_messages(request),
+        tokenize=False,
+        add_generation_prompt=True,
+    )
+    return (
+        text_prompt
+        + request.get("response_prefix", "<aux> x00")
+        + " "
+        + request["new_point_name"]
+    )
+
+
+def _build_text_only_prompt(processor, request: dict[str, Any]) -> str:
+    text_prompt = processor.apply_chat_template(
+        _build_text_only_messages(request),
         tokenize=False,
         add_generation_prompt=True,
     )
@@ -151,6 +177,19 @@ def _build_visual_batch_inputs(
     ).to(model.device)
 
 
+def _build_text_only_batch_inputs(
+    model,
+    processor,
+    requests: list[dict[str, Any]],
+) -> dict[str, Any]:
+    prompts = [_build_text_only_prompt(processor, request) for request in requests]
+    return processor(
+        text=prompts,
+        padding=True,
+        return_tensors="pt",
+    ).to(model.device)
+
+
 def _load_visual_processor():
     processor_source = (
         str(_QWEN3_VL_BASE_PROCESSOR_CACHE)
@@ -182,6 +221,86 @@ def generate_visual_aux_dsl_dict_batch(
     model_inputs = _build_visual_batch_inputs(model, processor, requests)
     profile["input_build_time_s"] += time.perf_counter() - input_build_start
     pad_token_id, eos_token_id = _resolve_visual_stop_tokens(processor, agent_kind)
+
+    generate_start = time.perf_counter()
+    generated_output = model.generate(
+        **model_inputs,
+        max_new_tokens=100,
+        num_beams=decoding_size,
+        num_return_sequences=decoding_size,
+        pad_token_id=pad_token_id,
+        eos_token_id=eos_token_id,
+        return_dict_in_generate=True,
+        output_scores=True,
+    )
+    profile["generate_time_s"] += time.perf_counter() - generate_start
+    scores = generated_output.sequences_scores.tolist()
+    prompt_token_counts = _count_prompt_tokens(model_inputs)
+    generated_token_counts = [
+        _count_generated_tokens(
+            sequence.tolist(),
+            prompt_token_count=prompt_token_counts[index // decoding_size],
+            pad_token_id=pad_token_id,
+            eos_token_id=eos_token_id,
+        )
+        for index, sequence in enumerate(generated_output.sequences)
+    ]
+    decode_start = time.perf_counter()
+    rebuilt_outputs = decode_batched_continuations(
+        requests=requests,
+        model_inputs=model_inputs,
+        sequences=generated_output.sequences,
+        decoding_size=decoding_size,
+        decode_batch=lambda batch: processor.batch_decode(
+            batch, skip_special_tokens=True
+        ),
+    )
+    profile["decode_time_s"] += time.perf_counter() - decode_start
+    results: list[dict[str, Any]] = []
+    for index, (request, aux_dsls) in enumerate(zip(requests, rebuilt_outputs)):
+        aux_dsl_dict: dict[str, float] = {}
+        start = index * decoding_size
+        end = start + decoding_size
+        for aux_dsl, score in zip(aux_dsls, scores[start:end]):
+            aux_dsl_dict[aux_dsl] = float(score)
+        request_profile = _build_request_profile(
+            prompt_token_count=prompt_token_counts[index],
+            generated_token_counts=generated_token_counts[start:end],
+            raw_candidate_count=len(aux_dsls),
+            unique_candidate_count=len(aux_dsl_dict),
+        )
+        _accumulate_request_profile(profile, request_profile)
+        results.append(
+            {
+                "request_id": request["request_id"],
+                "aux_dsl_dict": aux_dsl_dict,
+                "request_profile": request_profile,
+            }
+        )
+    return results, profile
+
+
+def generate_qwen3_text_only_aux_dsl_dict_batch(
+    model,
+    processor,
+    requests: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    if not requests:
+        return [], _create_worker_batch_profile(batch_size=0)
+    if any(request.get("with_predicate", False) for request in requests):
+        raise NotImplementedError(
+            "Batched generation currently supports with_predicate=False only."
+        )
+    decoding_size = int(requests[0]["decoding_size"])
+    if any(int(request["decoding_size"]) != decoding_size for request in requests):
+        raise ValueError("All requests in a batch must share decoding_size.")
+
+    profile = _create_worker_batch_profile(batch_size=len(requests))
+    input_build_start = time.perf_counter()
+    model_inputs = _build_text_only_batch_inputs(model, processor, requests)
+    profile["input_build_time_s"] += time.perf_counter() - input_build_start
+    pad_token_id = processor.tokenizer.pad_token_id
+    eos_token_id = processor.tokenizer.encode(" ;", add_special_tokens=False)[0]
 
     generate_start = time.perf_counter()
     generated_output = model.generate(
@@ -476,6 +595,148 @@ class VisionModelWorker(_BaseVisionWorker):
             profiles: list[dict[str, Any]] = []
             for request in requests:
                 request_results, request_profile = self._generate_group_with_fallback(
+                    [request]
+                )
+                all_results.extend(request_results)
+                profiles.append(request_profile)
+            merged_profile = _merge_worker_batch_profiles(*profiles)
+            merged_profile["fallback_time_s"] += time.perf_counter() - fallback_start
+            merged_profile["fallback_mode"] = "per_request"
+            return all_results, merged_profile
+
+
+@ray.remote(num_cpus=1, num_gpus=1, max_concurrency=1)
+class Qwen3VLTextWorker(_BaseVisionWorker):
+    def __init__(
+        self,
+        model_path: str,
+        agent_kind: str,
+        torch_seed: int = 123,
+        worker_slot: int = 0,
+    ):
+        resolved_path = resolve_model_path(model_path)
+        self.model_path = resolved_path
+        self.agent_kind = agent_kind
+        self.runtime = "transformers"
+        self.torch_seed = int(torch_seed)
+        self.worker_slot = int(worker_slot)
+        self.worker_id = f"gpu:{self.worker_slot}"
+        self.device_label = f"cuda:{self.worker_slot}"
+        torch.manual_seed(self.torch_seed)
+        if torch.cuda.is_available():
+            torch.cuda.manual_seed(self.torch_seed)
+            torch.cuda.manual_seed_all(self.torch_seed)
+        logger.info(
+            "Qwen3VLTextWorker init start: model_path=%s torch_seed=%d worker_id=%s",
+            resolved_path,
+            self.torch_seed,
+            self.worker_id,
+        )
+        self.model = Qwen3VLForConditionalGeneration.from_pretrained(
+            resolved_path,
+            torch_dtype="auto",
+            device_map="auto",
+            attn_implementation="flash_attention_2",
+        )
+        self.processor = _load_visual_processor()
+        self.processor.tokenizer.padding_side = "left"
+        self.num_requests = 0
+        self.num_batches = 0
+        logger.info(
+            "Qwen3VLTextWorker init done: model_device=%s padding_side=%s torch_seed=%d worker_id=%s",
+            next(self.model.parameters()).device,
+            self.processor.tokenizer.padding_side,
+            self.torch_seed,
+            self.worker_id,
+        )
+
+    def warmup(self) -> dict[str, Any]:
+        return {
+            "model_path": self.model_path,
+            "agent_kind": self.agent_kind,
+            "device": str(next(self.model.parameters()).device),
+            "padding_side": self.processor.tokenizer.padding_side,
+            "torch_seed": self.torch_seed,
+            "runtime": self.runtime,
+            "worker_id": self.worker_id,
+            "worker_slot": self.worker_slot,
+        }
+
+    @torch.no_grad()
+    def generate_batch(self, requests: list[dict[str, Any]]) -> dict[str, Any]:
+        if not requests:
+            return {
+                "results": [],
+                "worker_batch_profile": {
+                    **_create_worker_batch_profile(batch_size=0),
+                    "gpu_worker_id": self.worker_id,
+                    "gpu_device": self.device_label,
+                },
+            }
+        inference_start = time.time()
+        perf_start = time.perf_counter()
+        results, worker_batch_profile = self._generate_batch_with_fallback(requests)
+        return self._finalize_batch(
+            requests,
+            results,
+            worker_batch_profile,
+            perf_start=perf_start,
+            inference_start=inference_start,
+        )
+
+    def _generate_batch_with_fallback(
+        self, requests: list[dict[str, Any]]
+    ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+        try:
+            return generate_qwen3_text_only_aux_dsl_dict_batch(
+                self.model,
+                self.processor,
+                requests,
+            )
+        except Exception as exc:
+            if len(requests) == 1:
+                logger.exception(
+                    "Qwen3VLTextWorker generate failed for request_id=%s",
+                    requests[0].get("request_id"),
+                )
+                profile = _create_worker_batch_profile(batch_size=1)
+                profile["fallback_mode"] = "single_error"
+                return [
+                    _empty_result(requests[0], error=str(exc), batch_size=1)
+                ], profile
+            if _is_oom_error(exc):
+                logger.warning(
+                    "Qwen3VLTextWorker batched generate hit OOM; splitting batch_size=%d request_ids=%s",
+                    len(requests),
+                    [request.get("request_id") for request in requests],
+                )
+                fallback_start = time.perf_counter()
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                midpoint = len(requests) // 2
+                left_results, left_profile = self._generate_batch_with_fallback(
+                    requests[:midpoint]
+                )
+                right_results, right_profile = self._generate_batch_with_fallback(
+                    requests[midpoint:]
+                )
+                merged_profile = _merge_worker_batch_profiles(
+                    left_profile, right_profile
+                )
+                merged_profile["fallback_time_s"] += (
+                    time.perf_counter() - fallback_start
+                )
+                merged_profile["fallback_mode"] = "oom_split"
+                return left_results + right_results, merged_profile
+            logger.exception(
+                "Qwen3VLTextWorker batched generate failed; falling back to per-request execution for request_ids=%s",
+                [request.get("request_id") for request in requests],
+            )
+            fallback_start = time.perf_counter()
+            all_results: list[dict[str, Any]] = []
+            profiles: list[dict[str, Any]] = []
+            for request in requests:
+                request_results, request_profile = self._generate_batch_with_fallback(
                     [request]
                 )
                 all_results.extend(request_results)
