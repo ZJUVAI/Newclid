@@ -56,41 +56,83 @@ def _resolve_pass_key(rows: list[dict[str, Any]]) -> str:
     raise KeyError("No pass_at_* field found in difficulty-labeled rows")
 
 
-def _is_preferred(row: dict[str, Any], pass_key: str) -> bool:
-    return 0.15 <= row[pass_key] <= 0.60
+def _matches_pass_stage(
+    row: dict[str, Any], pass_key: str, stage: tuple[str, float, float]
+) -> bool:
+    _, min_pass, max_pass = stage
+    pass_value = float(row.get(pass_key, 0.0))
+    return min_pass <= pass_value <= max_pass
 
 
-def _is_fallback(row: dict[str, Any], pass_key: str) -> bool:
-    return 0.10 <= row[pass_key] <= 0.80
+def _build_pass_histogram(
+    rows: list[dict[str, Any]], pass_key: str
+) -> dict[str, int]:
+    return dict(
+        sorted(
+            Counter(f"{float(row.get(pass_key, 0.0)):.4f}" for row in rows).items(),
+            key=lambda item: float(item[0]),
+        )
+    )
 
 
 def filter_goldilocks(
     rows: list[dict[str, Any]],
-) -> tuple[list[dict[str, Any]], dict[str, int]]:
-    preferred = []
-    fallback = []
+    *,
+    preferred_min_pass: float,
+    preferred_max_pass: float,
+    fallback_min_pass: float,
+    fallback_max_pass: float,
+    relaxed_min_pass: float,
+    relaxed_max_pass: float,
+    mastered_pass_min: float,
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, Any]]:
     pass_key = _resolve_pass_key(rows)
+    stages = [
+        ("preferred", preferred_min_pass, preferred_max_pass),
+        ("fallback", fallback_min_pass, fallback_max_pass),
+        ("relaxed", relaxed_min_pass, relaxed_max_pass),
+    ]
+    stage_rows = {
+        "preferred": [],
+        "fallback": [],
+        "relaxed": [],
+        "non_dead": [],
+        "capped_mastered": [],
+    }
     stats = {
         "pass_key": pass_key,
         "removed_mastered": 0,
         "removed_all_invalid": 0,
-        "preferred_rows": 0,
-        "fallback_rows": 0,
+        "stage_available_rows": {},
+        "mastered_pass_threshold": mastered_pass_min,
     }
     for row in tqdm(rows, desc="Filtering goldilocks rows"):
-        if row.get("greedy_success") and row.get(pass_key, 0.0) >= 0.90:
+        pass_value = float(row.get(pass_key, 0.0))
+        if row.get("greedy_success") and pass_value >= mastered_pass_min:
             stats["removed_mastered"] += 1
+            stage_rows["capped_mastered"].append(
+                {**row, "_selection_stage": "capped_mastered"}
+            )
             continue
         if row.get("all_invalid"):
             stats["removed_all_invalid"] += 1
             continue
-        if _is_preferred(row, pass_key):
-            preferred.append(row)
-        elif _is_fallback(row, pass_key):
-            fallback.append(row)
-    stats["preferred_rows"] = len(preferred)
-    stats["fallback_rows"] = len(fallback)
-    return preferred, fallback, stats
+
+        assigned_stage = "non_dead"
+        for stage in stages:
+            if _matches_pass_stage(row, pass_key, stage):
+                assigned_stage = stage[0]
+                break
+        stage_rows[assigned_stage].append({**row, "_selection_stage": assigned_stage})
+
+    stats["stage_available_rows"] = {
+        stage_name: len(candidates) for stage_name, candidates in stage_rows.items()
+    }
+    return stage_rows, stats
+
+
+def _selected_mastered_count(selected: list[dict[str, Any]]) -> int:
+    return sum(1 for row in selected if row.get("_selection_stage") == "capped_mastered")
 
 
 def _take_matching(
@@ -99,12 +141,18 @@ def _take_matching(
     source: list[dict[str, Any]],
     predicate,
     limit: int,
+    mastered_cap: int,
 ) -> list[dict[str, Any]]:
     taken = []
     for row in source:
         if len(taken) >= limit:
             break
         if _row_id(row) in used_ids:
+            continue
+        if (
+            row.get("_selection_stage") == "capped_mastered"
+            and _selected_mastered_count(selected) >= mastered_cap
+        ):
             continue
         if predicate(row):
             used_ids.add(_row_id(row))
@@ -114,13 +162,40 @@ def _take_matching(
 
 
 def select_debug_rows(
-    rows: list[dict[str, Any]], target_size: int
+    rows: list[dict[str, Any]],
+    target_size: int,
+    *,
+    preferred_min_pass: float = 0.15,
+    preferred_max_pass: float = 0.60,
+    fallback_min_pass: float = 0.10,
+    fallback_max_pass: float = 0.80,
+    relaxed_min_pass: float = 0.05,
+    relaxed_max_pass: float = 0.90,
+    mastered_pass_min: float = 0.90,
+    mastered_max_fraction: float = 0.20,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    preferred, fallback, filter_stats = filter_goldilocks(rows)
-    source = preferred + fallback
+    stage_rows, filter_stats = filter_goldilocks(
+        rows,
+        preferred_min_pass=preferred_min_pass,
+        preferred_max_pass=preferred_max_pass,
+        fallback_min_pass=fallback_min_pass,
+        fallback_max_pass=fallback_max_pass,
+        relaxed_min_pass=relaxed_min_pass,
+        relaxed_max_pass=relaxed_max_pass,
+        mastered_pass_min=mastered_pass_min,
+    )
+    source = (
+        stage_rows["preferred"]
+        + stage_rows["fallback"]
+        + stage_rows["relaxed"]
+        + stage_rows["non_dead"]
+        + stage_rows["capped_mastered"]
+    )
     selected: list[dict[str, Any]] = []
     used_ids: set[str] = set()
     shortages: dict[str, int] = {}
+    pass_key = filter_stats["pass_key"]
+    mastered_cap = max(0, int(target_size * mastered_max_fraction))
 
     multi_segment_target = int(target_size * 0.50)
     multi_point_target = int(target_size * 0.40)
@@ -133,6 +208,7 @@ def select_debug_rows(
         source,
         lambda row: row.get("aux_segment_count", 0) >= 2,
         multi_segment_target,
+        mastered_cap,
     )
     shortages["multi_segment_shortage"] = max(0, multi_segment_target - len(taken))
 
@@ -142,6 +218,7 @@ def select_debug_rows(
         source,
         lambda row: row.get("aux_points_total", 0) >= 2,
         multi_point_target,
+        mastered_cap,
     )
     shortages["multi_point_shortage"] = max(0, multi_point_target - len(taken))
 
@@ -161,6 +238,7 @@ def select_debug_rows(
             source,
             lambda row, family=family: family in row.get("predicate_family_tags", []),
             need,
+            mastered_cap,
         )
         shortages[f"{family}_shortage"] = max(0, need - len(taken))
         for row in taken:
@@ -174,6 +252,11 @@ def select_debug_rows(
         if len(selected) >= target_size:
             break
         if _row_id(row) in used_ids:
+            continue
+        if (
+            row.get("_selection_stage") == "capped_mastered"
+            and _selected_mastered_count(selected) >= mastered_cap
+        ):
             continue
         goal_predicate = row.get("goal_predicate")
         if goal_predicate and goal_counter[goal_predicate] >= goal_cap:
@@ -194,19 +277,75 @@ def select_debug_rows(
         for row in selected[:target_size]
     ]
 
+    selected_full_rows = selected[:target_size]
+    selected_goal_counter = Counter(
+        row.get("goal_predicate") for row in selected_full_rows if row.get("goal_predicate")
+    )
+    selected_family_counter = Counter()
+    for row in selected_full_rows:
+        for tag in row.get("predicate_family_tags", []):
+            selected_family_counter[tag] += 1
+    selected_stage_counts = Counter(
+        row.get("_selection_stage", "unknown") for row in selected_full_rows
+    )
+    selected_mastered = _selected_mastered_count(selected_full_rows)
+    shortage_reasons = []
+    if len(final_rows) < target_size:
+        shortage_reasons.append("eligible_pool_exhausted_before_target")
+        if (
+            selected_stage_counts.get("capped_mastered", 0) >= mastered_cap
+            and len(stage_rows["capped_mastered"]) > mastered_cap
+        ):
+            shortage_reasons.append("mastered_cap_reached")
+        if filter_stats["removed_all_invalid"] > 0:
+            shortage_reasons.append("dead_rows_removed")
+        if filter_stats["removed_mastered"] > 0:
+            shortage_reasons.append("mastered_rows_limited")
+
     report = {
         **filter_stats,
         "target_size": target_size,
         "selected_rows": len(final_rows),
-        "selected_goal_predicate_distribution": dict(goal_counter.most_common()),
-        "selected_predicate_family_distribution": dict(family_counter.most_common()),
+        "stage_order": [
+            "preferred",
+            "fallback",
+            "relaxed",
+            "non_dead",
+            "capped_mastered",
+        ],
+        "stage_selected_rows": dict(selected_stage_counts),
+        "pass_windows": {
+            "preferred": [preferred_min_pass, preferred_max_pass],
+            "fallback": [fallback_min_pass, fallback_max_pass],
+            "relaxed": [relaxed_min_pass, relaxed_max_pass],
+        },
+        "mastered_max_fraction": mastered_max_fraction,
+        "mastered_cap_rows": mastered_cap,
+        "selected_mastered_rows": selected_mastered,
+        "selected_mastered_ratio": (
+            selected_mastered / len(final_rows) if final_rows else 0.0
+        ),
+        "selected_pass_histogram": _build_pass_histogram(selected_full_rows, pass_key),
+        "selected_goal_predicate_distribution": dict(selected_goal_counter.most_common()),
+        "selected_predicate_family_distribution": dict(
+            selected_family_counter.most_common()
+        ),
         "selected_aux_segment_count_distribution": dict(
-            sorted(Counter(row.get("aux_segment_count", 0) for row in selected).items())
+            sorted(
+                Counter(
+                    row.get("aux_segment_count", 0) for row in selected_full_rows
+                ).items()
+            )
         ),
         "selected_aux_points_total_distribution": dict(
-            sorted(Counter(row.get("aux_points_total", 0) for row in selected).items())
+            sorted(
+                Counter(
+                    row.get("aux_points_total", 0) for row in selected_full_rows
+                ).items()
+            )
         ),
         "shortages": shortages,
+        "shortage_reasons": shortage_reasons,
     }
     return final_rows, report
 
@@ -222,10 +361,29 @@ def main() -> None:
         help="JSON report path",
     )
     parser.add_argument("--target-size", type=int, default=2000)
+    parser.add_argument("--preferred-pass-min", type=float, default=0.15)
+    parser.add_argument("--preferred-pass-max", type=float, default=0.60)
+    parser.add_argument("--fallback-pass-min", type=float, default=0.10)
+    parser.add_argument("--fallback-pass-max", type=float, default=0.80)
+    parser.add_argument("--relaxed-pass-min", type=float, default=0.05)
+    parser.add_argument("--relaxed-pass-max", type=float, default=0.90)
+    parser.add_argument("--mastered-pass-min", type=float, default=0.90)
+    parser.add_argument("--mastered-max-fraction", type=float, default=0.20)
     args = parser.parse_args()
 
     rows = load_jsonl(args.input)
-    final_rows, report = select_debug_rows(rows, args.target_size)
+    final_rows, report = select_debug_rows(
+        rows,
+        args.target_size,
+        preferred_min_pass=args.preferred_pass_min,
+        preferred_max_pass=args.preferred_pass_max,
+        fallback_min_pass=args.fallback_pass_min,
+        fallback_max_pass=args.fallback_pass_max,
+        relaxed_min_pass=args.relaxed_pass_min,
+        relaxed_max_pass=args.relaxed_pass_max,
+        mastered_pass_min=args.mastered_pass_min,
+        mastered_max_fraction=args.mastered_max_fraction,
+    )
     write_jsonl(args.output, final_rows)
     write_json(args.report_output, report)
     print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))

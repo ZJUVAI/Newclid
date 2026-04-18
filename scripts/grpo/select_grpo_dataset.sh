@@ -48,6 +48,7 @@ CANDIDATE_POOL_SUMMARY_JSON="$OUTPUT_DIR/candidate_pool_summary.json"
 PREFILTERED_JSONL="$OUTPUT_DIR/candidate_pool_prefiltered.jsonl"
 PREFILTER_REPORT_JSON="$OUTPUT_DIR/candidate_pool_prefilter_report.json"
 DIFFICULTY_JSONL="$OUTPUT_DIR/difficulty_labels.jsonl"
+DIFFICULTY_SUMMARY_JSON="$OUTPUT_DIR/difficulty_labels_summary.json"
 SELECTED_JSONL="$OUTPUT_DIR/grpo_train_selected.jsonl"
 SELECTED_REPORT_JSON="$OUTPUT_DIR/grpo_train_report.json"
 SELECTED_ANNOTATED_JSONL="$OUTPUT_DIR/grpo_train_selected_annotated.jsonl"
@@ -73,6 +74,7 @@ SELECTED_SUMMARY_JSON="$OUTPUT_DIR/grpo_train_selected_summary.json"
 "$PYTHON_BIN" "$LABEL_SCRIPT" \
     "$PREFILTERED_JSONL" \
     "$DIFFICULTY_JSONL" \
+    --summary-output "$DIFFICULTY_SUMMARY_JSON" \
     --model-path "$MODEL_PATH" \
     --num-samples "$LABEL_NUM_SAMPLES" \
     --temperature "$LABEL_TEMPERATURE" \

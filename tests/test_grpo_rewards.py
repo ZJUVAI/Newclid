@@ -111,6 +111,20 @@ class TestGRPORewards(unittest.TestCase):
         self.assertEqual(first, second)
         self.assertEqual(wrapped.call_count, 1)
 
+    def test_reward_respects_env_overrides(self):
+        with mock.patch.dict(
+            "os.environ",
+            {
+                "NEWCLID_GRPO_VALID_REWARD": "0.4",
+                "NEWCLID_GRPO_INVALID_BUILD_REWARD": "-0.5",
+            },
+            clear=False,
+        ):
+            evaluator = AuxRewardEvaluator()
+
+        self.assertEqual(evaluator.valid_reward, 0.4)
+        self.assertEqual(evaluator.invalid_build_reward, -0.5)
+
     def test_prepare_grpo_aux_dataset(self):
         script_path = Path("scripts/grpo/prepare_grpo_aux_dataset.py")
         spec = importlib.util.spec_from_file_location(

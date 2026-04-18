@@ -487,6 +487,88 @@ class TestGRPODataSelection(unittest.TestCase):
         self.assertEqual(report["pass_key"], "pass_at_8")
         self.assertEqual(report["removed_mastered"], 1)
 
+    def test_select_debug_rows_relaxes_into_non_dead_and_caps_mastered(self):
+        rows = [
+            {
+                "sample_id": "s1",
+                "query": "q1",
+                "fl_problem": "p1",
+                "response": "r1",
+                "greedy_success": False,
+                "pass_at_16": 0.20,
+                "all_invalid": False,
+                "goal_predicate": "eqratio",
+                "predicate_family_tags": ["ratio_family"],
+                "aux_segment_count": 2,
+                "aux_points_total": 2,
+            },
+            {
+                "sample_id": "s2",
+                "query": "q2",
+                "fl_problem": "p2",
+                "response": "r2",
+                "greedy_success": False,
+                "pass_at_16": 0.70,
+                "all_invalid": False,
+                "goal_predicate": "perp",
+                "predicate_family_tags": ["parallel_perp_family"],
+                "aux_segment_count": 1,
+                "aux_points_total": 1,
+            },
+            {
+                "sample_id": "s3",
+                "query": "q3",
+                "fl_problem": "p3",
+                "response": "r3",
+                "greedy_success": False,
+                "pass_at_16": 0.92,
+                "all_invalid": False,
+                "goal_predicate": "eqangle",
+                "predicate_family_tags": ["angle_family"],
+                "aux_segment_count": 1,
+                "aux_points_total": 1,
+            },
+            {
+                "sample_id": "m1",
+                "query": "q4",
+                "fl_problem": "p4",
+                "response": "r4",
+                "greedy_success": True,
+                "pass_at_16": 0.95,
+                "all_invalid": False,
+                "goal_predicate": "cyclic",
+                "predicate_family_tags": ["circle_family"],
+                "aux_segment_count": 1,
+                "aux_points_total": 1,
+            },
+            {
+                "sample_id": "m2",
+                "query": "q5",
+                "fl_problem": "p5",
+                "response": "r5",
+                "greedy_success": True,
+                "pass_at_16": 0.99,
+                "all_invalid": False,
+                "goal_predicate": "eqratio",
+                "predicate_family_tags": ["ratio_family"],
+                "aux_segment_count": 1,
+                "aux_points_total": 1,
+            },
+        ]
+
+        final_rows, report = self.select_debug_set.select_debug_rows(
+            rows, target_size=5, mastered_max_fraction=0.20
+        )
+
+        self.assertEqual(len(final_rows), 4)
+        self.assertEqual(report["stage_selected_rows"]["preferred"], 1)
+        self.assertEqual(report["stage_selected_rows"]["fallback"], 1)
+        self.assertEqual(report["stage_selected_rows"]["non_dead"], 1)
+        self.assertEqual(report["stage_selected_rows"]["capped_mastered"], 1)
+        self.assertEqual(report["selected_mastered_rows"], 1)
+        self.assertIn("mastered_cap_reached", report["shortage_reasons"])
+        self.assertEqual(report["selected_pass_histogram"]["0.9500"], 1)
+
     def test_file_round_trip_for_candidate_pool(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)

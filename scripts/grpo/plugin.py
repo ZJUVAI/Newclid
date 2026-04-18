@@ -1,7 +1,9 @@
 """SWIFT plugin entrypoint for GRPO auxiliary-point rewards."""
 
+from collections import Counter
 import inspect
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +71,69 @@ class AuxReward(_AuxReward, ORM):
     """SWIFT-compatible wrapper around the aux evaluator."""
 
     def __init__(self, *args, **kwargs):
-        _AuxReward.__init__(self)
+        reward_log_interval = kwargs.pop(
+            "reward_log_interval",
+            os.getenv("NEWCLID_GRPO_REWARD_LOG_INTERVAL", "50"),
+        )
+        _AuxReward.__init__(self, **kwargs)
+        self._reward_log_interval = max(0, int(reward_log_interval))
+        self._call_count = 0
+        self._last_log_bucket = -1
+        self._window_status_counts = Counter()
+        self._window_sample_count = 0
         # Don't call ORM.__init__ as it's just a marker class
+
+    @staticmethod
+    def _extract_step(kwargs) -> int | None:
+        for key in ("global_step", "step", "trainer_step"):
+            value = kwargs.get(key)
+            if isinstance(value, int):
+                return value
+        for key in ("state", "trainer_state"):
+            state = kwargs.get(key)
+            if isinstance(state, dict):
+                for inner_key in ("global_step", "step"):
+                    value = state.get(inner_key)
+                    if isinstance(value, int):
+                        return value
+            for inner_key in ("global_step", "step"):
+                value = getattr(state, inner_key, None)
+                if isinstance(value, int):
+                    return value
+        return None
+
+    def _record_reward_window(self, results, kwargs) -> None:
+        self._call_count += 1
+        self._window_status_counts.update(result.ddar_status for result in results)
+        self._window_sample_count += len(results)
+        if self._reward_log_interval <= 0 or self._window_sample_count == 0:
+            return
+
+        step = self._extract_step(kwargs)
+        marker = step if step is not None else self._call_count
+        bucket = marker // self._reward_log_interval
+        if marker <= 0 or bucket <= self._last_log_bucket:
+            return
+
+        solved = self._window_status_counts.get("solved", 0)
+        valid_unsolved = self._window_status_counts.get("unsolved", 0)
+        build_invalid = self._window_status_counts.get("build_invalid", 0)
+        format_invalid = self._window_status_counts.get("format_invalid", 0)
+        engine_error = self._window_status_counts.get("engine_error", 0)
+        total = self._window_sample_count
+        logger.info(
+            "GRPO reward states up to step=%s: solved=%.3f valid=%.3f build_invalid=%.3f format_invalid=%.3f engine_error=%.3f samples=%d",
+            marker,
+            solved / total,
+            valid_unsolved / total,
+            build_invalid / total,
+            format_invalid / total,
+            engine_error / total,
+            total,
+        )
+        self._window_status_counts.clear()
+        self._window_sample_count = 0
+        self._last_log_bucket = bucket
 
     def __call__(self, completions=None, **kwargs) -> list[float]:
         """SWIFT-compatible __call__ that accepts completions as positional or kwarg."""
@@ -84,8 +147,11 @@ class AuxReward(_AuxReward, ORM):
         # Extract fl_problem from kwargs
         fl_problem = kwargs.pop('fl_problem', None)
 
-        # Call parent implementation
-        return _AuxReward.__call__(self, completions, fl_problem=fl_problem, **kwargs)
+        results = self.evaluate_batch(
+            completions, fl_problem=fl_problem, **kwargs
+        )
+        self._record_reward_window(results, kwargs)
+        return [result.reward for result in results]
 
 
 orms["aux_reward"] = AuxReward

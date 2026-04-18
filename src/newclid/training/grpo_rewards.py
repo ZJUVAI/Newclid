@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import os
 import re
 from dataclasses import dataclass
 from fractions import Fraction
@@ -68,26 +69,47 @@ def _coerce_problem_text(problem_dsl: Any) -> str:
     return match.group(1).strip() if match else text.strip()
 
 
+def _resolve_reward_value(
+    explicit_value: Optional[float], env_name: str, default_value: float
+) -> float:
+    if explicit_value is not None:
+        return explicit_value
+    env_value = os.getenv(env_name)
+    if env_value is None:
+        return default_value
+    return float(env_value)
+
+
 class AuxRewardEvaluator:
     """Evaluate an aux completion against the geometric engine."""
 
     def __init__(
         self,
         *,
-        solved_reward: float = 1.0,
-        valid_reward: float = 0.25,
-        invalid_build_reward: float = -0.25,
-        invalid_format_reward: float = -1.0,
-        engine_error_reward: float = 0.0,
+        solved_reward: Optional[float] = None,
+        valid_reward: Optional[float] = None,
+        invalid_build_reward: Optional[float] = None,
+        invalid_format_reward: Optional[float] = None,
+        engine_error_reward: Optional[float] = None,
         build_max_attempts: int = 100,
         ddar_max_level: int = 500,
         random_seed: int = 998244353,
     ) -> None:
-        self.solved_reward = solved_reward
-        self.valid_reward = valid_reward
-        self.invalid_build_reward = invalid_build_reward
-        self.invalid_format_reward = invalid_format_reward
-        self.engine_error_reward = engine_error_reward
+        self.solved_reward = _resolve_reward_value(
+            solved_reward, "NEWCLID_GRPO_SOLVED_REWARD", 1.0
+        )
+        self.valid_reward = _resolve_reward_value(
+            valid_reward, "NEWCLID_GRPO_VALID_REWARD", 0.25
+        )
+        self.invalid_build_reward = _resolve_reward_value(
+            invalid_build_reward, "NEWCLID_GRPO_INVALID_BUILD_REWARD", -0.25
+        )
+        self.invalid_format_reward = _resolve_reward_value(
+            invalid_format_reward, "NEWCLID_GRPO_INVALID_FORMAT_REWARD", -1.0
+        )
+        self.engine_error_reward = _resolve_reward_value(
+            engine_error_reward, "NEWCLID_GRPO_ENGINE_ERROR_REWARD", 0.0
+        )
         self.build_max_attempts = build_max_attempts
         self.ddar_max_level = ddar_max_level
         self.random_seed = random_seed
@@ -255,10 +277,12 @@ class AuxRewardEvaluator:
 class AuxReward:
     """Adapter around the evaluator for environments without SWIFT base types."""
 
-    def __init__(self) -> None:
-        self.evaluator = AuxRewardEvaluator()
+    def __init__(self, **kwargs) -> None:
+        self.evaluator = AuxRewardEvaluator(**kwargs)
 
-    def __call__(self, completions, fl_problem=None, **kwargs) -> list[float]:
+    def evaluate_batch(self, completions, fl_problem=None, **kwargs) -> list[AuxEvaluationResult]:
+        del kwargs
+
         if isinstance(completions, str):
             completions = [completions]
 
@@ -273,9 +297,17 @@ class AuxReward:
         if len(problem_texts) != len(completions):
             raise ValueError("`fl_problem` must align with completions.")
 
-        rewards = []
+        results = []
         for completion, sample_problem_text in zip(completions, problem_texts):
-            rewards.append(
-                self.evaluator.evaluate(completion, sample_problem_text).reward
+            results.append(
+                self.evaluator.evaluate(completion, sample_problem_text)
             )
-        return rewards
+        return results
+
+    def __call__(self, completions, fl_problem=None, **kwargs) -> list[float]:
+        return [
+            result.reward
+            for result in self.evaluate_batch(
+                completions, fl_problem=fl_problem, **kwargs
+            )
+        ]

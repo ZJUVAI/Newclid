@@ -9,10 +9,11 @@ import os
 import subprocess
 import sys
 import time
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from newclid.training.grpo_rewards import AuxRewardEvaluator
+from newclid.training.grpo_rewards import AuxEvaluationResult, AuxRewardEvaluator
 from scripts._tqdm import tqdm
 
 
@@ -32,6 +33,13 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
         for row in rows:
             handle.write(json.dumps(row, ensure_ascii=False))
             handle.write("\n")
+
+
+def write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
+        handle.write("\n")
 
 
 class VLMCompletionGenerator:
@@ -95,6 +103,108 @@ class VLMCompletionGenerator:
         return greedy_outputs, sampled_outputs
 
 
+def aggregate_difficulty_metrics(
+    sample: dict[str, Any],
+    greedy_completion: str,
+    sampled_completions: list[str],
+    evaluator: AuxRewardEvaluator,
+    *,
+    num_samples: int,
+) -> dict[str, Any]:
+    greedy_result = evaluator.evaluate(greedy_completion, sample["fl_problem"])
+    sampled_results = [
+        evaluator.evaluate(completion, sample["fl_problem"])
+        for completion in sampled_completions
+    ]
+    pass_key = f"pass_at_{num_samples}"
+    valid_key = f"valid_at_{num_samples}"
+    fmt_key = f"format_valid_at_{num_samples}"
+
+    ddar_valid_count = sum(1 for result in sampled_results if result.build_ok)
+    ddar_solved_count = sum(
+        1 for result in sampled_results if result.ddar_status == "solved"
+    )
+    format_valid_count = sum(1 for result in sampled_results if result.format_ok)
+    normalized_aux_values = [
+        result.normalized_aux for result in sampled_results if result.normalized_aux
+    ]
+    unique_aux_count = len(set(normalized_aux_values))
+    duplicate_aux_ratio = 0.0
+    if sampled_results:
+        duplicate_aux_ratio = 1.0 - (unique_aux_count / len(sampled_results))
+
+    status_counts = Counter(result.ddar_status for result in sampled_results)
+    n = len(sampled_results) or 1
+    return {
+        **sample,
+        "greedy_success": greedy_result.ddar_status == "solved",
+        "greedy_status": greedy_result.ddar_status,
+        "greedy_build_ok": greedy_result.build_ok,
+        "greedy_format_ok": greedy_result.format_ok,
+        pass_key: ddar_solved_count / n,
+        valid_key: ddar_valid_count / n,
+        fmt_key: format_valid_count / n,
+        "ddar_valid_count": ddar_valid_count,
+        "ddar_solved_count": ddar_solved_count,
+        "format_valid_count": format_valid_count,
+        "solved_count": status_counts.get("solved", 0),
+        "unsolved_count": status_counts.get("unsolved", 0),
+        "build_invalid_count": status_counts.get("build_invalid", 0),
+        "format_invalid_count": status_counts.get("format_invalid", 0),
+        "engine_error_count": status_counts.get("engine_error", 0),
+        "ddar_status_counts": dict(sorted(status_counts.items())),
+        "unique_aux_count": unique_aux_count,
+        "duplicate_aux_ratio": duplicate_aux_ratio,
+        "all_invalid": ddar_valid_count == 0,
+    }
+
+
+def build_summary(
+    rows: list[dict[str, Any]], *, num_samples: int, elapsed_seconds: float
+) -> dict[str, Any]:
+    pass_key = f"pass_at_{num_samples}"
+    pass_histogram = Counter()
+    greedy_success_count = 0
+    all_invalid_count = 0
+    status_totals = Counter()
+    invalidity_totals = Counter()
+    duplicate_aux_ratios = []
+    unique_aux_counts = []
+    for row in rows:
+        pass_histogram[f"{float(row.get(pass_key, 0.0)):.4f}"] += 1
+        greedy_success_count += int(bool(row.get("greedy_success")))
+        all_invalid_count += int(bool(row.get("all_invalid")))
+        status_totals.update(row.get("ddar_status_counts", {}))
+        invalidity_totals["build_invalid"] += int(row.get("build_invalid_count", 0))
+        invalidity_totals["format_invalid"] += int(row.get("format_invalid_count", 0))
+        invalidity_totals["engine_error"] += int(row.get("engine_error_count", 0))
+        duplicate_aux_ratios.append(float(row.get("duplicate_aux_ratio", 0.0)))
+        unique_aux_counts.append(int(row.get("unique_aux_count", 0)))
+
+    total = len(rows)
+    return {
+        "total_rows": total,
+        "num_samples": num_samples,
+        "pass_key": pass_key,
+        "elapsed_seconds": elapsed_seconds,
+        "greedy_success_count": greedy_success_count,
+        "greedy_success_rate": greedy_success_count / total if total else 0.0,
+        "all_invalid_count": all_invalid_count,
+        "all_invalid_rate": all_invalid_count / total if total else 0.0,
+        "pass_histogram": dict(
+            sorted(pass_histogram.items(), key=lambda item: float(item[0]))
+        ),
+        "sampled_status_totals": dict(sorted(status_totals.items())),
+        "invalidity_totals": dict(sorted(invalidity_totals.items())),
+        "avg_duplicate_aux_ratio": (
+            sum(duplicate_aux_ratios) / total if duplicate_aux_ratios else 0.0
+        ),
+        "avg_unique_aux_count": (
+            sum(unique_aux_counts) / total if unique_aux_counts else 0.0
+        ),
+    }
+
+
 def label_difficulty(
     rows: list[dict[str, Any]],
     generator: VLMCompletionGenerator,
@@ -107,8 +217,6 @@ def label_difficulty(
     labeled_rows = []
     start_time = time.perf_counter()
     pass_key = f"pass_at_{num_samples}"
-    valid_key = f"valid_at_{num_samples}"
-    fmt_key = f"format_valid_at_{num_samples}"
 
     total_batches = (len(rows) + batch_size - 1) // batch_size
     for batch_start in tqdm(
@@ -123,27 +231,14 @@ def label_difficulty(
         )
 
         for i, row in enumerate(batch):
-            greedy_result = evaluator.evaluate(greedy_outputs[i], fl_problems[i])
-            sampled_results = [
-                evaluator.evaluate(c, fl_problems[i]) for c in sampled_outputs[i]
-            ]
-
-            n = len(sampled_results) or 1
-            valid_count = sum(1 for r in sampled_results if r.build_ok)
-            solved_count = sum(1 for r in sampled_results if r.ddar_status == "solved")
-            fmt_count = sum(1 for r in sampled_results if r.format_ok)
-
             labeled_rows.append(
-                {
-                    **row,
-                    "greedy_success": greedy_result.ddar_status == "solved",
-                    "greedy_build_ok": greedy_result.build_ok,
-                    "greedy_format_ok": greedy_result.format_ok,
-                    pass_key: solved_count / n,
-                    valid_key: valid_count / n,
-                    fmt_key: fmt_count / n,
-                    "all_invalid": valid_count == 0,
-                }
+                aggregate_difficulty_metrics(
+                    row,
+                    greedy_outputs[i],
+                    sampled_outputs[i],
+                    evaluator,
+                    num_samples=num_samples,
+                )
             )
 
         idx = batch_start + len(batch)
@@ -152,7 +247,7 @@ def label_difficulty(
         eta = avg_time * (len(rows) - idx)
         last = labeled_rows[-1]
         print(
-            f"[{idx}/{len(rows)}] greedy={greedy_result.ddar_status} "
+            f"[{idx}/{len(rows)}] greedy={last['greedy_status']} "
             f"pass@{num_samples}={last[pass_key]:.2f} "
             f"elapsed={elapsed:.1f}s eta={eta:.1f}s"
         )
@@ -244,6 +339,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path, help="Candidate pool JSONL")
     parser.add_argument("output", type=Path, help="Difficulty labels JSONL")
+    parser.add_argument(
+        "--summary-output",
+        type=Path,
+        default=None,
+        help="Optional summary JSON path",
+    )
     parser.add_argument("--model-path", type=str, required=True)
     parser.add_argument("--model-type", type=str, default="qwen3_vl")
     parser.add_argument(
@@ -276,6 +377,7 @@ def main() -> None:
         max_batch_size=args.batch_size,
     )
     evaluator = AuxRewardEvaluator()
+    started = time.perf_counter()
     labeled = label_difficulty(
         rows,
         generator=generator,
@@ -286,6 +388,11 @@ def main() -> None:
         batch_size=args.batch_size,
     )
     write_jsonl(args.output, labeled)
+    if args.summary_output is not None:
+        summary = build_summary(
+            labeled, num_samples=args.num_samples, elapsed_seconds=time.perf_counter() - started
+        )
+        write_json(args.summary_output, summary)
     print(f"wrote {len(labeled)} labeled rows to {args.output}")
 
 

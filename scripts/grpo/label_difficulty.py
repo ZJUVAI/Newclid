@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -29,6 +30,13 @@ def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
         for row in rows:
             handle.write(json.dumps(row, ensure_ascii=False))
             handle.write("\n")
+
+
+def write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
+        handle.write("\n")
 
 
 class CompletionGenerator:
@@ -159,10 +167,54 @@ def label_difficulty(
     return labeled_rows
 
 
+def build_summary(
+    rows: list[dict[str, Any]], *, num_samples: int, elapsed_seconds: float
+) -> dict[str, Any]:
+    pass_key = f"pass_at_{num_samples}"
+    pass_histogram = Counter()
+    greedy_success_count = 0
+    all_invalid_count = 0
+    duplicate_aux_ratios = []
+    unique_aux_counts = []
+    for row in rows:
+        pass_histogram[f"{float(row.get(pass_key, 0.0)):.4f}"] += 1
+        greedy_success_count += int(bool(row.get("greedy_success")))
+        all_invalid_count += int(bool(row.get("all_invalid")))
+        duplicate_aux_ratios.append(float(row.get("duplicate_aux_ratio", 0.0)))
+        unique_aux_counts.append(int(row.get("unique_aux_count", 0)))
+
+    total = len(rows)
+    return {
+        "total_rows": total,
+        "num_samples": num_samples,
+        "pass_key": pass_key,
+        "elapsed_seconds": elapsed_seconds,
+        "greedy_success_count": greedy_success_count,
+        "greedy_success_rate": greedy_success_count / total if total else 0.0,
+        "all_invalid_count": all_invalid_count,
+        "all_invalid_rate": all_invalid_count / total if total else 0.0,
+        "pass_histogram": dict(
+            sorted(pass_histogram.items(), key=lambda item: float(item[0]))
+        ),
+        "avg_duplicate_aux_ratio": (
+            sum(duplicate_aux_ratios) / total if duplicate_aux_ratios else 0.0
+        ),
+        "avg_unique_aux_count": (
+            sum(unique_aux_counts) / total if unique_aux_counts else 0.0
+        ),
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path, help="Candidate pool JSONL")
     parser.add_argument("output", type=Path, help="Difficulty labels JSONL")
+    parser.add_argument(
+        "--summary-output",
+        type=Path,
+        default=None,
+        help="Optional summary JSON path",
+    )
     parser.add_argument(
         "--model-path",
         type=str,
@@ -182,6 +234,7 @@ def main() -> None:
     rows = load_jsonl(args.input)
     generator = CompletionGenerator(args.model_path)
     evaluator = AuxRewardEvaluator()
+    started = time.perf_counter()
     labeled = label_difficulty(
         rows,
         generator=generator,
@@ -191,6 +244,13 @@ def main() -> None:
         top_p=args.top_p,
     )
     write_jsonl(args.output, labeled)
+    if args.summary_output is not None:
+        summary = build_summary(
+            labeled,
+            num_samples=args.num_samples,
+            elapsed_seconds=time.perf_counter() - started,
+        )
+        write_json(args.summary_output, summary)
     print(f"wrote {len(labeled)} labeled rows to {args.output}")
 
 
