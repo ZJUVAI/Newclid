@@ -179,7 +179,7 @@ class BaseAgent(DeductiveAgent, ABC):
         depth: int,
         dispatcher,
         running_prepare_futures: dict[Future[dict[str, Any]], dict[str, Any]],
-        prepared_requests: deque[dict[str, Any]],
+        prepared_requests: list[tuple[int, dict[str, Any]]],
         pending_ddar_submit: deque[dict[str, Any]],
         running_futures: list[Any],
         frontier_exhausted: bool,
@@ -443,6 +443,7 @@ class BaseAgent(DeductiveAgent, ABC):
             "parent_node_id": parent_node_id,
             "path_key": path_key,
             "request": None,
+            "request_order": request_index,
         }
         future = prepare_executor.submit(
             self._run_prepare_request,
@@ -473,7 +474,7 @@ class BaseAgent(DeductiveAgent, ABC):
         *,
         running_prepare_futures: dict[Future[dict[str, Any]], dict[str, Any]],
         request_meta: dict[str, dict[str, Any]],
-        prepared_requests: deque[dict[str, Any]],
+        prepared_requests: list[tuple[int, dict[str, Any]]],
         profiling: dict[str, Any],
         block_timeout_s: float = 0.0,
     ) -> bool:
@@ -513,7 +514,8 @@ class BaseAgent(DeductiveAgent, ABC):
             request_built_at_perf_s = time.perf_counter()
             request_state["request_built_at_perf_s"] = request_built_at_perf_s
             request_state["request"] = request
-            prepared_requests.append(request)
+            prepared_requests.append((request_state["request_order"], request))
+            prepared_requests.sort(key=lambda item: item[0])
             add_profiling_time(
                 profiling,
                 "prepared_request_ready_wall_time_s",
@@ -1076,7 +1078,7 @@ class BaseAgent(DeductiveAgent, ABC):
                 )
                 next_queue = BeamQueue(max_size=self.beam_size)
                 frontier_iter = iter(beam_queue)
-                prepared_requests: deque[dict[str, Any]] = deque()
+                prepared_requests: list[tuple[int, dict[str, Any]]] = []
                 running_prepare_futures: dict[
                     Future[dict[str, Any]], dict[str, Any]
                 ] = {}
@@ -1213,7 +1215,7 @@ class BaseAgent(DeductiveAgent, ABC):
                         and (len(pending_ddar_submit) + len(running_futures))
                         <= ddar_backlog_high_watermark
                     ):
-                        request = prepared_requests.popleft()
+                        _, request = prepared_requests.pop(0)
                         enqueue_at = time.perf_counter()
                         request_state = request_meta[request["request_id"]]
                         add_profiling_time(

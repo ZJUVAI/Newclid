@@ -147,7 +147,12 @@ def reserve_unused_agent_ports(count: int) -> list[int]:
     candidate_hosts = [node_ip]
     if node_ip != "127.0.0.1":
         candidate_hosts.append("127.0.0.1")
-    return [reserve_port_across_hosts(candidate_hosts) for _ in range(count)]
+    ports: list[int] = []
+    while len(ports) < count:
+        port = reserve_port_across_hosts(candidate_hosts)
+        if port not in ports:
+            ports.append(port)
+    return ports
 
 
 def ray_init_with_explicit_agent_ports(init_kwargs: dict[str, object]) -> None:
