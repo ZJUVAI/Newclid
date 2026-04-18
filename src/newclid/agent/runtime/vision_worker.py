@@ -46,6 +46,16 @@ _QWEN3_VL_BASE_PROCESSOR_CACHE = (
 )
 
 
+def _reset_torch_seed(torch_seed: int) -> None:
+    # Qwen3-VL beam search on GPU is not stable unless we reset the torch RNG
+    # state before each generate() call. Seeding only once at worker startup
+    # is insufficient for reproducible text-only evaluation runs.
+    torch.manual_seed(torch_seed)
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed(torch_seed)
+        torch.cuda.manual_seed_all(torch_seed)
+
+
 def _empty_result(
     request: dict[str, Any], *, error: str, batch_size: int
 ) -> dict[str, Any]:
@@ -422,10 +432,7 @@ class VisionModelWorker(_BaseVisionWorker):
         self.worker_slot = int(worker_slot)
         self.worker_id = f"gpu:{self.worker_slot}"
         self.device_label = f"cuda:{self.worker_slot}"
-        torch.manual_seed(self.torch_seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed(self.torch_seed)
-            torch.cuda.manual_seed_all(self.torch_seed)
+        _reset_torch_seed(self.torch_seed)
         logger.info(
             "VisionModelWorker init start: agent_kind=%s model_path=%s torch_seed=%d worker_id=%s",
             agent_kind,
@@ -496,6 +503,7 @@ class VisionModelWorker(_BaseVisionWorker):
             len(requests),
             [request.get("request_id", "<missing>") for request in requests],
         )
+        _reset_torch_seed(self.torch_seed)
         inference_start = time.time()
         perf_start = time.perf_counter()
         results, worker_batch_profile = self._generate_batch_with_fallback(requests)
@@ -622,10 +630,7 @@ class Qwen3VLTextWorker(_BaseVisionWorker):
         self.worker_slot = int(worker_slot)
         self.worker_id = f"gpu:{self.worker_slot}"
         self.device_label = f"cuda:{self.worker_slot}"
-        torch.manual_seed(self.torch_seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed(self.torch_seed)
-            torch.cuda.manual_seed_all(self.torch_seed)
+        _reset_torch_seed(self.torch_seed)
         logger.info(
             "Qwen3VLTextWorker init start: model_path=%s torch_seed=%d worker_id=%s",
             resolved_path,
@@ -673,6 +678,7 @@ class Qwen3VLTextWorker(_BaseVisionWorker):
                     "gpu_device": self.device_label,
                 },
             }
+        _reset_torch_seed(self.torch_seed)
         inference_start = time.time()
         perf_start = time.perf_counter()
         results, worker_batch_profile = self._generate_batch_with_fallback(requests)
