@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import pytest
 from unittest.mock import patch
 
-from newclid.agent.runtime import vision_worker
+vision_worker = pytest.importorskip(
+    "newclid.agent.runtime.vision_worker",
+    reason="vision worker optional dependencies are not installed",
+)
 
 
 def test_reset_torch_seed_resets_cpu_and_cuda_rng():
