@@ -227,6 +227,30 @@ Decision rule:
 - if the `300-step` trace stays stable and `dev_imo` remains acceptable, continue to `500-step`
 - if the `300-step` trace regresses toward the historical `v1` failure pattern, stop promotion and return to data iteration
 
+### `v7` Promotion Result
+
+- Run:
+  - `models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401`
+- Outcome:
+  - promotion stopped early at `step 171 / 300`
+  - stop-summary artifact:
+    - `models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401/promotion_stop_171_summary.json`
+- Key metrics at stop:
+  - `first171_avg_frac_reward_zero_std = 0.6272`
+  - `first171_median_reward_std = 0.1089`
+  - `last50_avg_frac_reward_zero_std = 0.8775`
+  - `last50_median_reward_std = 0.0331`
+  - `max_consecutive_full_zero_std_steps = 4`
+- Comparison against historical `v1` at the same prefix length:
+  - `v7 first171 avg_zero = 0.6272`
+  - `v1 first171 avg_zero = 0.5965`
+  - `v7 last50 median_std = 0.0331`
+  - `v1 last50 median_std = 0.0`
+- Decision:
+  - treat `v7` as a smoke-pass but mid-training-fail dataset
+  - skip `checkpoint-300` eval, `checkpoint-500`, `dev_imo`, and `imo_95` on this branch
+  - return to data iteration on the full `150k` prefilter pool
+
 ## Active Artifacts
 
 - Main evaluation report:
@@ -255,10 +279,13 @@ Decision rule:
 - `v7` is now the best GRPO data iteration so far.
 - `v7` is the first dataset that passes the unified 50-step smoke gate.
 - The project should stop selector-only fallback work on `v5/v6`.
-- The active mainline is now `v7` promotion:
-  - run `300-step`
-  - if stable, continue to `dev_imo`
-  - then continue to `imo_95`
+- `v7` does not survive mid-training promotion:
+  - it passes smoke
+  - it collapses by `step 171 / 300`
+- The active mainline now returns to data iteration:
+  - reconcile the full `150k` prefilter pool against the union labels
+  - label the remaining delta
+  - rebuild selector output from the full merged label pool
 - Git hygiene for this phase:
   - track the two docs under `docs/`
   - do not stage temporary benchmark resume files, monitor logs, or one-off recovery helpers

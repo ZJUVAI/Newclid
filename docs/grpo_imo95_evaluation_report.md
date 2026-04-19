@@ -6,7 +6,7 @@
 
 **Status note:** This report is the historical evaluation summary for the old GRPO baseline `models/grpo_vlm_sft44_505_run1/v1-20260417-084328/checkpoint-505`. It is not the current `v7` result.
 
-**Current mainline status:** `v7_structure_strict_zero` has already passed the 50-step smoke gate and is pending `checkpoint-300` / `checkpoint-500` promotion and evaluation. Future `v7` evals should be compared against both the SFT baseline `checkpoint-20084` and the historical GRPO `checkpoint-505` results in this document.
+**Current mainline status:** `v7_structure_strict_zero` passed the 50-step smoke gate but failed mid-training promotion and was stopped early at `171 / 300` due to sustained zero-variance collapse. No `v7` `dev_imo` or `imo_95` evaluation was run from this branch. Future GRPO evals should still be compared against both the SFT baseline `checkpoint-20084` and the historical GRPO `checkpoint-505` results in this document.
 
 ---
 
