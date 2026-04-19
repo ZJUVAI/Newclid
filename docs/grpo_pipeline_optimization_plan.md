@@ -128,9 +128,52 @@ Only datasets that pass all three gates are allowed to continue to `300-step` tr
   - but it still fails the smoke gate because `0.4125 > 0.40`
   - selector-only changes help, but they are not sufficient
 
+### `v7_structure_strict_zero`
+
+- Dataset: `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v7_structure_2k`
+- Prefilter changes:
+  - expanded candidate pool target to `150k`
+  - switched the top-level structure budget from `multi_aux/single_aux` to `multi_point/single_point`
+  - targeted `multi_point = 70%`, but the realized prefilter ratio was supply-limited at `44.35%`
+- Label source:
+  - fast-path union of prior labels:
+    - `v5_merged_100k = 100000`
+    - `v2_relaxed_extra = 13350`
+  - merged label pool size: `113350`
+  - label model remains `/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
+- Selector policy: `v7_structure_strict_zero`
+- Static result:
+  - `selected_rows = 2000`
+  - `selected_zero_pass_ratio = 0.10`
+  - `selected_reward_mixed_zero_ratio = 0.10`
+  - `selected_nonzero_pass_ratio = 0.90`
+  - `selected_avg_proxy_reward_std = 0.3711`
+  - `selected_median_proxy_reward_std = 0.3476`
+  - `selected_avg_valid_ratio = 0.8267`
+  - `selected_avg_unique_aux_count = 2.1115`
+  - `multi_point_shortage = 61`
+  - high-pass tail improved:
+    - `0.8125 + 0.8750 = 200`
+- Smoke result:
+  - run: `models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401`
+  - smoke gate file: `models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401/smoke_gate_first50.json`
+  - comparison file: `models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401/compare_vs_v6_v5_first50.json`
+  - `first50_avg_frac_reward_zero_std = 0.2900`
+  - `first50_median_reward_std = 0.2562`
+  - `max_consecutive_full_zero_std_steps = 0`
+- Comparison against `v6` smoke:
+  - `avg_frac_reward_zero_std`: `0.4125 -> 0.2900`
+  - `median_reward_std`: `0.2054 -> 0.2562`
+  - `avg_reward`: `0.6626 -> 0.6162`
+  - `mean_length`: `48.44 -> 46.46`
+- Conclusion:
+  - `v7` is the first dataset iteration that passes the unified 50-step smoke gate
+  - the main win comes from reward-variance stability, not higher mean reward
+  - the next stage is `300-step` training on the same dataset and hyperparameters
+
 ## Current Diagnosis
 
-The evidence from `v3 -> v6` supports three conclusions:
+The evidence from `v3 -> v7` now supports four conclusions:
 
 1. Reducing pass-zero contamination is necessary.
    `v3` failed because it admitted too many `pass@16 = 0` samples.
@@ -138,89 +181,33 @@ The evidence from `v3 -> v6` supports three conclusions:
 2. Reducing pass-zero contamination alone is not sufficient.
    `v6` cut zero-pass share to `10%`, but still failed the smoke gate.
 
-3. The remaining failure now comes from the candidate-pool ceiling and structure mix.
-   In `v6`, the high-pass tail is too heavy and `multi_point` coverage is too weak, so the selected 2k rows are cleaner but still not the right training signal.
+3. Candidate-pool structure matters as much as selector policy.
+   `v7` only passed after widening the prefilter pool and explicitly biasing toward `multi_point` structure.
 
-Current working hypothesis:
+4. The current blocker has shifted from dataset construction to training stability validation.
+   `v7` has already cleared the 50-step gate, so the next question is whether that signal survives mid-training.
 
-- The candidate pool before difficulty labeling is too narrow for the selector to form a truly balanced 2k set.
-- `v6` exhausted the useful selector-only edits.
-- The next iteration must change prefilter, label reuse / relabel scope, and selector together.
+## Current Mainline: `v7` Promotion
 
-## Next Iteration: `v7`
+### Why `300-step` Is The Next Gate
 
-### Goal
+The historical `v1` GRPO run shows why `50-step` is not enough:
 
-Build a new 2k training set that:
+- `first50_avg_frac_reward_zero_std = 0.29`
+- `first50_median_reward_std = 0.3677`
+- but by `300-step`, the same run had already collapsed into persistent zero-variance behavior
 
-- keeps `reward_mixed_zero <= 10%`
-- keeps the high-pass tail (`0.8125 + 0.8750`) under tighter control
-- repairs the `multi_point` shortage
-- passes the unified 50-step smoke gate before any longer training
+So the current promotion path is:
 
-### `v7` Data Flow
+1. `v7` smoke pass at `checkpoint-50`
+2. true resume to `checkpoint-300`
+3. evaluate `checkpoint-300` on `dev_imo`
+4. only if the mid-training trace stays healthy, true resume to `checkpoint-500`
+5. evaluate `checkpoint-500` on `dev_imo`, then `imo_95`
 
-1. Rebuild the prefiltered pool from the original 1M raw source.
-2. Increase prefilter target size from `100k` to `150k-200k`.
-3. Reuse any overlapping difficulty labels from prior versions where safe.
-4. Relabel the new delta with the same label model:
-   `/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
-5. Keep difficulty resolution at `pass@16`.
-6. Run a new selector over the enlarged merged label pool to produce a `v7` 2k set.
+### `v7` Promotion Rules
 
-### `v7` Prefilter Changes
-
-Modify `scripts/grpo/prefilter_candidate_pool.py` so that the structural budget is no longer controlled only by `multi_aux` vs `single_aux`.
-
-Required changes:
-
-- Add an explicit `multi_point` distinction based on `aux_points_total >= 2`
-- Allocate the top-level prefilter budget with a stronger bias toward `multi_point`
-- Keep complexity and family balancing, but do not allow `single_point` rows to dominate through abundance
-
-Default target distribution for `v7` prefilter:
-
-- `multi_point = 70%`
-- `single_point = 30%`
-
-### `v7` Selector Changes
-
-Modify `scripts/grpo/select_debug_set.py` with a new selector iteration that keeps the `v6` zero-pass strictness but adds harder control over the high-pass tail and structural ranking.
-
-Required changes:
-
-- keep `reward_mixed_zero <= 10%`
-- keep `core` centered on `0.125 - 0.625`
-- allow `near_low` for `0.0625`
-- retain capped `near_high_mid` and `near_high_high`
-- explicitly rank structural strength ahead of pass-distance preference:
-  - `aux_points_total >= 2`
-  - `aux_segment_count >= 2`
-  - `unique_aux_count`
-  - then proxy reward variance and pass distance
-
-Required high-pass constraint:
-
-- selected `0.8125 + 0.8750 <= 200` rows
-
-### `v7` Static Acceptance Criteria
-
-The `v7` selected dataset must satisfy all of the following before training:
-
-- `selected_rows = 2000`
-- `selected_zero_pass_ratio <= 0.10`
-- `selected_nonzero_pass_ratio >= 0.88`
-- `selected_reward_mixed_zero_ratio <= 0.10`
-- `selected_avg_unique_aux_count >= 2.0`
-- `selected_median_proxy_reward_std >= 0.3476`
-- `multi_point_shortage <= 20`
-- `0.8125 + 0.8750 <= 200`
-
-### `v7` Training Plan
-
-Do not sweep training hyperparameters at the same time as the `v7` data change.
-
-The first `v7` smoke run must keep the same training setup as `v6` main smoke:
+Keep the successful smoke settings fixed during promotion:
 
 - `CUDA_VISIBLE_DEVICES=0,1,2,3`
 - `num_generations = 8`
@@ -229,17 +216,16 @@ The first `v7` smoke run must keep the same training setup as `v6` main smoke:
 - `beta = 0.04`
 - `max_completion_length = 256`
 - `reward_log_interval = 20`
-- `max_steps = 50`
+
+Use true checkpoint resume rather than model-only restart:
+
+- `checkpoint-50 -> checkpoint-300`
+- `checkpoint-300 -> checkpoint-500`
 
 Decision rule:
 
-- pass the unified smoke gate: continue to `300-step`
-- fail the unified smoke gate: stop and return to data iteration
-
-Only if the `300-step` run also looks stable should `v7` continue to:
-
-1. `dev_imo`
-2. `imo_95`
+- if the `300-step` trace stays stable and `dev_imo` remains acceptable, continue to `500-step`
+- if the `300-step` trace regresses toward the historical `v1` failure pattern, stop promotion and return to data iteration
 
 ## Active Artifacts
 
@@ -249,14 +235,30 @@ Only if the `300-step` run also looks stable should `v7` continue to:
   - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v5_rewardmix_2k/grpo_train_report_2000.json`
 - `v6` dataset report:
   - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v6_midpass_2k/grpo_train_report_2000.json`
+- `v7` prefilter report:
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v7_structure_2k/candidate_pool_prefilter_report_150k.json`
+- `v7` merged-label report:
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v7_structure_2k/difficulty_labels_union_v2_v5_113k_report.json`
+- `v7` dataset report:
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v7_structure_2k/grpo_train_report_2000.json`
 - `v6` smoke gate:
   - `models/grpo_vlm_sft44_v6_midpass_s1_4gpu_256/v0-20260419-210740/smoke_gate_first50.json`
-- `v6` vs `v5` smoke comparison:
-  - `models/grpo_vlm_sft44_v6_midpass_s1_4gpu_256/v0-20260419-210740/compare_vs_v5_main_first50.json`
+- `v7` smoke gate:
+  - `models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401/smoke_gate_first50.json`
+- `v7` vs `v6/v5` smoke comparison:
+  - `models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401/compare_vs_v6_v5_first50.json`
+- historical long-run GRPO baseline:
+  - `models/grpo_vlm_sft44_505_run1/v1-20260417-084328`
 
 ## Recent Conclusion
 
-- `v6` is the best selector-only iteration so far.
-- `v6` still does not pass the unified smoke gate.
-- The project should not spend more time on `v6` fallback sweeps.
-- The active mainline is now `v7`: wider prefilter, merged relabeling, and a structure-aware selector.
+- `v7` is now the best GRPO data iteration so far.
+- `v7` is the first dataset that passes the unified 50-step smoke gate.
+- The project should stop selector-only fallback work on `v5/v6`.
+- The active mainline is now `v7` promotion:
+  - run `300-step`
+  - if stable, continue to `dev_imo`
+  - then continue to `imo_95`
+- Git hygiene for this phase:
+  - track the two docs under `docs/`
+  - do not stage temporary benchmark resume files, monitor logs, or one-off recovery helpers
