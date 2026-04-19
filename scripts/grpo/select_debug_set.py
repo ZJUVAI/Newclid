@@ -27,6 +27,14 @@ POLICY_TIER_ORDER = {
         "reward_mixed_zero",
         "mastered",
     ),
+    "v6_mid_strict_zero": (
+        "core",
+        "near_low",
+        "reward_mixed_zero",
+        "near_high_mid",
+        "near_high_high",
+        "mastered",
+    ),
 }
 NON_MASTERED_TIERS_BY_POLICY = {
     "v3_tiered": (
@@ -40,10 +48,20 @@ NON_MASTERED_TIERS_BY_POLICY = {
         "near",
         "reward_mixed_zero",
     ),
+    "v6_mid_strict_zero": (
+        "core",
+        "near_low",
+        "reward_mixed_zero",
+        "near_high_mid",
+        "near_high_high",
+    ),
 }
 ALL_TIERS = (
     "core",
     "near",
+    "near_low",
+    "near_high_mid",
+    "near_high_high",
     "hard_valid_high",
     "hard_valid_mid",
     "reward_mixed_zero",
@@ -150,12 +168,22 @@ def _build_pass_histogram(rows: list[dict[str, Any]], pass_key: str) -> dict[str
     )
 
 
-def _tier_rank(row: dict[str, Any]) -> tuple[Any, ...]:
+def _pass_distance_rank(
+    row: dict[str, Any], pass_key: str, *, selection_policy: str
+) -> float:
+    if selection_policy == "v6_mid_strict_zero":
+        return abs(_pass_value(row, pass_key) - 0.375)
+    return abs(_valid_ratio(row, pass_key) - 0.5)
+
+
+def _tier_rank(
+    row: dict[str, Any], pass_key: str, *, selection_policy: str
+) -> tuple[Any, ...]:
     return (
         -_proxy_reward_std(row),
         -int(row.get("unique_aux_count", 0)),
         float(row.get("duplicate_aux_ratio", 1.0)),
-        abs(_valid_ratio(row, "pass_at_16") - 0.5),
+        _pass_distance_rank(row, pass_key, selection_policy=selection_policy),
         int(row.get("build_invalid_count", 0)),
         int(row.get("format_invalid_count", 0)),
         -int(row.get("aux_segment_count", 0)),
@@ -179,6 +207,7 @@ def _classify_row(
     hard_valid_format_invalid_max: int,
     hard_valid_unique_aux_min: int,
     hard_valid_duplicate_aux_max: float,
+    near_high_mid_max_pass: float,
     zero_valid_min: float,
     zero_valid_max: float,
     zero_pass_reward_std_min: float,
@@ -191,14 +220,23 @@ def _classify_row(
         return "all_invalid"
     if core_min_pass <= pass_value <= core_max_pass:
         return "core"
-    if (0.0 < pass_value < core_min_pass) or (
+
+    if selection_policy == "v6_mid_strict_zero":
+        if 0.0 < pass_value < core_min_pass:
+            return "near_low"
+        if core_max_pass < pass_value <= near_high_mid_max_pass:
+            return "near_high_mid"
+        if near_high_mid_max_pass < pass_value < mastered_pass_min:
+            return "near_high_high"
+    elif (0.0 < pass_value < core_min_pass) or (
         core_max_pass < pass_value < mastered_pass_min
     ):
         return "near"
+
     if pass_value != 0.0:
         return "discarded_non_dead"
 
-    if selection_policy == "v4_reward_mixed":
+    if selection_policy in {"v4_reward_mixed", "v6_mid_strict_zero"}:
         valid_ratio = _valid_ratio(row, pass_key)
         if valid_ratio < zero_valid_min or valid_ratio > zero_valid_max:
             return "discarded_non_dead"
@@ -236,6 +274,7 @@ def filter_candidate_tiers(
     hard_valid_format_invalid_max: int,
     hard_valid_unique_aux_min: int,
     hard_valid_duplicate_aux_max: float,
+    near_high_mid_max_pass: float,
     zero_valid_min: float,
     zero_valid_max: float,
     zero_pass_reward_std_min: float,
@@ -264,6 +303,7 @@ def filter_candidate_tiers(
             hard_valid_format_invalid_max=hard_valid_format_invalid_max,
             hard_valid_unique_aux_min=hard_valid_unique_aux_min,
             hard_valid_duplicate_aux_max=hard_valid_duplicate_aux_max,
+            near_high_mid_max_pass=near_high_mid_max_pass,
             zero_valid_min=zero_valid_min,
             zero_valid_max=zero_valid_max,
             zero_pass_reward_std_min=zero_pass_reward_std_min,
@@ -280,7 +320,11 @@ def filter_candidate_tiers(
         tier_rows[tier].append({**row, "_selection_tier": tier})
 
     for tier_name in ALL_TIERS:
-        tier_rows[tier_name].sort(key=_tier_rank)
+        tier_rows[tier_name].sort(
+            key=lambda row: _tier_rank(
+                row, pass_key, selection_policy=selection_policy
+            )
+        )
     stats["tier_available_rows"] = {
         tier_name: len(tier_rows[tier_name])
         for tier_name in POLICY_TIER_ORDER[selection_policy]
@@ -384,6 +428,9 @@ def select_debug_rows(
     hard_valid_duplicate_aux_max: float = 0.875,
     hard_valid_high_max_fraction: float = 0.50,
     hard_valid_mid_max_fraction: float = 0.20,
+    near_high_mid_max_pass: float = 0.75,
+    near_high_mid_max_fraction: float = 0.15,
+    near_high_high_max_fraction: float = 0.14,
     mastered_max_fraction: float = 0.05,
     mastered_fallback_min_fill_fraction: float = 0.90,
     multi_segment_min_fraction: float = 0.45,
@@ -408,6 +455,7 @@ def select_debug_rows(
         hard_valid_format_invalid_max=hard_valid_format_invalid_max,
         hard_valid_unique_aux_min=hard_valid_unique_aux_min,
         hard_valid_duplicate_aux_max=hard_valid_duplicate_aux_max,
+        near_high_mid_max_pass=near_high_mid_max_pass,
         zero_valid_min=zero_valid_min,
         zero_valid_max=zero_valid_max,
         zero_pass_reward_std_min=zero_pass_reward_std_min,
@@ -430,9 +478,19 @@ def select_debug_rows(
         tier_caps["hard_valid_mid"] = max(
             0, int(target_size * hard_valid_mid_max_fraction)
         )
-    else:
+    elif selection_policy == "v4_reward_mixed":
         tier_caps["reward_mixed_zero"] = max(
             0, int(target_size * reward_mixed_zero_max_fraction)
+        )
+    elif selection_policy == "v6_mid_strict_zero":
+        tier_caps["reward_mixed_zero"] = max(
+            0, int(target_size * reward_mixed_zero_max_fraction)
+        )
+        tier_caps["near_high_mid"] = max(
+            0, int(target_size * near_high_mid_max_fraction)
+        )
+        tier_caps["near_high_high"] = max(
+            0, int(target_size * near_high_high_max_fraction)
         )
     mastered_fallback_min_rows = max(
         0, int(target_size * mastered_fallback_min_fill_fraction)
@@ -577,6 +635,7 @@ def select_debug_rows(
             "hard_valid_format_invalid_max": hard_valid_format_invalid_max,
             "hard_valid_unique_aux_min": hard_valid_unique_aux_min,
             "hard_valid_duplicate_aux_max": hard_valid_duplicate_aux_max,
+            "near_high_mid_max_pass": near_high_mid_max_pass,
             "zero_valid_min": zero_valid_min,
             "zero_valid_max": zero_valid_max,
             "zero_pass_reward_std_min": zero_pass_reward_std_min,
@@ -584,6 +643,8 @@ def select_debug_rows(
             "reward_mixed_zero_max_fraction": reward_mixed_zero_max_fraction,
             "hard_valid_high_max_fraction": hard_valid_high_max_fraction,
             "hard_valid_mid_max_fraction": hard_valid_mid_max_fraction,
+            "near_high_mid_max_fraction": near_high_mid_max_fraction,
+            "near_high_high_max_fraction": near_high_high_max_fraction,
             "mastered_max_fraction": mastered_max_fraction,
             "mastered_fallback_min_fill_fraction": (
                 mastered_fallback_min_fill_fraction
@@ -612,6 +673,26 @@ def select_debug_rows(
         ),
         "selected_reward_mixed_zero_ratio": (
             selected_tier_counts.get("reward_mixed_zero", 0) / len(final_rows)
+            if final_rows
+            else 0.0
+        ),
+        "selected_near_low_rows": selected_tier_counts.get("near_low", 0),
+        "selected_near_low_ratio": (
+            selected_tier_counts.get("near_low", 0) / len(final_rows)
+            if final_rows
+            else 0.0
+        ),
+        "selected_near_high_mid_rows": selected_tier_counts.get("near_high_mid", 0),
+        "selected_near_high_mid_ratio": (
+            selected_tier_counts.get("near_high_mid", 0) / len(final_rows)
+            if final_rows
+            else 0.0
+        ),
+        "selected_near_high_high_rows": selected_tier_counts.get(
+            "near_high_high", 0
+        ),
+        "selected_near_high_high_ratio": (
+            selected_tier_counts.get("near_high_high", 0) / len(final_rows)
             if final_rows
             else 0.0
         ),
@@ -668,6 +749,9 @@ def main() -> None:
     parser.add_argument("--hard-valid-duplicate-aux-max", type=float, default=0.875)
     parser.add_argument("--hard-valid-high-max-fraction", type=float, default=0.50)
     parser.add_argument("--hard-valid-mid-max-fraction", type=float, default=0.20)
+    parser.add_argument("--near-high-mid-max-pass", type=float, default=0.75)
+    parser.add_argument("--near-high-mid-max-fraction", type=float, default=0.15)
+    parser.add_argument("--near-high-high-max-fraction", type=float, default=0.14)
     parser.add_argument("--mastered-max-fraction", type=float, default=0.05)
     parser.add_argument(
         "--mastered-fallback-min-fill-fraction", type=float, default=0.90
@@ -697,6 +781,9 @@ def main() -> None:
         hard_valid_duplicate_aux_max=args.hard_valid_duplicate_aux_max,
         hard_valid_high_max_fraction=args.hard_valid_high_max_fraction,
         hard_valid_mid_max_fraction=args.hard_valid_mid_max_fraction,
+        near_high_mid_max_pass=args.near_high_mid_max_pass,
+        near_high_mid_max_fraction=args.near_high_mid_max_fraction,
+        near_high_high_max_fraction=args.near_high_high_max_fraction,
         mastered_max_fraction=args.mastered_max_fraction,
         mastered_fallback_min_fill_fraction=args.mastered_fallback_min_fill_fraction,
         multi_segment_min_fraction=args.multi_segment_min_fraction,

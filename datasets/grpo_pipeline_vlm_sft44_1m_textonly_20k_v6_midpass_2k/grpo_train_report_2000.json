@@ -1,0 +1,173 @@
+{
+  "discarded_non_dead_rows": 23797,
+  "goal_cap_rows": 360,
+  "mastered_fallback_min_rows": 1800,
+  "mastered_fallback_triggered": false,
+  "pass_key": "pass_at_16",
+  "removed_all_invalid": 5246,
+  "removed_mastered": 68843,
+  "selected_aux_points_total_distribution": {
+    "1": 437,
+    "2": 1479,
+    "3": 82,
+    "4": 2
+  },
+  "selected_aux_segment_count_distribution": {
+    "1": 475,
+    "2": 1442,
+    "3": 81,
+    "4": 2
+  },
+  "selected_avg_duplicate_aux_ratio": 0.868,
+  "selected_avg_proxy_reward_std": 0.3662703647994343,
+  "selected_avg_unique_aux_count": 2.112,
+  "selected_avg_valid_ratio": 0.8333125,
+  "selected_goal_predicate_distribution": {
+    "coll": 25,
+    "cong": 173,
+    "contri": 212,
+    "contrir": 295,
+    "cyclic": 93,
+    "eqangle": 235,
+    "eqratio": 239,
+    "para": 160,
+    "perp": 221,
+    "rconst": 26,
+    "simtri": 159,
+    "simtrir": 162
+  },
+  "selected_hard_valid_mid_ratio": 0.0,
+  "selected_hard_valid_mid_rows": 0,
+  "selected_mastered_ratio": 0.0,
+  "selected_mastered_rows": 0,
+  "selected_median_proxy_reward_std": 0.3476343040826092,
+  "selected_near_high_high_ratio": 0.1355,
+  "selected_near_high_high_rows": 271,
+  "selected_near_high_mid_ratio": 0.1425,
+  "selected_near_high_mid_rows": 285,
+  "selected_near_low_ratio": 0.058,
+  "selected_near_low_rows": 116,
+  "selected_nonzero_pass_ratio": 0.9,
+  "selected_nonzero_pass_rows": 1800,
+  "selected_pass_histogram": {
+    "0.0000": 200,
+    "0.0625": 116,
+    "0.1250": 147,
+    "0.1875": 122,
+    "0.2500": 135,
+    "0.3125": 123,
+    "0.3750": 134,
+    "0.4375": 113,
+    "0.5000": 116,
+    "0.5625": 102,
+    "0.6250": 136,
+    "0.6875": 132,
+    "0.7500": 153,
+    "0.8125": 153,
+    "0.8750": 118
+  },
+  "selected_predicate_family_distribution": {
+    "angle_family": 1421,
+    "circle_family": 850,
+    "parallel_perp_family": 1771,
+    "ratio_family": 1994,
+    "triangle_family": 321
+  },
+  "selected_reward_mixed_zero_ratio": 0.1,
+  "selected_reward_mixed_zero_rows": 200,
+  "selected_rows": 2000,
+  "selected_zero_pass_ratio": 0.1,
+  "selected_zero_pass_rows": 200,
+  "selection_policy": "v6_mid_strict_zero",
+  "selection_thresholds": {
+    "core_pass_window": [
+      0.125,
+      0.625
+    ],
+    "family_min_fraction": 0.1,
+    "goal_max_fraction": 0.18,
+    "hard_valid_build_invalid_max": 2,
+    "hard_valid_duplicate_aux_max": 0.875,
+    "hard_valid_format_invalid_max": 1,
+    "hard_valid_high_max_fraction": 0.5,
+    "hard_valid_mid_max_fraction": 0.2,
+    "hard_valid_unique_aux_min": 2,
+    "mastered_fallback_min_fill_fraction": 0.9,
+    "mastered_max_fraction": 0.05,
+    "mastered_pass_min": 0.9,
+    "multi_point_min_fraction": 0.4,
+    "multi_segment_min_fraction": 0.45,
+    "near_high_high_max_fraction": 0.14,
+    "near_high_mid_max_fraction": 0.15,
+    "near_high_mid_max_pass": 0.75,
+    "reward_mixed_zero_max_fraction": 0.1,
+    "reward_mixed_zero_unique_aux_min": 2,
+    "selection_policy": "v6_mid_strict_zero",
+    "zero_pass_reward_std_min": 0.2,
+    "zero_valid_max": 0.75,
+    "zero_valid_min": 0.25
+  },
+  "shortage_reasons": [],
+  "shortages": {
+    "angle_family_shortage": 0,
+    "circle_family_shortage": 0,
+    "multi_point_shortage": 137,
+    "multi_segment_shortage": 0,
+    "parallel_perp_family_shortage": 0,
+    "ratio_family_shortage": 0,
+    "triangle_family_shortage": 0
+  },
+  "stage_available_rows": {
+    "core": 1128,
+    "mastered": 68843,
+    "near_high_high": 327,
+    "near_high_mid": 285,
+    "near_low": 116,
+    "reward_mixed_zero": 258
+  },
+  "stage_order": [
+    "core",
+    "near_low",
+    "reward_mixed_zero",
+    "near_high_mid",
+    "near_high_high",
+    "mastered"
+  ],
+  "stage_selected_rows": {
+    "core": 1128,
+    "near_high_high": 271,
+    "near_high_mid": 285,
+    "near_low": 116,
+    "reward_mixed_zero": 200
+  },
+  "target_size": 2000,
+  "tier_available_rows": {
+    "core": 1128,
+    "mastered": 68843,
+    "near_high_high": 327,
+    "near_high_mid": 285,
+    "near_low": 116,
+    "reward_mixed_zero": 258
+  },
+  "tier_caps": {
+    "mastered": 100,
+    "near_high_high": 280,
+    "near_high_mid": 300,
+    "reward_mixed_zero": 200
+  },
+  "tier_order": [
+    "core",
+    "near_low",
+    "reward_mixed_zero",
+    "near_high_mid",
+    "near_high_high",
+    "mastered"
+  ],
+  "tier_selected_rows": {
+    "core": 1128,
+    "near_high_high": 271,
+    "near_high_mid": 285,
+    "near_low": 116,
+    "reward_mixed_zero": 200
+  }
+}

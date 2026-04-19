@@ -1,0 +1,76 @@
+{
+  "aux_points_total_distribution": {
+    "1": 437,
+    "2": 1479,
+    "3": 82,
+    "4": 2
+  },
+  "aux_ratio": 1.0,
+  "aux_rows": 2000,
+  "aux_segment_count_distribution": {
+    "1": 475,
+    "2": 1442,
+    "3": 81,
+    "4": 2
+  },
+  "goal_predicate_distribution": {
+    "coll": 25,
+    "cong": 173,
+    "contri": 212,
+    "contrir": 295,
+    "cyclic": 93,
+    "eqangle": 235,
+    "eqratio": 239,
+    "para": 160,
+    "perp": 221,
+    "rconst": 26,
+    "simtri": 159,
+    "simtrir": 162
+  },
+  "predicate_family_distribution": {
+    "angle_family": 1421,
+    "circle_family": 850,
+    "parallel_perp_family": 1771,
+    "ratio_family": 1994,
+    "triangle_family": 321
+  },
+  "problem_clause_count_distribution": {
+    "1": 2,
+    "2": 218,
+    "3": 508,
+    "4": 722,
+    "5": 420,
+    "6": 60,
+    "7": 38,
+    "8": 29,
+    "9": 3
+  },
+  "problem_predicate_count_distribution": {
+    "3": 64,
+    "4": 63,
+    "5": 163,
+    "6": 129,
+    "7": 301,
+    "8": 261,
+    "9": 99,
+    "10": 126,
+    "11": 273,
+    "12": 143,
+    "13": 130,
+    "14": 23,
+    "15": 83,
+    "16": 20,
+    "17": 18,
+    "18": 32,
+    "19": 52,
+    "20": 8,
+    "21": 4,
+    "22": 3,
+    "28": 1,
+    "32": 1,
+    "33": 1,
+    "34": 1,
+    "41": 1
+  },
+  "total_rows": 2000
+}

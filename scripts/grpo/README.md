@@ -164,7 +164,7 @@ python scripts/grpo/label_difficulty_vlm.py \
 
 ### 5. Select the final GRPO subset
 
-The selector supports two policies.
+The selector supports three policies.
 
 `v3_tiered` keeps the earlier tiered policy:
 
@@ -179,6 +179,16 @@ It keeps the same `core` and `near` tiers, but only admits zero-pass rows into
 `reward_mixed_zero` when offline labels show genuinely mixed reward outcomes
 instead of the degenerate `valid_at_* ~= 1, pass_at_* = 0` pattern that often
 produces `reward_std = 0` during training.
+
+`v6_mid_strict_zero` is a selector-only refinement that narrows the learnable
+core and separates the easier high-pass tail into two capped tiers:
+
+- `core`: `0.125 <= pass_at_* <= 0.625`
+- `near_low`: low-pass rows just below the core window
+- `reward_mixed_zero`: stricter zero-pass rows with mixed reward outcomes
+- `near_high_mid`: moderate high-pass rows above core and up to a configurable cap
+- `near_high_high`: higher-pass but still non-mastered rows, kept under a tighter cap
+- `mastered`: only used as fallback if the selector still cannot fill enough rows
 
 The `v3_tiered` policy first groups rows into:
 
@@ -225,6 +235,26 @@ python scripts/grpo/select_debug_set.py \
   --zero-valid-max 0.875 \
   --zero-pass-reward-std-min 0.15 \
   --reward-mixed-zero-max-fraction 0.25
+```
+
+For the mid-band focused selector:
+
+```bash
+python scripts/grpo/select_debug_set.py \
+  datasets/grpo/difficulty_labels.jsonl \
+  datasets/grpo/grpo_train_selected.jsonl \
+  --report-output datasets/grpo/grpo_train_report.json \
+  --selection-policy v6_mid_strict_zero \
+  --target-size 2000 \
+  --core-pass-min 0.125 \
+  --core-pass-max 0.625 \
+  --near-high-mid-max-pass 0.75 \
+  --zero-valid-min 0.25 \
+  --zero-valid-max 0.75 \
+  --zero-pass-reward-std-min 0.20 \
+  --reward-mixed-zero-max-fraction 0.10 \
+  --near-high-mid-max-fraction 0.15 \
+  --near-high-high-max-fraction 0.14
 ```
 
 The output rows contain exactly:

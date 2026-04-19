@@ -1,0 +1,16 @@
+{
+  "label_model_path": "/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084",
+  "merged_labels_path": "datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v5_rewardmix_2k/difficulty_labels_merged_100k.jsonl",
+  "notes": [
+    "Selector-only v6 iteration built from the v5 100k merged difficulty labels without relabeling.",
+    "Raw source is the 1M geometry aux dataset at the provided 0123 path; difficulty labels were produced with vlm_sft44 checkpoint-20084.",
+    "Selection narrows core to pass@16 in [0.125, 0.625], caps stricter reward_mixed_zero rows at 10%, and splits high-pass non-mastered rows into near_high_mid and near_high_high tiers.",
+    "Static selector report improves zero-pass share relative to v5, but the selected high-pass tail becomes heavier; smoke training is still required before promoting this dataset."
+  ],
+  "previous_labels_path": "datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v2_relaxed/difficulty_labels.jsonl",
+  "raw_source_path": "/C20545/home/wangzi/GenesisGeo_data_models/datasets/0123/geometry_clauses10_samples1M_aux_updated_img512_inverted_pt_new_remove_proof.jsonl",
+  "report_path": "datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v6_midpass_2k/grpo_train_report_2000.json",
+  "selected_dataset_path": "datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v6_midpass_2k/grpo_train_selected_2000.jsonl",
+  "selection_policy": "v6_mid_strict_zero",
+  "summary_path": "datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v6_midpass_2k/grpo_train_selected_2000_summary.json"
+}

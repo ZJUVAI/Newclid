@@ -1,0 +1,18 @@
+{
+  "all_passed": true,
+  "gates": {
+    "selected_avg_unique_aux_count_ge_1_9": true,
+    "selected_median_proxy_reward_std_ge_0_25": true,
+    "selected_nonzero_pass_ratio_ge_0_60": true,
+    "selected_reward_mixed_zero_ratio_le_0_25": true,
+    "selected_rows_ge_1800": true
+  },
+  "metrics": {
+    "selected_avg_unique_aux_count": 2.112,
+    "selected_median_proxy_reward_std": 0.3476343040826092,
+    "selected_nonzero_pass_ratio": 0.9,
+    "selected_reward_mixed_zero_ratio": 0.1,
+    "selected_rows": 2000
+  },
+  "report_path": "datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v6_midpass_2k/grpo_train_report_2000.json"
+}
