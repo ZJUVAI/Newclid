@@ -5,10 +5,12 @@ set -euo pipefail
 #   python scripts/grpo/prepare_grpo_aux_dataset.py INPUT.jsonl OUTPUT.jsonl
 
 MODEL_PATH="${MODEL_PATH:-Qwen/Qwen3-0.6B-Base}"
+MODEL_TYPE="${MODEL_TYPE:-}"
 DATASET_PATH="${DATASET_PATH:-datasets/grpo_aux.jsonl}"
 OUTPUT_DIR="${OUTPUT_DIR:-models/grpo_aux}"
 NUM_GENERATIONS="${NUM_GENERATIONS:-}"
 TEMPERATURE="${TEMPERATURE:-}"
+TOP_K="${TOP_K:-}"
 MAX_COMPLETION_LENGTH="${MAX_COMPLETION_LENGTH:-}"
 BETA="${BETA:-}"
 REWARD_LOG_INTERVAL="${REWARD_LOG_INTERVAL:-50}"
@@ -47,8 +49,10 @@ metadata = {
     "dataset_path": str(dataset_path),
     "dataset_rows": dataset_rows,
     "output_dir": str(output_dir),
+    "model_type": os.getenv("MODEL_TYPE") or None,
     "num_generations": os.getenv("NUM_GENERATIONS") or None,
     "temperature": os.getenv("TEMPERATURE") or None,
+    "top_k": os.getenv("TOP_K") or None,
     "max_completion_length": os.getenv("MAX_COMPLETION_LENGTH") or None,
     "beta": os.getenv("BETA") or None,
     "reward_log_interval": os.getenv("NEWCLID_GRPO_REWARD_LOG_INTERVAL"),
@@ -70,11 +74,17 @@ print(f"wrote training metadata to {metadata_path}")
 PY
 
 SWIFT_ARGS=()
+if [[ -n "$MODEL_TYPE" ]]; then
+    SWIFT_ARGS+=(--model_type "$MODEL_TYPE")
+fi
 if [[ -n "$NUM_GENERATIONS" ]]; then
     SWIFT_ARGS+=(--num_generations "$NUM_GENERATIONS")
 fi
 if [[ -n "$TEMPERATURE" ]]; then
     SWIFT_ARGS+=(--temperature "$TEMPERATURE")
+fi
+if [[ -n "$TOP_K" ]]; then
+    SWIFT_ARGS+=(--top_k "$TOP_K")
 fi
 if [[ -n "$MAX_COMPLETION_LENGTH" ]]; then
     SWIFT_ARGS+=(--max_completion_length "$MAX_COMPLETION_LENGTH")

@@ -1,0 +1,13 @@
+{
+  "selection_policy": "v4_reward_mixed",
+  "raw_source_path": "/C20545/home/wangzi/GenesisGeo_data_models/datasets/0123/geometry_clauses10_samples1M_aux_updated_img512_inverted_pt_new_remove_proof.jsonl",
+  "label_input_path": "datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v2_relaxed/difficulty_labels.jsonl",
+  "label_model_path": "/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084",
+  "selected_dataset_path": "datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v4_rewardmix_800/grpo_train_selected_800.jsonl",
+  "report_path": "datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v4_rewardmix_800/grpo_train_report_800.json",
+  "summary_path": "datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v4_rewardmix_800/grpo_train_selected_800_summary.json",
+  "notes": [
+    "Reused the existing v2_relaxed difficulty labels to avoid relabeling cost.",
+    "Only pass-zero rows with mixed offline reward outcomes were kept."
+  ]
+}

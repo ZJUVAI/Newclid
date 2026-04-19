@@ -164,14 +164,29 @@ python scripts/grpo/label_difficulty_vlm.py \
 
 ### 5. Select the final GRPO subset
 
-The current selector uses a tiered `v3` policy rather than a single pass window.
-It first groups rows into:
+The selector supports two policies.
+
+`v3_tiered` keeps the earlier tiered policy:
 
 - `core`: non-mastered rows with non-trivial but still learnable pass rates
 - `near`: rows just outside the core window, either slightly harder or slightly easier
 - `hard_valid_high`: `pass_at_* = 0` rows that still look learnable because invalidity is low and aux diversity is acceptable
 - `hard_valid_mid`: `pass_at_* = 0` rows that are valid but less diverse
 - `mastered`: high-pass rows reserved only as a small fallback when the selector still cannot fill enough examples
+
+`v4_reward_mixed` is stricter about `pass_at_* = 0` rows.
+It keeps the same `core` and `near` tiers, but only admits zero-pass rows into
+`reward_mixed_zero` when offline labels show genuinely mixed reward outcomes
+instead of the degenerate `valid_at_* ~= 1, pass_at_* = 0` pattern that often
+produces `reward_std = 0` during training.
+
+The `v3_tiered` policy first groups rows into:
+
+- `core`
+- `near`
+- `hard_valid_high`
+- `hard_valid_mid`
+- `mastered`
 
 It always removes:
 
@@ -195,6 +210,21 @@ python scripts/grpo/select_debug_set.py \
   datasets/grpo/grpo_train_selected.jsonl \
   --report-output datasets/grpo/grpo_train_report.json \
   --target-size 2000
+```
+
+For the stricter zero-pass filter:
+
+```bash
+python scripts/grpo/select_debug_set.py \
+  datasets/grpo/difficulty_labels.jsonl \
+  datasets/grpo/grpo_train_selected.jsonl \
+  --report-output datasets/grpo/grpo_train_report.json \
+  --selection-policy v4_reward_mixed \
+  --target-size 800 \
+  --zero-valid-min 0.25 \
+  --zero-valid-max 0.875 \
+  --zero-pass-reward-std-min 0.15 \
+  --reward-mixed-zero-max-fraction 0.25
 ```
 
 The output rows contain exactly:
