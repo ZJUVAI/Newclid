@@ -35,6 +35,14 @@ POLICY_TIER_ORDER = {
         "near_high_high",
         "mastered",
     ),
+    "v7_structure_strict_zero": (
+        "core",
+        "near_low",
+        "reward_mixed_zero",
+        "near_high_mid",
+        "near_high_high",
+        "mastered",
+    ),
 }
 NON_MASTERED_TIERS_BY_POLICY = {
     "v3_tiered": (
@@ -49,6 +57,13 @@ NON_MASTERED_TIERS_BY_POLICY = {
         "reward_mixed_zero",
     ),
     "v6_mid_strict_zero": (
+        "core",
+        "near_low",
+        "reward_mixed_zero",
+        "near_high_mid",
+        "near_high_high",
+    ),
+    "v7_structure_strict_zero": (
         "core",
         "near_low",
         "reward_mixed_zero",
@@ -171,7 +186,7 @@ def _build_pass_histogram(rows: list[dict[str, Any]], pass_key: str) -> dict[str
 def _pass_distance_rank(
     row: dict[str, Any], pass_key: str, *, selection_policy: str
 ) -> float:
-    if selection_policy == "v6_mid_strict_zero":
+    if selection_policy in {"v6_mid_strict_zero", "v7_structure_strict_zero"}:
         return abs(_pass_value(row, pass_key) - 0.375)
     return abs(_valid_ratio(row, pass_key) - 0.5)
 
@@ -179,6 +194,23 @@ def _pass_distance_rank(
 def _tier_rank(
     row: dict[str, Any], pass_key: str, *, selection_policy: str
 ) -> tuple[Any, ...]:
+    if selection_policy == "v7_structure_strict_zero":
+        return (
+            -int(row.get("aux_points_total", 0) >= 2),
+            -int(row.get("aux_segment_count", 0) >= 2),
+            -int(row.get("unique_aux_count", 0)),
+            -_proxy_reward_std(row),
+            _pass_distance_rank(row, pass_key, selection_policy=selection_policy),
+            float(row.get("duplicate_aux_ratio", 1.0)),
+            int(row.get("build_invalid_count", 0)),
+            int(row.get("format_invalid_count", 0)),
+            -int(row.get("aux_segment_count", 0)),
+            -int(row.get("aux_points_total", 0)),
+            -int(row.get("n_premises", 0)),
+            -int(row.get("problem_predicate_count", 0)),
+            -int(row.get("problem_clause_count", 0)),
+            _row_id(row),
+        )
     return (
         -_proxy_reward_std(row),
         -int(row.get("unique_aux_count", 0)),
@@ -221,7 +253,7 @@ def _classify_row(
     if core_min_pass <= pass_value <= core_max_pass:
         return "core"
 
-    if selection_policy == "v6_mid_strict_zero":
+    if selection_policy in {"v6_mid_strict_zero", "v7_structure_strict_zero"}:
         if 0.0 < pass_value < core_min_pass:
             return "near_low"
         if core_max_pass < pass_value <= near_high_mid_max_pass:
@@ -236,7 +268,11 @@ def _classify_row(
     if pass_value != 0.0:
         return "discarded_non_dead"
 
-    if selection_policy in {"v4_reward_mixed", "v6_mid_strict_zero"}:
+    if selection_policy in {
+        "v4_reward_mixed",
+        "v6_mid_strict_zero",
+        "v7_structure_strict_zero",
+    }:
         valid_ratio = _valid_ratio(row, pass_key)
         if valid_ratio < zero_valid_min or valid_ratio > zero_valid_max:
             return "discarded_non_dead"
@@ -482,7 +518,7 @@ def select_debug_rows(
         tier_caps["reward_mixed_zero"] = max(
             0, int(target_size * reward_mixed_zero_max_fraction)
         )
-    elif selection_policy == "v6_mid_strict_zero":
+    elif selection_policy in {"v6_mid_strict_zero", "v7_structure_strict_zero"}:
         tier_caps["reward_mixed_zero"] = max(
             0, int(target_size * reward_mixed_zero_max_fraction)
         )

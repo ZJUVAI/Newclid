@@ -14,9 +14,9 @@ from typing import Any
 from scripts._tqdm import tqdm
 
 
-AUX_BUCKET_WEIGHTS = {
-    "multi_aux": 0.60,
-    "single_aux": 0.40,
+POINT_BUCKET_WEIGHTS = {
+    "multi_point": 0.70,
+    "single_point": 0.30,
 }
 
 PREMISE_BUCKET_WEIGHTS = {
@@ -71,10 +71,10 @@ def query_hash(query: str) -> str:
     return hashlib.sha256(query.encode("utf-8")).hexdigest()
 
 
-def aux_shape_bucket(row: dict[str, Any]) -> str:
-    if row.get("aux_segment_count", 0) >= 2 or row.get("aux_points_total", 0) >= 2:
-        return "multi_aux"
-    return "single_aux"
+def point_bucket(row: dict[str, Any]) -> str:
+    if row.get("aux_points_total", 0) >= 2:
+        return "multi_point"
+    return "single_point"
 
 
 def complexity_source_value(row: dict[str, Any]) -> int:
@@ -106,7 +106,7 @@ def primary_family(row: dict[str, Any]) -> str:
 
 
 def prefilter_key(row: dict[str, Any]) -> tuple[str, str, str]:
-    return (aux_shape_bucket(row), premise_bucket(row), primary_family(row))
+    return (point_bucket(row), premise_bucket(row), primary_family(row))
 
 
 def _safe_round(value: float) -> int:
@@ -118,27 +118,27 @@ def compute_bucket_quotas(
     target_size: int,
 ) -> dict[tuple[str, str, str], int]:
     quotas: dict[tuple[str, str, str], int] = {}
-    aux_totals: dict[str, int] = {}
-    for aux_bucket, weight in AUX_BUCKET_WEIGHTS.items():
-        aux_totals[aux_bucket] = _safe_round(target_size * weight)
+    point_totals: dict[str, int] = {}
+    for point_key, weight in POINT_BUCKET_WEIGHTS.items():
+        point_totals[point_key] = _safe_round(target_size * weight)
 
-    assigned = sum(aux_totals.values())
+    assigned = sum(point_totals.values())
     if assigned != target_size:
-        aux_totals["multi_aux"] += target_size - assigned
+        point_totals["multi_point"] += target_size - assigned
 
-    for aux_bucket, aux_target in aux_totals.items():
+    for point_key, point_target in point_totals.items():
         premise_totals: dict[str, int] = {}
         for prem_bucket, weight in PREMISE_BUCKET_WEIGHTS.items():
-            premise_totals[prem_bucket] = _safe_round(aux_target * weight)
+            premise_totals[prem_bucket] = _safe_round(point_target * weight)
         assigned = sum(premise_totals.values())
-        if assigned != aux_target:
-            premise_totals["p8_plus"] += aux_target - assigned
+        if assigned != point_target:
+            premise_totals["p8_plus"] += point_target - assigned
 
         for prem_bucket, prem_target in premise_totals.items():
             family_keys = sorted(
                 key
                 for key, count in bucket_counts.items()
-                if count > 0 and key[0] == aux_bucket and key[1] == prem_bucket
+                if count > 0 and key[0] == point_key and key[1] == prem_bucket
             )
             if not family_keys or prem_target <= 0:
                 continue
