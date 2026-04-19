@@ -13,7 +13,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from newclid.training.grpo_rewards import AuxEvaluationResult, AuxRewardEvaluator
+from newclid.training.grpo_rewards import AuxRewardEvaluator
 from scripts._tqdm import tqdm
 
 
@@ -224,7 +224,6 @@ def label_difficulty(
     ):
         batch = rows[batch_start : batch_start + batch_size]
         queries = [r["query"] for r in batch]
-        fl_problems = [r["fl_problem"] for r in batch]
 
         greedy_outputs, sampled_outputs = generator.generate_batch(
             queries, num_samples, temperature, top_p
@@ -274,7 +273,7 @@ def run_workers(args: argparse.Namespace) -> None:
     """Launch --workers subprocesses, each handling one GPU shard, then merge."""
     num_workers = args.workers
     rows = load_jsonl(args.input)
-    total = len(rows)
+    started = time.perf_counter()
 
     # Write per-shard input files
     shard_inputs: list[Path] = []
@@ -328,6 +327,13 @@ def run_workers(args: argparse.Namespace) -> None:
 
     merged = _merge_shards(shard_outputs)
     write_jsonl(args.output, merged)
+    if args.summary_output is not None:
+        summary = build_summary(
+            merged,
+            num_samples=args.num_samples,
+            elapsed_seconds=time.perf_counter() - started,
+        )
+        write_json(args.summary_output, summary)
     print(f"wrote {len(merged)} labeled rows to {args.output}")
 
     # Cleanup temp files
