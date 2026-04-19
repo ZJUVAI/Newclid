@@ -54,6 +54,46 @@ class TestGRPODataSelection(unittest.TestCase):
             "scripts/grpo/select_debug_set.py", "select_debug_set"
         )
 
+    def _selection_row(
+        self,
+        sample_id: str,
+        *,
+        pass_value: float = 0.0,
+        greedy_success: bool = False,
+        all_invalid: bool = False,
+        goal_predicate: str = "eqratio",
+        predicate_family_tags: list[str] | None = None,
+        aux_segment_count: int = 2,
+        aux_points_total: int = 2,
+        unique_aux_count: int = 2,
+        duplicate_aux_ratio: float = 0.5,
+        build_invalid_count: int = 0,
+        format_invalid_count: int = 0,
+        n_premises: int = 6,
+        problem_predicate_count: int = 5,
+        problem_clause_count: int = 4,
+    ) -> dict:
+        return {
+            "sample_id": sample_id,
+            "query": f"query-{sample_id}",
+            "fl_problem": f"problem-{sample_id}",
+            "response": f"response-{sample_id}",
+            "greedy_success": greedy_success,
+            "pass_at_16": pass_value,
+            "all_invalid": all_invalid,
+            "goal_predicate": goal_predicate,
+            "predicate_family_tags": predicate_family_tags or ["ratio_family"],
+            "aux_segment_count": aux_segment_count,
+            "aux_points_total": aux_points_total,
+            "unique_aux_count": unique_aux_count,
+            "duplicate_aux_ratio": duplicate_aux_ratio,
+            "build_invalid_count": build_invalid_count,
+            "format_invalid_count": format_invalid_count,
+            "n_premises": n_premises,
+            "problem_predicate_count": problem_predicate_count,
+            "problem_clause_count": problem_clause_count,
+        }
+
     def test_annotation_helpers(self):
         query = "<problem> a : ; b : perp a b b c [001] ; ? eqratio a b c d </problem>"
         output = "<aux> x00 g : coll a b g [002] ; </aux><proof>...</proof>"
@@ -375,61 +415,28 @@ class TestGRPODataSelection(unittest.TestCase):
 
     def test_select_debug_rows_filters_and_formats_output(self):
         rows = [
-            {
-                "sample_id": "mastered",
-                "query": "q",
-                "fl_problem": "p",
-                "response": "r",
-                "greedy_success": True,
-                "pass_at_16": 1.0,
-                "all_invalid": False,
-                "goal_predicate": "eqratio",
-                "predicate_family_tags": ["ratio_family"],
-                "aux_segment_count": 1,
-                "aux_points_total": 1,
-            },
-            {
-                "sample_id": "dead",
-                "query": "q",
-                "fl_problem": "p",
-                "response": "r",
-                "greedy_success": False,
-                "pass_at_16": 0.0,
-                "all_invalid": True,
-                "goal_predicate": "eqangle",
-                "predicate_family_tags": ["angle_family"],
-                "aux_segment_count": 1,
-                "aux_points_total": 1,
-            },
-            {
-                "sample_id": "keep1",
-                "query": "q1",
-                "fl_problem": "p1",
-                "response": "r1",
-                "greedy_success": False,
-                "pass_at_16": 0.2,
-                "all_invalid": False,
-                "goal_predicate": "eqratio",
-                "predicate_family_tags": ["ratio_family"],
-                "aux_segment_count": 2,
-                "aux_points_total": 2,
-            },
-            {
-                "sample_id": "keep2",
-                "query": "q2",
-                "fl_problem": "p2",
-                "response": "r2",
-                "greedy_success": False,
-                "pass_at_16": 0.5,
-                "all_invalid": False,
-                "goal_predicate": "perp",
-                "predicate_family_tags": ["parallel_perp_family"],
-                "aux_segment_count": 1,
-                "aux_points_total": 1,
-            },
+            self._selection_row("mastered", pass_value=1.0, greedy_success=True),
+            self._selection_row(
+                "dead",
+                pass_value=0.0,
+                all_invalid=True,
+                goal_predicate="eqangle",
+                predicate_family_tags=["angle_family"],
+            ),
+            self._selection_row("keep1", pass_value=0.2),
+            self._selection_row(
+                "keep2",
+                pass_value=0.5,
+                goal_predicate="perp",
+                predicate_family_tags=["parallel_perp_family"],
+                aux_segment_count=1,
+                aux_points_total=1,
+            ),
         ]
         final_rows, report = self.select_debug_set.select_debug_rows(
-            rows, target_size=2
+            rows,
+            target_size=2,
+            mastered_fallback_min_fill_fraction=0.0,
         )
         self.assertEqual(len(final_rows), 2)
         self.assertEqual(
@@ -437,6 +444,8 @@ class TestGRPODataSelection(unittest.TestCase):
         )
         self.assertEqual(report["removed_mastered"], 1)
         self.assertEqual(report["removed_all_invalid"], 1)
+        self.assertEqual(report["selection_policy"], "v3_tiered")
+        self.assertEqual(report["tier_selected_rows"]["core"], 2)
 
     def test_select_debug_rows_accepts_pass_at_8(self):
         rows = [
@@ -487,87 +496,145 @@ class TestGRPODataSelection(unittest.TestCase):
         self.assertEqual(report["pass_key"], "pass_at_8")
         self.assertEqual(report["removed_mastered"], 1)
 
-    def test_select_debug_rows_relaxes_into_non_dead_and_caps_mastered(self):
+    def test_select_debug_rows_applies_v3_tiers_and_caps(self):
         rows = [
-            {
-                "sample_id": "s1",
-                "query": "q1",
-                "fl_problem": "p1",
-                "response": "r1",
-                "greedy_success": False,
-                "pass_at_16": 0.20,
-                "all_invalid": False,
-                "goal_predicate": "eqratio",
-                "predicate_family_tags": ["ratio_family"],
-                "aux_segment_count": 2,
-                "aux_points_total": 2,
-            },
-            {
-                "sample_id": "s2",
-                "query": "q2",
-                "fl_problem": "p2",
-                "response": "r2",
-                "greedy_success": False,
-                "pass_at_16": 0.70,
-                "all_invalid": False,
-                "goal_predicate": "perp",
-                "predicate_family_tags": ["parallel_perp_family"],
-                "aux_segment_count": 1,
-                "aux_points_total": 1,
-            },
-            {
-                "sample_id": "s3",
-                "query": "q3",
-                "fl_problem": "p3",
-                "response": "r3",
-                "greedy_success": False,
-                "pass_at_16": 0.92,
-                "all_invalid": False,
-                "goal_predicate": "eqangle",
-                "predicate_family_tags": ["angle_family"],
-                "aux_segment_count": 1,
-                "aux_points_total": 1,
-            },
-            {
-                "sample_id": "m1",
-                "query": "q4",
-                "fl_problem": "p4",
-                "response": "r4",
-                "greedy_success": True,
-                "pass_at_16": 0.95,
-                "all_invalid": False,
-                "goal_predicate": "cyclic",
-                "predicate_family_tags": ["circle_family"],
-                "aux_segment_count": 1,
-                "aux_points_total": 1,
-            },
-            {
-                "sample_id": "m2",
-                "query": "q5",
-                "fl_problem": "p5",
-                "response": "r5",
-                "greedy_success": True,
-                "pass_at_16": 0.99,
-                "all_invalid": False,
-                "goal_predicate": "eqratio",
-                "predicate_family_tags": ["ratio_family"],
-                "aux_segment_count": 1,
-                "aux_points_total": 1,
-            },
+            self._selection_row("core", pass_value=0.20),
+            self._selection_row(
+                "near_low",
+                pass_value=0.01,
+                goal_predicate="perp",
+                predicate_family_tags=["parallel_perp_family"],
+            ),
+            self._selection_row(
+                "near_high",
+                pass_value=0.80,
+                goal_predicate="eqangle",
+                predicate_family_tags=["angle_family"],
+            ),
+            self._selection_row(
+                "high_a",
+                pass_value=0.0,
+                goal_predicate="cyclic",
+                predicate_family_tags=["circle_family"],
+                unique_aux_count=4,
+                duplicate_aux_ratio=0.50,
+            ),
+            self._selection_row(
+                "high_b",
+                pass_value=0.0,
+                goal_predicate="contri",
+                predicate_family_tags=["triangle_family"],
+                unique_aux_count=3,
+                duplicate_aux_ratio=0.60,
+            ),
+            self._selection_row(
+                "mid_a",
+                pass_value=0.0,
+                goal_predicate="simtri",
+                predicate_family_tags=["triangle_family"],
+                unique_aux_count=1,
+                duplicate_aux_ratio=0.95,
+            ),
+            self._selection_row(
+                "noisy",
+                pass_value=0.0,
+                build_invalid_count=4,
+                unique_aux_count=1,
+                duplicate_aux_ratio=0.98,
+            ),
+            self._selection_row("mastered", pass_value=0.95, greedy_success=True),
+            self._selection_row("dead", pass_value=0.0, all_invalid=True),
         ]
 
         final_rows, report = self.select_debug_set.select_debug_rows(
-            rows, target_size=5, mastered_max_fraction=0.20
+            rows,
+            target_size=5,
+            hard_valid_high_max_fraction=0.20,
+            hard_valid_mid_max_fraction=0.20,
+            mastered_fallback_min_fill_fraction=0.0,
+        )
+
+        self.assertEqual(len(final_rows), 5)
+        self.assertEqual(report["tier_available_rows"]["hard_valid_high"], 2)
+        self.assertEqual(report["tier_available_rows"]["hard_valid_mid"], 1)
+        self.assertEqual(report["discarded_non_dead_rows"], 1)
+        self.assertEqual(report["tier_selected_rows"]["core"], 1)
+        self.assertEqual(report["tier_selected_rows"]["near"], 2)
+        self.assertEqual(report["tier_selected_rows"]["hard_valid_high"], 1)
+        self.assertEqual(report["tier_selected_rows"]["hard_valid_mid"], 1)
+        self.assertEqual(report["selected_mastered_rows"], 0)
+        self.assertEqual(report["selected_nonzero_pass_rows"], 3)
+        self.assertEqual(report["selected_zero_pass_rows"], 2)
+
+    def test_select_debug_rows_prefers_more_diverse_rows_within_tier(self):
+        rows = [
+            self._selection_row(
+                "high_strong",
+                pass_value=0.0,
+                unique_aux_count=4,
+                duplicate_aux_ratio=0.50,
+            ),
+            self._selection_row(
+                "high_weak",
+                pass_value=0.0,
+                unique_aux_count=2,
+                duplicate_aux_ratio=0.80,
+            ),
+        ]
+
+        final_rows, report = self.select_debug_set.select_debug_rows(
+            rows,
+            target_size=1,
+            hard_valid_high_max_fraction=1.0,
+            hard_valid_mid_max_fraction=0.0,
+            mastered_fallback_min_fill_fraction=0.0,
+            multi_segment_min_fraction=0.0,
+            multi_point_min_fraction=0.0,
+        )
+
+        self.assertEqual(len(final_rows), 1)
+        self.assertEqual(final_rows[0]["query"], "query-high_strong")
+        self.assertEqual(report["tier_selected_rows"]["hard_valid_high"], 1)
+        self.assertAlmostEqual(report["selected_avg_unique_aux_count"], 4.0)
+
+    def test_select_debug_rows_uses_mastered_only_for_low_fill(self):
+        rows = [
+            self._selection_row("core", pass_value=0.20),
+            self._selection_row(
+                "near",
+                pass_value=0.02,
+                goal_predicate="perp",
+                predicate_family_tags=["parallel_perp_family"],
+            ),
+            self._selection_row(
+                "mastered_a",
+                pass_value=0.95,
+                greedy_success=True,
+                goal_predicate="eqangle",
+                predicate_family_tags=["angle_family"],
+            ),
+            self._selection_row(
+                "mastered_b",
+                pass_value=0.98,
+                greedy_success=True,
+                goal_predicate="cyclic",
+                predicate_family_tags=["circle_family"],
+            ),
+        ]
+
+        final_rows, report = self.select_debug_set.select_debug_rows(
+            rows,
+            target_size=4,
+            mastered_max_fraction=0.50,
+            mastered_fallback_min_fill_fraction=0.90,
         )
 
         self.assertEqual(len(final_rows), 4)
-        self.assertEqual(report["stage_selected_rows"]["preferred"], 1)
-        self.assertEqual(report["stage_selected_rows"]["fallback"], 1)
-        self.assertEqual(report["stage_selected_rows"]["non_dead"], 1)
-        self.assertEqual(report["stage_selected_rows"]["capped_mastered"], 1)
-        self.assertEqual(report["selected_mastered_rows"], 1)
-        self.assertIn("mastered_cap_reached", report["shortage_reasons"])
+        self.assertTrue(report["mastered_fallback_triggered"])
+        self.assertEqual(report["selected_mastered_rows"], 2)
+        self.assertEqual(report["tier_selected_rows"]["mastered"], 2)
         self.assertEqual(report["selected_pass_histogram"]["0.9500"], 1)
+        self.assertEqual(report["selected_pass_histogram"]["0.9800"], 1)
 
     def test_file_round_trip_for_candidate_pool(self):
         with tempfile.TemporaryDirectory() as tmp_dir:

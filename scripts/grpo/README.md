@@ -164,12 +164,30 @@ python scripts/grpo/label_difficulty_vlm.py \
 
 ### 5. Select the final GRPO subset
 
-This removes:
+The current selector uses a tiered `v3` policy rather than a single pass window.
+It first groups rows into:
+
+- `core`: non-mastered rows with non-trivial but still learnable pass rates
+- `near`: rows just outside the core window, either slightly harder or slightly easier
+- `hard_valid_high`: `pass_at_* = 0` rows that still look learnable because invalidity is low and aux diversity is acceptable
+- `hard_valid_mid`: `pass_at_* = 0` rows that are valid but less diverse
+- `mastered`: high-pass rows reserved only as a small fallback when the selector still cannot fill enough examples
+
+It always removes:
 
 - mastered rows: `greedy_success == true` and very high `pass_at_16`
 - dead rows: `all_invalid == true`
 
-It then constructs a balanced "goldilocks" subset for actual GRPO training.
+It then constructs a balanced subset for actual GRPO training while enforcing:
+
+- minimum multi-segment and multi-point coverage
+- minimum predicate-family coverage
+- a per-goal cap so one goal type cannot dominate
+- explicit caps on `hard_valid_high`, `hard_valid_mid`, and mastered fallback rows
+
+The JSON report records tier availability, tier-selected counts, selected pass histogram,
+pass-zero vs nonzero share, mastered share, and diversity statistics such as
+`unique_aux_count` and `duplicate_aux_ratio`.
 
 ```bash
 python scripts/grpo/select_debug_set.py \
@@ -243,6 +261,18 @@ Main outputs:
 - `grpo_train_selected.jsonl`: final training dataset
 - `grpo_train_report.json`: selection report from `select_debug_set.py`
 - `grpo_train_selected_summary.json`: recomputed stats for the final dataset
+
+### Current `vlm_sft44` Provenance
+
+For the current `vlm_sft44` GRPO experiments in this repo:
+
+- raw source JSONL:
+  `/C20545/home/wangzi/GenesisGeo_data_models/datasets/0123/geometry_clauses10_samples1M_aux_updated_img512_inverted_pt_new_remove_proof.jsonl`
+- VLM difficulty-label checkpoint:
+  `/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
+
+The existing `grpo_pipeline_vlm_sft44_1m_textonly_20k*` artifacts were produced from that
+raw source through `build_candidate_pool.py -> prefilter_candidate_pool.py -> label_difficulty_vlm.py`.
 
 ## Fast Path From Existing SFT Data
 
