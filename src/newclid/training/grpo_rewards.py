@@ -278,6 +278,8 @@ class AuxReward:
     """Adapter around the evaluator for environments without SWIFT base types."""
 
     def __init__(self, **kwargs) -> None:
+        # Filter out SWIFT-specific kwargs that AuxRewardEvaluator doesn't accept
+        kwargs.pop('args', None)
         self.evaluator = AuxRewardEvaluator(**kwargs)
 
     def evaluate_batch(self, completions, fl_problem=None, **kwargs) -> list[AuxEvaluationResult]:
