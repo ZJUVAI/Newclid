@@ -279,10 +279,12 @@ class AuxReward:
 
     def __init__(self, **kwargs) -> None:
         # Filter out SWIFT-specific kwargs that AuxRewardEvaluator doesn't accept
-        kwargs.pop('args', None)
+        kwargs.pop("args", None)
         self.evaluator = AuxRewardEvaluator(**kwargs)
 
-    def evaluate_batch(self, completions, fl_problem=None, **kwargs) -> list[AuxEvaluationResult]:
+    def evaluate_batch(
+        self, completions, fl_problem=None, **kwargs
+    ) -> list[AuxEvaluationResult]:
         del kwargs
 
         if isinstance(completions, str):
@@ -301,9 +303,7 @@ class AuxReward:
 
         results = []
         for completion, sample_problem_text in zip(completions, problem_texts):
-            results.append(
-                self.evaluator.evaluate(completion, sample_problem_text)
-            )
+            results.append(self.evaluator.evaluate(completion, sample_problem_text))
         return results
 
     def __call__(self, completions, fl_problem=None, **kwargs) -> list[float]:

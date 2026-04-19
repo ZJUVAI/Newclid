@@ -40,7 +40,11 @@ from newclid.generation.auxiliary import (
 
 def add_potential_points(point_names, coords, max_points, seed=0):
     """Wrapper that converts C++ output format to Python-compatible format."""
-    result = _add_potential_points_cpp(point_names, coords, max_points, seed)
+    try:
+        result = _add_potential_points_cpp(point_names, coords, max_points, seed)
+    except TypeError:
+        # Older compiled auxiliary extensions do not expose the optional seed.
+        result = _add_potential_points_cpp(point_names, coords, max_points)
     converted = []
     for coord, construction_strings in result:
         constructions = []

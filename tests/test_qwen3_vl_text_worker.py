@@ -7,9 +7,7 @@ from newclid.agent.runtime import vision_worker
 
 def test_reset_torch_seed_resets_cpu_and_cuda_rng():
     with patch.object(vision_worker.torch, "manual_seed") as manual_seed:
-        with patch.object(
-            vision_worker.torch.cuda, "is_available", return_value=True
-        ):
+        with patch.object(vision_worker.torch.cuda, "is_available", return_value=True):
             with patch.object(
                 vision_worker.torch.cuda, "manual_seed"
             ) as cuda_manual_seed:
