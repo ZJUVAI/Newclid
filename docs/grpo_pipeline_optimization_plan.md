@@ -27,9 +27,9 @@
   - 已在仓库中保留当前主实验所需的 aux-fix 版数据集：
     - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v9_stagebalanced_2k_auxfix`
   - `v8` 的 aux-fix 数据可通过同一脚本按需重建，但不再放进这次提交里；
-- 当前 active rerun：
-  - `models/grpo_vlm_sft44_v9_stagebalanced_s1_4gpu_tuned_auxfix`
-  - 配置沿用历史 tuned `v9` smoke：`temperature=1.1, top_p=0.95, top_k=0, beta=0.02, num_generations=8, max_steps=170`
+- 当前 active 诊断结论：
+  - full aux-format fix 已经在 `v8` / `v9` 两条 selector 上完成 smoke 诊断；
+  - 结果表明问题不是“只要修好 aux DSL 就会自然改善”，而是旧 selector 在 aux-fix 语义下需要重新适配。
 
 ## 当前 Gate
 
@@ -318,9 +318,45 @@ mid gate 固定检查：
     - 但因连续 `full-zero` 步数超过上限，按规则停止，不进入 `170-step` gate
     - stop-summary：`models/grpo_vlm_sft44_v9_stagebalanced_s1_4gpu_tuned/v0-20260420-154747/smoke_stop_114_summary.json`
 
-## 当前主线：`v8` Promotion
+### `v8/v9_auxfix_rerun`
 
-### 为什么下一步是 `170-step mid smoke`
+- 数据集：
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v8_structure_full150k_2k_auxfix`
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v9_stagebalanced_2k_auxfix`
+- 数据来源：
+  - 使用 `scripts/grpo/rewrite_selected_aux_responses.py`
+  - 依据 `(query, fl_problem)` 从原始 1M 数据
+    `/C20545/home/wangzi/GenesisGeo_data_models/datasets/0123/geometry_clauses10_samples1M_aux_updated_img512_inverted_pt_new_remove_proof.jsonl`
+    回填原始 `<aux> ... </aux>`，恢复首个 `x00`
+- 训练配置：
+  - 统一使用 tuned smoke 配置：`temperature=1.1, top_p=0.95, top_k=0, beta=0.02, num_generations=8, max_completion_length=256`
+- 运行结果：
+  - `v9 auxfix`：`models/grpo_vlm_sft44_v9_stagebalanced_s1_4gpu_tuned_auxfix/v0-20260420-184805`
+    - `first50_avg_frac_reward_zero_std = 0.53`
+    - `first50_median_reward_std = 0.0970`
+    - `first50_max_consecutive_full_zero_std_steps = 5`
+    - 在约 `step 125 / 170` 手动停止，因为后段持续出现 `reward_std = 0`
+  - `v8 auxfix`：`models/grpo_vlm_sft44_v8_tuned_auxfix_smoke/v0-20260420-191921`
+    - `first50_avg_frac_reward_zero_std = 0.56`
+    - `first50_median_reward_std = 0.0`
+    - `first50_max_consecutive_full_zero_std_steps = 6`
+    - 完整跑到 `50 step`，不进入后续 promotion
+- 对比结论：
+  - `v8` 本来就差：
+    - `v8_tuned_300step_bugfix/v1-20260420-171548` 的 `first50` 已经是
+      `avg_zero_std = 0.63`, `median_reward_std = 0.0`
+    - 因此 `v8 auxfix` 虽仍失败，但不是新的退化源头
+  - `v9` 是关键异常：
+    - 旧 `v9` 的 `first50` 是 `avg_zero_std = 0.22`, `median_reward_std = 0.3267`
+    - `v9 auxfix` 变成 `0.53 / 0.0970`
+    - 说明 `v9_stage_balanced` 的旧 selector 只适配了旧 reward / target 语义，不适配 full aux-fix 语义
+- 当前判断：
+  - 下一步主线不再是继续放大 `v8` 或直接重跑 `v9`
+  - 应该基于 aux-fix 语义重做 `v9` 的 selector / bucket 配额 / gate
+
+## 当前主线：`v9 auxfix` Selector 重做
+
+### 为什么下一步不是继续 promotion
 
 历史 `v1` GRPO run 说明，只看 `50-step` 不够：
 
@@ -328,13 +364,13 @@ mid gate 固定检查：
 - `first50_median_reward_std = 0.3677`
 - 但到 `150-170 step` 区间，同类 run 已经开始明显向 zero-variance 崩坏靠拢
 
-因此当前的 promotion 路径是：
+截至 2026-04-20 晚上的 full aux-fix 诊断，原先这条 promotion 路径已经失效：
 
-1. `v8` 在 `checkpoint-50` 通过 smoke
-2. 新数据集先完成 `170-step` 两段式 smoke
-3. 只有 `170-step` 轨迹仍然健康时，才继续进入 `300-step` promotion
-4. 再评估 `checkpoint-300` 的 `dev_imo`
-5. 如有必要，再继续到 `checkpoint-500`
+1. `v8` 在旧语义下的 smoke / promotion 结论只可作历史参考
+2. `v8 auxfix` 与 `v9 auxfix` 都没有通过新的 early smoke 诊断
+3. 尤其 `v9` 在旧语义下最好、在 aux-fix 语义下明显变坏，说明当前最需要修的是 selector，而不是继续延长训练
+4. 因此当前不再推进 `checkpoint-300` / `checkpoint-500` / `dev_imo`
+5. 下一步先产出适配 aux-fix 语义的新 selector 版本，再重新走 `50 + 170` 两段式 smoke
 
 ### `170-step mid smoke` 规则
 
@@ -357,7 +393,7 @@ mid gate 固定检查：
 - 如果 `170-step` 轨迹保持稳定，则进入 `300-step` promotion
 - 如果 `170-step` 轨迹开始向历史 `v7/v8` 失败模式回归，则停止，回到数据迭代
 
-### `v8` Promotion 当前状态
+### 旧 `v8` Promotion 状态
 
 #### 原始配置 Promotion（已失败）
 
@@ -442,20 +478,21 @@ mid gate 固定检查：
 
 ## 最近结论
 
-- `v8` 是目前为止最好的 GRPO 数据集迭代版本。
-- `v8` 在 50-step smoke gate 上优于 `v7`。
-- 但 `v8` 到 `step 147 / 300` 仍然表现出明显的中段塌缩：
-  - `all_avg_frac_reward_zero_std = 0.6134`
-  - `last20_avg_frac_reward_zero_std = 0.7750`
-  - `last20_median_reward_std = 0.0`
-- 因此，项目下一步应该从“在同一个 selector 上继续补更多标签”，转向“修改 selector / sampling 机制，显式压制 `50-150` step 窗口中的 zero-variance streak”。
-- 历史说明：`v7` 无法撑过中段 promotion：
-  - 它通过了 smoke
-  - 但在 `step 171 / 300` 崩塌
-- 当前主线应变为：
-  - 最终确认 `v8` 的 promotion 结论
-  - 记录这次中段失败轨迹
-  - 在启动 `v9` 之前重做 selector / promotion policy 设计
+- 历史上最好的旧语义 early smoke 仍然是 `v9_stage_balanced`：
+  - `first50_avg_frac_reward_zero_std = 0.22`
+  - `first50_median_reward_std = 0.3267`
+- 但 full aux-fix 诊断表明，旧 selector 不能直接继承到新语义：
+  - `v9 auxfix` 变成 `0.53 / 0.0970`
+  - `v8 auxfix` 也仍然失败，`0.56 / 0.0`
+- 因此当前的关键结论是：
+  - `auxfix` 不是单独的充分改进
+  - 旧 `v8/v9` selector 在 full aux-format 语义下都需要重新校准
+  - 最值得保留的是 `v9` 的 stage-balanced 思路，而不是它当前的精确配额
+- 下一步应变为：
+  - 基于 aux-fix 语义重新统计 `150k` 标注池的桶分布
+  - 重做 `v9` selector 的 bucket 配额与 zero-pass / near-low / near-high 限额
+  - 先跑新的 `50-step` smoke
+  - 只有 early gate 恢复到接近旧 `v9` 水平时，才重新进入 `170-step` / `300-step`
 - 当前阶段的 Git 纪律：
   - 只跟踪 `docs/` 下这两个文档
   - 不要提交临时 benchmark resume 文件、monitor log 或一次性的 recovery helper

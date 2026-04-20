@@ -6,7 +6,7 @@
 
 **状态说明：** 本文档记录的是旧 GRPO baseline `models/grpo_vlm_sft44_505_run1/v1-20260417-084328/checkpoint-505` 的历史评估总结，不是当前 `v8` 的结果。
 
-**当前主线状态：** 2026-04-20 又确认了一层更底层的问题：`48d9ea5` 修复的 aux DSL bug 只被部分保留在当前分支里，导致历史 `v8/v9` selected dataset 的 `response` 仍是错误格式。`v8_tuned_300step_bugfix/v1-20260420-171548` 因此只能算 reward-side bugfix rerun，不是 full aux-format fix rerun。当前主线已经切到 aux-fix 数据集重跑；在这条 full-fix smoke / promotion 轨迹明确恢复前，`v7/v8/v9` 都不应进入新的 `dev_imo` 或 `imo_95` 评估。未来新的 GRPO 评估仍应同时对照 SFT baseline `checkpoint-20084` 和本文中的历史 GRPO `checkpoint-505`。
+**当前主线状态：** 2026-04-20 已确认更底层的问题在于 aux DSL 语义与旧 selected dataset 不一致：`48d9ea5` 修复的 aux DSL bug 曾只被部分保留，导致历史 `v8/v9` selected dataset 的 `response` 仍是错误格式。`v8_tuned_300step_bugfix/v1-20260420-171548` 只能算 reward-side bugfix rerun，不是 full aux-format fix rerun。随后补跑的 full aux-fix 诊断也说明，旧 `v8/v9` selector 不能直接继承到新语义：`v8 auxfix` 与 `v9 auxfix` 的 smoke 都未恢复到可 promotion 水平。因此在新的 aux-fix selector 版本出现并通过 `50 + 170` smoke 之前，`v7/v8/v9` 都不应进入新的 `dev_imo` 或 `imo_95` 评估。未来新的 GRPO 评估仍应同时对照 SFT baseline `checkpoint-20084` 和本文中的历史 GRPO `checkpoint-505`。
 
 ---
 
