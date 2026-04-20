@@ -69,7 +69,41 @@
     - `src/newclid/training/grpo_rewards.py` 将这类单样本解析异常降级为 `format_invalid`
     - `scripts/grpo/label_difficulty_vlm.py` 在聚合阶段再包一层保险，将意外异常降级为 `engine_error`
     - `tests/test_grpo_rewards.py` 已新增对应回归测试并通过
-  - 当前 `20k` relabel 已按 `--resume` 从已有输出前缀重新恢复到 4 shard 并行运行
+  - `20k` relabel 已完成，顶层产物已合并：
+    - `difficulty_labels_auxfix_20k.jsonl`
+    - `difficulty_labels_auxfix_20k_summary.json`
+    - `difficulty_drift_old_vs_auxfix_20k.json`
+- `20k` relabel 的核心结论：
+  - 旧 `20k` 与新 `20k` 的 matched drift：
+    - `avg pass@16: 0.6057 -> 0.8319`
+    - `zero_ratio: 0.3324 -> 0.1288`
+    - `one_ratio: 0.5515 -> 0.7774`
+    - `greedy_success_rate: 0.6050 -> 0.8370`
+  - 说明旧语义下的难度标签明显失真，full aux-fix 语义下大量样本被重新判成易题
+- 第一版 `v10_auxfix_stage_balanced` selector 诊断结果：
+  - 直接用默认阈值时，由于 `core=[0.0625, 0.75]` 和 `pass@16` 离散刻度叠加，`near_low` / `near_high_mid` 实际为空
+  - 修正为 `core=[0.125, 0.625]` 后，桶结构恢复，但 `20k` relabel 池仍然只能选出约 `1615` 条非 mastered 样本
+  - 缺口只剩两类来源：
+    - 旧 zero-pass 样本重标后仍然几乎全是 `valid=1.0`、`reward std=0`、`unique_aux=1` 的低信号零方差样本
+    - 或者重新回退到 mastered/easy tail
+  - 因此结论不是“继续微调 selector”，而是必须扩大 aux-fix relabel 池
+- 新的 active 主线已经切换到完整 `remaining130k` 重标：
+  - 目录：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel150k_full_remaining130k`
+  - 输入池：`candidate_pool_extra_remaining130k.jsonl`
+  - 元数据：`dataset_metadata.json`
+  - 额外重标输出：
+    - `difficulty_labels_auxfix_extra_remaining130k.jsonl`
+    - `difficulty_labels_auxfix_extra_remaining130k_summary.json`
+  - 运行目录：
+    - `workdir/shard_*/progress.json`
+    - `workdir/shard_*/worker.log`
+  - 合并目标：
+    - 当前新 `20k` + 额外 `130k` = `150k` full aux-fix merged label pool
+  - 数据来源与标注模型：
+    - 来源标签池：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v8_structure_full150k_2k/difficulty_labels_merged_150k.jsonl`
+    - 排除：已在当前 `20k` 校准集中重标的 `20k` overlap
+    - 标注模型：`/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
+    - 标注参数：`qwen3_vl`, `num_samples=16`, `temperature=0.8`, `top_p=0.95`
 
 ## 当前 Gate
 
