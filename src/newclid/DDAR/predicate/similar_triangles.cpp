@@ -111,12 +111,12 @@ EqAngle SimilarTriangles::eqangle_bca() const
 
 EqAngle SimilarTriangles::eqangle_acb() const
 {
-    return EqAngle(-_left.angle_c(), _sameclock ? -_right.angle_b() : _right.angle_b());
+    return EqAngle(-_left.angle_c(), _sameclock ? -_right.angle_c() : _right.angle_c());
 }
 
 EqAngle SimilarTriangles::eqangle_cab() const
 {
-    return EqAngle(_left.angle_a(), _sameclock ? _right.angle_c() : -_right.angle_c());
+    return EqAngle(_left.angle_a(), _sameclock ? _right.angle_a() : -_right.angle_a());
 }
 
 vector<SimilarTriangles> SimilarTriangles::permutations() const

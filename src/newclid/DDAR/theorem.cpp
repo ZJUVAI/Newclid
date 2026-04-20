@@ -167,8 +167,7 @@ Theorem Theorem::thales_eqratio_of_para_with_common_point(const Coll &left, cons
     theorem.add_hypothesis(right.clone());
     theorem.add_hypothesis(make_unique<NColl>(NColl(left.b(), left.c(), right.b())));
     theorem.add_conclusion(make_unique<EqRatio>(EqRatio(Dist(left.a(), left.b()), Dist(left.a(), left.c()), Dist(right.a(), right.b()), Dist(right.a(), right.c()))));
-    theorem.add_conclusion(make_unique<EqRatio>(EqRatio(Dist(left.a(), left.b()), Dist(left.b(), left.c()), Dist(right.a(), right.b()), Dist(right.b(), right.c()))));
-    theorem.add_conclusion(make_unique<EqRatio>(EqRatio(Dist(left.a(), left.c()), Dist(left.b(), left.c()), Dist(right.a(), right.c()), Dist(right.b(), right.c()))));
+    theorem.add_conclusion(make_unique<EqRatio>(EqRatio(Dist(left.a(), left.b()), Dist(left.a(), left.c()), Dist(left.b(), right.b()), Dist(left.c(), right.c()))));
     return theorem;
 }
 
@@ -262,7 +261,7 @@ Theorem Theorem::thales_para_of_eqratio(const Thales &p)
 
 Theorem Theorem::thales_eqratio_of_para(const Thales &p)
 {
-    Theorem theorem("Thales Theorem 4", "r42");
+    Theorem theorem("Thales Theorem IV", "r42");
     theorem.add_hypothesis(p.left().clone());
     theorem.add_hypothesis(p.right().clone());
     theorem.add_hypothesis(p.para_ab().clone());
@@ -433,7 +432,31 @@ Theorem Theorem::congruent_triangles_properties(const CongruentTriangles &p)
     theorem.add_conclusion(p.cong_ab().clone());
     theorem.add_conclusion(p.cong_ac().clone());
     theorem.add_conclusion(p.cong_bc().clone());
-    theorem.add_conclusion(make_unique<SimilarTriangles>(SimilarTriangles(p.left(), p.right(), p.sameclock())));
+    theorem.add_conclusion(p.eqangle_abc().clone());
+    theorem.add_conclusion(p.eqangle_bca().clone());
+    theorem.add_conclusion(p.eqangle_cab().clone());
+    return theorem;
+}
+
+Theorem Theorem::congruent_triangles_of_sss(const CongruentTriangles &p)
+{
+    Theorem theorem("SSS Congruence of triangles", p.sameclock() ? "r110" : "r111");
+    theorem.add_hypothesis(p.cong_ab().clone());
+    theorem.add_hypothesis(p.cong_ac().clone());
+    theorem.add_hypothesis(p.cong_bc().clone());
+    theorem.add_hypothesis(p.to_sameclock().clone());
+    theorem.add_conclusion(p.clone());
+    return theorem;
+}
+
+Theorem Theorem::congruent_triangles_of_sas(const CongruentTriangles &p)
+{
+    Theorem theorem("SAS Congruence of triangles", p.sameclock() ? "r112" : "r113");
+    theorem.add_hypothesis(p.cong_ab().clone());
+    theorem.add_hypothesis(p.cong_bc().clone());
+    theorem.add_hypothesis(p.eqangle_abc().clone());
+    theorem.add_hypothesis(p.to_sameclock().clone());
+    theorem.add_conclusion(p.clone());
     return theorem;
 }
 

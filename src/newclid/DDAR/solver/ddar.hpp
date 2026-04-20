@@ -34,8 +34,13 @@ private:
 
     bool _solved{false};
 
-    bool _log_enabled;
-    bool _exp_enabled;
+    std::map<std::string, bool> _config;
+
+    bool get_config(const std::string &key, bool default_val = false) const
+    {
+        auto it = _config.find(key);
+        return it != _config.end() ? it->second : default_val;
+    }
 
     LinearSystem _system_slope;
     LinearSystem _system_dist;
@@ -56,6 +61,8 @@ public:
 
     bool is_solved() const { return _solved; }
 
+    const std::vector<Proof *> &goals() const { return _goals; }
+
     Proof *insert_statement(const std::unique_ptr<Statement> &p);
 
     const std::vector<Application> &applications() const { return _applications; }
@@ -64,7 +71,9 @@ public:
 
     size_t push_established_statement(Proof *pf);
 
-    DDARSolver(Problem *problem, bool log_enabled = false, bool exp_enabled = false);
+    DDARSolver(Problem *problem, const std::map<std::string, bool> &config = {});
+
+    const std::map<std::string, bool> &config() const { return _config; }
 
     void advance_theorem(size_t index);
 

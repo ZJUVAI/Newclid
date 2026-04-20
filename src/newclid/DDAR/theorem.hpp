@@ -133,6 +133,12 @@ public:
     // r103, r104
     static Theorem congruent_triangles_properties(const CongruentTriangles &p);
 
+    // Congruent triangles from SSS (Side-Side-Side)
+    static Theorem congruent_triangles_of_sss(const CongruentTriangles &p);
+
+    // Congruent triangles from SAS (Side-Angle-Side)
+    static Theorem congruent_triangles_of_sas(const CongruentTriangles &p);
+
     // r105
     static Theorem eqratio_of_coll(const Coll &left, const Coll &right);
 

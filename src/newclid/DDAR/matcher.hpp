@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <map>
 #include <string>
 #include "type/triangle.hpp"
 #include "theorem.hpp"
@@ -17,9 +18,17 @@ class Matcher
 private:
     Problem *_problem;
 
+    std::map<std::string, bool> _config;
+
     std::vector<Theorem> _theorems;
 
     std::vector<std::unique_ptr<Statement>> _stmts;
+
+    bool get_config(const std::string &key, bool default_val = false) const
+    {
+        auto it = _config.find(key);
+        return it != _config.end() ? it->second : default_val;
+    }
 
     void match_similar_triangles();
 
@@ -66,7 +75,7 @@ private:
     void insert_theorem(const Theorem &thm);
 
 public:
-    Matcher(Problem *prob);
+    Matcher(Problem *prob, const std::map<std::string, bool> &config = {});
 
     const std::vector<Theorem> &theorems() const { return _theorems; }
 

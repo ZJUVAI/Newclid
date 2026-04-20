@@ -234,22 +234,49 @@ class CSolver:
         problem_name: str = "anonymity",
         seed: int = 123,
         solver: GeometricSolver = None,
-        using_log: bool = False,
-        using_exp: bool = False,
-        light: bool = False,
+        config_path: Path = None,
+        **overrides
     ):
+        """
+        Initialize CSolver with configuration.
+
+        Args:
+            problem: Problem string
+            problem_name: Name of the problem
+            seed: Random seed
+            solver: Optional pre-built GeometricSolver
+            config_path: Path to config file (default: None, uses default config)
+            **overrides: Config overrides (e.g., using_log=True, using_exp=False, light=True)
+
+        Examples:
+            # Use default config
+            CSolver(fl_statement, solver=solver)
+
+            # Use custom config file
+            CSolver(fl_statement, solver=solver, config_path=Path("my_config.json"))
+
+            # Override config
+            CSolver(fl_statement, solver=solver, using_log=True)
+
+            # Custom config + override
+            CSolver(fl_statement, solver=solver, config_path=Path("my_config.json"), using_log=True)
+        """
+        from newclid.configs import load_solver_config
+
+        # Load config with overrides
+        final_config = load_solver_config(config_path, **overrides)
+
         self.problem = problem
         self.problem_name = problem_name
         self.seed = seed
-        self.log_enabled = using_log
-        self.exp_enabled = using_exp
+        self.config = final_config
 
         self.points: List[Tuple[str, Any, Any]] = []
         self.premises: List[Tuple[str, List[str]]] = []
         self.goals: List[Tuple[str, List[str]]] = []
         self.useful_points: List[str] = []
 
-        if light:
+        if final_config.get('light', False):
             # 轻量化路径：跳过 dep_graph、Matcher、rely 等符号推理开销
             self.solver = None
             problemJGEX = ProblemJGEX.from_text(self.problem)
@@ -337,8 +364,7 @@ class CSolver:
                 self.goals,
                 custom_rules,
                 max_level,
-                self.log_enabled,
-                self.exp_enabled,
+                self.config,
             )
         else:
             solved, dep_graph = DDAR.run_ddar(
@@ -347,8 +373,7 @@ class CSolver:
                 self.premises,
                 self.goals,
                 max_level,
-                self.log_enabled,
-                self.exp_enabled,
+                self.config,
             )
 
         if self.solver is not None:

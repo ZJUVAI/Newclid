@@ -119,7 +119,7 @@ class ProblemWorker:
                 return [], {}
 
             n_clauses = len(fl_statement.split(";"))
-            csolver = CSolver(fl_statement, seed=seed, solver=solver, using_log=True)
+            csolver = CSolver(fl_statement, seed=seed, solver=solver)
 
             # Run solver
             ddar_start = time.time()
@@ -480,7 +480,7 @@ class ProblemWorker:
         timings["build_solver_time"] = time.time() - t0
 
         t0 = time.time()
-        csolver_no_aux = CSolver(problem="", solver=solver_no_aux, using_log=True)
+        csolver_no_aux = CSolver(problem="", solver=solver_no_aux)
         csolver_no_aux.run()
         timings["run_solver_time"] = time.time() - t0
 
@@ -518,7 +518,7 @@ class ProblemWorker:
             )
             timings["build_solver_time"] += time.time() - t0
 
-            csolver_all_aux = CSolver(problem="", solver=solver_all_aux, using_log=True)
+            csolver_all_aux = CSolver(problem="", solver=solver_all_aux)
             t0 = time.time()
             csolver_all_aux.run()
             timings["run_solver_time"] += time.time() - t0
@@ -608,7 +608,7 @@ class ProblemWorker:
                 timings["build_solver_time"] += time.time() - t0
 
                 t0 = time.time()
-                csolver_test = CSolver(problem="", solver=solver_test, using_log=True)
+                csolver_test = CSolver(problem="", solver=solver_test)
                 csolver_test.run()
                 timings["run_solver_time"] += time.time() - t0
 
@@ -687,7 +687,7 @@ class ProblemWorker:
             )
             timings["build_solver_time"] += time.time() - t0
 
-            csolver_all_aux = CSolver(problem="", solver=solver_all_aux, using_log=True)
+            csolver_all_aux = CSolver(problem="", solver=solver_all_aux)
             t0 = time.time()
             csolver_all_aux.run()
             timings["run_solver_time"] += time.time() - t0

@@ -306,7 +306,6 @@ def solve_problem(
             problem_name=problem_name,
             seed=seed,
             solver=geometric_solver,
-            using_log=True,
         )
     except Exception as e:
         build_seconds = time.perf_counter() - build_start

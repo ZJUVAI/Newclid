@@ -21,7 +21,8 @@
 
 using namespace std;
 
-Matcher::Matcher(Problem *prob) : _problem(prob)
+Matcher::Matcher(Problem *prob, const std::map<std::string, bool> &config)
+    : _problem(prob), _config(config)
 {
     match_similar_triangles();
     match_between();
@@ -80,7 +81,12 @@ void Matcher::on_similar_triangles(const SimilarTriangles &simtri)
     CongruentTriangles const congtri(simtri.left(), simtri.right(), simtri.sameclock());
     if (congtri.check_numerically())
     {
-        insert_theorem(Theorem::congruent_triangles_of_cong(congtri));
+        // Use SSS and SAS to derive congruent triangles
+        for (const auto &rotated : congtri.cyclic_rotations())
+        {
+            insert_theorem(Theorem::congruent_triangles_of_sas(rotated));
+        }
+        insert_theorem(Theorem::congruent_triangles_of_sss(congtri));
         insert_theorem(Theorem::congruent_triangles_properties(congtri));
     }
 }
@@ -763,6 +769,21 @@ void Matcher::match_perps_paras()
 void Matcher::insert_theorem(const Theorem &thm)
 {
     if (!thm.check_numerically())
+    {
+        // cout << "定理未通过数值检测: " << thm.name() << endl;
+        // cout << "前提: " << endl;
+        // for (const auto &stmt : thm.hypotheses())
+        // {
+        //     cout << "  " << *stmt << endl;
+        // }
+        // cout << "结论: " << endl;
+        // for (const auto &stmt : thm.conclusions())
+        // {
+        //     cout << "  " << *stmt << endl;
+        // }
+        return;
+    }
+    if (!get_config(thm.rule(), false))
     {
         return;
     }
