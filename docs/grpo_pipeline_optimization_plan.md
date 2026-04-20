@@ -350,9 +350,30 @@ mid gate 固定检查：
     - 旧 `v9` 的 `first50` 是 `avg_zero_std = 0.22`, `median_reward_std = 0.3267`
     - `v9 auxfix` 变成 `0.53 / 0.0970`
     - 说明 `v9_stage_balanced` 的旧 selector 只适配了旧 reward / target 语义，不适配 full aux-fix 语义
+  - 进一步的 fixed-relabelling 诊断已经确认必须重标：
+    - 用 `scripts/grpo/label_difficulty_vlm.py` 对 `v9 auxfix` 当前 `2k` 选集随机抽样 `512` 条重新打标
+    - 旧标签下这 `512` 条的统计为：
+      - `avg_pass_at_16 = 0.3370`
+      - `median_pass_at_16 = 0.3125`
+      - `zero_ratio = 0.1367`
+      - `greedy_success_rate = 0.2852`
+      - `one_ratio = 0.0`
+    - fixed evaluator 下重标后变为：
+      - `avg_pass_at_16 = 0.6969`
+      - `median_pass_at_16 = 0.7500`
+      - `zero_ratio = 0.0195`
+      - `greedy_success_rate = 0.6875`
+      - `one_ratio = 0.3809`
+    - 分布漂移量级：
+      - `pass_up = 382 / 512`
+      - `delta_avg = +0.3599`
+      - `delta_median = +0.3125`
+    - 结论：
+      - 当前旧标签显著低估了这些样本在 full aux-fix 语义下的可解率
+      - 只改 selector 配额不够，必须先重标
 - 当前判断：
   - 下一步主线不再是继续放大 `v8` 或直接重跑 `v9`
-  - 应该基于 aux-fix 语义重做 `v9` 的 selector / bucket 配额 / gate
+  - 应该先基于 aux-fix 语义重标，再重做 `v9` 的 selector / bucket 配额 / gate
 
 ## 当前主线：`v9 auxfix` Selector 重做
 
@@ -487,9 +508,10 @@ mid gate 固定检查：
 - 因此当前的关键结论是：
   - `auxfix` 不是单独的充分改进
   - 旧 `v8/v9` selector 在 full aux-format 语义下都需要重新校准
-  - 最值得保留的是 `v9` 的 stage-balanced 思路，而不是它当前的精确配额
+  - 更准确地说，旧 `difficulty_labels` 本身已经过时，最值得保留的是 `v9` 的 stage-balanced 思路，而不是它当前的标签和精确配额
 - 下一步应变为：
-  - 基于 aux-fix 语义重新统计 `150k` 标注池的桶分布
+  - 先用 `label_difficulty_vlm.py` 基于 aux-fix 语义重新标注
+  - 基于新标签重新统计 `150k` 标注池的桶分布
   - 重做 `v9` selector 的 bucket 配额与 zero-pass / near-low / near-high 限额
   - 先跑新的 `50-step` smoke
   - 只有 early gate 恢复到接近旧 `v9` 水平时，才重新进入 `170-step` / `300-step`
