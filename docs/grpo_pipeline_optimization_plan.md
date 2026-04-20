@@ -31,6 +31,38 @@
   - full aux-format fix 已经在 `v8` / `v9` 两条 selector 上完成 smoke 诊断；
   - 结果表明问题不是“只要修好 aux DSL 就会自然改善”，而是旧 selector 在 aux-fix 语义下需要重新适配。
 
+## 2026-04-20 Relabel Infrastructure
+
+- 已实现新的 aux-fix 重标基础设施：
+  - `scripts/grpo/label_difficulty_vlm.py`
+    - 支持 `--resume`
+    - 支持 `--work-dir`
+    - 支持 worker 级 `progress.json` 与 `worker.log`
+    - 支持按 `flush-every-batches` 周期性落盘 shard 输出
+  - `scripts/grpo/report_difficulty_drift.py`
+    - 用于对齐旧标签与新标签的 `pass@k / greedy_success / all_invalid` 漂移
+  - `scripts/grpo/select_debug_set.py`
+    - 新增 `v10_auxfix_stage_balanced`
+    - 新增 easy-tail cap：`greedy_success_max_fraction`、`pass_one_max_fraction`、`high_pass_max_fraction`
+- 对应测试已补充并通过：
+  - `pytest -q tests/test_grpo_rewards.py tests/test_grpo_data_selection.py`
+
+## 当前 Active Run
+
+- 第一阶段 `20k` 校准重标集已生成：
+  - 目录：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel20k_calib`
+  - 输入池：`candidate_pool_relabel_20k.jsonl`
+  - 旧标签对照：`difficulty_labels_old_20k.jsonl`
+  - 元数据：`dataset_metadata.json`
+- 当前正在运行的任务：
+  - `difficulty_labels_auxfix_20k.jsonl`
+  - summary 输出：`difficulty_labels_auxfix_20k_summary.json`
+  - workdir：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel20k_calib/workdir`
+- 监控入口：
+  - launcher log：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel20k_calib/logs/launcher.log`
+  - worker log：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel20k_calib/workdir/shard_*/worker.log`
+  - progress：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel20k_calib/workdir/shard_*/progress.json`
+
 ## 当前 Gate
 
 所有新的 GRPO 数据集迭代都统一采用两段式 smoke：
