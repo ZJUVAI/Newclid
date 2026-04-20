@@ -4,9 +4,9 @@
 **Benchmark:** IMO-95 (95 geometry problems)  
 **Model:** Qwen3-VL Text-only Agent
 
-**Status note:** This report is the historical evaluation summary for the old GRPO baseline `models/grpo_vlm_sft44_505_run1/v1-20260417-084328/checkpoint-505`. It is not the current `v7` result.
+**Status note:** This report is the historical evaluation summary for the old GRPO baseline `models/grpo_vlm_sft44_505_run1/v1-20260417-084328/checkpoint-505`. It is not the current `v8` result.
 
-**Current mainline status:** `v7_structure_strict_zero` passed the 50-step smoke gate but failed mid-training promotion and was stopped early at `171 / 300` due to sustained zero-variance collapse. No `v7` `dev_imo` or `imo_95` evaluation was run from this branch. Future GRPO evals should still be compared against both the SFT baseline `checkpoint-20084` and the historical GRPO `checkpoint-505` results in this document.
+**Current mainline status:** `v8_structure_full150k_strict_zero` passed the 50-step smoke gate, but its resumed `300-step` promotion trace is again showing mid-training collapse by `step 147 / 300` with sustained `reward_std = 0.0` behavior in the recent window. The prior `v7_structure_strict_zero` branch also passed smoke but failed mid-training promotion and was stopped early at `171 / 300`. No `v7` `dev_imo` or `imo_95` evaluation was run from that branch, and `v8` should likewise not be evaluated unless the promotion trace recovers convincingly. Future GRPO evals should still be compared against both the SFT baseline `checkpoint-20084` and the historical GRPO `checkpoint-505` results in this document.
 
 ---
 

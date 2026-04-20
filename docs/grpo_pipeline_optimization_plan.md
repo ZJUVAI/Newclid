@@ -1,6 +1,6 @@
 # GRPO Iteration Status and Next Plan
 
-Last updated: 2026-04-19
+Last updated: 2026-04-20
 
 ## Background
 
@@ -187,7 +187,45 @@ The evidence from `v3 -> v7` now supports four conclusions:
 4. The current blocker has shifted from dataset construction to training stability validation.
    `v7` has already cleared the 50-step gate, so the next question is whether that signal survives mid-training.
 
-## Current Mainline: `v7` Promotion
+### `v8_structure_full150k_strict_zero`
+
+- Dataset:
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v8_structure_full150k_2k`
+- Label source:
+  - reused prior union labels for `71974` rows
+  - relabeled the remaining `78026` rows from the full `150k` prefilter pool
+  - merged label pool size: `150000`
+  - label model remains `/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
+- Selector policy:
+  - `v7_structure_strict_zero`
+- Static result:
+  - `selected_rows = 2000`
+  - `selected_zero_pass_ratio = 0.061`
+  - `selected_reward_mixed_zero_ratio = 0.061`
+  - `selected_nonzero_pass_ratio = 0.939`
+  - `selected_avg_proxy_reward_std = 0.3811`
+  - `selected_median_proxy_reward_std = 0.3631`
+  - `selected_avg_valid_ratio = 0.8429`
+  - `selected_avg_unique_aux_count = 2.138`
+  - selected tiers are concentrated in `core` with only light `reward_mixed_zero` backfill
+- Smoke result:
+  - run: `models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140`
+  - smoke gate file: `models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140/smoke_gate_first50.json`
+  - comparison file: `models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140/compare_vs_v7_v6_v5_first50.json`
+  - `first50_avg_frac_reward_zero_std = 0.2300`
+  - `first50_median_reward_std = 0.3472`
+  - `max_consecutive_full_zero_std_steps = 1`
+- Comparison against `v7` smoke:
+  - `avg_frac_reward_zero_std`: `0.2900 -> 0.2300`
+  - `median_reward_std`: `0.2562 -> 0.3472`
+  - `avg_reward`: `0.6162 -> 0.6084`
+  - `mean_length`: `46.46 -> 46.07`
+- Conclusion:
+  - `v8` is better than `v7` on the unified smoke gate metrics
+  - the main improvement is lower zero-variance contamination and materially higher reward variance
+  - `v8` is the active promotion candidate for `300-step` true resume
+
+## Current Mainline: `v8` Promotion
 
 ### Why `300-step` Is The Next Gate
 
@@ -199,13 +237,13 @@ The historical `v1` GRPO run shows why `50-step` is not enough:
 
 So the current promotion path is:
 
-1. `v7` smoke pass at `checkpoint-50`
+1. `v8` smoke pass at `checkpoint-50`
 2. true resume to `checkpoint-300`
 3. evaluate `checkpoint-300` on `dev_imo`
 4. only if the mid-training trace stays healthy, true resume to `checkpoint-500`
 5. evaluate `checkpoint-500` on `dev_imo`, then `imo_95`
 
-### `v7` Promotion Rules
+### `v8` Promotion Rules
 
 Keep the successful smoke settings fixed during promotion:
 
@@ -225,9 +263,31 @@ Use true checkpoint resume rather than model-only restart:
 Decision rule:
 
 - if the `300-step` trace stays stable and `dev_imo` remains acceptable, continue to `500-step`
-- if the `300-step` trace regresses toward the historical `v1` failure pattern, stop promotion and return to data iteration
+- if the `300-step` trace regresses toward the historical `v1` or `v7` failure pattern, stop promotion and return to data iteration
 
-### `v7` Promotion Result
+### `v8` Promotion Status
+
+- Active resumed run:
+  - `models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140/v0-20260420-090218`
+- Resume form:
+  - true resume from `checkpoint-50`
+  - training command used `max_steps = 300`
+- Mid-training status at `step 147 / 300`:
+  - `all_avg_frac_reward_zero_std = 0.6134`
+  - `all_median_reward_std = 0.0`
+  - `last20_avg_frac_reward_zero_std = 0.7750`
+  - `last20_median_reward_std = 0.0`
+  - `max_consecutive_full_zero_std_steps = 5`
+- Current interpretation:
+  - `v8` improves materially over `v7` on the first-50 smoke gate
+  - but by the mid-training window it again collapses into frequent `reward_std = 0.0` behavior
+  - this means full-`150k` relabel + reuse is not sufficient by itself to fix promotion stability
+- Working conclusion:
+  - treat `v8` as a stronger smoke-pass candidate than `v7`
+  - but treat the current promotion trace as a likely mid-training failure unless later steps unexpectedly recover
+  - the next data iteration should focus on selector dynamics, not only larger relabel coverage
+
+### Historical `v7` Promotion Result
 
 - Run:
   - `models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401`
@@ -265,27 +325,41 @@ Decision rule:
   - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v7_structure_2k/difficulty_labels_union_v2_v5_113k_report.json`
 - `v7` dataset report:
   - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v7_structure_2k/grpo_train_report_2000.json`
+- `v8` merged-label report:
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v8_structure_full150k_2k/difficulty_labels_merged_150k_report.json`
+- `v8` dataset report:
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v8_structure_full150k_2k/grpo_train_report_2000.json`
 - `v6` smoke gate:
   - `models/grpo_vlm_sft44_v6_midpass_s1_4gpu_256/v0-20260419-210740/smoke_gate_first50.json`
 - `v7` smoke gate:
   - `models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401/smoke_gate_first50.json`
 - `v7` vs `v6/v5` smoke comparison:
   - `models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401/compare_vs_v6_v5_first50.json`
+- `v8` smoke gate:
+  - `models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140/smoke_gate_first50.json`
+- `v8` vs `v7/v6/v5` smoke comparison:
+  - `models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140/compare_vs_v7_v6_v5_first50.json`
+- `v8` resumed promotion run:
+  - `models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140/v0-20260420-090218`
 - historical long-run GRPO baseline:
   - `models/grpo_vlm_sft44_505_run1/v1-20260417-084328`
 
 ## Recent Conclusion
 
-- `v7` is now the best GRPO data iteration so far.
-- `v7` is the first dataset that passes the unified 50-step smoke gate.
-- The project should stop selector-only fallback work on `v5/v6`.
-- `v7` does not survive mid-training promotion:
+- `v8` is now the best GRPO data iteration so far.
+- `v8` improves on `v7` at the 50-step smoke gate.
+- `v8` still shows mid-training collapse by `step 147 / 300`:
+  - `all_avg_frac_reward_zero_std = 0.6134`
+  - `last20_avg_frac_reward_zero_std = 0.7750`
+  - `last20_median_reward_std = 0.0`
+- The project should now move from “more labels on the same selector” to selector/sampling changes that explicitly suppress zero-variance streaks in the `50-150` step window.
+- historical note: `v7` does not survive mid-training promotion:
   - it passes smoke
   - it collapses by `step 171 / 300`
-- The active mainline now returns to data iteration:
-  - reconcile the full `150k` prefilter pool against the union labels
-  - label the remaining delta
-  - rebuild selector output from the full merged label pool
+- The active mainline is now:
+  - finalize the `v8` promotion outcome
+  - record the mid-training failure trace
+  - redesign the selector/promotion policy before launching `v9`
 - Git hygiene for this phase:
   - track the two docs under `docs/`
   - do not stage temporary benchmark resume files, monitor logs, or one-off recovery helpers
