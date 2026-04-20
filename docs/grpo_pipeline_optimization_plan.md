@@ -187,6 +187,33 @@
 4. 当前主问题已经从数据构建转移到了训练稳定性验证。  
    `v7` 已经通过了 50-step gate，接下来真正的问题是这个信号能不能撑到中段训练。
 
+## 版本演进摘要
+
+- `v3 -> v4`
+  - 主要提升：将通用的 zero-pass fallback 改成更严格的 `reward_mixed_zero`
+  - 直接效果：`selected_zero_pass_ratio` 从 `0.6785` 降到 `0.20375`
+  - 局限：`v4` 只有 `800` 条，更像 selector 概念验证
+
+- `v4 -> v5`
+  - 主要提升：将 reward-mixed 方案扩到 `2k`，并把标注池扩到 `100k`
+  - 直接效果：`selected_zero_pass_ratio` 进一步降到 `0.1685`，`selected_avg/median_proxy_reward_std` 上升
+  - 局限：smoke 仍未通过，说明仅扩大规模不够
+
+- `v5 -> v6`
+  - 主要提升：selector 切换为 `v6_mid_strict_zero`，收紧 `core`，限制高 pass easy 样本，并继续压 zero-pass
+  - 直接效果：`selected_zero_pass_ratio` 降到 `0.10`，smoke 指标继续改善
+  - 局限：仍未过统一 gate，说明只改 selector 还不够
+
+- `v6 -> v7`
+  - 主要提升：candidate pool 结构升级到 `150k` prefilter，并显式偏向 `multi_point`
+  - 直接效果：`selected_avg_unique_aux_count` 提升，high-pass 尾部减轻，`v7` 成为首个通过统一 50-step smoke gate 的版本
+  - 结论：池子结构和 selector 同等重要
+
+- `v7 -> v8`
+  - 主要提升：在相同 `v7_structure_strict_zero` selector 下，把标注池补齐到完整 `150k`，新增补标 `78026` 条
+  - 直接效果：`selected_zero_pass_ratio` 从 `0.10` 降到 `0.061`，`selected_avg_proxy_reward_std`、`selected_median_proxy_reward_std`、`selected_avg_valid_ratio` 继续提升，`50-step smoke` 明显优于 `v7`
+  - 局限：主要改善的是早期稳定性，中段训练仍会塌缩
+
 ### `v8_structure_full150k_strict_zero`
 
 - 数据集：
