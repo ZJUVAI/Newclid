@@ -170,14 +170,14 @@ class AuxRewardEvaluator:
         aux_content = aux_body.strip()
 
         # Remove <aux> tags if present
-        if aux_content.startswith('<aux>'):
+        if aux_content.startswith("<aux>"):
             aux_content = aux_content[5:]
-        if aux_content.endswith('</aux>'):
+        if aux_content.endswith("</aux>"):
             aux_content = aux_content[:-6]
         aux_content = aux_content.strip()
 
         # Split by semicolon to get individual auxiliary points
-        segments = [s.strip() for s in aux_content.split(';') if s.strip()]
+        segments = [s.strip() for s in aux_content.split(";") if s.strip()]
 
         # Process each segment
         all_constructions = []

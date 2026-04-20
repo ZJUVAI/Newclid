@@ -31,7 +31,7 @@ dependencies = [
     "markupsafe==3.0.2",
     "pyvis",
     "scipy>=1.15",
-    "adjusttext @ https://github.com/Phlya/adjustText/archive/master.zip",
+    "adjustText>=1.3.0",
     "pandas>=2.3",
     "pybind11",
     "httpx[socks]",
@@ -52,7 +52,7 @@ flash-attn = [{ requirement = "torch", match-runtime = true }]
 flash-attn = { MAX_JOBS = "10" }  # FLASH_ATTENTION_SKIP_CUDA_BUILD = "TRUE"; remove if you need to compile flash attn from source
 
 [[tool.uv.index]]
-url = "http://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/"
+url = "https://mirrors.tuna.tsinghua.edu.cn/pypi/web/simple/"
 name = "tsinghua"
 default = true
 

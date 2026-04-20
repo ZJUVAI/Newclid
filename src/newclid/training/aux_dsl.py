@@ -35,9 +35,8 @@ def extract_aux_body(completion: str) -> Optional[str]:
     if not body:
         return None
 
-    # Bug fix: Do not remove x00 prefix - it's part of the data format
-    # body = _AUX_PREFIX_RE.sub("", body, count=1)
-    # body = body.strip()
+    body = _AUX_PREFIX_RE.sub("", body, count=1)
+    body = body.strip()
     return body or None
 
 

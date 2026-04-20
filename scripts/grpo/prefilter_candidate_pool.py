@@ -15,8 +15,8 @@ from scripts._tqdm import tqdm
 
 
 POINT_BUCKET_WEIGHTS = {
-    "multi_point": 0.70,
-    "single_point": 0.30,
+    "multi_aux": 0.70,
+    "single_aux": 0.30,
 }
 
 PREMISE_BUCKET_WEIGHTS = {
@@ -72,9 +72,9 @@ def query_hash(query: str) -> str:
 
 
 def point_bucket(row: dict[str, Any]) -> str:
-    if row.get("aux_points_total", 0) >= 2:
-        return "multi_point"
-    return "single_point"
+    if row.get("aux_segment_count", 0) >= 2 or row.get("aux_points_total", 0) >= 2:
+        return "multi_aux"
+    return "single_aux"
 
 
 def complexity_source_value(row: dict[str, Any]) -> int:
@@ -124,7 +124,7 @@ def compute_bucket_quotas(
 
     assigned = sum(point_totals.values())
     if assigned != target_size:
-        point_totals["multi_point"] += target_size - assigned
+        point_totals["multi_aux"] += target_size - assigned
 
     for point_key, point_target in point_totals.items():
         premise_totals: dict[str, int] = {}
