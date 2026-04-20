@@ -51,6 +51,14 @@ POLICY_TIER_ORDER = {
         "near_high_high",
         "mastered",
     ),
+    "v10_auxfix_stage_balanced": (
+        "core",
+        "near_low",
+        "reward_mixed_zero",
+        "near_high_mid",
+        "near_high_high",
+        "mastered",
+    ),
 }
 NON_MASTERED_TIERS_BY_POLICY = {
     "v3_tiered": (
@@ -79,6 +87,13 @@ NON_MASTERED_TIERS_BY_POLICY = {
         "near_high_high",
     ),
     "v9_stage_balanced": (
+        "core",
+        "near_low",
+        "reward_mixed_zero",
+        "near_high_mid",
+        "near_high_high",
+    ),
+    "v10_auxfix_stage_balanced": (
         "core",
         "near_low",
         "reward_mixed_zero",
@@ -205,6 +220,7 @@ def _pass_distance_rank(
         "v6_mid_strict_zero",
         "v7_structure_strict_zero",
         "v9_stage_balanced",
+        "v10_auxfix_stage_balanced",
     }:
         return abs(_pass_value(row, pass_key) - 0.375)
     return abs(_valid_ratio(row, pass_key) - 0.5)
@@ -213,7 +229,11 @@ def _pass_distance_rank(
 def _tier_rank(
     row: dict[str, Any], pass_key: str, *, selection_policy: str
 ) -> tuple[Any, ...]:
-    if selection_policy in {"v7_structure_strict_zero", "v9_stage_balanced"}:
+    if selection_policy in {
+        "v7_structure_strict_zero",
+        "v9_stage_balanced",
+        "v10_auxfix_stage_balanced",
+    }:
         return (
             -int(row.get("aux_points_total", 0) >= 2),
             -int(row.get("aux_segment_count", 0) >= 2),
@@ -276,6 +296,7 @@ def _classify_row(
         "v6_mid_strict_zero",
         "v7_structure_strict_zero",
         "v9_stage_balanced",
+        "v10_auxfix_stage_balanced",
     }:
         if 0.0 < pass_value < core_min_pass:
             return "near_low"
@@ -296,6 +317,7 @@ def _classify_row(
         "v6_mid_strict_zero",
         "v7_structure_strict_zero",
         "v9_stage_balanced",
+        "v10_auxfix_stage_balanced",
     }:
         valid_ratio = _valid_ratio(row, pass_key)
         if valid_ratio < zero_valid_min or valid_ratio > zero_valid_max:
@@ -403,8 +425,13 @@ def _take_matching_from_tiers(
     predicate,
     limit: int,
     *,
+    pass_key: str,
     tier_caps: dict[str, int],
     goal_cap: int,
+    easy_tail_counter: Counter[str],
+    easy_tail_caps: dict[str, int],
+    high_pass_min: float,
+    pass_one_value: float,
 ) -> list[dict[str, Any]]:
     taken = []
     for tier_name in tier_order:
@@ -420,12 +447,31 @@ def _take_matching_from_tiers(
             goal_predicate = row.get("goal_predicate")
             if goal_predicate and goal_counter[goal_predicate] >= goal_cap:
                 continue
+            pass_value = _pass_value(row, pass_key)
+            if bool(row.get("greedy_success")) and (
+                easy_tail_counter["greedy_success"] >= easy_tail_caps["greedy_success"]
+            ):
+                continue
+            if pass_value >= pass_one_value and (
+                easy_tail_counter["pass_one"] >= easy_tail_caps["pass_one"]
+            ):
+                continue
+            if pass_value >= high_pass_min and (
+                easy_tail_counter["high_pass"] >= easy_tail_caps["high_pass"]
+            ):
+                continue
             if not predicate(row):
                 continue
             used_ids.add(row_id)
             selected.append(row)
             taken.append(row)
             tier_selected_counter[tier_name] += 1
+            if bool(row.get("greedy_success")):
+                easy_tail_counter["greedy_success"] += 1
+            if pass_value >= pass_one_value:
+                easy_tail_counter["pass_one"] += 1
+            if pass_value >= high_pass_min:
+                easy_tail_counter["high_pass"] += 1
             if goal_predicate:
                 goal_counter[goal_predicate] += 1
             for tag in row.get("predicate_family_tags", []):
@@ -529,6 +575,11 @@ def select_debug_rows(
     reward_mixed_zero_min_fraction: float = 0.0,
     near_high_mid_min_fraction: float = 0.0,
     near_high_high_min_fraction: float = 0.0,
+    greedy_success_max_fraction: float = 1.0,
+    pass_one_max_fraction: float = 1.0,
+    high_pass_min: float = 0.75,
+    high_pass_max_fraction: float = 1.0,
+    pass_one_value: float = 1.0,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     tier_order = POLICY_TIER_ORDER[selection_policy]
     non_mastered_tiers = NON_MASTERED_TIERS_BY_POLICY[selection_policy]
@@ -556,8 +607,14 @@ def select_debug_rows(
     tier_selected_counter: Counter[str] = Counter()
     family_counter: Counter[str] = Counter()
     goal_counter: Counter[str] = Counter()
+    easy_tail_counter: Counter[str] = Counter()
 
     tier_caps = {"mastered": max(0, int(target_size * mastered_max_fraction))}
+    easy_tail_caps = {
+        "greedy_success": max(0, int(target_size * greedy_success_max_fraction)),
+        "pass_one": max(0, int(target_size * pass_one_max_fraction)),
+        "high_pass": max(0, int(target_size * high_pass_max_fraction)),
+    }
     if selection_policy == "v3_tiered":
         tier_caps["hard_valid_high"] = max(
             0, int(target_size * hard_valid_high_max_fraction)
@@ -590,6 +647,17 @@ def select_debug_rows(
         tier_caps["near_high_high"] = max(
             0, int(target_size * near_high_high_max_fraction)
         )
+    elif selection_policy == "v10_auxfix_stage_balanced":
+        tier_caps["near_low"] = max(0, int(target_size * near_low_max_fraction))
+        tier_caps["reward_mixed_zero"] = max(
+            0, int(target_size * reward_mixed_zero_max_fraction)
+        )
+        tier_caps["near_high_mid"] = max(
+            0, int(target_size * near_high_mid_max_fraction)
+        )
+        tier_caps["near_high_high"] = max(
+            0, int(target_size * near_high_high_max_fraction)
+        )
     mastered_fallback_min_rows = max(
         0, int(target_size * mastered_fallback_min_fill_fraction)
     )
@@ -598,7 +666,7 @@ def select_debug_rows(
     family_target = max(1, int(target_size * family_min_fraction))
     goal_cap = max(1, int(target_size * goal_max_fraction))
     tier_min_rows = {}
-    if selection_policy == "v9_stage_balanced":
+    if selection_policy in {"v9_stage_balanced", "v10_auxfix_stage_balanced"}:
         tier_min_rows = {
             "near_low": max(0, int(target_size * near_low_min_fraction)),
             "reward_mixed_zero": max(
@@ -618,8 +686,13 @@ def select_debug_rows(
         non_mastered_tiers,
         lambda row: row.get("aux_segment_count", 0) >= 2,
         multi_segment_target,
+        pass_key=pass_key,
         tier_caps=tier_caps,
         goal_cap=goal_cap,
+        easy_tail_counter=easy_tail_counter,
+        easy_tail_caps=easy_tail_caps,
+        high_pass_min=high_pass_min,
+        pass_one_value=pass_one_value,
     )
     shortages["multi_segment_shortage"] = max(0, multi_segment_target - len(taken))
 
@@ -633,8 +706,13 @@ def select_debug_rows(
         non_mastered_tiers,
         lambda row: row.get("aux_points_total", 0) >= 2,
         multi_point_target,
+        pass_key=pass_key,
         tier_caps=tier_caps,
         goal_cap=goal_cap,
+        easy_tail_counter=easy_tail_counter,
+        easy_tail_caps=easy_tail_caps,
+        high_pass_min=high_pass_min,
+        pass_one_value=pass_one_value,
     )
     shortages["multi_point_shortage"] = max(0, multi_point_target - len(taken))
 
@@ -658,13 +736,18 @@ def select_debug_rows(
             non_mastered_tiers,
             lambda row, family=family: family in row.get("predicate_family_tags", []),
             need,
+            pass_key=pass_key,
             tier_caps=tier_caps,
             goal_cap=goal_cap,
+            easy_tail_counter=easy_tail_counter,
+            easy_tail_caps=easy_tail_caps,
+            high_pass_min=high_pass_min,
+            pass_one_value=pass_one_value,
         )
         shortages[f"{family}_shortage"] = max(0, need - len(taken))
 
     tier_floor_shortages = {}
-    if selection_policy == "v9_stage_balanced":
+    if selection_policy in {"v9_stage_balanced", "v10_auxfix_stage_balanced"}:
         for tier_name in (
             "near_low",
             "reward_mixed_zero",
@@ -682,8 +765,13 @@ def select_debug_rows(
                 (tier_name,),
                 lambda row: True,
                 needed,
+                pass_key=pass_key,
                 tier_caps=tier_caps,
                 goal_cap=goal_cap,
+                easy_tail_counter=easy_tail_counter,
+                easy_tail_caps=easy_tail_caps,
+                high_pass_min=high_pass_min,
+                pass_one_value=pass_one_value,
             )
             tier_floor_shortages[tier_name] = max(0, needed - len(taken))
 
@@ -697,8 +785,13 @@ def select_debug_rows(
         non_mastered_tiers,
         lambda row: True,
         target_size - len(selected),
+        pass_key=pass_key,
         tier_caps=tier_caps,
         goal_cap=goal_cap,
+        easy_tail_counter=easy_tail_counter,
+        easy_tail_caps=easy_tail_caps,
+        high_pass_min=high_pass_min,
+        pass_one_value=pass_one_value,
     )
 
     mastered_fallback_triggered = len(selected) < mastered_fallback_min_rows
@@ -713,8 +806,13 @@ def select_debug_rows(
             ("mastered",),
             lambda row: True,
             target_size - len(selected),
+            pass_key=pass_key,
             tier_caps=tier_caps,
             goal_cap=goal_cap,
+            easy_tail_counter=easy_tail_counter,
+            easy_tail_caps=easy_tail_caps,
+            high_pass_min=high_pass_min,
+            pass_one_value=pass_one_value,
         )
 
     selected_full_rows = selected[:target_size]
@@ -790,8 +888,14 @@ def select_debug_rows(
             "multi_point_min_fraction": multi_point_min_fraction,
             "family_min_fraction": family_min_fraction,
             "goal_max_fraction": goal_max_fraction,
+            "greedy_success_max_fraction": greedy_success_max_fraction,
+            "pass_one_max_fraction": pass_one_max_fraction,
+            "high_pass_min": high_pass_min,
+            "high_pass_max_fraction": high_pass_max_fraction,
+            "pass_one_value": pass_one_value,
         },
         "tier_caps": tier_caps,
+        "easy_tail_caps": easy_tail_caps,
         "tier_min_rows": tier_min_rows,
         "tier_max_rows": tier_caps,
         "tier_floor_shortages": tier_floor_shortages,
@@ -801,6 +905,14 @@ def select_debug_rows(
         "selected_mastered_rows": selected_mastered,
         "selected_mastered_ratio": (
             selected_mastered / len(final_rows) if final_rows else 0.0
+        ),
+        "selected_pass_one_rows": easy_tail_counter["pass_one"],
+        "selected_pass_one_ratio": (
+            easy_tail_counter["pass_one"] / len(final_rows) if final_rows else 0.0
+        ),
+        "selected_high_pass_rows": easy_tail_counter["high_pass"],
+        "selected_high_pass_ratio": (
+            easy_tail_counter["high_pass"] / len(final_rows) if final_rows else 0.0
         ),
         "selected_hard_valid_mid_rows": selected_tier_counts.get("hard_valid_mid", 0),
         "selected_hard_valid_mid_ratio": (
@@ -913,6 +1025,11 @@ def main() -> None:
     parser.add_argument("--reward-mixed-zero-min-fraction", type=float, default=0.0)
     parser.add_argument("--near-high-mid-min-fraction", type=float, default=0.0)
     parser.add_argument("--near-high-high-min-fraction", type=float, default=0.0)
+    parser.add_argument("--greedy-success-max-fraction", type=float, default=1.0)
+    parser.add_argument("--pass-one-max-fraction", type=float, default=1.0)
+    parser.add_argument("--high-pass-min", type=float, default=0.75)
+    parser.add_argument("--high-pass-max-fraction", type=float, default=1.0)
+    parser.add_argument("--pass-one-value", type=float, default=1.0)
     args = parser.parse_args()
 
     rows = load_jsonl(args.input)
@@ -948,6 +1065,11 @@ def main() -> None:
         reward_mixed_zero_min_fraction=args.reward_mixed_zero_min_fraction,
         near_high_mid_min_fraction=args.near_high_mid_min_fraction,
         near_high_high_min_fraction=args.near_high_high_min_fraction,
+        greedy_success_max_fraction=args.greedy_success_max_fraction,
+        pass_one_max_fraction=args.pass_one_max_fraction,
+        high_pass_min=args.high_pass_min,
+        high_pass_max_fraction=args.high_pass_max_fraction,
+        pass_one_value=args.pass_one_value,
     )
     write_jsonl(args.output, final_rows)
     write_json(args.report_output, report)

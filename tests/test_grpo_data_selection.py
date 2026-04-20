@@ -50,6 +50,12 @@ class TestGRPODataSelection(unittest.TestCase):
         self.label_difficulty = load_module(
             "scripts/grpo/label_difficulty.py", "label_difficulty"
         )
+        self.label_difficulty_vlm = load_module(
+            "scripts/grpo/label_difficulty_vlm.py", "label_difficulty_vlm"
+        )
+        self.report_difficulty_drift = load_module(
+            "scripts/grpo/report_difficulty_drift.py", "report_difficulty_drift"
+        )
         self.select_debug_set = load_module(
             "scripts/grpo/select_debug_set.py", "select_debug_set"
         )
@@ -704,6 +710,129 @@ class TestGRPODataSelection(unittest.TestCase):
             self.assertTrue(summary_path.exists())
             self.assertEqual(summary["total_rows"], 2)
             self.assertEqual(summary["aux_rows"], 1)
+
+    def test_select_debug_rows_applies_auxfix_easy_tail_caps(self):
+        rows = []
+        for idx in range(4):
+            rows.append(self._selection_row(f"core_{idx}", pass_value=0.25))
+        for idx in range(4):
+            rows.append(
+                self._selection_row(
+                    f"near_low_{idx}",
+                    pass_value=0.0625,
+                    goal_predicate="perp",
+                    predicate_family_tags=["parallel_perp_family"],
+                )
+            )
+        for idx in range(4):
+            rows.append(
+                self._selection_row(
+                    f"pass_one_{idx}",
+                    pass_value=1.0,
+                    greedy_success=False,
+                    goal_predicate="eqangle",
+                    predicate_family_tags=["angle_family"],
+                )
+            )
+        for idx in range(4):
+            rows.append(
+                self._selection_row(
+                    f"greedy_{idx}",
+                    pass_value=0.75,
+                    greedy_success=True,
+                    goal_predicate="cyclic",
+                    predicate_family_tags=["circle_family"],
+                )
+            )
+
+        final_rows, report = self.select_debug_set.select_debug_rows(
+            rows,
+            target_size=10,
+            selection_policy="v10_auxfix_stage_balanced",
+            near_low_min_fraction=0.20,
+            reward_mixed_zero_min_fraction=0.0,
+            near_high_mid_min_fraction=0.0,
+            near_high_high_min_fraction=0.0,
+            greedy_success_max_fraction=0.20,
+            pass_one_max_fraction=0.20,
+            high_pass_max_fraction=0.30,
+            mastered_fallback_min_fill_fraction=0.0,
+            multi_segment_min_fraction=0.0,
+            multi_point_min_fraction=0.0,
+            family_min_fraction=0.0,
+            goal_max_fraction=1.0,
+            near_low_max_fraction=1.0,
+            reward_mixed_zero_max_fraction=1.0,
+            near_high_mid_max_fraction=1.0,
+            near_high_high_max_fraction=1.0,
+            mastered_max_fraction=0.0,
+        )
+
+        self.assertEqual(len(final_rows), 10)
+        self.assertLessEqual(report["selected_greedy_success_rows"], 2)
+        self.assertLessEqual(report["selected_pass_one_rows"], 2)
+        self.assertLessEqual(report["selected_high_pass_rows"], 3)
+        self.assertEqual(report["selection_policy"], "v10_auxfix_stage_balanced")
+        self.assertEqual(report["easy_tail_caps"]["greedy_success"], 2)
+        self.assertEqual(report["easy_tail_caps"]["pass_one"], 2)
+        self.assertEqual(report["easy_tail_caps"]["high_pass"], 3)
+
+    def test_label_difficulty_vlm_resume_prefix_validation(self):
+        rows = [
+            {"_shard_index": 0, "sample_id": "a", "query": "q-a", "fl_problem": "p-a"},
+            {"_shard_index": 1, "sample_id": "b", "query": "q-b", "fl_problem": "p-b"},
+        ]
+        existing_rows = [
+            {"_shard_index": 0, "sample_id": "a", "query": "q-a", "fl_problem": "p-a"}
+        ]
+        self.label_difficulty_vlm._validate_resume_prefix(rows, existing_rows)
+        bad_existing = [
+            {"_shard_index": 0, "sample_id": "z", "query": "q-z", "fl_problem": "p-z"}
+        ]
+        with self.assertRaises(ValueError):
+            self.label_difficulty_vlm._validate_resume_prefix(rows, bad_existing)
+
+    def test_report_difficulty_drift_summarizes_pass_movement(self):
+        old_rows = [
+            {
+                "query": "q1",
+                "fl_problem": "p1",
+                "pass_at_16": 0.0,
+                "greedy_success": False,
+                "all_invalid": False,
+            },
+            {
+                "query": "q2",
+                "fl_problem": "p2",
+                "pass_at_16": 0.5,
+                "greedy_success": False,
+                "all_invalid": False,
+            },
+        ]
+        new_rows = [
+            {
+                "query": "q1",
+                "fl_problem": "p1",
+                "pass_at_16": 0.75,
+                "greedy_success": True,
+                "all_invalid": False,
+            },
+            {
+                "query": "q2",
+                "fl_problem": "p2",
+                "pass_at_16": 0.25,
+                "greedy_success": False,
+                "all_invalid": False,
+            },
+        ]
+
+        report = self.report_difficulty_drift.build_drift_report(old_rows, new_rows)
+
+        self.assertEqual(report["matched_rows"], 2)
+        self.assertEqual(report["movement"]["pass_up"], 1)
+        self.assertEqual(report["movement"]["pass_down"], 1)
+        self.assertEqual(report["old_stats"]["avg_pass"], 0.25)
+        self.assertEqual(report["new_stats"]["avg_pass"], 0.5)
 
 
 if __name__ == "__main__":

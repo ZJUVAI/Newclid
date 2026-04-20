@@ -11,7 +11,7 @@ import sys
 import time
 from collections import Counter
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 from newclid.training.grpo_rewards import AuxRewardEvaluator
 from scripts._tqdm import tqdm
@@ -40,6 +40,106 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
     with path.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
         handle.write("\n")
+
+
+def count_jsonl_rows(path: Path) -> int:
+    if not path.exists():
+        return 0
+    with path.open("r", encoding="utf-8") as handle:
+        return sum(1 for line in handle if line.strip())
+
+
+def _row_resume_key(row: dict[str, Any]) -> tuple[Any, ...]:
+    return (
+        row.get("_shard_index"),
+        row.get("sample_id"),
+        row.get("query"),
+        row.get("fl_problem"),
+    )
+
+
+def _validate_resume_prefix(
+    reference_rows: list[dict[str, Any]], existing_rows: list[dict[str, Any]]
+) -> None:
+    if len(existing_rows) > len(reference_rows):
+        raise ValueError(
+            "Resume output has more rows than the shard input; refusing to continue"
+        )
+    for idx, (existing, reference) in enumerate(zip(existing_rows, reference_rows)):
+        if _row_resume_key(existing) != _row_resume_key(reference):
+            raise ValueError(
+                f"Resume prefix mismatch at row {idx}: "
+                f"existing={_row_resume_key(existing)} "
+                f"reference={_row_resume_key(reference)}"
+            )
+
+
+def _load_existing_labeled_rows(
+    rows: list[dict[str, Any]], output_path: Path | None, resume: bool
+) -> list[dict[str, Any]]:
+    if not resume or output_path is None or not output_path.exists():
+        return []
+    existing_rows = load_jsonl(output_path)
+    _validate_resume_prefix(rows, existing_rows)
+    return existing_rows
+
+
+def _write_progress(
+    progress_output: Path | None,
+    *,
+    completed_rows: int,
+    total_rows: int,
+    completed: bool,
+    num_samples: int,
+    elapsed_seconds: float,
+) -> None:
+    if progress_output is None:
+        return
+    write_json(
+        progress_output,
+        {
+            "completed": completed,
+            "completed_rows": completed_rows,
+            "elapsed_seconds": elapsed_seconds,
+            "num_samples": num_samples,
+            "total_rows": total_rows,
+        },
+    )
+
+
+def _flush_state(
+    labeled_rows: list[dict[str, Any]],
+    *,
+    output_path: Path | None,
+    progress_output: Path | None,
+    total_rows: int,
+    num_samples: int,
+    start_time: float,
+    completed: bool,
+) -> None:
+    if output_path is not None:
+        write_jsonl(output_path, labeled_rows)
+    _write_progress(
+        progress_output,
+        completed_rows=len(labeled_rows),
+        total_rows=total_rows,
+        completed=completed,
+        num_samples=num_samples,
+        elapsed_seconds=time.perf_counter() - start_time,
+    )
+
+
+def _default_work_dir(output: Path) -> Path:
+    return output.parent / f"{output.stem}_workdir"
+
+
+def _shard_dir(work_dir: Path, shard_index: int, num_workers: int) -> Path:
+    return work_dir / f"shard_{shard_index:02d}_of_{num_workers:02d}"
+
+
+def _open_worker_log(path: Path) -> TextIO:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return path.open("a", encoding="utf-8")
 
 
 class VLMCompletionGenerator:
@@ -213,14 +313,38 @@ def label_difficulty(
     temperature: float,
     top_p: float,
     batch_size: int = 8,
+    *,
+    output_path: Path | None = None,
+    progress_output: Path | None = None,
+    resume: bool = False,
+    flush_every_batches: int = 1,
 ) -> list[dict[str, Any]]:
-    labeled_rows = []
+    labeled_rows = _load_existing_labeled_rows(rows, output_path, resume)
     start_time = time.perf_counter()
     pass_key = f"pass_at_{num_samples}"
+    resume_count = len(labeled_rows)
+    if resume_count:
+        print(
+            f"resuming shard from {resume_count}/{len(rows)} rows using {output_path}"
+        )
+        _write_progress(
+            progress_output,
+            completed_rows=resume_count,
+            total_rows=len(rows),
+            completed=resume_count == len(rows),
+            num_samples=num_samples,
+            elapsed_seconds=0.0,
+        )
+        if resume_count == len(rows):
+            return labeled_rows
 
     total_batches = (len(rows) + batch_size - 1) // batch_size
+    flushed_batches = 0
     for batch_start in tqdm(
-        range(0, len(rows), batch_size), total=total_batches, desc="Labeling difficulty"
+        range(resume_count, len(rows), batch_size),
+        total=total_batches,
+        initial=resume_count // batch_size,
+        desc="Labeling difficulty",
     ):
         batch = rows[batch_start : batch_start + batch_size]
         queries = [r["query"] for r in batch]
@@ -250,7 +374,28 @@ def label_difficulty(
             f"pass@{num_samples}={last[pass_key]:.2f} "
             f"elapsed={elapsed:.1f}s eta={eta:.1f}s"
         )
+        flushed_batches += 1
+        if flush_every_batches > 0 and flushed_batches >= flush_every_batches:
+            _flush_state(
+                labeled_rows,
+                output_path=output_path,
+                progress_output=progress_output,
+                total_rows=len(rows),
+                num_samples=num_samples,
+                start_time=start_time,
+                completed=False,
+            )
+            flushed_batches = 0
 
+    _flush_state(
+        labeled_rows,
+        output_path=output_path,
+        progress_output=progress_output,
+        total_rows=len(rows),
+        num_samples=num_samples,
+        start_time=start_time,
+        completed=True,
+    )
     return labeled_rows
 
 
@@ -274,22 +419,60 @@ def run_workers(args: argparse.Namespace) -> None:
     num_workers = args.workers
     rows = load_jsonl(args.input)
     started = time.perf_counter()
+    work_dir = args.work_dir or _default_work_dir(args.output)
+    work_dir.mkdir(parents=True, exist_ok=True)
 
     # Write per-shard input files
     shard_inputs: list[Path] = []
     shard_outputs: list[Path] = []
+    shard_progress: list[Path] = []
+    shard_logs: list[Path] = []
     for i in range(num_workers):
         shard_rows = _shard_rows(rows, i, num_workers)
         # Tag each row with its original index for merge ordering
         for j, r in enumerate(shard_rows):
             r["_shard_index"] = i + j * num_workers
-        p = Path(f"/tmp/_label_shard_{i}_of_{num_workers}.jsonl")
-        write_jsonl(p, shard_rows)
-        shard_inputs.append(p)
-        shard_outputs.append(Path(f"/tmp/_label_shard_{i}_of_{num_workers}_out.jsonl"))
+        shard_dir = _shard_dir(work_dir, i, num_workers)
+        shard_dir.mkdir(parents=True, exist_ok=True)
+        input_path = shard_dir / "input.jsonl"
+        output_path = shard_dir / "output.jsonl"
+        progress_path = shard_dir / "progress.json"
+        log_path = shard_dir / "worker.log"
+        write_jsonl(input_path, shard_rows)
+        shard_inputs.append(input_path)
+        shard_outputs.append(output_path)
+        shard_progress.append(progress_path)
+        shard_logs.append(log_path)
 
-    procs = []
+    procs: list[subprocess.Popen] = []
+    proc_logs: list[TextIO] = []
+    launched_workers: list[int] = []
     for i in range(num_workers):
+        shard_total = count_jsonl_rows(shard_inputs[i])
+        existing_rows = count_jsonl_rows(shard_outputs[i]) if args.resume else 0
+        if shard_total == 0:
+            write_jsonl(shard_outputs[i], [])
+            _write_progress(
+                shard_progress[i],
+                completed_rows=0,
+                total_rows=0,
+                completed=True,
+                num_samples=args.num_samples,
+                elapsed_seconds=0.0,
+            )
+            print(f"[worker {i}] skip-empty")
+            continue
+        if args.resume and shard_total > 0 and existing_rows >= shard_total:
+            _write_progress(
+                shard_progress[i],
+                completed_rows=shard_total,
+                total_rows=shard_total,
+                completed=True,
+                num_samples=args.num_samples,
+                elapsed_seconds=0.0,
+            )
+            print(f"[worker {i}] resume-skip ({existing_rows}/{shard_total} rows)")
+            continue
         env = os.environ.copy()
         env["CUDA_VISIBLE_DEVICES"] = str(i)
         cmd = [
@@ -309,21 +492,38 @@ def run_workers(args: argparse.Namespace) -> None:
             str(args.top_p),
             "--batch-size",
             str(args.batch_size),
-            "--shard-index",
-            str(i),
-            "--num-shards",
-            "1",  # already pre-sharded
+            "--flush-every-batches",
+            str(args.flush_every_batches),
+            "--progress-output",
+            str(shard_progress[i]),
         ]
+        if args.resume:
+            cmd.append("--resume")
+        log_handle = _open_worker_log(shard_logs[i])
         print(
-            f"[worker {i}] CUDA_VISIBLE_DEVICES={i} launching ({len(load_jsonl(shard_inputs[i]))} rows)"
+            f"[worker {i}] CUDA_VISIBLE_DEVICES={i} launching ({shard_total} rows) "
+            f"log={shard_logs[i]}"
         )
-        procs.append(subprocess.Popen(cmd, env=env))
+        proc_logs.append(log_handle)
+        launched_workers.append(i)
+        procs.append(
+            subprocess.Popen(
+                cmd,
+                env=env,
+                stdout=log_handle,
+                stderr=subprocess.STDOUT,
+            )
+        )
 
-    for i, p in enumerate(procs):
+    for worker_id, p in zip(launched_workers, procs):
         ret = p.wait()
         if ret != 0:
-            raise RuntimeError(f"Worker {i} exited with code {ret}")
-        print(f"[worker {i}] done")
+            raise RuntimeError(
+                f"Worker {worker_id} exited with code {ret}; inspect {shard_logs[worker_id]}"
+            )
+        print(f"[worker {worker_id}] done")
+    for handle in proc_logs:
+        handle.close()
 
     merged = _merge_shards(shard_outputs)
     write_jsonl(args.output, merged)
@@ -335,10 +535,9 @@ def run_workers(args: argparse.Namespace) -> None:
         )
         write_json(args.summary_output, summary)
     print(f"wrote {len(merged)} labeled rows to {args.output}")
-
-    # Cleanup temp files
-    for p in shard_inputs + shard_outputs:
-        p.unlink(missing_ok=True)
+    if args.cleanup_work_dir:
+        for p in shard_inputs + shard_outputs + shard_progress + shard_logs:
+            p.unlink(missing_ok=True)
 
 
 def main() -> None:
@@ -363,6 +562,34 @@ def main() -> None:
     )
     parser.add_argument(
         "--workers", type=int, default=1, help="Number of GPU workers (one per GPU)"
+    )
+    parser.add_argument(
+        "--work-dir",
+        type=Path,
+        default=None,
+        help="Persistent shard/log directory for multi-worker runs",
+    )
+    parser.add_argument(
+        "--progress-output",
+        type=Path,
+        default=None,
+        help="Optional JSON progress path for single-worker shard runs",
+    )
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume from an existing output/progress shard state when possible",
+    )
+    parser.add_argument(
+        "--flush-every-batches",
+        type=int,
+        default=1,
+        help="Write intermediate shard outputs every N batches",
+    )
+    parser.add_argument(
+        "--cleanup-work-dir",
+        action="store_true",
+        help="Delete shard/log files after a successful multi-worker merge",
     )
     # Internal sharding args used by worker subprocesses
     parser.add_argument("--shard-index", type=int, default=0)
@@ -392,11 +619,16 @@ def main() -> None:
         temperature=args.temperature,
         top_p=args.top_p,
         batch_size=args.batch_size,
+        output_path=args.output,
+        progress_output=args.progress_output,
+        resume=args.resume,
+        flush_every_batches=args.flush_every_batches,
     )
-    write_jsonl(args.output, labeled)
     if args.summary_output is not None:
         summary = build_summary(
-            labeled, num_samples=args.num_samples, elapsed_seconds=time.perf_counter() - started
+            labeled,
+            num_samples=args.num_samples,
+            elapsed_seconds=time.perf_counter() - started,
         )
         write_json(args.summary_output, summary)
     print(f"wrote {len(labeled)} labeled rows to {args.output}")
