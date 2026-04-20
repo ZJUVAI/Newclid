@@ -24,27 +24,60 @@ SAMPLE_COMPLETION = (
     "<aux> x00 i : cong a i b c [012] eqangle a b a i a i a c [013] ; </aux> "
     "<numerical_check> ncoll a c e [014] ; </numerical_check>"
 )
+SAMPLE_MULTI_AUX_COMPLETION = (
+    "<aux> x00 e : coll a b e [002] ; f : perp e f a b [003] ; </aux>"
+)
 
 
 class TestGRPORewards(unittest.TestCase):
     def test_aux_dsl_helpers_extract_and_translate(self):
         body = extract_aux_body(SAMPLE_COMPLETION)
-        self.assertEqual(body, "i : cong a i b c [012] eqangle a b a i a i a c [013] ;")
+        self.assertEqual(
+            body, "x00 i : cong a i b c [012] eqangle a b a i a i a c [013] ;"
+        )
         self.assertEqual(
             extract_first_aux_block(SAMPLE_COMPLETION),
-            "<aux> i : cong a i b c [012] eqangle a b a i a i a c [013] ; </aux>",
+            "<aux> x00 i : cong a i b c [012] eqangle a b a i a i a c [013] ; </aux>",
         )
         self.assertEqual(
             extract_first_tagged_aux_block(SAMPLE_COMPLETION),
-            "<aux> i : cong a i b c [012] eqangle a b a i a i a c [013] ; </aux>",
+            "<aux> x00 i : cong a i b c [012] eqangle a b a i a i a c [013] ; </aux>",
         )
         self.assertIsNone(
             extract_first_tagged_aux_block("<proof> no aux here </proof>")
         )
         self.assertEqual(
-            try_dsl_to_constructions(body),
+            try_dsl_to_constructions(body.removeprefix("x00 ").strip()),
             "i = eqdistance i a b c, angle_bisector i c a b",
         )
+
+    def test_reward_supports_multiple_auxiliary_points(self):
+        evaluator = AuxRewardEvaluator(build_max_attempts=100)
+        with (
+            mock.patch.object(
+                evaluator, "_run_ddar", return_value=True
+            ) as mocked_run_ddar,
+            mock.patch(
+                "newclid.training.grpo_rewards.ProblemJGEX.from_text"
+            ) as mocked_from_text,
+            mock.patch(
+                "newclid.training.grpo_rewards.ProofState.build_problemJGEX"
+            ) as mocked_build_problem,
+        ):
+            problem = mock.MagicMock()
+            problem.with_more_construction.return_value = "new_problem"
+            mocked_from_text.return_value = problem
+            mocked_build_problem.return_value = mock.MagicMock()
+
+            result = evaluator.evaluate(SAMPLE_MULTI_AUX_COMPLETION, SAMPLE_FL_PROBLEM)
+
+        self.assertTrue(result.format_ok)
+        self.assertTrue(result.build_ok)
+        self.assertEqual(result.ddar_status, "solved")
+        problem.with_more_construction.assert_called_once_with(
+            "e = on_line e a b; f = on_tline f e a b"
+        )
+        mocked_run_ddar.assert_called_once()
 
     def test_reward_returns_solved_for_real_sample(self):
         evaluator = AuxRewardEvaluator(build_max_attempts=100)
@@ -159,7 +192,7 @@ class TestGRPORewards(unittest.TestCase):
                 {
                     "query": "<problem> prompt </problem>",
                     "fl_problem": SAMPLE_FL_PROBLEM,
-                    "response": "<aux> i : cong a i b c [012] eqangle a b a i a i a c [013] ; </aux>",
+                    "response": "<aux> x00 i : cong a i b c [012] eqangle a b a i a i a c [013] ; </aux>",
                 }
             ],
         )

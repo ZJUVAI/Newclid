@@ -35,8 +35,8 @@ def extract_aux_body(completion: str) -> Optional[str]:
     if not body:
         return None
 
-    body = _AUX_PREFIX_RE.sub("", body, count=1)
-    body = body.strip()
+    # Preserve the leading x00 marker so training targets keep the same
+    # format as the model's response prefix.
     return body or None
 
 

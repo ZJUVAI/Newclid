@@ -6,7 +6,7 @@
 
 **状态说明：** 本文档记录的是旧 GRPO baseline `models/grpo_vlm_sft44_505_run1/v1-20260417-084328/checkpoint-505` 的历史评估总结，不是当前 `v8` 的结果。
 
-**当前主线状态：** `v8_structure_full150k_strict_zero` 已通过 50-step smoke gate，但其 resumed `300-step` promotion 轨迹在 `step 147 / 300` 左右再次出现中段塌缩，最近窗口内持续表现为 `reward_std = 0.0`。此前的 `v7_structure_strict_zero` 分支也同样通过了 smoke，但在 `171 / 300` 提前停止，原因也是中段 zero-variance collapse。`v7` 没有继续做 `dev_imo` 或 `imo_95` 评估；`v8` 同样不应在 promotion 轨迹未明显恢复前进入评估。未来新的 GRPO 评估仍应同时对照 SFT baseline `checkpoint-20084` 和本文中的历史 GRPO `checkpoint-505`。
+**当前主线状态：** 2026-04-20 又确认了一层更底层的问题：`48d9ea5` 修复的 aux DSL bug 只被部分保留在当前分支里，导致历史 `v8/v9` selected dataset 的 `response` 仍是错误格式。`v8_tuned_300step_bugfix/v1-20260420-171548` 因此只能算 reward-side bugfix rerun，不是 full aux-format fix rerun。当前主线已经切到 aux-fix 数据集重跑；在这条 full-fix smoke / promotion 轨迹明确恢复前，`v7/v8/v9` 都不应进入新的 `dev_imo` 或 `imo_95` 评估。未来新的 GRPO 评估仍应同时对照 SFT baseline `checkpoint-20084` 和本文中的历史 GRPO `checkpoint-505`。
 
 ---
 

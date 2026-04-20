@@ -10,6 +10,27 @@
 - 当前 selector 入口：`scripts/grpo/select_debug_set.py`
 - 当前判断：主要瓶颈仍然是数据分布，而不是 GRPO 训练超参数
 
+## 2026-04-20 Bug Audit
+
+- `48d9ea5` 修的是两个直接影响 GRPO 语义的 bug：
+  - `extract_aux_body()` 不应删除首个 `x00`，否则训练 target 会和模型的 `response_prefix="<aux> x00"` 不一致。
+  - `AuxRewardEvaluator._evaluate_uncached()` 之前只正确处理第一个辅助点，多辅助点样本会被截断评估。
+- 后续 `2972827` 为了修 CI / test regression，把 `extract_aux_body()` 又改回了旧行为，但保留了多辅助点评估逻辑，形成了“reward 侧半修复、dataset target 侧未修复”的不一致状态。
+- 排查结果：
+  - 旧版 `v8/v9` selected dataset 的 `response` 均为错误格式；
+  - `2000 / 2000` 行都缺失了首个 `x00`，同时后续辅助点前仍残留 `x00`；
+  - 因此 `models/grpo_vlm_sft44_v8_tuned_300step_bugfix/v1-20260420-171548` 应视为“reward-side bugfix rerun”，不是 full aux-format fix rerun。
+- 已执行修复：
+  - 恢复 `src/newclid/training/aux_dsl.py` 的完整前缀语义；
+  - 补充 `tests/test_grpo_rewards.py` 回归测试，覆盖多辅助点 reward 与 dataset 导出；
+  - 新增 `scripts/grpo/rewrite_selected_aux_responses.py`，从原始 1M 数据按 `(query, fl_problem)` 回填原始 `<aux> ... </aux>`；
+  - 已在仓库中保留当前主实验所需的 aux-fix 版数据集：
+    - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v9_stagebalanced_2k_auxfix`
+  - `v8` 的 aux-fix 数据可通过同一脚本按需重建，但不再放进这次提交里；
+- 当前 active rerun：
+  - `models/grpo_vlm_sft44_v9_stagebalanced_s1_4gpu_tuned_auxfix`
+  - 配置沿用历史 tuned `v9` smoke：`temperature=1.1, top_p=0.95, top_k=0, beta=0.02, num_generations=8, max_steps=170`
+
 ## 当前 Gate
 
 所有新的 GRPO 数据集迭代都统一采用两段式 smoke：

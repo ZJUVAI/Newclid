@@ -1,0 +1,7 @@
+{
+  "base_dataset": "datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v9_stagebalanced_2k",
+  "raw_source": "/C20545/home/wangzi/GenesisGeo_data_models/datasets/0123/geometry_clauses10_samples1M_aux_updated_img512_inverted_pt_new_remove_proof.jsonl",
+  "response_fix": "restore the leading x00 marker in selected GRPO responses by re-extracting the original tagged aux block from raw llm_output_renamed",
+  "rows_rewritten": 2000,
+  "note": "Selection and difficulty labels are unchanged; only the response field format differs from the base dataset."
+}
