@@ -62,6 +62,14 @@
   - launcher log：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel20k_calib/logs/launcher.log`
   - worker log：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel20k_calib/workdir/shard_*/worker.log`
   - progress：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel20k_calib/workdir/shard_*/progress.json`
+- 2026-04-20 晚间运行中新增发现：
+  - 部分 shard 会在重标过程中因为未捕获的 aux DSL 解析异常退出，典型报错为 `ValueError: too many values to unpack (expected 4)`
+  - 这类异常来自模型生成了参数数量不匹配的 `cong` / `perp` 关系，不应直接杀死整条重标任务
+  - 已做修复：
+    - `src/newclid/training/grpo_rewards.py` 将这类单样本解析异常降级为 `format_invalid`
+    - `scripts/grpo/label_difficulty_vlm.py` 在聚合阶段再包一层保险，将意外异常降级为 `engine_error`
+    - `tests/test_grpo_rewards.py` 已新增对应回归测试并通过
+  - 当前 `20k` relabel 已按 `--resume` 从已有输出前缀重新恢复到 4 shard 并行运行
 
 ## 当前 Gate
 

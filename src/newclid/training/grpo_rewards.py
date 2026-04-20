@@ -120,6 +120,7 @@ class AuxRewardEvaluator:
         self._cache: dict[str, AuxEvaluationResult] = {}
         self._cache_lock = Lock()
         self._seen_engine_errors: set[str] = set()
+        self._seen_parse_errors: set[str] = set()
 
     @property
     def defs(self) -> dict[str, DefinitionJGEX]:
@@ -162,6 +163,16 @@ class AuxRewardEvaluator:
             self._cache[key] = result
         return result
 
+    def engine_error_result(self) -> AuxEvaluationResult:
+        return AuxEvaluationResult(
+            normalized_aux=None,
+            format_ok=False,
+            build_ok=False,
+            ddar_status="engine_error",
+            error_type="engine_error",
+            reward=self.engine_error_reward,
+        )
+
     def _evaluate_uncached(
         self, *, aux_body: str, normalized_aux: str, problem_dsl: str
     ) -> AuxEvaluationResult:
@@ -186,7 +197,22 @@ class AuxRewardEvaluator:
             segment_clean = _AUX_PREFIX_RE.sub("", segment, count=1).strip()
 
             # Convert to construction
-            construction = try_dsl_to_constructions(segment_clean)
+            try:
+                construction = try_dsl_to_constructions(segment_clean)
+            except Exception as exc:
+                error_type = "parse_error"
+                message = f"{type(exc).__name__}: {exc}"
+                if message not in self._seen_parse_errors:
+                    logger.info("GRPO reward aux parse error: %s", message)
+                    self._seen_parse_errors.add(message)
+                return AuxEvaluationResult(
+                    normalized_aux=normalized_aux,
+                    format_ok=False,
+                    build_ok=False,
+                    ddar_status="format_invalid",
+                    error_type=error_type,
+                    reward=self.invalid_format_reward,
+                )
             if not construction:
                 return AuxEvaluationResult(
                     normalized_aux=normalized_aux,

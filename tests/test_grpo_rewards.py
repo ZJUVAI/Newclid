@@ -99,6 +99,23 @@ class TestGRPORewards(unittest.TestCase):
         self.assertEqual(result.ddar_status, "format_invalid")
         self.assertEqual(result.reward, -1.0)
 
+    def test_reward_returns_format_invalid_on_parse_exception(self):
+        evaluator = AuxRewardEvaluator()
+        with mock.patch(
+            "newclid.training.grpo_rewards.try_dsl_to_constructions",
+            side_effect=ValueError("too many values to unpack (expected 4)"),
+        ):
+            result = evaluator.evaluate(
+                "<aux> x00 i : cong a b c d e [001] ; </aux>",
+                SAMPLE_FL_PROBLEM,
+            )
+
+        self.assertFalse(result.format_ok)
+        self.assertFalse(result.build_ok)
+        self.assertEqual(result.ddar_status, "format_invalid")
+        self.assertEqual(result.error_type, "parse_error")
+        self.assertEqual(result.reward, -1.0)
+
     def test_reward_returns_build_invalid(self):
         evaluator = AuxRewardEvaluator(build_max_attempts=100)
 

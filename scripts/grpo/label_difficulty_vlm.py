@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -15,6 +16,8 @@ from typing import Any, TextIO
 
 from newclid.training.grpo_rewards import AuxRewardEvaluator
 from scripts._tqdm import tqdm
+
+logger = logging.getLogger(__name__)
 
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:
@@ -211,11 +214,19 @@ def aggregate_difficulty_metrics(
     *,
     num_samples: int,
 ) -> dict[str, Any]:
-    greedy_result = evaluator.evaluate(greedy_completion, sample["fl_problem"])
-    sampled_results = [
-        evaluator.evaluate(completion, sample["fl_problem"])
-        for completion in sampled_completions
-    ]
+    def _safe_evaluate(completion: str):
+        try:
+            return evaluator.evaluate(completion, sample["fl_problem"])
+        except Exception:
+            logger.exception(
+                "Difficulty labeling evaluation crashed for sample_id=%s; "
+                "downgrading completion to engine_error",
+                sample.get("sample_id"),
+            )
+            return evaluator.engine_error_result()
+
+    greedy_result = _safe_evaluate(greedy_completion)
+    sampled_results = [_safe_evaluate(completion) for completion in sampled_completions]
     pass_key = f"pass_at_{num_samples}"
     valid_key = f"valid_at_{num_samples}"
     fmt_key = f"format_valid_at_{num_samples}"
