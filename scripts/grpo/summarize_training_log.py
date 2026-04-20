@@ -87,6 +87,7 @@ def summarize_rows(
         "first_n_avg_completions_mean_length": _avg(
             collect("completions/mean_length", head)
         ),
+        "first_n_max_consecutive_full_zero_std_steps": _max_consecutive_zero_std(head),
         "all_avg_step_time": _avg(collect("step_time", rows)),
         "all_avg_frac_reward_zero_std": _avg(collect("frac_reward_zero_std", rows)),
         "max_consecutive_full_zero_std_steps": _max_consecutive_zero_std(rows),
@@ -106,6 +107,9 @@ def summarize_rows(
                 "last_n_avg_completions_mean_length": _avg(
                     collect("completions/mean_length", tail)
                 ),
+                "last_n_max_consecutive_full_zero_std_steps": _max_consecutive_zero_std(
+                    tail
+                ),
             }
         )
     if range_start is not None or range_end is not None:
@@ -122,6 +126,9 @@ def summarize_rows(
                 f"{range_key}_avg_reward": _avg(collect("reward", step_range)),
                 f"{range_key}_avg_completions_mean_length": _avg(
                     collect("completions/mean_length", step_range)
+                ),
+                f"{range_key}_max_consecutive_full_zero_std_steps": (
+                    _max_consecutive_zero_std(step_range)
                 ),
             }
         )

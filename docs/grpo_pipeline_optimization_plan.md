@@ -287,7 +287,15 @@ mid gate 固定检查：
   - `grpo_train_report_2000_gate_check.json` 全部通过
 - 当前状态：
   - 已完成 selector / report / dataset 产物
-  - 下一步是 tuned 配置下的 `170-step` 两段式 smoke
+  - `170-step` tuned smoke run：`models/grpo_vlm_sft44_v9_stagebalanced_s1_4gpu_tuned/v0-20260420-154747`
+  - early smoke 结果：
+    - `first50_avg_frac_reward_zero_std = 0.22`
+    - `first50_median_reward_std = 0.3267`
+    - `first50_max_consecutive_full_zero_std_steps = 4`
+  - 结论：
+    - 两个均值类指标优于 gate
+    - 但因连续 `full-zero` 步数超过上限，按规则停止，不进入 `170-step` gate
+    - stop-summary：`models/grpo_vlm_sft44_v9_stagebalanced_s1_4gpu_tuned/v0-20260420-154747/smoke_stop_114_summary.json`
 
 ## 当前主线：`v8` Promotion
 
