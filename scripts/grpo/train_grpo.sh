@@ -11,6 +11,7 @@ OUTPUT_DIR="${OUTPUT_DIR:-models/grpo_aux}"
 NUM_GENERATIONS="${NUM_GENERATIONS:-}"
 TEMPERATURE="${TEMPERATURE:-}"
 TOP_K="${TOP_K:-}"
+TOP_P="${TOP_P:-}"
 MAX_COMPLETION_LENGTH="${MAX_COMPLETION_LENGTH:-}"
 BETA="${BETA:-}"
 REWARD_LOG_INTERVAL="${REWARD_LOG_INTERVAL:-50}"
@@ -53,6 +54,7 @@ metadata = {
     "num_generations": os.getenv("NUM_GENERATIONS") or None,
     "temperature": os.getenv("TEMPERATURE") or None,
     "top_k": os.getenv("TOP_K") or None,
+    "top_p": os.getenv("TOP_P") or None,
     "max_completion_length": os.getenv("MAX_COMPLETION_LENGTH") or None,
     "beta": os.getenv("BETA") or None,
     "reward_log_interval": os.getenv("NEWCLID_GRPO_REWARD_LOG_INTERVAL"),
@@ -85,6 +87,9 @@ if [[ -n "$TEMPERATURE" ]]; then
 fi
 if [[ -n "$TOP_K" ]]; then
     SWIFT_ARGS+=(--top_k "$TOP_K")
+fi
+if [[ -n "$TOP_P" ]]; then
+    SWIFT_ARGS+=(--top_p "$TOP_P")
 fi
 if [[ -n "$MAX_COMPLETION_LENGTH" ]]; then
     SWIFT_ARGS+=(--max_completion_length "$MAX_COMPLETION_LENGTH")

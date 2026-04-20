@@ -81,6 +81,7 @@ class AuxReward(_AuxReward, ORM):
         self._last_log_bucket = -1
         self._window_status_counts = Counter()
         self._window_sample_count = 0
+        self._window_aux_signatures = set()
         # Don't call ORM.__init__ as it's just a marker class
 
     @staticmethod
@@ -106,6 +107,9 @@ class AuxReward(_AuxReward, ORM):
         self._call_count += 1
         self._window_status_counts.update(result.ddar_status for result in results)
         self._window_sample_count += len(results)
+        self._window_aux_signatures.update(
+            result.normalized_aux for result in results if result.normalized_aux
+        )
         if self._reward_log_interval <= 0 or self._window_sample_count == 0:
             return
 
@@ -121,18 +125,31 @@ class AuxReward(_AuxReward, ORM):
         format_invalid = self._window_status_counts.get("format_invalid", 0)
         engine_error = self._window_status_counts.get("engine_error", 0)
         total = self._window_sample_count
+        aux_unique_ratio = len(self._window_aux_signatures) / total if total > 0 else 0.0
+
+        # Classify the dominant cause when zero-std collapse is likely
+        zero_std_cause = ""
+        if solved / total >= 0.8:
+            zero_std_cause = " [collapse-cause: all-solved, data may be too easy]"
+        elif (valid_unsolved + build_invalid + format_invalid) / total >= 0.8:
+            zero_std_cause = " [collapse-cause: all-failed, exploration may be insufficient]"
+
         logger.info(
-            "GRPO reward states up to step=%s: solved=%.3f valid=%.3f build_invalid=%.3f format_invalid=%.3f engine_error=%.3f samples=%d",
+            "GRPO reward states up to step=%s: solved=%.3f valid=%.3f build_invalid=%.3f"
+            " format_invalid=%.3f engine_error=%.3f aux_unique_ratio=%.3f samples=%d%s",
             marker,
             solved / total,
             valid_unsolved / total,
             build_invalid / total,
             format_invalid / total,
             engine_error / total,
+            aux_unique_ratio,
             total,
+            zero_std_cause,
         )
         self._window_status_counts.clear()
         self._window_sample_count = 0
+        self._window_aux_signatures.clear()
         self._last_log_bucket = bucket
 
     def __call__(self, completions=None, **kwargs) -> list[float]:
