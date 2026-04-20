@@ -267,25 +267,29 @@
 
 ### `v8` Promotion 当前状态
 
-- 当前 resumed run：
-  - `models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140/v0-20260420-090218`
-- Resume 形式：
-  - 从 `checkpoint-50` 做 true resume
-  - 训练命令使用 `max_steps = 300`
+#### 原始配置 Promotion（已失败）
+
+- Run：`models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140/v0-20260420-090218`
+- 配置：`temperature=0.9, top_k=50, beta=0.04`
 - 在 `step 147 / 300` 的中段状态：
   - `all_avg_frac_reward_zero_std = 0.6134`
-  - `all_median_reward_std = 0.0`
   - `last20_avg_frac_reward_zero_std = 0.7750`
-  - `last20_median_reward_std = 0.0`
   - `max_consecutive_full_zero_std_steps = 5`
-- 当前解释：
-  - `v8` 在前 50 step 上明显优于 `v7`
-  - 但进入中段后，再次出现大量 `reward_std = 0.0` 的塌缩行为
-  - 这说明仅靠 full `150k` relabel + reuse，仍不足以修复 promotion 稳定性
-- 当前工作结论：
-  - 可以把 `v8` 视为比 `v7` 更强的 smoke-pass 候选
-  - 但除非后续 step 意外恢复，否则这条 promotion 轨迹应视为大概率中段失败
-  - 下一轮数据迭代应重点改 selector dynamics，而不只是继续扩大 relabel 覆盖
+- 结论：中段塌缩，与 v7 类似
+
+#### 调参配置 Smoke（已通过）
+
+- Run：`models/grpo_vlm_sft44_v8_structure_full150k_s2_4gpu_tuned/v3-20260420-115549`
+- 配置：`temperature=1.1, top_p=0.95, top_k=0, beta=0.02`
+- 50-step smoke 结果：
+  - `first50_avg_frac_reward_zero_std = 0.182`（gate ≤0.40 ✓，优于原始 0.23）
+  - `first50_median_reward_std = 0.368`（gate ≥0.20 ✓）
+  - `max_consecutive_full_zero_std_steps = 1`（gate ≤3 ✓）
+- 改进：
+  - 新增 plugin 状态分布监控（solved/unsolved/build_invalid/format_invalid + aux_unique_ratio）
+  - 补充 TOP_P 参数支持
+  - 提高探索强度（temperature 0.9→1.1，降低 KL 惩罚 beta 0.04→0.02）
+- 结论：三项 gate 全过，准备进入 300-step promotion
 
 ### 历史 `v7` Promotion 结果
 
