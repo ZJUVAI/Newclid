@@ -1,105 +1,105 @@
-# GRPO Iteration Status and Next Plan
+# GRPO 迭代状态与后续计划
 
-Last updated: 2026-04-20
+最后更新：2026-04-20
 
-## Background
+## 背景
 
-- Base model: `vlm_sft44` at `/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
-- Raw source data: `/C20545/home/wangzi/GenesisGeo_data_models/datasets/0123/geometry_clauses10_samples1M_aux_updated_img512_inverted_pt_new_remove_proof.jsonl`
-- Current training entrypoint: `scripts/grpo/train_grpo.sh`
-- Current selector entrypoint: `scripts/grpo/select_debug_set.py`
-- Current diagnosis: the main blocker is still data distribution, not GRPO training hyperparameters
+- 基础模型：`vlm_sft44`，路径为 `/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
+- 原始数据源：`/C20545/home/wangzi/GenesisGeo_data_models/datasets/0123/geometry_clauses10_samples1M_aux_updated_img512_inverted_pt_new_remove_proof.jsonl`
+- 当前训练入口：`scripts/grpo/train_grpo.sh`
+- 当前 selector 入口：`scripts/grpo/select_debug_set.py`
+- 当前判断：主要瓶颈仍然是数据分布，而不是 GRPO 训练超参数
 
-## Current Gate
+## 当前 Gate
 
-All new GRPO dataset iterations use the same smoke gate on the first 50 metric steps:
+所有新的 GRPO 数据集迭代都统一使用前 50 个 metric step 的 smoke gate：
 
 - `first50_avg_frac_reward_zero_std <= 0.40`
 - `first50_median_reward_std >= 0.20`
 - `max_consecutive_full_zero_std_steps <= 3`
 
-Only datasets that pass all three gates are allowed to continue to `300-step` training and evaluation.
+只有同时通过这三个 gate 的数据集，才允许继续进入 `300-step` 训练与评估。
 
-## Version Review
+## 版本回顾
 
 ### `v3_tiered`
 
-- Dataset: `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v3`
-- Selector policy: `v3_tiered`
-- Static result:
+- 数据集：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v3`
+- Selector 策略：`v3_tiered`
+- 静态结果：
   - `selected_rows = 2000`
   - `selected_zero_pass_ratio = 0.6785`
   - `selected_nonzero_pass_ratio = 0.3215`
   - `selected_avg_unique_aux_count = 1.873`
-- Main issue:
-  - the selected pool was dominated by `pass@16 = 0` rows (`1357 / 2000`)
-  - this made the dataset structurally large enough but reward-diversity-poor
-- Smoke result:
-  - run: `models/grpo_vlm_sft44_v3_smoke_s1_single/v1-20260419-112703`
+- 主要问题：
+  - 选出的样本池被 `pass@16 = 0` 的样本主导（`1357 / 2000`）
+  - 这使得数据集虽然在规模上够大，但 reward 多样性很差
+- Smoke 结果：
+  - run：`models/grpo_vlm_sft44_v3_smoke_s1_single/v1-20260419-112703`
   - `first50_avg_frac_reward_zero_std = 0.6136`
   - `first50_median_reward_std = 0.0`
   - `max_consecutive_full_zero_std_steps = 7`
-- Conclusion:
-  - `v3` fails clearly
-  - the old hard-valid fallback admitted too many pass-zero rows and collapsed GRPO reward variance
+- 结论：
+  - `v3` 明确失败
+  - 旧的 hard-valid fallback 放进了过多 pass-zero 样本，直接导致 GRPO reward variance 崩塌
 
 ### `v4_reward_mixed`
 
-- Dataset: `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v4_rewardmix_800`
-- Selector policy: `v4_reward_mixed`
-- Static result:
+- 数据集：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v4_rewardmix_800`
+- Selector 策略：`v4_reward_mixed`
+- 静态结果：
   - `selected_rows = 800`
   - `selected_zero_pass_ratio = 0.20375`
   - `selected_reward_mixed_zero_ratio = 0.20375`
   - `selected_avg_proxy_reward_std = 0.3512`
   - `selected_median_proxy_reward_std = 0.3248`
-- Main improvement:
-  - replacing generic pass-zero fallback with `reward_mixed_zero` was the right direction
-  - zero-pass share dropped from `67.85%` to `20.38%`
-- Main limitation:
-  - the dataset stayed too small at `800` rows
-  - this version was useful as a selector proof-of-concept, not as the final 2k training set
-- Conclusion:
-  - reward-mixed filtering is necessary
-  - but `v4` does not answer whether a 2k-scale dataset can still maintain good reward variance
+- 主要改进：
+  - 用 `reward_mixed_zero` 替代通用的 pass-zero fallback 是正确方向
+  - zero-pass 占比从 `67.85%` 降到了 `20.38%`
+- 主要限制：
+  - 数据集规模只有 `800` 条，仍然太小
+  - 这个版本更像是 selector 的概念验证，而不是最终的 2k 训练集
+- 结论：
+  - reward-mixed 过滤是必要的
+  - 但 `v4` 还不能回答“在 2k 规模下是否还能维持足够好的 reward variance”
 
 ### `v5_rewardmix_2k`
 
-- Dataset: `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v5_rewardmix_2k`
-- Label source:
-  - reused overlapping labels from `v2_relaxed`
-  - relabeled the delta and merged to `100k` rows
-- Selector policy: `v4_reward_mixed`
-- Static result:
+- 数据集：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v5_rewardmix_2k`
+- 标注来源：
+  - 复用了与 `v2_relaxed` 重叠的标签
+  - 对剩余 delta 重新标注，并合并到 `100k` 行
+- Selector 策略：`v4_reward_mixed`
+- 静态结果：
   - `selected_rows = 2000`
   - `selected_zero_pass_ratio = 0.1685`
   - `selected_reward_mixed_zero_ratio = 0.1685`
   - `selected_nonzero_pass_ratio = 0.8315`
   - `selected_avg_proxy_reward_std = 0.3595`
   - `selected_median_proxy_reward_std = 0.3476`
-  - no structural shortages remained in the selector report
-- Smoke result:
-  - main run: `models/grpo_vlm_sft44_v5_rewardmix_s1_4gpu_256/v1-20260419-195804`
+  - selector report 中不再有结构性 shortage
+- Smoke 结果：
+  - 主 run：`models/grpo_vlm_sft44_v5_rewardmix_s1_4gpu_256/v1-20260419-195804`
   - `first50_avg_frac_reward_zero_std = 0.4375`
   - `first50_median_reward_std = 0.1833`
   - `max_consecutive_full_zero_std_steps = 1`
-- Fallback checks:
-  - `ng4` run was worse than main smoke
-  - `max_len=192` run also failed to recover the gate
-- Conclusion:
-  - moving from `v4` to `v5` proved that larger scale alone is not enough
-  - the failure pattern suggests the bottleneck is not mainly `num_generations` or `max_completion_length`
-  - data composition is still the first-order problem
+- Fallback 检查：
+  - `ng4` run 比主 smoke 更差
+  - `max_len=192` 也没能把 gate 拉回来
+- 结论：
+  - 从 `v4` 到 `v5` 证明了“仅仅扩大规模”是不够的
+  - 失败模式说明瓶颈并不主要在 `num_generations` 或 `max_completion_length`
+  - 数据组成仍然是一阶问题
 
 ### `v6_mid_strict_zero`
 
-- Dataset: `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v6_midpass_2k`
-- Selector policy: `v6_mid_strict_zero`
-- Design goal:
-  - keep the stricter `reward_mixed_zero` filter
-  - narrow the core window to the mid pass band
-  - split higher-pass non-mastered rows into separate capped tiers
-- Static result:
+- 数据集：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v6_midpass_2k`
+- Selector 策略：`v6_mid_strict_zero`
+- 设计目标：
+  - 保留更严格的 `reward_mixed_zero` 过滤
+  - 将 core window 收窄到中间 pass band
+  - 将较高 pass、但尚未 mastered 的样本拆成独立限额 tier
+- 静态结果：
   - `selected_rows = 2000`
   - `selected_zero_pass_ratio = 0.10`
   - `selected_reward_mixed_zero_ratio = 0.10`
@@ -108,41 +108,41 @@ Only datasets that pass all three gates are allowed to continue to `300-step` tr
   - `selected_median_proxy_reward_std = 0.3476`
   - `selected_avg_valid_ratio = 0.8333`
   - `multi_point_shortage = 137`
-  - high-pass tail stayed heavy:
+  - high-pass 尾部仍然偏重：
     - `0.8125 = 153`
     - `0.8750 = 118`
-    - combined `0.8125 + 0.8750 = 271`
-- Smoke result:
-  - run: `models/grpo_vlm_sft44_v6_midpass_s1_4gpu_256/v0-20260419-210740`
-  - smoke gate file: `models/grpo_vlm_sft44_v6_midpass_s1_4gpu_256/v0-20260419-210740/smoke_gate_first50.json`
+    - 合计 `0.8125 + 0.8750 = 271`
+- Smoke 结果：
+  - run：`models/grpo_vlm_sft44_v6_midpass_s1_4gpu_256/v0-20260419-210740`
+  - smoke gate 文件：`models/grpo_vlm_sft44_v6_midpass_s1_4gpu_256/v0-20260419-210740/smoke_gate_first50.json`
   - `first50_avg_frac_reward_zero_std = 0.4125`
   - `first50_median_reward_std = 0.2054`
   - `max_consecutive_full_zero_std_steps = 0`
-- Comparison against `v5` main smoke:
-  - `avg_frac_reward_zero_std`: `0.4375 -> 0.4125`
-  - `median_reward_std`: `0.1833 -> 0.2054`
-  - `avg_reward`: `0.6164 -> 0.6626`
-  - `mean_length`: `50.88 -> 48.44`
-- Conclusion:
-  - `v6` is better than `v5`
-  - but it still fails the smoke gate because `0.4125 > 0.40`
-  - selector-only changes help, but they are not sufficient
+- 相比 `v5` 主 smoke：
+  - `avg_frac_reward_zero_std`：`0.4375 -> 0.4125`
+  - `median_reward_std`：`0.1833 -> 0.2054`
+  - `avg_reward`：`0.6164 -> 0.6626`
+  - `mean_length`：`50.88 -> 48.44`
+- 结论：
+  - `v6` 比 `v5` 更好
+  - 但仍然没过 smoke gate，因为 `0.4125 > 0.40`
+  - 单纯 selector 调整有帮助，但还不够
 
 ### `v7_structure_strict_zero`
 
-- Dataset: `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v7_structure_2k`
-- Prefilter changes:
-  - expanded candidate pool target to `150k`
-  - switched the top-level structure budget from `multi_aux/single_aux` to `multi_point/single_point`
-  - targeted `multi_point = 70%`, but the realized prefilter ratio was supply-limited at `44.35%`
-- Label source:
-  - fast-path union of prior labels:
+- 数据集：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v7_structure_2k`
+- Prefilter 改动：
+  - candidate pool 目标扩大到 `150k`
+  - 顶层结构预算从 `multi_aux/single_aux` 改成 `multi_point/single_point`
+  - 目标 `multi_point = 70%`，但实际 prefilter 结果受供给限制，只做到 `44.35%`
+- 标注来源：
+  - 通过 fast-path 合并已有标签：
     - `v5_merged_100k = 100000`
     - `v2_relaxed_extra = 13350`
-  - merged label pool size: `113350`
-  - label model remains `/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
-- Selector policy: `v7_structure_strict_zero`
-- Static result:
+  - 合并后的标签池规模为 `113350`
+  - 标注模型仍为 `/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
+- Selector 策略：`v7_structure_strict_zero`
+- 静态结果：
   - `selected_rows = 2000`
   - `selected_zero_pass_ratio = 0.10`
   - `selected_reward_mixed_zero_ratio = 0.10`
@@ -152,53 +152,53 @@ Only datasets that pass all three gates are allowed to continue to `300-step` tr
   - `selected_avg_valid_ratio = 0.8267`
   - `selected_avg_unique_aux_count = 2.1115`
   - `multi_point_shortage = 61`
-  - high-pass tail improved:
+  - high-pass 尾部得到改善：
     - `0.8125 + 0.8750 = 200`
-- Smoke result:
-  - run: `models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401`
-  - smoke gate file: `models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401/smoke_gate_first50.json`
-  - comparison file: `models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401/compare_vs_v6_v5_first50.json`
+- Smoke 结果：
+  - run：`models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401`
+  - smoke gate 文件：`models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401/smoke_gate_first50.json`
+  - 对比文件：`models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401/compare_vs_v6_v5_first50.json`
   - `first50_avg_frac_reward_zero_std = 0.2900`
   - `first50_median_reward_std = 0.2562`
   - `max_consecutive_full_zero_std_steps = 0`
-- Comparison against `v6` smoke:
-  - `avg_frac_reward_zero_std`: `0.4125 -> 0.2900`
-  - `median_reward_std`: `0.2054 -> 0.2562`
-  - `avg_reward`: `0.6626 -> 0.6162`
-  - `mean_length`: `48.44 -> 46.46`
-- Conclusion:
-  - `v7` is the first dataset iteration that passes the unified 50-step smoke gate
-  - the main win comes from reward-variance stability, not higher mean reward
-  - the next stage is `300-step` training on the same dataset and hyperparameters
+- 相比 `v6` smoke：
+  - `avg_frac_reward_zero_std`：`0.4125 -> 0.2900`
+  - `median_reward_std`：`0.2054 -> 0.2562`
+  - `avg_reward`：`0.6626 -> 0.6162`
+  - `mean_length`：`48.44 -> 46.46`
+- 结论：
+  - `v7` 是第一个通过统一 50-step smoke gate 的数据集版本
+  - 主要收益来自 reward-variance 稳定性，而不是更高的平均 reward
+  - 下一阶段应在相同数据和超参数下推进到 `300-step`
 
-## Current Diagnosis
+## 当前诊断
 
-The evidence from `v3 -> v7` now supports four conclusions:
+`v3 -> v7` 的证据目前支持四个结论：
 
-1. Reducing pass-zero contamination is necessary.
-   `v3` failed because it admitted too many `pass@16 = 0` samples.
+1. 必须减少 pass-zero 污染。  
+   `v3` 失败的直接原因就是放进了太多 `pass@16 = 0` 样本。
 
-2. Reducing pass-zero contamination alone is not sufficient.
-   `v6` cut zero-pass share to `10%`, but still failed the smoke gate.
+2. 仅仅减少 pass-zero 污染还不够。  
+   `v6` 已经把 zero-pass 占比降到 `10%`，但仍然没通过 smoke gate。
 
-3. Candidate-pool structure matters as much as selector policy.
-   `v7` only passed after widening the prefilter pool and explicitly biasing toward `multi_point` structure.
+3. Candidate pool 的结构和 selector 策略同等重要。  
+   `v7` 之所以能过，是因为扩大了 prefilter pool，并显式偏向 `multi_point` 结构。
 
-4. The current blocker has shifted from dataset construction to training stability validation.
-   `v7` has already cleared the 50-step gate, so the next question is whether that signal survives mid-training.
+4. 当前主问题已经从数据构建转移到了训练稳定性验证。  
+   `v7` 已经通过了 50-step gate，接下来真正的问题是这个信号能不能撑到中段训练。
 
 ### `v8_structure_full150k_strict_zero`
 
-- Dataset:
+- 数据集：
   - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v8_structure_full150k_2k`
-- Label source:
-  - reused prior union labels for `71974` rows
-  - relabeled the remaining `78026` rows from the full `150k` prefilter pool
-  - merged label pool size: `150000`
-  - label model remains `/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
-- Selector policy:
+- 标注来源：
+  - 复用已有 union labels 覆盖 `71974` 行
+  - 对 full `150k` prefilter pool 中剩余 `78026` 行重新标注
+  - 合并后标签池规模为 `150000`
+  - 标注模型仍为 `/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
+- Selector 策略：
   - `v7_structure_strict_zero`
-- Static result:
+- 静态结果：
   - `selected_rows = 2000`
   - `selected_zero_pass_ratio = 0.061`
   - `selected_reward_mixed_zero_ratio = 0.061`
@@ -207,45 +207,45 @@ The evidence from `v3 -> v7` now supports four conclusions:
   - `selected_median_proxy_reward_std = 0.3631`
   - `selected_avg_valid_ratio = 0.8429`
   - `selected_avg_unique_aux_count = 2.138`
-  - selected tiers are concentrated in `core` with only light `reward_mixed_zero` backfill
-- Smoke result:
-  - run: `models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140`
-  - smoke gate file: `models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140/smoke_gate_first50.json`
-  - comparison file: `models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140/compare_vs_v7_v6_v5_first50.json`
+  - 选出的 tier 主要集中在 `core`，只有少量 `reward_mixed_zero` 补位
+- Smoke 结果：
+  - run：`models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140`
+  - smoke gate 文件：`models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140/smoke_gate_first50.json`
+  - 对比文件：`models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140/compare_vs_v7_v6_v5_first50.json`
   - `first50_avg_frac_reward_zero_std = 0.2300`
   - `first50_median_reward_std = 0.3472`
   - `max_consecutive_full_zero_std_steps = 1`
-- Comparison against `v7` smoke:
-  - `avg_frac_reward_zero_std`: `0.2900 -> 0.2300`
-  - `median_reward_std`: `0.2562 -> 0.3472`
-  - `avg_reward`: `0.6162 -> 0.6084`
-  - `mean_length`: `46.46 -> 46.07`
-- Conclusion:
-  - `v8` is better than `v7` on the unified smoke gate metrics
-  - the main improvement is lower zero-variance contamination and materially higher reward variance
-  - `v8` is the active promotion candidate for `300-step` true resume
+- 相比 `v7` smoke：
+  - `avg_frac_reward_zero_std`：`0.2900 -> 0.2300`
+  - `median_reward_std`：`0.2562 -> 0.3472`
+  - `avg_reward`：`0.6162 -> 0.6084`
+  - `mean_length`：`46.46 -> 46.07`
+- 结论：
+  - `v8` 在统一 smoke gate 指标上优于 `v7`
+  - 主要提升是更低的 zero-variance 污染，以及更高的 reward variance
+  - `v8` 成为当前进入 `300-step` true resume 的主候选
 
-## Current Mainline: `v8` Promotion
+## 当前主线：`v8` Promotion
 
-### Why `300-step` Is The Next Gate
+### 为什么下一步是 `300-step`
 
-The historical `v1` GRPO run shows why `50-step` is not enough:
+历史 `v1` GRPO run 说明，只看 `50-step` 不够：
 
 - `first50_avg_frac_reward_zero_std = 0.29`
 - `first50_median_reward_std = 0.3677`
-- but by `300-step`, the same run had already collapsed into persistent zero-variance behavior
+- 但到 `300-step` 左右，同一条 run 已经塌成持续性的 zero-variance 行为
 
-So the current promotion path is:
+因此当前的 promotion 路径是：
 
-1. `v8` smoke pass at `checkpoint-50`
-2. true resume to `checkpoint-300`
-3. evaluate `checkpoint-300` on `dev_imo`
-4. only if the mid-training trace stays healthy, true resume to `checkpoint-500`
-5. evaluate `checkpoint-500` on `dev_imo`, then `imo_95`
+1. `v8` 在 `checkpoint-50` 通过 smoke
+2. true resume 到 `checkpoint-300`
+3. 评估 `checkpoint-300` 的 `dev_imo`
+4. 只有中段轨迹仍然健康时，才继续 true resume 到 `checkpoint-500`
+5. 再评估 `checkpoint-500` 的 `dev_imo`，之后再看 `imo_95`
 
-### `v8` Promotion Rules
+### `v8` Promotion 规则
 
-Keep the successful smoke settings fixed during promotion:
+在 promotion 阶段固定沿用 smoke 成功时的设置：
 
 - `CUDA_VISIBLE_DEVICES=0,1,2,3`
 - `num_generations = 8`
@@ -255,111 +255,111 @@ Keep the successful smoke settings fixed during promotion:
 - `max_completion_length = 256`
 - `reward_log_interval = 20`
 
-Use true checkpoint resume rather than model-only restart:
+使用 true checkpoint resume，而不是只恢复模型参数：
 
 - `checkpoint-50 -> checkpoint-300`
 - `checkpoint-300 -> checkpoint-500`
 
-Decision rule:
+决策规则：
 
-- if the `300-step` trace stays stable and `dev_imo` remains acceptable, continue to `500-step`
-- if the `300-step` trace regresses toward the historical `v1` or `v7` failure pattern, stop promotion and return to data iteration
+- 如果 `300-step` 轨迹保持稳定，且 `dev_imo` 结果可接受，则继续到 `500-step`
+- 如果 `300-step` 轨迹开始向历史 `v1` 或 `v7` 的失败模式回归，则停止 promotion，回到数据迭代
 
-### `v8` Promotion Status
+### `v8` Promotion 当前状态
 
-- Active resumed run:
+- 当前 resumed run：
   - `models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140/v0-20260420-090218`
-- Resume form:
-  - true resume from `checkpoint-50`
-  - training command used `max_steps = 300`
-- Mid-training status at `step 147 / 300`:
+- Resume 形式：
+  - 从 `checkpoint-50` 做 true resume
+  - 训练命令使用 `max_steps = 300`
+- 在 `step 147 / 300` 的中段状态：
   - `all_avg_frac_reward_zero_std = 0.6134`
   - `all_median_reward_std = 0.0`
   - `last20_avg_frac_reward_zero_std = 0.7750`
   - `last20_median_reward_std = 0.0`
   - `max_consecutive_full_zero_std_steps = 5`
-- Current interpretation:
-  - `v8` improves materially over `v7` on the first-50 smoke gate
-  - but by the mid-training window it again collapses into frequent `reward_std = 0.0` behavior
-  - this means full-`150k` relabel + reuse is not sufficient by itself to fix promotion stability
-- Working conclusion:
-  - treat `v8` as a stronger smoke-pass candidate than `v7`
-  - but treat the current promotion trace as a likely mid-training failure unless later steps unexpectedly recover
-  - the next data iteration should focus on selector dynamics, not only larger relabel coverage
+- 当前解释：
+  - `v8` 在前 50 step 上明显优于 `v7`
+  - 但进入中段后，再次出现大量 `reward_std = 0.0` 的塌缩行为
+  - 这说明仅靠 full `150k` relabel + reuse，仍不足以修复 promotion 稳定性
+- 当前工作结论：
+  - 可以把 `v8` 视为比 `v7` 更强的 smoke-pass 候选
+  - 但除非后续 step 意外恢复，否则这条 promotion 轨迹应视为大概率中段失败
+  - 下一轮数据迭代应重点改 selector dynamics，而不只是继续扩大 relabel 覆盖
 
-### Historical `v7` Promotion Result
+### 历史 `v7` Promotion 结果
 
-- Run:
+- Run：
   - `models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401`
-- Outcome:
-  - promotion stopped early at `step 171 / 300`
-  - stop-summary artifact:
+- 结果：
+  - 在 `step 171 / 300` 提前停止
+  - stop-summary 产物：
     - `models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401/promotion_stop_171_summary.json`
-- Key metrics at stop:
+- 停止时关键指标：
   - `first171_avg_frac_reward_zero_std = 0.6272`
   - `first171_median_reward_std = 0.1089`
   - `last50_avg_frac_reward_zero_std = 0.8775`
   - `last50_median_reward_std = 0.0331`
   - `max_consecutive_full_zero_std_steps = 4`
-- Comparison against historical `v1` at the same prefix length:
+- 与历史 `v1` 在相同前缀长度下对比：
   - `v7 first171 avg_zero = 0.6272`
   - `v1 first171 avg_zero = 0.5965`
   - `v7 last50 median_std = 0.0331`
   - `v1 last50 median_std = 0.0`
-- Decision:
-  - treat `v7` as a smoke-pass but mid-training-fail dataset
-  - skip `checkpoint-300` eval, `checkpoint-500`, `dev_imo`, and `imo_95` on this branch
-  - return to data iteration on the full `150k` prefilter pool
+- 决策：
+  - 将 `v7` 视为 smoke-pass 但 mid-training-fail 的数据集
+  - 跳过这条分支上的 `checkpoint-300` eval、`checkpoint-500`、`dev_imo` 和 `imo_95`
+  - 回到 full `150k` prefilter pool 的数据迭代
 
-## Active Artifacts
+## 当前有效产物
 
-- Main evaluation report:
+- 主评估报告：
   - `docs/grpo_imo95_evaluation_report.md`
-- `v5` dataset report:
+- `v5` 数据集报告：
   - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v5_rewardmix_2k/grpo_train_report_2000.json`
-- `v6` dataset report:
+- `v6` 数据集报告：
   - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v6_midpass_2k/grpo_train_report_2000.json`
-- `v7` prefilter report:
+- `v7` prefilter 报告：
   - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v7_structure_2k/candidate_pool_prefilter_report_150k.json`
-- `v7` merged-label report:
+- `v7` merged-label 报告：
   - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v7_structure_2k/difficulty_labels_union_v2_v5_113k_report.json`
-- `v7` dataset report:
+- `v7` 数据集报告：
   - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v7_structure_2k/grpo_train_report_2000.json`
-- `v8` merged-label report:
+- `v8` merged-label 报告：
   - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v8_structure_full150k_2k/difficulty_labels_merged_150k_report.json`
-- `v8` dataset report:
+- `v8` 数据集报告：
   - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v8_structure_full150k_2k/grpo_train_report_2000.json`
-- `v6` smoke gate:
+- `v6` smoke gate：
   - `models/grpo_vlm_sft44_v6_midpass_s1_4gpu_256/v0-20260419-210740/smoke_gate_first50.json`
-- `v7` smoke gate:
+- `v7` smoke gate：
   - `models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401/smoke_gate_first50.json`
-- `v7` vs `v6/v5` smoke comparison:
+- `v7` 对 `v6/v5` 的 smoke 对比：
   - `models/grpo_vlm_sft44_v7_structure_s1_4gpu_256/v0-20260419-213401/compare_vs_v6_v5_first50.json`
-- `v8` smoke gate:
+- `v8` smoke gate：
   - `models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140/smoke_gate_first50.json`
-- `v8` vs `v7/v6/v5` smoke comparison:
+- `v8` 对 `v7/v6/v5` 的 smoke 对比：
   - `models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140/compare_vs_v7_v6_v5_first50.json`
-- `v8` resumed promotion run:
+- `v8` resumed promotion run：
   - `models/grpo_vlm_sft44_v8_structure_full150k_s1_4gpu_256/v9-20260420-083140/v0-20260420-090218`
-- historical long-run GRPO baseline:
+- 历史长程 GRPO baseline：
   - `models/grpo_vlm_sft44_505_run1/v1-20260417-084328`
 
-## Recent Conclusion
+## 最近结论
 
-- `v8` is now the best GRPO data iteration so far.
-- `v8` improves on `v7` at the 50-step smoke gate.
-- `v8` still shows mid-training collapse by `step 147 / 300`:
+- `v8` 是目前为止最好的 GRPO 数据集迭代版本。
+- `v8` 在 50-step smoke gate 上优于 `v7`。
+- 但 `v8` 到 `step 147 / 300` 仍然表现出明显的中段塌缩：
   - `all_avg_frac_reward_zero_std = 0.6134`
   - `last20_avg_frac_reward_zero_std = 0.7750`
   - `last20_median_reward_std = 0.0`
-- The project should now move from “more labels on the same selector” to selector/sampling changes that explicitly suppress zero-variance streaks in the `50-150` step window.
-- historical note: `v7` does not survive mid-training promotion:
-  - it passes smoke
-  - it collapses by `step 171 / 300`
-- The active mainline is now:
-  - finalize the `v8` promotion outcome
-  - record the mid-training failure trace
-  - redesign the selector/promotion policy before launching `v9`
-- Git hygiene for this phase:
-  - track the two docs under `docs/`
-  - do not stage temporary benchmark resume files, monitor logs, or one-off recovery helpers
+- 因此，项目下一步应该从“在同一个 selector 上继续补更多标签”，转向“修改 selector / sampling 机制，显式压制 `50-150` step 窗口中的 zero-variance streak”。
+- 历史说明：`v7` 无法撑过中段 promotion：
+  - 它通过了 smoke
+  - 但在 `step 171 / 300` 崩塌
+- 当前主线应变为：
+  - 最终确认 `v8` 的 promotion 结论
+  - 记录这次中段失败轨迹
+  - 在启动 `v9` 之前重做 selector / promotion policy 设计
+- 当前阶段的 Git 纪律：
+  - 只跟踪 `docs/` 下这两个文档
+  - 不要提交临时 benchmark resume 文件、monitor log 或一次性的 recovery helper
