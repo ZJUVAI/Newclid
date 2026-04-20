@@ -192,6 +192,17 @@ core and separates the easier high-pass tail into two capped tiers:
 - `near_high_high`: higher-pass but still non-mastered rows, kept under a tighter cap
 - `mastered`: only used as fallback if the selector still cannot fill enough rows
 
+`v9_stage_balanced` builds on top of `v6/v7` and explicitly enforces minimum
+coverage for low-pass and high-pass boundary tiers so the final training set
+does not collapse into almost all `core` rows:
+
+- `core`: `0.125 <= pass_at_* <= 0.625`
+- `near_low`: lower-pass boundary rows below core
+- `reward_mixed_zero`: zero-pass rows that still satisfy validity, reward-mixing, and diversity constraints
+- `near_high_mid`: `0.625 < pass_at_* <= 0.75`
+- `near_high_high`: `0.75 < pass_at_* < mastered`
+- `mastered`: only used as fallback when the selector still cannot fill enough rows
+
 The `v3_tiered` policy first groups rows into:
 
 - `core`

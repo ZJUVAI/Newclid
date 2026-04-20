@@ -43,6 +43,14 @@ POLICY_TIER_ORDER = {
         "near_high_high",
         "mastered",
     ),
+    "v9_stage_balanced": (
+        "core",
+        "near_low",
+        "reward_mixed_zero",
+        "near_high_mid",
+        "near_high_high",
+        "mastered",
+    ),
 }
 NON_MASTERED_TIERS_BY_POLICY = {
     "v3_tiered": (
@@ -64,6 +72,13 @@ NON_MASTERED_TIERS_BY_POLICY = {
         "near_high_high",
     ),
     "v7_structure_strict_zero": (
+        "core",
+        "near_low",
+        "reward_mixed_zero",
+        "near_high_mid",
+        "near_high_high",
+    ),
+    "v9_stage_balanced": (
         "core",
         "near_low",
         "reward_mixed_zero",
@@ -186,7 +201,11 @@ def _build_pass_histogram(rows: list[dict[str, Any]], pass_key: str) -> dict[str
 def _pass_distance_rank(
     row: dict[str, Any], pass_key: str, *, selection_policy: str
 ) -> float:
-    if selection_policy in {"v6_mid_strict_zero", "v7_structure_strict_zero"}:
+    if selection_policy in {
+        "v6_mid_strict_zero",
+        "v7_structure_strict_zero",
+        "v9_stage_balanced",
+    }:
         return abs(_pass_value(row, pass_key) - 0.375)
     return abs(_valid_ratio(row, pass_key) - 0.5)
 
@@ -194,7 +213,7 @@ def _pass_distance_rank(
 def _tier_rank(
     row: dict[str, Any], pass_key: str, *, selection_policy: str
 ) -> tuple[Any, ...]:
-    if selection_policy == "v7_structure_strict_zero":
+    if selection_policy in {"v7_structure_strict_zero", "v9_stage_balanced"}:
         return (
             -int(row.get("aux_points_total", 0) >= 2),
             -int(row.get("aux_segment_count", 0) >= 2),
@@ -253,7 +272,11 @@ def _classify_row(
     if core_min_pass <= pass_value <= core_max_pass:
         return "core"
 
-    if selection_policy in {"v6_mid_strict_zero", "v7_structure_strict_zero"}:
+    if selection_policy in {
+        "v6_mid_strict_zero",
+        "v7_structure_strict_zero",
+        "v9_stage_balanced",
+    }:
         if 0.0 < pass_value < core_min_pass:
             return "near_low"
         if core_max_pass < pass_value <= near_high_mid_max_pass:
@@ -272,6 +295,7 @@ def _classify_row(
         "v4_reward_mixed",
         "v6_mid_strict_zero",
         "v7_structure_strict_zero",
+        "v9_stage_balanced",
     }:
         valid_ratio = _valid_ratio(row, pass_key)
         if valid_ratio < zero_valid_min or valid_ratio > zero_valid_max:
@@ -413,6 +437,7 @@ def _selected_rows_summary(rows: list[dict[str, Any]], pass_key: str) -> dict[st
     total_rows = len(rows)
     nonzero_pass_rows = sum(1 for row in rows if _pass_value(row, pass_key) > 0.0)
     zero_pass_rows = total_rows - nonzero_pass_rows
+    greedy_success_rows = sum(1 for row in rows if bool(row.get("greedy_success")))
     avg_unique_aux_count = (
         sum(int(row.get("unique_aux_count", 0)) for row in rows) / total_rows
         if total_rows
@@ -435,6 +460,7 @@ def _selected_rows_summary(rows: list[dict[str, Any]], pass_key: str) -> dict[st
         if total_rows
         else 0.0
     )
+    valid_eq_1_rows = sum(1 for row in rows if _valid_ratio(row, pass_key) == 1.0)
     return {
         "selected_nonzero_pass_rows": nonzero_pass_rows,
         "selected_nonzero_pass_ratio": (
@@ -447,6 +473,26 @@ def _selected_rows_summary(rows: list[dict[str, Any]], pass_key: str) -> dict[st
         "selected_avg_proxy_reward_std": avg_proxy_reward_std,
         "selected_median_proxy_reward_std": median_proxy_reward_std,
         "selected_avg_valid_ratio": avg_valid_ratio,
+        "selected_greedy_success_rows": greedy_success_rows,
+        "selected_greedy_success_ratio": (
+            greedy_success_rows / total_rows if total_rows else 0.0
+        ),
+        "selected_valid_eq_1_rows": valid_eq_1_rows,
+        "selected_valid_eq_1_ratio": (
+            valid_eq_1_rows / total_rows if total_rows else 0.0
+        ),
+    }
+
+
+def _build_pass_histogram_by_tier(
+    rows: list[dict[str, Any]], pass_key: str
+) -> dict[str, dict[str, int]]:
+    by_tier: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        by_tier.setdefault(row.get("_selection_tier", "unknown"), []).append(row)
+    return {
+        tier_name: _build_pass_histogram(tier_rows, pass_key)
+        for tier_name, tier_rows in sorted(by_tier.items())
     }
 
 
@@ -478,6 +524,11 @@ def select_debug_rows(
     zero_pass_reward_std_min: float = 0.15,
     reward_mixed_zero_unique_aux_min: int = 2,
     reward_mixed_zero_max_fraction: float = 0.25,
+    near_low_min_fraction: float = 0.0,
+    near_low_max_fraction: float = 1.0,
+    reward_mixed_zero_min_fraction: float = 0.0,
+    near_high_mid_min_fraction: float = 0.0,
+    near_high_high_min_fraction: float = 0.0,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     tier_order = POLICY_TIER_ORDER[selection_policy]
     non_mastered_tiers = NON_MASTERED_TIERS_BY_POLICY[selection_policy]
@@ -528,6 +579,17 @@ def select_debug_rows(
         tier_caps["near_high_high"] = max(
             0, int(target_size * near_high_high_max_fraction)
         )
+    elif selection_policy == "v9_stage_balanced":
+        tier_caps["near_low"] = max(0, int(target_size * near_low_max_fraction))
+        tier_caps["reward_mixed_zero"] = max(
+            0, int(target_size * reward_mixed_zero_max_fraction)
+        )
+        tier_caps["near_high_mid"] = max(
+            0, int(target_size * near_high_mid_max_fraction)
+        )
+        tier_caps["near_high_high"] = max(
+            0, int(target_size * near_high_high_max_fraction)
+        )
     mastered_fallback_min_rows = max(
         0, int(target_size * mastered_fallback_min_fill_fraction)
     )
@@ -535,6 +597,16 @@ def select_debug_rows(
     multi_point_target = max(0, int(target_size * multi_point_min_fraction))
     family_target = max(1, int(target_size * family_min_fraction))
     goal_cap = max(1, int(target_size * goal_max_fraction))
+    tier_min_rows = {}
+    if selection_policy == "v9_stage_balanced":
+        tier_min_rows = {
+            "near_low": max(0, int(target_size * near_low_min_fraction)),
+            "reward_mixed_zero": max(
+                0, int(target_size * reward_mixed_zero_min_fraction)
+            ),
+            "near_high_mid": max(0, int(target_size * near_high_mid_min_fraction)),
+            "near_high_high": max(0, int(target_size * near_high_high_min_fraction)),
+        }
 
     taken = _take_matching_from_tiers(
         selected,
@@ -590,6 +662,30 @@ def select_debug_rows(
             goal_cap=goal_cap,
         )
         shortages[f"{family}_shortage"] = max(0, need - len(taken))
+
+    tier_floor_shortages = {}
+    if selection_policy == "v9_stage_balanced":
+        for tier_name in (
+            "near_low",
+            "reward_mixed_zero",
+            "near_high_mid",
+            "near_high_high",
+        ):
+            needed = max(0, tier_min_rows.get(tier_name, 0) - tier_selected_counter[tier_name])
+            taken = _take_matching_from_tiers(
+                selected,
+                tier_selected_counter,
+                used_ids,
+                family_counter,
+                goal_counter,
+                tier_rows,
+                (tier_name,),
+                lambda row: True,
+                needed,
+                tier_caps=tier_caps,
+                goal_cap=goal_cap,
+            )
+            tier_floor_shortages[tier_name] = max(0, needed - len(taken))
 
     _take_matching_from_tiers(
         selected,
@@ -676,11 +772,16 @@ def select_debug_rows(
             "zero_valid_max": zero_valid_max,
             "zero_pass_reward_std_min": zero_pass_reward_std_min,
             "reward_mixed_zero_unique_aux_min": reward_mixed_zero_unique_aux_min,
+            "near_low_min_fraction": near_low_min_fraction,
+            "near_low_max_fraction": near_low_max_fraction,
+            "reward_mixed_zero_min_fraction": reward_mixed_zero_min_fraction,
             "reward_mixed_zero_max_fraction": reward_mixed_zero_max_fraction,
             "hard_valid_high_max_fraction": hard_valid_high_max_fraction,
             "hard_valid_mid_max_fraction": hard_valid_mid_max_fraction,
             "near_high_mid_max_fraction": near_high_mid_max_fraction,
+            "near_high_mid_min_fraction": near_high_mid_min_fraction,
             "near_high_high_max_fraction": near_high_high_max_fraction,
+            "near_high_high_min_fraction": near_high_high_min_fraction,
             "mastered_max_fraction": mastered_max_fraction,
             "mastered_fallback_min_fill_fraction": (
                 mastered_fallback_min_fill_fraction
@@ -691,6 +792,9 @@ def select_debug_rows(
             "goal_max_fraction": goal_max_fraction,
         },
         "tier_caps": tier_caps,
+        "tier_min_rows": tier_min_rows,
+        "tier_max_rows": tier_caps,
+        "tier_floor_shortages": tier_floor_shortages,
         "goal_cap_rows": goal_cap,
         "mastered_fallback_min_rows": mastered_fallback_min_rows,
         "mastered_fallback_triggered": mastered_fallback_triggered,
@@ -733,6 +837,9 @@ def select_debug_rows(
             else 0.0
         ),
         "selected_pass_histogram": _build_pass_histogram(selected_full_rows, pass_key),
+        "pass_bucket_selected_by_tier": _build_pass_histogram_by_tier(
+            selected_full_rows, pass_key
+        ),
         "selected_goal_predicate_distribution": dict(
             selected_goal_counter.most_common()
         ),
@@ -801,6 +908,11 @@ def main() -> None:
     parser.add_argument("--zero-pass-reward-std-min", type=float, default=0.15)
     parser.add_argument("--reward-mixed-zero-unique-aux-min", type=int, default=2)
     parser.add_argument("--reward-mixed-zero-max-fraction", type=float, default=0.25)
+    parser.add_argument("--near-low-min-fraction", type=float, default=0.0)
+    parser.add_argument("--near-low-max-fraction", type=float, default=1.0)
+    parser.add_argument("--reward-mixed-zero-min-fraction", type=float, default=0.0)
+    parser.add_argument("--near-high-mid-min-fraction", type=float, default=0.0)
+    parser.add_argument("--near-high-high-min-fraction", type=float, default=0.0)
     args = parser.parse_args()
 
     rows = load_jsonl(args.input)
@@ -831,6 +943,11 @@ def main() -> None:
         zero_pass_reward_std_min=args.zero_pass_reward_std_min,
         reward_mixed_zero_unique_aux_min=args.reward_mixed_zero_unique_aux_min,
         reward_mixed_zero_max_fraction=args.reward_mixed_zero_max_fraction,
+        near_low_min_fraction=args.near_low_min_fraction,
+        near_low_max_fraction=args.near_low_max_fraction,
+        reward_mixed_zero_min_fraction=args.reward_mixed_zero_min_fraction,
+        near_high_mid_min_fraction=args.near_high_mid_min_fraction,
+        near_high_high_min_fraction=args.near_high_high_min_fraction,
     )
     write_jsonl(args.output, final_rows)
     write_json(args.report_output, report)

@@ -12,13 +12,28 @@
 
 ## 当前 Gate
 
-所有新的 GRPO 数据集迭代都统一使用前 50 个 metric step 的 smoke gate：
+所有新的 GRPO 数据集迭代都统一采用两段式 smoke：
+
+- 第一段：前 `50` 个 metric step 的 early gate
+- 第二段：同一条 run 继续到 `170 step` 的 mid gate，用于覆盖 `v7/v8` 历史崩坏区间
+
+early gate 固定检查：
 
 - `first50_avg_frac_reward_zero_std <= 0.40`
 - `first50_median_reward_std >= 0.20`
 - `max_consecutive_full_zero_std_steps <= 3`
 
-只有同时通过这三个 gate 的数据集，才允许继续进入 `300-step` 训练与评估。
+mid gate 固定检查：
+
+- `first170_avg_frac_reward_zero_std <= 0.40`
+- `first170_median_reward_std >= 0.15`
+- `last50_avg_frac_reward_zero_std <= 0.35`
+- `last50_median_reward_std >= 0.15`
+- `121_170_avg_frac_reward_zero_std <= 0.35`
+- `121_170_median_reward_std >= 0.15`
+- `max_consecutive_full_zero_std_steps <= 3`
+
+只有同时通过 early gate 和 mid gate 的数据集，才允许继续进入 `300-step` 训练与评估。
 
 ## 版本回顾
 
@@ -252,27 +267,49 @@
   - 主要提升是更低的 zero-variance 污染，以及更高的 reward variance
   - `v8` 成为当前进入 `300-step` true resume 的主候选
 
+### `v9_stage_balanced`
+
+- 数据集：
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v9_stagebalanced_2k`
+- Selector 策略：
+  - `v9_stage_balanced`
+- 设计目标：
+  - 修复 `v8` 中 `near_low` / `near_high_mid` 实际为空桶的问题
+  - 在不重做 `150k` 标注的前提下，显式保留低通过率和高通过率边界桶
+  - 将 smoke 从“只看前 50 step”升级为“50 + 170”两段式
+- 静态结果：
+  - `selected_rows = 2000`
+  - `selected_zero_pass_ratio = 0.15`
+  - `selected_nonzero_pass_ratio = 0.85`
+  - `selected_median_proxy_reward_std = 0.3631`
+  - `selected_avg_unique_aux_count = 2.1325`
+  - `tier_selected_rows = {core: 1322, near_low: 138, reward_mixed_zero: 300, near_high_mid: 160, near_high_high: 80}`
+  - `grpo_train_report_2000_gate_check.json` 全部通过
+- 当前状态：
+  - 已完成 selector / report / dataset 产物
+  - 下一步是 tuned 配置下的 `170-step` 两段式 smoke
+
 ## 当前主线：`v8` Promotion
 
-### 为什么下一步是 `300-step`
+### 为什么下一步是 `170-step mid smoke`
 
 历史 `v1` GRPO run 说明，只看 `50-step` 不够：
 
 - `first50_avg_frac_reward_zero_std = 0.29`
 - `first50_median_reward_std = 0.3677`
-- 但到 `300-step` 左右，同一条 run 已经塌成持续性的 zero-variance 行为
+- 但到 `150-170 step` 区间，同类 run 已经开始明显向 zero-variance 崩坏靠拢
 
 因此当前的 promotion 路径是：
 
 1. `v8` 在 `checkpoint-50` 通过 smoke
-2. true resume 到 `checkpoint-300`
-3. 评估 `checkpoint-300` 的 `dev_imo`
-4. 只有中段轨迹仍然健康时，才继续 true resume 到 `checkpoint-500`
-5. 再评估 `checkpoint-500` 的 `dev_imo`，之后再看 `imo_95`
+2. 新数据集先完成 `170-step` 两段式 smoke
+3. 只有 `170-step` 轨迹仍然健康时，才继续进入 `300-step` promotion
+4. 再评估 `checkpoint-300` 的 `dev_imo`
+5. 如有必要，再继续到 `checkpoint-500`
 
-### `v8` Promotion 规则
+### `170-step mid smoke` 规则
 
-在 promotion 阶段固定沿用 smoke 成功时的设置：
+在 mid smoke 阶段固定沿用 tuned smoke 成功时的设置：
 
 - `CUDA_VISIBLE_DEVICES=0,1,2,3`
 - `num_generations = 8`
@@ -284,13 +321,12 @@
 
 使用 true checkpoint resume，而不是只恢复模型参数：
 
-- `checkpoint-50 -> checkpoint-300`
-- `checkpoint-300 -> checkpoint-500`
+- 同一条 run 直接从 `step 1 -> 170`
 
 决策规则：
 
-- 如果 `300-step` 轨迹保持稳定，且 `dev_imo` 结果可接受，则继续到 `500-step`
-- 如果 `300-step` 轨迹开始向历史 `v1` 或 `v7` 的失败模式回归，则停止 promotion，回到数据迭代
+- 如果 `170-step` 轨迹保持稳定，则进入 `300-step` promotion
+- 如果 `170-step` 轨迹开始向历史 `v7/v8` 失败模式回归，则停止，回到数据迭代
 
 ### `v8` Promotion 当前状态
 

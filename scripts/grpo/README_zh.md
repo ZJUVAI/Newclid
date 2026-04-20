@@ -189,6 +189,16 @@ python scripts/grpo/label_difficulty_vlm.py \
 - `near_high_high`：更高通过率但仍未掌握的样本，比例上限更严格
 - `mastered`：仅在筛选器仍无法填满时作为回退
 
+`v9_stage_balanced` 在 `v6/v7` 的基础上，显式要求低通过、中高通过和高通过边界桶都保留最小占比，
+避免训练集几乎全部落在 `core`：
+
+- `core`：`0.125 <= pass_at_* <= 0.625`
+- `near_low`：低于 core 的低通过率边界样本
+- `reward_mixed_zero`：满足有效性、奖励混合度和多样性约束的零通过样本
+- `near_high_mid`：`0.625 < pass_at_* <= 0.75`
+- `near_high_high`：`0.75 < pass_at_* < mastered`
+- `mastered`：仅在仍无法补足样本时作为回退
+
 `v3_tiered` 会先把样本分到：
 
 - `core`

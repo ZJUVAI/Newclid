@@ -1,0 +1,29 @@
+{
+  "all_passed": true,
+  "checks": {
+    "selected_rows_eq_2000": true,
+    "near_low_ge_120": true,
+    "reward_mixed_zero_ge_180": true,
+    "near_high_mid_ge_140": true,
+    "near_high_high_ge_80": true,
+    "selected_zero_pass_ratio_in_range": true,
+    "selected_nonzero_pass_ratio_in_range": true,
+    "selected_median_proxy_reward_std_ge_0_34": true,
+    "selected_avg_unique_aux_count_ge_2_10": true,
+    "selected_mastered_rows_eq_0": true,
+    "all_boundary_tiers_nonzero": true
+  },
+  "summary": {
+    "tier_selected_rows": {
+      "core": 1322,
+      "near_high_high": 80,
+      "near_high_mid": 160,
+      "near_low": 138,
+      "reward_mixed_zero": 300
+    },
+    "selected_zero_pass_ratio": 0.15,
+    "selected_nonzero_pass_ratio": 0.85,
+    "selected_median_proxy_reward_std": 0.3630921887069453,
+    "selected_avg_unique_aux_count": 2.1325
+  }
+}
