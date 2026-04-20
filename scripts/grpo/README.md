@@ -1,5 +1,7 @@
 # GRPO Aux Reward
 
+Chinese version: [README_zh.md](/C20545/home/wangzi/GenesisGeo-grpo/scripts/grpo/README_zh.md)
+
 This directory contains the data-selection, reward, and launch helpers for GRPO-based auxiliary-point generation.
 
 ## Scripts
