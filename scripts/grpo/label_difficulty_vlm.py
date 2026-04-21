@@ -154,14 +154,22 @@ class VLMCompletionGenerator:
         model_type: str = "qwen3_vl",
         max_new_tokens: int = 160,
         max_batch_size: int = 16,
+        attn_implementation: str | None = "flash_attention_2",
+        torch_dtype: str | None = "bfloat16",
     ) -> None:
         from swift.infer_engine import InferRequest, RequestConfig, TransformersEngine
 
-        self.engine = TransformersEngine(
-            model=model_path,
-            model_type=model_type,
-            max_batch_size=max_batch_size,
-        )
+        engine_kwargs = {
+            "model": model_path,
+            "model_type": model_type,
+            "max_batch_size": max_batch_size,
+        }
+        if attn_implementation is not None:
+            engine_kwargs["attn_implementation"] = attn_implementation
+        if torch_dtype is not None:
+            engine_kwargs["torch_dtype"] = torch_dtype
+
+        self.engine = TransformersEngine(**engine_kwargs)
         self.max_new_tokens = max_new_tokens
         self._InferRequest = InferRequest
         self._RequestConfig = RequestConfig
@@ -514,6 +522,12 @@ def run_workers(args: argparse.Namespace) -> None:
             str(args.top_p),
             "--batch-size",
             str(args.batch_size),
+            "--max-batch-size",
+            str(args.max_batch_size),
+            "--attn-implementation",
+            args.attn_implementation,
+            "--torch-dtype",
+            args.torch_dtype,
             "--flush-every-batches",
             str(args.flush_every_batches),
             "--progress-output",
@@ -601,6 +615,24 @@ def main() -> None:
         "--batch-size", type=int, default=8, help="Rows per inference batch"
     )
     parser.add_argument(
+        "--max-batch-size",
+        type=int,
+        default=128,
+        help="TransformersEngine max_batch_size for internal batching",
+    )
+    parser.add_argument(
+        "--attn-implementation",
+        type=str,
+        default="flash_attention_2",
+        help="Attention implementation (flash_attention_2, eager, sdpa, or none to skip)",
+    )
+    parser.add_argument(
+        "--torch-dtype",
+        type=str,
+        default="bfloat16",
+        help="Torch dtype (bfloat16, float16, float32, or none to skip)",
+    )
+    parser.add_argument(
         "--workers", type=int, default=1, help="Number of GPU workers (one per GPU)"
     )
     parser.add_argument(
@@ -644,10 +676,14 @@ def main() -> None:
     if args.num_shards > 1:
         rows = _shard_rows(rows, args.shard_index, args.num_shards)
 
+    attn_impl = args.attn_implementation if args.attn_implementation != "none" else None
+    dtype = args.torch_dtype if args.torch_dtype != "none" else None
     generator = VLMCompletionGenerator(
         args.model_path,
         args.model_type,
-        max_batch_size=args.batch_size,
+        max_batch_size=args.max_batch_size,
+        attn_implementation=attn_impl,
+        torch_dtype=dtype,
     )
     evaluator = AuxRewardEvaluator()
     started = time.perf_counter()
