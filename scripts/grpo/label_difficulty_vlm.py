@@ -425,6 +425,17 @@ def _merge_shards(shard_paths: list[Path]) -> list[dict[str, Any]]:
     return all_rows
 
 
+def _read_progress_safe(path: Path) -> dict[str, Any]:
+    """Read progress JSON, return empty dict if missing/invalid."""
+    try:
+        if not path.exists():
+            return {}
+        with path.open("r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
 def run_workers(args: argparse.Namespace) -> None:
     """Launch --workers subprocesses, each handling one GPU shard, then merge."""
     num_workers = args.workers
@@ -526,13 +537,31 @@ def run_workers(args: argparse.Namespace) -> None:
             )
         )
 
-    for worker_id, p in zip(launched_workers, procs):
-        ret = p.wait()
-        if ret != 0:
-            raise RuntimeError(
-                f"Worker {worker_id} exited with code {ret}; inspect {shard_logs[worker_id]}"
-            )
-        print(f"[worker {worker_id}] done")
+    total_rows = len(rows)
+    pbar = tqdm(total=total_rows, desc="Labeling (all workers)", unit="row")
+    done_set: set[int] = set()
+    prev_completed = 0
+    while len(done_set) < len(launched_workers):
+        time.sleep(2)
+        completed = sum(
+            _read_progress_safe(shard_progress[i]).get("completed_rows", 0)
+            for i in range(num_workers)
+        )
+        pbar.update(completed - prev_completed)
+        prev_completed = completed
+        for worker_id, p in zip(launched_workers, procs):
+            if worker_id in done_set:
+                continue
+            ret = p.poll()
+            if ret is not None:
+                if ret != 0:
+                    pbar.close()
+                    raise RuntimeError(
+                        f"Worker {worker_id} exited with code {ret}; inspect {shard_logs[worker_id]}"
+                    )
+                done_set.add(worker_id)
+    pbar.update(total_rows - prev_completed)
+    pbar.close()
     for handle in proc_logs:
         handle.close()
 
