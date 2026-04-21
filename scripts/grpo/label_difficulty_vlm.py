@@ -231,82 +231,95 @@ def _eval_completion_worker(payload: tuple[str, str]) -> dict[str, Any]:
     }
 
 
-def aggregate_difficulty_metrics(
-    sample: dict[str, Any],
-    greedy_completion: str,
-    sampled_completions: list[str],
+def _submit_ddar_batch(
+    batch: list[dict[str, Any]],
+    greedy_outputs: list[str],
+    sampled_outputs: list[list[str]],
+    ddar_pool: ProcessPoolExecutor | None,
     evaluator: AuxRewardEvaluator,
-    *,
     num_samples: int,
-    ddar_pool: ProcessPoolExecutor | None = None,
-) -> dict[str, Any]:
-    def _safe_evaluate(completion: str):
-        try:
-            result = evaluator.evaluate(completion, sample["fl_problem"])
-        except Exception:
-            logger.exception(
-                "Difficulty labeling evaluation crashed for sample_id=%s; "
-                "downgrading completion to engine_error",
-                sample.get("sample_id"),
-            )
-            result = evaluator.engine_error_result()
-        return {
-            "normalized_aux": result.normalized_aux,
-            "format_ok": result.format_ok,
-            "build_ok": result.build_ok,
-            "ddar_status": result.ddar_status,
-        }
+):
+    """Submit DDAR evaluation for a batch, returning futures or direct results."""
+    from concurrent.futures import Future
 
-    all_completions = [greedy_completion, *sampled_completions]
-    if ddar_pool is None:
-        all_results = [_safe_evaluate(completion) for completion in all_completions]
-    else:
-        payloads = [(completion, sample["fl_problem"]) for completion in all_completions]
-        all_results = list(ddar_pool.map(_eval_completion_worker, payloads))
+    results = []
+    for i, row in enumerate(batch):
+        all_completions = [greedy_outputs[i], *sampled_outputs[i]]
+        if ddar_pool is None:
+            fl_problem = row["fl_problem"]
 
-    greedy_result = all_results[0]
-    sampled_results = all_results[1:]
-    pass_key = f"pass_at_{num_samples}"
-    valid_key = f"valid_at_{num_samples}"
-    fmt_key = f"format_valid_at_{num_samples}"
+            def _safe_evaluate(completion: str, _fl=fl_problem, _row=row):
+                try:
+                    result = evaluator.evaluate(completion, _fl)
+                except Exception:
+                    logger.exception(
+                        "Difficulty labeling evaluation crashed for sample_id=%s",
+                        _row.get("sample_id"),
+                    )
+                    result = evaluator.engine_error_result()
+                return {
+                    "normalized_aux": result.normalized_aux,
+                    "format_ok": result.format_ok,
+                    "build_ok": result.build_ok,
+                    "ddar_status": result.ddar_status,
+                }
 
-    ddar_valid_count = sum(1 for result in sampled_results if result["build_ok"])
-    ddar_solved_count = sum(
-        1 for result in sampled_results if result["ddar_status"] == "solved"
-    )
-    format_valid_count = sum(1 for result in sampled_results if result["format_ok"])
-    normalized_aux_values = [
-        result["normalized_aux"] for result in sampled_results if result["normalized_aux"]
-    ]
-    unique_aux_count = len(set(normalized_aux_values))
-    duplicate_aux_ratio = 0.0
-    if sampled_results:
-        duplicate_aux_ratio = 1.0 - (unique_aux_count / len(sampled_results))
+            results.append([_safe_evaluate(c) for c in all_completions])
+        else:
+            payloads = [(c, row["fl_problem"]) for c in all_completions]
+            results.append(ddar_pool.map_async(_eval_completion_worker, payloads))
+    return results
 
-    status_counts = Counter(result["ddar_status"] for result in sampled_results)
-    n = len(sampled_results) or 1
-    return {
-        **sample,
-        "greedy_success": greedy_result["ddar_status"] == "solved",
-        "greedy_status": greedy_result["ddar_status"],
-        "greedy_build_ok": greedy_result["build_ok"],
-        "greedy_format_ok": greedy_result["format_ok"],
-        pass_key: ddar_solved_count / n,
-        valid_key: ddar_valid_count / n,
-        fmt_key: format_valid_count / n,
-        "ddar_valid_count": ddar_valid_count,
-        "ddar_solved_count": ddar_solved_count,
-        "format_valid_count": format_valid_count,
-        "solved_count": status_counts.get("solved", 0),
-        "unsolved_count": status_counts.get("unsolved", 0),
-        "build_invalid_count": status_counts.get("build_invalid", 0),
-        "format_invalid_count": status_counts.get("format_invalid", 0),
-        "engine_error_count": status_counts.get("engine_error", 0),
-        "ddar_status_counts": dict(sorted(status_counts.items())),
-        "unique_aux_count": unique_aux_count,
-        "duplicate_aux_ratio": duplicate_aux_ratio,
-        "all_invalid": ddar_valid_count == 0,
-    }
+
+def _collect_ddar_batch(
+    pending_results,
+    pending_batch: list[dict[str, Any]],
+    num_samples: int,
+) -> list[dict[str, Any]]:
+    """Collect DDAR results (blocking) and build labeled rows."""
+    labeled = []
+    for i, row in enumerate(pending_batch):
+        r = pending_results[i]
+        # r is either a list (serial) or AsyncResult (parallel)
+        all_results = list(r.get()) if hasattr(r, "get") else r
+        greedy_result = all_results[0]
+        sampled_results = all_results[1:]
+        pass_key = f"pass_at_{num_samples}"
+        valid_key = f"valid_at_{num_samples}"
+        fmt_key = f"format_valid_at_{num_samples}"
+        ddar_valid_count = sum(1 for x in sampled_results if x["build_ok"])
+        ddar_solved_count = sum(1 for x in sampled_results if x["ddar_status"] == "solved")
+        format_valid_count = sum(1 for x in sampled_results if x["format_ok"])
+        normalized_aux_values = [x["normalized_aux"] for x in sampled_results if x["normalized_aux"]]
+        unique_aux_count = len(set(normalized_aux_values))
+        duplicate_aux_ratio = 0.0
+        if sampled_results:
+            duplicate_aux_ratio = 1.0 - (unique_aux_count / len(sampled_results))
+        status_counts = Counter(x["ddar_status"] for x in sampled_results)
+        n = len(sampled_results) or 1
+        labeled.append({
+            **row,
+            "greedy_success": greedy_result["ddar_status"] == "solved",
+            "greedy_status": greedy_result["ddar_status"],
+            "greedy_build_ok": greedy_result["build_ok"],
+            "greedy_format_ok": greedy_result["format_ok"],
+            pass_key: ddar_solved_count / n,
+            valid_key: ddar_valid_count / n,
+            fmt_key: format_valid_count / n,
+            "ddar_valid_count": ddar_valid_count,
+            "ddar_solved_count": ddar_solved_count,
+            "format_valid_count": format_valid_count,
+            "solved_count": status_counts.get("solved", 0),
+            "unsolved_count": status_counts.get("unsolved", 0),
+            "build_invalid_count": status_counts.get("build_invalid", 0),
+            "format_invalid_count": status_counts.get("format_invalid", 0),
+            "engine_error_count": status_counts.get("engine_error", 0),
+            "ddar_status_counts": dict(sorted(status_counts.items())),
+            "unique_aux_count": unique_aux_count,
+            "duplicate_aux_ratio": duplicate_aux_ratio,
+            "all_invalid": ddar_valid_count == 0,
+        })
+    return labeled
 
 
 def build_summary(
@@ -394,8 +407,15 @@ def label_difficulty(
         total_batches = (len(rows) + batch_size - 1) // batch_size
         initial_batches = resume_count // batch_size
         flushed_batches = 0
+
+        # Pipeline state: hold pending DDAR futures from previous batch
+        pending_ddar = None   # list of AsyncResult or list-of-dicts
+        pending_batch = None  # the batch rows corresponding to pending_ddar
+        pending_idx = None    # batch_start + len(batch) for pending batch
+
+        batch_iter = range(resume_count, len(rows), batch_size)
         for batch_start in tqdm(
-            range(resume_count, len(rows), batch_size),
+            batch_iter,
             total=total_batches,
             initial=initial_batches,
             desc="Labeling difficulty",
@@ -403,23 +423,53 @@ def label_difficulty(
             batch = rows[batch_start : batch_start + batch_size]
             queries = [r["query"] for r in batch]
 
+            # Submit DDAR for current batch (non-blocking)
             greedy_outputs, sampled_outputs = generator.generate_batch(
                 queries, num_samples, temperature, top_p
             )
+            current_ddar = _submit_ddar_batch(
+                batch, greedy_outputs, sampled_outputs, ddar_pool, evaluator, num_samples
+            )
 
-            for i, row in enumerate(batch):
-                labeled_rows.append(
-                    aggregate_difficulty_metrics(
-                        row,
-                        greedy_outputs[i],
-                        sampled_outputs[i],
-                        evaluator,
-                        num_samples=num_samples,
-                        ddar_pool=ddar_pool,
-                    )
+            # Collect previous batch's DDAR results (now GPU is busy with next inference)
+            if pending_ddar is not None:
+                batch_labeled = _collect_ddar_batch(pending_ddar, pending_batch, num_samples)
+                labeled_rows.extend(batch_labeled)
+
+                idx = pending_idx
+                elapsed = time.perf_counter() - start_time
+                processed = idx - resume_count
+                avg_time = elapsed / processed if processed > 0 else 0
+                eta = avg_time * (len(rows) - idx)
+                last = labeled_rows[-1]
+                print(
+                    f"[{idx}/{len(rows)}] greedy={last['greedy_status']} "
+                    f"pass@{num_samples}={last[pass_key]:.2f} "
+                    f"elapsed={elapsed:.1f}s eta={eta:.1f}s"
                 )
+                flushed_batches += 1
+                if flush_every_batches > 0 and flushed_batches >= flush_every_batches:
+                    _flush_state(
+                        labeled_rows,
+                        output_path=output_path,
+                        progress_output=progress_output,
+                        total_rows=len(rows),
+                        num_samples=num_samples,
+                        start_time=start_time,
+                        completed=False,
+                    )
+                    flushed_batches = 0
 
-            idx = batch_start + len(batch)
+            pending_ddar = current_ddar
+            pending_batch = batch
+            pending_idx = batch_start + len(batch)
+
+        # Collect the last batch
+        if pending_ddar is not None:
+            batch_labeled = _collect_ddar_batch(pending_ddar, pending_batch, num_samples)
+            labeled_rows.extend(batch_labeled)
+
+            idx = pending_idx
             elapsed = time.perf_counter() - start_time
             processed = idx - resume_count
             avg_time = elapsed / processed if processed > 0 else 0
@@ -430,18 +480,6 @@ def label_difficulty(
                 f"pass@{num_samples}={last[pass_key]:.2f} "
                 f"elapsed={elapsed:.1f}s eta={eta:.1f}s"
             )
-            flushed_batches += 1
-            if flush_every_batches > 0 and flushed_batches >= flush_every_batches:
-                _flush_state(
-                    labeled_rows,
-                    output_path=output_path,
-                    progress_output=progress_output,
-                    total_rows=len(rows),
-                    num_samples=num_samples,
-                    start_time=start_time,
-                    completed=False,
-                )
-                flushed_batches = 0
 
         _flush_state(
             labeled_rows,
