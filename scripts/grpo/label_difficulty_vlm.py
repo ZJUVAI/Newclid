@@ -238,7 +238,7 @@ def aggregate_difficulty_metrics(
     evaluator: AuxRewardEvaluator,
     *,
     num_samples: int,
-    ddar_workers: int = 1,
+    ddar_pool: ProcessPoolExecutor | None = None,
 ) -> dict[str, Any]:
     def _safe_evaluate(completion: str):
         try:
@@ -258,12 +258,11 @@ def aggregate_difficulty_metrics(
         }
 
     all_completions = [greedy_completion, *sampled_completions]
-    if ddar_workers <= 1:
+    if ddar_pool is None:
         all_results = [_safe_evaluate(completion) for completion in all_completions]
     else:
         payloads = [(completion, sample["fl_problem"]) for completion in all_completions]
-        with ProcessPoolExecutor(max_workers=ddar_workers) as pool:
-            all_results = list(pool.map(_eval_completion_worker, payloads))
+        all_results = list(ddar_pool.map(_eval_completion_worker, payloads))
 
     greedy_result = all_results[0]
     sampled_results = all_results[1:]
@@ -390,65 +389,70 @@ def label_difficulty(
         if resume_count == len(rows):
             return labeled_rows
 
-    total_batches = (len(rows) + batch_size - 1) // batch_size
-    flushed_batches = 0
-    for batch_start in tqdm(
-        range(resume_count, len(rows), batch_size),
-        total=total_batches,
-        initial=resume_count // batch_size,
-        desc="Labeling difficulty",
-    ):
-        batch = rows[batch_start : batch_start + batch_size]
-        queries = [r["query"] for r in batch]
+    ddar_pool = ProcessPoolExecutor(max_workers=ddar_workers) if ddar_workers > 1 else None
+    try:
+        total_batches = (len(rows) + batch_size - 1) // batch_size
+        flushed_batches = 0
+        for batch_start in tqdm(
+            range(resume_count, len(rows), batch_size),
+            total=total_batches,
+            initial=resume_count // batch_size,
+            desc="Labeling difficulty",
+        ):
+            batch = rows[batch_start : batch_start + batch_size]
+            queries = [r["query"] for r in batch]
 
-        greedy_outputs, sampled_outputs = generator.generate_batch(
-            queries, num_samples, temperature, top_p
-        )
+            greedy_outputs, sampled_outputs = generator.generate_batch(
+                queries, num_samples, temperature, top_p
+            )
 
-        for i, row in enumerate(batch):
-            labeled_rows.append(
-                aggregate_difficulty_metrics(
-                    row,
-                    greedy_outputs[i],
-                    sampled_outputs[i],
-                    evaluator,
-                    num_samples=num_samples,
-                    ddar_workers=ddar_workers,
+            for i, row in enumerate(batch):
+                labeled_rows.append(
+                    aggregate_difficulty_metrics(
+                        row,
+                        greedy_outputs[i],
+                        sampled_outputs[i],
+                        evaluator,
+                        num_samples=num_samples,
+                        ddar_pool=ddar_pool,
+                    )
                 )
-            )
 
-        idx = batch_start + len(batch)
-        elapsed = time.perf_counter() - start_time
-        avg_time = elapsed / idx
-        eta = avg_time * (len(rows) - idx)
-        last = labeled_rows[-1]
-        print(
-            f"[{idx}/{len(rows)}] greedy={last['greedy_status']} "
-            f"pass@{num_samples}={last[pass_key]:.2f} "
-            f"elapsed={elapsed:.1f}s eta={eta:.1f}s"
+            idx = batch_start + len(batch)
+            elapsed = time.perf_counter() - start_time
+            avg_time = elapsed / idx
+            eta = avg_time * (len(rows) - idx)
+            last = labeled_rows[-1]
+            print(
+                f"[{idx}/{len(rows)}] greedy={last['greedy_status']} "
+                f"pass@{num_samples}={last[pass_key]:.2f} "
+                f"elapsed={elapsed:.1f}s eta={eta:.1f}s"
+            )
+            flushed_batches += 1
+            if flush_every_batches > 0 and flushed_batches >= flush_every_batches:
+                _flush_state(
+                    labeled_rows,
+                    output_path=output_path,
+                    progress_output=progress_output,
+                    total_rows=len(rows),
+                    num_samples=num_samples,
+                    start_time=start_time,
+                    completed=False,
+                )
+                flushed_batches = 0
+
+        _flush_state(
+            labeled_rows,
+            output_path=output_path,
+            progress_output=progress_output,
+            total_rows=len(rows),
+            num_samples=num_samples,
+            start_time=start_time,
+            completed=True,
         )
-        flushed_batches += 1
-        if flush_every_batches > 0 and flushed_batches >= flush_every_batches:
-            _flush_state(
-                labeled_rows,
-                output_path=output_path,
-                progress_output=progress_output,
-                total_rows=len(rows),
-                num_samples=num_samples,
-                start_time=start_time,
-                completed=False,
-            )
-            flushed_batches = 0
-
-    _flush_state(
-        labeled_rows,
-        output_path=output_path,
-        progress_output=progress_output,
-        total_rows=len(rows),
-        num_samples=num_samples,
-        start_time=start_time,
-        completed=True,
-    )
+    finally:
+        if ddar_pool is not None:
+            ddar_pool.shutdown(wait=False)
     return labeled_rows
 
 
