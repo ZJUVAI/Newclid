@@ -974,4 +974,41 @@ python scripts/grpo/select_debug_set.py \
 - 差异不在静态分布，而在于后续训练分支与记录口径：
   - `v10` 使用 stage/tier report
   - `bucket_unified` 使用 bucket report
-- 下一步对 `bucket_unified` 跑同配置 `1x8 tuned` 的 `50-step early smoke`，再看它是否能规避 `v10` 分支后半段的 zero-std 回升。
+
+### `bucket_unified` smoke 终止（2026-04-22）
+
+**执行情况：**
+
+- 训练目录：`models/grpo_vlm_sft44_geometry100k_bucket_unified_s1_4gpu_tuned/v0-20260422-001800`
+- 同样使用：
+  - `/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
+  - `1x8 tuned`
+  - `num_generations = 8`
+  - `temperature = 1.1`
+  - `top_p = 0.95`
+  - `top_k = 0`
+  - `beta = 0.02`
+
+**提前停止原因：**
+
+- `bucket_unified` 选出的训练集与显式 `v10` 训练集字节级完全一致：
+  - `sha256 = 6b44b467ffd6ecaa9767555cc9327de2ae864ee6beb48fa838e3b646f41da0b4`
+  - `same_bytes = true`
+- `bucket_unified` run 的第 `1` 步日志也与 `v10` 完全一致：
+  - `reward_std = 0.13258252`
+  - `frac_reward_zero_std = 0.5`
+  - `reward = 0.296875`
+
+**决策：**
+
+- 在当前这批 geometry100k 标签池上，`bucket_unified` fallback 没有形成新的数据分支，而是退化成与显式 `v10` 完全相同的训练输入。
+- 因此继续跑满 `50-step` 只会重复 `v10` 的实验，不再提供新的判别信息。
+- 这条 run 在 `step 2` 前后人工终止，不作为新的 smoke 结论。
+
+**当前结论：**
+
+- 本轮有效结论仍然只有一条：
+  - geometry100k 新标签池上的显式 `v10` selector 静态通过
+  - 但 `50-step early smoke` 因 `avg_frac_reward_zero_std = 0.4364` 未通过
+- 由于 `bucket_unified` 与 `v10` 选集完全相同，当前不再把它视为有效 fallback。
+- 如果要继续迭代，必须先改变 selector 的实际输出数据，而不是只切换 report / bucket 命名。
