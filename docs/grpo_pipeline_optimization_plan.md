@@ -767,3 +767,94 @@ mid gate 固定检查：
 **训练配置：**
 - 模型：`models/grpo_vlm_sft44_v12_structure_geometry100k_s1_4gpu_tuned_largerbatch/v1-20260421-170742`
 - 状态：部分通过 smoke gate（median_reward_std 通过），但 avg_frac_reward_zero_std 仍失败
+
+## 2026-04-21 Geometry100k 显式 `v10` Selector 复跑
+
+**背景：**
+
+- 当前 `select_debug_set.py` 的函数 / CLI 默认值仍是旧窗口：
+  - `core_pass_min = 0.0625`
+  - `core_pass_max = 0.75`
+  - `mastered_max_fraction = 0.05`
+- 这与 `v10_auxfix_stage_balanced` 在文档里实际采用的主线口径不一致。
+- 因此从这一轮开始，凡是复现 `v10` / `v11` stage-balanced selector，都**必须显式传参**，不能只写 `--selection-policy v10_auxfix_stage_balanced`。
+
+**数据源：**
+
+- `datasets/grpo_geometry100k_vlm_label_20260421_maxaux5/difficulty_labels.jsonl`
+
+**固定命令：**
+
+```bash
+python scripts/grpo/select_debug_set.py \
+  datasets/grpo_geometry100k_vlm_label_20260421_maxaux5/difficulty_labels.jsonl \
+  datasets/grpo_geometry100k_vlm_label_20260421_maxaux5_v10_stagebalanced_2k/grpo_train_selected_2000.jsonl \
+  --report-output datasets/grpo_geometry100k_vlm_label_20260421_maxaux5_v10_stagebalanced_2k/grpo_train_report_2000.json \
+  --selection-policy v10_auxfix_stage_balanced \
+  --target-size 2000 \
+  --core-pass-min 0.125 \
+  --core-pass-max 0.625 \
+  --near-high-mid-max-pass 0.75 \
+  --zero-valid-min 0.25 \
+  --zero-valid-max 0.875 \
+  --zero-pass-reward-std-min 0.15 \
+  --reward-mixed-zero-unique-aux-min 2 \
+  --near-low-min-fraction 0.05 \
+  --near-low-max-fraction 0.20 \
+  --reward-mixed-zero-min-fraction 0.05 \
+  --reward-mixed-zero-max-fraction 0.20 \
+  --near-high-mid-min-fraction 0.03 \
+  --near-high-mid-max-fraction 0.08 \
+  --mastered-max-fraction 0.0
+```
+
+**为什么不能只写 policy：**
+
+- 如果只传 `--selection-policy v10_auxfix_stage_balanced`，当前代码仍会落到旧默认窗口：
+  - `stage_available_rows = {core: 26662, near_low: 0, reward_mixed_zero: 8373, near_high_mid: 0, mastered: 31569}`
+  - `stage_selected_rows = {core: 1900, reward_mixed_zero: 100}`
+- 显式传入 `core=[0.125, 0.625]` 和 `mastered_max_fraction=0.0` 后，才会恢复到当前主线想要的边界桶结构：
+  - `stage_available_rows = {core: 17934, near_low: 5243, reward_mixed_zero: 8373, near_high_mid: 3485, mastered: 31569}`
+  - `stage_selected_rows = {core: 1740, near_low: 100, reward_mixed_zero: 100, near_high_mid: 60}`
+
+**静态结果：**
+
+- 输出目录：`datasets/grpo_geometry100k_vlm_label_20260421_maxaux5_v10_stagebalanced_2k`
+- 选集报告：`grpo_train_report_2000.json`
+- 结构 summary：`grpo_train_selected_2000_summary.json`
+- 关键验收：
+  - `selected_rows = 2000`
+  - `mastered_fallback_triggered = false`
+  - `tier_floor_shortages = {near_low: 0, reward_mixed_zero: 0, near_high_mid: 0}`
+  - `selected_zero_pass_ratio = 0.05`
+  - `selected_avg_proxy_reward_std = 0.4336`
+  - `selected_median_proxy_reward_std = 0.4050`
+- 最终分桶：
+  - `core = 1740`
+  - `near_low = 100`
+  - `reward_mixed_zero = 100`
+  - `near_high_mid = 60`
+- 最终 `pass@16` 直方图：
+  - `0.0000: 100`
+  - `0.0625: 100`
+  - `0.1250~0.6250: 1740`
+  - `0.6875: 29`
+  - `0.7500: 31`
+
+**结构 summary：**
+
+- `aux_points_total_distribution = {2: 1624, 3: 278, 4: 98}`
+- `aux_segment_count_distribution = {2: 1624, 3: 278, 4: 98}`
+- `goal_predicate` top buckets：
+  - `eqangle = 360`
+  - `eqratio = 360`
+  - `cong = 222`
+  - `simtrir = 196`
+  - `simtri = 184`
+  - `perp = 181`
+
+**决策：**
+
+- geometry100k 新标签池上的 `v10` 显式 selector 已通过静态验收。
+- 下一步先用这版数据进入 `1x8 tuned` 的 `50-step early smoke`。
+- 只有当 `v10` 未通过 `50-step` 或 `170-step` smoke 时，才切换到 `bucket_unified`。
