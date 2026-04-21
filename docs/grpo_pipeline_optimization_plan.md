@@ -858,3 +858,51 @@ python scripts/grpo/select_debug_set.py \
 - geometry100k 新标签池上的 `v10` 显式 selector 已通过静态验收。
 - 下一步先用这版数据进入 `1x8 tuned` 的 `50-step early smoke`。
 - 只有当 `v10` 未通过 `50-step` 或 `170-step` smoke 时，才切换到 `bucket_unified`。
+
+### `v10` 50-step early smoke（2026-04-21 / 2026-04-22）
+
+**训练配置：**
+
+- 模型：`/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
+- 输出目录：`models/grpo_vlm_sft44_geometry100k_v10_stagebalanced_s1_4gpu_tuned/v0-20260421-235544`
+- 参数：
+  - `per_device_train_batch_size = 1`
+  - `gradient_accumulation_steps = 8`
+  - `num_generations = 8`
+  - `temperature = 1.1`
+  - `top_p = 0.95`
+  - `top_k = 0`
+  - `beta = 0.02`
+  - `max_completion_length = 256`
+  - `reward_log_interval = 20`
+
+**结果：**
+
+- 产物：
+  - `logging.jsonl`
+  - `checkpoint-50`
+  - `smoke_gate_first50.json`
+- gate summary：
+  - `first50_avg_frac_reward_zero_std = 0.4364`
+  - `first50_median_reward_std = 0.2005`
+  - `max_consecutive_full_zero_std_steps = 1`
+- gate 判定：
+  - `avg_frac_reward_zero_std <= 0.40`：`FAIL`
+  - `median_reward_std >= 0.20`：`PASS`
+  - `max_consecutive_full_zero_std_steps <= 3`：`PASS`
+
+**尾部轨迹：**
+
+- `step 25`: `reward_std = 0.1354`, `frac_reward_zero_std = 0.7`
+- `step 30`: `reward_std = 0.0736`, `frac_reward_zero_std = 0.8`
+- `step 35`: `reward_std = 0.1599`, `frac_reward_zero_std = 0.6`
+- `step 40`: `reward_std = 0.2929`, `frac_reward_zero_std = 0.2`
+- `step 45`: `reward_std = 0.2005`, `frac_reward_zero_std = 0.7`
+- `step 50`: `reward_std = 0.0`, `frac_reward_zero_std = 1.0`
+
+**结论：**
+
+- 这条 `v10` 显式 selector run 属于“边缘但未通过”的 early smoke：
+  - `reward_std` 中位数刚好过线
+  - 但后半段 `zero_std` 占比偏高，最终把 `avg_frac_reward_zero_std` 顶到 `0.4364`
+- 按当前规则，不进入 `170-step`，直接切到 `bucket_unified` fallback。
