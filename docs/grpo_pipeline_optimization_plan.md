@@ -725,4 +725,45 @@ mid gate 固定检查：
 **训练配置：**
 - 模型：`models/grpo_vlm_sft44_v12_structure_geometry100k_s1_4gpu_tuned/v0-20260421-162833`
 - 参数：与 v11 一致（num_generations=8, temperature=1.1, beta=0.02）
+- Batch size：per_device_train_batch_size=1, gradient_accumulation_steps=8（每 step 8 个 problems）
 - 状态：未通过 50-step smoke gate，不进入后续训练
+
+### V12 Large Batch 实验（2026-04-21）
+
+**动机：** 验证增加 batch size 是否能改善 reward_std 分布，减少零方差步数。
+
+**配置变更：**
+- per_device_train_batch_size: 1 → 2
+- gradient_accumulation_steps: 8 → 16
+- 每 step 看到的 problems: 8 → 32（**4倍增加**）
+- 其他参数与 v12 原始配置完全一致
+
+**Smoke Test 结果对比（50 steps）：**
+
+| 指标 | 阈值 | V12 原始 (1×8) | V12 Large (2×16) | 改善 |
+|------|------|----------------|------------------|------|
+| avg_frac_reward_zero_std | ≤ 0.40 | 0.54 (✗) | 0.55 (✗) | +0.01 |
+| median_reward_std | ≥ 0.15 | 0.0884 (✗) | **0.1581 (✓)** | +0.0697 |
+| max_consecutive_zero_std | ≤ 3 | 3 (✓) | 1 (✓) | -2 |
+| 零方差步数占比 | - | 46.0% | **6.0%** | **-40.0%** |
+
+**关键改善：**
+1. **零方差步数大幅减少**：从 23/50 步（46%）降至 3/50 步（6%）
+2. **median_reward_std 通过阈值**：从 0.0884 提升至 0.1581（+79%）
+3. **连续零方差步数减少**：从最多 3 步降至 1 步
+4. **整个 step 坍塌问题基本解决**：94% 的 steps 有非零方差
+
+**仍存在的问题：**
+- `avg_frac_reward_zero_std` 仍未通过（0.55 > 0.40）
+- 虽然很少有整个 step 完全零方差，但每个 step 内仍有 30-60% 的 samples 是零方差
+- 说明增加 batch size 改善了"整个 step 坍塌"，但没有解决"数据分布质量不好"的根本问题
+
+**结论：**
+- Large batch 配置（2×16）显著优于原始配置（1×8）
+- 但仍未完全通过 smoke gate（1/3 指标失败）
+- 核心问题仍然是数据分布质量，不是 batch size
+- 建议：等待 VLM 标注完成，用 pass@16 精确筛选数据
+
+**训练配置：**
+- 模型：`models/grpo_vlm_sft44_v12_structure_geometry100k_s1_4gpu_tuned_largerbatch/v1-20260421-170742`
+- 状态：部分通过 smoke gate（median_reward_std 通过），但 avg_frac_reward_zero_std 仍失败
