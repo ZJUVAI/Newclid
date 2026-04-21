@@ -240,8 +240,6 @@ def _submit_ddar_batch(
     num_samples: int,
 ):
     """Submit DDAR evaluation for a batch, returning futures or direct results."""
-    from concurrent.futures import Future
-
     results = []
     for i, row in enumerate(batch):
         all_completions = [greedy_outputs[i], *sampled_outputs[i]]
@@ -267,7 +265,8 @@ def _submit_ddar_batch(
             results.append([_safe_evaluate(c) for c in all_completions])
         else:
             payloads = [(c, row["fl_problem"]) for c in all_completions]
-            results.append(ddar_pool.map_async(_eval_completion_worker, payloads))
+            futures = [ddar_pool.submit(_eval_completion_worker, p) for p in payloads]
+            results.append(futures)
     return results
 
 
@@ -280,8 +279,11 @@ def _collect_ddar_batch(
     labeled = []
     for i, row in enumerate(pending_batch):
         r = pending_results[i]
-        # r is either a list (serial) or AsyncResult (parallel)
-        all_results = list(r.get()) if hasattr(r, "get") else r
+        # r is either a list (serial) or list of futures (parallel)
+        if isinstance(r, list) and r and hasattr(r[0], "result"):
+            all_results = [f.result() for f in r]
+        else:
+            all_results = r
         greedy_result = all_results[0]
         sampled_results = all_results[1:]
         pass_key = f"pass_at_{num_samples}"
