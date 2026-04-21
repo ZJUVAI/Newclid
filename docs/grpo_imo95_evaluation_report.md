@@ -6,7 +6,11 @@
 
 **状态说明：** 本文档记录的是旧 GRPO baseline `models/grpo_vlm_sft44_505_run1/v1-20260417-084328/checkpoint-505` 的历史评估总结，不是当前 `v8` 的结果。
 
-**当前主线状态：** 2026-04-21 已完成 full aux-fix `150k` relabel，并基于此产出 `v11_auxfix_full150k_stagebalanced_2k`。这版数据已经能在不依赖 mastered 回填的前提下选满 `2k`，但桶分布仍然高度偏向 `core`，其中 `reward_mixed_zero` 实际只有 `10` 条。随后补跑的 tuned `300-step` 训练 `models/grpo_vlm_sft44_v11_full150k_tuned_300step/v0-20260421-125128` 在 `170 step` 前后再次出现明显坍塌：`first170_avg_frac_reward_zero_std = 0.5735`、`first170_median_reward_std = 0.0`、`last20_avg_frac_reward_zero_std = 0.9`、`max_consecutive_full_zero_std_steps = 23`。因此当前结论更新为：即使旧标签问题已经通过 aux-fix relabel 解决，现有 selector 仍未构造出足够高信号的 hard 训练分布；在新的 hard-signal selector 版本通过 `50 + 170` smoke 之前，`v7/v8/v9/v11` 都不应进入新的 `dev_imo` 或 `imo_95` 评估。未来新的 GRPO 评估仍应同时对照 SFT baseline `checkpoint-20084` 和本文中的历史 GRPO `checkpoint-505`。
+**当前主线状态：** 2026-04-21 已完成 full aux-fix `150k` relabel，并基于此产出 `v11_auxfix_full150k_stagebalanced_2k`。这版数据已经能在不依赖 mastered 回填的前提下选满 `2k`，但桶分布仍然高度偏向 `core`，其中 `reward_mixed_zero` 实际只有 `10` 条。随后补跑的 tuned `300-step` 训练 `models/grpo_vlm_sft44_v11_full150k_tuned_300step/v0-20260421-125128` 在 `170 step` 前后再次出现明显坍塌：`first170_avg_frac_reward_zero_std = 0.5735`、`first170_median_reward_std = 0.0`、`last20_avg_frac_reward_zero_std = 0.9`、`max_consecutive_full_zero_std_steps = 23`。
+
+**V12 Structure-Based 实验（2026-04-21）：** 尝试基于结构特征（无需 VLM label）快速构建训练集，从新 100k geometry 候选池采样 2k 数据。50-step smoke test 结果：`avg_frac_reward_zero_std = 0.54`（✗ FAIL，阈值 ≤0.40）、`median_reward_std = 0.0884`（✗ FAIL，阈值 ≥0.15）。失败原因：结构特征（aux_points_total、n_premises、goal_predicate）解释力有限（pseudo R² = 0.015），无法识别 reward_mixed_zero 类型样本，导致 46% 的步数出现零方差。结论：结构特征筛选不能替代 VLM 标注，需等待标注完成后用 pass@16 精确筛选。
+
+**总结：** 即使旧标签问题已经通过 aux-fix relabel 解决，现有 selector（包括 v11 和 v12 structure-based）仍未构造出足够高信号的 hard 训练分布；在新的 hard-signal selector 版本通过 `50 + 170` smoke 之前，`v7/v8/v9/v11/v12` 都不应进入新的 `dev_imo` 或 `imo_95` 评估。未来新的 GRPO 评估仍应同时对照 SFT baseline `checkpoint-20084` 和本文中的历史 GRPO `checkpoint-505`。
 
 ---
 

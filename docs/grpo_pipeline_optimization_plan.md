@@ -660,7 +660,7 @@ mid gate 固定检查：
 - `v11` 进一步说明：
   - 只靠 full `150k` relabel + 现有 stage-balanced selector，虽然已经能选满 `2k`
   - 但因为 `reward_mixed_zero` 和真正高信号 hard bucket 供给依旧过少，训练在 `170 step` 前后仍会坍塌
-  - `selected_zero_pass_ratio = 0.005` 并不意味着训练更稳定；这里暴露出的核心问题是“零通过脏样本减少了，但高方差 hard 样本没有补上”
+  - `selected_zero_pass_ratio = 0.005` 并不意味着训练更稳定；这里暴露出的核心问题是”零通过脏样本减少了，但高方差 hard 样本没有补上”
 - 下一步应变为：
   - 继续拆解 `discarded_non_dead` 的组成，确认 `(0.75, 0.9)` easy tail 与 low-signal zero-pass 各占多少
   - 对 full `150k` 池做更强的 hard-signal 挖掘，而不是继续压缩 easy tail
@@ -669,3 +669,60 @@ mid gate 固定检查：
 - 当前阶段的 Git 纪律：
   - 只跟踪 `docs/` 下这两个文档
   - 不要提交临时 benchmark resume 文件、monitor log 或一次性的 recovery helper
+
+## 2026-04-21 V12 Structure-Based Selector 实验
+
+**背景：** VLM 标注速度慢（100k 数据需要数小时），尝试基于结构特征（无需 VLM label）快速构建 GRPO 训练集。
+
+**数据源：** 新的 100k geometry 候选池（`grpo_geometry100k_vlm_label_20260421_maxaux5`）
+
+**筛选策略：**
+- 基于 `aux_points_total` 分层采样（保守配置：30%/40%/30%）
+- 限制 easy tail（排除 aux_points=1 且 n_premises<5）
+- 要求 aux_segment_count≥1
+- 谓词族平衡（每个 goal_predicate ≤18%）
+- 前提数覆盖（n_premises 2-25）
+
+**生成数据集：**
+- 路径：`datasets/grpo_pipeline_vlm_sft44_geometry100k_structure_v12_2k`
+- 规模：2,000 条
+- 脚本：`scripts/grpo/quick_sample_by_structure.py`
+
+**Smoke Test 结果（50 steps）：**
+
+| 指标 | 阈值 | V11 | V12 | 结果 |
+|------|------|-----|-----|------|
+| avg_frac_reward_zero_std | ≤ 0.40 | 0.29 | **0.54** | ✗ FAIL (+0.25) |
+| median_reward_std | ≥ 0.15 | 0.3574 | **0.0884** | ✗ FAIL (-0.27) |
+| max_consecutive_zero_std | ≤ 3 | N/A | 3 | ✓ PASS |
+
+**核心问题：**
+- 46% 的步数出现零方差（23/50 步）
+- reward_std 中位数仅 0.0884，不到 v11 的 1/4
+- 信号质量显著下降
+
+**失败原因分析：**
+1. **结构特征筛选过于粗糙**
+   - 仅基于 aux_points、n_premises、goal_predicate 平衡
+   - 缺少对候选池质量的直接评估（Pass@16 分布）
+   - 无法识别 reward_mixed_zero 类型样本（部分 aux 可解、部分不可解）
+
+2. **新 100k 候选池特性**
+   - 平均 Pass@16 从 79.5%（v10 auxfix）降至 57.3%
+   - 候选池更难，但不代表训练分布更好
+   - 需要更精细的难度分层采样
+
+3. **结构特征解释力有限**
+   - 基于 v10 auxfix 20k 的分析：pseudo R² 只有 0.015
+   - 说明 98.5% 的方差无法用结构特征解释
+   - 结构特征不能直接预测 proxy_reward_std
+
+**结论：**
+- 结构特征筛选**不能替代** VLM 标注
+- 增加数据量或 batch size 不会解决根本问题（问题在于数据分布质量，不是数量）
+- 建议等待 VLM 标注完成（当前 9.7%），用 pass@16 精确筛选
+
+**训练配置：**
+- 模型：`models/grpo_vlm_sft44_v12_structure_geometry100k_s1_4gpu_tuned/v0-20260421-162833`
+- 参数：与 v11 一致（num_generations=8, temperature=1.1, beta=0.02）
+- 状态：未通过 50-step smoke gate，不进入后续训练
