@@ -9,7 +9,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from scripts._tqdm import tqdm
+from tqdm import tqdm
 
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:

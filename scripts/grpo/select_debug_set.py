@@ -11,7 +11,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from scripts._tqdm import tqdm
+from tqdm import tqdm
 
 POLICY_TIER_ORDER = {
     "v3_tiered": (

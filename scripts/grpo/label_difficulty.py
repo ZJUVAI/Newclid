@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from newclid.training.grpo_rewards import AuxEvaluationResult, AuxRewardEvaluator
-from scripts._tqdm import tqdm
+from tqdm import tqdm
 
 
 def load_jsonl(path: Path) -> list[dict[str, Any]]:

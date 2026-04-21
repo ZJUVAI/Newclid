@@ -10,7 +10,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any
 
-from scripts._tqdm import tqdm
+from tqdm import tqdm
 
 from newclid.training.aux_dsl import extract_first_tagged_aux_block
 

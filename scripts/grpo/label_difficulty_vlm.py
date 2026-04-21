@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from newclid.training.grpo_rewards import AuxRewardEvaluator
-from scripts._tqdm import tqdm
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 

@@ -26,6 +26,7 @@ dependencies = [
     "ray[default]",
     "millify",
     "numpy",
+    "tqdm",
     "cairosvg",
     "matplotlib>=3.7.0",
     "markupsafe==3.0.2",
