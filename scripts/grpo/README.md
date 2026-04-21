@@ -183,24 +183,31 @@ instead of the degenerate `valid_at_* ~= 1, pass_at_* = 0` pattern that often
 produces `reward_std = 0` during training.
 
 `v6_mid_strict_zero` is a selector-only refinement that narrows the learnable
-core and separates the easier high-pass tail into two capped tiers:
+core and keeps only a small capped mid-high-pass tail:
 
 - `core`: `0.125 <= pass_at_* <= 0.625`
 - `near_low`: low-pass rows just below the core window
 - `reward_mixed_zero`: stricter zero-pass rows with mixed reward outcomes
 - `near_high_mid`: moderate high-pass rows above core and up to a configurable cap
-- `near_high_high`: higher-pass but still non-mastered rows, kept under a tighter cap
 - `mastered`: only used as fallback if the selector still cannot fill enough rows
 
+The current stage-balanced selector no longer keeps the overly easy
+`near_high_high` tail. Its default budget is shifted back toward harder and
+higher-signal tiers:
+
+- `near_low`: default `5%` to `20%`
+- `reward_mixed_zero`: default `5%` to `20%`
+- `near_high_mid`: default `3%` to `8%`
+
 `v9_stage_balanced` builds on top of `v6/v7` and explicitly enforces minimum
-coverage for low-pass and high-pass boundary tiers so the final training set
-does not collapse into almost all `core` rows:
+coverage for low-pass and mid-high-pass boundary tiers so the final training
+set does not collapse into almost all `core` rows, while suppressing the
+easiest non-mastered tail:
 
 - `core`: `0.125 <= pass_at_* <= 0.625`
 - `near_low`: lower-pass boundary rows below core
 - `reward_mixed_zero`: zero-pass rows that still satisfy validity, reward-mixing, and diversity constraints
 - `near_high_mid`: `0.625 < pass_at_* <= 0.75`
-- `near_high_high`: `0.75 < pass_at_* < mastered`
 - `mastered`: only used as fallback when the selector still cannot fill enough rows
 
 The `v3_tiered` policy first groups rows into:
@@ -265,9 +272,12 @@ python scripts/grpo/select_debug_set.py \
   --zero-valid-min 0.25 \
   --zero-valid-max 0.75 \
   --zero-pass-reward-std-min 0.20 \
-  --reward-mixed-zero-max-fraction 0.10 \
-  --near-high-mid-max-fraction 0.15 \
-  --near-high-high-max-fraction 0.14
+  --near-low-min-fraction 0.05 \
+  --near-low-max-fraction 0.20 \
+  --reward-mixed-zero-min-fraction 0.05 \
+  --reward-mixed-zero-max-fraction 0.20 \
+  --near-high-mid-min-fraction 0.03 \
+  --near-high-mid-max-fraction 0.08
 ```
 
 The output rows contain exactly:

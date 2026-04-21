@@ -452,6 +452,7 @@ class TestGRPODataSelection(unittest.TestCase):
         self.assertEqual(report["removed_all_invalid"], 1)
         self.assertEqual(report["selection_policy"], "v3_tiered")
         self.assertEqual(report["tier_selected_rows"]["core"], 2)
+        self.assertEqual(report["selected_core_rows"], 2)
 
     def test_select_debug_rows_accepts_pass_at_8(self):
         rows = [
@@ -642,6 +643,34 @@ class TestGRPODataSelection(unittest.TestCase):
         self.assertEqual(report["selected_pass_histogram"]["0.9500"], 1)
         self.assertEqual(report["selected_pass_histogram"]["0.9800"], 1)
 
+    def test_filter_candidate_tiers_discards_high_high_tail_for_stage_balanced(self):
+        rows = [
+            self._selection_row("core", pass_value=0.25),
+            self._selection_row("high_mid", pass_value=0.75),
+            self._selection_row("high_high", pass_value=0.8125),
+        ]
+
+        tier_rows, stats = self.select_debug_set.filter_candidate_tiers(
+            rows,
+            selection_policy="v10_auxfix_stage_balanced",
+            core_min_pass=0.125,
+            core_max_pass=0.625,
+            mastered_pass_min=0.90,
+            hard_valid_build_invalid_max=2,
+            hard_valid_format_invalid_max=1,
+            hard_valid_unique_aux_min=2,
+            hard_valid_duplicate_aux_max=0.875,
+            near_high_mid_max_pass=0.75,
+            zero_valid_min=0.25,
+            zero_valid_max=0.875,
+            zero_pass_reward_std_min=0.15,
+            reward_mixed_zero_unique_aux_min=2,
+        )
+
+        self.assertEqual(stats["discarded_non_dead_rows"], 1)
+        self.assertEqual(len(tier_rows["core"]), 1)
+        self.assertEqual(len(tier_rows["near_high_mid"]), 1)
+
     def test_file_round_trip_for_candidate_pool(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_path = Path(tmp_dir)
@@ -752,7 +781,6 @@ class TestGRPODataSelection(unittest.TestCase):
             near_low_min_fraction=0.20,
             reward_mixed_zero_min_fraction=0.0,
             near_high_mid_min_fraction=0.0,
-            near_high_high_min_fraction=0.0,
             greedy_success_max_fraction=0.20,
             pass_one_max_fraction=0.20,
             high_pass_max_fraction=0.30,
@@ -764,7 +792,6 @@ class TestGRPODataSelection(unittest.TestCase):
             near_low_max_fraction=1.0,
             reward_mixed_zero_max_fraction=1.0,
             near_high_mid_max_fraction=1.0,
-            near_high_high_max_fraction=1.0,
             mastered_max_fraction=0.0,
         )
 

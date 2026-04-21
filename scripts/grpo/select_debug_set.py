@@ -32,7 +32,6 @@ POLICY_TIER_ORDER = {
         "near_low",
         "reward_mixed_zero",
         "near_high_mid",
-        "near_high_high",
         "mastered",
     ),
     "v7_structure_strict_zero": (
@@ -40,7 +39,6 @@ POLICY_TIER_ORDER = {
         "near_low",
         "reward_mixed_zero",
         "near_high_mid",
-        "near_high_high",
         "mastered",
     ),
     "v9_stage_balanced": (
@@ -48,7 +46,6 @@ POLICY_TIER_ORDER = {
         "near_low",
         "reward_mixed_zero",
         "near_high_mid",
-        "near_high_high",
         "mastered",
     ),
     "v10_auxfix_stage_balanced": (
@@ -56,7 +53,6 @@ POLICY_TIER_ORDER = {
         "near_low",
         "reward_mixed_zero",
         "near_high_mid",
-        "near_high_high",
         "mastered",
     ),
 }
@@ -77,28 +73,24 @@ NON_MASTERED_TIERS_BY_POLICY = {
         "near_low",
         "reward_mixed_zero",
         "near_high_mid",
-        "near_high_high",
     ),
     "v7_structure_strict_zero": (
         "core",
         "near_low",
         "reward_mixed_zero",
         "near_high_mid",
-        "near_high_high",
     ),
     "v9_stage_balanced": (
         "core",
         "near_low",
         "reward_mixed_zero",
         "near_high_mid",
-        "near_high_high",
     ),
     "v10_auxfix_stage_balanced": (
         "core",
         "near_low",
         "reward_mixed_zero",
         "near_high_mid",
-        "near_high_high",
     ),
 }
 ALL_TIERS = (
@@ -106,7 +98,6 @@ ALL_TIERS = (
     "near",
     "near_low",
     "near_high_mid",
-    "near_high_high",
     "hard_valid_high",
     "hard_valid_mid",
     "reward_mixed_zero",
@@ -302,8 +293,6 @@ def _classify_row(
             return "near_low"
         if core_max_pass < pass_value <= near_high_mid_max_pass:
             return "near_high_mid"
-        if near_high_mid_max_pass < pass_value < mastered_pass_min:
-            return "near_high_high"
     elif (0.0 < pass_value < core_min_pass) or (
         core_max_pass < pass_value < mastered_pass_min
     ):
@@ -557,8 +546,7 @@ def select_debug_rows(
     hard_valid_high_max_fraction: float = 0.50,
     hard_valid_mid_max_fraction: float = 0.20,
     near_high_mid_max_pass: float = 0.75,
-    near_high_mid_max_fraction: float = 0.15,
-    near_high_high_max_fraction: float = 0.14,
+    near_high_mid_max_fraction: float = 0.08,
     mastered_max_fraction: float = 0.05,
     mastered_fallback_min_fill_fraction: float = 0.90,
     multi_segment_min_fraction: float = 0.45,
@@ -569,12 +557,11 @@ def select_debug_rows(
     zero_valid_max: float = 0.875,
     zero_pass_reward_std_min: float = 0.15,
     reward_mixed_zero_unique_aux_min: int = 2,
-    reward_mixed_zero_max_fraction: float = 0.25,
-    near_low_min_fraction: float = 0.0,
-    near_low_max_fraction: float = 1.0,
-    reward_mixed_zero_min_fraction: float = 0.0,
-    near_high_mid_min_fraction: float = 0.0,
-    near_high_high_min_fraction: float = 0.0,
+    reward_mixed_zero_max_fraction: float = 0.20,
+    near_low_min_fraction: float = 0.05,
+    near_low_max_fraction: float = 0.20,
+    reward_mixed_zero_min_fraction: float = 0.05,
+    near_high_mid_min_fraction: float = 0.03,
     greedy_success_max_fraction: float = 1.0,
     pass_one_max_fraction: float = 1.0,
     high_pass_min: float = 0.75,
@@ -633,9 +620,6 @@ def select_debug_rows(
         tier_caps["near_high_mid"] = max(
             0, int(target_size * near_high_mid_max_fraction)
         )
-        tier_caps["near_high_high"] = max(
-            0, int(target_size * near_high_high_max_fraction)
-        )
     elif selection_policy == "v9_stage_balanced":
         tier_caps["near_low"] = max(0, int(target_size * near_low_max_fraction))
         tier_caps["reward_mixed_zero"] = max(
@@ -644,9 +628,6 @@ def select_debug_rows(
         tier_caps["near_high_mid"] = max(
             0, int(target_size * near_high_mid_max_fraction)
         )
-        tier_caps["near_high_high"] = max(
-            0, int(target_size * near_high_high_max_fraction)
-        )
     elif selection_policy == "v10_auxfix_stage_balanced":
         tier_caps["near_low"] = max(0, int(target_size * near_low_max_fraction))
         tier_caps["reward_mixed_zero"] = max(
@@ -654,9 +635,6 @@ def select_debug_rows(
         )
         tier_caps["near_high_mid"] = max(
             0, int(target_size * near_high_mid_max_fraction)
-        )
-        tier_caps["near_high_high"] = max(
-            0, int(target_size * near_high_high_max_fraction)
         )
     mastered_fallback_min_rows = max(
         0, int(target_size * mastered_fallback_min_fill_fraction)
@@ -673,7 +651,6 @@ def select_debug_rows(
                 0, int(target_size * reward_mixed_zero_min_fraction)
             ),
             "near_high_mid": max(0, int(target_size * near_high_mid_min_fraction)),
-            "near_high_high": max(0, int(target_size * near_high_high_min_fraction)),
         }
 
     taken = _take_matching_from_tiers(
@@ -748,12 +725,7 @@ def select_debug_rows(
 
     tier_floor_shortages = {}
     if selection_policy in {"v9_stage_balanced", "v10_auxfix_stage_balanced"}:
-        for tier_name in (
-            "near_low",
-            "reward_mixed_zero",
-            "near_high_mid",
-            "near_high_high",
-        ):
+        for tier_name in ("near_low", "reward_mixed_zero", "near_high_mid"):
             needed = max(0, tier_min_rows.get(tier_name, 0) - tier_selected_counter[tier_name])
             taken = _take_matching_from_tiers(
                 selected,
@@ -878,8 +850,6 @@ def select_debug_rows(
             "hard_valid_mid_max_fraction": hard_valid_mid_max_fraction,
             "near_high_mid_max_fraction": near_high_mid_max_fraction,
             "near_high_mid_min_fraction": near_high_mid_min_fraction,
-            "near_high_high_max_fraction": near_high_high_max_fraction,
-            "near_high_high_min_fraction": near_high_high_min_fraction,
             "mastered_max_fraction": mastered_max_fraction,
             "mastered_fallback_min_fill_fraction": (
                 mastered_fallback_min_fill_fraction
@@ -940,11 +910,9 @@ def select_debug_rows(
             if final_rows
             else 0.0
         ),
-        "selected_near_high_high_rows": selected_tier_counts.get(
-            "near_high_high", 0
-        ),
-        "selected_near_high_high_ratio": (
-            selected_tier_counts.get("near_high_high", 0) / len(final_rows)
+        "selected_core_rows": selected_tier_counts.get("core", 0),
+        "selected_core_ratio": (
+            selected_tier_counts.get("core", 0) / len(final_rows)
             if final_rows
             else 0.0
         ),
@@ -1005,8 +973,7 @@ def main() -> None:
     parser.add_argument("--hard-valid-high-max-fraction", type=float, default=0.50)
     parser.add_argument("--hard-valid-mid-max-fraction", type=float, default=0.20)
     parser.add_argument("--near-high-mid-max-pass", type=float, default=0.75)
-    parser.add_argument("--near-high-mid-max-fraction", type=float, default=0.15)
-    parser.add_argument("--near-high-high-max-fraction", type=float, default=0.14)
+    parser.add_argument("--near-high-mid-max-fraction", type=float, default=0.08)
     parser.add_argument("--mastered-max-fraction", type=float, default=0.05)
     parser.add_argument(
         "--mastered-fallback-min-fill-fraction", type=float, default=0.90
@@ -1019,12 +986,11 @@ def main() -> None:
     parser.add_argument("--zero-valid-max", type=float, default=0.875)
     parser.add_argument("--zero-pass-reward-std-min", type=float, default=0.15)
     parser.add_argument("--reward-mixed-zero-unique-aux-min", type=int, default=2)
-    parser.add_argument("--reward-mixed-zero-max-fraction", type=float, default=0.25)
-    parser.add_argument("--near-low-min-fraction", type=float, default=0.0)
-    parser.add_argument("--near-low-max-fraction", type=float, default=1.0)
-    parser.add_argument("--reward-mixed-zero-min-fraction", type=float, default=0.0)
-    parser.add_argument("--near-high-mid-min-fraction", type=float, default=0.0)
-    parser.add_argument("--near-high-high-min-fraction", type=float, default=0.0)
+    parser.add_argument("--reward-mixed-zero-max-fraction", type=float, default=0.20)
+    parser.add_argument("--near-low-min-fraction", type=float, default=0.05)
+    parser.add_argument("--near-low-max-fraction", type=float, default=0.20)
+    parser.add_argument("--reward-mixed-zero-min-fraction", type=float, default=0.05)
+    parser.add_argument("--near-high-mid-min-fraction", type=float, default=0.03)
     parser.add_argument("--greedy-success-max-fraction", type=float, default=1.0)
     parser.add_argument("--pass-one-max-fraction", type=float, default=1.0)
     parser.add_argument("--high-pass-min", type=float, default=0.75)
@@ -1048,7 +1014,6 @@ def main() -> None:
         hard_valid_mid_max_fraction=args.hard_valid_mid_max_fraction,
         near_high_mid_max_pass=args.near_high_mid_max_pass,
         near_high_mid_max_fraction=args.near_high_mid_max_fraction,
-        near_high_high_max_fraction=args.near_high_high_max_fraction,
         mastered_max_fraction=args.mastered_max_fraction,
         mastered_fallback_min_fill_fraction=args.mastered_fallback_min_fill_fraction,
         multi_segment_min_fraction=args.multi_segment_min_fraction,
@@ -1064,7 +1029,6 @@ def main() -> None:
         near_low_max_fraction=args.near_low_max_fraction,
         reward_mixed_zero_min_fraction=args.reward_mixed_zero_min_fraction,
         near_high_mid_min_fraction=args.near_high_mid_min_fraction,
-        near_high_high_min_fraction=args.near_high_high_min_fraction,
         greedy_success_max_fraction=args.greedy_success_max_fraction,
         pass_one_max_fraction=args.pass_one_max_fraction,
         high_pass_min=args.high_pass_min,
