@@ -11,6 +11,7 @@ import subprocess
 import sys
 import time
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -214,6 +215,22 @@ class VLMCompletionGenerator:
         return greedy_outputs, sampled_outputs
 
 
+def _eval_completion_worker(payload: tuple[str, str]) -> dict[str, Any]:
+    completion, fl_problem = payload
+    evaluator = AuxRewardEvaluator()
+    try:
+        result = evaluator.evaluate(completion, fl_problem)
+    except Exception:
+        logger.exception("Worker evaluation crashed; downgrading completion to engine_error")
+        result = evaluator.engine_error_result()
+    return {
+        "normalized_aux": result.normalized_aux,
+        "format_ok": result.format_ok,
+        "build_ok": result.build_ok,
+        "ddar_status": result.ddar_status,
+    }
+
+
 def aggregate_difficulty_metrics(
     sample: dict[str, Any],
     greedy_completion: str,
@@ -221,45 +238,60 @@ def aggregate_difficulty_metrics(
     evaluator: AuxRewardEvaluator,
     *,
     num_samples: int,
+    ddar_workers: int = 1,
 ) -> dict[str, Any]:
     def _safe_evaluate(completion: str):
         try:
-            return evaluator.evaluate(completion, sample["fl_problem"])
+            result = evaluator.evaluate(completion, sample["fl_problem"])
         except Exception:
             logger.exception(
                 "Difficulty labeling evaluation crashed for sample_id=%s; "
                 "downgrading completion to engine_error",
                 sample.get("sample_id"),
             )
-            return evaluator.engine_error_result()
+            result = evaluator.engine_error_result()
+        return {
+            "normalized_aux": result.normalized_aux,
+            "format_ok": result.format_ok,
+            "build_ok": result.build_ok,
+            "ddar_status": result.ddar_status,
+        }
 
-    greedy_result = _safe_evaluate(greedy_completion)
-    sampled_results = [_safe_evaluate(completion) for completion in sampled_completions]
+    all_completions = [greedy_completion, *sampled_completions]
+    if ddar_workers <= 1:
+        all_results = [_safe_evaluate(completion) for completion in all_completions]
+    else:
+        payloads = [(completion, sample["fl_problem"]) for completion in all_completions]
+        with ProcessPoolExecutor(max_workers=ddar_workers) as pool:
+            all_results = list(pool.map(_eval_completion_worker, payloads))
+
+    greedy_result = all_results[0]
+    sampled_results = all_results[1:]
     pass_key = f"pass_at_{num_samples}"
     valid_key = f"valid_at_{num_samples}"
     fmt_key = f"format_valid_at_{num_samples}"
 
-    ddar_valid_count = sum(1 for result in sampled_results if result.build_ok)
+    ddar_valid_count = sum(1 for result in sampled_results if result["build_ok"])
     ddar_solved_count = sum(
-        1 for result in sampled_results if result.ddar_status == "solved"
+        1 for result in sampled_results if result["ddar_status"] == "solved"
     )
-    format_valid_count = sum(1 for result in sampled_results if result.format_ok)
+    format_valid_count = sum(1 for result in sampled_results if result["format_ok"])
     normalized_aux_values = [
-        result.normalized_aux for result in sampled_results if result.normalized_aux
+        result["normalized_aux"] for result in sampled_results if result["normalized_aux"]
     ]
     unique_aux_count = len(set(normalized_aux_values))
     duplicate_aux_ratio = 0.0
     if sampled_results:
         duplicate_aux_ratio = 1.0 - (unique_aux_count / len(sampled_results))
 
-    status_counts = Counter(result.ddar_status for result in sampled_results)
+    status_counts = Counter(result["ddar_status"] for result in sampled_results)
     n = len(sampled_results) or 1
     return {
         **sample,
-        "greedy_success": greedy_result.ddar_status == "solved",
-        "greedy_status": greedy_result.ddar_status,
-        "greedy_build_ok": greedy_result.build_ok,
-        "greedy_format_ok": greedy_result.format_ok,
+        "greedy_success": greedy_result["ddar_status"] == "solved",
+        "greedy_status": greedy_result["ddar_status"],
+        "greedy_build_ok": greedy_result["build_ok"],
+        "greedy_format_ok": greedy_result["format_ok"],
         pass_key: ddar_solved_count / n,
         valid_key: ddar_valid_count / n,
         fmt_key: format_valid_count / n,
@@ -337,6 +369,7 @@ def label_difficulty(
     progress_output: Path | None = None,
     resume: bool = False,
     flush_every_batches: int = 1,
+    ddar_workers: int = 1,
 ) -> list[dict[str, Any]]:
     labeled_rows = _load_existing_labeled_rows(rows, output_path, resume)
     start_time = time.perf_counter()
@@ -380,6 +413,7 @@ def label_difficulty(
                     sampled_outputs[i],
                     evaluator,
                     num_samples=num_samples,
+                    ddar_workers=ddar_workers,
                 )
             )
 
@@ -530,6 +564,8 @@ def run_workers(args: argparse.Namespace) -> None:
             args.torch_dtype,
             "--flush-every-batches",
             str(args.flush_every_batches),
+            "--ddar-workers",
+            str(args.ddar_workers),
             "--progress-output",
             str(shard_progress[i]),
         ]
@@ -636,6 +672,12 @@ def main() -> None:
         "--workers", type=int, default=1, help="Number of GPU workers (one per GPU)"
     )
     parser.add_argument(
+        "--ddar-workers",
+        type=int,
+        default=1,
+        help="Processes for parallel DDAR evaluation per row (1=sequential)",
+    )
+    parser.add_argument(
         "--work-dir",
         type=Path,
         default=None,
@@ -699,6 +741,7 @@ def main() -> None:
         progress_output=args.progress_output,
         resume=args.resume,
         flush_every_batches=args.flush_every_batches,
+        ddar_workers=args.ddar_workers,
     )
     if args.summary_output is not None:
         summary = build_summary(
