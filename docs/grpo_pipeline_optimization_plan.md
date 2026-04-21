@@ -906,3 +906,72 @@ python scripts/grpo/select_debug_set.py \
   - `reward_std` 中位数刚好过线
   - 但后半段 `zero_std` 占比偏高，最终把 `avg_frac_reward_zero_std` 顶到 `0.4364`
 - 按当前规则，不进入 `170-step`，直接切到 `bucket_unified` fallback。
+
+## 2026-04-22 Geometry100k `bucket_unified` Fallback 静态结果
+
+**触发原因：**
+
+- `v10` 显式 selector 的 `50-step` early smoke 未通过：
+  - `first50_avg_frac_reward_zero_std = 0.4364 > 0.40`
+- 因此按当前 fallback 规则，切换到 `bucket_unified`，并重新从 base checkpoint 开新分支，而不是继续沿用 `v10` 的 checkpoint-50。
+
+**固定命令：**
+
+```bash
+python scripts/grpo/select_debug_set.py \
+  datasets/grpo_geometry100k_vlm_label_20260421_maxaux5/difficulty_labels.jsonl \
+  datasets/grpo_geometry100k_vlm_label_20260421_maxaux5_bucket_unified_2k/grpo_train_selected_2000.jsonl \
+  --report-output datasets/grpo_geometry100k_vlm_label_20260421_maxaux5_bucket_unified_2k/grpo_train_report_2000.json \
+  --selection-policy bucket_unified \
+  --target-size 2000 \
+  --core-pass-min 0.125 \
+  --core-pass-max 0.625 \
+  --near-high-mid-max-pass 0.75 \
+  --zero-valid-min 0.25 \
+  --zero-valid-max 0.875 \
+  --zero-pass-reward-std-min 0.15 \
+  --reward-mixed-zero-unique-aux-min 2 \
+  --near-low-min-fraction 0.05 \
+  --near-low-max-fraction 0.20 \
+  --reward-mixed-zero-min-fraction 0.05 \
+  --reward-mixed-zero-max-fraction 0.20 \
+  --near-high-mid-min-fraction 0.03 \
+  --near-high-mid-max-fraction 0.08 \
+  --mastered-max-fraction 0.0
+```
+
+**静态结果：**
+
+- 输出目录：`datasets/grpo_geometry100k_vlm_label_20260421_maxaux5_bucket_unified_2k`
+- 选集报告：`grpo_train_report_2000.json`
+- 结构 summary：`grpo_train_selected_2000_summary.json`
+- 关键验收：
+  - `selected_rows = 2000`
+  - `fallback_triggered = false`
+  - `bucket_floor_shortages = {near_low: 0, reward_mixed_zero: 0, near_high_mid: 0}`
+  - `selected_zero_pass_ratio = 0.05`
+  - `selected_avg_proxy_reward_std = 0.4336`
+  - `selected_median_proxy_reward_std = 0.4050`
+
+**bucket 分配：**
+
+- `core = 1740`
+- `near_low = 100`
+- `reward_mixed_zero = 100`
+- `near_high_mid = 60`
+- 其余 bucket 全为 `0`：
+  - `easy_tail_nonzero = 0`
+  - `high_pass_non_greedy = 0`
+  - `zero_valid_low = 0`
+  - `zero_valid_high = 0`
+  - `zero_reward_std_low = 0`
+  - `zero_unique_aux_low = 0`
+  - `mastered = 0`
+
+**结论：**
+
+- 在这份 geometry100k 标签池上，`bucket_unified` 与显式 `v10` 的最终 `2k` 选集完全一致。
+- 差异不在静态分布，而在于后续训练分支与记录口径：
+  - `v10` 使用 stage/tier report
+  - `bucket_unified` 使用 bucket report
+- 下一步对 `bucket_unified` 跑同配置 `1x8 tuned` 的 `50-step early smoke`，再看它是否能规避 `v10` 分支后半段的 zero-std 回升。
