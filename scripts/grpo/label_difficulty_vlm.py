@@ -392,11 +392,12 @@ def label_difficulty(
     ddar_pool = ProcessPoolExecutor(max_workers=ddar_workers) if ddar_workers > 1 else None
     try:
         total_batches = (len(rows) + batch_size - 1) // batch_size
+        initial_batches = resume_count // batch_size
         flushed_batches = 0
         for batch_start in tqdm(
             range(resume_count, len(rows), batch_size),
             total=total_batches,
-            initial=resume_count // batch_size,
+            initial=initial_batches,
             desc="Labeling difficulty",
         ):
             batch = rows[batch_start : batch_start + batch_size]
@@ -420,7 +421,8 @@ def label_difficulty(
 
             idx = batch_start + len(batch)
             elapsed = time.perf_counter() - start_time
-            avg_time = elapsed / idx
+            processed = idx - resume_count
+            avg_time = elapsed / processed if processed > 0 else 0
             eta = avg_time * (len(rows) - idx)
             last = labeled_rows[-1]
             print(
