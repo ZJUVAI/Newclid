@@ -9,6 +9,7 @@ English version: [README.md](/C20545/home/wangzi/GenesisGeo-grpo/scripts/grpo/RE
 - `plugin.py`：为 SWIFT 注册 `aux_reward`。
 - `../analyze_dataset.py`：为 JSONL 数据添加辅助结构、目标谓词、谓词族标签以及轻量复杂度字段。
 - `analyze_selected_dataset.py`：在 `select_debug_set.py` 之后分析最终选出的 GRPO 训练 JSONL。
+- `analyze_difficulty_structure.py`：分析 `pass_at_k` 与 `aux_points_total` / `n_premises` 的关系，输出分组统计、热力表、Spearman 和 logit 模型。
 - `build_candidate_pool.py`：仅保留真正包含辅助目标的样本，并输出候选池摘要。
 - `prefilter_candidate_pool.py`：在模型难度标注前，对大规模候选池做廉价的流式预筛选。
 - `label_difficulty.py`：基于文本模型的难度标注，采用离线生成加奖励评估。
@@ -163,6 +164,30 @@ python scripts/grpo/label_difficulty_vlm.py \
   datasets/grpo/difficulty_labels.jsonl \
   --model-path /path/to/vlm-checkpoint
 ```
+
+### 4.1 分析难度与题目结构的关系
+
+如果你想分析题目难度 `pass_at_k` 与题目的 `aux_points_total`、`aux_segment_count`、`n_premises` 之间的关系，可以直接对
+`difficulty_labels*.jsonl` 运行：
+
+```bash
+python scripts/grpo/analyze_difficulty_structure.py \
+  datasets/grpo/difficulty_labels.jsonl \
+  --summary-output datasets/grpo/difficulty_structure_summary.json \
+  --plots-dir datasets/grpo/difficulty_structure_plots
+```
+
+输出会包含：
+
+- 按 `aux_points_total` 分组的平均 / 中位 `pass_at_k`
+- 按 `aux_segment_count` 分组的平均 / 中位 `pass_at_k`
+- 按 `n_premises` 分组的平均 / 中位 `pass_at_k`
+- `aux_points_total × n_premises` 的二维热力表统计
+- `aux_segment_count × n_premises` 的二维热力表统计
+- `Spearman` 相关
+- 两个 logit 模型：
+  - `success_count / k ~ aux + premises + aux*premises`
+  - `1(pass_at_k > 0) ~ aux + premises + aux*premises`
 
 ### 5. 选择最终 GRPO 子集
 
