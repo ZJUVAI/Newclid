@@ -6,7 +6,7 @@
 
 **状态说明：** 本文档记录的是旧 GRPO baseline `models/grpo_vlm_sft44_505_run1/v1-20260417-084328/checkpoint-505` 的历史评估总结，不是当前 `v8` 的结果。
 
-**当前主线状态：** 2026-04-20 已确认更底层的问题在于 aux DSL 语义与旧 selected dataset / 旧 difficulty labels 都不一致：`48d9ea5` 修复的 aux DSL bug 曾只被部分保留，导致历史 `v8/v9` selected dataset 的 `response` 仍是错误格式。`v8_tuned_300step_bugfix/v1-20260420-171548` 只能算 reward-side bugfix rerun，不是 full aux-format fix rerun。随后补跑的 full aux-fix smoke 说明旧 `v8/v9` selector 不能直接继承到新语义，而对 `v9 auxfix` 选集随机抽样 `512` 条做 fixed-evaluator 重标后，样本平均 `pass@16` 又从旧标签的 `0.337` 漂移到 `0.697`，证明旧标签本身已经过时。因此在新的 aux-fix relabel + selector 版本出现并通过 `50 + 170` smoke 之前，`v7/v8/v9` 都不应进入新的 `dev_imo` 或 `imo_95` 评估。未来新的 GRPO 评估仍应同时对照 SFT baseline `checkpoint-20084` 和本文中的历史 GRPO `checkpoint-505`。
+**当前主线状态：** 2026-04-21 已完成 full aux-fix `150k` relabel，并基于此产出 `v11_auxfix_full150k_stagebalanced_2k`。这版数据已经能在不依赖 mastered 回填的前提下选满 `2k`，但桶分布仍然高度偏向 `core`，其中 `reward_mixed_zero` 实际只有 `10` 条。随后补跑的 tuned `300-step` 训练 `models/grpo_vlm_sft44_v11_full150k_tuned_300step/v0-20260421-125128` 在 `170 step` 前后再次出现明显坍塌：`first170_avg_frac_reward_zero_std = 0.5735`、`first170_median_reward_std = 0.0`、`last20_avg_frac_reward_zero_std = 0.9`、`max_consecutive_full_zero_std_steps = 23`。因此当前结论更新为：即使旧标签问题已经通过 aux-fix relabel 解决，现有 selector 仍未构造出足够高信号的 hard 训练分布；在新的 hard-signal selector 版本通过 `50 + 170` smoke 之前，`v7/v8/v9/v11` 都不应进入新的 `dev_imo` 或 `imo_95` 评估。未来新的 GRPO 评估仍应同时对照 SFT baseline `checkpoint-20084` 和本文中的历史 GRPO `checkpoint-505`。
 
 ---
 

@@ -1,6 +1,6 @@
 # GRPO 迭代状态与后续计划
 
-最后更新：2026-04-20
+最后更新：2026-04-21
 
 ## 背景
 
@@ -47,21 +47,16 @@
 - 对应测试已补充并通过：
   - `pytest -q tests/test_grpo_rewards.py tests/test_grpo_data_selection.py`
 
-## 当前 Active Run
+## 当前主线状态
 
 - 第一阶段 `20k` 校准重标集已生成：
   - 目录：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel20k_calib`
   - 输入池：`candidate_pool_relabel_20k.jsonl`
   - 旧标签对照：`difficulty_labels_old_20k.jsonl`
   - 元数据：`dataset_metadata.json`
-- 当前正在运行的任务：
-  - `difficulty_labels_auxfix_20k.jsonl`
-  - summary 输出：`difficulty_labels_auxfix_20k_summary.json`
-  - workdir：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel20k_calib/workdir`
-- 监控入口：
-  - launcher log：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel20k_calib/logs/launcher.log`
-  - worker log：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel20k_calib/workdir/shard_*/worker.log`
-  - progress：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel20k_calib/workdir/shard_*/progress.json`
+- 目前 `20k` 与 `remaining130k` aux-fix relabel 都已完成，相关运行目录保留用于追溯：
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel20k_calib/workdir`
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel150k_full_remaining130k/workdir`
 - 2026-04-20 晚间运行中新增发现：
   - 部分 shard 会在重标过程中因为未捕获的 aux DSL 解析异常退出，典型报错为 `ValueError: too many values to unpack (expected 4)`
   - 这类异常来自模型生成了参数数量不匹配的 `cong` / `perp` 关系，不应直接杀死整条重标任务
@@ -104,6 +99,76 @@
     - 排除：已在当前 `20k` 校准集中重标的 `20k` overlap
     - 标注模型：`/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
     - 标注参数：`qwen3_vl`, `num_samples=16`, `temperature=0.8`, `top_p=0.95`
+- `remaining130k` 完成后已合并出 full aux-fix `150k` 标签池：
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel150k_full_remaining130k/difficulty_labels_auxfix_merged_150k.jsonl`
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel150k_full_remaining130k/difficulty_labels_auxfix_merged_150k_summary.json`
+  - 合并后整体统计：
+    - `total_rows = 150000`
+    - `avg pass@16 = 0.8642`
+    - `zero_ratio = 0.1238`
+    - `one_ratio = 0.8446`
+    - `all_invalid_ratio = 0.0868`
+    - `greedy_success_ratio = 0.8667`
+
+### `v11_auxfix_full150k_stagebalanced`
+
+- 数据集：
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v11_auxfix_full150k_stagebalanced_2k`
+- 标签池：
+  - full aux-fix `150k` merged pool
+- Selector：
+  - 继续沿用 `v10_auxfix_stage_balanced`
+  - 采用当前最新版配额：
+    - 去掉 `near_high_high`
+    - `near_low` 默认 `5%~20%`
+    - `reward_mixed_zero` 默认 `5%~20%`
+    - `near_high_mid` 默认 `3%~8%`
+- 静态结果：
+  - `selected_rows = 2000`
+  - `mastered_fallback_triggered = false`
+  - `selected_zero_pass_ratio = 0.005`
+  - `selected_nonzero_pass_ratio = 0.995`
+  - `selected_avg_proxy_reward_std = 0.4979`
+  - `selected_median_proxy_reward_std = 0.4961`
+  - `tier_selected_rows = {core: 1830, near_low: 100, reward_mixed_zero: 10, near_high_mid: 60}`
+  - `stage_available_rows = {core: 2094, near_low: 141, reward_mixed_zero: 10, near_high_mid: 897, mastered: 127227}`
+  - 完整 `150k` 分桶：
+    - `core = 2094`
+    - `near_low = 141`
+    - `reward_mixed_zero = 10`
+    - `near_high_mid = 897`
+    - `mastered = 127227`
+    - `all_invalid = 13014`
+    - `discarded_non_dead = 6617`
+- 结论：
+  - full `150k` 池已经足够支持“不依赖 mastered 回填”地选满 `2k`
+  - 但 `reward_mixed_zero` 仍然极缺，`100` 的 floor 实际只能拿到 `10`
+  - 因而这版数据虽然填满了规模约束，但难度信号依旧明显偏单一
+
+### `v11_full150k_tuned_300step`
+
+- Run：
+  - `models/grpo_vlm_sft44_v11_full150k_tuned_300step/v0-20260421-125128`
+- 配置：
+  - `num_generations = 8`
+  - `temperature = 1.1`
+  - `top_p = 0.95`
+  - `top_k = 0`
+  - `beta = 0.02`
+  - `max_completion_length = 256`
+- 结果：
+  - 日志已到 `300 / 300`
+  - 但中段已明显进入 collapse 轨迹
+- 到 `170 step` 的关键指标：
+  - `first170_avg_frac_reward_zero_std = 0.5735`
+  - `first170_median_reward_std = 0.0`
+  - `last20_avg_frac_reward_zero_std = 0.9`
+  - `last20_median_reward_std = 0.0`
+  - `max_consecutive_full_zero_std_steps = 23`
+- 判断：
+  - 这条 run 明显没有通过 mid gate
+  - 而且从 `last20` 看，表现比历史 `v7` 的中段崩坏还更糟
+  - 说明问题仍然是一阶数据分布问题，而不是单纯训练超参问题
 
 ## 当前 Gate
 
@@ -556,6 +621,15 @@ mid gate 固定检查：
   - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v8_structure_full150k_2k/difficulty_labels_merged_150k_report.json`
 - `v8` 数据集报告：
   - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v8_structure_full150k_2k/grpo_train_report_2000.json`
+- `v10` full aux-fix merged `150k`：
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel150k_full_remaining130k/difficulty_labels_auxfix_merged_150k.jsonl`
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel150k_full_remaining130k/difficulty_labels_auxfix_merged_150k_summary.json`
+- `v11` 数据集报告：
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v11_auxfix_full150k_stagebalanced_2k/grpo_train_report_2000.json`
+- `v11` 选集结构 summary：
+  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v11_auxfix_full150k_stagebalanced_2k/grpo_train_selected_2000_summary.json`
+- `v11` tuned 300-step run：
+  - `models/grpo_vlm_sft44_v11_full150k_tuned_300step/v0-20260421-125128`
 - `v6` smoke gate：
   - `models/grpo_vlm_sft44_v6_midpass_s1_4gpu_256/v0-20260419-210740/smoke_gate_first50.json`
 - `v7` smoke gate：
@@ -583,12 +657,15 @@ mid gate 固定检查：
   - `auxfix` 不是单独的充分改进
   - 旧 `v8/v9` selector 在 full aux-format 语义下都需要重新校准
   - 更准确地说，旧 `difficulty_labels` 本身已经过时，最值得保留的是 `v9` 的 stage-balanced 思路，而不是它当前的标签和精确配额
+- `v11` 进一步说明：
+  - 只靠 full `150k` relabel + 现有 stage-balanced selector，虽然已经能选满 `2k`
+  - 但因为 `reward_mixed_zero` 和真正高信号 hard bucket 供给依旧过少，训练在 `170 step` 前后仍会坍塌
+  - `selected_zero_pass_ratio = 0.005` 并不意味着训练更稳定；这里暴露出的核心问题是“零通过脏样本减少了，但高方差 hard 样本没有补上”
 - 下一步应变为：
-  - 先用 `label_difficulty_vlm.py` 基于 aux-fix 语义重新标注
-  - 基于新标签重新统计 `150k` 标注池的桶分布
-  - 重做 `v9` selector 的 bucket 配额与 zero-pass / near-low / near-high 限额
-  - 先跑新的 `50-step` smoke
-  - 只有 early gate 恢复到接近旧 `v9` 水平时，才重新进入 `170-step` / `300-step`
+  - 继续拆解 `discarded_non_dead` 的组成，确认 `(0.75, 0.9)` easy tail 与 low-signal zero-pass 各占多少
+  - 对 full `150k` 池做更强的 hard-signal 挖掘，而不是继续压缩 easy tail
+  - 结合 `aux_points_total / aux_segment_count / n_premises` 重新设计 hard bucket 或新的 selector
+  - 新 selector 仍先跑 `50-step` smoke，再决定是否进入 `170-step` / `300-step`
 - 当前阶段的 Git 纪律：
   - 只跟踪 `docs/` 下这两个文档
   - 不要提交临时 benchmark resume 文件、monitor log 或一次性的 recovery helper
