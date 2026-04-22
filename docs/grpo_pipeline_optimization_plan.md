@@ -1119,3 +1119,61 @@ python scripts/grpo/select_debug_set.py \
   - `first50_avg_frac_reward_zero_std` 从 `0.4364` 降到 `0.2659`
   - `first50_median_reward_std` 从 `0.2005` 提高到 `0.2913`
 - 当前可以把这条 `maxaux8 bucket_unified` 分支视为 geometry100k 上首条通过 early smoke 的新数据分支。
+
+## 2026-04-22 Geometry100k `maxaux8` `bucket_unified` `170-step` Smoke
+
+**续跑方式：**
+
+- 从 `50-step` run 的 `checkpoint-50` 做 true checkpoint resume：
+  - `models/grpo_vlm_sft44_geometry100k_maxaux8_bucket_unified_s1_4gpu_tuned/v0-20260422-094125/checkpoint-50`
+- 续跑产物目录：
+  - `models/grpo_vlm_sft44_geometry100k_maxaux8_bucket_unified_s1_4gpu_tuned/v0-20260422-094125/v0-20260422-101003`
+- `swift` 在 resume 时仍自动新建了一个子目录，但训练 global step 从 `51/170` 开始，确认为同一条 run 的续跑而非从头重训。
+
+**训练配置：**
+
+- 与通过 `50-step` 的 tuned smoke 配置保持一致：
+  - `per_device_train_batch_size = 1`
+  - `gradient_accumulation_steps = 8`
+  - `num_generations = 8`
+  - `temperature = 1.1`
+  - `top_p = 0.95`
+  - `top_k = 0`
+  - `max_completion_length = 256`
+  - `beta = 0.02`
+  - `max_steps = 170`
+
+**主要产物：**
+
+- `logging.jsonl`
+- `checkpoint-170`
+- `smoke_gate_first170.json`
+
+**mid gate：**
+
+- `first170_avg_frac_reward_zero_std = 0.3179`
+- `first170_median_reward_std = 0.2405`
+- `last50_avg_frac_reward_zero_std = 0.3600`
+- `last50_median_reward_std = 0.2168`
+- `121_170_avg_frac_reward_zero_std = 0.3600`
+- `121_170_median_reward_std = 0.2168`
+- `max_consecutive_full_zero_std_steps = 0`
+
+**结论：**
+
+- 这条 `170-step` run 不是历史 `v7/v8` 那种中段坍塌：
+  - 没有出现连续 `full-zero` step
+  - `first170_median_reward_std` 和 `121_170_median_reward_std` 都明显高于 gate 下限
+  - `step 170` 收尾仍保持 `reward_std = 0.3395`、`frac_reward_zero_std = 0`
+- 但它仍然**未完全通过**当前 `170-step` mid gate：
+  - `first170_avg_frac_reward_zero_std <= 0.40`：通过
+  - `first170_median_reward_std >= 0.15`：通过
+  - `last50_avg_frac_reward_zero_std <= 0.35`：失败，实际 `0.36`
+  - `last50_median_reward_std >= 0.15`：通过
+  - `121_170_avg_frac_reward_zero_std <= 0.35`：失败，实际 `0.36`
+  - `121_170_median_reward_std >= 0.15`：通过
+  - `max_consecutive_full_zero_std_steps <= 3`：通过
+- 当前判断：
+  - 这条分支已经显著优于之前的 geometry100k `maxaux5/v10` 失败 run
+  - 但后段 `zero_std` 占比仍略高于当前 promotion 线
+  - 按现规则，先不进入 `300-step`，仍归类为“边缘但未过 mid gate”的数据分支
