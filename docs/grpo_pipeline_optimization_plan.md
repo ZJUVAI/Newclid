@@ -195,6 +195,19 @@ mid gate 固定检查：
 
 只有同时通过 early gate 和 mid gate 的数据集，才允许继续进入 `300-step` 训练与评估。
 
+## 版本与文件系统路径映射
+
+**注意**：部分版本在文档中使用新的版本号（v13、v14），但文件系统中的目录名保持不变。
+
+| 版本 | 数据集路径 | 模型训练路径 |
+|------|-----------|-------------|
+| v13 | `datasets/grpo_geometry100k_vlm_label_20260421_maxaux5_v10_stagebalanced_2k/` | `models/grpo_vlm_sft44_geometry100k_v10_stagebalanced_s1_4gpu_tuned/` |
+| v14 | `datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_2k/` | `models/grpo_vlm_sft44_geometry100k_maxaux8_bucket_unified_s1_4gpu_tuned/` |
+
+**版本说明**：
+- **v13**：原称"v10 复跑"，使用 v10_auxfix_stage_balanced selector 在 geometry100k maxaux5 数据源上的实验，50-step smoke 边缘失败（avg_zero_std = 0.4364）
+- **v14**：原称"maxaux8"，使用 bucket_unified selector 在 geometry100k maxaux8 数据源上的实验，**首次通过 50-step smoke gate**（avg_zero_std = 0.2659），当前主线
+
 ## 版本回顾
 
 ### `v3_tiered`
@@ -1013,7 +1026,7 @@ python scripts/grpo/select_debug_set.py \
 - 由于 `bucket_unified` 与 `v10` 选集完全相同，当前不再把它视为有效 fallback。
 - 如果要继续迭代，必须先改变 selector 的实际输出数据，而不是只切换 report / bucket 命名。
 
-## 2026-04-22 Geometry100k `maxaux8` `bucket_unified` 静态结果
+## 2026-04-22 Geometry100k `v14` `bucket_unified` 静态结果
 
 **数据源：**
 
@@ -1074,12 +1087,12 @@ python scripts/grpo/select_debug_set.py \
 
 **与上一批 `maxaux5` 的区别：**
 
-- 新的 `maxaux8` 选集不再与旧的 `maxaux5 bucket_unified` 结果相同：
-  - `maxaux8` 选集 `sha256 = 492dbfa99fcf5b1aa2adf2f80b0c803a17a80695144d108c587da129c0b64bff`
+- 新的 `v14` 选集不再与旧的 `maxaux5 bucket_unified` 结果相同：
+  - `v14` 选集 `sha256 = 492dbfa99fcf5b1aa2adf2f80b0c803a17a80695144d108c587da129c0b64bff`
   - `maxaux5` 选集 `sha256 = 6b44b467ffd6ecaa9767555cc9327de2ae864ee6beb48fa838e3b646f41da0b4`
 - 因此这次 smoke 是新的数据分支，不是对前一轮 geometry100k run 的重复执行。
 
-## 2026-04-22 Geometry100k `maxaux8` `bucket_unified` `50-step` Smoke
+## 2026-04-22 Geometry100k `v14` `bucket_unified` `50-step` Smoke
 
 **训练设置：**
 
@@ -1111,16 +1124,16 @@ python scripts/grpo/select_debug_set.py \
 
 **结论：**
 
-- 这条 `maxaux8 bucket_unified` run 通过了当前 `50-step` smoke gate：
+- 这条 `v14` run 通过了当前 `50-step` smoke gate：
   - `avg_frac_reward_zero_std <= 0.40`：通过
   - `median_reward_std >= 0.20`：通过
   - `max_consecutive_full_zero_std_steps <= 3`：通过
 - 相比上一批 `maxaux5` 的 `v10` 失败 run：
   - `first50_avg_frac_reward_zero_std` 从 `0.4364` 降到 `0.2659`
   - `first50_median_reward_std` 从 `0.2005` 提高到 `0.2913`
-- 当前可以把这条 `maxaux8 bucket_unified` 分支视为 geometry100k 上首条通过 early smoke 的新数据分支。
+- 当前可以把这条 `v14` 分支视为 geometry100k 上首条通过 early smoke 的新数据分支。
 
-## 2026-04-22 Geometry100k `maxaux8` `bucket_unified` `170-step` Smoke
+## 2026-04-22 Geometry100k `v14` `bucket_unified` `170-step` Smoke
 
 **续跑方式：**
 
