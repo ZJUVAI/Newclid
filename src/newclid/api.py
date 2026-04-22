@@ -230,11 +230,14 @@ class GeometricSolverBuilder:
 class CSolver:
     def __init__(
         self,
-        problem: str,
+        problem: str = "",
         problem_name: str = "anonymity",
         seed: int = 123,
         solver: GeometricSolver = None,
         config_path: Path = None,
+        points: List[Tuple[str, Any, Any]] = None,
+        premises: List[Tuple[str, List[str]]] = None,
+        goals: List[Tuple[str, List[str]]] = None,
         **overrides
     ):
         """
@@ -246,6 +249,9 @@ class CSolver:
             seed: Random seed
             solver: Optional pre-built GeometricSolver
             config_path: Path to config file (default: None, uses default config)
+            points: Pre-built points list (lowest priority, used only when no other init path applies)
+            premises: Pre-built premises list (used together with points/goals)
+            goals: Pre-built goals list (used together with points/premises)
             **overrides: Config overrides (e.g., using_log=True, using_exp=False, light=True)
 
         Examples:
@@ -260,6 +266,9 @@ class CSolver:
 
             # Custom config + override
             CSolver(fl_statement, solver=solver, config_path=Path("my_config.json"), using_log=True)
+
+            # Directly supply pre-built data (lowest priority)
+            CSolver(points=pts, premises=prems, goals=gls)
         """
         from newclid.configs import load_solver_config
 
@@ -291,20 +300,30 @@ class CSolver:
                 for a in args:
                     if a and a not in self.useful_points:
                         self.useful_points.append(a)
-        else:
-            # 完整路径
-            if solver is None:
-                self.solver = (
-                    GeometricSolverBuilder(self.seed)
-                    .load_problem_from_txt(self.problem)
-                    .build()
-                )
-            else:
-                self.solver = solver
-
+        elif solver is None and problem:
+            self.solver = (
+                GeometricSolverBuilder(self.seed)
+                .load_problem_from_txt(self.problem)
+                .build()
+            )
             self._extract_premises()
             self._extract_goals()
             self._extract_points()
+        elif solver is not None:
+            self.solver = solver
+            self._extract_premises()
+            self._extract_goals()
+            self._extract_points()
+        elif points is not None and premises is not None and goals is not None:
+            # 直接传入预构建数据，跳过所有解析和推理初始化
+            self.solver = None
+            self.points = list(points) if points is not None else []
+            self.premises = list(premises) if premises is not None else []
+            self.goals = list(goals) if goals is not None else []
+            for _, args in self.premises:
+                for a in args:
+                    if a and a not in self.useful_points:
+                        self.useful_points.append(a)
 
     # -------------------- 内部方法 -------------------- #
     def _extract_points(self):
