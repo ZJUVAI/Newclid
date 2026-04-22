@@ -1,6 +1,6 @@
 # GRPO 迭代状态与后续计划
 
-最后更新：2026-04-21
+最后更新：2026-04-22
 
 ## 背景
 
@@ -1190,3 +1190,104 @@ python scripts/grpo/select_debug_set.py \
   - 这条分支已经显著优于之前的 geometry100k `maxaux5/v10` 失败 run
   - 但后段 `zero_std` 占比仍略高于当前 promotion 线
   - 按现规则，先不进入 `300-step`，仍归类为“边缘但未过 mid gate”的数据分支
+
+## 2026-04-22 Geometry100k `v14` `bucket_unified` `300-step` Promotion
+
+**续跑方式：**
+
+- 从 `170-step` run 的 `checkpoint-170` 继续 true checkpoint resume：
+  - `models/grpo_vlm_sft44_geometry100k_maxaux8_bucket_unified_s1_4gpu_tuned/v0-20260422-094125/v0-20260422-101003/checkpoint-170`
+- 续跑产物目录：
+  - `models/grpo_vlm_sft44_geometry100k_maxaux8_bucket_unified_s1_4gpu_tuned/v0-20260422-094125/v0-20260422-101003/v0-20260422-110958`
+
+**训练配置：**
+
+- 仍沿用 `v14` tuned smoke 的同一组配置：
+  - `per_device_train_batch_size = 1`
+  - `gradient_accumulation_steps = 8`
+  - `num_generations = 8`
+  - `temperature = 1.1`
+  - `top_p = 0.95`
+  - `top_k = 0`
+  - `max_completion_length = 256`
+  - `beta = 0.02`
+  - `max_steps = 300`
+
+**主要产物：**
+
+- `logging.jsonl`
+- `checkpoint-300`
+
+**运行观察：**
+
+- `300-step` 完整跑通，没有出现历史 `v7/v8/v11` 那种连续 collapse：
+  - `step 250`: `reward_std = 0.0776`, `frac_reward_zero_std = 0.8`
+  - `step 265`: `reward_std = 0.2973`, `frac_reward_zero_std = 0.3`
+  - `step 290`: `reward_std = 0.0890`, `frac_reward_zero_std = 0.7`
+  - `step 300`: `reward_std = 0.2765`, `frac_reward_zero_std = 0.4`
+- 结论：
+  - 后段波动明显增大
+  - 但没有进入不可逆的 full-zero 连续坍塌
+  - 因此继续推进到 `500-step` 做更长区间诊断
+
+## 2026-04-22 Geometry100k `v14` `bucket_unified` `500-step` Promotion
+
+**续跑方式：**
+
+- 从 `300-step` run 的 `checkpoint-300` 继续 true checkpoint resume：
+  - `models/grpo_vlm_sft44_geometry100k_maxaux8_bucket_unified_s1_4gpu_tuned/v0-20260422-094125/v0-20260422-101003/v0-20260422-110958/checkpoint-300`
+- 续跑产物目录：
+  - `models/grpo_vlm_sft44_geometry100k_maxaux8_bucket_unified_s1_4gpu_tuned/v0-20260422-094125/v0-20260422-101003/v0-20260422-110958/v0-20260422-114039`
+
+**训练配置：**
+
+- 继续沿用同一套 tuned 配置：
+  - `per_device_train_batch_size = 1`
+  - `gradient_accumulation_steps = 8`
+  - `num_generations = 8`
+  - `temperature = 1.1`
+  - `top_p = 0.95`
+  - `top_k = 0`
+  - `max_completion_length = 256`
+  - `beta = 0.02`
+  - `max_steps = 500`
+- 额外尝试：
+  - 显式传入 `save_steps = 50`，希望在 `350/400/450/500` 落中途 checkpoint
+  - 但 resume 时 `swift` 明确提示与 checkpoint 内 `trainer_state.json` 的 `save_steps = 500` 不一致
+  - 实际运行中也只在 `step 500` 保存了 `checkpoint-500`
+
+**主要产物：**
+
+- `logging.jsonl`
+- `checkpoint-500`
+
+**关键统计：**
+
+- `301_500_avg_frac_reward_zero_std = 0.5725`
+- `301_500_median_reward_std = 0.1498`
+- `421_500_avg_frac_reward_zero_std = 0.5375`
+- `421_500_median_reward_std = 0.1692`
+- `max_consecutive_full_zero_std_steps = 1`
+
+**代表性坏点：**
+
+- `step 305`: `reward_std = 0.0830`, `frac_reward_zero_std = 0.8`
+- `step 315`: `reward_std = 0.0`, `frac_reward_zero_std = 1.0`
+- `step 345`: `reward_std = 0.0`, `frac_reward_zero_std = 1.0`
+
+**收尾状态：**
+
+- `step 500`: `reward = 0.5031`
+- `step 500`: `reward_std = 0.2373`
+- `step 500`: `frac_reward_zero_std = 0.2`
+
+**结论：**
+
+- `500-step` 完整跑通，并最终保存出 `checkpoint-500`
+- 但从 `301-500` 整段统计看，后半程已经明显进入高零方差占比区间：
+  - `avg_frac_reward_zero_std` 已经升到 `0.57`
+  - `median_reward_std` 仅在 `0.15` 附近边缘徘徊
+- 这条分支比历史完全 collapse 的 run 仍然更稳：
+  - `max_consecutive_full_zero_std_steps = 1`
+  - 最后 `step 500` 没有贴零
+- 但它也不再属于“稳定 promotion”轨迹，而是“能跑完，但后半程明显劣化”的长程边缘分支
