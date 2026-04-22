@@ -659,7 +659,9 @@ def _build_line_idx_map(rule_map):
         parts = rule_id.split(":")
         if len(parts) >= 2:
             try:
-                idx = int(parts[-1])
+                # Handle rule_id with underscore suffix (e.g., "1003892_0" -> "1003892")
+                numeric_part = parts[-1].split("_")[0]
+                idx = int(numeric_part)
                 idx_map.setdefault(idx, []).append(rule_id)
             except (ValueError, IndexError):
                 pass
@@ -1058,7 +1060,9 @@ def load_rules_by_ids(
                                 parts = rule_id.split(":")
                                 if len(parts) >= 2:
                                     try:
-                                        idx = int(parts[-1])
+                                        # Handle rule_id with underscore suffix (e.g., "1003892_0" -> "1003892")
+                                        numeric_part = parts[-1].split("_")[0]
+                                        idx = int(numeric_part)
                                         if idx == line_idx:
                                             entry["rid"] = rule_id
                                             entries.append(entry)
