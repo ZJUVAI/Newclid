@@ -8,167 +8,35 @@
 - 原始数据源：`/C20545/home/wangzi/GenesisGeo_data_models/datasets/0123/geometry_clauses10_samples1M_aux_updated_img512_inverted_pt_new_remove_proof.jsonl`
 - 当前训练入口：`scripts/grpo/train_grpo.sh`
 - 当前 selector 入口：`scripts/grpo/select_debug_set.py`
-- 当前判断：主要瓶颈仍然是数据分布，而不是 GRPO 训练超参数
+- 核心判断：主要瓶颈仍然是数据分布，而不是 GRPO 训练超参数
 
-## 2026-04-20 Bug Audit
-
-- `48d9ea5` 修的是两个直接影响 GRPO 语义的 bug：
-  - `extract_aux_body()` 不应删除首个 `x00`，否则训练 target 会和模型的 `response_prefix="<aux> x00"` 不一致。
-  - `AuxRewardEvaluator._evaluate_uncached()` 之前只正确处理第一个辅助点，多辅助点样本会被截断评估。
-- 后续 `2972827` 为了修 CI / test regression，把 `extract_aux_body()` 又改回了旧行为，但保留了多辅助点评估逻辑，形成了“reward 侧半修复、dataset target 侧未修复”的不一致状态。
-- 排查结果：
-  - 旧版 `v8/v9` selected dataset 的 `response` 均为错误格式；
-  - `2000 / 2000` 行都缺失了首个 `x00`，同时后续辅助点前仍残留 `x00`；
-  - 因此 `models/grpo_vlm_sft44_v8_tuned_300step_bugfix/v1-20260420-171548` 应视为“reward-side bugfix rerun”，不是 full aux-format fix rerun。
-- 已执行修复：
-  - 恢复 `src/newclid/training/aux_dsl.py` 的完整前缀语义；
-  - 补充 `tests/test_grpo_rewards.py` 回归测试，覆盖多辅助点 reward 与 dataset 导出；
-  - 新增 `scripts/grpo/rewrite_selected_aux_responses.py`，从原始 1M 数据按 `(query, fl_problem)` 回填原始 `<aux> ... </aux>`；
-  - 已在仓库中保留当前主实验所需的 aux-fix 版数据集：
-    - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v9_stagebalanced_2k_auxfix`
-  - `v8` 的 aux-fix 数据可通过同一脚本按需重建，但不再放进这次提交里；
-- 当前 active 诊断结论：
-  - full aux-format fix 已经在 `v8` / `v9` 两条 selector 上完成 smoke 诊断；
-  - 结果表明问题不是“只要修好 aux DSL 就会自然改善”，而是旧 selector 在 aux-fix 语义下需要重新适配。
-
-## 2026-04-20 Relabel Infrastructure
-
-- 已实现新的 aux-fix 重标基础设施：
-  - `scripts/grpo/label_difficulty_vlm.py`
-    - 支持 `--resume`
-    - 支持 `--work-dir`
-    - 支持 worker 级 `progress.json` 与 `worker.log`
-    - 支持按 `flush-every-batches` 周期性落盘 shard 输出
-  - `scripts/grpo/report_difficulty_drift.py`
-    - 用于对齐旧标签与新标签的 `pass@k / greedy_success / all_invalid` 漂移
-  - `scripts/grpo/select_debug_set.py`
-    - 新增 `v10_auxfix_stage_balanced`
-    - 新增 easy-tail cap：`greedy_success_max_fraction`、`pass_one_max_fraction`、`high_pass_max_fraction`
-- 对应测试已补充并通过：
-  - `pytest -q tests/test_grpo_rewards.py tests/test_grpo_data_selection.py`
+---
 
 ## 当前主线状态
 
-- 第一阶段 `20k` 校准重标集已生成：
-  - 目录：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel20k_calib`
-  - 输入池：`candidate_pool_relabel_20k.jsonl`
-  - 旧标签对照：`difficulty_labels_old_20k.jsonl`
-  - 元数据：`dataset_metadata.json`
-- 目前 `20k` 与 `remaining130k` aux-fix relabel 都已完成，相关运行目录保留用于追溯：
-  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel20k_calib/workdir`
-  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel150k_full_remaining130k/workdir`
-- 2026-04-20 晚间运行中新增发现：
-  - 部分 shard 会在重标过程中因为未捕获的 aux DSL 解析异常退出，典型报错为 `ValueError: too many values to unpack (expected 4)`
-  - 这类异常来自模型生成了参数数量不匹配的 `cong` / `perp` 关系，不应直接杀死整条重标任务
-  - 已做修复：
-    - `src/newclid/training/grpo_rewards.py` 将这类单样本解析异常降级为 `format_invalid`
-    - `scripts/grpo/label_difficulty_vlm.py` 在聚合阶段再包一层保险，将意外异常降级为 `engine_error`
-    - `tests/test_grpo_rewards.py` 已新增对应回归测试并通过
-  - `20k` relabel 已完成，顶层产物已合并：
-    - `difficulty_labels_auxfix_20k.jsonl`
-    - `difficulty_labels_auxfix_20k_summary.json`
-    - `difficulty_drift_old_vs_auxfix_20k.json`
-- `20k` relabel 的核心结论：
-  - 旧 `20k` 与新 `20k` 的 matched drift：
-    - `avg pass@16: 0.6057 -> 0.8319`
-    - `zero_ratio: 0.3324 -> 0.1288`
-    - `one_ratio: 0.5515 -> 0.7774`
-    - `greedy_success_rate: 0.6050 -> 0.8370`
-  - 说明旧语义下的难度标签明显失真，full aux-fix 语义下大量样本被重新判成易题
-- 第一版 `v10_auxfix_stage_balanced` selector 诊断结果：
-  - 直接用默认阈值时，由于 `core=[0.0625, 0.75]` 和 `pass@16` 离散刻度叠加，`near_low` / `near_high_mid` 实际为空
-  - 修正为 `core=[0.125, 0.625]` 后，桶结构恢复，但 `20k` relabel 池仍然只能选出约 `1615` 条非 mastered 样本
-  - 缺口只剩两类来源：
-    - 旧 zero-pass 样本重标后仍然几乎全是 `valid=1.0`、`reward std=0`、`unique_aux=1` 的低信号零方差样本
-    - 或者重新回退到 mastered/easy tail
-  - 因此结论不是“继续微调 selector”，而是必须扩大 aux-fix relabel 池
-- 新的 active 主线已经切换到完整 `remaining130k` 重标：
-  - 目录：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel150k_full_remaining130k`
-  - 输入池：`candidate_pool_extra_remaining130k.jsonl`
-  - 元数据：`dataset_metadata.json`
-  - 额外重标输出：
-    - `difficulty_labels_auxfix_extra_remaining130k.jsonl`
-    - `difficulty_labels_auxfix_extra_remaining130k_summary.json`
-  - 运行目录：
-    - `workdir/shard_*/progress.json`
-    - `workdir/shard_*/worker.log`
-  - 合并目标：
-    - 当前新 `20k` + 额外 `130k` = `150k` full aux-fix merged label pool
-  - 数据来源与标注模型：
-    - 来源标签池：`datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v8_structure_full150k_2k/difficulty_labels_merged_150k.jsonl`
-    - 排除：已在当前 `20k` 校准集中重标的 `20k` overlap
-    - 标注模型：`/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
-    - 标注参数：`qwen3_vl`, `num_samples=16`, `temperature=0.8`, `top_p=0.95`
-- `remaining130k` 完成后已合并出 full aux-fix `150k` 标签池：
-  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel150k_full_remaining130k/difficulty_labels_auxfix_merged_150k.jsonl`
-  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v10_auxfix_relabel150k_full_remaining130k/difficulty_labels_auxfix_merged_150k_summary.json`
-  - 合并后整体统计：
-    - `total_rows = 150000`
-    - `avg pass@16 = 0.8642`
-    - `zero_ratio = 0.1238`
-    - `one_ratio = 0.8446`
-    - `all_invalid_ratio = 0.0868`
-    - `greedy_success_ratio = 0.8667`
+### v14 (2026-04-22) - 当前主线
 
-### `v11_auxfix_full150k_stagebalanced`
+**数据集**：`datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_2k`
 
-- 数据集：
-  - `datasets/grpo_pipeline_vlm_sft44_1m_textonly_20k_v11_auxfix_full150k_stagebalanced_2k`
-- 标签池：
-  - full aux-fix `150k` merged pool
-- Selector：
-  - 继续沿用 `v10_auxfix_stage_balanced`
-  - 采用当前最新版配额：
-    - 去掉 `near_high_high`
-    - `near_low` 默认 `5%~20%`
-    - `reward_mixed_zero` 默认 `5%~20%`
-    - `near_high_mid` 默认 `3%~8%`
-- 静态结果：
-  - `selected_rows = 2000`
-  - `mastered_fallback_triggered = false`
-  - `selected_zero_pass_ratio = 0.005`
-  - `selected_nonzero_pass_ratio = 0.995`
-  - `selected_avg_proxy_reward_std = 0.4979`
-  - `selected_median_proxy_reward_std = 0.4961`
-  - `tier_selected_rows = {core: 1830, near_low: 100, reward_mixed_zero: 10, near_high_mid: 60}`
-  - `stage_available_rows = {core: 2094, near_low: 141, reward_mixed_zero: 10, near_high_mid: 897, mastered: 127227}`
-  - 完整 `150k` 分桶：
-    - `core = 2094`
-    - `near_low = 141`
-    - `reward_mixed_zero = 10`
-    - `near_high_mid = 897`
-    - `mastered = 127227`
-    - `all_invalid = 13014`
-    - `discarded_non_dead = 6617`
-- 结论：
-  - full `150k` 池已经足够支持“不依赖 mastered 回填”地选满 `2k`
-  - 但 `reward_mixed_zero` 仍然极缺，`100` 的 floor 实际只能拿到 `10`
-  - 因而这版数据虽然填满了规模约束，但难度信号依旧明显偏单一
+**模型训练目录**：`models/grpo_vlm_sft44_geometry100k_maxaux8_bucket_unified_s1_4gpu_tuned`
 
-### `v11_full150k_tuned_300step`
+**训练进度**：
+- ✅ 50-step smoke gate：**通过** (`avg_zero_std = 0.2659`)
+- ⚠️ 170-step mid gate：**部分通过** (`last50_avg_zero_std = 0.36`，略超阈值 0.35)
+- ✅ 300-step 训练：**已完成**
+- ✅ 500-step 训练：**已完成**
+- ⚠️ dev_imo 评估：**12/16**（低于 SFT 的 14/16 和历史 GRPO505 的 13/16）
 
-- Run：
-  - `models/grpo_vlm_sft44_v11_full150k_tuned_300step/v0-20260421-125128`
-- 配置：
-  - `num_generations = 8`
-  - `temperature = 1.1`
-  - `top_p = 0.95`
-  - `top_k = 0`
-  - `beta = 0.02`
-  - `max_completion_length = 256`
-- 结果：
-  - 日志已到 `300 / 300`
-  - 但中段已明显进入 collapse 轨迹
-- 到 `170 step` 的关键指标：
-  - `first170_avg_frac_reward_zero_std = 0.5735`
-  - `first170_median_reward_std = 0.0`
-  - `last20_avg_frac_reward_zero_std = 0.9`
-  - `last20_median_reward_std = 0.0`
-  - `max_consecutive_full_zero_std_steps = 23`
-- 判断：
-  - 这条 run 明显没有通过 mid gate
-  - 而且从 `last20` 看，表现比历史 `v7` 的中段崩坏还更糟
-  - 说明问题仍然是一阶数据分布问题，而不是单纯训练超参问题
+**当前状态**：
+- v14 是 geometry100k 上首个通过 50-step smoke gate 的版本
+- 500-step 完整跑通，但后半程（301-500）零方差占比升至 0.57
+- checkpoint-500 在 dev_imo 上出现回退，proposal 分布已偏移
+
+**下一步**：
+- 分析 checkpoint-300 的 dev_imo 表现，判断是否在 300-step 前性能更好
+- 考虑调整数据策略或 selector，增加高质量 hard 样本供给
+
+---
 
 ## 当前 Gate
 
