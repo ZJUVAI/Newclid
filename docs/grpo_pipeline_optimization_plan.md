@@ -1012,3 +1012,110 @@ python scripts/grpo/select_debug_set.py \
   - 但 `50-step early smoke` 因 `avg_frac_reward_zero_std = 0.4364` 未通过
 - 由于 `bucket_unified` 与 `v10` 选集完全相同，当前不再把它视为有效 fallback。
 - 如果要继续迭代，必须先改变 selector 的实际输出数据，而不是只切换 report / bucket 命名。
+
+## 2026-04-22 Geometry100k `maxaux8` `bucket_unified` 静态结果
+
+**数据源：**
+
+- `datasets/grpo_geometry100k_vlm_label_20260421_maxaux8/difficulty_labels.jsonl`
+
+**固定命令：**
+
+```bash
+python scripts/grpo/select_debug_set.py \
+  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8/difficulty_labels.jsonl \
+  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_2k/grpo_train_selected_2000.jsonl \
+  --report-output datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_2k/grpo_train_report_2000.json \
+  --selection-policy bucket_unified \
+  --target-size 2000 \
+  --core-pass-min 0.125 \
+  --core-pass-max 0.625 \
+  --near-high-mid-max-pass 0.75 \
+  --zero-valid-min 0.25 \
+  --zero-valid-max 0.875 \
+  --zero-pass-reward-std-min 0.15 \
+  --reward-mixed-zero-unique-aux-min 2 \
+  --near-low-min-fraction 0.05 \
+  --near-low-max-fraction 0.20 \
+  --reward-mixed-zero-min-fraction 0.05 \
+  --reward-mixed-zero-max-fraction 0.20 \
+  --near-high-mid-min-fraction 0.03 \
+  --near-high-mid-max-fraction 0.08 \
+  --mastered-max-fraction 0.0
+```
+
+**静态结果：**
+
+- 输出目录：`datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_2k`
+- 选集报告：`grpo_train_report_2000.json`
+- 结构 summary：`grpo_train_selected_2000_summary.json`
+- 关键验收：
+  - `selected_rows = 2000`
+  - `fallback_triggered = false`
+  - `bucket_floor_shortages = {near_low: 0, reward_mixed_zero: 0, near_high_mid: 0}`
+  - `selected_zero_pass_ratio = 0.05`
+  - `selected_avg_proxy_reward_std = 0.4043`
+  - `selected_median_proxy_reward_std = 0.3721`
+
+**bucket 分配：**
+
+- `core = 1729`
+- `near_low = 111`
+- `reward_mixed_zero = 100`
+- `near_high_mid = 60`
+- 其余 bucket 全为 `0`：
+  - `easy_tail_nonzero = 0`
+  - `high_pass_non_greedy = 0`
+  - `zero_valid_low = 0`
+  - `zero_valid_high = 0`
+  - `zero_reward_std_low = 0`
+  - `zero_unique_aux_low = 0`
+  - `mastered = 0`
+
+**与上一批 `maxaux5` 的区别：**
+
+- 新的 `maxaux8` 选集不再与旧的 `maxaux5 bucket_unified` 结果相同：
+  - `maxaux8` 选集 `sha256 = 492dbfa99fcf5b1aa2adf2f80b0c803a17a80695144d108c587da129c0b64bff`
+  - `maxaux5` 选集 `sha256 = 6b44b467ffd6ecaa9767555cc9327de2ae864ee6beb48fa838e3b646f41da0b4`
+- 因此这次 smoke 是新的数据分支，不是对前一轮 geometry100k run 的重复执行。
+
+## 2026-04-22 Geometry100k `maxaux8` `bucket_unified` `50-step` Smoke
+
+**训练设置：**
+
+- 训练目录：`models/grpo_vlm_sft44_geometry100k_maxaux8_bucket_unified_s1_4gpu_tuned/v0-20260422-094125`
+- 模型：`/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
+- 配置：
+  - `per_device_train_batch_size = 1`
+  - `gradient_accumulation_steps = 8`
+  - `num_generations = 8`
+  - `temperature = 1.1`
+  - `top_p = 0.95`
+  - `top_k = 0`
+  - `max_completion_length = 256`
+  - `beta = 0.02`
+  - `max_steps = 50`
+
+**主要产物：**
+
+- `args.json`
+- `logging.jsonl`
+- `checkpoint-50`
+- `smoke_gate_first50.json`
+
+**first50 gate：**
+
+- `first50_avg_frac_reward_zero_std = 0.2659`
+- `first50_median_reward_std = 0.2913`
+- `max_consecutive_full_zero_std_steps = 0`
+
+**结论：**
+
+- 这条 `maxaux8 bucket_unified` run 通过了当前 `50-step` smoke gate：
+  - `avg_frac_reward_zero_std <= 0.40`：通过
+  - `median_reward_std >= 0.20`：通过
+  - `max_consecutive_full_zero_std_steps <= 3`：通过
+- 相比上一批 `maxaux5` 的 `v10` 失败 run：
+  - `first50_avg_frac_reward_zero_std` 从 `0.4364` 降到 `0.2659`
+  - `first50_median_reward_std` 从 `0.2005` 提高到 `0.2913`
+- 当前可以把这条 `maxaux8 bucket_unified` 分支视为 geometry100k 上首条通过 early smoke 的新数据分支。
