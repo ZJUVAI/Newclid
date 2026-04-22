@@ -14,7 +14,28 @@
 
 ## 当前主线状态
 
-### v14 (2026-04-22) - 当前主线
+### v15 (2026-04-22) - 当前主线
+
+**数据集**：`datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_2k`（与 v14 相同）
+
+**模型训练目录**：`models/grpo_vlm_sft44_geometry100k_maxaux8_bucket_unified_s1_4gpu_lr5e6`
+
+**核心变更**：学习率从 `1e-4` 降至 `5e-6`（与 SFT 阶段 1e-5 对齐），并添加 `warmup_steps=10`
+
+**训练进度**：
+- ✅ 50-step smoke gate：**通过** (`avg_zero_std = 0.0682`, `median_reward_std = 0.3730`)
+
+**当前状态**：
+- 50-step smoke gate 大幅优于 v14（avg_zero_std: 0.2659 → 0.0682，降低 74%）
+- 全程无连续零方差步数（max_consecutive = 0）
+- 下一步：继续 170-step mid gate
+
+**下一步**：
+- 从 checkpoint-50 resume，继续跑至 170 步，验证 mid gate
+
+---
+
+### v14 (2026-04-22) - 已归档
 
 **数据集**：`datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_2k`
 
@@ -27,14 +48,9 @@
 - ✅ 500-step 训练：**已完成**
 - ⚠️ dev_imo 评估：**12/16**（低于 SFT 的 14/16 和历史 GRPO505 的 13/16）
 
-**当前状态**：
-- v14 是 geometry100k 上首个通过 50-step smoke gate 的版本
-- 500-step 完整跑通，但后半程（301-500）零方差占比升至 0.57
-- checkpoint-500 在 dev_imo 上出现回退，proposal 分布已偏移
-
-**下一步**：
-- 分析 checkpoint-300 的 dev_imo 表现，判断是否在 300-step 前性能更好
-- 考虑调整数据策略或 selector，增加高质量 hard 样本供给
+**结论**：
+- 500-step 后半程（301-500）零方差占比升至 0.57，checkpoint-500 在 dev_imo 出现回退
+- 根本原因：学习率 1e-4 相对 SFT 的 1e-5 偏高，导致后期策略分布偏移
 
 ---
 
@@ -71,10 +87,12 @@ mid gate 固定检查：
 |------|-----------|-------------|
 | v13 | `datasets/grpo_geometry100k_vlm_label_20260421_maxaux5_v10_stagebalanced_2k/` | `models/grpo_vlm_sft44_geometry100k_v10_stagebalanced_s1_4gpu_tuned/` |
 | v14 | `datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_2k/` | `models/grpo_vlm_sft44_geometry100k_maxaux8_bucket_unified_s1_4gpu_tuned/` |
+| v15 | `datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_2k/` | `models/grpo_vlm_sft44_geometry100k_maxaux8_bucket_unified_s1_4gpu_lr5e6/` |
 
 **版本说明**：
 - **v13**：原称"v10 复跑"，使用 v10_auxfix_stage_balanced selector 在 geometry100k maxaux5 数据源上的实验，50-step smoke 边缘失败（avg_zero_std = 0.4364）
-- **v14**：原称"maxaux8"，使用 bucket_unified selector 在 geometry100k maxaux8 数据源上的实验，**首次通过 50-step smoke gate**（avg_zero_std = 0.2659），当前主线
+- **v14**：原称"maxaux8"，使用 bucket_unified selector 在 geometry100k maxaux8 数据源上的实验，首次通过 50-step smoke gate（avg_zero_std = 0.2659），但 500-step 后期退化，dev_imo 回退至 12/16
+- **v15**：与 v14 相同数据集，将学习率从 1e-4 降至 5e-6 并添加 warmup，50-step smoke gate 大幅改善（avg_zero_std = 0.0682），**当前主线**
 
 ## 版本回顾
 
@@ -1243,3 +1261,89 @@ python scripts/grpo/select_debug_set.py \
   - 模型没有完全 collapse
   - 但 proposal 明显变窄、重复模板增多、关键构造家族覆盖率下降
 - 因而 `checkpoint-500` 应视为“可运行但已出现策略分布偏移”的长程边缘点，不适合作为优于 pre-GRPO 的正向证据
+
+### 补充：基于重跑 `vlm_sft44 sv1` trace 的 pre/post GRPO aux 集中度对比
+
+**对比对象：**
+
+- pre-GRPO SFT：
+  - `results/devimo_grpo_compare/vlm_sft44/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_vlm_sft44_checkpoint-20084_sv1_d32_b512_s4_gbs4_gbt100_seed123_20260422T062514Z`
+- post-GRPO：
+  - `results/devimo_grpo_compare/v14_checkpoint-500_sv1_eval/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260422-114039_checkpoint-500_sv1_d32_b512_s4_gbs4_gbt100_seed123_20260422T044912Z`
+
+**口径说明：**
+
+- 采用 `depth 0-1` 的 request-level 指标做主对比，避免后续是否继续深搜对统计造成过强影响
+- 主要指标：
+  - `mean_unique_ratio`：单个 request 内不同 `construction_text` 的占比，越高表示越分散
+  - `mean_top1_share`：单个 request 内最常见构造的占比，越高表示越集中
+  - `mean_effective_ratio`：按 Shannon entropy 折算后的有效构造数占比，越高表示越分散
+
+**整体验证结论：**
+
+- 如果看整个 `dev_imo` 的 request 内部重复度，`GRPO500` 并没有表现成“全局显著更集中”：
+  - SFT：`mean_unique_ratio = 0.5085`
+  - `GRPO500`：`mean_unique_ratio = 0.5092`
+  - SFT：`mean_top1_share = 0.1102`
+  - `GRPO500`：`mean_top1_share = 0.0882`
+  - SFT：`mean_effective_ratio = 0.4808`
+  - `GRPO500`：`mean_effective_ratio = 0.4893`
+- 但如果看构造家族分布，`GRPO500` 已经发生非常明显的 proposal 偏移：
+  - `on_circum`：`14.42% -> 3.73%`
+  - `on_circle`：`24.68% -> 57.39%`
+  - `on_line`：`52.20% -> 28.44%`
+  - `on_tline`：`15.71% -> 7.81%`
+- 因此更准确的描述不是“GRPO 后所有题都明显更窄”，而是：
+  - 全局 request 内部的重复度与 SFT 相近
+  - 但 proposal 的结构家族分布明显塌向 `on_circle`
+
+**回退题聚合（`translated_imo_2008_p1b` + `translated_imo_2012_p5`）**
+
+- 在真正回退的两道题上，`GRPO500` 同时表现为“更偏”且“更集中”：
+  - `mean_unique_ratio`：`0.5549 -> 0.5143`
+  - `mean_top1_share`：`0.0554 -> 0.0805`
+  - `mean_effective_ratio`：`0.5439 -> 0.4914`
+- 对应相对变化：
+  - `unique_ratio` 下降约 `7.3%`
+  - `top1_share` 上升约 `45.3%`
+  - `effective_ratio` 下降约 `9.7%`
+- 结构家族分布变化更大：
+  - `on_circum`：`46.55% -> 9.03%`
+  - `on_circle`：`29.68% -> 70.50%`
+
+**单题 `translated_imo_2012_p5`**
+
+- 这道题是“更窄且更偏”的最强证据：
+  - `mean_unique_ratio`：`0.6891 -> 0.4949`
+  - `mean_top1_share`：`0.0549 -> 0.0869`
+  - `mean_effective_ratio`：`0.6806 -> 0.4755`
+- 对应相对变化：
+  - `unique_ratio` 下降约 `28.2%`
+  - `top1_share` 上升约 `58.3%`
+  - `effective_ratio` 下降约 `30.1%`
+- 结构家族分布：
+  - `on_circum`：`25.76% -> 2.94%`
+  - `on_circle`：`58.78% -> 77.60%`
+- 因而 `2012_p5` 上的问题不只是“方向偏了”，而是：
+  - proposal 本身已经显著更集中
+  - 且集中到了错误的 `on_circle` 家族上
+
+**单题 `translated_imo_2008_p1b`**
+
+- 这道题的 request 内重复度指标没有 `2012_p5` 那么一致：
+  - `mean_unique_ratio`：`0.5102 -> 0.5358`
+  - `mean_top1_share`：`0.0556 -> 0.0733`
+  - `mean_effective_ratio`：`0.4983 -> 0.5091`
+- 因此不能简单说它“明显更窄”
+- 但 proposal 家族偏移同样明显：
+  - `on_circum`：`52.04% -> 16.17%`
+  - `on_circle`：`22.00% -> 62.17%`
+
+**更新后的最终判断：**
+
+- `GRPO500` 不是在整个 `dev_imo` 上都表现成“aux 显著更集中”
+- 更准确的结论是：
+  - 全局 request 内部重复度与 pre-GRPO SFT 大致相当
+  - 但构造家族分布已经显著偏向 `on_circle`
+  - 在真正回退的题上，尤其 `2012_p5`，这种家族偏移进一步伴随了集中度上升
+- 因而当前 `dev_imo` 回退更像是“proposal family shift + 局部集中度恶化”的组合问题，而不是单一的全局 entropy collapse
