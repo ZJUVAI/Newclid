@@ -1291,3 +1291,87 @@ python scripts/grpo/select_debug_set.py \
   - `max_consecutive_full_zero_std_steps = 1`
   - 最后 `step 500` 没有贴零
 - 但它也不再属于“稳定 promotion”轨迹，而是“能跑完，但后半程明显劣化”的长程边缘分支
+
+## 2026-04-22 Geometry100k `v14` `bucket_unified` `checkpoint-500` `dev_imo` 回归分析
+
+**评估结果：**
+
+- 评估 CSV：
+  - `results/devimo_grpo_compare/v14_checkpoint-500_sv1_eval/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260422-114039_checkpoint-500_sv1_d32_b512_s4_gbs4_gbt100_seed123_20260422T044912Z.csv`
+- headline：
+  - `Solved: 12/16`
+- 对照基线：
+  - pre-GRPO SFT：
+    - `results/devimo_grpo_compare/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_vlm_sft44_checkpoint-20084_d32_b512_s4_gbs2_gbt100_seed123_20260417T052620Z.csv`
+    - `Solved: 14/16`
+  - 历史 GRPO `checkpoint-505 sv1`：
+    - `results/devimo_grpo_compare/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v1-20260417-084328_checkpoint-505_sv1_d32_b512_s4_gbs2_gbt100_seed123_20260418T035755Z.csv`
+    - `Solved: 13/16`
+
+**直接结论：**
+
+- `v14 checkpoint-500` 明确低于 pre-GRPO SFT，也低于历史 `GRPO505 sv1`
+- 相比 SFT 的回退题有两道：
+  - `translated_imo_2008_p1b`
+  - `translated_imo_2012_p5`
+- 相比历史 `GRPO505 sv1` 的新增回退题只有一道：
+  - `translated_imo_2012_p5`
+- 没有出现对 SFT 或历史 `GRPO505 sv1` 的新增提升题
+
+**核心判断：**
+
+- 退化主因不是 evaluator 或 search driver 出错，而是 `checkpoint-500` 的 proposal 分布已经偏移，导致 beam 预算在前几层被大量同质构造占满
+- 也就是说问题不是“搜得不够深”，而是“前几层已经被带偏”，后续深搜只是把错误分支继续展开
+
+### `translated_imo_2012_p5`
+
+- trace：
+  - 当前 `v14 checkpoint-500`：
+    - `results/devimo_grpo_compare/v14_checkpoint-500_sv1_eval/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260422-114039_checkpoint-500_sv1_d32_b512_s4_gbs4_gbt100_seed123_20260422T044912Z/problems/0008_translated_imo_2012_p5.jsonl`
+  - pre-GRPO SFT：
+    - `results/devimo_grpo_compare/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_vlm_sft44_checkpoint-20084_d32_b512_s4_gbs2_gbt100_seed123_20260417T052620Z/problems/0008_translated_imo_2012_p5.jsonl`
+  - 历史 `GRPO505 sv1`：
+    - `results/devimo_grpo_compare/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v1-20260417-084328_checkpoint-505_sv1_d32_b512_s4_gbs2_gbt100_seed123_20260418T035755Z/problems/0008_translated_imo_2012_p5.jsonl`
+- SFT 在 `depth = 1` 即命中，`7.39s` 结束
+- 历史 `GRPO505 sv1` 更早，在 `depth = 0` 就命中，`3.88s` 结束
+- 当前 `v14 checkpoint-500` 则一路跑到 `depth = 3`，消耗完整预算后仍未解出，`276.14s` 结束
+- 历史 `GRPO505 sv1` 的命中构造为：
+  - `i = on_circum i c d f, on_line i a d`
+- 在当前 `v14 checkpoint-500` 的完整 trace 中，这条构造出现次数为 `0`
+- 当前 `v14 checkpoint-500` 的候选分布明显偏向 `on_line + on_circle / on_bline / eqdistance`：
+  - `depth 0`：`on_circle = 66.1%`
+  - `depth 1`：`on_circle = 78.0%`
+  - `depth 2`：`on_circle = 86.0%`
+- 说明这条 run 已经显著降低了 `on_circum` 类关键辅助构造的概率质量，beam 宽度虽然还在，但被错误家族大量占用
+
+### `translated_imo_2008_p1b`
+
+- trace：
+  - 当前 `v14 checkpoint-500`：
+    - `results/devimo_grpo_compare/v14_checkpoint-500_sv1_eval/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260422-114039_checkpoint-500_sv1_d32_b512_s4_gbs4_gbt100_seed123_20260422T044912Z/problems/0003_translated_imo_2008_p1b.jsonl`
+  - pre-GRPO SFT：
+    - `results/devimo_grpo_compare/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_vlm_sft44_checkpoint-20084_d32_b512_s4_gbs2_gbt100_seed123_20260417T052620Z/problems/0003_translated_imo_2008_p1b.jsonl`
+  - 历史 `GRPO505 sv1`：
+    - `results/devimo_grpo_compare/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v1-20260417-084328_checkpoint-505_sv1_d32_b512_s4_gbs2_gbt100_seed123_20260418T035755Z/problems/0003_translated_imo_2008_p1b.jsonl`
+- SFT 在 `depth = 2` 命中，`117.92s` 结束
+- 当前 `v14 checkpoint-500` 与历史 `GRPO505 sv1` 都一路跑到 `depth = 3` 后耗尽预算：
+  - 当前 `v14 checkpoint-500`：`379.55s`
+  - 历史 `GRPO505 sv1`：`385.36s`
+- 当前 `v14 checkpoint-500` 在前几层明显偏 `on_circle / on_bline`：
+  - `depth 1`：`on_circle = 62.9%`
+  - `depth 2`：`on_circle = 50.2%`
+- 对照历史 `GRPO505 sv1`，同题的失败形态则更偏 `on_circum`：
+  - `depth 2`：`on_circum = 72.6%`
+- 因此这道题不是简单复制旧 run 的失败模式，而是换成了另一种同样无效的 proposal 偏置
+
+**与训练统计的对应关系：**
+
+- 这次 `500-step` 长跑在训练后半段已经出现明显退化信号：
+  - `301_500_avg_frac_reward_zero_std = 0.5725`
+  - `301_500_median_reward_std = 0.1498`
+  - `421_500_avg_frac_reward_zero_std = 0.5375`
+  - `421_500_median_reward_std = 0.1692`
+- 这些统计与 `dev_imo` trace 的现象是对齐的：
+  - 模型没有完全 collapse
+  - 但 proposal 明显变窄、重复模板增多、关键构造家族覆盖率下降
+- 因而 `checkpoint-500` 应视为“可运行但已出现策略分布偏移”的长程边缘点，不适合作为优于 pre-GRPO 的正向证据
