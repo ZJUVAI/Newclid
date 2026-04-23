@@ -14,7 +14,48 @@
 
 ## 当前主线状态
 
-### v16 (2026-04-22~23) - 当前主线
+### v17 (2026-04-23) - 当前主线
+
+**数据集**：`datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_5k_v17`
+
+**模型训练目录**：`models/grpo_vlm_sft44_geometry100k_v17_s1_4gpu_lr5e6`
+
+**核心变更**：在 v16 基础上将训练集从 2k 扩大到 5k，effective batch size 不变（32 problems/step），500 步覆盖约 3.2 epoch（v16 为 8 epoch）
+
+**数据集静态指标**：
+- `selected_rows = 5000`，`fallback_triggered = false`
+- `selected_zero_pass_ratio = 0.1736`（v16: 0.05，因 reward_mixed_zero 配额按比例扩大）
+- `selected_avg_proxy_reward_std = 0.3607`，`selected_median_proxy_reward_std = 0.3476`
+- `multi_point_shortage = 573`（core 供给在 5k 规模下接近上限）
+
+**训练配置**：与 v16 完全一致
+- `learning_rate = 5e-6`，`warmup_steps = 10`，`lr_scheduler_type = cosine`
+- `per_device_train_batch_size = 1`，`gradient_accumulation_steps = 8`，`num_generations = 8`
+- `NPROC_PER_NODE = 4`，`temperature = 1.1`，`top_p = 0.95`，`top_k = 0`，`beta = 0.02`
+- `max_steps = 500`，`save_steps = 50`
+
+**训练进度**：
+- ✅ 500-step 训练：**已完成**（2026-04-23）
+- 全程 `avg_zero_std = 0.1248`，`median_reward_std = 0.3415`，`max_consecutive_zero = 0`
+- 前 50 步：`avg_zero_std = 0.0778`，`median_reward_std = 0.3569`（smoke gate 全部通过）
+- 优于 v16 全程指标（avg_zero_std: 0.1670 → 0.1248，降低 25%）
+
+**评估结果**：
+- ✅ dev_imo：**14/16**（与 v16 和 SFT baseline 持平）
+- ⏸️ imo_95：因 Ray 稳定性问题暂未完成，参考 v16 的 55/95
+
+**结论**：
+- v17 是首个在 5k 数据集（3.2 epoch）上保持稳定的 GRPO 版本
+- 训练指标优于 v16（2k 数据集，8 epoch），说明扩大数据集、降低重复率有益
+- dev_imo 持平 SFT baseline，验证了 5k 数据集的有效性
+
+**下一步**：
+- 考虑进一步扩大数据集到 10k（约 1.6 epoch）
+- 或调整 selector 参数降低 reward_mixed_zero 比例（从 17.4% 降到 10%）
+
+---
+
+### v16 (2026-04-22~23) - 已归档
 
 **数据集**：`datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_2k`（与 v14/v15 相同）
 
@@ -124,12 +165,14 @@ mid gate 固定检查：
 | v14 | `datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_2k/` | `models/grpo_vlm_sft44_geometry100k_maxaux8_bucket_unified_s1_4gpu_tuned/` |
 | v15 | `datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_2k/` | `models/grpo_vlm_sft44_geometry100k_maxaux8_bucket_unified_s1_4gpu_lr5e6/` |
 | v16 | `datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_2k/` | `models/grpo_vlm_sft44_geometry100k_maxaux8_v16_s1_4gpu_lr5e6/` |
+| v17 | `datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_5k_v17/` | `models/grpo_vlm_sft44_geometry100k_v17_s1_4gpu_lr5e6/` |
 
 **版本说明**：
 - **v13**：原称"v10 复跑"，使用 v10_auxfix_stage_balanced selector 在 geometry100k maxaux5 数据源上的实验，50-step smoke 边缘失败（avg_zero_std = 0.4364）
 - **v14**：原称"maxaux8"，使用 bucket_unified selector 在 geometry100k maxaux8 数据源上的实验，首次通过 50-step smoke gate（avg_zero_std = 0.2659），但 500-step 后期退化，dev_imo 回退至 12/16
 - **v15**：与 v14 相同数据集，将学习率从 1e-4 降至 5e-6 并添加 warmup，50-step smoke gate 大幅改善（avg_zero_std = 0.0682），仅跑 50 步作为调参验证
-- **v16**：与 v15 相同配置，切换为 4 卡 DDP，500-step 全程稳定，dev_imo 14/16，imo_95 55/95，**当前主线**
+- **v16**：与 v15 相同配置，切换为 4 卡 DDP，500-step 全程稳定，dev_imo 14/16，imo_95 55/95
+- **v17**：与 v16 相同配置，训练集从 2k 扩大到 5k（约 3.2 epoch），前 50 步 avg_zero_std = 0.0778（优于 v16），**当前主线**
 
 ## 版本回顾
 
