@@ -42,12 +42,26 @@
 
 **评估结果**：
 - ✅ dev_imo：**14/16**（与 v16 和 SFT baseline 持平）
-- ⏸️ imo_95：因 Ray 稳定性问题暂未完成，参考 v16 的 55/95
+- ✅ imo_95：**59/95**（94 题完成，1 题未完成，优于 v16 的 55/95）
+- 评估产物：`results/v17_lr5e6_checkpoint500/`
+  - dev_imo CSV：`eval_single_problem_multi_gpu_vlm_dev_imo_*_checkpoint-500_*.csv`
+  - imo_95 合并 CSV：`imo_95_v17_checkpoint500_merged.csv`
+
+**对比基线**：
+
+| 版本 | dev_imo | imo_95 | 备注 |
+|------|---------|--------|------|
+| SFT baseline | 14/16 | - | pre-GRPO |
+| GRPO505 sv1 | 13/16 | - | 历史最佳 GRPO |
+| v14 checkpoint-500 | 12/16 | - | lr=1e-4，后期退化 |
+| v16 checkpoint-500 | 14/16 | 55/95 | lr=5e-6，2k 数据集，8 epoch |
+| **v17 checkpoint-500** | **14/16** | **59/95** | lr=5e-6，5k 数据集，3.2 epoch，**当前最佳** |
 
 **结论**：
 - v17 是首个在 5k 数据集（3.2 epoch）上保持稳定的 GRPO 版本
-- 训练指标优于 v16（2k 数据集，8 epoch），说明扩大数据集、降低重复率有益
-- dev_imo 持平 SFT baseline，验证了 5k 数据集的有效性
+- 训练指标优于 v16（avg_zero_std: 0.1670 → 0.1248，降低 25%）
+- dev_imo 持平 SFT baseline，imo_95 提升 4 题（55 → 59），验证了 5k 数据集的有效性
+- 扩大数据集、降低重复率（8 epoch → 3.2 epoch）对 GRPO 训练和评估都有益
 
 **下一步**：
 - 考虑进一步扩大数据集到 10k（约 1.6 epoch）
