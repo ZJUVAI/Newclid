@@ -51,9 +51,9 @@ from newclid.formulations.rule import Rule
 PROJECT_ROOT = Path(__file__).parent.parent
 
 BENCHMARKS: Dict[str, Path] = {
-    "hageo_409": PROJECT_ROOT / "benchmarks" / "core" / "hageo_409.txt",
-    "imo_95": PROJECT_ROOT / "benchmarks" / "extended" / "imo_95.txt",
-    "jgex_ag_231": PROJECT_ROOT / "benchmarks" / "extended" / "jgex_ag_231.txt",
+    "hageo_409": PROJECT_ROOT / "benchmarks" / "hageo_409.txt",
+    "imo_95": PROJECT_ROOT / "benchmarks" / "imo_95.txt",
+    "jgex_ag_231": PROJECT_ROOT / "benchmarks" / "jgex_ag_231.txt",
 }
 
 # Patterns of (premise_pred, conclusion_pred) that cause inference explosion
