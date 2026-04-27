@@ -211,7 +211,32 @@ With descending sort:
 
 ---
 
-### 2026-03-15: verify_groundtruth_rules.py 传入文件路径而非文件内容
+### [2026-04-27] Rule usage evaluation — jgex baseline cache filename mismatch
+
+**Command:**
+```bash
+python scripts/evaluate_rules_csolver.py evaluate \
+  --rules outputs/experiments/20260327_01_weak1m_rule_extraction/extracted_rules_maxprem7.txt \
+  --baseline-cache outputs/eval_baselines_csolver/ \
+  --output outputs/experiments/20260427_01_rule_usage_analysis/eval_weak1m_jgex231/ \
+  --benchmarks jgex_231 --workers 10 --timeout 600
+```
+
+**Expected Output:**
+Script should locate the cached baseline for `jgex_231` automatically.
+
+**Actual Output:**
+The benchmark key is `jgex_231`, but the existing cached baseline file is named `jgex_ag_231_baseline.json`, so the script would not find the cache without a compatibility symlink.
+
+**Status:** ✓
+
+**Notes:**
+Resolved locally by creating symlink:
+```bash
+ln -sf outputs/eval_baselines_csolver/jgex_ag_231_baseline.json outputs/eval_baselines_csolver/jgex_231_baseline.json
+```
+This is a historical naming mismatch in cached outputs, not a runtime solver bug.
+
 
 **Date:** 2026-03-15
 **Experiment:** 20260315_01_groundtruth_rule_extraction

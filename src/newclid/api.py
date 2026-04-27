@@ -402,6 +402,32 @@ class CSolver:
 
         return solved
 
+    def get_proof_rule_usage(self, custom_rule_ids: set[str]) -> dict[str, int]:
+        """Count how many times each custom rule appears in the final proof chain.
+
+        Only works when self.solver is not None (full GeometricSolver path).
+        Returns {rule_id: count} for rules that appear at least once.
+        """
+        if self.solver is None:
+            return {}
+
+        goals = [goal for goal in self.solver.proof.goals if goal.check()]
+        if not goals:
+            return {}
+
+        (
+            _points, _premises, _num_prem, _triv_prem,
+            _aux_points, _aux, _num_aux, _triv_aux,
+            proof_steps,
+        ) = self.solver.proof.dep_graph.get_proof_steps(goals)
+
+        usage: dict[str, int] = {}
+        for dep in proof_steps:
+            reason = dep.reason
+            if reason in custom_rule_ids:
+                usage[reason] = usage.get(reason, 0) + 1
+        return usage
+
     def possible_goals(self) -> List[str]:
         return DDAR.get_possible_goals(self.problem_name, self.points, self.premises)
 

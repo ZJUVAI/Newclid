@@ -18,14 +18,21 @@ Usage:
 
 import argparse
 import json
+import math
 import sys
 import time
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 import os
 
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import numpy as np
 import ray
 from ray.exceptions import TaskCancelledError, WorkerCrashedError
 
@@ -85,6 +92,18 @@ def load_problems(
 CHECK_INTERVAL = 30.0
 
 
+def ensure_rule_usage_fields(result: dict) -> dict:
+    """Normalize per-problem result shape with rule-usage fields."""
+    normalized = dict(result)
+    normalized.setdefault('custom_rules_ran', False)
+    normalized.setdefault('used_rules', {})
+    normalized.setdefault('used_rule_count', 0)
+    normalized.setdefault('used_rule_steps', 0)
+    normalized.setdefault('rule_usage_analyzed', False)
+    normalized.setdefault('rule_usage_error', None)
+    return normalized
+
+
 def collect_results_with_hard_timeout(
     refs: list,
     ref_to_pid: dict,
@@ -109,7 +128,7 @@ def collect_results_with_hard_timeout(
             except Exception as e:
                 result = {'problem_id': pid, 'solved': False, 'time': 0.0,
                           'error': f'worker crashed: {e}'}
-            results.append(result)
+            results.append(ensure_rule_usage_fields(result))
             if result['solved']:
                 print(f"  ✓ {result['problem_id']} ({result['time']:.2f}s)")
             else:
@@ -123,10 +142,10 @@ def collect_results_with_hard_timeout(
                     pid = ref_to_pid[ref]
                     print(f"  ⏰ Hard kill: {pid} (elapsed {elapsed:.0f}s > timeout {timeout}s)")
                     ray.cancel(ref, force=True)
-                    results.append({
+                    results.append(ensure_rule_usage_fields({
                         'problem_id': pid, 'solved': False,
                         'time': elapsed, 'error': 'hard_timeout'
-                    })
+                    }))
                 remaining = []
 
     return results
@@ -166,13 +185,14 @@ def rule_to_pipe_format(rule_id: str, rule_text: str) -> str:
     return f"{rule_id}|{premises}|{conclusions}"
 
 
-def load_rules_as_pipe(rules_path: Path) -> Tuple[List[str], int, int]:
+def load_rules_as_pipe(rules_path: Path) -> Tuple[List[str], List[str], int, int]:
     """Load rules from extracted_rules.txt and convert to pipe format.
 
-    Returns: (pipe_rules_list, total_loaded, filtered_count)
+    Returns: (pipe_rules_list, effective_rule_ids, total_loaded, filtered_count)
     """
     lines = rules_path.read_text(encoding='utf-8').strip().split('\n')
     rules_pipe = []
+    effective_rule_ids = []
     filtered = 0
     for i in range(0, len(lines), 2):
         if i + 1 >= len(lines):
@@ -206,8 +226,126 @@ def load_rules_as_pipe(rules_path: Path) -> Tuple[List[str], int, int]:
                 continue
 
         rules_pipe.append(rule_to_pipe_format(rule_id, rule_text))
+        effective_rule_ids.append(rule_id)
 
-    return rules_pipe, len(rules_pipe) + filtered, filtered
+    return rules_pipe, effective_rule_ids, len(rules_pipe) + filtered, filtered
+
+
+def summarize_rule_usage(
+    results: List[dict],
+    effective_rule_ids: List[str],
+) -> dict:
+    """Aggregate benchmark-level custom rule usage statistics."""
+    per_rule_usage: Counter[str] = Counter()
+    solved_problems_analyzed = 0
+    solved_problems_using_any_custom_rule = 0
+    total_rule_applications = 0
+
+    for result in results:
+        if not result.get('solved'):
+            continue
+        if not result.get('custom_rules_ran'):
+            continue
+        if not result.get('rule_usage_analyzed'):
+            continue
+
+        solved_problems_analyzed += 1
+        used_rules = result.get('used_rules', {})
+        used_rule_steps = int(result.get('used_rule_steps', 0) or 0)
+        if used_rules:
+            solved_problems_using_any_custom_rule += 1
+        total_rule_applications += used_rule_steps
+        per_rule_usage.update({rid: int(count) for rid, count in used_rules.items()})
+
+    rules_total_effective = len(effective_rule_ids)
+    rules_used = sum(1 for rid in effective_rule_ids if per_rule_usage.get(rid, 0) > 0)
+    rules_coverage = (rules_used / rules_total_effective) if rules_total_effective > 0 else 0.0
+
+    order_index = {rid: idx for idx, rid in enumerate(effective_rule_ids)}
+    heatmap_rule_order = sorted(
+        effective_rule_ids,
+        key=lambda rid: (-per_rule_usage.get(rid, 0), order_index[rid]),
+    )
+
+    top_rules = [
+        {'rule_id': rid, 'count': int(per_rule_usage.get(rid, 0))}
+        for rid in heatmap_rule_order[:20]
+        if per_rule_usage.get(rid, 0) > 0
+    ]
+    unused_rules = [rid for rid in effective_rule_ids if per_rule_usage.get(rid, 0) == 0]
+
+    return {
+        'rules_total_effective': rules_total_effective,
+        'rules_used': rules_used,
+        'rules_coverage': round(rules_coverage, 6),
+        'solved_problems_analyzed': solved_problems_analyzed,
+        'solved_problems_using_any_custom_rule': solved_problems_using_any_custom_rule,
+        'total_rule_applications': total_rule_applications,
+        'per_rule_usage': {rid: int(per_rule_usage.get(rid, 0)) for rid in effective_rule_ids},
+        'top_rules': top_rules,
+        'unused_rules': unused_rules,
+        'heatmap_rule_order': heatmap_rule_order,
+    }
+
+
+def plot_rule_usage_heatmap(
+    benchmark_name: str,
+    rule_usage_summary: dict,
+    output_path: Path,
+) -> None:
+    """Generate a fixed-size heatmap for per-rule usage counts."""
+    rule_order = rule_usage_summary['heatmap_rule_order']
+    per_rule_usage = rule_usage_summary['per_rule_usage']
+    n_rules = len(rule_order)
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    if n_rules == 0:
+        matrix = np.full((1, 1), np.nan)
+        cmap = plt.cm.viridis.copy()
+        cmap.set_bad(color='white')
+        image = ax.imshow(matrix, cmap=cmap)
+        title = f"{benchmark_name} rule usage\nNo effective custom rules"
+    else:
+        cols = math.ceil(math.sqrt(n_rules))
+        rows = math.ceil(n_rules / cols)
+        values = [float(per_rule_usage.get(rid, 0)) for rid in rule_order]
+        matrix = np.full((rows * cols,), np.nan)
+        matrix[:n_rules] = values
+        matrix = matrix.reshape(rows, cols)
+
+        base_cmap = plt.cm.viridis
+        sampled = base_cmap(np.linspace(0, 1, 256))
+        sampled[0] = np.array([1.0, 1.0, 1.0, 1.0])
+        cmap = mcolors.ListedColormap(sampled)
+        cmap.set_bad(color='white')
+
+        finite_values = np.array(values, dtype=float)
+        vmax = float(finite_values.max()) if finite_values.size > 0 else 0.0
+        if vmax <= 0:
+            vmax = 1.0
+
+        image = ax.imshow(matrix, cmap=cmap, vmin=0.0, vmax=vmax)
+        title = (
+            f"{benchmark_name} rule usage\n"
+            f"coverage={rule_usage_summary['rules_used']}/{rule_usage_summary['rules_total_effective']}"
+            f" ({rule_usage_summary['rules_coverage']:.1%}), "
+            f"applications={rule_usage_summary['total_rule_applications']}"
+        )
+
+    ax.set_title(title)
+    ax.set_xticks([])
+    ax.set_yticks([])
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+    cbar = fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
+    cbar.set_label('Usage count')
+
+    fig.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=200, bbox_inches='tight')
+    plt.close(fig)
 
 
 # ---------------------------------------------------------------------------
@@ -235,6 +373,7 @@ def solve_single_problem_csolver(
     problem_id: str,
     problem_text: str,
     custom_rules_pipe: Optional[List[str]],
+    custom_rule_ids: Optional[List[str]],
     timeout: int,
     seed: int,
     engine: str = "full",
@@ -259,18 +398,45 @@ def solve_single_problem_csolver(
         solved = csolver.run(custom_rules=custom_rules_pipe)
         elapsed = time.time() - start
 
+        used_rules: Dict[str, int] = {}
+        used_rule_count = 0
+        used_rule_steps = 0
+        rule_usage_analyzed = False
+        rule_usage_error = None
+
+        if solved and custom_rules_pipe and custom_rule_ids:
+            try:
+                used_rules = csolver.get_proof_rule_usage(set(custom_rule_ids))
+                used_rule_count = len(used_rules)
+                used_rule_steps = sum(used_rules.values())
+                rule_usage_analyzed = True
+            except Exception as e:
+                rule_usage_error = str(e)
+
         return {
             'problem_id': problem_id,
             'solved': solved,
             'time': elapsed,
-            'error': None
+            'error': None,
+            'custom_rules_ran': bool(custom_rules_pipe),
+            'used_rules': used_rules,
+            'used_rule_count': used_rule_count,
+            'used_rule_steps': used_rule_steps,
+            'rule_usage_analyzed': rule_usage_analyzed,
+            'rule_usage_error': rule_usage_error,
         }
     except Exception as e:
         return {
             'problem_id': problem_id,
             'solved': False,
             'time': 0.0,
-            'error': str(e)
+            'error': str(e),
+            'custom_rules_ran': bool(custom_rules_pipe),
+            'used_rules': {},
+            'used_rule_count': 0,
+            'used_rule_steps': 0,
+            'rule_usage_analyzed': False,
+            'rule_usage_error': None,
         }
 
 
@@ -303,7 +469,7 @@ def run_baseline(
         ref_to_pid = {}
         refs = []
         for pid, ptext in problems:
-            ref = solve_single_problem_csolver.remote(pid, ptext, None, timeout, 42, engine)
+            ref = solve_single_problem_csolver.remote(pid, ptext, None, None, timeout, 42, engine)
             refs.append(ref)
             ref_to_pid[ref] = pid
 
@@ -369,7 +535,7 @@ def run_evaluate(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load rules in pipe format
-    rules_pipe, total_loaded, filtered_count = load_rules_as_pipe(rules_path)
+    rules_pipe, effective_rule_ids, total_loaded, filtered_count = load_rules_as_pipe(rules_path)
     print(f"Loaded {total_loaded} rules, filtered {filtered_count} generative, using {len(rules_pipe)}")
 
     summary_rows = []
@@ -406,7 +572,15 @@ def run_evaluate(
         ref_to_pid = {}
         refs = []
         for pid, ptext in problems_to_run:
-            ref = solve_single_problem_csolver.remote(pid, ptext, rules_pipe, timeout, 42, engine)
+            ref = solve_single_problem_csolver.remote(
+                pid,
+                ptext,
+                rules_pipe,
+                effective_rule_ids,
+                timeout,
+                42,
+                engine,
+            )
             refs.append(ref)
             ref_to_pid[ref] = pid
 
@@ -417,7 +591,16 @@ def run_evaluate(
         if skip_baseline_solved:
             for pid in baseline_solved:
                 if pid in baseline_results:
-                    aug_results[pid] = baseline_results[pid].copy()
+                    merged_result = baseline_results[pid].copy()
+                    merged_result.update({
+                        'custom_rules_ran': False,
+                        'used_rules': {},
+                        'used_rule_count': 0,
+                        'used_rule_steps': 0,
+                        'rule_usage_analyzed': False,
+                        'rule_usage_error': None,
+                    })
+                    aug_results[pid] = merged_result
         for r in aug_results_list:
             aug_results[r['problem_id']] = r
 
@@ -438,6 +621,15 @@ def run_evaluate(
             for pid in sorted(regressed):
                 print(f"    - {pid}")
 
+        benchmark_results = sorted(
+            [r for r in aug_results.values()],
+            key=lambda r: r['problem_id']
+        )
+        rule_usage_summary = summarize_rule_usage(benchmark_results, effective_rule_ids)
+        heatmap_filename = f"{name}_rule_usage_heatmap.png"
+        heatmap_path = output_dir / heatmap_filename
+        plot_rule_usage_heatmap(name, rule_usage_summary, heatmap_path)
+
         # Save evaluation results
         eval_data = {
             'benchmark': name,
@@ -445,6 +637,7 @@ def run_evaluate(
             'rules_file': str(rules_path),
             'rules_count': len(rules_pipe),
             'rules_filtered': filtered_count,
+            'rule_ids_effective': effective_rule_ids,
             'baseline_solved': len(baseline_solved),
             'augmented_solved': len(aug_solved),
             'total': total,
@@ -452,14 +645,21 @@ def run_evaluate(
             'regressed': sorted(regressed),
             'net_improvement': len(new_solved) - len(regressed),
             'timestamp': datetime.now().isoformat(),
-            'results': sorted(
-                [r for r in aug_results.values()],
-                key=lambda r: r['problem_id']
-            ),
+            'rule_usage_summary': rule_usage_summary,
+            'rule_usage_heatmap': str(heatmap_path),
+            'results': benchmark_results,
         }
         eval_path = output_dir / f"{name}_eval.json"
         with open(eval_path, 'w', encoding='utf-8') as f:
             json.dump(eval_data, f, ensure_ascii=False, indent=2)
+
+        print(
+            f"  Rule usage: analyzed={rule_usage_summary['solved_problems_analyzed']}, "
+            f"coverage={rule_usage_summary['rules_used']}/{rule_usage_summary['rules_total_effective']} "
+            f"({rule_usage_summary['rules_coverage']:.1%}), "
+            f"applications={rule_usage_summary['total_rule_applications']}"
+        )
+        print(f"  Heatmap: {heatmap_path}")
 
         summary_rows.append({
             'benchmark': name,
@@ -468,6 +668,7 @@ def run_evaluate(
             'new': len(new_solved),
             'regressed': len(regressed),
             'net': len(new_solved) - len(regressed),
+            'coverage': rule_usage_summary['rules_coverage'],
         })
 
     # Print summary
@@ -478,7 +679,8 @@ def run_evaluate(
     total_reg = 0
     for row in summary_rows:
         print(f"  {row['benchmark']}: {row['baseline']} → {row['augmented']} "
-              f"(+{row['new']}, -{row['regressed']}, net={row['net']})")
+              f"(+{row['new']}, -{row['regressed']}, net={row['net']}, "
+              f"rule_coverage={row['coverage']:.1%})")
         total_new += row['new']
         total_reg += row['regressed']
     print(f"  Total: +{total_new} new, -{total_reg} regressed, net={total_new - total_reg}")
