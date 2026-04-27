@@ -288,66 +288,117 @@ def summarize_rule_usage(
     }
 
 
-def plot_rule_usage_heatmap(
-    benchmark_name: str,
-    rule_usage_summary: dict,
-    output_path: Path,
-) -> None:
-    """Generate a fixed-size heatmap for per-rule usage counts."""
+def prepare_rule_usage_heatmap_matrix(rule_usage_summary: dict) -> tuple[np.ndarray, int, int, float]:
+    """Build heatmap matrix and metadata from a rule usage summary."""
     rule_order = rule_usage_summary['heatmap_rule_order']
     per_rule_usage = rule_usage_summary['per_rule_usage']
     n_rules = len(rule_order)
 
-    fig, ax = plt.subplots(figsize=(10, 10))
-
     if n_rules == 0:
-        matrix = np.full((1, 1), np.nan)
-        cmap = plt.cm.Reds.copy()
-        cmap.set_bad(color='white')
-        image = ax.imshow(matrix, cmap=cmap)
-        title = f"{benchmark_name} rule usage\nNo effective custom rules"
-    else:
-        cols = math.ceil(math.sqrt(n_rules))
-        rows = math.ceil(n_rules / cols)
-        values = [float(per_rule_usage.get(rid, 0)) for rid in rule_order]
-        matrix = np.full((rows * cols,), np.nan)
-        matrix[:n_rules] = values
-        matrix = matrix.reshape(rows, cols)
+        return np.full((1, 1), np.nan), 1, 1, 1.0
 
-        cmap = mcolors.LinearSegmentedColormap.from_list(
-            'white_to_red',
-            ['#ffffff', '#fee5d9', '#fcae91', '#fb6a4a', '#de2d26', '#a50f15'],
-            N=256,
-        )
-        cmap.set_bad(color='white')
+    cols = math.ceil(math.sqrt(n_rules))
+    rows = math.ceil(n_rules / cols)
+    values = [float(per_rule_usage.get(rid, 0)) for rid in rule_order]
+    matrix = np.full((rows * cols,), np.nan)
+    matrix[:n_rules] = values
+    matrix = matrix.reshape(rows, cols)
 
-        finite_values = np.array(values, dtype=float)
-        vmax = float(finite_values.max()) if finite_values.size > 0 else 0.0
-        if vmax <= 0:
-            vmax = 1.0
+    finite_values = np.array(values, dtype=float)
+    vmax = float(finite_values.max()) if finite_values.size > 0 else 0.0
+    if vmax <= 0:
+        vmax = 1.0
+    return matrix, rows, cols, vmax
 
-        image = ax.imshow(matrix, cmap=cmap, vmin=0.0, vmax=vmax)
+
+def render_rule_usage_heatmap(
+    ax,
+    benchmark_name: str,
+    rule_usage_summary: dict,
+):
+    """Render a rule usage heatmap on an existing matplotlib axis."""
+    matrix, rows, cols, vmax = prepare_rule_usage_heatmap_matrix(rule_usage_summary)
+    has_effective_rules = rule_usage_summary['rules_total_effective'] > 0
+
+    cmap = mcolors.LinearSegmentedColormap.from_list(
+        'white_to_red',
+        ['#ffffff', '#fee5d9', '#fcae91', '#fb6a4a', '#de2d26', '#a50f15'],
+        N=256,
+    )
+    cmap.set_bad(color='white')
+
+    image = ax.imshow(matrix, cmap=cmap, vmin=0.0, vmax=vmax)
+
+    if has_effective_rules:
         ax.set_xticks(np.arange(-0.5, cols, 1), minor=True)
         ax.set_yticks(np.arange(-0.5, rows, 1), minor=True)
         ax.grid(which='minor', color='#000000', linestyle='-', linewidth=0.25)
         ax.tick_params(which='minor', bottom=False, left=False)
         title = (
-            f"{benchmark_name} rule usage\n"
+            f"{benchmark_name}\n"
             f"coverage={rule_usage_summary['rules_used']}/{rule_usage_summary['rules_total_effective']}"
             f" ({rule_usage_summary['rules_coverage']:.1%}), "
             f"applications={rule_usage_summary['total_rule_applications']}"
         )
+    else:
+        title = f"{benchmark_name}\nNo effective custom rules"
 
     ax.set_title(title)
     ax.set_xticks([])
     ax.set_yticks([])
     for spine in ax.spines.values():
         spine.set_visible(False)
+    return image
 
+
+
+
+def plot_rule_usage_heatmap(
+    benchmark_name: str,
+    rule_usage_summary: dict,
+    output_path: Path,
+) -> None:
+    """Generate a fixed-size heatmap for one benchmark."""
+    fig, ax = plt.subplots(figsize=(10, 10))
+    image = render_rule_usage_heatmap(ax, benchmark_name, rule_usage_summary)
     cbar = fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
     cbar.set_label('Usage count')
-
     fig.tight_layout()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_path, dpi=200, bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_combined_rule_usage_heatmaps(
+    benchmark_summaries: list[tuple[str, dict]],
+    output_path: Path,
+) -> None:
+    """Generate a combined figure with one rule-usage subplot per benchmark."""
+    n = len(benchmark_summaries)
+    if n == 0:
+        return
+
+    cols = math.ceil(math.sqrt(n))
+    rows = math.ceil(n / cols)
+    fig, axes = plt.subplots(rows, cols, figsize=(8 * cols, 8 * rows), constrained_layout=True)
+    axes = np.atleast_1d(axes).ravel()
+
+    images = []
+    for ax, (benchmark_name, summary) in zip(axes, benchmark_summaries):
+        image = render_rule_usage_heatmap(ax, benchmark_name, summary)
+        images.append(image)
+
+    for ax in axes[len(benchmark_summaries):]:
+        ax.axis('off')
+
+    vmax = max(float(image.norm.vmax) for image in images) if images else 1.0
+    shared_norm = plt.Normalize(vmin=0.0, vmax=vmax)
+    for image in images:
+        image.set_norm(shared_norm)
+
+    cbar = fig.colorbar(images[0], ax=axes[:len(benchmark_summaries)].tolist(), fraction=0.025, pad=0.02)
+    cbar.set_label('Usage count')
+    fig.suptitle('Rule usage heatmaps by benchmark', fontsize=18)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(output_path, dpi=200, bbox_inches='tight')
     plt.close(fig)
@@ -544,6 +595,7 @@ def run_evaluate(
     print(f"Loaded {total_loaded} rules, filtered {filtered_count} generative, using {len(rules_pipe)}")
 
     summary_rows = []
+    benchmark_heatmap_summaries: list[tuple[str, dict]] = []
     for name in benchmark_names:
         bench_path = BENCHMARKS[name]
         print(f"\n{'='*60}")
@@ -666,6 +718,8 @@ def run_evaluate(
         )
         print(f"  Heatmap: {heatmap_path}")
 
+        benchmark_heatmap_summaries.append((name, rule_usage_summary))
+
         summary_rows.append({
             'benchmark': name,
             'baseline': f"{len(baseline_solved)}/{total}",
@@ -675,6 +729,11 @@ def run_evaluate(
             'net': len(new_solved) - len(regressed),
             'coverage': rule_usage_summary['rules_coverage'],
         })
+
+    if len(benchmark_heatmap_summaries) > 1:
+        combined_heatmap_path = output_dir / "combined_rule_usage_heatmaps.png"
+        plot_combined_rule_usage_heatmaps(benchmark_heatmap_summaries, combined_heatmap_path)
+        print(f"Combined heatmap: {combined_heatmap_path}")
 
     # Print summary
     print(f"\n{'='*60}")
