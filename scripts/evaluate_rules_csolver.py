@@ -302,7 +302,7 @@ def plot_rule_usage_heatmap(
 
     if n_rules == 0:
         matrix = np.full((1, 1), np.nan)
-        cmap = plt.cm.viridis.copy()
+        cmap = plt.cm.Reds.copy()
         cmap.set_bad(color='white')
         image = ax.imshow(matrix, cmap=cmap)
         title = f"{benchmark_name} rule usage\nNo effective custom rules"
@@ -314,10 +314,11 @@ def plot_rule_usage_heatmap(
         matrix[:n_rules] = values
         matrix = matrix.reshape(rows, cols)
 
-        base_cmap = plt.cm.viridis
-        sampled = base_cmap(np.linspace(0, 1, 256))
-        sampled[0] = np.array([1.0, 1.0, 1.0, 1.0])
-        cmap = mcolors.ListedColormap(sampled)
+        cmap = mcolors.LinearSegmentedColormap.from_list(
+            'white_to_red',
+            ['#ffffff', '#fee5d9', '#fcae91', '#fb6a4a', '#de2d26', '#a50f15'],
+            N=256,
+        )
         cmap.set_bad(color='white')
 
         finite_values = np.array(values, dtype=float)
@@ -326,6 +327,10 @@ def plot_rule_usage_heatmap(
             vmax = 1.0
 
         image = ax.imshow(matrix, cmap=cmap, vmin=0.0, vmax=vmax)
+        ax.set_xticks(np.arange(-0.5, cols, 1), minor=True)
+        ax.set_yticks(np.arange(-0.5, rows, 1), minor=True)
+        ax.grid(which='minor', color='#d9d9d9', linestyle='-', linewidth=0.25)
+        ax.tick_params(which='minor', bottom=False, left=False)
         title = (
             f"{benchmark_name} rule usage\n"
             f"coverage={rule_usage_summary['rules_used']}/{rule_usage_summary['rules_total_effective']}"
