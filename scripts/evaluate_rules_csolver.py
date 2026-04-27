@@ -329,7 +329,7 @@ def plot_rule_usage_heatmap(
         image = ax.imshow(matrix, cmap=cmap, vmin=0.0, vmax=vmax)
         ax.set_xticks(np.arange(-0.5, cols, 1), minor=True)
         ax.set_yticks(np.arange(-0.5, rows, 1), minor=True)
-        ax.grid(which='minor', color='#d9d9d9', linestyle='-', linewidth=0.25)
+        ax.grid(which='minor', color='#000000', linestyle='-', linewidth=0.25)
         ax.tick_params(which='minor', bottom=False, left=False)
         title = (
             f"{benchmark_name} rule usage\n"
