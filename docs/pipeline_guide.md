@@ -108,14 +108,14 @@ python scripts/grpo/label_difficulty_vlm.py \
 
 **脚本**：`scripts/grpo/select_debug_set.py`
 
-**命令示例（v17 配置）**：
+**命令示例**：
 ```bash
 python scripts/grpo/select_debug_set.py \
-  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8/difficulty_labels.jsonl \
-  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_5k_v17/grpo_train_selected_5000.jsonl \
-  --report-output datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_5k_v17/grpo_train_report_5000.json \
+  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/difficulty_labels.jsonl \
+  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN_bucket_unified_Nk_vXX/grpo_train_selected_N000.jsonl \
+  --report-output datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN_bucket_unified_Nk_vXX/grpo_train_report_N000.json \
   --selection-policy bucket_unified \
-  --target-size 5000 \
+  --target-size N000 \
   --core-pass-min 0.125 \
   --core-pass-max 0.625 \
   --near-high-mid-max-pass 0.75 \
@@ -131,6 +131,10 @@ python scripts/grpo/select_debug_set.py \
   --near-high-mid-max-fraction 0.08 \
   --mastered-max-fraction 0.0
 ```
+
+**常用配置**：
+- v16/v17: `--target-size 2000/5000`, `--reward-mixed-zero-max-fraction 0.20`
+- v18 (10k): `--target-size 10000`, `--reward-mixed-zero-max-fraction 0.15`（降低零通过率样本比例）
 
 **选择策略**：
 - `bucket_unified`：当前主线策略
@@ -151,8 +155,8 @@ python scripts/grpo/select_debug_set.py \
 **命令示例**：
 ```bash
 python scripts/grpo/prepare_grpo_aux_dataset.py \
-  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_5k_v17/grpo_train_selected_5000.jsonl \
-  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_5k_v17/grpo_train.jsonl
+  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN_bucket_unified_Nk_vXX/grpo_train_selected_N000.jsonl \
+  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN_bucket_unified_Nk_vXX/grpo_train.jsonl
 ```
 
 **输出格式**：
@@ -174,56 +178,74 @@ python scripts/grpo/prepare_grpo_aux_dataset.py \
 
 **入口**：`scripts/grpo/train_grpo.sh`
 
-**命令示例（v17 配置）**：
+**命令示例**：
 ```bash
-export MODEL_PATH="/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084"
-export DATASET_PATH="datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_5k_v17/grpo_train.jsonl"
-export OUTPUT_DIR="models/grpo_vlm_sft44_geometry100k_v17_s1_4gpu_lr5e6"
-export NUM_GENERATIONS=8
-export TEMPERATURE=1.1
-export TOP_P=0.95
-export TOP_K=0
-export MAX_COMPLETION_LENGTH=256
-export BETA=0.02
-export REWARD_LOG_INTERVAL=5
-
-# 4 卡 DDP 训练
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
 NPROC_PER_NODE=4 \
+MODEL_PATH="/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084" \
+DATASET_PATH="datasets/<dataset_dir>/grpo_train_selected_N000.jsonl" \
+OUTPUT_DIR="models/<output_dir>" \
+NUM_GENERATIONS=8 \
+TEMPERATURE=1.1 \
+TOP_P=0.95 \
+TOP_K=0 \
+MAX_COMPLETION_LENGTH=256 \
+BETA=0.02 \
+REWARD_LOG_INTERVAL=20 \
 bash scripts/grpo/train_grpo.sh \
+  --tuner_type lora \
+  --lora_rank 8 \
+  --lora_alpha 32 \
+  --lora_dropout 0.05 \
+  --target_modules all-linear \
+  --freeze_vit true \
+  --freeze_aligner true \
+  --per_device_train_batch_size 1 \
+  --gradient_accumulation_steps 8 \
   --learning_rate 5e-6 \
   --warmup_steps 10 \
   --lr_scheduler_type cosine \
-  --per_device_train_batch_size 1 \
-  --gradient_accumulation_steps 8 \
-  --max_steps 500 \
+  --weight_decay 0.1 \
+  --max_grad_norm 1.0 \
+  --bf16 true \
+  --gradient_checkpointing true \
+  --logging_steps 5 \
+  --logging_first_step true \
   --save_steps 50 \
-  --logging_steps 1
+  --max_steps 500
 ```
+
+**注意**：`DATASET_PATH` 直接指向 `grpo_train_selected_N000.jsonl`，不需要额外的 `prepare_grpo_aux_dataset.py` 步骤（`train_grpo.sh` 内部会处理格式转换）。
 
 ### 3.3 关键参数
 
 **模型与数据**：
 - `MODEL_PATH`：基础模型路径
-- `DATASET_PATH`：训练数据 JSONL
+- `DATASET_PATH`：训练数据 JSONL（直接指向 `grpo_train_selected_N000.jsonl`）
 - `OUTPUT_DIR`：模型保存目录
 
 **GRPO 超参数**：
-- `NUM_GENERATIONS`：每个 prompt 生成的候选数（默认 8）
-- `TEMPERATURE`：采样温度（v17: 1.1）
-- `TOP_P`：nucleus 采样阈值（v17: 0.95）
-- `TOP_K`：top-k 采样（v17: 0，即不限制）
-- `MAX_COMPLETION_LENGTH`：最大生成长度（v17: 256）
-- `BETA`：KL 惩罚系数（v17: 0.02）
+- `NUM_GENERATIONS`：每个 prompt 生成的候选数（推荐 8）
+- `TEMPERATURE`：采样温度（推荐 1.1，提高探索性）
+- `TOP_P`：nucleus 采样阈值（推荐 0.95）
+- `TOP_K`：top-k 采样（推荐 0，即不限制，配合 top_p 使用）
+- `MAX_COMPLETION_LENGTH`：最大生成长度（推荐 256）
+- `BETA`：KL 惩罚系数（推荐 0.02，低惩罚有助于探索）
 
 **训练配置**：
-- `learning_rate`：学习率（v17: 5e-6）
-- `warmup_steps`：预热步数（v17: 10）
-- `lr_scheduler_type`：学习率调度器（v17: cosine）
-- `per_device_train_batch_size`：每卡批次大小（v17: 1）
-- `gradient_accumulation_steps`：梯度累积步数（v17: 8）
-- `max_steps`：最大训练步数（v17: 500）
-- `save_steps`：保存间隔（v17: 50）
+- `learning_rate`：学习率（推荐 5e-6，基于 SFT 阶段 1e-5 的 1/2）
+- `warmup_steps`：预热步数（推荐 10）
+- `lr_scheduler_type`：学习率调度器（推荐 cosine）
+- `per_device_train_batch_size`：每卡批次大小（推荐 1）
+- `gradient_accumulation_steps`：梯度累积步数（推荐 8）
+- `max_steps`：最大训练步数（推荐 500）
+- `save_steps`：保存间隔（推荐 50）
+
+**Effective batch size 计算**：
+```
+generation_batch_size = per_device_train_batch_size × num_processes × gradient_accumulation_steps
+                      = 1 × 4 × 8 = 32 problems/step（4 卡 DDP）
+```
 
 **奖励配置**（环境变量）：
 - `NEWCLID_GRPO_SOLVED_REWARD`：正确证明（默认 1.0）
@@ -261,35 +283,31 @@ bash scripts/grpo/train_grpo.sh \
 ```bash
 python scripts/evaluation.py \
   --problems_path benchmarks/dev_imo.txt \
-  --model_path models/grpo_vlm_sft44_geometry100k_v17_s1_4gpu_lr5e6/v0-20260423-165556/checkpoint-500 \
+  --model_path models/<output_dir>/v0-<timestamp>/checkpoint-<N> \
   --agent vlm \
   --decoding_size 32 \
   --beam_size 512 \
   --search_depth 4 \
-  --search_version v1 \
-  --gpu_batch_size 4 \
-  --gpu_batch_timeout_ms 100 \
-  --torch_seed 123 \
   --max_workers 40 \
-  --enable_trace
+  --enable_trace \
+  --log_dir results/<experiment_name>
 ```
 
 **命令示例（imo_95）**：
 ```bash
 python scripts/evaluation.py \
   --problems_path benchmarks/imo_95.txt \
-  --model_path models/grpo_vlm_sft44_geometry100k_v17_s1_4gpu_lr5e6/v0-20260423-165556/checkpoint-500 \
+  --model_path models/<output_dir>/v0-<timestamp>/checkpoint-<N> \
   --agent vlm \
   --decoding_size 32 \
   --beam_size 512 \
   --search_depth 4 \
-  --search_version v1 \
-  --gpu_batch_size 2 \
-  --gpu_batch_timeout_ms 100 \
-  --torch_seed 123 \
   --max_workers 40 \
-  --enable_trace
+  --enable_trace \
+  --log_dir results/<experiment_name>
 ```
+
+**注意**：两个评估不能同时运行（共享 Ray cluster），需顺序执行。如果评估中途因 Ray 崩溃中断，使用 `scripts/resume_eval_progress.py` 从已完成的 trace 恢复。
 
 ### 4.2 关键参数
 
@@ -297,24 +315,19 @@ python scripts/evaluation.py \
 - `--problems_path`：基准测试文件路径
 - `--model_path`：模型 checkpoint 路径
 - `--agent`：代理类型（`lm`, `vlm`, `qwen3_vl_text` 等）
+- `--log_dir`：结果输出目录（默认 `./results`）
 
 **搜索配置**：
-- `--decoding_size`：每个 beam 节点的候选数（默认 8）
-- `--beam_size`：深度间的最大候选数（默认 64）
-- `--search_depth`：辅助扩展轮数（默认 4）
-- `--search_version`：提示词变体（`v1` 或 `v2`）
+- `--decoding_size`：每个 beam 节点的候选数（推荐 32）
+- `--beam_size`：深度间的最大候选数（推荐 512）
+- `--search_depth`：辅助扩展轮数（推荐 4）
 
 **性能配置**：
-- `--gpu_batch_size`：每次 GPU 调用的请求数（默认 2）
-- `--gpu_batch_timeout_ms`：批次等待预算（默认 100ms）
-- `--torch_seed`：随机种子（默认 123）
-- `--timeout`：每个问题的超时时间（默认 7200s）
-- `--num_gpus_for_eval`：评估使用的 GPU 数（默认 0=全部可见）
-- `--max_workers`：Ray CPU 容量（默认 8）
+- `--timeout`：每个问题的超时时间（默认 3600s）
+- `--max_workers`：Ray CPU 容量（推荐 40）
 
 **输出配置**：
-- `--enable_trace`：写入每个问题的 trace JSONL
-- `--enable_profiling`：写入时间统计 CSV
+- `--enable_trace`：写入每个问题的 trace JSONL（推荐开启，用于断点续跑）
 
 ### 4.3 基准测试
 
@@ -379,14 +392,11 @@ translated_imo_2004_p1,√,5.06
 ├── datasets/                          # 生成的训练数据
 │   ├── 0123/                          # 原始生成数据（1M）
 │   ├── grpo_geometry100k_*/           # 候选池与标注
-│   └── grpo_geometry100k_*_v17/       # v17 训练集（5k）
+│   └── grpo_geometry100k_*_vXX/       # 各版本训练集
 ├── models/                            # 训练的模型
-│   ├── grpo_vlm_sft44_*_v16_*/        # v16 模型
-│   └── grpo_vlm_sft44_*_v17_*/        # v17 模型
+│   └── grpo_vlm_sft44_*_vXX_*/        # 各版本模型
 ├── results/                           # 评估结果
-│   ├── v16_lr5e6_checkpoint500/       # v16 评估
-│   ├── v17_lr5e6_checkpoint500/       # v17 评估
-│   └── devimo_grpo_compare/           # 对比评估
+│   └── vXX_lr5e6_checkpointN/         # 各版本评估
 ├── benchmarks/                        # 基准测试集
 │   ├── dev_imo.txt
 │   ├── imo_95.txt
@@ -396,14 +406,16 @@ translated_imo_2004_p1,√,5.06
 │   │   ├── train_grpo.sh              # 训练入口
 │   │   ├── select_debug_set.py        # 数据选择
 │   │   ├── label_difficulty_vlm.py    # VLM 标注
-│   │   └── prepare_grpo_aux_dataset.py # 数据准备
-│   └── evaluation.py                  # 评估入口
+│   │   └── build_candidate_pool.py    # 构建候选池
+│   ├── evaluation.py                  # 评估入口
+│   └── resume_eval_progress.py        # 断点续跑
 ├── src/newclid/                       # 核心代码
 │   ├── generation/                    # 数据生成
 │   ├── training/                      # 训练工具
 │   └── agent/                         # 推理代理
 └── docs/                              # 文档
-    └── grpo_pipeline_optimization_plan.md
+    ├── grpo_pipeline_optimization_plan.md  # 实验记录
+    └── pipeline_guide.md                   # 流程指南
 ```
 
 ---
@@ -418,7 +430,7 @@ translated_imo_2004_p1,√,5.06
 
 ---
 
-## 7. 完整流程示例（v17）
+## 7. 完整流程示例
 
 ### Step 1: 数据生成（已完成）
 ```bash
@@ -430,54 +442,47 @@ translated_imo_2004_p1,√,5.06
 ```bash
 python scripts/grpo/build_candidate_pool.py \
   /C20545/home/wangzi/GenesisGeo_data_models/datasets/0123/geometry_clauses10_samples1M_aux_updated_img512_inverted_pt_new_remove_proof.jsonl \
-  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8/candidate_pool.jsonl \
+  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/candidate_pool.jsonl \
   --target-size 100000
 ```
 
 ### Step 3: VLM 标注
 ```bash
 python scripts/grpo/label_difficulty_vlm.py \
-  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8/candidate_pool.jsonl \
-  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8/difficulty_labels.jsonl \
+  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/candidate_pool.jsonl \
+  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/difficulty_labels.jsonl \
   --model-path /C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084 \
   --num-samples 16 \
   --batch-size 4 \
   --num-workers 40
 ```
 
-### Step 4: 选择训练集（5k）
+### Step 4: 选择训练集
 ```bash
 python scripts/grpo/select_debug_set.py \
-  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8/difficulty_labels.jsonl \
-  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_5k_v17/grpo_train_selected_5000.jsonl \
-  --report-output datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_5k_v17/grpo_train_report_5000.json \
+  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/difficulty_labels.jsonl \
+  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN_bucket_unified_Nk_vXX/grpo_train_selected_N000.jsonl \
+  --report-output datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN_bucket_unified_Nk_vXX/grpo_train_report_N000.json \
   --selection-policy bucket_unified \
-  --target-size 5000 \
+  --target-size N000 \
   --core-pass-min 0.125 \
   --core-pass-max 0.625 \
   --mastered-max-fraction 0.0
 ```
 
-### Step 5: 准备 GRPO 数据
+### Step 5: GRPO 训练
 ```bash
-python scripts/grpo/prepare_grpo_aux_dataset.py \
-  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_5k_v17/grpo_train_selected_5000.jsonl \
-  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_5k_v17/grpo_train.jsonl
-```
-
-### Step 6: GRPO 训练
-```bash
-export MODEL_PATH="/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084"
-export DATASET_PATH="datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_5k_v17/grpo_train.jsonl"
-export OUTPUT_DIR="models/grpo_vlm_sft44_geometry100k_v17_s1_4gpu_lr5e6"
-export NUM_GENERATIONS=8
-export TEMPERATURE=1.1
-export TOP_P=0.95
-export TOP_K=0
-export MAX_COMPLETION_LENGTH=256
-export BETA=0.02
-
-CUDA_VISIBLE_DEVICES=0,1,2,3 NPROC_PER_NODE=4 \
+CUDA_VISIBLE_DEVICES=0,1,2,3 \
+NPROC_PER_NODE=4 \
+MODEL_PATH="/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084" \
+DATASET_PATH="datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN_bucket_unified_Nk_vXX/grpo_train_selected_N000.jsonl" \
+OUTPUT_DIR="models/grpo_vlm_sft44_geometry100k_vXX_s1_4gpu_lr5e6" \
+NUM_GENERATIONS=8 \
+TEMPERATURE=1.1 \
+TOP_P=0.95 \
+TOP_K=0 \
+MAX_COMPLETION_LENGTH=256 \
+BETA=0.02 \
 bash scripts/grpo/train_grpo.sh \
   --learning_rate 5e-6 \
   --warmup_steps 10 \
@@ -488,30 +493,32 @@ bash scripts/grpo/train_grpo.sh \
   --save_steps 50
 ```
 
-### Step 7: 评估 dev_imo
+### Step 6: 评估 dev_imo
 ```bash
 python scripts/evaluation.py \
   --problems_path benchmarks/dev_imo.txt \
-  --model_path models/grpo_vlm_sft44_geometry100k_v17_s1_4gpu_lr5e6/v0-20260423-165556/checkpoint-500 \
+  --model_path models/grpo_vlm_sft44_geometry100k_vXX_s1_4gpu_lr5e6/v0-<timestamp>/checkpoint-500 \
   --agent vlm \
   --decoding_size 32 \
   --beam_size 512 \
   --search_depth 4 \
   --max_workers 40 \
-  --enable_trace
+  --enable_trace \
+  --log_dir results/vXX_lr5e6_checkpoint500
 ```
 
-### Step 8: 评估 imo_95
+### Step 7: 评估 imo_95
 ```bash
 python scripts/evaluation.py \
   --problems_path benchmarks/imo_95.txt \
-  --model_path models/grpo_vlm_sft44_geometry100k_v17_s1_4gpu_lr5e6/v0-20260423-165556/checkpoint-500 \
+  --model_path models/grpo_vlm_sft44_geometry100k_vXX_s1_4gpu_lr5e6/v0-<timestamp>/checkpoint-500 \
   --agent vlm \
   --decoding_size 32 \
   --beam_size 512 \
   --search_depth 4 \
   --max_workers 40 \
-  --enable_trace
+  --enable_trace \
+  --log_dir results/vXX_lr5e6_checkpoint500
 ```
 
 ---
@@ -519,13 +526,13 @@ python scripts/evaluation.py \
 ## 8. 常见问题
 
 **Q: 如何调整训练集大小？**
-A: 修改 `select_debug_set.py` 的 `--target-size` 参数（v16: 2000, v17: 5000）
+A: 修改 `select_debug_set.py` 的 `--target-size` 参数（例如：2000, 5000, 10000）
 
 **Q: 如何调整学习率？**
-A: 修改 `train_grpo.sh` 的 `--learning_rate` 参数（v16/v17: 5e-6）
+A: 修改 `train_grpo.sh` 的 `--learning_rate` 参数（推荐 5e-6）
 
 **Q: 如何增加训练步数？**
-A: 修改 `train_grpo.sh` 的 `--max_steps` 参数（v16/v17: 500）
+A: 修改 `train_grpo.sh` 的 `--max_steps` 参数（推荐 500）
 
 **Q: 如何使用不同的基础模型？**
 A: 修改 `MODEL_PATH` 环境变量指向新的 checkpoint
@@ -535,3 +542,9 @@ A: `results/` 目录下，CSV 文件包含汇总，子目录包含详细 trace
 
 **Q: 如何对比两个版本？**
 A: 使用 `scripts/grpo/compare_imo95_versions.py` 或 `scripts/grpo/analyze_proposal_distribution.py`
+
+**Q: 评估中途 Ray 崩溃怎么办？**
+A: 使用 `scripts/resume_eval_progress.py` 从已完成的 trace 恢复，生成剩余题目列表，然后继续评估
+
+**Q: 如何验证 checkpoint-300 vs checkpoint-500？**
+A: 分别评估两个 checkpoint 的 dev_imo，对比 solved 数量
