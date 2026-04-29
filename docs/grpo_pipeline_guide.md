@@ -83,7 +83,37 @@ python scripts/analyze_dataset.py \
 - `goal_predicate`, `predicate_family_tags`
 - `problem_predicate_count`, `problem_clause_count`
 
-### 2.2 构建候选池
+### 2.2 预筛选候选池（可选，历史方案）
+
+**脚本**：`scripts/grpo/prefilter_candidate_pool.py`
+
+**命令示例**：
+```bash
+python scripts/grpo/prefilter_candidate_pool.py \
+  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/candidate_pool.jsonl \
+  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN_prefiltered_50k/candidate_pool_prefiltered.jsonl \
+  --report-output datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN_prefiltered_50k/prefilter_report.json \
+  --target-size 50000 \
+  --seed 998244353
+```
+
+**功能**：
+- 去重（按 query hash）
+- 按三维分桶进行配额分配：
+  - **点数维度**：`multi_aux`（70%）vs `single_aux`（30%）
+  - **复杂度维度**：`p8_plus`（60%）vs `p5_7`（30%）vs `p0_4`（10%）
+  - **谓词族维度**：按 goal_predicate 分类
+- 目标谓词上限（20% 的目标大小）
+- 水库采样保证分布均衡
+
+**历史背景**：
+- v3-v9 使用预筛选（v7 首次通过 smoke gate）
+- v10+ 直接跳过预筛选，改用 VLM 标注后的 bucket_unified selector
+- 当前主线（v14+）不使用预筛选
+
+**注意**：当前 v14+ 流程直接从 candidate_pool.jsonl 进行 VLM 标注，跳过此步骤。
+
+### 2.3 构建候选池
 
 **脚本**：`scripts/grpo/build_candidate_pool.py`
 
@@ -106,7 +136,7 @@ python scripts/grpo/build_candidate_pool.py \
 - `aux_segment_count`, `aux_points_total`
 - `n_premises`, `problem_predicate_count`, `problem_clause_count`
 
-### 2.3 难度标注（VLM）
+### 2.4 难度标注（VLM）
 
 **脚本**：`scripts/grpo/label_difficulty_vlm.py`
 
@@ -133,7 +163,7 @@ python scripts/grpo/label_difficulty_vlm.py \
 - `valid_ratio`：有效构造占比
 - `proxy_reward_std`：奖励标准差（衡量难度多样性）
 
-### 2.4 选择训练集
+### 2.5 选择训练集
 
 **脚本**：`scripts/grpo/select_debug_set.py`
 
@@ -177,7 +207,7 @@ python scripts/grpo/select_debug_set.py \
 - `near_high_mid`：高通过率边界（pass@16 ∈ (0.625, 0.75]）
 - `mastered`：过于简单（pass@16 > 0.75）
 
-### 2.5 准备 GRPO 训练数据
+### 2.6 准备 GRPO 训练数据
 
 **脚本**：`scripts/grpo/prepare_grpo_aux_dataset.py`
 
