@@ -13,97 +13,7 @@ from typing import Any
 
 from tqdm import tqdm
 
-POLICY_TIER_ORDER = {
-    "v3_tiered": (
-        "core",
-        "near",
-        "hard_valid_high",
-        "hard_valid_mid",
-        "mastered",
-    ),
-    "v4_reward_mixed": (
-        "core",
-        "near",
-        "reward_mixed_zero",
-        "mastered",
-    ),
-    "v6_mid_strict_zero": (
-        "core",
-        "near_low",
-        "reward_mixed_zero",
-        "near_high_mid",
-        "mastered",
-    ),
-    "v7_structure_strict_zero": (
-        "core",
-        "near_low",
-        "reward_mixed_zero",
-        "near_high_mid",
-        "mastered",
-    ),
-    "v9_stage_balanced": (
-        "core",
-        "near_low",
-        "reward_mixed_zero",
-        "near_high_mid",
-        "mastered",
-    ),
-    "v10_auxfix_stage_balanced": (
-        "core",
-        "near_low",
-        "reward_mixed_zero",
-        "near_high_mid",
-        "mastered",
-    ),
-}
 BUCKET_UNIFIED_POLICY = "bucket_unified"
-NON_MASTERED_TIERS_BY_POLICY = {
-    "v3_tiered": (
-        "core",
-        "near",
-        "hard_valid_high",
-        "hard_valid_mid",
-    ),
-    "v4_reward_mixed": (
-        "core",
-        "near",
-        "reward_mixed_zero",
-    ),
-    "v6_mid_strict_zero": (
-        "core",
-        "near_low",
-        "reward_mixed_zero",
-        "near_high_mid",
-    ),
-    "v7_structure_strict_zero": (
-        "core",
-        "near_low",
-        "reward_mixed_zero",
-        "near_high_mid",
-    ),
-    "v9_stage_balanced": (
-        "core",
-        "near_low",
-        "reward_mixed_zero",
-        "near_high_mid",
-    ),
-    "v10_auxfix_stage_balanced": (
-        "core",
-        "near_low",
-        "reward_mixed_zero",
-        "near_high_mid",
-    ),
-}
-ALL_TIERS = (
-    "core",
-    "near",
-    "near_low",
-    "near_high_mid",
-    "hard_valid_high",
-    "hard_valid_mid",
-    "reward_mixed_zero",
-    "mastered",
-)
 UNIFIED_BUCKETS = (
     "all_invalid",
     "mastered",
@@ -125,9 +35,7 @@ UNIFIED_MAIN_BUCKET_ORDER = (
     "near_high_mid",
 )
 UNIFIED_FALLBACK_BUCKET_ORDER = ("mastered",)
-ALL_SELECTION_POLICIES = tuple(
-    sorted((*POLICY_TIER_ORDER.keys(), BUCKET_UNIFIED_POLICY))
-)
+ALL_SELECTION_POLICIES = (BUCKET_UNIFIED_POLICY,)
 DEFAULT_REWARD_BY_STATUS = {
     "solved": 1.0,
     "unsolved": 0.25,
@@ -229,50 +137,18 @@ def _build_pass_histogram(rows: list[dict[str, Any]], pass_key: str) -> dict[str
     )
 
 
-def _pass_distance_rank(
-    row: dict[str, Any], pass_key: str, *, selection_policy: str
-) -> float:
-    if selection_policy in {
-        "v6_mid_strict_zero",
-        "v7_structure_strict_zero",
-        "v9_stage_balanced",
-        "v10_auxfix_stage_balanced",
-        BUCKET_UNIFIED_POLICY,
-    }:
-        return abs(_pass_value(row, pass_key) - 0.375)
-    return abs(_valid_ratio(row, pass_key) - 0.5)
+def _pass_distance_rank(row: dict[str, Any], pass_key: str) -> float:
+    return abs(_pass_value(row, pass_key) - 0.375)
 
 
-def _tier_rank(
-    row: dict[str, Any], pass_key: str, *, selection_policy: str
-) -> tuple[Any, ...]:
-    if selection_policy in {
-        "v7_structure_strict_zero",
-        "v9_stage_balanced",
-        "v10_auxfix_stage_balanced",
-        BUCKET_UNIFIED_POLICY,
-    }:
-        return (
-            -int(row.get("aux_points_total", 0) >= 2),
-            -int(row.get("aux_segment_count", 0) >= 2),
-            -int(row.get("unique_aux_count", 0)),
-            -_proxy_reward_std(row),
-            _pass_distance_rank(row, pass_key, selection_policy=selection_policy),
-            float(row.get("duplicate_aux_ratio", 1.0)),
-            int(row.get("build_invalid_count", 0)),
-            int(row.get("format_invalid_count", 0)),
-            -int(row.get("aux_segment_count", 0)),
-            -int(row.get("aux_points_total", 0)),
-            -int(row.get("n_premises", 0)),
-            -int(row.get("problem_predicate_count", 0)),
-            -int(row.get("problem_clause_count", 0)),
-            _row_id(row),
-        )
+def _tier_rank(row: dict[str, Any], pass_key: str) -> tuple[Any, ...]:
     return (
-        -_proxy_reward_std(row),
+        -int(row.get("aux_points_total", 0) >= 2),
+        -int(row.get("aux_segment_count", 0) >= 2),
         -int(row.get("unique_aux_count", 0)),
+        -_proxy_reward_std(row),
+        _pass_distance_rank(row, pass_key),
         float(row.get("duplicate_aux_ratio", 1.0)),
-        _pass_distance_rank(row, pass_key, selection_policy=selection_policy),
         int(row.get("build_invalid_count", 0)),
         int(row.get("format_invalid_count", 0)),
         -int(row.get("aux_segment_count", 0)),
@@ -282,148 +158,6 @@ def _tier_rank(
         -int(row.get("problem_clause_count", 0)),
         _row_id(row),
     )
-
-
-def _classify_row(
-    row: dict[str, Any],
-    pass_key: str,
-    *,
-    selection_policy: str,
-    core_min_pass: float,
-    core_max_pass: float,
-    mastered_pass_min: float,
-    hard_valid_build_invalid_max: int,
-    hard_valid_format_invalid_max: int,
-    hard_valid_unique_aux_min: int,
-    hard_valid_duplicate_aux_max: float,
-    near_high_mid_max_pass: float,
-    zero_valid_min: float,
-    zero_valid_max: float,
-    zero_pass_reward_std_min: float,
-    reward_mixed_zero_unique_aux_min: int,
-) -> str:
-    pass_value = _pass_value(row, pass_key)
-    if row.get("greedy_success") and pass_value >= mastered_pass_min:
-        return "mastered"
-    if row.get("all_invalid"):
-        return "all_invalid"
-    if core_min_pass <= pass_value <= core_max_pass:
-        return "core"
-
-    if selection_policy in {
-        "v6_mid_strict_zero",
-        "v7_structure_strict_zero",
-        "v9_stage_balanced",
-        "v10_auxfix_stage_balanced",
-    }:
-        if 0.0 < pass_value < core_min_pass:
-            return "near_low"
-        if core_max_pass < pass_value <= near_high_mid_max_pass:
-            return "near_high_mid"
-    elif (0.0 < pass_value < core_min_pass) or (
-        core_max_pass < pass_value < mastered_pass_min
-    ):
-        return "near"
-
-    if pass_value != 0.0:
-        return "discarded_non_dead"
-
-    if selection_policy in {
-        "v4_reward_mixed",
-        "v6_mid_strict_zero",
-        "v7_structure_strict_zero",
-        "v9_stage_balanced",
-        "v10_auxfix_stage_balanced",
-    }:
-        valid_ratio = _valid_ratio(row, pass_key)
-        if valid_ratio < zero_valid_min or valid_ratio > zero_valid_max:
-            return "discarded_non_dead"
-        if _proxy_reward_std(row) < zero_pass_reward_std_min:
-            return "discarded_non_dead"
-        if int(row.get("unique_aux_count", 0)) < reward_mixed_zero_unique_aux_min:
-            return "discarded_non_dead"
-        return "reward_mixed_zero"
-
-    build_invalid_count = int(row.get("build_invalid_count", 0))
-    format_invalid_count = int(row.get("format_invalid_count", 0))
-    if build_invalid_count > hard_valid_build_invalid_max:
-        return "discarded_non_dead"
-    if format_invalid_count > hard_valid_format_invalid_max:
-        return "discarded_non_dead"
-
-    unique_aux_count = int(row.get("unique_aux_count", 0))
-    duplicate_aux_ratio = float(row.get("duplicate_aux_ratio", 1.0))
-    if (
-        unique_aux_count >= hard_valid_unique_aux_min
-        or duplicate_aux_ratio <= hard_valid_duplicate_aux_max
-    ):
-        return "hard_valid_high"
-    return "hard_valid_mid"
-
-
-def _excluded_reason(
-    row: dict[str, Any],
-    pass_key: str,
-    *,
-    selection_policy: str,
-    core_min_pass: float,
-    core_max_pass: float,
-    mastered_pass_min: float,
-    hard_valid_build_invalid_max: int,
-    hard_valid_format_invalid_max: int,
-    near_high_mid_max_pass: float,
-    zero_valid_min: float,
-    zero_valid_max: float,
-    zero_pass_reward_std_min: float,
-    reward_mixed_zero_unique_aux_min: int,
-) -> str:
-    pass_value = _pass_value(row, pass_key)
-    if pass_value != 0.0:
-        if (
-            selection_policy
-            in {
-                "v6_mid_strict_zero",
-                "v7_structure_strict_zero",
-                "v9_stage_balanced",
-                "v10_auxfix_stage_balanced",
-            }
-            and near_high_mid_max_pass < pass_value < mastered_pass_min
-        ):
-            return (
-                f"nonzero_easy_tail_"
-                f"{near_high_mid_max_pass:.2f}_{mastered_pass_min:.2f}"
-            )
-        if pass_value >= mastered_pass_min:
-            return f"nonzero_highpass_ge_{mastered_pass_min:.2f}_without_greedy"
-        return "nonzero_other"
-
-    if selection_policy in {
-        "v4_reward_mixed",
-        "v6_mid_strict_zero",
-        "v7_structure_strict_zero",
-        "v9_stage_balanced",
-        "v10_auxfix_stage_balanced",
-    }:
-        valid_ratio = _valid_ratio(row, pass_key)
-        if valid_ratio < zero_valid_min:
-            return "zero_pass_valid_too_low"
-        if valid_ratio > zero_valid_max:
-            return "zero_pass_valid_too_high"
-        if _proxy_reward_std(row) < zero_pass_reward_std_min:
-            return "zero_pass_reward_std_too_low"
-        if int(row.get("unique_aux_count", 0)) < reward_mixed_zero_unique_aux_min:
-            return "zero_pass_unique_aux_too_low"
-        return "zero_pass_other"
-
-    build_invalid_count = int(row.get("build_invalid_count", 0))
-    if build_invalid_count > hard_valid_build_invalid_max:
-        return "zero_pass_build_invalid_too_high"
-
-    format_invalid_count = int(row.get("format_invalid_count", 0))
-    if format_invalid_count > hard_valid_format_invalid_max:
-        return "zero_pass_format_invalid_too_high"
-
-    return "zero_pass_other"
 
 
 def _classify_bucket_unified(
@@ -500,9 +234,7 @@ def filter_candidate_buckets(
 
     for bucket_name in UNIFIED_BUCKETS:
         bucket_rows[bucket_name].sort(
-            key=lambda row: _tier_rank(
-                row, pass_key, selection_policy=BUCKET_UNIFIED_POLICY
-            )
+            key=lambda row: _tier_rank(row, pass_key)
         )
 
     stats = {
@@ -518,104 +250,6 @@ def filter_candidate_buckets(
         },
     }
     return bucket_rows, stats
-
-
-def filter_candidate_tiers(
-    rows: list[dict[str, Any]],
-    *,
-    selection_policy: str,
-    core_min_pass: float,
-    core_max_pass: float,
-    mastered_pass_min: float,
-    hard_valid_build_invalid_max: int,
-    hard_valid_format_invalid_max: int,
-    hard_valid_unique_aux_min: int,
-    hard_valid_duplicate_aux_max: float,
-    near_high_mid_max_pass: float,
-    zero_valid_min: float,
-    zero_valid_max: float,
-    zero_pass_reward_std_min: float,
-    reward_mixed_zero_unique_aux_min: int,
-) -> tuple[dict[str, list[dict[str, Any]]], dict[str, Any]]:
-    pass_key = _resolve_pass_key(rows)
-    tier_rows = {tier_name: [] for tier_name in ALL_TIERS}
-    stats = {
-        "pass_key": pass_key,
-        "removed_all_invalid": 0,
-        "removed_mastered": 0,
-        "excluded_rows_total": 0,
-        "excluded_rows_by_reason": {},
-        "excluded_pass_histogram_by_reason": {},
-        "tier_available_rows": {},
-        "selection_policy": selection_policy,
-    }
-    excluded_rows_by_reason: dict[str, list[dict[str, Any]]] = {}
-    excluded_reason_counts: Counter[str] = Counter()
-
-    for row in tqdm(rows, desc="Classifying candidate tiers"):
-        tier = _classify_row(
-            row,
-            pass_key,
-            selection_policy=selection_policy,
-            core_min_pass=core_min_pass,
-            core_max_pass=core_max_pass,
-            mastered_pass_min=mastered_pass_min,
-            hard_valid_build_invalid_max=hard_valid_build_invalid_max,
-            hard_valid_format_invalid_max=hard_valid_format_invalid_max,
-            hard_valid_unique_aux_min=hard_valid_unique_aux_min,
-            hard_valid_duplicate_aux_max=hard_valid_duplicate_aux_max,
-            near_high_mid_max_pass=near_high_mid_max_pass,
-            zero_valid_min=zero_valid_min,
-            zero_valid_max=zero_valid_max,
-            zero_pass_reward_std_min=zero_pass_reward_std_min,
-            reward_mixed_zero_unique_aux_min=reward_mixed_zero_unique_aux_min,
-        )
-        if tier == "all_invalid":
-            stats["removed_all_invalid"] += 1
-            continue
-        if tier == "discarded_non_dead":
-            reason = _excluded_reason(
-                row,
-                pass_key,
-                selection_policy=selection_policy,
-                core_min_pass=core_min_pass,
-                core_max_pass=core_max_pass,
-                mastered_pass_min=mastered_pass_min,
-                hard_valid_build_invalid_max=hard_valid_build_invalid_max,
-                hard_valid_format_invalid_max=hard_valid_format_invalid_max,
-                near_high_mid_max_pass=near_high_mid_max_pass,
-                zero_valid_min=zero_valid_min,
-                zero_valid_max=zero_valid_max,
-                zero_pass_reward_std_min=zero_pass_reward_std_min,
-                reward_mixed_zero_unique_aux_min=reward_mixed_zero_unique_aux_min,
-            )
-            stats["excluded_rows_total"] += 1
-            excluded_reason_counts[reason] += 1
-            excluded_rows_by_reason.setdefault(reason, []).append(row)
-            continue
-        if tier == "mastered":
-            stats["removed_mastered"] += 1
-        tier_rows[tier].append({**row, "_selection_tier": tier})
-
-    for tier_name in ALL_TIERS:
-        tier_rows[tier_name].sort(
-            key=lambda row: _tier_rank(
-                row, pass_key, selection_policy=selection_policy
-            )
-        )
-    stats["tier_available_rows"] = {
-        tier_name: len(tier_rows[tier_name])
-        for tier_name in POLICY_TIER_ORDER[selection_policy]
-    }
-    stats["excluded_rows_by_reason"] = dict(sorted(excluded_reason_counts.items()))
-    stats["excluded_pass_histogram_by_reason"] = {
-        reason: _build_pass_histogram(reason_rows, pass_key)
-        for reason, reason_rows in sorted(excluded_rows_by_reason.items())
-    }
-    stats["excluded_rows_total"] = sum(
-        stats["excluded_rows_by_reason"].values()
-    )
-    return tier_rows, stats
 
 
 def _take_matching_from_tiers(
@@ -1088,16 +722,10 @@ def select_debug_rows(
     rows: list[dict[str, Any]],
     target_size: int,
     *,
-    selection_policy: str = "v3_tiered",
+    selection_policy: str = "bucket_unified",
     core_min_pass: float = 0.0625,
     core_max_pass: float = 0.75,
     mastered_pass_min: float = 0.90,
-    hard_valid_build_invalid_max: int = 2,
-    hard_valid_format_invalid_max: int = 1,
-    hard_valid_unique_aux_min: int = 2,
-    hard_valid_duplicate_aux_max: float = 0.875,
-    hard_valid_high_max_fraction: float = 0.50,
-    hard_valid_mid_max_fraction: float = 0.20,
     near_high_mid_max_pass: float = 0.75,
     near_high_mid_max_fraction: float = 0.08,
     mastered_max_fraction: float = 0.05,
@@ -1121,415 +749,36 @@ def select_debug_rows(
     high_pass_max_fraction: float = 1.0,
     pass_one_value: float = 1.0,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    if selection_policy == BUCKET_UNIFIED_POLICY:
-        return _select_debug_rows_bucket_unified(
-            rows,
-            target_size,
-            selection_policy=selection_policy,
-            core_min_pass=core_min_pass,
-            core_max_pass=core_max_pass,
-            mastered_pass_min=mastered_pass_min,
-            near_high_mid_max_pass=near_high_mid_max_pass,
-            near_high_mid_max_fraction=near_high_mid_max_fraction,
-            mastered_max_fraction=mastered_max_fraction,
-            mastered_fallback_min_fill_fraction=mastered_fallback_min_fill_fraction,
-            multi_segment_min_fraction=multi_segment_min_fraction,
-            multi_point_min_fraction=multi_point_min_fraction,
-            family_min_fraction=family_min_fraction,
-            goal_max_fraction=goal_max_fraction,
-            zero_valid_min=zero_valid_min,
-            zero_valid_max=zero_valid_max,
-            zero_pass_reward_std_min=zero_pass_reward_std_min,
-            reward_mixed_zero_unique_aux_min=reward_mixed_zero_unique_aux_min,
-            reward_mixed_zero_max_fraction=reward_mixed_zero_max_fraction,
-            near_low_min_fraction=near_low_min_fraction,
-            near_low_max_fraction=near_low_max_fraction,
-            reward_mixed_zero_min_fraction=reward_mixed_zero_min_fraction,
-            near_high_mid_min_fraction=near_high_mid_min_fraction,
-            greedy_success_max_fraction=greedy_success_max_fraction,
-            pass_one_max_fraction=pass_one_max_fraction,
-            high_pass_min=high_pass_min,
-            high_pass_max_fraction=high_pass_max_fraction,
-            pass_one_value=pass_one_value,
-        )
-
-    tier_order = POLICY_TIER_ORDER[selection_policy]
-    non_mastered_tiers = NON_MASTERED_TIERS_BY_POLICY[selection_policy]
-    tier_rows, filter_stats = filter_candidate_tiers(
+    return _select_debug_rows_bucket_unified(
         rows,
+        target_size,
         selection_policy=selection_policy,
         core_min_pass=core_min_pass,
         core_max_pass=core_max_pass,
         mastered_pass_min=mastered_pass_min,
-        hard_valid_build_invalid_max=hard_valid_build_invalid_max,
-        hard_valid_format_invalid_max=hard_valid_format_invalid_max,
-        hard_valid_unique_aux_min=hard_valid_unique_aux_min,
-        hard_valid_duplicate_aux_max=hard_valid_duplicate_aux_max,
         near_high_mid_max_pass=near_high_mid_max_pass,
+        near_high_mid_max_fraction=near_high_mid_max_fraction,
+        mastered_max_fraction=mastered_max_fraction,
+        mastered_fallback_min_fill_fraction=mastered_fallback_min_fill_fraction,
+        multi_segment_min_fraction=multi_segment_min_fraction,
+        multi_point_min_fraction=multi_point_min_fraction,
+        family_min_fraction=family_min_fraction,
+        goal_max_fraction=goal_max_fraction,
         zero_valid_min=zero_valid_min,
         zero_valid_max=zero_valid_max,
         zero_pass_reward_std_min=zero_pass_reward_std_min,
         reward_mixed_zero_unique_aux_min=reward_mixed_zero_unique_aux_min,
-    )
-
-    selected: list[dict[str, Any]] = []
-    used_ids: set[str] = set()
-    shortages: dict[str, int] = {}
-    pass_key = filter_stats["pass_key"]
-    tier_selected_counter: Counter[str] = Counter()
-    family_counter: Counter[str] = Counter()
-    goal_counter: Counter[str] = Counter()
-    easy_tail_counter: Counter[str] = Counter()
-
-    tier_caps = {"mastered": max(0, int(target_size * mastered_max_fraction))}
-    easy_tail_caps = {
-        "greedy_success": max(0, int(target_size * greedy_success_max_fraction)),
-        "pass_one": max(0, int(target_size * pass_one_max_fraction)),
-        "high_pass": max(0, int(target_size * high_pass_max_fraction)),
-    }
-    if selection_policy == "v3_tiered":
-        tier_caps["hard_valid_high"] = max(
-            0, int(target_size * hard_valid_high_max_fraction)
-        )
-        tier_caps["hard_valid_mid"] = max(
-            0, int(target_size * hard_valid_mid_max_fraction)
-        )
-    elif selection_policy == "v4_reward_mixed":
-        tier_caps["reward_mixed_zero"] = max(
-            0, int(target_size * reward_mixed_zero_max_fraction)
-        )
-    elif selection_policy in {"v6_mid_strict_zero", "v7_structure_strict_zero"}:
-        tier_caps["reward_mixed_zero"] = max(
-            0, int(target_size * reward_mixed_zero_max_fraction)
-        )
-        tier_caps["near_high_mid"] = max(
-            0, int(target_size * near_high_mid_max_fraction)
-        )
-    elif selection_policy == "v9_stage_balanced":
-        tier_caps["near_low"] = max(0, int(target_size * near_low_max_fraction))
-        tier_caps["reward_mixed_zero"] = max(
-            0, int(target_size * reward_mixed_zero_max_fraction)
-        )
-        tier_caps["near_high_mid"] = max(
-            0, int(target_size * near_high_mid_max_fraction)
-        )
-    elif selection_policy == "v10_auxfix_stage_balanced":
-        tier_caps["near_low"] = max(0, int(target_size * near_low_max_fraction))
-        tier_caps["reward_mixed_zero"] = max(
-            0, int(target_size * reward_mixed_zero_max_fraction)
-        )
-        tier_caps["near_high_mid"] = max(
-            0, int(target_size * near_high_mid_max_fraction)
-        )
-    mastered_fallback_min_rows = max(
-        0, int(target_size * mastered_fallback_min_fill_fraction)
-    )
-    multi_segment_target = max(0, int(target_size * multi_segment_min_fraction))
-    multi_point_target = max(0, int(target_size * multi_point_min_fraction))
-    family_target = max(1, int(target_size * family_min_fraction))
-    goal_cap = max(1, int(target_size * goal_max_fraction))
-    tier_min_rows = {}
-    if selection_policy in {"v9_stage_balanced", "v10_auxfix_stage_balanced"}:
-        tier_min_rows = {
-            "near_low": max(0, int(target_size * near_low_min_fraction)),
-            "reward_mixed_zero": max(
-                0, int(target_size * reward_mixed_zero_min_fraction)
-            ),
-            "near_high_mid": max(0, int(target_size * near_high_mid_min_fraction)),
-        }
-
-    taken = _take_matching_from_tiers(
-        selected,
-        tier_selected_counter,
-        used_ids,
-        family_counter,
-        goal_counter,
-        tier_rows,
-        non_mastered_tiers,
-        lambda row: row.get("aux_segment_count", 0) >= 2,
-        multi_segment_target,
-        pass_key=pass_key,
-        tier_caps=tier_caps,
-        goal_cap=goal_cap,
-        easy_tail_counter=easy_tail_counter,
-        easy_tail_caps=easy_tail_caps,
+        reward_mixed_zero_max_fraction=reward_mixed_zero_max_fraction,
+        near_low_min_fraction=near_low_min_fraction,
+        near_low_max_fraction=near_low_max_fraction,
+        reward_mixed_zero_min_fraction=reward_mixed_zero_min_fraction,
+        near_high_mid_min_fraction=near_high_mid_min_fraction,
+        greedy_success_max_fraction=greedy_success_max_fraction,
+        pass_one_max_fraction=pass_one_max_fraction,
         high_pass_min=high_pass_min,
+        high_pass_max_fraction=high_pass_max_fraction,
         pass_one_value=pass_one_value,
     )
-    shortages["multi_segment_shortage"] = max(0, multi_segment_target - len(taken))
-
-    taken = _take_matching_from_tiers(
-        selected,
-        tier_selected_counter,
-        used_ids,
-        family_counter,
-        goal_counter,
-        tier_rows,
-        non_mastered_tiers,
-        lambda row: row.get("aux_points_total", 0) >= 2,
-        multi_point_target,
-        pass_key=pass_key,
-        tier_caps=tier_caps,
-        goal_cap=goal_cap,
-        easy_tail_counter=easy_tail_counter,
-        easy_tail_caps=easy_tail_caps,
-        high_pass_min=high_pass_min,
-        pass_one_value=pass_one_value,
-    )
-    shortages["multi_point_shortage"] = max(0, multi_point_target - len(taken))
-
-    all_families = sorted(
-        {
-            tag
-            for tier in tier_order
-            for row in tier_rows[tier]
-            for tag in row.get("predicate_family_tags", [])
-        }
-    )
-    for family in tqdm(all_families, desc="Balancing predicate families"):
-        need = max(0, family_target - family_counter[family])
-        taken = _take_matching_from_tiers(
-            selected,
-            tier_selected_counter,
-            used_ids,
-            family_counter,
-            goal_counter,
-            tier_rows,
-            non_mastered_tiers,
-            lambda row, family=family: family in row.get("predicate_family_tags", []),
-            need,
-            pass_key=pass_key,
-            tier_caps=tier_caps,
-            goal_cap=goal_cap,
-            easy_tail_counter=easy_tail_counter,
-            easy_tail_caps=easy_tail_caps,
-            high_pass_min=high_pass_min,
-            pass_one_value=pass_one_value,
-        )
-        shortages[f"{family}_shortage"] = max(0, need - len(taken))
-
-    tier_floor_shortages = {}
-    if selection_policy in {"v9_stage_balanced", "v10_auxfix_stage_balanced"}:
-        for tier_name in ("near_low", "reward_mixed_zero", "near_high_mid"):
-            needed = max(0, tier_min_rows.get(tier_name, 0) - tier_selected_counter[tier_name])
-            taken = _take_matching_from_tiers(
-                selected,
-                tier_selected_counter,
-                used_ids,
-                family_counter,
-                goal_counter,
-                tier_rows,
-                (tier_name,),
-                lambda row: True,
-                needed,
-                pass_key=pass_key,
-                tier_caps=tier_caps,
-                goal_cap=goal_cap,
-                easy_tail_counter=easy_tail_counter,
-                easy_tail_caps=easy_tail_caps,
-                high_pass_min=high_pass_min,
-                pass_one_value=pass_one_value,
-            )
-            tier_floor_shortages[tier_name] = max(0, needed - len(taken))
-
-    _take_matching_from_tiers(
-        selected,
-        tier_selected_counter,
-        used_ids,
-        family_counter,
-        goal_counter,
-        tier_rows,
-        non_mastered_tiers,
-        lambda row: True,
-        target_size - len(selected),
-        pass_key=pass_key,
-        tier_caps=tier_caps,
-        goal_cap=goal_cap,
-        easy_tail_counter=easy_tail_counter,
-        easy_tail_caps=easy_tail_caps,
-        high_pass_min=high_pass_min,
-        pass_one_value=pass_one_value,
-    )
-
-    mastered_fallback_triggered = len(selected) < mastered_fallback_min_rows
-    if mastered_fallback_triggered:
-        _take_matching_from_tiers(
-            selected,
-            tier_selected_counter,
-            used_ids,
-            family_counter,
-            goal_counter,
-            tier_rows,
-            ("mastered",),
-            lambda row: True,
-            target_size - len(selected),
-            pass_key=pass_key,
-            tier_caps=tier_caps,
-            goal_cap=goal_cap,
-            easy_tail_counter=easy_tail_counter,
-            easy_tail_caps=easy_tail_caps,
-            high_pass_min=high_pass_min,
-            pass_one_value=pass_one_value,
-        )
-
-    selected_full_rows = selected[:target_size]
-    final_rows = [
-        {
-            "query": row["query"],
-            "fl_problem": row["fl_problem"],
-            "response": row["response"],
-        }
-        for row in selected_full_rows
-    ]
-
-    selected_goal_counter = Counter(
-        row.get("goal_predicate")
-        for row in selected_full_rows
-        if row.get("goal_predicate")
-    )
-    selected_family_counter = Counter()
-    for row in selected_full_rows:
-        for tag in row.get("predicate_family_tags", []):
-            selected_family_counter[tag] += 1
-    selected_tier_counts = Counter(
-        row.get("_selection_tier", "unknown") for row in selected_full_rows
-    )
-    selected_mastered = selected_tier_counts.get("mastered", 0)
-    shortage_reasons = []
-    if len(final_rows) < target_size:
-        shortage_reasons.append("eligible_pool_exhausted_before_target")
-        if filter_stats["excluded_rows_total"] > 0:
-            shortage_reasons.append("noisy_pass_zero_rows_excluded")
-        if sum(filter_stats["tier_available_rows"].values()) > len(final_rows):
-            shortage_reasons.append("tier_caps_or_goal_caps_limited_fill")
-        if not mastered_fallback_triggered:
-            shortage_reasons.append("mastered_fallback_not_enabled")
-
-    report = {
-        **filter_stats,
-        "target_size": target_size,
-        "selected_rows": len(final_rows),
-        "tier_order": list(tier_order),
-        "tier_selected_rows": dict(selected_tier_counts),
-        "stage_order": list(tier_order),
-        "stage_available_rows": filter_stats["tier_available_rows"],
-        "stage_selected_rows": dict(selected_tier_counts),
-        "selection_thresholds": {
-            "selection_policy": selection_policy,
-            "core_pass_window": [core_min_pass, core_max_pass],
-            "mastered_pass_min": mastered_pass_min,
-            "hard_valid_build_invalid_max": hard_valid_build_invalid_max,
-            "hard_valid_format_invalid_max": hard_valid_format_invalid_max,
-            "hard_valid_unique_aux_min": hard_valid_unique_aux_min,
-            "hard_valid_duplicate_aux_max": hard_valid_duplicate_aux_max,
-            "near_high_mid_max_pass": near_high_mid_max_pass,
-            "zero_valid_min": zero_valid_min,
-            "zero_valid_max": zero_valid_max,
-            "zero_pass_reward_std_min": zero_pass_reward_std_min,
-            "reward_mixed_zero_unique_aux_min": reward_mixed_zero_unique_aux_min,
-            "near_low_min_fraction": near_low_min_fraction,
-            "near_low_max_fraction": near_low_max_fraction,
-            "reward_mixed_zero_min_fraction": reward_mixed_zero_min_fraction,
-            "reward_mixed_zero_max_fraction": reward_mixed_zero_max_fraction,
-            "hard_valid_high_max_fraction": hard_valid_high_max_fraction,
-            "hard_valid_mid_max_fraction": hard_valid_mid_max_fraction,
-            "near_high_mid_max_fraction": near_high_mid_max_fraction,
-            "near_high_mid_min_fraction": near_high_mid_min_fraction,
-            "mastered_max_fraction": mastered_max_fraction,
-            "mastered_fallback_min_fill_fraction": (
-                mastered_fallback_min_fill_fraction
-            ),
-            "multi_segment_min_fraction": multi_segment_min_fraction,
-            "multi_point_min_fraction": multi_point_min_fraction,
-            "family_min_fraction": family_min_fraction,
-            "goal_max_fraction": goal_max_fraction,
-            "greedy_success_max_fraction": greedy_success_max_fraction,
-            "pass_one_max_fraction": pass_one_max_fraction,
-            "high_pass_min": high_pass_min,
-            "high_pass_max_fraction": high_pass_max_fraction,
-            "pass_one_value": pass_one_value,
-        },
-        "tier_caps": tier_caps,
-        "easy_tail_caps": easy_tail_caps,
-        "tier_min_rows": tier_min_rows,
-        "tier_max_rows": tier_caps,
-        "tier_floor_shortages": tier_floor_shortages,
-        "goal_cap_rows": goal_cap,
-        "mastered_fallback_min_rows": mastered_fallback_min_rows,
-        "mastered_fallback_triggered": mastered_fallback_triggered,
-        "selected_mastered_rows": selected_mastered,
-        "selected_mastered_ratio": (
-            selected_mastered / len(final_rows) if final_rows else 0.0
-        ),
-        "selected_pass_one_rows": easy_tail_counter["pass_one"],
-        "selected_pass_one_ratio": (
-            easy_tail_counter["pass_one"] / len(final_rows) if final_rows else 0.0
-        ),
-        "selected_high_pass_rows": easy_tail_counter["high_pass"],
-        "selected_high_pass_ratio": (
-            easy_tail_counter["high_pass"] / len(final_rows) if final_rows else 0.0
-        ),
-        "selected_hard_valid_mid_rows": selected_tier_counts.get("hard_valid_mid", 0),
-        "selected_hard_valid_mid_ratio": (
-            selected_tier_counts.get("hard_valid_mid", 0) / len(final_rows)
-            if final_rows
-            else 0.0
-        ),
-        "selected_reward_mixed_zero_rows": selected_tier_counts.get(
-            "reward_mixed_zero", 0
-        ),
-        "selected_reward_mixed_zero_ratio": (
-            selected_tier_counts.get("reward_mixed_zero", 0) / len(final_rows)
-            if final_rows
-            else 0.0
-        ),
-        "selected_near_low_rows": selected_tier_counts.get("near_low", 0),
-        "selected_near_low_ratio": (
-            selected_tier_counts.get("near_low", 0) / len(final_rows)
-            if final_rows
-            else 0.0
-        ),
-        "selected_near_high_mid_rows": selected_tier_counts.get("near_high_mid", 0),
-        "selected_near_high_mid_ratio": (
-            selected_tier_counts.get("near_high_mid", 0) / len(final_rows)
-            if final_rows
-            else 0.0
-        ),
-        "selected_core_rows": selected_tier_counts.get("core", 0),
-        "selected_core_ratio": (
-            selected_tier_counts.get("core", 0) / len(final_rows)
-            if final_rows
-            else 0.0
-        ),
-        "selected_pass_histogram": _build_pass_histogram(selected_full_rows, pass_key),
-        "pass_bucket_selected_by_tier": _build_pass_histogram_by_tier(
-            selected_full_rows, pass_key
-        ),
-        "selected_goal_predicate_distribution": dict(
-            selected_goal_counter.most_common()
-        ),
-        "selected_predicate_family_distribution": dict(
-            selected_family_counter.most_common()
-        ),
-        "selected_aux_segment_count_distribution": dict(
-            sorted(
-                Counter(
-                    row.get("aux_segment_count", 0) for row in selected_full_rows
-                ).items()
-            )
-        ),
-        "selected_aux_points_total_distribution": dict(
-            sorted(
-                Counter(
-                    row.get("aux_points_total", 0) for row in selected_full_rows
-                ).items()
-            )
-        ),
-        **_selected_rows_summary(selected_full_rows, pass_key),
-        "shortages": shortages,
-        "shortage_reasons": shortage_reasons,
-    }
-    return final_rows, report
 
 
 def main() -> None:
@@ -1546,17 +795,11 @@ def main() -> None:
     parser.add_argument(
         "--selection-policy",
         choices=ALL_SELECTION_POLICIES,
-        default="v3_tiered",
+        default=BUCKET_UNIFIED_POLICY,
     )
     parser.add_argument("--core-pass-min", type=float, default=0.0625)
     parser.add_argument("--core-pass-max", type=float, default=0.75)
     parser.add_argument("--mastered-pass-min", type=float, default=0.90)
-    parser.add_argument("--hard-valid-build-invalid-max", type=int, default=2)
-    parser.add_argument("--hard-valid-format-invalid-max", type=int, default=1)
-    parser.add_argument("--hard-valid-unique-aux-min", type=int, default=2)
-    parser.add_argument("--hard-valid-duplicate-aux-max", type=float, default=0.875)
-    parser.add_argument("--hard-valid-high-max-fraction", type=float, default=0.50)
-    parser.add_argument("--hard-valid-mid-max-fraction", type=float, default=0.20)
     parser.add_argument("--near-high-mid-max-pass", type=float, default=0.75)
     parser.add_argument("--near-high-mid-max-fraction", type=float, default=0.08)
     parser.add_argument("--mastered-max-fraction", type=float, default=0.05)
@@ -1591,12 +834,6 @@ def main() -> None:
         core_min_pass=args.core_pass_min,
         core_max_pass=args.core_pass_max,
         mastered_pass_min=args.mastered_pass_min,
-        hard_valid_build_invalid_max=args.hard_valid_build_invalid_max,
-        hard_valid_format_invalid_max=args.hard_valid_format_invalid_max,
-        hard_valid_unique_aux_min=args.hard_valid_unique_aux_min,
-        hard_valid_duplicate_aux_max=args.hard_valid_duplicate_aux_max,
-        hard_valid_high_max_fraction=args.hard_valid_high_max_fraction,
-        hard_valid_mid_max_fraction=args.hard_valid_mid_max_fraction,
         near_high_mid_max_pass=args.near_high_mid_max_pass,
         near_high_mid_max_fraction=args.near_high_mid_max_fraction,
         mastered_max_fraction=args.mastered_max_fraction,
@@ -1627,3 +864,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

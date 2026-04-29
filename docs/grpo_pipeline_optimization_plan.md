@@ -1,6 +1,6 @@
 # GRPO 迭代状态与后续计划
 
-最后更新：2026-04-29
+最后更新：2026-04-29 | 当前 commit: `da70fd477dc18c4859c1c96b8014e5c954b08254`
 
 ## 背景
 
@@ -28,6 +28,50 @@
 **数据集静态指标**：
 - `selected_rows = 10000`，`zero_pass_ratio = 0.1299`（优于 5k 的 0.1736）
 - `multi_point_shortage = 4000`（core 供给在 10k 规模下明显不足）
+
+**Selector 参数说明**：v18 使用当前代码库的 `scripts/grpo/select_debug_set.py`（`bucket_unified`）生成数据集。参考 commit: `da70fd477dc18c4859c1c96b8014e5c954b08254`
+
+**生成 v18 数据集的完整命令**：
+
+```bash
+python scripts/grpo/select_debug_set.py \
+  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8/difficulty_labels.jsonl \
+  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_10k_v18/grpo_train_selected_10000.jsonl \
+  --report-output datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_10k_v18/grpo_train_report_10000.json \
+  --selection-policy bucket_unified \
+  --target-size 10000 \
+  --core-pass-min 0.125 \
+  --core-pass-max 0.625 \
+  --mastered-pass-min 0.90 \
+  --near-high-mid-max-pass 0.75 \
+  --near-high-mid-max-fraction 0.08 \
+  --mastered-max-fraction 0.0 \
+  --mastered-fallback-min-fill-fraction 0.90 \
+  --multi-segment-min-fraction 0.45 \
+  --multi-point-min-fraction 0.40 \
+  --family-min-fraction 0.10 \
+  --goal-max-fraction 0.18 \
+  --zero-valid-min 0.25 \
+  --zero-valid-max 0.875 \
+  --zero-pass-reward-std-min 0.15 \
+  --reward-mixed-zero-unique-aux-min 2 \
+  --reward-mixed-zero-max-fraction 0.15 \
+  --near-low-min-fraction 0.05 \
+  --near-low-max-fraction 0.20 \
+  --reward-mixed-zero-min-fraction 0.05 \
+  --near-high-mid-min-fraction 0.03 \
+  --greedy-success-max-fraction 1.0 \
+  --pass-one-max-fraction 1.0 \
+  --high-pass-min 0.75 \
+  --high-pass-max-fraction 1.0 \
+  --pass-one-value 1.0
+```
+
+**验证**：按上述命令生成的数据集与现有 v18 数据集完全一致（集合和顺序都相同）。
+
+**关键差异（v17 → v18）**：
+- `--target-size 5000` → `10000`
+- `--reward-mixed-zero-max-fraction 0.20` → `0.15`
 
 **训练配置**：与 v17 完全一致
 - `learning_rate = 5e-6`，`warmup_steps = 10`，`lr_scheduler_type = cosine`
@@ -82,6 +126,46 @@
 - `selected_zero_pass_ratio = 0.1736`（v16: 0.05，因 reward_mixed_zero 配额按比例扩大）
 - `selected_avg_proxy_reward_std = 0.3607`，`selected_median_proxy_reward_std = 0.3476`
 - `multi_point_shortage = 573`（core 供给在 5k 规模下接近上限）
+
+**Selector 参数说明**：v17 使用当前代码库的 `scripts/grpo/select_debug_set.py`（`bucket_unified`）生成数据集。参考 commit: `da70fd477dc18c4859c1c96b8014e5c954b08254`
+
+**生成 v17 数据集的完整命令**：
+
+```bash
+python scripts/grpo/select_debug_set.py \
+  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8/difficulty_labels.jsonl \
+  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_5k_v17/grpo_train_selected_5000.jsonl \
+  --report-output datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_5k_v17/grpo_train_report_5000.json \
+  --selection-policy bucket_unified \
+  --target-size 5000 \
+  --core-pass-min 0.125 \
+  --core-pass-max 0.625 \
+  --mastered-pass-min 0.90 \
+  --near-high-mid-max-pass 0.75 \
+  --near-high-mid-max-fraction 0.08 \
+  --mastered-max-fraction 0.0 \
+  --mastered-fallback-min-fill-fraction 0.90 \
+  --multi-segment-min-fraction 0.45 \
+  --multi-point-min-fraction 0.40 \
+  --family-min-fraction 0.10 \
+  --goal-max-fraction 0.18 \
+  --zero-valid-min 0.25 \
+  --zero-valid-max 0.875 \
+  --zero-pass-reward-std-min 0.15 \
+  --reward-mixed-zero-unique-aux-min 2 \
+  --reward-mixed-zero-max-fraction 0.20 \
+  --near-low-min-fraction 0.05 \
+  --near-low-max-fraction 0.20 \
+  --reward-mixed-zero-min-fraction 0.05 \
+  --near-high-mid-min-fraction 0.03 \
+  --greedy-success-max-fraction 1.0 \
+  --pass-one-max-fraction 1.0 \
+  --high-pass-min 0.75 \
+  --high-pass-max-fraction 1.0 \
+  --pass-one-value 1.0
+```
+
+**验证**：按上述命令生成的数据集与现有 v17 数据集完全一致（集合和顺序都相同）。
 
 **训练配置**：与 v16 完全一致
 - `learning_rate = 5e-6`，`warmup_steps = 10`，`lr_scheduler_type = cosine`
