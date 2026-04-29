@@ -59,17 +59,46 @@ python src/newclid/generation/pipeline.py \
 
 ## 2. 数据标注与筛选
 
-### 2.1 构建候选池
+### 2.1 数据集标注
+
+**脚本**：`scripts/analyze_dataset.py`
+
+**命令示例**：
+```bash
+python scripts/analyze_dataset.py \
+  datasets/0123/geometry_clauses10_samples1M.jsonl \
+  --annotations-output datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/annotations.jsonl \
+  --summary-output datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/annotations_summary.json
+```
+
+**功能**：
+- 提取辅助点结构信息（`aux_segment_count`, `aux_points_total`）
+- 提取目标谓词（`goal_predicate`）
+- 提取谓词族标签（`predicate_family_tags`）
+- 提取问题统计信息（`problem_predicate_count`, `problem_clause_count`）
+
+**输出字段**：
+- `sample_id`, `query`, `fl_problem`, `response_aux`
+- `has_aux`, `aux_segment_count`, `aux_points_total`
+- `goal_predicate`, `predicate_family_tags`
+- `problem_predicate_count`, `problem_clause_count`
+
+### 2.2 构建候选池
 
 **脚本**：`scripts/grpo/build_candidate_pool.py`
 
 **命令示例**：
 ```bash
 python scripts/grpo/build_candidate_pool.py \
-  datasets/0123/geometry_clauses10_samples1M.jsonl \
-  datasets/grpo_geometry100k_candidate_pool.jsonl \
-  --target-size 100000
+  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/annotations.jsonl \
+  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/candidate_pool.jsonl \
+  --summary-output datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/candidate_pool_summary.json
 ```
+
+**功能**：
+- 过滤有辅助点的样本（`has_aux=true`）
+- 过滤有效的辅助结构（`aux_segment_count >= 1`, `aux_points_total >= 1`）
+- 保留必要的字段用于后续标注
 
 **输出字段**：
 - `sample_id`, `query`, `fl_problem`, `response`
@@ -77,15 +106,15 @@ python scripts/grpo/build_candidate_pool.py \
 - `aux_segment_count`, `aux_points_total`
 - `n_premises`, `problem_predicate_count`, `problem_clause_count`
 
-### 2.2 难度标注（VLM）
+### 2.3 难度标注（VLM）
 
 **脚本**：`scripts/grpo/label_difficulty_vlm.py`
 
 **命令示例**：
 ```bash
 python scripts/grpo/label_difficulty_vlm.py \
-  datasets/grpo_geometry100k_candidate_pool.jsonl \
-  datasets/grpo_geometry100k_vlm_label_20260421_maxaux8/difficulty_labels.jsonl \
+  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/candidate_pool.jsonl \
+  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/difficulty_labels.jsonl \
   --model-path /C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084 \
   --num-samples 16 \
   --batch-size 4 \
@@ -104,7 +133,7 @@ python scripts/grpo/label_difficulty_vlm.py \
 - `valid_ratio`：有效构造占比
 - `proxy_reward_std`：奖励标准差（衡量难度多样性）
 
-### 2.3 选择训练集
+### 2.4 选择训练集
 
 **脚本**：`scripts/grpo/select_debug_set.py`
 
@@ -148,7 +177,7 @@ python scripts/grpo/select_debug_set.py \
 - `near_high_mid`：高通过率边界（pass@16 ∈ (0.625, 0.75]）
 - `mastered`：过于简单（pass@16 > 0.75）
 
-### 2.4 准备 GRPO 训练数据
+### 2.5 准备 GRPO 训练数据
 
 **脚本**：`scripts/grpo/prepare_grpo_aux_dataset.py`
 
@@ -438,15 +467,23 @@ translated_imo_2004_p1,√,5.06
 # 位置：/C20545/home/wangzi/GenesisGeo_data_models/datasets/0123/
 ```
 
-### Step 2: 构建候选池
+### Step 2: 数据集标注
 ```bash
-python scripts/grpo/build_candidate_pool.py \
+python scripts/analyze_dataset.py \
   /C20545/home/wangzi/GenesisGeo_data_models/datasets/0123/geometry_clauses10_samples1M_aux_updated_img512_inverted_pt_new_remove_proof.jsonl \
-  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/candidate_pool.jsonl \
-  --target-size 100000
+  --annotations-output datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/annotations.jsonl \
+  --summary-output datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/annotations_summary.json
 ```
 
-### Step 3: VLM 标注
+### Step 3: 构建候选池
+```bash
+python scripts/grpo/build_candidate_pool.py \
+  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/annotations.jsonl \
+  datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/candidate_pool.jsonl \
+  --summary-output datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/candidate_pool_summary.json
+```
+
+### Step 4: VLM 标注
 ```bash
 python scripts/grpo/label_difficulty_vlm.py \
   datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/candidate_pool.jsonl \
@@ -457,7 +494,7 @@ python scripts/grpo/label_difficulty_vlm.py \
   --num-workers 40
 ```
 
-### Step 4: 选择训练集
+### Step 5: 选择训练集
 ```bash
 python scripts/grpo/select_debug_set.py \
   datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/difficulty_labels.jsonl \
@@ -470,7 +507,7 @@ python scripts/grpo/select_debug_set.py \
   --mastered-max-fraction 0.0
 ```
 
-### Step 5: GRPO 训练
+### Step 6: GRPO 训练
 ```bash
 CUDA_VISIBLE_DEVICES=0,1,2,3 \
 NPROC_PER_NODE=4 \
@@ -493,7 +530,7 @@ bash scripts/grpo/train_grpo.sh \
   --save_steps 50
 ```
 
-### Step 6: 评估 dev_imo
+### Step 7: 评估 dev_imo
 ```bash
 python scripts/evaluation.py \
   --problems_path benchmarks/dev_imo.txt \
@@ -507,7 +544,7 @@ python scripts/evaluation.py \
   --log_dir results/vXX_lr5e6_checkpoint500
 ```
 
-### Step 7: 评估 imo_95
+### Step 8: 评估 imo_95
 ```bash
 python scripts/evaluation.py \
   --problems_path benchmarks/imo_95.txt \
