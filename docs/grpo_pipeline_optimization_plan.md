@@ -4,7 +4,20 @@
 
 ## 背景
 
-- 基础模型：`vlm_sft44`，路径为 `/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
+- 基础模型（SFT baseline / pre-GRPO）：`vlm_sft44`
+  - 模型路径：`/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
+  - **评估结果路径**：
+    - **dev_imo 评估**：
+      - CSV：`results/devimo_grpo_compare/vlm_sft44/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_vlm_sft44_checkpoint-20084_sv1_d32_b512_s4_gbs4_gbt100_seed123_20260422T062514Z.csv`（14/16）
+      - trace 目录：`results/devimo_grpo_compare/vlm_sft44/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_vlm_sft44_checkpoint-20084_sv1_d32_b512_s4_gbs4_gbt100_seed123_20260422T062514Z/`
+        - problems/：单题 trace（`0000_translated_imo_2000_p6.jsonl` 等）
+        - attempts/：求解尝试记录
+    - **imo_95 评估**：
+      - 初始 run trace 目录：`results/devimo_grpo_compare/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_vlm_sft44_checkpoint-20084_d32_b512_s4_gbs2_gbt100_seed123_20260417T062654Z/`
+      - resume run trace 目录：`results/devimo_grpo_compare/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_resume_from_20260417T062654Z_vlm_sft44_checkpoint-20084_d32_b512_s4_gbs2_gbt100_seed123_20260417T104054Z/`
+      - **merged 合并结果**：`results/devimo_grpo_compare/imo_95_resume_from_20260417T062654Z_merged.csv`（54/95）
+        - problems/：单题 trace（`0000_imo_1983_p2.jsonl` 等）
+        - attempts/：求解尝试记录
 - 原始数据源（版本相关）：
   - v12 及以前：`/C20545/home/wangzi/GenesisGeo_data_models/datasets/0123/geometry_clauses10_samples1M_aux_updated_img512_inverted_pt_new_remove_proof.jsonl`
   - v13：`/C20545/home/wangzi/GenesisGeo/datasets/20260421_maxaux5/geometry_clauses10_samples100k.jsonl`
@@ -408,3 +421,4 @@ mid gate 固定检查：
 - **v15**：与 v14 相同数据集，将学习率从 1e-4 降至 5e-6 并添加 warmup，50-step smoke gate 大幅改善（avg_zero_std = 0.0682），仅跑 50 步作为调参验证
 - **v16**：与 v15 相同配置，切换为 4 卡 DDP，500-step 全程稳定，dev_imo 14/16，imo_95 55/95
 - **v17**：与 v16 相同配置，训练集从 2k 扩大到 5k（约 3.2 epoch），前 50 步 avg_zero_std = 0.0778（优于 v16），**当前主线**
+
