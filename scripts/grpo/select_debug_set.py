@@ -56,6 +56,7 @@ POLICY_TIER_ORDER = {
         "mastered",
     ),
 }
+BUCKET_UNIFIED_POLICY = "bucket_unified"
 NON_MASTERED_TIERS_BY_POLICY = {
     "v3_tiered": (
         "core",
@@ -102,6 +103,30 @@ ALL_TIERS = (
     "hard_valid_mid",
     "reward_mixed_zero",
     "mastered",
+)
+UNIFIED_BUCKETS = (
+    "all_invalid",
+    "mastered",
+    "core",
+    "near_low",
+    "near_high_mid",
+    "easy_tail_nonzero",
+    "high_pass_non_greedy",
+    "zero_valid_low",
+    "zero_valid_high",
+    "zero_reward_std_low",
+    "zero_unique_aux_low",
+    "reward_mixed_zero",
+)
+UNIFIED_MAIN_BUCKET_ORDER = (
+    "core",
+    "near_low",
+    "reward_mixed_zero",
+    "near_high_mid",
+)
+UNIFIED_FALLBACK_BUCKET_ORDER = ("mastered",)
+ALL_SELECTION_POLICIES = tuple(
+    sorted((*POLICY_TIER_ORDER.keys(), BUCKET_UNIFIED_POLICY))
 )
 DEFAULT_REWARD_BY_STATUS = {
     "solved": 1.0,
@@ -212,6 +237,7 @@ def _pass_distance_rank(
         "v7_structure_strict_zero",
         "v9_stage_balanced",
         "v10_auxfix_stage_balanced",
+        BUCKET_UNIFIED_POLICY,
     }:
         return abs(_pass_value(row, pass_key) - 0.375)
     return abs(_valid_ratio(row, pass_key) - 0.5)
@@ -224,6 +250,7 @@ def _tier_rank(
         "v7_structure_strict_zero",
         "v9_stage_balanced",
         "v10_auxfix_stage_balanced",
+        BUCKET_UNIFIED_POLICY,
     }:
         return (
             -int(row.get("aux_points_total", 0) >= 2),
@@ -334,6 +361,165 @@ def _classify_row(
     return "hard_valid_mid"
 
 
+def _excluded_reason(
+    row: dict[str, Any],
+    pass_key: str,
+    *,
+    selection_policy: str,
+    core_min_pass: float,
+    core_max_pass: float,
+    mastered_pass_min: float,
+    hard_valid_build_invalid_max: int,
+    hard_valid_format_invalid_max: int,
+    near_high_mid_max_pass: float,
+    zero_valid_min: float,
+    zero_valid_max: float,
+    zero_pass_reward_std_min: float,
+    reward_mixed_zero_unique_aux_min: int,
+) -> str:
+    pass_value = _pass_value(row, pass_key)
+    if pass_value != 0.0:
+        if (
+            selection_policy
+            in {
+                "v6_mid_strict_zero",
+                "v7_structure_strict_zero",
+                "v9_stage_balanced",
+                "v10_auxfix_stage_balanced",
+            }
+            and near_high_mid_max_pass < pass_value < mastered_pass_min
+        ):
+            return (
+                f"nonzero_easy_tail_"
+                f"{near_high_mid_max_pass:.2f}_{mastered_pass_min:.2f}"
+            )
+        if pass_value >= mastered_pass_min:
+            return f"nonzero_highpass_ge_{mastered_pass_min:.2f}_without_greedy"
+        return "nonzero_other"
+
+    if selection_policy in {
+        "v4_reward_mixed",
+        "v6_mid_strict_zero",
+        "v7_structure_strict_zero",
+        "v9_stage_balanced",
+        "v10_auxfix_stage_balanced",
+    }:
+        valid_ratio = _valid_ratio(row, pass_key)
+        if valid_ratio < zero_valid_min:
+            return "zero_pass_valid_too_low"
+        if valid_ratio > zero_valid_max:
+            return "zero_pass_valid_too_high"
+        if _proxy_reward_std(row) < zero_pass_reward_std_min:
+            return "zero_pass_reward_std_too_low"
+        if int(row.get("unique_aux_count", 0)) < reward_mixed_zero_unique_aux_min:
+            return "zero_pass_unique_aux_too_low"
+        return "zero_pass_other"
+
+    build_invalid_count = int(row.get("build_invalid_count", 0))
+    if build_invalid_count > hard_valid_build_invalid_max:
+        return "zero_pass_build_invalid_too_high"
+
+    format_invalid_count = int(row.get("format_invalid_count", 0))
+    if format_invalid_count > hard_valid_format_invalid_max:
+        return "zero_pass_format_invalid_too_high"
+
+    return "zero_pass_other"
+
+
+def _classify_bucket_unified(
+    row: dict[str, Any],
+    pass_key: str,
+    *,
+    core_min_pass: float,
+    core_max_pass: float,
+    mastered_pass_min: float,
+    near_high_mid_max_pass: float,
+    zero_valid_min: float,
+    zero_valid_max: float,
+    zero_pass_reward_std_min: float,
+    reward_mixed_zero_unique_aux_min: int,
+) -> str:
+    pass_value = _pass_value(row, pass_key)
+    if row.get("all_invalid"):
+        return "all_invalid"
+    if row.get("greedy_success") and pass_value >= mastered_pass_min:
+        return "mastered"
+    if core_min_pass <= pass_value <= core_max_pass:
+        return "core"
+    if 0.0 < pass_value < core_min_pass:
+        return "near_low"
+    if core_max_pass < pass_value <= near_high_mid_max_pass:
+        return "near_high_mid"
+    if near_high_mid_max_pass < pass_value < mastered_pass_min:
+        return "easy_tail_nonzero"
+    if pass_value >= mastered_pass_min:
+        return "high_pass_non_greedy"
+
+    valid_ratio = _valid_ratio(row, pass_key)
+    if valid_ratio < zero_valid_min:
+        return "zero_valid_low"
+    if valid_ratio > zero_valid_max:
+        return "zero_valid_high"
+    if _proxy_reward_std(row) < zero_pass_reward_std_min:
+        return "zero_reward_std_low"
+    if int(row.get("unique_aux_count", 0)) < reward_mixed_zero_unique_aux_min:
+        return "zero_unique_aux_low"
+    return "reward_mixed_zero"
+
+
+def filter_candidate_buckets(
+    rows: list[dict[str, Any]],
+    *,
+    selection_policy: str,
+    core_min_pass: float,
+    core_max_pass: float,
+    mastered_pass_min: float,
+    near_high_mid_max_pass: float,
+    zero_valid_min: float,
+    zero_valid_max: float,
+    zero_pass_reward_std_min: float,
+    reward_mixed_zero_unique_aux_min: int,
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, Any]]:
+    pass_key = _resolve_pass_key(rows)
+    bucket_rows = {bucket_name: [] for bucket_name in UNIFIED_BUCKETS}
+
+    for row in tqdm(rows, desc="Classifying candidate buckets"):
+        bucket = _classify_bucket_unified(
+            row,
+            pass_key,
+            core_min_pass=core_min_pass,
+            core_max_pass=core_max_pass,
+            mastered_pass_min=mastered_pass_min,
+            near_high_mid_max_pass=near_high_mid_max_pass,
+            zero_valid_min=zero_valid_min,
+            zero_valid_max=zero_valid_max,
+            zero_pass_reward_std_min=zero_pass_reward_std_min,
+            reward_mixed_zero_unique_aux_min=reward_mixed_zero_unique_aux_min,
+        )
+        bucket_rows[bucket].append({**row, "_selection_bucket": bucket})
+
+    for bucket_name in UNIFIED_BUCKETS:
+        bucket_rows[bucket_name].sort(
+            key=lambda row: _tier_rank(
+                row, pass_key, selection_policy=BUCKET_UNIFIED_POLICY
+            )
+        )
+
+    stats = {
+        "pass_key": pass_key,
+        "selection_policy": selection_policy,
+        "bucket_order": list(UNIFIED_MAIN_BUCKET_ORDER),
+        "bucket_available_rows": {
+            bucket_name: len(bucket_rows[bucket_name]) for bucket_name in UNIFIED_BUCKETS
+        },
+        "bucket_pass_histogram": {
+            bucket_name: _build_pass_histogram(bucket_rows[bucket_name], pass_key)
+            for bucket_name in UNIFIED_BUCKETS
+        },
+    }
+    return bucket_rows, stats
+
+
 def filter_candidate_tiers(
     rows: list[dict[str, Any]],
     *,
@@ -357,10 +543,14 @@ def filter_candidate_tiers(
         "pass_key": pass_key,
         "removed_all_invalid": 0,
         "removed_mastered": 0,
-        "discarded_non_dead_rows": 0,
+        "excluded_rows_total": 0,
+        "excluded_rows_by_reason": {},
+        "excluded_pass_histogram_by_reason": {},
         "tier_available_rows": {},
         "selection_policy": selection_policy,
     }
+    excluded_rows_by_reason: dict[str, list[dict[str, Any]]] = {}
+    excluded_reason_counts: Counter[str] = Counter()
 
     for row in tqdm(rows, desc="Classifying candidate tiers"):
         tier = _classify_row(
@@ -384,7 +574,24 @@ def filter_candidate_tiers(
             stats["removed_all_invalid"] += 1
             continue
         if tier == "discarded_non_dead":
-            stats["discarded_non_dead_rows"] += 1
+            reason = _excluded_reason(
+                row,
+                pass_key,
+                selection_policy=selection_policy,
+                core_min_pass=core_min_pass,
+                core_max_pass=core_max_pass,
+                mastered_pass_min=mastered_pass_min,
+                hard_valid_build_invalid_max=hard_valid_build_invalid_max,
+                hard_valid_format_invalid_max=hard_valid_format_invalid_max,
+                near_high_mid_max_pass=near_high_mid_max_pass,
+                zero_valid_min=zero_valid_min,
+                zero_valid_max=zero_valid_max,
+                zero_pass_reward_std_min=zero_pass_reward_std_min,
+                reward_mixed_zero_unique_aux_min=reward_mixed_zero_unique_aux_min,
+            )
+            stats["excluded_rows_total"] += 1
+            excluded_reason_counts[reason] += 1
+            excluded_rows_by_reason.setdefault(reason, []).append(row)
             continue
         if tier == "mastered":
             stats["removed_mastered"] += 1
@@ -400,6 +607,14 @@ def filter_candidate_tiers(
         tier_name: len(tier_rows[tier_name])
         for tier_name in POLICY_TIER_ORDER[selection_policy]
     }
+    stats["excluded_rows_by_reason"] = dict(sorted(excluded_reason_counts.items()))
+    stats["excluded_pass_histogram_by_reason"] = {
+        reason: _build_pass_histogram(reason_rows, pass_key)
+        for reason, reason_rows in sorted(excluded_rows_by_reason.items())
+    }
+    stats["excluded_rows_total"] = sum(
+        stats["excluded_rows_by_reason"].values()
+    )
     return tier_rows, stats
 
 
@@ -519,16 +734,354 @@ def _selected_rows_summary(rows: list[dict[str, Any]], pass_key: str) -> dict[st
     }
 
 
+def _build_pass_histogram_by_group(
+    rows: list[dict[str, Any]], pass_key: str, group_key: str
+) -> dict[str, dict[str, int]]:
+    by_group: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        by_group.setdefault(row.get(group_key, "unknown"), []).append(row)
+    return {
+        group_name: _build_pass_histogram(group_rows, pass_key)
+        for group_name, group_rows in sorted(by_group.items())
+    }
+
+
 def _build_pass_histogram_by_tier(
     rows: list[dict[str, Any]], pass_key: str
 ) -> dict[str, dict[str, int]]:
-    by_tier: dict[str, list[dict[str, Any]]] = {}
-    for row in rows:
-        by_tier.setdefault(row.get("_selection_tier", "unknown"), []).append(row)
-    return {
-        tier_name: _build_pass_histogram(tier_rows, pass_key)
-        for tier_name, tier_rows in sorted(by_tier.items())
+    return _build_pass_histogram_by_group(rows, pass_key, "_selection_tier")
+
+
+def _select_debug_rows_bucket_unified(
+    rows: list[dict[str, Any]],
+    target_size: int,
+    *,
+    selection_policy: str,
+    core_min_pass: float,
+    core_max_pass: float,
+    mastered_pass_min: float,
+    near_high_mid_max_pass: float,
+    near_high_mid_max_fraction: float,
+    mastered_max_fraction: float,
+    mastered_fallback_min_fill_fraction: float,
+    multi_segment_min_fraction: float,
+    multi_point_min_fraction: float,
+    family_min_fraction: float,
+    goal_max_fraction: float,
+    zero_valid_min: float,
+    zero_valid_max: float,
+    zero_pass_reward_std_min: float,
+    reward_mixed_zero_unique_aux_min: int,
+    reward_mixed_zero_max_fraction: float,
+    near_low_min_fraction: float,
+    near_low_max_fraction: float,
+    reward_mixed_zero_min_fraction: float,
+    near_high_mid_min_fraction: float,
+    greedy_success_max_fraction: float,
+    pass_one_max_fraction: float,
+    high_pass_min: float,
+    high_pass_max_fraction: float,
+    pass_one_value: float,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    bucket_rows, bucket_stats = filter_candidate_buckets(
+        rows,
+        selection_policy=selection_policy,
+        core_min_pass=core_min_pass,
+        core_max_pass=core_max_pass,
+        mastered_pass_min=mastered_pass_min,
+        near_high_mid_max_pass=near_high_mid_max_pass,
+        zero_valid_min=zero_valid_min,
+        zero_valid_max=zero_valid_max,
+        zero_pass_reward_std_min=zero_pass_reward_std_min,
+        reward_mixed_zero_unique_aux_min=reward_mixed_zero_unique_aux_min,
+    )
+
+    selected: list[dict[str, Any]] = []
+    used_ids: set[str] = set()
+    shortages: dict[str, int] = {}
+    pass_key = bucket_stats["pass_key"]
+    bucket_selected_counter: Counter[str] = Counter()
+    family_counter: Counter[str] = Counter()
+    goal_counter: Counter[str] = Counter()
+    easy_tail_counter: Counter[str] = Counter()
+
+    bucket_min_fraction = {
+        "near_low": near_low_min_fraction,
+        "reward_mixed_zero": reward_mixed_zero_min_fraction,
+        "near_high_mid": near_high_mid_min_fraction,
     }
+    bucket_max_fraction = {
+        "all_invalid": 0.0,
+        "mastered": mastered_max_fraction,
+        "near_low": near_low_max_fraction,
+        "near_high_mid": near_high_mid_max_fraction,
+        "easy_tail_nonzero": 0.0,
+        "high_pass_non_greedy": 0.0,
+        "zero_valid_low": 0.0,
+        "zero_valid_high": 0.0,
+        "zero_reward_std_low": 0.0,
+        "zero_unique_aux_low": 0.0,
+        "reward_mixed_zero": reward_mixed_zero_max_fraction,
+    }
+    bucket_min_rows = {
+        bucket_name: max(0, int(target_size * bucket_min_fraction.get(bucket_name, 0.0)))
+        for bucket_name in UNIFIED_BUCKETS
+    }
+    bucket_max_rows = {
+        bucket_name: (
+            max(0, int(target_size * bucket_max_fraction[bucket_name]))
+            if bucket_name in bucket_max_fraction
+            else target_size
+        )
+        for bucket_name in UNIFIED_BUCKETS
+    }
+    bucket_caps = dict(bucket_max_rows)
+
+    easy_tail_caps = {
+        "greedy_success": max(0, int(target_size * greedy_success_max_fraction)),
+        "pass_one": max(0, int(target_size * pass_one_max_fraction)),
+        "high_pass": max(0, int(target_size * high_pass_max_fraction)),
+    }
+    fallback_trigger_min_rows = max(
+        0, int(target_size * mastered_fallback_min_fill_fraction)
+    )
+    multi_segment_target = max(0, int(target_size * multi_segment_min_fraction))
+    multi_point_target = max(0, int(target_size * multi_point_min_fraction))
+    family_target = max(0, int(target_size * family_min_fraction))
+    goal_cap = max(1, int(target_size * goal_max_fraction))
+
+    taken = _take_matching_from_tiers(
+        selected,
+        bucket_selected_counter,
+        used_ids,
+        family_counter,
+        goal_counter,
+        bucket_rows,
+        UNIFIED_MAIN_BUCKET_ORDER,
+        lambda row: row.get("aux_segment_count", 0) >= 2,
+        multi_segment_target,
+        pass_key=pass_key,
+        tier_caps=bucket_caps,
+        goal_cap=goal_cap,
+        easy_tail_counter=easy_tail_counter,
+        easy_tail_caps=easy_tail_caps,
+        high_pass_min=high_pass_min,
+        pass_one_value=pass_one_value,
+    )
+    shortages["multi_segment_shortage"] = max(0, multi_segment_target - len(taken))
+
+    taken = _take_matching_from_tiers(
+        selected,
+        bucket_selected_counter,
+        used_ids,
+        family_counter,
+        goal_counter,
+        bucket_rows,
+        UNIFIED_MAIN_BUCKET_ORDER,
+        lambda row: row.get("aux_points_total", 0) >= 2,
+        multi_point_target,
+        pass_key=pass_key,
+        tier_caps=bucket_caps,
+        goal_cap=goal_cap,
+        easy_tail_counter=easy_tail_counter,
+        easy_tail_caps=easy_tail_caps,
+        high_pass_min=high_pass_min,
+        pass_one_value=pass_one_value,
+    )
+    shortages["multi_point_shortage"] = max(0, multi_point_target - len(taken))
+
+    all_families = sorted(
+        {
+            tag
+            for bucket_name in UNIFIED_BUCKETS
+            for row in bucket_rows[bucket_name]
+            for tag in row.get("predicate_family_tags", [])
+        }
+    )
+    for family in tqdm(all_families, desc="Balancing predicate families"):
+        need = max(0, family_target - family_counter[family])
+        taken = _take_matching_from_tiers(
+            selected,
+            bucket_selected_counter,
+            used_ids,
+            family_counter,
+            goal_counter,
+            bucket_rows,
+            UNIFIED_MAIN_BUCKET_ORDER,
+            lambda row, family=family: family in row.get("predicate_family_tags", []),
+            need,
+            pass_key=pass_key,
+            tier_caps=bucket_caps,
+            goal_cap=goal_cap,
+            easy_tail_counter=easy_tail_counter,
+            easy_tail_caps=easy_tail_caps,
+            high_pass_min=high_pass_min,
+            pass_one_value=pass_one_value,
+        )
+        shortages[f"{family}_shortage"] = max(0, need - len(taken))
+
+    bucket_floor_shortages = {}
+    for bucket_name in ("near_low", "reward_mixed_zero", "near_high_mid"):
+        needed = max(0, bucket_min_rows[bucket_name] - bucket_selected_counter[bucket_name])
+        taken = _take_matching_from_tiers(
+            selected,
+            bucket_selected_counter,
+            used_ids,
+            family_counter,
+            goal_counter,
+            bucket_rows,
+            (bucket_name,),
+            lambda row: True,
+            needed,
+            pass_key=pass_key,
+            tier_caps=bucket_caps,
+            goal_cap=goal_cap,
+            easy_tail_counter=easy_tail_counter,
+            easy_tail_caps=easy_tail_caps,
+            high_pass_min=high_pass_min,
+            pass_one_value=pass_one_value,
+        )
+        bucket_floor_shortages[bucket_name] = max(0, needed - len(taken))
+
+    _take_matching_from_tiers(
+        selected,
+        bucket_selected_counter,
+        used_ids,
+        family_counter,
+        goal_counter,
+        bucket_rows,
+        UNIFIED_MAIN_BUCKET_ORDER,
+        lambda row: True,
+        target_size - len(selected),
+        pass_key=pass_key,
+        tier_caps=bucket_caps,
+        goal_cap=goal_cap,
+        easy_tail_counter=easy_tail_counter,
+        easy_tail_caps=easy_tail_caps,
+        high_pass_min=high_pass_min,
+        pass_one_value=pass_one_value,
+    )
+
+    fallback_triggered = len(selected) < fallback_trigger_min_rows
+    if fallback_triggered:
+        _take_matching_from_tiers(
+            selected,
+            bucket_selected_counter,
+            used_ids,
+            family_counter,
+            goal_counter,
+            bucket_rows,
+            UNIFIED_FALLBACK_BUCKET_ORDER,
+            lambda row: True,
+            target_size - len(selected),
+            pass_key=pass_key,
+            tier_caps=bucket_caps,
+            goal_cap=goal_cap,
+            easy_tail_counter=easy_tail_counter,
+            easy_tail_caps=easy_tail_caps,
+            high_pass_min=high_pass_min,
+            pass_one_value=pass_one_value,
+        )
+
+    selected_full_rows = selected[:target_size]
+    final_rows = [
+        {
+            "query": row["query"],
+            "fl_problem": row["fl_problem"],
+            "response": row["response"],
+        }
+        for row in selected_full_rows
+    ]
+
+    selected_goal_counter = Counter(
+        row.get("goal_predicate")
+        for row in selected_full_rows
+        if row.get("goal_predicate")
+    )
+    selected_family_counter = Counter()
+    for row in selected_full_rows:
+        for tag in row.get("predicate_family_tags", []):
+            selected_family_counter[tag] += 1
+
+    bucket_selected_rows = {
+        bucket_name: bucket_selected_counter[bucket_name] for bucket_name in UNIFIED_BUCKETS
+    }
+    shortage_reasons = []
+    if len(final_rows) < target_size:
+        shortage_reasons.append("eligible_pool_exhausted_before_target")
+        if sum(bucket_stats["bucket_available_rows"].values()) > len(final_rows):
+            shortage_reasons.append("bucket_caps_or_goal_caps_limited_fill")
+        if not fallback_triggered:
+            shortage_reasons.append("fallback_bucket_not_triggered")
+
+    report = {
+        "pass_key": pass_key,
+        "selection_policy": selection_policy,
+        "target_size": target_size,
+        "selected_rows": len(final_rows),
+        "bucket_order": list(UNIFIED_MAIN_BUCKET_ORDER),
+        "fallback_bucket_order": list(UNIFIED_FALLBACK_BUCKET_ORDER),
+        "fallback_trigger_fill_fraction": mastered_fallback_min_fill_fraction,
+        "fallback_trigger_min_rows": fallback_trigger_min_rows,
+        "fallback_triggered": fallback_triggered,
+        "bucket_available_rows": bucket_stats["bucket_available_rows"],
+        "bucket_selected_rows": bucket_selected_rows,
+        "bucket_min_rows": bucket_min_rows,
+        "bucket_max_rows": bucket_max_rows,
+        "bucket_floor_shortages": bucket_floor_shortages,
+        "bucket_pass_histogram": bucket_stats["bucket_pass_histogram"],
+        "bucket_pass_histogram_selected": _build_pass_histogram_by_group(
+            selected_full_rows, pass_key, "_selection_bucket"
+        ),
+        "selection_thresholds": {
+            "selection_policy": selection_policy,
+            "core_pass_window": [core_min_pass, core_max_pass],
+            "mastered_pass_min": mastered_pass_min,
+            "near_high_mid_max_pass": near_high_mid_max_pass,
+            "zero_valid_min": zero_valid_min,
+            "zero_valid_max": zero_valid_max,
+            "zero_pass_reward_std_min": zero_pass_reward_std_min,
+            "reward_mixed_zero_unique_aux_min": reward_mixed_zero_unique_aux_min,
+            "bucket_min_fraction": bucket_min_fraction,
+            "bucket_max_fraction": bucket_max_fraction,
+            "multi_segment_min_fraction": multi_segment_min_fraction,
+            "multi_point_min_fraction": multi_point_min_fraction,
+            "family_min_fraction": family_min_fraction,
+            "goal_max_fraction": goal_max_fraction,
+            "greedy_success_max_fraction": greedy_success_max_fraction,
+            "pass_one_max_fraction": pass_one_max_fraction,
+            "high_pass_min": high_pass_min,
+            "high_pass_max_fraction": high_pass_max_fraction,
+            "pass_one_value": pass_one_value,
+        },
+        "easy_tail_caps": easy_tail_caps,
+        "goal_cap_rows": goal_cap,
+        "selected_pass_histogram": _build_pass_histogram(selected_full_rows, pass_key),
+        "selected_goal_predicate_distribution": dict(
+            selected_goal_counter.most_common()
+        ),
+        "selected_predicate_family_distribution": dict(
+            selected_family_counter.most_common()
+        ),
+        "selected_aux_segment_count_distribution": dict(
+            sorted(
+                Counter(
+                    row.get("aux_segment_count", 0) for row in selected_full_rows
+                ).items()
+            )
+        ),
+        "selected_aux_points_total_distribution": dict(
+            sorted(
+                Counter(
+                    row.get("aux_points_total", 0) for row in selected_full_rows
+                ).items()
+            )
+        ),
+        **_selected_rows_summary(selected_full_rows, pass_key),
+        "shortages": shortages,
+        "shortage_reasons": shortage_reasons,
+    }
+    return final_rows, report
 
 
 def select_debug_rows(
@@ -568,6 +1121,38 @@ def select_debug_rows(
     high_pass_max_fraction: float = 1.0,
     pass_one_value: float = 1.0,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    if selection_policy == BUCKET_UNIFIED_POLICY:
+        return _select_debug_rows_bucket_unified(
+            rows,
+            target_size,
+            selection_policy=selection_policy,
+            core_min_pass=core_min_pass,
+            core_max_pass=core_max_pass,
+            mastered_pass_min=mastered_pass_min,
+            near_high_mid_max_pass=near_high_mid_max_pass,
+            near_high_mid_max_fraction=near_high_mid_max_fraction,
+            mastered_max_fraction=mastered_max_fraction,
+            mastered_fallback_min_fill_fraction=mastered_fallback_min_fill_fraction,
+            multi_segment_min_fraction=multi_segment_min_fraction,
+            multi_point_min_fraction=multi_point_min_fraction,
+            family_min_fraction=family_min_fraction,
+            goal_max_fraction=goal_max_fraction,
+            zero_valid_min=zero_valid_min,
+            zero_valid_max=zero_valid_max,
+            zero_pass_reward_std_min=zero_pass_reward_std_min,
+            reward_mixed_zero_unique_aux_min=reward_mixed_zero_unique_aux_min,
+            reward_mixed_zero_max_fraction=reward_mixed_zero_max_fraction,
+            near_low_min_fraction=near_low_min_fraction,
+            near_low_max_fraction=near_low_max_fraction,
+            reward_mixed_zero_min_fraction=reward_mixed_zero_min_fraction,
+            near_high_mid_min_fraction=near_high_mid_min_fraction,
+            greedy_success_max_fraction=greedy_success_max_fraction,
+            pass_one_max_fraction=pass_one_max_fraction,
+            high_pass_min=high_pass_min,
+            high_pass_max_fraction=high_pass_max_fraction,
+            pass_one_value=pass_one_value,
+        )
+
     tier_order = POLICY_TIER_ORDER[selection_policy]
     non_mastered_tiers = NON_MASTERED_TIERS_BY_POLICY[selection_policy]
     tier_rows, filter_stats = filter_candidate_tiers(
@@ -813,7 +1398,7 @@ def select_debug_rows(
     shortage_reasons = []
     if len(final_rows) < target_size:
         shortage_reasons.append("eligible_pool_exhausted_before_target")
-        if filter_stats["discarded_non_dead_rows"] > 0:
+        if filter_stats["excluded_rows_total"] > 0:
             shortage_reasons.append("noisy_pass_zero_rows_excluded")
         if sum(filter_stats["tier_available_rows"].values()) > len(final_rows):
             shortage_reasons.append("tier_caps_or_goal_caps_limited_fill")
@@ -960,7 +1545,7 @@ def main() -> None:
     parser.add_argument("--target-size", type=int, default=2000)
     parser.add_argument(
         "--selection-policy",
-        choices=sorted(POLICY_TIER_ORDER),
+        choices=ALL_SELECTION_POLICIES,
         default="v3_tiered",
     )
     parser.add_argument("--core-pass-min", type=float, default=0.0625)
