@@ -181,10 +181,10 @@ class VLMAgent(BaseAgent):
         | tuple[ProblemJGEX, ProofState | None, str]
         | None
     ):
-        del ddar_result, proof, request, raw_aux_text
+        del ddar_result, proof, request, aux_dsl
         if self.search_version == "v2":
-            return new_problem, None, aux_dsl[len("<aux>") :]
-        del prior_state, aux_dsl
+            return new_problem, None, raw_aux_text
+        del prior_state, raw_aux_text
         return new_problem, None
 
     def finalize_next_queue(

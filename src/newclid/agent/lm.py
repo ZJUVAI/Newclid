@@ -111,11 +111,11 @@ class LMAgent(BaseAgent):
         aux_dsl: str,
         raw_aux_text: str,
     ) -> ProblemJGEX | tuple[ProblemJGEX, str]:
-        del ddar_result, proof, raw_aux_text
+        del ddar_result, proof, aux_dsl
         if self.search_version == "v2":
             del request
-            return new_problem, aux_dsl[len("<aux>") :]
-        del prior_state, request, aux_dsl
+            return new_problem, raw_aux_text
+        del prior_state, request, raw_aux_text
         return new_problem
 
     def get_new_point_name(self, problem: ProblemJGEX) -> str:

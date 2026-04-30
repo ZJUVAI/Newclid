@@ -13,7 +13,7 @@ from modelscope import AutoProcessor as ModelScopeAutoProcessor
 from modelscope import Qwen3VLForConditionalGeneration
 from qwen_vl_utils import process_vision_info
 from transformers import AutoProcessor as TransformersAutoProcessor
-from transformers import Qwen3_5ForConditionalGeneration
+from transformers import Qwen3_5ForConditionalGeneration, StoppingCriteria, StoppingCriteriaList
 from transformers.utils import logging as hf_logging
 
 from newclid.agent.runtime.batched_decode import decode_batched_continuations
@@ -134,6 +134,20 @@ def _build_text_only_prompt(processor, request: dict[str, Any]) -> str:
     )
 
 
+class _EndAuxTagCriteria(StoppingCriteria):
+    """Stop generation when all sequences end with the ` </aux>` token sequence."""
+
+    def __init__(self, stop_ids: list[int], device):
+        self._stop = torch.tensor(stop_ids, device=device)
+
+    def __call__(self, input_ids: torch.LongTensor, scores, **kwargs) -> bool:
+        n = len(self._stop)
+        if input_ids.shape[1] < n:
+            return False
+        tail = input_ids[:, -n:]
+        return bool((tail == self._stop).all())
+
+
 def _resolve_visual_stop_tokens(
     processor, agent_kind: str
 ) -> tuple[int | None, int | None]:
@@ -231,15 +245,19 @@ def generate_visual_aux_dsl_dict_batch(
     model_inputs = _build_visual_batch_inputs(model, processor, requests)
     profile["input_build_time_s"] += time.perf_counter() - input_build_start
     pad_token_id, eos_token_id = _resolve_visual_stop_tokens(processor, agent_kind)
+    stop_ids = processor.tokenizer.encode(" </aux>", add_special_tokens=False)
+    stopping_criteria = StoppingCriteriaList([
+        _EndAuxTagCriteria(stop_ids, device=model.device)
+    ])
 
     generate_start = time.perf_counter()
     generated_output = model.generate(
         **model_inputs,
-        max_new_tokens=100,
+        max_new_tokens=512,
         num_beams=decoding_size,
         num_return_sequences=decoding_size,
         pad_token_id=pad_token_id,
-        eos_token_id=eos_token_id,
+        stopping_criteria=stopping_criteria,
         return_dict_in_generate=True,
         output_scores=True,
     )
@@ -251,7 +269,7 @@ def generate_visual_aux_dsl_dict_batch(
             sequence.tolist(),
             prompt_token_count=prompt_token_counts[index // decoding_size],
             pad_token_id=pad_token_id,
-            eos_token_id=eos_token_id,
+            eos_token_id=None,
         )
         for index, sequence in enumerate(generated_output.sequences)
     ]
@@ -310,16 +328,19 @@ def generate_qwen3_text_only_aux_dsl_dict_batch(
     model_inputs = _build_text_only_batch_inputs(model, processor, requests)
     profile["input_build_time_s"] += time.perf_counter() - input_build_start
     pad_token_id = processor.tokenizer.pad_token_id
-    eos_token_id = processor.tokenizer.encode(" ;", add_special_tokens=False)[0]
+    stop_ids = processor.tokenizer.encode(" </aux>", add_special_tokens=False)
+    stopping_criteria = StoppingCriteriaList([
+        _EndAuxTagCriteria(stop_ids, device=model.device)
+    ])
 
     generate_start = time.perf_counter()
     generated_output = model.generate(
         **model_inputs,
-        max_new_tokens=100,
+        max_new_tokens=512,
         num_beams=decoding_size,
         num_return_sequences=decoding_size,
         pad_token_id=pad_token_id,
-        eos_token_id=eos_token_id,
+        stopping_criteria=stopping_criteria,
         return_dict_in_generate=True,
         output_scores=True,
     )
@@ -331,7 +352,7 @@ def generate_qwen3_text_only_aux_dsl_dict_batch(
             sequence.tolist(),
             prompt_token_count=prompt_token_counts[index // decoding_size],
             pad_token_id=pad_token_id,
-            eos_token_id=eos_token_id,
+            eos_token_id=None,
         )
         for index, sequence in enumerate(generated_output.sequences)
     ]

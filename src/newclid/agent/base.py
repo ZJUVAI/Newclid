@@ -132,10 +132,13 @@ class BaseAgent(DeductiveAgent, ABC):
         return next_queue
 
     def extract_raw_aux_text(self, aux_dsl: str, *, request: dict[str, Any]) -> str:
-        response_prefix = str(request.get("response_prefix", "<aux> x00"))
-        if aux_dsl.startswith(response_prefix):
-            return aux_dsl[len(response_prefix) :]
-        return aux_dsl
+        # Strip <aux> opening tag only; x00 prefix is handled by try_dsl_to_constructions
+        text = aux_dsl.removeprefix("<aux>").lstrip()
+        # Strip trailing </aux> tag if present (new EOS format)
+        stripped = text.rstrip()
+        if stripped.endswith("</aux>"):
+            text = stripped[: -len("</aux>")].rstrip()
+        return text
 
     def _child_path_key(
         self, parent_path_key: tuple[int, ...], candidate_rank: int

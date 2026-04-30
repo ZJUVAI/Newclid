@@ -192,7 +192,7 @@ def test_text_agent_v2_uses_root_query_and_accumulates_prefix():
         ddar_result={},
         proof=base_proof,
         request=request,
-        aux_dsl="<aux> d x00 d : coll a b d [000] ;",
+        aux_dsl="<aux> d x00 d : coll a b d [000] ; </aux>",
         raw_aux_text=" d x00 d : coll a b d [000] ;",
     )
     next_request = agent.prepare_request(
@@ -249,7 +249,7 @@ def test_visual_agent_v2_uses_root_query_and_preserves_aux_prefix_during_materia
         ddar_result={},
         proof=base_proof,
         request=request,
-        aux_dsl="<aux> d x00 d : coll a b d [000] ;",
+        aux_dsl="<aux> d x00 d : coll a b d [000] ; </aux>",
         raw_aux_text=" d x00 d : coll a b d [000] ;",
     )
 

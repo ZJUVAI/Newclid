@@ -7,7 +7,7 @@ from typing import Any
 
 import ray
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, StoppingCriteria, StoppingCriteriaList
 from transformers.utils import logging as hf_logging
 
 from newclid.agent.runtime.batched_decode import decode_batched_continuations
@@ -209,6 +209,20 @@ def _accumulate_request_profile(
         worker_batch_profile["first_token_latency_count"] += 1
 
 
+class _EndAuxTagCriteria(StoppingCriteria):
+    """Stop generation when all sequences end with the ` </aux>` token sequence."""
+
+    def __init__(self, stop_ids: list[int], device):
+        self._stop = torch.tensor(stop_ids, device=device)
+
+    def __call__(self, input_ids: torch.LongTensor, scores, **kwargs) -> bool:
+        n = len(self._stop)
+        if input_ids.shape[1] < n:
+            return False
+        tail = input_ids[:, -n:]
+        return bool((tail == self._stop).all())
+
+
 def generate_aux_dsl_dict_batch(
     model,
     tokenizer,
@@ -250,16 +264,19 @@ def generate_aux_dsl_dict_batch(
     )
     profile["input_build_time_s"] += time.perf_counter() - input_build_start
     pad_token_id = tokenizer.pad_token_id
-    eos_token_id = tokenizer.encode(" ;", add_special_tokens=False)[0]
+    stop_ids = tokenizer.encode(" </aux>", add_special_tokens=False)
+    stopping_criteria = StoppingCriteriaList([
+        _EndAuxTagCriteria(stop_ids, device=model.device)
+    ])
 
     generate_start = time.perf_counter()
     generated_output = model.generate(
         **model_inputs,
-        max_new_tokens=100,
+        max_new_tokens=512,
         num_beams=decoding_size,
         num_return_sequences=decoding_size,
         pad_token_id=pad_token_id,
-        eos_token_id=eos_token_id,
+        stopping_criteria=stopping_criteria,
         return_dict_in_generate=True,
         output_scores=True,
     )
@@ -271,7 +288,7 @@ def generate_aux_dsl_dict_batch(
             sequence.tolist(),
             prompt_token_count=prompt_token_counts[index // decoding_size],
             pad_token_id=pad_token_id,
-            eos_token_id=eos_token_id,
+            eos_token_id=None,
         )
         for index, sequence in enumerate(generated_output.sequences)
     ]

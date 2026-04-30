@@ -21,10 +21,10 @@ class BatchedDecodeTests(unittest.TestCase):
             np.array([201, 202, 203, 0, 0, 0, 0, 0, 17, 18]),
         ]
         decoded = {
-            (11, 12): " : perp b d c p [021] coll b d p [022] ;",
-            (13, 14): " : cyclic a b c p [021] coll b d p [022] ;",
-            (15, 16): " : perp a q b q [021] perp a q d q [022] ;",
-            (17, 18): " : coll a b q [021] coll c d q [022] ;",
+            (11, 12): " : perp b d c p [021] coll b d p [022] ; </aux>",
+            (13, 14): " : cyclic a b c p [021] coll b d p [022] ; </aux>",
+            (15, 16): " : perp a q b q [021] perp a q d q [022] ; </aux>",
+            (17, 18): " : coll a b q [021] coll c d q [022] ; </aux>",
         }
 
         outputs = decode_batched_continuations(
@@ -41,12 +41,12 @@ class BatchedDecodeTests(unittest.TestCase):
             outputs,
             [
                 [
-                    "<aux> x00 p : perp b d c p [021] coll b d p [022] ;",
-                    "<aux> x00 p : cyclic a b c p [021] coll b d p [022] ;",
+                    "<aux> x00 p : perp b d c p [021] coll b d p [022] ; </aux>",
+                    "<aux> x00 p : cyclic a b c p [021] coll b d p [022] ; </aux>",
                 ],
                 [
-                    "<aux> x00 q : perp a q b q [021] perp a q d q [022] ;",
-                    "<aux> x00 q : coll a b q [021] coll c d q [022] ;",
+                    "<aux> x00 q : perp a q b q [021] perp a q d q [022] ; </aux>",
+                    "<aux> x00 q : coll a b q [021] coll c d q [022] ; </aux>",
                 ],
             ],
         )
@@ -67,12 +67,12 @@ class BatchedDecodeTests(unittest.TestCase):
             model_inputs=model_inputs,
             sequences=sequences,
             decoding_size=1,
-            decode_batch=lambda batch: [" : perp b d c p [021] coll b d p [022] ;"],
+            decode_batch=lambda batch: [" : perp b d c p [021] coll b d p [022] ; </aux>"],
         )
 
         self.assertEqual(
             outputs,
-            [["<aux> x00 p : perp b d c p [021] coll b d p [022] ;"]],
+            [["<aux> x00 p : perp b d c p [021] coll b d p [022] ; </aux>"]],
         )
 
     def test_decode_batched_continuations_preserves_beam_order(self):
@@ -92,16 +92,16 @@ class BatchedDecodeTests(unittest.TestCase):
             sequences=sequences,
             decoding_size=3,
             decode_batch=lambda batch: [
-                f" : candidate_{item.tolist()[0]} ;" for item in batch
+                f" : candidate_{item.tolist()[0]} ; </aux>" for item in batch
             ],
         )
 
         self.assertEqual(
             outputs[0],
             [
-                "<aux> x00 p : candidate_41 ;",
-                "<aux> x00 p : candidate_42 ;",
-                "<aux> x00 p : candidate_43 ;",
+                "<aux> x00 p : candidate_41 ; </aux>",
+                "<aux> x00 p : candidate_42 ; </aux>",
+                "<aux> x00 p : candidate_43 ; </aux>",
             ],
         )
 
@@ -121,12 +121,12 @@ class BatchedDecodeTests(unittest.TestCase):
             model_inputs=model_inputs,
             sequences=sequences,
             decoding_size=1,
-            decode_batch=lambda batch: [" r : coll a b q [001] ;"],
+            decode_batch=lambda batch: [" r : coll a b q [001] ; </aux>"],
         )
 
         self.assertEqual(
             outputs,
-            [["<aux> a x00 q r : coll a b q [001] ;"]],
+            [["<aux> a x00 q r : coll a b q [001] ; </aux>"]],
         )
 
 
