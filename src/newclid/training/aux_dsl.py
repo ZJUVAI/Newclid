@@ -64,7 +64,11 @@ def extract_first_tagged_aux_block(completion: str) -> Optional[str]:
 
 
 def try_dsl_to_constructions(content: str) -> Optional[str]:
-    """Translate generated aux DSL into internal construction syntax."""
+    """Translate generated aux DSL into internal construction syntax.
+
+    Supports multiple auxiliary points separated by semicolons.
+    Each segment may optionally carry an x00 prefix.
+    """
     if content is None:
         return None
 
@@ -72,8 +76,25 @@ def try_dsl_to_constructions(content: str) -> Optional[str]:
     if not content:
         return None
 
+    segments = [s.strip() for s in content.split(";") if s.strip()]
+    if not segments:
+        return None
+
+    all_constructions = []
+    for segment in segments:
+        construction = _try_single_dsl_to_construction(segment)
+        if construction is None:
+            return None
+        all_constructions.append(construction)
+    return "; ".join(all_constructions)
+
+
+def _try_single_dsl_to_construction(segment: str) -> Optional[str]:
+    """Translate a single aux DSL segment into internal construction syntax."""
+    segment = _AUX_PREFIX_RE.sub("", segment, count=1).strip()
+
     try:
-        points, premises = content.split(";", 1)[0].split(" : ", 1)
+        points, premises = segment.split(" : ", 1)
     except ValueError:
         return None
 
@@ -83,7 +104,7 @@ def try_dsl_to_constructions(content: str) -> Optional[str]:
     point = points[0]
 
     premises = re.split(r"\s*\[\d+\]", premises)
-    premises = [segment.strip() for segment in premises if segment.strip()]
+    premises = [s.strip() for s in premises if s.strip()]
     if len(premises) > 2:
         return None
     if len(premises) == 0:

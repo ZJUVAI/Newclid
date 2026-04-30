@@ -22,7 +22,6 @@ from newclid.numerical.geometries import PointNum
 from newclid.agent.runtime.search_runtime import classify_build_exception
 from newclid.proof import ProofState
 from newclid.training.aux_dsl import (
-    _AUX_PREFIX_RE,
     extract_aux_body,
     normalize_aux_text,
     try_dsl_to_constructions,
@@ -176,8 +175,6 @@ class AuxRewardEvaluator:
     def _evaluate_uncached(
         self, *, aux_body: str, normalized_aux: str, problem_dsl: str
     ) -> AuxEvaluationResult:
-        # Bug fix: Support multiple auxiliary points
-        # Split by semicolon, remove x00 prefix from each segment, convert each to construction
         aux_content = aux_body.strip()
 
         # Remove <aux> tags if present
@@ -187,45 +184,31 @@ class AuxRewardEvaluator:
             aux_content = aux_content[:-6]
         aux_content = aux_content.strip()
 
-        # Split by semicolon to get individual auxiliary points
-        segments = [s.strip() for s in aux_content.split(";") if s.strip()]
-
-        # Process each segment
-        all_constructions = []
-        for segment in segments:
-            # Remove x00 prefix from this segment
-            segment_clean = _AUX_PREFIX_RE.sub("", segment, count=1).strip()
-
-            # Convert to construction
-            try:
-                construction = try_dsl_to_constructions(segment_clean)
-            except Exception as exc:
-                error_type = "parse_error"
-                message = f"{type(exc).__name__}: {exc}"
-                if message not in self._seen_parse_errors:
-                    logger.info("GRPO reward aux parse error: %s", message)
-                    self._seen_parse_errors.add(message)
-                return AuxEvaluationResult(
-                    normalized_aux=normalized_aux,
-                    format_ok=False,
-                    build_ok=False,
-                    ddar_status="format_invalid",
-                    error_type=error_type,
-                    reward=self.invalid_format_reward,
-                )
-            if not construction:
-                return AuxEvaluationResult(
-                    normalized_aux=normalized_aux,
-                    format_ok=False,
-                    build_ok=False,
-                    ddar_status="format_invalid",
-                    error_type="format_invalid",
-                    reward=self.invalid_format_reward,
-                )
-            all_constructions.append(construction)
-
-        # Join all constructions with semicolon
-        constructions = "; ".join(all_constructions)
+        try:
+            constructions = try_dsl_to_constructions(aux_content)
+        except Exception as exc:
+            error_type = "parse_error"
+            message = f"{type(exc).__name__}: {exc}"
+            if message not in self._seen_parse_errors:
+                logger.info("GRPO reward aux parse error: %s", message)
+                self._seen_parse_errors.add(message)
+            return AuxEvaluationResult(
+                normalized_aux=normalized_aux,
+                format_ok=False,
+                build_ok=False,
+                ddar_status="format_invalid",
+                error_type=error_type,
+                reward=self.invalid_format_reward,
+            )
+        if not constructions:
+            return AuxEvaluationResult(
+                normalized_aux=normalized_aux,
+                format_ok=False,
+                build_ok=False,
+                ddar_status="format_invalid",
+                error_type="format_invalid",
+                reward=self.invalid_format_reward,
+            )
 
         try:
             problem = ProblemJGEX.from_text(_coerce_problem_text(problem_dsl))
