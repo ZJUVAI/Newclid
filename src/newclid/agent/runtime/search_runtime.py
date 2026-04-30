@@ -59,7 +59,62 @@ def get_new_point_name(problem: ProblemJGEX) -> str:
 
 
 def try_dsl_to_constructions(content: str) -> str | None:
-    points, premises = content.split(";")[0].split(" : ")
+    """
+    Translate generated aux DSL into internal construction syntax.
+    Supports multiple auxiliary points separated by semicolons.
+
+    Args:
+        content: DSL string, e.g., "e : coll a b e [002] ; f : perp e f a b [003]"
+
+    Returns:
+        Construction string, e.g., "e = on_line e a b; f = on_tline f e a b"
+        or None if parsing fails
+    """
+    if not content:
+        return None
+
+    content = content.strip()
+    if not content:
+        return None
+
+    # Split by semicolon to get individual auxiliary points
+    segments = [s.strip() for s in content.split(";") if s.strip()]
+
+    if not segments:
+        return None
+
+    # Process each segment
+    all_constructions = []
+    for segment in segments:
+        construction = _try_single_dsl_to_construction(segment)
+        if construction is None:
+            return None
+        all_constructions.append(construction)
+
+    # Join all constructions with semicolon
+    return "; ".join(all_constructions)
+
+
+def _try_single_dsl_to_construction(segment: str) -> str | None:
+    """
+    Process a single auxiliary point segment.
+
+    Args:
+        segment: Single segment like "e : coll a b e [002]" or "x00 e : coll a b e [002]"
+                 Note: In actual data, each segment has x00 prefix
+
+    Returns:
+        Construction string like "e = on_line e a b" or None if invalid
+    """
+    # Remove x00 prefix if present (each segment in actual data has this)
+    # Pattern matches "x" followed by digits and whitespace
+    segment = re.sub(r"^x\d+\s+", "", segment).strip()
+
+    try:
+        points, premises = segment.split(" : ", 1)
+    except ValueError:
+        return None
+
     point_names = points.strip().split()
     if len(point_names) != 1:
         return None
@@ -67,7 +122,7 @@ def try_dsl_to_constructions(content: str) -> str | None:
 
     premise_segments = re.split(r"\s*\[\d+\]", premises)
     premise_segments = [
-        segment.strip() for segment in premise_segments if segment.strip()
+        seg.strip() for seg in premise_segments if seg.strip()
     ]
     if len(premise_segments) > 2:
         return None

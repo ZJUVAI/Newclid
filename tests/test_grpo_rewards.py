@@ -25,7 +25,7 @@ SAMPLE_COMPLETION = (
     "<numerical_check> ncoll a c e [014] ; </numerical_check>"
 )
 SAMPLE_MULTI_AUX_COMPLETION = (
-    "<aux> x00 e : coll a b e [002] ; f : perp e f a b [003] ; </aux>"
+    "<aux> x00 e : coll a b e [002] ; x00 f : perp e f a b [003] ; </aux>"
 )
 
 
