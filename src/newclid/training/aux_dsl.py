@@ -5,14 +5,11 @@ from __future__ import annotations
 import re
 from typing import Optional
 
-from newclid.predicates.collinearity import Coll
-from newclid.predicates.congruence import Cong
-from newclid.predicates.cyclic import Cyclic
-from newclid.predicates.equal_angles import EqAngle
-from newclid.predicates.equal_ratios import EqRatio
-from newclid.predicates.midpoint import MidPoint
-from newclid.predicates.parallelism import Para
-from newclid.predicates.perpendicularity import Perp
+# Import the unified DSL-to-construction functions from search_runtime
+from newclid.agent.runtime.search_runtime import (
+    try_dsl_to_constructions,
+    translate_dsl_to_construction,
+)
 
 
 _AUX_BLOCK_RE = re.compile(r"<aux>\s*(.*?)\s*</aux>", re.DOTALL | re.IGNORECASE)
@@ -63,118 +60,12 @@ def extract_first_tagged_aux_block(completion: str) -> Optional[str]:
     return extract_first_aux_block(match.group(0))
 
 
-def try_dsl_to_constructions(content: str) -> Optional[str]:
-    """Translate generated aux DSL into internal construction syntax.
-
-    Supports multiple auxiliary points separated by semicolons.
-    Each segment may optionally carry an x00 prefix.
-    """
-    if content is None:
-        return None
-
-    content = content.strip()
-    if not content:
-        return None
-
-    segments = [s.strip() for s in content.split(";") if s.strip()]
-    if not segments:
-        return None
-
-    all_constructions = []
-    for segment in segments:
-        construction = _try_single_dsl_to_construction(segment)
-        if construction is None:
-            return None
-        all_constructions.append(construction)
-    return "; ".join(all_constructions)
-
-
-def _try_single_dsl_to_construction(segment: str) -> Optional[str]:
-    """Translate a single aux DSL segment into internal construction syntax."""
-    segment = _AUX_PREFIX_RE.sub("", segment, count=1).strip()
-
-    try:
-        points, premises = segment.split(" : ", 1)
-    except ValueError:
-        return None
-
-    points = points.strip().split()
-    if len(points) == 0 or len(points) > 1:
-        return None
-    point = points[0]
-
-    premises = re.split(r"\s*\[\d+\]", premises)
-    premises = [s.strip() for s in premises if s.strip()]
-    if len(premises) > 2:
-        return None
-    if len(premises) == 0:
-        return f"{point} = free {point}"
-
-    result_constructions = []
-    for premise in premises:
-        parts = premise.split()
-        if not parts or not parts[0].isalpha():
-            return None
-        construction = translate_dsl_to_construction(point, parts[0], parts[1:])
-        result_constructions.append(construction)
-    return point + " = " + ", ".join(result_constructions)
-
-
-def translate_dsl_to_construction(point: str, predicate: str, args: list[str]) -> str:
-    """Translate a single DSL predicate into constructive syntax."""
-    if predicate == "perp":
-        return Perp.to_constructive(point, tuple(args))
-    if predicate == "para":
-        return Para.to_constructive(point, tuple(args))
-    if predicate == "cong":
-        return Cong.to_constructive(point, tuple(args))
-    if predicate == "midp":
-        return MidPoint.to_constructive(point, tuple(args))
-    if predicate == "coll":
-        return Coll.to_constructive(point, tuple(args))
-    if predicate == "eqangle":
-
-        def arrange_angle_points(a, b, c, d):
-            if a == c:
-                return (b, a, d)
-            if a == d:
-                return (b, a, c)
-            if b == c:
-                return (a, b, d)
-            if b == d:
-                return (a, b, c)
-            return None
-
-        a, b, c, d, e, f, g, h = args
-        if len(set([a, b, c, d, e, f, g, h])) == 8:
-            if point == h:
-                return f"on_aline0 {h} {a} {b} {c} {d} {e} {f} {g}"
-            if point == g:
-                return f"on_aline0 {g} {a} {b} {c} {d} {e} {f} {h}"
-            if point == f:
-                return f"on_aline0 {f} {c} {d} {a} {b} {g} {h} {e}"
-            if point == e:
-                return f"on_aline0 {e} {c} {d} {a} {b} {g} {h} {f}"
-            if point == d:
-                return f"on_aline0 {d} {e} {f} {g} {h} {a} {b} {c}"
-            if point == c:
-                return f"on_aline0 {c} {e} {f} {g} {h} {a} {b} {d}"
-            if point == b:
-                return f"on_aline0 {b} {g} {h} {e} {f} {c} {d} {a}"
-            if point == a:
-                return f"on_aline0 {a} {g} {h} {e} {f} {c} {d} {b}"
-            return None
-
-        if len(set([a, b, c, d])) == 4 and len(set([a, b, e, f])) == 3:
-            a, b, c, d, e, f, g, h = a, b, e, f, c, d, g, h
-        left = arrange_angle_points(a, b, c, d)
-        right = arrange_angle_points(e, f, g, h)
-        if left is None or right is None:
-            return None
-        return EqAngle.to_constructive(point, left + right)
-
-    if predicate == "cyclic":
-        return Cyclic.to_constructive(point, tuple(args))
-    if predicate == "eqratio":
-        return EqRatio.to_constructive(point, tuple(args))
-    return f"{predicate} {' '.join(args)}"
+# Re-export for backward compatibility
+__all__ = [
+    "extract_aux_body",
+    "normalize_aux_text",
+    "extract_first_aux_block",
+    "extract_first_tagged_aux_block",
+    "try_dsl_to_constructions",
+    "translate_dsl_to_construction",
+]
