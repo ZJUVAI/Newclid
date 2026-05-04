@@ -12,6 +12,7 @@ import sys
 import time
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -231,6 +232,24 @@ def _eval_completion_worker(payload: tuple[str, str]) -> dict[str, Any]:
     }
 
 
+def _engine_error_eval_result() -> dict[str, Any]:
+    return {
+        "normalized_aux": None,
+        "format_ok": False,
+        "build_ok": False,
+        "ddar_status": "engine_error",
+    }
+
+
+def _engine_error_ddar_batch(
+    batch: list[dict[str, Any]], num_samples: int
+) -> list[list[dict[str, Any]]]:
+    return [
+        [_engine_error_eval_result() for _ in range(num_samples + 1)]
+        for _ in batch
+    ]
+
+
 def _submit_ddar_batch(
     batch: list[dict[str, Any]],
     greedy_outputs: list[str],
@@ -281,7 +300,19 @@ def _collect_ddar_batch(
         r = pending_results[i]
         # r is either a list (serial) or list of futures (parallel)
         if isinstance(r, list) and r and hasattr(r[0], "result"):
-            all_results = [f.result() for f in r]
+            try:
+                all_results = [f.result() for f in r]
+            except BrokenProcessPool:
+                raise
+            except Exception:
+                logger.exception(
+                    "Difficulty labeling future crashed for sample_id=%s",
+                    row.get("sample_id"),
+                )
+                all_results = [
+                    _engine_error_eval_result()
+                    for _ in range(num_samples + 1)
+                ]
         else:
             all_results = r
         greedy_result = all_results[0]
@@ -404,7 +435,16 @@ def label_difficulty(
         if resume_count == len(rows):
             return labeled_rows
 
-    ddar_pool = ProcessPoolExecutor(max_workers=ddar_workers) if ddar_workers > 1 else None
+    def _new_ddar_pool() -> ProcessPoolExecutor | None:
+        if ddar_workers <= 1:
+            return None
+        return ProcessPoolExecutor(max_workers=ddar_workers)
+
+    def _shutdown_ddar_pool(pool: ProcessPoolExecutor | None) -> None:
+        if pool is not None:
+            pool.shutdown(wait=False, cancel_futures=True)
+
+    ddar_pool = _new_ddar_pool()
     try:
         total_batches = (len(rows) + batch_size - 1) // batch_size
         initial_batches = resume_count // batch_size
@@ -425,17 +465,29 @@ def label_difficulty(
             batch = rows[batch_start : batch_start + batch_size]
             queries = [r["query"] for r in batch]
 
-            # Submit DDAR for current batch (non-blocking)
             greedy_outputs, sampled_outputs = generator.generate_batch(
                 queries, num_samples, temperature, top_p
-            )
-            current_ddar = _submit_ddar_batch(
-                batch, greedy_outputs, sampled_outputs, ddar_pool, evaluator, num_samples
             )
 
             # Collect previous batch's DDAR results (now GPU is busy with next inference)
             if pending_ddar is not None:
-                batch_labeled = _collect_ddar_batch(pending_ddar, pending_batch, num_samples)
+                try:
+                    batch_labeled = _collect_ddar_batch(
+                        pending_ddar, pending_batch, num_samples
+                    )
+                except BrokenProcessPool:
+                    logger.exception(
+                        "DDAR process pool broke while collecting rows ending at %s; "
+                        "marking the batch as engine_error and recreating the pool",
+                        pending_idx,
+                    )
+                    _shutdown_ddar_pool(ddar_pool)
+                    ddar_pool = _new_ddar_pool()
+                    batch_labeled = _collect_ddar_batch(
+                        _engine_error_ddar_batch(pending_batch, num_samples),
+                        pending_batch,
+                        num_samples,
+                    )
                 labeled_rows.extend(batch_labeled)
 
                 idx = pending_idx
@@ -462,13 +514,64 @@ def label_difficulty(
                     )
                     flushed_batches = 0
 
+            # Submit DDAR for current batch after any previous-pool recovery.
+            try:
+                current_ddar = _submit_ddar_batch(
+                    batch,
+                    greedy_outputs,
+                    sampled_outputs,
+                    ddar_pool,
+                    evaluator,
+                    num_samples,
+                )
+            except BrokenProcessPool:
+                logger.exception(
+                    "DDAR process pool broke while submitting rows ending at %s; "
+                    "recreating the pool and retrying once",
+                    batch_start + len(batch),
+                )
+                _shutdown_ddar_pool(ddar_pool)
+                ddar_pool = _new_ddar_pool()
+                try:
+                    current_ddar = _submit_ddar_batch(
+                        batch,
+                        greedy_outputs,
+                        sampled_outputs,
+                        ddar_pool,
+                        evaluator,
+                        num_samples,
+                    )
+                except BrokenProcessPool:
+                    logger.exception(
+                        "DDAR process pool broke again while submitting rows ending at %s; "
+                        "marking the batch as engine_error",
+                        batch_start + len(batch),
+                    )
+                    _shutdown_ddar_pool(ddar_pool)
+                    ddar_pool = _new_ddar_pool()
+                    current_ddar = _engine_error_ddar_batch(batch, num_samples)
+
             pending_ddar = current_ddar
             pending_batch = batch
             pending_idx = batch_start + len(batch)
 
         # Collect the last batch
         if pending_ddar is not None:
-            batch_labeled = _collect_ddar_batch(pending_ddar, pending_batch, num_samples)
+            try:
+                batch_labeled = _collect_ddar_batch(pending_ddar, pending_batch, num_samples)
+            except BrokenProcessPool:
+                logger.exception(
+                    "DDAR process pool broke while collecting final rows ending at %s; "
+                    "marking the batch as engine_error",
+                    pending_idx,
+                )
+                _shutdown_ddar_pool(ddar_pool)
+                ddar_pool = _new_ddar_pool()
+                batch_labeled = _collect_ddar_batch(
+                    _engine_error_ddar_batch(pending_batch, num_samples),
+                    pending_batch,
+                    num_samples,
+                )
             labeled_rows.extend(batch_labeled)
 
             idx = pending_idx
@@ -493,8 +596,7 @@ def label_difficulty(
             completed=True,
         )
     finally:
-        if ddar_pool is not None:
-            ddar_pool.shutdown(wait=False)
+        _shutdown_ddar_pool(ddar_pool)
     return labeled_rows
 
 
