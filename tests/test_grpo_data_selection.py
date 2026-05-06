@@ -65,6 +65,7 @@ class TestGRPODataSelection(unittest.TestCase):
         sample_id: str,
         *,
         pass_value: float = 0.0,
+        valid_value: float | None = None,
         greedy_success: bool = False,
         all_invalid: bool = False,
         goal_predicate: str = "eqratio",
@@ -75,11 +76,14 @@ class TestGRPODataSelection(unittest.TestCase):
         duplicate_aux_ratio: float = 0.5,
         build_invalid_count: int = 0,
         format_invalid_count: int = 0,
+        solved_count: int = 0,
+        unsolved_count: int = 0,
+        engine_error_count: int = 0,
         n_premises: int = 6,
         problem_predicate_count: int = 5,
         problem_clause_count: int = 4,
     ) -> dict:
-        return {
+        row = {
             "sample_id": sample_id,
             "query": f"query-{sample_id}",
             "fl_problem": f"problem-{sample_id}",
@@ -95,10 +99,16 @@ class TestGRPODataSelection(unittest.TestCase):
             "duplicate_aux_ratio": duplicate_aux_ratio,
             "build_invalid_count": build_invalid_count,
             "format_invalid_count": format_invalid_count,
+            "solved_count": solved_count,
+            "unsolved_count": unsolved_count,
+            "engine_error_count": engine_error_count,
             "n_premises": n_premises,
             "problem_predicate_count": problem_predicate_count,
             "problem_clause_count": problem_clause_count,
         }
+        if valid_value is not None:
+            row["valid_at_16"] = valid_value
+        return row
 
     def test_annotation_helpers(self):
         query = "<problem> a : ; b : perp a b b c [001] ; ? eqratio a b c d </problem>"
@@ -442,17 +452,25 @@ class TestGRPODataSelection(unittest.TestCase):
         final_rows, report = self.select_debug_set.select_debug_rows(
             rows,
             target_size=2,
+            selection_policy="bucket_unified",
+            core_min_pass=0.125,
+            core_max_pass=0.625,
+            mastered_max_fraction=0.0,
             mastered_fallback_min_fill_fraction=0.0,
+            family_min_fraction=0.0,
+            goal_max_fraction=1.0,
+            multi_segment_min_fraction=0.0,
+            multi_point_min_fraction=0.0,
         )
         self.assertEqual(len(final_rows), 2)
         self.assertEqual(
             sorted(final_rows[0].keys()), ["fl_problem", "query", "response"]
         )
-        self.assertEqual(report["removed_mastered"], 1)
-        self.assertEqual(report["removed_all_invalid"], 1)
-        self.assertEqual(report["selection_policy"], "v3_tiered")
-        self.assertEqual(report["tier_selected_rows"]["core"], 2)
-        self.assertEqual(report["selected_core_rows"], 2)
+        self.assertEqual(report["selection_policy"], "bucket_unified")
+        self.assertEqual(report["bucket_selected_rows"]["core"], 2)
+        self.assertNotIn("removed_mastered", report)
+        self.assertNotIn("removed_all_invalid", report)
+        self.assertNotIn("tier_selected_rows", report)
 
     def test_select_debug_rows_accepts_pass_at_8(self):
         rows = [
@@ -468,6 +486,8 @@ class TestGRPODataSelection(unittest.TestCase):
                 "predicate_family_tags": ["ratio_family"],
                 "aux_segment_count": 1,
                 "aux_points_total": 1,
+                "unique_aux_count": 2,
+                "duplicate_aux_ratio": 0.5,
             },
             {
                 "sample_id": "keep1",
@@ -481,6 +501,8 @@ class TestGRPODataSelection(unittest.TestCase):
                 "predicate_family_tags": ["ratio_family"],
                 "aux_segment_count": 2,
                 "aux_points_total": 2,
+                "unique_aux_count": 2,
+                "duplicate_aux_ratio": 0.5,
             },
             {
                 "sample_id": "keep2",
@@ -494,172 +516,68 @@ class TestGRPODataSelection(unittest.TestCase):
                 "predicate_family_tags": ["parallel_perp_family"],
                 "aux_segment_count": 1,
                 "aux_points_total": 1,
+                "unique_aux_count": 2,
+                "duplicate_aux_ratio": 0.5,
             },
         ]
         final_rows, report = self.select_debug_set.select_debug_rows(
-            rows, target_size=2
+            rows,
+            target_size=2,
+            selection_policy="bucket_unified",
+            core_min_pass=0.125,
+            core_max_pass=0.625,
+            mastered_max_fraction=0.0,
+            mastered_fallback_min_fill_fraction=0.0,
         )
         self.assertEqual(len(final_rows), 2)
         self.assertEqual(report["pass_key"], "pass_at_8")
-        self.assertEqual(report["removed_mastered"], 1)
+        self.assertEqual(report["bucket_selected_rows"]["mastered"], 0)
+        self.assertNotIn("removed_mastered", report)
 
-    def test_select_debug_rows_applies_v3_tiers_and_caps(self):
+    def test_filter_candidate_buckets_assigns_all_rows_to_unified_buckets(self):
         rows = [
-            self._selection_row("core", pass_value=0.20),
-            self._selection_row(
-                "near_low",
-                pass_value=0.01,
-                goal_predicate="perp",
-                predicate_family_tags=["parallel_perp_family"],
-            ),
-            self._selection_row(
-                "near_high",
-                pass_value=0.80,
-                goal_predicate="eqangle",
-                predicate_family_tags=["angle_family"],
-            ),
-            self._selection_row(
-                "high_a",
-                pass_value=0.0,
-                goal_predicate="cyclic",
-                predicate_family_tags=["circle_family"],
-                unique_aux_count=4,
-                duplicate_aux_ratio=0.50,
-            ),
-            self._selection_row(
-                "high_b",
-                pass_value=0.0,
-                goal_predicate="contri",
-                predicate_family_tags=["triangle_family"],
-                unique_aux_count=3,
-                duplicate_aux_ratio=0.60,
-            ),
-            self._selection_row(
-                "mid_a",
-                pass_value=0.0,
-                goal_predicate="simtri",
-                predicate_family_tags=["triangle_family"],
-                unique_aux_count=1,
-                duplicate_aux_ratio=0.95,
-            ),
-            self._selection_row(
-                "noisy",
-                pass_value=0.0,
-                build_invalid_count=4,
-                unique_aux_count=1,
-                duplicate_aux_ratio=0.98,
-            ),
+            self._selection_row("all_invalid", pass_value=0.0, all_invalid=True),
             self._selection_row("mastered", pass_value=0.95, greedy_success=True),
-            self._selection_row("dead", pass_value=0.0, all_invalid=True),
-        ]
-
-        final_rows, report = self.select_debug_set.select_debug_rows(
-            rows,
-            target_size=5,
-            hard_valid_high_max_fraction=0.20,
-            hard_valid_mid_max_fraction=0.20,
-            mastered_fallback_min_fill_fraction=0.0,
-        )
-
-        self.assertEqual(len(final_rows), 5)
-        self.assertEqual(report["tier_available_rows"]["hard_valid_high"], 2)
-        self.assertEqual(report["tier_available_rows"]["hard_valid_mid"], 1)
-        self.assertEqual(report["discarded_non_dead_rows"], 1)
-        self.assertEqual(report["tier_selected_rows"]["core"], 1)
-        self.assertEqual(report["tier_selected_rows"]["near"], 2)
-        self.assertEqual(report["tier_selected_rows"]["hard_valid_high"], 1)
-        self.assertEqual(report["tier_selected_rows"]["hard_valid_mid"], 1)
-        self.assertEqual(report["selected_mastered_rows"], 0)
-        self.assertEqual(report["selected_nonzero_pass_rows"], 3)
-        self.assertEqual(report["selected_zero_pass_rows"], 2)
-
-    def test_select_debug_rows_prefers_more_diverse_rows_within_tier(self):
-        rows = [
-            self._selection_row(
-                "high_strong",
-                pass_value=0.0,
-                unique_aux_count=4,
-                duplicate_aux_ratio=0.50,
-            ),
-            self._selection_row(
-                "high_weak",
-                pass_value=0.0,
-                unique_aux_count=2,
-                duplicate_aux_ratio=0.80,
-            ),
-        ]
-
-        final_rows, report = self.select_debug_set.select_debug_rows(
-            rows,
-            target_size=1,
-            hard_valid_high_max_fraction=1.0,
-            hard_valid_mid_max_fraction=0.0,
-            mastered_fallback_min_fill_fraction=0.0,
-            multi_segment_min_fraction=0.0,
-            multi_point_min_fraction=0.0,
-        )
-
-        self.assertEqual(len(final_rows), 1)
-        self.assertEqual(final_rows[0]["query"], "query-high_strong")
-        self.assertEqual(report["tier_selected_rows"]["hard_valid_high"], 1)
-        self.assertAlmostEqual(report["selected_avg_unique_aux_count"], 4.0)
-
-    def test_select_debug_rows_uses_mastered_only_for_low_fill(self):
-        rows = [
-            self._selection_row("core", pass_value=0.20),
-            self._selection_row(
-                "near",
-                pass_value=0.02,
-                goal_predicate="perp",
-                predicate_family_tags=["parallel_perp_family"],
-            ),
-            self._selection_row(
-                "mastered_a",
-                pass_value=0.95,
-                greedy_success=True,
-                goal_predicate="eqangle",
-                predicate_family_tags=["angle_family"],
-            ),
-            self._selection_row(
-                "mastered_b",
-                pass_value=0.98,
-                greedy_success=True,
-                goal_predicate="cyclic",
-                predicate_family_tags=["circle_family"],
-            ),
-        ]
-
-        final_rows, report = self.select_debug_set.select_debug_rows(
-            rows,
-            target_size=4,
-            mastered_max_fraction=0.50,
-            mastered_fallback_min_fill_fraction=0.90,
-        )
-
-        self.assertEqual(len(final_rows), 4)
-        self.assertTrue(report["mastered_fallback_triggered"])
-        self.assertEqual(report["selected_mastered_rows"], 2)
-        self.assertEqual(report["tier_selected_rows"]["mastered"], 2)
-        self.assertEqual(report["selected_pass_histogram"]["0.9500"], 1)
-        self.assertEqual(report["selected_pass_histogram"]["0.9800"], 1)
-
-    def test_filter_candidate_tiers_discards_high_high_tail_for_stage_balanced(self):
-        rows = [
             self._selection_row("core", pass_value=0.25),
-            self._selection_row("high_mid", pass_value=0.75),
-            self._selection_row("high_high", pass_value=0.8125),
+            self._selection_row("near_low", pass_value=0.0625),
+            self._selection_row("near_high_mid", pass_value=0.75),
+            self._selection_row("easy_tail", pass_value=0.8125),
+            self._selection_row("high_pass_non_greedy", pass_value=1.0),
+            self._selection_row("zero_valid_low", pass_value=0.0, valid_value=0.10),
+            self._selection_row("zero_valid_high", pass_value=0.0, valid_value=0.95),
+            self._selection_row(
+                "zero_reward_std_low",
+                pass_value=0.0,
+                valid_value=0.50,
+                unique_aux_count=3,
+                unsolved_count=16,
+            ),
+            self._selection_row(
+                "zero_unique_aux_low",
+                pass_value=0.0,
+                valid_value=0.50,
+                unique_aux_count=1,
+                unsolved_count=8,
+                build_invalid_count=4,
+                format_invalid_count=4,
+            ),
+            self._selection_row(
+                "reward_mixed_zero",
+                pass_value=0.0,
+                valid_value=0.50,
+                unique_aux_count=3,
+                unsolved_count=8,
+                build_invalid_count=4,
+                format_invalid_count=4,
+            ),
         ]
 
-        tier_rows, stats = self.select_debug_set.filter_candidate_tiers(
+        bucket_rows, stats = self.select_debug_set.filter_candidate_buckets(
             rows,
-            selection_policy="v10_auxfix_stage_balanced",
+            selection_policy="bucket_unified",
             core_min_pass=0.125,
             core_max_pass=0.625,
             mastered_pass_min=0.90,
-            hard_valid_build_invalid_max=2,
-            hard_valid_format_invalid_max=1,
-            hard_valid_unique_aux_min=2,
-            hard_valid_duplicate_aux_max=0.875,
             near_high_mid_max_pass=0.75,
             zero_valid_min=0.25,
             zero_valid_max=0.875,
@@ -667,9 +585,168 @@ class TestGRPODataSelection(unittest.TestCase):
             reward_mixed_zero_unique_aux_min=2,
         )
 
-        self.assertEqual(stats["discarded_non_dead_rows"], 1)
-        self.assertEqual(len(tier_rows["core"]), 1)
-        self.assertEqual(len(tier_rows["near_high_mid"]), 1)
+        self.assertEqual(sum(stats["bucket_available_rows"].values()), len(rows))
+        self.assertEqual(len(bucket_rows["all_invalid"]), 1)
+        self.assertEqual(len(bucket_rows["mastered"]), 1)
+        self.assertEqual(len(bucket_rows["core"]), 1)
+        self.assertEqual(len(bucket_rows["near_low"]), 1)
+        self.assertEqual(len(bucket_rows["near_high_mid"]), 1)
+        self.assertEqual(len(bucket_rows["easy_tail_nonzero"]), 1)
+        self.assertEqual(len(bucket_rows["high_pass_non_greedy"]), 1)
+        self.assertEqual(len(bucket_rows["zero_valid_low"]), 1)
+        self.assertEqual(len(bucket_rows["zero_valid_high"]), 1)
+        self.assertEqual(len(bucket_rows["zero_reward_std_low"]), 1)
+        self.assertEqual(len(bucket_rows["zero_unique_aux_low"]), 1)
+        self.assertEqual(len(bucket_rows["reward_mixed_zero"]), 1)
+        self.assertEqual(
+            stats["bucket_pass_histogram"]["easy_tail_nonzero"], {"0.8125": 1}
+        )
+
+    def test_select_debug_rows_bucket_unified_reports_buckets_and_respects_zero_caps(self):
+        rows = [
+            self._selection_row("core_a", pass_value=0.25),
+            self._selection_row("core_b", pass_value=0.375),
+            self._selection_row(
+                "near_low", pass_value=0.0625, goal_predicate="perp"
+            ),
+            self._selection_row(
+                "reward_mixed_zero",
+                pass_value=0.0,
+                valid_value=0.50,
+                unique_aux_count=3,
+                unsolved_count=8,
+                build_invalid_count=4,
+                format_invalid_count=4,
+                goal_predicate="eqangle",
+                predicate_family_tags=["angle_family"],
+            ),
+            self._selection_row(
+                "near_high_mid",
+                pass_value=0.75,
+                goal_predicate="cyclic",
+                predicate_family_tags=["circle_family"],
+            ),
+            self._selection_row("easy_tail", pass_value=0.8125),
+            self._selection_row("high_pass_non_greedy", pass_value=1.0),
+            self._selection_row("zero_valid_high", pass_value=0.0, valid_value=0.95),
+            self._selection_row("all_invalid", pass_value=0.0, all_invalid=True),
+        ]
+
+        final_rows, report = self.select_debug_set.select_debug_rows(
+            rows,
+            target_size=5,
+            selection_policy="bucket_unified",
+            core_min_pass=0.125,
+            core_max_pass=0.625,
+            near_low_min_fraction=0.20,
+            reward_mixed_zero_min_fraction=0.20,
+            near_high_mid_min_fraction=0.20,
+            near_low_max_fraction=1.0,
+            reward_mixed_zero_max_fraction=1.0,
+            near_high_mid_max_fraction=1.0,
+            mastered_max_fraction=0.0,
+            family_min_fraction=0.0,
+            goal_max_fraction=1.0,
+            multi_segment_min_fraction=0.0,
+            multi_point_min_fraction=0.0,
+            mastered_fallback_min_fill_fraction=0.0,
+        )
+
+        self.assertEqual(len(final_rows), 5)
+        self.assertEqual(report["selection_policy"], "bucket_unified")
+        self.assertEqual(report["bucket_selected_rows"]["core"], 2)
+        self.assertEqual(report["bucket_selected_rows"]["near_low"], 1)
+        self.assertEqual(report["bucket_selected_rows"]["reward_mixed_zero"], 1)
+        self.assertEqual(report["bucket_selected_rows"]["near_high_mid"], 1)
+        self.assertEqual(report["bucket_selected_rows"]["easy_tail_nonzero"], 0)
+        self.assertEqual(report["bucket_selected_rows"]["high_pass_non_greedy"], 0)
+        self.assertEqual(report["bucket_selected_rows"]["zero_valid_high"], 0)
+        self.assertEqual(report["bucket_selected_rows"]["all_invalid"], 0)
+        self.assertIn("easy_tail_nonzero", report["bucket_available_rows"])
+        self.assertNotIn("removed_all_invalid", report)
+        self.assertNotIn("removed_mastered", report)
+        self.assertNotIn("excluded_rows_total", report)
+        self.assertNotIn("tier_selected_rows", report)
+        self.assertNotIn("stage_selected_rows", report)
+        self.assertFalse(report["fallback_triggered"])
+
+    def test_select_debug_rows_bucket_unified_uses_mastered_fallback(self):
+        rows = [
+            self._selection_row("core", pass_value=0.25),
+            self._selection_row("near_low", pass_value=0.0625),
+            self._selection_row("mastered_a", pass_value=0.95, greedy_success=True),
+            self._selection_row("mastered_b", pass_value=0.98, greedy_success=True),
+        ]
+
+        final_rows, report = self.select_debug_set.select_debug_rows(
+            rows,
+            target_size=4,
+            selection_policy="bucket_unified",
+            core_min_pass=0.125,
+            core_max_pass=0.625,
+            near_low_min_fraction=0.0,
+            reward_mixed_zero_min_fraction=0.0,
+            near_high_mid_min_fraction=0.0,
+            near_low_max_fraction=1.0,
+            reward_mixed_zero_max_fraction=1.0,
+            near_high_mid_max_fraction=1.0,
+            mastered_max_fraction=0.50,
+            family_min_fraction=0.0,
+            goal_max_fraction=1.0,
+            multi_segment_min_fraction=0.0,
+            multi_point_min_fraction=0.0,
+            mastered_fallback_min_fill_fraction=0.90,
+        )
+
+        self.assertEqual(len(final_rows), 4)
+        self.assertTrue(report["fallback_triggered"])
+        self.assertEqual(report["bucket_selected_rows"]["mastered"], 2)
+        self.assertEqual(report["bucket_pass_histogram_selected"]["mastered"]["0.9500"], 1)
+        self.assertEqual(report["bucket_pass_histogram_selected"]["mastered"]["0.9800"], 1)
+
+    def test_file_round_trip_for_candidate_pool(self):
+        rows = [
+            self._selection_row(
+                "high_strong",
+                pass_value=0.0,
+                valid_value=0.50,
+                unique_aux_count=4,
+                duplicate_aux_ratio=0.50,
+                unsolved_count=8,
+                build_invalid_count=4,
+                format_invalid_count=4,
+            ),
+            self._selection_row(
+                "high_weak",
+                pass_value=0.0,
+                valid_value=0.50,
+                unique_aux_count=2,
+                duplicate_aux_ratio=0.80,
+                unsolved_count=8,
+                build_invalid_count=4,
+                format_invalid_count=4,
+            ),
+        ]
+
+        final_rows, report = self.select_debug_set.select_debug_rows(
+            rows,
+            target_size=1,
+            selection_policy="bucket_unified",
+            core_min_pass=0.125,
+            core_max_pass=0.625,
+            reward_mixed_zero_min_fraction=1.0,
+            reward_mixed_zero_max_fraction=1.0,
+            mastered_fallback_min_fill_fraction=0.0,
+            multi_segment_min_fraction=0.0,
+            multi_point_min_fraction=0.0,
+            family_min_fraction=0.0,
+            goal_max_fraction=1.0,
+        )
+
+        self.assertEqual(len(final_rows), 1)
+        self.assertEqual(final_rows[0]["query"], "query-high_strong")
+        self.assertEqual(report["bucket_selected_rows"]["reward_mixed_zero"], 1)
+        self.assertAlmostEqual(report["selected_avg_unique_aux_count"], 4.0)
 
     def test_file_round_trip_for_candidate_pool(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -777,7 +854,7 @@ class TestGRPODataSelection(unittest.TestCase):
         final_rows, report = self.select_debug_set.select_debug_rows(
             rows,
             target_size=10,
-            selection_policy="v10_auxfix_stage_balanced",
+            selection_policy="bucket_unified",
             near_low_min_fraction=0.20,
             reward_mixed_zero_min_fraction=0.0,
             near_high_mid_min_fraction=0.0,
@@ -797,12 +874,7 @@ class TestGRPODataSelection(unittest.TestCase):
 
         self.assertEqual(len(final_rows), 10)
         self.assertLessEqual(report["selected_greedy_success_rows"], 2)
-        self.assertLessEqual(report["selected_pass_one_rows"], 2)
-        self.assertLessEqual(report["selected_high_pass_rows"], 3)
-        self.assertEqual(report["selection_policy"], "v10_auxfix_stage_balanced")
-        self.assertEqual(report["easy_tail_caps"]["greedy_success"], 2)
-        self.assertEqual(report["easy_tail_caps"]["pass_one"], 2)
-        self.assertEqual(report["easy_tail_caps"]["high_pass"], 3)
+        self.assertEqual(report["selection_policy"], "bucket_unified")
 
     def test_label_difficulty_vlm_resume_prefix_validation(self):
         rows = [
@@ -818,6 +890,38 @@ class TestGRPODataSelection(unittest.TestCase):
         ]
         with self.assertRaises(ValueError):
             self.label_difficulty_vlm._validate_resume_prefix(rows, bad_existing)
+
+    def test_label_difficulty_vlm_load_existing_labeled_rows_keeps_valid_prefix(self):
+        rows = [
+            {"_shard_index": 0, "sample_id": "a", "query": "q-a", "fl_problem": "p-a"},
+            {"_shard_index": 1, "sample_id": "b", "query": "q-b", "fl_problem": "p-b"},
+            {"_shard_index": 2, "sample_id": "c", "query": "q-c", "fl_problem": "p-c"},
+        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "output.jsonl"
+            with output_path.open("wb") as handle:
+                handle.write(json.dumps(rows[0]).encode("utf-8") + b"\n")
+                handle.write(json.dumps(rows[1]).encode("utf-8") + b"\n")
+                handle.write(b"\x00\x00\x00broken\n")
+            loaded = self.label_difficulty_vlm._load_existing_labeled_rows(
+                rows, output_path, resume=True
+            )
+        self.assertEqual(loaded, rows[:2])
+
+    def test_label_difficulty_vlm_load_existing_labeled_rows_restarts_on_leading_corruption(self):
+        rows = [
+            {"_shard_index": 0, "sample_id": "a", "query": "q-a", "fl_problem": "p-a"},
+            {"_shard_index": 1, "sample_id": "b", "query": "q-b", "fl_problem": "p-b"},
+        ]
+        with tempfile.TemporaryDirectory() as tmpdir:
+            output_path = Path(tmpdir) / "output.jsonl"
+            with output_path.open("wb") as handle:
+                handle.write(b"\x00\x00\x00broken\n")
+                handle.write(json.dumps(rows[0]).encode("utf-8") + b"\n")
+            loaded = self.label_difficulty_vlm._load_existing_labeled_rows(
+                rows, output_path, resume=True
+            )
+        self.assertEqual(loaded, [])
 
     def test_report_difficulty_drift_summarizes_pass_movement(self):
         old_rows = [

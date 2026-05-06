@@ -32,19 +32,34 @@ def load_jsonl(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
-def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+def _atomic_write_text(path: Path, write_fn) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
+    tmp_path = path.with_name(f".{path.name}.tmp.{os.getpid()}")
+    try:
+        with tmp_path.open("w", encoding="utf-8") as handle:
+            write_fn(handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp_path, path)
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+
+def write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    def _write(handle: TextIO) -> None:
         for row in rows:
             handle.write(json.dumps(row, ensure_ascii=False))
             handle.write("\n")
 
+    _atomic_write_text(path, _write)
+
 
 def write_json(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
+    def _write(handle: TextIO) -> None:
         json.dump(payload, handle, ensure_ascii=False, indent=2, sort_keys=True)
         handle.write("\n")
+
+    _atomic_write_text(path, _write)
 
 
 def count_jsonl_rows(path: Path) -> int:
@@ -84,7 +99,38 @@ def _load_existing_labeled_rows(
 ) -> list[dict[str, Any]]:
     if not resume or output_path is None or not output_path.exists():
         return []
-    existing_rows = load_jsonl(output_path)
+    existing_rows: list[dict[str, Any]] = []
+    corrupted_line = None
+    with output_path.open("r", encoding="utf-8", errors="replace") as handle:
+        for line_no, line in enumerate(handle, start=1):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            # Sparse-file holes / interrupted rewrites can leave NUL-filled lines behind.
+            if stripped.strip("\x00") == "":
+                corrupted_line = line_no
+                break
+            try:
+                existing_rows.append(json.loads(stripped))
+            except json.JSONDecodeError:
+                corrupted_line = line_no
+                break
+    if corrupted_line is not None:
+        if existing_rows:
+            logger.warning(
+                "Resume output %s is corrupted at line %s; resuming from the last "
+                "valid prefix (%s rows)",
+                output_path,
+                corrupted_line,
+                len(existing_rows),
+            )
+        else:
+            logger.warning(
+                "Resume output %s is corrupted at line %s before any valid rows; "
+                "restarting this shard from 0 rows",
+                output_path,
+                corrupted_line,
+            )
     _validate_resume_prefix(rows, existing_rows)
     return existing_rows
 
