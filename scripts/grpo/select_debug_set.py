@@ -195,11 +195,7 @@ def _classify_bucket_unified(
         return "zero_valid_low"
     if valid_ratio > zero_valid_max:
         return "zero_valid_high"
-    if _proxy_reward_std(row) < zero_pass_reward_std_min:
-        return "zero_reward_std_low"
-    if int(row.get("unique_aux_count", 0)) < reward_mixed_zero_unique_aux_min:
-        return "zero_unique_aux_low"
-    return "reward_mixed_zero"
+    return "zero_reward_std_low"
 
 
 def filter_candidate_buckets(
