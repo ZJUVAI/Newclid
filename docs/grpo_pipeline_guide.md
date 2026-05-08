@@ -61,11 +61,11 @@ python src/newclid/generation/pipeline.py \
 
 ### 2.1 数据集标注
 
-**脚本**：`scripts/analyze_dataset.py`
+**脚本**：`scripts/grpo/annotate_dataset.py`
 
 **命令示例**：
 ```bash
-python scripts/analyze_dataset.py \
+python scripts/grpo/annotate_dataset.py \
   datasets/0123/geometry_clauses10_samples1M.jsonl \
   --annotations-output datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/annotations.jsonl \
   --summary-output datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/annotations_summary.json
@@ -499,7 +499,7 @@ translated_imo_2004_p1,√,5.06
 
 ### Step 2: 数据集标注
 ```bash
-python scripts/analyze_dataset.py \
+python scripts/grpo/annotate_dataset.py \
   /C20545/home/wangzi/GenesisGeo_data_models/datasets/0123/geometry_clauses10_samples1M_aux_updated_img512_inverted_pt_new_remove_proof.jsonl \
   --annotations-output datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/annotations.jsonl \
   --summary-output datasets/grpo_geometry100k_vlm_label_YYYYMMDD_maxauxN/annotations_summary.json

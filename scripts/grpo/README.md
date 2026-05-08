@@ -7,7 +7,7 @@ This directory contains the data-selection, reward, and launch helpers for GRPO-
 ## Scripts
 
 - `plugin.py`: registers `aux_reward` for SWIFT.
-- `../analyze_dataset.py`: annotates JSONL rows with aux structure, goal predicate, predicate family tags, and lightweight complexity fields.
+- `annotate_dataset.py`: annotates JSONL rows with aux structure, goal predicate, predicate family tags, and lightweight complexity fields.
 - `analyze_selected_dataset.py`: analyzes the final selected GRPO training JSONL after `select_debug_set.py`.
 - `build_candidate_pool.py`: keeps only rows with real aux targets and emits a candidate pool summary.
 - `prefilter_candidate_pool.py`: applies a cheap streaming prefilter to large candidate pools before model-based difficulty labeling.
@@ -41,7 +41,7 @@ Recommended full pipeline:
 
 ```text
 raw JSONL
--> analyze_dataset.py
+-> annotate_dataset.py
 -> build_candidate_pool.py
 -> prefilter_candidate_pool.py
 -> label_difficulty.py / label_difficulty_vlm.py
@@ -60,7 +60,7 @@ This extracts:
 - `n_premises`, `problem_predicate_count`, and `problem_clause_count`
 
 ```bash
-python scripts/analyze_dataset.py \
+python scripts/grpo/annotate_dataset.py \
   datasets/raw.jsonl \
   --annotations-output datasets/grpo/annotated.jsonl \
   --summary-output datasets/grpo/annotated_summary.json
@@ -318,7 +318,7 @@ bash scripts/grpo/select_grpo_dataset.sh
 The wrapper runs:
 
 ```text
-analyze_dataset.py
+annotate_dataset.py
 -> build_candidate_pool.py
 -> prefilter_candidate_pool.py
 -> label_difficulty.py / label_difficulty_vlm.py

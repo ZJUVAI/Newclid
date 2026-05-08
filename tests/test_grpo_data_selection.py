@@ -34,8 +34,8 @@ class StubEvaluator:
 
 class TestGRPODataSelection(unittest.TestCase):
     def setUp(self):
-        self.analyze_dataset = load_module(
-            "scripts/analyze_dataset.py", "analyze_dataset"
+        self.annotate_dataset = load_module(
+            "scripts/grpo/annotate_dataset.py", "annotate_dataset"
         )
         self.analyze_selected_dataset = load_module(
             "scripts/grpo/analyze_selected_dataset.py",
@@ -119,7 +119,7 @@ class TestGRPODataSelection(unittest.TestCase):
             "fl_problem": "a b c d = quadrangle a b c d ? eqratio a b c d",
             "n_premises": 6,
         }
-        annotation = self.analyze_dataset.annotate_record(record, "sample:0")
+        annotation = self.annotate_dataset.annotate_record(record, "sample:0")
         self.assertEqual(annotation["sample_id"], "sample:0")
         self.assertTrue(annotation["has_aux"])
         self.assertEqual(annotation["aux_segment_count"], 1)
@@ -159,7 +159,7 @@ class TestGRPODataSelection(unittest.TestCase):
                 "\n".join(json.dumps(row) for row in rows) + "\n",
                 encoding="utf-8",
             )
-            annotations, summary = self.analyze_dataset.annotate_jsonl(input_path)
+            annotations, summary = self.annotate_dataset.annotate_jsonl(input_path)
 
         self.assertEqual(len(annotations), 3)
         self.assertEqual(summary["aux_rows"], 2)

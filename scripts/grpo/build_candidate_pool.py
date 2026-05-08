@@ -100,7 +100,7 @@ def write_json(path: Path, payload: dict[str, Any]) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "input", type=Path, help="Annotated JSONL from analyze_dataset.py"
+        "input", type=Path, help="Annotated JSONL from annotate_dataset.py"
     )
     parser.add_argument("output", type=Path, help="Candidate pool JSONL output")
     parser.add_argument(

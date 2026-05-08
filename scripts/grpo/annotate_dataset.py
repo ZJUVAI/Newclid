@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Analyze selected GRPO JSONL datasets with query/fl_problem/response rows."""
+"""Annotate geometry JSONL datasets for GRPO candidate selection."""
 
 from __future__ import annotations
 
@@ -24,10 +24,10 @@ from annotation_utils import (
 )
 
 
-def extract_aux_structure(response: str) -> tuple[bool, int, int]:
-    aux_block = extract_first_tagged_aux_block(response)
+def extract_aux_structure(llm_output: str) -> tuple[bool, str | None, int, int]:
+    aux_block = extract_first_tagged_aux_block(llm_output)
     if aux_block is None:
-        return False, 0, 0
+        return False, None, 0, 0
 
     body = aux_block[len("<aux> ") : -len(" </aux>")].strip()
     points_total = 0
@@ -42,20 +42,21 @@ def extract_aux_structure(response: str) -> tuple[bool, int, int]:
             continue
         segment_count += 1
         points_total += len(points)
-    return True, segment_count, points_total
+    return True, aux_block, segment_count, points_total
 
 
 def annotate_record(record: dict[str, Any], sample_id: str) -> dict[str, Any]:
-    query = record.get("query", "")
+    query = record.get("llm_input_renamed", "")
     fl_problem = record.get("fl_problem", "")
-    response = record.get("response", "")
     problem_text = extract_problem_text(query)
-    has_aux, aux_segment_count, aux_points_total = extract_aux_structure(response)
+    has_aux, response_aux, aux_segment_count, aux_points_total = extract_aux_structure(
+        record.get("llm_output_renamed", "")
+    )
     return {
         "sample_id": sample_id,
         "query": query,
         "fl_problem": fl_problem,
-        "response": response,
+        "response_aux": response_aux,
         "has_aux": has_aux,
         "aux_segment_count": aux_segment_count,
         "aux_points_total": aux_points_total,
@@ -63,6 +64,7 @@ def annotate_record(record: dict[str, Any], sample_id: str) -> dict[str, Any]:
         "predicate_family_tags": extract_predicate_family_tags(
             problem_text, fl_problem
         ),
+        "n_premises": record.get("n_premises"),
         "problem_predicate_count": extract_problem_predicate_count(problem_text),
         "problem_clause_count": extract_problem_clause_count(fl_problem),
     }
@@ -77,12 +79,7 @@ def summarize_annotations(annotations: list[dict[str, Any]]) -> dict[str, Any]:
     family_counter = Counter()
     segment_counter = Counter()
     points_counter = Counter()
-    predicate_counter = Counter()
-    clause_counter = Counter()
-
     for item in annotations:
-        predicate_counter[item["problem_predicate_count"]] += 1
-        clause_counter[item["problem_clause_count"]] += 1
         if item["has_aux"]:
             segment_counter[item["aux_segment_count"]] += 1
             points_counter[item["aux_points_total"]] += 1
@@ -97,17 +94,17 @@ def summarize_annotations(annotations: list[dict[str, Any]]) -> dict[str, Any]:
         "predicate_family_distribution": dict(family_counter.most_common()),
         "aux_segment_count_distribution": dict(sorted(segment_counter.items())),
         "aux_points_total_distribution": dict(sorted(points_counter.items())),
-        "problem_predicate_count_distribution": dict(sorted(predicate_counter.items())),
-        "problem_clause_count_distribution": dict(sorted(clause_counter.items())),
     }
 
 
-def analyze_jsonl(input_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def annotate_jsonl(input_path: Path) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     annotations: list[dict[str, Any]] = []
     with input_path.open("r", encoding="utf-8") as handle:
         total_lines = sum(1 for _ in handle)
     with input_path.open("r", encoding="utf-8") as handle:
-        for index, line in enumerate(tqdm(handle, total=total_lines, desc="Analyzing")):
+        for index, line in enumerate(
+            tqdm(handle, total=total_lines, desc="Annotating")
+        ):
             line = line.strip()
             if not line:
                 continue
@@ -138,7 +135,7 @@ def print_summary(summary: dict[str, Any]) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("input", type=Path, help="Selected GRPO JSONL dataset")
+    parser.add_argument("input", type=Path, help="Input JSONL dataset")
     parser.add_argument(
         "--annotations-output",
         type=Path,
@@ -153,7 +150,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    annotations, summary = analyze_jsonl(args.input)
+    annotations, summary = annotate_jsonl(args.input)
     if args.annotations_output is not None:
         write_jsonl(args.annotations_output, annotations)
     if args.summary_output is not None:

@@ -7,7 +7,7 @@ English version: [README.md](/C20545/home/wangzi/GenesisGeo-grpo/scripts/grpo/RE
 ## 脚本列表
 
 - `plugin.py`：为 SWIFT 注册 `aux_reward`。
-- `../analyze_dataset.py`：为 JSONL 数据添加辅助结构、目标谓词、谓词族标签以及轻量复杂度字段。
+- `annotate_dataset.py`：为 JSONL 数据添加辅助结构、目标谓词、谓词族标签以及轻量复杂度字段。
 - `analyze_selected_dataset.py`：在 `select_debug_set.py` 之后分析最终选出的 GRPO 训练 JSONL。
 - `analyze_difficulty_structure.py`：分析 `pass_at_k` 与 `aux_points_total` / `n_premises` 的关系，输出分组统计、热力表、Spearman 和 logit 模型。
 - `build_candidate_pool.py`：仅保留真正包含辅助目标的样本，并输出候选池摘要。
@@ -61,7 +61,7 @@ raw JSONL
 - `n_premises`、`problem_predicate_count` 和 `problem_clause_count`
 
 ```bash
-python scripts/analyze_dataset.py \
+python scripts/grpo/annotate_dataset.py \
   datasets/raw.jsonl \
   --annotations-output datasets/grpo/annotated.jsonl \
   --summary-output datasets/grpo/annotated_summary.json
@@ -334,7 +334,7 @@ bash scripts/grpo/select_grpo_dataset.sh
 这个包装脚本会运行：
 
 ```text
-analyze_dataset.py
+annotate_dataset.py
 -> build_candidate_pool.py
 -> prefilter_candidate_pool.py
 -> label_difficulty.py / label_difficulty_vlm.py

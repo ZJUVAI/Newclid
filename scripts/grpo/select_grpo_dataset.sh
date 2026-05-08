@@ -54,7 +54,7 @@ SELECTED_REPORT_JSON="$OUTPUT_DIR/grpo_train_report.json"
 SELECTED_ANNOTATED_JSONL="$OUTPUT_DIR/grpo_train_selected_annotated.jsonl"
 SELECTED_SUMMARY_JSON="$OUTPUT_DIR/grpo_train_selected_summary.json"
 
-"$PYTHON_BIN" scripts/analyze_dataset.py \
+"$PYTHON_BIN" scripts/grpo/annotate_dataset.py \
     "$INPUT_PATH" \
     --annotations-output "$ANNOTATED_JSONL" \
     --summary-output "$ANNOTATED_SUMMARY_JSON"
