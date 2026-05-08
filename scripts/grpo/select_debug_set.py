@@ -21,9 +21,8 @@ UNIFIED_BUCKETS = (
     "low",
     "high",
     "high_pass_non_greedy",
-    "zero_valid_low",
-    "zero_valid_high",
-    "zero_reward_std_low",
+    "zero_std",
+    "low_std",
     "reward_mixed_zero",
 )
 UNIFIED_MAIN_BUCKET_ORDER = (
@@ -165,8 +164,6 @@ def _classify_bucket_unified(
     core_min_pass: float,
     core_max_pass: float,
     mastered_pass_min: float,
-    zero_valid_min: float,
-    zero_valid_max: float,
     zero_pass_reward_std_min: float,
 ) -> str:
     pass_value = _pass_value(row, pass_key)
@@ -183,16 +180,13 @@ def _classify_bucket_unified(
     if pass_value >= mastered_pass_min:
         return "high_pass_non_greedy"
 
-    # For pass=0, prioritize reward-based classification
-    if _proxy_reward_std(row) >= zero_pass_reward_std_min:
+    # pass=0: classify by reward std
+    std = _proxy_reward_std(row)
+    if std >= zero_pass_reward_std_min:
         return "reward_mixed_zero"
-
-    valid_ratio = _valid_ratio(row, pass_key)
-    if valid_ratio < zero_valid_min:
-        return "zero_valid_low"
-    if valid_ratio > zero_valid_max:
-        return "zero_valid_high"
-    return "zero_reward_std_low"
+    if std == 0.0:
+        return "zero_std"
+    return "low_std"
 
 
 def filter_candidate_buckets(
@@ -202,8 +196,6 @@ def filter_candidate_buckets(
     core_min_pass: float,
     core_max_pass: float,
     mastered_pass_min: float,
-    zero_valid_min: float,
-    zero_valid_max: float,
     zero_pass_reward_std_min: float,
 ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, Any]]:
     pass_key = _resolve_pass_key(rows)
@@ -216,8 +208,6 @@ def filter_candidate_buckets(
             core_min_pass=core_min_pass,
             core_max_pass=core_max_pass,
             mastered_pass_min=mastered_pass_min,
-            zero_valid_min=zero_valid_min,
-            zero_valid_max=zero_valid_max,
             zero_pass_reward_std_min=zero_pass_reward_std_min,
         )
         bucket_rows[bucket].append({**row, "_selection_bucket": bucket})
@@ -392,8 +382,6 @@ def _select_debug_rows_bucket_unified(
     multi_point_min_fraction: float,
     family_min_fraction: float,
     goal_max_fraction: float,
-    zero_valid_min: float,
-    zero_valid_max: float,
     zero_pass_reward_std_min: float,
     reward_mixed_zero_max_fraction: float,
     low_min_fraction: float,
@@ -411,8 +399,6 @@ def _select_debug_rows_bucket_unified(
         core_min_pass=core_min_pass,
         core_max_pass=core_max_pass,
         mastered_pass_min=mastered_pass_min,
-        zero_valid_min=zero_valid_min,
-        zero_valid_max=zero_valid_max,
         zero_pass_reward_std_min=zero_pass_reward_std_min,
     )
 
@@ -436,9 +422,8 @@ def _select_debug_rows_bucket_unified(
         "low": low_max_fraction,
         "high": high_max_fraction,
         "high_pass_non_greedy": 0.0,
-        "zero_valid_low": 0.0,
-        "zero_valid_high": 0.0,
-        "zero_reward_std_low": 0.0,
+        "zero_std": 0.0,
+        "low_std": 0.0,
         "reward_mixed_zero": reward_mixed_zero_max_fraction,
     }
     bucket_min_rows = {
@@ -655,8 +640,6 @@ def _select_debug_rows_bucket_unified(
             "selection_policy": selection_policy,
             "core_pass_window": [core_min_pass, core_max_pass],
             "mastered_pass_min": mastered_pass_min,
-            "zero_valid_min": zero_valid_min,
-            "zero_valid_max": zero_valid_max,
             "zero_pass_reward_std_min": zero_pass_reward_std_min,
             "bucket_min_fraction": bucket_min_fraction,
             "bucket_max_fraction": bucket_max_fraction,
@@ -716,8 +699,6 @@ def select_debug_rows(
     multi_point_min_fraction: float = 0.40,
     family_min_fraction: float = 0.10,
     goal_max_fraction: float = 0.18,
-    zero_valid_min: float = 0.25,
-    zero_valid_max: float = 0.875,
     zero_pass_reward_std_min: float = 0.15,
     reward_mixed_zero_max_fraction: float = 0.20,
     low_min_fraction: float = 0.05,
@@ -744,8 +725,6 @@ def select_debug_rows(
         multi_point_min_fraction=multi_point_min_fraction,
         family_min_fraction=family_min_fraction,
         goal_max_fraction=goal_max_fraction,
-        zero_valid_min=zero_valid_min,
-        zero_valid_max=zero_valid_max,
         zero_pass_reward_std_min=zero_pass_reward_std_min,
         reward_mixed_zero_max_fraction=reward_mixed_zero_max_fraction,
         low_min_fraction=low_min_fraction,
@@ -787,8 +766,6 @@ def main() -> None:
     parser.add_argument("--multi-point-min-fraction", type=float, default=0.40)
     parser.add_argument("--family-min-fraction", type=float, default=0.10)
     parser.add_argument("--goal-max-fraction", type=float, default=0.18)
-    parser.add_argument("--zero-valid-min", type=float, default=0.25)
-    parser.add_argument("--zero-valid-max", type=float, default=0.875)
     parser.add_argument("--zero-pass-reward-std-min", type=float, default=0.15)
     parser.add_argument("--reward-mixed-zero-max-fraction", type=float, default=0.20)
     parser.add_argument("--low-min-fraction", type=float, default=0.05)
@@ -815,8 +792,6 @@ def main() -> None:
             core_min_pass=args.core_pass_min,
             core_max_pass=args.core_pass_max,
             mastered_pass_min=args.mastered_pass_min,
-            zero_valid_min=args.zero_valid_min,
-            zero_valid_max=args.zero_valid_max,
             zero_pass_reward_std_min=args.zero_pass_reward_std_min,
         )
         total_rows = sum(stats["bucket_available_rows"].values())
@@ -850,8 +825,6 @@ def main() -> None:
         multi_point_min_fraction=args.multi_point_min_fraction,
         family_min_fraction=args.family_min_fraction,
         goal_max_fraction=args.goal_max_fraction,
-        zero_valid_min=args.zero_valid_min,
-        zero_valid_max=args.zero_valid_max,
         zero_pass_reward_std_min=args.zero_pass_reward_std_min,
         reward_mixed_zero_max_fraction=args.reward_mixed_zero_max_fraction,
         low_min_fraction=args.low_min_fraction,
