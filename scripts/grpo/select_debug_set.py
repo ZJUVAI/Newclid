@@ -18,8 +18,8 @@ UNIFIED_BUCKETS = (
     "all_invalid",
     "mastered",
     "core",
-    "near_low",
-    "near_high_mid",
+    "low",
+    "high",
     "easy_tail_nonzero",
     "high_pass_non_greedy",
     "zero_valid_low",
@@ -30,9 +30,9 @@ UNIFIED_BUCKETS = (
 )
 UNIFIED_MAIN_BUCKET_ORDER = (
     "core",
-    "near_low",
+    "low",
     "reward_mixed_zero",
-    "near_high_mid",
+    "high",
 )
 UNIFIED_FALLBACK_BUCKET_ORDER = ("mastered",)
 ALL_SELECTION_POLICIES = (BUCKET_UNIFIED_POLICY,)
@@ -167,7 +167,6 @@ def _classify_bucket_unified(
     core_min_pass: float,
     core_max_pass: float,
     mastered_pass_min: float,
-    near_high_mid_max_pass: float,
     zero_valid_min: float,
     zero_valid_max: float,
     zero_pass_reward_std_min: float,
@@ -181,11 +180,9 @@ def _classify_bucket_unified(
     if core_min_pass <= pass_value <= core_max_pass:
         return "core"
     if 0.0 < pass_value < core_min_pass:
-        return "near_low"
-    if core_max_pass < pass_value <= near_high_mid_max_pass:
-        return "near_high_mid"
-    if near_high_mid_max_pass < pass_value < mastered_pass_min:
-        return "easy_tail_nonzero"
+        return "low"
+    if core_max_pass < pass_value < 1.0:
+        return "high"
     if pass_value >= mastered_pass_min:
         return "high_pass_non_greedy"
 
@@ -208,7 +205,6 @@ def filter_candidate_buckets(
     core_min_pass: float,
     core_max_pass: float,
     mastered_pass_min: float,
-    near_high_mid_max_pass: float,
     zero_valid_min: float,
     zero_valid_max: float,
     zero_pass_reward_std_min: float,
@@ -224,7 +220,6 @@ def filter_candidate_buckets(
             core_min_pass=core_min_pass,
             core_max_pass=core_max_pass,
             mastered_pass_min=mastered_pass_min,
-            near_high_mid_max_pass=near_high_mid_max_pass,
             zero_valid_min=zero_valid_min,
             zero_valid_max=zero_valid_max,
             zero_pass_reward_std_min=zero_pass_reward_std_min,
@@ -394,8 +389,8 @@ def _select_debug_rows_bucket_unified(
     core_min_pass: float,
     core_max_pass: float,
     mastered_pass_min: float,
-    near_high_mid_max_pass: float,
-    near_high_mid_max_fraction: float,
+    low_max_fraction: float,
+    high_max_fraction: float,
     mastered_max_fraction: float,
     mastered_fallback_min_fill_fraction: float,
     multi_segment_min_fraction: float,
@@ -407,10 +402,9 @@ def _select_debug_rows_bucket_unified(
     zero_pass_reward_std_min: float,
     reward_mixed_zero_unique_aux_min: int,
     reward_mixed_zero_max_fraction: float,
-    near_low_min_fraction: float,
-    near_low_max_fraction: float,
+    low_min_fraction: float,
     reward_mixed_zero_min_fraction: float,
-    near_high_mid_min_fraction: float,
+    high_min_fraction: float,
     greedy_success_max_fraction: float,
     pass_one_max_fraction: float,
     high_pass_min: float,
@@ -423,7 +417,6 @@ def _select_debug_rows_bucket_unified(
         core_min_pass=core_min_pass,
         core_max_pass=core_max_pass,
         mastered_pass_min=mastered_pass_min,
-        near_high_mid_max_pass=near_high_mid_max_pass,
         zero_valid_min=zero_valid_min,
         zero_valid_max=zero_valid_max,
         zero_pass_reward_std_min=zero_pass_reward_std_min,
@@ -440,15 +433,15 @@ def _select_debug_rows_bucket_unified(
     easy_tail_counter: Counter[str] = Counter()
 
     bucket_min_fraction = {
-        "near_low": near_low_min_fraction,
+        "low": low_min_fraction,
         "reward_mixed_zero": reward_mixed_zero_min_fraction,
-        "near_high_mid": near_high_mid_min_fraction,
+        "high": high_min_fraction,
     }
     bucket_max_fraction = {
         "all_invalid": 0.0,
         "mastered": mastered_max_fraction,
-        "near_low": near_low_max_fraction,
-        "near_high_mid": near_high_mid_max_fraction,
+        "low": low_max_fraction,
+        "high": high_max_fraction,
         "easy_tail_nonzero": 0.0,
         "high_pass_non_greedy": 0.0,
         "zero_valid_low": 0.0,
@@ -555,7 +548,7 @@ def _select_debug_rows_bucket_unified(
         shortages[f"{family}_shortage"] = max(0, need - len(taken))
 
     bucket_floor_shortages = {}
-    for bucket_name in ("near_low", "reward_mixed_zero", "near_high_mid"):
+    for bucket_name in ("low", "reward_mixed_zero", "high"):
         needed = max(0, bucket_min_rows[bucket_name] - bucket_selected_counter[bucket_name])
         taken = _take_matching_from_tiers(
             selected,
@@ -671,7 +664,6 @@ def _select_debug_rows_bucket_unified(
             "selection_policy": selection_policy,
             "core_pass_window": [core_min_pass, core_max_pass],
             "mastered_pass_min": mastered_pass_min,
-            "near_high_mid_max_pass": near_high_mid_max_pass,
             "zero_valid_min": zero_valid_min,
             "zero_valid_max": zero_valid_max,
             "zero_pass_reward_std_min": zero_pass_reward_std_min,
@@ -726,8 +718,8 @@ def select_debug_rows(
     core_min_pass: float = 0.0625,
     core_max_pass: float = 0.75,
     mastered_pass_min: float = 0.90,
-    near_high_mid_max_pass: float = 0.75,
-    near_high_mid_max_fraction: float = 0.08,
+    low_max_fraction: float = 0.20,
+    high_max_fraction: float = 0.08,
     mastered_max_fraction: float = 0.05,
     mastered_fallback_min_fill_fraction: float = 0.90,
     multi_segment_min_fraction: float = 0.45,
@@ -739,10 +731,9 @@ def select_debug_rows(
     zero_pass_reward_std_min: float = 0.15,
     reward_mixed_zero_unique_aux_min: int = 2,
     reward_mixed_zero_max_fraction: float = 0.20,
-    near_low_min_fraction: float = 0.05,
-    near_low_max_fraction: float = 0.20,
+    low_min_fraction: float = 0.05,
     reward_mixed_zero_min_fraction: float = 0.05,
-    near_high_mid_min_fraction: float = 0.03,
+    high_min_fraction: float = 0.03,
     greedy_success_max_fraction: float = 1.0,
     pass_one_max_fraction: float = 1.0,
     high_pass_min: float = 0.75,
@@ -756,8 +747,8 @@ def select_debug_rows(
         core_min_pass=core_min_pass,
         core_max_pass=core_max_pass,
         mastered_pass_min=mastered_pass_min,
-        near_high_mid_max_pass=near_high_mid_max_pass,
-        near_high_mid_max_fraction=near_high_mid_max_fraction,
+        low_max_fraction=low_max_fraction,
+        high_max_fraction=high_max_fraction,
         mastered_max_fraction=mastered_max_fraction,
         mastered_fallback_min_fill_fraction=mastered_fallback_min_fill_fraction,
         multi_segment_min_fraction=multi_segment_min_fraction,
@@ -769,10 +760,9 @@ def select_debug_rows(
         zero_pass_reward_std_min=zero_pass_reward_std_min,
         reward_mixed_zero_unique_aux_min=reward_mixed_zero_unique_aux_min,
         reward_mixed_zero_max_fraction=reward_mixed_zero_max_fraction,
-        near_low_min_fraction=near_low_min_fraction,
-        near_low_max_fraction=near_low_max_fraction,
+        low_min_fraction=low_min_fraction,
         reward_mixed_zero_min_fraction=reward_mixed_zero_min_fraction,
-        near_high_mid_min_fraction=near_high_mid_min_fraction,
+        high_min_fraction=high_min_fraction,
         greedy_success_max_fraction=greedy_success_max_fraction,
         pass_one_max_fraction=pass_one_max_fraction,
         high_pass_min=high_pass_min,
@@ -799,8 +789,8 @@ def main() -> None:
     parser.add_argument("--core-pass-min", type=float, default=0.0625)
     parser.add_argument("--core-pass-max", type=float, default=0.75)
     parser.add_argument("--mastered-pass-min", type=float, default=0.90)
-    parser.add_argument("--near-high-mid-max-pass", type=float, default=0.75)
-    parser.add_argument("--near-high-mid-max-fraction", type=float, default=0.08)
+    parser.add_argument("--low-max-fraction", type=float, default=0.20)
+    parser.add_argument("--high-max-fraction", type=float, default=0.08)
     parser.add_argument("--mastered-max-fraction", type=float, default=0.05)
     parser.add_argument(
         "--mastered-fallback-min-fill-fraction", type=float, default=0.90
@@ -814,10 +804,9 @@ def main() -> None:
     parser.add_argument("--zero-pass-reward-std-min", type=float, default=0.15)
     parser.add_argument("--reward-mixed-zero-unique-aux-min", type=int, default=2)
     parser.add_argument("--reward-mixed-zero-max-fraction", type=float, default=0.20)
-    parser.add_argument("--near-low-min-fraction", type=float, default=0.05)
-    parser.add_argument("--near-low-max-fraction", type=float, default=0.20)
+    parser.add_argument("--low-min-fraction", type=float, default=0.05)
     parser.add_argument("--reward-mixed-zero-min-fraction", type=float, default=0.05)
-    parser.add_argument("--near-high-mid-min-fraction", type=float, default=0.03)
+    parser.add_argument("--high-min-fraction", type=float, default=0.03)
     parser.add_argument("--greedy-success-max-fraction", type=float, default=1.0)
     parser.add_argument("--pass-one-max-fraction", type=float, default=1.0)
     parser.add_argument("--high-pass-min", type=float, default=0.75)
@@ -839,7 +828,6 @@ def main() -> None:
             core_min_pass=args.core_pass_min,
             core_max_pass=args.core_pass_max,
             mastered_pass_min=args.mastered_pass_min,
-            near_high_mid_max_pass=args.near_high_mid_max_pass,
             zero_valid_min=args.zero_valid_min,
             zero_valid_max=args.zero_valid_max,
             zero_pass_reward_std_min=args.zero_pass_reward_std_min,
@@ -868,8 +856,8 @@ def main() -> None:
         core_min_pass=args.core_pass_min,
         core_max_pass=args.core_pass_max,
         mastered_pass_min=args.mastered_pass_min,
-        near_high_mid_max_pass=args.near_high_mid_max_pass,
-        near_high_mid_max_fraction=args.near_high_mid_max_fraction,
+        low_max_fraction=args.low_max_fraction,
+        high_max_fraction=args.high_max_fraction,
         mastered_max_fraction=args.mastered_max_fraction,
         mastered_fallback_min_fill_fraction=args.mastered_fallback_min_fill_fraction,
         multi_segment_min_fraction=args.multi_segment_min_fraction,
@@ -881,10 +869,9 @@ def main() -> None:
         zero_pass_reward_std_min=args.zero_pass_reward_std_min,
         reward_mixed_zero_unique_aux_min=args.reward_mixed_zero_unique_aux_min,
         reward_mixed_zero_max_fraction=args.reward_mixed_zero_max_fraction,
-        near_low_min_fraction=args.near_low_min_fraction,
-        near_low_max_fraction=args.near_low_max_fraction,
+        low_min_fraction=args.low_min_fraction,
         reward_mixed_zero_min_fraction=args.reward_mixed_zero_min_fraction,
-        near_high_mid_min_fraction=args.near_high_mid_min_fraction,
+        high_min_fraction=args.high_min_fraction,
         greedy_success_max_fraction=args.greedy_success_max_fraction,
         pass_one_max_fraction=args.pass_one_max_fraction,
         high_pass_min=args.high_pass_min,
