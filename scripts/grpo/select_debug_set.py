@@ -20,12 +20,10 @@ UNIFIED_BUCKETS = (
     "core",
     "low",
     "high",
-    "easy_tail_nonzero",
     "high_pass_non_greedy",
     "zero_valid_low",
     "zero_valid_high",
     "zero_reward_std_low",
-    "zero_unique_aux_low",
     "reward_mixed_zero",
 )
 UNIFIED_MAIN_BUCKET_ORDER = (
@@ -170,7 +168,6 @@ def _classify_bucket_unified(
     zero_valid_min: float,
     zero_valid_max: float,
     zero_pass_reward_std_min: float,
-    reward_mixed_zero_unique_aux_min: int,
 ) -> str:
     pass_value = _pass_value(row, pass_key)
     if row.get("all_invalid"):
@@ -208,7 +205,6 @@ def filter_candidate_buckets(
     zero_valid_min: float,
     zero_valid_max: float,
     zero_pass_reward_std_min: float,
-    reward_mixed_zero_unique_aux_min: int,
 ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, Any]]:
     pass_key = _resolve_pass_key(rows)
     bucket_rows = {bucket_name: [] for bucket_name in UNIFIED_BUCKETS}
@@ -223,7 +219,6 @@ def filter_candidate_buckets(
             zero_valid_min=zero_valid_min,
             zero_valid_max=zero_valid_max,
             zero_pass_reward_std_min=zero_pass_reward_std_min,
-            reward_mixed_zero_unique_aux_min=reward_mixed_zero_unique_aux_min,
         )
         bucket_rows[bucket].append({**row, "_selection_bucket": bucket})
 
@@ -400,7 +395,6 @@ def _select_debug_rows_bucket_unified(
     zero_valid_min: float,
     zero_valid_max: float,
     zero_pass_reward_std_min: float,
-    reward_mixed_zero_unique_aux_min: int,
     reward_mixed_zero_max_fraction: float,
     low_min_fraction: float,
     reward_mixed_zero_min_fraction: float,
@@ -420,7 +414,6 @@ def _select_debug_rows_bucket_unified(
         zero_valid_min=zero_valid_min,
         zero_valid_max=zero_valid_max,
         zero_pass_reward_std_min=zero_pass_reward_std_min,
-        reward_mixed_zero_unique_aux_min=reward_mixed_zero_unique_aux_min,
     )
 
     selected: list[dict[str, Any]] = []
@@ -442,12 +435,10 @@ def _select_debug_rows_bucket_unified(
         "mastered": mastered_max_fraction,
         "low": low_max_fraction,
         "high": high_max_fraction,
-        "easy_tail_nonzero": 0.0,
         "high_pass_non_greedy": 0.0,
         "zero_valid_low": 0.0,
         "zero_valid_high": 0.0,
         "zero_reward_std_low": 0.0,
-        "zero_unique_aux_low": 0.0,
         "reward_mixed_zero": reward_mixed_zero_max_fraction,
     }
     bucket_min_rows = {
@@ -667,7 +658,6 @@ def _select_debug_rows_bucket_unified(
             "zero_valid_min": zero_valid_min,
             "zero_valid_max": zero_valid_max,
             "zero_pass_reward_std_min": zero_pass_reward_std_min,
-            "reward_mixed_zero_unique_aux_min": reward_mixed_zero_unique_aux_min,
             "bucket_min_fraction": bucket_min_fraction,
             "bucket_max_fraction": bucket_max_fraction,
             "multi_segment_min_fraction": multi_segment_min_fraction,
@@ -729,7 +719,6 @@ def select_debug_rows(
     zero_valid_min: float = 0.25,
     zero_valid_max: float = 0.875,
     zero_pass_reward_std_min: float = 0.15,
-    reward_mixed_zero_unique_aux_min: int = 2,
     reward_mixed_zero_max_fraction: float = 0.20,
     low_min_fraction: float = 0.05,
     reward_mixed_zero_min_fraction: float = 0.05,
@@ -758,7 +747,6 @@ def select_debug_rows(
         zero_valid_min=zero_valid_min,
         zero_valid_max=zero_valid_max,
         zero_pass_reward_std_min=zero_pass_reward_std_min,
-        reward_mixed_zero_unique_aux_min=reward_mixed_zero_unique_aux_min,
         reward_mixed_zero_max_fraction=reward_mixed_zero_max_fraction,
         low_min_fraction=low_min_fraction,
         reward_mixed_zero_min_fraction=reward_mixed_zero_min_fraction,
@@ -802,7 +790,6 @@ def main() -> None:
     parser.add_argument("--zero-valid-min", type=float, default=0.25)
     parser.add_argument("--zero-valid-max", type=float, default=0.875)
     parser.add_argument("--zero-pass-reward-std-min", type=float, default=0.15)
-    parser.add_argument("--reward-mixed-zero-unique-aux-min", type=int, default=2)
     parser.add_argument("--reward-mixed-zero-max-fraction", type=float, default=0.20)
     parser.add_argument("--low-min-fraction", type=float, default=0.05)
     parser.add_argument("--reward-mixed-zero-min-fraction", type=float, default=0.05)
@@ -831,7 +818,6 @@ def main() -> None:
             zero_valid_min=args.zero_valid_min,
             zero_valid_max=args.zero_valid_max,
             zero_pass_reward_std_min=args.zero_pass_reward_std_min,
-            reward_mixed_zero_unique_aux_min=args.reward_mixed_zero_unique_aux_min,
         )
         total_rows = sum(stats["bucket_available_rows"].values())
         bucket_percentages = {
@@ -867,7 +853,6 @@ def main() -> None:
         zero_valid_min=args.zero_valid_min,
         zero_valid_max=args.zero_valid_max,
         zero_pass_reward_std_min=args.zero_pass_reward_std_min,
-        reward_mixed_zero_unique_aux_min=args.reward_mixed_zero_unique_aux_min,
         reward_mixed_zero_max_fraction=args.reward_mixed_zero_max_fraction,
         low_min_fraction=args.low_min_fraction,
         reward_mixed_zero_min_fraction=args.reward_mixed_zero_min_fraction,
