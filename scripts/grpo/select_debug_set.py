@@ -186,6 +186,11 @@ def _classify_bucket_unified(
     if pass_value >= mastered_pass_min:
         return "high_pass_non_greedy"
 
+    # For pass=0, prioritize reward-based classification
+    if _proxy_reward_std(row) >= zero_pass_reward_std_min:
+        if int(row.get("unique_aux_count", 0)) >= reward_mixed_zero_unique_aux_min:
+            return "reward_mixed_zero"
+
     valid_ratio = _valid_ratio(row, pass_key)
     if valid_ratio < zero_valid_min:
         return "zero_valid_low"
