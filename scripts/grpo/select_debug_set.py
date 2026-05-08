@@ -845,6 +845,16 @@ def main() -> None:
             zero_pass_reward_std_min=args.zero_pass_reward_std_min,
             reward_mixed_zero_unique_aux_min=args.reward_mixed_zero_unique_aux_min,
         )
+        total_rows = sum(stats["bucket_available_rows"].values())
+        bucket_percentages = {
+            bucket: {
+                "count": count,
+                "percentage": (count / total_rows * 100) if total_rows > 0 else 0.0,
+            }
+            for bucket, count in stats["bucket_available_rows"].items()
+        }
+        stats["bucket_statistics"] = bucket_percentages
+        stats["total_rows"] = total_rows
         print(json.dumps(stats, ensure_ascii=False, indent=2, sort_keys=True))
         return
 
