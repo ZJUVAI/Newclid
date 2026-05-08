@@ -784,11 +784,10 @@ def select_debug_rows(
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path, help="Difficulty labels JSONL")
-    parser.add_argument("output", type=Path, help="Selected debug-set JSONL")
+    parser.add_argument("output", type=Path, nargs="?", help="Selected debug-set JSONL")
     parser.add_argument(
         "--report-output",
         type=Path,
-        required=True,
         help="JSON report path",
     )
     parser.add_argument("--target-size", type=int, default=2000)
@@ -824,9 +823,34 @@ def main() -> None:
     parser.add_argument("--high-pass-min", type=float, default=0.75)
     parser.add_argument("--high-pass-max-fraction", type=float, default=1.0)
     parser.add_argument("--pass-one-value", type=float, default=1.0)
+    parser.add_argument(
+        "--stats-only",
+        action="store_true",
+        help="Only show bucket statistics without performing selection",
+    )
     args = parser.parse_args()
 
     rows = load_jsonl(args.input)
+
+    if args.stats_only:
+        _, stats = filter_candidate_buckets(
+            rows,
+            selection_policy=args.selection_policy,
+            core_min_pass=args.core_pass_min,
+            core_max_pass=args.core_pass_max,
+            mastered_pass_min=args.mastered_pass_min,
+            near_high_mid_max_pass=args.near_high_mid_max_pass,
+            zero_valid_min=args.zero_valid_min,
+            zero_valid_max=args.zero_valid_max,
+            zero_pass_reward_std_min=args.zero_pass_reward_std_min,
+            reward_mixed_zero_unique_aux_min=args.reward_mixed_zero_unique_aux_min,
+        )
+        print(json.dumps(stats, ensure_ascii=False, indent=2, sort_keys=True))
+        return
+
+    if not args.output or not args.report_output:
+        parser.error("output and --report-output are required when not using --stats-only")
+
     final_rows, report = select_debug_rows(
         rows,
         args.target_size,
