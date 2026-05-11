@@ -177,7 +177,7 @@ The selector supports three policies.
 - `mastered`: high-pass rows reserved only as a small fallback when the selector still cannot fill enough examples
 
 `v4_reward_mixed` is stricter about `pass_at_* = 0` rows.
-It keeps the same `core` and `near` tiers, but only admits zero-pass rows into
+It keeps the same `core` and low/high boundary tiers, but only admits zero-pass rows into
 `reward_mixed_zero` when offline labels show genuinely mixed reward outcomes
 instead of the degenerate `valid_at_* ~= 1, pass_at_* = 0` pattern that often
 produces `reward_std = 0` during training.
@@ -186,18 +186,18 @@ produces `reward_std = 0` during training.
 core and keeps only a small capped mid-high-pass tail:
 
 - `core`: `0.125 <= pass_at_* <= 0.625`
-- `near_low`: low-pass rows just below the core window
+- `low`: low-pass rows just below the core window
 - `reward_mixed_zero`: stricter zero-pass rows with mixed reward outcomes
-- `near_high_mid`: moderate high-pass rows above core and up to a configurable cap
+- `high`: moderate high-pass rows above core and below mastered
 - `mastered`: only used as fallback if the selector still cannot fill enough rows
 
 The current stage-balanced selector no longer keeps the overly easy
 `near_high_high` tail. Its default budget is shifted back toward harder and
 higher-signal tiers:
 
-- `near_low`: default `5%` to `20%`
+- `low`: default `5%` to `20%`
 - `reward_mixed_zero`: default `5%` to `20%`
-- `near_high_mid`: default `3%` to `8%`
+- `high`: default `3%` to `8%`
 
 `v9_stage_balanced` builds on top of `v6/v7` and explicitly enforces minimum
 coverage for low-pass and mid-high-pass boundary tiers so the final training
@@ -205,9 +205,9 @@ set does not collapse into almost all `core` rows, while suppressing the
 easiest non-mastered tail:
 
 - `core`: `0.125 <= pass_at_* <= 0.625`
-- `near_low`: lower-pass boundary rows below core
+- `low`: lower-pass boundary rows below core
 - `reward_mixed_zero`: zero-pass rows that still satisfy validity, reward-mixing, and diversity constraints
-- `near_high_mid`: `0.625 < pass_at_* <= 0.75`
+- `high`: `0.625 < pass_at_* < 1.0`
 - `mastered`: only used as fallback when the selector still cannot fill enough rows
 
 The `v3_tiered` policy first groups rows into:

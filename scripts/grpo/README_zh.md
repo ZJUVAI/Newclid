@@ -202,30 +202,30 @@ python scripts/grpo/analyze_difficulty_structure.py \
 - `mastered`：高通过率样本，仅在筛选器无法补足数量时作为少量回退
 
 `v4_reward_mixed` 对 `pass_at_* = 0` 的样本更加严格。
-它保留相同的 `core` 和 `near` 层，但只有在离线标注显示奖励结果确实混合时，才会把零通过样本放入
+它保留相同的 `core` 与低/高通过率边界层，但只有在离线标注显示奖励结果确实混合时，才会把零通过样本放入
 `reward_mixed_zero`，而不是接纳那种退化的 `valid_at_* ~= 1, pass_at_* = 0` 模式，因为这种模式在训练中往往会产生 `reward_std = 0`。
 
 `v6_mid_strict_zero` 是只改选择器的细化版本，它收窄了可学习核心区间，并单独保留少量中高通过率尾部：
 
 - `core`：`0.125 <= pass_at_* <= 0.625`
-- `near_low`：略低于核心窗口的低通过率样本
+- `low`：略低于核心窗口的低通过率样本
 - `reward_mixed_zero`：奖励结果混合的、更严格的零通过样本
-- `near_high_mid`：高于核心且不超过配置上限的中高通过率样本
+- `high`：高于核心且尚未进入 mastered 的中高通过率样本
 - `mastered`：仅在筛选器仍无法填满时作为回退
 
 当前的 stage-balanced 选择器不再保留过易的 `near_high_high` 尾部，而是把预算回收到更有训练价值的区间：
 
-- `near_low`：默认 `5%` 到 `20%`
+- `low`：默认 `5%` 到 `20%`
 - `reward_mixed_zero`：默认 `5%` 到 `20%`
-- `near_high_mid`：默认 `3%` 到 `8%`
+- `high`：默认 `3%` 到 `8%`
 
 `v9_stage_balanced` 在 `v6/v7` 的基础上，显式要求低通过和中高通过边界桶保留最小占比，
 避免训练集几乎全部落在 `core`，同时压低高通过率尾部：
 
 - `core`：`0.125 <= pass_at_* <= 0.625`
-- `near_low`：低于 core 的低通过率边界样本
+- `low`：低于 core 的低通过率边界样本
 - `reward_mixed_zero`：满足有效性、奖励混合度和多样性约束的零通过样本
-- `near_high_mid`：`0.625 < pass_at_* <= 0.75`
+- `high`：`0.625 < pass_at_* < 1.0`
 - `mastered`：仅在仍无法补足样本时作为回退
 
 `v3_tiered` 会先把样本分到：

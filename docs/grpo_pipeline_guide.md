@@ -202,10 +202,12 @@ python scripts/grpo/select_debug_set.py \
 
 **分桶逻辑**（bucket_unified）：
 - `core`：中等难度（pass@16 ∈ [0.125, 0.625]）
-- `near_low`：低通过率边界（pass@16 ∈ [0.0625, 0.125)）
-- `reward_mixed_zero`：零通过但有信号（pass@16=0，但 valid_ratio>0.25，proxy_reward_std>0.15）
-- `near_high_mid`：高通过率边界（pass@16 ∈ (0.625, 0.75]）
-- `mastered`：过于简单（pass@16 > 0.75）
+- `low`：低通过率边界（pass@16 ∈ (0, 0.125)）
+- `high`：高通过率边界（pass@16 ∈ (0.625, 1.0)）
+- `high_pass_non_greedy`：高通过但未 greedy 成功的非主采样桶
+- `reward_mixed_zero`：零通过但奖励方差足够高（proxy_reward_std>0.15）
+- `zero_std` / `low_std`：零通过但奖励信号退化的样本桶
+- `mastered`：`greedy_success=true` 且 pass 足够高，仅在回退时使用
 
 ### 2.6 准备 GRPO 训练数据
 

@@ -213,16 +213,15 @@ def filter_candidate_buckets(
         bucket_rows[bucket].append({**row, "_selection_bucket": bucket})
 
     for bucket_name in UNIFIED_BUCKETS:
-        bucket_rows[bucket_name].sort(
-            key=lambda row: _tier_rank(row, pass_key)
-        )
+        bucket_rows[bucket_name].sort(key=lambda row: _tier_rank(row, pass_key))
 
     stats = {
         "pass_key": pass_key,
         "selection_policy": selection_policy,
         "bucket_order": list(UNIFIED_MAIN_BUCKET_ORDER),
         "bucket_available_rows": {
-            bucket_name: len(bucket_rows[bucket_name]) for bucket_name in UNIFIED_BUCKETS
+            bucket_name: len(bucket_rows[bucket_name])
+            for bucket_name in UNIFIED_BUCKETS
         },
         "bucket_pass_histogram": {
             bucket_name: _build_pass_histogram(bucket_rows[bucket_name], pass_key)
@@ -427,7 +426,9 @@ def _select_debug_rows_bucket_unified(
         "reward_mixed_zero": reward_mixed_zero_max_fraction,
     }
     bucket_min_rows = {
-        bucket_name: max(0, int(target_size * bucket_min_fraction.get(bucket_name, 0.0)))
+        bucket_name: max(
+            0, int(target_size * bucket_min_fraction.get(bucket_name, 0.0))
+        )
         for bucket_name in UNIFIED_BUCKETS
     }
     bucket_max_rows = {
@@ -525,7 +526,9 @@ def _select_debug_rows_bucket_unified(
 
     bucket_floor_shortages = {}
     for bucket_name in ("low", "reward_mixed_zero", "high"):
-        needed = max(0, bucket_min_rows[bucket_name] - bucket_selected_counter[bucket_name])
+        needed = max(
+            0, bucket_min_rows[bucket_name] - bucket_selected_counter[bucket_name]
+        )
         taken = _take_matching_from_tiers(
             selected,
             bucket_selected_counter,
@@ -607,7 +610,8 @@ def _select_debug_rows_bucket_unified(
             selected_family_counter[tag] += 1
 
     bucket_selected_rows = {
-        bucket_name: bucket_selected_counter[bucket_name] for bucket_name in UNIFIED_BUCKETS
+        bucket_name: bucket_selected_counter[bucket_name]
+        for bucket_name in UNIFIED_BUCKETS
     }
     shortage_reasons = []
     if len(final_rows) < target_size:
@@ -808,7 +812,9 @@ def main() -> None:
         return
 
     if not args.output or not args.report_output:
-        parser.error("output and --report-output are required when not using --stats-only")
+        parser.error(
+            "output and --report-output are required when not using --stats-only"
+        )
 
     final_rows, report = select_debug_rows(
         rows,
@@ -843,4 +849,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

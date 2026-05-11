@@ -539,21 +539,21 @@ class TestGRPODataSelection(unittest.TestCase):
             self._selection_row("all_invalid", pass_value=0.0, all_invalid=True),
             self._selection_row("mastered", pass_value=0.95, greedy_success=True),
             self._selection_row("core", pass_value=0.25),
-            self._selection_row("near_low", pass_value=0.0625),
-            self._selection_row("near_high_mid", pass_value=0.75),
-            self._selection_row("easy_tail", pass_value=0.8125),
+            self._selection_row("low", pass_value=0.0625),
+            self._selection_row("high_edge", pass_value=0.75),
+            self._selection_row("high_tail", pass_value=0.8125),
             self._selection_row("high_pass_non_greedy", pass_value=1.0),
-            self._selection_row("zero_valid_low", pass_value=0.0, valid_value=0.10),
-            self._selection_row("zero_valid_high", pass_value=0.0, valid_value=0.95),
+            self._selection_row("zero_std_low", pass_value=0.0, valid_value=0.10),
+            self._selection_row("zero_std_high", pass_value=0.0, valid_value=0.95),
             self._selection_row(
-                "zero_reward_std_low",
+                "zero_std_reward",
                 pass_value=0.0,
                 valid_value=0.50,
                 unique_aux_count=3,
                 unsolved_count=16,
             ),
             self._selection_row(
-                "zero_unique_aux_low",
+                "reward_mixed_zero_a",
                 pass_value=0.0,
                 valid_value=0.50,
                 unique_aux_count=1,
@@ -578,37 +578,30 @@ class TestGRPODataSelection(unittest.TestCase):
             core_min_pass=0.125,
             core_max_pass=0.625,
             mastered_pass_min=0.90,
-            near_high_mid_max_pass=0.75,
-            zero_valid_min=0.25,
-            zero_valid_max=0.875,
             zero_pass_reward_std_min=0.15,
-            reward_mixed_zero_unique_aux_min=2,
         )
 
         self.assertEqual(sum(stats["bucket_available_rows"].values()), len(rows))
         self.assertEqual(len(bucket_rows["all_invalid"]), 1)
         self.assertEqual(len(bucket_rows["mastered"]), 1)
         self.assertEqual(len(bucket_rows["core"]), 1)
-        self.assertEqual(len(bucket_rows["near_low"]), 1)
-        self.assertEqual(len(bucket_rows["near_high_mid"]), 1)
-        self.assertEqual(len(bucket_rows["easy_tail_nonzero"]), 1)
+        self.assertEqual(len(bucket_rows["low"]), 1)
+        self.assertEqual(len(bucket_rows["high"]), 2)
         self.assertEqual(len(bucket_rows["high_pass_non_greedy"]), 1)
-        self.assertEqual(len(bucket_rows["zero_valid_low"]), 1)
-        self.assertEqual(len(bucket_rows["zero_valid_high"]), 1)
-        self.assertEqual(len(bucket_rows["zero_reward_std_low"]), 1)
-        self.assertEqual(len(bucket_rows["zero_unique_aux_low"]), 1)
-        self.assertEqual(len(bucket_rows["reward_mixed_zero"]), 1)
+        self.assertEqual(len(bucket_rows["zero_std"]), 3)
+        self.assertEqual(len(bucket_rows["low_std"]), 0)
+        self.assertEqual(len(bucket_rows["reward_mixed_zero"]), 2)
         self.assertEqual(
-            stats["bucket_pass_histogram"]["easy_tail_nonzero"], {"0.8125": 1}
+            stats["bucket_pass_histogram"]["high"], {"0.7500": 1, "0.8125": 1}
         )
 
-    def test_select_debug_rows_bucket_unified_reports_buckets_and_respects_zero_caps(self):
+    def test_select_debug_rows_bucket_unified_reports_buckets_and_respects_zero_caps(
+        self,
+    ):
         rows = [
             self._selection_row("core_a", pass_value=0.25),
             self._selection_row("core_b", pass_value=0.375),
-            self._selection_row(
-                "near_low", pass_value=0.0625, goal_predicate="perp"
-            ),
+            self._selection_row("near_low", pass_value=0.0625, goal_predicate="perp"),
             self._selection_row(
                 "reward_mixed_zero",
                 pass_value=0.0,
@@ -638,12 +631,12 @@ class TestGRPODataSelection(unittest.TestCase):
             selection_policy="bucket_unified",
             core_min_pass=0.125,
             core_max_pass=0.625,
-            near_low_min_fraction=0.20,
+            low_min_fraction=0.20,
             reward_mixed_zero_min_fraction=0.20,
-            near_high_mid_min_fraction=0.20,
-            near_low_max_fraction=1.0,
+            high_min_fraction=0.20,
+            low_max_fraction=1.0,
             reward_mixed_zero_max_fraction=1.0,
-            near_high_mid_max_fraction=1.0,
+            high_max_fraction=1.0,
             mastered_max_fraction=0.0,
             family_min_fraction=0.0,
             goal_max_fraction=1.0,
@@ -655,14 +648,13 @@ class TestGRPODataSelection(unittest.TestCase):
         self.assertEqual(len(final_rows), 5)
         self.assertEqual(report["selection_policy"], "bucket_unified")
         self.assertEqual(report["bucket_selected_rows"]["core"], 2)
-        self.assertEqual(report["bucket_selected_rows"]["near_low"], 1)
+        self.assertEqual(report["bucket_selected_rows"]["low"], 1)
         self.assertEqual(report["bucket_selected_rows"]["reward_mixed_zero"], 1)
-        self.assertEqual(report["bucket_selected_rows"]["near_high_mid"], 1)
-        self.assertEqual(report["bucket_selected_rows"]["easy_tail_nonzero"], 0)
+        self.assertEqual(report["bucket_selected_rows"]["high"], 1)
         self.assertEqual(report["bucket_selected_rows"]["high_pass_non_greedy"], 0)
-        self.assertEqual(report["bucket_selected_rows"]["zero_valid_high"], 0)
+        self.assertEqual(report["bucket_selected_rows"]["zero_std"], 0)
         self.assertEqual(report["bucket_selected_rows"]["all_invalid"], 0)
-        self.assertIn("easy_tail_nonzero", report["bucket_available_rows"])
+        self.assertIn("high", report["bucket_available_rows"])
         self.assertNotIn("removed_all_invalid", report)
         self.assertNotIn("removed_mastered", report)
         self.assertNotIn("excluded_rows_total", report)
@@ -684,12 +676,12 @@ class TestGRPODataSelection(unittest.TestCase):
             selection_policy="bucket_unified",
             core_min_pass=0.125,
             core_max_pass=0.625,
-            near_low_min_fraction=0.0,
+            low_min_fraction=0.0,
             reward_mixed_zero_min_fraction=0.0,
-            near_high_mid_min_fraction=0.0,
-            near_low_max_fraction=1.0,
+            high_min_fraction=0.0,
+            low_max_fraction=1.0,
             reward_mixed_zero_max_fraction=1.0,
-            near_high_mid_max_fraction=1.0,
+            high_max_fraction=1.0,
             mastered_max_fraction=0.50,
             family_min_fraction=0.0,
             goal_max_fraction=1.0,
@@ -701,10 +693,14 @@ class TestGRPODataSelection(unittest.TestCase):
         self.assertEqual(len(final_rows), 4)
         self.assertTrue(report["fallback_triggered"])
         self.assertEqual(report["bucket_selected_rows"]["mastered"], 2)
-        self.assertEqual(report["bucket_pass_histogram_selected"]["mastered"]["0.9500"], 1)
-        self.assertEqual(report["bucket_pass_histogram_selected"]["mastered"]["0.9800"], 1)
+        self.assertEqual(
+            report["bucket_pass_histogram_selected"]["mastered"]["0.9500"], 1
+        )
+        self.assertEqual(
+            report["bucket_pass_histogram_selected"]["mastered"]["0.9800"], 1
+        )
 
-    def test_file_round_trip_for_candidate_pool(self):
+    def test_select_debug_rows_prefers_higher_diversity_reward_mixed_zero_rows(self):
         rows = [
             self._selection_row(
                 "high_strong",
@@ -855,9 +851,9 @@ class TestGRPODataSelection(unittest.TestCase):
             rows,
             target_size=10,
             selection_policy="bucket_unified",
-            near_low_min_fraction=0.20,
+            low_min_fraction=0.20,
             reward_mixed_zero_min_fraction=0.0,
-            near_high_mid_min_fraction=0.0,
+            high_min_fraction=0.0,
             greedy_success_max_fraction=0.20,
             pass_one_max_fraction=0.20,
             high_pass_max_fraction=0.30,
@@ -866,9 +862,9 @@ class TestGRPODataSelection(unittest.TestCase):
             multi_point_min_fraction=0.0,
             family_min_fraction=0.0,
             goal_max_fraction=1.0,
-            near_low_max_fraction=1.0,
+            low_max_fraction=1.0,
             reward_mixed_zero_max_fraction=1.0,
-            near_high_mid_max_fraction=1.0,
+            high_max_fraction=1.0,
             mastered_max_fraction=0.0,
         )
 
@@ -908,7 +904,9 @@ class TestGRPODataSelection(unittest.TestCase):
             )
         self.assertEqual(loaded, rows[:2])
 
-    def test_label_difficulty_vlm_load_existing_labeled_rows_restarts_on_leading_corruption(self):
+    def test_label_difficulty_vlm_load_existing_labeled_rows_restarts_on_leading_corruption(
+        self,
+    ):
         rows = [
             {"_shard_index": 0, "sample_id": "a", "query": "q-a", "fl_problem": "p-a"},
             {"_shard_index": 1, "sample_id": "b", "query": "q-b", "fl_problem": "p-b"},
