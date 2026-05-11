@@ -2,7 +2,8 @@
   "using_log": true,
   "using_exp": false,
   "light": false,
-
+  "use_predicate_cache": true,
+  "verbose": false,
   "r03": true,
   "r04": true,
   "r07": true,
@@ -44,5 +45,5 @@
   "r106": true,
   "r107": true,
   "r108": true,
-  "r109":true
+  "r109": true
 }

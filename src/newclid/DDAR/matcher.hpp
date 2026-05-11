@@ -104,6 +104,14 @@ class CustomTheoremMatcher
 private:
     Problem *_problem;
     std::vector<Theorem> _theorems;
+    std::map<std::string, bool> _config;
+
+    // 预计算索引：谓词名 -> 所有满足的点索引组合（包含所有排列）
+    // 例如 _index["coll"] = [[0,1,2], [1,0,2], [2,1,0], ...]
+    std::unordered_map<std::string, std::vector<std::vector<int>>> _index;
+
+    // 预计算常见谓词的所有满足实例
+    void build_predicate_index();
 
     // 递归匹配 stmts[idx..] 在当前 mapping 下的所有合法扩展
     void backtrack(
@@ -115,9 +123,27 @@ private:
     // 对一条 rule 的所有前提匹配，生成 Theorem 并插入 _theorems
     void match_rule(const CustomRule &rule);
 
+    bool get_config(const std::string &key, bool default_val = false) const
+    {
+        auto it = _config.find(key);
+        return it != _config.end() ? it->second : default_val;
+    }
+
+    void DebugLog(const std::string &msg) const;
+
+    std::vector<std::string> collect_new_vars(const Stmt &stmt, const Mapping &current) const;
+
+    bool verify_stmt(const Stmt &stmt, const Mapping &mapping) const;
+
+    void enumerate_brute_force(const std::vector<Stmt> &stmts, size_t stmt_idx, const std::vector<std::string> &new_vars, Mapping &current, std::vector<Mapping> &results) const;
+
+    void build_triangle_indices(size_t n);
+
 public:
     // rules: 每条规则包含前提、结论、名称、规则id
-    CustomTheoremMatcher(Problem *prob, const std::vector<CustomRule> &rules);
+    // config: 配置选项，支持 "use_predicate_cache" (默认true) 控制是否启用预计算索引
+    CustomTheoremMatcher(Problem *prob, const std::vector<CustomRule> &rules,
+                         const std::map<std::string, bool> &config = {});
 
     const std::vector<Theorem> &theorems() const { return _theorems; }
 };

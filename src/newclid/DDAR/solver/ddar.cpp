@@ -171,23 +171,26 @@ void DDARSolver::insert_application(Theorem thm)
 
 void DDARSolver::add_custom_theorems(const vector<CustomRule> &rules)
 {
-    CustomTheoremMatcher matcher(_problem, rules);
+    CustomTheoremMatcher matcher(_problem, rules, _config);
 
     // cout << "\n=== Matched Custom Theorems ===" << endl;
-    // size_t idx = 0;
+    size_t idx = 0;
     for (const auto &thm : matcher.theorems())
     {
-        // cout << "[" << idx++ << "] " << thm.name() << " (" << thm.rule() << ")" << endl;
+        if (get_config("verbose", false))
+        {
+            cout << "[" << idx++ << "] " << thm.name() << " (" << thm.rule() << ")" << endl;
 
-        // cout << "  Hypotheses:" << endl;
-        // for (const auto &hyp : thm.hypotheses())
-        //     cout << "    " << hyp->to_string() << endl;
+            cout << "  Hypotheses:" << endl;
+            for (const auto &hyp : thm.hypotheses())
+                cout << "    " << hyp->to_string() << endl;
 
-        // cout << "  Conclusions:" << endl;
-        // for (const auto &con : thm.conclusions())
-        //     cout << "    " << con->to_string() << endl;
+            cout << "  Conclusions:" << endl;
+            for (const auto &con : thm.conclusions())
+                cout << "    " << con->to_string() << endl;
 
-        // cout << endl;
+            cout << endl;
+        }
         insert_application(thm.clone());
     }
     // cout << "Total: " << matcher.theorems().size() << " custom theorems added" << endl;
