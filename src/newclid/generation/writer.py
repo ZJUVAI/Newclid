@@ -11,6 +11,8 @@ import os
 import ray
 import cairosvg
 
+POINT_COORDS_GRID_SIZE = 256
+
 
 def convert_svg_to_png(svg_path, png_path, width=1024):
     """Convert SVG file to PNG format."""
@@ -53,6 +55,70 @@ def save_figure_as_png(
 
     fig.savefig(svg_path, format="svg")
     convert_svg_to_png(svg_path, png_path, width=img_pixels)
+
+
+def _clamp_grid_coord(value: int, grid_size: int) -> int:
+    return max(0, min(value, grid_size - 1))
+
+
+def build_point_coords_grid(
+    display_points: dict[str, tuple[float, float]],
+    mapping: dict[str, str] | None,
+    canvas_width: float,
+    canvas_height: float,
+    grid_size: int = POINT_COORDS_GRID_SIZE,
+) -> dict[str, list[int]]:
+    """Convert rendered display coordinates into a fixed top-left grid."""
+    if canvas_width <= 0 or canvas_height <= 0:
+        raise ValueError("canvas dimensions must be positive")
+    if grid_size <= 0:
+        raise ValueError("grid_size must be positive")
+
+    output: dict[str, list[int]] = {}
+    if mapping is None:
+        sorted_items = [(name, name) for name in sorted(display_points)]
+    else:
+        sorted_items = sorted(mapping.items())
+    for source_name, target_name in sorted_items:
+        if source_name not in display_points:
+            continue
+        display_x, display_y = display_points[source_name]
+        gx = _clamp_grid_coord(
+            round(display_x / canvas_width * (grid_size - 1)),
+            grid_size,
+        )
+        gy = _clamp_grid_coord(
+            round((1.0 - display_y / canvas_height) * (grid_size - 1)),
+            grid_size,
+        )
+        output[target_name] = [gx, gy]
+    return output
+
+
+def extract_point_coords_grid(
+    ax,
+    point_lookup: dict[str, object],
+    mapping: dict[str, str] | None,
+    grid_size: int = POINT_COORDS_GRID_SIZE,
+) -> dict[str, list[int]]:
+    """Project rendered points into the fixed image-aligned grid."""
+    ax.figure.canvas.draw()
+    canvas_width, canvas_height = ax.figure.canvas.get_width_height()
+    display_points: dict[str, tuple[float, float]] = {}
+    for name, point in point_lookup.items():
+        point_num = getattr(point, "num", None)
+        if point_num is None:
+            continue
+        display_x, display_y = ax.transData.transform((point_num.x, point_num.y))
+        display_points[name] = (float(display_x), float(display_y))
+
+    return build_point_coords_grid(
+        display_points,
+        mapping,
+        canvas_width,
+        canvas_height,
+        grid_size=grid_size,
+    )
 
 
 @ray.remote(num_cpus=0.5)
@@ -149,6 +215,12 @@ def draw_figure_task(
                 draw_data["mapping"],
                 annotations,
             )
+            if "point_coords_grid" not in paths_update:
+                paths_update["point_coords_grid"] = extract_point_coords_grid(
+                    fig.axes[0],
+                    dep_graph.symbols_graph.name2node,
+                    draw_data["mapping"],
+                )
             save_figure_as_png(
                 fig,
                 png_path=png_path,

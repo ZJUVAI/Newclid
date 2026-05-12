@@ -168,6 +168,23 @@ python -m newclid.generation.pipeline \
 - `--remove_coords`: Remove coordinates from output
 - `--clear`: Clear old dataset files
 
+When `--img != 0`, each generated sample also includes:
+
+```json
+"point_coords_grid": {
+  "a": [83, 190],
+  "b": [201, 144],
+  "c": [127, 51]
+}
+```
+
+Dataset-wide conventions for `point_coords_grid`:
+- fixed `256x256` grid
+- top-left origin
+- `x` grows rightward
+- `y` grows downward
+- point names match the renamed/displayed point names in the sample
+
 ## External Construction Config
 
 Example `profiles.json`:
