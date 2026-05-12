@@ -3,6 +3,13 @@ from __future__ import annotations
 from typing import Any, Callable
 
 
+def strip_trailing_invalid_token_ids(token_ids: list[int]) -> list[int]:
+    trimmed = list(token_ids)
+    while trimmed and int(trimmed[-1]) < 0:
+        trimmed.pop()
+    return trimmed
+
+
 def _rebuild_prefixed_candidate(*, request: dict[str, Any], continuation: str) -> str:
     response_prefix = request.get("response_prefix", "<aux> x00")
     new_point_name = request["new_point_name"]
@@ -25,7 +32,10 @@ def decode_batched_continuations(
     for index, request in enumerate(requests):
         start = index * decoding_size
         end = start + decoding_size
-        trimmed = [sequence[input_width:] for sequence in sequences[start:end]]
+        trimmed = []
+        for sequence in sequences[start:end]:
+            continuation_token_ids = sequence[input_width:].tolist()
+            trimmed.append(strip_trailing_invalid_token_ids(continuation_token_ids))
         continuations = decode_batch(trimmed)
         rebuilt_outputs.append(
             [

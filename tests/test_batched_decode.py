@@ -4,7 +4,10 @@ import unittest
 
 import numpy as np
 
-from newclid.agent.runtime.batched_decode import decode_batched_continuations
+from newclid.agent.runtime.batched_decode import (
+    decode_batched_continuations,
+    strip_trailing_invalid_token_ids,
+)
 
 
 class BatchedDecodeTests(unittest.TestCase):
@@ -33,7 +36,7 @@ class BatchedDecodeTests(unittest.TestCase):
             sequences=sequences,
             decoding_size=2,
             decode_batch=lambda batch: [
-                decoded[tuple(item.tolist())] for item in batch
+                decoded[tuple(item)] for item in batch
             ],
         )
 
@@ -94,7 +97,7 @@ class BatchedDecodeTests(unittest.TestCase):
             sequences=sequences,
             decoding_size=3,
             decode_batch=lambda batch: [
-                f" : candidate_{item.tolist()[0]} ; </aux>" for item in batch
+                f" : candidate_{item[0]} ; </aux>" for item in batch
             ],
         )
 
@@ -129,6 +132,36 @@ class BatchedDecodeTests(unittest.TestCase):
         self.assertEqual(
             outputs,
             [["<aux> a x00 q r : coll a b q [001] ; </aux>"]],
+        )
+
+    def test_strip_trailing_invalid_token_ids_strips_negative_sentinel(self):
+        token_ids = [11, 12, 13, -1]
+        self.assertEqual(
+            strip_trailing_invalid_token_ids(token_ids),
+            [11, 12, 13],
+        )
+
+    def test_decode_batched_continuations_strips_trailing_invalid_token(self):
+        requests = [
+            {"request_id": "r0", "response_prefix": "<aux> x00", "new_point_name": "p"}
+        ]
+        model_inputs = {"input_ids": np.zeros((1, 4), dtype=np.int64)}
+        sequences = [np.array([0, 0, 0, 0, 61, 62, -1])]
+        decoded = {
+            (61, 62): " : coll a b p [001] ; </aux>",
+        }
+
+        outputs = decode_batched_continuations(
+            requests=requests,
+            model_inputs=model_inputs,
+            sequences=sequences,
+            decoding_size=1,
+            decode_batch=lambda batch: [decoded[tuple(item)] for item in batch],
+        )
+
+        self.assertEqual(
+            outputs,
+            [["<aux> x00 p : coll a b p [001] ; </aux>"]],
         )
 
 

@@ -15,8 +15,8 @@ from qwen_vl_utils import process_vision_info
 from transformers import AutoProcessor as TransformersAutoProcessor
 from transformers import (
     Qwen3_5ForConditionalGeneration,
-    StoppingCriteria,
     StoppingCriteriaList,
+    StopStringCriteria,
 )
 from transformers.utils import logging as hf_logging
 
@@ -138,32 +138,18 @@ def _build_text_only_prompt(processor, request: dict[str, Any]) -> str:
     )
 
 
-class _EndAuxTagCriteria(StoppingCriteria):
-    """Stop generation when all sequences end with the ` </aux>` token sequence."""
-
-    def __init__(self, stop_ids: list[int], device):
-        self._stop = torch.tensor(stop_ids, device=device)
-
-    def __call__(self, input_ids: torch.LongTensor, scores, **kwargs) -> bool:
-        n = len(self._stop)
-        if input_ids.shape[1] < n:
-            return False
-        tail = input_ids[:, -n:]
-        return bool((tail == self._stop).all())
-
-
 def _resolve_aux_stop_config(
     tokenizer,
     *,
     stop_at_semicolon: bool,
     device,
 ) -> tuple[int | None, StoppingCriteriaList | None, int]:
+    del device
     if stop_at_semicolon:
         eos_token_id = tokenizer.encode(" ;", add_special_tokens=False)[0]
         return eos_token_id, None, 100
-    stop_ids = tokenizer.encode(" </aux>", add_special_tokens=False)
     stopping_criteria = StoppingCriteriaList(
-        [_EndAuxTagCriteria(stop_ids, device=device)]
+        [StopStringCriteria(tokenizer=tokenizer, stop_strings=["</aux>"])]
     )
     return None, stopping_criteria, 512
 
@@ -271,7 +257,6 @@ def generate_visual_aux_dsl_dict_batch(
         stop_at_semicolon=stop_at_semicolon,
         device=model.device,
     )
-
     generate_start = time.perf_counter()
     generated_output = model.generate(
         **model_inputs,
@@ -358,7 +343,6 @@ def generate_qwen3_text_only_aux_dsl_dict_batch(
         stop_at_semicolon=stop_at_semicolon,
         device=model.device,
     )
-
     generate_start = time.perf_counter()
     generated_output = model.generate(
         **model_inputs,

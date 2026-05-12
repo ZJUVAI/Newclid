@@ -10,12 +10,15 @@ import torch
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
-    StoppingCriteria,
     StoppingCriteriaList,
+    StopStringCriteria,
 )
 from transformers.utils import logging as hf_logging
 
-from newclid.agent.runtime.batched_decode import decode_batched_continuations
+from newclid.agent.runtime.batched_decode import (
+    decode_batched_continuations,
+    strip_trailing_invalid_token_ids,
+)
 from newclid.agent.runtime.model_resolution import resolve_model_path
 
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
@@ -140,6 +143,7 @@ def _count_generated_tokens(
     if pad_token_id is not None:
         while continuation and continuation[-1] == pad_token_id:
             continuation.pop()
+    continuation = strip_trailing_invalid_token_ids(continuation)
     if eos_token_id is not None and continuation and continuation[-1] == eos_token_id:
         continuation.pop()
     return len(continuation)
@@ -214,32 +218,18 @@ def _accumulate_request_profile(
         worker_batch_profile["first_token_latency_count"] += 1
 
 
-class _EndAuxTagCriteria(StoppingCriteria):
-    """Stop generation when all sequences end with the ` </aux>` token sequence."""
-
-    def __init__(self, stop_ids: list[int], device):
-        self._stop = torch.tensor(stop_ids, device=device)
-
-    def __call__(self, input_ids: torch.LongTensor, scores, **kwargs) -> bool:
-        n = len(self._stop)
-        if input_ids.shape[1] < n:
-            return False
-        tail = input_ids[:, -n:]
-        return bool((tail == self._stop).all())
-
-
 def _resolve_text_stop_config(
     tokenizer,
     *,
     stop_at_semicolon: bool,
     device,
 ) -> tuple[int | None, StoppingCriteriaList | None, int]:
+    del device
     if stop_at_semicolon:
         eos_token_id = tokenizer.encode(" ;", add_special_tokens=False)[0]
         return eos_token_id, None, 100
-    stop_ids = tokenizer.encode(" </aux>", add_special_tokens=False)
     stopping_criteria = StoppingCriteriaList(
-        [_EndAuxTagCriteria(stop_ids, device=device)]
+        [StopStringCriteria(tokenizer=tokenizer, stop_strings=["</aux>"])]
     )
     return None, stopping_criteria, 512
 
@@ -291,7 +281,6 @@ def generate_aux_dsl_dict_batch(
         stop_at_semicolon=stop_at_semicolon,
         device=model.device,
     )
-
     generate_start = time.perf_counter()
     generated_output = model.generate(
         **model_inputs,
