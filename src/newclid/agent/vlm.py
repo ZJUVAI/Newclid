@@ -43,6 +43,7 @@ class VLMAgent(BaseAgent):
         prepare_request_workers: int = 1,
         prepare_prefetch_limit: int = 1,
         search_version: str = "v1",
+        eval_first_aux_only: bool = False,
         render_root: str | Path = "temp/single_problem_multi_gpu_eval_images",
         render_width: int = 1024,
         trace_writer=None,
@@ -59,6 +60,7 @@ class VLMAgent(BaseAgent):
             prepare_request_workers=prepare_request_workers,
             prepare_prefetch_limit=prepare_prefetch_limit,
             ddar_returns_proof=False,
+            eval_first_aux_only=eval_first_aux_only,
             trace_writer=trace_writer,
         )
         if search_version not in {"v1", "v2"}:
@@ -176,6 +178,7 @@ class VLMAgent(BaseAgent):
         request: dict[str, Any],
         aux_dsl: str,
         raw_aux_text: str,
+        selected_aux_text: str,
     ) -> (
         tuple[ProblemJGEX, ProofState | None]
         | tuple[ProblemJGEX, ProofState | None, str]
@@ -183,8 +186,8 @@ class VLMAgent(BaseAgent):
     ):
         del ddar_result, proof, request, aux_dsl
         if self.search_version == "v2":
-            return new_problem, None, raw_aux_text
-        del prior_state, raw_aux_text
+            return new_problem, None, selected_aux_text
+        del prior_state, raw_aux_text, selected_aux_text
         return new_problem, None
 
     def finalize_next_queue(

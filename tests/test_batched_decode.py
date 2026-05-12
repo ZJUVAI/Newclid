@@ -67,7 +67,9 @@ class BatchedDecodeTests(unittest.TestCase):
             model_inputs=model_inputs,
             sequences=sequences,
             decoding_size=1,
-            decode_batch=lambda batch: [" : perp b d c p [021] coll b d p [022] ; </aux>"],
+            decode_batch=lambda batch: [
+                " : perp b d c p [021] coll b d p [022] ; </aux>"
+            ],
         )
 
         self.assertEqual(

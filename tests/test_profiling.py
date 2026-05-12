@@ -63,8 +63,18 @@ class _DummyAgent(BaseAgent):
         request,
         aux_dsl,
         raw_aux_text,
+        selected_aux_text,
     ):
-        del new_problem, prior_state, ddar_result, proof, request, aux_dsl, raw_aux_text
+        del (
+            new_problem,
+            prior_state,
+            ddar_result,
+            proof,
+            request,
+            aux_dsl,
+            raw_aux_text,
+            selected_aux_text,
+        )
         return None
 
     def try_dsl_to_constructions(self, content: str):
@@ -489,6 +499,7 @@ def test_ddar_result_handle_breaks_out_non_overlapping_substages(monkeypatch) ->
             "candidate_rank": 0,
             "aux_dsl": "<aux> x00 d : coll a b d [000] ;",
             "raw_aux_text": "aux",
+            "selected_aux_text": "aux",
             "translated_aux": "aux",
         }
     }
@@ -518,7 +529,15 @@ def test_ddar_result_handle_breaks_out_non_overlapping_substages(monkeypatch) ->
     )
 
     def fake_next_state(
-        *, new_problem, prior_state, ddar_result, proof, request, aux_dsl, raw_aux_text
+        *,
+        new_problem,
+        prior_state,
+        ddar_result,
+        proof,
+        request,
+        aux_dsl,
+        raw_aux_text,
+        selected_aux_text,
     ):
         assert new_problem == "problem"
         assert prior_state == "state"
@@ -526,6 +545,7 @@ def test_ddar_result_handle_breaks_out_non_overlapping_substages(monkeypatch) ->
         assert request["response_prefix"] == "<aux> x00"
         assert aux_dsl == "<aux> x00 d : coll a b d [000] ;"
         assert raw_aux_text == "aux"
+        assert selected_aux_text == "aux"
         time.sleep(0.01)
         return ("problem", "proof")
 

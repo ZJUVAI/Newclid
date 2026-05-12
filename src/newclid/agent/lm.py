@@ -34,6 +34,7 @@ class LMAgent(BaseAgent):
         prepare_request_workers: int = 1,
         prepare_prefetch_limit: int = 1,
         search_version: str = "v1",
+        eval_first_aux_only: bool = False,
         trace_writer=None,
     ):
         super().__init__(
@@ -48,6 +49,7 @@ class LMAgent(BaseAgent):
             prepare_request_workers=prepare_request_workers,
             prepare_prefetch_limit=prepare_prefetch_limit,
             ddar_returns_proof=False,
+            eval_first_aux_only=eval_first_aux_only,
             trace_writer=trace_writer,
         )
         if search_version not in {"v1", "v2"}:
@@ -110,12 +112,13 @@ class LMAgent(BaseAgent):
         request: dict[str, Any],
         aux_dsl: str,
         raw_aux_text: str,
+        selected_aux_text: str,
     ) -> ProblemJGEX | tuple[ProblemJGEX, str]:
         del ddar_result, proof, aux_dsl
         if self.search_version == "v2":
             del request
-            return new_problem, raw_aux_text
-        del prior_state, request, raw_aux_text
+            return new_problem, selected_aux_text
+        del prior_state, request, raw_aux_text, selected_aux_text
         return new_problem
 
     def get_new_point_name(self, problem: ProblemJGEX) -> str:

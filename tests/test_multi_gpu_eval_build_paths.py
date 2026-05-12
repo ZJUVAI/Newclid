@@ -194,6 +194,7 @@ def test_text_agent_v2_uses_root_query_and_accumulates_prefix():
         request=request,
         aux_dsl="<aux> d x00 d : coll a b d [000] ; </aux>",
         raw_aux_text=" d x00 d : coll a b d [000] ;",
+        selected_aux_text=" d x00 d : coll a b d [000] ;",
     )
     next_request = agent.prepare_request(
         request_id="d1_p0",
@@ -251,6 +252,7 @@ def test_visual_agent_v2_uses_root_query_and_preserves_aux_prefix_during_materia
         request=request,
         aux_dsl="<aux> d x00 d : coll a b d [000] ; </aux>",
         raw_aux_text=" d x00 d : coll a b d [000] ;",
+        selected_aux_text=" d x00 d : coll a b d [000] ;",
     )
 
     next_queue = BeamQueue(max_size=4)
@@ -277,6 +279,86 @@ def test_visual_agent_v2_uses_root_query_and_preserves_aux_prefix_during_materia
             )
     assert next_request["query"] == root_query
     assert next_request["response_prefix"] == "<aux> d x00 d : coll a b d [000] ; x00"
+
+
+def test_text_agent_v2_first_aux_only_accumulates_only_first_segment():
+    defs = _load_defs()
+    problem = ProblemJGEX.from_text("a b c = triangle a b c")
+    next_problem = ProblemJGEX.from_text("a b c = triangle a b c; d = on_line d a b")
+    base_proof = build_problem_proof(problem, defs)
+
+    agent = LMAgent(
+        model_pool=_DummyModelPool(),
+        decoding_size=1,
+        beam_size=4,
+        search_depth=2,
+        search_version="v2",
+        eval_first_aux_only=True,
+    )
+    agent.problemJGEX = problem
+    seed_state = agent.seed_state(base_proof, base_proof)
+
+    request = agent.prepare_request(
+        request_id="d0_proot",
+        state=seed_state,
+        proof=base_proof,
+        depth=0,
+    )
+    next_state = agent.make_next_state_from_unsolved_ddar(
+        new_problem=next_problem,
+        prior_state=seed_state,
+        ddar_result={},
+        proof=base_proof,
+        request=request,
+        aux_dsl="<aux> x00 d : coll a b d [000] ; x00 e : perp d e a b [001] ; </aux>",
+        raw_aux_text="x00 d : coll a b d [000] ; x00 e : perp d e a b [001] ;",
+        selected_aux_text="x00 d : coll a b d [000]",
+    )
+    next_request = agent.prepare_request(
+        request_id="d1_p0",
+        state=next_state,
+        proof=base_proof,
+        depth=1,
+    )
+    assert next_request["response_prefix"] == "<aux>x00 d : coll a b d [000] x00"
+
+
+def test_visual_agent_v2_first_aux_only_preserves_only_first_segment_prefix():
+    defs = _load_defs()
+    problem = ProblemJGEX.from_text("a b c = triangle a b c")
+    next_problem = ProblemJGEX.from_text("a b c = triangle a b c; d = on_line d a b")
+    base_proof = build_problem_proof(problem, defs)
+
+    agent = VLMAgent(
+        model_pool=_DummyModelPool(),
+        decoding_size=1,
+        beam_size=4,
+        search_depth=2,
+        search_version="v2",
+        eval_first_aux_only=True,
+    )
+    agent.problemJGEX = problem
+    seed_state = agent.seed_state(base_proof, base_proof)
+
+    next_state = agent.make_next_state_from_unsolved_ddar(
+        new_problem=next_problem,
+        prior_state=seed_state,
+        ddar_result={},
+        proof=base_proof,
+        request={"response_prefix": "<aux> x00"},
+        aux_dsl="<aux> x00 d : coll a b d [000] ; x00 e : perp d e a b [001] ; </aux>",
+        raw_aux_text="x00 d : coll a b d [000] ; x00 e : perp d e a b [001] ;",
+        selected_aux_text="x00 d : coll a b d [000]",
+    )
+
+    next_queue = BeamQueue(max_size=4)
+    next_queue.add(node=(1, 0, (0,), next_state), val=1.0, stable_key=(0,))
+    profiling = {}
+    materialized_queue = agent.finalize_next_queue(
+        next_queue=next_queue, profiling=profiling
+    )
+    states = [node[3] for _, node in materialized_queue]
+    assert states[0][2] == "x00 d : coll a b d [000]"
 
 
 def test_visual_agent_skips_invalid_frontier_node_during_materialization():

@@ -244,6 +244,7 @@ class EvalOutputNamingTests(unittest.TestCase):
         stem = build_eval_output_stem(
             agent_type="vlm",
             search_version="v1",
+            eval_first_aux_only=False,
             problems_path=Path("benchmarks/imo_2000_p6.txt"),
             model_path="models/vlm_sft50/checkpoint-19194",
             decoding_size=2,
@@ -256,13 +257,30 @@ class EvalOutputNamingTests(unittest.TestCase):
         self.assertEqual(
             stem,
             "eval_single_problem_multi_gpu_vlm_imo_2000_p6_vlm_sft50_checkpoint-19194"
-            "_sv1_d2_b4_s1_gbs3_gbt250_seed123",
+            "_sv1_auxfull_d2_b4_s1_gbs3_gbt250_seed123",
         )
+
+    def test_build_eval_output_stem_distinguishes_first_aux_mode(self):
+        stem = build_eval_output_stem(
+            agent_type="vlm",
+            search_version="v1",
+            eval_first_aux_only=True,
+            problems_path=Path("benchmarks/imo_2000_p6.txt"),
+            model_path="models/vlm_sft50/checkpoint-19194",
+            decoding_size=2,
+            beam_size=4,
+            search_depth=1,
+            gpu_batch_size=3,
+            gpu_batch_timeout_ms=250,
+        )
+
+        self.assertIn("_sv1_auxfirst_", stem)
 
     def test_trace_run_id_uses_eval_stem_and_timestamp_suffix(self):
         stem = build_eval_output_stem(
             agent_type="lm",
             search_version="v1",
+            eval_first_aux_only=False,
             problems_path=Path("benchmarks/imo_2004_p1.txt"),
             model_path="models/sft34/checkpoint-25750",
             decoding_size=8,
@@ -316,6 +334,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
             eval_runner_module.create_agent(
                 agent_type="lm",
                 search_version="v2",
+                eval_first_aux_only=True,
                 model_pool="pool",
                 decoding_size=8,
                 beam_size=16,
@@ -329,12 +348,14 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
             )
 
         self.assertEqual(mock_lm_agent.call_args.kwargs["search_version"], "v2")
+        self.assertTrue(mock_lm_agent.call_args.kwargs["eval_first_aux_only"])
 
     def test_create_agent_passes_search_version_to_visual_agent(self):
         with patch("scripts.evaluation.VLMAgent") as mock_vlm_agent:
             eval_runner_module.create_agent(
                 agent_type="vlm",
                 search_version="v2",
+                eval_first_aux_only=True,
                 model_pool="pool",
                 decoding_size=8,
                 beam_size=16,
@@ -348,16 +369,22 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
             )
 
         self.assertEqual(mock_vlm_agent.call_args.kwargs["search_version"], "v2")
+        self.assertTrue(mock_vlm_agent.call_args.kwargs["eval_first_aux_only"])
 
     def test_create_workers_wraps_visual_workers_with_trace_metadata(self):
-        created: list[tuple[str, int, int]] = []
+        created: list[tuple[str, int, int, bool]] = []
 
         class _FakeVisionModelWorker:
             @classmethod
             def remote(
-                cls, model_path: str, agent_type: str, torch_seed: int, worker_slot: int
+                cls,
+                model_path: str,
+                agent_type: str,
+                torch_seed: int,
+                worker_slot: int,
+                stop_at_semicolon: bool,
             ):
-                created.append((model_path, torch_seed, worker_slot))
+                created.append((model_path, torch_seed, worker_slot, stop_at_semicolon))
                 return f"worker:{agent_type}:{worker_slot}"
 
         fake_visual_actor = types.SimpleNamespace(
@@ -373,11 +400,16 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                 model_path="/tmp/model",
                 num_gpus_for_eval=3,
                 torch_seed=42,
+                stop_at_semicolon=True,
             )
 
         self.assertEqual(
             created,
-            [("/tmp/model", 42, 0), ("/tmp/model", 42, 1), ("/tmp/model", 42, 2)],
+            [
+                ("/tmp/model", 42, 0, True),
+                ("/tmp/model", 42, 1, True),
+                ("/tmp/model", 42, 2, True),
+            ],
         )
         self.assertEqual(len(workers), 3)
         self.assertEqual(
@@ -467,6 +499,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                                                         timeout=3600,
                                                         agent_type="vlm",
                                                         search_version="v2",
+                                                        eval_first_aux_only=False,
                                                         max_pending_ddar=2,
                                                         prepare_request_workers=2,
                                                         prepare_prefetch_limit=2,
@@ -478,7 +511,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
 
             csv_path = (
                 log_dir / "eval_single_problem_multi_gpu_vlm_benchmarks_tmp_model"
-                "_sv2_d32_b512_s4_gbs1_gbt100_seed42_20260410T120000Z.csv"
+                "_sv2_auxfull_d32_b512_s4_gbs1_gbt100_seed42_20260410T120000Z.csv"
             )
             self.assertTrue(csv_path.exists())
             with csv_path.open(newline="", encoding="utf-8") as handle:
@@ -595,6 +628,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
                                                         timeout=3600,
                                                         agent_type="vlm",
                                                         search_version="v1",
+                                                        eval_first_aux_only=True,
                                                         max_pending_ddar=2,
                                                         prepare_request_workers=2,
                                                         prepare_prefetch_limit=2,
@@ -604,7 +638,7 @@ class SingleProblemEvalRunnerTests(unittest.TestCase):
 
             trace_run_dir = (
                 log_dir / "eval_single_problem_multi_gpu_vlm_benchmarks_tmp_model"
-                "_sv1_d32_b512_s4_gbs1_gbt100_seed42_20260410T120000Z"
+                "_sv1_auxfirst_d32_b512_s4_gbs1_gbt100_seed42_20260410T120000Z"
             )
             self.assertTrue((trace_run_dir / "run_meta.json").exists())
             self.assertTrue(

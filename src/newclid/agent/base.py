@@ -51,6 +51,7 @@ class BaseAgent(DeductiveAgent, ABC):
         prepare_request_workers: int = 1,
         prepare_prefetch_limit: int = 1,
         ddar_returns_proof: bool = False,
+        eval_first_aux_only: bool = False,
         trace_writer=None,
     ):
         self.any_new_statement_has_been_added = True
@@ -66,6 +67,7 @@ class BaseAgent(DeductiveAgent, ABC):
         self.prepare_request_workers = prepare_request_workers
         self.prepare_prefetch_limit = prepare_prefetch_limit
         self.ddar_returns_proof = ddar_returns_proof
+        self.eval_first_aux_only = eval_first_aux_only
         self.trace_writer = trace_writer
         self._scheduler_trace_interval_s = 0.5
         self._last_scheduler_trace_at = 0.0
@@ -104,6 +106,7 @@ class BaseAgent(DeductiveAgent, ABC):
         request: dict[str, Any],
         aux_dsl: str,
         raw_aux_text: str,
+        selected_aux_text: str,
     ) -> Any | None:
         raise NotImplementedError
 
@@ -139,6 +142,19 @@ class BaseAgent(DeductiveAgent, ABC):
         if stripped.endswith("</aux>"):
             text = stripped[: -len("</aux>")].rstrip()
         return text
+
+    def select_aux_text(self, raw_aux_text: str) -> str | None:
+        text = raw_aux_text.strip()
+        if not text:
+            return None
+        if not self.eval_first_aux_only:
+            return raw_aux_text
+        segments = [
+            segment.strip() for segment in raw_aux_text.split(";") if segment.strip()
+        ]
+        if not segments:
+            return None
+        return segments[0]
 
     def _child_path_key(
         self, parent_path_key: tuple[int, ...], candidate_rank: int
@@ -302,6 +318,7 @@ class BaseAgent(DeductiveAgent, ABC):
                     request=future_meta["request"],
                     aux_dsl=future_meta["aux_dsl"],
                     raw_aux_text=future_meta["raw_aux_text"],
+                    selected_aux_text=future_meta["selected_aux_text"],
                 )
                 add_profiling_time(
                     profiling,
@@ -791,8 +808,26 @@ class BaseAgent(DeductiveAgent, ABC):
                 gpu_result["aux_dsl_dict"].items()
             ):
                 raw_aux_text = self.extract_raw_aux_text(aux_dsl, request=request)
+                selected_aux_text = self.select_aux_text(raw_aux_text)
+                if selected_aux_text is None:
+                    increment_profiling_count(profiling, "candidate_parse_failed_count")
+                    self._trace(
+                        "candidate_transition",
+                        attempt_key=build_attempt_key(request_id, candidate_rank, None),
+                        request_id=request_id,
+                        parent_node_id=parent_node_id,
+                        node_id=None,
+                        candidate_rank=candidate_rank,
+                        depth=depth,
+                        decision="parse_failed",
+                        beam_score_before=prev_score,
+                        beam_score_after=None,
+                        raw_aux_text=raw_aux_text,
+                        construction_text=None,
+                    )
+                    continue
                 try:
-                    aux = self.try_dsl_to_constructions(raw_aux_text)
+                    aux = self.try_dsl_to_constructions(selected_aux_text)
                 except Exception:
                     increment_profiling_count(profiling, "candidate_parse_failed_count")
                     self._trace(
@@ -871,6 +906,7 @@ class BaseAgent(DeductiveAgent, ABC):
                         ),
                         "aux_dsl": aux_dsl,
                         "raw_aux_text": raw_aux_text,
+                        "selected_aux_text": selected_aux_text,
                         "construction_text": aux,
                     }
                 )

@@ -121,9 +121,7 @@ def _try_single_dsl_to_construction(segment: str) -> str | None:
     point = point_names[0]
 
     premise_segments = re.split(r"\s*\[\d+\]", premises)
-    premise_segments = [
-        seg.strip() for seg in premise_segments if seg.strip()
-    ]
+    premise_segments = [seg.strip() for seg in premise_segments if seg.strip()]
     if len(premise_segments) > 2:
         return None
     if not premise_segments:

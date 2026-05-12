@@ -7,7 +7,12 @@ from typing import Any
 
 import ray
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, StoppingCriteria, StoppingCriteriaList
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    StoppingCriteria,
+    StoppingCriteriaList,
+)
 from transformers.utils import logging as hf_logging
 
 from newclid.agent.runtime.batched_decode import decode_batched_continuations
@@ -223,12 +228,29 @@ class _EndAuxTagCriteria(StoppingCriteria):
         return bool((tail == self._stop).all())
 
 
+def _resolve_text_stop_config(
+    tokenizer,
+    *,
+    stop_at_semicolon: bool,
+    device,
+) -> tuple[int | None, StoppingCriteriaList | None, int]:
+    if stop_at_semicolon:
+        eos_token_id = tokenizer.encode(" ;", add_special_tokens=False)[0]
+        return eos_token_id, None, 100
+    stop_ids = tokenizer.encode(" </aux>", add_special_tokens=False)
+    stopping_criteria = StoppingCriteriaList(
+        [_EndAuxTagCriteria(stop_ids, device=device)]
+    )
+    return None, stopping_criteria, 512
+
+
 def generate_aux_dsl_dict_batch(
     model,
     tokenizer,
     requests: list[dict[str, Any]],
     *,
     agent_kind: str,
+    stop_at_semicolon: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if not requests:
         return [], _create_worker_batch_profile(batch_size=0)
@@ -264,18 +286,20 @@ def generate_aux_dsl_dict_batch(
     )
     profile["input_build_time_s"] += time.perf_counter() - input_build_start
     pad_token_id = tokenizer.pad_token_id
-    stop_ids = tokenizer.encode(" </aux>", add_special_tokens=False)
-    stopping_criteria = StoppingCriteriaList([
-        _EndAuxTagCriteria(stop_ids, device=model.device)
-    ])
+    eos_token_id, stopping_criteria, max_new_tokens = _resolve_text_stop_config(
+        tokenizer,
+        stop_at_semicolon=stop_at_semicolon,
+        device=model.device,
+    )
 
     generate_start = time.perf_counter()
     generated_output = model.generate(
         **model_inputs,
-        max_new_tokens=512,
+        max_new_tokens=max_new_tokens,
         num_beams=decoding_size,
         num_return_sequences=decoding_size,
         pad_token_id=pad_token_id,
+        eos_token_id=eos_token_id,
         stopping_criteria=stopping_criteria,
         return_dict_in_generate=True,
         output_scores=True,
@@ -288,7 +312,7 @@ def generate_aux_dsl_dict_batch(
             sequence.tolist(),
             prompt_token_count=prompt_token_counts[index // decoding_size],
             pad_token_id=pad_token_id,
-            eos_token_id=None,
+            eos_token_id=eos_token_id,
         )
         for index, sequence in enumerate(generated_output.sequences)
     ]
@@ -337,12 +361,14 @@ class ModelWorker:
         agent_kind: str = "lm",
         torch_seed: int = 123,
         worker_slot: int = 0,
+        stop_at_semicolon: bool = False,
     ):
         resolved_path = resolve_model_path(model_path)
         self.model_path = resolved_path
         self.agent_kind = agent_kind
         self.torch_seed = int(torch_seed)
         self.worker_slot = int(worker_slot)
+        self.stop_at_semicolon = bool(stop_at_semicolon)
         self.worker_id = f"gpu:{self.worker_slot}"
         self.device_label = f"cuda:{self.worker_slot}"
         torch.manual_seed(self.torch_seed)
@@ -431,6 +457,7 @@ class ModelWorker:
                 self.tokenizer,
                 requests,
                 agent_kind=getattr(self, "agent_kind", "lm"),
+                stop_at_semicolon=self.stop_at_semicolon,
             )
         except Exception as exc:
             if len(requests) == 1:

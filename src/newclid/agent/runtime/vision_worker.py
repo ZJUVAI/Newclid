@@ -13,7 +13,11 @@ from modelscope import AutoProcessor as ModelScopeAutoProcessor
 from modelscope import Qwen3VLForConditionalGeneration
 from qwen_vl_utils import process_vision_info
 from transformers import AutoProcessor as TransformersAutoProcessor
-from transformers import Qwen3_5ForConditionalGeneration, StoppingCriteria, StoppingCriteriaList
+from transformers import (
+    Qwen3_5ForConditionalGeneration,
+    StoppingCriteria,
+    StoppingCriteriaList,
+)
 from transformers.utils import logging as hf_logging
 
 from newclid.agent.runtime.batched_decode import decode_batched_continuations
@@ -148,6 +152,22 @@ class _EndAuxTagCriteria(StoppingCriteria):
         return bool((tail == self._stop).all())
 
 
+def _resolve_aux_stop_config(
+    tokenizer,
+    *,
+    stop_at_semicolon: bool,
+    device,
+) -> tuple[int | None, StoppingCriteriaList | None, int]:
+    if stop_at_semicolon:
+        eos_token_id = tokenizer.encode(" ;", add_special_tokens=False)[0]
+        return eos_token_id, None, 100
+    stop_ids = tokenizer.encode(" </aux>", add_special_tokens=False)
+    stopping_criteria = StoppingCriteriaList(
+        [_EndAuxTagCriteria(stop_ids, device=device)]
+    )
+    return None, stopping_criteria, 512
+
+
 def _resolve_visual_stop_tokens(
     processor, agent_kind: str
 ) -> tuple[int | None, int | None]:
@@ -229,6 +249,7 @@ def generate_visual_aux_dsl_dict_batch(
     requests: list[dict[str, Any]],
     *,
     agent_kind: str,
+    stop_at_semicolon: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if not requests:
         return [], _create_worker_batch_profile(batch_size=0)
@@ -244,19 +265,21 @@ def generate_visual_aux_dsl_dict_batch(
     input_build_start = time.perf_counter()
     model_inputs = _build_visual_batch_inputs(model, processor, requests)
     profile["input_build_time_s"] += time.perf_counter() - input_build_start
-    pad_token_id, eos_token_id = _resolve_visual_stop_tokens(processor, agent_kind)
-    stop_ids = processor.tokenizer.encode(" </aux>", add_special_tokens=False)
-    stopping_criteria = StoppingCriteriaList([
-        _EndAuxTagCriteria(stop_ids, device=model.device)
-    ])
+    pad_token_id, _ = _resolve_visual_stop_tokens(processor, agent_kind)
+    eos_token_id, stopping_criteria, max_new_tokens = _resolve_aux_stop_config(
+        processor.tokenizer,
+        stop_at_semicolon=stop_at_semicolon,
+        device=model.device,
+    )
 
     generate_start = time.perf_counter()
     generated_output = model.generate(
         **model_inputs,
-        max_new_tokens=512,
+        max_new_tokens=max_new_tokens,
         num_beams=decoding_size,
         num_return_sequences=decoding_size,
         pad_token_id=pad_token_id,
+        eos_token_id=eos_token_id,
         stopping_criteria=stopping_criteria,
         return_dict_in_generate=True,
         output_scores=True,
@@ -269,7 +292,7 @@ def generate_visual_aux_dsl_dict_batch(
             sequence.tolist(),
             prompt_token_count=prompt_token_counts[index // decoding_size],
             pad_token_id=pad_token_id,
-            eos_token_id=None,
+            eos_token_id=eos_token_id,
         )
         for index, sequence in enumerate(generated_output.sequences)
     ]
@@ -312,6 +335,8 @@ def generate_qwen3_text_only_aux_dsl_dict_batch(
     model,
     processor,
     requests: list[dict[str, Any]],
+    *,
+    stop_at_semicolon: bool = False,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     if not requests:
         return [], _create_worker_batch_profile(batch_size=0)
@@ -328,18 +353,20 @@ def generate_qwen3_text_only_aux_dsl_dict_batch(
     model_inputs = _build_text_only_batch_inputs(model, processor, requests)
     profile["input_build_time_s"] += time.perf_counter() - input_build_start
     pad_token_id = processor.tokenizer.pad_token_id
-    stop_ids = processor.tokenizer.encode(" </aux>", add_special_tokens=False)
-    stopping_criteria = StoppingCriteriaList([
-        _EndAuxTagCriteria(stop_ids, device=model.device)
-    ])
+    eos_token_id, stopping_criteria, max_new_tokens = _resolve_aux_stop_config(
+        processor.tokenizer,
+        stop_at_semicolon=stop_at_semicolon,
+        device=model.device,
+    )
 
     generate_start = time.perf_counter()
     generated_output = model.generate(
         **model_inputs,
-        max_new_tokens=512,
+        max_new_tokens=max_new_tokens,
         num_beams=decoding_size,
         num_return_sequences=decoding_size,
         pad_token_id=pad_token_id,
+        eos_token_id=eos_token_id,
         stopping_criteria=stopping_criteria,
         return_dict_in_generate=True,
         output_scores=True,
@@ -352,7 +379,7 @@ def generate_qwen3_text_only_aux_dsl_dict_batch(
             sequence.tolist(),
             prompt_token_count=prompt_token_counts[index // decoding_size],
             pad_token_id=pad_token_id,
-            eos_token_id=None,
+            eos_token_id=eos_token_id,
         )
         for index, sequence in enumerate(generated_output.sequences)
     ]
@@ -444,6 +471,7 @@ class VisionModelWorker(_BaseVisionWorker):
         agent_kind: str,
         torch_seed: int = 123,
         worker_slot: int = 0,
+        stop_at_semicolon: bool = False,
     ):
         resolved_path = resolve_model_path(model_path)
         self.model_path = resolved_path
@@ -451,6 +479,7 @@ class VisionModelWorker(_BaseVisionWorker):
         self.runtime = "transformers"
         self.torch_seed = int(torch_seed)
         self.worker_slot = int(worker_slot)
+        self.stop_at_semicolon = bool(stop_at_semicolon)
         self.worker_id = f"gpu:{self.worker_slot}"
         self.device_label = f"cuda:{self.worker_slot}"
         _reset_torch_seed(self.torch_seed)
@@ -578,6 +607,7 @@ class VisionModelWorker(_BaseVisionWorker):
                 self.processor,
                 requests,
                 agent_kind=self.agent_kind,
+                stop_at_semicolon=self.stop_at_semicolon,
             )
         except Exception as exc:
             if len(requests) == 1:
@@ -642,6 +672,7 @@ class Qwen3VLTextWorker(_BaseVisionWorker):
         agent_kind: str,
         torch_seed: int = 123,
         worker_slot: int = 0,
+        stop_at_semicolon: bool = False,
     ):
         resolved_path = resolve_model_path(model_path)
         self.model_path = resolved_path
@@ -649,6 +680,7 @@ class Qwen3VLTextWorker(_BaseVisionWorker):
         self.runtime = "transformers"
         self.torch_seed = int(torch_seed)
         self.worker_slot = int(worker_slot)
+        self.stop_at_semicolon = bool(stop_at_semicolon)
         self.worker_id = f"gpu:{self.worker_slot}"
         self.device_label = f"cuda:{self.worker_slot}"
         _reset_torch_seed(self.torch_seed)
@@ -719,6 +751,7 @@ class Qwen3VLTextWorker(_BaseVisionWorker):
                 self.model,
                 self.processor,
                 requests,
+                stop_at_semicolon=self.stop_at_semicolon,
             )
         except Exception as exc:
             if len(requests) == 1:

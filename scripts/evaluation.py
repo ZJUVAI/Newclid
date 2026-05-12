@@ -74,6 +74,7 @@ def build_eval_output_stem(
     *,
     agent_type: str,
     search_version: str,
+    eval_first_aux_only: bool,
     problems_path: Path,
     model_path: str,
     decoding_size: int,
@@ -88,9 +89,11 @@ def build_eval_output_stem(
     deepest_folder = path_obj.name
     parent_folder = path_obj.parent.name
     model_name = f"{parent_folder}_{deepest_folder}" if parent_folder else deepest_folder
+    aux_mode = "auxfirst" if eval_first_aux_only else "auxfull"
     return (
         f"eval_single_problem_multi_gpu_{agent_type}_{problems_name}_{model_name}"
         f"_sv{search_version[-1]}"
+        f"_{aux_mode}"
         f"_d{decoding_size}_b{beam_size}_s{search_depth}"
         f"_gbs{gpu_batch_size}_gbt{gpu_batch_timeout_ms}_seed{torch_seed}"
     )
@@ -216,13 +219,20 @@ def create_workers(
     model_path: str,
     num_gpus_for_eval: int,
     torch_seed: int,
+    stop_at_semicolon: bool,
 ):
     if agent_type in {"lm", "qwen35_text"}:
         from newclid.agent.runtime.text_worker import ModelWorker
 
         return [
             WorkerHandleWrapper(
-                ModelWorker.remote(model_path, agent_type, torch_seed, worker_slot),
+                ModelWorker.remote(
+                    model_path,
+                    agent_type,
+                    torch_seed,
+                    worker_slot,
+                    stop_at_semicolon,
+                ),
                 worker_trace_id=f"gpu:{worker_slot}",
                 worker_device=f"cuda:{worker_slot}",
             )
@@ -233,7 +243,13 @@ def create_workers(
 
         return [
             WorkerHandleWrapper(
-                Qwen3VLTextWorker.remote(model_path, agent_type, torch_seed, worker_slot),
+                Qwen3VLTextWorker.remote(
+                    model_path,
+                    agent_type,
+                    torch_seed,
+                    worker_slot,
+                    stop_at_semicolon,
+                ),
                 worker_trace_id=f"gpu:{worker_slot}",
                 worker_device=f"cuda:{worker_slot}",
             )
@@ -244,7 +260,13 @@ def create_workers(
 
         return [
             WorkerHandleWrapper(
-                VisionModelWorker.remote(model_path, agent_type, torch_seed, worker_slot),
+                VisionModelWorker.remote(
+                    model_path,
+                    agent_type,
+                    torch_seed,
+                    worker_slot,
+                    stop_at_semicolon,
+                ),
                 worker_trace_id=f"gpu:{worker_slot}",
                 worker_device=f"cuda:{worker_slot}",
             )
@@ -257,6 +279,7 @@ def create_agent(
     *,
     agent_type: str,
     search_version: str,
+    eval_first_aux_only: bool,
     model_pool: ModelPool,
     decoding_size: int,
     beam_size: int,
@@ -282,6 +305,7 @@ def create_agent(
             prepare_request_workers=prepare_request_workers,
             prepare_prefetch_limit=prepare_prefetch_limit,
             search_version=search_version,
+            eval_first_aux_only=eval_first_aux_only,
             trace_writer=trace_writer,
         )
     if agent_type in {"vlm", "qwen35_vl"}:
@@ -297,6 +321,7 @@ def create_agent(
             prepare_request_workers=prepare_request_workers,
             prepare_prefetch_limit=prepare_prefetch_limit,
             search_version=search_version,
+            eval_first_aux_only=eval_first_aux_only,
             render_root=render_root,
             trace_writer=trace_writer,
         )
@@ -310,6 +335,7 @@ def solve_one_problem(
     model_pool: ModelPool,
     agent_type: str,
     search_version: str,
+    eval_first_aux_only: bool,
     decoding_size: int,
     beam_size: int,
     search_depth: int,
@@ -335,6 +361,7 @@ def solve_one_problem(
     agent = create_agent(
         agent_type=agent_type,
         search_version=search_version,
+        eval_first_aux_only=eval_first_aux_only,
         model_pool=model_pool,
         decoding_size=decoding_size,
         beam_size=beam_size,
@@ -384,6 +411,7 @@ def solve_problems_single_problem_multi_gpu(
     timeout: int,
     agent_type: str,
     search_version: str,
+    eval_first_aux_only: bool,
     max_pending_ddar: int | None,
     prepare_request_workers: int | None,
     prepare_prefetch_limit: int | None,
@@ -453,11 +481,14 @@ def solve_problems_single_problem_multi_gpu(
         if gpu_batch_timeout_ms < 0:
             raise ValueError(f"gpu_batch_timeout_ms must be non-negative, got {gpu_batch_timeout_ms}.")
 
+        stop_at_semicolon = eval_first_aux_only
+
         workers = create_workers(
             agent_type=agent_type,
             model_path=model_path,
             num_gpus_for_eval=num_gpus_for_eval,
             torch_seed=torch_seed,
+            stop_at_semicolon=stop_at_semicolon,
         )
         logging.getLogger(__name__).info(
             "Created workers: agent=%s requested_gpus=%d visible_gpus=%d",
@@ -475,6 +506,7 @@ def solve_problems_single_problem_multi_gpu(
         output_name_stem = build_eval_output_stem(
             agent_type=agent_type,
             search_version=search_version,
+            eval_first_aux_only=eval_first_aux_only,
             problems_path=filepath,
             model_path=model_path,
             decoding_size=decoding_size,
@@ -507,6 +539,7 @@ def solve_problems_single_problem_multi_gpu(
                     "torch_seed": torch_seed,
                     "timeout": timeout,
                     "search_version": search_version,
+                    "eval_first_aux_only": eval_first_aux_only,
                     "max_pending_ddar": max_pending_ddar,
                     "num_gpus_for_eval": num_gpus_for_eval,
                     "prepare_request_workers": prepare_request_workers,
@@ -518,6 +551,7 @@ def solve_problems_single_problem_multi_gpu(
         print(f"Total problems to solve: {len(problem_names)}")
         print(f"Using agent: {agent_type}")
         print(f"Using search_version={search_version}")
+        print(f"Using eval_first_aux_only={eval_first_aux_only}")
         print(f"Using {num_gpus_for_eval} GPU workers")
         print(f"Using gpu_batch_size={gpu_batch_size}")
         print(f"Using gpu_batch_timeout_ms={gpu_batch_timeout_ms}")
@@ -572,6 +606,7 @@ def solve_problems_single_problem_multi_gpu(
                             model_pool=model_pool,
                             agent_type=agent_type,
                             search_version=search_version,
+                            eval_first_aux_only=eval_first_aux_only,
                             decoding_size=decoding_size,
                             beam_size=beam_size,
                             search_depth=search_depth,
@@ -769,6 +804,12 @@ def main():
         help="Search/prompt variant for auxiliary construction expansion.",
     )
     parser.add_argument(
+        "--eval_first_aux_only",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Consume only the first non-empty ';'-separated aux segment during evaluation instead of the full multi-aux text.",
+    )
+    parser.add_argument(
         "--gpu_batch_size",
         type=int,
         default=2,
@@ -838,6 +879,7 @@ def main():
         timeout=args.timeout,
         agent_type=args.agent,
         search_version=args.search_version,
+        eval_first_aux_only=args.eval_first_aux_only,
         max_pending_ddar=args.max_pending_ddar,
         prepare_request_workers=args.prepare_request_workers,
         prepare_prefetch_limit=args.prepare_prefetch_limit,
