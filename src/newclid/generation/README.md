@@ -92,6 +92,8 @@ pipeline = ProblemPipeline(
     n_threads=8,
     n_samples=1000,
     output_dir="./datasets",
+    direct_png=True,
+    img_pixels=512,
     using_log=True,
     using_exp=False,
 )
@@ -127,6 +129,13 @@ python -m newclid.generation.pipeline \
 # Generate with images
 python -m newclid.generation.pipeline \
   --img 3 \
+  --img_pixels 512 \
+  --n_samples 100
+
+# Fall back to the legacy svg -> png path
+python -m newclid.generation.pipeline \
+  --img 3 \
+  --no-direct_png \
   --n_samples 100
 ```
 
@@ -153,6 +162,8 @@ python -m newclid.generation.pipeline \
 
 **Output:**
 - `--img`: Image mode (0=none, 1=annotated, 2=plain, 3=both)
+- `--direct_png` / `--no-direct_png`: Toggle direct PNG rendering vs legacy svg -> png (default: direct PNG)
+- `--img_pixels`: Output image width in pixels (default: 512)
 - `--prune` / `--no-prune`: Enable/disable clause pruning (default: enabled)
 - `--remove_coords`: Remove coordinates from output
 - `--clear`: Clear old dataset files

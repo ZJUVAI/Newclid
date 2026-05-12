@@ -7,6 +7,7 @@ Handles asynchronous figure drawing and data writing with Ray.
 import json
 import logging
 import os
+
 import ray
 import cairosvg
 
@@ -25,6 +26,35 @@ def convert_svg_to_png(svg_path, png_path, width=1024):
         ) from e
 
 
+def save_figure_as_png(
+    fig,
+    png_path: str,
+    img_pixels: int,
+    direct_png: bool,
+    svg_path: str | None = None,
+):
+    """Persist a matplotlib figure to PNG using the selected rendering path."""
+    output_dir = os.path.dirname(png_path)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+
+    if direct_png:
+        width_inches = fig.get_size_inches()[0]
+        dpi = img_pixels / width_inches
+        fig.savefig(png_path, format="png", dpi=dpi)
+        return
+
+    if svg_path is None:
+        raise ValueError("svg_path is required when direct_png is False")
+
+    svg_output_dir = os.path.dirname(svg_path)
+    if svg_output_dir and not os.path.exists(svg_output_dir):
+        os.makedirs(svg_output_dir, exist_ok=True)
+
+    fig.savefig(svg_path, format="svg")
+    convert_svg_to_png(svg_path, png_path, width=img_pixels)
+
+
 @ray.remote(num_cpus=0.5)
 def draw_figure_task(
     draw_data: dict,
@@ -34,6 +64,8 @@ def draw_figure_task(
     file_idx: int,
     session_id: str,
     img_mode: int,
+    direct_png: bool,
+    img_pixels: int,
 ):
     """
     Ray remote task for drawing figures.
@@ -46,6 +78,8 @@ def draw_figure_task(
         file_idx: File index for naming
         session_id: Unique session identifier
         img_mode: 0=no images, 1=with annotations only, 2=without annotations only, 3=both
+        direct_png: Whether to save PNG directly instead of svg -> png conversion
+        img_pixels: Output image width in pixels
 
     Returns:
         Tuple of (file_idx, paths_update, error)
@@ -115,9 +149,14 @@ def draw_figure_task(
                 draw_data["mapping"],
                 annotations,
             )
-            fig.savefig(svg_path, format="svg")
+            save_figure_as_png(
+                fig,
+                png_path=png_path,
+                img_pixels=img_pixels,
+                direct_png=direct_png,
+                svg_path=svg_path,
+            )
             plt.close(fig)
-            convert_svg_to_png(svg_path, png_path)
 
             paths_update[f"image_path{suffix}"] = png_path
 
@@ -142,6 +181,8 @@ class Writer:
         img_mode: int,
         defs_data: dict,
         session_id: str,
+        direct_png: bool = True,
+        img_pixels: int = 512,
     ):
         """
         Initialize writer.
@@ -152,13 +193,20 @@ class Writer:
             img_mode: Image generation mode (0-3)
             defs_data: Serialized definitions for drawing
             session_id: Unique session identifier
+            direct_png: Whether to save PNG directly instead of svg -> png conversion
+            img_pixels: Output image width in pixels
         """
+        if img_pixels <= 0:
+            raise ValueError("img_pixels must be a positive integer")
+
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
         self.file_prefix = file_prefix
         self.img_mode = img_mode
         self.defs_data = defs_data
         self.session_id = session_id
+        self.direct_png = direct_png
+        self.img_pixels = img_pixels
 
         self.data_count = 0
         self.written_count = 0
@@ -236,8 +284,9 @@ class Writer:
         imgs_dir = os.path.join(self.output_dir, "imgs")
         imgs_png_dir = os.path.join(self.output_dir, "imgs_png")
         os.makedirs(os.path.dirname(filename), exist_ok=True)
-        os.makedirs(imgs_dir, exist_ok=True)
         os.makedirs(imgs_png_dir, exist_ok=True)
+        if not self.direct_png:
+            os.makedirs(imgs_dir, exist_ok=True)
 
         for data_item in all_data:
             self.data_count += 1
@@ -253,6 +302,8 @@ class Writer:
                     self.data_count,
                     self.session_id,
                     self.img_mode,
+                    self.direct_png,
+                    self.img_pixels,
                 )
                 self.pending_draw_tasks[task_id] = (self.data_count, data_item)
             else:
