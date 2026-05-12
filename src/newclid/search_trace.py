@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import importlib.metadata
 import json
+import platform
 import subprocess
 import sys
 import time
@@ -26,18 +28,125 @@ def sanitize_filename(value: str) -> str:
 
 
 def get_git_commit(repo_root: str | Path | None = None) -> str:
+    return _collect_git_snapshot(repo_root)["commit"] or "unknown"
+
+
+def _run_git_command(args: list[str], repo_root: str | Path | None = None) -> str | None:
     cwd = Path(repo_root or ".")
     try:
         result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
+            ["git", *args],
             cwd=cwd,
             capture_output=True,
             text=True,
             check=True,
         )
     except Exception:
-        return "unknown"
-    return result.stdout.strip() or "unknown"
+        return None
+    value = result.stdout.strip()
+    return value or None
+
+
+def _collect_git_snapshot(repo_root: str | Path | None = None) -> dict[str, Any]:
+    commit = _run_git_command(["rev-parse", "HEAD"], repo_root)
+    branch = _run_git_command(["rev-parse", "--abbrev-ref", "HEAD"], repo_root)
+    status = _run_git_command(["status", "--short"], repo_root)
+    return {
+        "commit": commit or "unknown",
+        "branch": branch,
+        "is_dirty": None if status is None else bool(status),
+    }
+
+
+_RUNTIME_SNAPSHOT_PACKAGES = [
+    "torch",
+    "torchvision",
+    "transformers",
+    "accelerate",
+    "deepspeed",
+    "vllm",
+    "flash-attn",
+    "ray",
+    "numpy",
+    "modelscope",
+    "qwen-vl-utils",
+    "Pillow",
+    "cairosvg",
+    "scipy",
+    "pandas",
+]
+
+
+def _collect_package_versions() -> dict[str, str | None]:
+    versions: dict[str, str | None] = {}
+    for package_name in _RUNTIME_SNAPSHOT_PACKAGES:
+        try:
+            versions[package_name] = importlib.metadata.version(package_name)
+        except importlib.metadata.PackageNotFoundError:
+            versions[package_name] = None
+    return versions
+
+
+def _collect_torch_runtime_snapshot() -> dict[str, Any]:
+    try:
+        import torch
+    except Exception as exc:
+        return {
+            "available": False,
+            "error": f"{type(exc).__name__}: {exc}",
+        }
+
+    cuda_available = bool(torch.cuda.is_available())
+    gpu_devices: list[dict[str, Any]] = []
+    if cuda_available:
+        for index in range(torch.cuda.device_count()):
+            capability = torch.cuda.get_device_capability(index)
+            gpu_devices.append(
+                {
+                    "index": index,
+                    "name": torch.cuda.get_device_name(index),
+                    "capability": f"{capability[0]}.{capability[1]}",
+                }
+            )
+
+    cudnn_version = None
+    try:
+        if torch.backends.cudnn.is_available():
+            cudnn_version = torch.backends.cudnn.version()
+    except Exception:
+        cudnn_version = None
+
+    return {
+        "available": True,
+        "torch_version": getattr(torch, "__version__", None),
+        "cuda_available": cuda_available,
+        "cuda_version": getattr(torch.version, "cuda", None),
+        "device_count": int(torch.cuda.device_count()) if cuda_available else 0,
+        "devices": gpu_devices,
+        "cudnn_available": bool(torch.backends.cudnn.is_available()),
+        "cudnn_version": cudnn_version,
+        "matmul_allow_tf32": bool(torch.backends.cuda.matmul.allow_tf32),
+        "cudnn_allow_tf32": bool(torch.backends.cudnn.allow_tf32),
+    }
+
+
+def collect_runtime_snapshot(repo_root: str | Path | None = None) -> dict[str, Any]:
+    return {
+        "python": {
+            "executable": sys.executable,
+            "version": sys.version,
+            "implementation": platform.python_implementation(),
+        },
+        "platform": {
+            "system": platform.system(),
+            "release": platform.release(),
+            "machine": platform.machine(),
+            "platform": platform.platform(),
+        },
+        "git": _collect_git_snapshot(repo_root),
+        "packages": _collect_package_versions(),
+        "torch_runtime": _collect_torch_runtime_snapshot(),
+    }
 
 
 def build_attempt_key(
@@ -347,15 +456,18 @@ class TraceRun:
         self.attempts_dir = self.run_dir / "attempts"
         self.problem_dir.mkdir(parents=True, exist_ok=True)
         self.attempts_dir.mkdir(parents=True, exist_ok=True)
+        runtime_snapshot = collect_runtime_snapshot(repo_root=repo_root)
         meta = {
             "run_id": self.run_id,
             "route": route,
             "agent": agent,
             "dataset_path": str(dataset_path),
             "model_path": model_path,
-            "git_commit": get_git_commit(repo_root),
+            "git_commit": runtime_snapshot["git"]["commit"],
+            "created_at_utc": utc_now_iso(),
             "argv": sys.argv,
             "trace_outputs": ["raw_events", "attempts"],
+            "environment": runtime_snapshot,
             **params,
         }
         with open(self.run_dir / "run_meta.json", "w", encoding="utf-8") as fp:

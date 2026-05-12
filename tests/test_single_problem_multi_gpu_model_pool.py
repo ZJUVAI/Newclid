@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import tempfile
 import types
 import unittest
@@ -306,6 +307,40 @@ class EvalOutputNamingTests(unittest.TestCase):
 
         self.assertEqual(trace_run.run_id, f"{stem}_{timestamp}")
         self.assertEqual(trace_run.run_dir.name, f"{stem}_{timestamp}")
+
+    def test_trace_run_writes_environment_snapshot_to_run_meta(self):
+        stem = "eval_single_problem_multi_gpu_lm_demo_model_sv1_auxfull_d8_b64_s4_gbs1_gbt0_seed123"
+        timestamp = "20260410T120000Z"
+        runtime_snapshot = {
+            "python": {"version": "3.10.test"},
+            "platform": {"system": "Linux"},
+            "git": {"commit": "deadbeef", "branch": "main", "is_dirty": False},
+            "packages": {"torch": "2.6.0"},
+            "torch_runtime": {"cuda_available": True},
+        }
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with patch(
+                "newclid.search_trace.collect_runtime_snapshot",
+                return_value=runtime_snapshot,
+            ):
+                trace_run = TraceRun(
+                    Path(tmpdir),
+                    route="evaluation_single_problem_multi_gpu",
+                    agent="lm",
+                    dataset_path=Path("benchmarks/imo_2004_p1.txt"),
+                    model_path="models/sft34/checkpoint-25750",
+                    params={"output_name_stem": stem, "torch_seed": 123},
+                    run_name=stem,
+                    run_timestamp=timestamp,
+                    repo_root=Path.cwd(),
+                )
+
+            run_meta = json.loads((trace_run.run_dir / "run_meta.json").read_text())
+            self.assertEqual(run_meta["git_commit"], "deadbeef")
+            self.assertEqual(run_meta["environment"], runtime_snapshot)
+            self.assertEqual(run_meta["torch_seed"], 123)
+            self.assertEqual(run_meta["created_at_utc"].endswith("Z"), True)
 
     def test_build_timestamped_output_stem_reuses_trace_timestamp_suffix(self):
         stem = "eval_single_problem_multi_gpu_vlm_imo_2008_p1b_model_sv2_d32_b512_s4_gbs4_gbt100"
