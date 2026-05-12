@@ -92,6 +92,8 @@ pipeline = ProblemPipeline(
     n_threads=8,
     n_samples=1000,
     output_dir="./datasets",
+    using_log=True,
+    using_exp=False,
 )
 pipeline.generate()
 ```
@@ -116,6 +118,12 @@ python -m newclid.generation.pipeline \
   --no-add_auxiliary \
   --n_samples 1000
 
+# Override CSolver equation settings
+python -m newclid.generation.pipeline \
+  --no-using_log \
+  --using_exp \
+  --n_samples 1000
+
 # Generate with images
 python -m newclid.generation.pipeline \
   --img 3 \
@@ -134,6 +142,8 @@ python -m newclid.generation.pipeline \
 - `--n_threads`: Parallel workers (default: 10)
 - `--timeout`: Task timeout in seconds (default: 3600)
 - `--max_level`: DDAR search depth (default: 500)
+- `--using_log` / `--no-using_log`: Toggle CSolver log equations (default: enabled)
+- `--using_exp` / `--no-using_exp`: Toggle CSolver exponential equations (default: disabled)
 - `--construction_config`: External JSON config path
 
 **Auxiliary Points:**

@@ -39,6 +39,8 @@ class ProblemPipeline:
         construction_config=None,
         seed_cache=False,
         base_seed=42,
+        using_log=True,
+        using_exp=False,
     ):
         self.n_clauses = n_clauses
         self.n_samples = n_samples
@@ -62,6 +64,8 @@ class ProblemPipeline:
         self.prune = prune
         self.remove_coords = remove_coords
         self.construction_config = construction_config
+        self.using_log = using_log
+        self.using_exp = using_exp
 
         self.use_seed_cache = seed_cache
         self.base_seed = base_seed
@@ -166,6 +170,8 @@ class ProblemPipeline:
                     seed,
                     self.n_clauses,
                     self.max_level,
+                    self.using_log,
+                    self.using_exp,
                     self.img,
                     self.aux_only,
                     self.add_auxiliary,
@@ -368,6 +374,18 @@ def main():
         help="Maximum DDAR search depth",
     )
     parser.add_argument(
+        "--using_log",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Enable CSolver logarithmic equations (default: enabled)",
+    )
+    parser.add_argument(
+        "--using_exp",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Enable CSolver exponential equation form (default: disabled)",
+    )
+    parser.add_argument(
         "--construction_config",
         required=False,
         default=None,
@@ -467,6 +485,8 @@ def main():
         construction_config=construction_config,
         seed_cache=args.seed_cache,
         base_seed=args.base_seed,
+        using_log=args.using_log,
+        using_exp=args.using_exp,
     )
     generator.generate()
 

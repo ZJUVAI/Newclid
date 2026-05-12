@@ -72,6 +72,8 @@ class ProblemWorker:
                 seed,
                 n_clauses,
                 max_level,
+                using_log,
+                using_exp,
                 img,
                 aux_only,
                 add_auxiliary,
@@ -119,7 +121,13 @@ class ProblemWorker:
                 return [], {}
 
             n_clauses = len(fl_statement.split(";"))
-            csolver = CSolver(fl_statement, seed=seed, solver=solver)
+            csolver = CSolver(
+                fl_statement,
+                seed=seed,
+                solver=solver,
+                using_log=using_log,
+                using_exp=using_exp,
+            )
 
             # Run solver
             ddar_start = time.time()
