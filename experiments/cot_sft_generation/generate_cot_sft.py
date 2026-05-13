@@ -63,6 +63,7 @@ FORBIDDEN_THINKING_PATTERNS = [
     re.compile(r"\bessential for proving\b", re.IGNORECASE),
     re.compile(r"\bhelp establish\b", re.IGNORECASE),
     re.compile(r"\$[^$]+\$"),
+    re.compile(r"`[^`]+`"),
 ]
 POINT_TAG_RE = re.compile(
     r"<point>\s*([a-z]\w*)\s*</point>\s*<coord>\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)</coord>",
@@ -304,7 +305,7 @@ def build_aux_keyword_expectations(aux_part):
     if "para" in inner:
         expectations.append(("parallel", ["parallel"]))
     if "coll" in inner:
-        expectations.append(("collinear/line", ["collinear", "line through", "on line"]))
+        expectations.append(("collinear/line", ["collinear", "line through", "passing through", "on line", "on the line", "intersection"]))
     return expectations
 
 
@@ -523,7 +524,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "5. construction: one or two sentences that finally introduce the new point and the intended construction in plain geometry language.\n\n"
         "Constraints:\n"
         "- Use only lowercase point names exactly as in the problem text.\n"
-        "- Do not use <point> tags, <coord> tags, LaTeX, $...$ math formatting, <aux>, <proof>, IDs, or rule names.\n"
+        "- Do not use <point> tags, <coord> tags, LaTeX, $...$ math formatting, backticks, <aux>, <proof>, IDs, or rule names.\n"
         "- Do not restate every premise. Focus only on the visible configuration and the bottleneck toward the visible goal.\n"
         "- Do not mention the new point name before the construction field.\n"
         "- Avoid vague filler such as 'this point is crucial' or 'this will help'.\n"
@@ -566,7 +567,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest):
         "4. Most of the reasoning should happen before the new auxiliary point is named; only introduce that point in the final one or two sentences.\n"
         "5. Use the plan faithfully, but rewrite it into smooth prose instead of JSON fragments.\n"
         "6. Replace vague statements like 'this point is crucial' with a concrete bottleneck or visual cue.\n"
-        "7. Use the original lowercase point names exactly as in the problem text; do not rewrite them as uppercase, LaTeX, or $...$ math formatting.\n"
+        "7. Use the original lowercase point names exactly as in the problem text; do not rewrite them as uppercase, LaTeX, $...$ math formatting, or backticks.\n"
         "8. Keep the body concise and specific, roughly 90 to 170 words.\n"
         "9. The final one or two sentences must stay faithful to the hidden target summary; do not invent a different construction than the approved plan.\n"
         "10. It must not contain <aux>, <proof>, <numerical_check>, [012]-style IDs, AR/r63/a01-style rule tokens, or meta-talk.\n"
