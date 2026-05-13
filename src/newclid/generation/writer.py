@@ -43,7 +43,13 @@ def save_figure_as_png(
     if direct_png:
         width_inches = fig.get_size_inches()[0]
         dpi = img_pixels / width_inches
-        fig.savefig(png_path, format="png", dpi=dpi)
+        fig.savefig(
+            png_path,
+            format="png",
+            dpi=dpi,
+            facecolor=fig.get_facecolor(),
+            edgecolor="none",
+        )
         return
 
     if svg_path is None:
@@ -53,7 +59,12 @@ def save_figure_as_png(
     if svg_output_dir and not os.path.exists(svg_output_dir):
         os.makedirs(svg_output_dir, exist_ok=True)
 
-    fig.savefig(svg_path, format="svg")
+    fig.savefig(
+        svg_path,
+        format="svg",
+        facecolor=fig.get_facecolor(),
+        edgecolor="none",
+    )
     convert_svg_to_png(svg_path, png_path, width=img_pixels)
 
 
