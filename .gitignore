@@ -62,6 +62,10 @@ datasets/
 core.[0-9]*
 temp/
 experiments/*
+!experiments/cot_sft_generation/
+!experiments/cot_sft_generation/README.md
+!experiments/cot_sft_generation/generate_cot_sft.py
+!experiments/cot_sft_generation/prepare_metadata.py
 outputs/
 tests_output
 exp/
