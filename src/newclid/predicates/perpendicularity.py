@@ -8,7 +8,7 @@ from numpy.random import Generator
 
 from newclid.dependencies.symbols import Point
 from newclid.numerical import nearly_zero
-from newclid.numerical.draw_figure import draw_segment_num
+from newclid.numerical.draw_figure import draw_segment_num, get_figure_theme
 from newclid.predicates.equal_angles import EqAngle
 from newclid.predicates.predicate import Predicate
 from newclid.numerical.geometries import intersect
@@ -144,7 +144,7 @@ class Perp(Predicate):
                 (o.x, o.y),
                 angle=ang / np.pi * 180,
                 fill=False,
-                color="yellow",
+                color=get_figure_theme(ax)["perpendicular"],
                 width=rectangle_size,
                 height=rectangle_size,
             )

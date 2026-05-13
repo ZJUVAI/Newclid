@@ -43,7 +43,13 @@ def save_figure_as_png(
     if direct_png:
         width_inches = fig.get_size_inches()[0]
         dpi = img_pixels / width_inches
-        fig.savefig(png_path, format="png", dpi=dpi)
+        fig.savefig(
+            png_path,
+            format="png",
+            dpi=dpi,
+            facecolor=fig.get_facecolor(),
+            edgecolor="none",
+        )
         return
 
     if svg_path is None:
@@ -53,7 +59,12 @@ def save_figure_as_png(
     if svg_output_dir and not os.path.exists(svg_output_dir):
         os.makedirs(svg_output_dir, exist_ok=True)
 
-    fig.savefig(svg_path, format="svg")
+    fig.savefig(
+        svg_path,
+        format="svg",
+        facecolor=fig.get_facecolor(),
+        edgecolor="none",
+    )
     convert_svg_to_png(svg_path, png_path, width=img_pixels)
 
 
@@ -216,10 +227,15 @@ def draw_figure_task(
                 annotations,
             )
             if "point_coords_grid" not in paths_update:
+                premise_mapping = {
+                    point_name: draw_data["mapping"][point_name]
+                    for point_name in draw_data["premise_point_names"]
+                    if point_name in draw_data["mapping"]
+                }
                 paths_update["point_coords_grid"] = extract_point_coords_grid(
                     fig.axes[0],
                     dep_graph.symbols_graph.name2node,
-                    draw_data["mapping"],
+                    premise_mapping,
                 )
             save_figure_as_png(
                 fig,

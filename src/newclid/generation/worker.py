@@ -798,7 +798,14 @@ class ProblemWorker:
             proof_steps = res["proof_steps"]
 
             # llm data generation
-            llm_renamed, clauses, mapping, n_premises, n_proof_steps = (
+            (
+                llm_renamed,
+                clauses,
+                mapping,
+                premise_point_names,
+                n_premises,
+                n_proof_steps,
+            ) = (
                 ProblemWorker.llm_solution_renamed(
                     clause2basics.copy(),
                     clause2args.copy(),
@@ -848,6 +855,7 @@ class ProblemWorker:
                 result["draw_data"] = {
                     "clauses": [(c.points, c.sentences) for c in clauses],
                     "mapping": mapping,
+                    "premise_point_names": premise_point_names,
                     "goal_tokens": goal_new.to_str().split(" "),
                     "point_coords": point_coords,
                     "seed": solver_builder.seed,
@@ -968,6 +976,7 @@ class ProblemWorker:
                 },
                 essential_premise_clauses,
                 mp,
+                sorted(set(essential_premise_point_names)),
                 n_premises,
                 len(proof_steps),
             )
