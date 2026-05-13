@@ -37,18 +37,24 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 ## 当前生成框架
 
-脚本采用两阶段生成：
+脚本现在采用更受控的两阶段生成：
 
-1. `draft`
+1. `plan`
    - 教师模型看到完整记录和图片
-   - 先写出一个初稿 `<thinking>`
-   - 目标是保证方向正确、最终能走到真实 aux
-2. `polish`
-   - 再用完整记录监督一次
-   - 把初稿改写成最终版本
-   - 明确要求最终文字必须“看起来只依赖图片和题目”
-   - 要求在关键原始点首次出现时，使用 `<point>p</point><coord>(x,y)</coord>` 格式
-   - 坐标只允许标注原图中已有点，不允许给新引入的辅助点伪造坐标
+   - 只输出结构化 JSON，而不是直接写整段 `thinking`
+   - JSON 中包含：
+     - `anchor_points`
+     - `anchor_relation`
+     - `goal_bottleneck`
+     - `helper_idea`
+     - `construction`
+   - 目标是先把“看图得到的关键锚点、当前证明瓶颈、需要的辅助构造类型、最终构造语句”拆干净
+2. `write`
+   - 再根据 `plan` 输出纯正文 body
+   - 这一步不允许模型自己输出 `<point>` / `<coord>` 标签
+   - 脚本会把 `plan` 中选出的锚点自动拼成带坐标的 anchor sentence，再与正文 body 合成为最终 `<thinking>`
+
+也就是说，坐标标签和最终结构顺序现在由脚本控制，而不是完全交给模型自由生成。
 
 ## 泄露控制
 
@@ -59,13 +65,21 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 - `AR` / `r63` / `a01` 这类证明引擎痕迹
 - `sameclock` / `simtri` / `simtrir` 这类未来证明或引擎术语
 - “hidden reference / supervisor / given aux / rest of the proof” 等元话术
+- LaTeX / `$...$` 数学包裹
+- `this point is crucial` / `necessary relationships` / `help establish` 这类低信息密度套话
 
 同时会校验：
 
 - 输出必须是且仅是一个 `<thinking>...</thinking>` 块
 - `thinking` 长度足够
+- `<point>...</point><coord>(x,y)</coord>` 标签数量不能过多
 - 至少出现一个 `<point>...</point><coord>(x,y)</coord>` 标签
 - 这些坐标必须与源数据中的 `point_coords_grid` / `grid_coord` 完全一致
+- `<point>` 标签不能单独出现，必须紧跟匹配坐标
+- `plan` 中的构造语义必须与 hidden aux 对齐，例如：
+  - `midp` 必须明确 midpoint
+  - `cyclic` 必须明确 circle / circumcircle / cyclic
+  - `cong` 必须明确 equal / congruent / equidistant
 
 ## 导出格式
 
@@ -117,7 +131,7 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 | `--model-name` | `qwen/qwen3.5-plus-02-15` | 教师模型 |
 | `-r, --max-retries` | `3` | 每个阶段的最大重试次数 |
 | `--sequential` | 关闭 | 顺序取前 N 条，而不是随机抽样 |
-| `-v, --verbose` | 关闭 | 记录样本级 prompt / draft / final thinking |
+| `-v, --verbose` | 关闭 | 记录样本级 prompt / plan / body / final thinking |
 
 ## 运行产物
 
@@ -134,8 +148,9 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 - public problem
 - 原始 aux
 - 脱敏后的 hidden proof 片段
-- draft / polish prompt
-- draft 输出
+- plan / write prompt
+- plan 输出
+- write 输出
 - final thinking
 - 校验失败信息
 

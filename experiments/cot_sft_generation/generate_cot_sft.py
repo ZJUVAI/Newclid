@@ -48,11 +48,29 @@ FORBIDDEN_THINKING_PATTERNS = [
     re.compile(r"hidden reference", re.IGNORECASE),
     re.compile(r"supervisor", re.IGNORECASE),
     re.compile(r"given aux", re.IGNORECASE),
+    re.compile(r"\\\([A-Za-z ,]+\\\)"),
+    re.compile(r"\bthe construction of point\b", re.IGNORECASE),
+    re.compile(r"\bthis point is crucial\b", re.IGNORECASE),
+    re.compile(r"\bnecessary relationships\b", re.IGNORECASE),
+    re.compile(r"\bit becomes evident\b", re.IGNORECASE),
+    re.compile(r"\bwill help us\b", re.IGNORECASE),
+    re.compile(r"\bspecific angle relationships\b", re.IGNORECASE),
+    re.compile(r"\bnot directly evident\b", re.IGNORECASE),
+    re.compile(r"\bdesired angle equality\b", re.IGNORECASE),
+    re.compile(r"\bdesired ratio\b", re.IGNORECASE),
+    re.compile(r"\bclear relationship\b", re.IGNORECASE),
+    re.compile(r"\bfacilitate\b", re.IGNORECASE),
+    re.compile(r"\bessential for proving\b", re.IGNORECASE),
+    re.compile(r"\bhelp establish\b", re.IGNORECASE),
+    re.compile(r"\$[^$]+\$"),
 ]
 POINT_TAG_RE = re.compile(
     r"<point>\s*([a-z]\w*)\s*</point>\s*<coord>\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)</coord>",
     re.IGNORECASE,
 )
+RAW_POINT_TAG_RE = re.compile(r"<point>\s*([a-z]\w*)\s*</point>", re.IGNORECASE)
+AUX_NEW_POINT_RE = re.compile(r"\bx00\s+([a-z]\w*)\b", re.IGNORECASE)
+PROBLEM_BODY_RE = re.compile(r"<problem>\s*(.*?)\s*</problem>", re.DOTALL | re.IGNORECASE)
 
 
 def configure_logging(log_path=None):
@@ -195,6 +213,8 @@ def validate_coord_tags(thinking_text: str, point_coords):
     tagged_points = POINT_TAG_RE.findall(thinking_text)
     if not tagged_points:
         return False, "Missing any <point>...</point><coord>(x,y)</coord> tags"
+    if len(tagged_points) > 4:
+        return False, "Too many coordinate tags; keep them sparse and only for key visible points"
 
     seen = {}
     for point_name, x_str, y_str in tagged_points:
@@ -212,6 +232,14 @@ def validate_coord_tags(thinking_text: str, point_coords):
         if point_name in seen and seen[point_name] != (x_val, y_val):
             return False, f"Inconsistent repeated coordinates for point '{point_name}'"
         seen[point_name] = (x_val, y_val)
+
+    stripped = POINT_TAG_RE.sub("", thinking_text)
+    raw_point_tags = RAW_POINT_TAG_RE.findall(stripped)
+    if raw_point_tags:
+        return False, (
+            "Every <point>...</point> tag must be immediately followed by its matching "
+            "<coord>(x,y)</coord>, and point tags may only be used for original visible points"
+        )
     return True, "Coordinate tags valid"
 
 
@@ -227,6 +255,8 @@ def validate_thinking_response(output_text: str, point_coords, require_coord_tag
     thinking_text = match.group(1).strip()
     if len(thinking_text) < 80:
         return False, f"<thinking> content too short ({len(thinking_text)} chars, minimum 80)"
+    if len(thinking_text) > 1400:
+        return False, f"<thinking> content too long ({len(thinking_text)} chars, maximum 1400)"
 
     for pattern in FORBIDDEN_THINKING_PATTERNS:
         hit = pattern.search(thinking_text)
@@ -241,12 +271,201 @@ def validate_thinking_response(output_text: str, point_coords, require_coord_tag
     return True, "Valid thinking response"
 
 
+def extract_json_object(output_text: str):
+    if not output_text:
+        return None
+    text = output_text.strip()
+    if text.startswith("```"):
+        text = re.sub(r"^```(?:json)?", "", text).strip()
+        text = re.sub(r"```$", "", text).strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r"(\{.*\})", text, re.DOTALL)
+        if not match:
+            return None
+        try:
+            return json.loads(match.group(1))
+        except json.JSONDecodeError:
+            return None
+
+
+def build_aux_keyword_expectations(aux_part):
+    expectations = []
+    inner = aux_part.replace("<aux>", "").replace("</aux>", "").lower()
+    if "midp" in inner:
+        expectations.append(("midpoint", ["midpoint"]))
+    if "cyclic" in inner:
+        expectations.append(("cyclic/circle", ["cyclic", "circle", "circumcircle", "concyclic"]))
+    if "cong" in inner:
+        expectations.append(("equal-length", ["equal", "congruent", "same distance", "equidistant"]))
+    if "perp" in inner:
+        expectations.append(("perpendicular", ["perpendicular", "right angle"]))
+    if "para" in inner:
+        expectations.append(("parallel", ["parallel"]))
+    if "coll" in inner:
+        expectations.append(("collinear/line", ["collinear", "line through", "on line"]))
+    return expectations
+
+
+def validate_plan_response(output_text: str, point_coords, aux_part=None):
+    plan = extract_json_object(output_text)
+    if not isinstance(plan, dict):
+        return False, "Planner must return a single JSON object", None
+
+    required_keys = [
+        "anchor_points",
+        "anchor_relation",
+        "goal_bottleneck",
+        "helper_idea",
+        "construction",
+    ]
+    missing = [key for key in required_keys if key not in plan]
+    if missing:
+        return False, f"Planner JSON missing keys: {missing}", None
+
+    anchor_points = plan.get("anchor_points")
+    if not isinstance(anchor_points, list) or not (2 <= len(anchor_points) <= 3):
+        return False, "anchor_points must be a list with 2 or 3 visible points", None
+    normalized_points = []
+    for point_name in anchor_points:
+        if not isinstance(point_name, str):
+            return False, "anchor_points entries must be strings", None
+        point_name = point_name.strip().lower()
+        if point_name not in point_coords:
+            return False, f"anchor point '{point_name}' is not an original visible point", None
+        normalized_points.append(point_name)
+    if len(set(normalized_points)) != len(normalized_points):
+        return False, "anchor_points must not contain duplicates", None
+
+    cleaned_plan = {"anchor_points": normalized_points}
+    for key in required_keys[1:]:
+        value = plan.get(key)
+        if not isinstance(value, str) or len(value.strip()) < 12:
+            return False, f"{key} must be a non-empty descriptive string", None
+        value = value.strip()
+        if RAW_POINT_TAG_RE.search(value) or POINT_TAG_RE.search(value):
+            return False, f"{key} must not contain point tags", None
+        for pattern in FORBIDDEN_THINKING_PATTERNS:
+            hit = pattern.search(value)
+            if hit:
+                return False, f"{key} contains forbidden pattern: {hit.group(0)}", None
+        cleaned_plan[key] = value
+
+    if aux_part:
+        construction_text = f"{cleaned_plan['helper_idea']} {cleaned_plan['construction']}".lower()
+        for label, keywords in build_aux_keyword_expectations(aux_part):
+            if not any(keyword in construction_text for keyword in keywords):
+                return False, f"construction is missing an expected {label} cue", None
+
+    return True, "Valid planner JSON", cleaned_plan
+
+
+def validate_writer_body(output_text: str):
+    if not output_text or not output_text.strip():
+        return False, "Writer body is empty"
+    body = output_text.strip()
+    if body.startswith("<thinking>") or body.endswith("</thinking>"):
+        return False, "Writer body must be plain text only, without <thinking> tags"
+    if RAW_POINT_TAG_RE.search(body) or POINT_TAG_RE.search(body):
+        return False, "Writer body must not contain point tags; anchor tags are inserted by the script"
+    if "<coord>" in body or "</coord>" in body:
+        return False, "Writer body must not contain coord tags"
+    if len(body) < 80:
+        return False, f"Writer body too short ({len(body)} chars, minimum 80)"
+    if len(body) > 1200:
+        return False, f"Writer body too long ({len(body)} chars, maximum 1200)"
+    for pattern in FORBIDDEN_THINKING_PATTERNS:
+        hit = pattern.search(body)
+        if hit:
+            return False, f"Writer body contains forbidden pattern: {hit.group(0)}"
+    return True, "Valid writer body"
+
+
 def build_instruction_text():
     return (
         "Given the geometry image and the formal problem text, write a forward-thinking "
         "trace that motivates the auxiliary construction. Output the thinking trace and "
         "the final aux block."
     )
+
+
+def extract_problem_goal(record):
+    problem_text = build_public_problem_text(record)
+    body_match = PROBLEM_BODY_RE.search(problem_text)
+    body = body_match.group(1).strip() if body_match else problem_text.strip()
+    if "?" in body:
+        return body.split("?", 1)[1].strip()
+    return ""
+
+
+def extract_problem_context(record):
+    problem_text = build_public_problem_text(record)
+    body_match = PROBLEM_BODY_RE.search(problem_text)
+    body = body_match.group(1).strip() if body_match else problem_text.strip()
+    if "?" in body:
+        return body.split("?", 1)[0].strip()
+    return body
+
+
+def extract_aux_new_points(aux_part):
+    return AUX_NEW_POINT_RE.findall(aux_part)
+
+
+def summarize_aux_clause(clause):
+    clause = re.sub(r"\[\d{3}\]", "", clause).strip()
+    tokens = clause.split()
+    if not tokens:
+        return None
+
+    pred = tokens[0]
+    args = tokens[1:]
+    if pred == "cong" and len(args) >= 4:
+        return f"{args[0]}{args[1]} = {args[2]}{args[3]}"
+    if pred == "perp" and len(args) >= 4:
+        return f"line {args[0]}{args[1]} is perpendicular to line {args[2]}{args[3]}"
+    if pred == "para" and len(args) >= 4:
+        return f"line {args[0]}{args[1]} is parallel to line {args[2]}{args[3]}"
+    if pred == "coll" and len(args) >= 3:
+        return f"{args[0]}, {args[1]}, {args[2]} are collinear"
+    if pred == "cyclic" and len(args) >= 4:
+        return f"{args[0]}, {args[1]}, {args[2]}, {args[3]} are concyclic"
+    if pred == "midp" and len(args) >= 3:
+        return f"{args[0]} is the midpoint of {args[1]}{args[2]}"
+    return clause
+
+
+def build_hidden_aux_brief(aux_part):
+    inner = aux_part.replace("<aux>", "").replace("</aux>", "").strip()
+    clauses = [part.strip() for part in inner.split(";") if part.strip()]
+    summaries = []
+    for clause in clauses:
+        summary = summarize_aux_clause(clause)
+        if summary:
+            summaries.append(summary)
+    if not summaries:
+        return inner
+    return "; ".join(summaries)
+
+
+def format_tagged_point(point_name, point_coords):
+    x_val, y_val = point_coords[point_name]
+    return f"<point>{point_name}</point><coord>({x_val},{y_val})</coord>"
+
+
+def join_natural_list(items):
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return f"{items[0]} and {items[1]}"
+    return ", ".join(items[:-1]) + f", and {items[-1]}"
+
+
+def build_anchor_sentence(plan, point_coords):
+    tagged_points = [format_tagged_point(point_name, point_coords) for point_name in plan["anchor_points"]]
+    anchor_list = join_natural_list(tagged_points)
+    relation = plan["anchor_relation"].strip().rstrip(".")
+    return f"From the diagram, the key visible anchors are {anchor_list}; visually, {relation}."
 
 
 def build_public_problem_text(record):
@@ -268,16 +487,22 @@ def build_supervisor_payload(record, aux_part, sanitized_rest):
     return json.dumps(payload, ensure_ascii=False, sort_keys=True, indent=2)
 
 
-def build_draft_prompt(record, aux_part, sanitized_rest):
+def build_plan_prompt(record, aux_part, sanitized_rest):
     public_problem = build_public_problem_text(record)
     supervisor_payload = build_supervisor_payload(record, aux_part, sanitized_rest)
+    visible_goal = extract_problem_goal(record)
+    hidden_aux_brief = build_hidden_aux_brief(aux_part)
+    new_points = extract_aux_new_points(aux_part)
+    new_points_text = ", ".join(new_points) if new_points else "the hidden auxiliary point"
     return (
-        "You are writing geometry CoT training data.\n\n"
+        "You are planning a geometry CoT training example.\n\n"
         "[What the future student model will see at training/eval time]\n"
         "1. The geometry image.\n"
         "2. The problem text below.\n\n"
         "[Problem Text]\n"
         f"{public_problem}\n\n"
+        "[Visible Goal]\n"
+        f"{visible_goal}\n\n"
         "[Hidden Supervisor-Only Reference]\n"
         "The JSON block below is available only while generating the dataset. It exists "
         "to keep the final answer correct, logically aligned with the true aux, and "
@@ -286,45 +511,68 @@ def build_draft_prompt(record, aux_part, sanitized_rest):
         "Do not mention the hidden reference, do not mention proof IDs, do not quote "
         "the proof engine, and do not say that some fact was provided to you.\n"
         f"{supervisor_payload}\n\n"
+        "[Hidden Target Summary]\n"
+        f"New point name(s): {new_points_text}\n"
+        f"Target auxiliary facts: {hidden_aux_brief}\n\n"
         "[Task]\n"
-        "Write only one <thinking>...</thinking> block.\n"
-        "The thinking must:\n"
-        "1. Focus on how the image and the problem suggest the auxiliary construction.\n"
-        "2. Read like forward problem solving, not like a retrospective proof summary.\n"
-        "3. Never depend in wording on any content outside the visible problem text and image.\n"
-        "4. When you name an original visible point for the first time in a structurally important step, "
-        "you may use the exact tag format <point>p</point><coord>(x,y)</coord>.\n"
-        "5. Do not assign coordinates to newly introduced auxiliary points if they are not original visible points.\n"
-        "6. Do not output <aux>, <proof>, <numerical_check>, IDs like [012], or proof-rule names.\n"
-        "7. End naturally at the idea of the needed auxiliary construction, but do not output the aux block.\n"
+        "Return exactly one JSON object with these keys:\n"
+        "1. anchor_points: a list of 2 or 3 original visible points that are the best anchors for describing the figure.\n"
+        "2. anchor_relation: one sentence describing the key visible relation or shape cue involving those anchors.\n"
+        "3. goal_bottleneck: one sentence describing the main obstacle to reaching the visible goal from the current figure.\n"
+        "4. helper_idea: one sentence describing what kind of helper is missing, without naming the new point yet.\n"
+        "5. construction: one or two sentences that finally introduce the new point and the intended construction in plain geometry language.\n\n"
+        "Constraints:\n"
+        "- Use only lowercase point names exactly as in the problem text.\n"
+        "- Do not use <point> tags, <coord> tags, LaTeX, $...$ math formatting, <aux>, <proof>, IDs, or rule names.\n"
+        "- Do not restate every premise. Focus only on the visible configuration and the bottleneck toward the visible goal.\n"
+        "- Do not mention the new point name before the construction field.\n"
+        "- Avoid vague filler such as 'this point is crucial' or 'this will help'.\n"
+        "- The construction field must describe the same geometric facts as the hidden target summary in plain language; do not invent a different line, circle, or intersection.\n"
+        "- The wording must sound supportable from the image and visible problem text alone.\n"
     )
 
 
-def build_polish_prompt(record, draft_thinking, aux_part, sanitized_rest):
+def build_write_prompt(record, plan, aux_part, sanitized_rest):
     public_problem = build_public_problem_text(record)
     supervisor_payload = build_supervisor_payload(record, aux_part, sanitized_rest)
+    visible_goal = extract_problem_goal(record)
+    hidden_aux_brief = build_hidden_aux_brief(aux_part)
+    new_points = extract_aux_new_points(aux_part)
+    new_points_text = ", ".join(new_points) if new_points else "the hidden auxiliary point"
     return (
         "You are polishing a geometry CoT example for SFT.\n\n"
         "[Visible Inputs]\n"
         "The final trained model will only see the image and the problem text below.\n"
         f"{public_problem}\n\n"
+        "[Visible Goal]\n"
+        f"{visible_goal}\n\n"
         "[Hidden Supervisor-Only Reference]\n"
         "Use this only to ensure factual correctness and exact point coordinates. Do not "
         "mention that it exists, and do not let any hidden proof artifact appear in the "
         "final wording.\n"
         f"{supervisor_payload}\n\n"
-        "[Draft Thinking]\n"
-        f"{draft_thinking}\n\n"
-        "[Rewrite Requirements]\n"
-        "Rewrite the draft into a clean final <thinking>...</thinking> block.\n"
-        "The final version must satisfy all of the following:\n"
+        "[Hidden Target Summary]\n"
+        f"New point name(s): {new_points_text}\n"
+        f"Target auxiliary facts: {hidden_aux_brief}\n\n"
+        "[Approved Plan]\n"
+        f"{json.dumps(plan, ensure_ascii=False, indent=2)}\n\n"
+        "[Write Requirements]\n"
+        "Write only the body text that comes after an anchor sentence supplied by the script.\n"
+        "Do NOT output <thinking>, <point>, or <coord> tags; the script will add the anchor sentence and the coordinate tags itself.\n"
+        "The body must satisfy all of the following:\n"
         "1. It should sound supportable from the image and visible problem text alone.\n"
-        "2. It should be logically coherent and centered on discovering the auxiliary construction.\n"
-        "3. It should contain at least one correct <point>p</point><coord>(x,y)</coord> tag for original visible points.\n"
-        "4. It must not contain <aux>, <proof>, <numerical_check>, [012]-style IDs, AR/r63/a01-style rule tokens, or meta-talk.\n"
-        "5. It must not say that some coordinate table, hidden answer, proof, or reference was provided.\n"
-        "6. It must not assign coordinates to newly introduced auxiliary points unless they are already original visible points.\n"
-        "Output only the final <thinking>...</thinking> block.\n"
+        "2. It should be logically coherent and centered on discovering the auxiliary construction for the visible goal, not on re-listing premises.\n"
+        "3. Follow this order: bottleneck -> missing helper idea -> final introduction of the new point.\n"
+        "4. Most of the reasoning should happen before the new auxiliary point is named; only introduce that point in the final one or two sentences.\n"
+        "5. Use the plan faithfully, but rewrite it into smooth prose instead of JSON fragments.\n"
+        "6. Replace vague statements like 'this point is crucial' with a concrete bottleneck or visual cue.\n"
+        "7. Use the original lowercase point names exactly as in the problem text; do not rewrite them as uppercase, LaTeX, or $...$ math formatting.\n"
+        "8. Keep the body concise and specific, roughly 90 to 170 words.\n"
+        "9. The final one or two sentences must stay faithful to the hidden target summary; do not invent a different construction than the approved plan.\n"
+        "10. It must not contain <aux>, <proof>, <numerical_check>, [012]-style IDs, AR/r63/a01-style rule tokens, or meta-talk.\n"
+        "11. It must not say that some coordinate table, hidden answer, proof, or reference was provided.\n"
+        "12. It must not assign coordinates to newly introduced auxiliary points.\n"
+        "Output only the plain-text body.\n"
     )
 
 
@@ -390,71 +638,195 @@ def run_stage(stage_name, messages, model_name, point_coords, max_retries, requi
     }
 
 
+def run_plan_stage(stage_name, messages, model_name, point_coords, aux_part, max_retries):
+    last_error = None
+    last_output = None
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(f"[{stage_name}] Attempt {attempt}/{max_retries}")
+            start = time.time()
+            output = call_model(messages, model_name)
+            elapsed = time.time() - start
+            last_output = output
+            ok, message, plan = validate_plan_response(output, point_coords, aux_part=aux_part)
+            if ok:
+                logger.info(f"[{stage_name}] Valid output in {elapsed:.2f}s")
+                return {
+                    "success": True,
+                    "output": output,
+                    "parsed": plan,
+                    "attempts_used": attempt,
+                    "elapsed_seconds": elapsed,
+                    "error": None,
+                }
+
+            last_error = message
+            logger.warning(f"[{stage_name}] Validation failed: {message}")
+            if attempt < max_retries:
+                feedback = (
+                    "Your previous JSON plan was invalid.\n"
+                    f"Validation error: {message}\n"
+                    "Return a corrected JSON object that satisfies every schema and quality constraint."
+                )
+                messages = messages + [{"role": "user", "content": feedback}]
+                time.sleep(1)
+
+        except Exception as exc:
+            last_error = str(exc)
+            logger.error(f"[{stage_name}] API call failed: {exc}")
+            if attempt < max_retries:
+                time.sleep(2)
+
+    return {
+        "success": False,
+        "output": last_output,
+        "parsed": None,
+        "attempts_used": max_retries,
+        "elapsed_seconds": None,
+        "error": last_error or "Unknown error",
+    }
+
+
+def run_writer_stage(stage_name, messages, model_name, max_retries):
+    last_error = None
+    last_output = None
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(f"[{stage_name}] Attempt {attempt}/{max_retries}")
+            start = time.time()
+            output = call_model(messages, model_name)
+            elapsed = time.time() - start
+            last_output = output
+            ok, message = validate_writer_body(output)
+            if ok:
+                logger.info(f"[{stage_name}] Valid output in {elapsed:.2f}s")
+                return {
+                    "success": True,
+                    "output": output.strip(),
+                    "attempts_used": attempt,
+                    "elapsed_seconds": elapsed,
+                    "error": None,
+                }
+
+            last_error = message
+            logger.warning(f"[{stage_name}] Validation failed: {message}")
+            if attempt < max_retries:
+                feedback = (
+                    "Your previous body text was invalid.\n"
+                    f"Validation error: {message}\n"
+                    "Return a corrected plain-text body that satisfies every format and quality constraint."
+                )
+                messages = messages + [{"role": "user", "content": feedback}]
+                time.sleep(1)
+
+        except Exception as exc:
+            last_error = str(exc)
+            logger.error(f"[{stage_name}] API call failed: {exc}")
+            if attempt < max_retries:
+                time.sleep(2)
+
+    return {
+        "success": False,
+        "output": last_output,
+        "attempts_used": max_retries,
+        "elapsed_seconds": None,
+        "error": last_error or "Unknown error",
+    }
+
+
 def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_name, max_retries, verbose):
-    draft_prompt = build_draft_prompt(record, aux_part, sanitized_rest)
-    draft_messages = [
+    point_coords = get_point_coords(record)
+    plan_prompt = build_plan_prompt(record, aux_part, sanitized_rest)
+    plan_messages = [
         {
             "role": "user",
             "content": [
                 {"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}},
-                {"type": "text", "text": draft_prompt},
+                {"type": "text", "text": plan_prompt},
             ],
         }
     ]
-    draft_result = run_stage(
-        "draft",
-        draft_messages,
+    plan_result = run_plan_stage(
+        "plan",
+        plan_messages,
         model_name=model_name,
-        point_coords={},
+        point_coords=point_coords,
+        aux_part=aux_part,
         max_retries=max_retries,
-        require_coord_tags=False,
     )
-    if not draft_result["success"]:
+    if not plan_result["success"]:
         return {
             "success": False,
-            "thinking": draft_result["output"],
-            "draft_prompt": draft_prompt,
-            "polish_prompt": None,
-            "attempts_used": draft_result["attempts_used"],
-            "elapsed_seconds": draft_result["elapsed_seconds"],
-            "error": draft_result["error"],
+            "thinking": plan_result["output"],
+            "plan_prompt": plan_prompt,
+            "write_prompt": None,
+            "plan_output": plan_result["output"] if verbose else None,
+            "attempts_used": plan_result["attempts_used"],
+            "elapsed_seconds": plan_result["elapsed_seconds"],
+            "error": plan_result["error"],
         }
 
-    polish_prompt = build_polish_prompt(
+    write_prompt = build_write_prompt(
         record,
-        draft_result["output"],
+        plan_result["parsed"],
         aux_part=aux_part,
         sanitized_rest=sanitized_rest,
     )
-    polish_messages = [
+    write_messages = [
         {
             "role": "user",
             "content": [
                 {"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}},
-                {"type": "text", "text": polish_prompt},
+                {"type": "text", "text": write_prompt},
             ],
         }
     ]
-    polish_result = run_stage(
-        "polish",
-        polish_messages,
+    write_result = run_writer_stage(
+        "write",
+        write_messages,
         model_name=model_name,
-        point_coords=get_point_coords(record),
         max_retries=max_retries,
-        require_coord_tags=True,
     )
+
+    assembled_thinking = None
+    if write_result["output"]:
+        anchor_sentence = build_anchor_sentence(plan_result["parsed"], point_coords)
+        assembled_thinking = f"<thinking>{anchor_sentence} {write_result['output'].strip()}</thinking>"
+        is_valid, message = validate_thinking_response(
+            assembled_thinking,
+            point_coords=point_coords,
+            require_coord_tags=True,
+        )
+        if not is_valid:
+            return {
+                "success": False,
+                "thinking": assembled_thinking,
+                "plan_prompt": plan_prompt if verbose else None,
+                "write_prompt": write_prompt if verbose else None,
+                "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+                "attempts_used": plan_result["attempts_used"] + write_result["attempts_used"],
+                "elapsed_seconds": (
+                    (plan_result["elapsed_seconds"] or 0.0) +
+                    (write_result["elapsed_seconds"] or 0.0)
+                ),
+                "error": f"Final assembly validation failed: {message}",
+            }
+
     return {
-        "success": polish_result["success"],
-        "thinking": polish_result["output"],
-        "draft_prompt": draft_prompt if verbose else None,
-        "polish_prompt": polish_prompt if verbose else None,
-        "attempts_used": draft_result["attempts_used"] + polish_result["attempts_used"],
+        "success": write_result["success"],
+        "thinking": assembled_thinking,
+        "plan_prompt": plan_prompt if verbose else None,
+        "write_prompt": write_prompt if verbose else None,
+        "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
         "elapsed_seconds": (
-            (draft_result["elapsed_seconds"] or 0.0) +
-            (polish_result["elapsed_seconds"] or 0.0)
+            (plan_result["elapsed_seconds"] or 0.0) +
+            (write_result["elapsed_seconds"] or 0.0)
         ),
-        "error": polish_result["error"],
-        "draft_output": draft_result["output"] if verbose else None,
+        "attempts_used": plan_result["attempts_used"] + write_result["attempts_used"],
+        "error": write_result["error"],
+        "write_output": write_result["output"] if verbose else None,
     }
 
 
@@ -576,9 +948,10 @@ def process_and_generate_sft(
             "aux": aux_part,
             "hidden_rest_sanitized": record["_sanitized_rest"],
             "point_coords_grid": record.get("point_coords_grid", {}),
-            "draft_prompt": generation.get("draft_prompt"),
-            "polish_prompt": generation.get("polish_prompt"),
-            "draft_output": generation.get("draft_output"),
+            "plan_prompt": generation.get("plan_prompt"),
+            "write_prompt": generation.get("write_prompt"),
+            "plan_output": generation.get("plan_output"),
+            "write_output": generation.get("write_output"),
             "thinking": thinking,
             "success": generation["success"],
             "attempts_used": generation["attempts_used"],
