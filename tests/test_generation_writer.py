@@ -151,3 +151,21 @@ def test_build_point_coords_grid_clamps_and_sorts():
     assert list(point_coords_grid.keys()) == ["a", "b"]
     assert point_coords_grid["a"] == [0, 0]
     assert point_coords_grid["b"] == [255, 255]
+
+
+def test_build_point_coords_grid_can_exclude_aux_points():
+    point_coords_grid = build_point_coords_grid(
+        {
+            "raw_a": (0.0, 512.0),
+            "raw_b": (512.0, 0.0),
+            "raw_aux": (256.0, 256.0),
+        },
+        {"raw_a": "a", "raw_b": "b"},
+        canvas_width=512,
+        canvas_height=512,
+    )
+
+    assert point_coords_grid == {
+        "a": [0, 0],
+        "b": [255, 255],
+    }

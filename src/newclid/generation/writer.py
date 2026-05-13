@@ -227,10 +227,15 @@ def draw_figure_task(
                 annotations,
             )
             if "point_coords_grid" not in paths_update:
+                premise_mapping = {
+                    point_name: draw_data["mapping"][point_name]
+                    for point_name in draw_data["premise_point_names"]
+                    if point_name in draw_data["mapping"]
+                }
                 paths_update["point_coords_grid"] = extract_point_coords_grid(
                     fig.axes[0],
                     dep_graph.symbols_graph.name2node,
-                    draw_data["mapping"],
+                    premise_mapping,
                 )
             save_figure_as_png(
                 fig,
