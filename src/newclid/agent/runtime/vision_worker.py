@@ -258,17 +258,19 @@ def generate_visual_aux_dsl_dict_batch(
         device=model.device,
     )
     generate_start = time.perf_counter()
-    generated_output = model.generate(
-        **model_inputs,
+    generate_kwargs = dict(
+        model_inputs,
         max_new_tokens=max_new_tokens,
         num_beams=decoding_size,
         num_return_sequences=decoding_size,
         pad_token_id=pad_token_id,
-        eos_token_id=eos_token_id,
         stopping_criteria=stopping_criteria,
         return_dict_in_generate=True,
         output_scores=True,
     )
+    if eos_token_id is not None:
+        generate_kwargs["eos_token_id"] = eos_token_id
+    generated_output = model.generate(**generate_kwargs)
     profile["generate_time_s"] += time.perf_counter() - generate_start
     scores = generated_output.sequences_scores.tolist()
     prompt_token_counts = _count_prompt_tokens(model_inputs)
@@ -344,17 +346,19 @@ def generate_qwen3_text_only_aux_dsl_dict_batch(
         device=model.device,
     )
     generate_start = time.perf_counter()
-    generated_output = model.generate(
-        **model_inputs,
+    generate_kwargs = dict(
+        model_inputs,
         max_new_tokens=max_new_tokens,
         num_beams=decoding_size,
         num_return_sequences=decoding_size,
         pad_token_id=pad_token_id,
-        eos_token_id=eos_token_id,
         stopping_criteria=stopping_criteria,
         return_dict_in_generate=True,
         output_scores=True,
     )
+    if eos_token_id is not None:
+        generate_kwargs["eos_token_id"] = eos_token_id
+    generated_output = model.generate(**generate_kwargs)
     profile["generate_time_s"] += time.perf_counter() - generate_start
     scores = generated_output.sequences_scores.tolist()
     prompt_token_counts = _count_prompt_tokens(model_inputs)
