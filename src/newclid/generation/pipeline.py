@@ -41,7 +41,12 @@ class ProblemPipeline:
         base_seed=42,
         using_log=True,
         using_exp=False,
+        direct_png=True,
+        img_pixels=512,
     ):
+        if img_pixels <= 0:
+            raise ValueError("img_pixels must be a positive integer")
+
         self.n_clauses = n_clauses
         self.n_samples = n_samples
         self.n_threads = n_threads
@@ -66,6 +71,8 @@ class ProblemPipeline:
         self.construction_config = construction_config
         self.using_log = using_log
         self.using_exp = using_exp
+        self.direct_png = direct_png
+        self.img_pixels = img_pixels
 
         self.use_seed_cache = seed_cache
         self.base_seed = base_seed
@@ -99,6 +106,8 @@ class ProblemPipeline:
             img_mode=self.img,
             defs_data=defs_data,
             session_id=session_id,
+            direct_png=self.direct_png,
+            img_pixels=self.img_pixels,
         )
 
         # Initialize statistics reporter
@@ -328,6 +337,13 @@ def load_construction_config(config_path: str | None) -> dict | None:
     return config
 
 
+def positive_int(value: str) -> int:
+    parsed = int(value)
+    if parsed <= 0:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return parsed
+
+
 def main():
     parser = argparse.ArgumentParser(description="Create problem fl - nl dataset")
     # General parameters
@@ -447,6 +463,19 @@ def main():
         "3=both",
     )
     parser.add_argument(
+        "--direct_png",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Save PNG directly instead of using svg -> png conversion (default: enabled)",
+    )
+    parser.add_argument(
+        "--img_pixels",
+        required=False,
+        type=positive_int,
+        default=512,
+        help="Output image width in pixels (default: 512)",
+    )
+    parser.add_argument(
         "--prune",
         action=argparse.BooleanOptionalAction,
         default=True,
@@ -487,6 +516,8 @@ def main():
         base_seed=args.base_seed,
         using_log=args.using_log,
         using_exp=args.using_exp,
+        direct_png=args.direct_png,
+        img_pixels=args.img_pixels,
     )
     generator.generate()
 

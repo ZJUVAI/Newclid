@@ -7,8 +7,11 @@ Handles asynchronous figure drawing and data writing with Ray.
 import json
 import logging
 import os
+
 import ray
 import cairosvg
+
+POINT_COORDS_GRID_SIZE = 256
 
 
 def convert_svg_to_png(svg_path, png_path, width=1024):
@@ -25,6 +28,99 @@ def convert_svg_to_png(svg_path, png_path, width=1024):
         ) from e
 
 
+def save_figure_as_png(
+    fig,
+    png_path: str,
+    img_pixels: int,
+    direct_png: bool,
+    svg_path: str | None = None,
+):
+    """Persist a matplotlib figure to PNG using the selected rendering path."""
+    output_dir = os.path.dirname(png_path)
+    if output_dir and not os.path.exists(output_dir):
+        os.makedirs(output_dir, exist_ok=True)
+
+    if direct_png:
+        width_inches = fig.get_size_inches()[0]
+        dpi = img_pixels / width_inches
+        fig.savefig(png_path, format="png", dpi=dpi)
+        return
+
+    if svg_path is None:
+        raise ValueError("svg_path is required when direct_png is False")
+
+    svg_output_dir = os.path.dirname(svg_path)
+    if svg_output_dir and not os.path.exists(svg_output_dir):
+        os.makedirs(svg_output_dir, exist_ok=True)
+
+    fig.savefig(svg_path, format="svg")
+    convert_svg_to_png(svg_path, png_path, width=img_pixels)
+
+
+def _clamp_grid_coord(value: int, grid_size: int) -> int:
+    return max(0, min(value, grid_size - 1))
+
+
+def build_point_coords_grid(
+    display_points: dict[str, tuple[float, float]],
+    mapping: dict[str, str] | None,
+    canvas_width: float,
+    canvas_height: float,
+    grid_size: int = POINT_COORDS_GRID_SIZE,
+) -> dict[str, list[int]]:
+    """Convert rendered display coordinates into a fixed top-left grid."""
+    if canvas_width <= 0 or canvas_height <= 0:
+        raise ValueError("canvas dimensions must be positive")
+    if grid_size <= 0:
+        raise ValueError("grid_size must be positive")
+
+    output: dict[str, list[int]] = {}
+    if mapping is None:
+        sorted_items = [(name, name) for name in sorted(display_points)]
+    else:
+        sorted_items = sorted(mapping.items())
+    for source_name, target_name in sorted_items:
+        if source_name not in display_points:
+            continue
+        display_x, display_y = display_points[source_name]
+        gx = _clamp_grid_coord(
+            round(display_x / canvas_width * (grid_size - 1)),
+            grid_size,
+        )
+        gy = _clamp_grid_coord(
+            round((1.0 - display_y / canvas_height) * (grid_size - 1)),
+            grid_size,
+        )
+        output[target_name] = [gx, gy]
+    return output
+
+
+def extract_point_coords_grid(
+    ax,
+    point_lookup: dict[str, object],
+    mapping: dict[str, str] | None,
+    grid_size: int = POINT_COORDS_GRID_SIZE,
+) -> dict[str, list[int]]:
+    """Project rendered points into the fixed image-aligned grid."""
+    ax.figure.canvas.draw()
+    canvas_width, canvas_height = ax.figure.canvas.get_width_height()
+    display_points: dict[str, tuple[float, float]] = {}
+    for name, point in point_lookup.items():
+        point_num = getattr(point, "num", None)
+        if point_num is None:
+            continue
+        display_x, display_y = ax.transData.transform((point_num.x, point_num.y))
+        display_points[name] = (float(display_x), float(display_y))
+
+    return build_point_coords_grid(
+        display_points,
+        mapping,
+        canvas_width,
+        canvas_height,
+        grid_size=grid_size,
+    )
+
+
 @ray.remote(num_cpus=0.5)
 def draw_figure_task(
     draw_data: dict,
@@ -34,6 +130,8 @@ def draw_figure_task(
     file_idx: int,
     session_id: str,
     img_mode: int,
+    direct_png: bool,
+    img_pixels: int,
 ):
     """
     Ray remote task for drawing figures.
@@ -46,6 +144,8 @@ def draw_figure_task(
         file_idx: File index for naming
         session_id: Unique session identifier
         img_mode: 0=no images, 1=with annotations only, 2=without annotations only, 3=both
+        direct_png: Whether to save PNG directly instead of svg -> png conversion
+        img_pixels: Output image width in pixels
 
     Returns:
         Tuple of (file_idx, paths_update, error)
@@ -115,9 +215,20 @@ def draw_figure_task(
                 draw_data["mapping"],
                 annotations,
             )
-            fig.savefig(svg_path, format="svg")
+            if "point_coords_grid" not in paths_update:
+                paths_update["point_coords_grid"] = extract_point_coords_grid(
+                    fig.axes[0],
+                    dep_graph.symbols_graph.name2node,
+                    draw_data["mapping"],
+                )
+            save_figure_as_png(
+                fig,
+                png_path=png_path,
+                img_pixels=img_pixels,
+                direct_png=direct_png,
+                svg_path=svg_path,
+            )
             plt.close(fig)
-            convert_svg_to_png(svg_path, png_path)
 
             paths_update[f"image_path{suffix}"] = png_path
 
@@ -142,6 +253,8 @@ class Writer:
         img_mode: int,
         defs_data: dict,
         session_id: str,
+        direct_png: bool = True,
+        img_pixels: int = 512,
     ):
         """
         Initialize writer.
@@ -152,13 +265,20 @@ class Writer:
             img_mode: Image generation mode (0-3)
             defs_data: Serialized definitions for drawing
             session_id: Unique session identifier
+            direct_png: Whether to save PNG directly instead of svg -> png conversion
+            img_pixels: Output image width in pixels
         """
+        if img_pixels <= 0:
+            raise ValueError("img_pixels must be a positive integer")
+
         self.output_dir = output_dir
         os.makedirs(self.output_dir, exist_ok=True)
         self.file_prefix = file_prefix
         self.img_mode = img_mode
         self.defs_data = defs_data
         self.session_id = session_id
+        self.direct_png = direct_png
+        self.img_pixels = img_pixels
 
         self.data_count = 0
         self.written_count = 0
@@ -236,8 +356,9 @@ class Writer:
         imgs_dir = os.path.join(self.output_dir, "imgs")
         imgs_png_dir = os.path.join(self.output_dir, "imgs_png")
         os.makedirs(os.path.dirname(filename), exist_ok=True)
-        os.makedirs(imgs_dir, exist_ok=True)
         os.makedirs(imgs_png_dir, exist_ok=True)
+        if not self.direct_png:
+            os.makedirs(imgs_dir, exist_ok=True)
 
         for data_item in all_data:
             self.data_count += 1
@@ -253,6 +374,8 @@ class Writer:
                     self.data_count,
                     self.session_id,
                     self.img_mode,
+                    self.direct_png,
+                    self.img_pixels,
                 )
                 self.pending_draw_tasks[task_id] = (self.data_count, data_item)
             else:

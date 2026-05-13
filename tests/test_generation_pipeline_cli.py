@@ -1,11 +1,48 @@
 import sys
 from types import SimpleNamespace
 
+import pytest
+
 from newclid.generation import pipeline as generation_pipeline
 from newclid.generation.worker import ProblemWorker
 
 
-def test_pipeline_cli_defaults(monkeypatch):
+@pytest.mark.parametrize(
+    ("argv", "expected_using_log", "expected_using_exp", "expected_direct_png", "expected_img_pixels"),
+    [
+        (
+            ["pipeline.py", "--n_samples", "1", "--dir", "./tmp-datasets"],
+            True,
+            False,
+            True,
+            512,
+        ),
+        (
+            [
+                "pipeline.py",
+                "--n_samples",
+                "1",
+                "--no-using_log",
+                "--using_exp",
+                "--no-direct_png",
+                "--img_pixels",
+                "768",
+            ],
+            False,
+            True,
+            False,
+            768,
+        ),
+    ],
+)
+def test_pipeline_cli_image_render_args(
+    monkeypatch,
+    argv,
+    expected_using_log,
+    expected_using_exp,
+    expected_direct_png,
+    expected_img_pixels,
+):
     captured = {}
 
     class DummyPipeline:
@@ -19,49 +56,14 @@ def test_pipeline_cli_defaults(monkeypatch):
     monkeypatch.setattr(
         generation_pipeline, "load_construction_config", lambda path: None
     )
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        ["pipeline.py", "--n_samples", "1", "--dir", "./tmp-datasets"],
-    )
+    monkeypatch.setattr(sys, "argv", argv)
 
     generation_pipeline.main()
 
-    assert captured["using_log"] is True
-    assert captured["using_exp"] is False
-    assert captured["generated"] is True
-
-
-def test_pipeline_cli_overrides(monkeypatch):
-    captured = {}
-
-    class DummyPipeline:
-        def __init__(self, **kwargs):
-            captured.update(kwargs)
-
-        def generate(self):
-            captured["generated"] = True
-
-    monkeypatch.setattr(generation_pipeline, "ProblemPipeline", DummyPipeline)
-    monkeypatch.setattr(
-        generation_pipeline, "load_construction_config", lambda path: None
-    )
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "pipeline.py",
-            "--n_samples",
-            "1",
-            "--no-using_log",
-            "--using_exp",
-        ],
-    )
-
-    generation_pipeline.main()
-
-    assert captured["using_log"] is False
-    assert captured["using_exp"] is True
+    assert captured["using_log"] is expected_using_log
+    assert captured["using_exp"] is expected_using_exp
+    assert captured["direct_png"] is expected_direct_png
+    assert captured["img_pixels"] == expected_img_pixels
     assert captured["generated"] is True
 
 
