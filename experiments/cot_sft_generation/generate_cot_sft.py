@@ -65,6 +65,8 @@ FORBIDDEN_THINKING_PATTERNS = [
     re.compile(r"\bfacilitate\b", re.IGNORECASE),
     re.compile(r"\bessential for proving\b", re.IGNORECASE),
     re.compile(r"\bhelp establish\b", re.IGNORECASE),
+    re.compile(r"\bcoordinates?\b", re.IGNORECASE),
+    re.compile(r"\bcoordinate table\b", re.IGNORECASE),
     re.compile(r"\$[^$]+\$"),
     re.compile(r"`[^`]+`"),
 ]
@@ -263,8 +265,8 @@ def validate_thinking_response(output_text: str, point_coords, require_coord_tag
     thinking_text = match.group(1).strip()
     if len(thinking_text) < 80:
         return False, f"<thinking> content too short ({len(thinking_text)} chars, minimum 80)"
-    if len(thinking_text) > 1400:
-        return False, f"<thinking> content too long ({len(thinking_text)} chars, maximum 1400)"
+    if len(thinking_text) > 2200:
+        return False, f"<thinking> content too long ({len(thinking_text)} chars, maximum 2200)"
 
     for pattern in FORBIDDEN_THINKING_PATTERNS:
         hit = pattern.search(thinking_text)
@@ -316,6 +318,115 @@ def build_aux_keyword_expectations(aux_part):
     return expectations
 
 
+def extract_visible_point_names(point_coords):
+    return sorted(point_coords.keys())
+
+
+def extract_point_mentions(text, visible_points):
+    mentioned = set()
+    lowered = text.lower()
+    for point_name in visible_points:
+        if re.search(rf"\b{re.escape(point_name.lower())}\b", lowered):
+            mentioned.add(point_name.lower())
+    return mentioned
+
+
+def relation_keyword_present(text):
+    keywords = [
+        "parallel",
+        "perpendicular",
+        "equal",
+        "congruent",
+        "midpoint",
+        "collinear",
+        "circle",
+        "cyclic",
+        "symmetric",
+        "symmetry",
+        "diameter",
+        "bisect",
+        "aligned",
+        "alignment",
+    ]
+    lowered = text.lower()
+    return any(keyword in lowered for keyword in keywords)
+
+
+def build_hidden_coordinate_hints(point_coords, max_items=6):
+    point_items = sorted(point_coords.items())
+    if len(point_items) < 2:
+        return "No reliable coordinate hint available."
+
+    def line_metrics(p1, p2):
+        x1, y1 = point_coords[p1]
+        x2, y2 = point_coords[p2]
+        dx = x2 - x1
+        dy = y2 - y1
+        length_sq = dx * dx + dy * dy
+        return dx, dy, length_sq
+
+    segment_names = []
+    for i, (p1, _) in enumerate(point_items):
+        for p2, _ in point_items[i + 1:]:
+            dx, dy, length_sq = line_metrics(p1, p2)
+            if length_sq == 0:
+                continue
+            segment_names.append((p1, p2, dx, dy, length_sq))
+
+    candidates = []
+
+    for i, (a, b, dx1, dy1, len1) in enumerate(segment_names):
+        for c, d, dx2, dy2, len2 in segment_names[i + 1:]:
+            if len1 == 0 or len2 == 0:
+                continue
+            dot = dx1 * dx2 + dy1 * dy2
+            cross = dx1 * dy2 - dy1 * dx2
+            norm = (len1 * len2) ** 0.5
+            if norm == 0:
+                continue
+            parallel_score = abs(cross) / norm
+            perp_score = abs(dot) / norm
+            if parallel_score <= 0.05:
+                candidates.append((parallel_score, f"segments {a}{b} and {c}{d} look parallel"))
+            if perp_score <= 0.08:
+                candidates.append((perp_score, f"segments {a}{b} and {c}{d} look perpendicular"))
+            rel_len_gap = abs(len1 - len2) / max(len1, len2)
+            if rel_len_gap <= 0.06:
+                candidates.append((rel_len_gap, f"segments {a}{b} and {c}{d} look equal in length"))
+
+    visible_points = [name for name, _ in point_items]
+    for mid in visible_points:
+        xm, ym = point_coords[mid]
+        for i, p1 in enumerate(visible_points):
+            for p2 in visible_points[i + 1:]:
+                if mid in {p1, p2}:
+                    continue
+                x1, y1 = point_coords[p1]
+                x2, y2 = point_coords[p2]
+                area2 = abs((x2 - x1) * (ym - y1) - (y2 - y1) * (xm - x1))
+                seg_len = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+                if seg_len == 0:
+                    continue
+                midpoint_gap = ((xm - (x1 + x2) / 2) ** 2 + (ym - (y1 + y2) / 2) ** 2) ** 0.5
+                if area2 / seg_len <= 2.0 and midpoint_gap <= 3.0:
+                    score = area2 / seg_len + midpoint_gap
+                    candidates.append((score, f"point {mid} looks like the midpoint of {p1}{p2}"))
+
+    unique_hints = []
+    seen = set()
+    for _, text in sorted(candidates, key=lambda item: item[0]):
+        if text in seen:
+            continue
+        seen.add(text)
+        unique_hints.append(text)
+        if len(unique_hints) >= max_items:
+            break
+
+    if not unique_hints:
+        return "No strong coordinate-based relation stands out beyond the visible diagram."
+    return "; ".join(unique_hints)
+
+
 def validate_plan_response(output_text: str, point_coords, aux_part=None):
     plan = extract_json_object(output_text)
     if not isinstance(plan, dict):
@@ -324,17 +435,21 @@ def validate_plan_response(output_text: str, point_coords, aux_part=None):
     required_keys = [
         "anchor_points",
         "anchor_relation",
+        "figure_overview",
+        "coordinate_hints",
         "goal_bottleneck",
         "helper_idea",
         "construction",
+        "verification_path",
     ]
     missing = [key for key in required_keys if key not in plan]
     if missing:
         return False, f"Planner JSON missing keys: {missing}", None
 
     anchor_points = plan.get("anchor_points")
-    if not isinstance(anchor_points, list) or not (2 <= len(anchor_points) <= 3):
-        return False, "anchor_points must be a list with 2 or 3 visible points", None
+    max_anchor_points = min(4, max(3, len(point_coords)))
+    if not isinstance(anchor_points, list) or not (3 <= len(anchor_points) <= max_anchor_points):
+        return False, "anchor_points must be a list with 3 or 4 visible points", None
     normalized_points = []
     for point_name in anchor_points:
         if not isinstance(point_name, str):
@@ -347,6 +462,7 @@ def validate_plan_response(output_text: str, point_coords, aux_part=None):
         return False, "anchor_points must not contain duplicates", None
 
     cleaned_plan = {"anchor_points": normalized_points}
+    visible_points = extract_visible_point_names(point_coords)
     for key in required_keys[1:]:
         value = plan.get(key)
         if not isinstance(value, str) or len(value.strip()) < 12:
@@ -360,11 +476,33 @@ def validate_plan_response(output_text: str, point_coords, aux_part=None):
                 return False, f"{key} contains forbidden pattern: {hit.group(0)}", None
         cleaned_plan[key] = value
 
+    if not relation_keyword_present(cleaned_plan["coordinate_hints"]):
+        return False, "coordinate_hints must mention at least one concrete geometric relation cue", None
+
+    figure_mentions = extract_point_mentions(
+        f"{cleaned_plan['figure_overview']} {cleaned_plan['verification_path']}",
+        visible_points,
+    )
+    if len(visible_points) > len(normalized_points) and not (figure_mentions - set(normalized_points)):
+        return False, "figure_overview or verification_path must mention at least one visible point outside anchor_points", None
+
     if aux_part:
         construction_text = f"{cleaned_plan['helper_idea']} {cleaned_plan['construction']}".lower()
         for label, keywords in build_aux_keyword_expectations(aux_part):
             if not any(keyword in construction_text for keyword in keywords):
                 return False, f"construction is missing an expected {label} cue", None
+        new_points = [point.lower() for point in extract_aux_new_points(aux_part)]
+        for point_name in new_points:
+            if point_name not in cleaned_plan["construction"].lower():
+                return False, f"construction must mention new point '{point_name}' explicitly", None
+        if len(new_points) > 1:
+            stage_markers = ["first", "then", "next", "after", "together", "simultaneously"]
+            combined_text = f"{cleaned_plan['construction']} {cleaned_plan['verification_path']}".lower()
+            if not any(marker in combined_text for marker in stage_markers):
+                return False, "multi-point auxiliary plans must describe a staged or combined construction strategy", None
+
+    if not relation_keyword_present(cleaned_plan["verification_path"]):
+        return False, "verification_path must mention concrete geometric relations unlocked by the aux", None
 
     return True, "Valid planner JSON", cleaned_plan
 
@@ -379,10 +517,10 @@ def validate_writer_body(output_text: str):
         return False, "Writer body must not contain point tags; anchor tags are inserted by the script"
     if "<coord>" in body or "</coord>" in body:
         return False, "Writer body must not contain coord tags"
-    if len(body) < 80:
-        return False, f"Writer body too short ({len(body)} chars, minimum 80)"
-    if len(body) > 1200:
-        return False, f"Writer body too long ({len(body)} chars, maximum 1200)"
+    if len(body) < 120:
+        return False, f"Writer body too short ({len(body)} chars, minimum 120)"
+    if len(body) > 1500:
+        return False, f"Writer body too long ({len(body)} chars, maximum 1500)"
     for pattern in FORBIDDEN_THINKING_PATTERNS:
         hit = pattern.search(body)
         if hit:
@@ -440,6 +578,12 @@ def summarize_aux_clause(clause):
         return f"{args[0]}, {args[1]}, {args[2]}, {args[3]} are concyclic"
     if pred == "midp" and len(args) >= 3:
         return f"{args[0]} is the midpoint of {args[1]}{args[2]}"
+    if pred == "eqratio" and len(args) >= 8:
+        return f"{args[0]}{args[1]}:{args[2]}{args[3]} = {args[4]}{args[5]}:{args[6]}{args[7]}"
+    if pred == "eqangle" and len(args) >= 8:
+        return f"angle {args[0]}{args[1]}/{args[2]}{args[3]} equals angle {args[4]}{args[5]}/{args[6]}{args[7]}"
+    if pred in {"simtri", "simtrir"} and len(args) >= 6:
+        return f"triangles {args[0]}{args[1]}{args[2]} and {args[3]}{args[4]}{args[5]} are similar"
     return clause
 
 
@@ -454,6 +598,68 @@ def build_hidden_aux_brief(aux_part):
     if not summaries:
         return inner
     return "; ".join(summaries)
+
+
+def build_multi_aux_instruction(aux_part):
+    new_points = extract_aux_new_points(aux_part)
+    if len(new_points) <= 1:
+        return ""
+
+    point_steps = []
+    inner = aux_part.replace("<aux>", "").replace("</aux>", "").strip()
+    clauses = [part.strip() for part in inner.split(";") if part.strip()]
+    for clause in clauses:
+        match = re.match(r"x00\s+([a-z]\w*)\s*:\s*(.*)", clause, re.IGNORECASE)
+        if not match:
+            continue
+        point_name = match.group(1).lower()
+        summary = summarize_aux_clause(match.group(2).strip()) or match.group(2).strip()
+        point_steps.append(f"{point_name}: {summary}")
+
+    steps_text = "; ".join(point_steps) if point_steps else ", ".join(new_points)
+    return (
+        "[Multi-Point Construction Requirement]\n"
+        "This target introduces multiple new points. Your construction field must use explicit stage markers such as "
+        "'first', 'then', and 'finally', or say that some points are introduced together before a later step.\n"
+        f"Target point-by-point outline: {steps_text}\n\n"
+    )
+
+
+def build_hidden_proof_milestones(sanitized_rest, aux_part, max_items=8):
+    proof_match = re.search(r"<proof>(.*?)</proof>", sanitized_rest or "", re.DOTALL | re.IGNORECASE)
+    if not proof_match:
+        return "No proof milestones available."
+
+    new_points = {point.lower() for point in extract_aux_new_points(aux_part)}
+    raw_clauses = [part.strip() for part in proof_match.group(1).split(";") if part.strip()]
+    highlighted = []
+    fallback = []
+
+    for clause in raw_clauses:
+        clause_lower = clause.lower()
+        summary = summarize_aux_clause(clause)
+        if not summary:
+            continue
+        fallback.append(summary)
+        if any(re.search(rf"\b{re.escape(point)}\b", clause_lower) for point in new_points):
+            highlighted.append(summary)
+
+    tail = fallback[-3:]
+    milestones = []
+    seen = set()
+    for summary in highlighted + tail:
+        if summary in seen:
+            continue
+        seen.add(summary)
+        milestones.append(summary)
+        if len(milestones) >= max_items:
+            break
+
+    if not milestones:
+        milestones = fallback[-max_items:]
+    if not milestones:
+        return "No proof milestones available."
+    return "; ".join(milestones)
 
 
 def format_tagged_point(point_name, point_coords):
@@ -474,6 +680,16 @@ def build_anchor_sentence(plan, point_coords):
     anchor_list = join_natural_list(tagged_points)
     relation = plan["anchor_relation"].strip().rstrip(".")
     return f"From the diagram, the key visible anchors are {anchor_list}; visually, {relation}."
+
+
+def build_overview_sentence(plan):
+    overview = plan["figure_overview"].strip().rstrip(".")
+    return f"{overview}."
+
+
+def build_coordinate_hint_sentence(plan):
+    hints = plan["coordinate_hints"].strip().rstrip(".")
+    return f"{hints}."
 
 
 def build_public_problem_text(record):
@@ -502,6 +718,11 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
     hidden_aux_brief = build_hidden_aux_brief(aux_part)
     new_points = extract_aux_new_points(aux_part)
     new_points_text = ", ".join(new_points) if new_points else "the hidden auxiliary point"
+    multi_aux_instruction = build_multi_aux_instruction(aux_part)
+    point_coords = get_point_coords(record)
+    coord_table = json.dumps(point_coords, ensure_ascii=False, sort_keys=True)
+    coordinate_hints = build_hidden_coordinate_hints(point_coords)
+    proof_milestones = build_hidden_proof_milestones(sanitized_rest, aux_part)
     return (
         "You are planning a geometry CoT training example.\n\n"
         "[What the future student model will see at training/eval time]\n"
@@ -519,23 +740,43 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "Do not mention the hidden reference, do not mention proof IDs, do not quote "
         "the proof engine, and do not say that some fact was provided to you.\n"
         f"{supervisor_payload}\n\n"
+        "[Hidden Visible-Point Coordinate Table]\n"
+        f"{coord_table}\n\n"
+        "[Hidden Coordinate Hints]\n"
+        "These hints are computed from the visible point coordinates only. Use them to "
+        "sanity-check visually plausible lines, equal lengths, midpoint structure, or "
+        "parallel/perpendicular cues, but do not cite the coordinate table explicitly in the final text.\n"
+        f"{coordinate_hints}\n\n"
         "[Hidden Target Summary]\n"
         f"New point name(s): {new_points_text}\n"
         f"Target auxiliary facts: {hidden_aux_brief}\n\n"
+        f"{multi_aux_instruction}"
+        "[Hidden Proof Milestones]\n"
+        "These are proof-side checkpoints showing how the true solution actually uses the aux. "
+        "Do not copy them or expose engine syntax; use them only to keep the proposed verification path realistic.\n"
+        f"{proof_milestones}\n\n"
         "[Task]\n"
         "Return exactly one JSON object with these keys:\n"
-        "1. anchor_points: a list of 2 or 3 original visible points that are the best anchors for describing the figure.\n"
+        "1. anchor_points: a list of 3 or 4 original visible points that are the best tagged anchors for orienting the figure.\n"
         "2. anchor_relation: one sentence describing the key visible relation or shape cue involving those anchors.\n"
-        "3. goal_bottleneck: one sentence describing the main obstacle to reaching the visible goal from the current figure.\n"
-        "4. helper_idea: one sentence describing what kind of helper is missing, without naming the new point yet.\n"
-        "5. construction: one or two sentences that finally introduce the new point and the intended construction in plain geometry language.\n\n"
+        "3. figure_overview: one or two sentences surveying the broader visible figure beyond the anchors, including other relevant points or sub-structures.\n"
+        "4. coordinate_hints: one or two sentences explaining which plausible geometric relations are visually reinforced by the overall placement and why they matter.\n"
+        "5. goal_bottleneck: one sentence describing the main obstacle to reaching the visible goal from the current figure.\n"
+        "6. helper_idea: one sentence describing what kind of helper is missing, without naming the new point yet.\n"
+        "7. construction: one or two sentences that finally introduce the new point or staged point sequence in plain geometry language.\n"
+        "8. verification_path: one or two sentences explaining how the proposed aux would unlock a concrete path toward the visible goal.\n\n"
         "Constraints:\n"
         "- Use only lowercase point names exactly as in the problem text.\n"
         "- Do not use <point> tags, <coord> tags, LaTeX, $...$ math formatting, backticks, <aux>, <proof>, IDs, or rule names.\n"
-        "- Do not restate every premise. Focus only on the visible configuration and the bottleneck toward the visible goal.\n"
+        "- Do not restate every premise. Focus on the visible configuration, the likely useful relations, and the bottleneck toward the visible goal.\n"
+        "- Survey the whole visible figure, not just the anchor points.\n"
+        "- Use the hidden coordinate table only as an internal consistency check for relations that also look plausible in the image.\n"
+        "- The coordinate_hints field must be written as ordinary visual geometry language. Do not say 'the coordinates show', 'the coordinates indicate', or anything similar.\n"
         "- Do not mention the new point name before the construction field.\n"
         "- Avoid vague filler such as 'this point is crucial' or 'this will help'.\n"
         "- The construction field must describe the same geometric facts as the hidden target summary in plain language; do not invent a different line, circle, or intersection.\n"
+        "- The verification_path must go beyond proposing the aux: say what intermediate relation, similarity, ratio, angle chase, cyclic step, midpoint step, or parallel/perpendicular consequence would be used next.\n"
+        "- If multiple new points appear in the hidden target summary, describe whether they are introduced together or in stages and what each stage unlocks.\n"
         "- The wording must sound supportable from the image and visible problem text alone.\n"
     )
 
@@ -547,6 +788,11 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest):
     hidden_aux_brief = build_hidden_aux_brief(aux_part)
     new_points = extract_aux_new_points(aux_part)
     new_points_text = ", ".join(new_points) if new_points else "the hidden auxiliary point"
+    multi_aux_instruction = build_multi_aux_instruction(aux_part)
+    point_coords = get_point_coords(record)
+    coord_table = json.dumps(point_coords, ensure_ascii=False, sort_keys=True)
+    coordinate_hints = build_hidden_coordinate_hints(point_coords)
+    proof_milestones = build_hidden_proof_milestones(sanitized_rest, aux_part)
     return (
         "You are polishing a geometry CoT example for SFT.\n\n"
         "[Visible Inputs]\n"
@@ -559,27 +805,38 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest):
         "mention that it exists, and do not let any hidden proof artifact appear in the "
         "final wording.\n"
         f"{supervisor_payload}\n\n"
+        "[Hidden Visible-Point Coordinate Table]\n"
+        f"{coord_table}\n\n"
+        "[Hidden Coordinate Hints]\n"
+        f"{coordinate_hints}\n\n"
         "[Hidden Target Summary]\n"
         f"New point name(s): {new_points_text}\n"
         f"Target auxiliary facts: {hidden_aux_brief}\n\n"
+        f"{multi_aux_instruction}"
+        "[Hidden Proof Milestones]\n"
+        "Use these only to keep the post-aux verification path faithful to the actual solvable route. "
+        "Do not quote them, and do not surface proof-engine artifacts.\n"
+        f"{proof_milestones}\n\n"
         "[Approved Plan]\n"
         f"{json.dumps(plan, ensure_ascii=False, indent=2)}\n\n"
         "[Write Requirements]\n"
-        "Write only the body text that comes after an anchor sentence supplied by the script.\n"
-        "Do NOT output <thinking>, <point>, or <coord> tags; the script will add the anchor sentence and the coordinate tags itself.\n"
+        "Write only the body text that comes after three script-supplied prefix sentences: an anchor sentence with coordinate tags, a full-figure overview sentence, and a coordinate-hints sentence.\n"
+        "Do NOT output <thinking>, <point>, or <coord> tags; the script will add the prefix sentences and the coordinate tags itself.\n"
         "The body must satisfy all of the following:\n"
         "1. It should sound supportable from the image and visible problem text alone.\n"
-        "2. It should be logically coherent and centered on discovering the auxiliary construction for the visible goal, not on re-listing premises.\n"
-        "3. Follow this order: bottleneck -> missing helper idea -> final introduction of the new point.\n"
-        "4. Most of the reasoning should happen before the new auxiliary point is named; only introduce that point in the final one or two sentences.\n"
+        "2. It should be logically coherent and centered on discovering the auxiliary construction and then checking that the construction can genuinely advance the visible goal.\n"
+        "3. Follow this order: bottleneck -> missing helper idea -> final introduction of the new point or staged points -> concrete post-aux verification path.\n"
+        "4. Most of the reasoning should happen before the new auxiliary point is named; only introduce that point in the later part of the body.\n"
         "5. Use the plan faithfully, but rewrite it into smooth prose instead of JSON fragments.\n"
-        "6. Replace vague statements like 'this point is crucial' with a concrete bottleneck or visual cue.\n"
+        "6. Replace vague statements like 'this point is crucial' with a concrete bottleneck, relation, or next-step verification claim.\n"
         "7. Use the original lowercase point names exactly as in the problem text; do not rewrite them as uppercase, LaTeX, $...$ math formatting, or backticks.\n"
-        "8. Keep the body concise and specific, roughly 90 to 170 words.\n"
-        "9. The final one or two sentences must stay faithful to the hidden target summary; do not invent a different construction than the approved plan.\n"
+        "8. Keep the body concise and specific, roughly 120 to 230 words.\n"
+        "9. The construction and post-aux verification must stay faithful to the hidden target summary; do not invent a different construction than the approved plan.\n"
         "10. It must not contain <aux>, <proof>, <numerical_check>, [012]-style IDs, AR/r63/a01-style rule tokens, or meta-talk.\n"
         "11. It must not say that some coordinate table, hidden answer, proof, or reference was provided.\n"
         "12. It must not assign coordinates to newly introduced auxiliary points.\n"
+        "13. Do not repeat the prefix sentences verbatim; continue from them.\n"
+        "14. Do not mention coordinates explicitly; describe those cues as visual placement, alignment, symmetry, equal-looking lengths, or perpendicular/parallel structure.\n"
         "Output only the plain-text body.\n"
     )
 
@@ -839,7 +1096,12 @@ def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_
     assembled_thinking = None
     if write_result["output"]:
         anchor_sentence = build_anchor_sentence(plan_result["parsed"], point_coords)
-        assembled_thinking = f"<thinking>{anchor_sentence} {write_result['output'].strip()}</thinking>"
+        overview_sentence = build_overview_sentence(plan_result["parsed"])
+        coordinate_hint_sentence = build_coordinate_hint_sentence(plan_result["parsed"])
+        assembled_thinking = (
+            f"<thinking>{anchor_sentence} {overview_sentence} "
+            f"{coordinate_hint_sentence} {write_result['output'].strip()}</thinking>"
+        )
         is_valid, message = validate_thinking_response(
             assembled_thinking,
             point_coords=point_coords,
