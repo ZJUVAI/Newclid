@@ -118,6 +118,7 @@ private:
         const std::vector<Stmt> &stmts,
         size_t idx,
         Mapping &current,
+        std::vector<bool> &used,
         std::vector<Mapping> &out) const;
 
     // 对一条 rule 的所有前提匹配，生成 Theorem 并插入 _theorems
@@ -135,7 +136,7 @@ private:
 
     bool verify_stmt(const Stmt &stmt, const Mapping &mapping) const;
 
-    void enumerate_brute_force(const std::vector<Stmt> &stmts, size_t stmt_idx, const std::vector<std::string> &new_vars, Mapping &current, std::vector<Mapping> &results) const;
+    void enumerate_brute_force(const std::vector<Stmt> &stmts, size_t stmt_idx, const std::vector<std::string> &new_vars, Mapping &current, std::vector<bool> &used, std::vector<Mapping> &results) const;
 
     void build_triangle_indices(size_t n);
 
