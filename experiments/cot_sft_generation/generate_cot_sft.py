@@ -328,6 +328,17 @@ def extract_point_mentions(text, visible_points):
     for point_name in visible_points:
         if re.search(rf"\b{re.escape(point_name.lower())}\b", lowered):
             mentioned.add(point_name.lower())
+
+    single_letter_points = {point.lower() for point in visible_points if len(point) == 1}
+    compound_matches = re.findall(
+        r"\b(?:segment|triangle|line|angle|side|midpoint(?:\s+of)?|points?)\s+([a-z]{2,6})\b",
+        lowered,
+    )
+    for token in compound_matches:
+        if not single_letter_points:
+            break
+        if all(char in single_letter_points for char in token):
+            mentioned.update(token)
     return mentioned
 
 
