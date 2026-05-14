@@ -92,6 +92,10 @@ pipeline = ProblemPipeline(
     n_threads=8,
     n_samples=1000,
     output_dir="./datasets",
+    direct_png=True,
+    img_pixels=512,
+    using_log=True,
+    using_exp=False,
 )
 pipeline.generate()
 ```
@@ -116,9 +120,22 @@ python -m newclid.generation.pipeline \
   --no-add_auxiliary \
   --n_samples 1000
 
+# Override CSolver equation settings
+python -m newclid.generation.pipeline \
+  --no-using_log \
+  --using_exp \
+  --n_samples 1000
+
 # Generate with images
 python -m newclid.generation.pipeline \
   --img 3 \
+  --img_pixels 512 \
+  --n_samples 100
+
+# Fall back to the legacy svg -> png path
+python -m newclid.generation.pipeline \
+  --img 3 \
+  --no-direct_png \
   --n_samples 100
 ```
 
@@ -134,6 +151,8 @@ python -m newclid.generation.pipeline \
 - `--n_threads`: Parallel workers (default: 10)
 - `--timeout`: Task timeout in seconds (default: 3600)
 - `--max_level`: DDAR search depth (default: 500)
+- `--using_log` / `--no-using_log`: Toggle CSolver log equations (default: enabled)
+- `--using_exp` / `--no-using_exp`: Toggle CSolver exponential equations (default: disabled)
 - `--construction_config`: External JSON config path
 
 **Auxiliary Points:**
@@ -143,9 +162,28 @@ python -m newclid.generation.pipeline \
 
 **Output:**
 - `--img`: Image mode (0=none, 1=annotated, 2=plain, 3=both)
+- `--direct_png` / `--no-direct_png`: Toggle direct PNG rendering vs legacy svg -> png (default: direct PNG)
+- `--img_pixels`: Output image width in pixels (default: 512)
 - `--prune` / `--no-prune`: Enable/disable clause pruning (default: enabled)
 - `--remove_coords`: Remove coordinates from output
 - `--clear`: Clear old dataset files
+
+When `--img != 0`, each generated sample also includes:
+
+```json
+"point_coords_grid": {
+  "a": [83, 190],
+  "b": [201, 144],
+  "c": [127, 51]
+}
+```
+
+Dataset-wide conventions for `point_coords_grid`:
+- fixed `256x256` grid
+- top-left origin
+- `x` grows rightward
+- `y` grows downward
+- point names match the renamed/displayed point names in the sample
 
 ## External Construction Config
 

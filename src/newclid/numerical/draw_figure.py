@@ -21,37 +21,58 @@ if TYPE_CHECKING:
     from newclid.proof import ProofState
     from newclid.statement import Statement
 
-PALETTE = [
-    "#e6194b",
-    "#3cb44b",
-    "#ffe119",
-    "#4363d8",
-    "#f58231",
-    "#911eb4",
-    "#46f0f0",
-    "#f032e6",
-    "#bcf60c",
-    "#fabebe",
-    "#008080",
-    "#e6beff",
-    "#9a6324",
-    "#fffac8",
-    "#800000",
-    "#aaffc3",
-    "#808000",
-    "#ffd8b1",
-    "#0000cd",
-    "#808080",
-    "#ffffff",
-]
+LIGHT_THEME = {
+    "background": "#ffffff",
+    "circle": "#ff0000",
+    "line": "#000000",
+    "point": "#000000",
+    "point_name": "#ff00ff",
+    "perpendicular": "#0000ff",
+    "angle_default": "#ffffff",
+    "palette": [
+        "#19e6b4",
+        "#c34bb4",
+        "#001ee6",
+        "#bc9c27",
+        "#0a7dce",
+        "#6ee14b",
+        "#b90f0f",
+        "#0fcd19",
+        "#4309f3",
+        "#054141",
+        "#ff7f7f",
+        "#194100",
+        "#659cdb",
+        "#000537",
+        "#7fffff",
+        "#55003c",
+        "#7f7fff",
+        "#00274e",
+        "#ffff32",
+        "#7f7f7f",
+        "#000000",
+    ],
+}
+
+PALETTE = LIGHT_THEME["palette"]
 
 
-def init_figure() -> "Figure":
+def get_figure_theme(ax: "Axes") -> dict[str, Any]:
+    return getattr(ax, "_newclid_theme", LIGHT_THEME)
+
+
+def init_figure(theme: Optional[dict[str, Any]] = None) -> "Figure":
     imsize = 512 / 100
     fig = Figure(figsize=(imsize, imsize))
     ax = fig.add_subplot(111)  # type: ignore
+    figure_theme = theme or LIGHT_THEME
     fig.subplots_adjust(left=0, right=1, top=1, bottom=0, wspace=0, hspace=0)
-    ax.set_facecolor((0.0, 0.0, 0.0))
+    fig.patch.set_facecolor(figure_theme["background"])
+    ax._newclid_theme = figure_theme  # type: ignore[attr-defined]
+    ax.set_facecolor(figure_theme["background"])
+    ax.tick_params(colors=figure_theme["background"])
+    for spine in ax.spines.values():
+        spine.set_color(figure_theme["background"])
     ax.set_aspect("equal", adjustable="datalim")
     return fig
 
@@ -82,7 +103,12 @@ def draw_figure(
         _draw(ax, points, proof.dep_graph.checked(), rng, draw_annotations)
 
     if save_to is not None:
-        fig.savefig(save_to, format=format)  # type: ignore
+        fig.savefig(
+            save_to,
+            format=format,
+            facecolor=fig.get_facecolor(),
+            edgecolor="none",
+        )  # type: ignore
 
 
 def _draw(
@@ -154,7 +180,7 @@ def draw_circle(ax: "Axes", c: Circle, **args: Any) -> None:
     fill_missing(
         args,
         {
-            "color": "cyan",
+            "color": get_figure_theme(ax)["circle"],
             "fill": False,
             "lw": 0.8,
         },
@@ -170,7 +196,7 @@ def draw_circle_num(ax: "Axes", c: CircleNum, **args: Any) -> None:
     fill_missing(
         args,
         {
-            "color": "cyan",
+            "color": get_figure_theme(ax)["circle"],
             "fill": False,
             "lw": 0.8,
         },
@@ -184,7 +210,10 @@ def draw_circle_num(ax: "Axes", c: CircleNum, **args: Any) -> None:
 
 def draw_line(ax: "Axes", line: Line, **args: Any):
     """Draw a line. Return the two extremities"""
-    fill_missing(args, {"color": "white", "lw": 0.4, "alpha": 0.9})
+    fill_missing(
+        args,
+        {"color": get_figure_theme(ax)["line"], "lw": 0.4, "alpha": 0.9},
+    )
 
     points: list[PointNum] = [p.num for p in line.points]
     p0, p1 = points[:2]
@@ -192,12 +221,18 @@ def draw_line(ax: "Axes", line: Line, **args: Any):
 
 
 def draw_segment(ax: "Axes", p0: Point, p1: Point, **args: Any):
-    fill_missing(args, {"color": "white", "lw": 0.4, "alpha": 0.9})
+    fill_missing(
+        args,
+        {"color": get_figure_theme(ax)["line"], "lw": 0.4, "alpha": 0.9},
+    )
     ax.plot((p0.num.x, p1.num.x), (p0.num.y, p1.num.y), **args)  # type: ignore
 
 
 def draw_segment_num(ax: "Axes", p0: PointNum, p1: PointNum, **args: Any):
-    fill_missing(args, {"color": "white", "lw": 0.4, "alpha": 0.9})
+    fill_missing(
+        args,
+        {"color": get_figure_theme(ax)["line"], "lw": 0.4, "alpha": 0.9},
+    )
     ax.plot((p0.x, p1.x), (p0.y, p1.y), **args)  # type: ignore
 
 
@@ -207,9 +242,10 @@ def draw_angle(
     point1: Point,
     point2: Point,
     rng: Generator,
-    color: str = "black",
+    color: Optional[str] = None,
     alpha: float = 0.5,
 ):
+    color = color or get_figure_theme(ax)["angle_default"]
     # 1. Dynamic sizing based on figure bounds
     xlim = ax.get_xlim()
     ylim = ax.get_ylim()
@@ -278,9 +314,10 @@ def draw_point(
     """draw a point."""
     args_point = args_point or {}
     args_name = args_name or {}
-    fill_missing(args_point, {"color": "white", "s": 5.0})
+    theme = get_figure_theme(ax)
+    fill_missing(args_point, {"color": theme["point"], "s": 5.0})
     ax.scatter(p.num.x, p.num.y, **args_point)  # type: ignore
-    fill_missing(args_name, {"color": "lime", "fontsize": 10})
+    fill_missing(args_name, {"color": theme["point_name"], "fontsize": 10})
     return ax.annotate(  # type: ignore
         p.pretty_name, (p.num.x, p.num.y), **args_name
     )

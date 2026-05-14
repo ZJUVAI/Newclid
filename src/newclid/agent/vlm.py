@@ -43,7 +43,7 @@ class VLMAgent(BaseAgent):
         prepare_request_workers: int = 1,
         prepare_prefetch_limit: int = 1,
         search_version: str = "v1",
-        render_root: str | Path = "temp/single_problem_multi_gpu_eval_images",
+        render_root: str | Path = "temp/eval_rendered_images",
         render_width: int = 1024,
         trace_writer=None,
     ):
