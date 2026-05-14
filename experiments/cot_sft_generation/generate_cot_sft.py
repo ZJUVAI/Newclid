@@ -36,6 +36,9 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 DEFAULT_INPUT_JSONL = REPO_ROOT / "datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl"
 DEFAULT_MODEL_NAME = "qwen/qwen3.5-plus-02-15"
+DEFAULT_API_TIMEOUT_SECONDS = float(os.getenv("ZJUVAI_TIMEOUT_SECONDS", "180"))
+DEFAULT_API_CALL_RETRIES = int(os.getenv("ZJUVAI_API_RETRIES", "3"))
+DEFAULT_API_RETRY_BACKOFF_SECONDS = float(os.getenv("ZJUVAI_API_RETRY_BACKOFF_SECONDS", "3"))
 FORBIDDEN_THINKING_PATTERNS = [
     re.compile(r"<\s*/?\s*(aux|proof|numerical_check)\s*>", re.IGNORECASE),
     re.compile(r"\[\d{3}\]"),
@@ -111,6 +114,7 @@ def get_client():
     client = OpenAI(
         api_key=os.getenv("ZJUVAI_API_KEY"),
         base_url=os.getenv("ZJUVAI_BASE_URL", "https://api.zjuqx.cn/v1"),
+        timeout=DEFAULT_API_TIMEOUT_SECONDS,
     )
     return client
 
@@ -151,6 +155,9 @@ def build_run_manifest(args_dict, output_jsonl, run_dir, model_name):
         "cwd": os.getcwd(),
         "model_name": model_name,
         "api_base_url": os.getenv("ZJUVAI_BASE_URL", "https://api.zjuqx.cn/v1"),
+        "api_timeout_seconds": DEFAULT_API_TIMEOUT_SECONDS,
+        "api_call_retries": DEFAULT_API_CALL_RETRIES,
+        "api_retry_backoff_seconds": DEFAULT_API_RETRY_BACKOFF_SECONDS,
         "default_input_jsonl": str(DEFAULT_INPUT_JSONL),
         "output_jsonl": os.path.abspath(output_jsonl),
         "run_dir": os.path.abspath(run_dir),
@@ -577,14 +584,52 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest):
     )
 
 
+def is_transient_api_error(exc):
+    message = str(exc).lower()
+    transient_markers = [
+        "connection error",
+        "timed out",
+        "timeout",
+        "temporarily unavailable",
+        "rate limit",
+        "too many requests",
+        "server disconnected",
+        "service unavailable",
+        "bad gateway",
+        "gateway timeout",
+        "internal server error",
+        "502",
+        "503",
+        "504",
+    ]
+    return any(marker in message for marker in transient_markers)
+
+
 def call_model(messages, model_name, temperature=0.2, max_tokens=2048):
-    response = get_client().chat.completions.create(
-        model=model_name,
-        messages=messages,
-        max_tokens=max_tokens,
-        temperature=temperature,
-    )
-    return response.choices[0].message.content
+    last_exc = None
+    for attempt in range(1, DEFAULT_API_CALL_RETRIES + 1):
+        try:
+            response = get_client().chat.completions.create(
+                model=model_name,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            return response.choices[0].message.content
+        except Exception as exc:
+            last_exc = exc
+            if attempt >= DEFAULT_API_CALL_RETRIES or not is_transient_api_error(exc):
+                raise
+            sleep_seconds = DEFAULT_API_RETRY_BACKOFF_SECONDS * attempt + random.uniform(0.0, 1.0)
+            logger.warning(
+                "Transient API failure on call attempt %s/%s: %s. Retrying in %.1fs",
+                attempt,
+                DEFAULT_API_CALL_RETRIES,
+                exc,
+                sleep_seconds,
+            )
+            time.sleep(sleep_seconds)
+    raise last_exc
 
 
 def run_stage(stage_name, messages, model_name, point_coords, max_retries, require_coord_tags):

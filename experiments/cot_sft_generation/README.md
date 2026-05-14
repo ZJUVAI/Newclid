@@ -169,6 +169,16 @@ export ZJUVAI_API_KEY="sk-xxxxxx"
 export ZJUVAI_BASE_URL="https://api.zjuqx.cn/v1"
 ```
 
+如果网关偶尔抖动，还可以额外设置：
+
+```bash
+export ZJUVAI_TIMEOUT_SECONDS="180"
+export ZJUVAI_API_RETRIES="3"
+export ZJUVAI_API_RETRY_BACKOFF_SECONDS="3"
+```
+
+这里的 `ZJUVAI_API_RETRIES` 是单次 API 调用内部对瞬时 `Connection error` / `timeout` / `502/503/504` 的补偿重试，不会替代脚本本身的 stage 级内容校验重试。
+
 ## 辅助脚本
 
 目录中的 `prepare_metadata.py` 仍然保留，用于从其他源数据准备本地抽样 metadata；它不是当前主生成流程的必要步骤。
