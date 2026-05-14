@@ -131,6 +131,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
      - `figure_overview` 句
      - `coordinate_hints` 句
      - `visible_relations` 句
+   - writer prompt 会显式给出这段将被注入的 prefix block，writer 应直接从 bottleneck / obstacle 起笔，而不是重复前缀里已经出现的图形概览或已知关系
    - writer 只负责后续正文，即：
      - 解释瓶颈
      - 引出 aux

@@ -1220,7 +1220,7 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
     return True, "Valid planner JSON", cleaned_plan
 
 
-def validate_writer_body(output_text: str):
+def validate_writer_body(output_text: str, visible_goal="", injected_prefix=""):
     if not output_text or not output_text.strip():
         return False, "Writer body is empty"
     body = output_text.strip()
@@ -1236,6 +1236,18 @@ def validate_writer_body(output_text: str):
         return False, f"Writer body too long ({len(body)} chars, maximum 1500)"
     if re.search(r"\b(I|We|I'm|We'll|I've|we've)\b", body):
         return False, "Writer body must stay impersonal and should not use first-person narration"
+    first_sentence_match = re.match(r"\s*(.+?[.!?])(?:\s|$)", body, re.DOTALL)
+    first_sentence = first_sentence_match.group(1).strip() if first_sentence_match else body
+    goal_points = parse_goal_expression(visible_goal).get("points", [])
+    goal_keywords = goal_keyword_hints(visible_goal)
+    if visible_goal:
+        first_sentence_lower = first_sentence.lower()
+        mentions_goal_point = sum(1 for point in goal_points if point in first_sentence_lower)
+        mentions_goal_keyword = any(keyword in first_sentence_lower for keyword in goal_keywords)
+        if mentions_goal_point < 1 and not mentions_goal_keyword:
+            return False, "Writer body must start from the bottleneck or goal-side obstacle, not by re-describing the injected prefix"
+    if injected_prefix and has_long_ngram_overlap(injected_prefix, body, ngram_size=7):
+        return False, "Writer body overlaps too much with the injected prefix block; continue from it instead of repeating it"
     for pattern in FORBIDDEN_THINKING_PATTERNS:
         hit = pattern.search(body)
         if hit:
@@ -1380,6 +1392,44 @@ def build_visible_relation_sentence(plan):
     return f"The visible givens also show that {relation_text}."
 
 
+def build_prefix_sentences(plan, point_coords):
+    sentences = [
+        build_anchor_sentence(plan, point_coords),
+        build_overview_sentence(plan),
+        build_coordinate_hint_sentence(plan),
+    ]
+    visible_relation_sentence = build_visible_relation_sentence(plan)
+    if visible_relation_sentence:
+        sentences.append(visible_relation_sentence)
+    return sentences
+
+
+def build_injected_prefix_block(plan, point_coords):
+    return " ".join(build_prefix_sentences(plan, point_coords))
+
+
+def _normalize_overlap_words(text):
+    lowered = re.sub(r"<[^>]+>", " ", text or "")
+    lowered = re.sub(r"[^a-z0-9/ ]+", " ", lowered.lower())
+    return [token for token in lowered.split() if token]
+
+
+def has_long_ngram_overlap(source_text, target_text, ngram_size=7):
+    source_words = _normalize_overlap_words(source_text)
+    target_words = _normalize_overlap_words(target_text)
+    if len(source_words) < ngram_size or len(target_words) < ngram_size:
+        return False
+    source_ngrams = {
+        tuple(source_words[idx:idx + ngram_size])
+        for idx in range(len(source_words) - ngram_size + 1)
+    }
+    target_ngrams = {
+        tuple(target_words[idx:idx + ngram_size])
+        for idx in range(len(target_words) - ngram_size + 1)
+    }
+    return bool(source_ngrams & target_ngrams)
+
+
 def build_public_problem_text(record):
     nl_problem = (record.get("nl_problem") or "").strip()
     formal_problem = (record.get("llm_input_renamed") or "").strip()
@@ -1496,7 +1546,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
     )
 
 
-def build_write_prompt(record, plan, aux_part, sanitized_rest):
+def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_block):
     public_problem = build_public_problem_text(record)
     supervisor_payload = build_supervisor_payload(record, aux_part, sanitized_rest)
     visible_goal = extract_problem_goal(record)
@@ -1553,6 +1603,9 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest):
         f"Direct aux consequences to realize in order: {json.dumps(plan.get('aux_direct_relations', []), ensure_ascii=False)}\n"
         f"Bridge relations to realize in order: {json.dumps(plan.get('bridge_relations', []), ensure_ascii=False)}\n"
         f"Goal-side finish to reach: {plan.get('goal_finish', '')}\n\n"
+        "[Injected Prefix Block]\n"
+        "The script will prepend the following block exactly before your body. Do not restate these claims; start after them.\n"
+        f"{injected_prefix_block}\n\n"
         "[Write Requirements]\n"
         "Write only the body text that comes after the script-supplied prefix block: an anchor sentence with coordinate tags, a full-figure overview sentence, a coordinate-focused prefix built from the approved relation checks, and a visible-relations sentence injected from the approved plan.\n"
         "Do NOT output <thinking>, <point>, or <coord> tags; the script will add the prefix sentences and the coordinate tags itself.\n"
@@ -1575,6 +1628,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest):
         "16. Do not introduce extra named centers, rotational symmetries, square/parallelogram claims, or triangle-similarity claims unless the approved plan already states them and the immediate aux step really supports them.\n"
         "17. Reuse the approved visible_relations when connecting the new point back to the old figure, rather than inventing fresh structural claims.\n"
         "18. Stay impersonal. Do not write in the first person.\n"
+        "19. The very first sentence of your body should state the bottleneck or goal-side obstacle. Do not spend the first sentence re-describing triangle abc, the midpoint layout, or the visible givens already covered by the injected prefix block.\n"
         "Output only the plain-text body.\n"
     )
 
@@ -1735,7 +1789,7 @@ def run_plan_stage(stage_name, messages, model_name, point_coords, visible_goal,
     }
 
 
-def run_writer_stage(stage_name, messages, model_name, max_retries):
+def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_prefix, max_retries):
     last_error = None
     last_output = None
 
@@ -1746,7 +1800,11 @@ def run_writer_stage(stage_name, messages, model_name, max_retries):
             output = call_model(messages, model_name)
             elapsed = time.time() - start
             last_output = output
-            ok, message = validate_writer_body(output)
+            ok, message = validate_writer_body(
+                output,
+                visible_goal=visible_goal,
+                injected_prefix=injected_prefix,
+            )
             if ok:
                 logger.info(f"[{stage_name}] Valid output in {elapsed:.2f}s")
                 return {
@@ -1825,7 +1883,9 @@ def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_
         plan_result["parsed"],
         aux_part=aux_part,
         sanitized_rest=sanitized_rest,
+        injected_prefix_block=build_injected_prefix_block(plan_result["parsed"], point_coords),
     )
+    injected_prefix = build_injected_prefix_block(plan_result["parsed"], point_coords)
     write_messages = [
         {
             "role": "user",
@@ -1839,19 +1899,14 @@ def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_
         "write",
         write_messages,
         model_name=model_name,
+        visible_goal=visible_goal,
+        injected_prefix=injected_prefix,
         max_retries=max_retries,
     )
 
     assembled_thinking = None
     if write_result["output"]:
-        anchor_sentence = build_anchor_sentence(plan_result["parsed"], point_coords)
-        overview_sentence = build_overview_sentence(plan_result["parsed"])
-        coordinate_hint_sentence = build_coordinate_hint_sentence(plan_result["parsed"])
-        visible_relation_sentence = build_visible_relation_sentence(plan_result["parsed"])
-        assembled_thinking = (
-            f"<thinking>{anchor_sentence} {overview_sentence} "
-            f"{coordinate_hint_sentence} {visible_relation_sentence} {write_result['output'].strip()}</thinking>"
-        )
+        assembled_thinking = f"<thinking>{injected_prefix} {write_result['output'].strip()}</thinking>"
         is_valid, message = validate_thinking_response(
             assembled_thinking,
             point_coords=point_coords,
