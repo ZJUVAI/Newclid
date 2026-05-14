@@ -77,6 +77,20 @@ POINT_TAG_RE = re.compile(
 RAW_POINT_TAG_RE = re.compile(r"<point>\s*([a-z]\w*)\s*</point>", re.IGNORECASE)
 AUX_NEW_POINT_RE = re.compile(r"\bx00\s+([a-z]\w*)\b", re.IGNORECASE)
 PROBLEM_BODY_RE = re.compile(r"<problem>\s*(.*?)\s*</problem>", re.DOTALL | re.IGNORECASE)
+FORMAL_RELATION_STARTERS = {
+    "cong",
+    "perp",
+    "para",
+    "coll",
+    "cyclic",
+    "midp",
+    "eqratio",
+    "eqangle",
+    "simtri",
+    "simtrir",
+    "contri",
+    "contrir",
+}
 
 
 def configure_logging(log_path=None):
@@ -398,6 +412,187 @@ def goal_keyword_hints(visible_goal):
     return mapping.get(predicate, ["angle", "ratio", "equal"])
 
 
+def parse_aux_clauses(aux_part):
+    inner = aux_part.replace("<aux>", "").replace("</aux>", "").strip()
+    clauses = []
+    for raw_clause in [part.strip() for part in inner.split(";") if part.strip()]:
+        point_match = re.match(r"x00\s+([a-z]\w*)\s*:\s*(.*)", raw_clause, re.IGNORECASE)
+        if point_match:
+            clauses.append(
+                {
+                    "new_point": point_match.group(1).lower(),
+                    "body": point_match.group(2).strip(),
+                }
+            )
+        else:
+            clauses.append({"new_point": None, "body": raw_clause})
+    return clauses
+
+
+def split_formal_relation_chain(text):
+    cleaned = re.sub(r"\[\d+\]", "|", text or "")
+    raw_parts = [part.strip(" ;") for part in cleaned.split("|") if part.strip(" ;")]
+    facts = []
+    for part in raw_parts:
+        starter = part.split()[0].lower() if part.split() else ""
+        if starter in FORMAL_RELATION_STARTERS:
+            facts.append(part)
+        elif facts:
+            facts[-1] = f"{facts[-1]} {part}".strip()
+    return facts or ([text.strip()] if text and text.strip() else [])
+
+
+def extract_aux_point_scope(aux_part):
+    scope = set()
+    for clause in parse_aux_clauses(aux_part):
+        for fact in split_formal_relation_chain(clause["body"]):
+            tokens = fact.split()
+            for token in tokens[1:]:
+                token = token.strip().lower()
+                if re.fullmatch(r"[a-z]\w*", token):
+                    scope.add(token)
+        if clause["new_point"]:
+            scope.add(clause["new_point"])
+    return scope
+
+
+def infer_relation_type_from_text(text):
+    lowered = (text or "").lower()
+    if "midpoint" in lowered:
+        return "midpoint"
+    if "concyclic" in lowered or "circumcircle" in lowered or "cyclic" in lowered or "circle" in lowered:
+        return "cyclic"
+    if "collinear" in lowered or " on line " in f" {lowered} " or "line through" in lowered:
+        return "collinear"
+    if "right angle" in lowered or "right-angled" in lowered:
+        return "right_triangle"
+    if "perpendicular" in lowered:
+        return "perpendicular"
+    if "parallel" in lowered:
+        return "parallel"
+    if "equilateral" in lowered:
+        return "equilateral"
+    if "isosceles" in lowered:
+        return "isosceles"
+    if "equal in length" in lowered or "same length" in lowered or "equidistant" in lowered:
+        return "equal_length"
+    if "congruent" in lowered or re.search(r"\b[a-z]{2}\s*=\s*[a-z]{2}\b", lowered):
+        return "equal_length"
+    return ""
+
+
+def build_aux_direct_consequences(aux_part):
+    consequences = []
+    for clause in parse_aux_clauses(aux_part):
+        for fact in split_formal_relation_chain(clause["body"]):
+            summary = summarize_aux_clause(fact)
+            if summary:
+                consequences.append(summary)
+    return consequences
+
+
+def coordinate_relation_matches_candidate(relation_text, candidate):
+    relation_type = infer_relation_type_from_text(relation_text)
+    if not relation_type:
+        return False
+
+    candidate_type = candidate.get("relation_type", "")
+    if relation_type == "right_triangle" and candidate_type == "perpendicular":
+        return False
+    if relation_type != candidate_type:
+        return False
+
+    candidate_points = {str(point).lower() for point in candidate.get("points", [])}
+    relation_points = extract_point_mentions(relation_text, sorted(candidate_points))
+    return candidate_points.issubset(relation_points)
+
+
+def validate_aux_step_scope(step_text, aux_part, visible_points):
+    step_points = extract_point_mentions(step_text, visible_points)
+    if not step_points:
+        return False, "verification_chain[0] must mention the auxiliary-point relation explicitly"
+    allowed_points = {point.lower() for point in extract_aux_point_scope(aux_part)}
+    extra_points = step_points - allowed_points
+    if extra_points:
+        return False, (
+            "verification_chain[0] should stay on the direct aux consequence and must not "
+            f"introduce extra old-figure points yet: {sorted(extra_points)}"
+        )
+    return True, None
+
+
+def audit_source_record(record, image_path: Path, aux_part, sanitized_rest):
+    issues = []
+    point_coords = get_point_coords(record)
+    visible_goal = extract_problem_goal(record)
+    goal_spec = parse_goal_expression(visible_goal)
+    goal_points = set(goal_spec["points"])
+    visible_points = set(extract_visible_point_names(point_coords))
+    aux_scope = extract_aux_point_scope(aux_part)
+    aux_direct = build_aux_direct_consequences(aux_part)
+    proof_guidance = build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal)
+
+    if not image_path.exists():
+        issues.append("missing_image")
+    if not point_coords:
+        issues.append("missing_point_coords")
+    if not visible_goal:
+        issues.append("missing_visible_goal")
+    if goal_points and not goal_points.issubset(visible_points | aux_scope):
+        issues.append("goal_references_unknown_points")
+    if not aux_direct:
+        issues.append("aux_has_no_parseable_direct_consequences")
+    if not proof_guidance["goal_finish_relations"]:
+        issues.append("proof_guidance_missing_goal_finish_relations")
+
+    return {
+        "issues": issues,
+        "has_issue": bool(issues),
+    }
+
+
+def audit_generation_quality(record, generation, aux_part):
+    issues = []
+    point_coords = get_point_coords(record)
+    visible_points = extract_visible_point_names(point_coords)
+    coordinate_candidates = build_hidden_coordinate_candidates(point_coords, max_items=8)
+    plan = generation.get("plan_parsed") or {}
+    suspicious_markers = [
+        "rotational symmetry",
+        "common center",
+        "circumcenter",
+        "square-like",
+        "parallelogram",
+        "crucial center",
+    ]
+
+    if plan:
+        unmatched_relations = [
+            relation
+            for relation in plan.get("coordinate_relations", [])
+            if not any(coordinate_relation_matches_candidate(relation, candidate) for candidate in coordinate_candidates)
+        ]
+        if unmatched_relations:
+            issues.append(
+                "coordinate_relations_unmatched:" + " | ".join(unmatched_relations)
+            )
+        ok, message = validate_aux_step_scope(plan.get("verification_chain", [""])[0], aux_part, visible_points)
+        if not ok:
+            issues.append(message)
+
+    text_to_scan = " ".join(
+        part for part in [generation.get("write_output"), generation.get("thinking")] if part
+    ).lower()
+    for marker in suspicious_markers:
+        if marker in text_to_scan:
+            issues.append(f"suspicious_phrase:{marker}")
+
+    return {
+        "issues": issues,
+        "has_issue": bool(issues),
+    }
+
+
 def _candidate_sort_key(candidate):
     relation_priority = {
         "midpoint": 0,
@@ -655,9 +850,10 @@ def validate_relation_list(items, field_name, visible_points, min_len=2, max_len
 
 def build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal, max_aux=6, max_bridge=4, max_finish=4):
     proof_match = re.search(r"<proof>(.*?)</proof>", sanitized_rest or "", re.DOTALL | re.IGNORECASE)
+    aux_direct = build_aux_direct_consequences(aux_part)
     if not proof_match:
         return {
-            "immediate_aux_consequences": [],
+            "immediate_aux_consequences": aux_direct[:max_aux],
             "bridge_relations": [],
             "goal_finish_relations": [],
         }
@@ -687,9 +883,16 @@ def build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal, max_aux=
     finish = []
     seen = set()
 
+    for text in aux_direct:
+        if text not in seen:
+            seen.add(text)
+            immediate.append(text)
+            if len(immediate) >= max_aux:
+                break
+
     for item in summaries:
         text = item["summary"]
-        if item["has_new_point"] and text not in seen:
+        if item["has_new_point"] and not item["has_goal_point"] and text not in seen:
             seen.add(text)
             immediate.append(text)
             if len(immediate) >= max_aux:
@@ -711,11 +914,24 @@ def build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal, max_aux=
                 if len(bridge) >= max_bridge:
                     break
 
-    for item in summaries[-max_finish:]:
+    for item in reversed(summaries):
         text = item["summary"]
         if text in finish:
             continue
-        finish.append(text)
+        if goal_spec["predicate"] and goal_spec["predicate"] in text.lower():
+            finish.append(text)
+            if len(finish) >= max_finish:
+                break
+    if len(finish) < max_finish:
+        for item in reversed(summaries):
+            text = item["summary"]
+            if text in finish:
+                continue
+            if item["has_goal_point"]:
+                finish.append(text)
+                if len(finish) >= max_finish:
+                    break
+    finish.reverse()
 
     return {
         "immediate_aux_consequences": immediate,
@@ -724,7 +940,7 @@ def build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal, max_aux=
     }
 
 
-def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_part=None):
+def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_part=None, coordinate_candidates=None):
     plan = extract_json_object(output_text)
     if not isinstance(plan, dict):
         return False, "Planner must return a single JSON object", None
@@ -808,6 +1024,18 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
     if not any(point in cleaned_plan["coordinate_hints"].lower() for point in relation_mentions):
         return False, "coordinate_hints must summarize at least one concrete point-based relation from coordinate_relations", None
 
+    if coordinate_candidates:
+        unmatched_relations = [
+            relation
+            for relation in cleaned_plan["coordinate_relations"]
+            if not any(coordinate_relation_matches_candidate(relation, candidate) for candidate in coordinate_candidates)
+        ]
+        if unmatched_relations:
+            return False, (
+                "coordinate_relations must stay grounded in the hidden coordinate candidates; "
+                f"unmatched items: {unmatched_relations}"
+            ), None
+
     if aux_part:
         construction_text = f"{cleaned_plan['helper_idea']} {cleaned_plan['construction']}".lower()
         for label, keywords in build_aux_keyword_expectations(aux_part):
@@ -824,6 +1052,9 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
                 return False, "multi-point auxiliary plans must describe a staged or combined construction strategy", None
         if new_points and not any(point in cleaned_chain[0].lower() for point in new_points):
             return False, "verification_chain[0] must state the immediate relation unlocked by the new point", None
+        ok, message = validate_aux_step_scope(cleaned_chain[0], aux_part, visible_points)
+        if not ok:
+            return False, message, None
         if new_points and not any(point in cleaned_chain[1].lower() for point in new_points):
             return False, "verification_chain[1] must still reference the auxiliary point while bridging to the old figure", None
     goal_spec = parse_goal_expression(visible_goal)
@@ -1088,8 +1319,10 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- The coordinate_hints field must be written as ordinary visual geometry language. Do not say 'the coordinates show', 'the coordinates indicate', or anything similar.\n"
         "- Do not mention the new point name before the construction field.\n"
         "- Avoid vague filler such as 'this point is crucial' or 'this will help'.\n"
+        "- Do not invent named centers, rotation claims, square/parallelogram claims, or similarity claims unless they are already supported by the approved coordinate checks or by the explicit verification chain.\n"
         "- The construction field must describe the same geometric facts as the hidden target summary in plain language; do not invent a different line, circle, or intersection.\n"
         "- The verification_chain must be explicit: the first step should state what the aux immediately gives, the second should say how that new relation interacts with the old figure, and the third should state the goal-side angle/ratio/congruence relation you expect to reach.\n"
+        "- The first verification step must stay local to the auxiliary construction itself. Do not pull unrelated old-figure points into that first step.\n"
         "- If multiple new points appear in the hidden target summary, describe whether they are introduced together or in stages and what each stage unlocks.\n"
         "- The wording must sound supportable from the image and visible problem text alone.\n"
     )
@@ -1159,6 +1392,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest):
         "13. Do not repeat the prefix sentences verbatim; continue from them.\n"
         "14. Do not mention coordinates explicitly; describe those cues as visual placement, alignment, symmetry, equal-looking lengths, or perpendicular/parallel structure.\n"
         "15. Keep the post-aux reasoning faithful to the approved verification_chain; do not replace it with a different invented route.\n"
+        "16. Do not introduce extra named centers, rotational symmetries, square/parallelogram claims, or triangle-similarity claims unless the approved plan already states them and the immediate aux step really supports them.\n"
         "Output only the plain-text body.\n"
     )
 
@@ -1263,7 +1497,7 @@ def run_stage(stage_name, messages, model_name, point_coords, max_retries, requi
     }
 
 
-def run_plan_stage(stage_name, messages, model_name, point_coords, visible_goal, aux_part, max_retries):
+def run_plan_stage(stage_name, messages, model_name, point_coords, visible_goal, aux_part, coordinate_candidates, max_retries):
     last_error = None
     last_output = None
 
@@ -1279,6 +1513,7 @@ def run_plan_stage(stage_name, messages, model_name, point_coords, visible_goal,
                 point_coords,
                 visible_goal=visible_goal,
                 aux_part=aux_part,
+                coordinate_candidates=coordinate_candidates,
             )
             if ok:
                 logger.info(f"[{stage_name}] Valid output in {elapsed:.2f}s")
@@ -1369,6 +1604,7 @@ def run_writer_stage(stage_name, messages, model_name, max_retries):
 def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_name, max_retries, verbose):
     point_coords = get_point_coords(record)
     visible_goal = extract_problem_goal(record)
+    coordinate_candidates = build_hidden_coordinate_candidates(point_coords, max_items=8)
     plan_prompt = build_plan_prompt(record, aux_part, sanitized_rest)
     plan_messages = [
         {
@@ -1386,6 +1622,7 @@ def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_
         point_coords=point_coords,
         visible_goal=visible_goal,
         aux_part=aux_part,
+        coordinate_candidates=coordinate_candidates,
         max_retries=max_retries,
     )
     if not plan_result["success"]:
@@ -1395,6 +1632,7 @@ def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_
             "plan_prompt": plan_prompt,
             "write_prompt": None,
             "plan_output": plan_result["output"] if verbose else None,
+            "plan_parsed": None,
             "attempts_used": plan_result["attempts_used"],
             "elapsed_seconds": plan_result["elapsed_seconds"],
             "error": plan_result["error"],
@@ -1443,6 +1681,7 @@ def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_
                 "plan_prompt": plan_prompt if verbose else None,
                 "write_prompt": write_prompt if verbose else None,
                 "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+                "plan_parsed": plan_result["parsed"],
                 "attempts_used": plan_result["attempts_used"] + write_result["attempts_used"],
                 "elapsed_seconds": (
                     (plan_result["elapsed_seconds"] or 0.0) +
@@ -1457,6 +1696,7 @@ def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_
         "plan_prompt": plan_prompt if verbose else None,
         "write_prompt": write_prompt if verbose else None,
         "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+        "plan_parsed": plan_result["parsed"],
         "elapsed_seconds": (
             (plan_result["elapsed_seconds"] or 0.0) +
             (write_result["elapsed_seconds"] or 0.0)
@@ -1538,6 +1778,12 @@ def process_and_generate_sft(
     def process_item(idx_record):
         sample_order, record = idx_record
         image_path = resolve_image_path(record.get("image_path", ""), input_path)
+        source_audit = audit_source_record(
+            record,
+            image_path=image_path,
+            aux_part=record["_aux_part"],
+            sanitized_rest=record["_sanitized_rest"],
+        )
         if not image_path.exists():
             return {
                 "result_data": None,
@@ -1545,6 +1791,7 @@ def process_and_generate_sft(
                     "sample_order": sample_order,
                     "input_index": record["_source_index"],
                     "image_path": str(image_path),
+                    "source_audit": source_audit,
                     "success": False,
                     "error": f"Image not found: {image_path}",
                 },
@@ -1564,6 +1811,7 @@ def process_and_generate_sft(
         thinking = generation["thinking"]
         output = None
         result_data = None
+        generation_audit = audit_generation_quality(record, generation, aux_part)
 
         if generation["success"] and thinking:
             output = f"{thinking}\n{aux_part}"
@@ -1585,9 +1833,12 @@ def process_and_generate_sft(
             "aux": aux_part,
             "hidden_rest_sanitized": record["_sanitized_rest"],
             "point_coords_grid": record.get("point_coords_grid", {}),
+            "source_audit": source_audit,
+            "generation_audit": generation_audit,
             "plan_prompt": generation.get("plan_prompt"),
             "write_prompt": generation.get("write_prompt"),
             "plan_output": generation.get("plan_output"),
+            "plan_parsed": generation.get("plan_parsed"),
             "write_output": generation.get("write_output"),
             "thinking": thinking,
             "success": generation["success"],
@@ -1620,12 +1871,16 @@ def process_and_generate_sft(
     if verbose:
         write_jsonl(run_dir / "item_records.jsonl", item_records)
 
+    source_audit_issue_items = sum(1 for item in item_records if item.get("source_audit", {}).get("has_issue"))
+    generation_audit_issue_items = sum(1 for item in item_records if item.get("generation_audit", {}).get("has_issue"))
     summary = {
         "input_jsonl": str(input_path),
         "total_candidates_with_aux": len(all_aux_records),
         "sampled_items": len(selected),
         "successful_items": len(sft_dataset),
         "failed_items": len(selected) - len(sft_dataset),
+        "source_audit_issue_items": source_audit_issue_items,
+        "generation_audit_issue_items": generation_audit_issue_items,
         "num_workers": num_workers,
         "max_retries_per_stage": max_retries,
         "model_name": model_name,
@@ -1634,6 +1889,16 @@ def process_and_generate_sft(
         "runtime_seconds": time.time() - start_time,
     }
     write_json(run_dir / "summary.json", summary)
+    write_jsonl(run_dir / "item_audits.jsonl", [
+        {
+            "sample_order": item["sample_order"],
+            "input_index": item["input_index"],
+            "source_audit": item.get("source_audit", {}),
+            "generation_audit": item.get("generation_audit", {}),
+            "success": item.get("success", False),
+        }
+        for item in item_records
+    ])
     logger.info("SFT dataset generation completed.")
     logger.info(f"Generated {len(sft_dataset)} records.")
     return {

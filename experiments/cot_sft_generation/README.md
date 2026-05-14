@@ -81,6 +81,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 1. 发现源样本异常时应优先标记，而不是硬写
    - 如果 visible problem、aux、proof、point coordinates 之间出现明显冲突，应优先在审计中记录或过滤。
    - 不要为了提高通过率，强行生成一条看似流畅但实际上与源样本不一致的 `thinking`。
+   - 当前脚本默认会对每条输入做 source audit，并把发现的问题记录到 artifacts；除非是缺图这类致命错误，否则会先记录，不会直接假设源样本一定有问题并强行过滤。
 
 2. 验收要靠真实抽样，而不是只靠 prompt 设计
    - 每次修改 prompt、schema、validator 或拼接策略后，都应做真实随机抽样审计。
@@ -228,8 +229,20 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 - `run.log`
 - `run_config.json`
 - `summary.json`
+- `item_audits.jsonl`
 - `sampled_inputs.jsonl`（仅 `-v`）
 - `item_records.jsonl`（仅 `-v`）
+
+`summary.json` 还会额外汇总：
+
+- `source_audit_issue_items`
+- `generation_audit_issue_items`
+
+`item_audits.jsonl` 会为每条样本分别记录：
+
+- `source_audit`
+- `generation_audit`
+- `success`
 
 `item_records.jsonl` 会保存每条样本的：
 
