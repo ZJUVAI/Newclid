@@ -104,37 +104,44 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
      - `anchor_relation`
      - `figure_overview`
      - `coordinate_relations`
+     - `visible_relations`
      - `coordinate_hints`
      - `goal_bottleneck`
      - `helper_idea`
      - `construction`
-     - `verification_chain`
+     - `aux_direct_relations`
+     - `bridge_relations`
+     - `goal_finish`
    - 目标不再只是“提出 aux”，而是把下面几件事先拆干净：
      - 用少量 tagged anchor points 给图定向
      - 对全图做更完整的可见结构概览，而不只盯 2-3 个点
      - 利用 hidden visible-point coordinates 做内部 sanity check，先提炼 2-3 个更具体的候选关系，再决定哪些几何关系值得继续追
      - 说明当前目标的真正瓶颈是什么
      - 给出 aux 的构造语句
-     - 明确写出“加了这个 aux 之后，下一步打算怎么继续解”的三步链，也就是 `verification_chain`
+     - 明确拆开“加了这个 aux 之后，下一步打算怎么继续解”的关系桶：
+       - `aux_direct_relations`
+       - `bridge_relations`
+       - `goal_finish`
    - 如果 hidden aux 含多个新点，还会额外要求 `construction` 里显式写出 staged strategy，例如 `first ... then ...`
 2. `write`
    - 再根据 `plan` 输出纯正文 body
    - 这一步不允许模型自己输出 `<point>` / `<coord>` 标签
-   - 脚本会自动把三类前缀句拼进最终 `thinking`：
+   - 脚本会自动把四类前缀句拼进最终 `thinking`：
      - 带 `<point>...</point><coord>(x,y)</coord>` 的 anchor sentence
      - `figure_overview` 句
      - `coordinate_hints` 句
+     - `visible_relations` 句
    - writer 只负责后续正文，即：
      - 解释瓶颈
      - 引出 aux
-     - 按 `verification_chain` 把 aux 之后的验证链真正推进到目标
+     - 按 `aux_direct_relations -> bridge_relations -> goal_finish` 把 aux 之后的验证链真正推进到目标
 
 也就是说，现在的机制是：
 
 - 模型负责选哪些点值得被 tagged，以及如何理解全图和后续验证路径
 - 脚本负责把这些点的真实坐标从源数据精确注入最终 `thinking`
 - hidden structured coordinate candidates 负责把“坐标判断”先收敛成更具体的可疑关系
-- hidden proof guidance 负责约束 `verification_chain` 不要停在“提出 aux”，而要尽量贴近真实可解路径
+- hidden proof guidance 负责约束 `aux_direct_relations / bridge_relations / goal_finish` 不要停在“提出 aux”，而要尽量贴近真实可解路径
 
 ## 泄露控制
 
@@ -162,12 +169,12 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
   - `cyclic` 必须明确 circle / circumcircle / cyclic
   - `cong` 必须明确 equal / congruent / equidistant
 - `plan` 中的 `coordinate_relations` 必须列出 2-3 个具体关系检查，并明确点名对应 visible points
+- `plan` 中的 `visible_relations` 必须优先复用 visible formal premises 中已有的具体关系，而不是凭空发明高层结构
 - `plan` 中的 `coordinate_hints` 必须说出具体几何关系，不允许空泛描述
-- `plan` 中的 `figure_overview` / `verification_chain` 必须覆盖锚点之外的可见点或子结构
-- `plan` 中的 `verification_chain` 必须是显式三步：
-  - aux 的直接后果
-  - 该后果如何连接回原图已有结构
-  - 最后要落到哪个 goal-side angle / ratio / congruence 关系
+- `plan` 中的 `figure_overview` / `visible_relations` / `bridge_relations` 必须覆盖锚点之外的可见点或子结构
+- `plan` 中的 `aux_direct_relations` 必须只写 aux 的直接后果，不能提前跳到旧图深处
+- `plan` 中的 `bridge_relations` 必须明确说明该后果如何连接回原图已有结构
+- `plan` 中的 `goal_finish` 必须明确最后要落到哪个 goal-side angle / ratio / congruence 关系
 - 多点 aux 的 `construction` 必须显式写出 staged / combined strategy，否则会被拒绝
 
 ## 导出格式

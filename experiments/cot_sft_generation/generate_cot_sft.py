@@ -353,6 +353,11 @@ def extract_point_mentions(text, visible_points):
             break
         if all(char in single_letter_points for char in token):
             mentioned.update(token)
+    if single_letter_points:
+        bare_compounds = re.findall(r"\b([a-z]{2,6})\b", lowered)
+        for token in bare_compounds:
+            if all(char in single_letter_points for char in token):
+                mentioned.update(token)
     return mentioned
 
 
@@ -382,7 +387,67 @@ def relation_keyword_present(text):
         "right-angled",
     ]
     lowered = text.lower()
-    return any(keyword in lowered for keyword in keywords)
+    if any(keyword in lowered for keyword in keywords):
+        return True
+    if re.search(r"\b[a-z]{2}\s*=\s*[a-z]{2}\b", lowered):
+        return True
+    if re.search(r"\bangle\s+[a-z]{2}/[a-z]{2}\s+equals\s+angle\s+[a-z]{2}/[a-z]{2}\b", lowered):
+        return True
+    return False
+
+
+def build_visible_premise_summaries(record, max_items=12):
+    formal_problem = (record.get("llm_input_renamed") or "").strip()
+    body_match = PROBLEM_BODY_RE.search(formal_problem)
+    body = body_match.group(1).strip() if body_match else formal_problem
+    if "?" in body:
+        body = body.split("?", 1)[0].strip()
+
+    summaries = []
+    seen = set()
+    for clause in [part.strip() for part in body.split(";") if part.strip()]:
+        if ":" not in clause:
+            continue
+        _, relation_text = clause.split(":", 1)
+        for fact in split_formal_relation_chain(relation_text):
+            summary = summarize_aux_clause(fact)
+            if not summary:
+                continue
+            normalized = summary.lower()
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            summaries.append(summary)
+            if len(summaries) >= max_items:
+                return summaries
+    return summaries
+
+
+def normalize_point_case(text, point_names):
+    if not isinstance(text, str) or not point_names:
+        return text
+
+    normalized = text
+    point_names = [str(point).lower() for point in point_names]
+    single_letter_points = {point for point in point_names if len(point) == 1}
+
+    for point in sorted(point_names, key=len, reverse=True):
+        normalized = re.sub(
+            rf"\b{re.escape(point)}\b",
+            point,
+            normalized,
+            flags=re.IGNORECASE,
+        )
+
+    def lower_compound(match):
+        token = match.group(0)
+        lowered = token.lower()
+        if single_letter_points and all(char in single_letter_points for char in lowered):
+            return lowered
+        return token
+
+    normalized = re.sub(r"\b[A-Za-z]{2,6}\b", lower_compound, normalized)
+    return normalized
 
 
 def parse_goal_expression(visible_goal):
@@ -497,25 +562,32 @@ def coordinate_relation_matches_candidate(relation_text, candidate):
         return False
 
     candidate_type = candidate.get("relation_type", "")
-    if relation_type == "right_triangle" and candidate_type == "perpendicular":
-        return False
-    if relation_type != candidate_type:
-        return False
 
     candidate_points = {str(point).lower() for point in candidate.get("points", [])}
     relation_points = extract_point_mentions(relation_text, sorted(candidate_points))
-    return candidate_points.issubset(relation_points)
+
+    equivalent_types = {
+        ("perpendicular", "right_triangle"),
+        ("equal_length", "isosceles"),
+        ("equal_length", "equilateral"),
+    }
+    if relation_type == candidate_type:
+        return candidate_points.issubset(relation_points)
+    if (relation_type, candidate_type) in equivalent_types:
+        return relation_points.issubset(candidate_points) and len(relation_points) >= 2
+    return False
 
 
 def validate_aux_step_scope(step_text, aux_part, visible_points):
-    step_points = extract_point_mentions(step_text, visible_points)
-    if not step_points:
-        return False, "verification_chain[0] must mention the auxiliary-point relation explicitly"
     allowed_points = {point.lower() for point in extract_aux_point_scope(aux_part)}
+    candidate_points = sorted(set(visible_points) | allowed_points)
+    step_points = extract_point_mentions(step_text, candidate_points)
+    if not (step_points & allowed_points):
+        return False, "the direct auxiliary relation must mention the auxiliary-point relation explicitly"
     extra_points = step_points - allowed_points
     if extra_points:
         return False, (
-            "verification_chain[0] should stay on the direct aux consequence and must not "
+            "the direct auxiliary relation should stay on the direct aux consequence and must not "
             f"introduce extra old-figure points yet: {sorted(extra_points)}"
         )
     return True, None
@@ -555,7 +627,7 @@ def audit_generation_quality(record, generation, aux_part):
     issues = []
     point_coords = get_point_coords(record)
     visible_points = extract_visible_point_names(point_coords)
-    coordinate_candidates = build_hidden_coordinate_candidates(point_coords, max_items=8)
+    coordinate_candidates = build_hidden_coordinate_candidates(point_coords, max_items=64, relax_type_limits=True)
     plan = generation.get("plan_parsed") or {}
     suspicious_markers = [
         "rotational symmetry",
@@ -576,7 +648,8 @@ def audit_generation_quality(record, generation, aux_part):
             issues.append(
                 "coordinate_relations_unmatched:" + " | ".join(unmatched_relations)
             )
-        ok, message = validate_aux_step_scope(plan.get("verification_chain", [""])[0], aux_part, visible_points)
+        direct_relations = plan.get("aux_direct_relations") or plan.get("verification_chain") or [""]
+        ok, message = validate_aux_step_scope(direct_relations[0], aux_part, visible_points)
         if not ok:
             issues.append(message)
 
@@ -611,7 +684,7 @@ def _candidate_sort_key(candidate):
     )
 
 
-def build_hidden_coordinate_candidates(point_coords, max_items=10):
+def build_hidden_coordinate_candidates(point_coords, max_items=10, relax_type_limits=False):
     point_items = sorted(point_coords.items())
     if len(point_items) < 2:
         return []
@@ -779,14 +852,14 @@ def build_hidden_coordinate_candidates(point_coords, max_items=10):
     unique_hints = []
     seen = set()
     type_limits = {
-        "midpoint": 2,
-        "collinear": 2,
-        "right_triangle": 2,
-        "isosceles": 2,
-        "equilateral": 1,
-        "perpendicular": 2,
-        "parallel": 2,
-        "equal_length": 2,
+        "midpoint": max_items if relax_type_limits else 2,
+        "collinear": max_items if relax_type_limits else 2,
+        "right_triangle": max_items if relax_type_limits else 2,
+        "isosceles": max_items if relax_type_limits else 2,
+        "equilateral": max_items if relax_type_limits else 1,
+        "perpendicular": max_items if relax_type_limits else 2,
+        "parallel": max_items if relax_type_limits else 2,
+        "equal_length": max_items if relax_type_limits else 2,
     }
     type_counts = {}
     for candidate in sorted(candidates, key=_candidate_sort_key):
@@ -818,8 +891,10 @@ def build_hidden_coordinate_guidance(point_coords, max_items=8):
     return json.dumps(hints, ensure_ascii=False, indent=2)
 
 
-def validate_descriptive_text(value, field_name):
-    if not isinstance(value, str) or len(value.strip()) < 12:
+def validate_descriptive_text(value, field_name, min_chars=12, point_names=None):
+    if isinstance(value, str) and point_names:
+        value = normalize_point_case(value, point_names)
+    if not isinstance(value, str) or len(value.strip()) < min_chars:
         return False, f"{field_name} must be a non-empty descriptive string", None
     value = value.strip()
     if RAW_POINT_TAG_RE.search(value) or POINT_TAG_RE.search(value):
@@ -831,12 +906,17 @@ def validate_descriptive_text(value, field_name):
     return True, None, value
 
 
-def validate_relation_list(items, field_name, visible_points, min_len=2, max_len=3):
+def validate_relation_list(items, field_name, visible_points, min_len=2, max_len=3, min_chars=12):
     if not isinstance(items, list) or not (min_len <= len(items) <= max_len):
         return False, f"{field_name} must be a list with {min_len} to {max_len} items", None
     cleaned = []
     for idx, item in enumerate(items):
-        ok, message, cleaned_item = validate_descriptive_text(item, f"{field_name}[{idx}]")
+        ok, message, cleaned_item = validate_descriptive_text(
+            item,
+            f"{field_name}[{idx}]",
+            min_chars=min_chars,
+            point_names=visible_points,
+        )
         if not ok:
             return False, message, None
         if not relation_keyword_present(cleaned_item):
@@ -950,11 +1030,14 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
         "anchor_relation",
         "figure_overview",
         "coordinate_relations",
+        "visible_relations",
         "coordinate_hints",
         "goal_bottleneck",
         "helper_idea",
         "construction",
-        "verification_chain",
+        "aux_direct_relations",
+        "bridge_relations",
+        "goal_finish",
     ]
     missing = [key for key in required_keys if key not in plan]
     if missing:
@@ -977,8 +1060,10 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
 
     cleaned_plan = {"anchor_points": normalized_points}
     visible_points = extract_visible_point_names(point_coords)
+    aux_points = [point.lower() for point in extract_aux_new_points(aux_part or "")]
+    known_points = visible_points + aux_points
     for key in ["anchor_relation", "figure_overview", "coordinate_hints", "goal_bottleneck", "helper_idea", "construction"]:
-        ok, message, cleaned_value = validate_descriptive_text(plan.get(key), key)
+        ok, message, cleaned_value = validate_descriptive_text(plan.get(key), key, point_names=known_points)
         if not ok:
             return False, message, None
         cleaned_plan[key] = cleaned_value
@@ -994,28 +1079,82 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
         return False, message, None
     cleaned_plan["coordinate_relations"] = cleaned_relations
 
-    verification_chain = plan.get("verification_chain")
-    if not isinstance(verification_chain, list) or len(verification_chain) != 3:
-        return False, "verification_chain must be a list of exactly 3 ordered steps", None
-    cleaned_chain = []
-    for idx, step in enumerate(verification_chain):
-        ok, message, cleaned_step = validate_descriptive_text(step, f"verification_chain[{idx}]")
+    ok, message, cleaned_visible_relations = validate_relation_list(
+        plan.get("visible_relations"),
+        "visible_relations",
+        visible_points,
+        min_len=2,
+        max_len=4,
+        min_chars=5,
+    )
+    if not ok:
+        return False, message, None
+    cleaned_plan["visible_relations"] = cleaned_visible_relations
+
+    aux_direct_relations = plan.get("aux_direct_relations")
+    if not isinstance(aux_direct_relations, list) or not (1 <= len(aux_direct_relations) <= 3):
+        return False, "aux_direct_relations must be a list with 1 to 3 ordered direct consequences", None
+    cleaned_direct = []
+    for idx, step in enumerate(aux_direct_relations):
+        ok, message, cleaned_step = validate_descriptive_text(
+            step,
+            f"aux_direct_relations[{idx}]",
+            min_chars=5,
+            point_names=known_points,
+        )
         if not ok:
             return False, message, None
         if not relation_keyword_present(cleaned_step):
-            return False, f"verification_chain[{idx}] must mention a concrete geometric relation", None
-        cleaned_chain.append(cleaned_step)
-    cleaned_plan["verification_chain"] = cleaned_chain
+            return False, f"aux_direct_relations[{idx}] must mention a concrete geometric relation", None
+        cleaned_direct.append(cleaned_step)
+    cleaned_plan["aux_direct_relations"] = cleaned_direct
+
+    bridge_relations = plan.get("bridge_relations")
+    if not isinstance(bridge_relations, list) or not (2 <= len(bridge_relations) <= 4):
+        return False, "bridge_relations must be a list with 2 to 4 ordered bridge steps", None
+    cleaned_bridge = []
+    for idx, step in enumerate(bridge_relations):
+        ok, message, cleaned_step = validate_descriptive_text(
+            step,
+            f"bridge_relations[{idx}]",
+            min_chars=5,
+            point_names=known_points,
+        )
+        if not ok:
+            return False, message, None
+        if not relation_keyword_present(cleaned_step):
+            return False, f"bridge_relations[{idx}] must mention a concrete geometric relation", None
+        cleaned_bridge.append(cleaned_step)
+    cleaned_plan["bridge_relations"] = cleaned_bridge
+
+    ok, message, cleaned_goal_finish = validate_descriptive_text(
+        plan.get("goal_finish"),
+        "goal_finish",
+        min_chars=8,
+        point_names=known_points,
+    )
+    if not ok:
+        return False, message, None
+    if not relation_keyword_present(cleaned_goal_finish):
+        return False, "goal_finish must mention a concrete goal-side geometric relation", None
+    cleaned_plan["goal_finish"] = cleaned_goal_finish
 
     if not relation_keyword_present(cleaned_plan["coordinate_hints"]):
         return False, "coordinate_hints must mention at least one concrete geometric relation cue", None
 
     figure_mentions = extract_point_mentions(
-        f"{cleaned_plan['figure_overview']} {' '.join(cleaned_plan['verification_chain'])}",
+        " ".join(
+            [
+                cleaned_plan["figure_overview"],
+                " ".join(cleaned_plan["visible_relations"]),
+                " ".join(cleaned_plan["bridge_relations"]),
+                cleaned_plan["goal_finish"],
+            ]
+        ),
         visible_points,
     )
     if len(visible_points) > len(normalized_points) and not (figure_mentions - set(normalized_points)):
-        return False, "figure_overview or verification_chain must mention at least one visible point outside anchor_points", None
+        return False, "figure_overview, visible_relations, bridge_relations, or goal_finish must mention at least one visible point outside anchor_points", None
 
     relation_mentions = extract_point_mentions(" ".join(cleaned_plan["coordinate_relations"]), visible_points)
     if len(relation_mentions) < 3:
@@ -1047,30 +1186,36 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
                 return False, f"construction must mention new point '{point_name}' explicitly", None
         if len(new_points) > 1:
             stage_markers = ["first", "then", "next", "after", "together", "simultaneously"]
-            combined_text = f"{cleaned_plan['construction']} {' '.join(cleaned_plan['verification_chain'])}".lower()
+            combined_text = (
+                f"{cleaned_plan['construction']} "
+                f"{' '.join(cleaned_plan['aux_direct_relations'])} "
+                f"{' '.join(cleaned_plan['bridge_relations'])}"
+            ).lower()
             if not any(marker in combined_text for marker in stage_markers):
                 return False, "multi-point auxiliary plans must describe a staged or combined construction strategy", None
-        if new_points and not any(point in cleaned_chain[0].lower() for point in new_points):
-            return False, "verification_chain[0] must state the immediate relation unlocked by the new point", None
-        ok, message = validate_aux_step_scope(cleaned_chain[0], aux_part, visible_points)
-        if not ok:
-            return False, message, None
-        if new_points and not any(point in cleaned_chain[1].lower() for point in new_points):
-            return False, "verification_chain[1] must still reference the auxiliary point while bridging to the old figure", None
+        if new_points:
+            if not any(point in " ".join(cleaned_plan["aux_direct_relations"]).lower() for point in new_points):
+                return False, "aux_direct_relations must state the immediate relation unlocked by the new point", None
+            for idx, step in enumerate(cleaned_plan["aux_direct_relations"]):
+                ok, message = validate_aux_step_scope(step, aux_part, visible_points)
+                if not ok:
+                    return False, f"aux_direct_relations[{idx}] invalid: {message}", None
+            if not any(point in cleaned_plan["bridge_relations"][0].lower() for point in new_points):
+                return False, "bridge_relations[0] must still reference the auxiliary point while bridging to the old figure", None
     goal_spec = parse_goal_expression(visible_goal)
     goal_points = set(goal_spec["points"])
     goal_keywords = goal_keyword_hints(visible_goal)
-    final_step = cleaned_chain[-1].lower()
+    final_step = cleaned_goal_finish.lower()
     if goal_points:
         mentioned_goal_points = {point for point in goal_points if point in final_step}
         if len(mentioned_goal_points) < min(2, len(goal_points)):
-            return False, "verification_chain[2] must mention the target relation using goal-side points", None
+            return False, "goal_finish must mention the target relation using goal-side points", None
     if not any(keyword in final_step for keyword in goal_keywords):
-        return False, "verification_chain[2] must explicitly describe the goal-side relation it is aiming for", None
+        return False, "goal_finish must explicitly describe the goal-side relation it is aiming for", None
     if aux_part:
-        bridge_mentions = extract_point_mentions(cleaned_chain[1], visible_points)
+        bridge_mentions = extract_point_mentions(" ".join(cleaned_plan["bridge_relations"]), visible_points)
         if not (bridge_mentions - set(extract_aux_new_points(aux_part))):
-            return False, "verification_chain[1] must connect the auxiliary point to existing visible points", None
+            return False, "bridge_relations must connect the auxiliary point to existing visible points", None
 
     return True, "Valid planner JSON", cleaned_plan
 
@@ -1089,6 +1234,8 @@ def validate_writer_body(output_text: str):
         return False, f"Writer body too short ({len(body)} chars, minimum 120)"
     if len(body) > 1500:
         return False, f"Writer body too long ({len(body)} chars, maximum 1500)"
+    if re.search(r"\b(I|We|I'm|We'll|I've|we've)\b", body):
+        return False, "Writer body must stay impersonal and should not use first-person narration"
     for pattern in FORBIDDEN_THINKING_PATTERNS:
         hit = pattern.search(body)
         if hit:
@@ -1226,6 +1373,13 @@ def build_coordinate_hint_sentence(plan):
     return f"{hints}."
 
 
+def build_visible_relation_sentence(plan):
+    relation_text = "; ".join(plan.get("visible_relations", [])).strip().rstrip(".")
+    if not relation_text:
+        return ""
+    return f"The visible givens also show that {relation_text}."
+
+
 def build_public_problem_text(record):
     nl_problem = (record.get("nl_problem") or "").strip()
     formal_problem = (record.get("llm_input_renamed") or "").strip()
@@ -1257,6 +1411,11 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
     coord_table = json.dumps(point_coords, ensure_ascii=False, sort_keys=True)
     coordinate_hints = build_hidden_coordinate_hints(point_coords)
     coordinate_guidance = build_hidden_coordinate_guidance(point_coords)
+    visible_premise_summaries = build_visible_premise_summaries(record)
+    visible_premise_guidance = (
+        json.dumps(visible_premise_summaries, ensure_ascii=False, indent=2)
+        if visible_premise_summaries else "[]"
+    )
     proof_guidance = json.dumps(
         build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal),
         ensure_ascii=False,
@@ -1290,6 +1449,10 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "Each item below is derived only from visible-point coordinates. Prefer choosing 2 or 3 of these "
         "as the concrete relation checks in your plan instead of jumping directly to high-level symmetry claims.\n"
         f"{coordinate_guidance}\n\n"
+        "[Visible Premise Summaries]\n"
+        "These are plain-language summaries of the visible formal premises. When you describe the existing figure, "
+        "prefer reusing these concrete relations instead of inventing new high-level geometry claims.\n"
+        f"{visible_premise_guidance}\n\n"
         "[Hidden Target Summary]\n"
         f"New point name(s): {new_points_text}\n"
         f"Target auxiliary facts: {hidden_aux_brief}\n\n"
@@ -1304,11 +1467,14 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "2. anchor_relation: one sentence describing the key visible relation or shape cue involving those anchors.\n"
         "3. figure_overview: one or two sentences surveying the broader visible figure beyond the anchors, including other relevant points or sub-structures.\n"
         "4. coordinate_relations: a list of 2 or 3 short relation checks inferred from the visible placement; each item must name the points and the relation.\n"
-        "5. coordinate_hints: one or two sentences synthesizing those coordinate-backed relation checks and why they matter.\n"
-        "6. goal_bottleneck: one sentence describing the main obstacle to reaching the visible goal from the current figure.\n"
-        "7. helper_idea: one sentence describing what kind of helper is missing, without naming the new point yet.\n"
-        "8. construction: one or two sentences that finally introduce the new point or staged point sequence in plain geometry language.\n"
-        "9. verification_chain: a list of exactly 3 short steps: immediate aux consequence -> bridge to existing visible structure -> goal-side relation.\n\n"
+        "5. visible_relations: a list of 2 to 4 concrete existing-figure relations that the later reasoning should actively reuse.\n"
+        "6. coordinate_hints: one or two sentences synthesizing those coordinate-backed relation checks and why they matter.\n"
+        "7. goal_bottleneck: one sentence describing the main obstacle to reaching the visible goal from the current figure.\n"
+        "8. helper_idea: one sentence describing what kind of helper is missing, without naming the new point yet.\n"
+        "9. construction: one or two sentences that finally introduce the new point or staged point sequence in plain geometry language.\n"
+        "10. aux_direct_relations: a list of 1 to 3 direct consequences that come immediately from the construction itself.\n"
+        "11. bridge_relations: a list of 2 to 4 ordered bridge relations showing how the new point reconnects to the old figure.\n"
+        "12. goal_finish: one sentence stating the goal-side angle/ratio/congruence relation that closes the argument.\n\n"
         "Constraints:\n"
         "- Use only lowercase point names exactly as in the problem text.\n"
         "- Do not use <point> tags, <coord> tags, LaTeX, $...$ math formatting, backticks, <aux>, <proof>, IDs, or rule names.\n"
@@ -1316,13 +1482,15 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- Survey the whole visible figure, not just the anchor points.\n"
         "- Use the hidden coordinate table only as an internal consistency check for relations that also look plausible in the image.\n"
         "- The coordinate_relations field should stay close to the structured coordinate candidates when possible. Avoid unsupported jumps like 'there is a rotation symmetry' unless you first name the concrete equal, parallel, perpendicular, midpoint, or collinear cues behind it.\n"
+        "- The visible_relations field should preferentially reuse the visible premise summaries above, plus a small number of visually obvious derived facts. It should not introduce invented centers, rotations, or unnamed transformations.\n"
         "- The coordinate_hints field must be written as ordinary visual geometry language. Do not say 'the coordinates show', 'the coordinates indicate', or anything similar.\n"
         "- Do not mention the new point name before the construction field.\n"
         "- Avoid vague filler such as 'this point is crucial' or 'this will help'.\n"
-        "- Do not invent named centers, rotation claims, square/parallelogram claims, or similarity claims unless they are already supported by the approved coordinate checks or by the explicit verification chain.\n"
+        "- Do not invent named centers, rotation claims, square/parallelogram claims, or similarity claims unless they are already supported by the approved coordinate checks or by the approved relation buckets.\n"
         "- The construction field must describe the same geometric facts as the hidden target summary in plain language; do not invent a different line, circle, or intersection.\n"
-        "- The verification_chain must be explicit: the first step should state what the aux immediately gives, the second should say how that new relation interacts with the old figure, and the third should state the goal-side angle/ratio/congruence relation you expect to reach.\n"
-        "- The first verification step must stay local to the auxiliary construction itself. Do not pull unrelated old-figure points into that first step.\n"
+        "- Each item in aux_direct_relations must stay local to the auxiliary construction itself. Do not pull unrelated old-figure points into those direct relations.\n"
+        "- The bridge_relations field should explicitly mention how the auxiliary point interacts with existing visible points or substructures, in a realistic order.\n"
+        "- The goal_finish field must mention the actual goal-side relation, not just say that the construction is useful.\n"
         "- If multiple new points appear in the hidden target summary, describe whether they are introduced together or in stages and what each stage unlocks.\n"
         "- The wording must sound supportable from the image and visible problem text alone.\n"
     )
@@ -1340,6 +1508,11 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest):
     coord_table = json.dumps(point_coords, ensure_ascii=False, sort_keys=True)
     coordinate_hints = build_hidden_coordinate_hints(point_coords)
     coordinate_guidance = build_hidden_coordinate_guidance(point_coords)
+    visible_premise_summaries = build_visible_premise_summaries(record)
+    visible_premise_guidance = (
+        json.dumps(visible_premise_summaries, ensure_ascii=False, indent=2)
+        if visible_premise_summaries else "[]"
+    )
     proof_guidance = json.dumps(
         build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal),
         ensure_ascii=False,
@@ -1363,6 +1536,8 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest):
         f"{coordinate_hints}\n\n"
         "[Hidden Structured Coordinate Candidates]\n"
         f"{coordinate_guidance}\n\n"
+        "[Visible Premise Summaries]\n"
+        f"{visible_premise_guidance}\n\n"
         "[Hidden Target Summary]\n"
         f"New point name(s): {new_points_text}\n"
         f"Target auxiliary facts: {hidden_aux_brief}\n\n"
@@ -1373,13 +1548,18 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest):
         f"{proof_guidance}\n\n"
         "[Approved Plan]\n"
         f"{json.dumps(plan, ensure_ascii=False, indent=2)}\n\n"
+        "[Approved Milestones]\n"
+        f"Existing visible relations to reuse: {json.dumps(plan.get('visible_relations', []), ensure_ascii=False)}\n"
+        f"Direct aux consequences to realize in order: {json.dumps(plan.get('aux_direct_relations', []), ensure_ascii=False)}\n"
+        f"Bridge relations to realize in order: {json.dumps(plan.get('bridge_relations', []), ensure_ascii=False)}\n"
+        f"Goal-side finish to reach: {plan.get('goal_finish', '')}\n\n"
         "[Write Requirements]\n"
-        "Write only the body text that comes after the script-supplied prefix block: an anchor sentence with coordinate tags, a full-figure overview sentence, and a coordinate-focused prefix built from the approved relation checks.\n"
+        "Write only the body text that comes after the script-supplied prefix block: an anchor sentence with coordinate tags, a full-figure overview sentence, a coordinate-focused prefix built from the approved relation checks, and a visible-relations sentence injected from the approved plan.\n"
         "Do NOT output <thinking>, <point>, or <coord> tags; the script will add the prefix sentences and the coordinate tags itself.\n"
         "The body must satisfy all of the following:\n"
         "1. It should sound supportable from the image and visible problem text alone.\n"
         "2. It should be logically coherent and centered on discovering the auxiliary construction and then checking that the construction can genuinely advance the visible goal.\n"
-        "3. Follow this order: bottleneck -> missing helper idea -> final introduction of the new point or staged points -> explicit realization of the three-step verification_chain.\n"
+        "3. Follow this order: bottleneck -> missing helper idea -> final introduction of the new point or staged points -> explicit realization of aux_direct_relations -> bridge_relations -> goal_finish.\n"
         "4. Most of the reasoning should happen before the new auxiliary point is named; only introduce that point in the later part of the body.\n"
         "5. Use the plan faithfully, but rewrite it into smooth prose instead of JSON fragments.\n"
         "6. Replace vague statements like 'this point is crucial' with a concrete bottleneck, relation, or next-step verification claim.\n"
@@ -1391,8 +1571,10 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest):
         "12. It must not assign coordinates to newly introduced auxiliary points.\n"
         "13. Do not repeat the prefix sentences verbatim; continue from them.\n"
         "14. Do not mention coordinates explicitly; describe those cues as visual placement, alignment, symmetry, equal-looking lengths, or perpendicular/parallel structure.\n"
-        "15. Keep the post-aux reasoning faithful to the approved verification_chain; do not replace it with a different invented route.\n"
+        "15. Keep the post-aux reasoning faithful to the approved visible_relations, aux_direct_relations, bridge_relations, and goal_finish; do not replace them with a different invented route.\n"
         "16. Do not introduce extra named centers, rotational symmetries, square/parallelogram claims, or triangle-similarity claims unless the approved plan already states them and the immediate aux step really supports them.\n"
+        "17. Reuse the approved visible_relations when connecting the new point back to the old figure, rather than inventing fresh structural claims.\n"
+        "18. Stay impersonal. Do not write in the first person.\n"
         "Output only the plain-text body.\n"
     )
 
@@ -1604,7 +1786,7 @@ def run_writer_stage(stage_name, messages, model_name, max_retries):
 def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_name, max_retries, verbose):
     point_coords = get_point_coords(record)
     visible_goal = extract_problem_goal(record)
-    coordinate_candidates = build_hidden_coordinate_candidates(point_coords, max_items=8)
+    coordinate_candidates = build_hidden_coordinate_candidates(point_coords, max_items=64, relax_type_limits=True)
     plan_prompt = build_plan_prompt(record, aux_part, sanitized_rest)
     plan_messages = [
         {
@@ -1665,9 +1847,10 @@ def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_
         anchor_sentence = build_anchor_sentence(plan_result["parsed"], point_coords)
         overview_sentence = build_overview_sentence(plan_result["parsed"])
         coordinate_hint_sentence = build_coordinate_hint_sentence(plan_result["parsed"])
+        visible_relation_sentence = build_visible_relation_sentence(plan_result["parsed"])
         assembled_thinking = (
             f"<thinking>{anchor_sentence} {overview_sentence} "
-            f"{coordinate_hint_sentence} {write_result['output'].strip()}</thinking>"
+            f"{coordinate_hint_sentence} {visible_relation_sentence} {write_result['output'].strip()}</thinking>"
         )
         is_valid, message = validate_thinking_response(
             assembled_thinking,
