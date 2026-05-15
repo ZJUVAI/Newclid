@@ -1292,6 +1292,8 @@ def validate_plan_response(
         if not ok:
             return False, message, None
         cleaned_plan[key] = cleaned_value
+    if aux_points:
+        cleaned_plan["helper_idea"] = anonymize_new_point_mentions(cleaned_plan["helper_idea"], aux_points)
 
     ok, message, cleaned_relations = validate_relation_list(
         plan.get("coordinate_relations"),
@@ -1651,6 +1653,16 @@ def enrich_bridge_steps_with_targets(plan):
     enriched_plan = dict(plan)
     enriched_plan["bridge_steps"] = enriched_steps
     return enriched_plan
+
+
+def anonymize_new_point_mentions(text, new_points):
+    if not isinstance(text, str) or not new_points:
+        return text
+    anonymized = text
+    for point_name in sorted({point.lower() for point in new_points}, key=len, reverse=True):
+        anonymized = re.sub(rf"\b{re.escape(point_name)}\b", "a point", anonymized, flags=re.IGNORECASE)
+    anonymized = re.sub(r"\ba point point\b", "a point", anonymized, flags=re.IGNORECASE)
+    return anonymized
 
 
 def build_canonical_bridge_unlock(next_target_relation, final_step=False):
@@ -2272,6 +2284,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "[helper_idea / aux_direct Guidance]\n"
         "Good helper_idea: 'we need a point that creates an equal-length transfer from k toward d while keeping a perpendicular link through c.'\n"
         "Bad helper_idea: 'we need a point that will facilitate the proof.'\n"
+        "Bad helper_idea: 'we need point k so that ...' because the new point name should first appear in construction.\n"
         "Good aux_direct_relations: ['kb equals kc', 'line ck is perpendicular to line dk']\n"
         "Bad aux_direct_relations: ['kb equals kc', 'angle akd equals ...'] when a is not part of the immediate construction.\n\n"
         "[coordinate_relations / visible_relations Guidance]\n"
