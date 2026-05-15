@@ -67,6 +67,8 @@ FORBIDDEN_THINKING_PATTERNS = [
     re.compile(r"\bhelp establish\b", re.IGNORECASE),
     re.compile(r"\bcoordinates?\b", re.IGNORECASE),
     re.compile(r"\bcoordinate table\b", re.IGNORECASE),
+    re.compile(r"\brotational symmetry\b", re.IGNORECASE),
+    re.compile(r"\bcenter of symmetry\b", re.IGNORECASE),
     re.compile(r"\$[^$]+\$"),
     re.compile(r"`[^`]+`"),
 ]
@@ -1568,8 +1570,13 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
         return False, "Writer body must not contain coord tags"
     if len(body) < 120:
         return False, f"Writer body too short ({len(body)} chars, minimum 120)"
-    if len(body) > 1500:
-        return False, f"Writer body too long ({len(body)} chars, maximum 1500)"
+    max_body_len = 1500
+    if injected_prefix:
+        # Reserve room for the injected prefix and a small margin so final assembly
+        # does not fail only after the body itself has already been accepted.
+        max_body_len = min(max_body_len, max(200, 2200 - len(injected_prefix) - 40))
+    if len(body) > max_body_len:
+        return False, f"Writer body too long ({len(body)} chars, maximum {max_body_len})"
     if re.search(r"\b(I|We|I'm|We'll|I've|we've)\b", body):
         return False, "Writer body must stay impersonal and should not use first-person narration"
     first_sentence_match = re.match(r"\s*(.+?[.!?])(?:\s|$)", body, re.DOTALL)
@@ -2112,6 +2119,14 @@ def build_writer_retry_feedback(validation_message, plan):
         )
         targeted_hints.append(
             "- do not summarize the support as 'symmetry', 'center of symmetry', or 'midpoint property'; explicitly restate the approved support relations such as 'h is the midpoint of bc' or 'bh equals ch'."
+        )
+    if "too long" in validation_message:
+        targeted_hints.append(
+            "- shorten the body by compressing helper or bridge prose; keep the approved relation names, but trim extra explanation and repeated restatements."
+        )
+    if "rotational symmetry" in validation_message or "center of symmetry" in validation_message:
+        targeted_hints.append(
+            "- remove high-level phrases like 'rotational symmetry' or 'center of symmetry'; replace them with the concrete equalities, parallels, or midpoint facts that are actually visible in the approved plan."
         )
     if "must explicitly realize bridge_steps" in validation_message:
         targeted_hints.append(
