@@ -1186,7 +1186,7 @@ def build_canonical_coordinate_hint(coordinate_relations):
     return f"the clearest visual cues are that {relation_text}, so the auxiliary plan should keep using those relations."
 
 
-def validate_descriptive_text(value, field_name, min_chars=12, point_names=None):
+def validate_descriptive_text(value, field_name, min_chars=12, point_names=None, ignored_forbidden_patterns=None):
     if isinstance(value, str) and point_names:
         value = normalize_point_case(value, point_names)
     if not isinstance(value, str) or len(value.strip()) < min_chars:
@@ -1194,7 +1194,10 @@ def validate_descriptive_text(value, field_name, min_chars=12, point_names=None)
     value = value.strip()
     if RAW_POINT_TAG_RE.search(value) or POINT_TAG_RE.search(value):
         return False, f"{field_name} must not contain point tags", None
+    ignored_forbidden_patterns = set(ignored_forbidden_patterns or [])
     for pattern in FORBIDDEN_THINKING_PATTERNS:
+        if pattern.pattern in ignored_forbidden_patterns:
+            continue
         hit = pattern.search(value)
         if hit:
             return False, f"{field_name} contains forbidden pattern: {hit.group(0)}", None
@@ -1373,7 +1376,15 @@ def validate_plan_response(
     aux_points = [point.lower() for point in extract_aux_new_points(aux_part or "")]
     known_points = visible_points + aux_points
     for key in ["anchor_relation", "figure_overview", "coordinate_hints", "goal_bottleneck", "helper_idea", "construction"]:
-        ok, message, cleaned_value = validate_descriptive_text(plan.get(key), key, point_names=known_points)
+        ignored_patterns = []
+        if key == "coordinate_hints":
+            ignored_patterns.append(r"\bmidpoint propert(?:y|ies)\b")
+        ok, message, cleaned_value = validate_descriptive_text(
+            plan.get(key),
+            key,
+            point_names=known_points,
+            ignored_forbidden_patterns=ignored_patterns,
+        )
         if not ok:
             return False, message, None
         cleaned_plan[key] = cleaned_value
@@ -2202,6 +2213,10 @@ def build_plan_retry_feedback(validation_message, aux_part):
     if "coordinate_hints must explain concrete midpoint" in validation_message:
         targeted_hints.append(
             "- rewrite coordinate_hints to summarize the concrete cues themselves, such as a midpoint, collinearity, equal-length, parallel, or perpendicular observation, instead of saying the figure suggests symmetry or rotation."
+        )
+    if "coordinate_hints contains forbidden pattern: midpoint propert" in validation_message:
+        targeted_hints.append(
+            "- do not write 'midpoint property' in coordinate_hints; instead name the concrete midpoint fact itself, such as 'm is the midpoint of ab' or 'am equals bm'."
         )
     if "bridge_steps must connect the auxiliary point to existing visible points" in validation_message:
         targeted_hints.append(
