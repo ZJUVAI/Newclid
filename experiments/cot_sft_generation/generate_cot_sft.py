@@ -1469,6 +1469,18 @@ def validate_plan_response(
             if not any(keyword in construction_text for keyword in keywords):
                 return False, f"construction is missing an expected {label} cue", None
         new_points = [point.lower() for point in extract_aux_new_points(aux_part)]
+        preconstruction_fields = [
+            cleaned_plan["anchor_relation"],
+            cleaned_plan["figure_overview"],
+            cleaned_plan["coordinate_hints"],
+            cleaned_plan["goal_bottleneck"],
+            cleaned_plan["helper_idea"],
+            " ".join(cleaned_plan["coordinate_relations"]),
+            " ".join(cleaned_plan["visible_relations"]),
+        ]
+        for point_name in new_points:
+            if any(re.search(rf"\b{re.escape(point_name)}\b", field.lower()) for field in preconstruction_fields):
+                return False, f"new point '{point_name}' must not appear before the construction field", None
         for point_name in new_points:
             if point_name not in cleaned_plan["construction"].lower():
                 return False, f"construction must mention new point '{point_name}' explicitly", None
@@ -1902,6 +1914,14 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- include coordinate_hints as one or two plain-language sentences summarizing which coordinate_relations matter and why."
         )
+    if "coordinate_relations must stay grounded in the hidden coordinate candidates" in validation_message:
+        targeted_hints.append(
+            "- coordinate_relations should be chosen from the hidden structured coordinate candidates, not copied from visible premises like a given parallel or equal-length statement."
+        )
+    if "visible_relations" in validation_message:
+        targeted_hints.append(
+            "- visible_relations should contain only old-figure relations that are already visible before the auxiliary point is introduced; do not place new-point relations there."
+        )
     if "construction is missing an expected" in validation_message:
         targeted_hints.append(
             "- construction must restate the hidden auxiliary facts in natural geometry language, including the required equal/perpendicular/parallel/circle cue."
@@ -2090,6 +2110,11 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "Bad helper_idea: 'we need a point that will facilitate the proof.'\n"
         "Good aux_direct_relations: ['kb equals kc', 'line ck is perpendicular to line dk']\n"
         "Bad aux_direct_relations: ['kb equals kc', 'angle akd equals ...'] when a is not part of the immediate construction.\n\n"
+        "[coordinate_relations / visible_relations Guidance]\n"
+        "Good coordinate_relations: items chosen from the hidden structured coordinate candidates, such as 'point g looks like the midpoint of ac' or 'points b, d, and i look nearly collinear'.\n"
+        "Bad coordinate_relations: copying a visible premise such as 'line ad is parallel to line bc' when that relation is not one of the hidden coordinate candidates.\n"
+        "Good visible_relations: old-figure relations like 'ab equals ac' or 'line ad is parallel to line bc'.\n"
+        "Bad visible_relations: any relation involving the new auxiliary point before construction, such as 'ah equals ch'.\n\n"
         "Constraints:\n"
         "- Use only lowercase point names exactly as in the problem text.\n"
         "- Do not use <point> tags, <coord> tags, LaTeX, $...$ math formatting, backticks, <aux>, <proof>, IDs, or rule names.\n"
@@ -2098,6 +2123,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- Use the hidden coordinate table only as an internal consistency check for relations that also look plausible in the image.\n"
         "- The coordinate_relations field should stay close to the structured coordinate candidates when possible. Avoid unsupported jumps like 'there is a rotation symmetry' unless you first name the concrete equal, parallel, perpendicular, midpoint, or collinear cues behind it.\n"
         "- The visible_relations field should preferentially reuse the visible premise summaries above, plus a small number of visually obvious derived facts. It should not introduce invented centers, rotations, or unnamed transformations.\n"
+        "- The coordinate_relations and visible_relations fields must stay separate: coordinate_relations are coordinate-backed visual checks, while visible_relations are existing-figure givens or obvious old-figure consequences.\n"
         "- The coordinate_hints field must be written as ordinary visual geometry language. Do not say 'the coordinates show', 'the coordinates indicate', or anything similar.\n"
         "- Do not mention the new point name before the construction field.\n"
         "- Avoid vague filler such as 'this point is crucial' or 'this will help'.\n"
