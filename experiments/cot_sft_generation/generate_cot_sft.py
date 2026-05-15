@@ -750,6 +750,61 @@ def iter_aux_constructed_parallelogram_mentions(text, aux_part):
             yield match.span()
 
 
+def extract_midpoint_relation_signature(text):
+    if not isinstance(text, str):
+        return None
+    lowered = text.lower().strip()
+    midpoint_patterns = [
+        r"(?:point\s+)?([a-z])\s+looks\s+like\s+the\s+midpoint\s+of\s+([a-z])([a-z])",
+        r"(?:point\s+)?([a-z])\s+is\s+the\s+midpoint\s+of\s+([a-z])([a-z])",
+        r"(?:point\s+)?([a-z])\s+appears\s+to\s+be\s+the\s+midpoint\s+of\s+([a-z])([a-z])",
+    ]
+    for pattern in midpoint_patterns:
+        match = re.search(pattern, lowered)
+        if not match:
+            continue
+        midpoint = match.group(1).lower()
+        endpoint_a = match.group(2).lower()
+        endpoint_b = match.group(3).lower()
+        return midpoint, tuple(sorted([endpoint_a, endpoint_b]))
+    return None
+
+
+def coordinate_hints_support_parallelogram(plan):
+    if not isinstance(plan, dict):
+        return False
+    midpoint_map = {}
+    for relation in plan.get("coordinate_relations", []):
+        signature = extract_midpoint_relation_signature(relation)
+        if not signature:
+            continue
+        midpoint, segment = signature
+        midpoint_map.setdefault(midpoint, set()).add(segment)
+    for midpoint, segments in midpoint_map.items():
+        if len(segments) < 2:
+            continue
+        segment_points = set()
+        for segment in segments:
+            segment_points.update(segment)
+        if len(segment_points) >= 4:
+            return True
+    return False
+
+
+def iter_coordinate_supported_parallelogram_mentions(text, plan):
+    if not isinstance(text, str) or not text or not coordinate_hints_support_parallelogram(plan):
+        return
+    patterns = [
+        r"\bparallelogram\s+structure\b",
+        r"\bsuggests?\s+(?:a|the)\s+parallelogram\b",
+        r"\bsuggests?\s+(?:a|the)\s+parallelogram\s+structure\b",
+        r"\bparallelogram-like\s+structure\b",
+    ]
+    for pattern in patterns:
+        for match in re.finditer(pattern, text):
+            yield match.span()
+
+
 def _coord_line_metrics(point_coords, p1, p2):
     x1, y1 = point_coords[p1]
     x2, y2 = point_coords[p2]
@@ -1088,6 +1143,7 @@ def audit_generation_quality(record, generation, aux_part):
         if marker == "parallelogram":
             supported_spans = list(iter_supported_parallelogram_mentions(record, text_to_scan))
             supported_spans.extend(iter_aux_constructed_parallelogram_mentions(text_to_scan, aux_part))
+            supported_spans.extend(iter_coordinate_supported_parallelogram_mentions(text_to_scan, plan))
             marker_hits = [match.span() for match in re.finditer(r"\bparallelogram\b", text_to_scan)]
             unsupported_hits = [
                 hit
@@ -1980,7 +2036,7 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
         mentions_goal_keyword = any(keyword in first_sentence_lower for keyword in goal_keywords)
         if mentions_goal_point < 1 and not mentions_goal_keyword:
             return False, "Writer body must start from the bottleneck or goal-side obstacle, not by re-describing the injected prefix"
-    if injected_prefix and has_long_ngram_overlap(injected_prefix, body, ngram_size=7):
+    if injected_prefix and has_long_ngram_overlap(injected_prefix, body, ngram_size=9):
         return False, "Writer body overlaps too much with the injected prefix block; continue from it instead of repeating it"
     for pattern in FORBIDDEN_THINKING_PATTERNS:
         hit = pattern.search(body)
@@ -2288,6 +2344,65 @@ def build_writer_bridge_contracts(plan):
         }
     )
     return contracts
+
+
+def build_writer_sentence_blueprints(plan):
+    if not isinstance(plan, dict):
+        return []
+    blueprints = [
+        {
+            "sentence_type": "opening",
+            "goal_finish": plan.get("goal_finish", ""),
+            "instruction": "State the obstacle directly in goal-side terms without re-describing the injected prefix.",
+        },
+        {
+            "sentence_type": "helper",
+            "instruction": "State the missing helper mechanism impersonally and concretely.",
+        },
+        {
+            "sentence_type": "construction",
+            "instruction": "Introduce the approved auxiliary construction in natural language.",
+        },
+    ]
+    if plan.get("aux_direct_relations"):
+        blueprints.append(
+            {
+                "sentence_type": "aux_direct",
+                "relation_sequence": plan.get("aux_direct_relations", []),
+                "instruction": "Realize the direct auxiliary consequences before any bridge sentence.",
+            }
+        )
+    for idx, step in enumerate(plan.get("bridge_steps", []), start=1):
+        if not isinstance(step, dict):
+            continue
+        support_sequence = step.get("required_supports") or step.get("depends_on", [])
+        blueprints.append(
+            {
+                "sentence_type": f"bridge_{idx}",
+                "recommended_order": [
+                    "support",
+                    "approved_relation",
+                    "next_target",
+                ],
+                "support_relation": support_sequence[0] if support_sequence else "",
+                "fallback_support_relations": support_sequence[1:] if len(support_sequence) > 1 else [],
+                "approved_relation": step.get("approved_route_relation") or step.get("relation", ""),
+                "next_target_relation": step.get("next_target_relation", ""),
+                "forbid_new_claims": True,
+                "instruction": (
+                    "Prefer a sentence of the form 'Because <support>, <approved relation>, which prepares <next target>'. "
+                    "Do not add a fresh geometric claim outside the approved support/relation/next-target bundle."
+                ),
+            }
+        )
+    blueprints.append(
+        {
+            "sentence_type": "goal_finish",
+            "approved_relation": plan.get("goal_finish", ""),
+            "instruction": "Use one final sentence that explicitly states the approved goal_finish relation and stops there.",
+        }
+    )
+    return blueprints
 
 
 def build_prefix_sentences(plan, point_coords):
@@ -2705,6 +2820,10 @@ def build_plan_retry_feedback(validation_message, aux_part):
 def build_writer_retry_feedback(validation_message, plan):
     bridge_steps = plan.get("bridge_steps", []) if isinstance(plan, dict) else []
     bridge_summary = json.dumps(bridge_steps, ensure_ascii=False, indent=2) if bridge_steps else "[]"
+    bridge_blueprints = (
+        json.dumps(build_writer_sentence_blueprints(plan), ensure_ascii=False, indent=2)
+        if isinstance(plan, dict) else "[]"
+    )
     targeted_hints = []
     if "overlaps too much with the injected prefix" in validation_message:
         targeted_hints.append(
@@ -2789,7 +2908,9 @@ def build_writer_retry_feedback(validation_message, plan):
         "Keep one sentence for each bridge step, and explicitly name concrete supporting relations instead of using vague shortcuts.\n"
         f"{targeted_hint_block}"
         "Approved bridge steps to realize in order:\n"
-        f"{bridge_summary}"
+        f"{bridge_summary}\n\n"
+        "Sentence blueprints:\n"
+        f"{bridge_blueprints}"
     )
 
 
@@ -2987,6 +3108,11 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         indent=2,
     )
     sentence_duties = build_writer_sentence_duties(plan)
+    sentence_blueprints = json.dumps(
+        build_writer_sentence_blueprints(plan),
+        ensure_ascii=False,
+        indent=2,
+    )
     bridge_contracts = json.dumps(
         build_writer_bridge_contracts(plan),
         ensure_ascii=False,
@@ -3032,6 +3158,9 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "[Sentence Duties]\n"
         "Use this outline internally to keep the body stepwise, concrete, and impersonal. Do not quote these lines verbatim, and do not repeat the injected prefix.\n"
         f"{sentence_duties}\n\n"
+        "[Sentence Blueprints]\n"
+        "Use these sentence-level blueprints as the preferred local writing pattern. They are stricter than the prose duties: support relation first when available, then the approved relation, then a short next-target clause, with no fresh geometric claim added in the middle.\n"
+        f"{sentence_blueprints}\n\n"
         "[Bridge Sentence Contracts]\n"
         "Use these contracts as a hard checklist for the post-aux body sentences. Each listed relation should appear explicitly, the listed supports should be named inside the same sentence when required, and the goal_finish contract must be realized after the final bridge sentence.\n"
         f"{bridge_contracts}\n\n"
@@ -3074,6 +3203,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "27. When an approved bridge relation is an angle or ratio relation, write it in nearly the same point ordering and surface form as the approved relation, rather than paraphrasing it into a looser sentence like 'the angle formed by ...'.\n"
         "28. Keep the bridge sentences tight: usually one approved relation, one or two concrete supports, and one short forward-looking clause. Do not spend multiple clauses re-explaining the same visible setup.\n"
         "29. Never wrap a point pair, line name, segment name, ratio, or angle label in dollar signs or LaTeX-style math. Write 'line be', 'segment bh', or 'ratio de to di' as plain text, not '$be$', '$bh$', or '$de:di$'.\n"
+        "30. Within each bridge sentence, prefer this local order unless the English becomes ungrammatical: approved support relation -> approved bridge relation -> short next-target clause. Avoid inserting a fresh geometric claim between those parts.\n"
         "Output only the plain-text body.\n"
     )
 
