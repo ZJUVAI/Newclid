@@ -476,7 +476,25 @@ def relations_semantically_match(text_a, text_b, point_names):
     points_b = extract_point_mentions(normalized_b, point_names)
     keyword_a = relation_text_keywords(normalized_a)
     keyword_b = relation_text_keywords(normalized_b)
+    structure_a = extract_high_level_structure_markers(normalized_a)
+    structure_b = extract_high_level_structure_markers(normalized_b)
     if not (points_a and points_b and keyword_a and keyword_b):
+        return False
+    exclusive_modalities = [
+        "angle",
+        "ratio",
+        "similar",
+        "parallel",
+        "perpendicular",
+        "collinear",
+        "midpoint",
+        "circle",
+        "isosceles",
+    ]
+    for label in exclusive_modalities:
+        if (label in keyword_a) != (label in keyword_b):
+            return False
+    if ("triangle" in structure_a) != ("triangle" in structure_b):
         return False
     shared_points = points_a & points_b
     shared_keywords = keyword_a & keyword_b
@@ -491,6 +509,34 @@ def relations_semantically_match(text_a, text_b, point_names):
     if {"collinear", "midpoint", "circle"} & shared_keywords and len(shared_points) >= 3:
         return True
     return False
+
+
+def align_bridge_steps_to_hidden_route(bridge_steps, hidden_route_relations, point_names):
+    matches = []
+    unmatched = []
+    cursor = -1
+    for step in bridge_steps:
+        relation_text = step.get("relation", "") if isinstance(step, dict) else ""
+        matched_index = None
+        for idx in range(cursor + 1, len(hidden_route_relations)):
+            if relations_semantically_match(relation_text, hidden_route_relations[idx], point_names):
+                matched_index = idx
+                break
+        if matched_index is None:
+            matches.append(None)
+            unmatched.append(relation_text)
+            continue
+        matches.append(
+            {
+                "index": matched_index,
+                "relation": hidden_route_relations[matched_index],
+            }
+        )
+        cursor = matched_index
+    return {
+        "matches": matches,
+        "unmatched": unmatched,
+    }
 
 
 def build_visible_premise_summaries(record, max_items=12):
@@ -1501,19 +1547,24 @@ def validate_plan_response(
         proof_guidance = build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal)
         hidden_route_relations = proof_guidance.get("bridge_relations", []) + proof_guidance.get("goal_finish_relations", [])
         if hidden_route_relations:
-            unmatched_bridge_steps = [
-                step["relation"]
-                for step in cleaned_plan["bridge_steps"]
-                if not any(
-                    relations_semantically_match(step["relation"], hidden_relation, known_points)
-                    for hidden_relation in hidden_route_relations
-                )
-            ]
-            if unmatched_bridge_steps:
+            route_alignment = align_bridge_steps_to_hidden_route(
+                cleaned_plan["bridge_steps"],
+                hidden_route_relations,
+                known_points,
+            )
+            if route_alignment["unmatched"]:
                 return False, (
-                    "bridge_steps relations must stay close to the hidden proof guidance route; "
-                    f"unmatched items: {unmatched_bridge_steps}"
+                    "bridge_steps relations must stay close to the hidden proof guidance route and follow its order; "
+                    f"unmatched items: {route_alignment['unmatched']}"
                 ), None
+            aligned_bridge_steps = []
+            for step, match in zip(cleaned_plan["bridge_steps"], route_alignment["matches"]):
+                aligned_step = dict(step)
+                if match:
+                    aligned_step["approved_route_relation"] = match["relation"]
+                    aligned_step["approved_route_position"] = match["index"] + 1
+                aligned_bridge_steps.append(aligned_step)
+            cleaned_plan["bridge_steps"] = aligned_bridge_steps
 
     cleaned_plan = enrich_bridge_steps_with_targets(cleaned_plan)
 
@@ -1875,8 +1926,9 @@ def build_writer_sentence_duties(plan):
     for idx, step in enumerate(plan.get("bridge_steps", []), start=1):
         if not isinstance(step, dict):
             continue
+        approved_relation = step.get("approved_route_relation") or step.get("relation", "")
         lines.append(
-            f"{len(lines) + 1}. Bridge sentence {idx}: state the approved relation '{step.get('relation', '')}', mention at least one concrete support from the approved plan, prefer an aux-direct or previous-bridge support when possible, avoid summary labels like symmetry or midpoint property in place of those supports, paraphrase any visible given that already appears in the prefix, and point toward '{step.get('next_target_relation', '')}'."
+            f"{len(lines) + 1}. Bridge sentence {idx}: state the approved relation '{approved_relation}', mention at least one concrete support from the approved plan, prefer an aux-direct or previous-bridge support when possible, avoid summary labels like symmetry or midpoint property in place of those supports, paraphrase any visible given that already appears in the prefix, and point toward '{step.get('next_target_relation', '')}'."
         )
     lines.append(
         f"{len(lines) + 1}. Final sentence: land on the approved goal-side finish exactly: {plan.get('goal_finish', '')}"
@@ -2163,6 +2215,9 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- when a hidden bridge relation pool is shown, copy those route relations almost verbatim into bridge_steps.relation instead of swapping in a different structure like a new similar-triangle, cyclic, or equal-length route."
         )
+        targeted_hints.append(
+            "- follow the approved route checkpoints in order: the first bridge step should match an earlier checkpoint, and later bridge steps should progress forward rather than jumping to a later finish relation or inventing a new parallel relation."
+        )
     if "unsupported high-level" in validation_message:
         targeted_hints.append(
             "- do not introduce new routes such as triangle similarity, cyclic quadrilaterals, or parallelograms inside why_it_helps unless that same structure is already stated in the approved relation chain."
@@ -2299,6 +2354,10 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
     )
     route_relation_pool = proof_guidance_payload.get("bridge_relations", []) + proof_guidance_payload.get("goal_finish_relations", [])
     route_relation_block = json.dumps(route_relation_pool, ensure_ascii=False, indent=2) if route_relation_pool else "[]"
+    ordered_route_checkpoint_block = (
+        "\n".join(f"{idx + 1}. {relation}" for idx, relation in enumerate(route_relation_pool))
+        if route_relation_pool else "1. (no hidden route checkpoints available)"
+    )
     return (
         "You are planning a geometry CoT training example.\n\n"
         "[What the future student model will see at training/eval time]\n"
@@ -2343,6 +2402,10 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "Choose bridge_steps.relation items from or very close to this relation pool, in a realistic order. "
         "Do not replace this route with a different high-level structure unless that same structure already appears below.\n"
         f"{route_relation_block}\n\n"
+        "[Approved Ordered Route Checkpoints]\n"
+        "Your bridge_steps should usually form an ordered subsequence of the checkpoints below. "
+        "Earlier bridge steps should match earlier checkpoints, and later bridge steps should move toward the goal-side checkpoints rather than inventing a new route.\n"
+        f"{ordered_route_checkpoint_block}\n\n"
         "[Task]\n"
         "Return exactly one JSON object with these keys:\n"
         "1. anchor_points: a list of 3 or 4 original visible points that are the best tagged anchors for orienting the figure.\n"
@@ -2400,6 +2463,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- Each bridge_steps relation should explicitly mention how the auxiliary point interacts with existing visible points or substructures, in a realistic order.\n"
         "- The first bridge_steps relation must explicitly contain the new auxiliary point together with at least one old visible point, and it should be written in a compact relation form such as 'ag equals dg' or 'angle bg/bj equals angle gi/ij'.\n"
         "- Each bridge_steps relation should stay semantically close to the hidden proof guidance bridge_relations or goal_finish_relations; do not swap in a different high-level route.\n"
+        "- Treat the Approved Ordered Route Checkpoints as the preferred bridge-step order. Do not jump to a later checkpoint first, and do not invent a fresh parallel/similarity/angle route when an earlier approved checkpoint is already available.\n"
         "- When the approved route relation pool lists a concrete relation such as 'line bg is parallel to line cd' or 'bk = dk', prefer using that relation directly instead of inventing an alternative route like a new similar-triangle claim.\n"
         "- Each bridge_steps depends_on list should reuse concrete items from visible_relations, aux_direct_relations, or an earlier bridge_steps relation, instead of inventing unsupported leaps.\n"
         "- Each depends_on item must be copied as a natural-language relation string, not written as a raw formal predicate such as 'cong b j d j'.\n"
