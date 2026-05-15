@@ -1797,7 +1797,7 @@ def build_writer_sentence_duties(plan):
         if not isinstance(step, dict):
             continue
         lines.append(
-            f"{len(lines) + 1}. Bridge sentence {idx}: state the approved relation '{step.get('relation', '')}', mention at least one concrete support from the approved plan, prefer an aux-direct or previous-bridge support when possible, paraphrase any visible given that already appears in the prefix, and point toward '{step.get('next_target_relation', '')}'."
+            f"{len(lines) + 1}. Bridge sentence {idx}: state the approved relation '{step.get('relation', '')}', mention at least one concrete support from the approved plan, prefer an aux-direct or previous-bridge support when possible, avoid summary labels like symmetry or midpoint property in place of those supports, paraphrase any visible given that already appears in the prefix, and point toward '{step.get('next_target_relation', '')}'."
         )
     lines.append(
         f"{len(lines) + 1}. Final sentence: land on the approved goal-side finish exactly: {plan.get('goal_finish', '')}"
@@ -2110,6 +2110,9 @@ def build_writer_retry_feedback(validation_message, plan):
         targeted_hints.append(
             "- in each bridge sentence, name the concrete depends_on relations and also state the next approved bridge relation or goal-side relation that this sentence unlocks."
         )
+        targeted_hints.append(
+            "- do not summarize the support as 'symmetry', 'center of symmetry', or 'midpoint property'; explicitly restate the approved support relations such as 'h is the midpoint of bc' or 'bh equals ch'."
+        )
     if "must explicitly realize bridge_steps" in validation_message:
         targeted_hints.append(
             "- include one explicit sentence for every approved bridge_steps relation in order; do not skip the last angle or parallel relation before the goal_finish sentence."
@@ -2358,6 +2361,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "23. Each bridge_steps object includes an internal next_target_relation chosen by the script. Use it to keep the reasoning pointed toward the next approved relation instead of inventing a different route.\n"
         "24. Use impersonal sentence forms such as 'the obstacle is ...', 'a helper is needed ...', 'construct point h ...', and 'this gives ...'; avoid first-person forms like 'we need' or 'we construct'.\n"
         "25. If you need to reuse a visible given that already appears in the injected prefix, paraphrase it instead of copying the exact wording from the prefix sentence.\n"
+        "26. In bridge sentences, do not replace the approved supports with summary labels such as 'symmetry', 'center of symmetry', or 'midpoint property'; name the actual equalities, collinearities, parallels, or perpendicularities instead.\n"
         "Output only the plain-text body.\n"
     )
 
