@@ -2,8 +2,10 @@
 
 from collections import Counter
 import inspect
+import json
 import logging
 import os
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -75,14 +77,60 @@ class AuxReward(_AuxReward, ORM):
             "reward_log_interval",
             os.getenv("NEWCLID_GRPO_REWARD_LOG_INTERVAL", "50"),
         )
+        breakdown_path = kwargs.pop(
+            "reward_breakdown_path",
+            os.getenv("NEWCLID_GRPO_REWARD_BREAKDOWN_PATH"),
+        )
         _AuxReward.__init__(self, **kwargs)
         self._reward_log_interval = max(0, int(reward_log_interval))
         self._call_count = 0
         self._last_log_bucket = -1
         self._window_status_counts = Counter()
+        self._window_reward_sums = Counter()
         self._window_sample_count = 0
         self._window_aux_signatures = set()
+        self._breakdown_path = self._resolve_breakdown_path(breakdown_path)
+        self._breakdown_initialized = False
         # Don't call ORM.__init__ as it's just a marker class
+
+    @staticmethod
+    def _resolve_breakdown_path(path_value: str | None) -> Path | None:
+        if not path_value:
+            return None
+        path = Path(path_value)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def _write_breakdown_header(self) -> None:
+        if self._breakdown_initialized or self._breakdown_path is None:
+            return
+        reward_cfg = self.evaluator
+        with self._breakdown_path.open("w", encoding="utf-8") as handle:
+            handle.write(
+                json.dumps(
+                    {
+                        "type": "header",
+                        "reward_log_interval": self._reward_log_interval,
+                        "reward_config": {
+                            "solved_reward": reward_cfg.solved_reward,
+                            "valid_reward": reward_cfg.valid_reward,
+                            "invalid_build_reward": reward_cfg.invalid_build_reward,
+                            "invalid_format_reward": reward_cfg.invalid_format_reward,
+                            "engine_error_reward": reward_cfg.engine_error_reward,
+                        },
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+        self._breakdown_initialized = True
+
+    def _append_breakdown_record(self, record: dict) -> None:
+        if self._breakdown_path is None:
+            return
+        self._write_breakdown_header()
+        with self._breakdown_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
 
     @staticmethod
     def _extract_step(kwargs) -> int | None:
@@ -106,6 +154,8 @@ class AuxReward(_AuxReward, ORM):
     def _record_reward_window(self, results, kwargs) -> None:
         self._call_count += 1
         self._window_status_counts.update(result.ddar_status for result in results)
+        for result in results:
+            self._window_reward_sums[result.ddar_status] += result.reward
         self._window_sample_count += len(results)
         self._window_aux_signatures.update(
             result.normalized_aux for result in results if result.normalized_aux
@@ -126,6 +176,8 @@ class AuxReward(_AuxReward, ORM):
         engine_error = self._window_status_counts.get("engine_error", 0)
         total = self._window_sample_count
         aux_unique_ratio = len(self._window_aux_signatures) / total if total > 0 else 0.0
+        reward_sum = sum(self._window_reward_sums.values())
+        avg_reward = reward_sum / total if total > 0 else 0.0
 
         # Classify the dominant cause when zero-std collapse is likely
         zero_std_cause = ""
@@ -147,7 +199,41 @@ class AuxReward(_AuxReward, ORM):
             total,
             zero_std_cause,
         )
+        self._append_breakdown_record(
+            {
+                "type": "window",
+                "step": marker,
+                "samples": total,
+                "avg_reward": avg_reward,
+                "aux_unique_ratio": aux_unique_ratio,
+                "status_counts": dict(self._window_status_counts),
+                "status_ratios": {
+                    "solved": solved / total,
+                    "valid_unsolved": valid_unsolved / total,
+                    "build_invalid": build_invalid / total,
+                    "format_invalid": format_invalid / total,
+                    "engine_error": engine_error / total,
+                },
+                "reward_contributions": {
+                    "solved": self._window_reward_sums.get("solved", 0.0) / total,
+                    "valid_unsolved": self._window_reward_sums.get("unsolved", 0.0)
+                    / total,
+                    "build_invalid": self._window_reward_sums.get(
+                        "build_invalid", 0.0
+                    )
+                    / total,
+                    "format_invalid": self._window_reward_sums.get(
+                        "format_invalid", 0.0
+                    )
+                    / total,
+                    "engine_error": self._window_reward_sums.get("engine_error", 0.0)
+                    / total,
+                },
+                "collapse_cause": zero_std_cause.strip(" []") or None,
+            }
+        )
         self._window_status_counts.clear()
+        self._window_reward_sums.clear()
         self._window_sample_count = 0
         self._window_aux_signatures.clear()
         self._last_log_bucket = bucket

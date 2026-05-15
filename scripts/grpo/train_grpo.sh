@@ -15,6 +15,7 @@ TOP_P="${TOP_P:-}"
 MAX_COMPLETION_LENGTH="${MAX_COMPLETION_LENGTH:-}"
 BETA="${BETA:-}"
 REWARD_LOG_INTERVAL="${REWARD_LOG_INTERVAL:-50}"
+REWARD_BREAKDOWN_FILENAME="${REWARD_BREAKDOWN_FILENAME:-reward_breakdown.jsonl}"
 
 # Get the directory of this script and use venv swift
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,6 +25,7 @@ PYTHON_BIN="${PYTHON_BIN:-$REPO_ROOT/.venv/bin/python}"
 mkdir -p "$OUTPUT_DIR"
 
 export NEWCLID_GRPO_REWARD_LOG_INTERVAL="$REWARD_LOG_INTERVAL"
+export NEWCLID_GRPO_REWARD_BREAKDOWN_PATH="$OUTPUT_DIR/$REWARD_BREAKDOWN_FILENAME"
 
 METADATA_PATH="$OUTPUT_DIR/run_metadata.json"
 "$PYTHON_BIN" - <<'PY' "$DATASET_PATH" "$OUTPUT_DIR" "$METADATA_PATH"
@@ -58,6 +60,7 @@ metadata = {
     "max_completion_length": os.getenv("MAX_COMPLETION_LENGTH") or None,
     "beta": os.getenv("BETA") or None,
     "reward_log_interval": os.getenv("NEWCLID_GRPO_REWARD_LOG_INTERVAL"),
+    "reward_breakdown_path": os.getenv("NEWCLID_GRPO_REWARD_BREAKDOWN_PATH"),
     "reward_config": {
         "solved_reward": os.getenv("NEWCLID_GRPO_SOLVED_REWARD"),
         "valid_reward": os.getenv("NEWCLID_GRPO_VALID_REWARD"),

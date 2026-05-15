@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import os
 import sys
 import tempfile
 import types
@@ -281,6 +282,78 @@ class TestGRPORewards(unittest.TestCase):
         self.assertEqual(
             reward(["<aux> broken </aux>"], fl_problem=SAMPLE_FL_PROBLEM), [-1.0]
         )
+
+    def test_plugin_writes_reward_breakdown_jsonl(self):
+        swift_module = types.ModuleType("swift")
+        rewards_module = types.ModuleType("swift.rewards")
+
+        class DummyORM:
+            pass
+
+        rewards_module.ORM = DummyORM
+        rewards_module.orms = {}
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            breakdown_path = Path(tmp_dir) / "reward_breakdown.jsonl"
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "NEWCLID_GRPO_REWARD_LOG_INTERVAL": "1",
+                    "NEWCLID_GRPO_REWARD_BREAKDOWN_PATH": str(breakdown_path),
+                },
+                clear=False,
+            ), mock.patch.dict(
+                sys.modules,
+                {
+                    "swift": swift_module,
+                    "swift.rewards": rewards_module,
+                },
+                clear=False,
+            ):
+                script_path = Path("scripts/grpo/plugin.py")
+                spec = importlib.util.spec_from_file_location("grpo_plugin", script_path)
+                module = importlib.util.module_from_spec(spec)
+                self.assertIsNotNone(spec.loader)
+                spec.loader.exec_module(module)
+
+                reward_cls = rewards_module.orms["aux_reward"]
+                reward = reward_cls()
+                with mock.patch.object(
+                    reward,
+                    "evaluate_batch",
+                    return_value=[
+                        types.SimpleNamespace(
+                            ddar_status="solved",
+                            reward=1.0,
+                            normalized_aux="aux_a",
+                        ),
+                        types.SimpleNamespace(
+                            ddar_status="format_invalid",
+                            reward=-1.0,
+                            normalized_aux=None,
+                        ),
+                    ],
+                ):
+                    output = reward(
+                        completions=["c1", "c2"],
+                        fl_problem=[SAMPLE_FL_PROBLEM, SAMPLE_FL_PROBLEM],
+                        global_step=1,
+                    )
+
+            self.assertEqual(output, [1.0, -1.0])
+            lines = breakdown_path.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(len(lines), 2)
+            header = json.loads(lines[0])
+            record = json.loads(lines[1])
+
+        self.assertEqual(header["type"], "header")
+        self.assertEqual(record["type"], "window")
+        self.assertEqual(record["step"], 1)
+        self.assertEqual(record["samples"], 2)
+        self.assertEqual(record["status_counts"]["solved"], 1)
+        self.assertEqual(record["status_counts"]["format_invalid"], 1)
+        self.assertEqual(record["reward_contributions"]["solved"], 0.5)
+        self.assertEqual(record["reward_contributions"]["format_invalid"], -0.5)
 
 
 if __name__ == "__main__":
