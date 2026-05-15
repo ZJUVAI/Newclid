@@ -681,6 +681,46 @@ def iter_supported_parallelogram_mentions(record, text):
                 yield match.span()
 
 
+def aux_constructs_parallelogram(aux_part):
+    if not isinstance(aux_part, str) or not aux_part.strip():
+        return False
+    new_points = {point.lower() for point in extract_aux_new_points(aux_part)}
+    if not new_points:
+        return False
+    para_counts = {point: 0 for point in new_points}
+    old_point_unions = {point: set() for point in new_points}
+    for clause in parse_aux_clauses(aux_part):
+        for fact in split_formal_relation_chain(clause["body"]):
+            tokens = fact.split()
+            if not tokens or tokens[0].lower() != "para":
+                continue
+            args = [token.lower() for token in tokens[1:]]
+            if len(args) < 4:
+                continue
+            arg_set = set(args[:4])
+            touched_new_points = arg_set & new_points
+            if not touched_new_points:
+                continue
+            for point in touched_new_points:
+                para_counts[point] += 1
+                old_point_unions[point].update(arg_set - {point})
+    return any(para_counts[point] >= 2 and len(old_point_unions[point]) >= 3 for point in new_points)
+
+
+def iter_aux_constructed_parallelogram_mentions(text, aux_part):
+    if not isinstance(text, str) or not text or not aux_constructs_parallelogram(aux_part):
+        return
+    patterns = [
+        r"\bcreate(?:s|d|ing)?\s+(?:an?\s+)?parallelogram\b",
+        r"\bform(?:s|ed|ing)?\s+(?:an?\s+)?parallelogram\b",
+        r"\bcomplete(?:s|d|ing)?\s+(?:an?\s+)?parallelogram\b",
+        r"\bmake(?:s|d|ing)?\s+(?:an?\s+)?parallelogram\b",
+    ]
+    for pattern in patterns:
+        for match in re.finditer(pattern, text):
+            yield match.span()
+
+
 def _coord_line_metrics(point_coords, p1, p2):
     x1, y1 = point_coords[p1]
     x2, y2 = point_coords[p2]
@@ -1018,6 +1058,7 @@ def audit_generation_quality(record, generation, aux_part):
     for marker in suspicious_markers:
         if marker == "parallelogram":
             supported_spans = list(iter_supported_parallelogram_mentions(record, text_to_scan))
+            supported_spans.extend(iter_aux_constructed_parallelogram_mentions(text_to_scan, aux_part))
             marker_hits = [match.span() for match in re.finditer(r"\bparallelogram\b", text_to_scan)]
             unsupported_hits = [
                 hit
@@ -1939,13 +1980,28 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
             if match_idx is None:
                 return False, f"Writer body must explicitly realize bridge_steps[{idx}].relation in order"
             sentence = sentences[match_idx]
+            required_supports = step.get("required_supports") or step.get("depends_on", [])
+            mentioned_dependencies = count_relation_mentions(sentence, required_supports)
+            min_support_mentions = step.get("min_support_mentions", 1 if required_supports else 0)
+            if mentioned_dependencies < min_support_mentions:
+                return False, (
+                    f"Writer sentence for bridge_steps[{idx}] must name at least one approved supporting relation"
+                )
             if any(marker in sentence.lower() for marker in generic_markers):
-                mentioned_dependencies = count_relation_mentions(sentence, step.get("depends_on", []))
-                if mentioned_dependencies < min(2, len(step.get("depends_on", []))):
+                if mentioned_dependencies < min(2, len(required_supports)):
                     return False, (
                         f"Writer sentence for bridge_steps[{idx}] uses a generic shortcut without naming enough supporting relations"
                     )
             search_start = match_idx + 1
+        goal_finish = plan.get("goal_finish", "")
+        if goal_finish:
+            finish_match_idx = None
+            for sentence_idx in range(search_start, len(sentences)):
+                if relation_mentioned_in_text(sentences[sentence_idx], goal_finish):
+                    finish_match_idx = sentence_idx
+                    break
+            if finish_match_idx is None:
+                return False, "Writer body must explicitly realize goal_finish after the bridge steps"
     return True, "Valid writer body"
 
 
@@ -1976,6 +2032,7 @@ def enrich_bridge_steps_with_targets(plan):
             if isinstance(dep, str) and dep.strip()
         ]
         enriched["required_supports"] = dependencies[: min(2, len(dependencies))]
+        enriched["min_support_mentions"] = 1 if dependencies else 0
         enriched_steps.append(enriched)
     enriched_plan = dict(plan)
     enriched_plan["bridge_steps"] = enriched_steps
@@ -2162,8 +2219,9 @@ def build_writer_sentence_duties(plan):
             continue
         approved_relation = step.get("approved_route_relation") or step.get("relation", "")
         required_supports = step.get("required_supports", [])
+        min_support_mentions = step.get("min_support_mentions", 1 if required_supports else 0)
         support_clause = (
-            f" explicitly mention these support relations if possible: {json.dumps(required_supports, ensure_ascii=False)};"
+            f" explicitly mention at least {min_support_mentions} of these support relations: {json.dumps(required_supports, ensure_ascii=False)};"
             if required_supports else
             " explicitly mention at least one approved support relation;"
         )
@@ -2171,9 +2229,36 @@ def build_writer_sentence_duties(plan):
             f"{len(lines) + 1}. Bridge sentence {idx}: state the approved relation '{approved_relation}',{support_clause} prefer an aux-direct or previous-bridge support when possible, avoid summary labels like symmetry or midpoint property in place of those supports, paraphrase any visible given that already appears in the prefix, and point toward '{step.get('next_target_relation', '')}'."
         )
     lines.append(
-        f"{len(lines) + 1}. Final sentence: land on the approved goal-side finish exactly: {plan.get('goal_finish', '')}"
+        f"{len(lines) + 1}. Final sentence: after the last bridge sentence, explicitly land on the approved goal-side finish exactly: {plan.get('goal_finish', '')}"
     )
     return "\n".join(lines)
+
+
+def build_writer_bridge_contracts(plan):
+    if not isinstance(plan, dict):
+        return []
+    contracts = []
+    bridge_steps = plan.get("bridge_steps", [])
+    for idx, step in enumerate(bridge_steps, start=1):
+        if not isinstance(step, dict):
+            continue
+        contracts.append(
+            {
+                "sentence_type": f"bridge_{idx}",
+                "relation": step.get("approved_route_relation") or step.get("relation", ""),
+                "required_supports": step.get("required_supports", []),
+                "min_support_mentions": step.get("min_support_mentions", 1 if step.get("required_supports") else 0),
+                "next_target_relation": step.get("next_target_relation", ""),
+            }
+        )
+    contracts.append(
+        {
+            "sentence_type": "goal_finish",
+            "relation": plan.get("goal_finish", ""),
+            "must_appear_after_bridge_count": len(bridge_steps),
+        }
+    )
+    return contracts
 
 
 def build_prefix_sentences(plan, point_coords):
@@ -2246,8 +2331,82 @@ def relation_mentioned_in_text(text, relation):
     return has_long_ngram_overlap(lowered_relation, lowered_text, ngram_size=3)
 
 
-def count_relation_mentions(text, relations):
-    return sum(1 for relation in relations if relation_mentioned_in_text(text, relation))
+def extract_relation_point_names(text):
+    lowered = (text or "").lower()
+    stopwords = {
+        "a",
+        "i",
+        "is",
+        "to",
+        "of",
+        "on",
+        "in",
+        "by",
+        "at",
+        "as",
+        "are",
+        "and",
+        "the",
+        "line",
+        "ratio",
+    }
+    point_names = set(re.findall(r"\b([a-z])\b", lowered))
+    for token in re.findall(r"\b[a-z]{2,4}\b", lowered):
+        if token in stopwords:
+            continue
+        if token in {"line", "ratio"}:
+            continue
+        if len(token) <= 4:
+            point_names.update(char for char in token if char.isalpha())
+    return sorted(point_names)
+
+
+def relation_semantically_mentioned_in_sentence(sentence, relation):
+    lowered_sentence = (sentence or "").lower()
+    relation_points = extract_relation_point_names(relation)
+    if not relation_points or not all(point in lowered_sentence for point in relation_points):
+        return False
+    keywords = relation_text_keywords(relation)
+    if "parallel" in keywords and "parallel" in lowered_sentence:
+        return True
+    if "perpendicular" in keywords and ("perpendicular" in lowered_sentence or "right angle" in lowered_sentence):
+        return True
+    if "collinear" in keywords and any(
+        phrase in lowered_sentence for phrase in ["collinear", "same line", "one line", "on one line", "on the same line"]
+    ):
+        return True
+    if "circle" in keywords and any(
+        phrase in lowered_sentence for phrase in ["cyclic", "concyclic", "circle", "circumcircle"]
+    ):
+        return True
+    if "midpoint" in keywords and "midpoint" in lowered_sentence:
+        return True
+    if "similar" in keywords and "similar" in lowered_sentence:
+        return True
+    if "ratio" in keywords and "ratio" in lowered_sentence:
+        return True
+    if "angle" in keywords and "angle" in lowered_sentence:
+        return True
+    if "equal" in keywords and any(
+        phrase in lowered_sentence for phrase in [" equal", " equals", "congruent", "same length", "same distance", "equidistant"]
+    ):
+        return True
+    return False
+
+
+def count_relation_mentions(text, relations, point_names=None):
+    mentions = 0
+    for relation in relations:
+        if relation_mentioned_in_text(text, relation):
+            mentions += 1
+            continue
+        if relation_semantically_mentioned_in_sentence(text, relation):
+            mentions += 1
+            continue
+        local_points = point_names or extract_relation_point_names(relation)
+        if local_points and relations_semantically_match(text, relation, local_points):
+            mentions += 1
+    return mentions
 
 
 def build_public_problem_text(record):
@@ -2545,6 +2704,20 @@ def build_writer_retry_feedback(validation_message, plan):
         targeted_hints.append(
             "- when a bridge step includes internal required_supports, mention those support relations explicitly in the same sentence before landing on the new bridge relation."
         )
+    if "must name at least one approved supporting relation" in validation_message:
+        targeted_hints.append(
+            "- every bridge sentence must name at least one concrete approved support relation from its required_supports or depends_on list; do not jump straight to the new relation with no cited support."
+        )
+        targeted_hints.append(
+            "- preferred bridge sentence shape: support relation first, then the new approved bridge relation, then one short clause about the next target."
+        )
+    if "must explicitly realize goal_finish after the bridge steps" in validation_message:
+        targeted_hints.append(
+            "- add one final sentence after the last bridge sentence that explicitly states the approved goal_finish relation, rather than stopping one step early."
+        )
+        targeted_hints.append(
+            "- do not end with a vague phrase like 'this gives the claim' or 'so the target follows'; restate the exact approved goal-side ratio, angle, or congruence relation."
+        )
     if "too long" in validation_message:
         targeted_hints.append(
             "- shorten the body by compressing helper or bridge prose; keep the approved relation names, but trim extra explanation and repeated restatements."
@@ -2558,6 +2731,9 @@ def build_writer_retry_feedback(validation_message, plan):
         )
         targeted_hints.append(
             "- examples: write 'the ratio ab over bg' instead of '$ab:bg$', and write 'angle bk/bj equals angle dj/dk' as plain text rather than math markup."
+        )
+        targeted_hints.append(
+            "- never wrap a point pair or line name in dollar signs: write 'line be' or 'segment bh', not '$be$' or '$bh$'."
         )
     if "midpoint propert" in validation_message:
         targeted_hints.append(
@@ -2782,6 +2958,11 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         indent=2,
     )
     sentence_duties = build_writer_sentence_duties(plan)
+    bridge_contracts = json.dumps(
+        build_writer_bridge_contracts(plan),
+        ensure_ascii=False,
+        indent=2,
+    )
     bridge_steps = plan.get("bridge_steps", []) if isinstance(plan, dict) else []
     expected_sentence_count = 4 + len(bridge_steps) + (1 if plan.get("aux_direct_relations") else 0)
     return (
@@ -2822,6 +3003,9 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "[Sentence Duties]\n"
         "Use this outline internally to keep the body stepwise, concrete, and impersonal. Do not quote these lines verbatim, and do not repeat the injected prefix.\n"
         f"{sentence_duties}\n\n"
+        "[Bridge Sentence Contracts]\n"
+        "Use these contracts as a hard checklist for the post-aux body sentences. Each listed relation should appear explicitly, the listed supports should be named inside the same sentence when required, and the goal_finish contract must be realized after the final bridge sentence.\n"
+        f"{bridge_contracts}\n\n"
         "[Compression Target]\n"
         f"Aim for about {expected_sentence_count} sentences total in the body. Keep each bridge sentence compact and concrete, usually one relation plus one or two named supports, rather than a long recap of the whole chain.\n\n"
         "[Injected Prefix Block]\n"
@@ -2860,6 +3044,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "26. In bridge sentences, do not replace the approved supports with summary labels such as 'symmetry', 'center of symmetry', or 'midpoint property'; name the actual equalities, collinearities, parallels, or perpendicularities instead.\n"
         "27. When an approved bridge relation is an angle or ratio relation, write it in nearly the same point ordering and surface form as the approved relation, rather than paraphrasing it into a looser sentence like 'the angle formed by ...'.\n"
         "28. Keep the bridge sentences tight: usually one approved relation, one or two concrete supports, and one short forward-looking clause. Do not spend multiple clauses re-explaining the same visible setup.\n"
+        "29. Never wrap a point pair, line name, segment name, ratio, or angle label in dollar signs or LaTeX-style math. Write 'line be', 'segment bh', or 'ratio de to di' as plain text, not '$be$', '$bh$', or '$de:di$'.\n"
         "Output only the plain-text body.\n"
     )
 
