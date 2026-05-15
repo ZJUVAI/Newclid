@@ -1459,6 +1459,8 @@ def validate_plan_response(
                     f"unmatched items: {unmatched_bridge_steps}"
                 ), None
 
+    cleaned_plan = enrich_bridge_steps_with_targets(cleaned_plan)
+
     goal_spec = parse_goal_expression(visible_goal)
     goal_points = set(goal_spec["points"])
     goal_keywords = goal_keyword_hints(visible_goal)
@@ -1522,9 +1524,10 @@ def validate_plan_response(
                 )
                 new_structure_markers = extract_high_level_structure_markers(why_text) - allowed_structure_markers
                 if new_structure_markers:
-                    return False, (
-                        f"bridge_steps[{idx}].why_it_helps introduces an unsupported high-level route: {sorted(new_structure_markers)}"
-                    ), None
+                    step["why_it_helps"] = build_canonical_bridge_unlock(
+                        step.get("next_target_relation", ""),
+                        final_step=False,
+                    )
             else:
                 why_text = step["why_it_helps"].lower()
                 allowed_structure_markers = (
@@ -1534,9 +1537,10 @@ def validate_plan_response(
                 )
                 new_structure_markers = extract_high_level_structure_markers(why_text) - allowed_structure_markers
                 if new_structure_markers:
-                    return False, (
-                        f"bridge_steps[{idx}].why_it_helps introduces an unsupported high-level finish route: {sorted(new_structure_markers)}"
-                    ), None
+                    step["why_it_helps"] = build_canonical_bridge_unlock(
+                        step.get("next_target_relation", ""),
+                        final_step=True,
+                    )
     final_step = cleaned_goal_finish.lower()
     if goal_points:
         mentioned_goal_points = {point for point in goal_points if point in final_step}
@@ -1549,7 +1553,6 @@ def validate_plan_response(
         if not (bridge_mentions - set(extract_aux_new_points(aux_part))):
             return False, "bridge_steps must connect the auxiliary point to existing visible points", None
 
-    cleaned_plan = enrich_bridge_steps_with_targets(cleaned_plan)
     return True, "Valid planner JSON", cleaned_plan
 
 
@@ -1636,6 +1639,16 @@ def enrich_bridge_steps_with_targets(plan):
     enriched_plan = dict(plan)
     enriched_plan["bridge_steps"] = enriched_steps
     return enriched_plan
+
+
+def build_canonical_bridge_unlock(next_target_relation, final_step=False):
+    target_text = normalize_relation_surface(next_target_relation or "").strip().rstrip(".")
+    if not target_text:
+        return "this prepares the next approved bridge relation."
+    target_text = re.sub(r"^(then|therefore|thus)\s+", "", target_text, flags=re.IGNORECASE)
+    if final_step:
+        return f"this prepares the final goal-side relation {target_text}."
+    return f"this is required to prove {target_text} next."
 
 
 def extract_problem_goal(record):
@@ -1765,6 +1778,31 @@ def build_visible_relation_sentence(plan):
     if not relation_text:
         return ""
     return f"The visible givens also show that {relation_text}."
+
+
+def build_writer_sentence_duties(plan):
+    if not isinstance(plan, dict):
+        return ""
+    lines = [
+        "1. Opening sentence: state the goal-side obstacle directly, using the target relation or the target-side points.",
+        "2. Helper sentence: restate the approved helper idea impersonally, but do not quote the plan wording word-for-word.",
+        "3. Construction sentence: introduce the auxiliary point from the approved construction, but keep the wording natural rather than copying the plan string verbatim.",
+    ]
+    aux_direct_relations = plan.get("aux_direct_relations", [])
+    if aux_direct_relations:
+        lines.append(
+            f"{len(lines) + 1}. Direct-aux sentence: explicitly realize the immediate construction consequences before any bridge step."
+        )
+    for idx, step in enumerate(plan.get("bridge_steps", []), start=1):
+        if not isinstance(step, dict):
+            continue
+        lines.append(
+            f"{len(lines) + 1}. Bridge sentence {idx}: state the approved relation '{step.get('relation', '')}', mention at least one concrete support from the approved plan, prefer an aux-direct or previous-bridge support when possible, paraphrase any visible given that already appears in the prefix, and point toward '{step.get('next_target_relation', '')}'."
+        )
+    lines.append(
+        f"{len(lines) + 1}. Final sentence: land on the approved goal-side finish exactly: {plan.get('goal_finish', '')}"
+    )
+    return "\n".join(lines)
 
 
 def build_prefix_sentences(plan, point_coords):
@@ -1977,6 +2015,10 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- bridge_steps must be a JSON array of objects, and each depends_on field must itself be a JSON list of 1 to 3 earlier relation strings."
         )
+    if "depends_on" in validation_message and "must mention a concrete geometric relation" in validation_message:
+        targeted_hints.append(
+            "- every depends_on item should copy an earlier concrete relation almost verbatim, such as 'ah equals ch' or 'line ad is parallel to line bc'; do not replace it with abstract support labels like 'the midpoint property' or 'the equal-length setup'."
+        )
     if "coordinate_hints" in validation_message:
         targeted_hints.append(
             "- include coordinate_hints as one or two plain-language sentences summarizing which coordinate_relations matter and why."
@@ -2051,12 +2093,18 @@ def build_writer_retry_feedback(validation_message, plan):
         targeted_hints.append(
             "- do not re-describe the anchors, figure overview, coordinate hints, or visible givens from the injected prefix; start directly from the bottleneck sentence."
         )
+        targeted_hints.append(
+            "- if a bridge sentence needs a visible given that already appears in the prefix, paraphrase it instead of copying the exact wording, such as 'because ad runs parallel to bc' instead of repeating 'line ad is parallel to line bc'."
+        )
     if "first-person narration" in validation_message:
         targeted_hints.append(
             "- stay impersonal: do not use 'i', 'we', 'our', or 'let us'; write 'construct point k' instead of 'we construct point k'."
         )
         targeted_hints.append(
             "- avoid openings like 'we need' or 'we construct'; rewrite them as 'a helper is needed' and 'construct point k'."
+        )
+        targeted_hints.append(
+            "- preferred impersonal rewrites: 'the obstacle is ...', 'a helper is needed ...', 'construct point k ...', and 'this gives ...'."
         )
     if "generic shortcut" in validation_message:
         targeted_hints.append(
@@ -2239,6 +2287,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         ensure_ascii=False,
         indent=2,
     )
+    sentence_duties = build_writer_sentence_duties(plan)
     return (
         "You are polishing a geometry CoT example for SFT.\n\n"
         "[Visible Inputs]\n"
@@ -2274,6 +2323,9 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         f"Direct aux consequences to realize in order: {json.dumps(plan.get('aux_direct_relations', []), ensure_ascii=False)}\n"
         f"Bridge steps to realize in order: {json.dumps(plan.get('bridge_steps', []), ensure_ascii=False, indent=2)}\n"
         f"Goal-side finish to reach: {plan.get('goal_finish', '')}\n\n"
+        "[Sentence Duties]\n"
+        "Use this outline internally to keep the body stepwise, concrete, and impersonal. Do not quote these lines verbatim, and do not repeat the injected prefix.\n"
+        f"{sentence_duties}\n\n"
         "[Injected Prefix Block]\n"
         "The script will prepend the following block exactly before your body. Do not restate these claims; start after them.\n"
         f"{injected_prefix_block}\n\n"
@@ -2304,6 +2356,8 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "21. Avoid shortcuts such as 'by symmetry', 'from the setup', or 'it follows' unless the same sentence explicitly names the concrete supporting relations.\n"
         "22. Do not hedge with phrases like 'similarity or angle equality'; state the specific approved relation you are using.\n"
         "23. Each bridge_steps object includes an internal next_target_relation chosen by the script. Use it to keep the reasoning pointed toward the next approved relation instead of inventing a different route.\n"
+        "24. Use impersonal sentence forms such as 'the obstacle is ...', 'a helper is needed ...', 'construct point h ...', and 'this gives ...'; avoid first-person forms like 'we need' or 'we construct'.\n"
+        "25. If you need to reuse a visible given that already appears in the injected prefix, paraphrase it instead of copying the exact wording from the prefix sentence.\n"
         "Output only the plain-text body.\n"
     )
 
