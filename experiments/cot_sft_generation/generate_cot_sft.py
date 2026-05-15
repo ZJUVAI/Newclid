@@ -1906,6 +1906,14 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- construction must restate the hidden auxiliary facts in natural geometry language, including the required equal/perpendicular/parallel/circle cue."
         )
+    if "helper_idea contains forbidden pattern" in validation_message:
+        targeted_hints.append(
+            "- rewrite helper_idea as a concrete missing mechanism such as an equal-length transfer, perpendicular link, midpoint, or angle relation; do not use filler like 'facilitate' or 'help establish'."
+        )
+    if "aux_direct_relations" in validation_message and "direct auxiliary relation should stay on the direct aux consequence" in validation_message:
+        targeted_hints.append(
+            "- aux_direct_relations must stay local to the new point and the immediately constructed line/circle/perpendicular/equal relation; do not pull old-figure points like a, b, or c into later consequences unless they are part of the construction itself."
+        )
     if "why_it_helps" in validation_message:
         targeted_hints.append(
             "- each why_it_helps string should explicitly name the next bridge relation or the final goal-side relation using concrete point names, not abstract phrases like 'enabling angle transfers'."
@@ -2077,6 +2085,11 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "Good: 'this prepares the goal angle by connecting bj to bg and the target angle on cg and fg.'\n"
         "Bad: 'this enables similar triangles involving j.'\n"
         "Bad: 'this helps form a cyclic quadrilateral and later gives a parallel line.'\n\n"
+        "[helper_idea / aux_direct Guidance]\n"
+        "Good helper_idea: 'we need a point that creates an equal-length transfer from k toward d while keeping a perpendicular link through c.'\n"
+        "Bad helper_idea: 'we need a point that will facilitate the proof.'\n"
+        "Good aux_direct_relations: ['kb equals kc', 'line ck is perpendicular to line dk']\n"
+        "Bad aux_direct_relations: ['kb equals kc', 'angle akd equals ...'] when a is not part of the immediate construction.\n\n"
         "Constraints:\n"
         "- Use only lowercase point names exactly as in the problem text.\n"
         "- Do not use <point> tags, <coord> tags, LaTeX, $...$ math formatting, backticks, <aux>, <proof>, IDs, or rule names.\n"
@@ -2088,6 +2101,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- The coordinate_hints field must be written as ordinary visual geometry language. Do not say 'the coordinates show', 'the coordinates indicate', or anything similar.\n"
         "- Do not mention the new point name before the construction field.\n"
         "- Avoid vague filler such as 'this point is crucial' or 'this will help'.\n"
+        "- The helper_idea field should describe a concrete missing mechanism such as an equal-length transfer, perpendicular link, midpoint control, or goal-side angle connection. Avoid filler such as 'facilitate', 'make progress', or 'help establish'.\n"
         "- Do not invent named centers, rotation claims, square/parallelogram claims, or similarity claims unless they are already supported by the approved coordinate checks or by the approved relation buckets.\n"
         "- The construction field must describe the same geometric facts as the hidden target summary in plain language; do not invent a different line, circle, or intersection.\n"
         "- Each item in aux_direct_relations must stay local to the auxiliary construction itself. Do not pull unrelated old-figure points into those direct relations.\n"
