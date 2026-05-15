@@ -1252,6 +1252,46 @@ def build_canonical_coordinate_hint(coordinate_relations):
     return f"the clearest visual cues are that {relation_text}, so the auxiliary plan should keep using those relations."
 
 
+def build_canonical_helper_idea(aux_direct_relations, goal_bottleneck=""):
+    relation_text = " ".join(
+        relation.lower()
+        for relation in (aux_direct_relations or [])
+        if isinstance(relation, str)
+    )
+    mechanism_parts = []
+    if "midpoint" in relation_text:
+        mechanism_parts.append("places a midpoint on the needed segment")
+    if "perpendicular" in relation_text or "right angle" in relation_text:
+        mechanism_parts.append("creates a perpendicular link")
+    if "parallel" in relation_text:
+        mechanism_parts.append("creates a parallel link")
+    if any(token in relation_text for token in [" equal", "equals", "congruent", "="]):
+        mechanism_parts.append("creates equal-length links")
+    if "collinear" in relation_text:
+        mechanism_parts.append("places the helper on an existing line")
+    if any(token in relation_text for token in ["cyclic", "circle", "concyclic"]):
+        mechanism_parts.append("places the helper on a useful circle")
+    if not mechanism_parts:
+        mechanism_parts.append("creates the missing geometric link")
+
+    bottleneck_text = (goal_bottleneck or "").lower()
+    goal_phrase = "so the goal-side relation can be connected"
+    if "angle" in bottleneck_text:
+        goal_phrase = "so the missing angle relation can be connected"
+    elif any(token in bottleneck_text for token in ["ratio", "proportion"]):
+        goal_phrase = "so the missing ratio relation can be connected"
+    elif any(token in bottleneck_text for token in ["similar", "congruent", "triangle"]):
+        goal_phrase = "so the final triangle comparison can be connected"
+
+    if len(mechanism_parts) == 1:
+        mechanism_text = mechanism_parts[0]
+    elif len(mechanism_parts) == 2:
+        mechanism_text = f"{mechanism_parts[0]} and {mechanism_parts[1]}"
+    else:
+        mechanism_text = ", ".join(mechanism_parts[:-1]) + f", and {mechanism_parts[-1]}"
+    return f"we need a helper that {mechanism_text} {goal_phrase}."
+
+
 def validate_descriptive_text(value, field_name, min_chars=12, point_names=None, ignored_forbidden_patterns=None):
     if isinstance(value, str) and point_names:
         value = normalize_point_case(value, point_names)
@@ -1445,6 +1485,17 @@ def validate_plan_response(
         ignored_patterns = []
         if key == "coordinate_hints":
             ignored_patterns.append(r"\bmidpoint propert(?:y|ies)\b")
+        if key == "helper_idea":
+            ignored_patterns.extend([
+                r"\bfacilitate\b",
+                r"\bhelp establish\b",
+                r"\bnecessary relationships\b",
+                r"\bclear relationship\b",
+                r"\bessential for proving\b",
+                r"\brotational symmetry\b",
+                r"\bcenter of symmetry\b",
+                r"\bmidpoint propert(?:y|ies)\b",
+            ])
         ok, message, cleaned_value = validate_descriptive_text(
             plan.get(key),
             key,
@@ -1505,6 +1556,25 @@ def validate_plan_response(
             return False, f"aux_direct_relations[{idx}] must mention a concrete geometric relation", None
         cleaned_direct.append(cleaned_step)
     cleaned_plan["aux_direct_relations"] = cleaned_direct
+    helper_idea_lower = cleaned_plan["helper_idea"].lower()
+    if any(
+        phrase in helper_idea_lower
+        for phrase in [
+            "facilitate",
+            "help establish",
+            "necessary relationships",
+            "clear relationship",
+            "essential for proving",
+            "rotational symmetry",
+            "center of symmetry",
+            "midpoint property",
+            "midpoint properties",
+        ]
+    ):
+        cleaned_plan["helper_idea"] = build_canonical_helper_idea(
+            cleaned_plan["aux_direct_relations"],
+            cleaned_plan.get("goal_bottleneck", ""),
+        )
 
     bridge_steps = plan.get("bridge_steps")
     if isinstance(bridge_steps, list) and len(bridge_steps) > 4:
