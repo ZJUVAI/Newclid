@@ -616,6 +616,40 @@ def extract_visible_formal_facts(record):
     return facts
 
 
+def _canonical_line_key(p1, p2):
+    a, b = sorted([p1.lower(), p2.lower()])
+    return (a, b)
+
+
+def visible_parallelogram_supported(record, vertex_word):
+    if not isinstance(vertex_word, str) or len(vertex_word) != 4:
+        return False
+    a, b, c, d = [char.lower() for char in vertex_word]
+    visible_facts = extract_visible_formal_facts(record)
+    parallel_pairs = set()
+    for fact in visible_facts:
+        if fact.get("predicate") != "para":
+            continue
+        args = fact.get("args", [])
+        if len(args) < 4:
+            continue
+        line_1 = _canonical_line_key(args[0], args[1])
+        line_2 = _canonical_line_key(args[2], args[3])
+        parallel_pairs.add(frozenset([line_1, line_2]))
+
+    needed_pairs = [
+        frozenset([
+            _canonical_line_key(a, b),
+            _canonical_line_key(c, d),
+        ]),
+        frozenset([
+            _canonical_line_key(a, d),
+            _canonical_line_key(b, c),
+        ]),
+    ]
+    return all(pair in parallel_pairs for pair in needed_pairs)
+
+
 def _coord_line_metrics(point_coords, p1, p2):
     x1, y1 = point_coords[p1]
     x2, y2 = point_coords[p2]
@@ -951,6 +985,17 @@ def audit_generation_quality(record, generation, aux_part):
         part for part in [generation.get("write_output"), generation.get("thinking")] if part
     ).lower()
     for marker in suspicious_markers:
+        if marker == "parallelogram":
+            supported_mentions = set()
+            for match in re.finditer(r"\bparallelogram\s+([a-z]{4})\b", text_to_scan):
+                vertex_word = match.group(1).lower()
+                if visible_parallelogram_supported(record, vertex_word):
+                    supported_mentions.add(match.group(0))
+            marker_hits = [match.group(0) for match in re.finditer(r"\bparallelogram\b", text_to_scan)]
+            unsupported_hits = [hit for hit in marker_hits if not any(hit in supported for supported in supported_mentions)]
+            if unsupported_hits:
+                issues.append(f"suspicious_phrase:{marker}")
+            continue
         if marker in text_to_scan:
             issues.append(f"suspicious_phrase:{marker}")
 
