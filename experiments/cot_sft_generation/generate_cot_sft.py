@@ -1904,6 +1904,34 @@ def build_plan_json_example():
     )
 
 
+def build_aux_specific_plan_guidance(aux_part):
+    if not aux_part:
+        return ""
+    inner = aux_part.replace("<aux>", "").replace("</aux>", "").lower()
+    if "midp" in inner:
+        return (
+            "[Midpoint Aux Guidance]\n"
+            "This target introduces a midpoint auxiliary point.\n"
+            "- Before the construction field, do not mention the new midpoint name.\n"
+            "- In aux_direct_relations, stay with midpoint-local facts only: the midpoint statement itself, the equal halves, and the resulting collinearity.\n"
+            "- Do not jump from 'midpoint' directly to extra altitude, perpendicular-bisector, or circumcenter claims unless those relations already appear in the hidden proof guidance route.\n"
+            "- For bridge_steps, prefer the concrete bridge_relations already hinted by the hidden proof guidance, such as equal-length transfers or congruent/angle consequences that explicitly reuse the midpoint facts.\n"
+            "Midpoint-flavored example:\n"
+            "{\n"
+            '  "construction": "construct point h as the midpoint of segment bc.",\n'
+            '  "aux_direct_relations": ["h is the midpoint of bc", "bh equals ch", "b, c, h are collinear"],\n'
+            '  "bridge_steps": [\n'
+            '    {\n'
+            '      "relation": "ah equals ch",\n'
+            '      "depends_on": ["h is the midpoint of bc", "bh equals ch"],\n'
+            '      "why_it_helps": "this equality is required to prove the next congruent-triangle or angle relation involving h and f."\n'
+            '    }\n'
+            '  ]\n'
+            "}\n\n"
+        )
+    return ""
+
+
 def build_plan_retry_feedback(validation_message, aux_part):
     targeted_hints = []
     if "depends_on" in validation_message:
@@ -2038,6 +2066,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         if visible_premise_summaries else "[]"
     )
     plan_example = build_plan_json_example()
+    aux_specific_guidance = build_aux_specific_plan_guidance(aux_part)
     proof_guidance = json.dumps(
         build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal),
         ensure_ascii=False,
@@ -2115,6 +2144,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "Bad coordinate_relations: copying a visible premise such as 'line ad is parallel to line bc' when that relation is not one of the hidden coordinate candidates.\n"
         "Good visible_relations: old-figure relations like 'ab equals ac' or 'line ad is parallel to line bc'.\n"
         "Bad visible_relations: any relation involving the new auxiliary point before construction, such as 'ah equals ch'.\n\n"
+        f"{aux_specific_guidance}"
         "Constraints:\n"
         "- Use only lowercase point names exactly as in the problem text.\n"
         "- Do not use <point> tags, <coord> tags, LaTeX, $...$ math formatting, backticks, <aux>, <proof>, IDs, or rule names.\n"
