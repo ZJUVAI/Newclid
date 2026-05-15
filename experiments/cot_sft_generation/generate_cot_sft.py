@@ -415,6 +415,15 @@ def normalize_relation_surface(text):
     if not cleaned:
         return cleaned
     normalized = re.sub(r"\[\d{3}\]", "", cleaned).strip(" ;")
+    coincide_match = re.fullmatch(
+        r"(?:point\s+)?([a-z]\w*)\s+coincides\s+with\s+(?:point\s+)?([a-z]\w*)\.?",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if coincide_match:
+        point_a = coincide_match.group(1).lower()
+        point_b = coincide_match.group(2).lower()
+        return f"{point_a} equals {point_b}"
     line_match = re.fullmatch(
         r"(?:point\s+)?([a-z]\w*)\s+lies\s+on\s+(?:the\s+)?(?:line|segment)\s+([a-z]\w*)([a-z]\w*)\.?",
         normalized,
@@ -1501,6 +1510,9 @@ def validate_plan_response(
             f"bridge_steps[{idx}].why_it_helps",
             min_chars=8,
             point_names=known_points,
+            ignored_forbidden_patterns=[
+                r"\bmidpoint propert(?:y|ies)\b",
+            ],
         )
         if not ok:
             return False, message, None
@@ -1667,6 +1679,12 @@ def validate_plan_response(
             if idx < len(cleaned_plan["bridge_steps"]) - 1:
                 next_relation = cleaned_plan["bridge_steps"][idx + 1]["relation"].lower()
                 why_text = step["why_it_helps"].lower()
+                if re.search(r"\bmidpoint propert(?:y|ies)\b", why_text, re.IGNORECASE):
+                    step["why_it_helps"] = build_canonical_bridge_unlock(
+                        step.get("next_target_relation", ""),
+                        final_step=False,
+                    )
+                    why_text = step["why_it_helps"].lower()
                 allowed_structure_markers = (
                     extract_high_level_structure_markers(step["relation"])
                     | extract_high_level_structure_markers(" ".join(step["depends_on"]))
@@ -1680,6 +1698,12 @@ def validate_plan_response(
                     )
             else:
                 why_text = step["why_it_helps"].lower()
+                if re.search(r"\bmidpoint propert(?:y|ies)\b", why_text, re.IGNORECASE):
+                    step["why_it_helps"] = build_canonical_bridge_unlock(
+                        step.get("next_target_relation", ""),
+                        final_step=True,
+                    )
+                    why_text = step["why_it_helps"].lower()
                 allowed_structure_markers = (
                     extract_high_level_structure_markers(step["relation"])
                     | extract_high_level_structure_markers(" ".join(step["depends_on"]))
@@ -2219,6 +2243,9 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- every bridge_steps relation should name the exact approved equality, angle, ratio, collinearity, parallel, or perpendicular statement, not a high-level summary like 'the triangles match' or 'an isosceles configuration forms'."
         )
+        targeted_hints.append(
+            "- avoid point-identification wording like 'h coincides with f'; if you must express that identification, rewrite it as a concrete equality or another approved route relation."
+        )
     if "coordinate_hints" in validation_message:
         targeted_hints.append(
             "- include coordinate_hints as one or two plain-language sentences summarizing which coordinate_relations matter and why."
@@ -2291,6 +2318,9 @@ def build_plan_retry_feedback(validation_message, aux_part):
         )
         targeted_hints.append(
             "- if the approved checkpoints are angle, ratio, equality, collinearity, or parallel relations, do not wrap them into an invented triangle-congruent or triangle-similar bridge unless that same triangle relation already appears in the approved checkpoint list."
+        )
+        targeted_hints.append(
+            "- do not invent a point-identification step like 'h equals f' unless that same identification or an equivalent equality already appears explicitly in the approved checkpoint list."
         )
     if "unsupported high-level" in validation_message:
         targeted_hints.append(
@@ -2519,6 +2549,9 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "Good aux_direct_relations: ['h is the midpoint of bc', 'b, c, h are collinear']\n"
         "Bad aux_direct_relations: ['h lies on line bc'] when the same fact should be written as 'b, c, h are collinear'.\n"
         "Bad aux_direct_relations: ['kb equals kc', 'angle akd equals ...'] when a is not part of the immediate construction.\n\n"
+        "[bridge_steps Surface Guidance]\n"
+        "Good bridge relation: 'ah equals bh' or 'angle ak/aj equals angle gk/gj'.\n"
+        "Bad bridge relation: 'h coincides with f' when the same idea should be written as a concrete equality or another approved route relation.\n\n"
         "[coordinate_relations / visible_relations Guidance]\n"
         "Good coordinate_relations: items chosen from the hidden structured coordinate candidates, such as 'point g looks like the midpoint of ac' or 'points b, d, and i look nearly collinear'.\n"
         "Bad coordinate_relations: copying a visible premise such as 'line ad is parallel to line bc' when that relation is not one of the hidden coordinate candidates.\n"
@@ -2551,6 +2584,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- Each bridge_steps relation should stay semantically close to the hidden proof guidance bridge_relations or goal_finish_relations; do not swap in a different high-level route.\n"
         "- Treat the Approved Ordered Route Checkpoints as the preferred bridge-step order. Do not jump to a later checkpoint first, and do not invent a fresh parallel/similarity/angle route when an earlier approved checkpoint is already available.\n"
         "- If the approved route checkpoints are angle, ratio, collinearity, equality, or parallel relations, do not wrap them into a new triangle-congruent or triangle-similar route unless that same triangle route already appears explicitly in the checkpoint list.\n"
+        "- Do not invent a point-identification bridge such as 'h equals f' unless that same identification, or an equivalent old-figure equality using h and f, already appears in the approved route checkpoints.\n"
         "- When the approved route relation pool lists a concrete relation such as 'line bg is parallel to line cd' or 'bk = dk', prefer using that relation directly instead of inventing an alternative route like a new similar-triangle claim.\n"
         "- Each bridge_steps depends_on list should reuse concrete items from visible_relations, aux_direct_relations, or an earlier bridge_steps relation, instead of inventing unsupported leaps.\n"
         "- Each depends_on item must be copied as a natural-language relation string, not written as a raw formal predicate such as 'cong b j d j'.\n"
