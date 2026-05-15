@@ -517,15 +517,17 @@ def relations_semantically_match(text_a, text_b, point_names):
         return False
     shared_points = points_a & points_b
     shared_keywords = keyword_a & keyword_b
-    if "equal" in shared_keywords and len(shared_points) >= 3:
-        return True
-    if {"parallel", "perpendicular"} & shared_keywords and len(shared_points) >= 4:
-        return True
     if "angle" in shared_keywords and len(shared_points) >= 4:
         return True
     if "ratio" in shared_keywords and len(shared_points) >= 4:
         return True
+    if {"parallel", "perpendicular"} & shared_keywords and len(shared_points) >= 4:
+        return True
     if {"collinear", "midpoint", "circle"} & shared_keywords and len(shared_points) >= 3:
+        return True
+    if "similar" in shared_keywords and len(shared_points) >= 4:
+        return True
+    if "equal" in shared_keywords and len(shared_points) >= 3 and "angle" not in keyword_a and "ratio" not in keyword_a:
         return True
     return False
 
@@ -1676,6 +1678,7 @@ def validate_plan_response(
                 if dependency not in deduped_dependencies:
                     deduped_dependencies.append(dependency)
             step["depends_on"] = deduped_dependencies
+            step["required_supports"] = deduped_dependencies[: min(2, len(deduped_dependencies))]
             if idx < len(cleaned_plan["bridge_steps"]) - 1:
                 next_relation = cleaned_plan["bridge_steps"][idx + 1]["relation"].lower()
                 why_text = step["why_it_helps"].lower()
