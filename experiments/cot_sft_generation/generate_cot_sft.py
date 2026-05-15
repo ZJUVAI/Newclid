@@ -1930,6 +1930,44 @@ def build_aux_specific_plan_guidance(aux_part):
             '  ]\n'
             "}\n\n"
         )
+    new_points = [point.lower() for point in extract_aux_new_points(aux_part)]
+    cong_clauses = re.findall(r"\bcong\s+([a-z]\w*)\s+([a-z]\w*)\s+([a-z]\w*)\s+([a-z]\w*)", inner)
+    if len(new_points) == 1 and len(cong_clauses) >= 2:
+        point_set = set()
+        point_hits = 0
+        for clause in cong_clauses[:2]:
+            point_set.update(clause)
+            if new_points[0] in clause:
+                point_hits += 1
+        if len(point_set) == 3 and point_hits == 2:
+            return (
+                "[Equal-Length Aux Guidance]\n"
+                "This target introduces one new point through two immediate equal-length facts on the same local frame.\n"
+                "- Before the construction field, do not name the new point and do not say 'point h' or 'triangle adh'.\n"
+                "- In helper_idea, describe the missing mechanism without the point name, for example: 'we need a point built from segment ad that gives two equal-length links and then bridges toward line ac.'\n"
+                "- In construction, explicitly introduce the new point and restate both equalities from the hidden target summary in plain language.\n"
+                "- In aux_direct_relations, stay with those immediate equalities only; do not jump early to collinearity, symmetry, rotation, or congruent-triangle claims.\n"
+                "- In bridge_steps, prefer the approved hidden route items such as a collinearity step, an equal-length transfer like ah equals ag or dh equals de, and then the final old-figure comparison.\n"
+                "- Each why_it_helps sentence should name the next concrete relation directly, such as 'this is required to prove cg equals hg next', rather than mentioning a generic triangle argument.\n"
+                "Equal-length example:\n"
+                "{\n"
+                '  "helper_idea": "we need a point built from segment ad that gives two equal-length links and then bridges toward line ac.",\n'
+                '  "construction": "construct point h such that ad equals ah and ah equals dh.",\n'
+                '  "aux_direct_relations": ["ad equals ah", "ah equals dh"],\n'
+                '  "bridge_steps": [\n'
+                '    {\n'
+                '      "relation": "a, c, h are collinear",\n'
+                '      "depends_on": ["ad equals ah", "ah equals dh", "ad is parallel to bc"],\n'
+                '      "why_it_helps": "this alignment is required to prove cg equals hg next."\n'
+                '    },\n'
+                '    {\n'
+                '      "relation": "cg equals hg",\n'
+                '      "depends_on": ["a, c, h are collinear", "cg equals eg"],\n'
+                '      "why_it_helps": "this equality is required to prove df equals cg next."\n'
+                '    }\n'
+                '  ]\n'
+                "}\n\n"
+            )
     return ""
 
 
@@ -1958,6 +1996,10 @@ def build_plan_retry_feedback(validation_message, aux_part):
     if "helper_idea contains forbidden pattern" in validation_message:
         targeted_hints.append(
             "- rewrite helper_idea as a concrete missing mechanism such as an equal-length transfer, perpendicular link, midpoint, or angle relation; do not use filler like 'facilitate' or 'help establish'."
+        )
+    if "must not appear before the construction field" in validation_message:
+        targeted_hints.append(
+            "- helper_idea and every pre-construction field must avoid the new point name; say 'a point built from segment ad that creates two equal-length links' rather than 'point h forms ...'."
         )
     if "aux_direct_relations" in validation_message and "direct auxiliary relation should stay on the direct aux consequence" in validation_message:
         targeted_hints.append(
