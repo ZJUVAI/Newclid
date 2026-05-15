@@ -2062,6 +2062,9 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- do not replace the approved bridge route with a different one; reuse bridge relations that are semantically close to the hidden proof guidance, such as equalities, angle relations, or the final parallel relation already indicated there."
         )
+        targeted_hints.append(
+            "- when a hidden bridge relation pool is shown, copy those route relations almost verbatim into bridge_steps.relation instead of swapping in a different structure like a new similar-triangle, cyclic, or equal-length route."
+        )
     if "unsupported high-level" in validation_message:
         targeted_hints.append(
             "- do not introduce new routes such as triangle similarity, cyclic quadrilaterals, or parallelograms inside why_it_helps unless that same structure is already stated in the approved relation chain."
@@ -2124,6 +2127,13 @@ def build_writer_retry_feedback(validation_message, plan):
         targeted_hints.append(
             "- shorten the body by compressing helper or bridge prose; keep the approved relation names, but trim extra explanation and repeated restatements."
         )
+    if "contains forbidden pattern" in validation_message:
+        targeted_hints.append(
+            "- remove all $...$ formatting, colon-style math snippets, and proof-like shorthand; restate ratios and angles as plain English geometry relations."
+        )
+        targeted_hints.append(
+            "- examples: write 'the ratio ab over bg' instead of '$ab:bg$', and write 'angle bk/bj equals angle dj/dk' as plain text rather than math markup."
+        )
     if "rotational symmetry" in validation_message or "center of symmetry" in validation_message:
         targeted_hints.append(
             "- remove high-level phrases like 'rotational symmetry' or 'center of symmetry'; replace them with the concrete equalities, parallels, or midpoint facts that are actually visible in the approved plan."
@@ -2176,11 +2186,14 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
     )
     plan_example = build_plan_json_example()
     aux_specific_guidance = build_aux_specific_plan_guidance(aux_part)
+    proof_guidance_payload = build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal)
     proof_guidance = json.dumps(
-        build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal),
+        proof_guidance_payload,
         ensure_ascii=False,
         indent=2,
     )
+    route_relation_pool = proof_guidance_payload.get("bridge_relations", []) + proof_guidance_payload.get("goal_finish_relations", [])
+    route_relation_block = json.dumps(route_relation_pool, ensure_ascii=False, indent=2) if route_relation_pool else "[]"
     return (
         "You are planning a geometry CoT training example.\n\n"
         "[What the future student model will see at training/eval time]\n"
@@ -2221,6 +2234,10 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "These grouped checkpoints show how the true solution moves from the aux toward the goal. "
         "Use them only to keep the verification chain realistic; do not expose proof-engine syntax.\n"
         f"{proof_guidance}\n\n"
+        "[Approved Route Relation Pool]\n"
+        "Choose bridge_steps.relation items from or very close to this relation pool, in a realistic order. "
+        "Do not replace this route with a different high-level structure unless that same structure already appears below.\n"
+        f"{route_relation_block}\n\n"
         "[Task]\n"
         "Return exactly one JSON object with these keys:\n"
         "1. anchor_points: a list of 3 or 4 original visible points that are the best tagged anchors for orienting the figure.\n"
@@ -2272,6 +2289,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- Each item in aux_direct_relations must stay local to the auxiliary construction itself. Do not pull unrelated old-figure points into those direct relations.\n"
         "- Each bridge_steps relation should explicitly mention how the auxiliary point interacts with existing visible points or substructures, in a realistic order.\n"
         "- Each bridge_steps relation should stay semantically close to the hidden proof guidance bridge_relations or goal_finish_relations; do not swap in a different high-level route.\n"
+        "- When the approved route relation pool lists a concrete relation such as 'line bg is parallel to line cd' or 'bk = dk', prefer using that relation directly instead of inventing an alternative route like a new similar-triangle claim.\n"
         "- Each bridge_steps depends_on list should reuse concrete items from visible_relations, aux_direct_relations, or an earlier bridge_steps relation, instead of inventing unsupported leaps.\n"
         "- Each depends_on item must be copied as a natural-language relation string, not written as a raw formal predicate such as 'cong b j d j'.\n"
         "- Each bridge_steps why_it_helps string should explain what the current step unlocks next in plain geometry language. The script will internally attach the exact next target relation for the writer.\n"
