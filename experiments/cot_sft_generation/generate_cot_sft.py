@@ -1106,6 +1106,28 @@ def build_hidden_coordinate_guidance(point_coords, max_items=8):
     return json.dumps(hints, ensure_ascii=False, indent=2)
 
 
+def build_canonical_coordinate_hint(coordinate_relations):
+    cleaned_relations = [
+        normalize_relation_surface(relation).strip().rstrip(".")
+        for relation in (coordinate_relations or [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+    cleaned_relations = [relation for relation in cleaned_relations if relation]
+    if not cleaned_relations:
+        return (
+            "the clearest visual cues are the midpoint, collinear, equal-length, parallel, "
+            "or perpendicular relations already identified in the figure."
+        )
+    if len(cleaned_relations) == 1:
+        relation_text = cleaned_relations[0]
+        return f"the clearest visual cue is that {relation_text}, so the auxiliary plan should keep using that relation."
+    if len(cleaned_relations) == 2:
+        relation_text = " and that ".join(cleaned_relations)
+        return f"the clearest visual cues are that {relation_text}, so the auxiliary plan should keep using those relations."
+    relation_text = "; ".join(cleaned_relations[:-1]) + f"; and {cleaned_relations[-1]}"
+    return f"the clearest visual cues are that {relation_text}, so the auxiliary plan should keep using those relations."
+
+
 def validate_descriptive_text(value, field_name, min_chars=12, point_names=None):
     if isinstance(value, str) and point_names:
         value = normalize_point_case(value, point_names)
@@ -1427,6 +1449,19 @@ def validate_plan_response(
         return False, "goal_finish must mention a concrete goal-side geometric relation", None
     cleaned_plan["goal_finish"] = cleaned_goal_finish
 
+    relation_mentions = extract_point_mentions(" ".join(cleaned_plan["coordinate_relations"]), visible_points)
+    if len(relation_mentions) < 3:
+        return False, "coordinate_relations should collectively cover at least three visible points", None
+
+    canonical_coordinate_hint = build_canonical_coordinate_hint(cleaned_plan["coordinate_relations"])
+    coordinate_hint_lower = cleaned_plan["coordinate_hints"].lower()
+    if (
+        not relation_keyword_present(cleaned_plan["coordinate_hints"])
+        or re.search(r"\bsymmetr(?:y|ic)\b|\brotat(?:e|es|ed|ing|ion|ional)\b", cleaned_plan["coordinate_hints"], re.IGNORECASE)
+        or not any(point in coordinate_hint_lower for point in relation_mentions)
+    ):
+        cleaned_plan["coordinate_hints"] = canonical_coordinate_hint
+        coordinate_hint_lower = cleaned_plan["coordinate_hints"].lower()
     if not relation_keyword_present(cleaned_plan["coordinate_hints"]):
         return False, "coordinate_hints must mention at least one concrete geometric relation cue", None
     if re.search(r"\bsymmetr(?:y|ic)\b|\brotat(?:e|es|ed|ing|ion|ional)\b", cleaned_plan["coordinate_hints"], re.IGNORECASE):
@@ -1434,6 +1469,8 @@ def validate_plan_response(
             "coordinate_hints must explain concrete midpoint, collinear, equal-length, parallel, or perpendicular cues, "
             "not generic symmetry or rotation language"
         ), None
+    if not any(point in coordinate_hint_lower for point in relation_mentions):
+        return False, "coordinate_hints must summarize at least one concrete point-based relation from coordinate_relations", None
 
     figure_mentions = extract_point_mentions(
         " ".join(
@@ -1448,13 +1485,6 @@ def validate_plan_response(
     )
     if len(visible_points) > len(normalized_points) and not (figure_mentions - set(normalized_points)):
         return False, "figure_overview, visible_relations, bridge_relations, or goal_finish must mention at least one visible point outside anchor_points", None
-
-    relation_mentions = extract_point_mentions(" ".join(cleaned_plan["coordinate_relations"]), visible_points)
-    if len(relation_mentions) < 3:
-        return False, "coordinate_relations should collectively cover at least three visible points", None
-
-    if not any(point in cleaned_plan["coordinate_hints"].lower() for point in relation_mentions):
-        return False, "coordinate_hints must summarize at least one concrete point-based relation from coordinate_relations", None
 
     if coordinate_candidates:
         unmatched_relations = [
@@ -1575,8 +1605,8 @@ def validate_plan_response(
     if not any(keyword in final_step for keyword in goal_keywords):
         return False, "goal_finish must explicitly describe the goal-side relation it is aiming for", None
     if aux_part:
-        bridge_mentions = extract_point_mentions(" ".join(cleaned_plan["bridge_relations"]), visible_points)
-        if not (bridge_mentions - set(extract_aux_new_points(aux_part))):
+        bridge_mentions = extract_point_mentions(" ".join(cleaned_plan["bridge_relations"]), known_points)
+        if not (bridge_mentions - set(aux_points)):
             return False, "bridge_steps must connect the auxiliary point to existing visible points", None
 
     return True, "Valid planner JSON", cleaned_plan
