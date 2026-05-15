@@ -415,6 +415,16 @@ def normalize_relation_surface(text):
     if not cleaned:
         return cleaned
     normalized = re.sub(r"\[\d{3}\]", "", cleaned).strip(" ;")
+    line_match = re.fullmatch(
+        r"(?:point\s+)?([a-z]\w*)\s+lies\s+on\s+(?:the\s+)?(?:line|segment)\s+([a-z]\w*)([a-z]\w*)\.?",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if line_match:
+        point_name = line_match.group(1).lower()
+        line_p1 = line_match.group(2).lower()
+        line_p2 = line_match.group(3).lower()
+        return f"{line_p1}, {line_p2}, {point_name} are collinear"
     tokens = normalized.split()
     if tokens and tokens[0].lower() in FORMAL_RELATION_STARTERS:
         summary = summarize_aux_clause(normalized)
@@ -2202,6 +2212,9 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- every aux_direct_relations item must state the immediate construction consequence itself, such as 'ah equals dh', 'line ck is perpendicular to line dk', or 'b, c, h are collinear'; do not write vague summaries like 'the construction creates symmetry' or 'an isosceles shape appears'."
         )
+        targeted_hints.append(
+            "- if the direct consequence is that a point lies on a known line, write it as a concrete collinearity such as 'a, b, h are collinear' instead of 'h lies on line ab'."
+        )
     if "bridge_steps" in validation_message and "must mention a concrete geometric relation" in validation_message:
         targeted_hints.append(
             "- every bridge_steps relation should name the exact approved equality, angle, ratio, collinearity, parallel, or perpendicular statement, not a high-level summary like 'the triangles match' or 'an isosceles configuration forms'."
@@ -2248,6 +2261,12 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- rewrite helper_idea as a concrete missing mechanism such as an equal-length transfer, perpendicular link, midpoint, or angle relation; do not use filler like 'facilitate' or 'help establish'."
         )
+        targeted_hints.append(
+            "- do not describe the helper as a center of symmetry, symmetric center, or rotation center; name the concrete midpoint, equal-length, parallel, or perpendicular mechanism instead."
+        )
+        targeted_hints.append(
+            "- do not say 'midpoint property' inside helper_idea; say the concrete midpoint fact itself, such as 'the midpoint of ad gives equal halves', instead."
+        )
     if "must not appear before the construction field" in validation_message:
         targeted_hints.append(
             "- helper_idea and every pre-construction field must avoid the new point name; say 'a point built from segment ad that creates two equal-length links' rather than 'point h forms ...'."
@@ -2269,6 +2288,9 @@ def build_plan_retry_feedback(validation_message, aux_part):
         )
         targeted_hints.append(
             "- follow the approved route checkpoints in order: the first bridge step should match an earlier checkpoint, and later bridge steps should progress forward rather than jumping to a later finish relation or inventing a new parallel relation."
+        )
+        targeted_hints.append(
+            "- if the approved checkpoints are angle, ratio, equality, collinearity, or parallel relations, do not wrap them into an invented triangle-congruent or triangle-similar bridge unless that same triangle relation already appears in the approved checkpoint list."
         )
     if "unsupported high-level" in validation_message:
         targeted_hints.append(
@@ -2488,9 +2510,14 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "Bad: 'this helps form a cyclic quadrilateral and later gives a parallel line.'\n\n"
         "[helper_idea / aux_direct Guidance]\n"
         "Good helper_idea: 'we need a point that creates an equal-length transfer from k toward d while keeping a perpendicular link through c.'\n"
+        "Good helper_idea: 'we need the midpoint of ad so that the equal halves can be used on the d-side.'\n"
         "Bad helper_idea: 'we need a point that will facilitate the proof.'\n"
+        "Bad helper_idea: 'we need a center of symmetry' or 'we need a symmetric center' when no concrete midpoint, equal-length, parallel, or perpendicular cue has been stated.\n"
+        "Bad helper_idea: 'we need the midpoint property' when the concrete midpoint fact itself has not been stated.\n"
         "Bad helper_idea: 'we need point k so that ...' because the new point name should first appear in construction.\n"
         "Good aux_direct_relations: ['kb equals kc', 'line ck is perpendicular to line dk']\n"
+        "Good aux_direct_relations: ['h is the midpoint of bc', 'b, c, h are collinear']\n"
+        "Bad aux_direct_relations: ['h lies on line bc'] when the same fact should be written as 'b, c, h are collinear'.\n"
         "Bad aux_direct_relations: ['kb equals kc', 'angle akd equals ...'] when a is not part of the immediate construction.\n\n"
         "[coordinate_relations / visible_relations Guidance]\n"
         "Good coordinate_relations: items chosen from the hidden structured coordinate candidates, such as 'point g looks like the midpoint of ac' or 'points b, d, and i look nearly collinear'.\n"
@@ -2515,6 +2542,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- Do not mention the new point name before the construction field.\n"
         "- Avoid vague filler such as 'this point is crucial' or 'this will help'.\n"
         "- The helper_idea field should describe a concrete missing mechanism such as an equal-length transfer, perpendicular link, midpoint control, or goal-side angle connection. Avoid filler such as 'facilitate', 'make progress', or 'help establish'.\n"
+        "- In helper_idea, do not use phrases like symmetry, symmetric center, center of symmetry, rotation center, or mirror center unless the same concrete structure is already explicitly stated in the approved visible or coordinate relations.\n"
         "- Do not invent named centers, rotation claims, square/parallelogram claims, or similarity claims unless they are already supported by the approved coordinate checks or by the approved relation buckets.\n"
         "- The construction field must describe the same geometric facts as the hidden target summary in plain language; do not invent a different line, circle, or intersection.\n"
         "- Each item in aux_direct_relations must stay local to the auxiliary construction itself. Do not pull unrelated old-figure points into those direct relations.\n"
@@ -2522,6 +2550,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- The first bridge_steps relation must explicitly contain the new auxiliary point together with at least one old visible point, and it should be written in a compact relation form such as 'ag equals dg' or 'angle bg/bj equals angle gi/ij'.\n"
         "- Each bridge_steps relation should stay semantically close to the hidden proof guidance bridge_relations or goal_finish_relations; do not swap in a different high-level route.\n"
         "- Treat the Approved Ordered Route Checkpoints as the preferred bridge-step order. Do not jump to a later checkpoint first, and do not invent a fresh parallel/similarity/angle route when an earlier approved checkpoint is already available.\n"
+        "- If the approved route checkpoints are angle, ratio, collinearity, equality, or parallel relations, do not wrap them into a new triangle-congruent or triangle-similar route unless that same triangle route already appears explicitly in the checkpoint list.\n"
         "- When the approved route relation pool lists a concrete relation such as 'line bg is parallel to line cd' or 'bk = dk', prefer using that relation directly instead of inventing an alternative route like a new similar-triangle claim.\n"
         "- Each bridge_steps depends_on list should reuse concrete items from visible_relations, aux_direct_relations, or an earlier bridge_steps relation, instead of inventing unsupported leaps.\n"
         "- Each depends_on item must be copied as a natural-language relation string, not written as a raw formal predicate such as 'cong b j d j'.\n"
