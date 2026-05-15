@@ -1514,7 +1514,6 @@ def validate_plan_response(
                 return False, f"bridge_steps[{idx}].depends_on must reuse an earlier visible, direct, or bridge relation", None
             if idx < len(cleaned_plan["bridge_steps"]) - 1:
                 next_relation = cleaned_plan["bridge_steps"][idx + 1]["relation"].lower()
-                next_relation_keywords = relation_text_keywords(next_relation)
                 why_text = step["why_it_helps"].lower()
                 allowed_structure_markers = (
                     extract_high_level_structure_markers(step["relation"])
@@ -1525,16 +1524,6 @@ def validate_plan_response(
                 if new_structure_markers:
                     return False, (
                         f"bridge_steps[{idx}].why_it_helps introduces an unsupported high-level route: {sorted(new_structure_markers)}"
-                    ), None
-                next_points = extract_point_mentions(next_relation, known_points)
-                mentioned_next_points = extract_point_mentions(why_text, known_points) & next_points
-                if next_points and len(mentioned_next_points) < min(2, len(next_points)):
-                    return False, (
-                        f"bridge_steps[{idx}].why_it_helps should name concrete points from the next bridge relation"
-                    ), None
-                if next_relation_keywords and not any(keyword in why_text for keyword in next_relation_keywords):
-                    return False, (
-                        f"bridge_steps[{idx}].why_it_helps should mention what kind of next bridge relation it unlocks"
                     ), None
             else:
                 why_text = step["why_it_helps"].lower()
@@ -1548,15 +1537,6 @@ def validate_plan_response(
                     return False, (
                         f"bridge_steps[{idx}].why_it_helps introduces an unsupported high-level finish route: {sorted(new_structure_markers)}"
                     ), None
-                mentioned_goal_points = extract_point_mentions(why_text, known_points) & goal_points
-                if goal_points and len(mentioned_goal_points) < min(2, len(goal_points)):
-                    return False, (
-                        f"bridge_steps[{idx}].why_it_helps should name concrete goal-side points for the finish"
-                    ), None
-                if goal_keywords and not any(keyword in why_text for keyword in goal_keywords):
-                    return False, (
-                        f"bridge_steps[{idx}].why_it_helps should mention the goal-side relation it prepares"
-                    ), None
     final_step = cleaned_goal_finish.lower()
     if goal_points:
         mentioned_goal_points = {point for point in goal_points if point in final_step}
@@ -1569,6 +1549,7 @@ def validate_plan_response(
         if not (bridge_mentions - set(extract_aux_new_points(aux_part))):
             return False, "bridge_steps must connect the auxiliary point to existing visible points", None
 
+    cleaned_plan = enrich_bridge_steps_with_targets(cleaned_plan)
     return True, "Valid planner JSON", cleaned_plan
 
 
@@ -1635,6 +1616,26 @@ def build_instruction_text():
         "trace that motivates the auxiliary construction. Output the thinking trace and "
         "the final aux block."
     )
+
+
+def enrich_bridge_steps_with_targets(plan):
+    if not isinstance(plan, dict) or not isinstance(plan.get("bridge_steps"), list):
+        return plan
+    enriched_steps = []
+    total_steps = len(plan["bridge_steps"])
+    for idx, step in enumerate(plan["bridge_steps"]):
+        if not isinstance(step, dict):
+            enriched_steps.append(step)
+            continue
+        enriched = dict(step)
+        if idx < total_steps - 1:
+            enriched["next_target_relation"] = plan["bridge_steps"][idx + 1].get("relation", "")
+        else:
+            enriched["next_target_relation"] = plan.get("goal_finish", "")
+        enriched_steps.append(enriched)
+    enriched_plan = dict(plan)
+    enriched_plan["bridge_steps"] = enriched_steps
+    return enriched_plan
 
 
 def extract_problem_goal(record):
@@ -1964,7 +1965,7 @@ def build_plan_retry_feedback(validation_message, aux_part):
         )
     if "why_it_helps" in validation_message:
         targeted_hints.append(
-            "- each why_it_helps string should explicitly name the next bridge relation or the final goal-side relation using concrete point names, not abstract phrases like 'enabling angle transfers'."
+            "- each why_it_helps string should say what the current step unlocks next in plain geometry language, but the exact next target relation will be derived by the script for the writer."
         )
     if "must stay close to the hidden proof guidance route" in validation_message:
         targeted_hints.append(
@@ -2130,8 +2131,8 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "Follow this JSON shape closely. In particular, bridge_steps must be a JSON list of objects, and each depends_on value must be a JSON list of earlier relation strings.\n"
         f"{plan_example}\n\n"
         "[why_it_helps Guidance]\n"
-        "Good: 'this equality is required to prove kc equals kd in the next step.'\n"
-        "Good: 'this prepares the goal angle by connecting bj to bg and the target angle on cg and fg.'\n"
+        "Good: 'this equality is required before the next bridge relation can be justified.'\n"
+        "Good: 'this prepares the final goal-side angle comparison.'\n"
         "Bad: 'this enables similar triangles involving j.'\n"
         "Bad: 'this helps form a cyclic quadrilateral and later gives a parallel line.'\n\n"
         "[helper_idea / aux_direct Guidance]\n"
@@ -2165,7 +2166,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- Each bridge_steps relation should stay semantically close to the hidden proof guidance bridge_relations or goal_finish_relations; do not swap in a different high-level route.\n"
         "- Each bridge_steps depends_on list should reuse concrete items from visible_relations, aux_direct_relations, or an earlier bridge_steps relation, instead of inventing unsupported leaps.\n"
         "- Each depends_on item must be copied as a natural-language relation string, not written as a raw formal predicate such as 'cong b j d j'.\n"
-        "- Each bridge_steps why_it_helps string should name the concrete next bridge relation or the concrete goal-side relation it unlocks, with actual point names, not abstract phrases like 'enabling angle transfers'.\n"
+        "- Each bridge_steps why_it_helps string should explain what the current step unlocks next in plain geometry language. The script will internally attach the exact next target relation for the writer.\n"
         "- Do not use why_it_helps to smuggle in a new route such as 'similar triangles', 'cyclic quadrilateral', or 'parallelogram' unless that same structure is already explicitly present in the approved relation chain.\n"
         "- The goal_finish field must mention the actual goal-side relation, not just say that the construction is useful.\n"
         "- If multiple new points appear in the hidden target summary, describe whether they are introduced together or in stages and what each stage unlocks.\n"
@@ -2174,6 +2175,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
 
 
 def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_block):
+    plan = enrich_bridge_steps_with_targets(plan)
     public_problem = build_public_problem_text(record)
     supervisor_payload = build_supervisor_payload(record, aux_part, sanitized_rest)
     visible_goal = extract_problem_goal(record)
@@ -2259,7 +2261,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "20. Give each bridge_steps relation its own sentence. In that sentence, explicitly name at least one concrete depends_on relation before or while stating the new bridge relation.\n"
         "21. Avoid shortcuts such as 'by symmetry', 'from the setup', or 'it follows' unless the same sentence explicitly names the concrete supporting relations.\n"
         "22. Do not hedge with phrases like 'similarity or angle equality'; state the specific approved relation you are using.\n"
-        "23. When a bridge sentence prepares the next bridge step or the final goal, name that next relation in concrete point-based terms rather than ending with abstract phrases like 'this enables angle transfers'.\n"
+        "23. Each bridge_steps object includes an internal next_target_relation chosen by the script. Use it to keep the reasoning pointed toward the next approved relation instead of inventing a different route.\n"
         "Output only the plain-text body.\n"
     )
 

@@ -137,6 +137,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
      - 引出 aux
      - 按 `aux_direct_relations -> bridge_steps -> goal_finish` 把 aux 之后的验证链真正推进到目标
    - writer 还会被要求把每个 `bridge_steps` 单独落成一句，并在该句中显式点出至少一个 `depends_on` 里的具体支持关系，而不是用 `by symmetry` / `it follows` 之类的空泛跳步
+   - 脚本还会在内部为每个 `bridge_steps` 自动补一个 `next_target_relation`，把“下一跳精确目标”显式传给 writer，避免完全依赖模型自己把 `why_it_helps` 写成机械的点名句
 
 也就是说，现在的机制是：
 
@@ -179,7 +180,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
   - 这一步得到什么 `relation`
   - 它依赖哪些已有关系 `depends_on`
   - 它为下一跳或收尾解锁什么 `why_it_helps`
-  - `why_it_helps` 不能只写抽象作用，例如 “enabling angle transfers”；应显式点出下一跳关系或 goal-side 关系里的具体点和关系类型
+  - `why_it_helps` 不能只写抽象作用，例如 “enabling angle transfers”；它应说明这一步为下一跳或收尾解锁了什么，但“下一跳的精确 relation”现在由脚本内部补成 `next_target_relation` 传给 writer
   - `why_it_helps` 也不应偷偷引入未在 relation/depends_on/下一跳中出现的新高层路线，例如凭空说相似三角形、圆、平行四边形等
 - `plan` 中的 `bridge_steps.relation` 还应尽量贴近 hidden proof guidance 给出的真实 bridge / finish 关系，不能任意换成另一条高层路线
 - `plan` 中的 `goal_finish` 必须明确最后要落到哪个 goal-side angle / ratio / congruence 关系
