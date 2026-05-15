@@ -1132,6 +1132,11 @@ def validate_relation_list(items, field_name, visible_points, min_len=2, max_len
         if not ok:
             return False, message, None
         cleaned_item = normalize_relation_surface(cleaned_item)
+        if field_name == "coordinate_relations" and re.search(r"\bsymmetr(?:y|ic)\b|\brotation(?:al)?\b", cleaned_item, re.IGNORECASE):
+            return False, (
+                f"{field_name}[{idx}] should name concrete equal/parallel/perpendicular/midpoint/collinear cues, "
+                "not high-level symmetry or rotation claims"
+            ), None
         if not relation_keyword_present(cleaned_item):
             return False, f"{field_name}[{idx}] must mention a concrete geometric relation", None
         mentioned = extract_point_mentions(cleaned_item, visible_points)
@@ -2034,6 +2039,10 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- coordinate_relations should be chosen from the hidden structured coordinate candidates, not copied from visible premises like a given parallel or equal-length statement."
         )
+    if "coordinate_relations" in validation_message and "symmetry or rotation claims" in validation_message:
+        targeted_hints.append(
+            "- rewrite coordinate_relations as concrete cues like midpoint, collinear, equal-length, parallel, or perpendicular observations; do not say points look symmetric or that there is a rotation."
+        )
     if "visible_relations" in validation_message:
         targeted_hints.append(
             "- visible_relations should contain only old-figure relations that are already visible before the auxiliary point is introduced; do not place new-point relations there."
@@ -2278,6 +2287,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- Survey the whole visible figure, not just the anchor points.\n"
         "- Use the hidden coordinate table only as an internal consistency check for relations that also look plausible in the image.\n"
         "- The coordinate_relations field should stay close to the structured coordinate candidates when possible. Avoid unsupported jumps like 'there is a rotation symmetry' unless you first name the concrete equal, parallel, perpendicular, midpoint, or collinear cues behind it.\n"
+        "- In coordinate_relations and coordinate_hints, do not describe points as symmetric or invoke rotation directly; spell out the concrete equal, parallel, perpendicular, midpoint, or collinear cues instead.\n"
         "- The visible_relations field should preferentially reuse the visible premise summaries above, plus a small number of visually obvious derived facts. It should not introduce invented centers, rotations, or unnamed transformations.\n"
         "- The coordinate_relations and visible_relations fields must stay separate: coordinate_relations are coordinate-backed visual checks, while visible_relations are existing-figure givens or obvious old-figure consequences.\n"
         "- The coordinate_hints field must be written as ordinary visual geometry language. Do not say 'the coordinates show', 'the coordinates indicate', or anything similar.\n"
