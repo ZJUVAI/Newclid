@@ -17,6 +17,67 @@
 - v19 在历史 run 中曾达到 `66/95`，但当前 commit 的主结果以最新完整补跑 `65/95` 为准。
 - v17/v19 使用的是 `qwen3_vl_text` multiaux 评估链路；v18 历史结果来自更早的 `vlm` 链路，跨版本比较主要用于主线演进记录。
 
+## IMO-95 代理 Benchmark 子集
+
+为了把 `imo_95` 的题目级差异单独拿出来复跑或做 trace drill-down，当前仓库额外维护两个从 [benchmarks/imo_95.txt](/C20545/home/wangzi/GenesisGeo-grpo/benchmarks/imo_95.txt) 抽取出的代理 benchmark：
+
+- [benchmarks/imo95_score_diff_11.txt](/C20545/home/wangzi/GenesisGeo-grpo/benchmarks/imo95_score_diff_11.txt)
+  - 格式与 `imo_95.txt` 完全一致，仍然是“题名行 + 题面行”的两行配对格式
+  - 包含 `11` 道真正解释主比较 headline 分差的 swing 题
+  - 用途：快速复跑 `62/95 -> 61/95 -> 65/95` 这类主线 score delta 的关键题
+- [benchmarks/imo95_mixed_outcomes_20.txt](/C20545/home/wangzi/GenesisGeo-grpo/benchmarks/imo95_mixed_outcomes_20.txt)
+  - 同样保持与 `imo_95.txt` 一致的两行配对格式
+  - 包含 `20` 道在 8 个完整 run 里曾出现 solved / unsolved 翻转的题
+  - 用途：覆盖全部不稳定题，用于 agent/link 差异、singleaux-vs-multiaux 差异和 trace 稳定性排查
+
+这两个子集的关系是：
+
+- `imo95_score_diff_11.txt` 是更小、更聚焦的主分差题集
+- `imo95_mixed_outcomes_20.txt` 是它的超集，额外包含 9 道“有翻转但不解释主比较 headline 分差”的题
+
+这两个子集的分析来源固定为 `8` 个完整 `95/95` 的 `imo_95` run；所有集合判断都基于这些 run 的逐题 `Solved` 列，明确排除了 `partial` / `resume` 中间产物，以及 `2026-05-12` 那个只解出 `1/95` 的中断 run。具体来源如下：
+
+- pre-GRPO multiaux baseline
+  - agent：`qwen3_vl_text`
+  - model：`vlm_sft44 checkpoint-20084`
+  - 结果 CSV：`results/pre_grpo_vlm_sft44_checkpoint20084_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_vlm_sft44_checkpoint-20084_sv1_d32_b512_s4_gbs2_gbt100_seed123_20260510T045624Z.csv`
+  - eval commit：`392ea7f6dd8d2f91824783494b78384c12db4428`
+- v17 multiaux
+  - agent：`qwen3_vl_text`
+  - model：`models/grpo_vlm_sft44_geometry100k_v17_s1_4gpu_lr5e6/v0-20260423-165556/checkpoint-500`
+  - 结果 CSV：`results/v17_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260423-165556_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260514T043538Z.csv`
+  - eval commit：`6e24d5121e6264eaf5f7c2dc30e184c52f8d5436`
+- v19 multiaux
+  - agent：`qwen3_vl_text`
+  - model：`models/grpo_vlm_sft44_geometry100k_v19_s1_4gpu_lr5e6/v0-20260508-105855/checkpoint-500`
+  - 结果 CSV：`results/v19_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260508-105855_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260513T073845Z.csv`
+  - eval commit：`6e24d5121e6264eaf5f7c2dc30e184c52f8d5436`
+- v17 singleaux
+  - agent：`qwen3_vl_text`
+  - model：`models/grpo_vlm_sft44_geometry100k_v17_s1_4gpu_lr5e6/v0-20260423-165556/checkpoint-500`
+  - 结果 CSV：`results/v17_lr5e6_checkpoint500_qwen3_vl_text_singleaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260423-165556_checkpoint-500_sv1_d32_b512_s4_gbs2_gbt100_seed123_20260430T073751Z.csv`
+  - eval commit：`7f98879d4a0006112636abbbe5cd44f5a2e676a4`
+- v19 singleaux
+  - agent：`qwen3_vl_text`
+  - model：`models/grpo_vlm_sft44_geometry100k_v19_s1_4gpu_lr5e6/v0-20260508-105855/checkpoint-500`
+  - 结果 CSV：`results/v19_lr5e6_checkpoint500_qwen3_vl_text_singleaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260508-105855_checkpoint-500_sv1_auxfirst_d32_b512_s4_gbs2_gbt100_seed123_20260511T091631Z.csv`
+  - eval commit：`5b167cf2ec6cd6b65adf849152fbcb7520783149`
+- v16 `vlm`
+  - agent：`vlm`
+  - model：`models/grpo_vlm_sft44_geometry100k_maxaux8_v16_s1_4gpu_lr5e6/v0-20260422-154539/checkpoint-500`
+  - 结果 CSV：`results/v16_lr5e6_checkpoint500_vlm/imo_95_v16_checkpoint500_merged.csv`
+  - eval commit：`a5482b00ad8b8f5623b3c48166415490303ae7a7`
+- v17 `vlm`
+  - agent：`vlm`
+  - model：`models/grpo_vlm_sft44_geometry100k_v17_s1_4gpu_lr5e6/v0-20260423-165556/checkpoint-500`
+  - 结果 CSV：`results/v17_lr5e6_checkpoint500_vlm/imo_95_v17_checkpoint500_merged.csv`
+  - eval commit：`e577945a27a86a7038ed57b7c9039eab55f8d3e9`
+- v18 `vlm`
+  - agent：`vlm`
+  - model：`models/grpo_vlm_sft44_geometry100k_v18_s1_4gpu_lr5e6/v0-20260427-200556/checkpoint-500`
+  - 结果 CSV：`results/v18_lr5e6_checkpoint500_vlm/imo_95_v18_checkpoint500_merged.csv`
+  - eval commit：`f384d7029f283c790acb9fb77a1b039511a3b750`
+
 ## 背景
 
 - 基础模型（SFT baseline / pre-GRPO）：`vlm_sft44`
