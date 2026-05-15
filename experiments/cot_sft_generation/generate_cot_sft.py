@@ -1788,6 +1788,11 @@ def enrich_bridge_steps_with_targets(plan):
             enriched["next_target_relation"] = plan["bridge_steps"][idx + 1].get("relation", "")
         else:
             enriched["next_target_relation"] = plan.get("goal_finish", "")
+        dependencies = [
+            dep for dep in enriched.get("depends_on", [])
+            if isinstance(dep, str) and dep.strip()
+        ]
+        enriched["required_supports"] = dependencies[: min(2, len(dependencies))]
         enriched_steps.append(enriched)
     enriched_plan = dict(plan)
     enriched_plan["bridge_steps"] = enriched_steps
@@ -1960,8 +1965,14 @@ def build_writer_sentence_duties(plan):
         if not isinstance(step, dict):
             continue
         approved_relation = step.get("approved_route_relation") or step.get("relation", "")
+        required_supports = step.get("required_supports", [])
+        support_clause = (
+            f" explicitly mention these support relations if possible: {json.dumps(required_supports, ensure_ascii=False)};"
+            if required_supports else
+            " explicitly mention at least one approved support relation;"
+        )
         lines.append(
-            f"{len(lines) + 1}. Bridge sentence {idx}: state the approved relation '{approved_relation}', mention at least one concrete support from the approved plan, prefer an aux-direct or previous-bridge support when possible, avoid summary labels like symmetry or midpoint property in place of those supports, paraphrase any visible given that already appears in the prefix, and point toward '{step.get('next_target_relation', '')}'."
+            f"{len(lines) + 1}. Bridge sentence {idx}: state the approved relation '{approved_relation}',{support_clause} prefer an aux-direct or previous-bridge support when possible, avoid summary labels like symmetry or midpoint property in place of those supports, paraphrase any visible given that already appears in the prefix, and point toward '{step.get('next_target_relation', '')}'."
         )
     lines.append(
         f"{len(lines) + 1}. Final sentence: land on the approved goal-side finish exactly: {plan.get('goal_finish', '')}"
@@ -2317,9 +2328,15 @@ def build_writer_retry_feedback(validation_message, plan):
         targeted_hints.append(
             "- do not summarize the support as 'symmetry', 'center of symmetry', or 'midpoint property'; explicitly restate the approved support relations such as 'h is the midpoint of bc' or 'bh equals ch'."
         )
+        targeted_hints.append(
+            "- when a bridge step includes internal required_supports, mention those support relations explicitly in the same sentence before landing on the new bridge relation."
+        )
     if "too long" in validation_message:
         targeted_hints.append(
             "- shorten the body by compressing helper or bridge prose; keep the approved relation names, but trim extra explanation and repeated restatements."
+        )
+        targeted_hints.append(
+            "- prefer one short sentence per bridge step: one relation, one or two concrete supports, and one brief forward-looking clause."
         )
     if "contains forbidden pattern" in validation_message:
         targeted_hints.append(
@@ -2540,6 +2557,8 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         indent=2,
     )
     sentence_duties = build_writer_sentence_duties(plan)
+    bridge_steps = plan.get("bridge_steps", []) if isinstance(plan, dict) else []
+    expected_sentence_count = 4 + len(bridge_steps) + (1 if plan.get("aux_direct_relations") else 0)
     return (
         "You are polishing a geometry CoT example for SFT.\n\n"
         "[Visible Inputs]\n"
@@ -2578,6 +2597,8 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "[Sentence Duties]\n"
         "Use this outline internally to keep the body stepwise, concrete, and impersonal. Do not quote these lines verbatim, and do not repeat the injected prefix.\n"
         f"{sentence_duties}\n\n"
+        "[Compression Target]\n"
+        f"Aim for about {expected_sentence_count} sentences total in the body. Keep each bridge sentence compact and concrete, usually one relation plus one or two named supports, rather than a long recap of the whole chain.\n\n"
         "[Injected Prefix Block]\n"
         "The script will prepend the following block exactly before your body. Do not restate these claims; start after them.\n"
         f"{injected_prefix_block}\n\n"
@@ -2605,6 +2626,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "18. Stay impersonal. Do not write in the first person.\n"
         "19. The very first sentence of your body should state the bottleneck or goal-side obstacle. Do not spend the first sentence re-describing triangle abc, the midpoint layout, or the visible givens already covered by the injected prefix block.\n"
         "20. Give each bridge_steps relation its own sentence. In that sentence, explicitly name at least one concrete depends_on relation before or while stating the new bridge relation.\n"
+        "20a. When a bridge step lists internal required_supports, mention those support relations explicitly in the same sentence unless doing so would repeat the exact prefix wording; in that case paraphrase them.\n"
         "21. Avoid shortcuts such as 'by symmetry', 'from the setup', or 'it follows' unless the same sentence explicitly names the concrete supporting relations.\n"
         "22. Do not hedge with phrases like 'similarity or angle equality'; state the specific approved relation you are using.\n"
         "23. Each bridge_steps object includes an internal next_target_relation chosen by the script. Use it to keep the reasoning pointed toward the next approved relation instead of inventing a different route.\n"
@@ -2612,6 +2634,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "25. If you need to reuse a visible given that already appears in the injected prefix, paraphrase it instead of copying the exact wording from the prefix sentence.\n"
         "26. In bridge sentences, do not replace the approved supports with summary labels such as 'symmetry', 'center of symmetry', or 'midpoint property'; name the actual equalities, collinearities, parallels, or perpendicularities instead.\n"
         "27. When an approved bridge relation is an angle or ratio relation, write it in nearly the same point ordering and surface form as the approved relation, rather than paraphrasing it into a looser sentence like 'the angle formed by ...'.\n"
+        "28. Keep the bridge sentences tight: usually one approved relation, one or two concrete supports, and one short forward-looking clause. Do not spend multiple clauses re-explaining the same visible setup.\n"
         "Output only the plain-text body.\n"
     )
 
