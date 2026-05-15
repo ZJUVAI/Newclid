@@ -460,6 +460,36 @@ def extract_high_level_structure_markers(text):
     return markers
 
 
+def relations_semantically_match(text_a, text_b, point_names):
+    normalized_a = normalize_relation_surface(normalize_point_case(text_a or "", point_names)).lower()
+    normalized_b = normalize_relation_surface(normalize_point_case(text_b or "", point_names)).lower()
+    if not normalized_a or not normalized_b:
+        return False
+    if normalized_a == normalized_b:
+        return True
+    if normalized_a in normalized_b or normalized_b in normalized_a:
+        return True
+    points_a = extract_point_mentions(normalized_a, point_names)
+    points_b = extract_point_mentions(normalized_b, point_names)
+    keyword_a = relation_text_keywords(normalized_a)
+    keyword_b = relation_text_keywords(normalized_b)
+    if not (points_a and points_b and keyword_a and keyword_b):
+        return False
+    shared_points = points_a & points_b
+    shared_keywords = keyword_a & keyword_b
+    if "equal" in shared_keywords and len(shared_points) >= 3:
+        return True
+    if {"parallel", "perpendicular"} & shared_keywords and len(shared_points) >= 4:
+        return True
+    if "angle" in shared_keywords and len(shared_points) >= 4:
+        return True
+    if "ratio" in shared_keywords and len(shared_points) >= 4:
+        return True
+    if {"collinear", "midpoint", "circle"} & shared_keywords and len(shared_points) >= 3:
+        return True
+    return False
+
+
 def build_visible_premise_summaries(record, max_items=12):
     summaries = []
     seen = set()
@@ -1201,7 +1231,14 @@ def build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal, max_aux=
     }
 
 
-def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_part=None, coordinate_candidates=None):
+def validate_plan_response(
+    output_text: str,
+    point_coords,
+    visible_goal="",
+    aux_part=None,
+    coordinate_candidates=None,
+    sanitized_rest=None,
+):
     plan = output_text if isinstance(output_text, dict) else extract_json_object(output_text)
     if not isinstance(plan, dict):
         return False, "Planner must return a single JSON object", None
@@ -1404,6 +1441,23 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
                 "coordinate_relations must stay grounded in the hidden coordinate candidates; "
                 f"unmatched items: {unmatched_relations}"
             ), None
+    if sanitized_rest and aux_part:
+        proof_guidance = build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal)
+        hidden_route_relations = proof_guidance.get("bridge_relations", []) + proof_guidance.get("goal_finish_relations", [])
+        if hidden_route_relations:
+            unmatched_bridge_steps = [
+                step["relation"]
+                for step in cleaned_plan["bridge_steps"]
+                if not any(
+                    relations_semantically_match(step["relation"], hidden_relation, known_points)
+                    for hidden_relation in hidden_route_relations
+                )
+            ]
+            if unmatched_bridge_steps:
+                return False, (
+                    "bridge_steps relations must stay close to the hidden proof guidance route; "
+                    f"unmatched items: {unmatched_bridge_steps}"
+                ), None
 
     goal_spec = parse_goal_expression(visible_goal)
     goal_points = set(goal_spec["points"])
@@ -1856,6 +1910,10 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- each why_it_helps string should explicitly name the next bridge relation or the final goal-side relation using concrete point names, not abstract phrases like 'enabling angle transfers'."
         )
+    if "must stay close to the hidden proof guidance route" in validation_message:
+        targeted_hints.append(
+            "- do not replace the approved bridge route with a different one; reuse bridge relations that are semantically close to the hidden proof guidance, such as equalities, angle relations, or the final parallel relation already indicated there."
+        )
     if "unsupported high-level" in validation_message:
         targeted_hints.append(
             "- do not introduce new routes such as triangle similarity, cyclic quadrilaterals, or parallelograms inside why_it_helps unless that same structure is already stated in the approved relation chain."
@@ -2034,6 +2092,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- The construction field must describe the same geometric facts as the hidden target summary in plain language; do not invent a different line, circle, or intersection.\n"
         "- Each item in aux_direct_relations must stay local to the auxiliary construction itself. Do not pull unrelated old-figure points into those direct relations.\n"
         "- Each bridge_steps relation should explicitly mention how the auxiliary point interacts with existing visible points or substructures, in a realistic order.\n"
+        "- Each bridge_steps relation should stay semantically close to the hidden proof guidance bridge_relations or goal_finish_relations; do not swap in a different high-level route.\n"
         "- Each bridge_steps depends_on list should reuse concrete items from visible_relations, aux_direct_relations, or an earlier bridge_steps relation, instead of inventing unsupported leaps.\n"
         "- Each depends_on item must be copied as a natural-language relation string, not written as a raw formal predicate such as 'cong b j d j'.\n"
         "- Each bridge_steps why_it_helps string should name the concrete next bridge relation or the concrete goal-side relation it unlocks, with actual point names, not abstract phrases like 'enabling angle transfers'.\n"
@@ -2235,7 +2294,17 @@ def run_stage(stage_name, messages, model_name, point_coords, max_retries, requi
     }
 
 
-def run_plan_stage(stage_name, messages, model_name, point_coords, visible_goal, aux_part, coordinate_candidates, max_retries):
+def run_plan_stage(
+    stage_name,
+    messages,
+    model_name,
+    point_coords,
+    visible_goal,
+    aux_part,
+    coordinate_candidates,
+    sanitized_rest,
+    max_retries,
+):
     last_error = None
     last_output = None
 
@@ -2252,6 +2321,7 @@ def run_plan_stage(stage_name, messages, model_name, point_coords, visible_goal,
                 visible_goal=visible_goal,
                 aux_part=aux_part,
                 coordinate_candidates=coordinate_candidates,
+                sanitized_rest=sanitized_rest,
             )
             if ok:
                 logger.info(f"[{stage_name}] Valid output in {elapsed:.2f}s")
@@ -2358,6 +2428,7 @@ def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_
         visible_goal=visible_goal,
         aux_part=aux_part,
         coordinate_candidates=coordinate_candidates,
+        sanitized_rest=sanitized_rest,
         max_retries=max_retries,
     )
     if not plan_result["success"]:
