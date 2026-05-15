@@ -1,21 +1,37 @@
 # GRPO 迭代状态与后续计划
 
-最后更新：2026-04-29 | 当前 commit: `da70fd477dc18c4859c1c96b8014e5c954b08254`
+最后更新：2026-05-15 | 当前 commit: `6e24d5121e6264eaf5f7c2dc30e184c52f8d5436`
+
+## 主要结果概览
+
+当前文档默认以 **当前 commit: `6e24d5121e6264eaf5f7c2dc30e184c52f8d5436`** 的最新完整评估结果为主；旧 commit / 旧 run 结果放在后文作为历史结果保留。
+
+| 版本 | agent / 评估链路 | dev_imo | imo_95 | 备注 |
+|------|------------------|---------|--------|------|
+| SFT baseline / pre-GRPO | `qwen3_vl_text` multiaux | 14/16 | 62/95 | 基线，`vlm_sft44 checkpoint-20084`，非当前 commit 历史结果（dev: `88851cfc` / imo95: `51686a42`） |
+| v17 checkpoint-500 | `qwen3_vl_text` multiaux | 14/16 | 61/95 | 5k `bucket_unified`，当前 commit 补跑 |
+| v18 checkpoint-500 | `vlm` | 14/16 | 55/95 | 10k `bucket_unified`，非当前 commit 历史结果（`f384d702`） |
+| **v19 checkpoint-500** | **`qwen3_vl_text` multiaux** | **14/16** | **65/95** | **当前最强版本**，`select_balanced` 10k |
+
+补充说明：
+- v19 在历史 run 中曾达到 `66/95`，但当前 commit 的主结果以最新完整补跑 `65/95` 为准。
+- v17/v19 使用的是 `qwen3_vl_text` multiaux 评估链路；v18 历史结果来自更早的 `vlm` 链路，跨版本比较主要用于主线演进记录。
 
 ## 背景
 
 - 基础模型（SFT baseline / pre-GRPO）：`vlm_sft44`
   - 模型路径：`/C20545/home/wangzi/GenesisGeo_data_models/models/vlm_sft44/checkpoint-20084`
-  - **评估结果路径**：
+  - 结果归属：均为**非当前 commit 历史结果**
+    - **评估结果路径**：
     - **dev_imo 评估**：
-      - CSV：`results/devimo_grpo_compare/vlm_sft44/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_vlm_sft44_checkpoint-20084_sv1_d32_b512_s4_gbs4_gbt100_seed123_20260422T062514Z.csv`（14/16）
+      - CSV：`results/devimo_grpo_compare/vlm_sft44/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_vlm_sft44_checkpoint-20084_sv1_d32_b512_s4_gbs4_gbt100_seed123_20260422T062514Z.csv`（14/16，run commit: `88851cfca89a9e2f286b3db820ecf20b4dcf32e4`）
       - trace 目录：`results/devimo_grpo_compare/vlm_sft44/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_vlm_sft44_checkpoint-20084_sv1_d32_b512_s4_gbs4_gbt100_seed123_20260422T062514Z/`
         - problems/：单题 trace（`0000_translated_imo_2000_p6.jsonl` 等）
         - attempts/：求解尝试记录
     - **imo_95 评估**：
-      - 初始 run trace 目录：`results/devimo_grpo_compare/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_vlm_sft44_checkpoint-20084_d32_b512_s4_gbs2_gbt100_seed123_20260417T062654Z/`
-      - resume run trace 目录：`results/devimo_grpo_compare/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_resume_from_20260417T062654Z_vlm_sft44_checkpoint-20084_d32_b512_s4_gbs2_gbt100_seed123_20260417T104054Z/`
-      - **merged 合并结果**：`results/devimo_grpo_compare/imo_95_resume_from_20260417T062654Z_merged.csv`（54/95）
+      - 初始 run trace 目录：`results/devimo_grpo_compare/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_vlm_sft44_checkpoint-20084_d32_b512_s4_gbs2_gbt100_seed123_20260417T062654Z/`（run commit: `51686a420ce49dd991f5d4b10d3f9e904553b24c`）
+      - resume run trace 目录：`results/devimo_grpo_compare/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_resume_from_20260417T062654Z_vlm_sft44_checkpoint-20084_d32_b512_s4_gbs2_gbt100_seed123_20260417T104054Z/`（run commit: `51686a420ce49dd991f5d4b10d3f9e904553b24c`）
+      - **merged 合并结果**：`results/devimo_grpo_compare/imo_95_resume_from_20260417T062654Z_merged.csv`（54/95，非当前 commit 历史结果，对应 run commit: `51686a420ce49dd991f5d4b10d3f9e904553b24c`）
         - problems/：单题 trace（`0000_imo_1983_p2.jsonl` 等）
         - attempts/：求解尝试记录
 - 原始数据源（版本相关）：
@@ -41,6 +57,81 @@
 ---
 
 ## 版本历史（主线 + 归档）
+
+### v19 (2026-05-08~14) - **当前最新 multiaux 主线**
+
+**数据集**：`datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl`
+
+**模型训练目录**：`models/grpo_vlm_sft44_geometry100k_v19_s1_4gpu_lr5e6`
+
+**核心变更**：
+- 从 v17/v18 的 debug-set 5k/10k bucket_unified 选集切换到 `select_balanced` 10k 数据集
+- 训练配置保持与 v17/v18 对齐，重点验证更大、更平衡的数据源是否能提升 `qwen3_vl_text` multiaux 评估
+
+**训练配置**：与 v17/v18 基本一致
+- `learning_rate = 5e-6`，`warmup_steps = 10`，`lr_scheduler_type = cosine`
+- `per_device_train_batch_size = 1`，`gradient_accumulation_steps = 8`，`num_generations = 8`
+- `NPROC_PER_NODE = 4`，`temperature = 1.1`，`top_p = 0.95`，`top_k = 0`，`beta = 0.02`
+- `max_steps = 500`，`save_steps = 50`
+- 训练脚本：`tmp/train_v19.sh`
+
+**主评估结果（multiaux / `qwen3_vl_text`，当前 commit）**：
+- ✅ dev_imo：**14/16**
+  - 2026-05-13 05:42:15 UTC 的中断 run 先停在 8/16，随后恢复并合并为：
+  - `results/v19_lr5e6_checkpoint500_qwen3_vl_text_multiaux/dev_imo_resume_from_20260513_054215_merged.csv`
+- ✅ imo_95：**65/95**
+  - 最新完整重跑 CSV：`results/v19_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260508-105855_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260513T073845Z.csv`
+- 评估产物目录：`results/v19_lr5e6_checkpoint500_qwen3_vl_text_multiaux/`
+
+**历史结果（旧 commit / 旧 run）**：
+- dev_imo：**14/16**
+  - `results/v19_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260508-105855_checkpoint-500_sv1_d32_b512_s4_gbs2_gbt100_seed123_20260508T143514Z.csv`（run commit: `392ea7f6dd8d2f91824783494b78384c12db4428`）
+- imo_95：**66/95**
+  - 初始 partial CSV：`results/v19_lr5e6_checkpoint500_qwen3_vl_text_multiaux/imo_95_v19_checkpoint500_partial.csv`（42/95，对应 run commit: `627150920bd4b856c5577b6ec9206d5996da3b6c`）
+  - remaining CSV：`results/v19_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v19_checkpoint500_remaining_v0-20260508-105855_checkpoint-500_sv1_d32_b512_s4_gbs2_gbt100_seed123_20260509T053840Z.csv`（24/52，对应 run commit: `392ea7f6dd8d2f91824783494b78384c12db4428`）
+  - merged 合并结果：`results/v19_lr5e6_checkpoint500_qwen3_vl_text_multiaux/imo_95_v19_checkpoint500_merged.csv`（非当前 commit 历史结果，由上述两个旧 run 合并）
+- 说明：
+  - 当前 commit 的主结果应以最新完整补跑 `65/95` 为准
+  - `66/95` 作为历史最佳 run 保留，说明该配置在不同 run 间存在轻微波动上界
+
+**singleaux 对照结果**：
+- dev_imo：`13/16`
+  - `results/v19_lr5e6_checkpoint500_qwen3_vl_text_singleaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260508-105855_checkpoint-500_sv1_auxfirst_d32_b512_s4_gbs2_gbt100_seed123_20260511T084607Z.csv`（非当前 commit，run commit: `5b167cf2ec6cd6b65adf849152fbcb7520783149`）
+- imo_95：`55/95`
+  - `results/v19_lr5e6_checkpoint500_qwen3_vl_text_singleaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260508-105855_checkpoint-500_sv1_auxfirst_d32_b512_s4_gbs2_gbt100_seed123_20260511T091631Z.csv`（非当前 commit，run commit: `5b167cf2ec6cd6b65adf849152fbcb7520783149`）
+
+**说明**：
+- `v19` 文档主结果使用的是 `qwen3_vl_text` agent；下面的 `v16/v17/v18` 历史结果则来自更早的 `vlm` agent 评估链路
+- 因此跨版本结论主要用于主线演进记录，不应把 `v16/v17/v18` 与 `v19 qwen3_vl_text` 做严格 apples-to-apples 的 agent 实现对比
+
+**对比基线**：
+
+| 版本 | dev_imo | imo_95 | 备注 |
+|------|---------|--------|------|
+| SFT baseline / pre-GRPO multiaux | 14/16 | 62/95 | `qwen3_vl_text` multiaux，`vlm_sft44 checkpoint-20084`，非当前 commit（dev: `88851cfc` / imo95: `51686a42`） |
+| v17 checkpoint-500 (`qwen3_vl_text`，当前 commit) | 14/16 | 61/95 | 2026-05-14 multiaux 补跑 |
+| v17 checkpoint-500 (`vlm` 历史结果) | 14/16 | 59/95 | 5k bucket_unified，非当前 commit / 旧评估链路 |
+| v18 checkpoint-500 | 14/16 | 55/95 | 10k bucket_unified，非当前 commit 历史结果 |
+| v19 checkpoint-500 singleaux | 13/16 | 55/95 | 仅保留首个 aux，明显低于 multiaux，非当前 commit（`5b167cf2`） |
+| **v19 checkpoint-500 multiaux（当前 commit）** | **14/16** | **65/95** | `select_balanced` 10k，最新完整补跑 |
+| v19 checkpoint-500 multiaux（历史最佳 run） | 14/16 | 66/95 | 非当前 commit / 旧 run 的 merged 最佳结果 |
+
+**与 pre-GRPO multiaux 对比（62/95 → 65/95，当前 commit）**：
+- v19 新增（+6）：至少包含 `imo_sl_1999_g6`、`imo_sl_2002_g7_variant`、`imo_sl_2008_g1b`、`imo_sl_2009_g3`、`imo_sl_2009_g6`、`imo_sl_2016_g5_variant`
+- v19 回退：相对历史最佳 `66/95` 少解 1 题
+- 净变化：`+3`
+
+**关键分析结论**：
+- v19 的主收益来自 **multiaux 搜索**，不是单 aux 本身；singleaux 对照只做到 `13/16` 和 `55/95`
+- 在当前 commit 的最新完整补跑里，`dev_imo` 保持 `14/16`，`imo_95` 达到 `65/95`，依然明显优于 pre-GRPO multiaux 的 `62/95`
+- 历史上同配置曾跑到 `66/95`，说明当前结论稳定成立，但 `imo_95` headline 会有小幅 run-to-run 波动
+
+**结论**：
+- v19 是当前最值得保留的 multiaux 主线：以当前 commit 计，`dev_imo 14/16`、`imo_95 65/95`，明显优于 pre-GRPO、v17 和 v18
+- singleaux 结果显著低于 multiaux，后续比较与回归时应继续把 multiaux 作为主汇报口径
+- 旧 commit 的 `66/95` 应作为历史最佳 run 记录，而不是覆盖当前 commit 的主结果
+
+---
 
 ### v18 (2026-04-27~29) - 已归档（未优于 v17）
 
@@ -105,20 +196,22 @@ python scripts/grpo/select_debug_set.py \
 - `max_steps = 500`，`save_steps = 50`
 
 **评估结果**：
-- ✅ dev_imo：**14/16**（与 v17 持平）
-- ✅ imo_95：**55/95**（低于 v17 的 59/95，-4 题）
-- 评估产物：`results/v18_lr5e6_checkpoint500/`
-  - dev_imo CSV：`eval_single_problem_multi_gpu_vlm_dev_imo_*_checkpoint-500_*.csv`
-  - imo_95 合并 CSV：`imo_95_v18_checkpoint500_merged.csv`
+- ✅ dev_imo：**14/16**（与 v17 持平，非当前 commit，run commit: `f384d7029f283c790acb9fb77a1b039511a3b750`）
+- ✅ imo_95：**55/95**（低于 v17 的 59/95，-4 题；非当前 commit，run commit: `f384d7029f283c790acb9fb77a1b039511a3b750`）
+- 评估设置：`agent=vlm`，`search_version=v1`，`decoding_size=32`，`beam_size=512`，`search_depth=4`，`num_gpus_for_eval=4`，`gpu_batch_size=2`
+- 评估产物：`results/v18_lr5e6_checkpoint500_vlm/`
+  - dev_imo CSV：`results/v18_lr5e6_checkpoint500_vlm/eval_single_problem_multi_gpu_vlm_dev_imo_v0-20260427-200556_checkpoint-500_sv1_d32_b512_s4_gbs2_gbt100_seed123_20260428T000747Z.csv`
+  - imo_95 CSV：`results/v18_lr5e6_checkpoint500_vlm/eval_single_problem_multi_gpu_vlm_imo_95_v0-20260427-200556_checkpoint-500_sv1_d32_b512_s4_gbs2_gbt100_seed123_20260428T012443Z.csv`
+  - imo_95 合并 CSV：`results/v18_lr5e6_checkpoint500_vlm/imo_95_v18_checkpoint500_merged.csv`
 
 **对比基线**：
 
 | 版本 | dev_imo | imo_95 | 备注 |
 |------|---------|--------|------|
-| SFT baseline | 14/16 | - | pre-GRPO |
-| v16 checkpoint-500 | 14/16 | 55/95 | lr=5e-6，2k 数据集，8 epoch |
-| **v17 checkpoint-500** | **14/16** | **59/95** | lr=5e-6，5k 数据集，3.2 epoch，**当前最佳** |
-| v18 checkpoint-500 | 14/16 | 55/95 | lr=5e-6，10k 数据集，1.6 epoch |
+| SFT baseline | 14/16 | - | pre-GRPO，非当前 commit |
+| v16 checkpoint-500 | 14/16 | 55/95 | lr=5e-6，2k 数据集，8 epoch，非当前 commit（`a5482b00`） |
+| **v17 checkpoint-500** | **14/16** | **59/95** | lr=5e-6，5k 数据集，3.2 epoch，非当前 commit 历史结果（dev: `497d6aaf` / imo95: `e577945a`） |
+| v18 checkpoint-500 | 14/16 | 55/95 | lr=5e-6，10k 数据集，1.6 epoch，非当前 commit（`f384d702`） |
 
 **imo_95 逐题对比（v17 → v18）**：
 - v18 回退（-4）：`imo_sl_2002_g7_variant`、`imo_sl_2009_g8`、`imo_sl_2013_g2`、`imo_sl_2020_g6`
@@ -133,12 +226,12 @@ python scripts/grpo/select_debug_set.py \
 
 **结论**：
 - 扩大数据集到 10k 并不带来进一步提升，反而因 epoch 数减少（3.2 → 1.6）导致模型对关键构造的学习不充分
-- v17（5k，3.2 epoch）仍是当前最优配置
+- 当时结论是 v17（5k，3.2 epoch）仍优于 v18；后续已被 v19 multiaux 超过
 - 下一步应探索：在保持 3.2 epoch 的前提下扩大数据集，或改善 10k 数据集的质量（降低 multi_point_shortage）
 
 ---
 
-### v17 (2026-04-23) - **当前最优**
+### v17 (2026-04-23) - 曾经最优（已被 v19 multiaux 超过）
 
 **数据集**：`datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_5k_v17`
 
@@ -205,28 +298,46 @@ python scripts/grpo/select_debug_set.py \
 - 优于 v16 全程指标（avg_zero_std: 0.1670 → 0.1248，降低 25%）
 
 **评估结果**：
-- ✅ dev_imo：**14/16**（与 v16 和 SFT baseline 持平）
-- ✅ imo_95：**59/95**（94 题完成，1 题未完成，优于 v16 的 55/95）
-- ✅ checkpoint-300 验证：dev_imo **13/16**（低于 checkpoint-500，确认 500 步是最优点）
-- 评估产物：`results/v17_lr5e6_checkpoint500/`
-  - dev_imo CSV：`eval_single_problem_multi_gpu_vlm_dev_imo_*_checkpoint-500_*.csv`
-  - imo_95 合并 CSV：`imo_95_v17_checkpoint500_merged.csv`
+- ✅ dev_imo：**14/16**（与 v16 和 SFT baseline 持平；非当前 commit，run commit: `497d6aaf46fa996c41ba95f6c64ac33d392a579a`）
+- ✅ imo_95：**59/95**（94 题完成，1 题未完成，优于 v16 的 55/95；非当前 commit，run commit: `e577945a27a86a7038ed57b7c9039eab55f8d3e9`）
+- ✅ checkpoint-300 验证：dev_imo **13/16**（低于 checkpoint-500，确认 500 步是最优点；非当前 commit 历史结果）
+- 评估设置：`agent=vlm`，`search_version=v1`，`decoding_size=32`，`beam_size=512`，`search_depth=4`，`num_gpus_for_eval=4`，`gpu_batch_size=2`
+- 评估产物：`results/v17_lr5e6_checkpoint500_vlm/`
+  - dev_imo CSV：`results/v17_lr5e6_checkpoint500_vlm/eval_single_problem_multi_gpu_vlm_dev_imo_v0-20260423-165556_checkpoint-500_sv1_d32_b512_s4_gbs2_gbt100_seed123_20260423T112909Z.csv`
+  - imo_95 初始 CSV：`results/v17_lr5e6_checkpoint500_vlm/eval_single_problem_multi_gpu_vlm_imo_95_v0-20260423-165556_checkpoint-500_sv1_d32_b512_s4_gbs2_gbt100_seed123_20260424T040027Z.csv`
+  - imo_95 resume CSV：`results/v17_lr5e6_checkpoint500_vlm/eval_single_problem_multi_gpu_vlm_imo_95_resume_v17_checkpoint500_v0-20260423-165556_checkpoint-500_sv1_d32_b512_s4_gbs2_gbt100_seed123_20260424T043041Z.csv`
+  - imo_95 partial CSV：`results/v17_lr5e6_checkpoint500_vlm/imo95_partial_recovered.csv`
+  - imo_95 合并 CSV：`results/v17_lr5e6_checkpoint500_vlm/imo_95_v17_checkpoint500_merged.csv`
+
+**主评估结果（`qwen3_vl_text` multiaux，当前 commit）**：
+- ✅ dev_imo：**14/16**
+  - `results/v17_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260423-165556_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260514T030032Z.csv`
+- ✅ imo_95：**61/95**
+  - `results/v17_lr5e6_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_imo_95_v0-20260423-165556_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260514T043538Z.csv`
+- 说明：
+  - 这组结果使用与 v19 相同的 `qwen3_vl_text` multiaux 评估链路，便于直接比较
+
+**历史结果（旧 commit / 旧 run）**：
+- `vlm` 链路：dev_imo **14/16**，imo_95 **59/95**（均为非当前 commit；dev run commit: `497d6aaf46fa996c41ba95f6c64ac33d392a579a`，imo95 run commit: `e577945a27a86a7038ed57b7c9039eab55f8d3e9`）
+- `results/v17_lr5e6_checkpoint500_vlm/imo_95_v17_checkpoint500_merged.csv`
+- 2026-05-12 的那次 `imo_95` auxfull run 只产出 `1/95`，明显是异常/中断产物，不作为正式结论
 
 **对比基线**：
 
 | 版本 | dev_imo | imo_95 | 备注 |
 |------|---------|--------|------|
-| SFT baseline | 14/16 | - | pre-GRPO |
+| SFT baseline | 14/16 | - | pre-GRPO，非当前 commit |
 | GRPO505 sv1 | 13/16 | - | 历史最佳 GRPO |
 | v14 checkpoint-500 | 12/16 | - | lr=1e-4，后期退化 |
-| v16 checkpoint-500 | 14/16 | 55/95 | lr=5e-6，2k 数据集，8 epoch |
-| **v17 checkpoint-500** | **14/16** | **59/95** | lr=5e-6，5k 数据集，3.2 epoch，**当前最佳** |
+| v16 checkpoint-500 | 14/16 | 55/95 | lr=5e-6，2k 数据集，8 epoch，非当前 commit（`a5482b00`） |
+| **v17 checkpoint-500 (`qwen3_vl_text` multiaux)** | **14/16** | **61/95** | 当前 commit，和 v19 使用同一评估链路 |
+| v17 checkpoint-500 (`vlm` 历史结果) | 14/16 | 59/95 | lr=5e-6，5k 数据集，3.2 epoch，非当前 commit / 旧评估链路 |
 
 **结论**：
 - v17 是首个在 5k 数据集（3.2 epoch）上保持稳定的 GRPO 版本
 - 训练指标优于 v16（avg_zero_std: 0.1670 → 0.1248，降低 25%）
-- dev_imo 持平 SFT baseline，imo_95 提升 4 题（55 → 59），验证了 5k 数据集的有效性
-- 扩大数据集、降低重复率（8 epoch → 3.2 epoch）对 GRPO 训练和评估都有益
+- 以当前 commit 的 `qwen3_vl_text` multiaux 结果计，v17 达到 `dev_imo 14/16`、`imo_95 61/95`
+- 扩大数据集、降低重复率（8 epoch → 3.2 epoch）对 GRPO 训练和评估都有益，但 v17 已被 v19 的当前 commit 结果 `65/95` 明确超过
 
 **v17 深度分析（2026-04-27）**：
 
@@ -313,20 +424,23 @@ python scripts/grpo/select_debug_set.py \
 - 无后期崩溃，完全避免了 v14 的 301-500 退化（v14 同阶段 `avg_zero_std = 0.57`）
 
 **评估结果**：
-- ✅ dev_imo：**14/16**（与 SFT baseline 持平，优于 v14 的 12/16）
-- ✅ imo_95：**55/95**（94 题完成，1 题因 Ray 崩溃未完成）
-- 评估产物：`results/v16_lr5e6_checkpoint500/`
-  - dev_imo CSV：`eval_single_problem_multi_gpu_vlm_dev_imo_v0-20260422-154539_checkpoint-500_sv1_d32_b512_s4_gbs2_gbt100_seed123_20260422T134636Z.csv`
-  - imo_95 合并 CSV：`imo_95_v16_checkpoint500_merged.csv`
+- ✅ dev_imo：**14/16**（与 SFT baseline 持平，优于 v14 的 12/16；非当前 commit，run commit: `a5482b00ad8b8f5623b3c48166415490303ae7a7`）
+- ✅ imo_95：**55/95**（94 题完成，1 题因 Ray 崩溃未完成；非当前 commit，run commit: `a5482b00ad8b8f5623b3c48166415490303ae7a7`）
+- 评估设置：`agent=vlm`，`search_version=v1`，`decoding_size=32`，`beam_size=512`，`search_depth=4`，`num_gpus_for_eval=4`，`gpu_batch_size=2`
+- 评估产物：`results/v16_lr5e6_checkpoint500_vlm/`
+  - dev_imo CSV：`results/v16_lr5e6_checkpoint500_vlm/eval_single_problem_multi_gpu_vlm_dev_imo_v0-20260422-154539_checkpoint-500_sv1_d32_b512_s4_gbs2_gbt100_seed123_20260422T134636Z.csv`
+  - imo_95 partial CSV：`results/v16_lr5e6_checkpoint500_vlm/imo95_partial_recovered.csv`
+  - imo_95 first8 CSV：`results/v16_lr5e6_checkpoint500_vlm/imo95_first8_recovered.csv`
+  - imo_95 合并 CSV：`results/v16_lr5e6_checkpoint500_vlm/imo_95_v16_checkpoint500_merged.csv`
 
 **对比基线**：
 
 | 版本 | dev_imo | imo_95 | 备注 |
 |------|---------|--------|------|
-| SFT baseline | 14/16 | - | pre-GRPO |
+| SFT baseline | 14/16 | - | pre-GRPO，非当前 commit |
 | GRPO505 sv1 | 13/16 | - | 历史最佳 GRPO |
 | v14 checkpoint-500 | 12/16 | - | lr=1e-4，后期退化 |
-| **v16 checkpoint-500** | **14/16** | **55/95** | lr=5e-6，4卡，当前主线 |
+| **v16 checkpoint-500** | **14/16** | **55/95** | lr=5e-6，4卡，首个稳定主线，非当前 commit（`a5482b00`） |
 
 **结论**：
 - v16 是首个在 500-step 全程保持稳定且 dev_imo 不低于 SFT baseline 的 GRPO 版本
@@ -426,11 +540,14 @@ mid gate 固定检查：
 | v15 | `datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_2k/` | `models/grpo_vlm_sft44_geometry100k_maxaux8_bucket_unified_s1_4gpu_lr5e6/` |
 | v16 | `datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_2k/` | `models/grpo_vlm_sft44_geometry100k_maxaux8_v16_s1_4gpu_lr5e6/` |
 | v17 | `datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_5k_v17/` | `models/grpo_vlm_sft44_geometry100k_v17_s1_4gpu_lr5e6/` |
+| v18 | `datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_10k_v18/` | `models/grpo_vlm_sft44_geometry100k_v18_s1_4gpu_lr5e6/` |
+| v19 | `datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl` | `models/grpo_vlm_sft44_geometry100k_v19_s1_4gpu_lr5e6/` |
 
 **版本说明**：
 - **v13**：原称"v10 复跑"，使用 v10_auxfix_stage_balanced selector 在 geometry100k maxaux5 数据源上的实验，50-step smoke 边缘失败（avg_zero_std = 0.4364）
 - **v14**：原称"maxaux8"，使用 bucket_unified selector 在 geometry100k maxaux8 数据源上的实验，首次通过 50-step smoke gate（avg_zero_std = 0.2659），但 500-step 后期退化，dev_imo 回退至 12/16
 - **v15**：与 v14 相同数据集，将学习率从 1e-4 降至 5e-6 并添加 warmup，50-step smoke gate 大幅改善（avg_zero_std = 0.0682），仅跑 50 步作为调参验证
-- **v16**：与 v15 相同配置，切换为 4 卡 DDP，500-step 全程稳定，dev_imo 14/16，imo_95 55/95
-- **v17**：与 v16 相同配置，训练集从 2k 扩大到 5k（约 3.2 epoch），前 50 步 avg_zero_std = 0.0778（优于 v16），**当前主线**
-
+- **v16**：与 v15 相同配置，切换为 4 卡 DDP，500-step 全程稳定，dev_imo 14/16，imo_95 55/95（非当前 commit，评估 run commit: `a5482b00`）
+- **v17**：与 v16 相同配置，训练集从 2k 扩大到 5k（约 3.2 epoch），前 50 步 avg_zero_std = 0.0778（优于 v16）；旧 `vlm` 链路结果为 59/95（非当前 commit，dev: `497d6aaf` / imo95: `e577945a`），当前 commit 的 `qwen3_vl_text` multiaux 补跑为 61/95
+- **v18**：将 bucket_unified 训练集从 5k 扩大到 10k，但 500 步只覆盖约 1.6 epoch，dev_imo 持平、imo_95 回退至 55/95（非当前 commit，评估 run commit: `f384d702`）
+- **v19**：切换到 `select_balanced` 10k 数据集，当前 commit 的 `qwen3_vl_text` multiaux 主结果为 `dev_imo 14/16`、`imo_95 65/95`；历史最佳旧 run 为 66/95（非当前 commit）
