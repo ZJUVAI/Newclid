@@ -434,6 +434,14 @@ def normalize_relation_surface(text):
         line_p1 = line_match.group(2).lower()
         line_p2 = line_match.group(3).lower()
         return f"{line_p1}, {line_p2}, {point_name} are collinear"
+    ratio_match = re.fullmatch(
+        r"([a-z]{2})\s*:\s*([a-z]{2})\s*=\s*([a-z]{2})\s*:\s*([a-z]{2})",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if ratio_match:
+        left_num, left_den, right_num, right_den = [group.lower() for group in ratio_match.groups()]
+        return f"ratio {left_num} to {left_den} equals ratio {right_num} to {right_den}"
     tokens = normalized.split()
     if tokens and tokens[0].lower() in FORMAL_RELATION_STARTERS:
         summary = summarize_aux_clause(normalized)
@@ -461,6 +469,8 @@ def relation_text_keywords(text):
     for label, variants in keyword_groups.items():
         if any(variant in lowered for variant in variants):
             keywords.add(label)
+    if re.search(r"\b[a-z]{2}\s*:\s*[a-z]{2}\s*=\s*[a-z]{2}\s*:\s*[a-z]{2}\b", lowered):
+        keywords.add("ratio")
     if re.search(r"\b[a-z]{2}\s*=\s*[a-z]{2}\b", lowered):
         keywords.add("equal")
     return keywords
@@ -590,7 +600,12 @@ def build_visible_premise_summaries(record, max_items=12):
 
 
 def extract_visible_formal_facts(record):
-    formal_problem = (record.get("llm_input_renamed") or "").strip()
+    formal_problem = (
+        record.get("llm_input_renamed")
+        or record.get("public_problem")
+        or record.get("input")
+        or ""
+    ).strip()
     body_match = PROBLEM_BODY_RE.search(formal_problem)
     body = body_match.group(1).strip() if body_match else formal_problem
     if "?" in body:
@@ -648,6 +663,22 @@ def visible_parallelogram_supported(record, vertex_word):
         ]),
     ]
     return all(pair in parallel_pairs for pair in needed_pairs)
+
+
+def iter_supported_parallelogram_mentions(record, text):
+    if not isinstance(text, str) or not text:
+        return
+    patterns = [
+        r"\bparallelogram\s+([a-z]{4})\b",
+        r"\b([a-z]{4})\s+forms?\s+(?:an?\s+)?parallelogram\b",
+        r"\b([a-z]{4})\s+is\s+(?:an?\s+)?parallelogram\b",
+        r"\bquadrilateral\s+([a-z]{4})\s+is\s+(?:an?\s+)?parallelogram\b",
+    ]
+    for pattern in patterns:
+        for match in re.finditer(pattern, text):
+            vertex_word = match.group(1).lower()
+            if visible_parallelogram_supported(record, vertex_word):
+                yield match.span()
 
 
 def _coord_line_metrics(point_coords, p1, p2):
@@ -986,13 +1017,13 @@ def audit_generation_quality(record, generation, aux_part):
     ).lower()
     for marker in suspicious_markers:
         if marker == "parallelogram":
-            supported_mentions = set()
-            for match in re.finditer(r"\bparallelogram\s+([a-z]{4})\b", text_to_scan):
-                vertex_word = match.group(1).lower()
-                if visible_parallelogram_supported(record, vertex_word):
-                    supported_mentions.add(match.group(0))
-            marker_hits = [match.group(0) for match in re.finditer(r"\bparallelogram\b", text_to_scan)]
-            unsupported_hits = [hit for hit in marker_hits if not any(hit in supported for supported in supported_mentions)]
+            supported_spans = list(iter_supported_parallelogram_mentions(record, text_to_scan))
+            marker_hits = [match.span() for match in re.finditer(r"\bparallelogram\b", text_to_scan)]
+            unsupported_hits = [
+                hit
+                for hit in marker_hits
+                if not any(supported_start <= hit[0] and hit[1] <= supported_end for supported_start, supported_end in supported_spans)
+            ]
             if unsupported_hits:
                 issues.append(f"suspicious_phrase:{marker}")
             continue
@@ -1995,6 +2026,14 @@ def extract_aux_new_points(aux_part):
 
 def summarize_aux_clause(clause):
     clause = re.sub(r"\[\d{3}\]", "", clause).strip()
+    ratio_clause_match = re.fullmatch(
+        r"([a-z]{2})\s*:\s*([a-z]{2})\s*=\s*([a-z]{2})\s*:\s*([a-z]{2})",
+        clause,
+        flags=re.IGNORECASE,
+    )
+    if ratio_clause_match:
+        left_num, left_den, right_num, right_den = [group.lower() for group in ratio_clause_match.groups()]
+        return f"ratio {left_num} to {left_den} equals ratio {right_num} to {right_den}"
     tokens = clause.split()
     if not tokens:
         return None
@@ -2014,11 +2053,16 @@ def summarize_aux_clause(clause):
     if pred == "midp" and len(args) >= 3:
         return f"{args[0]} is the midpoint of {args[1]}{args[2]}"
     if pred == "eqratio" and len(args) >= 8:
-        return f"{args[0]}{args[1]}:{args[2]}{args[3]} = {args[4]}{args[5]}:{args[6]}{args[7]}"
+        return (
+            f"ratio {args[0]}{args[1]} to {args[2]}{args[3]} "
+            f"equals ratio {args[4]}{args[5]} to {args[6]}{args[7]}"
+        )
     if pred == "eqangle" and len(args) >= 8:
         return f"angle {args[0]}{args[1]}/{args[2]}{args[3]} equals angle {args[4]}{args[5]}/{args[6]}{args[7]}"
     if pred in {"simtri", "simtrir"} and len(args) >= 6:
         return f"triangles {args[0]}{args[1]}{args[2]} and {args[3]}{args[4]}{args[5]} are similar"
+    if pred in {"contri", "contrir"} and len(args) >= 6:
+        return f"triangles {args[0]}{args[1]}{args[2]} and {args[3]}{args[4]}{args[5]} are congruent"
     return clause
 
 
