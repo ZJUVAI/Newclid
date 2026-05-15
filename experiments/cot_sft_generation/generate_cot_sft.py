@@ -444,31 +444,126 @@ def relation_text_keywords(text):
     return keywords
 
 
+def extract_high_level_structure_markers(text):
+    lowered = (text or "").lower()
+    marker_groups = {
+        "triangle": ["triangle", "triangles"],
+        "similar": ["similar"],
+        "cyclic": ["cyclic", "concyclic", "circle"],
+        "parallelogram": ["parallelogram"],
+        "midpoint": ["midpoint"],
+    }
+    markers = set()
+    for label, variants in marker_groups.items():
+        if any(variant in lowered for variant in variants):
+            markers.add(label)
+    return markers
+
+
 def build_visible_premise_summaries(record, max_items=12):
+    summaries = []
+    seen = set()
+    for fact in extract_visible_formal_facts(record):
+        summary = fact.get("summary")
+        if not summary:
+            continue
+        normalized = summary.lower()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        summaries.append(summary)
+        if len(summaries) >= max_items:
+            return summaries
+    return summaries
+
+
+def extract_visible_formal_facts(record):
     formal_problem = (record.get("llm_input_renamed") or "").strip()
     body_match = PROBLEM_BODY_RE.search(formal_problem)
     body = body_match.group(1).strip() if body_match else formal_problem
     if "?" in body:
         body = body.split("?", 1)[0].strip()
 
-    summaries = []
-    seen = set()
+    facts = []
     for clause in [part.strip() for part in body.split(";") if part.strip()]:
         if ":" not in clause:
             continue
         _, relation_text = clause.split(":", 1)
         for fact in split_formal_relation_chain(relation_text):
-            summary = summarize_aux_clause(fact)
-            if not summary:
+            tokens = fact.split()
+            if not tokens:
                 continue
-            normalized = summary.lower()
-            if normalized in seen:
-                continue
-            seen.add(normalized)
-            summaries.append(summary)
-            if len(summaries) >= max_items:
-                return summaries
-    return summaries
+            facts.append(
+                {
+                    "raw": fact.strip(),
+                    "predicate": tokens[0].lower(),
+                    "args": [token.lower() for token in tokens[1:]],
+                    "summary": summarize_aux_clause(fact),
+                }
+            )
+    return facts
+
+
+def _coord_line_metrics(point_coords, p1, p2):
+    x1, y1 = point_coords[p1]
+    x2, y2 = point_coords[p2]
+    dx = x2 - x1
+    dy = y2 - y1
+    length_sq = dx * dx + dy * dy
+    return x1, y1, x2, y2, dx, dy, length_sq
+
+
+def _visible_fact_coordinate_conflict(fact, point_coords):
+    predicate = fact.get("predicate", "")
+    args = fact.get("args", [])
+    summary = fact.get("summary") or fact.get("raw") or ""
+    if predicate == "cong" and len(args) >= 4 and all(point in point_coords for point in args[:4]):
+        _, _, _, _, _, _, len1 = _coord_line_metrics(point_coords, args[0], args[1])
+        _, _, _, _, _, _, len2 = _coord_line_metrics(point_coords, args[2], args[3])
+        if min(len1, len2) == 0:
+            return None
+        rel_gap = abs(len1 - len2) / max(len1, len2)
+        if rel_gap > 0.18:
+            return f"visible_premise_coordinate_conflict:{summary}"
+    if predicate == "perp" and len(args) >= 4 and all(point in point_coords for point in args[:4]):
+        _, _, _, _, dx1, dy1, len1 = _coord_line_metrics(point_coords, args[0], args[1])
+        _, _, _, _, dx2, dy2, len2 = _coord_line_metrics(point_coords, args[2], args[3])
+        if min(len1, len2) == 0:
+            return None
+        perp_score = abs(dx1 * dx2 + dy1 * dy2) / ((len1 * len2) ** 0.5)
+        if perp_score > 0.18:
+            return f"visible_premise_coordinate_conflict:{summary}"
+    if predicate == "para" and len(args) >= 4 and all(point in point_coords for point in args[:4]):
+        _, _, _, _, dx1, dy1, len1 = _coord_line_metrics(point_coords, args[0], args[1])
+        _, _, _, _, dx2, dy2, len2 = _coord_line_metrics(point_coords, args[2], args[3])
+        if min(len1, len2) == 0:
+            return None
+        parallel_score = abs(dx1 * dy2 - dy1 * dx2) / ((len1 * len2) ** 0.5)
+        if parallel_score > 0.14:
+            return f"visible_premise_coordinate_conflict:{summary}"
+    if predicate == "coll" and len(args) >= 3 and all(point in point_coords for point in args[:3]):
+        x1, y1 = point_coords[args[0]]
+        x2, y2 = point_coords[args[1]]
+        x3, y3 = point_coords[args[2]]
+        len12 = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+        len23 = ((x3 - x2) ** 2 + (y3 - y2) ** 2) ** 0.5
+        len13 = ((x3 - x1) ** 2 + (y3 - y1) ** 2) ** 0.5
+        longest_side = max(len12, len23, len13, 1.0)
+        area_score = abs((x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1)) / longest_side
+        if area_score > 3.0:
+            return f"visible_premise_coordinate_conflict:{summary}"
+    if predicate == "midp" and len(args) >= 3 and all(point in point_coords for point in args[:3]):
+        xm, ym = point_coords[args[0]]
+        x1, y1 = point_coords[args[1]]
+        x2, y2 = point_coords[args[2]]
+        seg_len = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+        if seg_len == 0:
+            return None
+        area_score = abs((x2 - x1) * (ym - y1) - (y2 - y1) * (xm - x1)) / seg_len
+        midpoint_gap = ((xm - (x1 + x2) / 2) ** 2 + (ym - (y1 + y2) / 2) ** 2) ** 0.5
+        if area_score > 3.0 or midpoint_gap > 4.0:
+            return f"visible_premise_coordinate_conflict:{summary}"
+    return None
 
 
 def normalize_point_case(text, point_names):
@@ -664,6 +759,15 @@ def audit_source_record(record, image_path: Path, aux_part, sanitized_rest):
         issues.append("aux_has_no_parseable_direct_consequences")
     if not proof_guidance["goal_finish_relations"]:
         issues.append("proof_guidance_missing_goal_finish_relations")
+    if point_coords:
+        visible_fact_conflicts = []
+        for fact in extract_visible_formal_facts(record):
+            conflict = _visible_fact_coordinate_conflict(fact, point_coords)
+            if conflict and conflict not in visible_fact_conflicts:
+                visible_fact_conflicts.append(conflict)
+            if len(visible_fact_conflicts) >= 8:
+                break
+        issues.extend(visible_fact_conflicts)
 
     return {
         "issues": issues,
@@ -1346,6 +1450,16 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
                 next_relation = cleaned_plan["bridge_steps"][idx + 1]["relation"].lower()
                 next_relation_keywords = relation_text_keywords(next_relation)
                 why_text = step["why_it_helps"].lower()
+                allowed_structure_markers = (
+                    extract_high_level_structure_markers(step["relation"])
+                    | extract_high_level_structure_markers(" ".join(step["depends_on"]))
+                    | extract_high_level_structure_markers(next_relation)
+                )
+                new_structure_markers = extract_high_level_structure_markers(why_text) - allowed_structure_markers
+                if new_structure_markers:
+                    return False, (
+                        f"bridge_steps[{idx}].why_it_helps introduces an unsupported high-level route: {sorted(new_structure_markers)}"
+                    ), None
                 next_points = extract_point_mentions(next_relation, known_points)
                 mentioned_next_points = extract_point_mentions(why_text, known_points) & next_points
                 if next_points and len(mentioned_next_points) < min(2, len(next_points)):
@@ -1358,6 +1472,16 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
                     ), None
             else:
                 why_text = step["why_it_helps"].lower()
+                allowed_structure_markers = (
+                    extract_high_level_structure_markers(step["relation"])
+                    | extract_high_level_structure_markers(" ".join(step["depends_on"]))
+                    | extract_high_level_structure_markers(cleaned_goal_finish)
+                )
+                new_structure_markers = extract_high_level_structure_markers(why_text) - allowed_structure_markers
+                if new_structure_markers:
+                    return False, (
+                        f"bridge_steps[{idx}].why_it_helps introduces an unsupported high-level finish route: {sorted(new_structure_markers)}"
+                    ), None
                 mentioned_goal_points = extract_point_mentions(why_text, known_points) & goal_points
                 if goal_points and len(mentioned_goal_points) < min(2, len(goal_points)):
                     return False, (
@@ -1732,6 +1856,13 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- each why_it_helps string should explicitly name the next bridge relation or the final goal-side relation using concrete point names, not abstract phrases like 'enabling angle transfers'."
         )
+    if "unsupported high-level" in validation_message:
+        targeted_hints.append(
+            "- do not introduce new routes such as triangle similarity, cyclic quadrilaterals, or parallelograms inside why_it_helps unless that same structure is already stated in the approved relation chain."
+        )
+        targeted_hints.append(
+            "- rewrite why_it_helps as a direct next-step statement like 'this is required to prove kc equals kd next' or 'this prepares the goal angle involving bg, bj, cg, and fg'."
+        )
     if "Planner JSON missing keys" in validation_message:
         targeted_hints.append(
             "- return all 12 required top-level keys exactly once; do not omit coordinate_hints, bridge_steps, or goal_finish."
@@ -1767,9 +1898,16 @@ def build_writer_retry_feedback(validation_message, plan):
         targeted_hints.append(
             "- stay impersonal: do not use 'i', 'we', 'our', or 'let us'; write 'construct point k' instead of 'we construct point k'."
         )
+        targeted_hints.append(
+            "- avoid openings like 'we need' or 'we construct'; rewrite them as 'a helper is needed' and 'construct point k'."
+        )
     if "generic shortcut" in validation_message:
         targeted_hints.append(
             "- in each bridge sentence, name the concrete depends_on relations and also state the next approved bridge relation or goal-side relation that this sentence unlocks."
+        )
+    if "must explicitly realize bridge_steps" in validation_message:
+        targeted_hints.append(
+            "- include one explicit sentence for every approved bridge_steps relation in order; do not skip the last angle or parallel relation before the goal_finish sentence."
         )
     targeted_hint_block = "\n".join(targeted_hints)
     if targeted_hint_block:
@@ -1876,6 +2014,11 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "[Schema Example]\n"
         "Follow this JSON shape closely. In particular, bridge_steps must be a JSON list of objects, and each depends_on value must be a JSON list of earlier relation strings.\n"
         f"{plan_example}\n\n"
+        "[why_it_helps Guidance]\n"
+        "Good: 'this equality is required to prove kc equals kd in the next step.'\n"
+        "Good: 'this prepares the goal angle by connecting bj to bg and the target angle on cg and fg.'\n"
+        "Bad: 'this enables similar triangles involving j.'\n"
+        "Bad: 'this helps form a cyclic quadrilateral and later gives a parallel line.'\n\n"
         "Constraints:\n"
         "- Use only lowercase point names exactly as in the problem text.\n"
         "- Do not use <point> tags, <coord> tags, LaTeX, $...$ math formatting, backticks, <aux>, <proof>, IDs, or rule names.\n"
@@ -1894,6 +2037,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- Each bridge_steps depends_on list should reuse concrete items from visible_relations, aux_direct_relations, or an earlier bridge_steps relation, instead of inventing unsupported leaps.\n"
         "- Each depends_on item must be copied as a natural-language relation string, not written as a raw formal predicate such as 'cong b j d j'.\n"
         "- Each bridge_steps why_it_helps string should name the concrete next bridge relation or the concrete goal-side relation it unlocks, with actual point names, not abstract phrases like 'enabling angle transfers'.\n"
+        "- Do not use why_it_helps to smuggle in a new route such as 'similar triangles', 'cyclic quadrilateral', or 'parallelogram' unless that same structure is already explicitly present in the approved relation chain.\n"
         "- The goal_finish field must mention the actual goal-side relation, not just say that the construction is useful.\n"
         "- If multiple new points appear in the hidden target summary, describe whether they are introduced together or in stages and what each stage unlocks.\n"
         "- The wording must sound supportable from the image and visible problem text alone.\n"
