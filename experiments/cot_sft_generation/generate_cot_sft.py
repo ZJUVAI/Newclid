@@ -322,7 +322,18 @@ def build_aux_keyword_expectations(aux_part):
     if "cyclic" in inner:
         expectations.append(("cyclic/circle", ["cyclic", "circle", "circumcircle", "concyclic"]))
     if "cong" in inner:
-        expectations.append(("equal-length", ["equal", "congruent", "same distance", "equidistant"]))
+        expectations.append(
+            (
+                "equal-length",
+                [
+                    "equal",
+                    "congruent",
+                    "same distance",
+                    "equidistant",
+                    "perpendicular bisector",
+                ],
+            )
+        )
     if "perp" in inner:
         expectations.append(("perpendicular", ["perpendicular", "right angle"]))
     if "para" in inner:
@@ -636,6 +647,12 @@ def audit_generation_quality(record, generation, aux_part):
         "square-like",
         "parallelogram",
         "crucial center",
+        "similarity or angle equality",
+        "specific angle conditions",
+    ]
+    generic_bridge_markers = [
+        "specific angle conditions",
+        "similarity or angle equality",
     ]
 
     if plan:
@@ -652,6 +669,26 @@ def audit_generation_quality(record, generation, aux_part):
         ok, message = validate_aux_step_scope(direct_relations[0], aux_part, visible_points)
         if not ok:
             issues.append(message)
+        bridge_relations = flatten_bridge_relations(plan)
+        if not bridge_relations:
+            issues.append("missing_bridge_relations")
+        write_output = generation.get("write_output") or ""
+        if write_output and isinstance(plan.get("bridge_steps"), list):
+            sentences = split_into_sentences(write_output)
+            search_start = 0
+            for idx, step in enumerate(plan["bridge_steps"]):
+                match_idx = None
+                for sentence_idx in range(search_start, len(sentences)):
+                    if relation_mentioned_in_text(sentences[sentence_idx], step.get("relation", "")):
+                        match_idx = sentence_idx
+                        break
+                if match_idx is None:
+                    issues.append(f"bridge_relation_missing_in_body:{idx}")
+                    continue
+                sentence = sentences[match_idx].lower()
+                if any(marker in sentence for marker in generic_bridge_markers):
+                    issues.append(f"generic_bridge_phrase:{idx}")
+                search_start = match_idx + 1
 
     text_to_scan = " ".join(
         part for part in [generation.get("write_output"), generation.get("thinking")] if part
@@ -907,6 +944,8 @@ def validate_descriptive_text(value, field_name, min_chars=12, point_names=None)
 
 
 def validate_relation_list(items, field_name, visible_points, min_len=2, max_len=3, min_chars=12):
+    if isinstance(items, list) and len(items) > max_len:
+        items = items[:max_len]
     if not isinstance(items, list) or not (min_len <= len(items) <= max_len):
         return False, f"{field_name} must be a list with {min_len} to {max_len} items", None
     cleaned = []
@@ -1021,7 +1060,7 @@ def build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal, max_aux=
 
 
 def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_part=None, coordinate_candidates=None):
-    plan = extract_json_object(output_text)
+    plan = output_text if isinstance(output_text, dict) else extract_json_object(output_text)
     if not isinstance(plan, dict):
         return False, "Planner must return a single JSON object", None
 
@@ -1036,7 +1075,7 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
         "helper_idea",
         "construction",
         "aux_direct_relations",
-        "bridge_relations",
+        "bridge_steps",
         "goal_finish",
     ]
     missing = [key for key in required_keys if key not in plan]
@@ -1109,23 +1148,68 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
         cleaned_direct.append(cleaned_step)
     cleaned_plan["aux_direct_relations"] = cleaned_direct
 
-    bridge_relations = plan.get("bridge_relations")
-    if not isinstance(bridge_relations, list) or not (2 <= len(bridge_relations) <= 4):
-        return False, "bridge_relations must be a list with 2 to 4 ordered bridge steps", None
-    cleaned_bridge = []
-    for idx, step in enumerate(bridge_relations):
-        ok, message, cleaned_step = validate_descriptive_text(
-            step,
-            f"bridge_relations[{idx}]",
+    bridge_steps = plan.get("bridge_steps")
+    if isinstance(bridge_steps, list) and len(bridge_steps) > 4:
+        bridge_steps = bridge_steps[:4]
+    if not isinstance(bridge_steps, list) or not (2 <= len(bridge_steps) <= 4):
+        return False, "bridge_steps must be a list with 2 to 4 ordered bridge-step objects", None
+    cleaned_bridge_steps = []
+    cleaned_bridge_relations = []
+    for idx, step in enumerate(bridge_steps):
+        if not isinstance(step, dict):
+            return False, f"bridge_steps[{idx}] must be an object", None
+        if any(key not in step for key in ["relation", "depends_on", "why_it_helps"]):
+            return False, f"bridge_steps[{idx}] must contain relation, depends_on, and why_it_helps", None
+        ok, message, cleaned_relation = validate_descriptive_text(
+            step.get("relation"),
+            f"bridge_steps[{idx}].relation",
             min_chars=5,
             point_names=known_points,
         )
         if not ok:
             return False, message, None
-        if not relation_keyword_present(cleaned_step):
-            return False, f"bridge_relations[{idx}] must mention a concrete geometric relation", None
-        cleaned_bridge.append(cleaned_step)
-    cleaned_plan["bridge_relations"] = cleaned_bridge
+        if not relation_keyword_present(cleaned_relation):
+            return False, f"bridge_steps[{idx}].relation must mention a concrete geometric relation", None
+        depends_on = step.get("depends_on")
+        if isinstance(depends_on, str) and depends_on.strip():
+            depends_on = [depends_on]
+        if isinstance(depends_on, list) and len(depends_on) > 3:
+            depends_on = depends_on[:3]
+        if not isinstance(depends_on, list) or not (1 <= len(depends_on) <= 3):
+            return False, f"bridge_steps[{idx}].depends_on must be a list with 1 to 3 supporting relations", None
+        cleaned_dependencies = []
+        for dep_idx, dependency in enumerate(depends_on):
+            ok, message, cleaned_dependency = validate_descriptive_text(
+                dependency,
+                f"bridge_steps[{idx}].depends_on[{dep_idx}]",
+                min_chars=5,
+                point_names=known_points,
+            )
+            if not ok:
+                return False, message, None
+            if not relation_keyword_present(cleaned_dependency):
+                return False, f"bridge_steps[{idx}].depends_on[{dep_idx}] must mention a concrete geometric relation", None
+            if len(extract_point_mentions(cleaned_dependency, known_points)) < 2:
+                return False, f"bridge_steps[{idx}].depends_on[{dep_idx}] must name at least two concrete points", None
+            cleaned_dependencies.append(cleaned_dependency)
+        ok, message, cleaned_help = validate_descriptive_text(
+            step.get("why_it_helps"),
+            f"bridge_steps[{idx}].why_it_helps",
+            min_chars=8,
+            point_names=known_points,
+        )
+        if not ok:
+            return False, message, None
+        cleaned_bridge_steps.append(
+            {
+                "relation": cleaned_relation,
+                "depends_on": cleaned_dependencies,
+                "why_it_helps": cleaned_help,
+            }
+        )
+        cleaned_bridge_relations.append(cleaned_relation)
+    cleaned_plan["bridge_steps"] = cleaned_bridge_steps
+    cleaned_plan["bridge_relations"] = cleaned_bridge_relations
 
     ok, message, cleaned_goal_finish = validate_descriptive_text(
         plan.get("goal_finish"),
@@ -1201,7 +1285,23 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
                 if not ok:
                     return False, f"aux_direct_relations[{idx}] invalid: {message}", None
             if not any(point in cleaned_plan["bridge_relations"][0].lower() for point in new_points):
-                return False, "bridge_relations[0] must still reference the auxiliary point while bridging to the old figure", None
+                return False, "bridge_steps[0].relation must still reference the auxiliary point while bridging to the old figure", None
+        available_supports = cleaned_plan["visible_relations"] + cleaned_plan["aux_direct_relations"]
+        for idx, step in enumerate(cleaned_plan["bridge_steps"]):
+            if idx > 0:
+                available_supports.append(cleaned_plan["bridge_steps"][idx - 1]["relation"])
+            if not any(
+                has_long_ngram_overlap(support, dependency, ngram_size=3) or dependency.lower() in support.lower() or support.lower() in dependency.lower()
+                for dependency in step["depends_on"]
+                for support in available_supports
+            ):
+                return False, f"bridge_steps[{idx}].depends_on must reuse an earlier visible, direct, or bridge relation", None
+            if idx < len(cleaned_plan["bridge_steps"]) - 1:
+                next_relation = cleaned_plan["bridge_steps"][idx + 1]["relation"].lower()
+                why_text = step["why_it_helps"].lower()
+                next_points = extract_point_mentions(next_relation, known_points)
+                if next_points and not any(point in why_text for point in next_points):
+                    return False, f"bridge_steps[{idx}].why_it_helps should point toward the next bridge relation", None
     goal_spec = parse_goal_expression(visible_goal)
     goal_points = set(goal_spec["points"])
     goal_keywords = goal_keyword_hints(visible_goal)
@@ -1215,12 +1315,12 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
     if aux_part:
         bridge_mentions = extract_point_mentions(" ".join(cleaned_plan["bridge_relations"]), visible_points)
         if not (bridge_mentions - set(extract_aux_new_points(aux_part))):
-            return False, "bridge_relations must connect the auxiliary point to existing visible points", None
+            return False, "bridge_steps must connect the auxiliary point to existing visible points", None
 
     return True, "Valid planner JSON", cleaned_plan
 
 
-def validate_writer_body(output_text: str, visible_goal="", injected_prefix=""):
+def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", plan=None):
     if not output_text or not output_text.strip():
         return False, "Writer body is empty"
     body = output_text.strip()
@@ -1252,6 +1352,28 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix=""):
         hit = pattern.search(body)
         if hit:
             return False, f"Writer body contains forbidden pattern: {hit.group(0)}"
+    if re.search(r"\bsimilarity or angle equality\b", body, re.IGNORECASE):
+        return False, "Writer body must state a specific bridge relation instead of hedging with 'similarity or angle equality'"
+    if plan and isinstance(plan.get("bridge_steps"), list):
+        sentences = split_into_sentences(body)
+        search_start = 0
+        generic_markers = ["symmetry", "it follows", "from the setup", "resulting symmetry"]
+        for idx, step in enumerate(plan["bridge_steps"]):
+            match_idx = None
+            for sentence_idx in range(search_start, len(sentences)):
+                if relation_mentioned_in_text(sentences[sentence_idx], step.get("relation", "")):
+                    match_idx = sentence_idx
+                    break
+            if match_idx is None:
+                return False, f"Writer body must explicitly realize bridge_steps[{idx}].relation in order"
+            sentence = sentences[match_idx]
+            if any(marker in sentence.lower() for marker in generic_markers):
+                mentioned_dependencies = count_relation_mentions(sentence, step.get("depends_on", []))
+                if mentioned_dependencies < min(2, len(step.get("depends_on", []))):
+                    return False, (
+                        f"Writer sentence for bridge_steps[{idx}] uses a generic shortcut without naming enough supporting relations"
+                    )
+            search_start = match_idx + 1
     return True, "Valid writer body"
 
 
@@ -1430,12 +1552,159 @@ def has_long_ngram_overlap(source_text, target_text, ngram_size=7):
     return bool(source_ngrams & target_ngrams)
 
 
+def flatten_bridge_relations(plan):
+    if not isinstance(plan, dict):
+        return []
+    if isinstance(plan.get("bridge_steps"), list):
+        relations = []
+        for step in plan["bridge_steps"]:
+            if isinstance(step, dict):
+                relation = step.get("relation")
+                if isinstance(relation, str) and relation.strip():
+                    relations.append(relation.strip())
+        if relations:
+            return relations
+    relations = plan.get("bridge_relations")
+    if isinstance(relations, list):
+        return [relation.strip() for relation in relations if isinstance(relation, str) and relation.strip()]
+    return []
+
+
+def split_into_sentences(text):
+    return [part.strip() for part in re.split(r"(?<=[.!?])\s+", text or "") if part.strip()]
+
+
+def relation_mentioned_in_text(text, relation):
+    lowered_text = (text or "").lower()
+    lowered_relation = (relation or "").lower().strip()
+    if not lowered_relation:
+        return False
+    if lowered_relation in lowered_text:
+        return True
+    return has_long_ngram_overlap(lowered_relation, lowered_text, ngram_size=3)
+
+
+def count_relation_mentions(text, relations):
+    return sum(1 for relation in relations if relation_mentioned_in_text(text, relation))
+
+
 def build_public_problem_text(record):
     nl_problem = (record.get("nl_problem") or "").strip()
     formal_problem = (record.get("llm_input_renamed") or "").strip()
     if nl_problem:
         return f"<nl_problem>{nl_problem}</nl_problem>\n{formal_problem}"
     return formal_problem
+
+
+def build_plan_json_example():
+    return json.dumps(
+        {
+            "anchor_points": ["a", "b", "c"],
+            "anchor_relation": "triangle abc is the main visible frame, with ab perpendicular to ac and ab equal to ac.",
+            "figure_overview": "point g lies on ac while d and j extend the right side of the figure beyond the main triangle.",
+            "coordinate_relations": [
+                "point g looks like the midpoint of segment ac",
+                "points b, d, and i look nearly collinear",
+            ],
+            "visible_relations": [
+                "ab is perpendicular to ac",
+                "ab equals ac",
+                "g is the midpoint of ac",
+            ],
+            "coordinate_hints": "the midpoint at g and the straight-looking b-d-i alignment suggest that any new helper should connect the central structure to the right side through d.",
+            "goal_bottleneck": "the goal angle at g still does not have a controlled link to the direction through bj.",
+            "helper_idea": "we need a local helper that first creates a tight relation around the new point and then transfers it toward d and j.",
+            "construction": "construct point k so that kb equals kc and line ck is perpendicular to line dk.",
+            "aux_direct_relations": [
+                "kb equals kc",
+                "line ck is perpendicular to line dk",
+            ],
+            "bridge_steps": [
+                {
+                    "relation": "kc equals kd",
+                    "depends_on": [
+                        "kb equals kc",
+                        "line ck is perpendicular to line dk",
+                    ],
+                    "why_it_helps": "this brings d into the same local balance around k and sets up the next relation kb equals kd.",
+                },
+                {
+                    "relation": "kb equals kd",
+                    "depends_on": [
+                        "kb equals kc",
+                        "kc equals kd",
+                    ],
+                    "why_it_helps": "this lets the k-based balance control the d-side direction and prepares the next angle relation with bj.",
+                },
+            ],
+            "goal_finish": "then the angle between bg and bj can match the target angle between cg and fg.",
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+def build_plan_retry_feedback(validation_message, aux_part):
+    targeted_hints = []
+    if "depends_on" in validation_message:
+        targeted_hints.append(
+            "- bridge_steps must be a JSON array of objects, and each depends_on field must itself be a JSON list of 1 to 3 earlier relation strings."
+        )
+    if "coordinate_hints" in validation_message:
+        targeted_hints.append(
+            "- include coordinate_hints as one or two plain-language sentences summarizing which coordinate_relations matter and why."
+        )
+    if "construction is missing an expected" in validation_message:
+        targeted_hints.append(
+            "- construction must restate the hidden auxiliary facts in natural geometry language, including the required equal/perpendicular/parallel/circle cue."
+        )
+    if "Planner JSON missing keys" in validation_message:
+        targeted_hints.append(
+            "- return all 12 required top-level keys exactly once; do not omit coordinate_hints, bridge_steps, or goal_finish."
+        )
+    if aux_part and len(extract_aux_new_points(aux_part)) > 1:
+        targeted_hints.append(
+            "- because multiple new points are introduced, construction should use stage markers such as first, then, and finally."
+        )
+    targeted_hint_block = "\n".join(targeted_hints)
+    if targeted_hint_block:
+        targeted_hint_block += "\n"
+    return (
+        "Your previous JSON plan was invalid.\n"
+        f"Validation error: {validation_message}\n"
+        "Return a corrected JSON object that satisfies every schema and quality constraint.\n"
+        "Use natural-language geometry statements rather than raw formal predicates such as 'cong b j d j'.\n"
+        "Repeat earlier relations verbatim inside depends_on instead of inventing new support strings.\n"
+        f"{targeted_hint_block}"
+        "Schema reminder:\n"
+        f"{build_plan_json_example()}"
+    )
+
+
+def build_writer_retry_feedback(validation_message, plan):
+    bridge_steps = plan.get("bridge_steps", []) if isinstance(plan, dict) else []
+    bridge_summary = json.dumps(bridge_steps, ensure_ascii=False, indent=2) if bridge_steps else "[]"
+    targeted_hints = []
+    if "overlaps too much with the injected prefix" in validation_message:
+        targeted_hints.append(
+            "- do not re-describe the anchors, figure overview, coordinate hints, or visible givens from the injected prefix; start directly from the bottleneck sentence."
+        )
+    if "first-person narration" in validation_message:
+        targeted_hints.append(
+            "- stay impersonal: do not use 'i', 'we', 'our', or 'let us'; write 'construct point k' instead of 'we construct point k'."
+        )
+    targeted_hint_block = "\n".join(targeted_hints)
+    if targeted_hint_block:
+        targeted_hint_block += "\n"
+    return (
+        "Your previous body text was invalid.\n"
+        f"Validation error: {validation_message}\n"
+        "Return a corrected plain-text body that satisfies every format and quality constraint.\n"
+        "Keep one sentence for each bridge step, and explicitly name concrete supporting relations instead of using vague shortcuts.\n"
+        f"{targeted_hint_block}"
+        "Approved bridge steps to realize in order:\n"
+        f"{bridge_summary}"
+    )
 
 
 def build_supervisor_payload(record, aux_part, sanitized_rest):
@@ -1466,6 +1735,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         json.dumps(visible_premise_summaries, ensure_ascii=False, indent=2)
         if visible_premise_summaries else "[]"
     )
+    plan_example = build_plan_json_example()
     proof_guidance = json.dumps(
         build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal),
         ensure_ascii=False,
@@ -1523,8 +1793,11 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "8. helper_idea: one sentence describing what kind of helper is missing, without naming the new point yet.\n"
         "9. construction: one or two sentences that finally introduce the new point or staged point sequence in plain geometry language.\n"
         "10. aux_direct_relations: a list of 1 to 3 direct consequences that come immediately from the construction itself.\n"
-        "11. bridge_relations: a list of 2 to 4 ordered bridge relations showing how the new point reconnects to the old figure.\n"
+        "11. bridge_steps: a list of 2 to 4 ordered objects; each object must contain relation, depends_on, and why_it_helps.\n"
         "12. goal_finish: one sentence stating the goal-side angle/ratio/congruence relation that closes the argument.\n\n"
+        "[Schema Example]\n"
+        "Follow this JSON shape closely. In particular, bridge_steps must be a JSON list of objects, and each depends_on value must be a JSON list of earlier relation strings.\n"
+        f"{plan_example}\n\n"
         "Constraints:\n"
         "- Use only lowercase point names exactly as in the problem text.\n"
         "- Do not use <point> tags, <coord> tags, LaTeX, $...$ math formatting, backticks, <aux>, <proof>, IDs, or rule names.\n"
@@ -1539,7 +1812,10 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- Do not invent named centers, rotation claims, square/parallelogram claims, or similarity claims unless they are already supported by the approved coordinate checks or by the approved relation buckets.\n"
         "- The construction field must describe the same geometric facts as the hidden target summary in plain language; do not invent a different line, circle, or intersection.\n"
         "- Each item in aux_direct_relations must stay local to the auxiliary construction itself. Do not pull unrelated old-figure points into those direct relations.\n"
-        "- The bridge_relations field should explicitly mention how the auxiliary point interacts with existing visible points or substructures, in a realistic order.\n"
+        "- Each bridge_steps relation should explicitly mention how the auxiliary point interacts with existing visible points or substructures, in a realistic order.\n"
+        "- Each bridge_steps depends_on list should reuse concrete items from visible_relations, aux_direct_relations, or an earlier bridge_steps relation, instead of inventing unsupported leaps.\n"
+        "- Each depends_on item must be copied as a natural-language relation string, not written as a raw formal predicate such as 'cong b j d j'.\n"
+        "- Each bridge_steps why_it_helps string should say what next relation or goal-side connection this bridge step unlocks.\n"
         "- The goal_finish field must mention the actual goal-side relation, not just say that the construction is useful.\n"
         "- If multiple new points appear in the hidden target summary, describe whether they are introduced together or in stages and what each stage unlocks.\n"
         "- The wording must sound supportable from the image and visible problem text alone.\n"
@@ -1601,7 +1877,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "[Approved Milestones]\n"
         f"Existing visible relations to reuse: {json.dumps(plan.get('visible_relations', []), ensure_ascii=False)}\n"
         f"Direct aux consequences to realize in order: {json.dumps(plan.get('aux_direct_relations', []), ensure_ascii=False)}\n"
-        f"Bridge relations to realize in order: {json.dumps(plan.get('bridge_relations', []), ensure_ascii=False)}\n"
+        f"Bridge steps to realize in order: {json.dumps(plan.get('bridge_steps', []), ensure_ascii=False, indent=2)}\n"
         f"Goal-side finish to reach: {plan.get('goal_finish', '')}\n\n"
         "[Injected Prefix Block]\n"
         "The script will prepend the following block exactly before your body. Do not restate these claims; start after them.\n"
@@ -1612,7 +1888,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "The body must satisfy all of the following:\n"
         "1. It should sound supportable from the image and visible problem text alone.\n"
         "2. It should be logically coherent and centered on discovering the auxiliary construction and then checking that the construction can genuinely advance the visible goal.\n"
-        "3. Follow this order: bottleneck -> missing helper idea -> final introduction of the new point or staged points -> explicit realization of aux_direct_relations -> bridge_relations -> goal_finish.\n"
+        "3. Follow this order: bottleneck -> missing helper idea -> final introduction of the new point or staged points -> explicit realization of aux_direct_relations -> each bridge_steps relation in order, using its depends_on and why_it_helps -> goal_finish.\n"
         "4. Most of the reasoning should happen before the new auxiliary point is named; only introduce that point in the later part of the body.\n"
         "5. Use the plan faithfully, but rewrite it into smooth prose instead of JSON fragments.\n"
         "6. Replace vague statements like 'this point is crucial' with a concrete bottleneck, relation, or next-step verification claim.\n"
@@ -1624,11 +1900,14 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "12. It must not assign coordinates to newly introduced auxiliary points.\n"
         "13. Do not repeat the prefix sentences verbatim; continue from them.\n"
         "14. Do not mention coordinates explicitly; describe those cues as visual placement, alignment, symmetry, equal-looking lengths, or perpendicular/parallel structure.\n"
-        "15. Keep the post-aux reasoning faithful to the approved visible_relations, aux_direct_relations, bridge_relations, and goal_finish; do not replace them with a different invented route.\n"
+        "15. Keep the post-aux reasoning faithful to the approved visible_relations, aux_direct_relations, bridge_steps, and goal_finish; do not replace them with a different invented route.\n"
         "16. Do not introduce extra named centers, rotational symmetries, square/parallelogram claims, or triangle-similarity claims unless the approved plan already states them and the immediate aux step really supports them.\n"
         "17. Reuse the approved visible_relations when connecting the new point back to the old figure, rather than inventing fresh structural claims.\n"
         "18. Stay impersonal. Do not write in the first person.\n"
         "19. The very first sentence of your body should state the bottleneck or goal-side obstacle. Do not spend the first sentence re-describing triangle abc, the midpoint layout, or the visible givens already covered by the injected prefix block.\n"
+        "20. Give each bridge_steps relation its own sentence. In that sentence, explicitly name at least one concrete depends_on relation before or while stating the new bridge relation.\n"
+        "21. Avoid shortcuts such as 'by symmetry', 'from the setup', or 'it follows' unless the same sentence explicitly names the concrete supporting relations.\n"
+        "22. Do not hedge with phrases like 'similarity or angle equality'; state the specific approved relation you are using.\n"
         "Output only the plain-text body.\n"
     )
 
@@ -1765,11 +2044,7 @@ def run_plan_stage(stage_name, messages, model_name, point_coords, visible_goal,
             last_error = message
             logger.warning(f"[{stage_name}] Validation failed: {message}")
             if attempt < max_retries:
-                feedback = (
-                    "Your previous JSON plan was invalid.\n"
-                    f"Validation error: {message}\n"
-                    "Return a corrected JSON object that satisfies every schema and quality constraint."
-                )
+                feedback = build_plan_retry_feedback(message, aux_part)
                 messages = messages + [{"role": "user", "content": feedback}]
                 time.sleep(1)
 
@@ -1789,7 +2064,7 @@ def run_plan_stage(stage_name, messages, model_name, point_coords, visible_goal,
     }
 
 
-def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_prefix, max_retries):
+def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_prefix, plan, max_retries):
     last_error = None
     last_output = None
 
@@ -1804,6 +2079,7 @@ def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_pr
                 output,
                 visible_goal=visible_goal,
                 injected_prefix=injected_prefix,
+                plan=plan,
             )
             if ok:
                 logger.info(f"[{stage_name}] Valid output in {elapsed:.2f}s")
@@ -1818,11 +2094,7 @@ def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_pr
             last_error = message
             logger.warning(f"[{stage_name}] Validation failed: {message}")
             if attempt < max_retries:
-                feedback = (
-                    "Your previous body text was invalid.\n"
-                    f"Validation error: {message}\n"
-                    "Return a corrected plain-text body that satisfies every format and quality constraint."
-                )
+                feedback = build_writer_retry_feedback(message, plan)
                 messages = messages + [{"role": "user", "content": feedback}]
                 time.sleep(1)
 
@@ -1901,6 +2173,7 @@ def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_
         model_name=model_name,
         visible_goal=visible_goal,
         injected_prefix=injected_prefix,
+        plan=plan_result["parsed"],
         max_retries=max_retries,
     )
 

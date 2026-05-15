@@ -110,7 +110,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
      - `helper_idea`
      - `construction`
      - `aux_direct_relations`
-     - `bridge_relations`
+     - `bridge_steps`
      - `goal_finish`
    - 目标不再只是“提出 aux”，而是把下面几件事先拆干净：
      - 用少量 tagged anchor points 给图定向
@@ -120,7 +120,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
      - 给出 aux 的构造语句
      - 明确拆开“加了这个 aux 之后，下一步打算怎么继续解”的关系桶：
        - `aux_direct_relations`
-       - `bridge_relations`
+       - `bridge_steps`
        - `goal_finish`
    - 如果 hidden aux 含多个新点，还会额外要求 `construction` 里显式写出 staged strategy，例如 `first ... then ...`
 2. `write`
@@ -135,14 +135,15 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
    - writer 只负责后续正文，即：
      - 解释瓶颈
      - 引出 aux
-     - 按 `aux_direct_relations -> bridge_relations -> goal_finish` 把 aux 之后的验证链真正推进到目标
+     - 按 `aux_direct_relations -> bridge_steps -> goal_finish` 把 aux 之后的验证链真正推进到目标
+   - writer 还会被要求把每个 `bridge_steps` 单独落成一句，并在该句中显式点出至少一个 `depends_on` 里的具体支持关系，而不是用 `by symmetry` / `it follows` 之类的空泛跳步
 
 也就是说，现在的机制是：
 
 - 模型负责选哪些点值得被 tagged，以及如何理解全图和后续验证路径
 - 脚本负责把这些点的真实坐标从源数据精确注入最终 `thinking`
 - hidden structured coordinate candidates 负责把“坐标判断”先收敛成更具体的可疑关系
-- hidden proof guidance 负责约束 `aux_direct_relations / bridge_relations / goal_finish` 不要停在“提出 aux”，而要尽量贴近真实可解路径
+- hidden proof guidance 负责约束 `aux_direct_relations / bridge_steps / goal_finish` 不要停在“提出 aux”，而要尽量贴近真实可解路径
 
 ## 泄露控制
 
@@ -172,9 +173,12 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 - `plan` 中的 `coordinate_relations` 必须列出 2-3 个具体关系检查，并明确点名对应 visible points
 - `plan` 中的 `visible_relations` 必须优先复用 visible formal premises 中已有的具体关系，而不是凭空发明高层结构
 - `plan` 中的 `coordinate_hints` 必须说出具体几何关系，不允许空泛描述
-- `plan` 中的 `figure_overview` / `visible_relations` / `bridge_relations` 必须覆盖锚点之外的可见点或子结构
+- `plan` 中的 `figure_overview` / `visible_relations` / `bridge_steps` 必须覆盖锚点之外的可见点或子结构
 - `plan` 中的 `aux_direct_relations` 必须只写 aux 的直接后果，不能提前跳到旧图深处
-- `plan` 中的 `bridge_relations` 必须明确说明该后果如何连接回原图已有结构
+- `plan` 中的 `bridge_steps` 必须是结构化桥接步骤，每步至少说明：
+  - 这一步得到什么 `relation`
+  - 它依赖哪些已有关系 `depends_on`
+  - 它为下一跳或收尾解锁什么 `why_it_helps`
 - `plan` 中的 `goal_finish` 必须明确最后要落到哪个 goal-side angle / ratio / congruence 关系
 - 多点 aux 的 `construction` 必须显式写出 staged / combined strategy，否则会被拒绝
 
