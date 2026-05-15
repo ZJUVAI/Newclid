@@ -179,6 +179,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
   - 这一步得到什么 `relation`
   - 它依赖哪些已有关系 `depends_on`
   - 它为下一跳或收尾解锁什么 `why_it_helps`
+  - `why_it_helps` 不能只写抽象作用，例如 “enabling angle transfers”；应显式点出下一跳关系或 goal-side 关系里的具体点和关系类型
 - `plan` 中的 `goal_finish` 必须明确最后要落到哪个 goal-side angle / ratio / congruence 关系
 - 多点 aux 的 `construction` 必须显式写出 staged / combined strategy，否则会被拒绝
 

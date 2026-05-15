@@ -407,6 +407,43 @@ def relation_keyword_present(text):
     return False
 
 
+def normalize_relation_surface(text):
+    cleaned = (text or "").strip()
+    if not cleaned:
+        return cleaned
+    normalized = re.sub(r"\[\d{3}\]", "", cleaned).strip(" ;")
+    tokens = normalized.split()
+    if tokens and tokens[0].lower() in FORMAL_RELATION_STARTERS:
+        summary = summarize_aux_clause(normalized)
+        if summary:
+            return summary
+    return cleaned
+
+
+def relation_text_keywords(text):
+    lowered = (text or "").lower()
+    keywords = set()
+    keyword_groups = {
+        "parallel": ["parallel"],
+        "perpendicular": ["perpendicular", "right angle", "right-angled"],
+        "equal": ["equal", "equals", "congruent", "equidistant"],
+        "ratio": ["ratio", "proportion"],
+        "similar": ["similar"],
+        "angle": ["angle"],
+        "midpoint": ["midpoint"],
+        "collinear": ["collinear", "aligned", "alignment"],
+        "circle": ["circle", "cyclic", "concyclic"],
+        "bisect": ["bisect"],
+        "isosceles": ["isosceles"],
+    }
+    for label, variants in keyword_groups.items():
+        if any(variant in lowered for variant in variants):
+            keywords.add(label)
+    if re.search(r"\b[a-z]{2}\s*=\s*[a-z]{2}\b", lowered):
+        keywords.add("equal")
+    return keywords
+
+
 def build_visible_premise_summaries(record, max_items=12):
     formal_problem = (record.get("llm_input_renamed") or "").strip()
     body_match = PROBLEM_BODY_RE.search(formal_problem)
@@ -958,6 +995,7 @@ def validate_relation_list(items, field_name, visible_points, min_len=2, max_len
         )
         if not ok:
             return False, message, None
+        cleaned_item = normalize_relation_surface(cleaned_item)
         if not relation_keyword_present(cleaned_item):
             return False, f"{field_name}[{idx}] must mention a concrete geometric relation", None
         mentioned = extract_point_mentions(cleaned_item, visible_points)
@@ -1143,6 +1181,7 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
         )
         if not ok:
             return False, message, None
+        cleaned_step = normalize_relation_surface(cleaned_step)
         if not relation_keyword_present(cleaned_step):
             return False, f"aux_direct_relations[{idx}] must mention a concrete geometric relation", None
         cleaned_direct.append(cleaned_step)
@@ -1168,6 +1207,7 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
         )
         if not ok:
             return False, message, None
+        cleaned_relation = normalize_relation_surface(cleaned_relation)
         if not relation_keyword_present(cleaned_relation):
             return False, f"bridge_steps[{idx}].relation must mention a concrete geometric relation", None
         depends_on = step.get("depends_on")
@@ -1187,6 +1227,7 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
             )
             if not ok:
                 return False, message, None
+            cleaned_dependency = normalize_relation_surface(cleaned_dependency)
             if not relation_keyword_present(cleaned_dependency):
                 return False, f"bridge_steps[{idx}].depends_on[{dep_idx}] must mention a concrete geometric relation", None
             if len(extract_point_mentions(cleaned_dependency, known_points)) < 2:
@@ -1219,6 +1260,7 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
     )
     if not ok:
         return False, message, None
+    cleaned_goal_finish = normalize_relation_surface(cleaned_goal_finish)
     if not relation_keyword_present(cleaned_goal_finish):
         return False, "goal_finish must mention a concrete goal-side geometric relation", None
     cleaned_plan["goal_finish"] = cleaned_goal_finish
@@ -1259,6 +1301,10 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
                 f"unmatched items: {unmatched_relations}"
             ), None
 
+    goal_spec = parse_goal_expression(visible_goal)
+    goal_points = set(goal_spec["points"])
+    goal_keywords = goal_keyword_hints(visible_goal)
+
     if aux_part:
         construction_text = f"{cleaned_plan['helper_idea']} {cleaned_plan['construction']}".lower()
         for label, keywords in build_aux_keyword_expectations(aux_part):
@@ -1298,13 +1344,29 @@ def validate_plan_response(output_text: str, point_coords, visible_goal="", aux_
                 return False, f"bridge_steps[{idx}].depends_on must reuse an earlier visible, direct, or bridge relation", None
             if idx < len(cleaned_plan["bridge_steps"]) - 1:
                 next_relation = cleaned_plan["bridge_steps"][idx + 1]["relation"].lower()
+                next_relation_keywords = relation_text_keywords(next_relation)
                 why_text = step["why_it_helps"].lower()
                 next_points = extract_point_mentions(next_relation, known_points)
-                if next_points and not any(point in why_text for point in next_points):
-                    return False, f"bridge_steps[{idx}].why_it_helps should point toward the next bridge relation", None
-    goal_spec = parse_goal_expression(visible_goal)
-    goal_points = set(goal_spec["points"])
-    goal_keywords = goal_keyword_hints(visible_goal)
+                mentioned_next_points = extract_point_mentions(why_text, known_points) & next_points
+                if next_points and len(mentioned_next_points) < min(2, len(next_points)):
+                    return False, (
+                        f"bridge_steps[{idx}].why_it_helps should name concrete points from the next bridge relation"
+                    ), None
+                if next_relation_keywords and not any(keyword in why_text for keyword in next_relation_keywords):
+                    return False, (
+                        f"bridge_steps[{idx}].why_it_helps should mention what kind of next bridge relation it unlocks"
+                    ), None
+            else:
+                why_text = step["why_it_helps"].lower()
+                mentioned_goal_points = extract_point_mentions(why_text, known_points) & goal_points
+                if goal_points and len(mentioned_goal_points) < min(2, len(goal_points)):
+                    return False, (
+                        f"bridge_steps[{idx}].why_it_helps should name concrete goal-side points for the finish"
+                    ), None
+                if goal_keywords and not any(keyword in why_text for keyword in goal_keywords):
+                    return False, (
+                        f"bridge_steps[{idx}].why_it_helps should mention the goal-side relation it prepares"
+                    ), None
     final_step = cleaned_goal_finish.lower()
     if goal_points:
         mentioned_goal_points = {point for point in goal_points if point in final_step}
@@ -1636,6 +1698,14 @@ def build_plan_json_example():
                     ],
                     "why_it_helps": "this lets the k-based balance control the d-side direction and prepares the next angle relation with bj.",
                 },
+                {
+                    "relation": "angle bk/bj equals angle dj/dk",
+                    "depends_on": [
+                        "kb equals kd",
+                        "bj equals dj",
+                    ],
+                    "why_it_helps": "this prepares the goal angle by connecting bj to bg and the target angle on cg and fg.",
+                },
             ],
             "goal_finish": "then the angle between bg and bj can match the target angle between cg and fg.",
         },
@@ -1657,6 +1727,10 @@ def build_plan_retry_feedback(validation_message, aux_part):
     if "construction is missing an expected" in validation_message:
         targeted_hints.append(
             "- construction must restate the hidden auxiliary facts in natural geometry language, including the required equal/perpendicular/parallel/circle cue."
+        )
+    if "why_it_helps" in validation_message:
+        targeted_hints.append(
+            "- each why_it_helps string should explicitly name the next bridge relation or the final goal-side relation using concrete point names, not abstract phrases like 'enabling angle transfers'."
         )
     if "Planner JSON missing keys" in validation_message:
         targeted_hints.append(
@@ -1692,6 +1766,10 @@ def build_writer_retry_feedback(validation_message, plan):
     if "first-person narration" in validation_message:
         targeted_hints.append(
             "- stay impersonal: do not use 'i', 'we', 'our', or 'let us'; write 'construct point k' instead of 'we construct point k'."
+        )
+    if "generic shortcut" in validation_message:
+        targeted_hints.append(
+            "- in each bridge sentence, name the concrete depends_on relations and also state the next approved bridge relation or goal-side relation that this sentence unlocks."
         )
     targeted_hint_block = "\n".join(targeted_hints)
     if targeted_hint_block:
@@ -1815,7 +1893,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- Each bridge_steps relation should explicitly mention how the auxiliary point interacts with existing visible points or substructures, in a realistic order.\n"
         "- Each bridge_steps depends_on list should reuse concrete items from visible_relations, aux_direct_relations, or an earlier bridge_steps relation, instead of inventing unsupported leaps.\n"
         "- Each depends_on item must be copied as a natural-language relation string, not written as a raw formal predicate such as 'cong b j d j'.\n"
-        "- Each bridge_steps why_it_helps string should say what next relation or goal-side connection this bridge step unlocks.\n"
+        "- Each bridge_steps why_it_helps string should name the concrete next bridge relation or the concrete goal-side relation it unlocks, with actual point names, not abstract phrases like 'enabling angle transfers'.\n"
         "- The goal_finish field must mention the actual goal-side relation, not just say that the construction is useful.\n"
         "- If multiple new points appear in the hidden target summary, describe whether they are introduced together or in stages and what each stage unlocks.\n"
         "- The wording must sound supportable from the image and visible problem text alone.\n"
@@ -1908,6 +1986,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "20. Give each bridge_steps relation its own sentence. In that sentence, explicitly name at least one concrete depends_on relation before or while stating the new bridge relation.\n"
         "21. Avoid shortcuts such as 'by symmetry', 'from the setup', or 'it follows' unless the same sentence explicitly names the concrete supporting relations.\n"
         "22. Do not hedge with phrases like 'similarity or angle equality'; state the specific approved relation you are using.\n"
+        "23. When a bridge sentence prepares the next bridge step or the final goal, name that next relation in concrete point-based terms rather than ending with abstract phrases like 'this enables angle transfers'.\n"
         "Output only the plain-text body.\n"
     )
 
