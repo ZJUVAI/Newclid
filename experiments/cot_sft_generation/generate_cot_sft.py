@@ -1497,6 +1497,51 @@ def validate_relation_list(items, field_name, visible_points, min_len=2, max_len
     return True, None, cleaned
 
 
+def canonicalize_visible_relations(items, visible_points, fallback_summaries, min_len=2, max_len=4, min_chars=5):
+    raw_items = items if isinstance(items, list) else []
+    cleaned = []
+    used_lower = set()
+    fallback_queue = [summary for summary in (fallback_summaries or []) if isinstance(summary, str) and summary.strip()]
+
+    def next_fallback():
+        while fallback_queue:
+            candidate = normalize_relation_surface(fallback_queue.pop(0).strip())
+            lowered = candidate.lower()
+            if lowered not in used_lower:
+                return candidate
+        return None
+
+    for item in raw_items[:max_len]:
+        ok, _, cleaned_item = validate_descriptive_text(
+            item,
+            "visible_relations_item",
+            min_chars=min_chars,
+            point_names=visible_points,
+        )
+        if ok and cleaned_item:
+            cleaned_item = normalize_relation_surface(cleaned_item)
+            mentioned = extract_point_mentions(cleaned_item, visible_points)
+            if relation_keyword_present(cleaned_item) and len(mentioned) >= 2:
+                lowered = cleaned_item.lower()
+                if lowered not in used_lower:
+                    cleaned.append(cleaned_item)
+                    used_lower.add(lowered)
+                    continue
+        fallback = next_fallback()
+        if fallback:
+            cleaned.append(fallback)
+            used_lower.add(fallback.lower())
+
+    while len(cleaned) < min_len:
+        fallback = next_fallback()
+        if not fallback:
+            break
+        cleaned.append(fallback)
+        used_lower.add(fallback.lower())
+
+    return cleaned[:max_len]
+
+
 def build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal, max_aux=6, max_bridge=4, max_finish=4):
     proof_match = re.search(r"<proof>(.*?)</proof>", sanitized_rest or "", re.DOTALL | re.IGNORECASE)
     aux_direct = build_aux_direct_consequences(aux_part)
@@ -1596,6 +1641,7 @@ def validate_plan_response(
     aux_part=None,
     coordinate_candidates=None,
     sanitized_rest=None,
+    visible_premise_summaries=None,
 ):
     plan = output_text if isinstance(output_text, dict) else extract_json_object(output_text)
     if not isinstance(plan, dict):
@@ -1683,8 +1729,16 @@ def validate_plan_response(
         return False, message, None
     cleaned_plan["coordinate_relations"] = cleaned_relations
 
-    ok, message, cleaned_visible_relations = validate_relation_list(
+    visible_relations_seed = canonicalize_visible_relations(
         plan.get("visible_relations"),
+        visible_points,
+        visible_premise_summaries,
+        min_len=2,
+        max_len=4,
+        min_chars=5,
+    )
+    ok, message, cleaned_visible_relations = validate_relation_list(
+        visible_relations_seed,
         "visible_relations",
         visible_points,
         min_len=2,
@@ -1895,7 +1949,12 @@ def validate_plan_response(
         construction_text = f"{cleaned_plan['helper_idea']} {cleaned_plan['construction']}".lower()
         for label, keywords in build_aux_keyword_expectations(aux_part):
             if not any(keyword in construction_text for keyword in keywords):
-                return False, f"construction is missing an expected {label} cue", None
+                canonical_construction = build_canonical_construction(aux_part)
+                if canonical_construction:
+                    cleaned_plan["construction"] = canonical_construction
+                    construction_text = f"{cleaned_plan['helper_idea']} {cleaned_plan['construction']}".lower()
+                if not any(keyword in construction_text for keyword in keywords):
+                    return False, f"construction is missing an expected {label} cue", None
         new_points = [point.lower() for point in extract_aux_new_points(aux_part)]
         preconstruction_fields = [
             cleaned_plan["anchor_relation"],
@@ -2219,6 +2278,31 @@ def build_hidden_aux_brief(aux_part):
     if not summaries:
         return inner
     return "; ".join(summaries)
+
+
+def build_canonical_construction(aux_part):
+    clauses = parse_aux_clauses(aux_part or "")
+    if not clauses:
+        return ""
+    sentences = []
+    for clause in clauses:
+        point_name = clause.get("new_point")
+        fact_summaries = []
+        for fact in split_formal_relation_chain(clause.get("body", "")):
+            summary = summarize_aux_clause(fact)
+            if summary:
+                fact_summaries.append(summary)
+        if not point_name or not fact_summaries:
+            continue
+        if len(fact_summaries) == 1:
+            fact_text = fact_summaries[0]
+        elif len(fact_summaries) == 2:
+            fact_text = f"{fact_summaries[0]} and {fact_summaries[1]}"
+        else:
+            fact_text = ", ".join(fact_summaries[:-1]) + f", and {fact_summaries[-1]}"
+        lead = "construct" if not sentences else "then construct"
+        sentences.append(f"{lead} point {point_name} such that {fact_text}")
+    return ". ".join(sentences).strip()
 
 
 def build_multi_aux_instruction(aux_part):
@@ -3317,6 +3401,7 @@ def run_plan_stage(
     aux_part,
     coordinate_candidates,
     sanitized_rest,
+    visible_premise_summaries,
     max_retries,
 ):
     last_error = None
@@ -3336,6 +3421,7 @@ def run_plan_stage(
                 aux_part=aux_part,
                 coordinate_candidates=coordinate_candidates,
                 sanitized_rest=sanitized_rest,
+                visible_premise_summaries=visible_premise_summaries,
             )
             if ok:
                 logger.info(f"[{stage_name}] Valid output in {elapsed:.2f}s")
@@ -3424,6 +3510,7 @@ def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_
     point_coords = get_point_coords(record)
     visible_goal = extract_problem_goal(record)
     coordinate_candidates = build_hidden_coordinate_candidates(point_coords, max_items=64, relax_type_limits=True)
+    visible_premise_summaries = build_visible_premise_summaries(record)
     plan_prompt = build_plan_prompt(record, aux_part, sanitized_rest)
     plan_messages = [
         {
@@ -3443,6 +3530,7 @@ def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_
         aux_part=aux_part,
         coordinate_candidates=coordinate_candidates,
         sanitized_rest=sanitized_rest,
+        visible_premise_summaries=visible_premise_summaries,
         max_retries=max_retries,
     )
     if not plan_result["success"]:
