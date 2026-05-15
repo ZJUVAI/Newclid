@@ -2095,6 +2095,13 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- rewrite coordinate_hints to summarize the concrete cues themselves, such as a midpoint, collinearity, equal-length, parallel, or perpendicular observation, instead of saying the figure suggests symmetry or rotation."
         )
+    if "bridge_steps must connect the auxiliary point to existing visible points" in validation_message:
+        targeted_hints.append(
+            "- make the first bridge relation explicitly combine the new auxiliary point with old visible points in a concrete relation, such as 'ag equals dg', 'a, c, e, g are concyclic', or 'angle bg/bj equals angle gi/ij'; do not let the bridge route drift into pure old-figure statements."
+        )
+        targeted_hints.append(
+            "- prefer compact point-pair surface forms like 'ag equals dg' over looser wrappers such as 'segment ag equals segment dg' when you describe an approved bridge relation."
+        )
     if "visible_relations" in validation_message:
         targeted_hints.append(
             "- visible_relations should contain only old-figure relations that are already visible before the auxiliary point is introduced; do not place new-point relations there."
@@ -2337,6 +2344,8 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "[coordinate_relations / visible_relations Guidance]\n"
         "Good coordinate_relations: items chosen from the hidden structured coordinate candidates, such as 'point g looks like the midpoint of ac' or 'points b, d, and i look nearly collinear'.\n"
         "Bad coordinate_relations: copying a visible premise such as 'line ad is parallel to line bc' when that relation is not one of the hidden coordinate candidates.\n"
+        "Good coordinate_hints: 'the midpoint at g and the near-collinearity of b, d, and i suggest a bridge through d.'\n"
+        "Bad coordinate_hints: 'the figure suggests a symmetry between e and f' or 'a rotation seems present'.\n"
         "Good visible_relations: old-figure relations like 'ab equals ac' or 'line ad is parallel to line bc'.\n"
         "Bad visible_relations: any relation involving the new auxiliary point before construction, such as 'ah equals ch'.\n\n"
         f"{aux_specific_guidance}"
@@ -2348,6 +2357,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- Use the hidden coordinate table only as an internal consistency check for relations that also look plausible in the image.\n"
         "- The coordinate_relations field should stay close to the structured coordinate candidates when possible. Avoid unsupported jumps like 'there is a rotation symmetry' unless you first name the concrete equal, parallel, perpendicular, midpoint, or collinear cues behind it.\n"
         "- In coordinate_relations and coordinate_hints, do not describe points as symmetric or invoke rotation directly; spell out the concrete equal, parallel, perpendicular, midpoint, or collinear cues instead.\n"
+        "- In coordinate_hints, do not use words like symmetry, symmetric, mirror, or rotation; summarize the actual midpoint, collinear, equal-length, parallel, or perpendicular cue instead.\n"
         "- The visible_relations field should preferentially reuse the visible premise summaries above, plus a small number of visually obvious derived facts. It should not introduce invented centers, rotations, or unnamed transformations.\n"
         "- The coordinate_relations and visible_relations fields must stay separate: coordinate_relations are coordinate-backed visual checks, while visible_relations are existing-figure givens or obvious old-figure consequences.\n"
         "- The coordinate_hints field must be written as ordinary visual geometry language. Do not say 'the coordinates show', 'the coordinates indicate', or anything similar.\n"
@@ -2358,6 +2368,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- The construction field must describe the same geometric facts as the hidden target summary in plain language; do not invent a different line, circle, or intersection.\n"
         "- Each item in aux_direct_relations must stay local to the auxiliary construction itself. Do not pull unrelated old-figure points into those direct relations.\n"
         "- Each bridge_steps relation should explicitly mention how the auxiliary point interacts with existing visible points or substructures, in a realistic order.\n"
+        "- The first bridge_steps relation must explicitly contain the new auxiliary point together with at least one old visible point, and it should be written in a compact relation form such as 'ag equals dg' or 'angle bg/bj equals angle gi/ij'.\n"
         "- Each bridge_steps relation should stay semantically close to the hidden proof guidance bridge_relations or goal_finish_relations; do not swap in a different high-level route.\n"
         "- When the approved route relation pool lists a concrete relation such as 'line bg is parallel to line cd' or 'bk = dk', prefer using that relation directly instead of inventing an alternative route like a new similar-triangle claim.\n"
         "- Each bridge_steps depends_on list should reuse concrete items from visible_relations, aux_direct_relations, or an earlier bridge_steps relation, instead of inventing unsupported leaps.\n"
