@@ -415,6 +415,7 @@ def normalize_relation_surface(text):
     if not cleaned:
         return cleaned
     normalized = re.sub(r"\[\d{3}\]", "", cleaned).strip(" ;")
+    normalized = re.sub(r"^(?:then|thus|therefore|hence|so)\s+", "", normalized, flags=re.IGNORECASE)
     coincide_match = re.fullmatch(
         r"(?:point\s+)?([a-z]\w*)\s+coincides\s+with\s+(?:point\s+)?([a-z]\w*)\.?",
         normalized,
@@ -442,6 +443,34 @@ def normalize_relation_surface(text):
     if ratio_match:
         left_num, left_den, right_num, right_den = [group.lower() for group in ratio_match.groups()]
         return f"ratio {left_num} to {left_den} equals ratio {right_num} to {right_den}"
+    equality_match = re.fullmatch(
+        r"([a-z]{2})\s*=\s*([a-z]{2})\.?",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if equality_match:
+        left_seg, right_seg = [group.lower() for group in equality_match.groups()]
+        return f"{left_seg} equals {right_seg}"
+    triangle_binary_match = re.fullmatch(
+        r"(?:with\s+[^,]+,\s*)?triangles?\s+([a-z]{3})\s+and\s+([a-z]{3})\s+are\s+(similar|congruent)\b.*",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if triangle_binary_match:
+        tri_a = triangle_binary_match.group(1).lower()
+        tri_b = triangle_binary_match.group(2).lower()
+        relation = triangle_binary_match.group(3).lower()
+        return f"triangles {tri_a} and {tri_b} are {relation}"
+    triangle_unary_match = re.fullmatch(
+        r"(?:with\s+[^,]+,\s*)?triangle\s+([a-z]{3})\s+is\s+(similar|congruent)\s+to\s+triangle\s+([a-z]{3})\b.*",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+    if triangle_unary_match:
+        tri_a = triangle_unary_match.group(1).lower()
+        relation = triangle_unary_match.group(2).lower()
+        tri_b = triangle_unary_match.group(3).lower()
+        return f"triangles {tri_a} and {tri_b} are {relation}"
     tokens = normalized.split()
     if tokens and tokens[0].lower() in FORMAL_RELATION_STARTERS:
         summary = summarize_aux_clause(normalized)
@@ -2098,7 +2127,7 @@ def summarize_aux_clause(clause):
     pred = tokens[0]
     args = tokens[1:]
     if pred == "cong" and len(args) >= 4:
-        return f"{args[0]}{args[1]} = {args[2]}{args[3]}"
+        return f"{args[0]}{args[1]} equals {args[2]}{args[3]}"
     if pred == "perp" and len(args) >= 4:
         return f"line {args[0]}{args[1]} is perpendicular to line {args[2]}{args[3]}"
     if pred == "para" and len(args) >= 4:
