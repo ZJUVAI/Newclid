@@ -69,6 +69,7 @@ FORBIDDEN_THINKING_PATTERNS = [
     re.compile(r"\bcoordinate table\b", re.IGNORECASE),
     re.compile(r"\brotational symmetry\b", re.IGNORECASE),
     re.compile(r"\bcenter of symmetry\b", re.IGNORECASE),
+    re.compile(r"\bmidpoint propert(?:y|ies)\b", re.IGNORECASE),
     re.compile(r"\$[^$]+\$"),
     re.compile(r"`[^`]+`"),
 ]
@@ -820,10 +821,14 @@ def audit_generation_quality(record, generation, aux_part):
         "square-like",
         "parallelogram",
         "crucial center",
+        "midpoint property",
+        "midpoint properties",
         "similarity or angle equality",
         "specific angle conditions",
     ]
     generic_bridge_markers = [
+        "midpoint property",
+        "midpoint properties",
         "specific angle conditions",
         "similarity or angle equality",
     ]
@@ -1293,7 +1298,14 @@ def validate_plan_response(
             return False, message, None
         cleaned_plan[key] = cleaned_value
     if aux_points:
-        cleaned_plan["helper_idea"] = anonymize_new_point_mentions(cleaned_plan["helper_idea"], aux_points)
+        for field_name in [
+            "anchor_relation",
+            "figure_overview",
+            "coordinate_hints",
+            "goal_bottleneck",
+            "helper_idea",
+        ]:
+            cleaned_plan[field_name] = anonymize_new_point_mentions(cleaned_plan[field_name], aux_points)
 
     ok, message, cleaned_relations = validate_relation_list(
         plan.get("coordinate_relations"),
@@ -1417,6 +1429,11 @@ def validate_plan_response(
 
     if not relation_keyword_present(cleaned_plan["coordinate_hints"]):
         return False, "coordinate_hints must mention at least one concrete geometric relation cue", None
+    if re.search(r"\bsymmetr(?:y|ic)\b|\brotat(?:e|es|ed|ing|ion|ional)\b", cleaned_plan["coordinate_hints"], re.IGNORECASE):
+        return False, (
+            "coordinate_hints must explain concrete midpoint, collinear, equal-length, parallel, or perpendicular cues, "
+            "not generic symmetry or rotation language"
+        ), None
 
     figure_mentions = extract_point_mentions(
         " ".join(
@@ -1607,7 +1624,15 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
     if plan and isinstance(plan.get("bridge_steps"), list):
         sentences = split_into_sentences(body)
         search_start = 0
-        generic_markers = ["symmetry", "it follows", "from the setup", "resulting symmetry"]
+        generic_markers = [
+            "symmetry",
+            "by symmetry",
+            "it follows",
+            "from the setup",
+            "resulting symmetry",
+            "midpoint property",
+            "midpoint properties",
+        ]
         for idx, step in enumerate(plan["bridge_steps"]):
             match_idx = None
             for sentence_idx in range(search_start, len(sentences)):
@@ -2043,6 +2068,14 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- every depends_on item should copy an earlier concrete relation almost verbatim, such as 'ah equals ch' or 'line ad is parallel to line bc'; do not replace it with abstract support labels like 'the midpoint property' or 'the equal-length setup'."
         )
+    if "aux_direct_relations" in validation_message and "must mention a concrete geometric relation" in validation_message:
+        targeted_hints.append(
+            "- every aux_direct_relations item must state the immediate construction consequence itself, such as 'ah equals dh', 'line ck is perpendicular to line dk', or 'b, c, h are collinear'; do not write vague summaries like 'the construction creates symmetry' or 'an isosceles shape appears'."
+        )
+    if "bridge_steps" in validation_message and "must mention a concrete geometric relation" in validation_message:
+        targeted_hints.append(
+            "- every bridge_steps relation should name the exact approved equality, angle, ratio, collinearity, parallel, or perpendicular statement, not a high-level summary like 'the triangles match' or 'an isosceles configuration forms'."
+        )
     if "coordinate_hints" in validation_message:
         targeted_hints.append(
             "- include coordinate_hints as one or two plain-language sentences summarizing which coordinate_relations matter and why."
@@ -2051,9 +2084,16 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- coordinate_relations should be chosen from the hidden structured coordinate candidates, not copied from visible premises like a given parallel or equal-length statement."
         )
+        targeted_hints.append(
+            "- rewrite abstract shape summaries like 'triangle adc looks isosceles' into the concrete candidate relation they imply, such as 'ad looks equal to cd', only if that exact equality appears in the hidden coordinate candidate list."
+        )
     if "coordinate_relations" in validation_message and "symmetry or rotation claims" in validation_message:
         targeted_hints.append(
             "- rewrite coordinate_relations as concrete cues like midpoint, collinear, equal-length, parallel, or perpendicular observations; do not say points look symmetric or that there is a rotation."
+        )
+    if "coordinate_hints must explain concrete midpoint" in validation_message:
+        targeted_hints.append(
+            "- rewrite coordinate_hints to summarize the concrete cues themselves, such as a midpoint, collinearity, equal-length, parallel, or perpendicular observation, instead of saying the figure suggests symmetry or rotation."
         )
     if "visible_relations" in validation_message:
         targeted_hints.append(
@@ -2155,6 +2195,10 @@ def build_writer_retry_feedback(validation_message, plan):
         targeted_hints.append(
             "- examples: write 'the ratio ab over bg' instead of '$ab:bg$', and write 'angle bk/bj equals angle dj/dk' as plain text rather than math markup."
         )
+    if "midpoint propert" in validation_message:
+        targeted_hints.append(
+            "- do not summarize support as 'midpoint property' or 'midpoint properties'; restate the concrete midpoint facts themselves, such as 'm is the midpoint of ab' and 'am equals bm'."
+        )
     if "rotational symmetry" in validation_message or "center of symmetry" in validation_message:
         targeted_hints.append(
             "- remove high-level phrases like 'rotational symmetry' or 'center of symmetry'; replace them with the concrete equalities, parallels, or midpoint facts that are actually visible in the approved plan."
@@ -2162,6 +2206,9 @@ def build_writer_retry_feedback(validation_message, plan):
     if "must explicitly realize bridge_steps" in validation_message:
         targeted_hints.append(
             "- include one explicit sentence for every approved bridge_steps relation in order; do not skip the last angle or parallel relation before the goal_finish sentence."
+        )
+        targeted_hints.append(
+            "- when a bridge relation is an angle or ratio, restate it in nearly the same point ordering and surface form as the approved relation, such as 'angle bg/bj equals angle gi/ij' or 'ac over ce equals hf over ch'."
         )
     targeted_hint_block = "\n".join(targeted_hints)
     if targeted_hint_block:
@@ -2418,6 +2465,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "24. Use impersonal sentence forms such as 'the obstacle is ...', 'a helper is needed ...', 'construct point h ...', and 'this gives ...'; avoid first-person forms like 'we need' or 'we construct'.\n"
         "25. If you need to reuse a visible given that already appears in the injected prefix, paraphrase it instead of copying the exact wording from the prefix sentence.\n"
         "26. In bridge sentences, do not replace the approved supports with summary labels such as 'symmetry', 'center of symmetry', or 'midpoint property'; name the actual equalities, collinearities, parallels, or perpendicularities instead.\n"
+        "27. When an approved bridge relation is an angle or ratio relation, write it in nearly the same point ordering and surface form as the approved relation, rather than paraphrasing it into a looser sentence like 'the angle formed by ...'.\n"
         "Output only the plain-text body.\n"
     )
 
