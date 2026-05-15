@@ -539,6 +539,18 @@ def align_bridge_steps_to_hidden_route(bridge_steps, hidden_route_relations, poi
     }
 
 
+def align_dependency_to_support(dependency, available_supports, point_names):
+    for support in available_supports:
+        if (
+            has_long_ngram_overlap(support, dependency, ngram_size=3)
+            or dependency.lower() in support.lower()
+            or support.lower() in dependency.lower()
+            or relations_semantically_match(dependency, support, point_names)
+        ):
+            return support
+    return None
+
+
 def build_visible_premise_summaries(record, max_items=12):
     summaries = []
     seen = set()
@@ -1615,12 +1627,22 @@ def validate_plan_response(
         for idx, step in enumerate(cleaned_plan["bridge_steps"]):
             if idx > 0:
                 available_supports.append(cleaned_plan["bridge_steps"][idx - 1]["relation"])
-            if not any(
-                has_long_ngram_overlap(support, dependency, ngram_size=3) or dependency.lower() in support.lower() or support.lower() in dependency.lower()
-                for dependency in step["depends_on"]
-                for support in available_supports
-            ):
+            canonical_dependencies = []
+            matched_supports = []
+            for dependency in step["depends_on"]:
+                matched_support = align_dependency_to_support(dependency, available_supports, known_points)
+                if matched_support:
+                    canonical_dependencies.append(matched_support)
+                    matched_supports.append(matched_support)
+                else:
+                    canonical_dependencies.append(dependency)
+            if not matched_supports:
                 return False, f"bridge_steps[{idx}].depends_on must reuse an earlier visible, direct, or bridge relation", None
+            deduped_dependencies = []
+            for dependency in canonical_dependencies:
+                if dependency not in deduped_dependencies:
+                    deduped_dependencies.append(dependency)
+            step["depends_on"] = deduped_dependencies
             if idx < len(cleaned_plan["bridge_steps"]) - 1:
                 next_relation = cleaned_plan["bridge_steps"][idx + 1]["relation"].lower()
                 why_text = step["why_it_helps"].lower()
@@ -2149,6 +2171,10 @@ def build_plan_retry_feedback(validation_message, aux_part):
     if "depends_on" in validation_message and "must mention a concrete geometric relation" in validation_message:
         targeted_hints.append(
             "- every depends_on item should copy an earlier concrete relation almost verbatim, such as 'ah equals ch' or 'line ad is parallel to line bc'; do not replace it with abstract support labels like 'the midpoint property' or 'the equal-length setup'."
+        )
+    if "depends_on must reuse an earlier visible, direct, or bridge relation" in validation_message:
+        targeted_hints.append(
+            "- every depends_on item should be copied from visible_relations, aux_direct_relations, or an earlier bridge_steps relation with nearly the same surface form; do not invent a fresh paraphrase when an earlier approved support already exists."
         )
     if "aux_direct_relations" in validation_message and "must mention a concrete geometric relation" in validation_message:
         targeted_hints.append(
