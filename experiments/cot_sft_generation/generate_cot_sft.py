@@ -2771,6 +2771,22 @@ def build_visible_relation_sentence(plan):
     return f"The visible givens also show that {relation_text}."
 
 
+def build_prefix_coverage_notes(plan):
+    if not isinstance(plan, dict):
+        return "[]"
+    notes = []
+    figure_overview = plan.get("figure_overview")
+    if isinstance(figure_overview, str) and figure_overview.strip():
+        notes.append(f"overview already covered: {figure_overview.strip().rstrip('.')}")
+    for relation in plan.get("coordinate_relations", []) or []:
+        if isinstance(relation, str) and relation.strip():
+            notes.append(f"coordinate cue already covered: {relation.strip().rstrip('.')}")
+    for relation in plan.get("visible_relations", []) or []:
+        if isinstance(relation, str) and relation.strip():
+            notes.append(f"visible relation already covered: {relation.strip().rstrip('.')}")
+    return json.dumps(notes, ensure_ascii=False, indent=2) if notes else "[]"
+
+
 def build_writer_sentence_duties(plan):
     if not isinstance(plan, dict):
         return ""
@@ -3366,7 +3382,7 @@ def build_plan_retry_feedback(validation_message, aux_part):
     )
 
 
-def build_writer_retry_feedback(validation_message, plan):
+def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
     bridge_steps = plan.get("bridge_steps", []) if isinstance(plan, dict) else []
     bridge_summary = json.dumps(bridge_steps, ensure_ascii=False, indent=2) if bridge_steps else "[]"
     bridge_blueprints = (
@@ -3377,6 +3393,7 @@ def build_writer_retry_feedback(validation_message, plan):
         json.dumps(build_writer_bridge_contracts(plan), ensure_ascii=False, indent=2)
         if isinstance(plan, dict) else "[]"
     )
+    prefix_coverage_notes = build_prefix_coverage_notes(plan)
     targeted_hints = []
     if "overlaps too much with the injected prefix" in validation_message:
         targeted_hints.append(
@@ -3384,6 +3401,9 @@ def build_writer_retry_feedback(validation_message, plan):
         )
         targeted_hints.append(
             "- if a bridge sentence needs a visible given that already appears in the prefix, paraphrase it instead of copying the exact wording, such as 'because ad runs parallel to bc' instead of repeating 'line ad is parallel to line bc'."
+        )
+        targeted_hints.append(
+            "- the first two body sentences should avoid every item listed under Prefix-Covered Facts; use those sentences only for the bottleneck and the missing helper."
         )
     if "first-person narration" in validation_message:
         targeted_hints.append(
@@ -3470,6 +3490,10 @@ def build_writer_retry_feedback(validation_message, plan):
         f"Validation error: {validation_message}\n"
         "Return a corrected plain-text body that satisfies every format and quality constraint.\n"
         "Keep one sentence for each bridge step, and explicitly name concrete supporting relations instead of using vague shortcuts.\n"
+        "Prefix-Covered Facts:\n"
+        f"{prefix_coverage_notes}\n\n"
+        "Injected Prefix Block:\n"
+        f"{injected_prefix}\n\n"
         f"{targeted_hint_block}"
         "Approved bridge steps to realize in order:\n"
         f"{bridge_summary}\n\n"
@@ -3702,6 +3726,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         ensure_ascii=False,
         indent=2,
     )
+    prefix_coverage_notes = build_prefix_coverage_notes(plan)
     bridge_steps = plan.get("bridge_steps", []) if isinstance(plan, dict) else []
     expected_sentence_count = 4 + len(bridge_steps) + (1 if plan.get("aux_direct_relations") else 0)
     return (
@@ -3753,6 +3778,9 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "[Injected Prefix Block]\n"
         "The script will prepend the following block exactly before your body. Do not restate these claims; start after them.\n"
         f"{injected_prefix_block}\n\n"
+        "[Prefix-Covered Facts]\n"
+        "The facts below are already stated by the injected prefix. Do not repeat them in the first two body sentences, and later references should usually be paraphrased rather than copied verbatim.\n"
+        f"{prefix_coverage_notes}\n\n"
         "[Write Requirements]\n"
         "Write only the body text that comes after the script-supplied prefix block: an anchor sentence with coordinate tags, a full-figure overview sentence, a coordinate-focused prefix built from the approved relation checks, and a visible-relations sentence injected from the approved plan.\n"
         "Do NOT output <thinking>, <point>, or <coord> tags; the script will add the prefix sentences and the coordinate tags itself.\n"
@@ -3778,6 +3806,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "17. Reuse the approved visible_relations when connecting the new point back to the old figure, rather than inventing fresh structural claims.\n"
         "18. Stay impersonal. Do not write in the first person.\n"
         "19. The very first sentence of your body should state the bottleneck or goal-side obstacle. Do not spend the first sentence re-describing triangle abc, the midpoint layout, or the visible givens already covered by the injected prefix block.\n"
+        "19a. The second sentence should state the missing helper idea, not repeat any overview, coordinate cue, or visible relation already listed under Prefix-Covered Facts.\n"
         "20. Give each bridge_steps relation its own sentence. In that sentence, explicitly name at least one concrete depends_on relation before or while stating the new bridge relation.\n"
         "20a. When a bridge step lists internal required_supports, mention those support relations explicitly in the same sentence unless doing so would repeat the exact prefix wording; in that case paraphrase them.\n"
         "20b. When a bridge contract includes a preferred_sentence_shell, stay very close to that local order and only smooth the wording lightly.\n"
@@ -3990,7 +4019,7 @@ def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_pr
             last_error = message
             logger.warning(f"[{stage_name}] Validation failed: {message}")
             if attempt < max_retries:
-                feedback = build_writer_retry_feedback(message, plan)
+                feedback = build_writer_retry_feedback(message, plan, injected_prefix=injected_prefix)
                 messages = messages + [{"role": "user", "content": feedback}]
                 time.sleep(1)
 
