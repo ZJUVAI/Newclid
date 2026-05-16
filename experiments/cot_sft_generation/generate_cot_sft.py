@@ -93,6 +93,7 @@ FORMAL_RELATION_STARTERS = {
     "simtrir",
     "contri",
     "contrir",
+    "eqpoint",
 }
 
 
@@ -451,8 +452,8 @@ def normalize_relation_surface(text):
     if equality_match:
         left_seg, right_seg = [group.lower() for group in equality_match.groups()]
         return f"{left_seg} equals {right_seg}"
-    triangle_binary_match = re.fullmatch(
-        r"(?:with\s+[^,]+,\s*)?triangles?\s+([a-z]{3})\s+and\s+([a-z]{3})\s+are\s+(similar|congruent)\b.*",
+    triangle_binary_match = re.search(
+        r"triangles?\s+([a-z]{3})\s+and\s+([a-z]{3})\s+are\s+(similar|congruent)\b",
         normalized,
         flags=re.IGNORECASE,
     )
@@ -461,8 +462,8 @@ def normalize_relation_surface(text):
         tri_b = triangle_binary_match.group(2).lower()
         relation = triangle_binary_match.group(3).lower()
         return f"triangles {tri_a} and {tri_b} are {relation}"
-    triangle_unary_match = re.fullmatch(
-        r"(?:with\s+[^,]+,\s*)?triangle\s+([a-z]{3})\s+is\s+(similar|congruent)\s+to\s+triangle\s+([a-z]{3})\b.*",
+    triangle_unary_match = re.search(
+        r"triangle\s+([a-z]{3})\s+is\s+(similar|congruent)\s+to\s+triangle\s+([a-z]{3})\b",
         normalized,
         flags=re.IGNORECASE,
     )
@@ -609,6 +610,72 @@ def align_dependency_to_support(dependency, available_supports, point_names):
         ):
             return support
     return None
+
+
+def score_support_relation(support, relation_text, point_names, next_target_relation=""):
+    support_points = extract_point_mentions(support, point_names)
+    relation_points = extract_point_mentions(relation_text, point_names)
+    support_keywords = relation_text_keywords(support)
+    relation_keywords = relation_text_keywords(relation_text)
+    score = 0
+    score += 5 * len(support_points & relation_points)
+    score += 3 * len(support_keywords & relation_keywords)
+
+    if next_target_relation:
+        next_points = extract_point_mentions(next_target_relation, point_names)
+        next_keywords = relation_text_keywords(next_target_relation)
+        score += 2 * len(support_points & next_points)
+        score += 1 * len(support_keywords & next_keywords)
+
+    if "midpoint" in support_keywords and "equal" in relation_keywords and len(support_points & relation_points) >= 2:
+        score += 4
+    if "collinear" in support_keywords and "collinear" in relation_keywords and len(support_points & relation_points) >= 2:
+        score += 4
+    if relations_semantically_match(support, relation_text, point_names):
+        score += 2
+    return score
+
+
+def select_support_relations_for_step(relation_text, available_supports, point_names, next_target_relation="", max_supports=2):
+    ranked = []
+    for support in available_supports:
+        if not isinstance(support, str) or not support.strip():
+            continue
+        score = score_support_relation(
+            support,
+            relation_text,
+            point_names,
+            next_target_relation=next_target_relation,
+        )
+        if score <= 0:
+            continue
+        ranked.append((score, support))
+    ranked.sort(key=lambda item: (-item[0], len(item[1]), item[1].lower()))
+
+    selected = []
+    for _, support in ranked:
+        if support not in selected:
+            selected.append(support)
+        if len(selected) >= max_supports:
+            break
+    return selected
+
+
+def relation_duplicates_earlier_support(relation_text, available_supports, point_names):
+    normalized_relation = normalize_relation_surface(relation_text).lower()
+    relation_points = extract_point_mentions(normalized_relation, point_names)
+    relation_keywords = relation_text_keywords(normalized_relation)
+    for support in available_supports:
+        normalized_support = normalize_relation_surface(support).lower()
+        if not normalized_support:
+            continue
+        if normalized_relation == normalized_support:
+            return True
+        support_points = extract_point_mentions(normalized_support, point_names)
+        support_keywords = relation_text_keywords(normalized_support)
+        if relation_points == support_points and relation_keywords & support_keywords and relations_semantically_match(relation_text, support, point_names):
+            return True
+    return False
 
 
 def build_visible_premise_summaries(record, max_items=12):
@@ -1542,6 +1609,69 @@ def canonicalize_visible_relations(items, visible_points, fallback_summaries, mi
     return cleaned[:max_len]
 
 
+def canonicalize_coordinate_relations(items, visible_points, coordinate_candidates, min_len=2, max_len=3):
+    raw_items = items if isinstance(items, list) else []
+    cleaned = []
+    used_lower = set()
+    candidates = coordinate_candidates or []
+    fallback_queue = []
+    for candidate in candidates:
+        summary = candidate.get("summary") if isinstance(candidate, dict) else None
+        if isinstance(summary, str) and summary.strip():
+            fallback_queue.append(summary.strip())
+
+    def next_fallback():
+        while fallback_queue:
+            candidate = normalize_relation_surface(fallback_queue.pop(0))
+            lowered = candidate.lower()
+            if lowered not in used_lower:
+                return candidate
+        return None
+
+    for item in raw_items[:max_len]:
+        ok, _, cleaned_item = validate_descriptive_text(
+            item,
+            "coordinate_relations_item",
+            min_chars=12,
+            point_names=visible_points,
+        )
+        if ok and cleaned_item:
+            cleaned_item = normalize_relation_surface(cleaned_item)
+            mentioned = extract_point_mentions(cleaned_item, visible_points)
+            if (
+                relation_keyword_present(cleaned_item)
+                and len(mentioned) >= 2
+                and any(coordinate_relation_matches_candidate(cleaned_item, candidate) for candidate in candidates)
+            ):
+                lowered = cleaned_item.lower()
+                if lowered not in used_lower:
+                    cleaned.append(cleaned_item)
+                    used_lower.add(lowered)
+                    continue
+        fallback = next_fallback()
+        if fallback:
+            cleaned.append(fallback)
+            used_lower.add(fallback.lower())
+
+    while len(cleaned) < min_len:
+        fallback = next_fallback()
+        if not fallback:
+            break
+        cleaned.append(fallback)
+        used_lower.add(fallback.lower())
+
+    covered_points = extract_point_mentions(" ".join(cleaned), visible_points)
+    while len(cleaned) < max_len and len(covered_points) < 3:
+        fallback = next_fallback()
+        if not fallback:
+            break
+        cleaned.append(fallback)
+        used_lower.add(fallback.lower())
+        covered_points = extract_point_mentions(" ".join(cleaned), visible_points)
+
+    return cleaned[:max_len]
+
+
 def build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal, max_aux=6, max_bridge=4, max_finish=4):
     proof_match = re.search(r"<proof>(.*?)</proof>", sanitized_rest or "", re.DOTALL | re.IGNORECASE)
     aux_direct = build_aux_direct_consequences(aux_part)
@@ -1561,6 +1691,7 @@ def build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal, max_aux=
         summary = summarize_aux_clause(clause)
         if not summary:
             continue
+        summary = normalize_relation_surface(summary)
         lowered = clause.lower()
         clause_points = set(re.findall(r"\b([a-z]\w*)\b", lowered))
         summaries.append(
@@ -1718,8 +1849,15 @@ def validate_plan_response(
         ]:
             cleaned_plan[field_name] = anonymize_new_point_mentions(cleaned_plan[field_name], aux_points)
 
-    ok, message, cleaned_relations = validate_relation_list(
+    coordinate_relations_seed = canonicalize_coordinate_relations(
         plan.get("coordinate_relations"),
+        visible_points,
+        coordinate_candidates,
+        min_len=2,
+        max_len=3,
+    )
+    ok, message, cleaned_relations = validate_relation_list(
+        coordinate_relations_seed,
         "coordinate_relations",
         visible_points,
         min_len=2,
@@ -1864,6 +2002,9 @@ def validate_plan_response(
     if not ok:
         return False, message, None
     cleaned_goal_finish = normalize_relation_surface(cleaned_goal_finish)
+    canonical_goal_finish = normalize_relation_surface(summarize_aux_clause(visible_goal) or "")
+    if canonical_goal_finish:
+        cleaned_goal_finish = canonical_goal_finish
     if not relation_keyword_present(cleaned_goal_finish):
         return False, "goal_finish must mention a concrete goal-side geometric relation", None
     cleaned_plan["goal_finish"] = cleaned_goal_finish
@@ -1993,6 +2134,8 @@ def validate_plan_response(
         for idx, step in enumerate(cleaned_plan["bridge_steps"]):
             if idx > 0:
                 available_supports.append(cleaned_plan["bridge_steps"][idx - 1]["relation"])
+            if relation_duplicates_earlier_support(step["relation"], available_supports, known_points):
+                return False, f"bridge_steps[{idx}].relation must advance beyond earlier visible, direct, or bridge relations", None
             canonical_dependencies = []
             matched_supports = []
             for dependency in step["depends_on"]:
@@ -2008,8 +2151,25 @@ def validate_plan_response(
             for dependency in canonical_dependencies:
                 if dependency not in deduped_dependencies:
                     deduped_dependencies.append(dependency)
-            step["depends_on"] = deduped_dependencies
-            step["required_supports"] = deduped_dependencies[: min(2, len(deduped_dependencies))]
+            preferred_dependencies = select_support_relations_for_step(
+                step["relation"],
+                available_supports,
+                known_points,
+                next_target_relation=step.get("next_target_relation", ""),
+                max_supports=min(2, len(available_supports)),
+            )
+            merged_dependencies = preferred_dependencies + [
+                dependency for dependency in deduped_dependencies
+                if dependency not in preferred_dependencies
+            ]
+            if not merged_dependencies:
+                merged_dependencies = deduped_dependencies
+            step["depends_on"] = merged_dependencies[:3]
+            step["required_supports"] = (
+                preferred_dependencies[: min(2, len(preferred_dependencies))]
+                if preferred_dependencies else
+                step["depends_on"][: min(2, len(step["depends_on"]))]
+            )
             if idx < len(cleaned_plan["bridge_steps"]) - 1:
                 next_relation = cleaned_plan["bridge_steps"][idx + 1]["relation"].lower()
                 why_text = step["why_it_helps"].lower()
@@ -2253,6 +2413,8 @@ def summarize_aux_clause(clause):
         return f"{args[0]}, {args[1]}, {args[2]}, {args[3]} are concyclic"
     if pred == "midp" and len(args) >= 3:
         return f"{args[0]} is the midpoint of {args[1]}{args[2]}"
+    if pred == "eqpoint" and len(args) >= 2:
+        return f"{args[0]} equals {args[1]}"
     if pred == "eqratio" and len(args) >= 8:
         return (
             f"ratio {args[0]}{args[1]} to {args[2]}{args[3]} "
@@ -2403,6 +2565,24 @@ def build_writer_sentence_duties(plan):
     return "\n".join(lines)
 
 
+def build_bridge_sentence_shell(step):
+    if not isinstance(step, dict):
+        return ""
+    supports = step.get("required_supports") or step.get("depends_on", [])
+    relation = step.get("approved_route_relation") or step.get("relation", "")
+    next_target = step.get("next_target_relation", "")
+    if supports:
+        support_text = supports[0]
+        if len(supports) > 1:
+            support_text = f"{supports[0]} and {supports[1]}"
+        shell = f"Because {support_text}, {relation}"
+    else:
+        shell = f"State {relation}"
+    if next_target:
+        shell += f", which prepares {next_target}"
+    return shell + "."
+
+
 def build_writer_bridge_contracts(plan):
     if not isinstance(plan, dict):
         return []
@@ -2418,6 +2598,7 @@ def build_writer_bridge_contracts(plan):
                 "required_supports": step.get("required_supports", []),
                 "min_support_mentions": step.get("min_support_mentions", 1 if step.get("required_supports") else 0),
                 "next_target_relation": step.get("next_target_relation", ""),
+                "preferred_sentence_shell": build_bridge_sentence_shell(step),
             }
         )
     contracts.append(
@@ -2425,6 +2606,7 @@ def build_writer_bridge_contracts(plan):
             "sentence_type": "goal_finish",
             "relation": plan.get("goal_finish", ""),
             "must_appear_after_bridge_count": len(bridge_steps),
+            "preferred_sentence_shell": f"Therefore, {plan.get('goal_finish', '')}.",
         }
     )
     return contracts
@@ -2472,6 +2654,7 @@ def build_writer_sentence_blueprints(plan):
                 "fallback_support_relations": support_sequence[1:] if len(support_sequence) > 1 else [],
                 "approved_relation": step.get("approved_route_relation") or step.get("relation", ""),
                 "next_target_relation": step.get("next_target_relation", ""),
+                "preferred_sentence_shell": build_bridge_sentence_shell(step),
                 "forbid_new_claims": True,
                 "instruction": (
                     "Prefer a sentence of the form 'Because <support>, <approved relation>, which prepares <next target>'. "
@@ -2607,7 +2790,11 @@ def relation_semantically_mentioned_in_sentence(sentence, relation):
         phrase in lowered_sentence for phrase in ["cyclic", "concyclic", "circle", "circumcircle"]
     ):
         return True
-    if "midpoint" in keywords and "midpoint" in lowered_sentence:
+    if "midpoint" in keywords and (
+        "midpoint" in lowered_sentence
+        or "bisect" in lowered_sentence
+        or "bisects" in lowered_sentence
+    ):
         return True
     if "similar" in keywords and "similar" in lowered_sentence:
         return True
@@ -2825,6 +3012,13 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- prefer compact point-pair surface forms like 'ag equals dg' over looser wrappers such as 'segment ag equals segment dg' when you describe an approved bridge relation."
         )
+    if "must advance beyond earlier visible, direct, or bridge relations" in validation_message:
+        targeted_hints.append(
+            "- each bridge_steps relation must be a new checkpoint beyond the visible_relations, aux_direct_relations, and earlier bridge steps; do not repeat an aux-direct equality such as 'bj equals dj' as a separate bridge step."
+        )
+        targeted_hints.append(
+            "- if a hidden route relation is already unlocked directly by the auxiliary construction, move to the next realistic checkpoint instead of repeating the same relation."
+        )
     if "visible_relations" in validation_message:
         targeted_hints.append(
             "- visible_relations should contain only old-figure relations that are already visible before the auxiliary point is introduced; do not place new-point relations there."
@@ -2908,6 +3102,10 @@ def build_writer_retry_feedback(validation_message, plan):
         json.dumps(build_writer_sentence_blueprints(plan), ensure_ascii=False, indent=2)
         if isinstance(plan, dict) else "[]"
     )
+    bridge_contracts = (
+        json.dumps(build_writer_bridge_contracts(plan), ensure_ascii=False, indent=2)
+        if isinstance(plan, dict) else "[]"
+    )
     targeted_hints = []
     if "overlaps too much with the injected prefix" in validation_message:
         targeted_hints.append(
@@ -2942,6 +3140,9 @@ def build_writer_retry_feedback(validation_message, plan):
         )
         targeted_hints.append(
             "- preferred bridge sentence shape: support relation first, then the new approved bridge relation, then one short clause about the next target."
+        )
+        targeted_hints.append(
+            "- if needed, follow the preferred_sentence_shell in the bridge contracts almost verbatim and only smooth the wording lightly."
         )
     if "must explicitly realize goal_finish after the bridge steps" in validation_message:
         targeted_hints.append(
@@ -2993,6 +3194,8 @@ def build_writer_retry_feedback(validation_message, plan):
         f"{targeted_hint_block}"
         "Approved bridge steps to realize in order:\n"
         f"{bridge_summary}\n\n"
+        "Bridge contracts:\n"
+        f"{bridge_contracts}\n\n"
         "Sentence blueprints:\n"
         f"{bridge_blueprints}"
     )
@@ -3278,6 +3481,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "19. The very first sentence of your body should state the bottleneck or goal-side obstacle. Do not spend the first sentence re-describing triangle abc, the midpoint layout, or the visible givens already covered by the injected prefix block.\n"
         "20. Give each bridge_steps relation its own sentence. In that sentence, explicitly name at least one concrete depends_on relation before or while stating the new bridge relation.\n"
         "20a. When a bridge step lists internal required_supports, mention those support relations explicitly in the same sentence unless doing so would repeat the exact prefix wording; in that case paraphrase them.\n"
+        "20b. When a bridge contract includes a preferred_sentence_shell, stay very close to that local order and only smooth the wording lightly.\n"
         "21. Avoid shortcuts such as 'by symmetry', 'from the setup', or 'it follows' unless the same sentence explicitly names the concrete supporting relations.\n"
         "22. Do not hedge with phrases like 'similarity or angle equality'; state the specific approved relation you are using.\n"
         "23. Each bridge_steps object includes an internal next_target_relation chosen by the script. Use it to keep the reasoning pointed toward the next approved relation instead of inventing a different route.\n"
