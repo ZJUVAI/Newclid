@@ -1309,7 +1309,7 @@ def audit_generation_quality(record, generation, aux_part):
             for idx, step in enumerate(plan["bridge_steps"]):
                 match_idx = None
                 for sentence_idx in range(search_start, len(sentences)):
-                    if relation_mentioned_in_text(sentences[sentence_idx], step.get("relation", "")):
+                    if bridge_step_relation_realized(sentences[sentence_idx], step):
                         match_idx = sentence_idx
                         break
                 if match_idx is None:
@@ -1859,12 +1859,71 @@ def canonicalize_coordinate_relations(items, visible_points, coordinate_candidat
     return cleaned[:max_len]
 
 
-def build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal, max_aux=6, max_bridge=4, max_finish=4):
+def canonicalize_aux_direct_relations(items, aux_part, visible_points, preferred_immediate, min_len=1, max_len=3):
+    raw_items = coerce_relation_list_field(items, max_len=max_len)
+    cleaned = []
+    used_lower = set()
+    fallback_queue = [
+        normalize_relation_surface(relation).strip()
+        for relation in (preferred_immediate or [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+
+    def next_fallback():
+        while fallback_queue:
+            candidate = fallback_queue.pop(0)
+            lowered = candidate.lower()
+            ok, _ = validate_aux_step_scope(candidate, aux_part, visible_points)
+            if lowered not in used_lower and ok:
+                return candidate
+        return None
+
+    for item in raw_items[:max_len]:
+        ok, _, cleaned_item = validate_descriptive_text(
+            item,
+            "aux_direct_relations_item",
+            min_chars=5,
+            point_names=visible_points + [point.lower() for point in extract_aux_new_points(aux_part or "")],
+        )
+        if ok and cleaned_item:
+            cleaned_item = normalize_relation_surface(cleaned_item)
+            lowered = cleaned_item.lower()
+            scope_ok, _ = validate_aux_step_scope(cleaned_item, aux_part, visible_points)
+            if relation_keyword_present(cleaned_item) and scope_ok and lowered not in used_lower:
+                cleaned.append(cleaned_item)
+                used_lower.add(lowered)
+                continue
+        fallback = next_fallback()
+        if fallback:
+            cleaned.append(fallback)
+            used_lower.add(fallback.lower())
+
+    while len(cleaned) < min_len:
+        fallback = next_fallback()
+        if not fallback:
+            break
+        cleaned.append(fallback)
+        used_lower.add(fallback.lower())
+
+    return cleaned[:max_len]
+
+
+def build_hidden_proof_guidance(
+    sanitized_rest,
+    aux_part,
+    visible_goal,
+    max_aux=6,
+    max_aux_bridge=4,
+    max_bridge=4,
+    max_finish=4,
+):
     proof_match = re.search(r"<proof>(.*?)</proof>", sanitized_rest or "", re.DOTALL | re.IGNORECASE)
     aux_direct = build_aux_direct_consequences(aux_part)
+    aux_scope = {point.lower() for point in extract_aux_point_scope(aux_part)}
     if not proof_match:
         return {
             "immediate_aux_consequences": aux_direct[:max_aux],
+            "aux_bridge_relations": [],
             "bridge_relations": [],
             "goal_finish_relations": [],
         }
@@ -1891,6 +1950,7 @@ def build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal, max_aux=
         )
 
     immediate = []
+    aux_bridge = []
     bridge = []
     finish = []
     seen = set()
@@ -1904,10 +1964,27 @@ def build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal, max_aux=
 
     for item in summaries:
         text = item["summary"]
-        if item["has_new_point"] and not item["has_goal_point"] and text not in seen:
+        if (
+            item["has_new_point"]
+            and not item["has_goal_point"]
+            and text not in seen
+            and item["points"].issubset(aux_scope)
+        ):
             seen.add(text)
             immediate.append(text)
             if len(immediate) >= max_aux:
+                break
+
+    for item in summaries:
+        text = item["summary"]
+        if (
+            item["has_new_point"]
+            and text not in seen
+            and not item["points"].issubset(aux_scope)
+        ):
+            seen.add(text)
+            aux_bridge.append(text)
+            if len(aux_bridge) >= max_aux_bridge:
                 break
 
     for item in summaries:
@@ -1947,6 +2024,7 @@ def build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal, max_aux=
 
     return {
         "immediate_aux_consequences": immediate,
+        "aux_bridge_relations": aux_bridge,
         "bridge_relations": bridge,
         "goal_finish_relations": finish,
     }
@@ -2107,7 +2185,21 @@ def validate_plan_response(
     if find_forbidden_shape_shorthand(cleaned_plan["goal_bottleneck"]) or find_forbidden_center_shorthand(cleaned_plan["goal_bottleneck"]):
         cleaned_plan["goal_bottleneck"] = build_canonical_goal_bottleneck(visible_goal)
 
-    aux_direct_relations = coerce_relation_list_field(plan.get("aux_direct_relations"), max_len=3)
+    preferred_immediate_aux = []
+    if sanitized_rest and aux_part:
+        preferred_immediate_aux = build_hidden_proof_guidance(
+            sanitized_rest,
+            aux_part,
+            visible_goal,
+        ).get("immediate_aux_consequences", [])
+    aux_direct_relations = canonicalize_aux_direct_relations(
+        plan.get("aux_direct_relations"),
+        aux_part,
+        visible_points,
+        preferred_immediate_aux,
+        min_len=1,
+        max_len=3,
+    )
     if not (1 <= len(aux_direct_relations) <= 3):
         return False, "aux_direct_relations must be a list with 1 to 3 ordered direct consequences", None
     cleaned_direct = []
@@ -2283,7 +2375,11 @@ def validate_plan_response(
             ), None
     if sanitized_rest and aux_part:
         proof_guidance = build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal)
-        hidden_route_relations = proof_guidance.get("bridge_relations", []) + proof_guidance.get("goal_finish_relations", [])
+        hidden_route_relations = (
+            proof_guidance.get("aux_bridge_relations", [])
+            + proof_guidance.get("bridge_relations", [])
+            + proof_guidance.get("goal_finish_relations", [])
+        )
         if hidden_route_relations:
             route_alignment = align_bridge_steps_to_hidden_route(
                 cleaned_plan["bridge_steps"],
@@ -2517,7 +2613,7 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
         for idx, step in enumerate(plan["bridge_steps"]):
             match_idx = None
             for sentence_idx in range(search_start, len(sentences)):
-                if relation_mentioned_in_text(sentences[sentence_idx], step.get("relation", "")):
+                if bridge_step_relation_realized(sentences[sentence_idx], step):
                     match_idx = sentence_idx
                     break
             if match_idx is None:
@@ -3079,6 +3175,23 @@ def count_relation_mentions(text, relations, point_names=None):
     return mentions
 
 
+def bridge_step_relation_realized(sentence, step):
+    if not isinstance(step, dict):
+        return False
+    relation_candidates = []
+    for key in ["relation", "approved_route_relation"]:
+        relation = step.get(key, "")
+        if isinstance(relation, str) and relation.strip() and relation not in relation_candidates:
+            relation_candidates.append(relation)
+    for relation in relation_candidates:
+        if relation_mentioned_in_text(sentence, relation):
+            return True
+        local_points = extract_relation_point_names(relation)
+        if local_points and relations_semantically_match(sentence, relation, local_points):
+            return True
+    return False
+
+
 def build_public_problem_text(record):
     nl_problem = (record.get("nl_problem") or "").strip()
     formal_problem = (record.get("llm_input_renamed") or "").strip()
@@ -3326,6 +3439,16 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- aux_direct_relations must stay local to the new point and the immediately constructed line/circle/perpendicular/equal relation; do not pull old-figure points like a, b, or c into later consequences unless they are part of the construction itself."
         )
+        targeted_hints.append(
+            "- if a relation still uses the auxiliary point but reaches out to older figure points beyond the construction scope, move it into bridge_steps and use the Preferred Aux-Bridge Checkpoints bucket instead of aux_direct_relations."
+        )
+    if "bridge_steps[0].relation must still reference the auxiliary point" in validation_message:
+        targeted_hints.append(
+            "- the first bridge_steps relation must still contain the new auxiliary point together with at least one old visible point; do not start the bridge route with a pure old-figure angle or ratio relation."
+        )
+        targeted_hints.append(
+            "- when a Preferred Aux-Bridge Checkpoints bucket is shown, copy the first bridge relation from that bucket or stay very close to it before moving on to older goal-side checkpoints."
+        )
     if "why_it_helps" in validation_message:
         targeted_hints.append(
             "- each why_it_helps string should say what the current step unlocks next in plain geometry language, but the exact next target relation will be derived by the script for the writer."
@@ -3542,7 +3665,9 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
     )
     immediate_aux_pool = proof_guidance_payload.get("immediate_aux_consequences", [])
     immediate_aux_block = json.dumps(immediate_aux_pool, ensure_ascii=False, indent=2) if immediate_aux_pool else "[]"
-    route_relation_pool = proof_guidance_payload.get("bridge_relations", []) + proof_guidance_payload.get("goal_finish_relations", [])
+    aux_bridge_pool = proof_guidance_payload.get("aux_bridge_relations", [])
+    aux_bridge_block = json.dumps(aux_bridge_pool, ensure_ascii=False, indent=2) if aux_bridge_pool else "[]"
+    route_relation_pool = aux_bridge_pool + proof_guidance_payload.get("bridge_relations", []) + proof_guidance_payload.get("goal_finish_relations", [])
     route_relation_block = json.dumps(route_relation_pool, ensure_ascii=False, indent=2) if route_relation_pool else "[]"
     ordered_route_checkpoint_block = (
         "\n".join(f"{idx + 1}. {relation}" for idx, relation in enumerate(route_relation_pool))
@@ -3592,6 +3717,9 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "Choose aux_direct_relations from or very close to this bucket whenever possible. "
         "These are the local consequences that should appear immediately after the construction, before any broader bridge step.\n"
         f"{immediate_aux_block}\n\n"
+        "[Preferred Aux-Bridge Checkpoints]\n"
+        "If the first useful bridge relation still needs the auxiliary point, choose it from or very close to this bucket before moving on to older goal-side checkpoints.\n"
+        f"{aux_bridge_block}\n\n"
         "[Approved Route Relation Pool]\n"
         "Choose bridge_steps.relation items from or very close to this relation pool, in a realistic order. "
         "Do not replace this route with a different high-level structure unless that same structure already appears below.\n"
@@ -3632,6 +3760,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "Good aux_direct_relations: ['kb equals kc', 'line ck is perpendicular to line dk']\n"
         "Good aux_direct_relations: ['h is the midpoint of bc', 'b, c, h are collinear']\n"
         "Good aux_direct_relations: if Hidden Proof Guidance.immediate_aux_consequences starts with ['a, d, i are collinear', 'ab equals bi', 'bd equals di'], copy 1 to 3 of those local items almost verbatim before introducing any broader equality like 'ai equals eg'.\n"
+        "Bad aux_direct_relations: if a candidate relation needs old points outside the construction scope, such as a later bridge equality or a goal-side angle relation, do not place it in aux_direct_relations; use a later bridge step instead.\n"
         "Bad aux_direct_relations: ['h lies on line bc'] when the same fact should be written as 'b, c, h are collinear'.\n"
         "Bad aux_direct_relations: ['kb equals kc', 'angle akd equals ...'] when a is not part of the immediate construction.\n\n"
         "[bridge_steps Surface Guidance]\n"
@@ -3671,6 +3800,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- When multiple new points are introduced, construction must explicitly describe a staged or combined strategy with markers such as 'first', 'then', 'next', or 'finally', rather than naming all points in one flat sentence.\n"
         "- Each item in aux_direct_relations must stay local to the auxiliary construction itself. Do not pull unrelated old-figure points into those direct relations.\n"
         "- aux_direct_relations should usually be copied from the Preferred Immediate Aux Consequences bucket above with only light natural-language cleanup. Do not replace those local items with later bridge equalities or broad summaries.\n"
+        "- If a useful relation contains the auxiliary point but also reaches outside the construction scope, place it in bridge_steps, not aux_direct_relations. Use the Preferred Aux-Bridge Checkpoints bucket for that handoff.\n"
         "- Each bridge_steps relation should explicitly mention how the auxiliary point interacts with existing visible points or substructures, in a realistic order.\n"
         "- The first bridge_steps relation must explicitly contain the new auxiliary point together with at least one old visible point, and it should be written in a compact relation form such as 'ag equals dg' or 'angle bg/bj equals angle gi/ij'.\n"
         "- A bridge_steps relation must be a new checkpoint beyond visible_relations, aux_direct_relations, and earlier bridge_steps. If the construction already gives a relation directly, treat that relation as support and move to the next bridge checkpoint instead of repeating it.\n"
