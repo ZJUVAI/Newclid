@@ -767,6 +767,59 @@ def relation_duplicates_earlier_support(relation_text, available_supports, point
     return False
 
 
+def backoff_last_bridge_before_goal_finish(cleaned_plan, hidden_route_relations, point_names):
+    bridge_steps = cleaned_plan.get("bridge_steps") or []
+    goal_finish = cleaned_plan.get("goal_finish", "")
+    if not bridge_steps or not goal_finish or not hidden_route_relations:
+        return False
+
+    last_step = bridge_steps[-1]
+    last_relation = last_step.get("approved_route_relation") or last_step.get("relation", "")
+    if not relations_semantically_match(last_relation, goal_finish, point_names):
+        return False
+
+    previous_floor = -1
+    if len(bridge_steps) >= 2:
+        previous_floor = (bridge_steps[-2].get("approved_route_position") or 0) - 1
+
+    candidate_index = (last_step.get("approved_route_position") or 0) - 2
+    if candidate_index < 0:
+        matched_index = None
+        for idx, relation in enumerate(hidden_route_relations):
+            if relations_semantically_match(last_relation, relation, point_names):
+                matched_index = idx
+                break
+        candidate_index = matched_index - 1 if matched_index is not None else -1
+
+    available_supports = cleaned_plan.get("visible_relations", []) + cleaned_plan.get("aux_direct_relations", [])
+    if len(bridge_steps) >= 2:
+        available_supports.extend(
+            step.get("relation", "")
+            for step in bridge_steps[:-1]
+            if isinstance(step, dict) and step.get("relation")
+        )
+
+    while candidate_index > previous_floor:
+        candidate_relation = normalize_relation_surface(hidden_route_relations[candidate_index])
+        if (
+            candidate_relation
+            and not relations_semantically_match(candidate_relation, goal_finish, point_names)
+            and not relation_duplicates_earlier_support(candidate_relation, available_supports, point_names)
+        ):
+            last_step["relation"] = candidate_relation
+            last_step["approved_route_relation"] = candidate_relation
+            last_step["approved_route_position"] = candidate_index + 1
+            last_step["why_it_helps"] = build_canonical_bridge_unlock(goal_finish, final_step=True)
+            cleaned_plan["bridge_relations"] = [
+                step.get("relation", "")
+                for step in bridge_steps
+                if isinstance(step, dict)
+            ]
+            return True
+        candidate_index -= 1
+    return False
+
+
 def build_visible_premise_summaries(record, max_items=12):
     summaries = []
     seen = set()
@@ -2431,15 +2484,6 @@ def validate_plan_response(
         min_len=2,
         max_len=4,
     )
-    if cleaned_plan["bridge_steps"]:
-        last_bridge_relation = (
-            cleaned_plan["bridge_steps"][-1].get("approved_route_relation")
-            or cleaned_plan["bridge_steps"][-1].get("relation", "")
-        )
-        if relations_semantically_match(last_bridge_relation, cleaned_goal_finish, known_points):
-            return False, (
-                "last bridge_steps relation must stay before goal_finish instead of duplicating the final goal-side relation"
-            ), None
 
     relation_mentions = extract_point_mentions(" ".join(cleaned_plan["coordinate_relations"]), visible_points)
     if len(relation_mentions) < 3:
@@ -2517,6 +2561,25 @@ def validate_plan_response(
                     aligned_step["approved_route_position"] = match["index"] + 1
                 aligned_bridge_steps.append(aligned_step)
             cleaned_plan["bridge_steps"] = aligned_bridge_steps
+            cleaned_plan["bridge_relations"] = [
+                step.get("relation", "")
+                for step in cleaned_plan["bridge_steps"]
+            ]
+            backoff_last_bridge_before_goal_finish(
+                cleaned_plan,
+                hidden_route_relations,
+                known_points,
+            )
+
+    if cleaned_plan["bridge_steps"]:
+        last_bridge_relation = (
+            cleaned_plan["bridge_steps"][-1].get("approved_route_relation")
+            or cleaned_plan["bridge_steps"][-1].get("relation", "")
+        )
+        if relations_semantically_match(last_bridge_relation, cleaned_goal_finish, known_points):
+            return False, (
+                "last bridge_steps relation must stay before goal_finish instead of duplicating the final goal-side relation"
+            ), None
 
     cleaned_plan = enrich_bridge_steps_with_targets(cleaned_plan)
 
@@ -3714,6 +3777,9 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- if the approved route pool already contains the final goal relation, keep that relation only in goal_finish and move the last bridge step back to the preceding approved checkpoint."
         )
+        targeted_hints.append(
+            "- do not use the last bridge step for a substitution-version of the goal such as 'ratio dg to cg equals ratio de to df' when goal_finish is 'ratio ac to bc equals ratio de to df'; stop one checkpoint earlier and let goal_finish make the final substitution."
+        )
     if "unsupported high-level" in validation_message:
         targeted_hints.append(
             "- do not introduce new routes such as triangle similarity, cyclic quadrilaterals, or parallelograms inside why_it_helps unless that same structure is already stated in the approved relation chain."
@@ -4050,6 +4116,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- If the approved route checkpoints are angle, ratio, collinearity, equality, or parallel relations, do not wrap them into a new triangle-congruent or triangle-similar route unless that same triangle route already appears explicitly in the checkpoint list.\n"
         "- Do not invent a point-identification bridge such as 'h equals f' unless that same identification, or an equivalent old-figure equality using h and f, already appears in the approved route checkpoints.\n"
         "- When the approved route relation pool lists a concrete relation such as 'line bg is parallel to line cd' or 'bk = dk', prefer using that relation directly instead of inventing an alternative route like a new similar-triangle claim.\n"
+        "- The last bridge_steps relation must stay before the final goal statement. Do not make the last bridge step a substitution-flavored restatement of goal_finish such as 'ratio dg to cg equals ratio de to df' when goal_finish is 'ratio ac to bc equals ratio de to df'.\n"
         "- Each bridge_steps depends_on list should reuse concrete items from visible_relations, aux_direct_relations, or an earlier bridge_steps relation, instead of inventing unsupported leaps.\n"
         "- Each depends_on item should be a full earlier relation string with at least two named points, such as 'ab equals bi' or 'a, d, i are collinear'. Do not write shorthand like 'the equality setup' or 'the perpendicular condition'.\n"
         "- Each depends_on item must be copied as a natural-language relation string, not written as a raw formal predicate such as 'cong b j d j'.\n"
