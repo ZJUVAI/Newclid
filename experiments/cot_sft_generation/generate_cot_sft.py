@@ -1104,6 +1104,21 @@ def validate_aux_step_scope(step_text, aux_part, visible_points):
     return True, None
 
 
+def find_forbidden_shape_shorthand(text):
+    if not isinstance(text, str):
+        return None
+    patterns = [
+        r"\bsquare-like\b",
+        r"\bsquare structures?\b",
+        r"\bsquare configurations?\b",
+    ]
+    for pattern in patterns:
+        hit = re.search(pattern, text, re.IGNORECASE)
+        if hit:
+            return hit.group(0)
+    return None
+
+
 def audit_source_record(record, image_path: Path, aux_part, sanitized_rest):
     issues = []
     point_coords = get_point_coords(record)
@@ -1154,6 +1169,10 @@ def audit_generation_quality(record, generation, aux_part):
         "common center",
         "circumcenter",
         "square-like",
+        "square structure",
+        "square structures",
+        "square configuration",
+        "square configurations",
         "parallelogram",
         "crucial center",
         "midpoint property",
@@ -1838,6 +1857,12 @@ def validate_plan_response(
         )
         if not ok:
             return False, message, None
+        forbidden_shape = find_forbidden_shape_shorthand(cleaned_value)
+        if forbidden_shape:
+            return False, (
+                f"{key} must avoid vague shape shorthand like '{forbidden_shape}' and should spell out "
+                "the concrete perpendicular, equal-length, midpoint, or parallel relations instead"
+            ), None
         cleaned_plan[key] = cleaned_value
     if aux_points:
         for field_name in [
@@ -2263,6 +2288,12 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
             return False, f"Writer body contains forbidden pattern: {hit.group(0)}"
     if re.search(r"\bsimilarity or angle equality\b", body, re.IGNORECASE):
         return False, "Writer body must state a specific bridge relation instead of hedging with 'similarity or angle equality'"
+    forbidden_shape = find_forbidden_shape_shorthand(body)
+    if forbidden_shape:
+        return False, (
+            f"Writer body must avoid vague shape shorthand like '{forbidden_shape}' and should state the "
+            "concrete perpendicular, equal-length, midpoint, or parallel relations instead"
+        )
     if plan and isinstance(plan.get("bridge_steps"), list):
         sentences = split_into_sentences(body)
         search_start = 0
@@ -3019,6 +3050,10 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- if a hidden route relation is already unlocked directly by the auxiliary construction, move to the next realistic checkpoint instead of repeating the same relation."
         )
+    if "must avoid vague shape shorthand" in validation_message:
+        targeted_hints.append(
+            "- do not write phrases like 'square-like', 'square structure', or 'square configuration'; replace them with the concrete perpendicular, equal-length, midpoint, or parallel facts that are actually visible."
+        )
     if "visible_relations" in validation_message:
         targeted_hints.append(
             "- visible_relations should contain only old-figure relations that are already visible before the auxiliary point is introduced; do not place new-point relations there."
@@ -3183,6 +3218,10 @@ def build_writer_retry_feedback(validation_message, plan):
         targeted_hints.append(
             "- when a bridge relation is an angle or ratio, restate it in nearly the same point ordering and surface form as the approved relation, such as 'angle bg/bj equals angle gi/ij' or 'ac over ce equals hf over ch'."
         )
+    if "must avoid vague shape shorthand" in validation_message:
+        targeted_hints.append(
+            "- do not write phrases like 'square-like', 'square structure', or 'square configuration'; name the concrete perpendicular, equal-length, midpoint, or parallel relations instead."
+        )
     targeted_hint_block = "\n".join(targeted_hints)
     if targeted_hint_block:
         targeted_hint_block += "\n"
@@ -3345,6 +3384,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- The coordinate_relations field should stay close to the structured coordinate candidates when possible. Avoid unsupported jumps like 'there is a rotation symmetry' unless you first name the concrete equal, parallel, perpendicular, midpoint, or collinear cues behind it.\n"
         "- In coordinate_relations and coordinate_hints, do not describe points as symmetric or invoke rotation directly; spell out the concrete equal, parallel, perpendicular, midpoint, or collinear cues instead.\n"
         "- In coordinate_hints, do not use words like symmetry, symmetric, mirror, or rotation; summarize the actual midpoint, collinear, equal-length, parallel, or perpendicular cue instead.\n"
+        "- Do not use vague shape shorthand such as 'square-like', 'square structure', or 'square configuration'; if a square-style cue matters, spell out the concrete perpendicular, equal-length, and parallel facts instead.\n"
         "- The visible_relations field should preferentially reuse the visible premise summaries above, plus a small number of visually obvious derived facts. It should not introduce invented centers, rotations, or unnamed transformations.\n"
         "- The coordinate_relations and visible_relations fields must stay separate: coordinate_relations are coordinate-backed visual checks, while visible_relations are existing-figure givens or obvious old-figure consequences.\n"
         "- The coordinate_hints field must be written as ordinary visual geometry language. Do not say 'the coordinates show', 'the coordinates indicate', or anything similar.\n"
@@ -3480,6 +3520,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "14. Do not mention coordinates explicitly; describe those cues as visual placement, alignment, symmetry, equal-looking lengths, or perpendicular/parallel structure.\n"
         "15. Keep the post-aux reasoning faithful to the approved visible_relations, aux_direct_relations, bridge_steps, and goal_finish; do not replace them with a different invented route.\n"
         "16. Do not introduce extra named centers, rotational symmetries, square/parallelogram claims, or triangle-similarity claims unless the approved plan already states them and the immediate aux step really supports them.\n"
+        "16a. Do not use vague shape shorthand such as 'square-like', 'square structure', or 'square configuration'; replace it with the concrete perpendicular, equal-length, midpoint, or parallel relations that justify the step.\n"
         "17. Reuse the approved visible_relations when connecting the new point back to the old figure, rather than inventing fresh structural claims.\n"
         "18. Stay impersonal. Do not write in the first person.\n"
         "19. The very first sentence of your body should state the bottleneck or goal-side obstacle. Do not spend the first sentence re-describing triangle abc, the midpoint layout, or the visible givens already covered by the injected prefix block.\n"
