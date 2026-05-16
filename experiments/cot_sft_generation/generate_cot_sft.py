@@ -2784,6 +2784,11 @@ def enrich_bridge_steps_with_targets(plan):
             enriched["next_target_relation"] = plan["bridge_steps"][idx + 1].get("relation", "")
         else:
             enriched["next_target_relation"] = plan.get("goal_finish", "")
+        enriched["next_target_purpose"] = build_step_unlock_purpose(
+            enriched.get("approved_route_relation") or enriched.get("relation", ""),
+            enriched.get("next_target_relation", ""),
+            final_step=(idx == total_steps - 1),
+        )
         dependencies = [
             dep for dep in enriched.get("depends_on", [])
             if isinstance(dep, str) and dep.strip()
@@ -2815,6 +2820,52 @@ def build_canonical_bridge_unlock(next_target_relation, final_step=False):
     if final_step:
         return f"this prepares the final goal-side relation {target_text}."
     return f"this is required to prove {target_text} next."
+
+
+def build_step_unlock_purpose(relation_text, next_target_relation, final_step=False):
+    current_keywords = relation_text_keywords(relation_text or "")
+    next_keywords = relation_text_keywords(next_target_relation or "")
+    if final_step:
+        if "perpendicular" in next_keywords:
+            return "this fixes the final angle configuration needed for the perpendicular conclusion."
+        if "parallel" in next_keywords:
+            return "this fixes the final direction comparison needed for the parallel conclusion."
+        if "similar" in next_keywords:
+            return "this supplies the last correspondence needed for the final similarity conclusion."
+        if "ratio" in next_keywords:
+            return "this supplies the last proportional comparison needed for the final ratio conclusion."
+        if "angle" in next_keywords:
+            return "this supplies the last angle comparison needed for the final angle conclusion."
+        if "equal" in next_keywords:
+            return "this supplies the last equality needed for the final conclusion."
+        return "this prepares the final goal-side conclusion."
+    if "similar" in next_keywords:
+        if {"angle", "collinear", "parallel", "perpendicular", "circle"} & current_keywords:
+            return "this fixes the angle alignment needed for the upcoming similarity step."
+        if {"ratio", "equal"} & current_keywords:
+            return "this fixes the side correspondence needed for the upcoming similarity step."
+        return "this supplies one of the correspondences needed for the upcoming similarity step."
+    if "ratio" in next_keywords:
+        if "similar" in current_keywords:
+            return "this lets the needed proportional comparison be read off next."
+        if {"equal", "collinear"} & current_keywords:
+            return "this transfers the needed length comparison into the next ratio step."
+        return "this supplies the proportional comparison needed next."
+    if "angle" in next_keywords:
+        if "similar" in current_keywords:
+            return "this lets the needed angle correspondence be read off next."
+        if {"collinear", "parallel", "perpendicular", "circle"} & current_keywords:
+            return "this fixes the angle alignment needed in the next step."
+        return "this supplies the angle comparison needed next."
+    if "equal" in next_keywords:
+        return "this supplies the equality needed next."
+    if "collinear" in next_keywords:
+        return "this places the needed points on one line for the next step."
+    if "parallel" in next_keywords:
+        return "this fixes the direction comparison needed next."
+    if "perpendicular" in next_keywords:
+        return "this fixes the right-angle configuration needed next."
+    return build_canonical_bridge_unlock(next_target_relation, final_step=False)
 
 
 def extract_problem_goal(record):
@@ -3027,7 +3078,7 @@ def build_writer_sentence_duties(plan):
             " explicitly mention at least one approved support relation;"
         )
         lines.append(
-            f"{len(lines) + 1}. Bridge sentence {idx}: state the approved relation '{approved_relation}',{support_clause} prefer an aux-direct or previous-bridge support when possible, avoid summary labels like symmetry or midpoint property in place of those supports, paraphrase any visible given that already appears in the prefix, and point toward '{step.get('next_target_relation', '')}'."
+            f"{len(lines) + 1}. Bridge sentence {idx}: state the approved relation '{approved_relation}',{support_clause} prefer an aux-direct or previous-bridge support when possible, avoid summary labels like symmetry or midpoint property in place of those supports, paraphrase any visible given that already appears in the prefix, and explain its bridge function as '{step.get('next_target_purpose', '')}' rather than mechanically repeating the next target relation."
         )
     lines.append(
         f"{len(lines) + 1}. Final sentence: after the last bridge sentence, explicitly land on the approved goal-side finish exactly: {plan.get('goal_finish', '')}"
@@ -3041,6 +3092,7 @@ def build_bridge_sentence_shell(step):
     supports = step.get("required_supports") or step.get("depends_on", [])
     relation = step.get("approved_route_relation") or step.get("relation", "")
     next_target = step.get("next_target_relation", "")
+    unlock_purpose = step.get("next_target_purpose", "")
     if supports:
         support_text = supports[0]
         if len(supports) > 1:
@@ -3048,7 +3100,9 @@ def build_bridge_sentence_shell(step):
         shell = f"Because {support_text}, {relation}"
     else:
         shell = f"State {relation}"
-    if next_target:
+    if unlock_purpose:
+        shell += f", and {unlock_purpose.rstrip('.')}"
+    elif next_target:
         shell += f", which prepares {next_target}"
     return shell + "."
 
@@ -3068,6 +3122,7 @@ def build_writer_bridge_contracts(plan):
                 "required_supports": step.get("required_supports", []),
                 "min_support_mentions": step.get("min_support_mentions", 1 if step.get("required_supports") else 0),
                 "next_target_relation": step.get("next_target_relation", ""),
+                "next_target_purpose": step.get("next_target_purpose", ""),
                 "preferred_sentence_shell": build_bridge_sentence_shell(step),
             }
         )
@@ -3118,17 +3173,18 @@ def build_writer_sentence_blueprints(plan):
                 "recommended_order": [
                     "support",
                     "approved_relation",
-                    "next_target",
+                    "unlock_purpose",
                 ],
                 "support_relation": support_sequence[0] if support_sequence else "",
                 "fallback_support_relations": support_sequence[1:] if len(support_sequence) > 1 else [],
                 "approved_relation": step.get("approved_route_relation") or step.get("relation", ""),
                 "next_target_relation": step.get("next_target_relation", ""),
+                "next_target_purpose": step.get("next_target_purpose", ""),
                 "preferred_sentence_shell": build_bridge_sentence_shell(step),
                 "forbid_new_claims": True,
                 "instruction": (
-                    "Prefer a sentence of the form 'Because <support>, <approved relation>, which prepares <next target>'. "
-                    "Do not add a fresh geometric claim outside the approved support/relation/next-target bundle."
+                    "Prefer a sentence of the form 'Because <support>, <approved relation>, and <unlock purpose>'. "
+                    "Mention the exact next target relation only when it clarifies the bridge, and do not add a fresh geometric claim outside the approved support/relation/unlock bundle."
                 ),
             }
         )
@@ -4081,7 +4137,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "Use this outline internally to keep the body stepwise, concrete, and impersonal. Do not quote these lines verbatim, and do not repeat the injected prefix.\n"
         f"{sentence_duties}\n\n"
         "[Sentence Blueprints]\n"
-        "Use these sentence-level blueprints as the preferred local writing pattern. They are stricter than the prose duties: support relation first when available, then the approved relation, then a short next-target clause, with no fresh geometric claim added in the middle.\n"
+        "Use these sentence-level blueprints as the preferred local writing pattern. They are stricter than the prose duties: support relation first when available, then the approved relation, then a short unlock clause explaining what that step now makes possible, with no fresh geometric claim added in the middle.\n"
         f"{sentence_blueprints}\n\n"
         "[Bridge Sentence Contracts]\n"
         "Use these contracts as a hard checklist for the post-aux body sentences. Each listed relation should appear explicitly, the listed supports should be named inside the same sentence when required, and the goal_finish contract must be realized after the final bridge sentence.\n"
@@ -4125,14 +4181,15 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "20b. When a bridge contract includes a preferred_sentence_shell, stay very close to that local order and only smooth the wording lightly.\n"
         "21. Avoid shortcuts such as 'by symmetry', 'from the setup', or 'it follows' unless the same sentence explicitly names the concrete supporting relations.\n"
         "22. Do not hedge with phrases like 'similarity or angle equality'; state the specific approved relation you are using.\n"
-        "23. Each bridge_steps object includes an internal next_target_relation chosen by the script. Use it to keep the reasoning pointed toward the next approved relation instead of inventing a different route.\n"
+        "23. Each bridge_steps object includes an internal next_target_relation and next_target_purpose chosen by the script. Use them to keep the reasoning pointed toward the next approved relation instead of inventing a different route.\n"
         "24. Use impersonal sentence forms such as 'the obstacle is ...', 'a helper is needed ...', 'construct point h ...', and 'this gives ...'; avoid first-person forms like 'we need' or 'we construct'.\n"
         "25. If you need to reuse a visible given that already appears in the injected prefix, paraphrase it instead of copying the exact wording from the prefix sentence.\n"
         "26. In bridge sentences, do not replace the approved supports with summary labels such as 'symmetry', 'center of symmetry', or 'midpoint property'; name the actual equalities, collinearities, parallels, or perpendicularities instead.\n"
         "27. When an approved bridge relation is an angle or ratio relation, write it in nearly the same point ordering and surface form as the approved relation, rather than paraphrasing it into a looser sentence like 'the angle formed by ...'.\n"
-        "28. Keep the bridge sentences tight: usually one approved relation, one or two concrete supports, and one short forward-looking clause. Do not spend multiple clauses re-explaining the same visible setup.\n"
+        "28. Keep the bridge sentences tight: usually one approved relation, one or two concrete supports, and one short forward-looking unlock clause. Do not spend multiple clauses re-explaining the same visible setup.\n"
         "29. Never wrap a point pair, line name, segment name, ratio, or angle label in dollar signs or LaTeX-style math. Write 'line be', 'segment bh', or 'ratio de to di' as plain text, not '$be$', '$bh$', or '$de:di$'.\n"
-        "30. Within each bridge sentence, prefer this local order unless the English becomes ungrammatical: approved support relation -> approved bridge relation -> short next-target clause. Avoid inserting a fresh geometric claim between those parts.\n"
+        "30. Within each bridge sentence, prefer this local order unless the English becomes ungrammatical: approved support relation -> approved bridge relation -> short unlock clause. Avoid inserting a fresh geometric claim between those parts.\n"
+        "31. Do not mechanically repeat the phrase 'which prepares ...' in every bridge sentence. Vary the final clause by saying what correspondence, alignment, ratio, or angle comparison the current step now makes available.\n"
         "Output only the plain-text body.\n"
     )
 
