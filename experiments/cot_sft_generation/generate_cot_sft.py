@@ -1410,6 +1410,12 @@ def audit_generation_quality(record, generation, aux_part):
                 if any(marker in sentence for marker in generic_bridge_markers):
                     issues.append(f"generic_bridge_phrase:{idx}")
                 search_start = match_idx + 1
+        if isinstance(plan.get("bridge_steps"), list) and plan.get("goal_finish"):
+            last_step = plan["bridge_steps"][-1] if plan["bridge_steps"] else None
+            if isinstance(last_step, dict):
+                last_relation = last_step.get("approved_route_relation") or last_step.get("relation", "")
+                if relations_semantically_match(last_relation, plan.get("goal_finish", ""), visible_points):
+                    issues.append("bridge_goal_finish_duplicate")
 
     text_to_scan = " ".join(
         part for part in [generation.get("write_output"), generation.get("thinking")] if part
@@ -2425,6 +2431,15 @@ def validate_plan_response(
         min_len=2,
         max_len=4,
     )
+    if cleaned_plan["bridge_steps"]:
+        last_bridge_relation = (
+            cleaned_plan["bridge_steps"][-1].get("approved_route_relation")
+            or cleaned_plan["bridge_steps"][-1].get("relation", "")
+        )
+        if relations_semantically_match(last_bridge_relation, cleaned_goal_finish, known_points):
+            return False, (
+                "last bridge_steps relation must stay before goal_finish instead of duplicating the final goal-side relation"
+            ), None
 
     relation_mentions = extract_point_mentions(" ".join(cleaned_plan["coordinate_relations"]), visible_points)
     if len(relation_mentions) < 3:
@@ -3279,6 +3294,55 @@ def count_relation_mentions(text, relations, point_names=None):
     return mentions
 
 
+def relation_only_appears_in_preparation_clause(sentence, relation, point_names=None):
+    lowered_sentence = (sentence or "").lower()
+    local_points = point_names or extract_relation_point_names(relation)
+    preparation_markers = [
+        "which prepares",
+        "this prepares",
+        "which is required to prove",
+        "required to prove",
+        "to prove",
+    ]
+    for marker in preparation_markers:
+        marker_idx = lowered_sentence.find(marker)
+        if marker_idx < 0:
+            continue
+        prefix = sentence[:marker_idx]
+        suffix = sentence[marker_idx:]
+        if not relation_mentioned_in_text(suffix, relation):
+            if not (local_points and relations_semantically_match(suffix, relation, local_points)):
+                continue
+        if (
+            relation_mentioned_in_text(prefix, relation)
+            and relation_has_sufficient_point_coverage(prefix, relation, point_names=local_points)
+        ):
+            return False
+        if (
+            local_points
+            and relations_semantically_match(prefix, relation, local_points)
+            and relation_has_sufficient_point_coverage(prefix, relation, point_names=local_points)
+        ):
+            return False
+        return True
+    return False
+
+
+def relation_has_sufficient_point_coverage(sentence, relation, point_names=None):
+    local_points = point_names or extract_relation_point_names(relation)
+    if not local_points:
+        return False
+    mentioned_points = extract_point_mentions(sentence, local_points)
+    keywords = relation_text_keywords(relation)
+    if {"collinear", "midpoint", "circle"} & keywords:
+        return len(mentioned_points) >= 3
+    if {"parallel", "perpendicular", "angle", "ratio", "similar"} & keywords:
+        return len(mentioned_points) >= 4
+    if "equal" in keywords:
+        return len(mentioned_points) >= 3
+    return len(mentioned_points) >= min(3, len(local_points))
+
+
 def bridge_step_relation_realized(sentence, step):
     if not isinstance(step, dict):
         return False
@@ -3288,10 +3352,18 @@ def bridge_step_relation_realized(sentence, step):
         if isinstance(relation, str) and relation.strip() and relation not in relation_candidates:
             relation_candidates.append(relation)
     for relation in relation_candidates:
-        if relation_mentioned_in_text(sentence, relation):
-            return True
         local_points = extract_relation_point_names(relation)
+        if relation_mentioned_in_text(sentence, relation):
+            if relation_only_appears_in_preparation_clause(sentence, relation):
+                continue
+            if not relation_has_sufficient_point_coverage(sentence, relation, point_names=local_points):
+                continue
+            return True
         if local_points and relations_semantically_match(sentence, relation, local_points):
+            if relation_only_appears_in_preparation_clause(sentence, relation, point_names=local_points):
+                continue
+            if not relation_has_sufficient_point_coverage(sentence, relation, point_names=local_points):
+                continue
             return True
     return False
 
@@ -3578,6 +3650,13 @@ def build_plan_retry_feedback(validation_message, aux_part):
         )
         targeted_hints.append(
             "- do not invent a point-identification step like 'h equals f' unless that same identification or an equivalent equality already appears explicitly in the approved checkpoint list."
+        )
+    if "last bridge_steps relation must stay before goal_finish" in validation_message:
+        targeted_hints.append(
+            "- the final bridge_steps relation should stop at the last pre-finish checkpoint, such as an angle, ratio, equality, or collinearity relation, and goal_finish alone should state the final target relation."
+        )
+        targeted_hints.append(
+            "- if the approved route pool already contains the final goal relation, keep that relation only in goal_finish and move the last bridge step back to the preceding approved checkpoint."
         )
     if "unsupported high-level" in validation_message:
         targeted_hints.append(
