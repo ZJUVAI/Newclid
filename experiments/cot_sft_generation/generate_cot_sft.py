@@ -69,6 +69,8 @@ FORBIDDEN_THINKING_PATTERNS = [
     re.compile(r"\bcoordinate table\b", re.IGNORECASE),
     re.compile(r"\brotational symmetry\b", re.IGNORECASE),
     re.compile(r"\bcenter of symmetry\b", re.IGNORECASE),
+    re.compile(r"\bcenter of similarity\b", re.IGNORECASE),
+    re.compile(r"\bsimilarity center\b", re.IGNORECASE),
     re.compile(r"\bmidpoint propert(?:y|ies)\b", re.IGNORECASE),
     re.compile(r"\$[^$]+\$"),
     re.compile(r"`[^`]+`"),
@@ -661,6 +663,93 @@ def select_support_relations_for_step(relation_text, available_supports, point_n
     return selected
 
 
+def score_visible_relation_candidate(relation_text, route_relations_text, visible_points):
+    relation_points = extract_point_mentions(relation_text, visible_points)
+    relation_keywords = relation_text_keywords(relation_text)
+    route_points = extract_point_mentions(route_relations_text, visible_points)
+    route_keywords = relation_text_keywords(route_relations_text)
+    score = 0
+    score += 5 * len(relation_points & route_points)
+    score += 2 * len(relation_keywords & route_keywords)
+    if "equal" in relation_keywords and any(keyword in route_keywords for keyword in {"similar", "ratio", "equal"}):
+        score += 2
+    if "collinear" in relation_keywords and any(keyword in route_keywords for keyword in {"angle", "ratio", "similar"}):
+        score += 2
+    if "circle" in relation_keywords and any(keyword in route_keywords for keyword in {"angle", "similar"}):
+        score += 1
+    return score
+
+
+def prioritize_visible_relations_for_route(existing_relations, fallback_summaries, route_relations, visible_points, min_len=2, max_len=4):
+    cleaned_existing = [
+        normalize_relation_surface(relation.strip())
+        for relation in (existing_relations or [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+    route_relations_text = " ".join(
+        relation.strip()
+        for relation in (route_relations or [])
+        if isinstance(relation, str) and relation.strip()
+    )
+    if not route_relations_text:
+        return cleaned_existing[:max_len]
+
+    candidates = []
+    seen = set()
+    for origin_rank, relation in enumerate(cleaned_existing + list(fallback_summaries or [])):
+        if not isinstance(relation, str) or not relation.strip():
+            continue
+        cleaned_relation = normalize_relation_surface(relation.strip())
+        lowered = cleaned_relation.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        candidates.append(
+            (
+                score_visible_relation_candidate(cleaned_relation, route_relations_text, visible_points),
+                origin_rank,
+                cleaned_relation,
+            )
+        )
+
+    current_score = sum(
+        score_visible_relation_candidate(relation, route_relations_text, visible_points)
+        for relation in cleaned_existing[:max_len]
+    )
+    ranked = sorted(
+        candidates,
+        key=lambda item: (-item[0], item[1], len(item[2]), item[2].lower()),
+    )
+
+    selected = []
+    for score, _, relation in ranked:
+        if score <= 0:
+            continue
+        if relation not in selected:
+            selected.append(relation)
+        if len(selected) >= max_len:
+            break
+    for relation in cleaned_existing:
+        if relation not in selected:
+            selected.append(relation)
+        if len(selected) >= max_len:
+            break
+    for _, _, relation in ranked:
+        if relation not in selected:
+            selected.append(relation)
+        if len(selected) >= max_len:
+            break
+
+    selected = selected[:max_len]
+    proposed_score = sum(
+        score_visible_relation_candidate(relation, route_relations_text, visible_points)
+        for relation in selected
+    )
+    if len(selected) >= min_len and proposed_score > current_score:
+        return selected
+    return cleaned_existing[:max_len]
+
+
 def relation_duplicates_earlier_support(relation_text, available_supports, point_names):
     normalized_relation = normalize_relation_surface(relation_text).lower()
     relation_points = extract_point_mentions(normalized_relation, point_names)
@@ -1165,6 +1254,8 @@ def find_forbidden_center_shorthand(text):
         r"\bcommon center\b",
         r"\breference center\b",
         r"\bcenter of symmetry\b",
+        r"\bcenter of similarity\b",
+        r"\bsimilarity center\b",
         r"\bsymmetric center\b",
         r"\brotation center\b",
         r"\brotational center\b",
@@ -1630,7 +1721,7 @@ def build_canonical_helper_idea(aux_direct_relations, goal_bottleneck=""):
         mechanism_text = f"{mechanism_parts[0]} and {mechanism_parts[1]}"
     else:
         mechanism_text = ", ".join(mechanism_parts[:-1]) + f", and {mechanism_parts[-1]}"
-    return f"we need a helper that {mechanism_text} {goal_phrase}."
+    return f"a helper is needed that {mechanism_text} {goal_phrase}."
 
 
 def build_canonical_anchor_relation(anchor_points, visible_relations):
@@ -2093,6 +2184,8 @@ def validate_plan_response(
                 r"\bessential for proving\b",
                 r"\brotational symmetry\b",
                 r"\bcenter of symmetry\b",
+                r"\bcenter of similarity\b",
+                r"\bsimilarity center\b",
                 r"\bmidpoint propert(?:y|ies)\b",
             ])
         ok, message, cleaned_value = validate_descriptive_text(
@@ -2228,6 +2321,8 @@ def validate_plan_response(
             "essential for proving",
             "rotational symmetry",
             "center of symmetry",
+            "center of similarity",
+            "similarity center",
             "symmetric center",
             "rotation center",
             "rotational center",
@@ -2322,6 +2417,14 @@ def validate_plan_response(
     if not relation_keyword_present(cleaned_goal_finish):
         return False, "goal_finish must mention a concrete goal-side geometric relation", None
     cleaned_plan["goal_finish"] = cleaned_goal_finish
+    cleaned_plan["visible_relations"] = prioritize_visible_relations_for_route(
+        cleaned_plan["visible_relations"],
+        visible_premise_summaries,
+        cleaned_plan["bridge_relations"] + [cleaned_plan["goal_finish"]],
+        visible_points,
+        min_len=2,
+        max_len=4,
+    )
 
     relation_mentions = extract_point_mentions(" ".join(cleaned_plan["coordinate_relations"]), visible_points)
     if len(relation_mentions) < 3:
@@ -2684,6 +2787,7 @@ def anonymize_new_point_mentions(text, new_points):
     anonymized = text
     for point_name in sorted({point.lower() for point in new_points}, key=len, reverse=True):
         anonymized = re.sub(rf"\b{re.escape(point_name)}\b", "a point", anonymized, flags=re.IGNORECASE)
+    anonymized = re.sub(r"\ba point(?:\s+a point)+\b", "a point", anonymized, flags=re.IGNORECASE)
     anonymized = re.sub(r"\ba point point\b", "a point", anonymized, flags=re.IGNORECASE)
     return anonymized
 
