@@ -1141,6 +1141,13 @@ def find_forbidden_shape_shorthand(text):
         return None
     patterns = [
         r"\bsquare-like\b",
+        r"\bsquare\s+[a-z]{4}\b",
+        r"\bcomplete(?:s|d|ing)?\s+the\s+square\b",
+        r"\bform(?:s|ed|ing)?\s+the\s+square\b",
+        r"\bsquare\b",
+        r"\brectangle\b",
+        r"\brectangular\b",
+        r"\bparallelogram\b",
         r"\bsquare structures?\b",
         r"\bsquare configurations?\b",
     ]
@@ -1157,6 +1164,11 @@ def find_forbidden_center_shorthand(text):
     patterns = [
         r"\bcommon center\b",
         r"\breference center\b",
+        r"\bcenter of symmetry\b",
+        r"\bsymmetric center\b",
+        r"\brotation center\b",
+        r"\brotational center\b",
+        r"\bcircumcenter\b",
         r"\bserve as the (?:reference )?center\b",
     ]
     for pattern in patterns:
@@ -1621,6 +1633,76 @@ def build_canonical_helper_idea(aux_direct_relations, goal_bottleneck=""):
     return f"we need a helper that {mechanism_text} {goal_phrase}."
 
 
+def build_canonical_anchor_relation(anchor_points, visible_relations):
+    clean_points = [point.lower() for point in (anchor_points or []) if isinstance(point, str) and point.strip()]
+    anchor_text = join_natural_list(clean_points) if clean_points else "the main visible points"
+    relation_parts = []
+    anchor_set = set(clean_points)
+    for relation in visible_relations or []:
+        if not isinstance(relation, str) or not relation.strip():
+            continue
+        if len(extract_point_mentions(relation, clean_points)) < 2:
+            continue
+        relation_parts.append(normalize_relation_surface(relation).strip().rstrip("."))
+        if len(relation_parts) >= 2:
+            break
+    if len(relation_parts) == 1:
+        return f"points {anchor_text} form the main visible frame, with {relation_parts[0]}."
+    if len(relation_parts) >= 2:
+        return f"points {anchor_text} form the main visible frame, with {relation_parts[0]} and {relation_parts[1]}."
+    if anchor_set:
+        return f"points {anchor_text} form the main visible frame of the diagram."
+    return "the named visible points form the main frame of the diagram."
+
+
+def build_canonical_figure_overview(anchor_points, visible_relations, coordinate_relations, visible_points):
+    anchor_set = {point.lower() for point in (anchor_points or []) if isinstance(point, str)}
+    candidate_relations = []
+    extra_points = []
+    for relation in list(visible_relations or []) + list(coordinate_relations or []):
+        if not isinstance(relation, str) or not relation.strip():
+            continue
+        mentioned = extract_point_mentions(relation, visible_points)
+        if not (mentioned - anchor_set):
+            continue
+        candidate_relations.append(normalize_relation_surface(relation).strip().rstrip("."))
+        for point in sorted(mentioned - anchor_set):
+            if point not in extra_points:
+                extra_points.append(point)
+        if len(candidate_relations) >= 2 and len(extra_points) >= 2:
+            break
+    if not candidate_relations:
+        return "the broader figure introduces additional visible points and relations beyond the anchor frame."
+    overview_parts = []
+    if extra_points:
+        overview_parts.append(
+            f"beyond the anchor points, the broader figure also involves {join_natural_list(extra_points)}"
+        )
+    if len(candidate_relations) == 1:
+        relation_text = candidate_relations[0]
+    else:
+        relation_text = f"{candidate_relations[0]} and {candidate_relations[1]}"
+    if overview_parts:
+        return f"{overview_parts[0]}, with {relation_text}."
+    return f"the broader figure also uses {relation_text}."
+
+
+def build_canonical_goal_bottleneck(visible_goal):
+    goal_spec = parse_goal_expression(visible_goal or "")
+    goal_points = [point.lower() for point in goal_spec.get("points", []) if isinstance(point, str)]
+    point_text = join_natural_list(goal_points) if goal_points else "the named target points"
+    predicate = (goal_spec.get("predicate") or "").lower()
+    if "ratio" in predicate:
+        return f"the target ratio around {point_text} still lacks a concrete bridge between the needed segment comparisons."
+    if "angle" in predicate:
+        return f"the target angle comparison around {point_text} still lacks a concrete bridge between the needed directions."
+    if "simtri" in predicate or "contri" in predicate:
+        return f"the target triangle comparison around {point_text} still lacks enough direct side or angle correspondences."
+    if "cong" in predicate or "equal" in predicate:
+        return f"the target equality around {point_text} still lacks a concrete bridge from the visible relations."
+    return f"the target relation around {point_text} still lacks a concrete bridge from the visible figure."
+
+
 def validate_descriptive_text(value, field_name, min_chars=12, point_names=None, ignored_forbidden_patterns=None):
     if isinstance(value, str) and point_names:
         value = normalize_point_case(value, point_names)
@@ -1945,12 +2027,18 @@ def validate_plan_response(
             return False, message, None
         forbidden_shape = find_forbidden_shape_shorthand(cleaned_value)
         if forbidden_shape:
+            if key in {"anchor_relation", "figure_overview", "coordinate_hints", "goal_bottleneck", "helper_idea"}:
+                cleaned_plan[key] = cleaned_value
+                continue
             return False, (
                 f"{key} must avoid vague shape shorthand like '{forbidden_shape}' and should spell out "
                 "the concrete perpendicular, equal-length, midpoint, or parallel relations instead"
             ), None
         forbidden_center = find_forbidden_center_shorthand(cleaned_value)
         if forbidden_center:
+            if key in {"anchor_relation", "figure_overview", "coordinate_hints", "goal_bottleneck", "helper_idea"}:
+                cleaned_plan[key] = cleaned_value
+                continue
             return False, (
                 f"{key} must avoid unsupported center shorthand like '{forbidden_center}' and should spell out "
                 "the concrete midpoint, equal-length, perpendicular, or collinear relations instead"
@@ -2004,6 +2092,21 @@ def validate_plan_response(
         return False, message, None
     cleaned_plan["visible_relations"] = cleaned_visible_relations
 
+    if find_forbidden_shape_shorthand(cleaned_plan["anchor_relation"]) or find_forbidden_center_shorthand(cleaned_plan["anchor_relation"]):
+        cleaned_plan["anchor_relation"] = build_canonical_anchor_relation(
+            cleaned_plan["anchor_points"],
+            cleaned_plan["visible_relations"],
+        )
+    if find_forbidden_shape_shorthand(cleaned_plan["figure_overview"]) or find_forbidden_center_shorthand(cleaned_plan["figure_overview"]):
+        cleaned_plan["figure_overview"] = build_canonical_figure_overview(
+            cleaned_plan["anchor_points"],
+            cleaned_plan["visible_relations"],
+            cleaned_plan["coordinate_relations"],
+            visible_points,
+        )
+    if find_forbidden_shape_shorthand(cleaned_plan["goal_bottleneck"]) or find_forbidden_center_shorthand(cleaned_plan["goal_bottleneck"]):
+        cleaned_plan["goal_bottleneck"] = build_canonical_goal_bottleneck(visible_goal)
+
     aux_direct_relations = coerce_relation_list_field(plan.get("aux_direct_relations"), max_len=3)
     if not (1 <= len(aux_direct_relations) <= 3):
         return False, "aux_direct_relations must be a list with 1 to 3 ordered direct consequences", None
@@ -2033,10 +2136,18 @@ def validate_plan_response(
             "essential for proving",
             "rotational symmetry",
             "center of symmetry",
+            "symmetric center",
+            "rotation center",
+            "rotational center",
+            "circumcenter",
+            "parallelogram",
+            "rectangle",
+            "rectangular",
+            "square",
             "midpoint property",
             "midpoint properties",
         ]
-    ):
+    ) or find_forbidden_shape_shorthand(cleaned_plan["helper_idea"]) or find_forbidden_center_shorthand(cleaned_plan["helper_idea"]):
         cleaned_plan["helper_idea"] = build_canonical_helper_idea(
             cleaned_plan["aux_direct_relations"],
             cleaned_plan.get("goal_bottleneck", ""),
@@ -2129,6 +2240,8 @@ def validate_plan_response(
     if (
         not relation_keyword_present(cleaned_plan["coordinate_hints"])
         or re.search(r"\bsymmetr(?:y|ic)\b|\brotat(?:e|es|ed|ing|ion|ional)\b", cleaned_plan["coordinate_hints"], re.IGNORECASE)
+        or find_forbidden_shape_shorthand(cleaned_plan["coordinate_hints"])
+        or find_forbidden_center_shorthand(cleaned_plan["coordinate_hints"])
         or not any(point in coordinate_hint_lower for point in relation_mentions)
     ):
         cleaned_plan["coordinate_hints"] = canonical_coordinate_hint
@@ -3165,11 +3278,11 @@ def build_plan_retry_feedback(validation_message, aux_part):
         )
     if "must avoid vague shape shorthand" in validation_message:
         targeted_hints.append(
-            "- do not write phrases like 'square-like', 'square structure', or 'square configuration'; replace them with the concrete perpendicular, equal-length, midpoint, or parallel facts that are actually visible."
+            "- do not write phrases like 'square-like', 'square structure', 'square abcd', 'rectangle', or 'parallelogram'; replace them with the concrete perpendicular, equal-length, midpoint, or parallel facts that are actually visible."
         )
     if "must avoid unsupported center shorthand" in validation_message:
         targeted_hints.append(
-            "- do not write phrases like 'common center', 'reference center', or 'serve as the center'; replace them with the concrete midpoint, equal-length, perpendicular, or collinear relations that justify the step."
+            "- do not write phrases like 'common center', 'reference center', 'center of symmetry', or 'serve as the center'; replace them with the concrete midpoint, equal-length, perpendicular, or collinear relations that justify the step."
         )
     if "visible_relations" in validation_message:
         targeted_hints.append(
@@ -3343,11 +3456,11 @@ def build_writer_retry_feedback(validation_message, plan):
         )
     if "must avoid vague shape shorthand" in validation_message:
         targeted_hints.append(
-            "- do not write phrases like 'square-like', 'square structure', or 'square configuration'; name the concrete perpendicular, equal-length, midpoint, or parallel relations instead."
+            "- do not write phrases like 'square-like', 'square structure', 'square abcd', 'rectangle', or 'parallelogram'; name the concrete perpendicular, equal-length, midpoint, or parallel relations instead."
         )
     if "must avoid unsupported center shorthand" in validation_message:
         targeted_hints.append(
-            "- do not write phrases like 'common center', 'reference center', or 'serve as the center'; name the concrete midpoint, equal-length, perpendicular, or collinear relations instead."
+            "- do not write phrases like 'common center', 'reference center', 'center of symmetry', or 'serve as the center'; name the concrete midpoint, equal-length, perpendicular, or collinear relations instead."
         )
     targeted_hint_block = "\n".join(targeted_hints)
     if targeted_hint_block:
@@ -3520,7 +3633,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- The coordinate_relations field should stay close to the structured coordinate candidates when possible. Avoid unsupported jumps like 'there is a rotation symmetry' unless you first name the concrete equal, parallel, perpendicular, midpoint, or collinear cues behind it.\n"
         "- In coordinate_relations and coordinate_hints, do not describe points as symmetric or invoke rotation directly; spell out the concrete equal, parallel, perpendicular, midpoint, or collinear cues instead.\n"
         "- In coordinate_hints, do not use words like symmetry, symmetric, mirror, or rotation; summarize the actual midpoint, collinear, equal-length, parallel, or perpendicular cue instead.\n"
-        "- Do not use vague shape shorthand such as 'square-like', 'square structure', or 'square configuration'; if a square-style cue matters, spell out the concrete perpendicular, equal-length, and parallel facts instead.\n"
+        "- Do not use vague shape shorthand or high-level shape labels such as 'square-like', 'square structure', 'square abcd', 'rectangle', or 'parallelogram'; if that cue matters, spell out the concrete perpendicular, equal-length, midpoint, and parallel facts instead.\n"
         "- The visible_relations field should preferentially reuse the visible premise summaries above, plus a small number of visually obvious derived facts. It should not introduce invented centers, rotations, or unnamed transformations.\n"
         "- The coordinate_relations and visible_relations fields must stay separate: coordinate_relations are coordinate-backed visual checks, while visible_relations are existing-figure givens or obvious old-figure consequences.\n"
         "- The coordinate_hints field must be written as ordinary visual geometry language. Do not say 'the coordinates show', 'the coordinates indicate', or anything similar.\n"
@@ -3528,7 +3641,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- Avoid vague filler such as 'this point is crucial' or 'this will help'.\n"
         "- The helper_idea field should describe a concrete missing mechanism such as an equal-length transfer, perpendicular link, midpoint control, or goal-side angle connection. Avoid filler such as 'facilitate', 'make progress', or 'help establish'.\n"
         "- In helper_idea, do not use phrases like symmetry, symmetric center, center of symmetry, rotation center, or mirror center unless the same concrete structure is already explicitly stated in the approved visible or coordinate relations.\n"
-        "- Do not describe the helper as a common center, reference center, or generic center of the figure; if a midpoint or equal-distance fact matters, spell out that concrete relation directly.\n"
+        "- Do not describe the helper as a common center, reference center, center of symmetry, or generic center of the figure; if a midpoint or equal-distance fact matters, spell out that concrete relation directly.\n"
         "- Do not invent named centers, rotation claims, square/parallelogram claims, or similarity claims unless they are already supported by the approved coordinate checks or by the approved relation buckets.\n"
         "- The construction field must describe the same geometric facts as the hidden target summary in plain language; do not invent a different line, circle, or intersection.\n"
         "- When multiple new points are introduced, construction must explicitly describe a staged or combined strategy with markers such as 'first', 'then', 'next', or 'finally', rather than naming all points in one flat sentence.\n"
@@ -3660,8 +3773,8 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "14. Do not mention coordinates explicitly; describe those cues as visual placement, alignment, symmetry, equal-looking lengths, or perpendicular/parallel structure.\n"
         "15. Keep the post-aux reasoning faithful to the approved visible_relations, aux_direct_relations, bridge_steps, and goal_finish; do not replace them with a different invented route.\n"
         "16. Do not introduce extra named centers, rotational symmetries, square/parallelogram claims, or triangle-similarity claims unless the approved plan already states them and the immediate aux step really supports them.\n"
-        "16a. Do not use vague shape shorthand such as 'square-like', 'square structure', or 'square configuration'; replace it with the concrete perpendicular, equal-length, midpoint, or parallel relations that justify the step.\n"
-        "16b. Do not use unsupported center shorthand such as 'common center', 'reference center', or 'serve as the center'; replace it with the concrete midpoint, equal-length, perpendicular, or collinear relations that justify the step.\n"
+        "16a. Do not use vague shape shorthand or high-level shape labels such as 'square-like', 'square structure', 'square abcd', 'rectangle', or 'parallelogram'; replace them with the concrete perpendicular, equal-length, midpoint, or parallel relations that justify the step.\n"
+        "16b. Do not use unsupported center shorthand such as 'common center', 'reference center', 'center of symmetry', or 'serve as the center'; replace it with the concrete midpoint, equal-length, perpendicular, or collinear relations that justify the step.\n"
         "17. Reuse the approved visible_relations when connecting the new point back to the old figure, rather than inventing fresh structural claims.\n"
         "18. Stay impersonal. Do not write in the first person.\n"
         "19. The very first sentence of your body should state the bottleneck or goal-side obstacle. Do not spend the first sentence re-describing triangle abc, the midpoint layout, or the visible givens already covered by the injected prefix block.\n"
