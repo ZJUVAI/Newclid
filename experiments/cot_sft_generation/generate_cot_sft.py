@@ -1067,6 +1067,38 @@ def build_aux_direct_consequences(aux_part):
     return consequences
 
 
+def coerce_relation_list_field(value, max_len=3):
+    if isinstance(value, list):
+        return value[:max_len]
+    if isinstance(value, tuple):
+        return list(value)[:max_len]
+    if not isinstance(value, str):
+        return []
+    stripped = value.strip()
+    if not stripped:
+        return []
+    if stripped.startswith("[") and stripped.endswith("]"):
+        try:
+            parsed = json.loads(stripped)
+        except Exception:
+            parsed = None
+        if isinstance(parsed, list):
+            return parsed[:max_len]
+    if "\n" in stripped:
+        lines = [
+            re.sub(r"^[\-\*\d\.\)\s]+", "", line).strip(" ,;")
+            for line in stripped.splitlines()
+        ]
+        lines = [line for line in lines if line]
+        if len(lines) >= 2:
+            return lines[:max_len]
+    if ";" in stripped:
+        parts = [part.strip(" ,;") for part in stripped.split(";") if part.strip()]
+        if len(parts) >= 2:
+            return parts[:max_len]
+    return [stripped]
+
+
 def coordinate_relation_matches_candidate(relation_text, candidate):
     relation_type = infer_relation_type_from_text(relation_text)
     if not relation_type:
@@ -1157,6 +1189,9 @@ def audit_source_record(record, image_path: Path, aux_part, sanitized_rest):
         issues.append("aux_has_no_parseable_direct_consequences")
     if not proof_guidance["goal_finish_relations"]:
         issues.append("proof_guidance_missing_goal_finish_relations")
+    relation_conflicts = detect_visible_premise_relation_conflicts(record)
+    if relation_conflicts:
+        issues.extend(relation_conflicts[:8])
     if point_coords:
         visible_fact_conflicts = []
         for fact in extract_visible_formal_facts(record):
@@ -1171,6 +1206,41 @@ def audit_source_record(record, image_path: Path, aux_part, sanitized_rest):
         "issues": issues,
         "has_issue": bool(issues),
     }
+
+
+def detect_visible_premise_relation_conflicts(record):
+    issues = []
+    visible_facts = extract_visible_formal_facts(record)
+    line_pair_predicates = {}
+    midpoint_claims = {}
+
+    for fact in visible_facts:
+        predicate = fact.get("predicate", "")
+        args = fact.get("args", [])
+        if predicate in {"para", "perp"} and len(args) >= 4:
+            line_pair = frozenset([
+                _canonical_line_key(args[0], args[1]),
+                _canonical_line_key(args[2], args[3]),
+            ])
+            line_pair_predicates.setdefault(line_pair, set()).add(predicate)
+        elif predicate == "midp" and len(args) >= 3:
+            segment_key = _canonical_line_key(args[1], args[2])
+            midpoint_claims.setdefault(segment_key, set()).add(args[0])
+
+    for line_pair, predicates in line_pair_predicates.items():
+        if {"para", "perp"}.issubset(predicates):
+            lines = sorted("".join(points) for points in line_pair)
+            issues.append(
+                "visible_premise_relation_conflict:"
+                f"{'/'.join(lines)} both parallel and perpendicular"
+            )
+    for segment_key, midpoints in midpoint_claims.items():
+        if len(midpoints) > 1:
+            issues.append(
+                "visible_premise_midpoint_conflict:"
+                f"{''.join(segment_key)} has multiple midpoints {','.join(sorted(midpoints))}"
+            )
+    return issues
 
 
 def audit_generation_quality(record, generation, aux_part):
@@ -1934,8 +2004,8 @@ def validate_plan_response(
         return False, message, None
     cleaned_plan["visible_relations"] = cleaned_visible_relations
 
-    aux_direct_relations = plan.get("aux_direct_relations")
-    if not isinstance(aux_direct_relations, list) or not (1 <= len(aux_direct_relations) <= 3):
+    aux_direct_relations = coerce_relation_list_field(plan.get("aux_direct_relations"), max_len=3)
+    if not (1 <= len(aux_direct_relations) <= 3):
         return False, "aux_direct_relations must be a list with 1 to 3 ordered direct consequences", None
     cleaned_direct = []
     for idx, step in enumerate(aux_direct_relations):
@@ -1995,13 +2065,7 @@ def validate_plan_response(
         cleaned_relation = normalize_relation_surface(cleaned_relation)
         if not relation_keyword_present(cleaned_relation):
             return False, f"bridge_steps[{idx}].relation must mention a concrete geometric relation", None
-        depends_on = step.get("depends_on")
-        if isinstance(depends_on, str) and depends_on.strip():
-            depends_on = [depends_on]
-        if isinstance(depends_on, list) and len(depends_on) > 3:
-            depends_on = depends_on[:3]
-        if not isinstance(depends_on, list) or not (1 <= len(depends_on) <= 3):
-            return False, f"bridge_steps[{idx}].depends_on must be a list with 1 to 3 supporting relations", None
+        depends_on = coerce_relation_list_field(step.get("depends_on"), max_len=3)
         cleaned_dependencies = []
         for dep_idx, dependency in enumerate(depends_on):
             ok, message, cleaned_dependency = validate_descriptive_text(
@@ -2011,12 +2075,12 @@ def validate_plan_response(
                 point_names=known_points,
             )
             if not ok:
-                return False, message, None
+                continue
             cleaned_dependency = normalize_relation_surface(cleaned_dependency)
             if not relation_keyword_present(cleaned_dependency):
-                return False, f"bridge_steps[{idx}].depends_on[{dep_idx}] must mention a concrete geometric relation", None
+                continue
             if len(extract_point_mentions(cleaned_dependency, known_points)) < 2:
-                return False, f"bridge_steps[{idx}].depends_on[{dep_idx}] must name at least two concrete points", None
+                continue
             cleaned_dependencies.append(cleaned_dependency)
         ok, message, cleaned_help = validate_descriptive_text(
             step.get("why_it_helps"),
@@ -2192,12 +2256,6 @@ def validate_plan_response(
                     matched_supports.append(matched_support)
                 else:
                     canonical_dependencies.append(dependency)
-            if not matched_supports:
-                return False, f"bridge_steps[{idx}].depends_on must reuse an earlier visible, direct, or bridge relation", None
-            deduped_dependencies = []
-            for dependency in canonical_dependencies:
-                if dependency not in deduped_dependencies:
-                    deduped_dependencies.append(dependency)
             preferred_dependencies = select_support_relations_for_step(
                 step["relation"],
                 available_supports,
@@ -2205,6 +2263,15 @@ def validate_plan_response(
                 next_target_relation=step.get("next_target_relation", ""),
                 max_supports=min(2, len(available_supports)),
             )
+            if not matched_supports and preferred_dependencies:
+                matched_supports = preferred_dependencies[:]
+                canonical_dependencies = preferred_dependencies + canonical_dependencies
+            if not matched_supports:
+                return False, f"bridge_steps[{idx}].depends_on must reuse an earlier visible, direct, or bridge relation", None
+            deduped_dependencies = []
+            for dependency in canonical_dependencies:
+                if dependency not in deduped_dependencies:
+                    deduped_dependencies.append(dependency)
             merged_dependencies = preferred_dependencies + [
                 dependency for dependency in deduped_dependencies
                 if dependency not in preferred_dependencies
@@ -3019,6 +3086,14 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- bridge_steps must be a JSON array of objects, and each depends_on field must itself be a JSON list of 1 to 3 earlier relation strings."
         )
+    if "depends_on" in validation_message and "must name at least two concrete points" in validation_message:
+        targeted_hints.append(
+            "- every depends_on item should be a full earlier relation string with named points, such as 'ab equals bi', 'a, d, i are collinear', or 'line ac is perpendicular to line di'; do not write shorthand like 'the equality', 'the perpendicular setup', or a single-point fragment."
+        )
+    if "depends_on" in validation_message and "must be a list with 1 to 3 supporting relations" in validation_message:
+        targeted_hints.append(
+            "- if only one support is needed, still return it inside JSON brackets, for example: \"depends_on\": [\"ab equals bi\"]."
+        )
     if "depends_on" in validation_message and "must mention a concrete geometric relation" in validation_message:
         targeted_hints.append(
             "- every depends_on item should copy an earlier concrete relation almost verbatim, such as 'ah equals ch' or 'line ad is parallel to line bc'; do not replace it with abstract support labels like 'the midpoint property' or 'the equal-length setup'."
@@ -3033,6 +3108,13 @@ def build_plan_retry_feedback(validation_message, aux_part):
         )
         targeted_hints.append(
             "- if the direct consequence is that a point lies on a known line, write it as a concrete collinearity such as 'a, b, h are collinear' instead of 'h lies on line ab'."
+        )
+    if "aux_direct_relations" in validation_message and "must be a list with 1 to 3 ordered direct consequences" in validation_message:
+        targeted_hints.append(
+            "- aux_direct_relations must be an actual JSON list, for example: [\"a, d, i are collinear\", \"ab equals bi\", \"bd equals di\"]. Do not collapse the list into one sentence or one quoted paragraph."
+        )
+        targeted_hints.append(
+            "- prefer copying 1 to 3 items from Hidden Proof Guidance.immediate_aux_consequences almost verbatim, starting from the most local construction consequences first."
         )
     if "bridge_steps" in validation_message and "must mention a concrete geometric relation" in validation_message:
         targeted_hints.append(
@@ -3077,6 +3159,9 @@ def build_plan_retry_feedback(validation_message, aux_part):
         )
         targeted_hints.append(
             "- if a hidden route relation is already unlocked directly by the auxiliary construction, move to the next realistic checkpoint instead of repeating the same relation."
+        )
+        targeted_hints.append(
+            "- do not restate an earlier bridge checkpoint later in the route. Once a relation has already appeared as visible support, aux-direct support, or a prior bridge step, the next bridge step should move to a later approved checkpoint."
         )
     if "must avoid vague shape shorthand" in validation_message:
         targeted_hints.append(
@@ -3124,7 +3209,13 @@ def build_plan_retry_feedback(validation_message, aux_part):
             "- when a hidden bridge relation pool is shown, copy those route relations almost verbatim into bridge_steps.relation instead of swapping in a different structure like a new similar-triangle, cyclic, or equal-length route."
         )
         targeted_hints.append(
+            "- if the approved route pool lists only equalities, angle relations, ratios, collinearities, or one specific triangle step, do not invent a fresh congruent-triangle relation such as 'triangles abc and abe are congruent' unless that same triangle relation already appears explicitly in the pool."
+        )
+        targeted_hints.append(
             "- follow the approved route checkpoints in order: the first bridge step should match an earlier checkpoint, and later bridge steps should progress forward rather than jumping to a later finish relation or inventing a new parallel relation."
+        )
+        targeted_hints.append(
+            "- do not postpone an earlier approved checkpoint behind a later one. If the ordered route starts with an equality like 'ai equals eg', that equality must appear before later checkpoints like 'di equals de' or 'be equals ie', not after them."
         )
         targeted_hints.append(
             "- if the approved checkpoints are angle, ratio, equality, collinearity, or parallel relations, do not wrap them into an invented triangle-congruent or triangle-similar bridge unless that same triangle relation already appears in the approved checkpoint list."
@@ -3312,6 +3403,8 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         ensure_ascii=False,
         indent=2,
     )
+    immediate_aux_pool = proof_guidance_payload.get("immediate_aux_consequences", [])
+    immediate_aux_block = json.dumps(immediate_aux_pool, ensure_ascii=False, indent=2) if immediate_aux_pool else "[]"
     route_relation_pool = proof_guidance_payload.get("bridge_relations", []) + proof_guidance_payload.get("goal_finish_relations", [])
     route_relation_block = json.dumps(route_relation_pool, ensure_ascii=False, indent=2) if route_relation_pool else "[]"
     ordered_route_checkpoint_block = (
@@ -3358,6 +3451,10 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "These grouped checkpoints show how the true solution moves from the aux toward the goal. "
         "Use them only to keep the verification chain realistic; do not expose proof-engine syntax.\n"
         f"{proof_guidance}\n\n"
+        "[Preferred Immediate Aux Consequences]\n"
+        "Choose aux_direct_relations from or very close to this bucket whenever possible. "
+        "These are the local consequences that should appear immediately after the construction, before any broader bridge step.\n"
+        f"{immediate_aux_block}\n\n"
         "[Approved Route Relation Pool]\n"
         "Choose bridge_steps.relation items from or very close to this relation pool, in a realistic order. "
         "Do not replace this route with a different high-level structure unless that same structure already appears below.\n"
@@ -3397,11 +3494,14 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "Bad helper_idea: 'we need point k so that ...' because the new point name should first appear in construction.\n"
         "Good aux_direct_relations: ['kb equals kc', 'line ck is perpendicular to line dk']\n"
         "Good aux_direct_relations: ['h is the midpoint of bc', 'b, c, h are collinear']\n"
+        "Good aux_direct_relations: if Hidden Proof Guidance.immediate_aux_consequences starts with ['a, d, i are collinear', 'ab equals bi', 'bd equals di'], copy 1 to 3 of those local items almost verbatim before introducing any broader equality like 'ai equals eg'.\n"
         "Bad aux_direct_relations: ['h lies on line bc'] when the same fact should be written as 'b, c, h are collinear'.\n"
         "Bad aux_direct_relations: ['kb equals kc', 'angle akd equals ...'] when a is not part of the immediate construction.\n\n"
         "[bridge_steps Surface Guidance]\n"
         "Good bridge relation: 'ah equals bh' or 'angle ak/aj equals angle gk/gj'.\n"
         "Good bridge relation: if aux_direct_relations already give 'bj equals dj', then a later bridge step should use that equality to reach the next checkpoint, not repeat 'bj equals dj' itself.\n"
+        "Good bridge ordering: if the approved ordered route checkpoints are ['ai equals eg', 'di equals de', 'be equals ie'], then the bridge steps should keep that order or take an ordered subsequence such as ['ai equals eg', 'di equals de']; do not write ['di equals de', 'be equals ie', 'ai equals eg'].\n"
+        "Bad bridge relation: 'triangles abc and abe are congruent' when the approved route pool only lists equalities, angle relations, ratios, collinearities, or a different named triangle relation.\n"
         "Bad bridge relation: 'h coincides with f' when the same idea should be written as a concrete equality or another approved route relation.\n\n"
         "[coordinate_relations / visible_relations Guidance]\n"
         "Good coordinate_relations: items chosen from the hidden structured coordinate candidates, such as 'point g looks like the midpoint of ac' or 'points b, d, and i look nearly collinear'.\n"
@@ -3433,16 +3533,19 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- The construction field must describe the same geometric facts as the hidden target summary in plain language; do not invent a different line, circle, or intersection.\n"
         "- When multiple new points are introduced, construction must explicitly describe a staged or combined strategy with markers such as 'first', 'then', 'next', or 'finally', rather than naming all points in one flat sentence.\n"
         "- Each item in aux_direct_relations must stay local to the auxiliary construction itself. Do not pull unrelated old-figure points into those direct relations.\n"
+        "- aux_direct_relations should usually be copied from the Preferred Immediate Aux Consequences bucket above with only light natural-language cleanup. Do not replace those local items with later bridge equalities or broad summaries.\n"
         "- Each bridge_steps relation should explicitly mention how the auxiliary point interacts with existing visible points or substructures, in a realistic order.\n"
         "- The first bridge_steps relation must explicitly contain the new auxiliary point together with at least one old visible point, and it should be written in a compact relation form such as 'ag equals dg' or 'angle bg/bj equals angle gi/ij'.\n"
         "- A bridge_steps relation must be a new checkpoint beyond visible_relations, aux_direct_relations, and earlier bridge_steps. If the construction already gives a relation directly, treat that relation as support and move to the next bridge checkpoint instead of repeating it.\n"
         "- Each bridge_steps relation should stay semantically close to the hidden proof guidance bridge_relations or goal_finish_relations; do not swap in a different high-level route.\n"
         "- Treat the Approved Ordered Route Checkpoints as the preferred bridge-step order. Do not jump to a later checkpoint first, and do not invent a fresh parallel/similarity/angle route when an earlier approved checkpoint is already available.\n"
+        "- When the ordered route begins with a concrete equality or collinearity checkpoint, do not postpone that earlier checkpoint behind a later checkpoint. Keep the bridge steps monotone in the listed order.\n"
         "- If a candidate bridge relation is not visibly close to one of the Approved Ordered Route Checkpoints, do not use it. In particular, do not inject a fresh goal-side equality or ratio relation just because it sounds useful unless that same relation family already appears in the approved checkpoint list.\n"
         "- If the approved route checkpoints are angle, ratio, collinearity, equality, or parallel relations, do not wrap them into a new triangle-congruent or triangle-similar route unless that same triangle route already appears explicitly in the checkpoint list.\n"
         "- Do not invent a point-identification bridge such as 'h equals f' unless that same identification, or an equivalent old-figure equality using h and f, already appears in the approved route checkpoints.\n"
         "- When the approved route relation pool lists a concrete relation such as 'line bg is parallel to line cd' or 'bk = dk', prefer using that relation directly instead of inventing an alternative route like a new similar-triangle claim.\n"
         "- Each bridge_steps depends_on list should reuse concrete items from visible_relations, aux_direct_relations, or an earlier bridge_steps relation, instead of inventing unsupported leaps.\n"
+        "- Each depends_on item should be a full earlier relation string with at least two named points, such as 'ab equals bi' or 'a, d, i are collinear'. Do not write shorthand like 'the equality setup' or 'the perpendicular condition'.\n"
         "- Each depends_on item must be copied as a natural-language relation string, not written as a raw formal predicate such as 'cong b j d j'.\n"
         "- Each bridge_steps why_it_helps string should explain what the current step unlocks next in plain geometry language. The script will internally attach the exact next target relation for the writer.\n"
         "- Do not use why_it_helps to smuggle in a new route such as 'similar triangles', 'cyclic quadrilateral', or 'parallelogram' unless that same structure is already explicitly present in the approved relation chain.\n"
