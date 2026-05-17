@@ -3941,6 +3941,13 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
         targeted_hints.append(
             "- remove high-level phrases like 'rotational symmetry' or 'center of symmetry'; replace them with the concrete equalities, parallels, or midpoint facts that are actually visible in the approved plan."
         )
+    if "must avoid generic symmetry shorthand" in validation_message:
+        targeted_hints.append(
+            "- remove generic phrases like 'symmetry', 'symmetry axis', 'axis of symmetry', 'axis points', or 'symmetric'; replace them with the concrete equalities, parallels, midpoint facts, or collinearities that the approved plan actually uses."
+        )
+        targeted_hints.append(
+            "- if a sentence needs the role of a bisector or balanced point set, name the exact relation instead, such as 'ah equals bh', 'e and f lie on the perpendicular bisector of ab', or 'a, c, h are collinear', rather than summarizing that role as symmetry."
+        )
     if "must explicitly realize bridge_steps" in validation_message:
         targeted_hints.append(
             "- include one explicit sentence for every approved bridge_steps relation in order; do not skip the last angle or parallel relation before the goal_finish sentence."
