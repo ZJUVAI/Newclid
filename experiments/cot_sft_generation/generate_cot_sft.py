@@ -3766,6 +3766,9 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- do not invent a point-identification step like 'h equals f' unless that same identification or an equivalent equality already appears explicitly in the approved checkpoint list."
         )
+        targeted_hints.append(
+            "- do not insert a fresh collinearity bridge such as 'b, k, h are collinear' just because an earlier support already places h on line be and the construction places k on be; unless that exact collinearity appears in the approved checkpoint list, keep it as support and move to the next approved route relation."
+        )
     if "last bridge_steps relation must stay before goal_finish" in validation_message:
         targeted_hints.append(
             "- the final bridge_steps relation should stop at the last pre-finish checkpoint, such as an angle, ratio, equality, or collinearity relation, and goal_finish alone should state the final target relation."
@@ -4111,6 +4114,7 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- If a candidate bridge relation is not visibly close to one of the Approved Ordered Route Checkpoints, do not use it. In particular, do not inject a fresh goal-side equality or ratio relation just because it sounds useful unless that same relation family already appears in the approved checkpoint list.\n"
         "- If the approved route checkpoints are angle, ratio, collinearity, equality, or parallel relations, do not wrap them into a new triangle-congruent or triangle-similar route unless that same triangle route already appears explicitly in the checkpoint list.\n"
         "- Do not invent a point-identification bridge such as 'h equals f' unless that same identification, or an equivalent old-figure equality using h and f, already appears in the approved route checkpoints.\n"
+        "- Do not insert a fresh collinearity bridge such as 'b, k, h are collinear' just because an earlier visible relation already gives 'b, e, h are collinear' and the construction places k on line be. Unless that exact collinearity appears in the approved checkpoint list, treat it as support only and move to the next approved route relation.\n"
         "- When the approved route relation pool lists a concrete relation such as 'line bg is parallel to line cd' or 'bk = dk', prefer using that relation directly instead of inventing an alternative route like a new similar-triangle claim.\n"
         "- The last bridge_steps relation must stay before the final goal statement. Do not make the last bridge step a substitution-flavored restatement of goal_finish such as 'ratio dg to cg equals ratio de to df' when goal_finish is 'ratio ac to bc equals ratio de to df'.\n"
         "- Each bridge_steps depends_on list should reuse concrete items from visible_relations, aux_direct_relations, or an earlier bridge_steps relation, instead of inventing unsupported leaps.\n"

@@ -137,6 +137,9 @@
 - 当前未提交补丁对应的最新随机结果是 `v104`：随机 `4/4` 成功，`source_audit_issue_items=0`，`generation_audit_issue_items=0`。
   - 记录：`/tmp/cot_quality_test_run_v104_random4_artifacts_20260517_154443/summary.json`
   - 但这 `4` 条分别用了 `2, 2, 3, 2` 次样本级尝试，说明当前链路虽然通过，但仍在依赖 planner/writer 重试兜底。
+- 后续针对 route-drift 的窄提示补丁在 `v106` 随机回归中也维持了 `4/4`，`source_audit_issue_items=0`，`generation_audit_issue_items=0`。
+  - 记录：`/tmp/cot_quality_test_run_v106_random4_artifacts_20260517_162205/summary.json`
+  - 这 `4` 条分别用了 `2, 3, 2, 2` 次样本级尝试，说明 route-drift 有所收紧，但整体仍未摆脱重试依赖。
 - 历史上证据最好的随机结果是 `v92`：随机 `4/4` 成功，`source_audit_issue_items=0`，`generation_audit_issue_items=0`。
   - 记录：`/tmp/cot_quality_test_run_v92_random4_artifacts_20260516_065335/summary.json`
 - 但 `v92` 也有明显局限：
