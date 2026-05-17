@@ -2291,6 +2291,12 @@ def validate_plan_response(
             if key == "anchor_relation":
                 cleaned_plan[key] = cleaned_value
                 continue
+            if key == "figure_overview":
+                cleaned_plan[key] = cleaned_value
+                continue
+            if key == "goal_bottleneck":
+                cleaned_plan[key] = cleaned_value
+                continue
             if key == "helper_idea":
                 cleaned_plan[key] = cleaned_value
                 continue
@@ -2356,14 +2362,22 @@ def validate_plan_response(
             cleaned_plan["anchor_points"],
             cleaned_plan["visible_relations"],
         )
-    if find_forbidden_shape_shorthand(cleaned_plan["figure_overview"]) or find_forbidden_center_shorthand(cleaned_plan["figure_overview"]):
+    if (
+        find_forbidden_shape_shorthand(cleaned_plan["figure_overview"])
+        or find_forbidden_center_shorthand(cleaned_plan["figure_overview"])
+        or find_forbidden_symmetry_shorthand(cleaned_plan["figure_overview"])
+    ):
         cleaned_plan["figure_overview"] = build_canonical_figure_overview(
             cleaned_plan["anchor_points"],
             cleaned_plan["visible_relations"],
             cleaned_plan["coordinate_relations"],
             visible_points,
         )
-    if find_forbidden_shape_shorthand(cleaned_plan["goal_bottleneck"]) or find_forbidden_center_shorthand(cleaned_plan["goal_bottleneck"]):
+    if (
+        find_forbidden_shape_shorthand(cleaned_plan["goal_bottleneck"])
+        or find_forbidden_center_shorthand(cleaned_plan["goal_bottleneck"])
+        or find_forbidden_symmetry_shorthand(cleaned_plan["goal_bottleneck"])
+    ):
         cleaned_plan["goal_bottleneck"] = build_canonical_goal_bottleneck(visible_goal)
 
     preferred_immediate_aux = []
