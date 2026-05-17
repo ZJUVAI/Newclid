@@ -166,13 +166,15 @@ def ray_init_with_explicit_agent_ports(init_kwargs: dict[str, object]) -> None:
 
     (
         metrics_agent_port,
+        metrics_export_port,
         dashboard_agent_listen_port,
         runtime_env_agent_port,
-    ) = reserve_unused_agent_ports(3)
+    ) = reserve_unused_agent_ports(4)
     logger = logging.getLogger(__name__)
     logger.info(
-        "ray.init local port override: metrics_agent_port=%d dashboard_agent_listen_port=%d runtime_env_agent_port=%d",
+        "ray.init local port override: metrics_agent_port=%d metrics_export_port=%d dashboard_agent_listen_port=%d runtime_env_agent_port=%d",
         metrics_agent_port,
+        metrics_export_port,
         dashboard_agent_listen_port,
         runtime_env_agent_port,
     )
@@ -180,7 +182,9 @@ def ray_init_with_explicit_agent_ports(init_kwargs: dict[str, object]) -> None:
     original_init = RayParams.__init__
 
     def patched_init(self, *args, **kwargs):
+        kwargs.setdefault("node_ip_address", "127.0.0.1")
         kwargs.setdefault("metrics_agent_port", metrics_agent_port)
+        kwargs.setdefault("metrics_export_port", metrics_export_port)
         kwargs.setdefault("dashboard_agent_listen_port", dashboard_agent_listen_port)
         kwargs.setdefault("runtime_env_agent_port", runtime_env_agent_port)
         return original_init(self, *args, **kwargs)
