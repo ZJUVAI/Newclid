@@ -3985,6 +3985,20 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- do not insert a fresh collinearity bridge just because an earlier support already places one point on a visible line and the construction places another point on that same line; unless that exact collinearity appears in the approved checkpoint list, keep it as support and move to the next approved route relation."
         )
+        if re.search(r"unmatched items:\s*\[[^]]*(center|circumcenter|circle passing through)", validation_message, re.IGNORECASE):
+            targeted_hints.append(
+                "- do not upgrade a midpoint or equal-distance checkpoint into a 'center of the circle', 'circumcenter', or similar center claim unless that exact center relation appears in the approved route pool."
+            )
+            targeted_hints.append(
+                "- if the approved route pool lists equalities like 'ag equals eg' or 'cg equals eg', keep those as the bridge checkpoints themselves rather than paraphrasing them as a circle-center statement."
+            )
+        if re.search(r"unmatched items:\s*\[[^]]*congruent", validation_message, re.IGNORECASE):
+            targeted_hints.append(
+                "- do not swap an approved similar-triangle, equality, angle, or ratio checkpoint into a fresh congruent-triangle relation unless that same congruent-triangle relation appears explicitly in the approved route pool."
+            )
+            targeted_hints.append(
+                "- if the route pool names 'triangles afg and cfg are similar', keep it as similar; do not rewrite it as a congruent-triangle checkpoint."
+            )
         if re.search(r"unmatched items:\s*\[[^]]*collinear", validation_message, re.IGNORECASE):
             targeted_hints.append(
                 "- your previous bridge route promoted a support collinearity into a new checkpoint. Keep that collinearity only inside depends_on, and choose the next approved checkpoint from the route pool as bridge_steps.relation."
@@ -4329,6 +4343,8 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "Good bridge relation: if aux_direct_relations already give 'bj equals dj', then a later bridge step should use that equality to reach the next checkpoint, not repeat 'bj equals dj' itself.\n"
         "Good bridge ordering: if the approved ordered route checkpoints are ['ai equals eg', 'di equals de', 'be equals ie'], then the bridge steps should keep that order or take an ordered subsequence such as ['ai equals eg', 'di equals de']; do not write ['di equals de', 'be equals ie', 'ai equals eg'].\n"
         "Bad bridge relation: 'triangles abc and abe are congruent' when the approved route pool only lists equalities, angle relations, ratios, collinearities, or a different named triangle relation.\n"
+        "Bad bridge relation: 'g is the center of the circle passing through a, c, d, e' when the approved route pool only lists equalities such as 'ag equals eg' and 'cg equals eg'.\n"
+        "Bad bridge relation: rewriting an approved similar-triangle checkpoint as a congruent-triangle checkpoint when the approved route pool names only the similar-triangle version.\n"
         "Bad bridge relation: 'h coincides with f' when the same idea should be written as a concrete equality or another approved route relation.\n\n"
         "[coordinate_relations / visible_relations Guidance]\n"
         "Good coordinate_relations: items chosen from the hidden structured coordinate candidates, such as 'point g looks like the midpoint of ac' or 'points b, d, and i look nearly collinear'.\n"
@@ -4346,6 +4362,8 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
         "- Use the hidden coordinate table only as an internal consistency check for relations that also look plausible in the image.\n"
         "- The coordinate_relations field should stay close to the structured coordinate candidates when possible. Avoid unsupported jumps like 'there is a rotation symmetry' unless you first name the concrete equal, parallel, perpendicular, midpoint, or collinear cues behind it.\n"
         "- In coordinate_relations and coordinate_hints, do not describe points as symmetric or invoke rotation directly; spell out the concrete equal, parallel, perpendicular, midpoint, or collinear cues instead.\n"
+        "- In bridge_steps, do not rename an approved equality checkpoint as a circle-center or circumcenter claim unless that exact center relation appears in the approved route pool.\n"
+        "- If the approved route pool contains a specific triangle relation such as a similar-triangle checkpoint, keep that exact modality; do not rewrite it into a congruent-triangle checkpoint unless the pool explicitly does so.\n"
         "- In coordinate_hints, do not use words like symmetry, symmetric, mirror, or rotation; summarize the actual midpoint, collinear, equal-length, parallel, or perpendicular cue instead.\n"
         "- Do not use vague shape shorthand or high-level shape labels such as 'square-like', 'square structure', 'square abcd', 'rectangle', or 'parallelogram'; if that cue matters, spell out the concrete perpendicular, equal-length, midpoint, and parallel facts instead.\n"
         "- The visible_relations field should preferentially reuse the visible premise summaries above, plus a small number of visually obvious derived facts. It should not introduce invented centers, rotations, or unnamed transformations.\n"
