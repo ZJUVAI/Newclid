@@ -2601,11 +2601,15 @@ def validate_plan_response(
                 "last bridge_steps relation must stay before goal_finish instead of duplicating the final goal-side relation"
             ), None
 
-    cleaned_plan = enrich_bridge_steps_with_targets(cleaned_plan)
-
     goal_spec = parse_goal_expression(visible_goal)
     goal_points = set(goal_spec["points"])
     goal_keywords = goal_keyword_hints(visible_goal)
+    cleaned_plan = enrich_bridge_steps_with_targets(cleaned_plan)
+    cleaned_plan["coverage_targets"] = build_plan_coverage_targets(
+        cleaned_plan,
+        visible_goal=visible_goal,
+        visible_points=visible_points,
+    )
 
     if aux_part:
         construction_text = f"{cleaned_plan['helper_idea']} {cleaned_plan['construction']}".lower()
@@ -3148,12 +3152,134 @@ def build_prefix_coverage_notes(plan):
     return json.dumps(notes, ensure_ascii=False, indent=2) if notes else "[]"
 
 
+def build_plan_coverage_targets(plan, visible_goal="", visible_points=None, max_points=6, max_relations=4):
+    if not isinstance(plan, dict):
+        return {}
+    visible_points = [point.lower() for point in (visible_points or []) if isinstance(point, str) and point.strip()]
+    anchor_points = [point.lower() for point in (plan.get("anchor_points") or []) if isinstance(point, str) and point.strip()]
+    anchor_set = set(anchor_points)
+    goal_points = [
+        point.lower()
+        for point in parse_goal_expression(visible_goal or "").get("points", [])
+        if isinstance(point, str) and point.strip()
+    ]
+    seen_goal_points = set()
+    ordered_goal_points = []
+    for point in goal_points:
+        if point in seen_goal_points:
+            continue
+        seen_goal_points.add(point)
+        ordered_goal_points.append(point)
+
+    relation_sources = []
+    overview = plan.get("figure_overview")
+    if isinstance(overview, str) and overview.strip():
+        relation_sources.append(("figure_overview", overview.strip(), False))
+    for relation in plan.get("visible_relations", []) or []:
+        if isinstance(relation, str) and relation.strip():
+            relation_sources.append(("visible_relation", relation.strip(), True))
+    for relation in plan.get("coordinate_relations", []) or []:
+        if isinstance(relation, str) and relation.strip():
+            relation_sources.append(("coordinate_relation", relation.strip(), True))
+    for step in plan.get("bridge_steps", []) or []:
+        if isinstance(step, dict):
+            relation = step.get("approved_route_relation") or step.get("relation", "")
+            if isinstance(relation, str) and relation.strip():
+                relation_sources.append(("bridge_relation", relation.strip(), True))
+    goal_finish = plan.get("goal_finish")
+    if isinstance(goal_finish, str) and goal_finish.strip():
+        relation_sources.append(("goal_finish", goal_finish.strip(), True))
+
+    point_counts = {}
+    point_first_seen = {}
+    focus_relations = []
+    seen_relations = set()
+    for source_label, relation_text, include_in_focus in relation_sources:
+        mentioned_points = [
+            point for point in extract_point_mentions(relation_text, visible_points)
+            if point not in anchor_set
+        ]
+        for point in mentioned_points:
+            point_counts[point] = point_counts.get(point, 0) + 1
+            point_first_seen.setdefault(point, len(point_first_seen))
+        normalized_relation = normalize_relation_surface(relation_text).strip().rstrip(".")
+        lowered_relation = normalized_relation.lower()
+        if (
+            include_in_focus
+            and mentioned_points
+            and relation_keyword_present(normalized_relation)
+            and lowered_relation not in seen_relations
+        ):
+            seen_relations.add(lowered_relation)
+            focus_relations.append(
+                {
+                    "source": source_label,
+                    "relation": normalized_relation,
+                    "points": mentioned_points,
+                }
+            )
+
+    ranked_non_anchor_points = sorted(
+        point_counts,
+        key=lambda point: (
+            point not in ordered_goal_points,
+            -point_counts[point],
+            point_first_seen.get(point, 0),
+            point,
+        ),
+    )
+    primary_points = ranked_non_anchor_points[:max_points]
+    goal_points_outside_anchors = [point for point in ordered_goal_points if point not in anchor_set]
+    opening_focus_points = goal_points_outside_anchors[:3] or primary_points[:3]
+    bridge_focus_points = primary_points[:4]
+
+    reminder_parts = []
+    if opening_focus_points:
+        reminder_parts.append(
+            f"frame the bottleneck through {join_natural_list(opening_focus_points)} rather than only the anchor frame"
+        )
+    if bridge_focus_points:
+        reminder_parts.append(
+            f"reconnect the auxiliary route to {join_natural_list(bridge_focus_points)} as the body advances"
+        )
+    reminder = ". ".join(reminder_parts).strip()
+    if reminder:
+        reminder += "."
+
+    return {
+        "goal_points": ordered_goal_points,
+        "goal_points_outside_anchors": goal_points_outside_anchors,
+        "non_anchor_points": primary_points,
+        "opening_focus_points": opening_focus_points,
+        "bridge_focus_points": bridge_focus_points,
+        "focus_relations": focus_relations[:max_relations],
+        "reminder": reminder,
+    }
+
+
 def build_writer_sentence_duties(plan):
     if not isinstance(plan, dict):
         return ""
+    coverage_targets = plan.get("coverage_targets") if isinstance(plan.get("coverage_targets"), dict) else {}
+    opening_focus_points = coverage_targets.get("opening_focus_points", [])
+    bridge_focus_points = coverage_targets.get("bridge_focus_points", [])
+    opening_focus_clause = ""
+    if opening_focus_points:
+        opening_focus_clause = (
+            f" If possible, frame that obstacle through at least one non-anchor focus point such as "
+            f"{join_natural_list(opening_focus_points)}."
+        )
+    helper_focus_clause = ""
+    if bridge_focus_points:
+        helper_focus_clause = (
+            f" Keep the missing helper tied to the broader figure around {join_natural_list(bridge_focus_points)} "
+            "rather than only restating the anchor frame."
+        )
     lines = [
-        "1. Opening sentence: state the goal-side obstacle directly, using the target relation or the target-side points.",
-        "2. Helper sentence: restate the approved helper idea impersonally, but do not quote the plan wording word-for-word.",
+        "1. Opening sentence: state the goal-side obstacle directly, using the target relation or the target-side points."
+        + opening_focus_clause,
+        "2. Helper sentence: restate the approved helper idea impersonally, but do not quote the plan wording word-for-word."
+        + helper_focus_clause,
         "3. Construction sentence: introduce the auxiliary point from the approved construction, but keep the wording natural rather than copying the plan string verbatim.",
     ]
     aux_direct_relations = plan.get("aux_direct_relations", [])
@@ -3235,15 +3361,23 @@ def build_writer_bridge_contracts(plan):
 def build_writer_sentence_blueprints(plan):
     if not isinstance(plan, dict):
         return []
+    coverage_targets = plan.get("coverage_targets") if isinstance(plan.get("coverage_targets"), dict) else {}
     blueprints = [
         {
             "sentence_type": "opening",
             "goal_finish": plan.get("goal_finish", ""),
-            "instruction": "State the obstacle directly in goal-side terms without re-describing the injected prefix.",
+            "coverage_points": coverage_targets.get("opening_focus_points", []),
+            "instruction": (
+                "State the obstacle directly in goal-side terms without re-describing the injected prefix. "
+                "When possible, anchor that obstacle in one of the listed non-anchor coverage points instead of narrating only the anchor triangle."
+            ),
         },
         {
             "sentence_type": "helper",
-            "instruction": "State the missing helper mechanism impersonally and concretely.",
+            "coverage_points": coverage_targets.get("bridge_focus_points", []),
+            "instruction": (
+                "State the missing helper mechanism impersonally and concretely, and keep it tied to the broader visible figure listed under the coverage points."
+            ),
         },
         {
             "sentence_type": "construction",
@@ -3868,6 +4002,10 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
         if isinstance(plan, dict) else "[]"
     )
     prefix_coverage_notes = build_prefix_coverage_notes(plan)
+    coverage_targets = (
+        json.dumps(plan.get("coverage_targets", {}), ensure_ascii=False, indent=2)
+        if isinstance(plan, dict) else "{}"
+    )
     targeted_hints = []
     if "overlaps too much with the injected prefix" in validation_message:
         targeted_hints.append(
@@ -3899,6 +4037,9 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
         targeted_hints.append(
             "- when a bridge step includes internal required_supports, mention those support relations explicitly in the same sentence before landing on the new bridge relation."
         )
+        targeted_hints.append(
+            "- keep the bridge tied to the non-anchor focus points listed under Global Coverage Targets instead of drifting back to generic anchor-only language."
+        )
     if "must name at least one approved supporting relation" in validation_message:
         targeted_hints.append(
             "- every bridge sentence must name at least one concrete approved support relation from its required_supports or depends_on list; do not jump straight to the new relation with no cited support."
@@ -3908,6 +4049,10 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
         )
         targeted_hints.append(
             "- if needed, follow the preferred_sentence_shell in the bridge contracts almost verbatim and only smooth the wording lightly."
+        )
+    if "overlaps too much with the injected prefix" in validation_message:
+        targeted_hints.append(
+            "- use the Global Coverage Targets block to move into the non-anchor obstacle or bridge region instead of rephrasing the already-covered overview."
         )
     if "must explicitly realize goal_finish after the bridge steps" in validation_message:
         targeted_hints.append(
@@ -3971,6 +4116,8 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
         f"Validation error: {validation_message}\n"
         "Return a corrected plain-text body that satisfies every format and quality constraint.\n"
         "Keep one sentence for each bridge step, and explicitly name concrete supporting relations instead of using vague shortcuts.\n"
+        "Global Coverage Targets:\n"
+        f"{coverage_targets}\n\n"
         "Prefix-Covered Facts:\n"
         f"{prefix_coverage_notes}\n\n"
         "Injected Prefix Block:\n"
@@ -4263,6 +4410,9 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "[Bridge Sentence Contracts]\n"
         "Use these contracts as a hard checklist for the post-aux body sentences. Each listed relation should appear explicitly, the listed supports should be named inside the same sentence when required, and the goal_finish contract must be realized after the final bridge sentence.\n"
         f"{bridge_contracts}\n\n"
+        "[Global Coverage Targets]\n"
+        "These are derived from the approved plan so the body keeps track of the broader visible figure beyond the tagged anchors. Use them to keep the obstacle, helper, and bridge sentences connected to the whole diagram instead of circling only around the anchor frame.\n"
+        f"{json.dumps(plan.get('coverage_targets', {}), ensure_ascii=False, indent=2)}\n\n"
         "[Compression Target]\n"
         f"Aim for about {expected_sentence_count} sentences total in the body. Keep each bridge sentence compact and concrete, usually one relation plus one or two named supports, rather than a long recap of the whole chain.\n\n"
         "[Injected Prefix Block]\n"
@@ -4297,6 +4447,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "18. Stay impersonal. Do not write in the first person.\n"
         "19. The very first sentence of your body should state the bottleneck or goal-side obstacle. Do not spend the first sentence re-describing triangle abc, the midpoint layout, or the visible givens already covered by the injected prefix block.\n"
         "19a. The second sentence should state the missing helper idea, not repeat any overview, coordinate cue, or visible relation already listed under Prefix-Covered Facts.\n"
+        "19b. Use the Global Coverage Targets block to keep the obstacle and helper tied to non-anchor visible points or substructures whenever the approved plan depends on them.\n"
         "20. Give each bridge_steps relation its own sentence. In that sentence, explicitly name at least one concrete depends_on relation before or while stating the new bridge relation.\n"
         "20a. When a bridge step lists internal required_supports, mention those support relations explicitly in the same sentence unless doing so would repeat the exact prefix wording; in that case paraphrase them.\n"
         "20b. When a bridge contract includes a preferred_sentence_shell, stay very close to that local order and only smooth the wording lightly.\n"
