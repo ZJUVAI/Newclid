@@ -2815,8 +2815,41 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
             f"Writer body must avoid generic symmetry shorthand like '{forbidden_symmetry}' and should state the "
             "concrete midpoint, equal-length, parallel, perpendicular, or collinear relations instead"
         )
+    sentences = split_into_sentences(body)
+    coverage_targets = plan.get("coverage_targets", {}) if isinstance(plan, dict) else {}
+    opening_focus_points = [
+        point.lower()
+        for point in (coverage_targets.get("opening_focus_points") or [])
+        if isinstance(point, str) and point.strip()
+    ]
+    bridge_focus_points = [
+        point.lower()
+        for point in (coverage_targets.get("bridge_focus_points") or [])
+        if isinstance(point, str) and point.strip()
+    ]
+    coverage_point_pool = []
+    for point in (
+        (plan.get("anchor_points") or []) if isinstance(plan, dict) else []
+    ) + (coverage_targets.get("goal_points") or []) + (coverage_targets.get("non_anchor_points") or []):
+        if isinstance(point, str):
+            point = point.lower().strip()
+            if point and point not in coverage_point_pool:
+                coverage_point_pool.append(point)
+    if opening_focus_points and sentences:
+        sentence_points = extract_point_mentions(sentences[0], coverage_point_pool or opening_focus_points)
+        if not (sentence_points & set(opening_focus_points)):
+            return False, (
+                "Writer opening sentence must mention at least one approved non-anchor opening focus point "
+                "from Global Coverage Targets"
+            )
+    if bridge_focus_points and len(sentences) >= 2:
+        sentence_points = extract_point_mentions(sentences[1], coverage_point_pool or bridge_focus_points)
+        if not (sentence_points & set(bridge_focus_points)):
+            return False, (
+                "Writer helper sentence must mention at least one approved non-anchor bridge focus point "
+                "from Global Coverage Targets"
+            )
     if plan and isinstance(plan.get("bridge_steps"), list):
-        sentences = split_into_sentences(body)
         search_start = 0
         generic_markers = [
             "symmetry",
@@ -4026,6 +4059,20 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
         )
         targeted_hints.append(
             "- preferred impersonal rewrites: 'the obstacle is ...', 'a helper is needed ...', 'construct point k ...', and 'this gives ...'."
+        )
+    if "opening sentence must mention at least one approved non-anchor opening focus point" in validation_message:
+        targeted_hints.append(
+            "- in the first sentence, name at least one point from opening_focus_points under Global Coverage Targets so the bottleneck is tied to the real goal-side region, not only to the anchor frame."
+        )
+        targeted_hints.append(
+            "- preferred shape: mention the target relation together with one of those points, such as 'the goal angle involving d, h, i, j ...' or 'the target ratio around ae, af, ce, cj ...'."
+        )
+    if "helper sentence must mention at least one approved non-anchor bridge focus point" in validation_message:
+        targeted_hints.append(
+            "- in the second sentence, name at least one point from bridge_focus_points under Global Coverage Targets so the missing helper is attached to the broader visible figure."
+        )
+        targeted_hints.append(
+            "- preferred shape: describe the helper through the line, circle, or side around those points, such as 'a point on line cd', 'a point on be', or 'a helper around g and h'."
         )
     if "generic shortcut" in validation_message:
         targeted_hints.append(
