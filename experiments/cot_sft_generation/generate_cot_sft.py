@@ -1322,6 +1322,22 @@ def find_forbidden_center_shorthand(text):
     return None
 
 
+def find_forbidden_symmetry_shorthand(text):
+    if not isinstance(text, str):
+        return None
+    patterns = [
+        r"\baxis of symmetry\b",
+        r"\bsymmetry axis\b",
+        r"\bsymmetr(?:y|ic|ically)\b",
+        r"\bmirror\b",
+    ]
+    for pattern in patterns:
+        hit = re.search(pattern, text, re.IGNORECASE)
+        if hit:
+            return hit.group(0)
+    return None
+
+
 def audit_source_record(record, image_path: Path, aux_part, sanitized_rest):
     issues = []
     point_coords = get_point_coords(record)
@@ -2268,6 +2284,12 @@ def validate_plan_response(
                 f"{key} must avoid unsupported center shorthand like '{forbidden_center}' and should spell out "
                 "the concrete midpoint, equal-length, perpendicular, or collinear relations instead"
             ), None
+        forbidden_symmetry = find_forbidden_symmetry_shorthand(cleaned_value)
+        if forbidden_symmetry and key != "coordinate_hints":
+            return False, (
+                f"{key} must avoid generic symmetry shorthand like '{forbidden_symmetry}' and should spell out "
+                "the concrete midpoint, equal-length, parallel, perpendicular, or collinear relations instead"
+            ), None
         cleaned_plan[key] = cleaned_value
     if aux_points:
         for field_name in [
@@ -2673,7 +2695,10 @@ def validate_plan_response(
             if idx < len(cleaned_plan["bridge_steps"]) - 1:
                 next_relation = cleaned_plan["bridge_steps"][idx + 1]["relation"].lower()
                 why_text = step["why_it_helps"].lower()
-                if re.search(r"\bmidpoint propert(?:y|ies)\b", why_text, re.IGNORECASE):
+                if (
+                    re.search(r"\bmidpoint propert(?:y|ies)\b", why_text, re.IGNORECASE)
+                    or find_forbidden_symmetry_shorthand(why_text)
+                ):
                     step["why_it_helps"] = build_canonical_bridge_unlock(
                         step.get("next_target_relation", ""),
                         final_step=False,
@@ -2692,7 +2717,10 @@ def validate_plan_response(
                     )
             else:
                 why_text = step["why_it_helps"].lower()
-                if re.search(r"\bmidpoint propert(?:y|ies)\b", why_text, re.IGNORECASE):
+                if (
+                    re.search(r"\bmidpoint propert(?:y|ies)\b", why_text, re.IGNORECASE)
+                    or find_forbidden_symmetry_shorthand(why_text)
+                ):
                     step["why_it_helps"] = build_canonical_bridge_unlock(
                         step.get("next_target_relation", ""),
                         final_step=True,
@@ -2774,6 +2802,12 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
         return False, (
             f"Writer body must avoid unsupported center shorthand like '{forbidden_center}' and should state the "
             "concrete midpoint, equal-length, perpendicular, or collinear relations instead"
+        )
+    forbidden_symmetry = find_forbidden_symmetry_shorthand(body)
+    if forbidden_symmetry:
+        return False, (
+            f"Writer body must avoid generic symmetry shorthand like '{forbidden_symmetry}' and should state the "
+            "concrete midpoint, equal-length, parallel, perpendicular, or collinear relations instead"
         )
     if plan and isinstance(plan.get("bridge_steps"), list):
         sentences = split_into_sentences(body)
@@ -3704,6 +3738,10 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- do not write phrases like 'common center', 'reference center', 'center of symmetry', or 'serve as the center'; replace them with the concrete midpoint, equal-length, perpendicular, or collinear relations that justify the step."
         )
+    if "must avoid generic symmetry shorthand" in validation_message:
+        targeted_hints.append(
+            "- do not write phrases like 'axis of symmetry', 'symmetry', 'symmetric', or 'mirror'; replace them with the concrete midpoint, equal-length, parallel, perpendicular, or collinear relations that justify the step."
+        )
     if "visible_relations" in validation_message:
         targeted_hints.append(
             "- visible_relations should contain only old-figure relations that are already visible before the auxiliary point is introduced; do not place new-point relations there."
@@ -4234,7 +4272,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "11. It must not say that some coordinate table, hidden answer, proof, or reference was provided.\n"
         "12. It must not assign coordinates to newly introduced auxiliary points.\n"
         "13. Do not repeat the prefix sentences verbatim; continue from them.\n"
-        "14. Do not mention coordinates explicitly; describe those cues as visual placement, alignment, symmetry, equal-looking lengths, or perpendicular/parallel structure.\n"
+        "14. Do not mention coordinates explicitly; describe those cues as visual placement, alignment, equal-looking lengths, or perpendicular/parallel structure.\n"
         "15. Keep the post-aux reasoning faithful to the approved visible_relations, aux_direct_relations, bridge_steps, and goal_finish; do not replace them with a different invented route.\n"
         "16. Do not introduce extra named centers, rotational symmetries, square/parallelogram claims, or triangle-similarity claims unless the approved plan already states them and the immediate aux step really supports them.\n"
         "16a. Do not use vague shape shorthand or high-level shape labels such as 'square-like', 'square structure', 'square abcd', 'rectangle', or 'parallelogram'; replace them with the concrete perpendicular, equal-length, midpoint, or parallel relations that justify the step.\n"
