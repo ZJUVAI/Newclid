@@ -2260,6 +2260,10 @@ def validate_plan_response(
                 r"\bsimilarity center\b",
                 r"\bmidpoint propert(?:y|ies)\b",
             ])
+        if key == "coordinate_hints":
+            ignored_patterns.extend([
+                r"\bmidpoint propert(?:y|ies)\b",
+            ])
         ok, message, cleaned_value = validate_descriptive_text(
             plan.get(key),
             key,
