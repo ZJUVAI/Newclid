@@ -3215,6 +3215,70 @@ def build_prefix_coverage_notes(plan):
     return json.dumps(notes, ensure_ascii=False, indent=2) if notes else "[]"
 
 
+def build_relation_reuse_hint(relation_text):
+    if not isinstance(relation_text, str):
+        return ""
+    relation = normalize_relation_surface(relation_text).strip().rstrip(".")
+    lowered = relation.lower()
+    concyclic_match = re.fullmatch(
+        r"([a-z]\w*)(?:,\s*([a-z]\w*))(?:,\s*([a-z]\w*))(?:,\s*([a-z]\w*)) are concyclic",
+        lowered,
+    )
+    if concyclic_match:
+        points = [point for point in concyclic_match.groups() if point]
+        if len(points) >= 4:
+            base = ", ".join(points[:-1])
+            return f"say '{points[-1]} lies on the same circle through {base}' instead of repeating it verbatim"
+    collinear_match = re.fullmatch(
+        r"([a-z]\w*),\s*([a-z]\w*),\s*([a-z]\w*) are collinear",
+        lowered,
+    )
+    if collinear_match:
+        p1, p2, p3 = collinear_match.groups()
+        return f"say 'point {p3} lies on line {p1}{p2}' instead of repeating it verbatim"
+    parallel_match = re.fullmatch(
+        r"line ([a-z]\w*[a-z]\w*) is parallel to line ([a-z]\w*[a-z]\w*)",
+        lowered,
+    )
+    if parallel_match:
+        left, right = parallel_match.groups()
+        return f"say 'line {left} runs parallel to line {right}' instead of repeating it verbatim"
+    perpendicular_match = re.fullmatch(
+        r"line ([a-z]\w*[a-z]\w*) is perpendicular to line ([a-z]\w*[a-z]\w*)",
+        lowered,
+    )
+    if perpendicular_match:
+        left, right = perpendicular_match.groups()
+        return f"say 'line {left} meets line {right} at a right angle' instead of repeating it verbatim"
+    equality_match = re.fullmatch(r"([a-z]\w*) equals ([a-z]\w*)", lowered)
+    if equality_match:
+        left, right = equality_match.groups()
+        return f"say '{left} and {right} have the same length' instead of repeating it verbatim"
+    return f"paraphrase '{relation}' rather than copying the same wording from the prefix"
+
+
+def build_prefix_reuse_guidance(plan):
+    if not isinstance(plan, dict):
+        return "[]"
+    guidance = []
+    seen = set()
+    for relation in plan.get("visible_relations", []) or []:
+        if not isinstance(relation, str) or not relation.strip():
+            continue
+        normalized = normalize_relation_surface(relation).strip().rstrip(".")
+        lowered = normalized.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        guidance.append(
+            {
+                "already_in_prefix": normalized,
+                "reuse_hint": build_relation_reuse_hint(normalized),
+            }
+        )
+    return json.dumps(guidance, ensure_ascii=False, indent=2) if guidance else "[]"
+
+
 def build_plan_coverage_targets(plan, visible_goal="", visible_points=None, max_points=6, max_relations=4):
     if not isinstance(plan, dict):
         return {}
@@ -4079,6 +4143,7 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
         if isinstance(plan, dict) else "[]"
     )
     prefix_coverage_notes = build_prefix_coverage_notes(plan)
+    prefix_reuse_guidance = build_prefix_reuse_guidance(plan)
     coverage_targets = (
         json.dumps(plan.get("coverage_targets", {}), ensure_ascii=False, indent=2)
         if isinstance(plan, dict) else "{}"
@@ -4093,6 +4158,9 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
         )
         targeted_hints.append(
             "- the first two body sentences should avoid every item listed under Prefix-Covered Facts; use those sentences only for the bottleneck and the missing helper."
+        )
+        targeted_hints.append(
+            "- if a later bridge sentence needs one of the visible givens from the prefix, follow Prefix Reuse Guidance and switch to the suggested paraphrase instead of reusing the exact same clause."
         )
     if "first-person narration" in validation_message:
         targeted_hints.append(
@@ -4211,6 +4279,8 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
         f"{coverage_targets}\n\n"
         "Prefix-Covered Facts:\n"
         f"{prefix_coverage_notes}\n\n"
+        "Prefix Reuse Guidance:\n"
+        f"{prefix_reuse_guidance}\n\n"
         "Injected Prefix Block:\n"
         f"{injected_prefix}\n\n"
         f"{targeted_hint_block}"
@@ -4459,6 +4529,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         indent=2,
     )
     prefix_coverage_notes = build_prefix_coverage_notes(plan)
+    prefix_reuse_guidance = build_prefix_reuse_guidance(plan)
     bridge_steps = plan.get("bridge_steps", []) if isinstance(plan, dict) else []
     expected_sentence_count = 4 + len(bridge_steps) + (1 if plan.get("aux_direct_relations") else 0)
     return (
@@ -4516,6 +4587,9 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "[Prefix-Covered Facts]\n"
         "The facts below are already stated by the injected prefix. Do not repeat them in the first two body sentences, and later references should usually be paraphrased rather than copied verbatim.\n"
         f"{prefix_coverage_notes}\n\n"
+        "[Prefix Reuse Guidance]\n"
+        "If a later bridge sentence needs one of the prefix-covered visible relations, prefer these paraphrase patterns instead of copying the same wording again.\n"
+        f"{prefix_reuse_guidance}\n\n"
         "[Write Requirements]\n"
         "Write only the body text that comes after the script-supplied prefix block: an anchor sentence with coordinate tags, a full-figure overview sentence, a coordinate-focused prefix built from the approved relation checks, and a visible-relations sentence injected from the approved plan.\n"
         "Do NOT output <thinking>, <point>, or <coord> tags; the script will add the prefix sentences and the coordinate tags itself.\n"
