@@ -2288,6 +2288,9 @@ def validate_plan_response(
             ), None
         forbidden_symmetry = find_forbidden_symmetry_shorthand(cleaned_value)
         if forbidden_symmetry and key != "coordinate_hints":
+            if key == "helper_idea":
+                cleaned_plan[key] = cleaned_value
+                continue
             return False, (
                 f"{key} must avoid generic symmetry shorthand like '{forbidden_symmetry}' and should spell out "
                 "the concrete midpoint, equal-length, parallel, perpendicular, or collinear relations instead"
@@ -2412,7 +2415,7 @@ def validate_plan_response(
             "midpoint property",
             "midpoint properties",
         ]
-    ) or find_forbidden_shape_shorthand(cleaned_plan["helper_idea"]) or find_forbidden_center_shorthand(cleaned_plan["helper_idea"]):
+    ) or find_forbidden_shape_shorthand(cleaned_plan["helper_idea"]) or find_forbidden_center_shorthand(cleaned_plan["helper_idea"]) or find_forbidden_symmetry_shorthand(cleaned_plan["helper_idea"]):
         cleaned_plan["helper_idea"] = build_canonical_helper_idea(
             cleaned_plan["aux_direct_relations"],
             cleaned_plan.get("goal_bottleneck", ""),
