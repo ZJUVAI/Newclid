@@ -1729,18 +1729,15 @@ def build_canonical_coordinate_hint(coordinate_relations):
     ]
     cleaned_relations = [relation for relation in cleaned_relations if relation]
     if not cleaned_relations:
-        return (
-            "the clearest visual cues are the midpoint, collinear, equal-length, parallel, "
-            "or perpendicular relations already identified in the figure."
-        )
+        return "the clearest visual cues are the midpoint, collinear, equal-length, parallel, or perpendicular relations already visible."
     if len(cleaned_relations) == 1:
         relation_text = cleaned_relations[0]
-        return f"the clearest visual cue is that {relation_text}, so the auxiliary plan should keep using that relation."
+        return f"the clearest visual cue is that {relation_text}."
     if len(cleaned_relations) == 2:
         relation_text = " and that ".join(cleaned_relations)
-        return f"the clearest visual cues are that {relation_text}, so the auxiliary plan should keep using those relations."
+        return f"the clearest visual cues are that {relation_text}."
     relation_text = "; ".join(cleaned_relations[:-1]) + f"; and {cleaned_relations[-1]}"
-    return f"the clearest visual cues are that {relation_text}, so the auxiliary plan should keep using those relations."
+    return f"the clearest visual cues are that {relation_text}."
 
 
 def build_canonical_helper_idea(aux_direct_relations, goal_bottleneck=""):
@@ -2232,8 +2229,6 @@ def validate_plan_response(
     known_points = visible_points + aux_points
     for key in ["anchor_relation", "figure_overview", "coordinate_hints", "goal_bottleneck", "helper_idea", "construction"]:
         ignored_patterns = []
-        if key == "coordinate_hints":
-            ignored_patterns.append(r"\bmidpoint propert(?:y|ies)\b")
         if key == "helper_idea":
             ignored_patterns.extend([
                 r"\bfacilitate\b",
@@ -2494,6 +2489,7 @@ def validate_plan_response(
     if (
         not relation_keyword_present(cleaned_plan["coordinate_hints"])
         or re.search(r"\bsymmetr(?:y|ic)\b|\brotat(?:e|es|ed|ing|ion|ional)\b", cleaned_plan["coordinate_hints"], re.IGNORECASE)
+        or re.search(r"\bmidpoint propert(?:y|ies)\b", cleaned_plan["coordinate_hints"], re.IGNORECASE)
         or find_forbidden_shape_shorthand(cleaned_plan["coordinate_hints"])
         or find_forbidden_center_shorthand(cleaned_plan["coordinate_hints"])
         or not any(point in coordinate_hint_lower for point in relation_mentions)
@@ -2742,9 +2738,9 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
         return False, f"Writer body too short ({len(body)} chars, minimum 120)"
     max_body_len = 1500
     if injected_prefix:
-        # Reserve room for the injected prefix and a small margin so final assembly
-        # does not fail only after the body itself has already been accepted.
-        max_body_len = min(max_body_len, max(200, 2200 - len(injected_prefix) - 40))
+        # Reserve room for the injected prefix, the joining space, and a small
+        # cleanup margin without throwing away large chunks of the 2200-char budget.
+        max_body_len = min(max_body_len, max(200, 2200 - len(injected_prefix) - 12))
     if len(body) > max_body_len:
         return False, f"Writer body too long ({len(body)} chars, maximum {max_body_len})"
     if re.search(r"\b(I|We|I'm|We'll|I've|we've)\b", body):
