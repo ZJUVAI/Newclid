@@ -2468,6 +2468,10 @@ def validate_plan_response(
             point_names=known_points,
             ignored_forbidden_patterns=[
                 r"\bmidpoint propert(?:y|ies)\b",
+                r"\brotational symmetry\b",
+                r"\bcenter of symmetry\b",
+                r"\bcenter of similarity\b",
+                r"\bsimilarity center\b",
             ],
         )
         if not ok:
@@ -2707,6 +2711,7 @@ def validate_plan_response(
                 if (
                     re.search(r"\bmidpoint propert(?:y|ies)\b", why_text, re.IGNORECASE)
                     or find_forbidden_symmetry_shorthand(why_text)
+                    or find_forbidden_center_shorthand(why_text)
                 ):
                     step["why_it_helps"] = build_canonical_bridge_unlock(
                         step.get("next_target_relation", ""),
@@ -2729,6 +2734,7 @@ def validate_plan_response(
                 if (
                     re.search(r"\bmidpoint propert(?:y|ies)\b", why_text, re.IGNORECASE)
                     or find_forbidden_symmetry_shorthand(why_text)
+                    or find_forbidden_center_shorthand(why_text)
                 ):
                     step["why_it_helps"] = build_canonical_bridge_unlock(
                         step.get("next_target_relation", ""),
