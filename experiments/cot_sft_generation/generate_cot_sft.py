@@ -3377,6 +3377,17 @@ def build_plan_coverage_targets(plan, visible_goal="", visible_points=None, max_
     if reminder:
         reminder += "."
 
+    opening_sentence_hint = ""
+    if opening_focus_points:
+        opening_sentence_hint = (
+            f"name the obstacle through {join_natural_list(opening_focus_points[:3])} in the first sentence"
+        )
+    helper_sentence_hint = ""
+    if bridge_focus_points:
+        helper_sentence_hint = (
+            f"name the helper through the local configuration around {join_natural_list(bridge_focus_points[:4])} in the second sentence"
+        )
+
     return {
         "goal_points": ordered_goal_points,
         "goal_points_outside_anchors": goal_points_outside_anchors,
@@ -3384,6 +3395,8 @@ def build_plan_coverage_targets(plan, visible_goal="", visible_points=None, max_
         "opening_focus_points": opening_focus_points,
         "bridge_focus_points": bridge_focus_points,
         "focus_relations": focus_relations[:max_relations],
+        "opening_sentence_hint": opening_sentence_hint,
+        "helper_sentence_hint": helper_sentence_hint,
         "reminder": reminder,
     }
 
@@ -3406,11 +3419,13 @@ def build_writer_sentence_duties(plan):
             f" Keep the missing helper tied to the broader figure around {join_natural_list(bridge_focus_points)} "
             "rather than only restating the anchor frame."
         )
+    helper_sentence_hint = coverage_targets.get("helper_sentence_hint", "")
     lines = [
         "1. Opening sentence: state the goal-side obstacle directly, using the target relation or the target-side points."
         + opening_focus_clause,
         "2. Helper sentence: restate the approved helper idea impersonally, but do not quote the plan wording word-for-word."
-        + helper_focus_clause,
+        + helper_focus_clause
+        + (f" Prefer this shape: {helper_sentence_hint}." if helper_sentence_hint else ""),
         "3. Construction sentence: introduce the auxiliary point from the approved construction, but keep the wording natural rather than copying the plan string verbatim.",
     ]
     aux_direct_relations = plan.get("aux_direct_relations", [])
@@ -3498,6 +3513,7 @@ def build_writer_sentence_blueprints(plan):
             "sentence_type": "opening",
             "goal_finish": plan.get("goal_finish", ""),
             "coverage_points": coverage_targets.get("opening_focus_points", []),
+            "preferred_focus_hint": coverage_targets.get("opening_sentence_hint", ""),
             "instruction": (
                 "State the obstacle directly in goal-side terms without re-describing the injected prefix. "
                 "When possible, anchor that obstacle in one of the listed non-anchor coverage points instead of narrating only the anchor triangle."
@@ -3506,6 +3522,7 @@ def build_writer_sentence_blueprints(plan):
         {
             "sentence_type": "helper",
             "coverage_points": coverage_targets.get("bridge_focus_points", []),
+            "preferred_focus_hint": coverage_targets.get("helper_sentence_hint", ""),
             "instruction": (
                 "State the missing helper mechanism impersonally and concretely, and keep it tied to the broader visible figure listed under the coverage points."
             ),
