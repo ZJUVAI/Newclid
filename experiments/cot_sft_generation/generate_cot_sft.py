@@ -2288,6 +2288,9 @@ def validate_plan_response(
             ), None
         forbidden_symmetry = find_forbidden_symmetry_shorthand(cleaned_value)
         if forbidden_symmetry and key != "coordinate_hints":
+            if key == "anchor_relation":
+                cleaned_plan[key] = cleaned_value
+                continue
             if key == "helper_idea":
                 cleaned_plan[key] = cleaned_value
                 continue
@@ -2344,7 +2347,11 @@ def validate_plan_response(
         return False, message, None
     cleaned_plan["visible_relations"] = cleaned_visible_relations
 
-    if find_forbidden_shape_shorthand(cleaned_plan["anchor_relation"]) or find_forbidden_center_shorthand(cleaned_plan["anchor_relation"]):
+    if (
+        find_forbidden_shape_shorthand(cleaned_plan["anchor_relation"])
+        or find_forbidden_center_shorthand(cleaned_plan["anchor_relation"])
+        or find_forbidden_symmetry_shorthand(cleaned_plan["anchor_relation"])
+    ):
         cleaned_plan["anchor_relation"] = build_canonical_anchor_relation(
             cleaned_plan["anchor_points"],
             cleaned_plan["visible_relations"],
