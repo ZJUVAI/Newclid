@@ -1326,8 +1326,10 @@ def find_forbidden_symmetry_shorthand(text):
     if not isinstance(text, str):
         return None
     patterns = [
+        r"\baxis points?\b",
         r"\baxis of symmetry\b",
         r"\bsymmetry axis\b",
+        r"\baxis\b",
         r"\bsymmetr(?:y|ic|ically)\b",
         r"\bmirror\b",
     ]
