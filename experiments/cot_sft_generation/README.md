@@ -322,11 +322,21 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 - `run_config.json`
 - `summary.json`
 - `item_audits.jsonl`
+- `semantic_audits.jsonl`
 - `sampled_inputs.jsonl`（仅 `-v`）
 - `item_records.jsonl`（仅 `-v`）
 
 `summary.json` 还会额外汇总：
 
+- `surface_pass_items`
+- `surface_fail_items`
+- `surface_pass_rate`
+- `semantic_reviewed_items`
+- `semantic_pass_items`
+- `semantic_fail_items`
+- `semantic_pass_rate`
+- `manual_critical_error_items`
+- `semantic_review_status`
 - `source_audit_issue_items`
 - `generation_audit_issue_items`
 
@@ -334,7 +344,17 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 
 - `source_audit`
 - `generation_audit`
+- `surface_pass`
 - `success`
+
+`semantic_audits.jsonl` 会为每条样本预先写出语义审读占位记录：
+
+- `surface_pass`
+- `semantic_pass`
+- `manual_critical_error`
+- `review_status`
+- `issues`
+- `notes`
 
 `item_records.jsonl` 会保存每条样本的：
 
@@ -345,6 +365,7 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 - plan 输出
 - write 输出
 - final thinking
+- `surface_pass`
 - 校验失败信息
 
 ## 依赖

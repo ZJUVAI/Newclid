@@ -25,6 +25,25 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
+    from .run_artifacts import (
+        build_dataset_output_record,
+        build_item_audit_record,
+        build_item_record,
+        build_missing_image_item_record,
+        build_run_summary,
+        build_semantic_audit_stub,
+    )
+except ImportError:  # pragma: no cover - script execution path
+    from run_artifacts import (
+        build_dataset_output_record,
+        build_item_audit_record,
+        build_item_record,
+        build_missing_image_item_record,
+        build_run_summary,
+        build_semantic_audit_stub,
+    )
+
+try:
     from openai import OpenAI
 except ImportError:  # pragma: no cover - exercised in bare environments
     OpenAI = None
@@ -5275,14 +5294,13 @@ def process_and_generate_sft(
         if not image_path.exists():
             return {
                 "result_data": None,
-                "item_record": {
-                    "sample_order": sample_order,
-                    "input_index": record["_source_index"],
-                    "image_path": str(image_path),
-                    "source_audit": source_audit,
-                    "success": False,
-                    "error": f"Image not found: {image_path}",
-                },
+                "item_record": build_missing_image_item_record(
+                    sample_order=sample_order,
+                    input_index=record["_source_index"],
+                    image_path=str(image_path),
+                    source_audit=source_audit,
+                    error=f"Image not found: {image_path}",
+                ),
             }
 
         generation = generate_thinking(
@@ -5297,43 +5315,31 @@ def process_and_generate_sft(
         public_problem = build_public_problem_text(record)
         aux_part = record["_aux_part"]
         thinking = generation["thinking"]
-        output = None
         result_data = None
         generation_audit = audit_generation_quality(record, generation, aux_part)
 
         if generation["success"] and thinking:
-            output = f"{thinking}\n{aux_part}"
-            result_data = {
-                "instruction": build_instruction_text(),
-                "input": public_problem,
-                "thinking": thinking,
-                "aux": aux_part,
-                "output": output,
-                "image_path": record.get("image_path", ""),
-                "_order": sample_order,
-            }
+            result_data = build_dataset_output_record(
+                sample_order=sample_order,
+                instruction=build_instruction_text(),
+                public_problem=public_problem,
+                thinking=thinking,
+                aux_part=aux_part,
+                image_path=record.get("image_path", ""),
+            )
 
-        item_record = {
-            "sample_order": sample_order,
-            "input_index": record["_source_index"],
-            "image_path": str(image_path),
-            "public_problem": public_problem,
-            "aux": aux_part,
-            "hidden_rest_sanitized": record["_sanitized_rest"],
-            "point_coords_grid": record.get("point_coords_grid", {}),
-            "source_audit": source_audit,
-            "generation_audit": generation_audit,
-            "plan_prompt": generation.get("plan_prompt"),
-            "write_prompt": generation.get("write_prompt"),
-            "plan_output": generation.get("plan_output"),
-            "plan_parsed": generation.get("plan_parsed"),
-            "write_output": generation.get("write_output"),
-            "thinking": thinking,
-            "success": generation["success"],
-            "attempts_used": generation["attempts_used"],
-            "elapsed_seconds": generation["elapsed_seconds"],
-            "error": generation["error"],
-        }
+        item_record = build_item_record(
+            sample_order=sample_order,
+            input_index=record["_source_index"],
+            image_path=str(image_path),
+            public_problem=public_problem,
+            aux_part=aux_part,
+            hidden_rest_sanitized=record["_sanitized_rest"],
+            point_coords_grid=record.get("point_coords_grid", {}),
+            source_audit=source_audit,
+            generation_audit=generation_audit,
+            generation=generation,
+        )
         return {"result_data": result_data, "item_record": item_record}
 
     sft_dataset = []
@@ -5361,32 +5367,28 @@ def process_and_generate_sft(
 
     source_audit_issue_items = sum(1 for item in item_records if item.get("source_audit", {}).get("has_issue"))
     generation_audit_issue_items = sum(1 for item in item_records if item.get("generation_audit", {}).get("has_issue"))
-    summary = {
-        "input_jsonl": str(input_path),
-        "total_candidates_with_aux": len(all_aux_records),
-        "sampled_items": len(selected),
-        "successful_items": len(sft_dataset),
-        "failed_items": len(selected) - len(sft_dataset),
-        "source_audit_issue_items": source_audit_issue_items,
-        "generation_audit_issue_items": generation_audit_issue_items,
-        "num_workers": num_workers,
-        "max_retries_per_stage": max_retries,
-        "model_name": model_name,
-        "output_jsonl": os.path.abspath(output_jsonl),
-        "artifacts_dir": os.path.abspath(run_dir),
-        "runtime_seconds": time.time() - start_time,
-    }
+    semantic_audit_records = [build_semantic_audit_stub(item) for item in item_records]
+    summary = build_run_summary(
+        input_jsonl=str(input_path),
+        total_candidates_with_aux=len(all_aux_records),
+        sampled_items=len(selected),
+        item_records=item_records,
+        semantic_audit_records=semantic_audit_records,
+        source_audit_issue_items=source_audit_issue_items,
+        generation_audit_issue_items=generation_audit_issue_items,
+        num_workers=num_workers,
+        max_retries_per_stage=max_retries,
+        model_name=model_name,
+        output_jsonl=output_jsonl,
+        artifacts_dir=run_dir,
+        runtime_seconds=time.time() - start_time,
+    )
     write_json(run_dir / "summary.json", summary)
-    write_jsonl(run_dir / "item_audits.jsonl", [
-        {
-            "sample_order": item["sample_order"],
-            "input_index": item["input_index"],
-            "source_audit": item.get("source_audit", {}),
-            "generation_audit": item.get("generation_audit", {}),
-            "success": item.get("success", False),
-        }
-        for item in item_records
-    ])
+    write_jsonl(
+        run_dir / "item_audits.jsonl",
+        [build_item_audit_record(item) for item in item_records],
+    )
+    write_jsonl(run_dir / "semantic_audits.jsonl", semantic_audit_records)
     logger.info("SFT dataset generation completed.")
     logger.info(f"Generated {len(sft_dataset)} records.")
     return {

@@ -1,6 +1,6 @@
 # Current CoT SFT Design
 
-本文档只描述当前代码头部实现，也就是 [generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py) 现在真正执行的流程；历史迭代和实验结论见 [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/STATUS.md) 与 [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/EXPERIMENT_LOG.md)。
+本文档描述当前代码头部实现，也就是 [generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py) 与 [run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py) 现在真正执行的流程；历史迭代和实验结论见 [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/STATUS.md) 与 [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/EXPERIMENT_LOG.md)。
 
 ## 1. 总体目标
 
@@ -274,6 +274,69 @@ writer body 通过后，脚本才会：
    - `aux`
    - `output = thinking + "\\n" + aux`
 
+### 2.10 run artifacts 层
+
+当前 artifacts/schema 相关逻辑已经从主流程里抽出一层，放到 [run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py)。
+
+它负责的不是几何推理，而是 run 级数据结构：
+
+1. 数据集输出条目
+   - `instruction`
+   - `input`
+   - `thinking`
+   - `aux`
+   - `output`
+   - `image_path`
+
+2. `item_record`
+   - 样本级完整记录
+   - 包括：
+     - public problem
+     - aux
+     - hidden rest
+     - source audit
+     - generation audit
+     - plan / write prompt
+     - plan / write 输出
+     - final thinking
+     - `surface_pass`
+
+3. `item_audits.jsonl`
+   - 当前每条样本都会导出：
+     - `sample_order`
+     - `input_index`
+     - `source_audit`
+     - `generation_audit`
+     - `surface_pass`
+   - 为了兼容旧分析脚本，仍保留 `success` 字段，但长期应优先读 `surface_pass`
+
+4. `semantic_audits.jsonl`
+   - 当前生成阶段不会自动给出 `semantic_pass`
+   - 但脚本已经会为每条样本写出一条语义审读占位记录，包含：
+     - `surface_pass`
+     - `semantic_pass: null`
+     - `manual_critical_error: null`
+     - `review_status: "pending"`
+     - `issues`
+     - `notes`
+   - 这一步的目的，是把“语义审读还没做”也显式落盘，而不是只留在对话记忆里
+
+5. `summary.json`
+   - 当前仍保留旧的兼容字段：
+     - `successful_items`
+     - `failed_items`
+   - 同时新增更明确的分层字段：
+     - `surface_pass_items`
+     - `surface_fail_items`
+     - `surface_pass_rate`
+     - `semantic_reviewed_items`
+     - `semantic_pass_items`
+     - `semantic_fail_items`
+     - `semantic_pass_rate`
+     - `manual_critical_error_items`
+     - `semantic_review_status`
+   - 因为当前 run 结束时默认还没做人工/Codex 审读，所以大多数 run 的 `semantic_review_status` 会是 `not_reviewed`
+
 ## 3. 中间哪些步骤是通过脚本做的
 
 是的，中间大部分关键控制都已经转成脚本，不只是 prompt。
@@ -290,6 +353,8 @@ writer body 通过后，脚本才会：
 - injected prefix 注入
 - writer body 终检
 - final `<thinking>` 组装
+- run artifacts schema 构造
+- `surface_pass` / `semantic_audits` 占位落盘
 
 模型主要负责两件事：
 
@@ -321,3 +386,4 @@ writer body 通过后，脚本才会：
 1. 虽然当前头部设计已经在固定回归上拿到新的 `4/4`，但样本数仍然小。
 2. sample3 一类样本之前仍会掉到 `write 2`，最新 `ace2ae7` 是针对这个点的补丁，但还缺新的完整 live 结论。
 3. 全量 10 万样本的真实通过率、重试成本和长尾失败分布还没有被充分测过。
+4. 虽然代码已经开始显式落 `semantic_audits.jsonl` 和 `surface_pass_rate`，但真正的 `semantic_pass` 仍然要靠后续人工/Codex 审读回填；当前还没有自动 `critic` 阶段。

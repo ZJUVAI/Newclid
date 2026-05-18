@@ -61,8 +61,17 @@
     - planner / writer 调用
     - validator
     - generation audit
-    - run artifacts 落盘
+    - 主流程编排
   - 任何对 prompt、validator、artifact schema、run summary 的修改，都必须同步更新 `CURRENT_DESIGN.md`。
+
+- [run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py)
+  - 当前 artifacts/schema 层，负责：
+    - 数据集输出条目 schema
+    - `item_record`
+    - `item_audits.jsonl`
+    - `semantic_audits.jsonl`
+    - `summary.json`
+  - 如果改动的是 run summary、surface/semantic pass 字段、人工审读占位 schema，这里应优先作为落点，而不是继续把 schema 拼装逻辑塞回主脚本。
 
 - [prepare_metadata.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/prepare_metadata.py)
   - 独立的前处理脚本，负责抽样和反转图片。
