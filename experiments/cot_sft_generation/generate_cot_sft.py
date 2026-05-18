@@ -3618,6 +3618,31 @@ def build_writer_bridge_contracts(plan):
     return contracts
 
 
+def build_bridge_sentence_checklist(plan):
+    if not isinstance(plan, dict):
+        return ""
+    lines = []
+    for idx, step in enumerate(plan.get("bridge_steps", []), start=1):
+        if not isinstance(step, dict):
+            continue
+        relation = step.get("approved_route_relation") or step.get("relation", "")
+        required_supports = step.get("required_supports", [])
+        line = f"{idx}. State '{relation}' as its own bridge sentence."
+        if required_supports:
+            line += f" Mention at least one of {json.dumps(required_supports, ensure_ascii=False)}."
+        if step.get("focus_points"):
+            line += f" Mention at least one of {join_natural_list(step.get('focus_points', []))}."
+        next_target_purpose = step.get("next_target_purpose", "")
+        if next_target_purpose:
+            line += f" Unlock clause: '{next_target_purpose}'."
+        lines.append(line)
+    if plan.get("goal_finish"):
+        lines.append(
+            f"{len(lines) + 1}. After the last bridge sentence, end with '{plan.get('goal_finish', '')}'."
+        )
+    return "\n".join(lines)
+
+
 def build_writer_sentence_blueprints(plan):
     if not isinstance(plan, dict):
         return []
@@ -4279,6 +4304,10 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
         json.dumps(build_writer_sentence_blueprints(plan), ensure_ascii=False, indent=2)
         if isinstance(plan, dict) else "[]"
     )
+    bridge_sentence_checklist = (
+        build_bridge_sentence_checklist(plan)
+        if isinstance(plan, dict) else ""
+    )
     bridge_contracts = (
         json.dumps(bridge_contract_items, ensure_ascii=False, indent=2)
         if isinstance(plan, dict) else "[]"
@@ -4446,6 +4475,8 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
         "Keep one sentence for each bridge step, and explicitly name concrete supporting relations instead of using vague shortcuts.\n"
         "Global Coverage Targets:\n"
         f"{coverage_targets}\n\n"
+        "Non-Skippable Bridge Checklist:\n"
+        f"{bridge_sentence_checklist}\n\n"
         "Prefix-Covered Facts:\n"
         f"{prefix_coverage_notes}\n\n"
         "Prefix Reuse Guidance:\n"
@@ -4692,6 +4723,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         ensure_ascii=False,
         indent=2,
     )
+    bridge_sentence_checklist = build_bridge_sentence_checklist(plan)
     bridge_contracts = json.dumps(
         build_writer_bridge_contracts(plan),
         ensure_ascii=False,
@@ -4736,6 +4768,9 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         f"Direct aux consequences to realize in order: {json.dumps(plan.get('aux_direct_relations', []), ensure_ascii=False)}\n"
         f"Bridge steps to realize in order: {json.dumps(plan.get('bridge_steps', []), ensure_ascii=False, indent=2)}\n"
         f"Goal-side finish to reach: {plan.get('goal_finish', '')}\n\n"
+        "[Non-Skippable Bridge Checklist]\n"
+        "Each item below must appear as its own sentence in order. Do not merge bridge step i into bridge step i+1, and do not replace an approved relation with a later stronger-looking relation.\n"
+        f"{bridge_sentence_checklist}\n\n"
         "[Sentence Duties]\n"
         "Use this outline internally to keep the body stepwise, concrete, and impersonal. Do not quote these lines verbatim, and do not repeat the injected prefix.\n"
         f"{sentence_duties}\n\n"
@@ -4790,6 +4825,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "20a. When a bridge step lists internal required_supports, mention those support relations explicitly in the same sentence unless doing so would repeat the exact prefix wording; in that case paraphrase them.\n"
         "20b. When a bridge contract includes a preferred_sentence_shell, stay very close to that local order and only smooth the wording lightly.\n"
         "20c. When a bridge contract includes non-empty focus_points, mention at least one of those points in the same sentence so the bridge stays tied to the intended non-anchor region.\n"
+        "20d. Do not skip bridge_steps[i] just because bridge_steps[i+1] feels more informative; each approved bridge relation must appear explicitly before the next one starts.\n"
         "21. Avoid shortcuts such as 'by symmetry', 'from the setup', or 'it follows' unless the same sentence explicitly names the concrete supporting relations.\n"
         "22. Do not hedge with phrases like 'similarity or angle equality'; state the specific approved relation you are using.\n"
         "23. Each bridge_steps object includes an internal next_target_relation and next_target_purpose chosen by the script. Use them to keep the reasoning pointed toward the next approved relation instead of inventing a different route.\n"
