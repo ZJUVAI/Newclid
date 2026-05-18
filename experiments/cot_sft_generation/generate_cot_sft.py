@@ -3654,8 +3654,10 @@ def build_writer_handoff(plan):
             {
                 "relation": step.get("approved_route_relation") or step.get("relation", ""),
                 "required_supports": step.get("required_supports", []),
+                "min_support_mentions": step.get("min_support_mentions", 1 if step.get("required_supports") else 0),
                 "focus_points": step.get("focus_points", []),
                 "unlock_purpose": step.get("next_target_purpose", ""),
+                "preferred_sentence_shell": build_bridge_sentence_shell(step),
             }
         )
     coverage_targets = plan.get("coverage_targets", {}) if isinstance(plan.get("coverage_targets"), dict) else {}
@@ -4765,6 +4767,7 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         f"{proof_guidance}\n\n"
         "[Approved Writer Handoff]\n"
         "This is the compact plan-to-write payload. Follow it faithfully instead of inventing a different route.\n"
+        "If a bridge step includes preferred_sentence_shell, stay close to that local order and wording while still writing natural English.\n"
         f"{writer_handoff}\n\n"
         "[Non-Skippable Bridge Checklist]\n"
         "Each item below must appear as its own sentence in order. Do not merge bridge step i into bridge step i+1, and do not replace an approved relation with a later stronger-looking relation.\n"
