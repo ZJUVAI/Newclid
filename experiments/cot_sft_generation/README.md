@@ -14,6 +14,12 @@
 
 因此，这个脚本做的是“full-information teacher -> visible-only student target”的数据蒸馏，而不是把完整证明直接暴露给训练模型。
 
+## 文档导航
+
+- [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/CURRENT_DESIGN.md)：当前代码真正执行的流程、`plan` 字段、脚本派生字段、writer 约束。
+- [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/STATUS.md)：阶段性进展、当前最好证据、已知问题、距离目标的差距。
+- [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/EXPERIMENT_LOG.md)：按时间记录的近期实验日志和提交对应关系。
+
 ## 默认数据源
 
 默认输入文件已经切换为：
@@ -94,59 +100,59 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 ## 当前生成框架
 
-脚本现在采用更受控的两阶段生成：
+当前代码是“脚本强约束 + 两阶段模型生成”：
 
-1. `plan`
-   - 教师模型看到完整记录和图片
-   - 只输出结构化 JSON，而不是直接写整段 `thinking`
-   - JSON 中包含：
+1. `source audit`
+   - 先检查图片、题面、`<aux>`、proof、坐标字段是否缺失或明显冲突。
+   - 发现异常先记录，不为了通过率强行硬写。
+
+2. `plan`
+   - planner 只输出结构化 JSON，不直接写整段 `thinking`。
+   - 关键字段包括：
      - `anchor_points`
-     - `anchor_relation`
      - `figure_overview`
      - `coordinate_relations`
      - `visible_relations`
-     - `coordinate_hints`
      - `goal_bottleneck`
-     - `helper_idea`
      - `construction`
      - `aux_direct_relations`
      - `bridge_steps`
      - `goal_finish`
-   - 目标不再只是“提出 aux”，而是把下面几件事先拆干净：
-     - 用少量 tagged anchor points 给图定向
-     - 对全图做更完整的可见结构概览，而不只盯 2-3 个点
-     - 利用 hidden visible-point coordinates 做内部 sanity check，先提炼 2-3 个更具体的候选关系，再决定哪些几何关系值得继续追
-     - 说明当前目标的真正瓶颈是什么
-     - 给出 aux 的构造语句
-     - 明确拆开“加了这个 aux 之后，下一步打算怎么继续解”的关系桶：
-       - `aux_direct_relations`
-       - `bridge_steps`
-       - `goal_finish`
-   - 如果 hidden aux 含多个新点，还会额外要求 `construction` 里显式写出 staged strategy，例如 `first ... then ...`
-2. `write`
-   - 再根据 `plan` 输出纯正文 body
-   - 这一步不允许模型自己输出 `<point>` / `<coord>` 标签
-   - 脚本会自动把四类前缀句拼进最终 `thinking`：
-     - 带 `<point>...</point><coord>(x,y)</coord>` 的 anchor sentence
-     - `figure_overview` 句
-     - `coordinate_hints` 句
-     - `visible_relations` 句
-   - writer prompt 会显式给出这段将被注入的 prefix block，writer 应直接从 bottleneck / obstacle 起笔，而不是重复前缀里已经出现的图形概览或已知关系
-   - 脚本还会从 `figure_overview / visible_relations / bridge_steps / goal_finish` 中派生一组 `Global Coverage Targets`，把非锚点但与 goal 和 bridge 真正相关的可见点、旧图关系显式传给 writer，减少正文只围着 anchor frame 打转
-   - writer 的前两句会被优先约束到这些 targets：第一句直接点出 goal-side obstacle 所在的非锚点区域，第二句说明 helper 要接回哪些非锚点子结构
-   - writer 只负责后续正文，即：
-     - 解释瓶颈
-     - 引出 aux
-     - 按 `aux_direct_relations -> bridge_steps -> goal_finish` 把 aux 之后的验证链真正推进到目标
-   - writer 还会被要求把每个 `bridge_steps` 单独落成一句，并在该句中显式点出至少一个 `depends_on` 里的具体支持关系，而不是用 `by symmetry` / `it follows` 之类的空泛跳步
-   - 脚本还会在内部为每个 `bridge_steps` 自动补一个 `next_target_relation`，把“下一跳精确目标”显式传给 writer，避免完全依赖模型自己把 `why_it_helps` 写成机械的点名句
+   - 脚本会把 planner 输出继续规范化，并自动补齐 route / coverage 相关派生字段。
 
-也就是说，现在的机制是：
+3. 脚本补全中间约束
+   - 自动派生 `coverage_targets`，把 goal-side 非锚点区域显式交给 writer。
+   - 为每个 `bridge_steps[*]` 自动补：
+     - `next_target_relation`
+     - `next_target_purpose`
+     - `required_supports`
+     - `focus_points`
+     - `preferred_sentence_shell`
+   - 这些字段的目的，是强制 writer 不要只围着 anchor frame 打转，也不要跳过 bridge。
 
-- 模型负责选哪些点值得被 tagged，以及如何理解全图和后续验证路径
-- 脚本负责把这些点的真实坐标从源数据精确注入最终 `thinking`
-- hidden structured coordinate candidates 负责把“坐标判断”先收敛成更具体的可疑关系
-- hidden proof guidance 负责约束 `aux_direct_relations / bridge_steps / goal_finish` 不要停在“提出 aux”，而要尽量贴近真实可解路径
+4. `write`
+   - writer 只写 body 纯文本，不允许自己写 `<point>` / `<coord>`。
+   - 脚本会先注入 prefix：
+     - anchor sentence
+     - figure overview sentence
+     - coordinate hint sentence
+     - visible relation sentence
+   - writer 实际吃到的是紧凑版 `Approved Writer Handoff`，而不是整份冗长 plan。
+   - prompt 中还会附带：
+     - `Global Coverage Targets`
+     - `Non-Skippable Bridge Checklist`
+     - 每个 bridge step 的 `preferred_sentence_shell`
+
+5. 终检与导出
+   - writer body 通过脚本终检后，才会组装成最终 `<thinking>...</thinking>`。
+   - 终检会检查：
+     - 长度和格式
+     - prefix 重复
+     - shorthand / 泄露
+     - bridge relation 是否逐句按顺序落实
+     - `goal_finish` 是否真的落地
+
+更细的字段说明和脚本过程见 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/CURRENT_DESIGN.md)。
 
 ## 泄露控制
 

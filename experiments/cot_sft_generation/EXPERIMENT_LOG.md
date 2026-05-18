@@ -6,14 +6,22 @@
 
 ### 最近提交
 
+- `ace2ae7` `Relax bridge focus fallback for anchor-side steps`
+  - 这已经不是未提交补丁，已经入库。
+  - 改动点：放宽 `build_bridge_step_focus_points(...)` 的 fallback。
+  - 目的：如果某个 bridge step 的非锚点 `focus_points` 过窄，就回退到 support-side points，并允许把 anchor-side support 也补进来。
+  - 直接动机：`v142` sample3 的首条 bridge 句第一次失败，报错是：
+    - `Writer sentence for bridge_steps[0] must mention at least one approved bridge focus point from its contract`
+  - 当时 sample3 的相关 route 是：
+    - `ag equals eg`
+    - `cg equals eg`
+    - `triangles afg and cfg are similar`
+    - `dg equals fg`
+  - 补丁前，step1 的 `focus_points` 太窄，writer 很容易自然地先谈 support-side 的 `d/e/g`，却因为 contract 只收得很窄而被拒。
+
 - `56e432b` `Add bridge sentence shells to writer handoff`
   - 在 compact writer handoff 里给每个 `bridge_steps` 补回 `preferred_sentence_shell` 和 `min_support_mentions`。
   - 目的：压掉 compact handoff 后 sample1 首轮 `generic shortcut` 的 writer 失败。
-
-- 工作区未提交补丁：bridge focus fallback
-  - 当前在本地补了 `build_bridge_step_focus_points` 的 fallback：
-    - 如果非锚点 `focus_points` 太窄，会补入 support-side 的 anchor 点
-  - 目的：解决 sample3 首条 bridge 句因为 `focus_points=['a']` 过窄而掉到 `write 2` 的问题
 
 - `82118d6` `Compress writer handoff payload`
   - 把 writer prompt 从整份 plan + 多套重复说明，压成更小的 `Approved Writer Handoff`。
@@ -98,7 +106,11 @@
   - 输入：`/tmp/cot_regression_v143_single_sample3_focus_fallback_input.jsonl`
   - artifacts：`/tmp/cot_regression_v143_single_sample3_focus_fallback_output_artifacts_20260518_024413`
   - 当前状态：
-    - 仍卡在首个 `plan` 调用，尚未形成质量结论
+    - 这轮没有产出 `summary.json`，因此没有形成可用于判断质量的正式结论。
+    - `run.log` 只记录到：
+      - `2026-05-18 10:49:45 [INFO] [plan] Valid output in 332.14s`
+      - `2026-05-18 10:49:45 [INFO] [write] Attempt 1/3`
+    - 之后未完成落盘，当前也没有活跃进程；因此这轮只能记为未完成，不应拿来证明 `ace2ae7` 已经生效。
 
 ### 最新判断补充
 
@@ -107,6 +119,7 @@
   - sample1 单样本：`plan 1 + write 1`
   - sample2 单样本：`plan 1 + write 1`
 - 固定 `4` 条回归 `v142` 已经给出新的完整 `4/4` 证据，但 sample3 仍依赖一次 writer retry。
+- `ace2ae7` 已经把 sample3 暴露出的 contract 过窄问题补到代码里，但还缺新的 live 成功样本来确认它是否把 sample3 从 `write 2` 压回 `write 1`。
 
 ### 当前判断
 
@@ -116,5 +129,5 @@
   - 最后只把最必要的局部句壳加回去
 
 - 现阶段最关键的验证项仍然是：
-  - 固定 `4` 条回归能否形成一轮新的完整 `4/4`
-  - sample1/sample2 是否能稳定保持 `write 1`
+  - 在 `ace2ae7` 之后，sample3 是否能稳定保持 `write 1`
+  - 当前 compact handoff 路线在更大随机样本上是否还能维持 `4/4` 级别的局部表现
