@@ -33,6 +33,19 @@
     - 新增/删除阶段
     - summary 或 audit schema 变化
 
+- [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/ARTIFACT_SCHEMA.md)
+  - 回答：
+    - `summary.json`
+    - `item_records.jsonl`
+    - `item_audits.jsonl`
+    - `semantic_audits.jsonl`
+    - 最终输出 JSONL
+    - 这些文件里有哪些稳定字段
+  - 适合更新的场景：
+    - schema 变更
+    - 新增/废弃兼容字段
+    - 语义审读刷新协议变化
+
 - [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/STATUS.md)
   - 回答：
     - 当前最好证据是什么
@@ -52,6 +65,15 @@
     - 新 run 落盘
     - 新 commit 对应的实验结果确认
     - 新的人审结论需要追加到时间线
+
+- [benchmarks/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/README.md)
+  - 回答：
+    - 当前有哪些固定 benchmark
+    - 这些 benchmark 的来源和用途
+    - manifest 至少应记录哪些信息
+  - 适合更新的场景：
+    - 新 benchmark 落仓
+    - 历史 benchmark 废弃或换代
 
 ### 1.2 代码文件
 
@@ -76,6 +98,20 @@
 - [prepare_metadata.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/prepare_metadata.py)
   - 独立的前处理脚本，负责抽样和反转图片。
   - 如果这里只改采样元数据，不需要更新主链设计文档；只有当输入协议变化时，才要更新 `README.md` 或 `CURRENT_DESIGN.md`。
+
+- [semantic_review.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/semantic_review.py)
+  - 负责：
+    - 校验 `semantic_audits.jsonl` 与 `item_audits.jsonl` 是否逐行对齐
+    - 刷新 `summary.json` 的 run 级 semantic 指标
+  - 如果改了语义审读字段、review status 规则或 summary 汇总逻辑，这里必须和 `ARTIFACT_SCHEMA.md` 同步更新。
+
+- [tests/test_cot_sft_review_artifacts.py](/root/GenesisGeo-cot/tests/test_cot_sft_review_artifacts.py)
+  - 负责：
+    - `run_artifacts.py`
+    - `semantic_review.py`
+    - summary 刷新协议
+    的最小回归验证
+  - 当前刻意写成 `unittest` 入口，避免长期维护依赖额外安装 `pytest`。
 
 ## 2. 变更类型与必查文件
 
@@ -105,7 +141,10 @@
 至少检查：
 
 - `generate_cot_sft.py` 的落盘逻辑
+- `run_artifacts.py`
+- `semantic_review.py`
 - `CURRENT_DESIGN.md` 的 artifacts 说明
+- `ARTIFACT_SCHEMA.md`
 - `README.md` 的“迭代规范流程”是否还要求了当前代码没有落盘的字段
 - 历史实验记录里是否存在旧字段口径，需要补说明
 
@@ -148,11 +187,18 @@
 - run 级 `semantic_pass_rate`
 - run 级 `manual_critical_error_rate`
 
+当前已经落仓的最小基线是：
+
+- [benchmarks/fixed_v104sample_input.jsonl](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_input.jsonl)
+- [benchmarks/fixed_v104sample_manifest.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_manifest.json)
+
+但这还只是起点，不代表分层基线已经补齐。
+
 ## 4. 当前代码最需要避免的维护风险
 
 ### 4.1 单文件过大
 
-当前主脚本体量已经较大，后续若继续增长，会让以下几类修改更容易互相干扰：
+当前主脚本体量已经较大；截至 2026-05-18，[generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py) 约 `5484` 行。后续若继续增长，会让以下几类修改更容易互相干扰：
 
 - prompt 调整
 - validator 调整
@@ -160,6 +206,15 @@
 - 审计指标调整
 
 因此，后续重构时应优先把“纯 schema / artifacts 逻辑”和“模型推理逻辑”拆开，而不是继续把所有辅助函数堆回主文件。
+
+推荐的下一轮拆分边界是：
+
+1. `planner/plan normalization`
+2. `writer contract / prefix assembly`
+3. `validators / audits`
+4. `prompt builders`
+
+如果以后继续做大改，但没有沿这些边界拆模块，那么“文档清楚”也不足以抵消主文件互相干扰的风险。
 
 ### 4.2 文档先行、代码不跟
 
@@ -195,10 +250,11 @@ Codex 可以基于对话上下文推进，但长期维护不能依赖“之前�
    - 文档口径
 
 2. 对应文档是否同步了
-   - `README.md`
-   - `CURRENT_DESIGN.md`
-   - `STATUS.md`
-   - `EXPERIMENT_LOG.md`
+  - `README.md`
+  - `CURRENT_DESIGN.md`
+  - `ARTIFACT_SCHEMA.md`
+  - `STATUS.md`
+  - `EXPERIMENT_LOG.md`
 
 3. 当前 run artifacts 是否还能回答下面这些问题
    - 哪些样本 `surface_pass`
@@ -210,21 +266,32 @@ Codex 可以基于对话上下文推进，但长期维护不能依赖“之前�
 4. 这轮结论是否仍然依赖 `/tmp` 中不可复现的临时文件
    - 如果是，要在文档里明确标注它只是“临时证据”，不能当长期基线
 
+5. 最小验证入口是否还能在当前环境运行
+   - `python -m py_compile ...`
+   - `python experiments/cot_sft_generation/semantic_review.py --help`
+   - `python -m unittest discover -s tests -p 'test_cot_sft_review_artifacts.py'`
+
 ## 6. 当前仍需补齐的说明
 
-截至当前版本，仍建议后续补齐：
+截至当前版本，下面几项已经补齐：
 
-1. 固定 benchmark 清单落仓规则
+1. 固定 benchmark 的落仓目录和 manifest 说明
 2. 语义审读 artifacts 的正式 schema
 3. `summary.json` 字段表
 4. `item_records.jsonl` / `item_audits.jsonl` 字段表
-5. “改某个 goal type 的 prompt 时，应抽哪些样本做定向审读”的具体说明
+5. `semantic_review.py` 的刷新协议
+6. 最小验证入口的标准库运行方式
 
-这些内容一旦落地，应优先更新到 `CURRENT_DESIGN.md` 或新增专门 schema 文档，而不是只停留在聊天记录里。
+当前仍建议继续补齐的是：
+
+1. 按 `goal_type` / `aux_type` 分层的 benchmark 清单
+2. “改某个 goal type 的 prompt 时，应抽哪些样本做定向审读”的具体规则
+3. 主脚本后续模块拆分后的落点文档
+4. 如果将来引入自动 `critic`，其输出 schema 和与 `semantic_audits.jsonl` 的关系
 
 ## 7. 当前支撑程度判断
 
-按当前代码与文档状态，这套链路已经可以支撑“有纪律的持续 Codex 迭代”，但还不能算“完全稳定的长期维护形态”。
+按当前代码与文档状态，这套链路已经可以支撑“稳定交接的长期 Codex 迭代”，但还不能算“长期低成本维护”。
 
 ### 7.1 已经具备的条件
 
@@ -234,17 +301,20 @@ Codex 可以基于对话上下文推进，但长期维护不能依赖“之前�
   - `semantic_audits.jsonl` 占位记录
   - run 级 `surface_pass_rate`
 - artifacts/schema 层已经单独拆出，不必继续所有字段都塞回主脚本
+- 固定 benchmark 已经开始版本化进仓库，而不是只留在 `/tmp`
+- `semantic_review.py` 已经把“语义审读回填后如何刷新 summary”变成可执行协议
+- schema 细节和最小验证入口已经写成文档，不再依赖会话记忆
 
 ### 7.2 仍然限制长期稳定性的点
 
-- 固定回归集和分层抽样集还没有真正版本化进仓库
+- 固定 benchmark 目前只有一组 `4` 条样本，分层覆盖仍然不够
 - `semantic_pass` 仍需人工/Codex 回填，当前还没有自动 `critic` 阶段
 - prompt / validator / audit 逻辑仍高度集中在主脚本里，后续还需要继续拆分
 
 ### 7.3 当前推荐结论
 
-- 如果目标是下一轮继续按同一协议推进实验，当前结构已经够用
-- 如果目标是把这条链路长期交给不同 Codex 会话、不同人或不同机器持续接手，仍建议优先补齐：
-  - benchmark 持久化
-  - 语义审读落盘协议
+- 如果目标是让不同 Codex 会话、不同人或不同机器按同一协议继续维护，这一版已经够用
+- 如果目标是让后续维护成本继续下降，优先级最高的补充仍然是：
+  - 分层 benchmark 扩充
+  - 自动 `critic` 或更强语义审读协议
   - 更细的代码拆分

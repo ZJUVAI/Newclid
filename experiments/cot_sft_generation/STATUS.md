@@ -125,7 +125,12 @@
 
 7. 导出与记录
    - 导出 `thinking + aux`。
-   - 同时保存 `summary.json`、`item_records.jsonl`、`item_audits.jsonl`，方便后续随机回归和失败样本回放。
+   - 同时保存 `summary.json`、`item_records.jsonl`、`item_audits.jsonl`、`semantic_audits.jsonl`，方便后续随机回归、语义审读和失败样本回放。
+
+8. 维护侧补强
+   - 固定 benchmark 已经开始版本化进仓库，不再只靠 `/tmp`。
+   - 语义审读结果现在可以通过 `semantic_review.py` 回刷到 `summary.json`。
+   - artifacts 字段协议已经单独写入 `ARTIFACT_SCHEMA.md`，不再只散落在实现和聊天记录里。
 
 更细的字段格式、脚本派生字段和 writer 合同见 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/CURRENT_DESIGN.md)。
 
@@ -235,6 +240,18 @@
   - 表层格式、泄露控制和 route checklist 已经显著变强
   - 小样本脚本通过率重新回到 `4/4`
   - 但真实几何语义可靠性仍未建立，不能直接视为可批量生产的数据链路
+
+## 当前维护支撑度
+
+- 如果问题是“这套代码和文档现在能不能支撑稳定的长期 Codex 迭代”，当前答案已经接近“能”：
+  - 文档分工已经清楚区分目标、现状、实验时间线、维护约定和 artifact schema
+  - 固定 benchmark 已落仓
+  - 语义审读回刷 summary 的协议已可执行
+  - 最小验证入口不再依赖额外安装 `pytest`
+- 但如果问题是“后续维护成本是否已经足够低”，答案仍然是否：
+  - [generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py) 仍然过大
+  - benchmark 覆盖仍然偏窄
+  - 自动 `critic` 还没有落地
 
 ## 距离目标的差距
 

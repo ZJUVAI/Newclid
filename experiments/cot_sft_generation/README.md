@@ -17,7 +17,9 @@
 ## 文档导航
 
 - [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/CURRENT_DESIGN.md)：当前代码真正执行的流程、`plan` 字段、脚本派生字段、writer 约束。
+- [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/ARTIFACT_SCHEMA.md)：`summary.json`、`item_records.jsonl`、`item_audits.jsonl`、`semantic_audits.jsonl` 的正式字段协议。
 - [MAINTENANCE_PLAYBOOK.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/MAINTENANCE_PLAYBOOK.md)：长期 Codex 迭代时的文件分工、变更地图、回归资产要求和维护检查清单。
+- [benchmarks/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/README.md)：仓库内固定 benchmark、manifest 和复用方式。
 - [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/STATUS.md)：阶段性进展、当前最好证据、已知问题、距离目标的差距。
 - [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/EXPERIMENT_LOG.md)：按时间记录的近期实验日志和提交对应关系。
 
@@ -30,6 +32,21 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 ```
 
 如果不传 `-i/--input`，脚本会直接使用这个文件。
+
+## 固定基线
+
+长期迭代时，不应只依赖 `/tmp` 里的临时回归文件。当前已经落仓的固定基线见 [benchmarks/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/README.md)。
+
+当前最重要的固定集是：
+
+- [benchmarks/fixed_v104sample_input.jsonl](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_input.jsonl)
+- [benchmarks/fixed_v104sample_manifest.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_manifest.json)
+
+它用于：
+
+- 固定 surface regression
+- 固定 semantic review baseline
+- 复现 `v142` 这组当前最常引用的 `4` 条回归样本
 
 ## 生成目标
 
@@ -149,6 +166,12 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 7. 只有双重通过，才算本轮改动有效
    - 脚本回归稳定，只说明“表层约束没有明显坏掉”。
    - 只有脚本回归稳定且 Codex 人审明确改善，才能把这轮改动记为“数据质量提升证据”。
+
+补充要求：
+
+- 固定回归优先使用仓库内 benchmark，而不是重新在 `/tmp` 手工挑样本。
+- 完成人工/Codex 审读后，要回填 `semantic_audits.jsonl`，再运行 `semantic_review.py --write-summary` 刷新 `summary.json`。
+- schema 细节和字段解释以 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/ARTIFACT_SCHEMA.md) 为准。
 
 ## 脚本检测与 Codex 人审的分工
 
@@ -340,6 +363,16 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 - `source_audit_issue_items`
 - `generation_audit_issue_items`
 
+如果已经补完 `semantic_audits.jsonl`，应再运行：
+
+```bash
+python experiments/cot_sft_generation/semantic_review.py \
+  --run-dir /path/to/run_artifacts \
+  --write-summary
+```
+
+这样 `summary.json` 里的 `semantic_review_status`、`semantic_pass_rate` 和 `manual_critical_error_items` 才会与最新语义审读结果一致。
+
 `item_audits.jsonl` 会为每条样本分别记录：
 
 - `source_audit`
@@ -368,6 +401,8 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 - `surface_pass`
 - 校验失败信息
 
+更细的字段表见 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/ARTIFACT_SCHEMA.md)。
+
 ## 依赖
 
 脚本运行生成时需要：
@@ -392,6 +427,19 @@ export ZJUVAI_API_RETRY_BACKOFF_SECONDS="3"
 ```
 
 这里的 `ZJUVAI_API_RETRIES` 是单次 API 调用内部对瞬时 `Connection error` / `timeout` / `502/503/504` 的补偿重试，不会替代脚本本身的 stage 级内容校验重试。
+
+维护相关的最小本地检查：
+
+```bash
+python -m py_compile \
+  experiments/cot_sft_generation/generate_cot_sft.py \
+  experiments/cot_sft_generation/run_artifacts.py \
+  experiments/cot_sft_generation/semantic_review.py
+
+python experiments/cot_sft_generation/semantic_review.py --help
+
+python -m unittest discover -s tests -p 'test_cot_sft_review_artifacts.py'
+```
 
 ## 辅助脚本
 

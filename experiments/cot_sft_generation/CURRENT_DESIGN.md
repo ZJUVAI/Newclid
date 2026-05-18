@@ -1,6 +1,6 @@
 # Current CoT SFT Design
 
-本文档描述当前代码头部实现，也就是 [generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py) 与 [run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py) 现在真正执行的流程；历史迭代和实验结论见 [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/STATUS.md) 与 [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/EXPERIMENT_LOG.md)。
+本文档描述当前代码头部实现，也就是 [generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py)、[run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py) 与 [semantic_review.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/semantic_review.py) 现在真正执行的流程；历史迭代和实验结论见 [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/STATUS.md) 与 [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/EXPERIMENT_LOG.md)。字段表见 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/ARTIFACT_SCHEMA.md)。
 
 ## 1. 总体目标
 
@@ -276,7 +276,7 @@ writer body 通过后，脚本才会：
 
 ### 2.10 run artifacts 层
 
-当前 artifacts/schema 相关逻辑已经从主流程里抽出一层，放到 [run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py)。
+当前 artifacts/schema 相关逻辑已经从主流程里抽出一层，放到 [run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py) 与 [semantic_review.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/semantic_review.py)。
 
 它负责的不是几何推理，而是 run 级数据结构：
 
@@ -337,6 +337,27 @@ writer body 通过后，脚本才会：
      - `semantic_review_status`
    - 因为当前 run 结束时默认还没做人工/Codex 审读，所以大多数 run 的 `semantic_review_status` 会是 `not_reviewed`
 
+6. `semantic_review.py`
+   - 用途不是重新生成数据，而是对已落盘的语义审读结果做一致性校验和汇总刷新。
+   - 它会：
+     - 校验 `semantic_audits.jsonl` 与 `item_audits.jsonl` 行数和 `(sample_order, input_index)` 是否对齐
+     - 规范化 `semantic_pass` / `review_status` / `issues`
+     - 刷新 `summary.json` 中的 `semantic_review_status`、`semantic_pass_rate`、`manual_critical_error_items`
+   - 推荐在人工/Codex 回填完 `semantic_audits.jsonl` 后运行：
+
+```bash
+python experiments/cot_sft_generation/semantic_review.py \
+  --run-dir /path/to/run_artifacts \
+  --write-summary
+```
+
+7. 固定 benchmark
+   - 当前仓库内已经有一组固定回归基线：
+     - [benchmarks/fixed_v104sample_input.jsonl](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_input.jsonl)
+     - [benchmarks/fixed_v104sample_manifest.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_manifest.json)
+   - 其用途是给长期回归和语义复核提供一个不会因 `/tmp` 被清空而消失的稳定入口。
+   - 更细说明见 [benchmarks/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/README.md)。
+
 ## 3. 中间哪些步骤是通过脚本做的
 
 是的，中间大部分关键控制都已经转成脚本，不只是 prompt。
@@ -355,6 +376,7 @@ writer body 通过后，脚本才会：
 - final `<thinking>` 组装
 - run artifacts schema 构造
 - `surface_pass` / `semantic_audits` 占位落盘
+- `semantic_review.py` 对语义审读结果的对齐检查和 summary 刷新
 
 模型主要负责两件事：
 
@@ -386,4 +408,5 @@ writer body 通过后，脚本才会：
 1. 虽然当前头部设计已经在固定回归上拿到新的 `4/4`，但样本数仍然小。
 2. sample3 一类样本之前仍会掉到 `write 2`，最新 `ace2ae7` 是针对这个点的补丁，但还缺新的完整 live 结论。
 3. 全量 10 万样本的真实通过率、重试成本和长尾失败分布还没有被充分测过。
-4. 虽然代码已经开始显式落 `semantic_audits.jsonl` 和 `surface_pass_rate`，但真正的 `semantic_pass` 仍然要靠后续人工/Codex 审读回填；当前还没有自动 `critic` 阶段。
+4. 虽然代码已经开始显式落 `semantic_audits.jsonl` 和 `surface_pass_rate`，并支持通过 `semantic_review.py` 刷新 run 级汇总，但真正的 `semantic_pass` 仍然要靠后续人工/Codex 审读回填；当前还没有自动 `critic` 阶段。
+5. 当前固定 benchmark 只有一组 `4` 条样本，足够做稳定回放，但还不足以覆盖 goal type / aux type 的长期分层回归。

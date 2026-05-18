@@ -1,0 +1,66 @@
+{
+  "benchmark_name": "fixed_v104sample",
+  "description": "Fixed 4-sample regression set rebuilt from the historical v104 sample input and reused by v142.",
+  "input_jsonl": "experiments/cot_sft_generation/benchmarks/fixed_v104sample_input.jsonl",
+  "source_provenance": "/tmp/cot_regression_v114_v104sample_rebuilt_input.jsonl",
+  "records": [
+    {
+      "sample_order": 0,
+      "goal_type": "eqratio",
+      "aux_type": "single_point",
+      "aux_shape": "cyclic_plus_collinear",
+      "focus_tags": [
+        "ratio_finish",
+        "cyclic_bridge",
+        "support_to_similarity"
+      ],
+      "notes": "Historically the strongest-looking sample in the fixed-4 set, but still not semantic-pass as of 2026-05-18."
+    },
+    {
+      "sample_order": 1,
+      "goal_type": "eqratio",
+      "aux_type": "single_point",
+      "aux_shape": "equal_length_plus_collinear",
+      "focus_tags": [
+        "equal_length_transfer",
+        "collinearity_support",
+        "late_ratio_closure"
+      ],
+      "notes": "Useful for catching support/relation mismatches in late ratio bridges."
+    },
+    {
+      "sample_order": 2,
+      "goal_type": "eqangle",
+      "aux_type": "single_point",
+      "aux_shape": "double_perpendicular",
+      "focus_tags": [
+        "perpendicular_bridge",
+        "fake_equal_length",
+        "late_angle_finish"
+      ],
+      "notes": "Useful for catching invalid equal-length or similarity claims derived from perpendicular-only setup."
+    },
+    {
+      "sample_order": 3,
+      "goal_type": "eqangle",
+      "aux_type": "single_point",
+      "aux_shape": "midpoint_on_line",
+      "focus_tags": [
+        "circle_route",
+        "fake_similarity",
+        "goal_side_finish"
+      ],
+      "notes": "Useful for catching route drift that looks smooth in prose but is not grounded in the figure."
+    }
+  ],
+  "subsets": {
+    "all": [0, 1, 2, 3],
+    "ratio_goals": [0, 1],
+    "angle_goals": [2, 3],
+    "semantic_review_priority": [0, 1, 2, 3],
+    "single_sample0": [0],
+    "single_sample1": [1],
+    "single_sample2": [2],
+    "single_sample3": [3]
+  }
+}
