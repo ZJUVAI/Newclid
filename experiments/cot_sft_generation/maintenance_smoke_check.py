@@ -19,6 +19,7 @@ TESTS_DIR = REPO_ROOT / "tests"
 CORE_FILES = [
     SCRIPT_DIR / "generate_cot_sft.py",
     SCRIPT_DIR / "geometry_text.py",
+    SCRIPT_DIR / "writer_contracts.py",
     SCRIPT_DIR / "run_artifacts.py",
     SCRIPT_DIR / "semantic_review.py",
 ]
