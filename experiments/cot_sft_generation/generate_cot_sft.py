@@ -3643,6 +3643,36 @@ def build_bridge_sentence_checklist(plan):
     return "\n".join(lines)
 
 
+def build_writer_handoff(plan):
+    if not isinstance(plan, dict):
+        return {}
+    handoff_steps = []
+    for step in plan.get("bridge_steps", []):
+        if not isinstance(step, dict):
+            continue
+        handoff_steps.append(
+            {
+                "relation": step.get("approved_route_relation") or step.get("relation", ""),
+                "required_supports": step.get("required_supports", []),
+                "focus_points": step.get("focus_points", []),
+                "unlock_purpose": step.get("next_target_purpose", ""),
+            }
+        )
+    coverage_targets = plan.get("coverage_targets", {}) if isinstance(plan.get("coverage_targets"), dict) else {}
+    return {
+        "goal_bottleneck": plan.get("goal_bottleneck", ""),
+        "helper_idea": plan.get("helper_idea", ""),
+        "construction": plan.get("construction", ""),
+        "aux_direct_relations": plan.get("aux_direct_relations", []),
+        "bridge_steps": handoff_steps,
+        "goal_finish": plan.get("goal_finish", ""),
+        "opening_focus_points": coverage_targets.get("opening_focus_points", []),
+        "bridge_focus_points": coverage_targets.get("bridge_focus_points", []),
+        "opening_sentence_hint": coverage_targets.get("opening_sentence_hint", ""),
+        "helper_sentence_hint": coverage_targets.get("helper_sentence_hint", ""),
+    }
+
+
 def build_writer_sentence_blueprints(plan):
     if not isinstance(plan, dict):
         return []
@@ -4697,38 +4727,23 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
 def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_block):
     plan = enrich_bridge_steps_with_targets(plan)
     public_problem = build_public_problem_text(record)
-    supervisor_payload = build_supervisor_payload(record, aux_part, sanitized_rest)
     visible_goal = extract_problem_goal(record)
     hidden_aux_brief = build_hidden_aux_brief(aux_part)
     new_points = extract_aux_new_points(aux_part)
     new_points_text = ", ".join(new_points) if new_points else "the hidden auxiliary point"
     multi_aux_instruction = build_multi_aux_instruction(aux_part)
-    point_coords = get_point_coords(record)
-    coord_table = json.dumps(point_coords, ensure_ascii=False, sort_keys=True)
-    coordinate_hints = build_hidden_coordinate_hints(point_coords)
-    coordinate_guidance = build_hidden_coordinate_guidance(point_coords)
-    visible_premise_summaries = build_visible_premise_summaries(record)
-    visible_premise_guidance = (
-        json.dumps(visible_premise_summaries, ensure_ascii=False, indent=2)
-        if visible_premise_summaries else "[]"
-    )
     proof_guidance = json.dumps(
         build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal),
         ensure_ascii=False,
         indent=2,
     )
+    writer_handoff = json.dumps(
+        build_writer_handoff(plan),
+        ensure_ascii=False,
+        indent=2,
+    )
     sentence_duties = build_writer_sentence_duties(plan)
-    sentence_blueprints = json.dumps(
-        build_writer_sentence_blueprints(plan),
-        ensure_ascii=False,
-        indent=2,
-    )
     bridge_sentence_checklist = build_bridge_sentence_checklist(plan)
-    bridge_contracts = json.dumps(
-        build_writer_bridge_contracts(plan),
-        ensure_ascii=False,
-        indent=2,
-    )
     prefix_coverage_notes = build_prefix_coverage_notes(plan)
     prefix_reuse_guidance = build_prefix_reuse_guidance(plan)
     bridge_steps = plan.get("bridge_steps", []) if isinstance(plan, dict) else []
@@ -4740,19 +4755,6 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         f"{public_problem}\n\n"
         "[Visible Goal]\n"
         f"{visible_goal}\n\n"
-        "[Hidden Supervisor-Only Reference]\n"
-        "Use this only to ensure factual correctness and exact point coordinates. Do not "
-        "mention that it exists, and do not let any hidden proof artifact appear in the "
-        "final wording.\n"
-        f"{supervisor_payload}\n\n"
-        "[Hidden Visible-Point Coordinate Table]\n"
-        f"{coord_table}\n\n"
-        "[Hidden Coordinate Hints]\n"
-        f"{coordinate_hints}\n\n"
-        "[Hidden Structured Coordinate Candidates]\n"
-        f"{coordinate_guidance}\n\n"
-        "[Visible Premise Summaries]\n"
-        f"{visible_premise_guidance}\n\n"
         "[Hidden Target Summary]\n"
         f"New point name(s): {new_points_text}\n"
         f"Target auxiliary facts: {hidden_aux_brief}\n\n"
@@ -4761,25 +4763,15 @@ def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_b
         "Use these only to keep the post-aux verification path faithful to the actual solvable route. "
         "Do not quote them, and do not surface proof-engine artifacts.\n"
         f"{proof_guidance}\n\n"
-        "[Approved Plan]\n"
-        f"{json.dumps(plan, ensure_ascii=False, indent=2)}\n\n"
-        "[Approved Milestones]\n"
-        f"Existing visible relations to reuse: {json.dumps(plan.get('visible_relations', []), ensure_ascii=False)}\n"
-        f"Direct aux consequences to realize in order: {json.dumps(plan.get('aux_direct_relations', []), ensure_ascii=False)}\n"
-        f"Bridge steps to realize in order: {json.dumps(plan.get('bridge_steps', []), ensure_ascii=False, indent=2)}\n"
-        f"Goal-side finish to reach: {plan.get('goal_finish', '')}\n\n"
+        "[Approved Writer Handoff]\n"
+        "This is the compact plan-to-write payload. Follow it faithfully instead of inventing a different route.\n"
+        f"{writer_handoff}\n\n"
         "[Non-Skippable Bridge Checklist]\n"
         "Each item below must appear as its own sentence in order. Do not merge bridge step i into bridge step i+1, and do not replace an approved relation with a later stronger-looking relation.\n"
         f"{bridge_sentence_checklist}\n\n"
         "[Sentence Duties]\n"
         "Use this outline internally to keep the body stepwise, concrete, and impersonal. Do not quote these lines verbatim, and do not repeat the injected prefix.\n"
         f"{sentence_duties}\n\n"
-        "[Sentence Blueprints]\n"
-        "Use these sentence-level blueprints as the preferred local writing pattern. They are stricter than the prose duties: support relation first when available, then the approved relation, then a short unlock clause explaining what that step now makes possible, with no fresh geometric claim added in the middle.\n"
-        f"{sentence_blueprints}\n\n"
-        "[Bridge Sentence Contracts]\n"
-        "Use these contracts as a hard checklist for the post-aux body sentences. Each listed relation should appear explicitly, the listed supports should be named inside the same sentence when required, and the goal_finish contract must be realized after the final bridge sentence.\n"
-        f"{bridge_contracts}\n\n"
         "[Global Coverage Targets]\n"
         "These are derived from the approved plan so the body keeps track of the broader visible figure beyond the tagged anchors. Use them to keep the obstacle, helper, and bridge sentences connected to the whole diagram instead of circling only around the anchor frame.\n"
         f"{json.dumps(plan.get('coverage_targets', {}), ensure_ascii=False, indent=2)}\n\n"
