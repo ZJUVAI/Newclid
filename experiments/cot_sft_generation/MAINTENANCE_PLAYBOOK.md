@@ -99,6 +99,13 @@
   - 独立的前处理脚本，负责抽样和反转图片。
   - 如果这里只改采样元数据，不需要更新主链设计文档；只有当输入协议变化时，才要更新 `README.md` 或 `CURRENT_DESIGN.md`。
 
+- [geometry_text.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/geometry_text.py)
+  - 负责：
+    - goal / aux / visible relation 文本拆解
+    - relation 归一化和 semantic match
+    - 跨 planner、validator、writer 共用的底层几何文本 helper
+  - 如果改了 point mention、relation keyword、aux clause parsing、goal parsing、surface normalization，这里应优先作为落点，而不是继续把底层文本规则塞回主脚本。
+
 - [semantic_review.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/semantic_review.py)
   - 负责：
     - 校验 `semantic_audits.jsonl` 与 `item_audits.jsonl` 是否逐行对齐
@@ -198,7 +205,7 @@
 
 ### 4.1 单文件过大
 
-当前主脚本体量已经较大；截至 2026-05-18，[generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py) 约 `5484` 行。后续若继续增长，会让以下几类修改更容易互相干扰：
+当前主脚本体量已经较大；截至 2026-05-18，在把几何文本 helper 拆到 [geometry_text.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/geometry_text.py) 后，[generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py) 仍约 `4820` 行。后续若继续增长，会让以下几类修改更容易互相干扰：
 
 - prompt 调整
 - validator 调整

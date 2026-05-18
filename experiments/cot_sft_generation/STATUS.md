@@ -131,6 +131,7 @@
    - 固定 benchmark 已经开始版本化进仓库，不再只靠 `/tmp`。
    - 语义审读结果现在可以通过 `semantic_review.py` 回刷到 `summary.json`。
    - artifacts 字段协议已经单独写入 `ARTIFACT_SCHEMA.md`，不再只散落在实现和聊天记录里。
+   - 底层几何文本解析和 relation normalization 已经从主脚本拆到 `geometry_text.py`，主脚本职责边界比之前更清楚。
 
 更细的字段格式、脚本派生字段和 writer 合同见 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/CURRENT_DESIGN.md)。
 
