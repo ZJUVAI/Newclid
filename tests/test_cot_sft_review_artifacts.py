@@ -28,6 +28,7 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
             "input_index": 1,
             "surface_pass": True,
             "success": True,
+            "attempts_used": 2,
             "source_audit": {"has_issue": False},
             "generation_audit": {"has_issue": False},
         }
@@ -53,6 +54,8 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
         self.assertEqual(summary["surface_pass_rate"], 1.0)
         self.assertEqual(summary["semantic_review_status"], "not_reviewed")
         self.assertIsNone(summary["semantic_pass_rate"])
+        self.assertIsNone(summary["manual_critical_error_rate"])
+        self.assertEqual(summary["avg_attempts_used"], 2.0)
 
     def test_validate_semantic_audit_alignment_rejects_misaligned_rows(self):
         item_audits = [{"sample_order": 0, "input_index": 1, "surface_pass": True}]
@@ -114,6 +117,7 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
                 "sampled_items": 2,
                 "successful_items": 1,
                 "failed_items": 1,
+                "avg_attempts_used": 2.5,
             }
 
             _write_json(run_dir / "summary.json", summary)
@@ -126,6 +130,8 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
             self.assertEqual(refreshed["semantic_review_status"], "fully_reviewed")
             self.assertEqual(refreshed["semantic_pass_rate"], 0.5)
             self.assertEqual(refreshed["manual_critical_error_items"], 1)
+            self.assertEqual(refreshed["manual_critical_error_rate"], 0.5)
+            self.assertEqual(refreshed["avg_attempts_used"], 2.5)
 
             persisted = json.loads((run_dir / "summary.json").read_text(encoding="utf-8"))
             self.assertEqual(persisted["semantic_fail_items"], 1)
@@ -155,6 +161,7 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
         self.assertEqual(summary_fields["semantic_review_status"], "partially_reviewed")
         self.assertEqual(summary_fields["semantic_reviewed_items"], 1)
         self.assertEqual(summary_fields["semantic_pass_rate"], 1.0)
+        self.assertEqual(summary_fields["manual_critical_error_rate"], 0.0)
 
 
 if __name__ == "__main__":

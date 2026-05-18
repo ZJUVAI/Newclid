@@ -329,11 +329,13 @@ writer body 通过后，脚本才会：
      - `surface_pass_items`
      - `surface_fail_items`
      - `surface_pass_rate`
+     - `avg_attempts_used`
      - `semantic_reviewed_items`
      - `semantic_pass_items`
      - `semantic_fail_items`
      - `semantic_pass_rate`
      - `manual_critical_error_items`
+     - `manual_critical_error_rate`
      - `semantic_review_status`
    - 因为当前 run 结束时默认还没做人工/Codex 审读，所以大多数 run 的 `semantic_review_status` 会是 `not_reviewed`
 
@@ -342,7 +344,7 @@ writer body 通过后，脚本才会：
    - 它会：
      - 校验 `semantic_audits.jsonl` 与 `item_audits.jsonl` 行数和 `(sample_order, input_index)` 是否对齐
      - 规范化 `semantic_pass` / `review_status` / `issues`
-     - 刷新 `summary.json` 中的 `semantic_review_status`、`semantic_pass_rate`、`manual_critical_error_items`
+     - 刷新 `summary.json` 中的 `semantic_review_status`、`semantic_pass_rate`、`manual_critical_error_items`、`manual_critical_error_rate`
    - 推荐在人工/Codex 回填完 `semantic_audits.jsonl` 后运行：
 
 ```bash

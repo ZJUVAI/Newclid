@@ -114,6 +114,9 @@ def build_semantic_summary_fields(
         "semantic_fail_items": semantic_fail_items,
         "semantic_pass_rate": semantic_pass_rate,
         "manual_critical_error_items": manual_critical_error_items,
+        "manual_critical_error_rate": (
+            manual_critical_error_items / reviewed_items if reviewed_items else None
+        ),
         "semantic_review_status": semantic_review_status,
     }
 

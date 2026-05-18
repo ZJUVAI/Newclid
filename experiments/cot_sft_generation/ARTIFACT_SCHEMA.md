@@ -114,7 +114,9 @@
 | `semantic_fail_items` | `int` | 语义失败数 |
 | `semantic_pass_rate` | `float \| null` | 已审样本中的语义通过率 |
 | `manual_critical_error_items` | `int` | 人工确认关键错误数 |
+| `manual_critical_error_rate` | `float \| null` | 已审样本中的关键错误比例 |
 | `semantic_review_status` | `str` | `not_reviewed` / `partially_reviewed` / `fully_reviewed` |
+| `avg_attempts_used` | `float \| null` | 样本级 `attempts_used` 的 run 级平均值 |
 | `source_audit_issue_items` | `int` | 源样本审计发现问题的条数 |
 | `generation_audit_issue_items` | `int` | 生成审计发现问题的条数 |
 | `num_workers` | `int` | worker 数 |
@@ -142,6 +144,11 @@ python experiments/cot_sft_generation/semantic_review.py \
    - `semantic_review_status`
    - `semantic_pass_rate`
    - `manual_critical_error_items`
+   - `manual_critical_error_rate`
+
+注意：
+
+- `semantic_review.py` 当前只刷新语义审读相关汇总字段，不会重新计算 `avg_attempts_used` 这类生成期统计。
 
 ## 8. 最小验证入口
 

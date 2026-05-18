@@ -210,6 +210,7 @@
 - run 级 `surface_pass_rate`
 - run 级 `semantic_pass_rate`
 - run 级 `manual_critical_error_rate`
+- run 级 `avg_attempts_used`
 
 当前已经落仓的最小基线是：
 

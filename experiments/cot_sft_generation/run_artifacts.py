@@ -18,6 +18,13 @@ def _safe_rate(numerator: int, denominator: int) -> Optional[float]:
     return numerator / denominator
 
 
+def _safe_average(values: Iterable[Any]) -> Optional[float]:
+    numeric_values = [value for value in values if isinstance(value, (int, float))]
+    if not numeric_values:
+        return None
+    return sum(numeric_values) / len(numeric_values)
+
+
 def build_dataset_output_record(
     sample_order: int,
     instruction: str,
@@ -151,6 +158,7 @@ def build_run_summary(
     manual_critical_error_items = sum(
         1 for item in semantic_audit_records if item.get("manual_critical_error") is True
     )
+    avg_attempts_used = _safe_average(item.get("attempts_used") for item in item_records)
 
     if reviewed_items == 0:
         semantic_review_status = "not_reviewed"
@@ -173,7 +181,9 @@ def build_run_summary(
         "semantic_fail_items": semantic_fail_items,
         "semantic_pass_rate": _safe_rate(semantic_pass_items, reviewed_items),
         "manual_critical_error_items": manual_critical_error_items,
+        "manual_critical_error_rate": _safe_rate(manual_critical_error_items, reviewed_items),
         "semantic_review_status": semantic_review_status,
+        "avg_attempts_used": avg_attempts_used,
         "source_audit_issue_items": source_audit_issue_items,
         "generation_audit_issue_items": generation_audit_issue_items,
         "num_workers": num_workers,

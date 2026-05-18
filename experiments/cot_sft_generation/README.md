@@ -359,6 +359,8 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 - `semantic_fail_items`
 - `semantic_pass_rate`
 - `manual_critical_error_items`
+- `manual_critical_error_rate`
+- `avg_attempts_used`
 - `semantic_review_status`
 - `source_audit_issue_items`
 - `generation_audit_issue_items`
@@ -371,7 +373,7 @@ python experiments/cot_sft_generation/semantic_review.py \
   --write-summary
 ```
 
-这样 `summary.json` 里的 `semantic_review_status`、`semantic_pass_rate` 和 `manual_critical_error_items` 才会与最新语义审读结果一致。
+这样 `summary.json` 里的 `semantic_review_status`、`semantic_pass_rate`、`manual_critical_error_items` 和 `manual_critical_error_rate` 才会与最新语义审读结果一致。
 
 `item_audits.jsonl` 会为每条样本分别记录：
 
