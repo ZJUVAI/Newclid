@@ -288,7 +288,29 @@ writer body 通过后，脚本才会：
    - `output`
    - `image_path`
 
-2. `item_record`
+2. `run_config.json`
+   - 每次 run 开始时先落：
+     - `artifact_schema_version`
+     - `git_commit` / `git_branch` / `git_dirty`
+     - `resolved_input_jsonl`
+     - `input_jsonl_sha256`
+     - CLI 参数和 API 配置
+   - 目的：
+     - 让后续 Codex 会话能直接知道某个 artifacts 目录是基于哪份代码和哪份输入生成的
+
+3. `sampled_inputs.jsonl`
+   - 仅 `-v` 时导出
+   - 记录本轮实际抽中的：
+     - `sample_order`
+     - `input_index`
+     - `image_path`
+     - 原始可见题面
+     - 原始 aux
+     - `point_coords_grid`
+   - 目的：
+     - 让回放样本和复现抽样不再依赖聊天记录或 `/tmp` 临时笔记
+
+4. `item_record`
    - 样本级完整记录
    - 包括：
      - public problem
@@ -303,7 +325,7 @@ writer body 通过后，脚本才会：
      - final thinking
      - `surface_pass`
 
-3. `item_audits.jsonl`
+5. `item_audits.jsonl`
    - 当前每条样本都会导出：
      - `sample_order`
      - `input_index`
@@ -314,7 +336,7 @@ writer body 通过后，脚本才会：
      - `surface_pass`
    - 为了兼容旧分析脚本，仍保留 `success` 字段，但长期应优先读 `surface_pass`
 
-4. `semantic_audits.jsonl`
+6. `semantic_audits.jsonl`
    - 当前生成阶段不会自动给出 `semantic_pass`
    - 但脚本已经会为每条样本写出一条语义审读占位记录，包含：
      - `goal_type`
@@ -329,11 +351,12 @@ writer body 通过后，脚本才会：
      - `notes`
    - 这一步的目的，是把“语义审读还没做”也显式落盘，而不是只留在对话记忆里
 
-5. `summary.json`
+7. `summary.json`
    - 当前仍保留旧的兼容字段：
      - `successful_items`
      - `failed_items`
    - 同时新增更明确的分层字段：
+     - `artifact_schema_version`
      - `surface_pass_items`
      - `surface_fail_items`
      - `surface_pass_rate`
@@ -347,7 +370,7 @@ writer body 通过后，脚本才会：
      - `semantic_review_status`
    - 因为当前 run 结束时默认还没做人工/Codex 审读，所以大多数 run 的 `semantic_review_status` 会是 `not_reviewed`
 
-6. `semantic_review.py`
+8. `semantic_review.py`
    - 用途不是重新生成数据，而是对已落盘的语义审读结果做一致性校验和汇总刷新。
    - 它会：
      - 校验 `semantic_audits.jsonl` 与 `item_audits.jsonl` 行数和 `(sample_order, input_index)` 是否对齐
@@ -361,14 +384,14 @@ python experiments/cot_sft_generation/semantic_review.py \
   --write-summary
 ```
 
-7. 固定 benchmark
+9. 固定 benchmark
    - 当前仓库内已经有一组固定回归基线：
      - [benchmarks/fixed_v104sample_input.jsonl](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_input.jsonl)
      - [benchmarks/fixed_v104sample_manifest.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_manifest.json)
    - 其用途是给长期回归和语义复核提供一个不会因 `/tmp` 被清空而消失的稳定入口。
    - 更细说明见 [benchmarks/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/README.md)。
 
-8. `geometry_text.py`
+10. `geometry_text.py`
    - 负责：
      - visible goal / public problem 文本拆解
      - aux 子句解析
@@ -378,7 +401,7 @@ python experiments/cot_sft_generation/semantic_review.py \
      - 避免 `generate_cot_sft.py` 同时承担“主流程编排”和“底层文本规则库”两类职责
      - 为 `prompt_builders.py`、`writer_contracts.py` 和后续 validator 拆分提供稳定底层
 
-9. `writer_contracts.py`
+11. `writer_contracts.py`
    - 负责：
      - `coverage_targets`
      - bridge step `focus_points`
@@ -388,7 +411,7 @@ python experiments/cot_sft_generation/semantic_review.py \
      - 把“writer 约束协议”从主脚本编排层剥离出来
      - 让后续只改 writer 合同的人，不必再同时触碰主流程和 validator 大块逻辑
 
-10. `prompt_builders.py`
+12. `prompt_builders.py`
    - 负责：
      - planner prompt
      - writer prompt

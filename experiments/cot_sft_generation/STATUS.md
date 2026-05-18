@@ -253,6 +253,7 @@
   - 语义审读回刷 summary 的协议已可执行
   - 最小验证入口不再依赖额外安装 `pytest`
   - prompt / retry feedback 已经有独立模块和单测，不再和主流程编排硬耦合
+  - `run_config.json` 和 `sampled_inputs.jsonl` 已经进入正式 schema，并带 git / 输入文件指纹
 - 但如果问题是“后续维护成本是否已经足够低”，答案仍然是否：
   - [generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py) 仍然过大
   - benchmark 的 `aux_shape` 和长尾失败模式覆盖仍然偏窄

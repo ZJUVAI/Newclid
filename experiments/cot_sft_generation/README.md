@@ -354,6 +354,12 @@ python experiments/cot_sft_generation/generate_cot_sft.py \
 - `sampled_inputs.jsonl`（仅 `-v`）
 - `item_records.jsonl`（仅 `-v`）
 
+其中：
+
+- `run_config.json` 用于记录当前 run 的代码版本、输入文件指纹、参数和 git 状态
+- `sampled_inputs.jsonl` 用于记录本轮实际抽中的源样本
+- 这两个文件的正式字段协议见 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/ARTIFACT_SCHEMA.md)
+
 `summary.json` 还会额外汇总：
 
 - `surface_pass_items`

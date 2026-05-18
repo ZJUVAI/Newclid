@@ -17,9 +17,50 @@
 
 1. 长期读 run 结果时，优先使用 `surface_pass`，不要再把 `success` 当主字段。
 2. `success` 目前只为兼容旧脚本保留，语义上等同于 `surface_pass`。
-3. 任何新增长期字段，都应先落到 `run_artifacts.py`，再同步更新本文档。
+3. 当前 run artifacts schema 版本为 `cot_sft_artifacts_v1`。
+4. 任何新增长期字段，都应先落到 `run_artifacts.py`，再同步更新本文档。
 
-## 2. 最终数据集输出条目
+## 2. `run_config.json`
+
+这个文件在每次 run 开始时落盘，记录“这轮结果是基于哪份代码、哪份输入、哪套参数”生成的。
+
+| 字段 | 类型 | 含义 |
+|------|------|------|
+| `artifact_schema_version` | `str` | 当前 artifacts schema 版本 |
+| `started_at_utc` | `str` | run 开始时间 |
+| `script` | `str` | 主脚本绝对路径 |
+| `cwd` | `str` | 启动 run 时的工作目录 |
+| `repo_root` | `str` | 仓库根目录 |
+| `model_name` | `str` | 教师模型名 |
+| `api_base_url` | `str` | 推理网关地址 |
+| `api_timeout_seconds` | `int` | 单次 API 超时设置 |
+| `api_call_retries` | `int` | 单次 API 调用内部补偿重试次数 |
+| `api_retry_backoff_seconds` | `int` | 单次 API 调用重试回退秒数 |
+| `default_input_jsonl` | `str` | 脚本默认输入文件 |
+| `output_jsonl` | `str` | 最终输出路径 |
+| `run_dir` | `str` | artifacts 目录路径 |
+| `arguments` | `object` | 原始 CLI 参数字典 |
+| `git_commit` | `str \| null` | 当前仓库 commit SHA |
+| `git_branch` | `str \| null` | 当前分支名 |
+| `git_dirty` | `bool \| null` | 当前工作树是否有未提交修改 |
+| `resolved_input_jsonl` | `str` | 实际使用的输入文件绝对路径 |
+| `input_jsonl_sha256` | `str` | 实际输入文件的 SHA-256 指纹 |
+| `input_jsonl_bytes` | `int` | 实际输入文件大小 |
+
+## 3. `sampled_inputs.jsonl`
+
+这个文件只在 `-v/--verbose` 时导出。它回答“这轮抽中的到底是哪些原始样本”，方便做回放和复核。
+
+| 字段 | 类型 | 含义 |
+|------|------|------|
+| `sample_order` | `int` | 本次 run 内顺序 |
+| `input_index` | `int` | 输入源中的索引 |
+| `image_path` | `str` | 源样本图片路径 |
+| `llm_input_renamed` | `str` | 原始可见题面字段 |
+| `aux` | `str` | 原始 aux |
+| `point_coords_grid` | `object` | 源样本可见点坐标表 |
+
+## 4. 最终数据集输出条目
 
 最终输出 JSONL 的每条记录由 `build_dataset_output_record(...)` 生成，稳定字段如下：
 
@@ -33,7 +74,7 @@
 | `image_path` | `str` | 图片路径 |
 | `_order` | `int` | 本次 run 中的样本顺序 |
 
-## 3. `item_records.jsonl`
+## 5. `item_records.jsonl`
 
 这个文件只在 `-v/--verbose` 时导出。它保留样本级完整上下文，适合回放失败样本和对照 prompt。
 
@@ -62,7 +103,7 @@
 | `elapsed_seconds` | `float \| null` | 本条样本耗时 |
 | `error` | `str \| null` | 失败原因 |
 
-## 4. `item_audits.jsonl`
+## 6. `item_audits.jsonl`
 
 这个文件是 run 级轻量审计索引，适合快速统计 surface 结果。
 
@@ -77,7 +118,7 @@
 | `surface_pass` | `bool` | 是否通过脚本终检 |
 | `success` | `bool` | 兼容字段，等同 `surface_pass` |
 
-## 5. `semantic_audits.jsonl`
+## 7. `semantic_audits.jsonl`
 
 这个文件是 run 级语义审读落盘入口。生成阶段会先写占位 stub，后续由人工或 Codex 回填。
 
@@ -106,12 +147,13 @@
 4. `review_checklist_version` 当前必须为 `cot_sft_semantic_review_v1`。
 5. 若 `semantic_pass = false`，应至少填写一个 `issue_codes` 或 `issues`。
 
-## 6. `summary.json`
+## 8. `summary.json`
 
 这个文件是 run 级汇总。它同时保留兼容字段和新的 surface/semantic 双层字段。
 
 | 字段 | 类型 | 含义 |
 |------|------|------|
+| `artifact_schema_version` | `str` | 当前 artifacts schema 版本 |
 | `input_jsonl` | `str` | 本次输入文件 |
 | `total_candidates_with_aux` | `int` | 输入中带 aux 的总候选数 |
 | `sampled_items` | `int` | 本次实际抽样条数 |
@@ -137,7 +179,7 @@
 | `artifacts_dir` | `str` | 本次 artifacts 目录 |
 | `runtime_seconds` | `float` | run 总耗时 |
 
-## 7. 语义审读刷新流程
+## 9. 语义审读刷新流程
 
 推荐顺序如下：
 
@@ -162,7 +204,7 @@ python experiments/cot_sft_generation/semantic_review.py \
 
 - `semantic_review.py` 当前只刷新语义审读相关汇总字段，不会重新计算 `avg_attempts_used` 这类生成期统计。
 
-## 8. 最小验证入口
+## 10. 最小验证入口
 
 为了避免长期维护依赖额外测试框架，当前最小验证入口应保证在标准库环境里可跑：
 

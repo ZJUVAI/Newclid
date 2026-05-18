@@ -8,10 +8,15 @@ pipeline so artifact evolution does not further bloat the generation script.
 
 from __future__ import annotations
 
+import hashlib
 import os
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 
 
+ARTIFACT_SCHEMA_VERSION = "cot_sft_artifacts_v1"
 SEMANTIC_REVIEW_CHECKLIST_VERSION = "cot_sft_semantic_review_v1"
 SEMANTIC_REVIEW_ISSUE_CODE_DESCRIPTIONS = {
     "not_visible_only": "The thinking reads like hidden-proof supervision rather than visible-input reasoning.",
@@ -39,6 +44,101 @@ def _safe_average(values: Iterable[Any]) -> Optional[float]:
     if not numeric_values:
         return None
     return sum(numeric_values) / len(numeric_values)
+
+
+def _run_git_command(args: list[str], cwd: Path) -> Optional[str]:
+    result = subprocess.run(
+        args,
+        cwd=str(cwd),
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return None
+    text = result.stdout.strip()
+    return text or None
+
+
+def detect_git_context(repo_root: str | Path) -> Dict[str, Any]:
+    root = Path(repo_root).resolve()
+    commit = _run_git_command(["git", "rev-parse", "HEAD"], root)
+    branch = _run_git_command(["git", "rev-parse", "--abbrev-ref", "HEAD"], root)
+    dirty_output = _run_git_command(["git", "status", "--short"], root)
+    return {
+        "git_commit": commit,
+        "git_branch": branch,
+        "git_dirty": bool(dirty_output) if dirty_output is not None else None,
+    }
+
+
+def compute_file_sha256(path: str | Path) -> str:
+    digest = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def build_input_file_metadata(input_jsonl_path: str | Path) -> Dict[str, Any]:
+    input_path = Path(input_jsonl_path).resolve()
+    return {
+        "resolved_input_jsonl": str(input_path),
+        "input_jsonl_sha256": compute_file_sha256(input_path),
+        "input_jsonl_bytes": input_path.stat().st_size,
+    }
+
+
+def build_run_config(
+    args_dict: Dict[str, Any],
+    output_jsonl: str,
+    run_dir: str,
+    model_name: str,
+    script_path: str,
+    cwd: str,
+    repo_root: str,
+    default_input_jsonl: str,
+    api_base_url: str,
+    api_timeout_seconds: int,
+    api_call_retries: int,
+    api_retry_backoff_seconds: int,
+) -> Dict[str, Any]:
+    run_config = {
+        "artifact_schema_version": ARTIFACT_SCHEMA_VERSION,
+        "started_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "script": os.path.abspath(script_path),
+        "cwd": cwd,
+        "repo_root": os.path.abspath(repo_root),
+        "model_name": model_name,
+        "api_base_url": api_base_url,
+        "api_timeout_seconds": api_timeout_seconds,
+        "api_call_retries": api_call_retries,
+        "api_retry_backoff_seconds": api_retry_backoff_seconds,
+        "default_input_jsonl": str(default_input_jsonl),
+        "output_jsonl": os.path.abspath(output_jsonl),
+        "run_dir": os.path.abspath(run_dir),
+        "arguments": args_dict,
+    }
+    run_config.update(detect_git_context(repo_root))
+    return run_config
+
+
+def build_sampled_input_record(
+    sample_order: int,
+    input_index: int,
+    image_path: str,
+    llm_input_renamed: str,
+    aux_part: str,
+    point_coords_grid: Dict[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "sample_order": sample_order,
+        "input_index": input_index,
+        "image_path": image_path,
+        "llm_input_renamed": llm_input_renamed,
+        "aux": aux_part,
+        "point_coords_grid": point_coords_grid,
+    }
 
 
 def build_dataset_output_record(
@@ -196,6 +296,7 @@ def build_run_summary(
         semantic_review_status = "fully_reviewed"
 
     return {
+        "artifact_schema_version": ARTIFACT_SCHEMA_VERSION,
         "input_jsonl": input_jsonl,
         "total_candidates_with_aux": total_candidates_with_aux,
         "sampled_items": sampled_items,

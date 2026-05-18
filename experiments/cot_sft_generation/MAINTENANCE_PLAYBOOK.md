@@ -98,6 +98,8 @@
 
 - [run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py)
   - 当前 artifacts/schema 层，负责：
+    - `run_config.json`
+    - `sampled_inputs.jsonl`
     - 数据集输出条目 schema
     - `item_record`
     - `item_audits.jsonl`
@@ -328,11 +330,12 @@ Codex 可以基于对话上下文推进，但长期维护不能依赖“之前�
 截至当前版本，下面几项已经补齐：
 
 1. 固定 benchmark 的落仓目录和 manifest 说明
-2. 语义审读 artifacts 的正式 schema
-3. `summary.json` 字段表
-4. `item_records.jsonl` / `item_audits.jsonl` 字段表
-5. `semantic_review.py` 的刷新协议
-6. 最小验证入口的标准库运行方式
+2. `run_config.json` / `sampled_inputs.jsonl` 的正式 schema
+3. 语义审读 artifacts 的正式 schema
+4. `summary.json` 字段表
+5. `item_records.jsonl` / `item_audits.jsonl` 字段表
+6. `semantic_review.py` 的刷新协议
+7. 最小验证入口的标准库运行方式
 
 当前仍建议继续补齐的是：
 

@@ -4,8 +4,12 @@ import unittest
 from pathlib import Path
 
 from experiments.cot_sft_generation.run_artifacts import (
+    ARTIFACT_SCHEMA_VERSION,
     SEMANTIC_REVIEW_CHECKLIST_VERSION,
+    build_input_file_metadata,
+    build_run_config,
     build_run_summary,
+    build_sampled_input_record,
     build_semantic_audit_stub,
 )
 from experiments.cot_sft_generation.semantic_review import (
@@ -26,6 +30,54 @@ def _write_jsonl(path: Path, records):
 
 
 class CotSftReviewArtifactsTest(unittest.TestCase):
+    def test_build_input_file_metadata_tracks_hash_and_size(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "input.jsonl"
+            path.write_text('{"a": 1}\n', encoding="utf-8")
+
+            metadata = build_input_file_metadata(path)
+
+            self.assertEqual(metadata["resolved_input_jsonl"], str(path.resolve()))
+            self.assertEqual(metadata["input_jsonl_bytes"], path.stat().st_size)
+            self.assertEqual(len(metadata["input_jsonl_sha256"]), 64)
+
+    def test_build_run_config_tracks_schema_and_git_context(self):
+        config = build_run_config(
+            args_dict={"num_samples": 3},
+            output_jsonl="out.jsonl",
+            run_dir="artifacts",
+            model_name="model",
+            script_path="experiments/cot_sft_generation/generate_cot_sft.py",
+            cwd=str(Path.cwd()),
+            repo_root=str(Path.cwd()),
+            default_input_jsonl="input.jsonl",
+            api_base_url="https://example.com/v1",
+            api_timeout_seconds=180,
+            api_call_retries=3,
+            api_retry_backoff_seconds=3,
+        )
+
+        self.assertEqual(config["artifact_schema_version"], ARTIFACT_SCHEMA_VERSION)
+        self.assertIsInstance(config["started_at_utc"], str)
+        self.assertIn("git_commit", config)
+        self.assertIn("git_branch", config)
+        self.assertIn("git_dirty", config)
+
+    def test_build_sampled_input_record_keeps_visible_sampling_context(self):
+        record = build_sampled_input_record(
+            sample_order=2,
+            input_index=17,
+            image_path="img.png",
+            llm_input_renamed="<problem>...</problem>",
+            aux_part="<aux>...</aux>",
+            point_coords_grid={"a": [0, 0]},
+        )
+
+        self.assertEqual(record["sample_order"], 2)
+        self.assertEqual(record["input_index"], 17)
+        self.assertEqual(record["aux"], "<aux>...</aux>")
+        self.assertEqual(record["point_coords_grid"], {"a": [0, 0]})
+
     def test_build_run_summary_tracks_surface_and_semantic_placeholders(self):
         item_record = {
             "sample_order": 0,
@@ -58,6 +110,7 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
 
         self.assertEqual(summary["surface_pass_items"], 1)
         self.assertEqual(summary["surface_pass_rate"], 1.0)
+        self.assertEqual(summary["artifact_schema_version"], ARTIFACT_SCHEMA_VERSION)
         self.assertEqual(summary["semantic_review_status"], "not_reviewed")
         self.assertIsNone(summary["semantic_pass_rate"])
         self.assertIsNone(summary["manual_critical_error_rate"])

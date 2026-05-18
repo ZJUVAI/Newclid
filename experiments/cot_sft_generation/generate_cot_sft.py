@@ -26,11 +26,14 @@ from pathlib import Path
 
 try:
     from .run_artifacts import (
+        build_input_file_metadata,
         build_dataset_output_record,
         build_item_audit_record,
         build_item_record,
         build_missing_image_item_record,
+        build_run_config,
         build_run_summary,
+        build_sampled_input_record,
         build_semantic_audit_stub,
     )
     from .geometry_text import (
@@ -87,11 +90,14 @@ try:
     )
 except ImportError:  # pragma: no cover - script execution path
     from run_artifacts import (
+        build_input_file_metadata,
         build_dataset_output_record,
         build_item_audit_record,
         build_item_record,
         build_missing_image_item_record,
+        build_run_config,
         build_run_summary,
+        build_sampled_input_record,
         build_semantic_audit_stub,
     )
     from geometry_text import (
@@ -274,23 +280,6 @@ def build_run_dir(output_jsonl):
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
     stem = output_path.stem or "cot_sft"
     return output_path.parent / f"{stem}_artifacts_{timestamp}"
-
-
-def build_run_manifest(args_dict, output_jsonl, run_dir, model_name):
-    return {
-        "started_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "script": os.path.abspath(__file__),
-        "cwd": os.getcwd(),
-        "model_name": model_name,
-        "api_base_url": os.getenv("ZJUVAI_BASE_URL", "https://api.zjuqx.cn/v1"),
-        "api_timeout_seconds": DEFAULT_API_TIMEOUT_SECONDS,
-        "api_call_retries": DEFAULT_API_CALL_RETRIES,
-        "api_retry_backoff_seconds": DEFAULT_API_RETRY_BACKOFF_SECONDS,
-        "default_input_jsonl": str(DEFAULT_INPUT_JSONL),
-        "output_jsonl": os.path.abspath(output_jsonl),
-        "run_dir": os.path.abspath(run_dir),
-        "arguments": args_dict,
-    }
 
 
 def _encode_image_base64(image_path: Path) -> str:
@@ -3067,6 +3056,8 @@ def process_and_generate_sft(
     logger.info(f"Run artifacts will be stored in {run_dir}")
 
     if run_metadata is not None:
+        run_metadata = dict(run_metadata)
+        run_metadata.update(build_input_file_metadata(input_path))
         write_json(run_dir / "run_config.json", run_metadata)
 
     all_aux_records = []
@@ -3096,14 +3087,14 @@ def process_and_generate_sft(
     sampled_inputs = []
     for idx, record in enumerate(selected):
         sampled_inputs.append(
-            {
-                "sample_order": idx,
-                "input_index": record["_source_index"],
-                "image_path": record.get("image_path", ""),
-                "llm_input_renamed": record.get("llm_input_renamed", ""),
-                "aux": record["_aux_part"],
-                "point_coords_grid": record.get("point_coords_grid", {}),
-            }
+            build_sampled_input_record(
+                sample_order=idx,
+                input_index=record["_source_index"],
+                image_path=record.get("image_path", ""),
+                llm_input_renamed=record.get("llm_input_renamed", ""),
+                aux_part=record["_aux_part"],
+                point_coords_grid=record.get("point_coords_grid", {}),
+            )
         )
     if verbose:
         write_jsonl(run_dir / "sampled_inputs.jsonl", sampled_inputs)
@@ -3306,7 +3297,20 @@ if __name__ == "__main__":
     args = parse_args()
     args_dict = vars(args).copy()
     run_dir = build_run_dir(args.output)
-    run_metadata = build_run_manifest(args_dict, args.output, run_dir, args.model_name)
+    run_metadata = build_run_config(
+        args_dict=args_dict,
+        output_jsonl=args.output,
+        run_dir=run_dir,
+        model_name=args.model_name,
+        script_path=__file__,
+        cwd=os.getcwd(),
+        repo_root=REPO_ROOT,
+        default_input_jsonl=str(DEFAULT_INPUT_JSONL),
+        api_base_url=os.getenv("ZJUVAI_BASE_URL", "https://api.zjuqx.cn/v1"),
+        api_timeout_seconds=DEFAULT_API_TIMEOUT_SECONDS,
+        api_call_retries=DEFAULT_API_CALL_RETRIES,
+        api_retry_backoff_seconds=DEFAULT_API_RETRY_BACKOFF_SECONDS,
+    )
 
     process_and_generate_sft(
         input_jsonl=args.input,
