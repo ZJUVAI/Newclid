@@ -118,6 +118,7 @@
   - 负责：
     - core files `py_compile`
     - benchmark manifest 一致性检查
+    - `generate_cot_sft.py --help`
     - `semantic_review.py --help`
     - `tests/test_cot_sft_*.py` 的统一回归入口
   - 如果新增长期维护必跑检查，应优先把它接到这里，而不是只补一条文档命令。

@@ -105,6 +105,17 @@ def check_semantic_review_help() -> None:
         raise RuntimeError("semantic_review.py --help output did not contain the expected description")
 
 
+def check_generate_cli_help() -> None:
+    result = run_subprocess(
+        [sys.executable, str(SCRIPT_DIR / "generate_cot_sft.py"), "--help"],
+        cwd=REPO_ROOT,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(result.stderr or result.stdout or "generate_cot_sft.py --help failed")
+    if "Generate geometry CoT SFT data" not in result.stdout:
+        raise RuntimeError("generate_cot_sft.py --help output did not contain the expected description")
+
+
 def check_unittests() -> None:
     result = run_subprocess(
         [sys.executable, "-m", "unittest", "discover", "-s", str(TESTS_DIR), "-p", "test_cot_sft_*.py"],
@@ -134,6 +145,7 @@ def main() -> None:
     args = parse_args()
     run_check("py_compile", check_py_compile)
     run_check("benchmark_manifest", check_benchmark_assets)
+    run_check("generate_cli_help", check_generate_cli_help)
     run_check("semantic_review_help", check_semantic_review_help)
     if not args.skip_tests:
         run_check("unittest", check_unittests)

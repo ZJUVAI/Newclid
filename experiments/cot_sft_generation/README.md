@@ -438,6 +438,7 @@ python experiments/cot_sft_generation/maintenance_smoke_check.py
 
 - core files 的 `py_compile`
 - 固定 benchmark manifest 和输入文件的一致性检查
+- `generate_cot_sft.py --help`
 - `semantic_review.py --help`
 - `tests/test_cot_sft_*.py` 的 `unittest` 回归
 
