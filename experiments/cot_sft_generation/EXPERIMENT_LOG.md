@@ -72,13 +72,21 @@
 - 截止当前日志状态：
   - sample0：`plan 1 + write 1` 成功
   - sample1：`plan 1 + write 1` 成功
-  - sample2：`plan 1` 已开始
+  - sample2：`plan 1` 已开始，尚未返回
   - 当前日志摘录：
     - `2026-05-18 10:22:43 [INFO] [plan] Valid output in 149.55s`
     - `2026-05-18 10:23:17 [INFO] [write] Valid output in 33.57s`
     - `2026-05-18 10:28:48 [INFO] [plan] Valid output in 331.30s`
     - `2026-05-18 10:30:15 [INFO] [write] Valid output in 87.30s`
     - `2026-05-18 10:30:15 [INFO] [plan] Attempt 1/3`
+
+### 最新判断补充
+
+- `56e432b` 之后，当前最强的 live 证据是：
+  - sample0 单样本：`plan 1 + write 1`
+  - sample1 单样本：`plan 1 + write 1`
+  - sample2 单样本：`plan 1 + write 1`
+- 固定 `4` 条回归 `v142` 目前已经证明前两条样本也都是 `plan 1 + write 1`，但整轮结果还未落盘。
 
 ### 当前判断
 
