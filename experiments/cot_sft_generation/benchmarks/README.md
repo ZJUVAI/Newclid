@@ -105,3 +105,33 @@ python experiments/cot_sft_generation/semantic_review.py \
 3. 如果某个历史固定回归集不再使用，应在 manifest 或文档中标明废弃，而不是直接静默删除
 4. 当前 `fixed_v104sample` 仍是最小稳定基线；`stratified_v1_12sample` 则是当前默认的分层长期基线
 5. `python experiments/cot_sft_generation/maintenance_smoke_check.py` 现在会校验本目录下所有 `*_manifest.json`，不是只看单个固定文件
+
+## 定向抽查建议
+
+当改动不是“全链大改”，而是某一类 prompt / validator / audit 规则的局部调整时，默认先审下面这些 subset，而不是每次都盲抽。
+
+### 按 goal type 改动
+
+- `eqratio` 相关改动：优先审 `eqratio_goals`
+- `eqangle` 相关改动：优先审 `eqangle_goals`
+- `simtri` 相关改动：优先审 `simtri_goals`
+- `simtrir` 相关改动：优先审 `simtrir_goals`
+- `contri` 相关改动：优先审 `contri_goals`
+- `contrir` 相关改动：优先审 `contrir_goals`
+
+### 按 aux type 或 staged strategy 改动
+
+- 单点构造相关改动：优先审 `single_point`
+- 多点构造相关改动：优先审 `multi_point`
+- 多点构造的 staged strategy、step ordering、bridge unfolding 相关改动：至少审 `multi_point_staging_priority`
+
+### 按回归目的改动
+
+- 快速回放最近固定失败/成功样本：先跑 `fixed_v104sample`
+- 改的是全局 bridge 语义、goal finish 收尾、或 generation audit 这类跨 goal 规则：优先跑 `stratified_v1_12sample` 的 `all`
+- 改的是语义审读口径或需要人工/Codex 重点复核的规则：优先看 `semantic_review_priority`
+
+### 当前仍未覆盖到 subset 级的维度
+
+- `aux_shape` 目前已经写在 manifest `records[*].aux_shape` 里，但还没有全部拆成稳定 subset
+- 如果改动强依赖某个 `aux_shape` 或某类失败模式，应先用 `focus_tags` / `notes` 手工选样，再考虑把该维度升级成新的固定 subset

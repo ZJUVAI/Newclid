@@ -1,6 +1,6 @@
 import unittest
 
-from experiments.cot_sft_generation.generate_cot_sft import build_visible_premise_summaries
+from experiments.cot_sft_generation.audits import build_visible_premise_summaries
 from experiments.cot_sft_generation.prompt_builders import (
     build_plan_prompt,
     build_plan_retry_feedback,

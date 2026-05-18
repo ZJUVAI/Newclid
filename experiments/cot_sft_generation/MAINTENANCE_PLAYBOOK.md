@@ -89,12 +89,18 @@
 
 - [generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py)
   - 当前主入口，负责：
-    - source audit
     - planner / writer 调用
     - validator
-    - generation audit
     - 主流程编排
   - 任何对主流程阶段、validator、artifact schema、run summary 的修改，都必须同步更新 `CURRENT_DESIGN.md`。
+
+- [audits.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/audits.py)
+  - 负责：
+    - `source audit`
+    - `generation audit`
+    - visible formal fact parsing
+    - bridge sentence relation matching
+  - 如果改的是 source/generation 审计规则、句级 relation 命中规则或可见 formal fact 解析，这里应优先作为落点，而不是继续把这些逻辑塞回主脚本。
 
 - [run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py)
   - 当前 artifacts/schema 层，负责：
@@ -115,6 +121,7 @@
   - 负责：
     - goal / aux / visible relation 文本拆解
     - relation 归一化和 semantic match
+    - hidden coordinate candidate / hint / guidance 生成
     - 跨 planner、validator、writer 共用的底层几何文本 helper
   - 如果改了 point mention、relation keyword、aux clause parsing、goal parsing、surface normalization，这里应优先作为落点，而不是继续把底层文本规则塞回主脚本。
 
@@ -156,12 +163,51 @@
     的最小回归验证
   - 当前刻意写成 `unittest` 入口，避免长期维护依赖额外安装 `pytest`。
 
+- [tests/test_cot_sft_audits.py](/root/GenesisGeo-cot/tests/test_cot_sft_audits.py)
+  - 负责：
+    - `audits.py`
+    - `source audit`
+    - bridge relation 句级命中规则
+    - visible formal fact 抽取
+    的最小回归验证
+  - 如果改了 `audits.py` 的核心规则，这个测试文件应视为必跑最小回归。
+
+- [tests/test_cot_sft_geometry_text.py](/root/GenesisGeo-cot/tests/test_cot_sft_geometry_text.py)
+  - 负责：
+    - `geometry_text.py`
+    - relation normalization / semantic match
+    - aux / goal / public problem 拆解
+    的最小回归验证
+  - 如果改了 relation surface、formal-text 解析或 hidden-route 对齐规则，这个测试文件应视为必跑最小回归。
+
 - [tests/test_cot_sft_prompt_builders.py](/root/GenesisGeo-cot/tests/test_cot_sft_prompt_builders.py)
   - 负责：
     - `prompt_builders.py`
-    - `build_visible_premise_summaries(...)`
     - planner / writer prompt 关键段落存在性
   - 目的不是验证 prompt 语义好坏，而是避免重构后出现缺段、断引用或隐式依赖缺失。
+
+- [tests/test_cot_sft_writer_contracts.py](/root/GenesisGeo-cot/tests/test_cot_sft_writer_contracts.py)
+  - 负责：
+    - `writer_contracts.py`
+    - coverage target 派生
+    - bridge target enrichment
+    - writer handoff / injected prefix 结构
+  - 如果改了 writer contract、focus point、prefix 或 handoff schema，这个测试文件应视为必跑最小回归。
+
+- [tests/test_cot_sft_maintenance_smoke.py](/root/GenesisGeo-cot/tests/test_cot_sft_maintenance_smoke.py)
+  - 负责：
+    - `maintenance_smoke_check.py`
+    - benchmark manifest 的结构约束
+    - 仓库内 benchmark 资产的最小完整性验证
+  - 如果新增 benchmark manifest 字段、subset 规则或 smoke check 行为，这个测试文件应视为必跑最小回归。
+
+- [tests/test_cot_sft_fixture_pipeline.py](/root/GenesisGeo-cot/tests/test_cot_sft_fixture_pipeline.py)
+  - 负责：
+    - `process_and_generate_sft(...)`
+    - `generate_thinking(...)`
+    - planner -> writer -> artifacts 主链编排
+    - 在不依赖外部 API 的情况下验证离线 fixture run
+  - 如果改了主流程编排、stage 接口、item/run artifact 落盘或 validator 接线，这个测试文件应视为必跑最小回归。
 
 ## 2. 变更类型与必查文件
 
@@ -182,7 +228,9 @@
 
 至少检查：
 
-- `generate_cot_sft.py` 里的相关 validator / audit 函数
+- `generate_cot_sft.py` 里的相关 validator 函数
+- `audits.py` 里的 source / generation audit 或 relation matching 规则
+- `tests/test_cot_sft_audits.py`
 - `CURRENT_DESIGN.md`
 - `README.md` 里的长期验收口径是否仍匹配
 - `STATUS.md` 里的“距离目标的差距”是否要重写
@@ -211,6 +259,20 @@
 
 - `generate_cot_sft.py`
 - 对应 run artifacts schema
+
+### 2.5 改 benchmark manifest 或定向审读子集
+
+至少检查：
+
+- `benchmarks/README.md`
+- 对应的 `*_manifest.json`
+- `maintenance_smoke_check.py`
+- `tests/test_cot_sft_maintenance_smoke.py`
+
+如果变更会影响“某类修改该先审哪组样本”的默认协议，还要检查：
+
+- `README.md`
+- `STATUS.md`
 
 ## 3. 长期回归资产要求
 
@@ -254,7 +316,7 @@
 
 ### 4.1 单文件过大
 
-当前主脚本体量已经较大；截至 2026-05-18，在把几何文本 helper 拆到 [geometry_text.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/geometry_text.py)、把 prompt 组装拆到 [prompt_builders.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/prompt_builders.py)、把 writer 合同 helper 拆到 [writer_contracts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/writer_contracts.py) 后，[generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py) 仍约 `3323` 行。后续若继续增长，会让以下几类修改更容易互相干扰：
+当前主脚本体量已经较大；截至 2026-05-18，在把审计 helper 拆到 [audits.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/audits.py)、把几何文本 helper 拆到 [geometry_text.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/geometry_text.py)、把 prompt 组装拆到 [prompt_builders.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/prompt_builders.py)、把 writer 合同 helper 拆到 [writer_contracts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/writer_contracts.py) 后，[generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py) 仍约 `2460` 行。后续若继续增长，会让以下几类修改更容易互相干扰：
 
 - prompt 调整
 - validator 调整
@@ -266,9 +328,8 @@
 推荐的下一轮拆分边界是：
 
 1. `planner/plan normalization`
-2. `validators / audits`
-3. `source audit / generation audit`
-4. `run orchestration`
+2. `validators`
+3. `run orchestration`
 
 如果以后继续做大改，但没有沿这些边界拆模块，那么“文档清楚”也不足以抵消主文件互相干扰的风险。
 
@@ -339,10 +400,10 @@ Codex 可以基于对话上下文推进，但长期维护不能依赖“之前�
 
 当前仍建议继续补齐的是：
 
-1. “改某个 goal type 的 prompt 时，应优先抽查哪些 stratified 子集”的具体规则
-2. 按 `aux_shape` 和失败模式继续扩充的 benchmark 清单
-3. 主脚本后续模块拆分后的落点文档
-4. 如果将来引入自动 `critic`，其输出 schema 和与 `semantic_audits.jsonl` 的关系
+1. 按 `aux_shape` 和失败模式继续扩充的 benchmark 清单
+2. 主脚本后续模块拆分后的落点文档
+3. 如果将来引入自动 `critic`，其输出 schema 和与 `semantic_audits.jsonl` 的关系
+4. 更细粒度的 validator / planner normalization 模块拆分计划
 
 ## 7. 当前支撑程度判断
 
@@ -360,6 +421,7 @@ Codex 可以基于对话上下文推进，但长期维护不能依赖“之前�
 - 按 `goal_type x aux_type` 分层的仓库内 benchmark 已经有第一版固定清单
 - `semantic_review.py` 已经把“语义审读回填后如何刷新 summary”变成可执行协议
 - schema 细节和最小验证入口已经写成文档，不再依赖会话记忆
+- 已经补上一个不依赖外部 API 的 offline fixture pipeline test，可离线验证 planner -> writer -> artifacts 主链编排没有断
 
 ### 7.2 仍然限制长期稳定性的点
 

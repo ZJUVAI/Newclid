@@ -1,6 +1,6 @@
 # Current CoT SFT Design
 
-本文档描述当前代码头部实现，也就是 [generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py)、[geometry_text.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/geometry_text.py)、[prompt_builders.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/prompt_builders.py)、[writer_contracts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/writer_contracts.py)、[run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py) 与 [semantic_review.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/semantic_review.py) 现在真正执行的流程；历史迭代和实验结论见 [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/STATUS.md) 与 [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/EXPERIMENT_LOG.md)。字段表见 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/ARTIFACT_SCHEMA.md)。
+本文档描述当前代码头部实现，也就是 [generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py)、[audits.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/audits.py)、[geometry_text.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/geometry_text.py)、[prompt_builders.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/prompt_builders.py)、[writer_contracts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/writer_contracts.py)、[run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py) 与 [semantic_review.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/semantic_review.py) 现在真正执行的流程；历史迭代和实验结论见 [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/STATUS.md) 与 [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/EXPERIMENT_LOG.md)。字段表见 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/ARTIFACT_SCHEMA.md)。
 
 ## 1. 总体目标
 
@@ -276,7 +276,7 @@ writer body 通过后，脚本才会：
 
 ### 2.10 run artifacts 层
 
-当前 artifacts/schema 相关逻辑已经从主流程里抽出一层，放到 [run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py) 与 [semantic_review.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/semantic_review.py)。另外，几何文本解析、关系归一化、goal/aux 拆解这层公共 helper 现在放到 [geometry_text.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/geometry_text.py)，planner / writer prompt 与 retry feedback 这层长文本协议现在放到 [prompt_builders.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/prompt_builders.py)，而 writer 合同、coverage target、prefix 组装这层公共 helper 现在放到 [writer_contracts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/writer_contracts.py)。
+当前 artifacts/schema 相关逻辑已经从主流程里抽出一层，放到 [run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py) 与 [semantic_review.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/semantic_review.py)。另外，`source audit` / `generation audit`、visible premise summaries 与句级 relation 命中这层公共 helper 现在放到 [audits.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/audits.py)，几何文本解析、关系归一化、goal/aux 拆解以及 hidden coordinate candidate / hint / guidance 这层公共 helper 现在放到 [geometry_text.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/geometry_text.py)，planner / writer prompt 与 retry feedback 这层长文本协议现在放到 [prompt_builders.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/prompt_builders.py)，而 writer 合同、coverage target、prefix 组装这层公共 helper 现在放到 [writer_contracts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/writer_contracts.py)。
 
 它负责的不是几何推理，而是 run 级数据结构：
 
@@ -388,10 +388,22 @@ python experiments/cot_sft_generation/semantic_review.py \
    - 当前仓库内已经有一组固定回归基线：
      - [benchmarks/fixed_v104sample_input.jsonl](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_input.jsonl)
      - [benchmarks/fixed_v104sample_manifest.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_manifest.json)
+     - [benchmarks/stratified_v1_12sample_input.jsonl](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/stratified_v1_12sample_input.jsonl)
+     - [benchmarks/stratified_v1_12sample_manifest.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/stratified_v1_12sample_manifest.json)
    - 其用途是给长期回归和语义复核提供一个不会因 `/tmp` 被清空而消失的稳定入口。
    - 更细说明见 [benchmarks/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/README.md)。
 
-10. `geometry_text.py`
+10. `audits.py`
+   - 负责：
+     - `source audit`
+     - `generation audit`
+     - visible formal fact parsing
+     - bridge sentence relation matching
+   - 目的：
+     - 把样本审计和句级 relation 命中逻辑从主流程编排层剥离出来
+     - 让后续单独改 audit 规则的人，不必再同时触碰 planner / writer 调用编排
+
+11. `geometry_text.py`
    - 负责：
      - visible goal / public problem 文本拆解
      - aux 子句解析
@@ -401,7 +413,7 @@ python experiments/cot_sft_generation/semantic_review.py \
      - 避免 `generate_cot_sft.py` 同时承担“主流程编排”和“底层文本规则库”两类职责
      - 为 `prompt_builders.py`、`writer_contracts.py` 和后续 validator 拆分提供稳定底层
 
-11. `writer_contracts.py`
+12. `writer_contracts.py`
    - 负责：
      - `coverage_targets`
      - bridge step `focus_points`
@@ -411,7 +423,7 @@ python experiments/cot_sft_generation/semantic_review.py \
      - 把“writer 约束协议”从主脚本编排层剥离出来
      - 让后续只改 writer 合同的人，不必再同时触碰主流程和 validator 大块逻辑
 
-12. `prompt_builders.py`
+13. `prompt_builders.py`
    - 负责：
      - planner prompt
      - writer prompt
@@ -472,4 +484,4 @@ python experiments/cot_sft_generation/semantic_review.py \
 2. sample3 一类样本之前仍会掉到 `write 2`，最新 `ace2ae7` 是针对这个点的补丁，但还缺新的完整 live 结论。
 3. 全量 10 万样本的真实通过率、重试成本和长尾失败分布还没有被充分测过。
 4. 虽然代码已经开始显式落 `semantic_audits.jsonl` 和 `surface_pass_rate`，并支持通过 `semantic_review.py` 刷新 run 级汇总，但真正的 `semantic_pass` 仍然要靠后续人工/Codex 审读回填；当前还没有自动 `critic` 阶段。
-5. 当前固定 benchmark 只有一组 `4` 条样本，足够做稳定回放，但还不足以覆盖 goal type / aux type 的长期分层回归。
+5. 当前固定 benchmark 已经补到一组最小 `4` 条回放集和一组 `12` 条 `goal_type x aux_type` 分层集，但不同 `aux_shape` 和更长尾失败模式仍然覆盖不足。

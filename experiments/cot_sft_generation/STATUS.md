@@ -131,10 +131,13 @@
   - 固定 benchmark 已经开始版本化进仓库，不再只靠 `/tmp`。
   - 语义审读结果现在可以通过 `semantic_review.py` 回刷到 `summary.json`。
   - artifacts 字段协议已经单独写入 `ARTIFACT_SCHEMA.md`，不再只散落在实现和聊天记录里。
-  - 底层几何文本解析和 relation normalization 已经从主脚本拆到 `geometry_text.py`，主脚本职责边界比之前更清楚。
+  - `source audit` / `generation audit` 与句级 relation 命中 helper 已经拆到 `audits.py`。
+  - visible premise summaries 已经从主脚本迁到 `audits.py`。
+  - 底层几何文本解析、relation normalization，以及 hidden coordinate candidate / hint / guidance 已经从主脚本拆到 `geometry_text.py`，主脚本职责边界比之前更清楚。
   - 统一维护入口 `maintenance_smoke_check.py` 已落仓，后续 Codex 会话可以直接跑一条命令检查维护基线是否断裂。
+  - 已经补上一个不依赖外部 API 的 offline fixture pipeline test，可以离线验证 planner -> writer -> artifacts 主链编排没有断。
   - writer contract / coverage target / prefix 组装这层公共协议已经拆到 `writer_contracts.py`。
-  - planner / writer prompt 与 retry feedback 已经拆到 `prompt_builders.py`，主脚本进一步从 `4124` 行降到 `3323` 行。
+  - planner / writer prompt 与 retry feedback 已经拆到 `prompt_builders.py`，主脚本进一步从 `4124` 行降到约 `2460` 行。
 
 更细的字段格式、脚本派生字段和 writer 合同见 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/CURRENT_DESIGN.md)。
 
@@ -254,6 +257,7 @@
   - 最小验证入口不再依赖额外安装 `pytest`
   - prompt / retry feedback 已经有独立模块和单测，不再和主流程编排硬耦合
   - `run_config.json` 和 `sampled_inputs.jsonl` 已经进入正式 schema，并带 git / 输入文件指纹
+  - `source audit` / `generation audit` 已经从主脚本拆出，后续改审计规则不必再同时改编排层
 - 但如果问题是“后续维护成本是否已经足够低”，答案仍然是否：
   - [generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py) 仍然过大
   - benchmark 的 `aux_shape` 和长尾失败模式覆盖仍然偏窄

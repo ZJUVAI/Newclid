@@ -5,6 +5,7 @@ Shared geometry-text parsing and normalization helpers for CoT SFT generation.
 
 from __future__ import annotations
 
+import json
 import re
 
 
@@ -278,6 +279,250 @@ def extract_high_level_structure_markers(text):
         if any(variant in lowered for variant in variants):
             markers.add(label)
     return markers
+
+
+def _coordinate_candidate_sort_key(candidate):
+    relation_priority = {
+        "midpoint": 0,
+        "collinear": 1,
+        "right_triangle": 2,
+        "isosceles": 3,
+        "equilateral": 4,
+        "perpendicular": 5,
+        "parallel": 6,
+        "equal_length": 7,
+    }
+    return (
+        relation_priority.get(candidate["relation_type"], 99),
+        candidate["score"],
+        tuple(candidate["points"]),
+    )
+
+
+def build_hidden_coordinate_candidates(point_coords, max_items=10, relax_type_limits=False):
+    point_items = sorted(point_coords.items())
+    if len(point_items) < 2:
+        return []
+
+    def add_candidate(candidates, score, relation_type, points, summary):
+        candidates.append(
+            {
+                "score": round(float(score), 4),
+                "relation_type": relation_type,
+                "points": list(points),
+                "summary": summary,
+            }
+        )
+
+    def line_metrics(p1, p2):
+        x1, y1 = point_coords[p1]
+        x2, y2 = point_coords[p2]
+        dx = x2 - x1
+        dy = y2 - y1
+        length_sq = dx * dx + dy * dy
+        return dx, dy, length_sq
+
+    segment_names = []
+    for i, (p1, _) in enumerate(point_items):
+        for p2, _ in point_items[i + 1:]:
+            dx, dy, length_sq = line_metrics(p1, p2)
+            if length_sq == 0:
+                continue
+            segment_names.append((p1, p2, dx, dy, length_sq))
+
+    candidates = []
+
+    for i, (a, b, dx1, dy1, len1) in enumerate(segment_names):
+        for c, d, dx2, dy2, len2 in segment_names[i + 1:]:
+            if len1 == 0 or len2 == 0:
+                continue
+            dot = dx1 * dx2 + dy1 * dy2
+            cross = dx1 * dy2 - dy1 * dx2
+            norm = (len1 * len2) ** 0.5
+            if norm == 0:
+                continue
+            parallel_score = abs(cross) / norm
+            perp_score = abs(dot) / norm
+            if parallel_score <= 0.05:
+                add_candidate(
+                    candidates,
+                    parallel_score,
+                    "parallel",
+                    [a, b, c, d],
+                    f"segments {a}{b} and {c}{d} look parallel",
+                )
+            if perp_score <= 0.08:
+                add_candidate(
+                    candidates,
+                    perp_score,
+                    "perpendicular",
+                    [a, b, c, d],
+                    f"segments {a}{b} and {c}{d} look perpendicular",
+                )
+            rel_len_gap = abs(len1 - len2) / max(len1, len2)
+            if rel_len_gap <= 0.06:
+                add_candidate(
+                    candidates,
+                    rel_len_gap,
+                    "equal_length",
+                    [a, b, c, d],
+                    f"segments {a}{b} and {c}{d} look equal in length",
+                )
+
+    visible_points = [name for name, _ in point_items]
+    for mid in visible_points:
+        xm, ym = point_coords[mid]
+        for i, p1 in enumerate(visible_points):
+            for p2 in visible_points[i + 1:]:
+                if mid in {p1, p2}:
+                    continue
+                x1, y1 = point_coords[p1]
+                x2, y2 = point_coords[p2]
+                area2 = abs((x2 - x1) * (ym - y1) - (y2 - y1) * (xm - x1))
+                seg_len = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
+                if seg_len == 0:
+                    continue
+                midpoint_gap = ((xm - (x1 + x2) / 2) ** 2 + (ym - (y1 + y2) / 2) ** 2) ** 0.5
+                if area2 / seg_len <= 2.0 and midpoint_gap <= 3.0:
+                    score = area2 / seg_len + midpoint_gap
+                    add_candidate(
+                        candidates,
+                        score,
+                        "midpoint",
+                        [mid, p1, p2],
+                        f"point {mid} looks like the midpoint of {p1}{p2}",
+                    )
+
+    for i, p1 in enumerate(visible_points):
+        x1, y1 = point_coords[p1]
+        for j, p2 in enumerate(visible_points[i + 1:], start=i + 1):
+            x2, y2 = point_coords[p2]
+            for p3 in visible_points[j + 1:]:
+                x3, y3 = point_coords[p3]
+                len12 = (x2 - x1) ** 2 + (y2 - y1) ** 2
+                len23 = (x3 - x2) ** 2 + (y3 - y2) ** 2
+                len13 = (x3 - x1) ** 2 + (y3 - y1) ** 2
+                if min(len12, len23, len13) == 0:
+                    continue
+                twice_area = abs((x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1))
+                longest_side = max(len12, len23, len13) ** 0.5
+                area_score = twice_area / max(longest_side, 1.0)
+                if area_score <= 2.0:
+                    add_candidate(
+                        candidates,
+                        area_score,
+                        "collinear",
+                        [p1, p2, p3],
+                        f"points {p1}, {p2}, and {p3} look nearly collinear",
+                    )
+
+                if len12 >= len23 and len12 >= len13:
+                    vertex = p3
+                    side_a, side_b, hyp = len13, len23, len12
+                elif len23 >= len12 and len23 >= len13:
+                    vertex = p1
+                    side_a, side_b, hyp = len12, len13, len23
+                else:
+                    vertex = p2
+                    side_a, side_b, hyp = len12, len23, len13
+                right_score = abs(side_a + side_b - hyp) / max(hyp, 1.0)
+                if right_score <= 0.08:
+                    add_candidate(
+                        candidates,
+                        right_score,
+                        "right_triangle",
+                        [p1, p2, p3],
+                        f"triangle {p1}{p2}{p3} looks right-angled at {vertex}",
+                    )
+
+                sides = sorted([len12, len23, len13])
+                iso_score = abs(sides[0] - sides[1]) / max(sides[1], 1.0)
+                if iso_score <= 0.08:
+                    repeated = []
+                    if abs(len12 - len13) / max(len12, len13) <= 0.08:
+                        repeated.append(p1)
+                    if abs(len12 - len23) / max(len12, len23) <= 0.08:
+                        repeated.append(p2)
+                    if abs(len13 - len23) / max(len13, len23) <= 0.08:
+                        repeated.append(p3)
+                    if repeated:
+                        add_candidate(
+                            candidates,
+                            iso_score,
+                            "isosceles",
+                            [p1, p2, p3],
+                            f"triangle {p1}{p2}{p3} looks isosceles with apex near {repeated[0]}",
+                        )
+
+                eq_score = max(abs(len12 - len23), abs(len23 - len13), abs(len12 - len13)) / max(len12, len23, len13)
+                if eq_score <= 0.08:
+                    add_candidate(
+                        candidates,
+                        eq_score,
+                        "equilateral",
+                        [p1, p2, p3],
+                        f"triangle {p1}{p2}{p3} looks close to equilateral",
+                    )
+
+    unique_hints = []
+    seen = set()
+    type_limits = {
+        "midpoint": max_items if relax_type_limits else 2,
+        "collinear": max_items if relax_type_limits else 2,
+        "right_triangle": max_items if relax_type_limits else 2,
+        "isosceles": max_items if relax_type_limits else 2,
+        "equilateral": max_items if relax_type_limits else 1,
+        "perpendicular": max_items if relax_type_limits else 2,
+        "parallel": max_items if relax_type_limits else 2,
+        "equal_length": max_items if relax_type_limits else 2,
+    }
+    type_counts = {}
+    for candidate in sorted(candidates, key=_coordinate_candidate_sort_key):
+        dedupe_key = (candidate["relation_type"], tuple(candidate["points"]))
+        if dedupe_key in seen:
+            continue
+        relation_type = candidate["relation_type"]
+        if type_counts.get(relation_type, 0) >= type_limits.get(relation_type, max_items):
+            continue
+        seen.add(dedupe_key)
+        unique_hints.append(candidate)
+        type_counts[relation_type] = type_counts.get(relation_type, 0) + 1
+        if len(unique_hints) >= max_items:
+            break
+    return unique_hints
+
+
+def build_hidden_coordinate_hints(point_coords, max_items=6):
+    hints = build_hidden_coordinate_candidates(point_coords, max_items=max_items)
+    if not hints:
+        return "No strong coordinate-based relation stands out beyond the visible diagram."
+    return "; ".join(candidate["summary"] for candidate in hints)
+
+
+def build_hidden_coordinate_guidance(point_coords, max_items=8):
+    hints = build_hidden_coordinate_candidates(point_coords, max_items=max_items)
+    if not hints:
+        return "[]"
+    return json.dumps(hints, ensure_ascii=False, indent=2)
+
+
+def build_canonical_coordinate_hint(coordinate_relations):
+    cleaned_relations = [
+        normalize_relation_surface(relation).strip().rstrip(".")
+        for relation in (coordinate_relations or [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+    cleaned_relations = [relation for relation in cleaned_relations if relation]
+    if not cleaned_relations:
+        return "the clearest visual cues are the midpoint, collinear, equal-length, parallel, or perpendicular relations already visible."
+    if len(cleaned_relations) == 1:
+        relation_text = cleaned_relations[0]
+        return f"the clearest visual cue is that {relation_text}."
+    if len(cleaned_relations) == 2:
+        relation_text = " and that ".join(cleaned_relations)
+        return f"the clearest visual cues are that {relation_text}."
+    relation_text = "; ".join(cleaned_relations[:-1]) + f"; and {cleaned_relations[-1]}"
+    return f"the clearest visual cues are that {relation_text}."
 
 
 def normalize_point_case(text, point_names):

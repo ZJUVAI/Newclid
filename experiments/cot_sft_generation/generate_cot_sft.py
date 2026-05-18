@@ -25,6 +25,24 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
+    from .audits import (
+        audit_generation_quality,
+        audit_source_record,
+        bridge_step_relation_realized,
+        build_visible_premise_summaries,
+        coordinate_relation_matches_candidate,
+        count_relation_mentions,
+        extract_relation_point_names,
+        flatten_bridge_relations,
+        get_point_coords,
+        has_long_ngram_overlap,
+        relation_has_sufficient_point_coverage,
+        relation_only_appears_in_preparation_clause,
+        relation_semantically_mentioned_in_sentence,
+        relation_mentioned_in_text,
+        split_into_sentences,
+        validate_aux_step_scope,
+    )
     from .run_artifacts import (
         build_input_file_metadata,
         build_dataset_output_record,
@@ -42,11 +60,16 @@ try:
         build_aux_direct_consequences,
         build_aux_keyword_expectations,
         build_canonical_construction,
+        build_canonical_coordinate_hint,
         build_hidden_aux_brief,
+        build_hidden_coordinate_candidates,
+        build_hidden_coordinate_guidance,
+        build_hidden_coordinate_hints,
         build_multi_aux_instruction,
         build_public_problem_text,
         extract_aux_new_points,
         extract_aux_point_scope,
+        extract_high_level_structure_markers,
         extract_point_mentions,
         extract_problem_goal,
         extract_visible_point_names,
@@ -89,6 +112,24 @@ try:
         build_canonical_bridge_unlock,
     )
 except ImportError:  # pragma: no cover - script execution path
+    from audits import (
+        audit_generation_quality,
+        audit_source_record,
+        bridge_step_relation_realized,
+        build_visible_premise_summaries,
+        coordinate_relation_matches_candidate,
+        count_relation_mentions,
+        extract_relation_point_names,
+        flatten_bridge_relations,
+        get_point_coords,
+        has_long_ngram_overlap,
+        relation_has_sufficient_point_coverage,
+        relation_only_appears_in_preparation_clause,
+        relation_semantically_mentioned_in_sentence,
+        relation_mentioned_in_text,
+        split_into_sentences,
+        validate_aux_step_scope,
+    )
     from run_artifacts import (
         build_input_file_metadata,
         build_dataset_output_record,
@@ -106,11 +147,16 @@ except ImportError:  # pragma: no cover - script execution path
         build_aux_direct_consequences,
         build_aux_keyword_expectations,
         build_canonical_construction,
+        build_canonical_coordinate_hint,
         build_hidden_aux_brief,
+        build_hidden_coordinate_candidates,
+        build_hidden_coordinate_guidance,
+        build_hidden_coordinate_hints,
         build_multi_aux_instruction,
         build_public_problem_text,
         extract_aux_new_points,
         extract_aux_point_scope,
+        extract_high_level_structure_markers,
         extract_point_mentions,
         extract_problem_goal,
         extract_visible_point_names,
@@ -325,15 +371,6 @@ def extract_aux_and_rest(formal_output: str):
     return aux_part, sanitized_rest
 
 
-def get_point_coords(record):
-    coords = record.get("grid_coord") or record.get("point_coords_grid") or {}
-    normalized = {}
-    for point_name, pair in coords.items():
-        if isinstance(pair, (list, tuple)) and len(pair) == 2:
-            normalized[str(point_name)] = (int(pair[0]), int(pair[1]))
-    return normalized
-
-
 def validate_coord_tags(thinking_text: str, point_coords):
     tagged_points = POINT_TAG_RE.findall(thinking_text)
     if not tagged_points:
@@ -480,262 +517,6 @@ def align_dependency_to_support(dependency, available_supports, point_names):
     return None
 
 
-def build_visible_premise_summaries(record, max_items=12):
-    summaries = []
-    seen = set()
-    for fact in extract_visible_formal_facts(record):
-        summary = fact.get("summary")
-        if not summary:
-            continue
-        normalized = summary.lower()
-        if normalized in seen:
-            continue
-        seen.add(normalized)
-        summaries.append(summary)
-        if len(summaries) >= max_items:
-            return summaries
-    return summaries
-
-
-def extract_visible_formal_facts(record):
-    formal_problem = (
-        record.get("llm_input_renamed")
-        or record.get("public_problem")
-        or record.get("input")
-        or ""
-    ).strip()
-    body_match = PROBLEM_BODY_RE.search(formal_problem)
-    body = body_match.group(1).strip() if body_match else formal_problem
-    if "?" in body:
-        body = body.split("?", 1)[0].strip()
-
-    facts = []
-    for clause in [part.strip() for part in body.split(";") if part.strip()]:
-        if ":" not in clause:
-            continue
-        _, relation_text = clause.split(":", 1)
-        for fact in split_formal_relation_chain(relation_text):
-            tokens = fact.split()
-            if not tokens:
-                continue
-            facts.append(
-                {
-                    "raw": fact.strip(),
-                    "predicate": tokens[0].lower(),
-                    "args": [token.lower() for token in tokens[1:]],
-                    "summary": summarize_aux_clause(fact),
-                }
-            )
-    return facts
-
-
-def _canonical_line_key(p1, p2):
-    a, b = sorted([p1.lower(), p2.lower()])
-    return (a, b)
-
-
-def visible_parallelogram_supported(record, vertex_word):
-    if not isinstance(vertex_word, str) or len(vertex_word) != 4:
-        return False
-    a, b, c, d = [char.lower() for char in vertex_word]
-    visible_facts = extract_visible_formal_facts(record)
-    parallel_pairs = set()
-    for fact in visible_facts:
-        if fact.get("predicate") != "para":
-            continue
-        args = fact.get("args", [])
-        if len(args) < 4:
-            continue
-        line_1 = _canonical_line_key(args[0], args[1])
-        line_2 = _canonical_line_key(args[2], args[3])
-        parallel_pairs.add(frozenset([line_1, line_2]))
-
-    needed_pairs = [
-        frozenset([
-            _canonical_line_key(a, b),
-            _canonical_line_key(c, d),
-        ]),
-        frozenset([
-            _canonical_line_key(a, d),
-            _canonical_line_key(b, c),
-        ]),
-    ]
-    return all(pair in parallel_pairs for pair in needed_pairs)
-
-
-def iter_supported_parallelogram_mentions(record, text):
-    if not isinstance(text, str) or not text:
-        return
-    patterns = [
-        r"\bparallelogram\s+([a-z]{4})\b",
-        r"\b([a-z]{4})\s+forms?\s+(?:an?\s+)?parallelogram\b",
-        r"\b([a-z]{4})\s+is\s+(?:an?\s+)?parallelogram\b",
-        r"\bquadrilateral\s+([a-z]{4})\s+is\s+(?:an?\s+)?parallelogram\b",
-    ]
-    for pattern in patterns:
-        for match in re.finditer(pattern, text):
-            vertex_word = match.group(1).lower()
-            if visible_parallelogram_supported(record, vertex_word):
-                yield match.span()
-
-
-def aux_constructs_parallelogram(aux_part):
-    if not isinstance(aux_part, str) or not aux_part.strip():
-        return False
-    new_points = {point.lower() for point in extract_aux_new_points(aux_part)}
-    if not new_points:
-        return False
-    para_counts = {point: 0 for point in new_points}
-    old_point_unions = {point: set() for point in new_points}
-    for clause in parse_aux_clauses(aux_part):
-        for fact in split_formal_relation_chain(clause["body"]):
-            tokens = fact.split()
-            if not tokens or tokens[0].lower() != "para":
-                continue
-            args = [token.lower() for token in tokens[1:]]
-            if len(args) < 4:
-                continue
-            arg_set = set(args[:4])
-            touched_new_points = arg_set & new_points
-            if not touched_new_points:
-                continue
-            for point in touched_new_points:
-                para_counts[point] += 1
-                old_point_unions[point].update(arg_set - {point})
-    return any(para_counts[point] >= 2 and len(old_point_unions[point]) >= 3 for point in new_points)
-
-
-def iter_aux_constructed_parallelogram_mentions(text, aux_part):
-    if not isinstance(text, str) or not text or not aux_constructs_parallelogram(aux_part):
-        return
-    patterns = [
-        r"\bcreate(?:s|d|ing)?\s+(?:an?\s+)?parallelogram\b",
-        r"\bform(?:s|ed|ing)?\s+(?:an?\s+)?parallelogram\b",
-        r"\bcomplete(?:s|d|ing)?\s+(?:an?\s+)?parallelogram\b",
-        r"\bmake(?:s|d|ing)?\s+(?:an?\s+)?parallelogram\b",
-    ]
-    for pattern in patterns:
-        for match in re.finditer(pattern, text):
-            yield match.span()
-
-
-def extract_midpoint_relation_signature(text):
-    if not isinstance(text, str):
-        return None
-    lowered = text.lower().strip()
-    midpoint_patterns = [
-        r"(?:point\s+)?([a-z])\s+looks\s+like\s+the\s+midpoint\s+of\s+([a-z])([a-z])",
-        r"(?:point\s+)?([a-z])\s+is\s+the\s+midpoint\s+of\s+([a-z])([a-z])",
-        r"(?:point\s+)?([a-z])\s+appears\s+to\s+be\s+the\s+midpoint\s+of\s+([a-z])([a-z])",
-    ]
-    for pattern in midpoint_patterns:
-        match = re.search(pattern, lowered)
-        if not match:
-            continue
-        midpoint = match.group(1).lower()
-        endpoint_a = match.group(2).lower()
-        endpoint_b = match.group(3).lower()
-        return midpoint, tuple(sorted([endpoint_a, endpoint_b]))
-    return None
-
-
-def coordinate_hints_support_parallelogram(plan):
-    if not isinstance(plan, dict):
-        return False
-    midpoint_map = {}
-    for relation in plan.get("coordinate_relations", []):
-        signature = extract_midpoint_relation_signature(relation)
-        if not signature:
-            continue
-        midpoint, segment = signature
-        midpoint_map.setdefault(midpoint, set()).add(segment)
-    for midpoint, segments in midpoint_map.items():
-        if len(segments) < 2:
-            continue
-        segment_points = set()
-        for segment in segments:
-            segment_points.update(segment)
-        if len(segment_points) >= 4:
-            return True
-    return False
-
-
-def iter_coordinate_supported_parallelogram_mentions(text, plan):
-    if not isinstance(text, str) or not text or not coordinate_hints_support_parallelogram(plan):
-        return
-    patterns = [
-        r"\bparallelogram\s+structure\b",
-        r"\bsuggests?\s+(?:a|the)\s+parallelogram\b",
-        r"\bsuggests?\s+(?:a|the)\s+parallelogram\s+structure\b",
-        r"\bparallelogram-like\s+structure\b",
-    ]
-    for pattern in patterns:
-        for match in re.finditer(pattern, text):
-            yield match.span()
-
-
-def _coord_line_metrics(point_coords, p1, p2):
-    x1, y1 = point_coords[p1]
-    x2, y2 = point_coords[p2]
-    dx = x2 - x1
-    dy = y2 - y1
-    length_sq = dx * dx + dy * dy
-    return x1, y1, x2, y2, dx, dy, length_sq
-
-
-def _visible_fact_coordinate_conflict(fact, point_coords):
-    predicate = fact.get("predicate", "")
-    args = fact.get("args", [])
-    summary = fact.get("summary") or fact.get("raw") or ""
-    if predicate == "cong" and len(args) >= 4 and all(point in point_coords for point in args[:4]):
-        _, _, _, _, _, _, len1 = _coord_line_metrics(point_coords, args[0], args[1])
-        _, _, _, _, _, _, len2 = _coord_line_metrics(point_coords, args[2], args[3])
-        if min(len1, len2) == 0:
-            return None
-        rel_gap = abs(len1 - len2) / max(len1, len2)
-        if rel_gap > 0.18:
-            return f"visible_premise_coordinate_conflict:{summary}"
-    if predicate == "perp" and len(args) >= 4 and all(point in point_coords for point in args[:4]):
-        _, _, _, _, dx1, dy1, len1 = _coord_line_metrics(point_coords, args[0], args[1])
-        _, _, _, _, dx2, dy2, len2 = _coord_line_metrics(point_coords, args[2], args[3])
-        if min(len1, len2) == 0:
-            return None
-        perp_score = abs(dx1 * dx2 + dy1 * dy2) / ((len1 * len2) ** 0.5)
-        if perp_score > 0.18:
-            return f"visible_premise_coordinate_conflict:{summary}"
-    if predicate == "para" and len(args) >= 4 and all(point in point_coords for point in args[:4]):
-        _, _, _, _, dx1, dy1, len1 = _coord_line_metrics(point_coords, args[0], args[1])
-        _, _, _, _, dx2, dy2, len2 = _coord_line_metrics(point_coords, args[2], args[3])
-        if min(len1, len2) == 0:
-            return None
-        parallel_score = abs(dx1 * dy2 - dy1 * dx2) / ((len1 * len2) ** 0.5)
-        if parallel_score > 0.14:
-            return f"visible_premise_coordinate_conflict:{summary}"
-    if predicate == "coll" and len(args) >= 3 and all(point in point_coords for point in args[:3]):
-        x1, y1 = point_coords[args[0]]
-        x2, y2 = point_coords[args[1]]
-        x3, y3 = point_coords[args[2]]
-        len12 = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
-        len23 = ((x3 - x2) ** 2 + (y3 - y2) ** 2) ** 0.5
-        len13 = ((x3 - x1) ** 2 + (y3 - y1) ** 2) ** 0.5
-        longest_side = max(len12, len23, len13, 1.0)
-        area_score = abs((x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1)) / longest_side
-        if area_score > 3.0:
-            return f"visible_premise_coordinate_conflict:{summary}"
-    if predicate == "midp" and len(args) >= 3 and all(point in point_coords for point in args[:3]):
-        xm, ym = point_coords[args[0]]
-        x1, y1 = point_coords[args[1]]
-        x2, y2 = point_coords[args[2]]
-        seg_len = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
-        if seg_len == 0:
-            return None
-        area_score = abs((x2 - x1) * (ym - y1) - (y2 - y1) * (xm - x1)) / seg_len
-        midpoint_gap = ((xm - (x1 + x2) / 2) ** 2 + (ym - (y1 + y2) / 2) ** 2) ** 0.5
-        if area_score > 3.0 or midpoint_gap > 4.0:
-            return f"visible_premise_coordinate_conflict:{summary}"
-    return None
-
-
 def coerce_relation_list_field(value, max_len=3):
     if isinstance(value, list):
         return value[:max_len]
@@ -766,43 +547,6 @@ def coerce_relation_list_field(value, max_len=3):
         if len(parts) >= 2:
             return parts[:max_len]
     return [stripped]
-
-
-def coordinate_relation_matches_candidate(relation_text, candidate):
-    relation_type = infer_relation_type_from_text(relation_text)
-    if not relation_type:
-        return False
-
-    candidate_type = candidate.get("relation_type", "")
-
-    candidate_points = {str(point).lower() for point in candidate.get("points", [])}
-    relation_points = extract_point_mentions(relation_text, sorted(candidate_points))
-
-    equivalent_types = {
-        ("perpendicular", "right_triangle"),
-        ("equal_length", "isosceles"),
-        ("equal_length", "equilateral"),
-    }
-    if relation_type == candidate_type:
-        return candidate_points.issubset(relation_points)
-    if (relation_type, candidate_type) in equivalent_types:
-        return relation_points.issubset(candidate_points) and len(relation_points) >= 2
-    return False
-
-
-def validate_aux_step_scope(step_text, aux_part, visible_points):
-    allowed_points = {point.lower() for point in extract_aux_point_scope(aux_part)}
-    candidate_points = sorted(set(visible_points) | allowed_points)
-    step_points = extract_point_mentions(step_text, candidate_points)
-    if not (step_points & allowed_points):
-        return False, "the direct auxiliary relation must mention the auxiliary-point relation explicitly"
-    extra_points = step_points - allowed_points
-    if extra_points:
-        return False, (
-            "the direct auxiliary relation should stay on the direct aux consequence and must not "
-            f"introduce extra old-figure points yet: {sorted(extra_points)}"
-        )
-    return True, None
 
 
 def find_forbidden_shape_shorthand(text):
@@ -865,424 +609,6 @@ def find_forbidden_symmetry_shorthand(text):
         if hit:
             return hit.group(0)
     return None
-
-
-def audit_source_record(record, image_path: Path, aux_part, sanitized_rest):
-    issues = []
-    point_coords = get_point_coords(record)
-    visible_goal = extract_problem_goal(record)
-    goal_spec = parse_goal_expression(visible_goal)
-    goal_points = set(goal_spec["points"])
-    visible_points = set(extract_visible_point_names(point_coords))
-    aux_scope = extract_aux_point_scope(aux_part)
-    aux_direct = build_aux_direct_consequences(aux_part)
-    proof_guidance = build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal)
-
-    if not image_path.exists():
-        issues.append("missing_image")
-    if not point_coords:
-        issues.append("missing_point_coords")
-    if not visible_goal:
-        issues.append("missing_visible_goal")
-    if goal_points and not goal_points.issubset(visible_points | aux_scope):
-        issues.append("goal_references_unknown_points")
-    if not aux_direct:
-        issues.append("aux_has_no_parseable_direct_consequences")
-    if not proof_guidance["goal_finish_relations"]:
-        issues.append("proof_guidance_missing_goal_finish_relations")
-    relation_conflicts = detect_visible_premise_relation_conflicts(record)
-    if relation_conflicts:
-        issues.extend(relation_conflicts[:8])
-    if point_coords:
-        visible_fact_conflicts = []
-        for fact in extract_visible_formal_facts(record):
-            conflict = _visible_fact_coordinate_conflict(fact, point_coords)
-            if conflict and conflict not in visible_fact_conflicts:
-                visible_fact_conflicts.append(conflict)
-            if len(visible_fact_conflicts) >= 8:
-                break
-        issues.extend(visible_fact_conflicts)
-
-    return {
-        "issues": issues,
-        "has_issue": bool(issues),
-    }
-
-
-def detect_visible_premise_relation_conflicts(record):
-    issues = []
-    visible_facts = extract_visible_formal_facts(record)
-    line_pair_predicates = {}
-    midpoint_claims = {}
-
-    for fact in visible_facts:
-        predicate = fact.get("predicate", "")
-        args = fact.get("args", [])
-        if predicate in {"para", "perp"} and len(args) >= 4:
-            line_pair = frozenset([
-                _canonical_line_key(args[0], args[1]),
-                _canonical_line_key(args[2], args[3]),
-            ])
-            line_pair_predicates.setdefault(line_pair, set()).add(predicate)
-        elif predicate == "midp" and len(args) >= 3:
-            segment_key = _canonical_line_key(args[1], args[2])
-            midpoint_claims.setdefault(segment_key, set()).add(args[0])
-
-    for line_pair, predicates in line_pair_predicates.items():
-        if {"para", "perp"}.issubset(predicates):
-            lines = sorted("".join(points) for points in line_pair)
-            issues.append(
-                "visible_premise_relation_conflict:"
-                f"{'/'.join(lines)} both parallel and perpendicular"
-            )
-    for segment_key, midpoints in midpoint_claims.items():
-        if len(midpoints) > 1:
-            issues.append(
-                "visible_premise_midpoint_conflict:"
-                f"{''.join(segment_key)} has multiple midpoints {','.join(sorted(midpoints))}"
-            )
-    return issues
-
-
-def audit_generation_quality(record, generation, aux_part):
-    issues = []
-    point_coords = get_point_coords(record)
-    visible_points = extract_visible_point_names(point_coords)
-    coordinate_candidates = build_hidden_coordinate_candidates(point_coords, max_items=64, relax_type_limits=True)
-    plan = generation.get("plan_parsed") or {}
-    suspicious_markers = [
-        "rotational symmetry",
-        "common center",
-        "reference center",
-        "circumcenter",
-        "square-like",
-        "square structure",
-        "square structures",
-        "square configuration",
-        "square configurations",
-        "parallelogram",
-        "crucial center",
-        "midpoint property",
-        "midpoint properties",
-        "similarity or angle equality",
-        "specific angle conditions",
-    ]
-    generic_bridge_markers = [
-        "midpoint property",
-        "midpoint properties",
-        "specific angle conditions",
-        "similarity or angle equality",
-    ]
-
-    if plan:
-        unmatched_relations = [
-            relation
-            for relation in plan.get("coordinate_relations", [])
-            if not any(coordinate_relation_matches_candidate(relation, candidate) for candidate in coordinate_candidates)
-        ]
-        if unmatched_relations:
-            issues.append(
-                "coordinate_relations_unmatched:" + " | ".join(unmatched_relations)
-            )
-        direct_relations = plan.get("aux_direct_relations") or plan.get("verification_chain") or [""]
-        ok, message = validate_aux_step_scope(direct_relations[0], aux_part, visible_points)
-        if not ok:
-            issues.append(message)
-        bridge_relations = flatten_bridge_relations(plan)
-        if not bridge_relations:
-            issues.append("missing_bridge_relations")
-        write_output = generation.get("write_output") or ""
-        if write_output and isinstance(plan.get("bridge_steps"), list):
-            sentences = split_into_sentences(write_output)
-            search_start = 0
-            for idx, step in enumerate(plan["bridge_steps"]):
-                match_idx = None
-                for sentence_idx in range(search_start, len(sentences)):
-                    if bridge_step_relation_realized(sentences[sentence_idx], step):
-                        match_idx = sentence_idx
-                        break
-                if match_idx is None:
-                    issues.append(f"bridge_relation_missing_in_body:{idx}")
-                    continue
-                sentence = sentences[match_idx].lower()
-                if any(marker in sentence for marker in generic_bridge_markers):
-                    issues.append(f"generic_bridge_phrase:{idx}")
-                search_start = match_idx + 1
-        if isinstance(plan.get("bridge_steps"), list) and plan.get("goal_finish"):
-            last_step = plan["bridge_steps"][-1] if plan["bridge_steps"] else None
-            if isinstance(last_step, dict):
-                last_relation = last_step.get("approved_route_relation") or last_step.get("relation", "")
-                if relations_semantically_match(last_relation, plan.get("goal_finish", ""), visible_points):
-                    issues.append("bridge_goal_finish_duplicate")
-
-    text_to_scan = " ".join(
-        part for part in [generation.get("write_output"), generation.get("thinking")] if part
-    ).lower()
-    for marker in suspicious_markers:
-        if marker == "parallelogram":
-            supported_spans = list(iter_supported_parallelogram_mentions(record, text_to_scan))
-            supported_spans.extend(iter_aux_constructed_parallelogram_mentions(text_to_scan, aux_part))
-            supported_spans.extend(iter_coordinate_supported_parallelogram_mentions(text_to_scan, plan))
-            marker_hits = [match.span() for match in re.finditer(r"\bparallelogram\b", text_to_scan)]
-            unsupported_hits = [
-                hit
-                for hit in marker_hits
-                if not any(supported_start <= hit[0] and hit[1] <= supported_end for supported_start, supported_end in supported_spans)
-            ]
-            if unsupported_hits:
-                issues.append(f"suspicious_phrase:{marker}")
-            continue
-        if marker in text_to_scan:
-            issues.append(f"suspicious_phrase:{marker}")
-
-    return {
-        "issues": issues,
-        "has_issue": bool(issues),
-    }
-
-
-def _candidate_sort_key(candidate):
-    relation_priority = {
-        "midpoint": 0,
-        "collinear": 1,
-        "right_triangle": 2,
-        "isosceles": 3,
-        "equilateral": 4,
-        "perpendicular": 5,
-        "parallel": 6,
-        "equal_length": 7,
-    }
-    return (
-        relation_priority.get(candidate["relation_type"], 99),
-        candidate["score"],
-        tuple(candidate["points"]),
-    )
-
-
-def build_hidden_coordinate_candidates(point_coords, max_items=10, relax_type_limits=False):
-    point_items = sorted(point_coords.items())
-    if len(point_items) < 2:
-        return []
-
-    def add_candidate(candidates, score, relation_type, points, summary):
-        candidates.append(
-            {
-                "score": round(float(score), 4),
-                "relation_type": relation_type,
-                "points": list(points),
-                "summary": summary,
-            }
-        )
-
-    def line_metrics(p1, p2):
-        x1, y1 = point_coords[p1]
-        x2, y2 = point_coords[p2]
-        dx = x2 - x1
-        dy = y2 - y1
-        length_sq = dx * dx + dy * dy
-        return dx, dy, length_sq
-
-    segment_names = []
-    for i, (p1, _) in enumerate(point_items):
-        for p2, _ in point_items[i + 1:]:
-            dx, dy, length_sq = line_metrics(p1, p2)
-            if length_sq == 0:
-                continue
-            segment_names.append((p1, p2, dx, dy, length_sq))
-
-    candidates = []
-
-    for i, (a, b, dx1, dy1, len1) in enumerate(segment_names):
-        for c, d, dx2, dy2, len2 in segment_names[i + 1:]:
-            if len1 == 0 or len2 == 0:
-                continue
-            dot = dx1 * dx2 + dy1 * dy2
-            cross = dx1 * dy2 - dy1 * dx2
-            norm = (len1 * len2) ** 0.5
-            if norm == 0:
-                continue
-            parallel_score = abs(cross) / norm
-            perp_score = abs(dot) / norm
-            if parallel_score <= 0.05:
-                add_candidate(
-                    candidates,
-                    parallel_score,
-                    "parallel",
-                    [a, b, c, d],
-                    f"segments {a}{b} and {c}{d} look parallel",
-                )
-            if perp_score <= 0.08:
-                add_candidate(
-                    candidates,
-                    perp_score,
-                    "perpendicular",
-                    [a, b, c, d],
-                    f"segments {a}{b} and {c}{d} look perpendicular",
-                )
-            rel_len_gap = abs(len1 - len2) / max(len1, len2)
-            if rel_len_gap <= 0.06:
-                add_candidate(
-                    candidates,
-                    rel_len_gap,
-                    "equal_length",
-                    [a, b, c, d],
-                    f"segments {a}{b} and {c}{d} look equal in length",
-                )
-
-    visible_points = [name for name, _ in point_items]
-    for mid in visible_points:
-        xm, ym = point_coords[mid]
-        for i, p1 in enumerate(visible_points):
-            for p2 in visible_points[i + 1:]:
-                if mid in {p1, p2}:
-                    continue
-                x1, y1 = point_coords[p1]
-                x2, y2 = point_coords[p2]
-                area2 = abs((x2 - x1) * (ym - y1) - (y2 - y1) * (xm - x1))
-                seg_len = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5
-                if seg_len == 0:
-                    continue
-                midpoint_gap = ((xm - (x1 + x2) / 2) ** 2 + (ym - (y1 + y2) / 2) ** 2) ** 0.5
-                if area2 / seg_len <= 2.0 and midpoint_gap <= 3.0:
-                    score = area2 / seg_len + midpoint_gap
-                    add_candidate(
-                        candidates,
-                        score,
-                        "midpoint",
-                        [mid, p1, p2],
-                        f"point {mid} looks like the midpoint of {p1}{p2}",
-                    )
-
-    for i, p1 in enumerate(visible_points):
-        x1, y1 = point_coords[p1]
-        for j, p2 in enumerate(visible_points[i + 1:], start=i + 1):
-            x2, y2 = point_coords[p2]
-            for p3 in visible_points[j + 1:]:
-                x3, y3 = point_coords[p3]
-                len12 = (x2 - x1) ** 2 + (y2 - y1) ** 2
-                len23 = (x3 - x2) ** 2 + (y3 - y2) ** 2
-                len13 = (x3 - x1) ** 2 + (y3 - y1) ** 2
-                if min(len12, len23, len13) == 0:
-                    continue
-                twice_area = abs((x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1))
-                longest_side = max(len12, len23, len13) ** 0.5
-                area_score = twice_area / max(longest_side, 1.0)
-                if area_score <= 2.0:
-                    add_candidate(
-                        candidates,
-                        area_score,
-                        "collinear",
-                        [p1, p2, p3],
-                        f"points {p1}, {p2}, and {p3} look nearly collinear",
-                    )
-
-                if len12 >= len23 and len12 >= len13:
-                    vertex = p3
-                    side_a, side_b, hyp = len13, len23, len12
-                elif len23 >= len12 and len23 >= len13:
-                    vertex = p1
-                    side_a, side_b, hyp = len12, len13, len23
-                else:
-                    vertex = p2
-                    side_a, side_b, hyp = len12, len23, len13
-                right_score = abs(side_a + side_b - hyp) / max(hyp, 1.0)
-                if right_score <= 0.08:
-                    add_candidate(
-                        candidates,
-                        right_score,
-                        "right_triangle",
-                        [p1, p2, p3],
-                        f"triangle {p1}{p2}{p3} looks right-angled at {vertex}",
-                    )
-
-                sides = sorted([len12, len23, len13])
-                iso_score = abs(sides[0] - sides[1]) / max(sides[1], 1.0)
-                if iso_score <= 0.08:
-                    repeated = []
-                    if abs(len12 - len13) / max(len12, len13) <= 0.08:
-                        repeated.append(p1)
-                    if abs(len12 - len23) / max(len12, len23) <= 0.08:
-                        repeated.append(p2)
-                    if abs(len13 - len23) / max(len13, len23) <= 0.08:
-                        repeated.append(p3)
-                    if repeated:
-                        add_candidate(
-                            candidates,
-                            iso_score,
-                            "isosceles",
-                            [p1, p2, p3],
-                            f"triangle {p1}{p2}{p3} looks isosceles with apex near {repeated[0]}",
-                        )
-
-                eq_score = max(abs(len12 - len23), abs(len23 - len13), abs(len12 - len13)) / max(len12, len23, len13)
-                if eq_score <= 0.08:
-                    add_candidate(
-                        candidates,
-                        eq_score,
-                        "equilateral",
-                        [p1, p2, p3],
-                        f"triangle {p1}{p2}{p3} looks close to equilateral",
-                    )
-
-    unique_hints = []
-    seen = set()
-    type_limits = {
-        "midpoint": max_items if relax_type_limits else 2,
-        "collinear": max_items if relax_type_limits else 2,
-        "right_triangle": max_items if relax_type_limits else 2,
-        "isosceles": max_items if relax_type_limits else 2,
-        "equilateral": max_items if relax_type_limits else 1,
-        "perpendicular": max_items if relax_type_limits else 2,
-        "parallel": max_items if relax_type_limits else 2,
-        "equal_length": max_items if relax_type_limits else 2,
-    }
-    type_counts = {}
-    for candidate in sorted(candidates, key=_candidate_sort_key):
-        dedupe_key = (candidate["relation_type"], tuple(candidate["points"]))
-        if dedupe_key in seen:
-            continue
-        relation_type = candidate["relation_type"]
-        if type_counts.get(relation_type, 0) >= type_limits.get(relation_type, max_items):
-            continue
-        seen.add(dedupe_key)
-        unique_hints.append(candidate)
-        type_counts[relation_type] = type_counts.get(relation_type, 0) + 1
-        if len(unique_hints) >= max_items:
-            break
-    return unique_hints
-
-
-def build_hidden_coordinate_hints(point_coords, max_items=6):
-    hints = build_hidden_coordinate_candidates(point_coords, max_items=max_items)
-    if not hints:
-        return "No strong coordinate-based relation stands out beyond the visible diagram."
-    return "; ".join(candidate["summary"] for candidate in hints)
-
-
-def build_hidden_coordinate_guidance(point_coords, max_items=8):
-    hints = build_hidden_coordinate_candidates(point_coords, max_items=max_items)
-    if not hints:
-        return "[]"
-    return json.dumps(hints, ensure_ascii=False, indent=2)
-
-
-def build_canonical_coordinate_hint(coordinate_relations):
-    cleaned_relations = [
-        normalize_relation_surface(relation).strip().rstrip(".")
-        for relation in (coordinate_relations or [])
-        if isinstance(relation, str) and relation.strip()
-    ]
-    cleaned_relations = [relation for relation in cleaned_relations if relation]
-    if not cleaned_relations:
-        return "the clearest visual cues are the midpoint, collinear, equal-length, parallel, or perpendicular relations already visible."
-    if len(cleaned_relations) == 1:
-        relation_text = cleaned_relations[0]
-        return f"the clearest visual cue is that {relation_text}."
-    if len(cleaned_relations) == 2:
-        relation_text = " and that ".join(cleaned_relations)
-        return f"the clearest visual cues are that {relation_text}."
-    relation_text = "; ".join(cleaned_relations[:-1]) + f"; and {cleaned_relations[-1]}"
-    return f"the clearest visual cues are that {relation_text}."
 
 
 def build_canonical_helper_idea(aux_direct_relations, goal_bottleneck=""):
@@ -2471,216 +1797,6 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
     return True, "Valid writer body"
 
 
-def _normalize_overlap_words(text):
-    lowered = re.sub(r"<[^>]+>", " ", text or "")
-    lowered = re.sub(r"[^a-z0-9/ ]+", " ", lowered.lower())
-    return [token for token in lowered.split() if token]
-
-
-def has_long_ngram_overlap(source_text, target_text, ngram_size=7):
-    source_words = _normalize_overlap_words(source_text)
-    target_words = _normalize_overlap_words(target_text)
-    if len(source_words) < ngram_size or len(target_words) < ngram_size:
-        return False
-    source_ngrams = {
-        tuple(source_words[idx:idx + ngram_size])
-        for idx in range(len(source_words) - ngram_size + 1)
-    }
-    target_ngrams = {
-        tuple(target_words[idx:idx + ngram_size])
-        for idx in range(len(target_words) - ngram_size + 1)
-    }
-    return bool(source_ngrams & target_ngrams)
-
-
-def flatten_bridge_relations(plan):
-    if not isinstance(plan, dict):
-        return []
-    if isinstance(plan.get("bridge_steps"), list):
-        relations = []
-        for step in plan["bridge_steps"]:
-            if isinstance(step, dict):
-                relation = step.get("relation")
-                if isinstance(relation, str) and relation.strip():
-                    relations.append(relation.strip())
-        if relations:
-            return relations
-    relations = plan.get("bridge_relations")
-    if isinstance(relations, list):
-        return [relation.strip() for relation in relations if isinstance(relation, str) and relation.strip()]
-    return []
-
-
-def split_into_sentences(text):
-    return [part.strip() for part in re.split(r"(?<=[.!?])\s+", text or "") if part.strip()]
-
-
-def relation_mentioned_in_text(text, relation):
-    lowered_text = (text or "").lower()
-    lowered_relation = (relation or "").lower().strip()
-    if not lowered_relation:
-        return False
-    if lowered_relation in lowered_text:
-        return True
-    return has_long_ngram_overlap(lowered_relation, lowered_text, ngram_size=3)
-
-
-def extract_relation_point_names(text):
-    lowered = (text or "").lower()
-    stopwords = {
-        "a",
-        "i",
-        "is",
-        "to",
-        "of",
-        "on",
-        "in",
-        "by",
-        "at",
-        "as",
-        "are",
-        "and",
-        "the",
-        "line",
-        "ratio",
-    }
-    point_names = set(re.findall(r"\b([a-z])\b", lowered))
-    for token in re.findall(r"\b[a-z]{2,4}\b", lowered):
-        if token in stopwords:
-            continue
-        if token in {"line", "ratio"}:
-            continue
-        if len(token) <= 4:
-            point_names.update(char for char in token if char.isalpha())
-    return sorted(point_names)
-
-
-def relation_semantically_mentioned_in_sentence(sentence, relation):
-    lowered_sentence = (sentence or "").lower()
-    relation_points = extract_relation_point_names(relation)
-    if not relation_points or not all(point in lowered_sentence for point in relation_points):
-        return False
-    keywords = relation_text_keywords(relation)
-    if "parallel" in keywords and "parallel" in lowered_sentence:
-        return True
-    if "perpendicular" in keywords and ("perpendicular" in lowered_sentence or "right angle" in lowered_sentence):
-        return True
-    if "collinear" in keywords and any(
-        phrase in lowered_sentence for phrase in ["collinear", "same line", "one line", "on one line", "on the same line"]
-    ):
-        return True
-    if "circle" in keywords and any(
-        phrase in lowered_sentence for phrase in ["cyclic", "concyclic", "circle", "circumcircle"]
-    ):
-        return True
-    if "midpoint" in keywords and (
-        "midpoint" in lowered_sentence
-        or "bisect" in lowered_sentence
-        or "bisects" in lowered_sentence
-    ):
-        return True
-    if "similar" in keywords and "similar" in lowered_sentence:
-        return True
-    if "ratio" in keywords and "ratio" in lowered_sentence:
-        return True
-    if "angle" in keywords and "angle" in lowered_sentence:
-        return True
-    if "equal" in keywords and any(
-        phrase in lowered_sentence for phrase in [" equal", " equals", "congruent", "same length", "same distance", "equidistant"]
-    ):
-        return True
-    return False
-
-
-def count_relation_mentions(text, relations, point_names=None):
-    mentions = 0
-    for relation in relations:
-        if relation_mentioned_in_text(text, relation):
-            mentions += 1
-            continue
-        if relation_semantically_mentioned_in_sentence(text, relation):
-            mentions += 1
-            continue
-        local_points = point_names or extract_relation_point_names(relation)
-        if local_points and relations_semantically_match(text, relation, local_points):
-            mentions += 1
-    return mentions
-
-
-def relation_only_appears_in_preparation_clause(sentence, relation, point_names=None):
-    lowered_sentence = (sentence or "").lower()
-    local_points = point_names or extract_relation_point_names(relation)
-    preparation_markers = [
-        "which prepares",
-        "this prepares",
-        "which is required to prove",
-        "required to prove",
-        "to prove",
-    ]
-    for marker in preparation_markers:
-        marker_idx = lowered_sentence.find(marker)
-        if marker_idx < 0:
-            continue
-        prefix = sentence[:marker_idx]
-        suffix = sentence[marker_idx:]
-        if not relation_mentioned_in_text(suffix, relation):
-            if not (local_points and relations_semantically_match(suffix, relation, local_points)):
-                continue
-        if (
-            relation_mentioned_in_text(prefix, relation)
-            and relation_has_sufficient_point_coverage(prefix, relation, point_names=local_points)
-        ):
-            return False
-        if (
-            local_points
-            and relations_semantically_match(prefix, relation, local_points)
-            and relation_has_sufficient_point_coverage(prefix, relation, point_names=local_points)
-        ):
-            return False
-        return True
-    return False
-
-
-def relation_has_sufficient_point_coverage(sentence, relation, point_names=None):
-    local_points = point_names or extract_relation_point_names(relation)
-    if not local_points:
-        return False
-    mentioned_points = extract_point_mentions(sentence, local_points)
-    keywords = relation_text_keywords(relation)
-    if {"collinear", "midpoint", "circle"} & keywords:
-        return len(mentioned_points) >= 3
-    if {"parallel", "perpendicular", "angle", "ratio", "similar"} & keywords:
-        return len(mentioned_points) >= 4
-    if "equal" in keywords:
-        return len(mentioned_points) >= 3
-    return len(mentioned_points) >= min(3, len(local_points))
-
-
-def bridge_step_relation_realized(sentence, step):
-    if not isinstance(step, dict):
-        return False
-    relation_candidates = []
-    for key in ["relation", "approved_route_relation"]:
-        relation = step.get(key, "")
-        if isinstance(relation, str) and relation.strip() and relation not in relation_candidates:
-            relation_candidates.append(relation)
-    for relation in relation_candidates:
-        local_points = extract_relation_point_names(relation)
-        if relation_mentioned_in_text(sentence, relation):
-            if relation_only_appears_in_preparation_clause(sentence, relation, point_names=local_points):
-                continue
-            if not relation_has_sufficient_point_coverage(sentence, relation, point_names=local_points):
-                continue
-            return True
-        if local_points and relations_semantically_match(sentence, relation, local_points):
-            if relation_only_appears_in_preparation_clause(sentence, relation, point_names=local_points):
-                continue
-            if not relation_has_sufficient_point_coverage(sentence, relation, point_names=local_points):
-                continue
-            return True
-    return False
-
-
 def build_plan_prompt(record, aux_part, sanitized_rest):
     point_coords = get_point_coords(record)
     visible_goal = extract_problem_goal(record)
@@ -2755,58 +1871,6 @@ def call_model(messages, model_name, temperature=0.2, max_tokens=2048):
             )
             time.sleep(sleep_seconds)
     raise last_exc
-
-
-def run_stage(stage_name, messages, model_name, point_coords, max_retries, require_coord_tags):
-    last_error = None
-    last_output = None
-
-    for attempt in range(1, max_retries + 1):
-        try:
-            logger.info(f"[{stage_name}] Attempt {attempt}/{max_retries}")
-            start = time.time()
-            output = call_model(messages, model_name)
-            elapsed = time.time() - start
-            last_output = output
-            ok, message = validate_thinking_response(
-                output,
-                point_coords=point_coords,
-                require_coord_tags=require_coord_tags,
-            )
-            if ok:
-                logger.info(f"[{stage_name}] Valid output in {elapsed:.2f}s")
-                return {
-                    "success": True,
-                    "output": output,
-                    "attempts_used": attempt,
-                    "elapsed_seconds": elapsed,
-                    "error": None,
-                }
-
-            last_error = message
-            logger.warning(f"[{stage_name}] Validation failed: {message}")
-            if attempt < max_retries:
-                feedback = (
-                    "Your previous answer was invalid.\n"
-                    f"Validation error: {message}\n"
-                    "Return a corrected answer that satisfies every format and leakage constraint."
-                )
-                messages = messages + [{"role": "user", "content": feedback}]
-                time.sleep(1)
-
-        except Exception as exc:
-            last_error = str(exc)
-            logger.error(f"[{stage_name}] API call failed: {exc}")
-            if attempt < max_retries:
-                time.sleep(2)
-
-    return {
-        "success": False,
-        "output": last_output,
-        "attempts_used": max_retries,
-        "elapsed_seconds": None,
-        "error": last_error or "Unknown error",
-    }
 
 
 def run_plan_stage(
@@ -3104,11 +2168,18 @@ def process_and_generate_sft(
     def process_item(idx_record):
         sample_order, record = idx_record
         image_path = resolve_image_path(record.get("image_path", ""), input_path)
+        visible_goal = extract_problem_goal(record)
+        proof_guidance = build_hidden_proof_guidance(
+            record["_sanitized_rest"],
+            record["_aux_part"],
+            visible_goal,
+        )
         source_audit = audit_source_record(
             record,
             image_path=image_path,
             aux_part=record["_aux_part"],
-            sanitized_rest=record["_sanitized_rest"],
+            visible_goal=visible_goal,
+            proof_guidance=proof_guidance,
         )
         if not image_path.exists():
             return {
@@ -3133,7 +2204,6 @@ def process_and_generate_sft(
         )
         public_problem = build_public_problem_text(record)
         aux_part = record["_aux_part"]
-        visible_goal = extract_problem_goal(record)
         goal_type = parse_goal_expression(visible_goal).get("predicate") or None
         aux_new_points = extract_aux_new_points(aux_part)
         if len(aux_new_points) == 1:
@@ -3144,7 +2214,17 @@ def process_and_generate_sft(
             aux_type = None
         thinking = generation["thinking"]
         result_data = None
-        generation_audit = audit_generation_quality(record, generation, aux_part)
+        coordinate_candidates = build_hidden_coordinate_candidates(
+            get_point_coords(record),
+            max_items=64,
+            relax_type_limits=True,
+        )
+        generation_audit = audit_generation_quality(
+            record,
+            generation,
+            aux_part,
+            coordinate_candidates=coordinate_candidates,
+        )
 
         if generation["success"] and thinking:
             result_data = build_dataset_output_record(

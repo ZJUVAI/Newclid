@@ -3,6 +3,8 @@ import unittest
 from experiments.cot_sft_generation.geometry_text import (
     align_bridge_steps_to_hidden_route,
     build_canonical_construction,
+    build_hidden_coordinate_candidates,
+    build_hidden_coordinate_guidance,
     build_multi_aux_instruction,
     build_public_problem_text,
     extract_problem_goal,
@@ -69,6 +71,21 @@ class CotSftGeometryTextTest(unittest.TestCase):
         self.assertEqual(alignment["matches"][0]["index"], 0)
         self.assertEqual(alignment["matches"][1]["index"], 1)
         self.assertEqual(alignment["unmatched"], [])
+
+    def test_build_hidden_coordinate_candidates_and_guidance(self):
+        point_coords = {
+            "a": (0, 0),
+            "b": (4, 0),
+            "c": (1, 3),
+            "d": (5, 3),
+        }
+
+        candidates = build_hidden_coordinate_candidates(point_coords, max_items=8, relax_type_limits=True)
+        guidance = build_hidden_coordinate_guidance(point_coords, max_items=4)
+
+        self.assertTrue(any(item["relation_type"] == "parallel" for item in candidates))
+        self.assertTrue(any(item["relation_type"] == "equal_length" for item in candidates))
+        self.assertIn("segments ab and cd look parallel", guidance)
 
 
 if __name__ == "__main__":

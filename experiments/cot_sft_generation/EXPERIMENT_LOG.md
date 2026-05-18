@@ -6,6 +6,54 @@
 
 ### 最近提交
 
+- working tree `uncommitted`
+  - 当前工作树新增了一组“长期维护支撑”补丁，还未单独提交：
+    - 新增 `tests/test_cot_sft_fixture_pipeline.py`
+    - 把 `build_visible_premise_summaries(...)` 从主脚本迁到 `audits.py`
+    - 把 hidden coordinate candidate / hint / guidance helper 从主脚本迁到 `geometry_text.py`
+    - 修复 `validate_plan_response(...)` 缺少 `extract_high_level_structure_markers` 导入导致的运行时 `NameError`
+  - 这组补丁的目的不是调样本质量，而是补齐“无外部 API 的主链离线证明”和进一步压缩主脚本职责边界。
+  - 验证：
+    - `python -m unittest discover -s tests -p 'test_cot_sft_*.py'`
+      - 当前结果：`Ran 34 tests ... OK`
+    - `python experiments/cot_sft_generation/maintenance_smoke_check.py`
+      - 当前结果：全部检查通过
+
+- `351b6bc` `Track cot sft run metadata and schema version`
+  - 这次改动的目标不是提升单轮样本质量，而是把 run 复现信息变成正式 artifacts。
+  - 新增内容：
+    - `run_config.json`
+    - `artifact_schema_version = cot_sft_artifacts_v1`
+    - `resolved_input_jsonl` / `input_jsonl_sha256` / `input_jsonl_bytes`
+    - `sampled_inputs.jsonl` 的正式 schema
+  - 作用：后续 Codex 会话不必再靠聊天记录猜“这轮 run 用的是哪份输入、哪份代码”。
+  - 验证：
+    - `python -m unittest discover -s tests -p 'test_cot_sft_*.py'`
+    - `python experiments/cot_sft_generation/maintenance_smoke_check.py`
+
+- `f5c30ac` `Add cot sft stratified benchmark baseline`
+  - 这次改动的目标是把分层固定回归从 `/tmp` 搬进仓库。
+  - 新增内容：
+    - `benchmarks/stratified_v1_12sample_input.jsonl`
+    - `benchmarks/stratified_v1_12sample_manifest.json`
+    - `goal_type x aux_type` 的第一版固定 subset
+  - 同时更新：
+    - `maintenance_smoke_check.py` 现在校验 `benchmarks/` 下所有 `*_manifest.json`
+  - 验证：
+    - `python -m unittest discover -s tests -p 'test_cot_sft_*.py'`
+    - `python experiments/cot_sft_generation/maintenance_smoke_check.py`
+
+- `40dfb66` `Split cot sft prompt builders and semantic review protocol`
+  - 这次改动的目标是把长 prompt 文本和语义审读协议从主脚本/对话记忆里拆出来。
+  - 新增内容：
+    - `prompt_builders.py`
+    - `SEMANTIC_REVIEW_GUIDE.md`
+    - `goal_type` / `aux_type` / `review_checklist_version` / `issue_codes` 这类语义审读字段
+  - 作用：后续 Codex 改 prompt 或人工回填 `semantic_audits.jsonl` 时，不必继续依赖历史聊天上下文。
+  - 验证：
+    - `python -m unittest discover -s tests -p 'test_cot_sft_*.py'`
+    - `python experiments/cot_sft_generation/maintenance_smoke_check.py`
+
 - `ace2ae7` `Relax bridge focus fallback for anchor-side steps`
   - 这已经不是未提交补丁，已经入库。
   - 改动点：放宽 `build_bridge_step_focus_points(...)` 的 fallback。
