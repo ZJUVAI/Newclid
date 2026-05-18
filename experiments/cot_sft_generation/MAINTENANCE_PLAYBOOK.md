@@ -241,8 +241,12 @@
 
 - [benchmarks/fixed_v104sample_input.jsonl](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_input.jsonl)
 - [benchmarks/fixed_v104sample_manifest.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/fixed_v104sample_manifest.json)
+- [benchmarks/stratified_v1_12sample_input.jsonl](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/stratified_v1_12sample_input.jsonl)
+- [benchmarks/stratified_v1_12sample_manifest.json](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/stratified_v1_12sample_manifest.json)
 
-但这还只是起点，不代表分层基线已经补齐。
+- `fixed_v104sample` 负责最小稳定回放。
+- `stratified_v1_12sample` 负责当前默认的 `goal_type x aux_type` 分层回归。
+- 但这仍不代表长期分层 benchmark 已经彻底补齐，例如不同 `aux_shape` 和更长尾失败模式还需要继续补。
 
 ## 4. 当前代码最需要避免的维护风险
 
@@ -332,8 +336,8 @@ Codex 可以基于对话上下文推进，但长期维护不能依赖“之前�
 
 当前仍建议继续补齐的是：
 
-1. 按 `goal_type` / `aux_type` 分层的 benchmark 清单
-2. “改某个 goal type 的 prompt 时，应抽哪些样本做定向审读”的具体规则
+1. “改某个 goal type 的 prompt 时，应优先抽查哪些 stratified 子集”的具体规则
+2. 按 `aux_shape` 和失败模式继续扩充的 benchmark 清单
 3. 主脚本后续模块拆分后的落点文档
 4. 如果将来引入自动 `critic`，其输出 schema 和与 `semantic_audits.jsonl` 的关系
 
@@ -350,12 +354,13 @@ Codex 可以基于对话上下文推进，但长期维护不能依赖“之前�
   - run 级 `surface_pass_rate`
 - artifacts/schema 层已经单独拆出，不必继续所有字段都塞回主脚本
 - 固定 benchmark 已经开始版本化进仓库，而不是只留在 `/tmp`
+- 按 `goal_type x aux_type` 分层的仓库内 benchmark 已经有第一版固定清单
 - `semantic_review.py` 已经把“语义审读回填后如何刷新 summary”变成可执行协议
 - schema 细节和最小验证入口已经写成文档，不再依赖会话记忆
 
 ### 7.2 仍然限制长期稳定性的点
 
-- 固定 benchmark 目前只有一组 `4` 条样本，分层覆盖仍然不够
+- 分层 benchmark 虽然已有第一版，但不同 `aux_shape`、失败模式和更长尾复杂题仍然覆盖不足
 - `semantic_pass` 仍需人工/Codex 回填，当前还没有自动 `critic` 阶段
 - prompt / validator / audit 逻辑仍高度集中在主脚本里，后续还需要继续拆分
 

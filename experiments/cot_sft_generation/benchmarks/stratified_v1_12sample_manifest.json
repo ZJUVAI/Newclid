@@ -1,0 +1,154 @@
+{
+  "benchmark_name": "stratified_v1_12sample",
+  "description": "Stratified 12-sample regression and semantic-review set with one single-point and one multi-point sample for each core goal type.",
+  "input_jsonl": "experiments/cot_sft_generation/benchmarks/stratified_v1_12sample_input.jsonl",
+  "source_dataset": "datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl",
+  "selection_rationale": "Provide a repo-stored long-term baseline that covers eqratio, eqangle, simtri, simtrir, contri, and contrir across both single-point and multi-point auxiliary constructions.",
+  "records": [
+    {
+      "sample_order": 0,
+      "source_index": 11,
+      "goal_type": "eqratio",
+      "goal_text": "eqratio a e b d e g b f",
+      "aux_type": "single_point",
+      "aux_shape": "midpoint_single",
+      "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_12.png",
+      "focus_tags": ["midpoint_bridge", "ratio_finish", "single_point_baseline"],
+      "notes": "Useful for checking whether a single midpoint-style helper genuinely closes a ratio chain instead of only sounding plausible."
+    },
+    {
+      "sample_order": 1,
+      "source_index": 24,
+      "goal_type": "eqangle",
+      "goal_text": "eqangle a b a c a d a e",
+      "aux_type": "single_point",
+      "aux_shape": "cyclic_plus_collinear_single",
+      "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_25.png",
+      "focus_tags": ["cyclic_bridge", "collinearity_reuse", "angle_finish"],
+      "notes": "Useful for checking whether the writer can keep angle-side closure grounded after a cyclic plus collinear single-point construction."
+    },
+    {
+      "sample_order": 2,
+      "source_index": 85,
+      "goal_type": "simtrir",
+      "goal_text": "simtrir b d e c e g",
+      "aux_type": "single_point",
+      "aux_shape": "parallel_plus_perpendicular_single",
+      "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_86.png",
+      "focus_tags": ["parallel_bridge", "right_angle_control", "similarity_finish"],
+      "notes": "Useful for checking whether a similarity route built from parallel and perpendicular support stays explicit and ordered."
+    },
+    {
+      "sample_order": 3,
+      "source_index": 124,
+      "goal_type": "simtri",
+      "goal_text": "simtri a c g f a g",
+      "aux_type": "single_point",
+      "aux_shape": "double_cyclic_single",
+      "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_125.png",
+      "focus_tags": ["double_cyclic", "similarity_bridge", "single_point_baseline"],
+      "notes": "Useful for checking whether double-cyclic support is converted into explicit similarity-side bridge relations rather than high-level circle talk."
+    },
+    {
+      "sample_order": 4,
+      "source_index": 152,
+      "goal_type": "contri",
+      "goal_text": "contri b c f f e b",
+      "aux_type": "single_point",
+      "aux_shape": "congruence_plus_perpendicular_single",
+      "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_153.png",
+      "focus_tags": ["congruence_setup", "right_angle_bridge", "congruence_finish"],
+      "notes": "Useful for checking whether a single-point congruence setup is followed by a real triangle-congruence closure instead of a fake similarity shortcut."
+    },
+    {
+      "sample_order": 5,
+      "source_index": 421,
+      "goal_type": "contrir",
+      "goal_text": "contrir b d i i f b",
+      "aux_type": "single_point",
+      "aux_shape": "perpendicular_plus_eqangle_single",
+      "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_422.png",
+      "focus_tags": ["angle_transfer", "perpendicular_bridge", "reverse_congruence_finish"],
+      "notes": "Useful for checking whether reverse-congruence style closure remains tied to explicit angle and perpendicular support."
+    },
+    {
+      "sample_order": 6,
+      "source_index": 3642,
+      "goal_type": "eqratio",
+      "goal_text": "eqratio b e c e d e b e",
+      "aux_type": "multi_point",
+      "aux_shape": "parallel_plus_congruence_plus_cyclic_multi",
+      "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_3643.png",
+      "focus_tags": ["multi_point_staging", "ratio_finish", "shape_diversity"],
+      "notes": "Useful for checking whether a multi-point ratio route can keep staged roles clear across parallel, congruence, and cyclic supports."
+    },
+    {
+      "sample_order": 7,
+      "source_index": 996,
+      "goal_type": "eqangle",
+      "goal_text": "eqangle a e c e d f c f",
+      "aux_type": "multi_point",
+      "aux_shape": "collinear_plus_perpendicular_multi",
+      "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_997.png",
+      "focus_tags": ["multi_point_staging", "angle_finish", "line_to_right_angle_bridge"],
+      "notes": "Useful for checking whether a mixed collinear and perpendicular multi-point construction is explained in stages and closed back to an angle target."
+    },
+    {
+      "sample_order": 8,
+      "source_index": 2212,
+      "goal_type": "simtri",
+      "goal_text": "simtri a b e d c a",
+      "aux_type": "multi_point",
+      "aux_shape": "collinear_plus_congruence_plus_cyclic_multi",
+      "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_2213.png",
+      "focus_tags": ["multi_point_staging", "cyclic_bridge", "similarity_finish"],
+      "notes": "Useful for checking whether a three-mechanism multi-point construction can reach a true similarity closure without route drift."
+    },
+    {
+      "sample_order": 9,
+      "source_index": 2380,
+      "goal_type": "simtrir",
+      "goal_text": "simtrir a g i i g h",
+      "aux_type": "multi_point",
+      "aux_shape": "perpendicular_plus_parallel_plus_congruence_multi",
+      "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_2381.png",
+      "focus_tags": ["multi_point_staging", "parallel_bridge", "reverse_similarity_finish"],
+      "notes": "Useful for checking whether reverse-similarity closure stays grounded when the helper route mixes perpendicular, parallel, and congruence relations."
+    },
+    {
+      "sample_order": 10,
+      "source_index": 6282,
+      "goal_type": "contri",
+      "goal_text": "contri a b d c d b",
+      "aux_type": "multi_point",
+      "aux_shape": "collinear_plus_parallel_plus_congruence_multi",
+      "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_6283.png",
+      "focus_tags": ["multi_point_staging", "congruence_finish", "shape_diversity"],
+      "notes": "Useful for checking whether a longer staged congruence route remains explicit about why each new point exists."
+    },
+    {
+      "sample_order": 11,
+      "source_index": 9120,
+      "goal_type": "contrir",
+      "goal_text": "contrir a c h d b h",
+      "aux_type": "multi_point",
+      "aux_shape": "midpoint_plus_collinear_multi",
+      "image_path": "./datasets/20260512/imgs_png_inverted/771d102f839b4d2b_9121.png",
+      "focus_tags": ["multi_point_staging", "midpoint_bridge", "reverse_congruence_finish"],
+      "notes": "Useful for checking whether midpoint language in a multi-point setting stays concrete and still closes to the reverse-congruence target."
+    }
+  ],
+  "subsets": {
+    "all": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+    "single_point": [0, 1, 2, 3, 4, 5],
+    "multi_point": [6, 7, 8, 9, 10, 11],
+    "eqratio_goals": [0, 6],
+    "eqangle_goals": [1, 7],
+    "simtri_goals": [3, 8],
+    "simtrir_goals": [2, 9],
+    "contri_goals": [4, 10],
+    "contrir_goals": [5, 11],
+    "semantic_review_priority": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11],
+    "multi_point_staging_priority": [6, 7, 8, 9, 10, 11]
+  }
+}

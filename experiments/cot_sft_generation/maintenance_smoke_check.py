@@ -16,6 +16,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 TESTS_DIR = REPO_ROOT / "tests"
+BENCHMARKS_DIR = SCRIPT_DIR / "benchmarks"
 CORE_FILES = [
     SCRIPT_DIR / "generate_cot_sft.py",
     SCRIPT_DIR / "geometry_text.py",
@@ -24,8 +25,6 @@ CORE_FILES = [
     SCRIPT_DIR / "run_artifacts.py",
     SCRIPT_DIR / "semantic_review.py",
 ]
-BENCHMARK_MANIFEST = SCRIPT_DIR / "benchmarks" / "fixed_v104sample_manifest.json"
-BENCHMARK_INPUT = SCRIPT_DIR / "benchmarks" / "fixed_v104sample_input.jsonl"
 
 
 def count_nonempty_jsonl_lines(path: Path) -> int:
@@ -33,17 +32,38 @@ def count_nonempty_jsonl_lines(path: Path) -> int:
         return sum(1 for line in f if line.strip())
 
 
-def validate_benchmark_manifest(manifest_path: Path, input_jsonl_path: Path) -> dict:
+def resolve_benchmark_input_path(input_jsonl_path: str, manifest_path: Path) -> Path:
+    path = Path(input_jsonl_path)
+    candidates = [
+        path,
+        (REPO_ROOT / path).resolve(),
+        (manifest_path.parent / path).resolve(),
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate.resolve()
+    return path.resolve()
+
+
+def validate_benchmark_manifest(manifest_path: Path, input_jsonl_path: Path | None = None) -> dict:
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
 
+    benchmark_name = manifest.get("benchmark_name")
+    manifest_input = manifest.get("input_jsonl")
     records = manifest.get("records")
     subsets = manifest.get("subsets")
+    if not isinstance(benchmark_name, str) or not benchmark_name.strip():
+        raise ValueError("benchmark manifest field 'benchmark_name' must be a non-empty string")
+    if not isinstance(manifest_input, str) or not manifest_input.strip():
+        raise ValueError("benchmark manifest field 'input_jsonl' must be a non-empty string")
     if not isinstance(records, list):
         raise ValueError("benchmark manifest field 'records' must be a list")
     if not isinstance(subsets, dict):
         raise ValueError("benchmark manifest field 'subsets' must be an object")
 
+    if input_jsonl_path is None:
+        input_jsonl_path = resolve_benchmark_input_path(manifest_input, manifest_path)
     line_count = count_nonempty_jsonl_lines(input_jsonl_path)
     if len(records) != line_count:
         raise ValueError(
@@ -58,6 +78,20 @@ def validate_benchmark_manifest(manifest_path: Path, input_jsonl_path: Path) -> 
             raise ValueError(
                 f"benchmark manifest record {idx} has sample_order={record.get('sample_order')} instead of {idx}"
             )
+        goal_type = record.get("goal_type")
+        aux_type = record.get("aux_type")
+        focus_tags = record.get("focus_tags")
+        if not isinstance(goal_type, str) or not goal_type.strip():
+            raise ValueError(f"benchmark manifest record {idx} must include a non-empty string goal_type")
+        if not isinstance(aux_type, str) or not aux_type.strip():
+            raise ValueError(f"benchmark manifest record {idx} must include a non-empty string aux_type")
+        if not isinstance(focus_tags, list) or not focus_tags:
+            raise ValueError(f"benchmark manifest record {idx} must include a non-empty focus_tags list")
+        for tag in focus_tags:
+            if not isinstance(tag, str) or not tag.strip():
+                raise ValueError(
+                    f"benchmark manifest record {idx} contains an invalid focus tag: {tag!r}"
+                )
 
     for subset_name, subset in subsets.items():
         if not isinstance(subset, list):
@@ -69,8 +103,23 @@ def validate_benchmark_manifest(manifest_path: Path, input_jsonl_path: Path) -> 
                 raise ValueError(f"benchmark subset '{subset_name}' contains out-of-range index: {item}")
 
     return {
+        "benchmark_name": benchmark_name,
+        "input_jsonl": str(input_jsonl_path),
         "records": line_count,
         "subsets": len(subsets),
+    }
+
+
+def validate_all_benchmark_manifests(benchmarks_dir: Path) -> dict:
+    manifest_paths = sorted(benchmarks_dir.glob("*_manifest.json"))
+    if not manifest_paths:
+        raise ValueError(f"no benchmark manifests found in {benchmarks_dir}")
+
+    summaries = [validate_benchmark_manifest(path) for path in manifest_paths]
+    return {
+        "manifests": len(summaries),
+        "records": sum(item["records"] for item in summaries),
+        "benchmark_names": [item["benchmark_name"] for item in summaries],
     }
 
 
@@ -127,7 +176,7 @@ def check_unittests() -> None:
 
 
 def check_benchmark_assets() -> None:
-    validate_benchmark_manifest(BENCHMARK_MANIFEST, BENCHMARK_INPUT)
+    validate_all_benchmark_manifests(BENCHMARKS_DIR)
 
 
 def parse_args() -> argparse.Namespace:
