@@ -6,13 +6,20 @@
 
 ### 最近提交
 
-- working tree `uncommitted`
-  - 当前工作树新增了一组“长期维护支撑”补丁，还未单独提交：
-    - 新增 `tests/test_cot_sft_fixture_pipeline.py`
+- `2ebca04` `Harden cot sft maintenance regression harness`
+  - 这次改动的目标不是继续调样本 prompt，而是补齐长期维护闭环。
+  - 新增内容：
+    - `tests/test_cot_sft_fixture_pipeline.py`
+    - `tests/test_cot_sft_audits.py`
+    - `audits.py`
+  - 同时完成：
     - 把 `build_visible_premise_summaries(...)` 从主脚本迁到 `audits.py`
     - 把 hidden coordinate candidate / hint / guidance helper 从主脚本迁到 `geometry_text.py`
     - 修复 `validate_plan_response(...)` 缺少 `extract_high_level_structure_markers` 导入导致的运行时 `NameError`
-  - 这组补丁的目的不是调样本质量，而是补齐“无外部 API 的主链离线证明”和进一步压缩主脚本职责边界。
+    - 删除未使用的 `run_stage(...)` 死代码
+  - 作用：
+    - 让 `planner -> writer -> artifacts` 主链第一次具备不依赖外部 API 的离线回归证明
+    - 让 prompt/audit/geometry helper 的代码边界继续从主脚本剥离
   - 验证：
     - `python -m unittest discover -s tests -p 'test_cot_sft_*.py'`
       - 当前结果：`Ran 34 tests ... OK`

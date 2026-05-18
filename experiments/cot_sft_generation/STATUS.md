@@ -250,7 +250,7 @@
 
 ## 当前维护支撑度
 
-- 如果问题是“这套代码和文档现在能不能支撑稳定的长期 Codex 迭代”，当前答案已经接近“能”：
+- 如果问题是“这套代码和文档现在能不能支撑稳定的长期 Codex 迭代”，当前答案现在可以明确写成“能”：
   - 文档分工已经清楚区分目标、现状、实验时间线、维护约定和 artifact schema
   - 固定 benchmark 已落仓，而且已经补到 `goal_type x aux_type` 的第一版分层清单
   - 语义审读回刷 summary 的协议已可执行
@@ -258,6 +258,7 @@
   - prompt / retry feedback 已经有独立模块和单测，不再和主流程编排硬耦合
   - `run_config.json` 和 `sampled_inputs.jsonl` 已经进入正式 schema，并带 git / 输入文件指纹
   - `source audit` / `generation audit` 已经从主脚本拆出，后续改审计规则不必再同时改编排层
+  - offline fixture pipeline test 已落仓，后续 Codex 会话可以在不依赖外部 API 的情况下离线验证 planner -> writer -> artifacts 主链
 - 但如果问题是“后续维护成本是否已经足够低”，答案仍然是否：
   - [generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py) 仍然过大
   - benchmark 的 `aux_shape` 和长尾失败模式覆盖仍然偏窄
