@@ -10,6 +10,11 @@
   - 在 compact writer handoff 里给每个 `bridge_steps` 补回 `preferred_sentence_shell` 和 `min_support_mentions`。
   - 目的：压掉 compact handoff 后 sample1 首轮 `generic shortcut` 的 writer 失败。
 
+- 工作区未提交补丁：bridge focus fallback
+  - 当前在本地补了 `build_bridge_step_focus_points` 的 fallback：
+    - 如果非锚点 `focus_points` 太窄，会补入 support-side 的 anchor 点
+  - 目的：解决 sample3 首条 bridge 句因为 `focus_points=['a']` 过窄而掉到 `write 2` 的问题
+
 - `82118d6` `Compress writer handoff payload`
   - 把 writer prompt 从整份 plan + 多套重复说明，压成更小的 `Approved Writer Handoff`。
   - 保留的核心字段：
@@ -70,10 +75,13 @@
   - artifacts：`/tmp/cot_regression_v142_v104sample_shell_handoff_output_artifacts_20260518_022014`
 
 - 截止当前日志状态：
-  - sample0：`plan 1 + write 1` 成功
-  - sample1：`plan 1 + write 1` 成功
-  - sample2：`plan 1 + write 1` 成功
-  - sample3：`plan 1` 已开始，尚未返回
+  - 最终结果：`4/4`
+  - `source_audit_issue_items=0`
+  - `generation_audit_issue_items=0`
+  - sample0：`plan 1 + write 1`
+  - sample1：`plan 1 + write 1`
+  - sample2：`plan 1 + write 1`
+  - sample3：`plan 1 + write 2`
   - 当前日志摘录：
     - `2026-05-18 10:22:43 [INFO] [plan] Valid output in 149.55s`
     - `2026-05-18 10:23:17 [INFO] [write] Valid output in 33.57s`
@@ -81,7 +89,16 @@
     - `2026-05-18 10:30:15 [INFO] [write] Valid output in 87.30s`
     - `2026-05-18 10:33:05 [INFO] [plan] Valid output in 169.08s`
     - `2026-05-18 10:34:06 [INFO] [write] Valid output in 61.10s`
-    - `2026-05-18 10:34:06 [INFO] [plan] Attempt 1/3`
+    - `2026-05-18 10:37:02 [INFO] [plan] Valid output in 176.58s`
+    - `2026-05-18 10:39:17 [WARNING] [write] Validation failed: Writer sentence for bridge_steps[0] must mention at least one approved bridge focus point from its contract`
+    - `2026-05-18 10:39:55 [INFO] [write] Valid output in 36.72s`
+
+- `v143`
+  - 任务：sample3 targeted 回放，验证 bridge focus fallback
+  - 输入：`/tmp/cot_regression_v143_single_sample3_focus_fallback_input.jsonl`
+  - artifacts：`/tmp/cot_regression_v143_single_sample3_focus_fallback_output_artifacts_20260518_024413`
+  - 当前状态：
+    - 仍卡在首个 `plan` 调用，尚未形成质量结论
 
 ### 最新判断补充
 
@@ -89,7 +106,7 @@
   - sample0 单样本：`plan 1 + write 1`
   - sample1 单样本：`plan 1 + write 1`
   - sample2 单样本：`plan 1 + write 1`
-- 固定 `4` 条回归 `v142` 目前已经证明前三条样本也都是 `plan 1 + write 1`，但整轮结果还未落盘。
+- 固定 `4` 条回归 `v142` 已经给出新的完整 `4/4` 证据，但 sample3 仍依赖一次 writer retry。
 
 ### 当前判断
 

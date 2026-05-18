@@ -3444,23 +3444,49 @@ def build_bridge_step_focus_points(
     }
     point_scores = {}
     point_first_seen = {}
+    support_points = []
+    support_points_with_anchors = []
 
     def add_points(relation_text, weight):
         if not isinstance(relation_text, str) or not relation_text.strip():
-            return
+            return []
+        local_points = []
         for point in extract_point_mentions(relation_text, visible_points or []):
             point = point.lower()
             if point in anchor_set:
                 continue
             point_scores[point] = point_scores.get(point, 0) + weight
             point_first_seen.setdefault(point, len(point_first_seen))
+            if point not in local_points:
+                local_points.append(point)
+        return local_points
+
+    def extract_points_including_anchors(relation_text):
+        if not isinstance(relation_text, str) or not relation_text.strip():
+            return []
+        local_points = []
+        for point in extract_point_mentions(relation_text, visible_points or []):
+            point = point.lower()
+            if point not in local_points:
+                local_points.append(point)
+        return local_points
 
     add_points(step.get("approved_route_relation") or step.get("relation", ""), 4)
     add_points(step.get("next_target_relation", ""), 3)
     for relation in step.get("required_supports", []) or []:
-        add_points(relation, 2)
+        for point in extract_points_including_anchors(relation):
+            if point not in support_points_with_anchors:
+                support_points_with_anchors.append(point)
+        for point in add_points(relation, 2):
+            if point not in support_points:
+                support_points.append(point)
     for relation in step.get("depends_on", []) or []:
-        add_points(relation, 1)
+        for point in extract_points_including_anchors(relation):
+            if point not in support_points_with_anchors:
+                support_points_with_anchors.append(point)
+        for point in add_points(relation, 1):
+            if point not in support_points:
+                support_points.append(point)
 
     ranked_points = sorted(
         point_scores,
@@ -3472,7 +3498,18 @@ def build_bridge_step_focus_points(
             point,
         ),
     )
-    return ranked_points[:max_points]
+    selected = ranked_points[:max_points]
+    if support_points and not any(point in support_points for point in selected):
+        fallback_support = support_points[0]
+        selected = [fallback_support] + [point for point in selected if point != fallback_support]
+        selected = selected[:max_points]
+    if len(selected) < 2:
+        for point in support_points_with_anchors:
+            if point not in selected:
+                selected.append(point)
+            if len(selected) >= max_points:
+                break
+    return selected
 
 
 def enrich_bridge_steps_with_coverage_targets(plan, visible_points=None):
