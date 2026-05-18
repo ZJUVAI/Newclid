@@ -12,6 +12,22 @@ import os
 from typing import Any, Dict, Iterable, Optional
 
 
+SEMANTIC_REVIEW_CHECKLIST_VERSION = "cot_sft_semantic_review_v1"
+SEMANTIC_REVIEW_ISSUE_CODE_DESCRIPTIONS = {
+    "not_visible_only": "The thinking reads like hidden-proof supervision rather than visible-input reasoning.",
+    "full_figure_coverage_missing": "The text stays on a narrow anchor frame and misses needed visible substructures.",
+    "coordinate_cue_unused": "Coordinate or visual cues are named but never actually enter the reasoning chain.",
+    "aux_direct_not_grounded": "The immediate aux consequences are misstated or not direct consequences of the construction.",
+    "bridge_unsupported": "A bridge relation is not actually supported by the cited earlier relations.",
+    "route_drift": "The route drifts away from the approved or plausible goal-side chain.",
+    "goal_finish_unclosed": "The final 2-4 steps do not genuinely close to the target goal relation.",
+    "goal_type_mismatch": "The reasoning closes toward the wrong goal modality or wrong target relation family.",
+    "staged_strategy_missing": "A multi-point auxiliary construction is not explained as a staged strategy.",
+    "high_level_shorthand_without_support": "High-level geometry language replaces concrete supporting relations.",
+    "other": "Fallback code for issues that do not fit the current structured taxonomy.",
+}
+
+
 def _safe_rate(numerator: int, denominator: int) -> Optional[float]:
     if denominator <= 0:
         return None
@@ -56,6 +72,8 @@ def build_missing_image_item_record(
         "sample_order": sample_order,
         "input_index": input_index,
         "image_path": image_path,
+        "goal_type": None,
+        "aux_type": None,
         "source_audit": source_audit,
         "generation_audit": {"issues": [], "has_issue": False},
         "surface_pass": False,
@@ -72,6 +90,8 @@ def build_item_record(
     image_path: str,
     public_problem: str,
     aux_part: str,
+    goal_type: Optional[str],
+    aux_type: Optional[str],
     hidden_rest_sanitized: str,
     point_coords_grid: Dict[str, Any],
     source_audit: Dict[str, Any],
@@ -85,6 +105,8 @@ def build_item_record(
         "image_path": image_path,
         "public_problem": public_problem,
         "aux": aux_part,
+        "goal_type": goal_type,
+        "aux_type": aux_type,
         "hidden_rest_sanitized": hidden_rest_sanitized,
         "point_coords_grid": point_coords_grid,
         "source_audit": source_audit,
@@ -107,6 +129,8 @@ def build_item_audit_record(item_record: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "sample_order": item_record["sample_order"],
         "input_index": item_record["input_index"],
+        "goal_type": item_record.get("goal_type"),
+        "aux_type": item_record.get("aux_type"),
         "source_audit": item_record.get("source_audit", {}),
         "generation_audit": item_record.get("generation_audit", {}),
         "surface_pass": item_record.get("surface_pass", item_record.get("success", False)),
@@ -119,11 +143,15 @@ def build_semantic_audit_stub(item_record: Dict[str, Any]) -> Dict[str, Any]:
         "sample_order": item_record["sample_order"],
         "input_index": item_record["input_index"],
         "image_path": item_record.get("image_path", ""),
+        "goal_type": item_record.get("goal_type"),
+        "aux_type": item_record.get("aux_type"),
         "surface_pass": item_record.get("surface_pass", item_record.get("success", False)),
         "semantic_pass": None,
         "manual_critical_error": None,
         "review_status": "pending",
+        "review_checklist_version": SEMANTIC_REVIEW_CHECKLIST_VERSION,
         "reviewer": None,
+        "issue_codes": [],
         "issues": [],
         "notes": "",
     }

@@ -128,12 +128,13 @@
    - 同时保存 `summary.json`、`item_records.jsonl`、`item_audits.jsonl`、`semantic_audits.jsonl`，方便后续随机回归、语义审读和失败样本回放。
 
 8. 维护侧补强
-   - 固定 benchmark 已经开始版本化进仓库，不再只靠 `/tmp`。
-   - 语义审读结果现在可以通过 `semantic_review.py` 回刷到 `summary.json`。
-   - artifacts 字段协议已经单独写入 `ARTIFACT_SCHEMA.md`，不再只散落在实现和聊天记录里。
-   - 底层几何文本解析和 relation normalization 已经从主脚本拆到 `geometry_text.py`，主脚本职责边界比之前更清楚。
-   - 统一维护入口 `maintenance_smoke_check.py` 已落仓，后续 Codex 会话可以直接跑一条命令检查维护基线是否断裂。
-   - writer contract / coverage target / prefix 组装这层公共协议已经拆到 `writer_contracts.py`，主脚本进一步从 `4818` 行降到 `4124` 行。
+  - 固定 benchmark 已经开始版本化进仓库，不再只靠 `/tmp`。
+  - 语义审读结果现在可以通过 `semantic_review.py` 回刷到 `summary.json`。
+  - artifacts 字段协议已经单独写入 `ARTIFACT_SCHEMA.md`，不再只散落在实现和聊天记录里。
+  - 底层几何文本解析和 relation normalization 已经从主脚本拆到 `geometry_text.py`，主脚本职责边界比之前更清楚。
+  - 统一维护入口 `maintenance_smoke_check.py` 已落仓，后续 Codex 会话可以直接跑一条命令检查维护基线是否断裂。
+  - writer contract / coverage target / prefix 组装这层公共协议已经拆到 `writer_contracts.py`。
+  - planner / writer prompt 与 retry feedback 已经拆到 `prompt_builders.py`，主脚本进一步从 `4124` 行降到 `3323` 行。
 
 更细的字段格式、脚本派生字段和 writer 合同见 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/CURRENT_DESIGN.md)。
 
@@ -251,6 +252,7 @@
   - 固定 benchmark 已落仓
   - 语义审读回刷 summary 的协议已可执行
   - 最小验证入口不再依赖额外安装 `pytest`
+  - prompt / retry feedback 已经有独立模块和单测，不再和主流程编排硬耦合
 - 但如果问题是“后续维护成本是否已经足够低”，答案仍然是否：
   - [generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py) 仍然过大
   - benchmark 覆盖仍然偏窄

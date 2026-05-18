@@ -46,6 +46,16 @@
     - 新增/废弃兼容字段
     - 语义审读刷新协议变化
 
+- [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/SEMANTIC_REVIEW_GUIDE.md)
+  - 回答：
+    - `semantic_pass` 的统一判定口径
+    - `manual_critical_error` 的使用边界
+    - `issue_codes` 的固定代码表
+  - 适合更新的场景：
+    - 人审 checklist 变化
+    - 新增 / 废弃 issue code
+    - 不同 Codex 会话之间需要统一语义审读口径
+
 - [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/STATUS.md)
   - 回答：
     - 当前最好证据是什么
@@ -84,7 +94,7 @@
     - validator
     - generation audit
     - 主流程编排
-  - 任何对 prompt、validator、artifact schema、run summary 的修改，都必须同步更新 `CURRENT_DESIGN.md`。
+  - 任何对主流程阶段、validator、artifact schema、run summary 的修改，都必须同步更新 `CURRENT_DESIGN.md`。
 
 - [run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py)
   - 当前 artifacts/schema 层，负责：
@@ -114,6 +124,13 @@
     - plan 到 writer handoff 的公共转换
   - 如果改了 focus points、sentence shell、prefix 结构、writer handoff 字段或 coverage target 逻辑，这里应优先作为落点，而不是继续把 writer 协议细节塞回主脚本。
 
+- [prompt_builders.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/prompt_builders.py)
+  - 负责：
+    - planner / writer prompt 正文
+    - planner / writer retry feedback
+    - hidden supervisor payload 组装
+  - 如果改的是 prompt 正文、retry guidance、prompt 中暴露的 hidden context、或 prompt 级约束口径，这里应优先作为落点，而不是继续把长 prompt 文本塞回主脚本。
+
 - [maintenance_smoke_check.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/maintenance_smoke_check.py)
   - 负责：
     - core files `py_compile`
@@ -127,7 +144,7 @@
   - 负责：
     - 校验 `semantic_audits.jsonl` 与 `item_audits.jsonl` 是否逐行对齐
     - 刷新 `summary.json` 的 run 级 semantic 指标
-  - 如果改了语义审读字段、review status 规则或 summary 汇总逻辑，这里必须和 `ARTIFACT_SCHEMA.md` 同步更新。
+  - 如果改了语义审读字段、review status 规则、issue code 规则或 summary 汇总逻辑，这里必须和 `ARTIFACT_SCHEMA.md`、`SEMANTIC_REVIEW_GUIDE.md` 同步更新。
 
 - [tests/test_cot_sft_review_artifacts.py](/root/GenesisGeo-cot/tests/test_cot_sft_review_artifacts.py)
   - 负责：
@@ -137,13 +154,21 @@
     的最小回归验证
   - 当前刻意写成 `unittest` 入口，避免长期维护依赖额外安装 `pytest`。
 
+- [tests/test_cot_sft_prompt_builders.py](/root/GenesisGeo-cot/tests/test_cot_sft_prompt_builders.py)
+  - 负责：
+    - `prompt_builders.py`
+    - `build_visible_premise_summaries(...)`
+    - planner / writer prompt 关键段落存在性
+  - 目的不是验证 prompt 语义好坏，而是避免重构后出现缺段、断引用或隐式依赖缺失。
+
 ## 2. 变更类型与必查文件
 
 ### 2.1 改 prompt 或 writer handoff
 
 至少检查：
 
-- `generate_cot_sft.py` 里的 `build_plan_prompt(...)` / `build_write_prompt(...)`
+- `prompt_builders.py` 里的 `build_plan_prompt(...)` / `build_write_prompt(...)`
+- 如果 prompt 依赖的上下文字段也变了，还要检查 `generate_cot_sft.py` 里的 wrapper / context 预计算
 - `CURRENT_DESIGN.md`
 - `STATUS.md` 的“下一步修改方向”是否还准确
 
@@ -223,7 +248,7 @@
 
 ### 4.1 单文件过大
 
-当前主脚本体量已经较大；截至 2026-05-18，在把几何文本 helper 拆到 [geometry_text.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/geometry_text.py)、把 writer 合同 helper 拆到 [writer_contracts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/writer_contracts.py) 后，[generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py) 仍约 `4124` 行。后续若继续增长，会让以下几类修改更容易互相干扰：
+当前主脚本体量已经较大；截至 2026-05-18，在把几何文本 helper 拆到 [geometry_text.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/geometry_text.py)、把 prompt 组装拆到 [prompt_builders.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/prompt_builders.py)、把 writer 合同 helper 拆到 [writer_contracts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/writer_contracts.py) 后，[generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py) 仍约 `3323` 行。后续若继续增长，会让以下几类修改更容易互相干扰：
 
 - prompt 调整
 - validator 调整
@@ -235,9 +260,9 @@
 推荐的下一轮拆分边界是：
 
 1. `planner/plan normalization`
-2. `writer contract / prefix assembly`
-3. `validators / audits`
-4. `prompt builders`
+2. `validators / audits`
+3. `source audit / generation audit`
+4. `run orchestration`
 
 如果以后继续做大改，但没有沿这些边界拆模块，那么“文档清楚”也不足以抵消主文件互相干扰的风险。
 

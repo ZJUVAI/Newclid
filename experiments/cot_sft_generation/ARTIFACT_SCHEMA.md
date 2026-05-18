@@ -9,6 +9,7 @@
 
 - [run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py)
 - [semantic_review.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/semantic_review.py)
+- [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/SEMANTIC_REVIEW_GUIDE.md)
 
 固定 benchmark 资产和其 manifest 见 [benchmarks/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/README.md)。
 
@@ -43,6 +44,8 @@
 | `image_path` | `str` | 图片路径 |
 | `public_problem` | `str` | 对学生可见的题面 |
 | `aux` | `str` | 原始 aux |
+| `goal_type` | `str \| null` | 可见目标类型 |
+| `aux_type` | `str \| null` | 辅助构造类型 |
 | `hidden_rest_sanitized` | `str` | 脱敏后的 hidden proof/rest |
 | `point_coords_grid` | `object` | 可见点坐标表 |
 | `source_audit` | `object` | 源样本检查结果 |
@@ -67,6 +70,8 @@
 |------|------|------|
 | `sample_order` | `int` | 与 `item_records.jsonl` 对齐的顺序 |
 | `input_index` | `int` | 源样本索引 |
+| `goal_type` | `str \| null` | 目标类型，便于分层统计 |
+| `aux_type` | `str \| null` | 辅助构造类型，便于分层统计 |
 | `source_audit` | `object` | 源样本检查结果 |
 | `generation_audit` | `object` | 脚本终检和质量审计结果 |
 | `surface_pass` | `bool` | 是否通过脚本终检 |
@@ -81,11 +86,15 @@
 | `sample_order` | `int` | 必须与 `item_audits.jsonl` 对齐 |
 | `input_index` | `int` | 必须与 `item_audits.jsonl` 对齐 |
 | `image_path` | `str` | 图片路径，便于人工复核 |
+| `goal_type` | `str \| null` | 当前样本的目标类型，如 `eqangle` / `eqratio` |
+| `aux_type` | `str \| null` | 当前样本的辅助构造形态，如 `single_point` / `multi_point` |
 | `surface_pass` | `bool` | 该样本是否先过了 surface 检查 |
 | `semantic_pass` | `bool \| null` | 语义审读结论；`null` 表示尚未审 |
 | `manual_critical_error` | `bool \| null` | 是否存在人工确认的关键错误 |
 | `review_status` | `str` | `pending` 或 `reviewed` |
+| `review_checklist_version` | `str` | 当前使用的语义审读口径版本 |
 | `reviewer` | `str \| null` | 审读者标识 |
+| `issue_codes` | `list[str]` | 结构化语义问题代码；代码表见 `SEMANTIC_REVIEW_GUIDE.md` |
 | `issues` | `list[str]` | 语义问题列表 |
 | `notes` | `str` | 审读备注 |
 
@@ -94,6 +103,8 @@
 1. 行数必须和 `item_audits.jsonl` 完全一致。
 2. 每行 `(sample_order, input_index)` 必须逐行对齐。
 3. 若 `semantic_pass` 非空，`review_status` 应视为 `reviewed`。
+4. `review_checklist_version` 当前必须为 `cot_sft_semantic_review_v1`。
+5. 若 `semantic_pass = false`，应至少填写一个 `issue_codes` 或 `issues`。
 
 ## 6. `summary.json`
 
@@ -132,6 +143,7 @@
 
 1. 先生成 run，拿到 `item_audits.jsonl` 和 `semantic_audits.jsonl` 占位文件。
 2. 人工或 Codex 按样本回填 `semantic_audits.jsonl`。
+   - 具体填写口径见 [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/SEMANTIC_REVIEW_GUIDE.md)
 3. 运行：
 
 ```bash

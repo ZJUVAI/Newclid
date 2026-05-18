@@ -18,6 +18,7 @@
 
 - [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/CURRENT_DESIGN.md)：当前代码真正执行的流程、`plan` 字段、脚本派生字段、writer 约束。
 - [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/ARTIFACT_SCHEMA.md)：`summary.json`、`item_records.jsonl`、`item_audits.jsonl`、`semantic_audits.jsonl` 的正式字段协议。
+- [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/SEMANTIC_REVIEW_GUIDE.md)：`semantic_pass` / `manual_critical_error` / `issue_codes` 的统一人审口径。
 - [MAINTENANCE_PLAYBOOK.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/MAINTENANCE_PLAYBOOK.md)：长期 Codex 迭代时的文件分工、变更地图、回归资产要求和维护检查清单。
 - [benchmarks/README.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/benchmarks/README.md)：仓库内固定 benchmark、manifest 和复用方式。
 - [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/STATUS.md)：阶段性进展、当前最好证据、已知问题、距离目标的差距。
@@ -171,6 +172,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 - 固定回归优先使用仓库内 benchmark，而不是重新在 `/tmp` 手工挑样本。
 - 完成人工/Codex 审读后，要回填 `semantic_audits.jsonl`，再运行 `semantic_review.py --write-summary` 刷新 `summary.json`。
+- `semantic_audits.jsonl` 的字段填写和 `issue_codes` 口径以 [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/SEMANTIC_REVIEW_GUIDE.md) 为准。
 - schema 细节和字段解释以 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/ARTIFACT_SCHEMA.md) 为准。
 
 ## 脚本检测与 Codex 人审的分工
@@ -377,6 +379,8 @@ python experiments/cot_sft_generation/semantic_review.py \
 
 `item_audits.jsonl` 会为每条样本分别记录：
 
+- `goal_type`
+- `aux_type`
 - `source_audit`
 - `generation_audit`
 - `surface_pass`
@@ -384,10 +388,14 @@ python experiments/cot_sft_generation/semantic_review.py \
 
 `semantic_audits.jsonl` 会为每条样本预先写出语义审读占位记录：
 
+- `goal_type`
+- `aux_type`
 - `surface_pass`
 - `semantic_pass`
 - `manual_critical_error`
 - `review_status`
+- `review_checklist_version`
+- `issue_codes`
 - `issues`
 - `notes`
 
@@ -395,6 +403,8 @@ python experiments/cot_sft_generation/semantic_review.py \
 
 - public problem
 - 原始 aux
+- `goal_type`
+- `aux_type`
 - 脱敏后的 hidden proof 片段
 - plan / write prompt
 - plan 输出

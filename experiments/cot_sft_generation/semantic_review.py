@@ -10,6 +10,17 @@ import json
 from pathlib import Path
 from typing import Any, Dict, List
 
+try:
+    from .run_artifacts import (
+        SEMANTIC_REVIEW_CHECKLIST_VERSION,
+        SEMANTIC_REVIEW_ISSUE_CODE_DESCRIPTIONS,
+    )
+except ImportError:  # pragma: no cover - script execution path
+    from run_artifacts import (
+        SEMANTIC_REVIEW_CHECKLIST_VERSION,
+        SEMANTIC_REVIEW_ISSUE_CODE_DESCRIPTIONS,
+    )
+
 
 def read_json(path: Path) -> Dict[str, Any]:
     with open(path, "r", encoding="utf-8") as f:
@@ -37,16 +48,38 @@ def normalize_semantic_audit_record(record: Dict[str, Any]) -> Dict[str, Any]:
     normalized.setdefault("surface_pass", False)
     normalized.setdefault("semantic_pass", None)
     normalized.setdefault("manual_critical_error", None)
+    normalized.setdefault("goal_type", None)
+    normalized.setdefault("aux_type", None)
     normalized.setdefault("review_status", "pending")
+    normalized.setdefault("review_checklist_version", SEMANTIC_REVIEW_CHECKLIST_VERSION)
     normalized.setdefault("reviewer", None)
+    normalized.setdefault("issue_codes", [])
     normalized.setdefault("issues", [])
     normalized.setdefault("notes", "")
     if normalized["semantic_pass"] is None and normalized["review_status"] != "pending":
         normalized["review_status"] = "pending"
     if normalized["semantic_pass"] is not None:
         normalized["review_status"] = "reviewed"
+    if normalized["review_checklist_version"] != SEMANTIC_REVIEW_CHECKLIST_VERSION:
+        raise ValueError(
+            "semantic audit field 'review_checklist_version' must match "
+            f"{SEMANTIC_REVIEW_CHECKLIST_VERSION!r}"
+        )
+    if not isinstance(normalized["issue_codes"], list):
+        raise ValueError("semantic audit field 'issue_codes' must be a list")
+    for issue_code in normalized["issue_codes"]:
+        if issue_code not in SEMANTIC_REVIEW_ISSUE_CODE_DESCRIPTIONS:
+            raise ValueError(f"unknown semantic audit issue code: {issue_code!r}")
     if not isinstance(normalized["issues"], list):
         raise ValueError("semantic audit field 'issues' must be a list")
+    if normalized["semantic_pass"] is False and not normalized["issue_codes"] and not normalized["issues"]:
+        raise ValueError(
+            "semantic audit rows marked semantic_pass=false must include at least one issue code or issue note"
+        )
+    if normalized["semantic_pass"] is True and normalized["manual_critical_error"] is True:
+        raise ValueError(
+            "semantic audit rows cannot set semantic_pass=true together with manual_critical_error=true"
+        )
     return normalized
 
 
@@ -72,6 +105,20 @@ def validate_semantic_audit_alignment(
                 "semantic audit row "
                 f"{idx} does not align with item_audits row {idx}: "
                 f"expected {expected_pair}, got {actual_pair}"
+            )
+        expected_goal_type = item_audit.get("goal_type")
+        if expected_goal_type is not None and normalized_record.get("goal_type") != expected_goal_type:
+            raise ValueError(
+                "semantic audit row "
+                f"{idx} goal_type mismatch: expected {expected_goal_type!r}, "
+                f"got {normalized_record.get('goal_type')!r}"
+            )
+        expected_aux_type = item_audit.get("aux_type")
+        if expected_aux_type is not None and normalized_record.get("aux_type") != expected_aux_type:
+            raise ValueError(
+                "semantic audit row "
+                f"{idx} aux_type mismatch: expected {expected_aux_type!r}, "
+                f"got {normalized_record.get('aux_type')!r}"
             )
         normalized.append(normalized_record)
     return normalized

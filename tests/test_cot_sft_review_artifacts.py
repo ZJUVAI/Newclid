@@ -3,7 +3,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from experiments.cot_sft_generation.run_artifacts import build_run_summary, build_semantic_audit_stub
+from experiments.cot_sft_generation.run_artifacts import (
+    SEMANTIC_REVIEW_CHECKLIST_VERSION,
+    build_run_summary,
+    build_semantic_audit_stub,
+)
 from experiments.cot_sft_generation.semantic_review import (
     build_semantic_summary_fields,
     refresh_run_summary,
@@ -26,6 +30,8 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
         item_record = {
             "sample_order": 0,
             "input_index": 1,
+            "goal_type": "eqangle",
+            "aux_type": "single_point",
             "surface_pass": True,
             "success": True,
             "attempts_used": 2,
@@ -56,10 +62,12 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
         self.assertIsNone(summary["semantic_pass_rate"])
         self.assertIsNone(summary["manual_critical_error_rate"])
         self.assertEqual(summary["avg_attempts_used"], 2.0)
+        self.assertEqual(semantic_record["review_checklist_version"], SEMANTIC_REVIEW_CHECKLIST_VERSION)
+        self.assertEqual(semantic_record["issue_codes"], [])
 
     def test_validate_semantic_audit_alignment_rejects_misaligned_rows(self):
-        item_audits = [{"sample_order": 0, "input_index": 1, "surface_pass": True}]
-        semantic_audits = [{"sample_order": 9, "input_index": 1, "surface_pass": True}]
+        item_audits = [{"sample_order": 0, "input_index": 1, "goal_type": "eqangle", "aux_type": "single_point", "surface_pass": True}]
+        semantic_audits = [{"sample_order": 9, "input_index": 1, "goal_type": "eqangle", "aux_type": "single_point", "surface_pass": True}]
 
         with self.assertRaises(ValueError) as ctx:
             validate_semantic_audit_alignment(item_audits, semantic_audits)
@@ -75,6 +83,8 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
                 {
                     "sample_order": 0,
                     "input_index": 10,
+                    "goal_type": "eqangle",
+                    "aux_type": "single_point",
                     "source_audit": {"has_issue": False},
                     "generation_audit": {"has_issue": False},
                     "surface_pass": True,
@@ -83,6 +93,8 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
                 {
                     "sample_order": 1,
                     "input_index": 11,
+                    "goal_type": "eqratio",
+                    "aux_type": "multi_point",
                     "source_audit": {"has_issue": False},
                     "generation_audit": {"has_issue": True},
                     "surface_pass": False,
@@ -93,20 +105,28 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
                 {
                     "sample_order": 0,
                     "input_index": 10,
+                    "goal_type": "eqangle",
+                    "aux_type": "single_point",
                     "surface_pass": True,
                     "semantic_pass": True,
                     "manual_critical_error": False,
                     "review_status": "reviewed",
+                    "review_checklist_version": SEMANTIC_REVIEW_CHECKLIST_VERSION,
+                    "issue_codes": [],
                     "issues": [],
                     "notes": "good",
                 },
                 {
                     "sample_order": 1,
                     "input_index": 11,
+                    "goal_type": "eqratio",
+                    "aux_type": "multi_point",
                     "surface_pass": False,
                     "semantic_pass": False,
                     "manual_critical_error": True,
                     "review_status": "reviewed",
+                    "review_checklist_version": SEMANTIC_REVIEW_CHECKLIST_VERSION,
+                    "issue_codes": ["bridge_unsupported"],
                     "issues": ["bridge mismatch"],
                     "notes": "bad",
                 },
@@ -138,21 +158,29 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
 
     def test_build_semantic_summary_fields_handles_partial_review(self):
         item_audits = [
-            {"sample_order": 0, "input_index": 1, "surface_pass": True},
-            {"sample_order": 1, "input_index": 2, "surface_pass": True},
+            {"sample_order": 0, "input_index": 1, "goal_type": "eqangle", "aux_type": "single_point", "surface_pass": True},
+            {"sample_order": 1, "input_index": 2, "goal_type": "eqratio", "aux_type": "multi_point", "surface_pass": True},
         ]
         semantic_audits = [
             {
                 "sample_order": 0,
                 "input_index": 1,
+                "goal_type": "eqangle",
+                "aux_type": "single_point",
                 "semantic_pass": True,
                 "manual_critical_error": False,
+                "review_checklist_version": SEMANTIC_REVIEW_CHECKLIST_VERSION,
+                "issue_codes": [],
             },
             {
                 "sample_order": 1,
                 "input_index": 2,
+                "goal_type": "eqratio",
+                "aux_type": "multi_point",
                 "semantic_pass": None,
                 "manual_critical_error": None,
+                "review_checklist_version": SEMANTIC_REVIEW_CHECKLIST_VERSION,
+                "issue_codes": [],
             },
         ]
 
@@ -162,6 +190,52 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
         self.assertEqual(summary_fields["semantic_reviewed_items"], 1)
         self.assertEqual(summary_fields["semantic_pass_rate"], 1.0)
         self.assertEqual(summary_fields["manual_critical_error_rate"], 0.0)
+
+    def test_validate_semantic_audit_alignment_rejects_unknown_issue_code(self):
+        item_audits = [
+            {"sample_order": 0, "input_index": 1, "goal_type": "eqangle", "aux_type": "single_point", "surface_pass": True}
+        ]
+        semantic_audits = [
+            {
+                "sample_order": 0,
+                "input_index": 1,
+                "goal_type": "eqangle",
+                "aux_type": "single_point",
+                "semantic_pass": False,
+                "manual_critical_error": False,
+                "review_checklist_version": SEMANTIC_REVIEW_CHECKLIST_VERSION,
+                "issue_codes": ["unknown_code"],
+                "issues": ["bad"],
+            }
+        ]
+
+        with self.assertRaises(ValueError) as ctx:
+            validate_semantic_audit_alignment(item_audits, semantic_audits)
+
+        self.assertIn("unknown semantic audit issue code", str(ctx.exception))
+
+    def test_validate_semantic_audit_alignment_requires_reason_for_semantic_fail(self):
+        item_audits = [
+            {"sample_order": 0, "input_index": 1, "goal_type": "eqangle", "aux_type": "single_point", "surface_pass": True}
+        ]
+        semantic_audits = [
+            {
+                "sample_order": 0,
+                "input_index": 1,
+                "goal_type": "eqangle",
+                "aux_type": "single_point",
+                "semantic_pass": False,
+                "manual_critical_error": False,
+                "review_checklist_version": SEMANTIC_REVIEW_CHECKLIST_VERSION,
+                "issue_codes": [],
+                "issues": [],
+            }
+        ]
+
+        with self.assertRaises(ValueError) as ctx:
+            validate_semantic_audit_alignment(item_audits, semantic_audits)
+
+        self.assertIn("must include at least one issue code or issue note", str(ctx.exception))
 
 
 if __name__ == "__main__":

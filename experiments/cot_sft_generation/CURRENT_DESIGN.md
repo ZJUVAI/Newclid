@@ -1,6 +1,6 @@
 # Current CoT SFT Design
 
-本文档描述当前代码头部实现，也就是 [generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py)、[geometry_text.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/geometry_text.py)、[writer_contracts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/writer_contracts.py)、[run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py) 与 [semantic_review.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/semantic_review.py) 现在真正执行的流程；历史迭代和实验结论见 [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/STATUS.md) 与 [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/EXPERIMENT_LOG.md)。字段表见 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/ARTIFACT_SCHEMA.md)。
+本文档描述当前代码头部实现，也就是 [generate_cot_sft.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/generate_cot_sft.py)、[geometry_text.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/geometry_text.py)、[prompt_builders.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/prompt_builders.py)、[writer_contracts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/writer_contracts.py)、[run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py) 与 [semantic_review.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/semantic_review.py) 现在真正执行的流程；历史迭代和实验结论见 [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/STATUS.md) 与 [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/EXPERIMENT_LOG.md)。字段表见 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/ARTIFACT_SCHEMA.md)。
 
 ## 1. 总体目标
 
@@ -276,7 +276,7 @@ writer body 通过后，脚本才会：
 
 ### 2.10 run artifacts 层
 
-当前 artifacts/schema 相关逻辑已经从主流程里抽出一层，放到 [run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py) 与 [semantic_review.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/semantic_review.py)。另外，几何文本解析、关系归一化、goal/aux 拆解这层公共 helper 现在放到 [geometry_text.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/geometry_text.py)，而 writer 合同、coverage target、prefix 组装这层公共 helper 现在放到 [writer_contracts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/writer_contracts.py)。
+当前 artifacts/schema 相关逻辑已经从主流程里抽出一层，放到 [run_artifacts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/run_artifacts.py) 与 [semantic_review.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/semantic_review.py)。另外，几何文本解析、关系归一化、goal/aux 拆解这层公共 helper 现在放到 [geometry_text.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/geometry_text.py)，planner / writer prompt 与 retry feedback 这层长文本协议现在放到 [prompt_builders.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/prompt_builders.py)，而 writer 合同、coverage target、prefix 组装这层公共 helper 现在放到 [writer_contracts.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/writer_contracts.py)。
 
 它负责的不是几何推理，而是 run 级数据结构：
 
@@ -293,6 +293,8 @@ writer body 通过后，脚本才会：
    - 包括：
      - public problem
      - aux
+     - `goal_type`
+     - `aux_type`
      - hidden rest
      - source audit
      - generation audit
@@ -305,6 +307,8 @@ writer body 通过后，脚本才会：
    - 当前每条样本都会导出：
      - `sample_order`
      - `input_index`
+     - `goal_type`
+     - `aux_type`
      - `source_audit`
      - `generation_audit`
      - `surface_pass`
@@ -313,10 +317,14 @@ writer body 通过后，脚本才会：
 4. `semantic_audits.jsonl`
    - 当前生成阶段不会自动给出 `semantic_pass`
    - 但脚本已经会为每条样本写出一条语义审读占位记录，包含：
+     - `goal_type`
+     - `aux_type`
      - `surface_pass`
      - `semantic_pass: null`
      - `manual_critical_error: null`
      - `review_status: "pending"`
+     - `review_checklist_version`
+     - `issue_codes`
      - `issues`
      - `notes`
    - 这一步的目的，是把“语义审读还没做”也显式落盘，而不是只留在对话记忆里
@@ -343,7 +351,7 @@ writer body 通过后，脚本才会：
    - 用途不是重新生成数据，而是对已落盘的语义审读结果做一致性校验和汇总刷新。
    - 它会：
      - 校验 `semantic_audits.jsonl` 与 `item_audits.jsonl` 行数和 `(sample_order, input_index)` 是否对齐
-     - 规范化 `semantic_pass` / `review_status` / `issues`
+     - 规范化 `semantic_pass` / `review_status` / `issue_codes` / `issues`
      - 刷新 `summary.json` 中的 `semantic_review_status`、`semantic_pass_rate`、`manual_critical_error_items`、`manual_critical_error_rate`
    - 推荐在人工/Codex 回填完 `semantic_audits.jsonl` 后运行：
 
@@ -368,7 +376,7 @@ python experiments/cot_sft_generation/semantic_review.py \
      - relation keyword / point mention / semantic match 这些跨阶段公用 helper
    - 目的：
      - 避免 `generate_cot_sft.py` 同时承担“主流程编排”和“底层文本规则库”两类职责
-     - 为后续继续拆 `prompt builders` 和 `writer contracts` 预留稳定底层
+     - 为 `prompt_builders.py`、`writer_contracts.py` 和后续 validator 拆分提供稳定底层
 
 9. `writer_contracts.py`
    - 负责：
@@ -379,6 +387,16 @@ python experiments/cot_sft_generation/semantic_review.py \
    - 目的：
      - 把“writer 约束协议”从主脚本编排层剥离出来
      - 让后续只改 writer 合同的人，不必再同时触碰主流程和 validator 大块逻辑
+
+10. `prompt_builders.py`
+   - 负责：
+     - planner prompt
+     - writer prompt
+     - planner / writer retry feedback
+     - hidden supervisor payload 组装
+   - 目的：
+     - 把超长 prompt 文本和重试提示从主脚本编排层剥离出来
+     - 让 prompt 调整和 validator / audit 调整可以分别维护、分别测试
 
 ## 3. 中间哪些步骤是通过脚本做的
 
