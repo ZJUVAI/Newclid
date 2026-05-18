@@ -1,10 +1,10 @@
 # GRPO 迭代状态与后续计划
 
-最后更新：2026-05-15 | 当前 commit: `6e24d5121e6264eaf5f7c2dc30e184c52f8d5436`
+最后更新：2026-05-18 | 当前 commit: `85885b0ad987b04d1776b501f15cedcee1c97bac`
 
 ## 主要结果概览
 
-当前文档默认以 **当前 commit: `6e24d5121e6264eaf5f7c2dc30e184c52f8d5436`** 的最新完整评估结果为主；旧 commit / 旧 run 结果放在后文作为历史结果保留。
+当前文档默认以**当前仓库下可复现的最新完整评估结果**为主；其中 full `imo_95` 主口径仍以 `v19` 的完整补跑结果为准，旧 commit / 旧 run 结果放在后文作为历史结果保留。
 
 | 版本 | agent / 评估链路 | dev_imo | imo_95 | 备注 |
 |------|------------------|---------|--------|------|
@@ -16,6 +16,34 @@
 补充说明：
 - v19 在历史 run 中曾达到 `66/95`，但当前 commit 的主结果以最新完整补跑 `65/95` 为准。
 - v17/v19 使用的是 `qwen3_vl_text` multiaux 评估链路；v18 历史结果来自更早的 `vlm` 链路，跨版本比较主要用于主线演进记录。
+
+## v20-v25 短推理消融概览
+
+`v20-v25` 这一轮不是继续追 `imo_95` 全量 headline，而是围绕短推理主线做 `loss_type / scale_rewards / importance_sampling_level` 的单因子消融。由于多次 `safe-eval` 受 Ray startup 假失败污染，这里统一以各版本各自修正后的 `imo95_score_diff_11_final.csv` 口径汇总；`v19` 的 `7/11` 则来自其完整 `imo_95` 结果中对应 11 题的逐题抽取。
+
+| 版本 | 训练差异 | dev_imo | `imo95_score_diff_11`（修正后） | 备注 |
+|------|----------|---------|-------------------------------|------|
+| v19 | `grpo + group + token` | 14/16 | 7/11 | 当前 full `imo_95` 主线基线 |
+| v20 | `dapo + batch + sequence` | 14/16 | 5/11 | 两道 30 多秒假失败补测后仍偏弱 |
+| v21 | `dr_grpo + batch + sequence` | 14/16 | 6/11 | 相比 v20 回升，但仍弱于最佳组 |
+| v22 | `dr_grpo + group + sequence` | 14/16 | 8/11 | 修正后当前最好之一 |
+| v23 | `dr_grpo + group + token` | 14/16 | 6/11 | 两道异常题补测后都是真失败 |
+| v24 | `grpo + group + token` | 14/16 | 8/11 | 与 v22 并列当前最好 |
+| v25 | `dapo + group + token` | 14/16 | 5/11 | `dapo` 在这条主线上再次明显变差 |
+
+这轮消融的当前结论是：
+- `dapo` 无论配 `batch + sequence` 还是 `group + token`，修正 infra 后都只到 `5/11`，不应作为短推理主线优先方向。
+- `group` reward scaling 很关键；`v21 -> v22` 从 `6/11` 直接回升到 `8/11`。
+- 在 `group + token` 这条线上，`grpo` 至少不弱于 `dr_grpo`；`v24=8/11`，而 `v23=6/11`。
+- 当前最强的短推理对比口径仍是 `v22/v24=8/11`；但它们都还没有完整 `imo_95` 重跑，因此 full benchmark 主口径仍以 `v19=65/95` 为准。
+
+主要证据：
+- [v20 dev_imo](/C20545/home/wangzi/GenesisGeo-grpo/results/v20_dapo_batchseq_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260515-153615_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260515T182641Z.csv), [v20 11题修正后汇总](/C20545/home/wangzi/GenesisGeo-grpo/results/v20_dapo_batchseq_checkpoint500_qwen3_vl_text_multiaux/imo95_score_diff_11_final.csv)
+- [v21 dev_imo](/C20545/home/wangzi/GenesisGeo-grpo/results/v21_drgrpo_batchseq_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v1-20260516-042514_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260516T074742Z.csv), [v21 11题修正后汇总](/C20545/home/wangzi/GenesisGeo-grpo/results/v21_drgrpo_batchseq_checkpoint500_qwen3_vl_text_multiaux/imo95_score_diff_11_final.csv)
+- [v22 dev_imo](/C20545/home/wangzi/GenesisGeo-grpo/results/v22_drgrpo_groupseq_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260516-134720_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260516T164611Z.csv), [v22 11题修正后汇总](/C20545/home/wangzi/GenesisGeo-grpo/results/v22_drgrpo_groupseq_checkpoint500_qwen3_vl_text_multiaux/imo95_score_diff_11_final.csv)
+- [v23 dev_imo](/C20545/home/wangzi/GenesisGeo-grpo/results/v23_drgrpo_grouptoken_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260516-195040_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260516T224915Z.csv), [v23 11题修正后汇总](/C20545/home/wangzi/GenesisGeo-grpo/results/v23_drgrpo_grouptoken_checkpoint500_qwen3_vl_text_multiaux/imo95_score_diff_11_final.csv)
+- [v24 dev_imo](/C20545/home/wangzi/GenesisGeo-grpo/results/v24_grpo_grouptoken_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v1-20260517-035158_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260517T100147Z.csv), [v24 11题修正后汇总](/C20545/home/wangzi/GenesisGeo-grpo/results/v24_grpo_grouptoken_checkpoint500_qwen3_vl_text_multiaux/imo95_score_diff_11_final.csv)
+- [v25 dev_imo](/C20545/home/wangzi/GenesisGeo-grpo/results/v25_dapo_grouptoken_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260517-170112_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260517T200141Z.csv), [v25 11题修正后汇总](/C20545/home/wangzi/GenesisGeo-grpo/results/v25_dapo_grouptoken_checkpoint500_qwen3_vl_text_multiaux/imo95_score_diff_11_final.csv)
 
 ## IMO-95 代理 Benchmark 子集
 
@@ -98,10 +126,11 @@
 - 原始数据源（版本相关）：
   - v12 及以前：`/C20545/home/wangzi/GenesisGeo_data_models/datasets/0123/geometry_clauses10_samples1M_aux_updated_img512_inverted_pt_new_remove_proof.jsonl`
   - v13：`/C20545/home/wangzi/GenesisGeo/datasets/20260421_maxaux5/geometry_clauses10_samples100k.jsonl`
-  - v14 及以后：`/C20545/home/wangzi/GenesisGeo/datasets/maxaux8/20260421/geometry_clauses10_samples100k.jsonl`
+  - v14-v18：`/C20545/home/wangzi/GenesisGeo/datasets/maxaux8/20260421/geometry_clauses10_samples100k.jsonl`
+  - v19-v25：`datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl`
 - 当前训练入口：`scripts/grpo/train_grpo.sh`
 - 当前 selector 入口：`scripts/grpo/select_debug_set.py`
-- 核心判断：主要瓶颈仍然是数据分布，而不是 GRPO 训练超参数
+- 核心判断：主要瓶颈仍然还是数据分布，但 `v20-v25` 表明 `reward scaling / loss_type / importance_sampling_level` 也会显著影响短推理子集表现
 
 ## 采样效率分析
 
@@ -118,6 +147,205 @@
 ---
 
 ## 版本历史（主线 + 归档）
+
+### v25 (2026-05-17~18) - `dapo` 在 `group + token` 上再次回退
+
+**数据集**：`datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl`
+
+**模型训练目录**：`models/grpo_vlm_sft44_geometry100k_v25_s1_4gpu_dapo_grouptoken`
+
+**核心变更**：
+- 在 `v24` 基础上只改一项：`loss_type = grpo -> dapo`
+- 其余仍保持 `group` reward scaling、`token` importance sampling、`lr=5e-6`、`beta=0.02`
+
+**训练配置**：与 `v24` 基本一致
+- `learning_rate = 5e-6`，`warmup_steps = 10`，`lr_scheduler_type = cosine`
+- `per_device_train_batch_size = 1`，`gradient_accumulation_steps = 8`，`num_generations = 8`
+- `NPROC_PER_NODE = 4`，`temperature = 1.1`，`top_p = 0.95`，`top_k = 0`，`beta = 0.02`
+- `max_steps = 500`，`save_steps = 50`
+- 训练脚本：[tmp/train_v25.sh](/C20545/home/wangzi/GenesisGeo-grpo/tmp/train_v25.sh)
+
+**评估结果**：
+- ✅ dev_imo：**14/16**
+  - [eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260517-170112_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260517T200141Z.csv](/C20545/home/wangzi/GenesisGeo-grpo/results/v25_dapo_grouptoken_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260517-170112_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260517T200141Z.csv)
+- ✅ imo95_score_diff_11：**5/11**
+  - 初始 `safe-eval` 为 `4/11`
+  - `imo_sl_2016_g5_variant` 在初始安全跑里是 `34.73s` 的 Ray startup 假失败；补测后修正为 `Success`
+  - 修正后汇总：[imo95_score_diff_11_final.csv](/C20545/home/wangzi/GenesisGeo-grpo/results/v25_dapo_grouptoken_checkpoint500_qwen3_vl_text_multiaux/imo95_score_diff_11_final.csv)
+- full `imo_95`：暂未完整补跑
+- 评估产物目录：`results/v25_dapo_grouptoken_checkpoint500_qwen3_vl_text_multiaux/`
+
+**结论**：
+- `dapo` 即使放在 `group + token` 这条相对更稳的组合里，修正后也只有 `5/11`
+- 这进一步支持：当前短推理主线不应继续优先围绕 `dapo`
+
+---
+
+### v24 (2026-05-17) - `grpo` 在 `group + token` 上追平当前最好结果
+
+**数据集**：`datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl`
+
+**模型训练目录**：`models/grpo_vlm_sft44_geometry100k_v24_s1_4gpu_grpo_grouptoken`
+
+**核心变更**：
+- 在 `v23` 基础上只改一项：`loss_type = dr_grpo -> grpo`
+- 其余保留 `group` reward scaling 与 `token` importance sampling
+
+**训练配置**：与 `v23` 基本一致
+- `learning_rate = 5e-6`，`warmup_steps = 10`，`lr_scheduler_type = cosine`
+- `per_device_train_batch_size = 1`，`gradient_accumulation_steps = 8`，`num_generations = 8`
+- `NPROC_PER_NODE = 4`，`temperature = 1.1`，`top_p = 0.95`，`top_k = 0`，`beta = 0.02`
+- `max_steps = 500`，`save_steps = 50`
+- 训练脚本：[tmp/train_v24.sh](/C20545/home/wangzi/GenesisGeo-grpo/tmp/train_v24.sh)
+
+**评估结果**：
+- ✅ dev_imo：**14/16**
+  - [eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v1-20260517-035158_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260517T100147Z.csv](/C20545/home/wangzi/GenesisGeo-grpo/results/v24_grpo_grouptoken_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v1-20260517-035158_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260517T100147Z.csv)
+- ✅ imo95_score_diff_11：**8/11**
+  - 初始 `safe-eval` 为 `5/11`
+  - `imo_sl_2009_g6`、`imo_sl_2013_g2`、`imo_sl_2015_g5_variant`、`imo_sl_2020_g6` 在初始安全跑里都受 Ray startup 假失败污染
+  - 补测修正后汇总：[imo95_score_diff_11_final.csv](/C20545/home/wangzi/GenesisGeo-grpo/results/v24_grpo_grouptoken_checkpoint500_qwen3_vl_text_multiaux/imo95_score_diff_11_final.csv)
+- full `imo_95`：暂未完整补跑
+- 评估产物目录：`results/v24_grpo_grouptoken_checkpoint500_qwen3_vl_text_multiaux/`
+
+**结论**：
+- `v24` 修正后达到 `8/11`，与 `v22` 并列当前最好
+- 在这条 `group + token` 主线上，`grpo` 至少不弱于 `dr_grpo`
+
+---
+
+### v23 (2026-05-16~17) - `token` importance sampling 未带来收益
+
+**数据集**：`datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl`
+
+**模型训练目录**：`models/grpo_vlm_sft44_geometry100k_v23_s1_4gpu_drgrpo_grouptoken`
+
+**核心变更**：
+- 在 `v22` 基础上只改一项：`importance_sampling_level = sequence -> token`
+- 其余保留 `dr_grpo + group`
+
+**训练配置**：与 `v22` 基本一致
+- `learning_rate = 5e-6`，`warmup_steps = 10`，`lr_scheduler_type = cosine`
+- `per_device_train_batch_size = 1`，`gradient_accumulation_steps = 8`，`num_generations = 8`
+- `NPROC_PER_NODE = 4`，`temperature = 1.1`，`top_p = 0.95`，`top_k = 0`，`beta = 0.02`
+- `max_steps = 500`，`save_steps = 50`
+- 训练脚本：[tmp/train_v23.sh](/C20545/home/wangzi/GenesisGeo-grpo/tmp/train_v23.sh)
+
+**评估结果**：
+- ✅ dev_imo：**14/16**
+  - [eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260516-195040_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260516T224915Z.csv](/C20545/home/wangzi/GenesisGeo-grpo/results/v23_drgrpo_grouptoken_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260516-195040_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260516T224915Z.csv)
+- ✅ imo95_score_diff_11：**6/11**
+  - 初始 `safe-eval` 为 `6/11`
+  - `imo_sl_2002_g7_variant` 和 `imo_sl_2013_g2` 都出现了约 `34s` 的异常失败；补测后两题都仍为真实失败
+  - 修正后汇总：[imo95_score_diff_11_final.csv](/C20545/home/wangzi/GenesisGeo-grpo/results/v23_drgrpo_grouptoken_checkpoint500_qwen3_vl_text_multiaux/imo95_score_diff_11_final.csv)
+- full `imo_95`：暂未完整补跑
+- 评估产物目录：`results/v23_drgrpo_grouptoken_checkpoint500_qwen3_vl_text_multiaux/`
+
+**结论**：
+- 把 `importance_sampling_level` 从 `sequence` 改回 `token` 后，修正后仍只有 `6/11`
+- 至少在当前主线上，`token` importance sampling 明显不如 `sequence`
+
+---
+
+### v22 (2026-05-16~17) - `group` reward scaling 是关键回升点
+
+**数据集**：`datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl`
+
+**模型训练目录**：`models/grpo_vlm_sft44_geometry100k_v22_s1_4gpu_drgrpo_groupseq`
+
+**核心变更**：
+- 在 `v21` 基础上只改一项：`scale_rewards = batch -> group`
+- 其余保留 `dr_grpo + sequence`
+
+**训练配置**：与 `v21` 基本一致
+- `learning_rate = 5e-6`，`warmup_steps = 10`，`lr_scheduler_type = cosine`
+- `per_device_train_batch_size = 1`，`gradient_accumulation_steps = 8`，`num_generations = 8`
+- `NPROC_PER_NODE = 4`，`temperature = 1.1`，`top_p = 0.95`，`top_k = 0`，`beta = 0.02`
+- `max_steps = 500`，`save_steps = 50`
+- 训练脚本：[tmp/train_v22.sh](/C20545/home/wangzi/GenesisGeo-grpo/tmp/train_v22.sh)
+
+**评估结果**：
+- ✅ dev_imo：**14/16**
+  - [eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260516-134720_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260516T164611Z.csv](/C20545/home/wangzi/GenesisGeo-grpo/results/v22_drgrpo_groupseq_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260516-134720_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260516T164611Z.csv)
+- ✅ imo95_score_diff_11：**8/11**
+  - 初始 `safe-eval` 为 `4/11`
+  - 多道题在初始安全跑里出现约 `34s` 的 Ray startup 假失败；补测后真实结果回升
+  - 修正后汇总：[imo95_score_diff_11_final.csv](/C20545/home/wangzi/GenesisGeo-grpo/results/v22_drgrpo_groupseq_checkpoint500_qwen3_vl_text_multiaux/imo95_score_diff_11_final.csv)
+- full `imo_95`：暂未完整补跑
+- 评估产物目录：`results/v22_drgrpo_groupseq_checkpoint500_qwen3_vl_text_multiaux/`
+
+**结论**：
+- `v22` 修正后达到 `8/11`，是当前短推理对比口径里最强的一组
+- `v21 -> v22` 的跃升说明 `group` reward scaling 比 `batch` 明显更适合当前主线
+
+---
+
+### v21 (2026-05-16~18) - 去掉 `dapo` 后先回升一步
+
+**数据集**：`datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl`
+
+**模型训练目录**：`models/grpo_vlm_sft44_geometry100k_v21_s1_4gpu_drgrpo_batchseq`
+
+**核心变更**：
+- 在 `v20` 基础上只改一项：`loss_type = dapo -> dr_grpo`
+- 其余保留 `batch` reward scaling 与 `sequence` importance sampling
+
+**训练配置**：与 `v20` 基本一致
+- `learning_rate = 5e-6`，`warmup_steps = 10`，`lr_scheduler_type = cosine`
+- `per_device_train_batch_size = 1`，`gradient_accumulation_steps = 8`，`num_generations = 8`
+- `NPROC_PER_NODE = 4`，`temperature = 1.1`，`top_p = 0.95`，`top_k = 0`，`beta = 0.02`
+- `max_steps = 500`，`save_steps = 50`
+- 训练脚本：[tmp/train_v21.sh](/C20545/home/wangzi/GenesisGeo-grpo/tmp/train_v21.sh)
+
+**评估结果**：
+- ✅ dev_imo：**14/16**
+  - [eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v1-20260516-042514_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260516T074742Z.csv](/C20545/home/wangzi/GenesisGeo-grpo/results/v21_drgrpo_batchseq_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v1-20260516-042514_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260516T074742Z.csv)
+- ✅ imo95_score_diff_11：**6/11**
+  - 初始 `safe-eval` 为 `5/11`
+  - `imo_sl_2013_g2` 和 `imo_sl_2020_g6` 在初始安全跑里受 infra 污染；补测后前者修正为 `Success`，后者仍为真实失败
+  - 修正后汇总：[imo95_score_diff_11_final.csv](/C20545/home/wangzi/GenesisGeo-grpo/results/v21_drgrpo_batchseq_checkpoint500_qwen3_vl_text_multiaux/imo95_score_diff_11_final.csv)
+- full `imo_95`：暂未完整补跑
+- 评估产物目录：`results/v21_drgrpo_batchseq_checkpoint500_qwen3_vl_text_multiaux/`
+
+**结论**：
+- 单独把 `loss_type` 从 `dapo` 改回 `dr_grpo` 后，结果从 `5/11` 回升到 `6/11`
+- 这说明优先去掉 `dapo` 是对的，但 `batch + sequence` 这条线还不是最佳组合
+
+---
+
+### v20 (2026-05-15~18) - 结构化目标首测但短推理表现偏弱
+
+**数据集**：`datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl`
+
+**模型训练目录**：`models/grpo_vlm_sft44_geometry100k_v20_s1_4gpu_dapo_batchseq`
+
+**核心变更**：
+- 相对 `v19`，优先验证 `dapo + batch + sequence` 这一组更结构化的训练目标
+- 目标是测试它在非长推理场景下是否也能成为更好的主线
+
+**训练配置**：与 `v19` 基本一致，重点只改目标函数相关项
+- `learning_rate = 5e-6`，`warmup_steps = 10`，`lr_scheduler_type = cosine`
+- `per_device_train_batch_size = 1`，`gradient_accumulation_steps = 8`，`num_generations = 8`
+- `NPROC_PER_NODE = 4`，`temperature = 1.1`，`top_p = 0.95`，`top_k = 0`，`beta = 0.02`
+- `loss_type = dapo`，`scale_rewards = batch`，`importance_sampling_level = sequence`
+- `max_steps = 500`，`save_steps = 50`
+- 训练脚本：[tmp/train_v20.sh](/C20545/home/wangzi/GenesisGeo-grpo/tmp/train_v20.sh)
+
+**评估结果**：
+- ✅ dev_imo：**14/16**
+  - [eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260515-153615_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260515T182641Z.csv](/C20545/home/wangzi/GenesisGeo-grpo/results/v20_dapo_batchseq_checkpoint500_qwen3_vl_text_multiaux/eval_single_problem_multi_gpu_qwen3_vl_text_dev_imo_v0-20260515-153615_checkpoint-500_sv1_auxfull_d32_b512_s4_gbs2_gbt100_seed123_20260515T182641Z.csv)
+- ✅ imo95_score_diff_11：**5/11**
+  - 初始 `safe-eval` 为 `3/11`
+  - `imo_sl_2015_g5_variant` 和 `imo_sl_2020_g6` 在初始安全跑里是 30 多秒的 Ray startup 假失败；补测后都修正为 `Success`
+  - 修正后汇总：[imo95_score_diff_11_final.csv](/C20545/home/wangzi/GenesisGeo-grpo/results/v20_dapo_batchseq_checkpoint500_qwen3_vl_text_multiaux/imo95_score_diff_11_final.csv)
+- full `imo_95`：暂未完整补跑
+- 评估产物目录：`results/v20_dapo_batchseq_checkpoint500_qwen3_vl_text_multiaux/`
+
+**结论**：
+- `dev_imo` 没掉，但修正 infra 后 11 题子集仍只有 `5/11`
+- 这说明 `dapo + batch + sequence` 不适合作为当前短推理主线的优先方向
+
+---
 
 ### v19 (2026-05-08~14) - **当前最新 multiaux 主线**
 
@@ -603,6 +831,12 @@ mid gate 固定检查：
 | v17 | `datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_5k_v17/` | `models/grpo_vlm_sft44_geometry100k_v17_s1_4gpu_lr5e6/` |
 | v18 | `datasets/grpo_geometry100k_vlm_label_20260421_maxaux8_bucket_unified_10k_v18/` | `models/grpo_vlm_sft44_geometry100k_v18_s1_4gpu_lr5e6/` |
 | v19 | `datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl` | `models/grpo_vlm_sft44_geometry100k_v19_s1_4gpu_lr5e6/` |
+| v20 | `datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl` | `models/grpo_vlm_sft44_geometry100k_v20_s1_4gpu_dapo_batchseq/` |
+| v21 | `datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl` | `models/grpo_vlm_sft44_geometry100k_v21_s1_4gpu_drgrpo_batchseq/` |
+| v22 | `datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl` | `models/grpo_vlm_sft44_geometry100k_v22_s1_4gpu_drgrpo_groupseq/` |
+| v23 | `datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl` | `models/grpo_vlm_sft44_geometry100k_v23_s1_4gpu_drgrpo_grouptoken/` |
+| v24 | `datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl` | `models/grpo_vlm_sft44_geometry100k_v24_s1_4gpu_grpo_grouptoken/` |
+| v25 | `datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl` | `models/grpo_vlm_sft44_geometry100k_v25_s1_4gpu_dapo_grouptoken/` |
 
 **版本说明**：
 - **v13**：原称"v10 复跑"，使用 v10_auxfix_stage_balanced selector 在 geometry100k maxaux5 数据源上的实验，50-step smoke 边缘失败（avg_zero_std = 0.4364）
@@ -612,3 +846,9 @@ mid gate 固定检查：
 - **v17**：与 v16 相同配置，训练集从 2k 扩大到 5k（约 3.2 epoch），前 50 步 avg_zero_std = 0.0778（优于 v16）；旧 `vlm` 链路结果为 59/95（非当前 commit，dev: `497d6aaf` / imo95: `e577945a`），当前 commit 的 `qwen3_vl_text` multiaux 补跑为 61/95
 - **v18**：将 bucket_unified 训练集从 5k 扩大到 10k，但 500 步只覆盖约 1.6 epoch，dev_imo 持平、imo_95 回退至 55/95（非当前 commit，评估 run commit: `f384d702`）
 - **v19**：切换到 `select_balanced` 10k 数据集，当前 commit 的 `qwen3_vl_text` multiaux 主结果为 `dev_imo 14/16`、`imo_95 65/95`；历史最佳旧 run 为 66/95（非当前 commit）
+- **v20**：在 `v19` 数据集上首测 `dapo + batch + sequence`，`dev_imo 14/16` 但 `imo95_score_diff_11` 修正后仅 `5/11`
+- **v21**：只把 `loss_type` 从 `dapo` 回到 `dr_grpo`，11 题修正后回升到 `6/11`
+- **v22**：只把 `scale_rewards` 从 `batch` 回到 `group`，11 题修正后升到 `8/11`，是当前短推理最好口径之一
+- **v23**：只把 `importance_sampling_level` 从 `sequence` 改回 `token`，11 题修正后回落到 `6/11`
+- **v24**：只把 `loss_type` 从 `dr_grpo` 改成 `grpo`，11 题修正后达到 `8/11`，与 `v22` 并列最好
+- **v25**：在 `v24` 上单独改回 `dapo`，11 题修正后再次降到 `5/11`，进一步确认 `dapo` 不适合这条短推理主线
