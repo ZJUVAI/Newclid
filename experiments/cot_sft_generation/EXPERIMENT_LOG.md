@@ -75,6 +75,26 @@
   - `plan 1 + write 1`
   - 这条样本对应前一轮 fixed-4 回归里唯一掉到 `write 2` 的 sample1，说明 `preferred_sentence_shell` 回补是有效的
 
+### 2026-05-18 人工语义审读补充
+
+- 在 `v142` 完整落盘后，对这 `4` 条样本做了结合原题和图片的人工/Codex 审读，不使用脚本做“是否成立”的替代判断。
+- 审读结论：
+  - `v142` 的 `4/4` 只能算 `surface_pass`
+  - 如果按 README 的数据质量目标衡量，这 `4` 条都还不能记为 `semantic_pass`
+- 共同问题不是格式，而是后半段桥接语义：
+  - bridge relation 表面上逐句出现了，但 support 与 relation 经常错位
+  - 文本后半段像是在复述一条 route，而不是从图和题面上真实推出
+  - visual cue / coordinate cue 常常只停留在前缀，没有真正进入后续推理链
+  - 最后两步经常形式上落到 goal，但没有真实闭环
+- 样本级简记：
+  - sample0：最接近可用，但 `c, g, k are collinear` 与后续相似三角形的支撑仍不扎实
+  - sample1：存在明显支撑错位，例如把长度条件拿去支撑共线或新的等长
+  - sample2：存在更明显的伪 bridge，例如把“同垂于一线”直接写成等长
+  - sample3：存在更明显的伪等长、伪相似和 goal-side 收尾失真
+- 交叉查看：
+  - `v141` 和 `v139` 的对应单样本输出也出现了同类问题
+  - 这说明问题不是 `v142` 单轮偶发，而是当前 validator 主要控制 surface quality，尚不足以担保 semantic quality
+
 ### 当前正在跑的回归
 
 - `v142`
@@ -120,6 +140,9 @@
   - sample2 单样本：`plan 1 + write 1`
 - 固定 `4` 条回归 `v142` 已经给出新的完整 `4/4` 证据，但 sample3 仍依赖一次 writer retry。
 - `ace2ae7` 已经把 sample3 暴露出的 contract 过窄问题补到代码里，但还缺新的 live 成功样本来确认它是否把 sample3 从 `write 2` 压回 `write 1`。
+- 更重要的是，`v142` 这轮人工语义审读已经说明：
+  - `4/4` 不等于这 `4` 条样本已经满足 README 的数据质量目标
+  - 后续实验记录必须把 `surface_pass` 和 `semantic_pass` 分开写，不再只记录脚本通过率
 
 ### 当前判断
 
@@ -127,7 +150,11 @@
   - 先给 writer 更明确的局部 bridge 约束
   - 再压缩 plan-to-write handoff，去掉重复的大块上下文
   - 最后只把最必要的局部句壳加回去
+- 但从 `v142` 的人工审读看，下一阶段不能继续只沿着“writer 合同更紧”这条路推进：
+  - 当前真正缺的是后半段 bridge 的语义审稿能力
+  - 下一步应优先补 `critic` 阶段、收缩 writer 在关键桥接句上的自由度，并把 run 级验收切换成“脚本回归 + Codex 人审”的双通道
 
 - 现阶段最关键的验证项仍然是：
   - 在 `ace2ae7` 之后，sample3 是否能稳定保持 `write 1`
-  - 当前 compact handoff 路线在更大随机样本上是否还能维持 `4/4` 级别的局部表现
+  - 当前 compact handoff 路线在更大随机样本上是否还能维持 `surface_pass`
+  - 在此基础上，是否能通过新的人工/Codex 抽样审读拿到第一批可信的 `semantic_pass` 证据

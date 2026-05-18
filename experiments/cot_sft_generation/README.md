@@ -17,6 +17,7 @@
 ## 文档导航
 
 - [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/CURRENT_DESIGN.md)：当前代码真正执行的流程、`plan` 字段、脚本派生字段、writer 约束。
+- [MAINTENANCE_PLAYBOOK.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/MAINTENANCE_PLAYBOOK.md)：长期 Codex 迭代时的文件分工、变更地图、回归资产要求和维护检查清单。
 - [STATUS.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/STATUS.md)：阶段性进展、当前最好证据、已知问题、距离目标的差距。
 - [EXPERIMENT_LOG.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/EXPERIMENT_LOG.md)：按时间记录的近期实验日志和提交对应关系。
 
@@ -97,6 +98,73 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
      - aux 后是否有有效验证链
      - 末段是否真正 bridge 到 goal
      - 多点 aux 是否写出了 staged strategy
+
+## 迭代规范流程
+
+为了避免把“脚本没报错”误当成“数据已经可用”，后续所有迭代都应区分两类通过：
+
+1. `surface_pass`
+   - 含义：样本通过脚本检查。
+   - 作用：说明格式、泄露控制、坐标标签、route 顺序、prefix 重复等表层约束暂时成立。
+   - 非作用：不能单独证明这条 `thinking` 的几何语义已经可靠，更不能单独证明这轮改动提升了数据质量。
+
+2. `semantic_pass`
+   - 含义：结合原题、图片、`aux` 和最终 `thinking` 做人工或 Codex 审读后，确认文本确实满足上面的数据质量目标。
+   - 最低检查项：
+     - 文本是否真的像从图和题面观察得到
+     - 坐标/视觉 cue 是否真正进入推理链
+     - `aux_direct_relations -> bridge_steps -> goal_finish` 是否形成有效闭环
+     - 每个 bridge relation 是否真的由前文 support 推出
+     - 最后 2 到 4 步是否真实落到目标
+
+后续每轮迭代都应按下面的顺序执行，而不是只看一次脚本回归：
+
+1. 明确本轮改动想修什么
+   - 例如：修 route drift、修最后两步脱节、修 ratio 链闭环、修多点 aux staged strategy。
+   - 不要在没有明确失败模式的情况下同时大改 prompt、validator、writer handoff 和长度预算。
+
+2. 固定失败样本脚本回归
+   - 先在已知失败样本或固定基准样本上跑脚本回归。
+   - 目标：确认没有引入明显格式回退、泄露回退、prefix 重复回退或 route 顺序回退。
+
+3. 小规模随机脚本回归
+   - 再跑一小批真实随机样本。
+   - 目标：确认改动不是只修了固定回放样本，而是没有立刻在其他样本上回归。
+
+4. 定向 Codex 人审
+   - 对 5 到 10 条与本轮改动强相关的样本做人工/Codex 审读。
+   - 目标：直接回答“这次改动想修的问题，在真实文本里是不是真的被修了”。
+
+5. 随机 Codex 人审
+   - 再对 15 到 20 条随机样本做审读，最好覆盖不同 goal type 和 aux type。
+   - 目标：确认没有新的高频语义错误被 prompt 或 validator 掩盖。
+
+6. 分开记录两类结果
+   - `surface_pass_rate`
+   - `semantic_pass_rate`
+   - `manual_critical_error_rate`
+   - `avg_attempts_used`
+   - 任何实验记录都不应只写 `4/4`、`generation_audit_issue_items=0`，而不说明是否做过语义审读。
+
+7. 只有双重通过，才算本轮改动有效
+   - 脚本回归稳定，只说明“表层约束没有明显坏掉”。
+   - 只有脚本回归稳定且 Codex 人审明确改善，才能把这轮改动记为“数据质量提升证据”。
+
+## 脚本检测与 Codex 人审的分工
+
+两者都需要，不能互相替代。
+
+- 脚本检测适合做：
+  - 格式、长度、标签、泄露、prefix 重复、route 顺序、source audit、运行级统计
+  - 大规模预筛和批量回归
+
+- Codex 人审适合做：
+  - 结合图片和题面判断文本是否自然可信
+  - 判断某个 support 是否真的推出某个 bridge relation
+  - 判断最后几步是否真实落到 goal
+  - 判断“覆盖全图”是否只是提到了点，还是确实进入了推理链
+
+因此，日常内环迭代可以先靠脚本筛选，但任何声称“质量提升”或“可以批量生产”的结论，都必须经过 Codex 人审确认。
 
 ## 当前生成框架
 

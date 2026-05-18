@@ -64,6 +64,22 @@
   - `v141`：sample1 `1/1`，`plan 1 + write 1`
   - `v142`：固定 `4` 条回归 `4/4`
 
+### 阶段 6：开始把“脚本通过”和“语义通过”分开看
+
+- 2026-05-18 对最新完整 run `v142` 做了结合原题和图片的人工/Codex 审读。
+- 审读范围：
+  - `v142` 固定 `4` 条回归全部样本
+  - 交叉查看 `v141` 和 `v139` 的单样本输出，确认问题不是 `v142` 单轮偶发
+- 当前结论：
+  - `v142` 的 `4/4` 只能算 `surface_pass`
+  - 如果按 README 里的数据质量目标衡量，这 `4` 条都还不能记为 `semantic_pass`
+- 暴露出的新核心问题不是格式，而是语义：
+  - bridge relation 被逐句写出来了，但 support 并不能真的推出它
+  - 文本后半段看起来像一条 route，却和题面/图形并不真正对齐
+  - 前缀里的 visual cue 被写进了 prose，但没有真正进入后续推理链
+  - 最后两步经常形式上落到 goal，实际上并没有形成可信闭环
+- 这说明当前 validator 更擅长控制 surface quality，还不擅长识别“看起来顺，但几何上不成立”的桥接句。
+
 ## 当前流程概括
 
 1. 输入处理
@@ -201,7 +217,7 @@
 
 ## 当前最好质量
 
-- 如果按“当前设计分支的最新 live 证据”看，最强结果是 `v142`：
+- 如果按 `surface_pass` 看，当前设计分支的最强 live 结果仍然是 `v142`：
   - 固定 `4` 条回归：`4/4`
   - `source_audit_issue_items=0`
   - `generation_audit_issue_items=0`
@@ -211,20 +227,71 @@
     - sample1：`plan 1 + write 1`
     - sample2：`plan 1 + write 1`
     - sample3：`plan 1 + write 2`
-- 如果按“历史上最近的小样本随机回归”看，`v104` 和 `v106` 都达到过随机 `4/4`：
-  - `v104`：`/tmp/cot_quality_test_run_v104_random4_artifacts_20260517_154443/summary.json`
-  - `v106`：`/tmp/cot_quality_test_run_v106_random4_artifacts_20260517_162205/summary.json`
-- 但无论是 `v92`、`v104`、`v106` 还是 `v142`，都只有很小的样本规模，不能直接当成全量真实通过率。
-- 当前最佳质量可以概括为：
-  - 结构上，planner/writer 的主要偷懒路径已经大幅被脚本约束住
-  - 小样本上，最新设计已经重新拿到 `4/4`
-  - 稳定性上，sample3 一类 bridge-focus 样本还没被证明已经完全摆脱 writer retry
+- 如果按 `semantic_pass` 看，当前还没有一轮最新 run 能证明“这一批样本已经达到 README 的数据质量目标”：
+  - 对 `v142` 的人工/Codex 审读结论是：`4/4 surface_pass`，但 `0/4 semantic_pass`
+  - 其中 sample0 最接近可用，但后半段 bridge 仍有支撑错位和 route 落地不实的问题
+  - sample1 到 sample3 则已经出现更明显的伪 bridge、伪等长、伪相似或 goal-side 收尾失真
+- 因此，当前最佳质量应描述为：
+  - 表层格式、泄露控制和 route checklist 已经显著变强
+  - 小样本脚本通过率重新回到 `4/4`
+  - 但真实几何语义可靠性仍未建立，不能直接视为可批量生产的数据链路
 
 ## 距离目标的差距
 
-- 虽然当前设计在 `v142` 已经重新拿到 `4/4`，但样本量仍很小，而且 sample3 还依赖一次 writer retry。
-- 随机抽样规模仍偏小，现阶段只能说明局部质量较好，不能代表全量 10 万样本的真实通过率。
-- 仍会偶发 planner/writer 漏出 shorthand、长度边界、最后几步桥接不自然的问题。
-- 当前随机样本里已经看到 planner 一度想写出不在批准 route 里的关系，例如 `b, k, h are collinear`，只是后来被重试纠正了；这说明 route 漂移风险还在。
-- `source audit` 目前在已抽样样本里基本没发现明显矛盾，但这只能说明“目前没撞到”，还不能等同于“全量源数据已经充分验证”。
-- `ace2ae7` 针对 sample3 的 bridge-focus fallback 已经落代码，但还缺新的完整 live 结论来证明它是否把 `write 2` 压回 `write 1`。
+- 当前最主要的差距已经不是 surface 约束不够，而是 semantic validator 仍然偏弱：
+  - 它能检查“bridge 写没写出来”
+  - 但还不能稳定检查“这条 bridge 是否真的被 support 推出来”
+- writer 目前仍有过大的自由度：
+  - 即使 planner/contract 给定了 route，writer 仍可能把 support 和 relation 拼成一条表面合法、几何上失真的句子
+- 当前很多硬阈值更偏工程控形，不一定与真实质量一致：
+  - `anchor_points = 3~4`
+  - `coordinate_relations = 2~3`
+  - `bridge_steps = 2~4`
+  - `coord tags <= 4`
+  - `thinking <= 2200`
+  - 这些规则有助于防退化，但也可能迫使复杂题把真实桥接压扁
+- 实验记录口径也需要更新：
+  - 不能再把 `4/4`、`generation_audit_issue_items=0` 直接当成高质量证据
+  - 后续必须同时记录 `surface_pass_rate` 和 `semantic_pass_rate`
+- `source audit` 目前更多是在排除显式冲突，还没有解决“源样本没错，但生成文本语义错位”的主问题。
+
+## 下一步修改方向
+
+1. 先改成功标准，而不是继续只调 writer prompt
+   - 所有 run 都要区分 `surface_pass` 和 `semantic_pass`
+   - 没有人工/Codex 审读通过的 run，不应被写成“质量提升证据”
+
+2. 在 `write` 之后增加独立 `critic` 阶段
+   - 重点不是再查格式，而是结构化审稿：
+     - support 是否真的推出当前 bridge
+     - 这一步是否和图片/题面一致
+     - 最后两步是否真实闭环到 goal
+
+3. 收缩 writer 在关键桥接句上的自由度
+   - 开头 obstacle / helper 句仍可自由写
+   - `aux_direct_relations`、`bridge_steps`、`goal_finish` 应更接近半模板渲染
+   - 目标是减少“句子流畅但 relation 不成立”的空间
+
+4. 给 planner 的每个 bridge step 增加更强的支撑账本
+   - 不只保留 `relation / depends_on / why_it_helps`
+   - 还应明确：
+     - support 来自 visible givens、aux 直接后果，还是前序 bridge
+     - 依赖了哪些具体点
+     - 为什么这些 support 足以推出当前 relation
+
+5. 把纯黑名单式高层几何词控制改成“条件允许”
+   - `symmetry`、`circumcenter`、`parallelogram` 等词本身不是错误
+   - 真正要限制的是：这些词不能替代关键支撑关系
+   - 后续应优先做“若出现高层词，必须同时给出具体支撑”的检查
+
+6. 重新审视固定数量和长度阈值
+   - 对复杂题，应允许更多 anchor、更多 coordinate cues、更多真实 bridge
+   - 这些预算更适合改成按题复杂度自适应，而不是长期固定死
+
+7. 按 goal type 拆 prompt 和语义审计标准
+   - `eqratio`、`eqangle`、`simtri`、`contri` 的闭环方式不同
+   - 后续不应继续让一套 writer 合同覆盖全部类型
+
+8. 更积极地放弃低置信样本
+   - 如果 planner、writer、critic 在后半段 bridge 上不一致，宁可过滤
+   - 当前目标是高质量蒸馏样本，不是最大化表面通过率
