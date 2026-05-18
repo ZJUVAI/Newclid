@@ -431,15 +431,15 @@ export ZJUVAI_API_RETRY_BACKOFF_SECONDS="3"
 维护相关的最小本地检查：
 
 ```bash
-python -m py_compile \
-  experiments/cot_sft_generation/generate_cot_sft.py \
-  experiments/cot_sft_generation/run_artifacts.py \
-  experiments/cot_sft_generation/semantic_review.py
-
-python experiments/cot_sft_generation/semantic_review.py --help
-
-python -m unittest discover -s tests -p 'test_cot_sft_review_artifacts.py'
+python experiments/cot_sft_generation/maintenance_smoke_check.py
 ```
+
+它会统一执行：
+
+- core files 的 `py_compile`
+- 固定 benchmark manifest 和输入文件的一致性检查
+- `semantic_review.py --help`
+- `tests/test_cot_sft_*.py` 的 `unittest` 回归
 
 ## 辅助脚本
 

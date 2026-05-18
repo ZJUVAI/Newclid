@@ -106,6 +106,14 @@
     - 跨 planner、validator、writer 共用的底层几何文本 helper
   - 如果改了 point mention、relation keyword、aux clause parsing、goal parsing、surface normalization，这里应优先作为落点，而不是继续把底层文本规则塞回主脚本。
 
+- [maintenance_smoke_check.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/maintenance_smoke_check.py)
+  - 负责：
+    - core files `py_compile`
+    - benchmark manifest 一致性检查
+    - `semantic_review.py --help`
+    - `tests/test_cot_sft_*.py` 的统一回归入口
+  - 如果新增长期维护必跑检查，应优先把它接到这里，而不是只补一条文档命令。
+
 - [semantic_review.py](/root/GenesisGeo-cot/experiments/cot_sft_generation/semantic_review.py)
   - 负责：
     - 校验 `semantic_audits.jsonl` 与 `item_audits.jsonl` 是否逐行对齐
@@ -274,9 +282,7 @@ Codex 可以基于对话上下文推进，但长期维护不能依赖“之前�
    - 如果是，要在文档里明确标注它只是“临时证据”，不能当长期基线
 
 5. 最小验证入口是否还能在当前环境运行
-   - `python -m py_compile ...`
-   - `python experiments/cot_sft_generation/semantic_review.py --help`
-   - `python -m unittest discover -s tests -p 'test_cot_sft_review_artifacts.py'`
+   - `python experiments/cot_sft_generation/maintenance_smoke_check.py`
 
 ## 6. 当前仍需补齐的说明
 

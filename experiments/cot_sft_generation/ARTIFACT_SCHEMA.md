@@ -148,12 +148,12 @@ python experiments/cot_sft_generation/semantic_review.py \
 为了避免长期维护依赖额外测试框架，当前最小验证入口应保证在标准库环境里可跑：
 
 ```bash
-python -m py_compile \
-  experiments/cot_sft_generation/generate_cot_sft.py \
-  experiments/cot_sft_generation/run_artifacts.py \
-  experiments/cot_sft_generation/semantic_review.py
-
-python experiments/cot_sft_generation/semantic_review.py --help
-
-python -m unittest discover -s tests -p 'test_cot_sft_review_artifacts.py'
+python experiments/cot_sft_generation/maintenance_smoke_check.py
 ```
+
+它会统一覆盖：
+
+1. core files 的 `py_compile`
+2. benchmark manifest 与固定输入文件的一致性
+3. `semantic_review.py --help`
+4. `tests/test_cot_sft_*.py` 的 `unittest` 回归

@@ -132,6 +132,7 @@
    - 语义审读结果现在可以通过 `semantic_review.py` 回刷到 `summary.json`。
    - artifacts 字段协议已经单独写入 `ARTIFACT_SCHEMA.md`，不再只散落在实现和聊天记录里。
    - 底层几何文本解析和 relation normalization 已经从主脚本拆到 `geometry_text.py`，主脚本职责边界比之前更清楚。
+   - 统一维护入口 `maintenance_smoke_check.py` 已落仓，后续 Codex 会话可以直接跑一条命令检查维护基线是否断裂。
 
 更细的字段格式、脚本派生字段和 writer 合同见 [CURRENT_DESIGN.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/CURRENT_DESIGN.md)。
 
