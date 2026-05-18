@@ -19,7 +19,7 @@
 
 ## v20-v25 短推理消融概览
 
-`v20-v25` 这一轮不是继续追 `imo_95` 全量 headline，而是围绕短推理主线做 `loss_type / scale_rewards / importance_sampling_level` 的单因子消融。由于多次 `safe-eval` 受 Ray startup 假失败污染，这里统一以各版本各自修正后的 `imo95_score_diff_11_final.csv` 口径汇总；`v19` 的 `7/11` 则来自其完整 `imo_95` 结果中对应 11 题的逐题抽取。
+`v20-v25` 这一轮不是继续追 `imo_95` 全量 headline，而是围绕短推理主线做 `loss_type / scale_rewards / importance_sampling_level` 对比。需要特别说明：`v21-v24` 基本构成单因子链路，但 `v25` 在最初文档里被误写成 `dapo + group + token`；实际 `train.log` 与 `args.json` 显示它跑的是 `dapo + batch + sequence`，因此应视为 `v20` 风格配置的复跑，而不是新的 grouptoken 消融。由于多次 `safe-eval` 受 Ray startup 假失败污染，这里统一以各版本各自修正后的 `imo95_score_diff_11_final.csv` 口径汇总；`v19` 的 `7/11` 则来自其完整 `imo_95` 结果中对应 11 题的逐题抽取。
 
 | 版本 | 训练差异 | dev_imo | `imo95_score_diff_11`（修正后） | 备注 |
 |------|----------|---------|-------------------------------|------|
@@ -29,12 +29,13 @@
 | v22 | `dr_grpo + group + sequence` | 14/16 | 8/11 | 修正后当前最好之一 |
 | v23 | `dr_grpo + group + token` | 14/16 | 6/11 | 两道异常题补测后都是真失败 |
 | v24 | `grpo + group + token` | 14/16 | 8/11 | 与 v22 并列当前最好 |
-| v25 | `dapo + group + token` | 14/16 | 5/11 | `dapo` 在这条主线上再次明显变差 |
+| v25 | `实际与 v20 相同：dapo + batch + sequence` | 14/16 | 5/11 | 目录名/旧文档曾误写为 `grouptoken`；不构成新消融 |
 
 这轮消融的当前结论是：
-- `dapo` 无论配 `batch + sequence` 还是 `group + token`，修正 infra 后都只到 `5/11`，不应作为短推理主线优先方向。
+- `v20` 和 `v25` 实际上是同一组 `dapo + batch + sequence` 配置，并且两次修正后都停在 `5/11`，说明这组配置本身偏弱。
 - `group` reward scaling 很关键；`v21 -> v22` 从 `6/11` 直接回升到 `8/11`。
 - 在 `group + token` 这条线上，`grpo` 至少不弱于 `dr_grpo`；`v24=8/11`，而 `v23=6/11`。
+- 当前没有有效的 `dapo + group + token` 对照实验；旧版文档把 `v25` 写成这组参数是错误归因。
 - 当前最强的短推理对比口径仍是 `v22/v24=8/11`；但它们都还没有完整 `imo_95` 重跑，因此 full benchmark 主口径仍以 `v19=65/95` 为准。
 
 主要证据：
@@ -148,22 +149,29 @@
 
 ## 版本历史（主线 + 归档）
 
-### v25 (2026-05-17~18) - `dapo` 在 `group + token` 上再次回退
+### v25 (2026-05-17~18) - 更正：这不是 `group + token` 消融，而是 `v20` 风格复跑
 
 **数据集**：`datasets/maxaux8/20260429/geometry_clauses10_samples1M_select_balanced_10k.jsonl`
 
 **模型训练目录**：`models/grpo_vlm_sft44_geometry100k_v25_s1_4gpu_dapo_grouptoken`
 
 **核心变更**：
-- 在 `v24` 基础上只改一项：`loss_type = grpo -> dapo`
-- 其余仍保持 `group` reward scaling、`token` importance sampling、`lr=5e-6`、`beta=0.02`
+- 错误更正（2026-05-18）：旧版文档曾把 `v25` 写成“在 `v24` 基础上只改 `loss_type = grpo -> dapo`”
+- 实际 `train.log`、启动命令与最终 `args.json` 都显示，本次 run 的真实参数是 `loss_type = dapo`、`scale_rewards = batch`、`importance_sampling_level = sequence`
+- 因此 `v25` 应视为 `v20` 风格配置的复跑，而不是 `dapo + group + token` 的有效对照实验
+- 目录名里的 `dapo_grouptoken` 是历史误命名，不代表真实训练参数
 
-**训练配置**：与 `v24` 基本一致
+**训练配置**：实际与 `v20` 一致
 - `learning_rate = 5e-6`，`warmup_steps = 10`，`lr_scheduler_type = cosine`
 - `per_device_train_batch_size = 1`，`gradient_accumulation_steps = 8`，`num_generations = 8`
 - `NPROC_PER_NODE = 4`，`temperature = 1.1`，`top_p = 0.95`，`top_k = 0`，`beta = 0.02`
+- `loss_type = dapo`，`scale_rewards = batch`，`importance_sampling_level = sequence`
 - `max_steps = 500`，`save_steps = 50`
 - 训练脚本：[tmp/train_v25.sh](/C20545/home/wangzi/GenesisGeo-grpo/tmp/train_v25.sh)
+- 关键证据：
+  - [tmp/train_v25.sh](/C20545/home/wangzi/GenesisGeo-grpo/tmp/train_v25.sh)
+  - [train.log](/C20545/home/wangzi/GenesisGeo-grpo/models/grpo_vlm_sft44_geometry100k_v25_s1_4gpu_dapo_grouptoken/train.log)
+  - [args.json](/C20545/home/wangzi/GenesisGeo-grpo/models/grpo_vlm_sft44_geometry100k_v25_s1_4gpu_dapo_grouptoken/v0-20260517-170112/args.json)
 
 **评估结果**：
 - ✅ dev_imo：**14/16**
@@ -176,8 +184,9 @@
 - 评估产物目录：`results/v25_dapo_grouptoken_checkpoint500_qwen3_vl_text_multiaux/`
 
 **结论**：
-- `dapo` 即使放在 `group + token` 这条相对更稳的组合里，修正后也只有 `5/11`
-- 这进一步支持：当前短推理主线不应继续优先围绕 `dapo`
+- `v25` 不能再被解读为“`dapo + group + token` 也只有 `5/11`”
+- 正确解读是：`dapo + batch + sequence` 这组配置在 `v20` 与 `v25` 两次 run 里都停在 `5/11`
+- 因而它强化的是 `v20` 这组配置偏弱的判断，而不是对 `dapo + group + token` 的判断
 
 ---
 
@@ -851,4 +860,4 @@ mid gate 固定检查：
 - **v22**：只把 `scale_rewards` 从 `batch` 回到 `group`，11 题修正后升到 `8/11`，是当前短推理最好口径之一
 - **v23**：只把 `importance_sampling_level` 从 `sequence` 改回 `token`，11 题修正后回落到 `6/11`
 - **v24**：只把 `loss_type` 从 `dr_grpo` 改成 `grpo`，11 题修正后达到 `8/11`，与 `v22` 并列最好
-- **v25**：在 `v24` 上单独改回 `dapo`，11 题修正后再次降到 `5/11`，进一步确认 `dapo` 不适合这条短推理主线
+- **v25**：目录名虽为 `dapo_grouptoken`，但实际参数与 `v20` 相同，属于 `dapo + batch + sequence` 的复跑；修正后仍为 `5/11`
