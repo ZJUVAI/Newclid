@@ -866,8 +866,24 @@ def audit_generation_quality(
             for relation in (coverage_targets.get("coordinate_focus_relations") or coordinate_relations)
             if isinstance(relation, str) and relation.strip()
         ]
+        observation_focus_relations = [
+            relation
+            for relation in (coverage_targets.get("observation_focus_relations") or [])
+            if isinstance(relation, str) and relation.strip()
+        ]
+        if not observation_focus_relations:
+            for observation in plan.get("observation_relations", []) or []:
+                if not isinstance(observation, dict):
+                    continue
+                relation = observation.get("relation")
+                if isinstance(relation, str) and relation.strip() and relation not in observation_focus_relations:
+                    observation_focus_relations.append(relation.strip())
         coordinate_reuse_min = int(coverage_targets.get("coordinate_reuse_min") or (1 if coordinate_relations else 0))
         early_coordinate_reuse_min = int(coverage_targets.get("early_coordinate_reuse_min") or 0)
+        observation_relation_mentions = (
+            count_relation_mentions(write_output, observation_focus_relations, point_names=visible_points)
+            if write_output and observation_focus_relations else 0
+        )
         coordinate_relation_mentions = (
             count_relation_mentions(write_output, coordinate_relations, point_names=visible_points)
             if write_output and coordinate_relations else 0
@@ -876,6 +892,8 @@ def audit_generation_quality(
             extract_point_mentions(write_output, non_anchor_coordinate_points)
             if write_output and non_anchor_coordinate_points else set()
         )
+        if observation_focus_relations and observation_relation_mentions == 0:
+            issues.append("observation_cues_not_reused_in_body")
         if coordinate_relations and coordinate_relation_mentions == 0:
             issues.append("coordinate_cues_not_reused_in_body")
         elif coordinate_relations and coordinate_relation_mentions < coordinate_reuse_min:
@@ -886,6 +904,15 @@ def audit_generation_quality(
             issues.append("non_anchor_coordinate_cues_unused")
         if write_output and isinstance(plan.get("bridge_steps"), list):
             sentences = split_into_sentences(write_output)
+            if observation_focus_relations:
+                early_body = " ".join(sentences[: min(3, len(sentences))])
+                early_observation_mentions = count_relation_mentions(
+                    early_body,
+                    observation_focus_relations,
+                    point_names=visible_points,
+                )
+                if early_observation_mentions < 1:
+                    issues.append("early_observation_cue_missing")
             if early_coordinate_reuse_min and coordinate_focus_relations:
                 early_body = " ".join(sentences[: min(3, len(sentences))])
                 early_coordinate_mentions = count_relation_mentions(

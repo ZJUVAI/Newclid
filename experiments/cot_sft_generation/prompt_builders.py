@@ -546,6 +546,55 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
         targeted_hints.append(
             "- preferred shape: connect that cue directly to the helper or first bridge, such as 'because f is the midpoint of ac...' or 'because c, d, and g stay collinear...'."
         )
+    if "approved observation cue" in validation_message and "must explicitly reuse at least" in validation_message:
+        coverage_targets_dict = plan.get("coverage_targets", {}) if isinstance(plan, dict) else {}
+        observation_focus_relations = [
+            relation
+            for relation in (coverage_targets_dict.get("observation_focus_relations") or [])
+            if isinstance(relation, str) and relation.strip()
+        ]
+        observation_focus_regions = [
+            region
+            for region in (coverage_targets_dict.get("observation_focus_regions") or [])
+            if isinstance(region, str) and region.strip()
+        ]
+        targeted_hints.append(
+            "- after the prefix, explicitly reuse at least one approved visual observation cue so the body continues from the same local geometry instead of treating the prefix as disposable."
+        )
+        if observation_focus_relations:
+            targeted_hints.append(
+                f"- preferred early observation cues: {json.dumps(observation_focus_relations[:3], ensure_ascii=False)}."
+            )
+        if observation_focus_regions:
+            targeted_hints.append(
+                f"- keep the obstacle and helper grounded in observation regions such as {join_natural_list(observation_focus_regions[:3])}."
+            )
+        targeted_hints.append(
+            "- preferred shape: turn the cue into a live sentence about the obstacle or helper, such as 'the line through d, e, and f still controls the missing side relation...'."
+        )
+    if "Writer early body must continue from at least one approved observation cue" in validation_message:
+        coverage_targets_dict = plan.get("coverage_targets", {}) if isinstance(plan, dict) else {}
+        observation_focus_relations = [
+            relation
+            for relation in (coverage_targets_dict.get("observation_focus_relations") or [])
+            if isinstance(relation, str) and relation.strip()
+        ]
+        observation_focus_regions = [
+            region
+            for region in (coverage_targets_dict.get("observation_focus_regions") or [])
+            if isinstance(region, str) and region.strip()
+        ]
+        targeted_hints.append(
+            "- within the first three body sentences, keep building on one approved observation cue instead of restarting from the anchor triangle or a generic helper sentence."
+        )
+        if observation_focus_relations:
+            targeted_hints.append(
+                f"- preferred early observation cues: {json.dumps(observation_focus_relations[:3], ensure_ascii=False)}."
+            )
+        if observation_focus_regions:
+            targeted_hints.append(
+                f"- stay in the same local observation region, such as {join_natural_list(observation_focus_regions[:3])}, before broadening out to later bridge steps."
+            )
     if "Writer early body must connect the bottleneck/helper to at least one approved non-anchor coordinate cue" in validation_message:
         coverage_targets_dict = plan.get("coverage_targets", {}) if isinstance(plan, dict) else {}
         observation_focus_relations = [

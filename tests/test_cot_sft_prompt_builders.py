@@ -225,6 +225,16 @@ class CotSftPromptBuildersTest(unittest.TestCase):
         self.assertIn("preferred early coordinate cues", feedback)
         self.assertIn("preferred non-anchor coordinate region", feedback)
 
+    def test_build_writer_retry_feedback_surfaces_observation_retry_hints(self):
+        feedback = build_writer_retry_feedback(
+            "Writer early body must continue from at least one approved observation cue instead of restarting from the anchor frame",
+            self.plan,
+            injected_prefix="Prefix sentence block.",
+        )
+
+        self.assertIn("preferred early observation cues", feedback)
+        self.assertIn("same local observation region", feedback)
+
 
 if __name__ == "__main__":
     unittest.main()

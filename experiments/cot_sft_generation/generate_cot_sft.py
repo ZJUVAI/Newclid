@@ -2373,6 +2373,18 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
         for relation in (coverage_targets.get("coordinate_focus_relations") or [])
         if isinstance(relation, str) and relation.strip()
     ]
+    observation_focus_relations = [
+        relation
+        for relation in (coverage_targets.get("observation_focus_relations") or [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+    if not observation_focus_relations and isinstance(plan, dict):
+        for observation in plan.get("observation_relations", []) or []:
+            if not isinstance(observation, dict):
+                continue
+            relation = normalize_relation_surface(observation.get("relation") or "").strip()
+            if relation and relation not in observation_focus_relations:
+                observation_focus_relations.append(relation)
     coordinate_reuse_min = int(coverage_targets.get("coordinate_reuse_min") or 0)
     early_coordinate_reuse_min = int(coverage_targets.get("early_coordinate_reuse_min") or 0)
     coverage_point_pool = []
@@ -2383,6 +2395,25 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
             point = point.lower().strip()
             if point and point not in coverage_point_pool:
                 coverage_point_pool.append(point)
+    if observation_focus_relations:
+        observation_relation_mentions = count_relation_mentions(
+            body,
+            observation_focus_relations,
+            point_names=coverage_point_pool or None,
+        )
+        if observation_relation_mentions < 1:
+            return False, "Writer body must explicitly reuse at least one approved observation cue after the prefix"
+        early_body = " ".join(sentences[: min(3, len(sentences))])
+        early_observation_mentions = count_relation_mentions(
+            early_body,
+            observation_focus_relations,
+            point_names=coverage_point_pool or None,
+        )
+        if early_observation_mentions < 1:
+            return False, (
+                "Writer early body must continue from at least one approved observation cue "
+                "instead of restarting from the anchor frame"
+            )
     if plan and isinstance(plan.get("coordinate_relations"), list):
         coordinate_relations = [
             relation

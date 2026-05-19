@@ -182,6 +182,82 @@ class CotSftAuditsTest(unittest.TestCase):
         self.assertIn("non_anchor_coordinate_cues_unused", audit["issues"])
         self.assertIn("early_non_anchor_coordinate_cue_missing", audit["issues"])
 
+    def test_audit_generation_quality_flags_unused_observation_cues(self):
+        record = {
+            "point_coords_grid": {
+                "a": [0, 0],
+                "b": [4, 0],
+                "c": [1, 3],
+                "d": [5, 3],
+                "e": [6, 1],
+                "f": [7, 1],
+                "g": [8, 1],
+            }
+        }
+        generation = {
+            "plan_parsed": {
+                "anchor_points": ["a", "b", "c"],
+                "observation_relations": [
+                    {
+                        "relation": "points e, f, and g look nearly collinear",
+                        "points": ["e", "f", "g"],
+                    }
+                ],
+                "coordinate_relations": [],
+                "coverage_targets": {
+                    "observation_focus_relations": ["points e, f, and g look nearly collinear"],
+                    "observation_focus_regions": ["around e, f, and g"],
+                },
+                "aux_direct_relations": ["ah equals dh"],
+                "bridge_steps": [{"relation": "dh equals ch"}],
+                "goal_finish": "ad equals bc",
+            },
+            "write_output": "The target still needs one equality, so a helper should connect the d-side back to the main frame. Because ah equals dh, dh equals ch, and therefore ad equals bc.",
+        }
+
+        audit = audit_generation_quality(record, generation, "<aux>x00 h : cong a h d h</aux>")
+
+        self.assertIn("observation_cues_not_reused_in_body", audit["issues"])
+        self.assertIn("early_observation_cue_missing", audit["issues"])
+
+    def test_audit_generation_quality_accepts_reused_observation_cues(self):
+        record = {
+            "point_coords_grid": {
+                "a": [0, 0],
+                "b": [4, 0],
+                "c": [1, 3],
+                "d": [5, 3],
+                "e": [6, 1],
+                "f": [7, 1],
+                "g": [8, 1],
+            }
+        }
+        generation = {
+            "plan_parsed": {
+                "anchor_points": ["a", "b", "c"],
+                "observation_relations": [
+                    {
+                        "relation": "points e, f, and g look nearly collinear",
+                        "points": ["e", "f", "g"],
+                    }
+                ],
+                "coordinate_relations": [],
+                "coverage_targets": {
+                    "observation_focus_relations": ["points e, f, and g look nearly collinear"],
+                    "observation_focus_regions": ["around e, f, and g"],
+                },
+                "aux_direct_relations": ["ah equals dh"],
+                "bridge_steps": [{"relation": "dh equals ch"}],
+                "goal_finish": "ad equals bc",
+            },
+            "write_output": "The line through e, f, and g stays nearly collinear, so the outer right side should be tracked with the helper. Because ah equals dh, dh equals ch, and therefore ad equals bc.",
+        }
+
+        audit = audit_generation_quality(record, generation, "<aux>x00 h : cong a h d h</aux>")
+
+        self.assertNotIn("observation_cues_not_reused_in_body", audit["issues"])
+        self.assertNotIn("early_observation_cue_missing", audit["issues"])
+
     def test_audit_generation_quality_accepts_reused_coordinate_cues(self):
         record = {
             "point_coords_grid": {

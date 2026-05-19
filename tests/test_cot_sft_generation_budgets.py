@@ -174,6 +174,85 @@ class CotSftGenerationBudgetsTest(unittest.TestCase):
         self.assertFalse(ok)
         self.assertIn("coordinate relation cue", message)
 
+    def test_validate_writer_body_requires_observation_cue_reuse(self):
+        plan = {
+            "observation_relations": [
+                {
+                    "relation": "points d, e, and f look nearly collinear",
+                    "points": ["d", "e", "f"],
+                }
+            ],
+            "coordinate_relations": [],
+            "anchor_points": ["a", "b", "c"],
+            "coverage_targets": {
+                "opening_focus_points": ["d", "e"],
+                "bridge_focus_points": ["f", "g"],
+                "goal_points": ["d", "e", "f", "g"],
+                "non_anchor_points": ["d", "e", "f", "g"],
+                "observation_focus_relations": ["points d, e, and f look nearly collinear"],
+                "observation_focus_regions": ["around d, e, and f"],
+            },
+            "bridge_steps": [{"relation": "fg equals dg", "required_supports": [], "focus_points": ["f", "g"]}],
+            "goal_finish": "de equals fg",
+        }
+        body = (
+            "The d-side obstacle still has to be tied back to e and f before the target equality can close. "
+            "A helper around f and g is needed to reconnect the outer structure. "
+            "Construct point k on the outer side. "
+            "Because fg equals dg, this prepares the final equality. "
+            "Therefore de equals fg."
+        )
+
+        ok, message = validate_writer_body(
+            body,
+            visible_goal="cong d e f g",
+            injected_prefix="prefix",
+            plan=plan,
+        )
+
+        self.assertFalse(ok)
+        self.assertIn("observation cue", message)
+
+    def test_validate_writer_body_requires_early_observation_cue_reuse(self):
+        plan = {
+            "observation_relations": [
+                {
+                    "relation": "points d, e, and f look nearly collinear",
+                    "points": ["d", "e", "f"],
+                }
+            ],
+            "coordinate_relations": [],
+            "anchor_points": ["a", "b", "c"],
+            "coverage_targets": {
+                "opening_focus_points": ["d", "e"],
+                "bridge_focus_points": ["f", "g"],
+                "goal_points": ["d", "e", "f", "g"],
+                "non_anchor_points": ["d", "e", "f", "g"],
+                "observation_focus_relations": ["points d, e, and f look nearly collinear"],
+                "observation_focus_regions": ["around d, e, and f"],
+            },
+            "bridge_steps": [{"relation": "fg equals dg", "required_supports": [], "focus_points": ["f", "g"]}],
+            "goal_finish": "de equals fg",
+        }
+        body = (
+            "The d-side obstacle still has to be tied back to e and f before the target equality can close. "
+            "A helper around f and g is needed to reconnect the outer structure. "
+            "Construct point k on the outer side. "
+            "Because points d, e, and f stay nearly collinear, fg equals dg, and this prepares the final equality. "
+            "Therefore de equals fg."
+        )
+
+        ok, message = validate_writer_body(
+            body,
+            visible_goal="cong d e f g",
+            injected_prefix="prefix",
+            plan=plan,
+        )
+
+        self.assertFalse(ok)
+        self.assertIn("approved observation cue", message)
+        self.assertIn("early body", message)
+
     def test_validate_writer_body_requires_multiple_coordinate_cues_when_requested(self):
         plan = {
             "coordinate_relations": [
