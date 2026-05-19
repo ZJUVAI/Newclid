@@ -7,9 +7,11 @@ from experiments.cot_sft_generation.geometry_text import (
     build_hidden_coordinate_guidance,
     build_multi_aux_instruction,
     build_public_problem_text,
+    extract_relation_segment_tokens,
     extract_problem_goal,
     normalize_relation_surface,
     relations_semantically_match,
+    select_support_relations_for_step,
 )
 
 
@@ -24,6 +26,14 @@ class CotSftGeometryTextTest(unittest.TestCase):
             normalize_relation_surface("triangles AFG and CFG are similar"),
             "triangles afg and cfg are similar",
         )
+        self.assertEqual(
+            normalize_relation_surface("points b, d, and f look nearly collinear"),
+            "b, d, f are collinear",
+        )
+        self.assertEqual(
+            normalize_relation_surface("the line through e, f, and g stays nearly collinear"),
+            "e, f, g are collinear",
+        )
 
     def test_relations_semantically_match_accepts_surface_variants(self):
         self.assertTrue(
@@ -33,6 +43,35 @@ class CotSftGeometryTextTest(unittest.TestCase):
                 ["a", "c", "f", "g"],
             )
         )
+        self.assertTrue(
+            relations_semantically_match(
+                "points b, d, and f look nearly collinear",
+                "b, d, f are collinear",
+                ["b", "d", "f"],
+            )
+        )
+
+    def test_extract_relation_segment_tokens_and_support_ranking_handle_natural_collinear_cues(self):
+        self.assertEqual(
+            extract_relation_segment_tokens("points b, d, and f look nearly collinear"),
+            {"bd", "bf", "df"},
+        )
+
+        supports = [
+            "points b, d, and f look nearly collinear",
+            "b, f, g, k are concyclic",
+            "c, d, k are collinear",
+            "ab is parallel to cd",
+        ]
+        ranked = select_support_relations_for_step(
+            "b, d, f are collinear",
+            supports,
+            ["a", "b", "c", "d", "f", "g", "k"],
+            next_target_relation="angle bd/bg equals angle fk/dk",
+            max_supports=3,
+        )
+
+        self.assertEqual(ranked[0], "points b, d, and f look nearly collinear")
 
     def test_build_canonical_construction_and_multi_aux_instruction(self):
         aux_part = "<aux>x00 h : coll h a b [001] cong a h b h; x00 k : perp k h a b</aux>"

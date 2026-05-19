@@ -90,13 +90,13 @@
 
 10. `aux_direct_relations`
     - 格式：`list[str]`
-    - 长度：`1` 到 `3`
+    - 长度：通常 `1` 到 `3`；多点 aux 或更复杂题型允许放宽到 `4`
     - 含义：构造一完成就直接成立的局部后果。
     - 要求：必须是 immediate consequences，不能跳进旧图深处。
 
 11. `bridge_steps`
     - 格式：`list[object]`
-    - 长度：`2` 到 `4`
+    - 长度：通常 `2` 到 `4`；复杂题允许放宽到 `5`
     - 每个对象至少包含：
       - `relation: str`
       - `depends_on: list[str]`
@@ -115,9 +115,11 @@
 
 1. 基础 schema 校验
    - 字段是否齐全
-   - `anchor_points` 数量是否为 `3/4`
-   - `coordinate_relations` 是否为 `2/3`
-   - `bridge_steps` 是否为 `2` 到 `4`
+   - `anchor_points` 是否在复杂度自适应预算内，通常是 `3/4`，复杂题可放宽到 `5`
+   - `coordinate_relations` 是否在复杂度自适应预算内，通常是 `2/3`，复杂题可放宽到 `4`
+   - `bridge_steps` 是否在复杂度自适应预算内，通常是 `2` 到 `4`，复杂题可放宽到 `5`
+   - `coordinate_relations` 是否覆盖足够多的可见点；复杂题默认要求至少覆盖 `4` 个可见点，而不是只围着少量 anchor 打转
+   - 如果只是 `anchor_points` 选得过满、把 coordinate-heavy 点错误吸进了 anchor frame，脚本现在会优先自动回收多余 anchor，再判断是否仍需打回
 
 2. 文本约束
    - 禁止 proof-engine 痕迹
@@ -160,19 +162,31 @@
 5. `bridge_focus_points`
    - writer 第二正文句应该优先接回的更大可见区域。
 
-6. `focus_relations`
+6. `coordinate_focus_points`
+   - `coordinate_relations` 里真正覆盖到的非 anchor 点，writer 早段应优先继续使用这些点对应的坐标 cue。
+
+7. `coordinate_focus_relations`
+   - 需要在正文里继续复用的非 anchor 坐标关系摘要。
+
+8. `coordinate_reuse_min` / `early_coordinate_reuse_min`
+   - writer 正文至少要复用多少个坐标 cue，以及前 3 句里至少要尽早复用多少个非 anchor 坐标 cue。
+
+9. `focus_relations`
    - 对应这些点的关键关系摘要。
 
-7. `opening_sentence_hint`
+10. `opening_sentence_hint`
    - 第一正文句的局部落点提示。
 
-8. `helper_sentence_hint`
+11. `helper_sentence_hint`
    - 第二正文句的局部落点提示。
 
-9. `reminder`
+12. `coordinate_sentence_hint`
+   - writer 在 helper / first bridge 里如何尽早把非 anchor 坐标 cue 接回正文的短提示。
+
+13. `reminder`
    - 给 writer 的简短提醒，要求不要只围着 anchor frame 打转。
 
-注意：现在仍然只给 `3-4` 个 `anchor_points` 打标签，不等于只看 `3-4` 个点。全图覆盖要求主要由 `figure_overview`、`visible_relations`、`coverage_targets`、`bridge_steps[*].focus_points` 来补。
+注意：现在通常只给 `3-4` 个 `anchor_points` 打标签，复杂题可放宽到 `5` 个；这仍不等于只看这些点。全图覆盖要求主要由 `coordinate_relations`、`figure_overview`、`visible_relations`、`coverage_targets`、`bridge_steps[*].focus_points` 来补，而且复杂题默认要求 `coordinate_relations` 至少覆盖 `4` 个可见点，并尽量覆盖 `2-3` 个非 anchor visible points。若 planner 只是把 `d/e/g/j` 这类本应继续作为非 anchor cue 使用的点错误塞进了 `anchor_points`，脚本现在会优先把它们回收到最小 anchor frame，而不是直接把整条 plan 判死。
 
 ### 2.6 `bridge_steps[*].focus_points` 是什么
 
@@ -227,9 +241,16 @@
    - 脚本把每个 bridge step 重新列成一句一句的硬约束
    - 每条通常会要求：
      - 本 step 单独成句
-     - 点出至少一个 `required_supports`
+     - 点出足够的 `required_supports`
      - 点出至少一个 `focus_points`
      - 说明这句解锁什么 `unlock_purpose`
+
+`required_supports` 不是简单按字符串顺序截断：
+
+- 脚本会优先从当前 step 的 `depends_on` 里挑“对当前 relation 真正必要”的 support
+- 对 `collinear` 这类结构化 bridge，会优先保留那两条真正拼出当前共线关系的 collinear supports
+- 对 `collinear` / `similar` / `ratio` 这类更容易被一句套话糊过去的 bridge，`min_support_mentions` 现在通常会提高到 `2`
+- 对 `angle` / `similar` / `ratio` 这类高阶 bridge，脚本现在还会检查 `required_supports` 是否已经把当前 relation 里真正用到的大部分线段对象先“引进来”；如果一句 bridge 里突然冒出多个此前 support 从未覆盖过的 `df` / `dk` / `bg` 这类对象，plan 会被打回，要求拆成更早的 checkpoint
 
 4. `preferred_sentence_shell`
    - 脚本会为每个 bridge step 生成一句推荐壳子
@@ -245,7 +266,7 @@ writer 只输出 body 纯文本，不允许自己输出 `<thinking>`、`<point>`
 
 1. 格式
    - 是否只有正文
-   - 长度是否在预算内
+   - 长度是否在复杂度自适应预算内
    - 是否出现第一人称
 
 2. 与 prefix 的关系
@@ -258,6 +279,8 @@ writer 只输出 body 纯文本，不允许自己输出 `<thinking>`、`<point>`
    - 对应句子必须提到足够的 `required_supports`
    - 对应句子必须提到至少一个 `focus_points`
    - 最后必须显式写出 `goal_finish`
+   - 句级 relation matcher 不再只看“点名是否大量重叠”；对 `collinear` / `midpoint` / `equal` / `parallel` / `perpendicular` 这些结构化关系，会进一步检查 relation signature，避免把两条相近关系误判成同一条 support
+   - 对 `angle` / `similar` / `ratio` 这类 bridge，脚本在 plan 阶段已经要求 `required_supports` 覆盖当前句里大部分 segment/ray 对象；writer 终检因此不再接受“support 只提到一半对象，剩下一半靠读者脑补”的压缩句
 
 4. 泄露与偷懒表达
    - 禁止 hidden proof 痕迹
@@ -268,11 +291,23 @@ writer 只输出 body 纯文本，不允许自己输出 `<thinking>`、`<point>`
 writer body 通过后，脚本才会：
 
 1. 把 prefix 和 body 拼成最终 `<thinking>...</thinking>`
+   - 复杂题的总长度预算会随 `anchor_points` / `coordinate_relations` / `aux_direct_relations` / `bridge_steps` 数量适度放宽，不再固定卡死在同一条全局阈值上。
+   - `<point><coord>` 标签数通常与 `anchor_points` 数量一致；复杂题最多可放宽到 `5` 个标签，而不是一律卡在 `4` 个。
 2. 把原始 `<aux>` 原样带出
 3. 导出：
    - `thinking`
    - `aux`
    - `output = thinking + "\\n" + aux`
+
+### 2.9.1 planner bonus retry
+
+planner 默认仍以命令行 `--max-retries` 为基础，但对少数明显“再试一次就可能修好”的失败类型，脚本现在会自动多给 `1-2` 次 bonus retry。当前主要覆盖：
+
+- 高阶 `angle` / `similar` / `ratio` bridge 的 support / object grounding 还不完整
+- 跳过了 prerequisite checkpoint
+- 非 anchor coordinate coverage 仍然太窄
+
+目的不是无上限重试，而是避免 useful hint 恰好出现在最后一次、模型还没来得及用上就结束。
 
 ### 2.10 run artifacts 层
 

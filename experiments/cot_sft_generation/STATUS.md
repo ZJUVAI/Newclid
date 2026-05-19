@@ -95,10 +95,10 @@
    - 关键字段包括 `anchor_points`、`figure_overview`、`coordinate_hints`、`aux_direct_relations`、`bridge_steps`、`goal_finish`。
    - hidden 坐标和 hidden proof 只用于约束这条链要可解、贴近真实路线，不允许直接暴露到最终文本。
    - `plan` 字段说明：
-   - `anchor_points`：选 3 到 4 个可见点，作为最终 `thinking` 里打标签的坐标锚点。
+   - `anchor_points`：通常选 3 到 4 个可见点，复杂题可放宽到 5 个，作为最终 `thinking` 里打标签的坐标锚点。
    - `anchor_relation`：围绕这些 anchor points 的一句核心可见关系，用来给整张图定向。
    - `figure_overview`：对锚点之外的图形结构做简短概览，补充相关点和子结构。
-   - `coordinate_relations`：基于 visible point 坐标提炼出的 2 到 3 个具体关系检查，如共线、垂直、中点、等长。
+   - `coordinate_relations`：基于 visible point 坐标提炼出的 2 到 4 个具体关系检查，如共线、垂直、中点、等长；复杂题默认应尽量覆盖至少 4 个可见点。
    - `visible_relations`：题面里已有、后续推理应主动复用的可见 formal relations。
    - `coordinate_hints`：把 `coordinate_relations` 总结成自然语言提示，说明哪些视觉关系值得继续追。
    - `goal_bottleneck`：说明当前图到 visible goal 之间最主要的缺口是什么。
@@ -268,19 +268,19 @@
 
 - 当前最主要的差距已经不是 surface 约束不够，而是 semantic validator 仍然偏弱：
   - 它能检查“bridge 写没写出来”
-  - 但还不能稳定检查“这条 bridge 是否真的被 support 推出来”
+  - 对 `collinear` / `similar` / `ratio` 这类 bridge，最近一轮已经开始通过更严格的 `required_supports` 选择、`min_support_mentions`，以及 relation-signature matcher 去拦截“support 看起来相关、其实推不出当前 bridge”的伪通过样本
+  - 最新一轮又补了一个更贴近 rerun9 的硬约束：`angle` / `similar` / `ratio` bridge 不能在 `required_supports` 还没把相关 segment/ray 对象引进来的情况下，突然自己冒出多个新的 `df` / `dk` / `bd` 这类对象
+  - 同时也补了两条编排层修正，避免“本来能修好，但死在流程上”：
+    - `anchor_points` 如果只是把 coordinate-heavy 的外层点吸进去、导致非 anchor coverage 失真，脚本会优先自动回收到更小的 anchor frame
+    - planner 对 support/object grounding、prerequisite route checkpoint、non-anchor coordinate coverage 这类可修复失败现在会自动多给 `1-2` 次 bonus retry
+  - 但这仍然只覆盖了部分高频结构，尚不能视为完整 semantic proof checker
 - writer 目前仍有过大的自由度：
   - 即使 planner/contract 给定了 route，writer 仍可能把 support 和 relation 拼成一条表面合法、几何上失真的句子
 - benchmark 基线虽然不再只有固定 `4` 条：
   - 现在已经补到 `12` 条分层清单，并覆盖 `6` 个核心 goal type 的 `single_point / multi_point`
   - 但更细的 `aux_shape`、复杂度分桶和失败模式分桶还没有补齐
-- 当前很多硬阈值更偏工程控形，不一定与真实质量一致：
-  - `anchor_points = 3~4`
-  - `coordinate_relations = 2~3`
-  - `bridge_steps = 2~4`
-  - `coord tags <= 4`
-  - `thinking <= 2200`
-  - 这些规则有助于防退化，但也可能迫使复杂题把真实桥接压扁
+- 当前仍有一部分硬阈值更偏工程控形，不一定与真实质量一致：
+  - 复杂题虽然已经开始按复杂度自适应放宽 `anchor_points` / `coordinate_relations` / `bridge_steps` / `<thinking>` 总长度 / `<point><coord>` 标签数预算，但这些预算是否足够仍要继续靠 Codex 审读验证
 - 实验记录口径也需要更新：
   - 不能再把 `4/4`、`generation_audit_issue_items=0` 直接当成高质量证据
   - 后续必须同时记录 `surface_pass_rate` 和 `semantic_pass_rate`

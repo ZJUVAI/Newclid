@@ -11,6 +11,27 @@
 
 - `cot_sft_semantic_review_v1`
 
+迭代阶段如果想先拿到待审样本清单，可以先运行：
+
+```bash
+python experiments/cot_sft_generation/semantic_review.py \
+  --run-dir /path/to/run_artifacts \
+  --print-pending \
+  --surface-pass-only
+```
+
+如果要把完整审读上下文直接交给 Codex，而不是再手工翻 `item_records.jsonl`，可以改用：
+
+```bash
+python experiments/cot_sft_generation/semantic_review.py \
+  --run-dir /path/to/run_artifacts \
+  --print-pending \
+  --print-pending-payloads \
+  --surface-pass-only
+```
+
+注意：payload 模式依赖 `item_records.jsonl`，因此要求原始 run 使用了 `-v/--verbose`。
+
 ## 1. 审读必看材料
 
 每条样本至少同时看：
@@ -59,10 +80,14 @@
   - 只围着少量 anchor 打转，没有覆盖真正相关的可见子结构
 - `coordinate_cue_unused`
   - 坐标 / 视觉 cue 被提到，但没有进入后续推理链
+- `coordinate_cue_reuse_too_shallow`
+  - 坐标 cue 虽然被复用了，但只点到一次，或者太晚才出现，没有真正参与前段 obstacle / helper / first-bridge 判断
 - `aux_direct_not_grounded`
   - `aux_direct_relations` 不是直接构造后果，或写错了直接后果
 - `bridge_unsupported`
   - bridge relation 不能由同句或前文 support 推出
+  - 尤其注意：`collinear` / `similar` / `ratio` 这类 bridge 往往需要两条明确 support；如果正文只提到一条，或者只是点名了很多相关点，不应算作已支撑
+  - 另一个高频坏味道是：一句 `angle` / `similar` / `ratio` bridge 里突然用了 `df`、`dk`、`bd` 这类对象，但前文 support 根本没有把这些线段/射线对象引进来；这也应算 `bridge_unsupported`
 - `route_drift`
   - 路线偏离可信的 goal-side chain，出现伪 bridge 或高层跳跃
 - `goal_finish_unclosed`

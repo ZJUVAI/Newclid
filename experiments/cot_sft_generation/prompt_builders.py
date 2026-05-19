@@ -177,13 +177,13 @@ def build_plan_retry_feedback(validation_message, aux_part):
     targeted_hints = []
     if "depends_on" in validation_message:
         targeted_hints.append(
-            "- bridge_steps must be a JSON array of objects, and each depends_on field must itself be a JSON list of 1 to 3 earlier relation strings."
+            "- bridge_steps must be a JSON array of objects, and each depends_on field must itself be a JSON list of earlier relation strings rather than one free-form paragraph."
         )
     if "depends_on" in validation_message and "must name at least two concrete points" in validation_message:
         targeted_hints.append(
             "- every depends_on item should be a full earlier relation string with named points, such as 'ab equals bi', 'a, d, i are collinear', or 'line ac is perpendicular to line di'; do not write shorthand like 'the equality', 'the perpendicular setup', or a single-point fragment."
         )
-    if "depends_on" in validation_message and "must be a list with 1 to 3 supporting relations" in validation_message:
+    if "depends_on" in validation_message and "must be a list with" in validation_message:
         targeted_hints.append(
             "- if only one support is needed, still return it inside JSON brackets, for example: \"depends_on\": [\"ab equals bi\"]."
         )
@@ -191,9 +191,9 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- every depends_on item should copy an earlier concrete relation almost verbatim, such as 'ah equals ch' or 'line ad is parallel to line bc'; do not replace it with abstract support labels like 'the midpoint property' or 'the equal-length setup'."
         )
-    if "depends_on must reuse an earlier visible, direct, or bridge relation" in validation_message:
+    if "depends_on must reuse an earlier visible, coordinate, direct, or bridge relation" in validation_message:
         targeted_hints.append(
-            "- every depends_on item should be copied from visible_relations, aux_direct_relations, or an earlier bridge_steps relation with nearly the same surface form; do not invent a fresh paraphrase when an earlier approved support already exists."
+            "- every depends_on item should be copied from coordinate_relations, visible_relations, aux_direct_relations, or an earlier bridge_steps relation with nearly the same surface form; do not invent a fresh paraphrase when an earlier approved support already exists."
         )
     if "aux_direct_relations" in validation_message and "must mention a concrete geometric relation" in validation_message:
         targeted_hints.append(
@@ -202,12 +202,12 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- if the direct consequence is that a point lies on a known line, write it as a concrete collinearity such as 'a, b, h are collinear' instead of 'h lies on line ab'."
         )
-    if "aux_direct_relations" in validation_message and "must be a list with 1 to 3 ordered direct consequences" in validation_message:
+    if "aux_direct_relations" in validation_message and "must be a list with" in validation_message:
         targeted_hints.append(
             "- aux_direct_relations must be an actual JSON list, for example: [\"a, d, i are collinear\", \"ab equals bi\", \"bd equals di\"]. Do not collapse the list into one sentence or one quoted paragraph."
         )
         targeted_hints.append(
-            "- prefer copying 1 to 3 items from Hidden Proof Guidance.immediate_aux_consequences almost verbatim, starting from the most local construction consequences first."
+            "- prefer copying 1 to 4 items from Hidden Proof Guidance.immediate_aux_consequences almost verbatim, starting from the most local construction consequences first."
         )
     if "bridge_steps" in validation_message and "must mention a concrete geometric relation" in validation_message:
         targeted_hints.append(
@@ -226,6 +226,16 @@ def build_plan_retry_feedback(validation_message, aux_part):
         )
         targeted_hints.append(
             "- rewrite abstract shape summaries like 'triangle adc looks isosceles' into the concrete candidate relation they imply, such as 'ad looks equal to cd', only if that exact equality appears in the hidden coordinate candidate list."
+        )
+    if "coordinate_relations should cover at least" in validation_message and "visible non-anchor points" in validation_message:
+        targeted_hints.append(
+            "- spread coordinate_relations across the broader visible figure, especially outer or goal-side non-anchor points, instead of stacking several variations on the same anchor triangle."
+        )
+        targeted_hints.append(
+            "- prefer coordinate candidates from different local regions so the plan has more than one coordinate-backed handle on the figure."
+        )
+        targeted_hints.append(
+            "- do not absorb too many coordinate-rich outer points into anchor_points. Anchor points are only the tagged orientation frame; leave some goal-side or bridge-side points outside anchor_points so coordinate_relations can still cover them as non-anchor evidence."
         )
     if "coordinate_relations" in validation_message and "symmetry or rotation claims" in validation_message:
         targeted_hints.append(
@@ -256,6 +266,30 @@ def build_plan_retry_feedback(validation_message, aux_part):
         targeted_hints.append(
             "- do not restate an earlier bridge checkpoint later in the route. Once a relation has already appeared as visible support, aux-direct support, or a prior bridge step, the next bridge step should move to a later approved checkpoint."
         )
+    if "introduces unsupported angle/ratio/similar segments" in validation_message:
+        missing_segments_match = re.search(r"segments before they are grounded by required_supports: (\[[^\]]+\])", validation_message)
+        targeted_hints.append(
+            "- for angle, ratio, or similar-triangle bridge steps, do not introduce fresh segment pairs that were never grounded by the chosen supports. If the step names bd, df, dk, or similar objects, the required_supports should already mention those lines directly or through a concrete collinearity/cyclic relation that contains them."
+        )
+        targeted_hints.append(
+            "- if a high-order checkpoint still needs several new line objects, split it into an earlier bridge step instead of compressing the whole jump into one relation."
+        )
+        targeted_hints.append(
+            "- choose bridge steps whose same-sentence required_supports already cover almost all of the segments used by that angle/ratio/similar relation."
+        )
+        if missing_segments_match:
+            targeted_hints.append(
+                f"- the current failed bridge still leaves these segment objects ungrounded: {missing_segments_match.group(1)}. Insert an earlier checkpoint or rewrite depends_on so those objects are already named before the high-order relation appears."
+            )
+    if "missing prerequisite:" in validation_message:
+        missing_prerequisite_match = re.search(r"missing prerequisite:\s*(.+)$", validation_message)
+        targeted_hints.append(
+            "- do not skip the earlier approved checkpoint that the validator named. Insert that missing checkpoint as its own earlier bridge_steps relation before the later similarity, ratio, or angle step that depends on it."
+        )
+        if missing_prerequisite_match:
+            targeted_hints.append(
+                f"- specifically, add the missing checkpoint '{missing_prerequisite_match.group(1).strip()}' before the later bridge step instead of trying to compress past it."
+            )
     if "must avoid vague shape shorthand" in validation_message:
         targeted_hints.append(
             "- do not write phrases like 'square-like', 'square structure', 'square abcd', 'rectangle', or 'parallelogram'; replace them with the concrete perpendicular, equal-length, midpoint, or parallel facts that are actually visible."
@@ -285,6 +319,14 @@ def build_plan_retry_feedback(validation_message, aux_part):
         )
         targeted_hints.append(
             "- do not say 'midpoint property' inside helper_idea; say the concrete midpoint fact itself, such as 'the midpoint of ad gives equal halves', instead."
+        )
+    if "goal_finish contains forbidden pattern" in validation_message:
+        targeted_hints.append(
+            "- rewrite goal_finish as the concrete final goal-side relation itself; do not use summary labels such as 'midpoint property', 'symmetry', or other shorthand in place of the actual ratio, angle, or equality statement."
+        )
+    if "midpoint propert" in validation_message:
+        targeted_hints.append(
+            "- do not write 'midpoint property' or 'midpoint properties' in any plan field; restate the concrete midpoint fact itself, such as 'e is the midpoint of ad' or 'ae equals de'."
         )
     if "must not appear before the construction field" in validation_message:
         targeted_hints.append(
@@ -428,6 +470,9 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
             "- if a bridge sentence needs a visible given that already appears in the prefix, paraphrase it instead of copying the exact wording, such as 'because ad runs parallel to bc' instead of repeating 'line ad is parallel to line bc'."
         )
         targeted_hints.append(
+            "- apply the same rule to coordinate cues: if the prefix already says 'point g looks like the midpoint of cd', rewrite it as 'the midpoint-looking point g on cd' or another short paraphrase instead of copying the whole cue sentence."
+        )
+        targeted_hints.append(
             "- the first two body sentences should avoid every item listed under Prefix-Covered Facts; use those sentences only for the bottleneck and the missing helper."
         )
         targeted_hints.append(
@@ -457,6 +502,55 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
         targeted_hints.append(
             "- preferred shape: describe the helper through the line, circle, or side around those points, such as 'a point on line cd', 'a point on be', or 'a helper around g and h'."
         )
+    if "approved coordinate relation cue" in validation_message and "must explicitly reuse at least" in validation_message:
+        coordinate_relations = [
+            relation
+            for relation in (plan.get("coordinate_relations") or [])
+            if isinstance(relation, str) and relation.strip()
+        ] if isinstance(plan, dict) else []
+        coverage_targets_dict = plan.get("coverage_targets", {}) if isinstance(plan, dict) else {}
+        coordinate_focus_points = [
+            point
+            for point in (coverage_targets_dict.get("coordinate_focus_points") or [])
+            if isinstance(point, str) and point.strip()
+        ]
+        targeted_hints.append(
+            "- after the prefix, mention the approved coordinate relations again in natural language so the body actually uses the visual cues instead of leaving them only in the injected prefix."
+        )
+        if coordinate_relations:
+            targeted_hints.append(
+                f"- approved coordinate cues available for reuse: {json.dumps(coordinate_relations[:3], ensure_ascii=False)}."
+            )
+        if coordinate_focus_points:
+            targeted_hints.append(
+                f"- keep those coordinate cues tied to non-anchor points such as {join_natural_list(coordinate_focus_points)} rather than drifting back to anchor-only narration."
+            )
+        targeted_hints.append(
+            "- preferred shape: connect that cue directly to the helper or first bridge, such as 'because f is the midpoint of ac...' or 'because c, d, and g stay collinear...'."
+        )
+    if "Writer early body must connect the bottleneck/helper to at least one approved non-anchor coordinate cue" in validation_message:
+        coverage_targets_dict = plan.get("coverage_targets", {}) if isinstance(plan, dict) else {}
+        coordinate_focus_relations = [
+            relation
+            for relation in (coverage_targets_dict.get("coordinate_focus_relations") or [])
+            if isinstance(relation, str) and relation.strip()
+        ]
+        coordinate_focus_points = [
+            point
+            for point in (coverage_targets_dict.get("coordinate_focus_points") or [])
+            if isinstance(point, str) and point.strip()
+        ]
+        targeted_hints.append(
+            "- within the first three body sentences, tie the obstacle or helper to at least one approved non-anchor coordinate cue instead of waiting until the final bridge."
+        )
+        if coordinate_focus_relations:
+            targeted_hints.append(
+                f"- preferred early coordinate cues: {json.dumps(coordinate_focus_relations[:3], ensure_ascii=False)}."
+            )
+        if coordinate_focus_points:
+            targeted_hints.append(
+                f"- preferred non-anchor coordinate region: {join_natural_list(coordinate_focus_points)}."
+            )
     if "must mention at least one approved bridge focus point from its contract" in validation_message:
         targeted_hints.append(
             "- in that bridge sentence, mention at least one point from focus_points in the matching Bridge Sentence Contract so the step stays tied to the intended non-anchor region."
@@ -477,7 +571,7 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
         targeted_hints.append(
             "- keep the bridge tied to the non-anchor focus points listed under Global Coverage Targets instead of drifting back to generic anchor-only language."
         )
-    if "must name at least one approved supporting relation" in validation_message:
+    if "approved supporting relation" in validation_message:
         targeted_hints.append(
             "- every bridge sentence must name at least one concrete approved support relation from its required_supports or depends_on list; do not jump straight to the new relation with no cited support."
         )
@@ -638,7 +732,7 @@ def build_plan_prompt(
     immediate_aux_block = json.dumps(immediate_aux_pool, ensure_ascii=False, indent=2) if immediate_aux_pool else "[]"
     aux_bridge_pool = proof_guidance_payload.get("aux_bridge_relations", [])
     aux_bridge_block = json.dumps(aux_bridge_pool, ensure_ascii=False, indent=2) if aux_bridge_pool else "[]"
-    route_relation_pool = (
+    route_relation_pool = proof_guidance_payload.get("ordered_route_relations") or (
         aux_bridge_pool
         + proof_guidance_payload.get("bridge_relations", [])
         + proof_guidance_payload.get("goal_finish_relations", [])
@@ -673,8 +767,8 @@ def build_plan_prompt(
         "parallel/perpendicular cues, but do not cite the coordinate table explicitly in the final text.\n"
         f"{coordinate_hints}\n\n"
         "[Hidden Structured Coordinate Candidates]\n"
-        "Each item below is derived only from visible-point coordinates. Prefer choosing 2 or 3 of these "
-        "as the concrete relation checks in your plan instead of jumping directly to high-level symmetry claims.\n"
+        "Each item below is derived only from visible-point coordinates. Prefer choosing 2 to 4 of these "
+        "as the concrete relation checks in your plan instead of jumping directly to high-level symmetry claims, and try to cover more than one local region of the figure rather than repeating variations on the same anchor-side cue.\n"
         f"{coordinate_guidance}\n\n"
         "[Visible Premise Summaries]\n"
         "These are plain-language summaries of the visible formal premises. When you describe the existing figure, "
@@ -705,17 +799,17 @@ def build_plan_prompt(
         f"{ordered_route_checkpoint_block}\n\n"
         "[Task]\n"
         "Return exactly one JSON object with these keys:\n"
-        "1. anchor_points: a list of 3 or 4 original visible points that are the best tagged anchors for orienting the figure.\n"
+        "1. anchor_points: a list of 3 to 5 original visible points that are the best tagged anchors for orienting the figure.\n"
         "2. anchor_relation: one sentence describing the key visible relation or shape cue involving those anchors.\n"
         "3. figure_overview: one or two sentences surveying the broader visible figure beyond the anchors, including other relevant points or sub-structures.\n"
-        "4. coordinate_relations: a list of 2 or 3 short relation checks inferred from the visible placement; each item must name the points and the relation.\n"
-        "5. visible_relations: a list of 2 to 4 concrete existing-figure relations that the later reasoning should actively reuse.\n"
+        "4. coordinate_relations: a list of 2 to 4 short relation checks inferred from the visible placement; spread them across the visible figure so the later reasoning does not stay trapped on the anchor frame or on one tiny local cluster.\n"
+        "5. visible_relations: a list of 2 to 5 concrete existing-figure relations that the later reasoning should actively reuse.\n"
         "6. coordinate_hints: one or two sentences synthesizing those coordinate-backed relation checks and why they matter.\n"
         "7. goal_bottleneck: one sentence describing the main obstacle to reaching the visible goal from the current figure.\n"
         "8. helper_idea: one sentence describing what kind of helper is missing, without naming the new point yet.\n"
         "9. construction: one or two sentences that finally introduce the new point or staged point sequence in plain geometry language.\n"
-        "10. aux_direct_relations: a list of 1 to 3 direct consequences that come immediately from the construction itself.\n"
-        "11. bridge_steps: a list of 2 to 4 ordered objects; each object must contain relation, depends_on, and why_it_helps.\n"
+        "10. aux_direct_relations: a list of 1 to 4 direct consequences that come immediately from the construction itself.\n"
+        "11. bridge_steps: a list of 2 to 5 ordered objects; each object must contain relation, depends_on, and why_it_helps.\n"
         "12. goal_finish: one sentence stating the goal-side angle/ratio/congruence relation that closes the argument.\n\n"
         "[Schema Example]\n"
         "Follow this JSON shape closely. In particular, bridge_steps must be a JSON list of objects, and each depends_on value must be a JSON list of earlier relation strings.\n"
@@ -734,7 +828,7 @@ def build_plan_prompt(
         "Bad helper_idea: 'we need point k so that ...' because the new point name should first appear in construction.\n"
         "Good aux_direct_relations: ['kb equals kc', 'line ck is perpendicular to line dk']\n"
         "Good aux_direct_relations: ['h is the midpoint of bc', 'b, c, h are collinear']\n"
-        "Good aux_direct_relations: if Hidden Proof Guidance.immediate_aux_consequences starts with ['a, d, i are collinear', 'ab equals bi', 'bd equals di'], copy 1 to 3 of those local items almost verbatim before introducing any broader equality like 'ai equals eg'.\n"
+        "Good aux_direct_relations: if Hidden Proof Guidance.immediate_aux_consequences starts with ['a, d, i are collinear', 'ab equals bi', 'bd equals di'], copy 1 to 4 of those local items almost verbatim before introducing any broader equality like 'ai equals eg'.\n"
         "Bad aux_direct_relations: if a candidate relation needs old points outside the construction scope, such as a later bridge equality or a goal-side angle relation, do not place it in aux_direct_relations; use a later bridge step instead.\n"
         "Bad aux_direct_relations: ['h lies on line bc'] when the same fact should be written as 'b, c, h are collinear'.\n"
         "Bad aux_direct_relations: ['kb equals kc', 'angle akd equals ...'] when a is not part of the immediate construction.\n\n"
@@ -747,7 +841,7 @@ def build_plan_prompt(
         "Bad bridge relation: rewriting an approved similar-triangle checkpoint as a congruent-triangle checkpoint when the approved route pool names only the similar-triangle version.\n"
         "Bad bridge relation: 'h coincides with f' when the same idea should be written as a concrete equality or another approved route relation.\n\n"
         "[coordinate_relations / visible_relations Guidance]\n"
-        "Good coordinate_relations: items chosen from the hidden structured coordinate candidates, such as 'point g looks like the midpoint of ac' or 'points b, d, and i look nearly collinear'.\n"
+        "Good coordinate_relations: items chosen from the hidden structured coordinate candidates, such as 'point g looks like the midpoint of ac' or 'points b, d, and i look nearly collinear', with enough spread that outer or goal-side visible points also appear when the figure is richer than the anchor frame.\n"
         "Bad coordinate_relations: copying a visible premise such as 'line ad is parallel to line bc' when that relation is not one of the hidden coordinate candidates.\n"
         "Good coordinate_hints: 'the midpoint at g and the near-collinearity of b, d, and i suggest a bridge through d.'\n"
         "Bad coordinate_hints: 'the figure suggests a symmetry between e and f' or 'a rotation seems present'.\n"
@@ -759,6 +853,7 @@ def build_plan_prompt(
         "- Do not use <point> tags, <coord> tags, LaTeX, $...$ math formatting, backticks, <aux>, <proof>, IDs, or rule names.\n"
         "- Do not restate every premise. Focus on the visible configuration, the likely useful relations, and the bottleneck toward the visible goal.\n"
         "- Survey the whole visible figure, not just the anchor points.\n"
+        "- When there are visible points beyond the anchors, let coordinate_relations cover those outer or goal-side points too; do not spend all coordinate checks on one anchor-only triangle.\n"
         "- Use the hidden coordinate table only as an internal consistency check for relations that also look plausible in the image.\n"
         "- The coordinate_relations field should stay close to the structured coordinate candidates when possible. Avoid unsupported jumps like 'there is a rotation symmetry' unless you first name the concrete equal, parallel, perpendicular, midpoint, or collinear cues behind it.\n"
         "- In coordinate_relations and coordinate_hints, do not describe points as symmetric or invoke rotation directly; spell out the concrete equal, parallel, perpendicular, midpoint, or collinear cues instead.\n"
@@ -783,6 +878,7 @@ def build_plan_prompt(
         "- Each bridge_steps relation should explicitly mention how the auxiliary point interacts with existing visible points or substructures, in a realistic order.\n"
         "- The first bridge_steps relation must explicitly contain the new auxiliary point together with at least one old visible point, and it should be written in a compact relation form such as 'ag equals dg' or 'angle bg/bj equals angle gi/ij'.\n"
         "- A bridge_steps relation must be a new checkpoint beyond visible_relations, aux_direct_relations, and earlier bridge_steps. If the construction already gives a relation directly, treat that relation as support and move to the next bridge checkpoint instead of repeating it.\n"
+        "- For any angle, ratio, or similar-triangle bridge step, the depends_on list should already name almost all of the segment or ray objects used in that relation. If a step still needs fresh objects like dg, dk, bd, or df, insert an earlier bridge checkpoint instead of skipping ahead.\n"
         "- Each bridge_steps relation should stay semantically close to the hidden proof guidance bridge_relations or goal_finish_relations; do not swap in a different high-level route.\n"
         "- Treat the Approved Ordered Route Checkpoints as the preferred bridge-step order. Do not jump to a later checkpoint first, and do not invent a fresh parallel/similarity/angle route when an earlier approved checkpoint is already available.\n"
         "- When the ordered route begins with a concrete equality or collinearity checkpoint, do not postpone that earlier checkpoint behind a later checkpoint. Keep the bridge steps monotone in the listed order.\n"
@@ -792,7 +888,7 @@ def build_plan_prompt(
         "- Do not insert a fresh collinearity bridge just because an earlier visible relation already places one point on a line and the construction places another point on that same line. Unless that exact collinearity appears in the approved checkpoint list, treat it as support only and move to the next approved route relation.\n"
         "- When the approved route relation pool lists a concrete relation such as 'line bg is parallel to line cd' or 'bk = dk', prefer using that relation directly instead of inventing an alternative route like a new similar-triangle claim.\n"
         "- The last bridge_steps relation must stay before the final goal statement. Do not make the last bridge step a substitution-flavored restatement of goal_finish such as 'ratio dg to cg equals ratio de to df' when goal_finish is 'ratio ac to bc equals ratio de to df'.\n"
-        "- Each bridge_steps depends_on list should reuse concrete items from visible_relations, aux_direct_relations, or an earlier bridge_steps relation, instead of inventing unsupported leaps.\n"
+        "- Each bridge_steps depends_on list should reuse concrete items from coordinate_relations, visible_relations, aux_direct_relations, or an earlier bridge_steps relation, instead of inventing unsupported leaps.\n"
         "- Each depends_on item should be a full earlier relation string with at least two named points, such as 'ab equals bi' or 'a, d, i are collinear'. Do not write shorthand like 'the equality setup' or 'the perpendicular condition'.\n"
         "- Each depends_on item must be copied as a natural-language relation string, not written as a raw formal predicate such as 'cong b j d j'.\n"
         "- Each bridge_steps why_it_helps string should explain what the current step unlocks next in plain geometry language. The script will internally attach the exact next target relation for the writer.\n"
@@ -893,6 +989,7 @@ def build_write_prompt(record, plan, aux_part, injected_prefix_block, proof_guid
         "19. The very first sentence of your body should state the bottleneck or goal-side obstacle. Do not spend the first sentence re-describing triangle abc, the midpoint layout, or the visible givens already covered by the injected prefix block.\n"
         "19a. The second sentence should state the missing helper idea, not repeat any overview, coordinate cue, or visible relation already listed under Prefix-Covered Facts.\n"
         "19b. Use the Global Coverage Targets block to keep the obstacle and helper tied to non-anchor visible points or substructures whenever the approved plan depends on them.\n"
+        "19c. Reuse the approved coordinate cues early, especially the ones attached to non-anchor visible points, so the body keeps extracting geometry from the broader coordinate layout instead of falling back to anchor-only narration.\n"
         "20. Give each bridge_steps relation its own sentence. In that sentence, explicitly name at least one concrete depends_on relation before or while stating the new bridge relation.\n"
         "20a. When a bridge step lists internal required_supports, mention those support relations explicitly in the same sentence unless doing so would repeat the exact prefix wording; in that case paraphrase them.\n"
         "20b. When a bridge contract includes a preferred_sentence_shell, stay very close to that local order and only smooth the wording lightly.\n"

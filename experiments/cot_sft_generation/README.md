@@ -82,8 +82,8 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 4. 坐标应当服务于几何关系判断，而不是只做标签
    - 生成期可以使用 `point_coords_grid` / `grid_coord` 做内部 sanity check。
-   - 坐标的作用应当是帮助教师模型确认哪些平行、垂直、等长、中点、共线、对称、圆结构值得进一步追踪。
-   - 最终 `thinking` 中的坐标标签只是一层可见锚定；高质量样本还应当体现这些坐标支持的几何关系确实进入了推理链。
+   - 坐标的作用应当是帮助教师模型确认哪些平行、垂直、等长、中点、共线、圆结构值得进一步追踪，而且这些判断不应只围着少数 anchor 点打转。
+   - 最终 `thinking` 中的坐标标签只是一层可见锚定；高质量样本还应当体现这些坐标支持的几何关系确实进入了推理链，尤其要能覆盖 anchor 之外的 goal-side / outer visible points。
 
 5. 需要包含从提出 aux 到解答出 goal 的完整逻辑
    - 高质量样本不能只说明“为什么要加这个点”，还要继续写清楚加点之后的关键关系如何逐步推进到最终结论。
@@ -174,7 +174,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 补充要求：
 
 - 固定回归优先使用仓库内 benchmark，而不是重新在 `/tmp` 手工挑样本。
-- 完成人工/Codex 审读后，要回填 `semantic_audits.jsonl`，再运行 `semantic_review.py --write-summary` 刷新 `summary.json`。
+- 迭代阶段建议先运行 `semantic_review.py --print-pending --surface-pass-only`，只把已经 `surface_pass` 的样本送去 Codex 审读；完成人工/Codex 审读后，再回填 `semantic_audits.jsonl` 并运行 `semantic_review.py --write-summary` 刷新 `summary.json`。
 - `semantic_audits.jsonl` 的字段填写和 `issue_codes` 口径以 [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/SEMANTIC_REVIEW_GUIDE.md) 为准。
 - schema 细节和字段解释以 [ARTIFACT_SCHEMA.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/ARTIFACT_SCHEMA.md) 为准。
 
@@ -224,6 +224,8 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
      - `required_supports`
      - `focus_points`
      - `preferred_sentence_shell`
+   - 对 `angle` / `similar` / `ratio` 这类高阶 bridge，还会检查 `required_supports` 是否已经覆盖当前 relation 里真正使用到的大部分 segment/ray 对象，避免正文一句里突然引入多个此前没有被 support 铺垫过的线段名。
+   - 如果 planner 只是把 coordinate-heavy 的外层点错误吸进了 `anchor_points`，导致非 anchor coverage 被人为吃掉，脚本会优先自动把多余 anchor 回收到最小 anchor frame，而不是立刻整条 plan 失败。
    - 这些字段的目的，是强制 writer 不要只围着 anchor frame 打转，也不要跳过 bridge。
 
 4. `write`
@@ -266,8 +268,9 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 同时会校验：
 
 - 输出必须是且仅是一个 `<thinking>...</thinking>` 块
-- `thinking` 长度足够
+- `thinking` 长度足够；复杂题的总长度预算会按 plan 复杂度适度放宽
 - `<point>...</point><coord>(x,y)</coord>` 标签数量不能过多
+- 标签数量通常与 `anchor_points` 数一致；复杂题最多可放宽到 `5` 个
 - 至少出现一个 `<point>...</point><coord>(x,y)</coord>` 标签
 - 这些坐标必须与源数据中的 `point_coords_grid` / `grid_coord` 完全一致
 - `<point>` 标签不能单独出现，必须紧跟匹配坐标
@@ -275,11 +278,14 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
   - `midp` 必须明确 midpoint
   - `cyclic` 必须明确 circle / circumcircle / cyclic
   - `cong` 必须明确 equal / congruent / equidistant
-- `plan` 中的 `coordinate_relations` 必须列出 2-3 个具体关系检查，并明确点名对应 visible points
+- `plan` 中的 `coordinate_relations` 必须列出 2-4 个具体关系检查，并明确点名对应 visible points；复杂题应尽量让这些坐标线索覆盖至少 4 个可见点，而不是只围着少量 anchor
+- 当图中存在 anchor 之外的可见点时，`plan` 中的 `coordinate_relations` 还应尽量覆盖其中至少 `2-3` 个非 anchor 点，避免把所有坐标判断都挤在同一个 anchor 局部
+- 如果只是 `anchor_points` 选得过满，脚本现在会优先自动回收会吞掉非 anchor coverage 的多余 anchor；但这不替代 planner 自己去覆盖更广的坐标区域
 - `plan` 中的 `visible_relations` 必须优先复用 visible formal premises 中已有的具体关系，而不是凭空发明高层结构
 - `plan` 中的 `coordinate_hints` 必须说出具体几何关系，不允许空泛描述
 - `plan` 中的 `figure_overview` / `visible_relations` / `bridge_steps` 必须覆盖锚点之外的可见点或子结构
-- `plan` 中的 `aux_direct_relations` 必须只写 aux 的直接后果，不能提前跳到旧图深处
+- writer 正文不能只在前缀里挂一个坐标 cue 就结束；当 plan 较丰富时，正文早段应显式复用这些非 anchor 的坐标线索，并把它们接到 helper / first bridge 上
+- `plan` 中的 `aux_direct_relations` 必须只写 aux 的直接后果，不能提前跳到旧图深处；复杂题可比简单题保留更多直接后果
 - `plan` 中的 `bridge_steps` 必须是结构化桥接步骤，每步至少说明：
   - 这一步得到什么 `relation`
   - 它依赖哪些已有关系 `depends_on`
@@ -386,6 +392,40 @@ python experiments/cot_sft_generation/semantic_review.py \
 
 这样 `summary.json` 里的 `semantic_review_status`、`semantic_pass_rate`、`manual_critical_error_items` 和 `manual_critical_error_rate` 才会与最新语义审读结果一致。
 
+如果是在迭代阶段准备给 Codex 做语义审读，建议先运行：
+
+```bash
+python experiments/cot_sft_generation/semantic_review.py \
+  --run-dir /path/to/run_artifacts \
+  --print-pending \
+  --surface-pass-only \
+  --max-items 20
+```
+
+这样会先列出当前最值得审的待审样本队列，并附上 `source_audit` / `generation_audit` 的问题提示，避免把还没过 surface 的样本和真正值得看语义的样本混在一起。
+
+如果想直接把完整审读上下文交给 Codex，而不是再手工翻 `item_records.jsonl`，可以在 `-v/--verbose` 生成的 run 上继续运行：
+
+```bash
+python experiments/cot_sft_generation/semantic_review.py \
+  --run-dir /path/to/run_artifacts \
+  --print-pending \
+  --print-pending-payloads \
+  --surface-pass-only \
+  --max-items 10
+```
+
+或者导出成独立 JSONL：
+
+```bash
+python experiments/cot_sft_generation/semantic_review.py \
+  --run-dir /path/to/run_artifacts \
+  --surface-pass-only \
+  --export-pending-review-jsonl /path/to/pending_review_payloads.jsonl
+```
+
+注意：payload 模式依赖 `item_records.jsonl`，因此必须来自带 `-v/--verbose` 的 run。
+
 `item_audits.jsonl` 会为每条样本分别记录：
 
 - `goal_type`
@@ -448,6 +488,12 @@ export ZJUVAI_API_RETRY_BACKOFF_SECONDS="3"
 ```
 
 这里的 `ZJUVAI_API_RETRIES` 是单次 API 调用内部对瞬时 `Connection error` / `timeout` / `502/503/504` 的补偿重试，不会替代脚本本身的 stage 级内容校验重试。
+
+注意：planner stage 现在对少数明显可修复的失败类型会额外给 `1-2` 次 bonus retry，主要覆盖：
+
+- 高阶 `angle` / `similar` / `ratio` bridge 的 support/object grounding 还不完整
+- 跳过 prerequisite checkpoint
+- 非 anchor coordinate coverage 仍然太窄
 
 维护相关的最小本地检查：
 

@@ -30,6 +30,7 @@ try:
         audit_source_record,
         bridge_step_relation_realized,
         build_visible_premise_summaries,
+        count_support_relation_mentions,
         coordinate_relation_matches_candidate,
         count_relation_mentions,
         extract_relation_point_names,
@@ -71,6 +72,7 @@ try:
         extract_aux_point_scope,
         extract_high_level_structure_markers,
         extract_point_mentions,
+        extract_relation_segment_tokens,
         extract_problem_goal,
         extract_visible_point_names,
         goal_keyword_hints,
@@ -117,6 +119,7 @@ except ImportError:  # pragma: no cover - script execution path
         audit_source_record,
         bridge_step_relation_realized,
         build_visible_premise_summaries,
+        count_support_relation_mentions,
         coordinate_relation_matches_candidate,
         count_relation_mentions,
         extract_relation_point_names,
@@ -158,6 +161,7 @@ except ImportError:  # pragma: no cover - script execution path
         extract_aux_point_scope,
         extract_high_level_structure_markers,
         extract_point_mentions,
+        extract_relation_segment_tokens,
         extract_problem_goal,
         extract_visible_point_names,
         goal_keyword_hints,
@@ -263,7 +267,12 @@ def configure_logging(log_path=None):
         datefmt="%Y-%m-%d %H:%M:%S",
     )
     logger.setLevel(logging.INFO)
-    logger.handlers.clear()
+    for handler in list(logger.handlers):
+        logger.removeHandler(handler)
+        try:
+            handler.close()
+        except Exception:
+            pass
     logger.propagate = False
 
     stream_handler = logging.StreamHandler(sys.stdout)
@@ -371,11 +380,11 @@ def extract_aux_and_rest(formal_output: str):
     return aux_part, sanitized_rest
 
 
-def validate_coord_tags(thinking_text: str, point_coords):
+def validate_coord_tags(thinking_text: str, point_coords, max_tags=4):
     tagged_points = POINT_TAG_RE.findall(thinking_text)
     if not tagged_points:
         return False, "Missing any <point>...</point><coord>(x,y)</coord> tags"
-    if len(tagged_points) > 4:
+    if len(tagged_points) > max_tags:
         return False, "Too many coordinate tags; keep them sparse and only for key visible points"
 
     seen = {}
@@ -405,7 +414,13 @@ def validate_coord_tags(thinking_text: str, point_coords):
     return True, "Coordinate tags valid"
 
 
-def validate_thinking_response(output_text: str, point_coords, require_coord_tags=True):
+def validate_thinking_response(
+    output_text: str,
+    point_coords,
+    require_coord_tags=True,
+    max_total_len=2200,
+    max_coord_tags=4,
+):
     if not output_text or not output_text.strip():
         return False, "Output is empty"
 
@@ -417,8 +432,8 @@ def validate_thinking_response(output_text: str, point_coords, require_coord_tag
     thinking_text = match.group(1).strip()
     if len(thinking_text) < 80:
         return False, f"<thinking> content too short ({len(thinking_text)} chars, minimum 80)"
-    if len(thinking_text) > 2200:
-        return False, f"<thinking> content too long ({len(thinking_text)} chars, maximum 2200)"
+    if len(thinking_text) > max_total_len:
+        return False, f"<thinking> content too long ({len(thinking_text)} chars, maximum {max_total_len})"
 
     for pattern in FORBIDDEN_THINKING_PATTERNS:
         hit = pattern.search(thinking_text)
@@ -426,7 +441,7 @@ def validate_thinking_response(output_text: str, point_coords, require_coord_tag
             return False, f"Forbidden leakage pattern detected: {hit.group(0)}"
 
     if require_coord_tags and point_coords:
-        ok, message = validate_coord_tags(thinking_text, point_coords)
+        ok, message = validate_coord_tags(thinking_text, point_coords, max_tags=max_coord_tags)
         if not ok:
             return False, message
 
@@ -754,18 +769,19 @@ def validate_relation_list(items, field_name, visible_points, min_len=2, max_len
         )
         if not ok:
             return False, message, None
-        cleaned_item = normalize_relation_surface(cleaned_item)
-        if field_name == "coordinate_relations" and re.search(r"\bsymmetr(?:y|ic)\b|\brotation(?:al)?\b", cleaned_item, re.IGNORECASE):
+        surface_item = cleaned_item.strip()
+        normalized_item = normalize_relation_surface(surface_item)
+        if field_name == "coordinate_relations" and re.search(r"\bsymmetr(?:y|ic)\b|\brotation(?:al)?\b", normalized_item, re.IGNORECASE):
             return False, (
                 f"{field_name}[{idx}] should name concrete equal/parallel/perpendicular/midpoint/collinear cues, "
                 "not high-level symmetry or rotation claims"
             ), None
-        if not relation_keyword_present(cleaned_item):
+        if not relation_keyword_present(normalized_item):
             return False, f"{field_name}[{idx}] must mention a concrete geometric relation", None
-        mentioned = extract_point_mentions(cleaned_item, visible_points)
+        mentioned = extract_point_mentions(normalized_item, visible_points)
         if len(mentioned) < 2:
             return False, f"{field_name}[{idx}] must mention at least two visible points", None
-        cleaned.append(cleaned_item)
+        cleaned.append(surface_item if field_name == "coordinate_relations" else normalized_item)
     return True, None, cleaned
 
 
@@ -827,8 +843,8 @@ def canonicalize_coordinate_relations(items, visible_points, coordinate_candidat
 
     def next_fallback():
         while fallback_queue:
-            candidate = normalize_relation_surface(fallback_queue.pop(0))
-            lowered = candidate.lower()
+            candidate = fallback_queue.pop(0).strip()
+            lowered = normalize_relation_surface(candidate).lower()
             if lowered not in used_lower:
                 return candidate
         return None
@@ -841,16 +857,17 @@ def canonicalize_coordinate_relations(items, visible_points, coordinate_candidat
             point_names=visible_points,
         )
         if ok and cleaned_item:
-            cleaned_item = normalize_relation_surface(cleaned_item)
-            mentioned = extract_point_mentions(cleaned_item, visible_points)
+            surface_item = cleaned_item.strip()
+            normalized_item = normalize_relation_surface(surface_item)
+            mentioned = extract_point_mentions(normalized_item, visible_points)
             if (
-                relation_keyword_present(cleaned_item)
+                relation_keyword_present(normalized_item)
                 and len(mentioned) >= 2
-                and any(coordinate_relation_matches_candidate(cleaned_item, candidate) for candidate in candidates)
+                and any(coordinate_relation_matches_candidate(normalized_item, candidate) for candidate in candidates)
             ):
-                lowered = cleaned_item.lower()
+                lowered = normalized_item.lower()
                 if lowered not in used_lower:
-                    cleaned.append(cleaned_item)
+                    cleaned.append(surface_item)
                     used_lower.add(lowered)
                     continue
         fallback = next_fallback()
@@ -951,7 +968,7 @@ def build_hidden_proof_guidance(
     new_points = {point.lower() for point in extract_aux_new_points(aux_part)}
     raw_clauses = [part.strip() for part in proof_match.group(1).split(";") if part.strip()]
     summaries = []
-    for clause in raw_clauses:
+    for clause_index, clause in enumerate(raw_clauses):
         summary = summarize_aux_clause(clause)
         if not summary:
             continue
@@ -960,10 +977,13 @@ def build_hidden_proof_guidance(
         clause_points = set(re.findall(r"\b([a-z]\w*)\b", lowered))
         summaries.append(
             {
+                "index": clause_index,
                 "summary": summary,
                 "points": clause_points,
                 "has_new_point": bool(clause_points & new_points),
                 "has_goal_point": bool(clause_points & goal_points),
+                "keywords": relation_text_keywords(summary),
+                "segments": extract_relation_segment_tokens(summary),
             }
         )
 
@@ -1040,12 +1060,423 @@ def build_hidden_proof_guidance(
                     break
     finish.reverse()
 
+    ordered_route_relations = build_ordered_hidden_route_relations(
+        summaries,
+        immediate_relations=immediate,
+        route_relations=aux_bridge + bridge + finish,
+    )
+
     return {
         "immediate_aux_consequences": immediate,
         "aux_bridge_relations": aux_bridge,
         "bridge_relations": bridge,
         "goal_finish_relations": finish,
+        "ordered_route_relations": ordered_route_relations,
     }
+
+
+def build_ordered_hidden_route_relations(summaries, immediate_relations, route_relations, max_extra=4):
+    ordered_core = []
+    seen_core = set()
+    for relation in route_relations or []:
+        if not isinstance(relation, str) or not relation.strip():
+            continue
+        lowered = relation.lower().strip()
+        if lowered in seen_core:
+            continue
+        seen_core.add(lowered)
+        ordered_core.append(relation)
+    if not ordered_core:
+        return []
+
+    immediate_order = []
+    seen_immediate = set()
+    for relation in immediate_relations or []:
+        if not isinstance(relation, str) or not relation.strip():
+            continue
+        lowered = relation.lower().strip()
+        if lowered in seen_immediate:
+            continue
+        seen_immediate.add(lowered)
+        immediate_order.append(relation)
+
+    summary_by_relation = {}
+    for item in summaries or []:
+        text = item.get("summary", "")
+        lowered = text.lower().strip()
+        summary_by_relation.setdefault(lowered, item)
+
+    expanded_route = []
+    used_relations = set()
+    added_extra = 0
+    last_route_index = -1
+
+    for relation in ordered_core:
+        lowered_relation = relation.lower().strip()
+        current_item = summary_by_relation.get(lowered_relation)
+        current_index = current_item.get("index", len(summaries) + len(expanded_route)) if current_item else len(summaries) + len(expanded_route)
+        if current_index <= last_route_index:
+            current_index = last_route_index + 1
+
+        current_keywords = relation_text_keywords(relation)
+        current_segments = extract_relation_segment_tokens(relation)
+        grounded_segments = set()
+        for support in immediate_order + expanded_route:
+            grounded_segments.update(extract_relation_segment_tokens(support))
+
+        if current_keywords & {"angle", "ratio", "similar"} and current_segments:
+            missing_segments = current_segments - grounded_segments
+            while missing_segments and added_extra < max_extra:
+                best_item = None
+                best_key = None
+                for item in summaries or []:
+                    candidate_text = item.get("summary", "")
+                    candidate_lower = candidate_text.lower().strip()
+                    if (
+                        not candidate_text
+                        or candidate_lower in used_relations
+                        or candidate_lower == lowered_relation
+                    ):
+                        continue
+                    candidate_index = item.get("index", -1)
+                    if candidate_index >= current_index:
+                        continue
+                    candidate_segments = item.get("segments") or set()
+                    if not candidate_segments or not (candidate_segments & missing_segments):
+                        continue
+                    candidate_keywords = item.get("keywords") or set()
+                    if candidate_keywords & {"ratio", "similar"}:
+                        continue
+                    if not candidate_keywords & {"collinear", "equal", "parallel", "perpendicular", "angle", "circle"}:
+                        continue
+                    covered_missing = len(candidate_segments & missing_segments)
+                    covered_current = len(candidate_segments & current_segments)
+                    distance = current_index - candidate_index
+                    key = (
+                        covered_missing,
+                        covered_current,
+                        -distance,
+                        -len(candidate_text),
+                        candidate_lower,
+                    )
+                    if best_key is None or key > best_key:
+                        best_key = key
+                        best_item = item
+                if best_item is None:
+                    break
+                candidate_text = best_item["summary"]
+                candidate_lower = candidate_text.lower().strip()
+                expanded_route.append(candidate_text)
+                used_relations.add(candidate_lower)
+                grounded_segments.update(best_item.get("segments") or set())
+                missing_segments = current_segments - grounded_segments
+                last_route_index = max(last_route_index, best_item.get("index", last_route_index))
+                added_extra += 1
+
+        if lowered_relation not in used_relations:
+            expanded_route.append(relation)
+            used_relations.add(lowered_relation)
+        if current_item:
+            last_route_index = max(last_route_index, current_item.get("index", last_route_index))
+
+    return expanded_route
+
+
+def compute_plan_complexity_limits(point_coords, visible_goal="", aux_part=None):
+    visible_points = extract_visible_point_names(point_coords or {})
+    aux_points = [point.lower() for point in extract_aux_new_points(aux_part or "")]
+    goal_spec = parse_goal_expression(visible_goal or "")
+    complexity_score = 0
+    if len(visible_points) >= 5:
+        complexity_score += 1
+    if len(aux_points) > 1:
+        complexity_score += 1
+    if goal_spec.get("predicate") in {"eqratio", "simtri", "contri"}:
+        complexity_score += 1
+
+    extended_budget = complexity_score >= 1
+    richer_route_budget = complexity_score >= 2 or len(aux_points) > 1
+    anchor_min = 3 if len(visible_points) >= 3 else len(visible_points)
+    anchor_max = min(5, len(visible_points)) if visible_points else 0
+    if not extended_budget:
+        anchor_max = min(anchor_max, 4)
+    coordinate_coverage_min = 4 if extended_budget and len(visible_points) >= 4 else min(3, len(visible_points))
+    return {
+        "extended_budget": extended_budget,
+        "anchor_min": anchor_min,
+        "anchor_max": anchor_max,
+        "coordinate_relations_min": 2,
+        "coordinate_relations_max": 4 if extended_budget else 3,
+        "visible_relations_min": 2,
+        "visible_relations_max": 5 if extended_budget else 4,
+        "aux_direct_relations_min": 1,
+        "aux_direct_relations_max": 4 if richer_route_budget else 3,
+        "bridge_steps_min": 2,
+        "bridge_steps_max": 5 if richer_route_budget else 4,
+        "depends_on_max": 4 if richer_route_budget else 3,
+        "coordinate_coverage_min": coordinate_coverage_min,
+    }
+
+
+def compute_writer_body_budget(plan=None, injected_prefix=""):
+    anchor_count = len(plan.get("anchor_points") or []) if isinstance(plan, dict) else 0
+    coordinate_count = len(plan.get("coordinate_relations") or []) if isinstance(plan, dict) else 0
+    aux_direct_count = len(plan.get("aux_direct_relations") or []) if isinstance(plan, dict) else 0
+    bridge_count = len(plan.get("bridge_steps") or []) if isinstance(plan, dict) else 0
+
+    total_budget = compute_thinking_total_budget(plan)
+
+    body_budget = 1500
+    body_budget += max(0, bridge_count - 4) * 130
+    body_budget += max(0, anchor_count - 4) * 70
+    body_budget += max(0, coordinate_count - 3) * 60
+    body_budget += max(0, aux_direct_count - 3) * 50
+    body_budget = min(body_budget, 1900)
+
+    if injected_prefix:
+        body_budget = min(body_budget, max(240, total_budget - len(injected_prefix) - 12))
+    return body_budget
+
+
+def compute_thinking_total_budget(plan=None):
+    anchor_count = len(plan.get("anchor_points") or []) if isinstance(plan, dict) else 0
+    coordinate_count = len(plan.get("coordinate_relations") or []) if isinstance(plan, dict) else 0
+    aux_direct_count = len(plan.get("aux_direct_relations") or []) if isinstance(plan, dict) else 0
+    bridge_count = len(plan.get("bridge_steps") or []) if isinstance(plan, dict) else 0
+
+    total_budget = 2200
+    total_budget += max(0, bridge_count - 4) * 160
+    total_budget += max(0, anchor_count - 4) * 90
+    total_budget += max(0, coordinate_count - 3) * 80
+    total_budget += max(0, aux_direct_count - 3) * 70
+    return min(total_budget, 2700)
+
+
+def choose_required_supports_for_bridge_step(step, point_names, max_supports=2):
+    if not isinstance(step, dict):
+        return []
+    relation_text = step.get("approved_route_relation") or step.get("relation", "")
+    if not isinstance(relation_text, str) or not relation_text.strip() or max_supports <= 0:
+        return []
+    dependencies = [
+        dependency
+        for dependency in (step.get("depends_on") or [])
+        if isinstance(dependency, str) and dependency.strip()
+    ]
+    if not dependencies:
+        return []
+    relation_keywords = relation_text_keywords(relation_text)
+    relation_points = extract_point_mentions(relation_text, point_names)
+    next_target_relation = step.get("next_target_relation", "")
+
+    low_level_relation_families = {"collinear", "midpoint", "equal", "parallel", "perpendicular"}
+    exact_semantic_matches = [
+        dependency
+        for dependency in dependencies
+        if relations_semantically_match(dependency, relation_text, point_names)
+    ]
+    if relation_keywords & low_level_relation_families and exact_semantic_matches:
+        exact_semantic_matches = sorted(
+            exact_semantic_matches,
+            key=lambda dependency: (
+                0 if re.search(r"\b(?:look|looks|appear|appears|seem|seems|nearly|midpoint)\b", dependency, re.IGNORECASE) else 1,
+                len(dependency),
+                dependency.lower(),
+            ),
+        )
+        return exact_semantic_matches[:1]
+
+    selected = []
+
+    def append_supports(items):
+        for item in items:
+            if item not in selected:
+                selected.append(item)
+            if len(selected) >= max_supports:
+                break
+
+    if "collinear" in relation_keywords:
+        collinear_dependencies = [
+            dependency
+            for dependency in dependencies
+            if (
+                "collinear" in relation_text_keywords(dependency)
+                and len(extract_point_mentions(dependency, point_names) & relation_points) >= 2
+            )
+        ]
+        append_supports(
+            sorted(
+                collinear_dependencies,
+                key=lambda dependency: (
+                    -len(extract_point_mentions(dependency, point_names) & relation_points),
+                    len(dependency),
+                    dependency.lower(),
+                ),
+            )
+        )
+
+    ranked_dependencies = select_support_relations_for_step(
+        relation_text,
+        dependencies,
+        point_names,
+        next_target_relation=next_target_relation,
+        max_supports=max(len(dependencies), max_supports),
+    )
+    append_supports(ranked_dependencies)
+    append_supports(dependencies)
+    return selected[:max_supports]
+
+
+def compute_bridge_step_min_support_mentions(step):
+    if not isinstance(step, dict):
+        return 0
+    required_supports = [
+        dependency
+        for dependency in (step.get("required_supports") or [])
+        if isinstance(dependency, str) and dependency.strip()
+    ]
+    if not required_supports:
+        return 0
+    relation_text = step.get("approved_route_relation") or step.get("relation", "")
+    relation_keywords = relation_text_keywords(relation_text)
+    if relation_keywords & {"collinear", "similar", "ratio"}:
+        return min(2, len(required_supports))
+    return 1
+
+
+def compute_bridge_step_required_support_cap(step):
+    if not isinstance(step, dict):
+        return 2
+    relation_text = step.get("approved_route_relation") or step.get("relation", "")
+    relation_keywords = relation_text_keywords(relation_text)
+    if relation_keywords & {"angle", "similar", "ratio"}:
+        return 3
+    return 2
+
+
+def rebalance_anchor_points_for_coordinate_coverage(
+    anchor_points,
+    coordinate_relations,
+    visible_points,
+    min_anchor_count,
+    required_non_anchor_coverage,
+):
+    normalized_anchor_points = [
+        point.lower()
+        for point in (anchor_points or [])
+        if isinstance(point, str) and point.strip()
+    ]
+    if required_non_anchor_coverage <= 0 or len(normalized_anchor_points) <= min_anchor_count:
+        return normalized_anchor_points
+
+    relation_mentions = [
+        extract_point_mentions(relation, visible_points)
+        for relation in (coordinate_relations or [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+    if not relation_mentions:
+        return normalized_anchor_points
+
+    all_coordinate_points = set().union(*relation_mentions)
+
+    def compute_non_anchor_mentions(candidate_anchor_points):
+        candidate_anchor_set = set(candidate_anchor_points)
+        mentions = set()
+        for mentioned_points in relation_mentions:
+            mentions.update(
+                point
+                for point in mentioned_points
+                if point not in candidate_anchor_set
+            )
+        return mentions
+
+    best_anchor_points = normalized_anchor_points[:]
+    best_non_anchor_mentions = compute_non_anchor_mentions(best_anchor_points)
+    while (
+        len(best_anchor_points) > min_anchor_count
+        and len(best_non_anchor_mentions) < required_non_anchor_coverage
+    ):
+        best_trial = None
+        best_trial_mentions = best_non_anchor_mentions
+        best_trial_key = None
+        for idx, anchor_point in enumerate(best_anchor_points):
+            trial_anchor_points = (
+                best_anchor_points[:idx] + best_anchor_points[idx + 1:]
+            )
+            trial_non_anchor_mentions = compute_non_anchor_mentions(trial_anchor_points)
+            trial_key = (
+                len(trial_non_anchor_mentions),
+                1 if anchor_point in all_coordinate_points else 0,
+                idx,
+            )
+            if best_trial_key is None or trial_key > best_trial_key:
+                best_trial_key = trial_key
+                best_trial = trial_anchor_points
+                best_trial_mentions = trial_non_anchor_mentions
+        if best_trial is None or len(best_trial_mentions) <= len(best_non_anchor_mentions):
+            break
+        best_anchor_points = best_trial
+        best_non_anchor_mentions = best_trial_mentions
+    return best_anchor_points
+
+
+def find_unsupported_bridge_relation_segments(step, support_relations):
+    if not isinstance(step, dict):
+        return []
+    relation_text = step.get("approved_route_relation") or step.get("relation", "")
+    relation_keywords = relation_text_keywords(relation_text)
+    if not relation_keywords & {"angle", "ratio", "similar"}:
+        return []
+    relation_segments = extract_relation_segment_tokens(relation_text)
+    if not relation_segments:
+        return []
+    grounded_segments = set()
+    for support in support_relations or []:
+        if isinstance(support, str) and support.strip():
+            grounded_segments.update(extract_relation_segment_tokens(support))
+    return sorted(relation_segments - grounded_segments)
+
+
+def find_skipped_prerequisite_route_checkpoint(
+    step,
+    previous_route_position,
+    hidden_route_relations,
+    point_names,
+    previous_bridge_relation="",
+):
+    if not isinstance(step, dict):
+        return ""
+    current_route_position = step.get("approved_route_position")
+    if not isinstance(current_route_position, int) or current_route_position <= previous_route_position + 1:
+        return ""
+    current_relation = step.get("approved_route_relation") or step.get("relation", "")
+    current_keywords = relation_text_keywords(current_relation)
+    if not current_keywords & {"similar", "ratio"}:
+        return ""
+    current_points = extract_point_mentions(current_relation, point_names)
+    dependency_pool = [
+        dependency
+        for dependency in (step.get("depends_on") or [])
+        if isinstance(dependency, str) and dependency.strip()
+    ]
+    if previous_bridge_relation:
+        dependency_pool.append(previous_bridge_relation)
+    skipped_relations = hidden_route_relations[previous_route_position: current_route_position - 1]
+    best_candidate = ("", -1, -1)
+    for skipped_relation in skipped_relations:
+        skipped_keywords = relation_text_keywords(skipped_relation)
+        if not skipped_keywords & {"angle", "ratio", "parallel", "perpendicular", "equal", "collinear"}:
+            continue
+        skipped_points = extract_point_mentions(skipped_relation, point_names)
+        shared_points = current_points & skipped_points
+        if len(shared_points) < 3:
+            continue
+        if any(relations_semantically_match(dependency, skipped_relation, point_names) for dependency in dependency_pool):
+            continue
+        score = (len(shared_points), len(current_keywords & skipped_keywords))
+        if score > best_candidate[1:]:
+            best_candidate = (skipped_relation, score[0], score[1])
+    return best_candidate[0]
 
 
 def validate_plan_response(
@@ -1060,6 +1491,7 @@ def validate_plan_response(
     plan = output_text if isinstance(output_text, dict) else extract_json_object(output_text)
     if not isinstance(plan, dict):
         return False, "Planner must return a single JSON object", None
+    limits = compute_plan_complexity_limits(point_coords, visible_goal=visible_goal, aux_part=aux_part)
 
     required_keys = [
         "anchor_points",
@@ -1080,9 +1512,12 @@ def validate_plan_response(
         return False, f"Planner JSON missing keys: {missing}", None
 
     anchor_points = plan.get("anchor_points")
-    max_anchor_points = min(4, max(3, len(point_coords)))
-    if not isinstance(anchor_points, list) or not (3 <= len(anchor_points) <= max_anchor_points):
-        return False, "anchor_points must be a list with 3 or 4 visible points", None
+    if not isinstance(anchor_points, list) or not (
+        limits["anchor_min"] <= len(anchor_points) <= limits["anchor_max"]
+    ):
+        return False, (
+            f"anchor_points must be a list with {limits['anchor_min']} to {limits['anchor_max']} visible points"
+        ), None
     normalized_points = []
     for point_name in anchor_points:
         if not isinstance(point_name, str):
@@ -1176,15 +1611,15 @@ def validate_plan_response(
         plan.get("coordinate_relations"),
         visible_points,
         coordinate_candidates,
-        min_len=2,
-        max_len=3,
+        min_len=limits["coordinate_relations_min"],
+        max_len=limits["coordinate_relations_max"],
     )
     ok, message, cleaned_relations = validate_relation_list(
         coordinate_relations_seed,
         "coordinate_relations",
         visible_points,
-        min_len=2,
-        max_len=3,
+        min_len=limits["coordinate_relations_min"],
+        max_len=limits["coordinate_relations_max"],
     )
     if not ok:
         return False, message, None
@@ -1194,21 +1629,46 @@ def validate_plan_response(
         plan.get("visible_relations"),
         visible_points,
         visible_premise_summaries,
-        min_len=2,
-        max_len=4,
+        min_len=limits["visible_relations_min"],
+        max_len=limits["visible_relations_max"],
         min_chars=5,
     )
     ok, message, cleaned_visible_relations = validate_relation_list(
         visible_relations_seed,
         "visible_relations",
         visible_points,
-        min_len=2,
-        max_len=4,
+        min_len=limits["visible_relations_min"],
+        max_len=limits["visible_relations_max"],
         min_chars=5,
     )
     if not ok:
         return False, message, None
     cleaned_plan["visible_relations"] = cleaned_visible_relations
+
+    non_anchor_coordinate_coverage_min = min(
+        3 if limits["extended_budget"] else 2,
+        max(0, len(visible_points) - limits["anchor_min"]),
+    )
+    rebalanced_anchor_points = rebalance_anchor_points_for_coordinate_coverage(
+        normalized_points,
+        cleaned_plan["coordinate_relations"],
+        visible_points,
+        limits["anchor_min"],
+        non_anchor_coordinate_coverage_min,
+    )
+    if rebalanced_anchor_points != normalized_points:
+        normalized_points = rebalanced_anchor_points
+        cleaned_plan["anchor_points"] = normalized_points
+        cleaned_plan["anchor_relation"] = build_canonical_anchor_relation(
+            cleaned_plan["anchor_points"],
+            cleaned_plan["visible_relations"],
+        )
+        cleaned_plan["figure_overview"] = build_canonical_figure_overview(
+            cleaned_plan["anchor_points"],
+            cleaned_plan["visible_relations"],
+            cleaned_plan["coordinate_relations"],
+            visible_points,
+        )
 
     if (
         find_forbidden_shape_shorthand(cleaned_plan["anchor_relation"])
@@ -1249,11 +1709,18 @@ def validate_plan_response(
         aux_part,
         visible_points,
         preferred_immediate_aux,
-        min_len=1,
-        max_len=3,
+        min_len=limits["aux_direct_relations_min"],
+        max_len=limits["aux_direct_relations_max"],
     )
-    if not (1 <= len(aux_direct_relations) <= 3):
-        return False, "aux_direct_relations must be a list with 1 to 3 ordered direct consequences", None
+    if not (
+        limits["aux_direct_relations_min"]
+        <= len(aux_direct_relations)
+        <= limits["aux_direct_relations_max"]
+    ):
+        return False, (
+            "aux_direct_relations must be a list with "
+            f"{limits['aux_direct_relations_min']} to {limits['aux_direct_relations_max']} ordered direct consequences"
+        ), None
     cleaned_direct = []
     for idx, step in enumerate(aux_direct_relations):
         ok, message, cleaned_step = validate_descriptive_text(
@@ -1300,10 +1767,15 @@ def validate_plan_response(
         )
 
     bridge_steps = plan.get("bridge_steps")
-    if isinstance(bridge_steps, list) and len(bridge_steps) > 4:
-        bridge_steps = bridge_steps[:4]
-    if not isinstance(bridge_steps, list) or not (2 <= len(bridge_steps) <= 4):
-        return False, "bridge_steps must be a list with 2 to 4 ordered bridge-step objects", None
+    if isinstance(bridge_steps, list) and len(bridge_steps) > limits["bridge_steps_max"]:
+        bridge_steps = bridge_steps[: limits["bridge_steps_max"]]
+    if not isinstance(bridge_steps, list) or not (
+        limits["bridge_steps_min"] <= len(bridge_steps) <= limits["bridge_steps_max"]
+    ):
+        return False, (
+            "bridge_steps must be a list with "
+            f"{limits['bridge_steps_min']} to {limits['bridge_steps_max']} ordered bridge-step objects"
+        ), None
     cleaned_bridge_steps = []
     cleaned_bridge_relations = []
     for idx, step in enumerate(bridge_steps):
@@ -1322,7 +1794,7 @@ def validate_plan_response(
         cleaned_relation = normalize_relation_surface(cleaned_relation)
         if not relation_keyword_present(cleaned_relation):
             return False, f"bridge_steps[{idx}].relation must mention a concrete geometric relation", None
-        depends_on = coerce_relation_list_field(step.get("depends_on"), max_len=3)
+        depends_on = coerce_relation_list_field(step.get("depends_on"), max_len=limits["depends_on_max"])
         cleaned_dependencies = []
         for dep_idx, dependency in enumerate(depends_on):
             ok, message, cleaned_dependency = validate_descriptive_text(
@@ -1385,13 +1857,37 @@ def validate_plan_response(
         visible_premise_summaries,
         cleaned_plan["bridge_relations"] + [cleaned_plan["goal_finish"]],
         visible_points,
-        min_len=2,
-        max_len=4,
+        min_len=limits["visible_relations_min"],
+        max_len=limits["visible_relations_max"],
     )
 
     relation_mentions = extract_point_mentions(" ".join(cleaned_plan["coordinate_relations"]), visible_points)
-    if len(relation_mentions) < 3:
-        return False, "coordinate_relations should collectively cover at least three visible points", None
+    if len(relation_mentions) < limits["coordinate_coverage_min"]:
+        return False, (
+            "coordinate_relations should collectively cover at least "
+            f"{limits['coordinate_coverage_min']} visible points"
+        ), None
+    non_anchor_visible_points = [
+        point for point in visible_points
+        if point not in set(normalized_points)
+    ]
+    non_anchor_visible_point_set = set(non_anchor_visible_points)
+    non_anchor_coordinate_mentions = set()
+    for relation in cleaned_plan["coordinate_relations"]:
+        non_anchor_coordinate_mentions.update(
+            point
+            for point in extract_point_mentions(relation, visible_points)
+            if point in non_anchor_visible_point_set
+        )
+    non_anchor_coordinate_coverage_min = min(
+        3 if limits["extended_budget"] else 2,
+        len(non_anchor_visible_points),
+    )
+    if non_anchor_coordinate_coverage_min and len(non_anchor_coordinate_mentions) < non_anchor_coordinate_coverage_min:
+        return False, (
+            "coordinate_relations should cover at least "
+            f"{non_anchor_coordinate_coverage_min} visible non-anchor points so the route does not stay trapped on the anchor frame"
+        ), None
 
     canonical_coordinate_hint = build_canonical_coordinate_hint(cleaned_plan["coordinate_relations"])
     coordinate_hint_lower = cleaned_plan["coordinate_hints"].lower()
@@ -1442,7 +1938,7 @@ def validate_plan_response(
             ), None
     if sanitized_rest and aux_part:
         proof_guidance = build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal)
-        hidden_route_relations = (
+        hidden_route_relations = proof_guidance.get("ordered_route_relations") or (
             proof_guidance.get("aux_bridge_relations", [])
             + proof_guidance.get("bridge_relations", [])
             + proof_guidance.get("goal_finish_relations", [])
@@ -1462,6 +1958,7 @@ def validate_plan_response(
             for step, match in zip(cleaned_plan["bridge_steps"], route_alignment["matches"]):
                 aligned_step = dict(step)
                 if match:
+                    aligned_step["relation"] = match["relation"]
                     aligned_step["approved_route_relation"] = match["relation"]
                     aligned_step["approved_route_position"] = match["index"] + 1
                 aligned_bridge_steps.append(aligned_step)
@@ -1544,12 +2041,23 @@ def validate_plan_response(
                     return False, f"aux_direct_relations[{idx}] invalid: {message}", None
             if not any(point in cleaned_plan["bridge_relations"][0].lower() for point in new_points):
                 return False, "bridge_steps[0].relation must still reference the auxiliary point while bridging to the old figure", None
-        available_supports = cleaned_plan["visible_relations"] + cleaned_plan["aux_direct_relations"]
+        novelty_supports = cleaned_plan["visible_relations"] + cleaned_plan["aux_direct_relations"]
+        available_supports = (
+            cleaned_plan["coordinate_relations"]
+            + cleaned_plan["visible_relations"]
+            + cleaned_plan["aux_direct_relations"]
+        )
         for idx, step in enumerate(cleaned_plan["bridge_steps"]):
             if idx > 0:
-                available_supports.append(cleaned_plan["bridge_steps"][idx - 1]["relation"])
-            if relation_duplicates_earlier_support(step["relation"], available_supports, known_points):
+                previous_relation = cleaned_plan["bridge_steps"][idx - 1]["relation"]
+                available_supports.append(previous_relation)
+                novelty_supports.append(previous_relation)
+            if relation_duplicates_earlier_support(step["relation"], novelty_supports, known_points):
                 return False, f"bridge_steps[{idx}].relation must advance beyond earlier visible, direct, or bridge relations", None
+            support_cap = min(
+                compute_bridge_step_required_support_cap(step),
+                limits["depends_on_max"],
+            )
             canonical_dependencies = []
             matched_supports = []
             for dependency in step["depends_on"]:
@@ -1564,13 +2072,13 @@ def validate_plan_response(
                 available_supports,
                 known_points,
                 next_target_relation=step.get("next_target_relation", ""),
-                max_supports=min(2, len(available_supports)),
+                max_supports=min(support_cap, len(available_supports)),
             )
             if not matched_supports and preferred_dependencies:
                 matched_supports = preferred_dependencies[:]
                 canonical_dependencies = preferred_dependencies + canonical_dependencies
             if not matched_supports:
-                return False, f"bridge_steps[{idx}].depends_on must reuse an earlier visible, direct, or bridge relation", None
+                return False, f"bridge_steps[{idx}].depends_on must reuse an earlier visible, coordinate, direct, or bridge relation", None
             deduped_dependencies = []
             for dependency in canonical_dependencies:
                 if dependency not in deduped_dependencies:
@@ -1581,12 +2089,42 @@ def validate_plan_response(
             ]
             if not merged_dependencies:
                 merged_dependencies = deduped_dependencies
-            step["depends_on"] = merged_dependencies[:3]
-            step["required_supports"] = (
-                preferred_dependencies[: min(2, len(preferred_dependencies))]
-                if preferred_dependencies else
-                step["depends_on"][: min(2, len(step["depends_on"]))]
+            step["depends_on"] = merged_dependencies[: limits["depends_on_max"]]
+            step["required_supports"] = choose_required_supports_for_bridge_step(
+                step,
+                known_points,
+                max_supports=min(support_cap, len(step["depends_on"])),
             )
+            if not step["required_supports"]:
+                step["required_supports"] = step["depends_on"][: min(support_cap, len(step["depends_on"]))]
+            step["min_support_mentions"] = compute_bridge_step_min_support_mentions(step)
+            unsupported_required_segments = find_unsupported_bridge_relation_segments(
+                step,
+                step["required_supports"],
+            )
+            if len(unsupported_required_segments) > 1:
+                return False, (
+                    f"bridge_steps[{idx}].relation still introduces unsupported angle/ratio/similar segments "
+                    "before they are grounded by required_supports: "
+                    f"{unsupported_required_segments}"
+                ), None
+            previous_route_position = 0
+            previous_bridge_relation = ""
+            if idx > 0:
+                previous_route_position = int(cleaned_plan["bridge_steps"][idx - 1].get("approved_route_position") or 0)
+                previous_bridge_relation = cleaned_plan["bridge_steps"][idx - 1].get("approved_route_relation") or cleaned_plan["bridge_steps"][idx - 1].get("relation", "")
+            skipped_prerequisite = find_skipped_prerequisite_route_checkpoint(
+                step,
+                previous_route_position,
+                hidden_route_relations,
+                known_points,
+                previous_bridge_relation=previous_bridge_relation,
+            )
+            if skipped_prerequisite:
+                return False, (
+                    "bridge_steps should not skip prerequisite hidden-route checkpoints before higher-order similarity or ratio steps; "
+                    f"missing prerequisite: {skipped_prerequisite}"
+                ), None
             if idx < len(cleaned_plan["bridge_steps"]) - 1:
                 next_relation = cleaned_plan["bridge_steps"][idx + 1]["relation"].lower()
                 why_text = step["why_it_helps"].lower()
@@ -1661,11 +2199,7 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
         return False, "Writer body must not contain coord tags"
     if len(body) < 120:
         return False, f"Writer body too short ({len(body)} chars, minimum 120)"
-    max_body_len = 1500
-    if injected_prefix:
-        # Reserve room for the injected prefix, the joining space, and a small
-        # cleanup margin without throwing away large chunks of the 2200-char budget.
-        max_body_len = min(max_body_len, max(200, 2200 - len(injected_prefix) - 12))
+    max_body_len = compute_writer_body_budget(plan=plan, injected_prefix=injected_prefix)
     if len(body) > max_body_len:
         return False, f"Writer body too long ({len(body)} chars, maximum {max_body_len})"
     if re.search(r"\b(I|We|I'm|We'll|I've|we've)\b", body):
@@ -1718,6 +2252,18 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
         for point in (coverage_targets.get("bridge_focus_points") or [])
         if isinstance(point, str) and point.strip()
     ]
+    coordinate_focus_points = [
+        point.lower()
+        for point in (coverage_targets.get("coordinate_focus_points") or [])
+        if isinstance(point, str) and point.strip()
+    ]
+    coordinate_focus_relations = [
+        relation
+        for relation in (coverage_targets.get("coordinate_focus_relations") or [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+    coordinate_reuse_min = int(coverage_targets.get("coordinate_reuse_min") or 0)
+    early_coordinate_reuse_min = int(coverage_targets.get("early_coordinate_reuse_min") or 0)
     coverage_point_pool = []
     for point in (
         (plan.get("anchor_points") or []) if isinstance(plan, dict) else []
@@ -1726,6 +2272,35 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
             point = point.lower().strip()
             if point and point not in coverage_point_pool:
                 coverage_point_pool.append(point)
+    if plan and isinstance(plan.get("coordinate_relations"), list):
+        coordinate_relations = [
+            relation
+            for relation in plan.get("coordinate_relations", [])
+            if isinstance(relation, str) and relation.strip()
+        ]
+        required_coordinate_mentions = coordinate_reuse_min or (1 if coordinate_relations else 0)
+        coordinate_relation_mentions = (
+            count_relation_mentions(body, coordinate_relations, point_names=coverage_point_pool or None)
+            if coordinate_relations else 0
+        )
+        if coordinate_relations and coordinate_relation_mentions < required_coordinate_mentions:
+            if required_coordinate_mentions <= 1:
+                return False, "Writer body must explicitly reuse at least one approved coordinate relation cue after the prefix"
+            return False, (
+                "Writer body must explicitly reuse at least "
+                f"{required_coordinate_mentions} approved coordinate relation cues after the prefix"
+            )
+    if coordinate_focus_relations and early_coordinate_reuse_min:
+        early_body = " ".join(sentences[: min(3, len(sentences))])
+        early_coordinate_mentions = count_relation_mentions(
+            early_body,
+            coordinate_focus_relations,
+            point_names=coverage_point_pool or coordinate_focus_points or None,
+        )
+        if early_coordinate_mentions < early_coordinate_reuse_min:
+            return False, (
+                "Writer early body must connect the bottleneck/helper to at least one approved non-anchor coordinate cue"
+            )
     if opening_focus_points and sentences:
         sentence_points = extract_point_mentions(sentences[0], coverage_point_pool or opening_focus_points)
         if not (sentence_points & set(opening_focus_points)):
@@ -1761,11 +2336,21 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
                 return False, f"Writer body must explicitly realize bridge_steps[{idx}].relation in order"
             sentence = sentences[match_idx]
             required_supports = step.get("required_supports") or step.get("depends_on", [])
-            mentioned_dependencies = count_relation_mentions(sentence, required_supports)
+            mentioned_dependencies = count_support_relation_mentions(
+                sentence,
+                required_supports,
+                point_names=coverage_point_pool or None,
+                target_relation=step.get("approved_route_relation") or step.get("relation", ""),
+            )
             min_support_mentions = step.get("min_support_mentions", 1 if required_supports else 0)
             if mentioned_dependencies < min_support_mentions:
+                support_phrase = (
+                    "at least one approved supporting relation"
+                    if min_support_mentions <= 1 else
+                    f"at least {min_support_mentions} approved supporting relations"
+                )
                 return False, (
-                    f"Writer sentence for bridge_steps[{idx}] must name at least one approved supporting relation"
+                    f"Writer sentence for bridge_steps[{idx}] must name {support_phrase}"
                 )
             focus_points = [
                 point.lower()
@@ -1846,6 +2431,19 @@ def is_transient_api_error(exc):
     return any(marker in message for marker in transient_markers)
 
 
+def should_extend_plan_retry_budget(validation_message, used_bonus_retries, max_bonus_retries=2):
+    if not isinstance(validation_message, str) or not validation_message.strip():
+        return False
+    if used_bonus_retries >= max_bonus_retries:
+        return False
+    extension_markers = [
+        "introduces unsupported angle/ratio/similar segments",
+        "should not skip prerequisite hidden-route checkpoints",
+        "coordinate_relations should cover at least",
+    ]
+    return any(marker in validation_message for marker in extension_markers)
+
+
 def call_model(messages, model_name, temperature=0.2, max_tokens=2048):
     last_exc = None
     for attempt in range(1, DEFAULT_API_CALL_RETRIES + 1):
@@ -1887,10 +2485,13 @@ def run_plan_stage(
 ):
     last_error = None
     last_output = None
+    attempt = 1
+    allowed_retries = max_retries
+    bonus_retries_used = 0
 
-    for attempt in range(1, max_retries + 1):
+    while attempt <= allowed_retries:
         try:
-            logger.info(f"[{stage_name}] Attempt {attempt}/{max_retries}")
+            logger.info(f"[{stage_name}] Attempt {attempt}/{allowed_retries}")
             start = time.time()
             output = call_model(messages, model_name)
             elapsed = time.time() - start
@@ -1917,7 +2518,10 @@ def run_plan_stage(
 
             last_error = message
             logger.warning(f"[{stage_name}] Validation failed: {message}")
-            if attempt < max_retries:
+            if should_extend_plan_retry_budget(message, bonus_retries_used):
+                allowed_retries += 1
+                bonus_retries_used += 1
+            if attempt < allowed_retries:
                 feedback = build_plan_retry_feedback(message, aux_part)
                 messages = messages + [{"role": "user", "content": feedback}]
                 time.sleep(1)
@@ -1925,14 +2529,15 @@ def run_plan_stage(
         except Exception as exc:
             last_error = str(exc)
             logger.error(f"[{stage_name}] API call failed: {exc}")
-            if attempt < max_retries:
+            if attempt < allowed_retries:
                 time.sleep(2)
+        attempt += 1
 
     return {
         "success": False,
         "output": last_output,
         "parsed": None,
-        "attempts_used": max_retries,
+        "attempts_used": attempt - 1,
         "elapsed_seconds": None,
         "error": last_error or "Unknown error",
     }
@@ -2057,10 +2662,13 @@ def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_
     assembled_thinking = None
     if write_result["output"]:
         assembled_thinking = f"<thinking>{injected_prefix} {write_result['output'].strip()}</thinking>"
+        max_coord_tags = min(5, max(1, len(plan_result["parsed"].get("anchor_points") or [])))
         is_valid, message = validate_thinking_response(
             assembled_thinking,
             point_coords=point_coords,
             require_coord_tags=True,
+            max_total_len=compute_thinking_total_budget(plan_result["parsed"]),
+            max_coord_tags=max_coord_tags,
         )
         if not is_valid:
             return {

@@ -3,6 +3,7 @@ import unittest
 from experiments.cot_sft_generation.writer_contracts import (
     build_injected_prefix_block,
     build_plan_coverage_targets,
+    build_prefix_reuse_guidance,
     build_writer_handoff,
     enrich_bridge_steps_with_targets,
 )
@@ -52,6 +53,8 @@ class CotSftWriterContractsTest(unittest.TestCase):
         self.assertIn("e", coverage["goal_points"])
         self.assertTrue(coverage["non_anchor_points"])
         self.assertTrue(coverage["focus_relations"])
+        self.assertEqual(coverage["coordinate_focus_points"], ["d"])
+        self.assertEqual(coverage["coordinate_reuse_min"], 1)
 
     def test_build_writer_handoff_and_prefix_block_include_expected_fields(self):
         plan = {
@@ -79,8 +82,12 @@ class CotSftWriterContractsTest(unittest.TestCase):
             "coverage_targets": {
                 "opening_focus_points": ["d"],
                 "bridge_focus_points": ["d", "e"],
+                "coordinate_focus_points": ["d"],
+                "coordinate_focus_relations": ["points b, c, and d look nearly collinear"],
+                "coordinate_reuse_min": 1,
                 "opening_sentence_hint": "name d in the opening obstacle",
                 "helper_sentence_hint": "name d and e in the helper sentence",
+                "coordinate_sentence_hint": "reuse the d-side collinearity early",
             },
         }
         point_coords = {"a": (0, 0), "b": (2, 0), "c": (1, 2)}
@@ -89,8 +96,65 @@ class CotSftWriterContractsTest(unittest.TestCase):
         prefix = build_injected_prefix_block(plan, point_coords)
 
         self.assertEqual(handoff["bridge_steps"][0]["relation"], "de equals ce")
+        self.assertEqual(handoff["coordinate_focus_points"], ["d"])
         self.assertIn("<point>a</point><coord>(0,0)</coord>", prefix)
         self.assertIn("The visible givens also show that ab equals ac.", prefix)
+
+    def test_build_prefix_reuse_guidance_includes_coordinate_relations(self):
+        plan = {
+            "coordinate_relations": ["point g looks like the midpoint of cd"],
+            "visible_relations": ["line ab is parallel to line cd"],
+        }
+
+        guidance = build_prefix_reuse_guidance(plan)
+
+        self.assertIn("point g looks like the midpoint of cd", guidance)
+        self.assertIn("midpoint-looking point g on cd", guidance)
+        self.assertIn("line ab is parallel to line cd", guidance)
+
+    def test_build_plan_coverage_targets_extends_budget_for_complex_plan(self):
+        plan = {
+            "anchor_points": ["a", "b", "c", "d", "e"],
+            "figure_overview": "points f and g lie on the right side while h, i, and j spread across the lower frame",
+            "coordinate_relations": [
+                "points e, f, and g are collinear",
+                "line hi looks parallel to line cd",
+                "fj looks equal to gi",
+                "points h, i, and j look nearly collinear",
+            ],
+            "visible_relations": [
+                "line ef is parallel to line bg",
+                "fj equals gi",
+                "points h, i, and j are collinear",
+            ],
+            "aux_direct_relations": [
+                "fk equals gk",
+                "line hk is perpendicular to line ij",
+                "h, i, k are collinear",
+                "jk equals hk",
+            ],
+            "bridge_steps": [
+                {"relation": "fk equals hk"},
+                {"relation": "angle fkh equals angle hij"},
+                {"relation": "line hj is parallel to line fg"},
+                {"relation": "fj equals gj"},
+                {"relation": "ratio fj gj equals hi ij"},
+            ],
+            "goal_finish": "eqratio f j h i",
+        }
+
+        coverage = build_plan_coverage_targets(
+            plan,
+            visible_goal="eqratio f j h i",
+            visible_points=["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"],
+        )
+
+        self.assertEqual(len(coverage["bridge_focus_points"]), 5)
+        self.assertLessEqual(len(coverage["focus_relations"]), 5)
+        self.assertIn("f", coverage["non_anchor_points"])
+        self.assertIn("h", coverage["goal_points"])
+        self.assertGreaterEqual(coverage["coordinate_reuse_min"], 1)
+        self.assertTrue(coverage["coordinate_focus_points"])
 
 
 if __name__ == "__main__":

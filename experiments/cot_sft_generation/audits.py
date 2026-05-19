@@ -18,6 +18,7 @@ try:
     from .geometry_text import (
         PROBLEM_BODY_RE,
         build_aux_direct_consequences,
+        extract_relation_signatures,
         extract_aux_new_points,
         extract_aux_point_scope,
         extract_point_mentions,
@@ -34,6 +35,7 @@ except ImportError:  # pragma: no cover - script execution path
     from geometry_text import (
         PROBLEM_BODY_RE,
         build_aux_direct_consequences,
+        extract_relation_signatures,
         extract_aux_new_points,
         extract_aux_point_scope,
         extract_point_mentions,
@@ -201,9 +203,9 @@ def extract_midpoint_relation_signature(text: str):
         return None
     lowered = text.lower().strip()
     midpoint_patterns = [
-        r"(?:point\s+)?([a-z])\s+looks\s+like\s+the\s+midpoint\s+of\s+([a-z])([a-z])",
-        r"(?:point\s+)?([a-z])\s+is\s+the\s+midpoint\s+of\s+([a-z])([a-z])",
-        r"(?:point\s+)?([a-z])\s+appears\s+to\s+be\s+the\s+midpoint\s+of\s+([a-z])([a-z])",
+        r"(?:point\s+)?([a-z])\s+looks\s+like\s+the\s+midpoint\s+of\s+(?:segment\s+)?([a-z])([a-z])\b",
+        r"(?:point\s+)?([a-z])\s+is\s+the\s+midpoint\s+of\s+(?:segment\s+)?([a-z])([a-z])\b",
+        r"(?:point\s+)?([a-z])\s+appears\s+to\s+be\s+the\s+midpoint\s+of\s+(?:segment\s+)?([a-z])([a-z])\b",
     ]
     for pattern in midpoint_patterns:
         match = re.search(pattern, lowered)
@@ -403,10 +405,16 @@ def relation_mentioned_in_text(text: str, relation: str) -> bool:
         return False
     if lowered_relation in lowered_text:
         return True
-    return has_long_ngram_overlap(lowered_relation, lowered_text, ngram_size=3)
+    if {"parallel", "perpendicular", "collinear", "midpoint", "equal"} & relation_text_keywords(relation):
+        return False
+    return has_long_ngram_overlap(lowered_relation, lowered_text, ngram_size=4)
 
 
-def extract_relation_point_names(text: str) -> list[str]:
+def extract_relation_point_names(text: str, point_names=None) -> list[str]:
+    if point_names:
+        explicit_points = extract_point_mentions(text, point_names)
+        if explicit_points:
+            return sorted(explicit_points)
     lowered = (text or "").lower()
     stopwords = {
         "a",
@@ -436,12 +444,24 @@ def extract_relation_point_names(text: str) -> list[str]:
     return sorted(point_names)
 
 
-def relation_semantically_mentioned_in_sentence(sentence: str, relation: str) -> bool:
+def relation_semantically_mentioned_in_sentence(sentence: str, relation: str, point_names=None) -> bool:
     lowered_sentence = (sentence or "").lower()
-    relation_points = extract_relation_point_names(relation)
+    relation_points = extract_relation_point_names(relation, point_names=point_names)
     if not relation_points or not all(point in lowered_sentence for point in relation_points):
         return False
     keywords = relation_text_keywords(relation)
+    sentence_signatures = extract_relation_signatures(sentence)
+    relation_signatures = extract_relation_signatures(relation)
+    structured_signature_required = False
+    for family in ["parallel", "perpendicular", "collinear", "midpoint", "equal"]:
+        if family not in keywords:
+            continue
+        if relation_signatures[family]:
+            structured_signature_required = True
+        if relation_signatures[family] and sentence_signatures[family] & relation_signatures[family]:
+            return True
+    if structured_signature_required:
+        return False
     if "parallel" in keywords and "parallel" in lowered_sentence:
         return True
     if "perpendicular" in keywords and ("perpendicular" in lowered_sentence or "right angle" in lowered_sentence):
@@ -475,11 +495,147 @@ def count_relation_mentions(text: str, relations: Iterable[str], point_names=Non
         if relation_mentioned_in_text(text, relation):
             mentions += 1
             continue
-        if relation_semantically_mentioned_in_sentence(text, relation):
+        if relation_semantically_mentioned_in_sentence(text, relation, point_names=point_names):
             mentions += 1
             continue
-        local_points = point_names or extract_relation_point_names(relation)
+        relation_keywords = relation_text_keywords(relation)
+        if {"parallel", "perpendicular", "collinear", "midpoint", "equal"} & relation_keywords:
+            continue
+        local_points = extract_relation_point_names(relation, point_names=point_names)
         if local_points and relations_semantically_match(text, relation, local_points):
+            mentions += 1
+    return mentions
+
+
+def _support_requires_distinct_grounding_phrase(
+    support: str,
+    target_relation: str,
+    point_names=None,
+) -> bool:
+    if not isinstance(support, str) or not support.strip():
+        return False
+    if not isinstance(target_relation, str) or not target_relation.strip():
+        return False
+    local_points = point_names or extract_relation_point_names(support)
+    if not local_points:
+        return False
+    if not relations_semantically_match(support, target_relation, local_points):
+        return False
+    lowered_support = support.lower()
+    return any(
+        marker in lowered_support
+        for marker in [
+            "look",
+            "looks",
+            "appear",
+            "appears",
+            "seem",
+            "seems",
+            "nearly",
+            "split",
+            "splits",
+            "evenly",
+            "divides",
+            "aligned",
+            "same line",
+            "one line",
+            "line through",
+        ]
+    )
+
+
+def _sentence_has_distinct_support_grounding_phrase(sentence: str, support: str) -> bool:
+    lowered_sentence = (sentence or "").lower()
+    support_keywords = relation_text_keywords(support)
+    grounding_phrases = []
+    if "collinear" in support_keywords:
+        grounding_phrases.extend([
+            "nearly collinear",
+            "same line",
+            "one line",
+            "line through",
+            "aligned",
+        ])
+    if "midpoint" in support_keywords:
+        grounding_phrases.extend([
+            "looks like the midpoint",
+            "appears to be the midpoint",
+            "split",
+            "splits",
+            "evenly",
+            "equal parts",
+            "divides",
+        ])
+    if "parallel" in support_keywords:
+        grounding_phrases.extend(["looks parallel", "appear parallel", "seem parallel"])
+    if "perpendicular" in support_keywords:
+        grounding_phrases.extend(["looks perpendicular", "appear perpendicular", "seem perpendicular"])
+    if "equal" in support_keywords:
+        grounding_phrases.extend(["equal in length", "same length", "looks equal", "appear equal"])
+    if any(phrase in lowered_sentence for phrase in grounding_phrases):
+        return True
+    return any(
+        marker in lowered_sentence
+        for marker in [
+            "look",
+            "looks",
+            "appear",
+            "appears",
+            "seem",
+            "seems",
+            "nearly",
+            "split",
+            "splits",
+            "evenly",
+            "divides",
+            "aligned",
+            "same line",
+            "one line",
+            "line through",
+        ]
+    )
+
+
+def support_relation_grounded_in_sentence(
+    sentence: str,
+    support: str,
+    point_names=None,
+    target_relation: str = "",
+) -> bool:
+    if not isinstance(support, str) or not support.strip():
+        return False
+    mentioned = False
+    if relation_mentioned_in_text(sentence, support):
+        mentioned = True
+    elif relation_semantically_mentioned_in_sentence(sentence, support, point_names=point_names):
+        mentioned = True
+    else:
+        keywords = relation_text_keywords(support)
+        if not {"parallel", "perpendicular", "collinear", "midpoint", "equal"} & keywords:
+            local_points = extract_relation_point_names(support, point_names=point_names)
+            if local_points and relations_semantically_match(sentence, support, local_points):
+                mentioned = True
+    if not mentioned:
+        return False
+    if _support_requires_distinct_grounding_phrase(support, target_relation, point_names=point_names):
+        return _sentence_has_distinct_support_grounding_phrase(sentence, support)
+    return True
+
+
+def count_support_relation_mentions(
+    sentence: str,
+    relations: Iterable[str],
+    point_names=None,
+    target_relation: str = "",
+) -> int:
+    mentions = 0
+    for relation in relations:
+        if support_relation_grounded_in_sentence(
+            sentence,
+            relation,
+            point_names=point_names,
+            target_relation=target_relation,
+        ):
             mentions += 1
     return mentions
 
@@ -687,8 +843,58 @@ def audit_generation_quality(
         if not bridge_relations:
             issues.append("missing_bridge_relations")
         write_output = generation.get("write_output") or ""
+        coordinate_relations = [
+            relation
+            for relation in plan.get("coordinate_relations", [])
+            if isinstance(relation, str) and relation.strip()
+        ]
+        coverage_targets = plan.get("coverage_targets", {}) if isinstance(plan.get("coverage_targets"), dict) else {}
+        anchor_points = {
+            point.lower()
+            for point in (plan.get("anchor_points") or [])
+            if isinstance(point, str) and point.strip()
+        }
+        non_anchor_coordinate_points = []
+        for relation in coordinate_relations:
+            for point in extract_point_mentions(relation, visible_points):
+                point = point.lower()
+                if point in anchor_points or point in non_anchor_coordinate_points:
+                    continue
+                non_anchor_coordinate_points.append(point)
+        coordinate_focus_relations = [
+            relation
+            for relation in (coverage_targets.get("coordinate_focus_relations") or coordinate_relations)
+            if isinstance(relation, str) and relation.strip()
+        ]
+        coordinate_reuse_min = int(coverage_targets.get("coordinate_reuse_min") or (1 if coordinate_relations else 0))
+        early_coordinate_reuse_min = int(coverage_targets.get("early_coordinate_reuse_min") or 0)
+        coordinate_relation_mentions = (
+            count_relation_mentions(write_output, coordinate_relations, point_names=visible_points)
+            if write_output and coordinate_relations else 0
+        )
+        mentioned_coordinate_points = (
+            extract_point_mentions(write_output, non_anchor_coordinate_points)
+            if write_output and non_anchor_coordinate_points else set()
+        )
+        if coordinate_relations and coordinate_relation_mentions == 0:
+            issues.append("coordinate_cues_not_reused_in_body")
+        elif coordinate_relations and coordinate_relation_mentions < coordinate_reuse_min:
+            issues.append(
+                f"coordinate_cue_reuse_too_shallow:{coordinate_relation_mentions}/{coordinate_reuse_min}"
+            )
+        if non_anchor_coordinate_points and not mentioned_coordinate_points:
+            issues.append("non_anchor_coordinate_cues_unused")
         if write_output and isinstance(plan.get("bridge_steps"), list):
             sentences = split_into_sentences(write_output)
+            if early_coordinate_reuse_min and coordinate_focus_relations:
+                early_body = " ".join(sentences[: min(3, len(sentences))])
+                early_coordinate_mentions = count_relation_mentions(
+                    early_body,
+                    coordinate_focus_relations,
+                    point_names=visible_points,
+                )
+                if early_coordinate_mentions < early_coordinate_reuse_min:
+                    issues.append("early_non_anchor_coordinate_cue_missing")
             search_start = 0
             for idx, step in enumerate(plan["bridge_steps"]):
                 match_idx = None
@@ -700,8 +906,19 @@ def audit_generation_quality(
                     issues.append(f"bridge_relation_missing_in_body:{idx}")
                     continue
                 sentence = sentences[match_idx].lower()
+                sentence_text = sentences[match_idx]
                 if any(marker in sentence for marker in generic_bridge_markers):
                     issues.append(f"generic_bridge_phrase:{idx}")
+                required_supports = step.get("required_supports") or step.get("depends_on", [])
+                min_support_mentions = step.get("min_support_mentions", 1 if required_supports else 0)
+                mentioned_dependencies = count_support_relation_mentions(
+                    sentence_text,
+                    required_supports,
+                    point_names=visible_points,
+                    target_relation=step.get("approved_route_relation") or step.get("relation", ""),
+                )
+                if mentioned_dependencies < min_support_mentions:
+                    issues.append(f"bridge_supports_missing_in_body:{idx}")
                 search_start = match_idx + 1
         if isinstance(plan.get("bridge_steps"), list) and plan.get("goal_finish"):
             last_step = plan["bridge_steps"][-1] if plan["bridge_steps"] else None

@@ -184,9 +184,41 @@
 推荐顺序如下：
 
 1. 先生成 run，拿到 `item_audits.jsonl` 和 `semantic_audits.jsonl` 占位文件。
-2. 人工或 Codex 按样本回填 `semantic_audits.jsonl`。
+2. 迭代阶段可先运行：
+
+```bash
+python experiments/cot_sft_generation/semantic_review.py \
+  --run-dir /path/to/run_artifacts \
+  --print-pending \
+  --surface-pass-only \
+  --max-items 20
+```
+
+   - 这会输出当前待审样本队列，默认优先给已经 `surface_pass` 的样本做 Codex 语义审读。
+   - 如果只需要待审索引，`item_audits.jsonl` 就足够。
+   - 如果要直接把完整审读上下文交给 Codex，可继续运行：
+
+```bash
+python experiments/cot_sft_generation/semantic_review.py \
+  --run-dir /path/to/run_artifacts \
+  --print-pending \
+  --print-pending-payloads \
+  --surface-pass-only
+```
+
+   - 或导出为 JSONL：
+
+```bash
+python experiments/cot_sft_generation/semantic_review.py \
+  --run-dir /path/to/run_artifacts \
+  --surface-pass-only \
+  --export-pending-review-jsonl /path/to/pending_review_payloads.jsonl
+```
+
+   - 这两种 payload 模式都依赖 `item_records.jsonl`，因此要求原始 run 是带 `-v/--verbose` 生成的。
+3. 人工或 Codex 按样本回填 `semantic_audits.jsonl`。
    - 具体填写口径见 [SEMANTIC_REVIEW_GUIDE.md](/root/GenesisGeo-cot/experiments/cot_sft_generation/SEMANTIC_REVIEW_GUIDE.md)
-3. 运行：
+4. 运行：
 
 ```bash
 python experiments/cot_sft_generation/semantic_review.py \
@@ -194,7 +226,7 @@ python experiments/cot_sft_generation/semantic_review.py \
   --write-summary
 ```
 
-4. 用刷新后的 `summary.json` 记录：
+5. 用刷新后的 `summary.json` 记录：
    - `semantic_review_status`
    - `semantic_pass_rate`
    - `manual_critical_error_items`

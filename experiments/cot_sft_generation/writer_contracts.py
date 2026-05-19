@@ -193,6 +193,28 @@ def build_relation_reuse_hint(relation_text):
         return ""
     relation = normalize_relation_surface(relation_text).strip().rstrip(".")
     lowered = relation.lower()
+    midpoint_match = re.fullmatch(
+        r"point\s+([a-z]\w*)\s+looks\s+like\s+the\s+midpoint\s+of\s+(?:segment\s+)?([a-z]\w*)([a-z]\w*)",
+        lowered,
+    )
+    if midpoint_match:
+        midpoint = midpoint_match.group(1)
+        end_a = midpoint_match.group(2)
+        end_b = midpoint_match.group(3)
+        return (
+            f"say 'the midpoint-looking point {midpoint} on {end_a}{end_b}' or "
+            f"'{midpoint} appears to split {end_a}{end_b} evenly' instead of repeating it verbatim"
+        )
+    right_triangle_match = re.fullmatch(
+        r"triangle\s+([a-z]\w*)([a-z]\w*)([a-z]\w*)\s+looks\s+right-angled\s+at\s+([a-z]\w*)",
+        lowered,
+    )
+    if right_triangle_match:
+        tri_a, tri_b, tri_c, right_vertex = right_triangle_match.groups()
+        return (
+            f"say 'the sides through {right_vertex} meet at a right angle in triangle {tri_a}{tri_b}{tri_c}' "
+            "instead of repeating it verbatim"
+        )
     concyclic_match = re.fullmatch(
         r"([a-z]\w*)(?:,\s*([a-z]\w*))(?:,\s*([a-z]\w*))(?:,\s*([a-z]\w*)) are concyclic",
         lowered,
@@ -235,26 +257,43 @@ def build_prefix_reuse_guidance(plan):
         return "[]"
     guidance = []
     seen = set()
-    for relation in plan.get("visible_relations", []) or []:
-        if not isinstance(relation, str) or not relation.strip():
-            continue
-        normalized = normalize_relation_surface(relation).strip().rstrip(".")
-        lowered = normalized.lower()
-        if lowered in seen:
-            continue
-        seen.add(lowered)
-        guidance.append(
-            {
-                "already_in_prefix": normalized,
-                "reuse_hint": build_relation_reuse_hint(normalized),
-            }
-        )
+    for field_name in ["coordinate_relations", "visible_relations"]:
+        for relation in plan.get(field_name, []) or []:
+            if not isinstance(relation, str) or not relation.strip():
+                continue
+            normalized = normalize_relation_surface(relation).strip().rstrip(".")
+            lowered = normalized.lower()
+            if lowered in seen:
+                continue
+            seen.add(lowered)
+            guidance.append(
+                {
+                    "already_in_prefix": normalized,
+                    "reuse_hint": build_relation_reuse_hint(normalized),
+                }
+            )
     return json.dumps(guidance, ensure_ascii=False, indent=2) if guidance else "[]"
 
 
-def build_plan_coverage_targets(plan, visible_goal="", visible_points=None, max_points=6, max_relations=4):
+def _uses_extended_coverage_budget(plan):
+    if not isinstance(plan, dict):
+        return False
+    return (
+        len(plan.get("anchor_points") or []) >= 5
+        or len(plan.get("bridge_steps") or []) >= 5
+        or len(plan.get("coordinate_relations") or []) >= 4
+        or len(plan.get("aux_direct_relations") or []) >= 4
+    )
+
+
+def build_plan_coverage_targets(plan, visible_goal="", visible_points=None, max_points=None, max_relations=None):
     if not isinstance(plan, dict):
         return {}
+    extended_budget = _uses_extended_coverage_budget(plan)
+    if max_points is None:
+        max_points = 7 if extended_budget else 6
+    if max_relations is None:
+        max_relations = 5 if extended_budget else 4
     visible_points = [point.lower() for point in (visible_points or []) if isinstance(point, str) and point.strip()]
     anchor_points = [point.lower() for point in (plan.get("anchor_points") or []) if isinstance(point, str) and point.strip()]
     anchor_set = set(anchor_points)
@@ -294,6 +333,10 @@ def build_plan_coverage_targets(plan, visible_goal="", visible_points=None, max_
     point_first_seen = {}
     focus_relations = []
     seen_relations = set()
+    coordinate_point_counts = {}
+    coordinate_point_first_seen = {}
+    coordinate_focus_relations = []
+    seen_coordinate_relations = set()
     for source_label, relation_text, include_in_focus in relation_sources:
         mentioned_points = [
             point for point in extract_point_mentions(relation_text, visible_points)
@@ -318,6 +361,19 @@ def build_plan_coverage_targets(plan, visible_goal="", visible_points=None, max_
                     "points": mentioned_points,
                 }
             )
+        if source_label != "coordinate_relation":
+            continue
+        for point in mentioned_points:
+            coordinate_point_counts[point] = coordinate_point_counts.get(point, 0) + 1
+            coordinate_point_first_seen.setdefault(point, len(coordinate_point_first_seen))
+        if mentioned_points and relation_keyword_present(normalized_relation) and lowered_relation not in seen_coordinate_relations:
+            seen_coordinate_relations.add(lowered_relation)
+            coordinate_focus_relations.append(
+                {
+                    "relation": normalized_relation,
+                    "points": mentioned_points,
+                }
+            )
 
     ranked_non_anchor_points = sorted(
         point_counts,
@@ -330,8 +386,30 @@ def build_plan_coverage_targets(plan, visible_goal="", visible_points=None, max_
     )
     primary_points = ranked_non_anchor_points[:max_points]
     goal_points_outside_anchors = [point for point in ordered_goal_points if point not in anchor_set]
-    opening_focus_points = goal_points_outside_anchors[:3] or primary_points[:3]
-    bridge_focus_points = primary_points[:4]
+    opening_focus_cap = 4 if extended_budget else 3
+    bridge_focus_cap = 5 if extended_budget else 4
+    opening_focus_points = goal_points_outside_anchors[:opening_focus_cap] or primary_points[:opening_focus_cap]
+    bridge_focus_points = primary_points[:bridge_focus_cap]
+    ranked_coordinate_points = sorted(
+        coordinate_point_counts,
+        key=lambda point: (
+            point not in ordered_goal_points,
+            -coordinate_point_counts[point],
+            coordinate_point_first_seen.get(point, 0),
+            point,
+        ),
+    )
+    coordinate_focus_cap = 5 if extended_budget else 4
+    coordinate_focus_points = ranked_coordinate_points[:coordinate_focus_cap]
+    coordinate_focus_relation_cap = 3 if extended_budget else 2
+    coordinate_focus_relation_texts = [
+        item["relation"]
+        for item in coordinate_focus_relations[:coordinate_focus_relation_cap]
+    ]
+    coordinate_reuse_min = 0
+    if coordinate_focus_relation_texts:
+        coordinate_reuse_min = 2 if extended_budget and len(coordinate_focus_relation_texts) >= 2 else 1
+    early_coordinate_reuse_min = 1 if coordinate_focus_relation_texts else 0
 
     reminder_parts = []
     if opening_focus_points:
@@ -342,6 +420,10 @@ def build_plan_coverage_targets(plan, visible_goal="", visible_points=None, max_
         reminder_parts.append(
             f"reconnect the auxiliary route to {join_natural_list(bridge_focus_points)} as the body advances"
         )
+    if coordinate_focus_points:
+        reminder_parts.append(
+            f"keep using coordinate-backed cues around {join_natural_list(coordinate_focus_points)} instead of collapsing back to the anchor frame"
+        )
     reminder = ". ".join(reminder_parts).strip()
     if reminder:
         reminder += "."
@@ -349,12 +431,17 @@ def build_plan_coverage_targets(plan, visible_goal="", visible_points=None, max_
     opening_sentence_hint = ""
     if opening_focus_points:
         opening_sentence_hint = (
-            f"name the obstacle through {join_natural_list(opening_focus_points[:3])} in the first sentence"
+            f"name the obstacle through {join_natural_list(opening_focus_points[:opening_focus_cap])} in the first sentence"
         )
     helper_sentence_hint = ""
     if bridge_focus_points:
         helper_sentence_hint = (
-            f"name the helper through the local configuration around {join_natural_list(bridge_focus_points[:4])} in the second sentence"
+            f"name the helper through the local configuration around {join_natural_list(bridge_focus_points[:bridge_focus_cap])} in the second sentence"
+        )
+    coordinate_sentence_hint = ""
+    if coordinate_focus_points:
+        coordinate_sentence_hint = (
+            f"reuse coordinate-backed cues around {join_natural_list(coordinate_focus_points[:coordinate_focus_cap])} in the helper or first bridge"
         )
 
     return {
@@ -363,9 +450,14 @@ def build_plan_coverage_targets(plan, visible_goal="", visible_points=None, max_
         "non_anchor_points": primary_points,
         "opening_focus_points": opening_focus_points,
         "bridge_focus_points": bridge_focus_points,
+        "coordinate_focus_points": coordinate_focus_points,
+        "coordinate_focus_relations": coordinate_focus_relation_texts,
+        "coordinate_reuse_min": coordinate_reuse_min,
+        "early_coordinate_reuse_min": early_coordinate_reuse_min,
         "focus_relations": focus_relations[:max_relations],
         "opening_sentence_hint": opening_sentence_hint,
         "helper_sentence_hint": helper_sentence_hint,
+        "coordinate_sentence_hint": coordinate_sentence_hint,
         "reminder": reminder,
     }
 
@@ -468,6 +560,7 @@ def build_bridge_step_focus_points(
 def enrich_bridge_steps_with_coverage_targets(plan, visible_points=None):
     if not isinstance(plan, dict) or not isinstance(plan.get("bridge_steps"), list):
         return plan
+    max_focus_points = 5 if _uses_extended_coverage_budget(plan) else 4
     coverage_targets = plan.get("coverage_targets", {}) if isinstance(plan.get("coverage_targets"), dict) else {}
     anchor_points = plan.get("anchor_points") or []
     goal_points = coverage_targets.get("goal_points") or []
@@ -484,6 +577,7 @@ def enrich_bridge_steps_with_coverage_targets(plan, visible_points=None):
             goal_points=goal_points,
             global_non_anchor_points=global_non_anchor_points,
             visible_points=visible_points or [],
+            max_points=max_focus_points,
         )
         enriched["focus_points"] = focus_points
         if focus_points:
@@ -504,6 +598,9 @@ def build_writer_sentence_duties(plan):
     coverage_targets = plan.get("coverage_targets") if isinstance(plan.get("coverage_targets"), dict) else {}
     opening_focus_points = coverage_targets.get("opening_focus_points", [])
     bridge_focus_points = coverage_targets.get("bridge_focus_points", [])
+    coordinate_focus_points = coverage_targets.get("coordinate_focus_points", [])
+    coordinate_focus_relations = coverage_targets.get("coordinate_focus_relations", [])
+    coordinate_reuse_min = int(coverage_targets.get("coordinate_reuse_min") or 0)
     opening_focus_clause = ""
     if opening_focus_points:
         opening_focus_clause = (
@@ -517,11 +614,26 @@ def build_writer_sentence_duties(plan):
             "rather than only restating the anchor frame."
         )
     helper_sentence_hint = coverage_targets.get("helper_sentence_hint", "")
+    coordinate_sentence_hint = coverage_targets.get("coordinate_sentence_hint", "")
+    coordinate_clause = ""
+    if coordinate_focus_relations:
+        cue_label = "cue" if coordinate_reuse_min == 1 else "cues"
+        coordinate_clause = (
+            f" Reuse at least {coordinate_reuse_min} approved coordinate {cue_label} across the early body, such as "
+            f"{join_natural_list(coordinate_focus_relations[:2])}."
+        )
+        if coordinate_focus_points:
+            coordinate_clause += (
+                f" Keep those cues tied to non-anchor points like {join_natural_list(coordinate_focus_points)}."
+            )
+        if coordinate_sentence_hint:
+            coordinate_clause += f" Prefer this shape: {coordinate_sentence_hint}."
     lines = [
         "1. Opening sentence: state the goal-side obstacle directly, using the target relation or the target-side points."
         + opening_focus_clause,
         "2. Helper sentence: restate the approved helper idea impersonally, but do not quote the plan wording word-for-word."
         + helper_focus_clause
+        + coordinate_clause
         + (f" Prefer this shape: {helper_sentence_hint}." if helper_sentence_hint else ""),
         "3. Construction sentence: introduce the auxiliary point from the approved construction, but keep the wording natural rather than copying the plan string verbatim.",
     ]
@@ -660,8 +772,12 @@ def build_writer_handoff(plan):
         "goal_finish": plan.get("goal_finish", ""),
         "opening_focus_points": coverage_targets.get("opening_focus_points", []),
         "bridge_focus_points": coverage_targets.get("bridge_focus_points", []),
+        "coordinate_focus_points": coverage_targets.get("coordinate_focus_points", []),
+        "coordinate_focus_relations": coverage_targets.get("coordinate_focus_relations", []),
+        "coordinate_reuse_min": coverage_targets.get("coordinate_reuse_min", 0),
         "opening_sentence_hint": coverage_targets.get("opening_sentence_hint", ""),
         "helper_sentence_hint": coverage_targets.get("helper_sentence_hint", ""),
+        "coordinate_sentence_hint": coverage_targets.get("coordinate_sentence_hint", ""),
     }
 
 
@@ -684,8 +800,10 @@ def build_writer_sentence_blueprints(plan):
             "sentence_type": "helper",
             "coverage_points": coverage_targets.get("bridge_focus_points", []),
             "preferred_focus_hint": coverage_targets.get("helper_sentence_hint", ""),
+            "coordinate_focus_points": coverage_targets.get("coordinate_focus_points", []),
+            "coordinate_focus_relations": coverage_targets.get("coordinate_focus_relations", []),
             "instruction": (
-                "State the missing helper mechanism impersonally and concretely, and keep it tied to the broader visible figure listed under the coverage points."
+                "State the missing helper mechanism impersonally and concretely, keep it tied to the broader visible figure listed under the coverage points, and start reusing the approved non-anchor coordinate cues instead of dropping back to anchor-only language."
             ),
         },
         {

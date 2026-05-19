@@ -33,6 +33,13 @@ def write_json(path: Path, data: Dict[str, Any]) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+def write_jsonl(path: Path, records: List[Dict[str, Any]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        for record in records:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+
 def read_jsonl(path: Path) -> List[Dict[str, Any]]:
     records: List[Dict[str, Any]] = []
     with open(path, "r", encoding="utf-8") as f:
@@ -168,6 +175,108 @@ def build_semantic_summary_fields(
     }
 
 
+def build_pending_review_queue(
+    item_audits: List[Dict[str, Any]],
+    semantic_audits: List[Dict[str, Any]],
+    surface_pass_only: bool = False,
+    max_items: int | None = None,
+) -> List[Dict[str, Any]]:
+    normalized = validate_semantic_audit_alignment(item_audits, semantic_audits)
+    queue: List[Dict[str, Any]] = []
+    for item_audit, semantic_audit in zip(item_audits, normalized):
+        if semantic_audit.get("semantic_pass") is not None:
+            continue
+        surface_pass = item_audit.get("surface_pass", item_audit.get("success", False))
+        if surface_pass_only and not surface_pass:
+            continue
+        queue.append(
+            {
+                "sample_order": semantic_audit.get("sample_order"),
+                "input_index": semantic_audit.get("input_index"),
+                "goal_type": semantic_audit.get("goal_type"),
+                "aux_type": semantic_audit.get("aux_type"),
+                "surface_pass": surface_pass,
+                "review_recommendation": "review_now" if surface_pass else "fix_surface_first",
+                "source_audit_issues": (item_audit.get("source_audit") or {}).get("issues", []),
+                "generation_audit_issues": (item_audit.get("generation_audit") or {}).get("issues", []),
+            }
+        )
+        if max_items is not None and len(queue) >= max_items:
+            break
+    return queue
+
+
+def validate_item_record_alignment(
+    item_audits: List[Dict[str, Any]],
+    item_records: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    if len(item_audits) != len(item_records):
+        raise ValueError(
+            "item_records.jsonl must have the same number of rows as item_audits.jsonl "
+            "when building review payloads"
+        )
+    normalized: List[Dict[str, Any]] = []
+    for idx, (item_audit, item_record) in enumerate(zip(item_audits, item_records)):
+        expected_pair = (item_audit.get("sample_order"), item_audit.get("input_index"))
+        actual_pair = (item_record.get("sample_order"), item_record.get("input_index"))
+        if expected_pair != actual_pair:
+            raise ValueError(
+                "item_records row "
+                f"{idx} does not align with item_audits row {idx}: "
+                f"expected {expected_pair}, got {actual_pair}"
+            )
+        normalized.append(item_record)
+    return normalized
+
+
+def build_pending_review_payloads(
+    item_records: List[Dict[str, Any]],
+    item_audits: List[Dict[str, Any]],
+    semantic_audits: List[Dict[str, Any]],
+    surface_pass_only: bool = False,
+    max_items: int | None = None,
+) -> List[Dict[str, Any]]:
+    normalized_item_records = validate_item_record_alignment(item_audits, item_records)
+    normalized_semantic_audits = validate_semantic_audit_alignment(item_audits, semantic_audits)
+    payloads: List[Dict[str, Any]] = []
+    for item_record, item_audit, semantic_audit in zip(
+        normalized_item_records,
+        item_audits,
+        normalized_semantic_audits,
+    ):
+        if semantic_audit.get("semantic_pass") is not None:
+            continue
+        surface_pass = item_audit.get("surface_pass", item_audit.get("success", False))
+        if surface_pass_only and not surface_pass:
+            continue
+        payloads.append(
+            {
+                "sample_order": item_record.get("sample_order"),
+                "input_index": item_record.get("input_index"),
+                "goal_type": item_record.get("goal_type"),
+                "aux_type": item_record.get("aux_type"),
+                "surface_pass": surface_pass,
+                "review_recommendation": "review_now" if surface_pass else "fix_surface_first",
+                "context": {
+                    "image_path": item_record.get("image_path", ""),
+                    "public_problem": item_record.get("public_problem", ""),
+                    "aux": item_record.get("aux", ""),
+                    "thinking": item_record.get("thinking"),
+                    "plan_parsed": item_record.get("plan_parsed"),
+                    "write_output": item_record.get("write_output"),
+                    "source_audit": item_record.get("source_audit", {}),
+                    "generation_audit": item_record.get("generation_audit", {}),
+                    "attempts_used": item_record.get("attempts_used"),
+                    "error": item_record.get("error"),
+                },
+                "review_stub": semantic_audit,
+            }
+        )
+        if max_items is not None and len(payloads) >= max_items:
+            break
+    return payloads
+
+
 def refresh_run_summary(run_dir: Path, write_summary: bool = False) -> Dict[str, Any]:
     summary_path = run_dir / "summary.json"
     item_audits_path = run_dir / "item_audits.jsonl"
@@ -201,13 +310,88 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Overwrite summary.json with refreshed semantic review metrics.",
     )
+    parser.add_argument(
+        "--print-pending",
+        action="store_true",
+        help="Print the pending semantic-review queue for iteration-time Codex review.",
+    )
+    parser.add_argument(
+        "--surface-pass-only",
+        action="store_true",
+        help="When printing pending reviews, include only rows that already passed surface checks.",
+    )
+    parser.add_argument(
+        "--max-items",
+        type=int,
+        default=None,
+        help="Optional cap when printing the pending review queue.",
+    )
+    parser.add_argument(
+        "--print-pending-payloads",
+        action="store_true",
+        help="Print full pending review payloads. Requires item_records.jsonl, which is emitted by verbose runs.",
+    )
+    parser.add_argument(
+        "--export-pending-review-jsonl",
+        type=Path,
+        default=None,
+        help="Write full pending review payloads to a JSONL file. Requires item_records.jsonl from a verbose run.",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    summary = refresh_run_summary(args.run_dir.resolve(), write_summary=args.write_summary)
-    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    run_dir = args.run_dir.resolve()
+    summary = refresh_run_summary(run_dir, write_summary=args.write_summary)
+    if not args.print_pending and not args.print_pending_payloads and args.export_pending_review_jsonl is None:
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        return
+
+    item_audits = read_jsonl(run_dir / "item_audits.jsonl")
+    semantic_audits = read_jsonl(run_dir / "semantic_audits.jsonl")
+    pending_reviews = build_pending_review_queue(
+        item_audits,
+        semantic_audits,
+        surface_pass_only=args.surface_pass_only,
+        max_items=args.max_items,
+    )
+    pending_payloads = None
+    if args.print_pending_payloads or args.export_pending_review_jsonl is not None:
+        item_records_path = run_dir / "item_records.jsonl"
+        if not item_records_path.exists():
+            raise FileNotFoundError(
+                "pending review payload export requires item_records.jsonl; rerun generation with --verbose"
+            )
+        item_records = read_jsonl(item_records_path)
+        pending_payloads = build_pending_review_payloads(
+            item_records,
+            item_audits,
+            semantic_audits,
+            surface_pass_only=args.surface_pass_only,
+            max_items=args.max_items,
+        )
+    if args.export_pending_review_jsonl is not None:
+        export_path = args.export_pending_review_jsonl.resolve()
+        write_jsonl(export_path, pending_payloads or [])
+    print(
+        json.dumps(
+            {
+                "summary": summary,
+                "pending_review_items": len(pending_reviews),
+                "surface_pass_only": args.surface_pass_only,
+                "pending_reviews": pending_reviews,
+                "pending_review_payload_items": len(pending_payloads or []),
+                "pending_review_payloads": pending_payloads if args.print_pending_payloads else None,
+                "pending_review_payload_export": (
+                    str(args.export_pending_review_jsonl.resolve())
+                    if args.export_pending_review_jsonl is not None else None
+                ),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
 
 
 if __name__ == "__main__":

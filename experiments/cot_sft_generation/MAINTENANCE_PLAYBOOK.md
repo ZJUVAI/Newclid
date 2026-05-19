@@ -153,6 +153,8 @@
   - 负责：
     - 校验 `semantic_audits.jsonl` 与 `item_audits.jsonl` 是否逐行对齐
     - 刷新 `summary.json` 的 run 级 semantic 指标
+    - 按 `surface_pass` 优先级导出待审样本队列
+    - 在 `item_records.jsonl` 可用时导出完整的 Codex 审读 payload
   - 如果改了语义审读字段、review status 规则、issue code 规则或 summary 汇总逻辑，这里必须和 `ARTIFACT_SCHEMA.md`、`SEMANTIC_REVIEW_GUIDE.md` 同步更新。
 
 - [tests/test_cot_sft_review_artifacts.py](/root/GenesisGeo-cot/tests/test_cot_sft_review_artifacts.py)

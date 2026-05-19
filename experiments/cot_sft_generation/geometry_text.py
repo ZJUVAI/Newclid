@@ -195,6 +195,25 @@ def normalize_relation_surface(text):
         line_p1 = line_match.group(2).lower()
         line_p2 = line_match.group(3).lower()
         return f"{line_p1}, {line_p2}, {point_name} are collinear"
+    natural_collinear_patterns = [
+        r"(?:points?\s+)?([a-z]\w*)\s*,\s*([a-z]\w*)\s*,\s*(?:and\s+)?([a-z]\w*)\s+"
+        r"(?:look|looks|stay|stays|remain|remains|seem|seems|appear|appears|are)\s+"
+        r"(?:still\s+)?(?:nearly\s+)?collinear\.?",
+        r"(?:the\s+)?line\s+through\s+([a-z]\w*)\s*,\s*([a-z]\w*)\s*,\s*(?:and\s+)?([a-z]\w*)\s+"
+        r"(?:look|looks|stay|stays|remain|remains|seem|seems|appear|appears|is|are)\s+"
+        r"(?:still\s+)?(?:nearly\s+)?collinear\.?",
+    ]
+    for pattern in natural_collinear_patterns:
+        natural_collinear_match = re.fullmatch(
+            pattern,
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        if natural_collinear_match:
+            point_a = natural_collinear_match.group(1).lower()
+            point_b = natural_collinear_match.group(2).lower()
+            point_c = natural_collinear_match.group(3).lower()
+            return f"{point_a}, {point_b}, {point_c} are collinear"
     ratio_match = re.fullmatch(
         r"([a-z]{2})\s*:\s*([a-z]{2})\s*=\s*([a-z]{2})\s*:\s*([a-z]{2})",
         normalized,
@@ -263,6 +282,197 @@ def relation_text_keywords(text):
     if re.search(r"\b[a-z]{2}\s*=\s*[a-z]{2}\b", lowered):
         keywords.add("equal")
     return keywords
+
+
+def _canonical_segment_token(token):
+    lowered = (token or "").lower()
+    if len(lowered) == 2:
+        return "".join(sorted(lowered))
+    return lowered
+
+
+def _triangle_edge_tokens(triangle_word):
+    lowered = (triangle_word or "").lower()
+    if len(lowered) != 3:
+        return set()
+    a, b, c = lowered
+    return {
+        _canonical_segment_token(a + b),
+        _canonical_segment_token(a + c),
+        _canonical_segment_token(b + c),
+    }
+
+
+def _pairwise_segment_tokens(points):
+    normalized_points = [str(point).lower() for point in points if isinstance(point, str) and point]
+    tokens = set()
+    for idx, point_a in enumerate(normalized_points):
+        for point_b in normalized_points[idx + 1:]:
+            if len(point_a) == 1 and len(point_b) == 1:
+                tokens.add(_canonical_segment_token(point_a + point_b))
+    return tokens
+
+
+def extract_relation_segment_tokens(text):
+    lowered = normalize_relation_surface(text or "").lower().strip(" ;")
+    if not lowered:
+        return set()
+
+    tokens = set()
+
+    for match in re.finditer(r"angle ([a-z]{2})/([a-z]{2})", lowered):
+        tokens.add(_canonical_segment_token(match.group(1)))
+        tokens.add(_canonical_segment_token(match.group(2)))
+
+    for match in re.finditer(r"ratio ([a-z]{2}) to ([a-z]{2})", lowered):
+        tokens.add(_canonical_segment_token(match.group(1)))
+        tokens.add(_canonical_segment_token(match.group(2)))
+
+    for match in re.finditer(r"\b([a-z]{2})\b equals \b([a-z]{2})\b", lowered):
+        tokens.add(_canonical_segment_token(match.group(1)))
+        tokens.add(_canonical_segment_token(match.group(2)))
+
+    for pattern in [
+        r"line ([a-z]{2}) is parallel to line ([a-z]{2})",
+        r"line ([a-z]{2}) is perpendicular to line ([a-z]{2})",
+        r"([a-z]{2}) looks parallel to ([a-z]{2})",
+        r"([a-z]{2}) looks perpendicular to ([a-z]{2})",
+        r"segments ([a-z]{2}) and ([a-z]{2}) look parallel",
+        r"segments ([a-z]{2}) and ([a-z]{2}) look perpendicular",
+        r"([a-z]{2}) is parallel to ([a-z]{2})",
+        r"([a-z]{2}) is perpendicular to ([a-z]{2})",
+    ]:
+        for match in re.finditer(pattern, lowered):
+            tokens.add(_canonical_segment_token(match.group(1)))
+            tokens.add(_canonical_segment_token(match.group(2)))
+
+    midpoint_patterns = [
+        r"(?:point\s+)?([a-z]\w*)\s+looks\s+like\s+the\s+midpoint\s+of\s+(?:segment\s+)?([a-z])([a-z])\b",
+        r"(?:point\s+)?([a-z]\w*)\s+is\s+the\s+midpoint\s+of\s+(?:segment\s+)?([a-z])([a-z])\b",
+        r"(?:point\s+)?([a-z]\w*)\s+appears\s+to\s+be\s+the\s+midpoint\s+of\s+(?:segment\s+)?([a-z])([a-z])\b",
+        r"(?:point\s+)?([a-z]\w*)\s+appears\s+to\s+split\s+(?:segment\s+)?([a-z]\w*)([a-z]\w*)\s+evenly",
+        r"(?:point\s+)?([a-z]\w*)\s+splits\s+(?:segment\s+)?([a-z]\w*)([a-z]\w*)\s+evenly",
+        r"(?:point\s+)?([a-z]\w*)\s+divides\s+(?:segment\s+)?([a-z]\w*)([a-z]\w*)\s+into\s+two\s+equal\s+parts",
+    ]
+    for pattern in midpoint_patterns:
+        for match in re.finditer(pattern, lowered):
+            midpoint = match.group(1).lower()
+            endpoint_a = match.group(2).lower()
+            endpoint_b = match.group(3).lower()
+            if len(midpoint) == 1 and len(endpoint_a) == 1:
+                tokens.add(_canonical_segment_token(midpoint + endpoint_a))
+            if len(midpoint) == 1 and len(endpoint_b) == 1:
+                tokens.add(_canonical_segment_token(midpoint + endpoint_b))
+            if len(endpoint_a) == 1 and len(endpoint_b) == 1:
+                tokens.add(_canonical_segment_token(endpoint_a + endpoint_b))
+
+    for match in re.finditer(
+        r"([a-z]\w*),\s*([a-z]\w*),\s*([a-z]\w*) are collinear",
+        lowered,
+    ):
+        tokens.update(_pairwise_segment_tokens(match.groups()))
+
+    for match in re.finditer(
+        r"([a-z]\w*),\s*([a-z]\w*),\s*([a-z]\w*),\s*([a-z]\w*) are concyclic",
+        lowered,
+    ):
+        tokens.update(_pairwise_segment_tokens(match.groups()))
+
+    for match in re.finditer(
+        r"triangles?\s+([a-z]{3})\s+and\s+([a-z]{3})\s+are\s+(?:similar|congruent)\b",
+        lowered,
+    ):
+        tokens.update(_triangle_edge_tokens(match.group(1)))
+        tokens.update(_triangle_edge_tokens(match.group(2)))
+
+    for match in re.finditer(
+        r"triangle\s+([a-z]{3})\s+is\s+(?:similar|congruent)\s+to\s+triangle\s+([a-z]{3})\b",
+        lowered,
+    ):
+        tokens.update(_triangle_edge_tokens(match.group(1)))
+        tokens.update(_triangle_edge_tokens(match.group(2)))
+
+    return tokens
+
+
+def extract_relation_signatures(text):
+    raw_lowered = re.sub(r"\[\d{3}\]", "", text or "").strip(" ;").lower()
+    normalized_lowered = normalize_relation_surface(text or "").strip(" ;").lower()
+    search_texts = []
+    for candidate in [raw_lowered, normalized_lowered]:
+        if candidate and candidate not in search_texts:
+            search_texts.append(candidate)
+    signatures = {
+        "collinear": set(),
+        "midpoint": set(),
+        "equal": set(),
+        "parallel": set(),
+        "perpendicular": set(),
+    }
+
+    collinear_patterns = [
+        r"([a-z]\w*),\s*([a-z]\w*),\s*([a-z]\w*) are collinear",
+        r"(?:points?\s+)?([a-z]\w*)\s*,\s*([a-z]\w*)\s*,\s*(?:and\s+)?([a-z]\w*)\s+"
+        r"(?:look|looks|stay|stays|remain|remains|seem|seems|appear|appears|are)\s+"
+        r"(?:still\s+)?(?:nearly\s+)?collinear",
+        r"(?:the\s+)?line\s+through\s+([a-z]\w*)\s*,\s*([a-z]\w*)\s*,\s*(?:and\s+)?([a-z]\w*)\s+"
+        r"(?:look|looks|stay|stays|remain|remains|seem|seems|appear|appears|is|are)\s+"
+        r"(?:still\s+)?(?:nearly\s+)?collinear",
+    ]
+    for lowered in search_texts:
+        for pattern in collinear_patterns:
+            for match in re.finditer(pattern, lowered):
+                signatures["collinear"].add(tuple(sorted(match.groups())))
+
+    midpoint_patterns = [
+        r"(?:point\s+)?([a-z]\w*)\s+looks\s+like\s+the\s+midpoint\s+of\s+(?:segment\s+)?([a-z])([a-z])\b",
+        r"(?:point\s+)?([a-z]\w*)\s+is\s+the\s+midpoint\s+of\s+(?:segment\s+)?([a-z])([a-z])\b",
+        r"(?:point\s+)?([a-z]\w*)\s+appears\s+to\s+be\s+the\s+midpoint\s+of\s+(?:segment\s+)?([a-z])([a-z])\b",
+        r"(?:point\s+)?([a-z]\w*)\s+appears\s+to\s+split\s+(?:segment\s+)?([a-z]\w*)([a-z]\w*)\s+evenly",
+        r"(?:point\s+)?([a-z]\w*)\s+splits\s+(?:segment\s+)?([a-z]\w*)([a-z]\w*)\s+evenly",
+        r"(?:point\s+)?([a-z]\w*)\s+divides\s+(?:segment\s+)?([a-z]\w*)([a-z]\w*)\s+into\s+two\s+equal\s+parts",
+    ]
+    for lowered in search_texts:
+        for pattern in midpoint_patterns:
+            for match in re.finditer(pattern, lowered):
+                midpoint = match.group(1).lower()
+                endpoint_a = match.group(2).lower()
+                endpoint_b = match.group(3).lower()
+                signatures["midpoint"].add((midpoint, tuple(sorted([endpoint_a, endpoint_b]))))
+
+        for match in re.finditer(r"([a-z]{1,2}) equals ([a-z]{1,2})", lowered):
+            signatures["equal"].add(tuple(sorted([
+                _canonical_segment_token(match.group(1)),
+                _canonical_segment_token(match.group(2)),
+            ])))
+
+    parallel_patterns = [
+        r"line ([a-z]{2}) is parallel to line ([a-z]{2})",
+        r"segments ([a-z]{2}) and ([a-z]{2}) look parallel",
+        r"([a-z]{2}) looks parallel to ([a-z]{2})",
+    ]
+    for lowered in search_texts:
+        for pattern in parallel_patterns:
+            for match in re.finditer(pattern, lowered):
+                signatures["parallel"].add(tuple(sorted([
+                    _canonical_segment_token(match.group(1)),
+                    _canonical_segment_token(match.group(2)),
+                ])))
+
+    perpendicular_patterns = [
+        r"line ([a-z]{2}) is perpendicular to line ([a-z]{2})",
+        r"segments ([a-z]{2}) and ([a-z]{2}) look perpendicular",
+        r"([a-z]{2}) looks perpendicular to ([a-z]{2})",
+    ]
+    for lowered in search_texts:
+        for pattern in perpendicular_patterns:
+            for match in re.finditer(pattern, lowered):
+                signatures["perpendicular"].add(tuple(sorted([
+                    _canonical_segment_token(match.group(1)),
+                    _canonical_segment_token(match.group(2)),
+                ])))
+
+    return signatures
 
 
 def extract_high_level_structure_markers(text):
@@ -569,6 +779,8 @@ def relations_semantically_match(text_a, text_b, point_names):
     structure_b = extract_high_level_structure_markers(normalized_b)
     if not (points_a and points_b and keyword_a and keyword_b):
         return False
+    shared_points = points_a & points_b
+    shared_keywords = keyword_a & keyword_b
     exclusive_modalities = [
         "angle",
         "ratio",
@@ -585,8 +797,13 @@ def relations_semantically_match(text_a, text_b, point_names):
             return False
     if ("triangle" in structure_a) != ("triangle" in structure_b):
         return False
-    shared_points = points_a & points_b
-    shared_keywords = keyword_a & keyword_b
+    signatures_a = extract_relation_signatures(normalized_a)
+    signatures_b = extract_relation_signatures(normalized_b)
+    for family in ["collinear", "midpoint", "equal", "parallel", "perpendicular"]:
+        if family not in shared_keywords:
+            continue
+        if signatures_a[family] or signatures_b[family]:
+            return bool(signatures_a[family] & signatures_b[family])
     if "angle" in shared_keywords and len(shared_points) >= 4:
         return True
     if "ratio" in shared_keywords and len(shared_points) >= 4:
@@ -635,15 +852,20 @@ def score_support_relation(support, relation_text, point_names, next_target_rela
     relation_points = extract_point_mentions(relation_text, point_names)
     support_keywords = relation_text_keywords(support)
     relation_keywords = relation_text_keywords(relation_text)
+    support_segments = extract_relation_segment_tokens(support)
+    relation_segments = extract_relation_segment_tokens(relation_text)
     score = 0
     score += 5 * len(support_points & relation_points)
     score += 3 * len(support_keywords & relation_keywords)
+    score += 4 * len(support_segments & relation_segments)
 
     if next_target_relation:
         next_points = extract_point_mentions(next_target_relation, point_names)
         next_keywords = relation_text_keywords(next_target_relation)
+        next_segments = extract_relation_segment_tokens(next_target_relation)
         score += 2 * len(support_points & next_points)
         score += 1 * len(support_keywords & next_keywords)
+        score += 2 * len(support_segments & next_segments)
 
     if "midpoint" in support_keywords and "equal" in relation_keywords and len(support_points & relation_points) >= 2:
         score += 4
@@ -656,6 +878,8 @@ def score_support_relation(support, relation_text, point_names, next_target_rela
 
 def select_support_relations_for_step(relation_text, available_supports, point_names, next_target_relation="", max_supports=2):
     ranked = []
+    relation_segments = extract_relation_segment_tokens(relation_text)
+    next_target_segments = extract_relation_segment_tokens(next_target_relation)
     for support in available_supports:
         if not isinstance(support, str) or not support.strip():
             continue
@@ -667,11 +891,50 @@ def select_support_relations_for_step(relation_text, available_supports, point_n
         )
         if score <= 0:
             continue
-        ranked.append((score, support))
+        ranked.append(
+            (
+                score,
+                support,
+                extract_relation_segment_tokens(support),
+            )
+        )
     ranked.sort(key=lambda item: (-item[0], len(item[1]), item[1].lower()))
 
     selected = []
-    for _, support in ranked:
+    covered_relation_segments = set()
+    covered_next_target_segments = set()
+
+    if relation_segments or next_target_segments:
+        remaining = ranked[:]
+        while remaining and len(selected) < max_supports:
+            best_item = None
+            best_key = None
+            for item in remaining:
+                score, support, support_segments = item
+                new_relation_segments = len((support_segments & relation_segments) - covered_relation_segments)
+                new_next_target_segments = len((support_segments & next_target_segments) - covered_next_target_segments)
+                key = (
+                    new_relation_segments,
+                    new_next_target_segments,
+                    score,
+                    -len(support),
+                    support.lower(),
+                )
+                if best_key is None or key > best_key:
+                    best_key = key
+                    best_item = item
+            if best_item is None:
+                break
+            score, support, support_segments = best_item
+            if support not in selected:
+                selected.append(support)
+                covered_relation_segments.update(support_segments & relation_segments)
+                covered_next_target_segments.update(support_segments & next_target_segments)
+            remaining = [item for item in remaining if item[1] != support]
+            if best_key and best_key[0] <= 0 and best_key[1] <= 0:
+                break
+
+    for _, support, _ in ranked:
         if support not in selected:
             selected.append(support)
         if len(selected) >= max_supports:

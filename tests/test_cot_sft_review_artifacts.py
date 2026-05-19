@@ -13,8 +13,11 @@ from experiments.cot_sft_generation.run_artifacts import (
     build_semantic_audit_stub,
 )
 from experiments.cot_sft_generation.semantic_review import (
+    build_pending_review_payloads,
+    build_pending_review_queue,
     build_semantic_summary_fields,
     refresh_run_summary,
+    validate_item_record_alignment,
     validate_semantic_audit_alignment,
 )
 
@@ -243,6 +246,132 @@ class CotSftReviewArtifactsTest(unittest.TestCase):
         self.assertEqual(summary_fields["semantic_reviewed_items"], 1)
         self.assertEqual(summary_fields["semantic_pass_rate"], 1.0)
         self.assertEqual(summary_fields["manual_critical_error_rate"], 0.0)
+
+    def test_build_pending_review_queue_prioritizes_surface_pass_items(self):
+        item_audits = [
+            {
+                "sample_order": 0,
+                "input_index": 1,
+                "goal_type": "eqangle",
+                "aux_type": "single_point",
+                "surface_pass": True,
+                "source_audit": {"issues": []},
+                "generation_audit": {"issues": ["generic_bridge_phrase:0"]},
+            },
+            {
+                "sample_order": 1,
+                "input_index": 2,
+                "goal_type": "eqratio",
+                "aux_type": "multi_point",
+                "surface_pass": False,
+                "source_audit": {"issues": ["missing_image"]},
+                "generation_audit": {"issues": ["bridge_relation_missing_in_body:1"]},
+            },
+        ]
+        semantic_audits = [
+            {
+                "sample_order": 0,
+                "input_index": 1,
+                "goal_type": "eqangle",
+                "aux_type": "single_point",
+                "surface_pass": True,
+                "semantic_pass": None,
+                "review_checklist_version": SEMANTIC_REVIEW_CHECKLIST_VERSION,
+                "issue_codes": [],
+                "issues": [],
+            },
+            {
+                "sample_order": 1,
+                "input_index": 2,
+                "goal_type": "eqratio",
+                "aux_type": "multi_point",
+                "surface_pass": False,
+                "semantic_pass": None,
+                "review_checklist_version": SEMANTIC_REVIEW_CHECKLIST_VERSION,
+                "issue_codes": [],
+                "issues": [],
+            },
+        ]
+
+        queue = build_pending_review_queue(item_audits, semantic_audits, surface_pass_only=True)
+
+        self.assertEqual(len(queue), 1)
+        self.assertEqual(queue[0]["sample_order"], 0)
+        self.assertEqual(queue[0]["review_recommendation"], "review_now")
+        self.assertEqual(queue[0]["generation_audit_issues"], ["generic_bridge_phrase:0"])
+
+    def test_build_pending_review_payloads_includes_context_and_stub(self):
+        item_records = [
+            {
+                "sample_order": 0,
+                "input_index": 1,
+                "goal_type": "eqangle",
+                "aux_type": "single_point",
+                "image_path": "img.png",
+                "public_problem": "<problem>...</problem>",
+                "aux": "<aux>...</aux>",
+                "thinking": "<thinking>...</thinking>",
+                "plan_parsed": {"anchor_points": ["a", "b", "c"]},
+                "write_output": "body",
+                "source_audit": {"issues": []},
+                "generation_audit": {"issues": ["coordinate_cues_not_reused_in_body"]},
+                "attempts_used": 2,
+                "error": None,
+            }
+        ]
+        item_audits = [
+            {
+                "sample_order": 0,
+                "input_index": 1,
+                "goal_type": "eqangle",
+                "aux_type": "single_point",
+                "surface_pass": True,
+                "source_audit": {"issues": []},
+                "generation_audit": {"issues": ["coordinate_cues_not_reused_in_body"]},
+            }
+        ]
+        semantic_audits = [
+            {
+                "sample_order": 0,
+                "input_index": 1,
+                "goal_type": "eqangle",
+                "aux_type": "single_point",
+                "surface_pass": True,
+                "semantic_pass": None,
+                "review_checklist_version": SEMANTIC_REVIEW_CHECKLIST_VERSION,
+                "issue_codes": [],
+                "issues": [],
+            }
+        ]
+
+        payloads = build_pending_review_payloads(
+            item_records,
+            item_audits,
+            semantic_audits,
+            surface_pass_only=True,
+        )
+
+        self.assertEqual(len(payloads), 1)
+        self.assertEqual(payloads[0]["review_recommendation"], "review_now")
+        self.assertEqual(payloads[0]["context"]["public_problem"], "<problem>...</problem>")
+        self.assertEqual(
+            payloads[0]["context"]["generation_audit"]["issues"],
+            ["coordinate_cues_not_reused_in_body"],
+        )
+        self.assertIsNone(payloads[0]["review_stub"]["semantic_pass"])
+
+    def test_validate_item_record_alignment_rejects_misaligned_rows(self):
+        item_audits = [
+            {"sample_order": 0, "input_index": 1, "goal_type": "eqangle", "aux_type": "single_point"}
+        ]
+        item_records = [
+            {"sample_order": 3, "input_index": 1, "goal_type": "eqangle", "aux_type": "single_point"}
+        ]
+
+        with self.assertRaises(ValueError) as ctx:
+            validate_item_record_alignment(item_audits, item_records)
+
+        self.assertIn("does not align", str(ctx.exception))
 
     def test_validate_semantic_audit_alignment_rejects_unknown_issue_code(self):
         item_audits = [
