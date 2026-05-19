@@ -80,6 +80,24 @@
   - 最后两步经常形式上落到 goal，实际上并没有形成可信闭环
 - 这说明当前 validator 更擅长控制 surface quality，还不擅长识别“看起来顺，但几何上不成立”的桥接句。
 
+### 阶段 7：observation-first skeleton 与 observation-cue reuse 落地
+
+- 2026-05-19 之后，当前实现又沿着“不要先锁死 anchor frame”这个方向继续推进，已经落库的关键提交包括：
+  - `72f9fc0`：`Add hybrid scripted planner for cot_sft generation`
+  - `02edce3`：`Add observation-first plan skeleton support`
+  - `9203395`：`Observation-first writer prefix and coverage contracts`
+  - `ab9e26c`：`Enforce observation cue reuse in writer validation and audits`
+- 当前真实变化不是小调 prompt，而是三层同时变化：
+  - `plan` 阶段支持 `hybrid`，先由脚本生成 observation-first skeleton，再让 planner 展开
+  - writer prefix 改成 observation sentence -> overview -> orientation -> coordinate -> visible
+  - validator / `generation audit` 新增 observation cue reuse 检查，要求正文尤其是前 `3` 句必须真的接回 approved observation cues
+- 当前证据：
+  - `python -m unittest discover -s tests -p 'test_cot_sft_*.py'`
+    - 当前结果：`Ran 93 tests ... OK`
+  - `python experiments/cot_sft_generation/maintenance_smoke_check.py`
+    - 当前结果：全部检查通过
+- 这一步的作用不是直接证明语义质量已经够好，而是把“visual cue 只停留在 prefix、正文又退回 anchor-only narration”这个已知失败模式正式收进实现与回归基线。
+
 ## 当前流程概括
 
 1. 输入处理
@@ -92,11 +110,13 @@
 
 3. `plan` 生成
    - 教师模型先输出一个结构化 JSON，而不是直接写整段 CoT。
-   - 关键字段包括 `anchor_points`、`figure_overview`、`coordinate_hints`、`aux_direct_relations`、`bridge_steps`、`goal_finish`。
+   - 当前推荐 `hybrid`：脚本先给 observation-first skeleton，再由 planner 展开。
+   - 关键字段包括 `anchor_points`、`observation_relations`、`figure_overview`、`coordinate_hints`、`aux_direct_relations`、`bridge_steps`、`goal_finish`。
    - hidden 坐标和 hidden proof 只用于约束这条链要可解、贴近真实路线，不允许直接暴露到最终文本。
    - `plan` 字段说明：
-   - `anchor_points`：通常选 3 到 4 个可见点，复杂题可放宽到 5 个，作为最终 `thinking` 里打标签的坐标锚点。
+   - `anchor_points`：通常选 3 到 4 个可见点，复杂题可放宽到 5 个，作为最终 `thinking` 里打标签的坐标锚点；当前不再要求它们主导起手观察。
    - `anchor_relation`：围绕这些 anchor points 的一句核心可见关系，用来给整张图定向。
+   - `observation_relations`：先从图上局部区域抽出的 visual cue，例如近共线、中点感、局部平行/垂直；这些 cue 后续应真正进入正文。
    - `figure_overview`：对锚点之外的图形结构做简短概览，补充相关点和子结构。
    - `coordinate_relations`：基于 visible point 坐标提炼出的 2 到 4 个具体关系检查，如共线、垂直、中点、等长；复杂题默认应尽量覆盖至少 4 个可见点。
    - `visible_relations`：题面里已有、后续推理应主动复用的可见 formal relations。
@@ -115,8 +135,9 @@
 
 5. writer 生成正文
    - writer 只负责写正文 body，不允许自己写 `<point>` / `<coord>` 标签。
-   - anchor 坐标句、图形概览句、coordinate hint 句、visible relation 句由脚本自动注入成前缀。
+   - observation 句、图形概览句、orientation/anchor 句、coordinate hint 句、visible relation 句由脚本自动注入成前缀。
    - writer 要从 bottleneck 开始，按 `aux_direct_relations -> bridge_steps -> goal_finish` 往后写，避免重复前缀。
+   - 当前 validator 还会额外要求：如果 plan 有 approved observation cues，正文和前 `3` 句必须真的把它们接回推理链。
 
 6. 终组装与终检
    - 脚本把前缀和 writer body 组装成最终 `<thinking>...</thinking>`。

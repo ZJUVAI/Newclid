@@ -84,6 +84,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
    - 生成期可以使用 `point_coords_grid` / `grid_coord` 做内部 sanity check。
    - 坐标的作用应当是帮助教师模型确认哪些平行、垂直、等长、中点、共线、圆结构值得进一步追踪，而且这些判断不应只围着少数 anchor 点打转。
    - 最终 `thinking` 中的坐标标签只是一层可见锚定；高质量样本还应当体现这些坐标支持的几何关系确实进入了推理链，尤其要能覆盖 anchor 之外的 goal-side / outer visible points。
+   - 当前实现已经进一步要求：先形成 `observation_relations` 这类局部 visual cue，再由脚本和 planner 把它们接回 `coordinate_relations`、bridge 路线和最终正文；不能只是先固定 anchor point，然后把后续几何关系与坐标和局部区域脱钩。
 
 5. 需要包含从提出 aux 到解答出 goal 的完整逻辑
    - 高质量样本不能只说明“为什么要加这个点”，还要继续写清楚加点之后的关键关系如何逐步推进到最终结论。
@@ -204,8 +205,10 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 2. `plan`
    - planner 只输出结构化 JSON，不直接写整段 `thinking`。
+   - 默认推荐 `--plan-mode hybrid`：脚本先生成 observation-first skeleton，再让 planner 展开。
    - 关键字段包括：
      - `anchor_points`
+     - `observation_relations`
      - `figure_overview`
      - `coordinate_relations`
      - `visible_relations`
@@ -218,6 +221,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 
 3. 脚本补全中间约束
    - 自动派生 `coverage_targets`，把 goal-side 非锚点区域显式交给 writer。
+   - 自动把 observation cues 变成 `observation_focus_relations` / `observation_focus_regions`，要求 writer 前段真的接回这些局部 visual cue。
    - 为每个 `bridge_steps[*]` 自动补：
      - `next_target_relation`
      - `next_target_purpose`
@@ -231,8 +235,9 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
 4. `write`
    - writer 只写 body 纯文本，不允许自己写 `<point>` / `<coord>`。
    - 脚本会先注入 prefix：
-     - anchor sentence
+     - observation sentence
      - figure overview sentence
+     - orientation / anchor sentence
      - coordinate hint sentence
      - visible relation sentence
    - writer 实际吃到的是紧凑版 `Approved Writer Handoff`，而不是整份冗长 plan。
@@ -247,6 +252,7 @@ datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl
      - 长度和格式
      - prefix 重复
      - shorthand / 泄露
+     - observation cue 是否真的在正文里被复用，尤其是前 3 句
      - bridge relation 是否逐句按顺序落实
      - `goal_finish` 是否真的落地
 

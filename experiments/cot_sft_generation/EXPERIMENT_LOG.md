@@ -2,6 +2,69 @@
 
 本文件用于实时记录 `experiments/cot_sft_generation` 近期实验、证据和当前运行状态。
 
+## 2026-05-19 observation-first 补充快照
+
+### 最近提交
+
+- `ab9e26c` `Enforce observation cue reuse in writer validation and audits`
+  - 目标：把“observation cue 只停在 prefix，正文重新退回 anchor-only narration”正式收进 validator 和 `generation audit`。
+  - 新增内容：
+    - writer body 必须复用至少一个 approved observation cue
+    - 前 `3` 句必须尽早接回 observation cue
+    - retry feedback 明确回灌 `observation_focus_relations` / `observation_focus_regions`
+    - `generation audit` 新增：
+      - `observation_cues_not_reused_in_body`
+      - `early_observation_cue_missing`
+  - 验证：
+    - `python -m unittest discover -s tests -p 'test_cot_sft_*.py'`
+      - 当前结果：`Ran 93 tests ... OK`
+    - `python experiments/cot_sft_generation/maintenance_smoke_check.py`
+      - 当前结果：全部检查通过
+
+- `9203395` `Observation-first writer prefix and coverage contracts`
+  - 目标：把 writer 入口从 anchor-first 改成 observation-first。
+  - 新增内容：
+    - prefix 顺序改成：
+      - observation sentence
+      - figure overview sentence
+      - orientation / anchor sentence
+      - coordinate hint sentence
+      - visible relation sentence
+    - `coverage_targets` / handoff 新增：
+      - `observation_focus_relations`
+      - `observation_focus_regions`
+      - `goal_side_relation_chain`
+      - `bridge_side_relation_chain`
+  - 作用：writer 不再一上来默认重新讲 anchor frame，而是先延续已批准的局部 visual cue。
+
+- `02edce3` `Add observation-first plan skeleton support`
+  - 目标：把 plan skeleton 本身改成 observation-first，而不是先定 anchor 再补外层关系。
+  - 新增内容：
+    - `observation_relations`
+    - `build_observation_relations_for_skeleton(...)`
+    - `select_anchor_points_from_observations(...)`
+  - 作用：当前 skeleton 顺序变成：
+    - 先 observation cues
+    - 再 coordinate relations
+    - 再最小 anchor frame
+
+- `72f9fc0` `Add hybrid scripted planner for cot_sft generation`
+  - 目标：把“脚本给 skeleton + 模型补 narrative”正式作为 `plan-mode hybrid` 落库。
+  - 作用：后续不必再让 planner 从零开始生成整份 plan。
+
+### 当前判断
+
+- 这几次提交的意义，不是证明数据已经达到 `semantic_pass`，而是把之前人工审读里反复出现的一个具体失败模式收进实现：
+  - prefix 里虽然写了 visual / coordinate cue
+  - 但正文起手又掉回 anchor-only narration
+  - 于是 cue 并没有真正进入后续 bridge 链
+- 当前 observation-first 改造已经贯通到：
+  - `hybrid` plan skeleton
+  - writer prefix / handoff
+  - validator
+  - `generation audit`
+- 下一步真正有价值的证据，不是再看 unittest，而是跑新的 live generation，并结合图片和原题审读 observation cue 是否真的进入了后续推理链。
+
 ## 2026-05-18 当前快照
 
 ### 最近提交

@@ -41,7 +41,25 @@
 
 ### 2.3 `plan` 阶段
 
-这一步调用 planner 模型，先产出结构化 JSON，而不是直接写整段 `thinking`。
+这一步已经支持两种模式：
+
+- `llm`
+  - planner 直接从 prompt 产出完整结构化 JSON。
+- `hybrid`
+  - 脚本先生成 observation-first 的 skeleton。
+  - planner 再只负责把 skeleton 展开成自然语言化、route-aware 的正式 plan。
+  - 最后脚本再统一做规范化、route 对齐和 coverage 补全。
+
+当前推荐模式是 `hybrid`，因为它能把“先观察图上局部关系，再决定 anchor 和桥接路线”这件事固定下来，而不是把起手观察完全交给模型自由发挥。
+
+当前 skeleton 的顺序已经改成：
+
+1. 先整理 `observation_relations`
+2. 再派生 `coordinate_relations`
+3. 再选择最小 `anchor_points`
+4. 再组装 `figure_overview`、`goal_bottleneck`、`helper_idea`、`bridge_steps`
+
+也就是说，anchor 现在只负责最终文本中的定向和坐标标注，不再是 plan 的起点。
 
 `plan` 的原始必填字段如下：
 
@@ -58,43 +76,52 @@
    - 格式：`str`
    - 含义：锚点之外的整图概览，必须把注意力扩展到和目标相关的其他可见点或子结构。
 
-4. `coordinate_relations`
+4. `observation_relations`
+   - 格式：`list[object]`
+   - 长度：通常 `1` 到 `3`
+   - 每个对象至少包含：
+     - `relation: str`
+     - `points: list[str]`
+   - 含义：先从图上值得优先盯住的局部几何 cue 出发，例如近共线、中点感、局部平行或局部垂直。
+   - 要求：这些 cue 最终必须能回收到 visible points 与坐标支持，而不是纯高层形状判断。
+
+5. `coordinate_relations`
    - 格式：`list[str]`
    - 长度：`2` 到 `3`
    - 含义：由 visible-point 坐标支持的具体关系检查。
    - 要求：必须 grounded 在脚本内部算出的 coordinate candidates 上，不能随意发明。
 
-5. `visible_relations`
+6. `visible_relations`
    - 格式：`list[str]`
    - 长度：`2` 到 `4`
    - 含义：题面里已有、后续桥接应该主动复用的可见 formal relations。
 
-6. `coordinate_hints`
+7. `coordinate_hints`
    - 格式：`str`
    - 含义：把 `coordinate_relations` 转成自然语言提示。
    - 要求：不能说 `coordinate table`，也不能用 `symmetry`、`midpoint property` 这种偷懒话术。
 
-7. `goal_bottleneck`
+8. `goal_bottleneck`
    - 格式：`str`
    - 含义：当前图到 visible goal 之间真正缺的那一步。
 
-8. `helper_idea`
+9. `helper_idea`
    - 格式：`str`
    - 含义：需要什么辅助机制，例如等长转移、角对齐、比例桥接。
    - 要求：还不能提前说出新点名字。
 
-9. `construction`
+10. `construction`
    - 格式：`str`
    - 含义：正式引入 aux。
    - 多点 aux 时：必须写出 staged strategy，例如 `first ... then ...`。
 
-10. `aux_direct_relations`
+11. `aux_direct_relations`
     - 格式：`list[str]`
     - 长度：通常 `1` 到 `3`；多点 aux 或更复杂题型允许放宽到 `4`
     - 含义：构造一完成就直接成立的局部后果。
     - 要求：必须是 immediate consequences，不能跳进旧图深处。
 
-11. `bridge_steps`
+12. `bridge_steps`
     - 格式：`list[object]`
     - 长度：通常 `2` 到 `4`；复杂题允许放宽到 `5`
     - 每个对象至少包含：
@@ -103,7 +130,7 @@
       - `why_it_helps: str`
     - 含义：把 aux 的直接后果重新接回旧图，并逐步推到目标前一跳。
 
-12. `goal_finish`
+13. `goal_finish`
     - 格式：`str`
     - 含义：最后必须明确落到的 goal-side relation。
 
@@ -116,6 +143,7 @@
 1. 基础 schema 校验
    - 字段是否齐全
    - `anchor_points` 是否在复杂度自适应预算内，通常是 `3/4`，复杂题可放宽到 `5`
+   - `observation_relations` 是否 point-grounded，是否真的是局部 visual cue，而不是空泛结构标签
    - `coordinate_relations` 是否在复杂度自适应预算内，通常是 `2/3`，复杂题可放宽到 `4`
    - `bridge_steps` 是否在复杂度自适应预算内，通常是 `2` 到 `4`，复杂题可放宽到 `5`
    - `coordinate_relations` 是否覆盖足够多的可见点；复杂题默认要求至少覆盖 `4` 个可见点，而不是只围着少量 anchor 打转
@@ -132,6 +160,7 @@
 
 4. 脚本自动补充的派生字段
    - `bridge_relations`
+   - canonicalized `observation_relations`
    - `coverage_targets`
    - 每个 `bridge_steps[*]` 上的：
      - `next_target_relation`
@@ -143,7 +172,7 @@
 
 ### 2.5 `coverage_targets` 是什么
 
-这是脚本根据 `figure_overview`、`visible_relations`、`bridge_steps`、`goal_finish` 自动派生出来的全图覆盖目标。
+这是脚本根据 `figure_overview`、`observation_relations`、`visible_relations`、`bridge_steps`、`goal_finish` 自动派生出来的全图覆盖目标。
 
 主要字段有：
 
@@ -168,25 +197,37 @@
 7. `coordinate_focus_relations`
    - 需要在正文里继续复用的非 anchor 坐标关系摘要。
 
-8. `coordinate_reuse_min` / `early_coordinate_reuse_min`
+8. `observation_focus_relations`
+   - 需要在正文里继续复用的 observation-first visual cue。
+
+9. `observation_focus_regions`
+   - 上述 observation cue 对应的局部区域摘要，例如 `around d, e, and f`。
+
+10. `goal_side_relation_chain`
+   - 更贴近目标侧点集的关键关系链摘要。
+
+11. `bridge_side_relation_chain`
+   - 更贴近辅助桥接侧的关键关系链摘要。
+
+12. `coordinate_reuse_min` / `early_coordinate_reuse_min`
    - writer 正文至少要复用多少个坐标 cue，以及前 3 句里至少要尽早复用多少个非 anchor 坐标 cue。
 
-9. `focus_relations`
+13. `focus_relations`
    - 对应这些点的关键关系摘要。
 
-10. `opening_sentence_hint`
+14. `opening_sentence_hint`
    - 第一正文句的局部落点提示。
 
-11. `helper_sentence_hint`
+15. `helper_sentence_hint`
    - 第二正文句的局部落点提示。
 
-12. `coordinate_sentence_hint`
+16. `coordinate_sentence_hint`
    - writer 在 helper / first bridge 里如何尽早把非 anchor 坐标 cue 接回正文的短提示。
 
-13. `reminder`
+17. `reminder`
    - 给 writer 的简短提醒，要求不要只围着 anchor frame 打转。
 
-注意：现在通常只给 `3-4` 个 `anchor_points` 打标签，复杂题可放宽到 `5` 个；这仍不等于只看这些点。全图覆盖要求主要由 `coordinate_relations`、`figure_overview`、`visible_relations`、`coverage_targets`、`bridge_steps[*].focus_points` 来补，而且复杂题默认要求 `coordinate_relations` 至少覆盖 `4` 个可见点，并尽量覆盖 `2-3` 个非 anchor visible points。若 planner 只是把 `d/e/g/j` 这类本应继续作为非 anchor cue 使用的点错误塞进了 `anchor_points`，脚本现在会优先把它们回收到最小 anchor frame，而不是直接把整条 plan 判死。
+注意：现在通常只给 `3-4` 个 `anchor_points` 打标签，复杂题可放宽到 `5` 个；这仍不等于只看这些点。全图覆盖要求主要由 `observation_relations`、`coordinate_relations`、`figure_overview`、`visible_relations`、`coverage_targets`、`bridge_steps[*].focus_points` 来补，而且复杂题默认要求 `coordinate_relations` 至少覆盖 `4` 个可见点，并尽量覆盖 `2-3` 个非 anchor visible points。若 planner 只是把 `d/e/g/j` 这类本应继续作为 non-anchor observation cue 使用的点错误塞进了 `anchor_points`，脚本现在会优先把它们回收到最小 anchor frame，而不是直接把整条 plan 判死。
 
 ### 2.6 `bridge_steps[*].focus_points` 是什么
 
@@ -218,8 +259,9 @@
 
 1. `Injected Prefix Block`
    - 由脚本自动拼接，包含：
-     - anchor sentence
+     - observation sentence
      - figure overview sentence
+     - orientation / anchor sentence
      - coordinate hint sentence
      - visible relation sentence
 
@@ -234,6 +276,12 @@
      - `goal_finish`
      - `opening_focus_points`
      - `bridge_focus_points`
+     - `coordinate_focus_points`
+     - `coordinate_focus_relations`
+     - `observation_focus_relations`
+     - `observation_focus_regions`
+     - `goal_side_relation_chain`
+     - `bridge_side_relation_chain`
      - `opening_sentence_hint`
      - `helper_sentence_hint`
 
@@ -273,6 +321,9 @@ writer 只输出 body 纯文本，不允许自己输出 `<thinking>`、`<point>`
    - 不能大面积重复 injected prefix
    - 第一正文句必须落到 `opening_focus_points`
    - 第二正文句必须落到 `bridge_focus_points`
+   - 如果 plan 提供了 `observation_focus_relations`，正文必须至少复用一个 approved observation cue
+   - 如果 plan 提供了 `observation_focus_relations`，前 `3` 句里也必须尽早接回至少一个 observation cue，而不是重新从 anchor frame 起讲
+   - 如果 plan 提供了 `coordinate_focus_relations`，前 `3` 句里仍必须尽早接回至少一个 non-anchor coordinate cue
 
 3. bridge 合同是否逐句落实
    - 每个 `bridge_steps[i].relation` 必须按顺序出现
@@ -285,6 +336,17 @@ writer 只输出 body 纯文本，不允许自己输出 `<thinking>`、`<point>`
 4. 泄露与偷懒表达
    - 禁止 hidden proof 痕迹
    - 禁止 `symmetry`、`midpoint property`、`common center`、`square-like` 等 shorthand
+
+### 2.8.1 `generation audit`
+
+writer body 通过终检后，`generation audit` 还会继续做 run-level 复核，当前重点包括：
+
+1. `coordinate_relations` 是否和候选坐标关系匹配
+2. `write_output` 是否真的复用了 non-anchor coordinate cues
+3. `write_output` 是否真的复用了 approved observation cues
+4. observation cue 是否在前 `3` 句里就进入正文
+5. bridge sentence 是否真的逐句落地、是否点明足够的 supports
+6. 是否又出现 `parallelogram`、`common center`、`midpoint property` 这类高风险 shorthand
 
 ### 2.9 终组装
 
@@ -508,10 +570,12 @@ python experiments/cot_sft_generation/semantic_review.py \
 ## 5. 当前设计相对旧版本的关键变化
 
 1. 从“直接整段写 `thinking`”转成了 `plan -> write` 两阶段。
-2. 从“只管 anchor 定向”扩展到 `coverage_targets` 和 step-level `focus_points`。
-3. 从“大而重复的 writer prompt”压缩成 `Approved Writer Handoff`。
-4. 给 writer 加了 `Non-Skippable Bridge Checklist` 和 `preferred_sentence_shell`。
-5. 把很多历史上反复出问题的 shorthand、route drift、prefix 重复、bridge 跳步都收进脚本校验。
+2. `plan` 默认支持 `hybrid` 模式，先由脚本给 observation-first skeleton，再由 planner 展开。
+3. 从“anchor-first 定向”扩展到 `observation_relations`、`coverage_targets` 和 step-level `focus_points`。
+4. 从“大而重复的 writer prompt”压缩成 `Approved Writer Handoff`。
+5. writer prefix 改成 observation sentence -> overview -> orientation -> coordinate -> visible relation，而不是一上来先 anchor sentence。
+6. 给 writer 加了 `Non-Skippable Bridge Checklist` 和 `preferred_sentence_shell`。
+7. 把很多历史上反复出问题的 shorthand、route drift、prefix 重复、bridge 跳步，以及 observation cue 只停留在 prefix 的问题都收进脚本校验。
 
 ## 6. 当前还没彻底解决的问题
 
