@@ -2,6 +2,7 @@ import unittest
 
 from experiments.cot_sft_generation.audits import build_visible_premise_summaries
 from experiments.cot_sft_generation.prompt_builders import (
+    build_plan_narrative_prompt,
     build_plan_prompt,
     build_plan_retry_feedback,
     build_supervisor_payload,
@@ -92,6 +93,18 @@ class CotSftPromptBuildersTest(unittest.TestCase):
         self.assertIn("Do not use <point> tags", prompt)
         self.assertIn("depends_on list should already name almost all of the segment or ray objects", prompt)
         self.assertIn("depends_on list should reuse concrete items from coordinate_relations", prompt)
+
+    def test_build_plan_narrative_prompt_locks_route_structure(self):
+        prompt = build_plan_narrative_prompt(
+            self.record,
+            "<aux>x00 h : midp h b c</aux>",
+            self.plan,
+        )
+
+        self.assertIn("[Locked Scripted Plan Skeleton]", prompt)
+        self.assertIn("Do not change any bridge route", prompt)
+        self.assertIn("bridge_step_unlocks", prompt)
+        self.assertIn('"anchor_relation"', prompt)
 
     def test_build_plan_retry_feedback_adds_multi_point_stage_hint(self):
         feedback = build_plan_retry_feedback(

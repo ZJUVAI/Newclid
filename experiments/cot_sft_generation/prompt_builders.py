@@ -899,6 +899,64 @@ def build_plan_prompt(
     )
 
 
+def build_plan_narrative_prompt(record, aux_part, plan_skeleton):
+    public_problem = build_public_problem_text(record)
+    visible_goal = extract_problem_goal(record)
+    hidden_aux_brief = build_hidden_aux_brief(aux_part)
+    bridge_steps = plan_skeleton.get("bridge_steps", []) if isinstance(plan_skeleton, dict) else []
+    bridge_step_count = len(bridge_steps)
+    skeleton_block = json.dumps(plan_skeleton, ensure_ascii=False, indent=2)
+    example = json.dumps(
+        {
+            "anchor_relation": "points a, b, c, and d form the main visible frame, with ab equals bc and line ab is perpendicular to line bc.",
+            "figure_overview": "beyond the anchor points, the broader figure also involves e, f, g, and j, with point f looks like the midpoint of ac and point g looks like the midpoint of cd.",
+            "coordinate_hints": "the clearest visual cues are that point f looks like the midpoint of ac and that point g looks like the midpoint of cd.",
+            "goal_bottleneck": "the target ratio around a, e, f, c, and j still lacks a concrete bridge between the needed segment comparisons.",
+            "helper_idea": "a helper is needed that places the helper on an existing line and places the helper on a useful circle so the missing ratio relation can be connected.",
+            "construction": "construct point k such that b, f, g, and k are concyclic and c, d, and k are collinear.",
+            "bridge_step_unlocks": [
+                "this is required to prove angle bf/bg equals angle fk/gk next.",
+                "this is required to prove triangles bdg and kdf are similar next.",
+            ],
+        },
+        ensure_ascii=False,
+        indent=2,
+    )
+    return (
+        "You are polishing the narrative fields of a geometry CoT plan.\n\n"
+        "[Visible Inputs]\n"
+        "The final trained model will only see the image and the problem text below.\n"
+        f"{public_problem}\n\n"
+        "[Visible Goal]\n"
+        f"{visible_goal}\n\n"
+        "[Hidden Target Summary]\n"
+        f"Target auxiliary facts: {hidden_aux_brief}\n\n"
+        "[Locked Scripted Plan Skeleton]\n"
+        "The JSON block below is already approved structurally. Do not change any bridge route, "
+        "support relation, ordering, or goal relation. You may only supply natural-language narrative "
+        "fields that describe the same approved skeleton.\n"
+        f"{skeleton_block}\n\n"
+        "[Task]\n"
+        "Return exactly one JSON object with these keys:\n"
+        "1. anchor_relation\n"
+        "2. figure_overview\n"
+        "3. coordinate_hints\n"
+        "4. goal_bottleneck\n"
+        "5. helper_idea\n"
+        "6. construction\n"
+        f"7. bridge_step_unlocks: a JSON list with exactly {bridge_step_count} short why_it_helps strings, one per locked bridge step in order.\n\n"
+        "[Hard Constraints]\n"
+        "- Do not add, remove, or rename any bridge step.\n"
+        "- Do not rewrite relation strings such as angle, ratio, similar, equal, collinear, parallel, or perpendicular checkpoints.\n"
+        "- Do not mention hidden references, proof IDs, or that a route was given.\n"
+        "- Do not use vague shape shorthand like square-like, rectangle, parallelogram, symmetry, or center of symmetry.\n"
+        "- Keep the wording supportable from the image and visible problem text alone.\n"
+        "- In bridge_step_unlocks, describe only what the current approved step unlocks next; do not invent a new route.\n\n"
+        "[Output Example]\n"
+        f"{example}\n"
+    )
+
+
 def build_write_prompt(record, plan, aux_part, injected_prefix_block, proof_guidance_payload):
     plan = enrich_bridge_steps_with_targets(plan)
     public_problem = build_public_problem_text(record)
@@ -1012,6 +1070,7 @@ def build_write_prompt(record, plan, aux_part, injected_prefix_block, proof_guid
 
 __all__ = [
     "build_aux_specific_plan_guidance",
+    "build_plan_narrative_prompt",
     "build_plan_json_example",
     "build_plan_prompt",
     "build_plan_retry_feedback",

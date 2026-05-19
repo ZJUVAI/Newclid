@@ -2,6 +2,7 @@ import unittest
 from unittest.mock import patch
 
 from experiments.cot_sft_generation.generate_cot_sft import (
+    build_scripted_plan_skeleton,
     build_hidden_proof_guidance,
     choose_required_supports_for_bridge_step,
     compute_bridge_step_required_support_cap,
@@ -11,6 +12,7 @@ from experiments.cot_sft_generation.generate_cot_sft import (
     compute_writer_body_budget,
     find_skipped_prerequisite_route_checkpoint,
     find_unsupported_bridge_relation_segments,
+    merge_plan_skeleton_and_narrative,
     rebalance_anchor_points_for_coordinate_coverage,
     run_plan_stage,
     should_extend_plan_retry_budget,
@@ -18,6 +20,8 @@ from experiments.cot_sft_generation.generate_cot_sft import (
     validate_writer_body,
     validate_thinking_response,
 )
+from experiments.cot_sft_generation.audits import build_visible_premise_summaries, get_point_coords
+from experiments.cot_sft_generation.geometry_text import build_hidden_coordinate_candidates
 
 
 class CotSftGenerationBudgetsTest(unittest.TestCase):
@@ -442,6 +446,99 @@ class CotSftGenerationBudgetsTest(unittest.TestCase):
             cleaned["bridge_steps"][1]["required_supports"],
             ["points b, d, and f look nearly collinear"],
         )
+
+    def test_build_scripted_plan_skeleton_produces_valid_ratio_plan(self):
+        record = {
+            "llm_input_renamed": (
+                "<problem> a : ; b : ; c : perp a b b c [000] cong a b b c [001] ; "
+                "d : para a b c d [002] para a d b c [003] ; "
+                "e : coll a d e [004] cong a e d e [005] ; "
+                "f : coll a c f [006] cong a f c f [007] ; "
+                "g : coll c d g [008] cong c g d g [009] ; "
+                "j : coll b d j [015] ? eqratio a e a f c e c j </problem>"
+            ),
+            "llm_output_renamed": (
+                "<aux> x00 k : cyclic b f g k [016] coll c d k [017] ; </aux> "
+                "<proof>coll c g k; eqangle b f b g f k g k; coll b d f; "
+                "eqangle b d b g f k d k; eqangle b g d f d g f k; "
+                "simtrir b d g k d f; eqratio b f c f d g d e; "
+                "simtrir b c f g e d; eqratio a e a f c e c j;</proof>"
+            ),
+            "point_coords_grid": {
+                "a": [191, 71],
+                "b": [98, 12],
+                "c": [38, 105],
+                "d": [132, 165],
+                "e": [162, 118],
+                "f": [115, 88],
+                "g": [85, 135],
+                "j": [148, 241],
+            },
+        }
+        point_coords = get_point_coords(record)
+        visible_goal = "eqratio a e a f c e c j"
+        aux_part = "<aux> x00 k : cyclic b f g k [016] coll c d k [017] ; </aux>"
+        sanitized_rest = (
+            "<proof>coll c g k; eqangle b f b g f k g k; coll b d f; "
+            "eqangle b d b g f k d k; eqangle b g d f d g f k; "
+            "simtrir b d g k d f; eqratio b f c f d g d e; "
+            "simtrir b c f g e d; eqratio a e a f c e c j;</proof>"
+        )
+        coordinate_candidates = build_hidden_coordinate_candidates(
+            point_coords,
+            max_items=64,
+            relax_type_limits=True,
+        )
+        visible_premise_summaries = build_visible_premise_summaries(record)
+
+        skeleton = build_scripted_plan_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            point_coords,
+            coordinate_candidates,
+            visible_premise_summaries,
+            visible_goal,
+        )
+        ok, message, cleaned = validate_plan_response(
+            skeleton,
+            point_coords,
+            visible_goal=visible_goal,
+            aux_part=aux_part,
+            coordinate_candidates=coordinate_candidates,
+            sanitized_rest=sanitized_rest,
+            visible_premise_summaries=visible_premise_summaries,
+        )
+
+        self.assertTrue(ok, message)
+        self.assertTrue(cleaned["bridge_steps"])
+        self.assertIn("k", cleaned["bridge_steps"][0]["relation"].lower())
+
+    def test_merge_plan_skeleton_and_narrative_keeps_locked_relations(self):
+        plan_skeleton = {
+            "anchor_points": ["a", "b", "c"],
+            "anchor_relation": "old anchor relation",
+            "figure_overview": "old figure overview",
+            "coordinate_hints": "old coordinate hints",
+            "goal_bottleneck": "old bottleneck",
+            "helper_idea": "old helper",
+            "construction": "old construction",
+            "bridge_steps": [
+                {"relation": "c, g, k are collinear", "why_it_helps": "old unlock"},
+                {"relation": "angle bf/bg equals angle fk/gk", "why_it_helps": "old unlock 2"},
+            ],
+        }
+        narrative = {
+            "anchor_relation": "new anchor relation",
+            "bridge_step_unlocks": ["new unlock", "new unlock 2"],
+            "bridge_steps": [{"relation": "tampered relation"}],
+        }
+
+        merged = merge_plan_skeleton_and_narrative(plan_skeleton, narrative)
+
+        self.assertEqual(merged["anchor_relation"], "new anchor relation")
+        self.assertEqual(merged["bridge_steps"][0]["relation"], "c, g, k are collinear")
+        self.assertEqual(merged["bridge_steps"][0]["why_it_helps"], "new unlock")
 
     def test_validate_writer_body_rejects_bridge_sentence_that_uses_conclusion_as_its_own_support(self):
         plan = {

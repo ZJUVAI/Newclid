@@ -157,6 +157,7 @@ class CotSftReplayArtifactChecksTest(unittest.TestCase):
                     sample_size=1,
                     num_workers=1,
                     model_name="fixture-model",
+                    plan_mode="llm",
                     verbose=True,
                     random_sample=False,
                     process_all=False,

@@ -91,6 +91,7 @@ try:
         summarize_aux_clause,
     )
     from .prompt_builders import (
+        build_plan_narrative_prompt as build_plan_narrative_prompt_text,
         build_plan_prompt as build_plan_prompt_text,
         build_plan_retry_feedback,
         build_write_prompt as build_write_prompt_text,
@@ -180,6 +181,7 @@ except ImportError:  # pragma: no cover - script execution path
         summarize_aux_clause,
     )
     from prompt_builders import (
+        build_plan_narrative_prompt as build_plan_narrative_prompt_text,
         build_plan_prompt as build_plan_prompt_text,
         build_plan_retry_feedback,
         build_write_prompt as build_write_prompt_text,
@@ -2398,6 +2400,379 @@ def build_plan_prompt(record, aux_part, sanitized_rest):
     )
 
 
+def build_plan_narrative_prompt(record, aux_part, plan_skeleton):
+    return build_plan_narrative_prompt_text(
+        record,
+        aux_part,
+        plan_skeleton,
+    )
+
+
+def build_canonical_goal_finish_relation(visible_goal, proof_guidance_payload=None):
+    proof_guidance_payload = proof_guidance_payload or {}
+    goal_finish_relations = proof_guidance_payload.get("goal_finish_relations") or []
+    if goal_finish_relations:
+        return normalize_relation_surface(goal_finish_relations[-1]).strip()
+    ordered_route = proof_guidance_payload.get("ordered_route_relations") or []
+    if ordered_route:
+        return normalize_relation_surface(ordered_route[-1]).strip()
+
+    goal_spec = parse_goal_expression(visible_goal or "")
+    predicate = (goal_spec.get("predicate") or "").lower()
+    points = [point.lower() for point in goal_spec.get("points", []) if isinstance(point, str)]
+    if predicate == "eqratio" and len(points) >= 8:
+        return f"ratio {points[0]}{points[1]} to {points[2]}{points[3]} equals ratio {points[4]}{points[5]} to {points[6]}{points[7]}"
+    if predicate == "eqangle" and len(points) >= 8:
+        return f"angle {points[0]}{points[1]}/{points[2]}{points[3]} equals angle {points[4]}{points[5]}/{points[6]}{points[7]}"
+    if predicate in {"cong", "equal"} and len(points) >= 4:
+        return f"{points[0]}{points[1]} equals {points[2]}{points[3]}"
+    if predicate in {"simtri", "simtrir"} and len(points) >= 6:
+        return f"triangles {points[0]}{points[1]}{points[2]} and {points[3]}{points[4]}{points[5]} are similar"
+    if predicate in {"contri", "contrir"} and len(points) >= 6:
+        return f"triangles {points[0]}{points[1]}{points[2]} and {points[3]}{points[4]}{points[5]} are congruent"
+    if predicate == "para" and len(points) >= 4:
+        return f"line {points[0]}{points[1]} is parallel to line {points[2]}{points[3]}"
+    if predicate == "perp" and len(points) >= 4:
+        return f"line {points[0]}{points[1]} is perpendicular to line {points[2]}{points[3]}"
+    if predicate == "coll" and len(points) >= 3:
+        return f"{points[0]}, {points[1]}, and {points[2]} are collinear"
+    return build_canonical_goal_bottleneck(visible_goal)
+
+
+def select_coordinate_relations_for_skeleton(
+    coordinate_candidates,
+    route_relations,
+    anchor_points,
+    visible_points,
+    min_len=2,
+    max_len=4,
+):
+    route_relations = [
+        relation.strip()
+        for relation in (route_relations or [])
+        if isinstance(relation, str) and relation.strip()
+    ]
+    if not coordinate_candidates:
+        return []
+
+    anchor_set = {point.lower() for point in (anchor_points or []) if isinstance(point, str)}
+    route_text = " ".join(route_relations)
+    route_points = extract_point_mentions(route_text, visible_points)
+    route_keywords = relation_text_keywords(route_text)
+    selected = []
+    selected_lower = set()
+    covered_points = set()
+
+    ranked_candidates = []
+    for idx, candidate in enumerate(coordinate_candidates):
+        summary = normalize_relation_surface((candidate or {}).get("summary", "")).strip()
+        if not summary:
+            continue
+        points = extract_point_mentions(summary, visible_points)
+        if len(points) < 2:
+            continue
+        keywords = relation_text_keywords(summary)
+        non_anchor_points = points - anchor_set
+        key = (
+            len(non_anchor_points & route_points),
+            len(points & route_points),
+            len(keywords & route_keywords),
+            1 if any(keyword in keywords for keyword in {"midpoint", "collinear", "equal", "parallel", "perpendicular"}) else 0,
+            -float(candidate.get("score", 9999.0)),
+            -idx,
+        )
+        ranked_candidates.append((key, summary, points))
+    ranked_candidates.sort(key=lambda item: item[0], reverse=True)
+
+    while ranked_candidates and len(selected) < max_len:
+        best_idx = None
+        best_key = None
+        for idx, (base_key, summary, points) in enumerate(ranked_candidates):
+            lowered = summary.lower()
+            if lowered in selected_lower:
+                continue
+            new_non_anchor = len((points - anchor_set) - covered_points)
+            new_points = len(points - covered_points)
+            key = (
+                new_non_anchor,
+                new_points,
+                *base_key,
+                -len(summary),
+                summary.lower(),
+            )
+            if best_key is None or key > best_key:
+                best_key = key
+                best_idx = idx
+        if best_idx is None:
+            break
+        _, summary, points = ranked_candidates.pop(best_idx)
+        selected.append(summary)
+        selected_lower.add(summary.lower())
+        covered_points.update(points)
+
+    for _, summary, _ in ranked_candidates:
+        if len(selected) >= max_len:
+            break
+        lowered = summary.lower()
+        if lowered in selected_lower:
+            continue
+        selected.append(summary)
+        selected_lower.add(lowered)
+
+    return selected[: max(min_len, min(max_len, len(selected)))] if selected else []
+
+
+def build_scripted_plan_skeleton(
+    record,
+    aux_part,
+    sanitized_rest,
+    point_coords,
+    coordinate_candidates,
+    visible_premise_summaries,
+    visible_goal,
+):
+    proof_guidance_payload = build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal)
+    limits = compute_plan_complexity_limits(point_coords, visible_goal=visible_goal, aux_part=aux_part)
+    visible_points = extract_visible_point_names(point_coords)
+    known_points = visible_points + [point.lower() for point in extract_aux_new_points(aux_part or "")]
+    goal_finish = build_canonical_goal_finish_relation(
+        visible_goal,
+        proof_guidance_payload=proof_guidance_payload,
+    )
+
+    target_anchor_count = min(
+        limits["anchor_max"],
+        max(limits["anchor_min"], 4 if len(visible_points) >= 4 else len(visible_points)),
+    )
+    anchor_points = visible_points[:target_anchor_count]
+
+    route_relations = proof_guidance_payload.get("ordered_route_relations") or (
+        proof_guidance_payload.get("aux_bridge_relations", [])
+        + proof_guidance_payload.get("bridge_relations", [])
+        + proof_guidance_payload.get("goal_finish_relations", [])
+    )
+    coordinate_relations = select_coordinate_relations_for_skeleton(
+        coordinate_candidates,
+        route_relations,
+        anchor_points,
+        visible_points,
+        min_len=limits["coordinate_relations_min"],
+        max_len=limits["coordinate_relations_max"],
+    )
+    anchor_points = rebalance_anchor_points_for_coordinate_coverage(
+        anchor_points,
+        coordinate_relations,
+        visible_points,
+        min_anchor_count=limits["anchor_min"],
+        required_non_anchor_coverage=min(
+            limits["coordinate_coverage_min"],
+            max(0, len(visible_points) - limits["anchor_min"]),
+        ),
+    )
+
+    aux_direct_relations = [
+        normalize_relation_surface(relation).strip()
+        for relation in (
+            proof_guidance_payload.get("immediate_aux_consequences")
+            or build_aux_direct_consequences(aux_part)
+        )
+        if isinstance(relation, str) and relation.strip()
+    ][: limits["aux_direct_relations_max"]]
+    visible_relations = prioritize_visible_relations_for_route(
+        existing_relations=[],
+        fallback_summaries=visible_premise_summaries,
+        route_relations=route_relations,
+        visible_points=visible_points,
+        min_len=limits["visible_relations_min"],
+        max_len=limits["visible_relations_max"],
+    )
+    visible_relations = canonicalize_visible_relations(
+        visible_relations,
+        visible_points,
+        visible_premise_summaries,
+        min_len=limits["visible_relations_min"],
+        max_len=limits["visible_relations_max"],
+        min_chars=5,
+    )
+
+    bridge_steps = []
+    available_supports = coordinate_relations + visible_relations + aux_direct_relations
+    novelty_supports = visible_relations + aux_direct_relations
+    hidden_route_relations = route_relations[:]
+    normalized_goal_finish = normalize_relation_surface(goal_finish).strip()
+
+    for route_index, relation in enumerate(hidden_route_relations):
+        if len(bridge_steps) >= limits["bridge_steps_max"]:
+            break
+        if not isinstance(relation, str) or not relation.strip():
+            continue
+        relation = normalize_relation_surface(relation).strip()
+        if relations_semantically_match(relation, normalized_goal_finish, known_points):
+            continue
+        if not bridge_steps and known_points[len(visible_points):]:
+            aux_points = known_points[len(visible_points):]
+            if not any(point in relation.lower() for point in aux_points):
+                continue
+        if relation_duplicates_earlier_support(relation, novelty_supports, known_points):
+            continue
+
+        previous_route_position = 0
+        previous_bridge_relation = ""
+        if bridge_steps:
+            previous_route_position = int(bridge_steps[-1].get("approved_route_position") or 0)
+            previous_bridge_relation = (
+                bridge_steps[-1].get("approved_route_relation")
+                or bridge_steps[-1].get("relation", "")
+            )
+        support_cap = min(compute_bridge_step_required_support_cap({"relation": relation}), limits["depends_on_max"])
+        next_target_relation = ""
+        for later_relation in hidden_route_relations[route_index + 1:]:
+            if not isinstance(later_relation, str) or not later_relation.strip():
+                continue
+            later_relation = normalize_relation_surface(later_relation).strip()
+            if relations_semantically_match(later_relation, normalized_goal_finish, known_points):
+                next_target_relation = normalized_goal_finish
+                break
+            if later_relation not in {step.get("relation", "") for step in bridge_steps}:
+                next_target_relation = later_relation
+                break
+        if not next_target_relation:
+            next_target_relation = normalized_goal_finish
+
+        preferred_dependencies = select_support_relations_for_step(
+            relation,
+            available_supports,
+            known_points,
+            next_target_relation=next_target_relation,
+            max_supports=min(support_cap, len(available_supports)),
+        )
+        if not preferred_dependencies:
+            continue
+        step = {
+            "relation": relation,
+            "approved_route_relation": relation,
+            "approved_route_position": route_index + 1,
+            "depends_on": preferred_dependencies[: limits["depends_on_max"]],
+        }
+        step["required_supports"] = choose_required_supports_for_bridge_step(
+            step,
+            known_points,
+            max_supports=min(support_cap, len(step["depends_on"])),
+        )
+        if not step["required_supports"]:
+            step["required_supports"] = step["depends_on"][: min(support_cap, len(step["depends_on"]))]
+        if len(find_unsupported_bridge_relation_segments(step, step["required_supports"])) > 1:
+            continue
+        skipped_prerequisite = find_skipped_prerequisite_route_checkpoint(
+            step,
+            previous_route_position,
+            hidden_route_relations,
+            known_points,
+            previous_bridge_relation=previous_bridge_relation,
+        )
+        if skipped_prerequisite:
+            continue
+        bridge_steps.append(step)
+        available_supports.append(relation)
+        novelty_supports.append(relation)
+
+    if len(bridge_steps) < limits["bridge_steps_min"]:
+        fallback_relations = []
+        for relation in hidden_route_relations:
+            normalized_relation = normalize_relation_surface(relation).strip()
+            if relations_semantically_match(normalized_relation, normalized_goal_finish, known_points):
+                continue
+            if normalized_relation not in fallback_relations:
+                fallback_relations.append(normalized_relation)
+            if len(fallback_relations) >= limits["bridge_steps_min"]:
+                break
+        bridge_steps = []
+        available_supports = coordinate_relations + visible_relations + aux_direct_relations
+        novelty_supports = visible_relations + aux_direct_relations
+        for route_index, relation in enumerate(fallback_relations):
+            support_cap = min(compute_bridge_step_required_support_cap({"relation": relation}), limits["depends_on_max"])
+            preferred_dependencies = select_support_relations_for_step(
+                relation,
+                available_supports,
+                known_points,
+                next_target_relation=normalized_goal_finish,
+                max_supports=min(support_cap, len(available_supports)),
+            )
+            if not preferred_dependencies:
+                continue
+            step = {
+                "relation": relation,
+                "approved_route_relation": relation,
+                "approved_route_position": route_index + 1,
+                "depends_on": preferred_dependencies[: limits["depends_on_max"]],
+            }
+            bridge_steps.append(step)
+            available_supports.append(relation)
+            novelty_supports.append(relation)
+
+    bridge_plan = {"bridge_steps": bridge_steps, "goal_finish": normalized_goal_finish}
+    bridge_plan = enrich_bridge_steps_with_targets(bridge_plan)
+    enriched_steps = []
+    total_steps = len(bridge_plan.get("bridge_steps", []))
+    for idx, step in enumerate(bridge_plan.get("bridge_steps", [])):
+        enriched = dict(step)
+        enriched["required_supports"] = choose_required_supports_for_bridge_step(
+            enriched,
+            known_points,
+            max_supports=min(
+                compute_bridge_step_required_support_cap(enriched),
+                len(enriched.get("depends_on", [])),
+                limits["depends_on_max"],
+            ),
+        ) or enriched.get("depends_on", [])[: min(limits["depends_on_max"], len(enriched.get("depends_on", [])))]
+        enriched["min_support_mentions"] = compute_bridge_step_min_support_mentions(enriched)
+        enriched["why_it_helps"] = build_canonical_bridge_unlock(
+            enriched.get("next_target_relation", normalized_goal_finish),
+            final_step=(idx == total_steps - 1),
+        )
+        enriched_steps.append(enriched)
+
+    return {
+        "anchor_points": anchor_points,
+        "anchor_relation": build_canonical_anchor_relation(anchor_points, visible_relations),
+        "figure_overview": build_canonical_figure_overview(anchor_points, visible_relations, coordinate_relations, visible_points),
+        "coordinate_relations": coordinate_relations,
+        "visible_relations": visible_relations,
+        "coordinate_hints": build_canonical_coordinate_hint(coordinate_relations),
+        "goal_bottleneck": build_canonical_goal_bottleneck(visible_goal),
+        "helper_idea": build_canonical_helper_idea(aux_direct_relations, build_canonical_goal_bottleneck(visible_goal)),
+        "construction": build_canonical_construction(aux_part),
+        "aux_direct_relations": aux_direct_relations,
+        "bridge_steps": enriched_steps,
+        "goal_finish": normalized_goal_finish,
+    }
+
+
+def merge_plan_skeleton_and_narrative(plan_skeleton, narrative_fields):
+    merged = json.loads(json.dumps(plan_skeleton))
+    if not isinstance(narrative_fields, dict):
+        return merged
+    for key in [
+        "anchor_relation",
+        "figure_overview",
+        "coordinate_hints",
+        "goal_bottleneck",
+        "helper_idea",
+        "construction",
+    ]:
+        value = narrative_fields.get(key)
+        if isinstance(value, str) and value.strip():
+            merged[key] = value.strip()
+    unlocks = narrative_fields.get("bridge_step_unlocks")
+    if isinstance(unlocks, list):
+        for idx, unlock in enumerate(unlocks):
+            if idx >= len(merged.get("bridge_steps", [])):
+                break
+            if isinstance(unlock, str) and unlock.strip():
+                merged["bridge_steps"][idx]["why_it_helps"] = unlock.strip()
+    return merged
+
+
 def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_block):
     visible_goal = extract_problem_goal(record)
     proof_guidance_payload = build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal)
@@ -2543,6 +2918,88 @@ def run_plan_stage(
     }
 
 
+def run_plan_narrative_stage(
+    stage_name,
+    messages,
+    model_name,
+    plan_skeleton,
+    point_coords,
+    visible_goal,
+    aux_part,
+    coordinate_candidates,
+    sanitized_rest,
+    visible_premise_summaries,
+    max_retries,
+):
+    last_error = None
+    last_output = None
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(f"[{stage_name}] Attempt {attempt}/{max_retries}")
+            start = time.time()
+            output = call_model(messages, model_name)
+            elapsed = time.time() - start
+            last_output = output
+            narrative_fields = extract_json_object(output)
+            if not isinstance(narrative_fields, dict):
+                last_error = "Plan narrative stage must return a single JSON object"
+                logger.warning(f"[{stage_name}] Validation failed: {last_error}")
+                if attempt < max_retries:
+                    messages = messages + [{
+                        "role": "user",
+                        "content": "Return exactly one JSON object with only the requested narrative fields. Do not change the locked plan skeleton."
+                    }]
+                    time.sleep(1)
+                continue
+            merged_plan = merge_plan_skeleton_and_narrative(plan_skeleton, narrative_fields)
+            ok, message, cleaned_plan = validate_plan_response(
+                merged_plan,
+                point_coords,
+                visible_goal=visible_goal,
+                aux_part=aux_part,
+                coordinate_candidates=coordinate_candidates,
+                sanitized_rest=sanitized_rest,
+                visible_premise_summaries=visible_premise_summaries,
+            )
+            if ok:
+                logger.info(f"[{stage_name}] Valid output in {elapsed:.2f}s")
+                return {
+                    "success": True,
+                    "output": output.strip(),
+                    "parsed": cleaned_plan,
+                    "attempts_used": attempt,
+                    "elapsed_seconds": elapsed,
+                    "error": None,
+                }
+
+            last_error = message
+            logger.warning(f"[{stage_name}] Validation failed: {message}")
+            if attempt < max_retries:
+                feedback = (
+                    "Keep the locked route structure exactly as given. "
+                    "Only rewrite the narrative text fields and the per-step unlock lines.\n"
+                    f"{build_plan_retry_feedback(message, aux_part)}"
+                )
+                messages = messages + [{"role": "user", "content": feedback}]
+                time.sleep(1)
+
+        except Exception as exc:
+            last_error = str(exc)
+            logger.error(f"[{stage_name}] API call failed: {exc}")
+            if attempt < max_retries:
+                time.sleep(2)
+
+    return {
+        "success": False,
+        "output": last_output,
+        "parsed": None,
+        "attempts_used": max_retries,
+        "elapsed_seconds": None,
+        "error": last_error or "Unknown error",
+    }
+
+
 def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_prefix, plan, max_retries):
     last_error = None
     last_output = None
@@ -2592,33 +3049,104 @@ def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_pr
     }
 
 
-def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_name, max_retries, verbose):
+def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_name, max_retries, verbose, plan_mode="hybrid"):
     point_coords = get_point_coords(record)
     visible_goal = extract_problem_goal(record)
     coordinate_candidates = build_hidden_coordinate_candidates(point_coords, max_items=64, relax_type_limits=True)
     visible_premise_summaries = build_visible_premise_summaries(record)
-    plan_prompt = build_plan_prompt(record, aux_part, sanitized_rest)
-    plan_messages = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}},
-                {"type": "text", "text": plan_prompt},
-            ],
-        }
-    ]
-    plan_result = run_plan_stage(
-        "plan",
-        plan_messages,
-        model_name=model_name,
-        point_coords=point_coords,
-        visible_goal=visible_goal,
-        aux_part=aux_part,
-        coordinate_candidates=coordinate_candidates,
-        sanitized_rest=sanitized_rest,
-        visible_premise_summaries=visible_premise_summaries,
-        max_retries=max_retries,
-    )
+    plan_prompt = None
+    plan_result = None
+
+    if plan_mode == "llm":
+        plan_prompt = build_plan_prompt(record, aux_part, sanitized_rest)
+        plan_messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}},
+                    {"type": "text", "text": plan_prompt},
+                ],
+            }
+        ]
+        plan_result = run_plan_stage(
+            "plan",
+            plan_messages,
+            model_name=model_name,
+            point_coords=point_coords,
+            visible_goal=visible_goal,
+            aux_part=aux_part,
+            coordinate_candidates=coordinate_candidates,
+            sanitized_rest=sanitized_rest,
+            visible_premise_summaries=visible_premise_summaries,
+            max_retries=max_retries,
+        )
+    else:
+        skeleton_plan = build_scripted_plan_skeleton(
+            record,
+            aux_part,
+            sanitized_rest,
+            point_coords,
+            coordinate_candidates,
+            visible_premise_summaries,
+            visible_goal,
+        )
+        skeleton_ok, skeleton_message, cleaned_skeleton = validate_plan_response(
+            skeleton_plan,
+            point_coords,
+            visible_goal=visible_goal,
+            aux_part=aux_part,
+            coordinate_candidates=coordinate_candidates,
+            sanitized_rest=sanitized_rest,
+            visible_premise_summaries=visible_premise_summaries,
+        )
+        if not skeleton_ok:
+            return {
+                "success": False,
+                "thinking": json.dumps(skeleton_plan, ensure_ascii=False, indent=2),
+                "plan_prompt": None,
+                "write_prompt": None,
+                "plan_output": json.dumps(skeleton_plan, ensure_ascii=False, indent=2) if verbose else None,
+                "plan_parsed": None,
+                "attempts_used": 0,
+                "elapsed_seconds": None,
+                "error": f"Scripted plan skeleton invalid: {skeleton_message}",
+            }
+        plan_prompt = build_plan_narrative_prompt(record, aux_part, cleaned_skeleton)
+        plan_messages = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}},
+                    {"type": "text", "text": plan_prompt},
+                ],
+            }
+        ]
+        narrative_result = run_plan_narrative_stage(
+            "plan_narrative",
+            plan_messages,
+            model_name=model_name,
+            plan_skeleton=cleaned_skeleton,
+            point_coords=point_coords,
+            visible_goal=visible_goal,
+            aux_part=aux_part,
+            coordinate_candidates=coordinate_candidates,
+            sanitized_rest=sanitized_rest,
+            visible_premise_summaries=visible_premise_summaries,
+            max_retries=max_retries,
+        )
+        if narrative_result["success"]:
+            plan_result = narrative_result
+        else:
+            logger.warning(f"[plan_narrative] Falling back to scripted plan skeleton: {narrative_result['error']}")
+            plan_result = {
+                "success": True,
+                "output": json.dumps(cleaned_skeleton, ensure_ascii=False, indent=2),
+                "parsed": cleaned_skeleton,
+                "attempts_used": narrative_result["attempts_used"],
+                "elapsed_seconds": narrative_result["elapsed_seconds"],
+                "error": None,
+            }
+
     if not plan_result["success"]:
         return {
             "success": False,
@@ -2709,6 +3237,7 @@ def process_and_generate_sft(
     sample_size,
     num_workers,
     model_name,
+    plan_mode,
     verbose,
     random_sample,
     process_all,
@@ -2809,6 +3338,7 @@ def process_and_generate_sft(
             model_name=model_name,
             max_retries=max_retries,
             verbose=verbose,
+            plan_mode=plan_mode,
         )
         public_problem = build_public_problem_text(record)
         aux_part = record["_aux_part"]
@@ -2961,6 +3491,13 @@ def parse_args():
         help=f"Teacher model name. Default: {DEFAULT_MODEL_NAME}",
     )
     parser.add_argument(
+        "--plan-mode",
+        type=str,
+        choices=["hybrid", "llm"],
+        default="hybrid",
+        help="Planning mode. 'hybrid' uses a scripted skeleton plus model-written narrative fields; 'llm' uses the legacy full-model planner. Default: hybrid.",
+    )
+    parser.add_argument(
         "-r",
         "--max-retries",
         type=int,
@@ -3006,6 +3543,7 @@ if __name__ == "__main__":
         sample_size=args.num_samples,
         num_workers=args.num_workers,
         model_name=args.model_name,
+        plan_mode=args.plan_mode,
         verbose=args.verbose,
         random_sample=not args.sequential,
         process_all=args.process_all,
