@@ -896,6 +896,101 @@ def canonicalize_coordinate_relations(items, visible_points, coordinate_candidat
     return cleaned[:max_len]
 
 
+def canonicalize_observation_relations(items, visible_points, coordinate_candidates, max_len=4):
+    if not isinstance(items, list):
+        items = []
+    cleaned = []
+    candidate_map = {}
+    for candidate in coordinate_candidates or []:
+        if not isinstance(candidate, dict):
+            continue
+        summary = normalize_relation_surface((candidate.get("summary") or "")).strip()
+        if not summary:
+            continue
+        candidate_map[summary.lower()] = candidate
+
+    for raw_item in items[:max_len]:
+        if not isinstance(raw_item, dict):
+            continue
+        relation = normalize_relation_surface((raw_item.get("relation") or raw_item.get("visual_surface") or "")).strip()
+        if not relation:
+            continue
+        candidate = candidate_map.get(relation.lower())
+        if not candidate:
+            continue
+        points = [
+            point.lower()
+            for point in (raw_item.get("points") or candidate.get("points") or [])
+            if isinstance(point, str) and point.strip() and point.lower() in visible_points
+        ]
+        if len(points) < 2:
+            points = sorted(extract_point_mentions(relation, visible_points))
+        if len(points) < 2:
+            continue
+        evidence_mode = (raw_item.get("evidence_mode") or "hybrid").strip().lower()
+        if evidence_mode not in {"visual_only", "coordinate_only", "hybrid"}:
+            evidence_mode = "hybrid"
+        verification_role = (raw_item.get("verification_role") or "seed").strip().lower()
+        if verification_role not in {"seed", "verify", "derive"}:
+            verification_role = "seed"
+        priority_region = (raw_item.get("priority_region") or "mixed").strip().lower()
+        if priority_region not in {"goal_side", "bridge_side", "anchor_side", "mixed"}:
+            priority_region = "mixed"
+        cleaned.append(
+            {
+                "id": raw_item.get("id") or f"obs_{len(cleaned) + 1}",
+                "relation": relation,
+                "relation_type": raw_item.get("relation_type") or candidate.get("relation_type") or infer_relation_type_from_text(relation),
+                "points": points,
+                "evidence_mode": evidence_mode,
+                "visual_surface": (raw_item.get("visual_surface") or relation).strip(),
+                "coordinate_surface": (raw_item.get("coordinate_surface") or candidate.get("summary") or relation).strip(),
+                "verification_role": verification_role,
+                "priority_region": priority_region,
+            }
+        )
+    return cleaned[:max_len]
+
+
+def derive_observation_relations_from_coordinate_relations(coordinate_relations, visible_points, coordinate_candidates, max_len=4):
+    derived = []
+    candidate_map = {}
+    for candidate in coordinate_candidates or []:
+        if not isinstance(candidate, dict):
+            continue
+        summary = normalize_relation_surface((candidate.get("summary") or "")).strip()
+        if summary:
+            candidate_map[summary.lower()] = candidate
+    for relation in coordinate_relations[:max_len]:
+        normalized_relation = normalize_relation_surface(relation).strip()
+        if not normalized_relation:
+            continue
+        candidate = candidate_map.get(normalized_relation.lower(), {})
+        points = [
+            point.lower()
+            for point in (candidate.get("points") or [])
+            if isinstance(point, str) and point.strip() and point.lower() in visible_points
+        ]
+        if len(points) < 2:
+            points = sorted(extract_point_mentions(normalized_relation, visible_points))
+        if len(points) < 2:
+            continue
+        derived.append(
+            {
+                "id": f"obs_{len(derived) + 1}",
+                "relation": normalized_relation,
+                "relation_type": candidate.get("relation_type") or infer_relation_type_from_text(normalized_relation),
+                "points": points,
+                "evidence_mode": "hybrid",
+                "visual_surface": normalized_relation,
+                "coordinate_surface": candidate.get("summary") or normalized_relation,
+                "verification_role": "seed",
+                "priority_region": "mixed",
+            }
+        )
+    return derived[:max_len]
+
+
 def canonicalize_aux_direct_relations(items, aux_part, visible_points, preferred_immediate, min_len=1, max_len=3):
     raw_items = coerce_relation_list_field(items, max_len=max_len)
     cleaned = []
@@ -1626,6 +1721,20 @@ def validate_plan_response(
     if not ok:
         return False, message, None
     cleaned_plan["coordinate_relations"] = cleaned_relations
+    observation_relations = canonicalize_observation_relations(
+        plan.get("observation_relations"),
+        visible_points,
+        coordinate_candidates,
+        max_len=limits["coordinate_relations_max"],
+    )
+    if not observation_relations:
+        observation_relations = derive_observation_relations_from_coordinate_relations(
+            cleaned_plan["coordinate_relations"],
+            visible_points,
+            coordinate_candidates,
+            max_len=limits["coordinate_relations_max"],
+        )
+    cleaned_plan["observation_relations"] = observation_relations
 
     visible_relations_seed = canonicalize_visible_relations(
         plan.get("visible_relations"),
@@ -2522,6 +2631,155 @@ def select_coordinate_relations_for_skeleton(
     return selected[: max(min_len, min(max_len, len(selected)))] if selected else []
 
 
+def classify_observation_priority_region(points, goal_points, bridge_route_points):
+    point_set = {point.lower() for point in (points or []) if isinstance(point, str)}
+    goal_set = {point.lower() for point in (goal_points or []) if isinstance(point, str)}
+    bridge_set = {point.lower() for point in (bridge_route_points or []) if isinstance(point, str)}
+    if point_set & goal_set:
+        return "goal_side"
+    if point_set & bridge_set:
+        return "bridge_side"
+    return "mixed"
+
+
+def build_observation_relations_for_skeleton(
+    coordinate_candidates,
+    route_relations,
+    visible_points,
+    goal_points,
+    max_items=4,
+):
+    if not coordinate_candidates:
+        return []
+    route_text = " ".join(
+        relation.strip()
+        for relation in (route_relations or [])
+        if isinstance(relation, str) and relation.strip()
+    )
+    route_points = extract_point_mentions(route_text, visible_points)
+    goal_point_set = {point.lower() for point in (goal_points or []) if isinstance(point, str)}
+    observations = []
+    seen_relations = set()
+    ranked = []
+    for idx, candidate in enumerate(coordinate_candidates):
+        if not isinstance(candidate, dict):
+            continue
+        relation = normalize_relation_surface((candidate.get("summary") or "")).strip()
+        if not relation:
+            continue
+        points = [
+            point.lower()
+            for point in (candidate.get("points") or [])
+            if isinstance(point, str) and point.strip() and point.lower() in visible_points
+        ]
+        if len(points) < 2:
+            points = sorted(extract_point_mentions(relation, visible_points))
+        if len(points) < 2:
+            continue
+        relation_type = candidate.get("relation_type") or infer_relation_type_from_text(relation)
+        relation_points = set(points)
+        bridge_overlap = len(relation_points & route_points)
+        goal_overlap = len(relation_points & goal_point_set)
+        quality_bonus = 1 if relation_type in {"midpoint", "collinear", "equal_length", "parallel", "perpendicular"} else 0
+        score = (
+            goal_overlap,
+            bridge_overlap,
+            quality_bonus,
+            -float(candidate.get("score", 9999.0)),
+            -idx,
+        )
+        ranked.append((score, relation, points, relation_type, candidate))
+    ranked.sort(key=lambda item: item[0], reverse=True)
+
+    covered_points = set()
+    while ranked and len(observations) < max_items:
+        best_idx = None
+        best_key = None
+        for idx, (score, relation, points, relation_type, candidate) in enumerate(ranked):
+            lowered = relation.lower()
+            if lowered in seen_relations:
+                continue
+            new_points = len(set(points) - covered_points)
+            goal_overlap = len(set(points) & goal_point_set)
+            key = (
+                new_points,
+                goal_overlap,
+                *score,
+                -len(relation),
+                relation.lower(),
+            )
+            if best_key is None or key > best_key:
+                best_key = key
+                best_idx = idx
+        if best_idx is None:
+            break
+        _, relation, points, relation_type, candidate = ranked.pop(best_idx)
+        seen_relations.add(relation.lower())
+        covered_points.update(points)
+        observations.append(
+            {
+                "id": f"obs_{len(observations) + 1}",
+                "relation": relation,
+                "relation_type": relation_type,
+                "points": points,
+                "evidence_mode": "hybrid",
+                "visual_surface": relation,
+                "coordinate_surface": candidate.get("summary") or relation,
+                "verification_role": "seed",
+                "priority_region": classify_observation_priority_region(points, goal_points, route_points),
+            }
+        )
+    return observations
+
+
+def select_anchor_points_from_observations(
+    visible_points,
+    observation_relations,
+    goal_points,
+    min_anchor_count,
+    max_anchor_count,
+):
+    visible_points = [point.lower() for point in (visible_points or []) if isinstance(point, str) and point.strip()]
+    goal_set = {point.lower() for point in (goal_points or []) if isinstance(point, str)}
+    observation_points = []
+    observation_point_set = set()
+    point_scores = {}
+    for observation in observation_relations or []:
+        for point in observation.get("points", []) or []:
+            point = point.lower()
+            if point not in visible_points:
+                continue
+            observation_points.append(point)
+            observation_point_set.add(point)
+            point_scores[point] = point_scores.get(point, 0) + 1
+
+    ranked = sorted(
+        visible_points,
+        key=lambda point: (
+            point in goal_set,
+            point in observation_point_set,
+            -point_scores.get(point, 0),
+            visible_points.index(point),
+            point,
+        ),
+    )
+    anchors = []
+    reserved_non_anchor = set(observation_points[: min(3, len(observation_points))])
+    for point in ranked:
+        if point in reserved_non_anchor and len(visible_points) - len(anchors) > min_anchor_count:
+            continue
+        anchors.append(point)
+        if len(anchors) >= max_anchor_count:
+            break
+    if len(anchors) < min_anchor_count:
+        for point in visible_points:
+            if point not in anchors:
+                anchors.append(point)
+            if len(anchors) >= min_anchor_count:
+                break
+    return anchors[:max_anchor_count]
+
+
 def build_scripted_plan_skeleton(
     record,
     aux_part,
@@ -2535,30 +2793,57 @@ def build_scripted_plan_skeleton(
     limits = compute_plan_complexity_limits(point_coords, visible_goal=visible_goal, aux_part=aux_part)
     visible_points = extract_visible_point_names(point_coords)
     known_points = visible_points + [point.lower() for point in extract_aux_new_points(aux_part or "")]
+    goal_points = parse_goal_expression(visible_goal or "").get("points", [])
     goal_finish = build_canonical_goal_finish_relation(
         visible_goal,
         proof_guidance_payload=proof_guidance_payload,
     )
-
-    target_anchor_count = min(
-        limits["anchor_max"],
-        max(limits["anchor_min"], 4 if len(visible_points) >= 4 else len(visible_points)),
-    )
-    anchor_points = visible_points[:target_anchor_count]
 
     route_relations = proof_guidance_payload.get("ordered_route_relations") or (
         proof_guidance_payload.get("aux_bridge_relations", [])
         + proof_guidance_payload.get("bridge_relations", [])
         + proof_guidance_payload.get("goal_finish_relations", [])
     )
-    coordinate_relations = select_coordinate_relations_for_skeleton(
+    observation_relations = build_observation_relations_for_skeleton(
         coordinate_candidates,
         route_relations,
-        anchor_points,
         visible_points,
-        min_len=limits["coordinate_relations_min"],
-        max_len=limits["coordinate_relations_max"],
+        goal_points,
+        max_items=limits["coordinate_relations_max"],
     )
+    target_anchor_count = min(
+        limits["anchor_max"],
+        max(limits["anchor_min"], 4 if len(visible_points) >= 4 else len(visible_points)),
+    )
+    anchor_points = select_anchor_points_from_observations(
+        visible_points,
+        observation_relations,
+        goal_points,
+        min_anchor_count=limits["anchor_min"],
+        max_anchor_count=target_anchor_count,
+    )
+    coordinate_relations = [
+        observation.get("relation", "")
+        for observation in observation_relations
+        if isinstance(observation, dict) and observation.get("relation")
+    ]
+    if len(coordinate_relations) < limits["coordinate_relations_min"]:
+        coordinate_relations = select_coordinate_relations_for_skeleton(
+            coordinate_candidates,
+            route_relations,
+            anchor_points,
+            visible_points,
+            min_len=limits["coordinate_relations_min"],
+            max_len=limits["coordinate_relations_max"],
+        )
+        if not observation_relations:
+            observation_relations = build_observation_relations_for_skeleton(
+                coordinate_candidates,
+                route_relations,
+                visible_points,
+                goal_points,
+                max_items=limits["coordinate_relations_max"],
+            )
     anchor_points = rebalance_anchor_points_for_coordinate_coverage(
         anchor_points,
         coordinate_relations,
@@ -2736,6 +3021,7 @@ def build_scripted_plan_skeleton(
         "anchor_points": anchor_points,
         "anchor_relation": build_canonical_anchor_relation(anchor_points, visible_relations),
         "figure_overview": build_canonical_figure_overview(anchor_points, visible_relations, coordinate_relations, visible_points),
+        "observation_relations": observation_relations,
         "coordinate_relations": coordinate_relations,
         "visible_relations": visible_relations,
         "coordinate_hints": build_canonical_coordinate_hint(coordinate_relations),

@@ -513,6 +513,11 @@ class CotSftGenerationBudgetsTest(unittest.TestCase):
         self.assertTrue(ok, message)
         self.assertTrue(cleaned["bridge_steps"])
         self.assertIn("k", cleaned["bridge_steps"][0]["relation"].lower())
+        self.assertTrue(cleaned["observation_relations"])
+        self.assertEqual(
+            cleaned["coordinate_relations"],
+            [item["relation"] for item in cleaned["observation_relations"]],
+        )
 
     def test_merge_plan_skeleton_and_narrative_keeps_locked_relations(self):
         plan_skeleton = {
@@ -539,6 +544,76 @@ class CotSftGenerationBudgetsTest(unittest.TestCase):
         self.assertEqual(merged["anchor_relation"], "new anchor relation")
         self.assertEqual(merged["bridge_steps"][0]["relation"], "c, g, k are collinear")
         self.assertEqual(merged["bridge_steps"][0]["why_it_helps"], "new unlock")
+
+    def test_validate_plan_response_derives_observation_relations_from_coordinate_relations(self):
+        plan = {
+            "anchor_points": ["a", "b", "c"],
+            "anchor_relation": "points a, b, and c form the main visible frame.",
+            "figure_overview": "beyond the anchor points, the broader figure also involves d, f, and g.",
+            "coordinate_relations": [
+                "point f looks like the midpoint of ac",
+                "points b, d, and f look nearly collinear",
+                "point g looks like the midpoint of cd",
+            ],
+            "visible_relations": [
+                "ab equals bc",
+                "ab is perpendicular to bc",
+            ],
+            "coordinate_hints": (
+                "the clearest visual cues are that point f looks like the midpoint of ac "
+                "and that points b, d, and f look nearly collinear."
+            ),
+            "goal_bottleneck": "the target ratio still lacks a concrete bridge.",
+            "helper_idea": "a helper is needed that places the helper on a useful circle so the missing ratio relation can be connected.",
+            "construction": "construct point k such that b, f, g, and k are concyclic and c, d, and k are collinear.",
+            "aux_direct_relations": [
+                "b, f, g, k are concyclic",
+                "c, d, k are collinear",
+            ],
+            "bridge_steps": [
+                {
+                    "relation": "c, g, k are collinear",
+                    "depends_on": ["c, d, g are collinear", "c, d, k are collinear"],
+                    "why_it_helps": "this is required to prove angle bf/bg equals angle fk/gk next.",
+                },
+                {
+                    "relation": "angle bf/bg equals angle fk/gk",
+                    "depends_on": ["b, f, g, k are concyclic", "c, g, k are collinear"],
+                    "why_it_helps": "this is required to prove ratio ae to af equals ratio ce to cj next.",
+                },
+            ],
+            "goal_finish": "ratio ae to af equals ratio ce to cj",
+        }
+        point_coords = {
+            "a": (191, 71),
+            "b": (98, 12),
+            "c": (38, 105),
+            "d": (132, 165),
+            "e": (162, 118),
+            "f": (115, 88),
+            "g": (85, 135),
+            "j": (148, 241),
+        }
+        coordinate_candidates = [
+            {"relation_type": "midpoint", "points": ["f", "a", "c"], "summary": "point f looks like the midpoint of ac"},
+            {"relation_type": "collinear", "points": ["b", "d", "f"], "summary": "points b, d, and f look nearly collinear"},
+            {"relation_type": "midpoint", "points": ["g", "c", "d"], "summary": "point g looks like the midpoint of cd"},
+        ]
+        aux_part = "<aux> x00 k : cyclic b f g k [016] coll c d k [017] ; </aux>"
+        sanitized_rest = "<proof>coll c g k; eqangle b f b g f k g k; eqratio a e a f c e c j;</proof>"
+
+        ok, message, cleaned = validate_plan_response(
+            plan,
+            point_coords,
+            visible_goal="eqratio a e a f c e c j",
+            aux_part=aux_part,
+            coordinate_candidates=coordinate_candidates,
+            sanitized_rest=sanitized_rest,
+        )
+
+        self.assertTrue(ok, message)
+        self.assertEqual(len(cleaned["observation_relations"]), 3)
+        self.assertEqual(cleaned["observation_relations"][0]["relation"], "point f looks like the midpoint of ac")
 
     def test_validate_writer_body_rejects_bridge_sentence_that_uses_conclusion_as_its_own_support(self):
         plan = {
