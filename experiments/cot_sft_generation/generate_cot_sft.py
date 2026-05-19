@@ -216,8 +216,15 @@ logger = logging.getLogger(__name__)
 SCRIPT_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SCRIPT_DIR.parent.parent
 DEFAULT_INPUT_JSONL = REPO_ROOT / "datasets/20260512/geometry_clauses10_samples100k_inverted_fl_points_only.jsonl"
-DEFAULT_MODEL_NAME = "qwen/qwen3.5-plus-02-15"
-DEFAULT_API_TIMEOUT_SECONDS = float(os.getenv("ZJUVAI_TIMEOUT_SECONDS", "180"))
+DEFAULT_MODEL_NAME = os.getenv("ZJUVAI_MODEL_NAME", "qwen/qwen2.5-vl-72b-instruct")
+DEFAULT_FALLBACK_MODELS = [
+    model_name
+    for model_name in (
+        os.getenv("ZJUVAI_FALLBACK_MODELS", "gpt-4.1-mini,gpt-4o-mini").split(",")
+    )
+    if model_name.strip()
+]
+DEFAULT_API_TIMEOUT_SECONDS = float(os.getenv("ZJUVAI_TIMEOUT_SECONDS", "120"))
 DEFAULT_API_CALL_RETRIES = int(os.getenv("ZJUVAI_API_RETRIES", "3"))
 DEFAULT_API_RETRY_BACKOFF_SECONDS = float(os.getenv("ZJUVAI_API_RETRY_BACKOFF_SECONDS", "3"))
 FORBIDDEN_THINKING_PATTERNS = [
@@ -291,6 +298,17 @@ configure_logging()
 
 
 client = None
+CLIENT_BASE_URL = os.getenv("ZJUVAI_BASE_URL", "https://api.zjuqx.cn/v1")
+CLIENT_TIMEOUT_SECONDS = DEFAULT_API_TIMEOUT_SECONDS
+
+
+def configure_client(base_url=None, timeout_seconds=None):
+    global client, CLIENT_BASE_URL, CLIENT_TIMEOUT_SECONDS
+    if base_url is not None:
+        CLIENT_BASE_URL = base_url
+    if timeout_seconds is not None:
+        CLIENT_TIMEOUT_SECONDS = timeout_seconds
+    client = None
 
 
 def get_client():
@@ -304,10 +322,30 @@ def get_client():
         )
     client = OpenAI(
         api_key=os.getenv("ZJUVAI_API_KEY"),
-        base_url=os.getenv("ZJUVAI_BASE_URL", "https://api.zjuqx.cn/v1"),
-        timeout=DEFAULT_API_TIMEOUT_SECONDS,
+        base_url=CLIENT_BASE_URL,
+        timeout=CLIENT_TIMEOUT_SECONDS,
     )
     return client
+
+
+def normalize_model_name_list(raw_models):
+    if raw_models is None:
+        return []
+    if isinstance(raw_models, str):
+        raw_items = raw_models.split(",")
+    else:
+        raw_items = raw_models
+    normalized = []
+    seen = set()
+    for item in raw_items:
+        if not isinstance(item, str):
+            continue
+        model_name = item.strip()
+        if not model_name or model_name in seen:
+            continue
+        normalized.append(model_name)
+        seen.add(model_name)
+    return normalized
 
 
 def ensure_parent_dir(file_path):
@@ -3123,6 +3161,11 @@ def is_transient_api_error(exc):
     return any(marker in message for marker in transient_markers)
 
 
+def is_timeout_api_error(exc):
+    message = str(exc).lower()
+    return "timed out" in message or "timeout" in message
+
+
 def should_extend_plan_retry_budget(validation_message, used_bonus_retries, max_bonus_retries=2):
     if not isinstance(validation_message, str) or not validation_message.strip():
         return False
@@ -3136,30 +3179,74 @@ def should_extend_plan_retry_budget(validation_message, used_bonus_retries, max_
     return any(marker in validation_message for marker in extension_markers)
 
 
-def call_model(messages, model_name, temperature=0.2, max_tokens=2048):
+def call_model(messages, model_name, fallback_model_names=None, temperature=0.2, max_tokens=2048):
     last_exc = None
-    for attempt in range(1, DEFAULT_API_CALL_RETRIES + 1):
-        try:
-            response = get_client().chat.completions.create(
-                model=model_name,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
-            return response.choices[0].message.content
-        except Exception as exc:
-            last_exc = exc
-            if attempt >= DEFAULT_API_CALL_RETRIES or not is_transient_api_error(exc):
-                raise
-            sleep_seconds = DEFAULT_API_RETRY_BACKOFF_SECONDS * attempt + random.uniform(0.0, 1.0)
-            logger.warning(
-                "Transient API failure on call attempt %s/%s: %s. Retrying in %.1fs",
-                attempt,
-                DEFAULT_API_CALL_RETRIES,
-                exc,
-                sleep_seconds,
-            )
-            time.sleep(sleep_seconds)
+    model_sequence = normalize_model_name_list([model_name] + list(fallback_model_names or []))
+    for model_index, active_model_name in enumerate(model_sequence, start=1):
+        for attempt in range(1, DEFAULT_API_CALL_RETRIES + 1):
+            try:
+                response = get_client().chat.completions.create(
+                    model=active_model_name,
+                    messages=messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
+                if active_model_name != model_name:
+                    logger.info(
+                        "Model fallback succeeded with %s (primary %s timed out or failed earlier).",
+                        active_model_name,
+                        model_name,
+                    )
+                return response.choices[0].message.content
+            except Exception as exc:
+                last_exc = exc
+                is_last_attempt = attempt >= DEFAULT_API_CALL_RETRIES
+                transient = is_transient_api_error(exc)
+                timed_out = is_timeout_api_error(exc)
+                has_next_model = model_index < len(model_sequence)
+                if not transient and not has_next_model:
+                    raise
+                if not transient and has_next_model:
+                    logger.warning(
+                        "Model %s failed with a non-transient error on attempt %s/%s: %s. Trying fallback model %s.",
+                        active_model_name,
+                        attempt,
+                        DEFAULT_API_CALL_RETRIES,
+                        exc,
+                        model_sequence[model_index],
+                    )
+                    break
+                if timed_out and has_next_model:
+                    logger.warning(
+                        "Model %s timed out on attempt %s/%s: %s. Switching immediately to fallback model %s.",
+                        active_model_name,
+                        attempt,
+                        DEFAULT_API_CALL_RETRIES,
+                        exc,
+                        model_sequence[model_index],
+                    )
+                    break
+                if is_last_attempt and has_next_model:
+                    logger.warning(
+                        "Model %s exhausted %s transient retries: %s. Trying fallback model %s.",
+                        active_model_name,
+                        DEFAULT_API_CALL_RETRIES,
+                        exc,
+                        model_sequence[model_index],
+                    )
+                    break
+                if is_last_attempt:
+                    raise
+                sleep_seconds = DEFAULT_API_RETRY_BACKOFF_SECONDS * attempt + random.uniform(0.0, 1.0)
+                logger.warning(
+                    "Transient API failure on model %s call attempt %s/%s: %s. Retrying in %.1fs",
+                    active_model_name,
+                    attempt,
+                    DEFAULT_API_CALL_RETRIES,
+                    exc,
+                    sleep_seconds,
+                )
+                time.sleep(sleep_seconds)
     raise last_exc
 
 
@@ -3174,6 +3261,7 @@ def run_plan_stage(
     sanitized_rest,
     visible_premise_summaries,
     max_retries,
+    fallback_model_names=None,
 ):
     last_error = None
     last_output = None
@@ -3185,7 +3273,7 @@ def run_plan_stage(
         try:
             logger.info(f"[{stage_name}] Attempt {attempt}/{allowed_retries}")
             start = time.time()
-            output = call_model(messages, model_name)
+            output = call_model(messages, model_name, fallback_model_names=fallback_model_names)
             elapsed = time.time() - start
             last_output = output
             ok, message, plan = validate_plan_response(
@@ -3247,6 +3335,7 @@ def run_plan_narrative_stage(
     sanitized_rest,
     visible_premise_summaries,
     max_retries,
+    fallback_model_names=None,
 ):
     last_error = None
     last_output = None
@@ -3255,7 +3344,7 @@ def run_plan_narrative_stage(
         try:
             logger.info(f"[{stage_name}] Attempt {attempt}/{max_retries}")
             start = time.time()
-            output = call_model(messages, model_name)
+            output = call_model(messages, model_name, fallback_model_names=fallback_model_names)
             elapsed = time.time() - start
             last_output = output
             narrative_fields = extract_json_object(output)
@@ -3317,7 +3406,7 @@ def run_plan_narrative_stage(
     }
 
 
-def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_prefix, plan, max_retries):
+def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_prefix, plan, max_retries, fallback_model_names=None):
     last_error = None
     last_output = None
 
@@ -3325,7 +3414,7 @@ def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_pr
         try:
             logger.info(f"[{stage_name}] Attempt {attempt}/{max_retries}")
             start = time.time()
-            output = call_model(messages, model_name)
+            output = call_model(messages, model_name, fallback_model_names=fallback_model_names)
             elapsed = time.time() - start
             last_output = output
             ok, message = validate_writer_body(
@@ -3366,7 +3455,17 @@ def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_pr
     }
 
 
-def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_name, max_retries, verbose, plan_mode="hybrid"):
+def generate_thinking(
+    record,
+    image_path: Path,
+    aux_part,
+    sanitized_rest,
+    model_name,
+    max_retries,
+    verbose,
+    plan_mode="hybrid",
+    fallback_model_names=None,
+):
     point_coords = get_point_coords(record)
     visible_goal = extract_problem_goal(record)
     coordinate_candidates = build_hidden_coordinate_candidates(point_coords, max_items=64, relax_type_limits=True)
@@ -3389,6 +3488,7 @@ def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_
             "plan",
             plan_messages,
             model_name=model_name,
+            fallback_model_names=fallback_model_names,
             point_coords=point_coords,
             visible_goal=visible_goal,
             aux_part=aux_part,
@@ -3442,6 +3542,7 @@ def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_
             "plan_narrative",
             plan_messages,
             model_name=model_name,
+            fallback_model_names=fallback_model_names,
             plan_skeleton=cleaned_skeleton,
             point_coords=point_coords,
             visible_goal=visible_goal,
@@ -3498,6 +3599,7 @@ def generate_thinking(record, image_path: Path, aux_part, sanitized_rest, model_
         "write",
         write_messages,
         model_name=model_name,
+        fallback_model_names=fallback_model_names,
         visible_goal=visible_goal,
         injected_prefix=injected_prefix,
         plan=plan_result["parsed"],
@@ -3561,6 +3663,7 @@ def process_and_generate_sft(
     max_retries,
     run_metadata=None,
     run_dir=None,
+    fallback_model_names=None,
 ):
     input_path = resolve_input_jsonl(input_jsonl)
     if not input_path.exists():
@@ -3653,6 +3756,7 @@ def process_and_generate_sft(
             aux_part=record["_aux_part"],
             sanitized_rest=record["_sanitized_rest"],
             model_name=model_name,
+            fallback_model_names=fallback_model_names,
             max_retries=max_retries,
             verbose=verbose,
             plan_mode=plan_mode,
@@ -3808,6 +3912,21 @@ def parse_args():
         help=f"Teacher model name. Default: {DEFAULT_MODEL_NAME}",
     )
     parser.add_argument(
+        "--fallback-models",
+        type=str,
+        default=",".join(DEFAULT_FALLBACK_MODELS),
+        help=(
+            "Comma-separated fallback model names used when the primary model times out or fails. "
+            f"Default: {','.join(DEFAULT_FALLBACK_MODELS)}"
+        ),
+    )
+    parser.add_argument(
+        "--api-timeout-seconds",
+        type=float,
+        default=DEFAULT_API_TIMEOUT_SECONDS,
+        help=f"Per-request API timeout in seconds. Default: {DEFAULT_API_TIMEOUT_SECONDS}",
+    )
+    parser.add_argument(
         "--plan-mode",
         type=str,
         choices=["hybrid", "llm"],
@@ -3837,6 +3956,8 @@ def parse_args():
 
 if __name__ == "__main__":
     args = parse_args()
+    fallback_model_names = normalize_model_name_list(args.fallback_models)
+    configure_client(timeout_seconds=args.api_timeout_seconds)
     args_dict = vars(args).copy()
     run_dir = build_run_dir(args.output)
     run_metadata = build_run_config(
@@ -3844,12 +3965,13 @@ if __name__ == "__main__":
         output_jsonl=args.output,
         run_dir=run_dir,
         model_name=args.model_name,
+        fallback_model_names=fallback_model_names,
         script_path=__file__,
         cwd=os.getcwd(),
         repo_root=REPO_ROOT,
         default_input_jsonl=str(DEFAULT_INPUT_JSONL),
-        api_base_url=os.getenv("ZJUVAI_BASE_URL", "https://api.zjuqx.cn/v1"),
-        api_timeout_seconds=DEFAULT_API_TIMEOUT_SECONDS,
+        api_base_url=CLIENT_BASE_URL,
+        api_timeout_seconds=args.api_timeout_seconds,
         api_call_retries=DEFAULT_API_CALL_RETRIES,
         api_retry_backoff_seconds=DEFAULT_API_RETRY_BACKOFF_SECONDS,
     )
@@ -3860,6 +3982,7 @@ if __name__ == "__main__":
         sample_size=args.num_samples,
         num_workers=args.num_workers,
         model_name=args.model_name,
+        fallback_model_names=fallback_model_names,
         plan_mode=args.plan_mode,
         verbose=args.verbose,
         random_sample=not args.sequential,

@@ -102,6 +102,7 @@ def build_run_config(
     api_timeout_seconds: int,
     api_call_retries: int,
     api_retry_backoff_seconds: int,
+    fallback_model_names: Optional[list[str]] = None,
 ) -> Dict[str, Any]:
     run_config = {
         "artifact_schema_version": ARTIFACT_SCHEMA_VERSION,
@@ -110,6 +111,7 @@ def build_run_config(
         "cwd": cwd,
         "repo_root": os.path.abspath(repo_root),
         "model_name": model_name,
+        "fallback_model_names": list(fallback_model_names or []),
         "api_base_url": api_base_url,
         "api_timeout_seconds": api_timeout_seconds,
         "api_call_retries": api_call_retries,

@@ -13,6 +13,7 @@ from experiments.cot_sft_generation.generate_cot_sft import (
     find_skipped_prerequisite_route_checkpoint,
     find_unsupported_bridge_relation_segments,
     merge_plan_skeleton_and_narrative,
+    normalize_model_name_list,
     rebalance_anchor_points_for_coordinate_coverage,
     run_plan_stage,
     should_extend_plan_retry_budget,
@@ -25,6 +26,12 @@ from experiments.cot_sft_generation.geometry_text import build_hidden_coordinate
 
 
 class CotSftGenerationBudgetsTest(unittest.TestCase):
+    def test_normalize_model_name_list_deduplicates_and_trims(self):
+        self.assertEqual(
+            normalize_model_name_list(" qwen/qwen2.5-vl-72b-instruct , gpt-4.1-mini, , qwen/qwen2.5-vl-72b-instruct "),
+            ["qwen/qwen2.5-vl-72b-instruct", "gpt-4.1-mini"],
+        )
+
     def test_compute_plan_complexity_limits_keeps_simple_budget_tight(self):
         limits = compute_plan_complexity_limits(
             point_coords={"a": (0, 0), "b": (2, 0), "c": (1, 2), "d": (3, 2)},
