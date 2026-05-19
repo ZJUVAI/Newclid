@@ -28,6 +28,12 @@ class CotSftPromptBuildersTest(unittest.TestCase):
             "anchor_relation": "triangle abc is the main visible frame",
             "figure_overview": "point d lies on line bc",
             "coordinate_hints": "the near-collinearity of b, c, and d matters",
+            "observation_relations": [
+                {
+                    "relation": "points b, c, and d look nearly collinear",
+                    "points": ["b", "c", "d"],
+                }
+            ],
             "coordinate_relations": ["points b, c, and d look nearly collinear"],
             "visible_relations": ["ab equals ac"],
             "goal_bottleneck": "the target angle still needs a link through d",
@@ -50,6 +56,8 @@ class CotSftPromptBuildersTest(unittest.TestCase):
                 "bridge_focus_points": ["d", "e"],
                 "coordinate_focus_points": ["d"],
                 "coordinate_focus_relations": ["points b, c, and d look nearly collinear"],
+                "observation_focus_relations": ["points b, c, and d look nearly collinear"],
+                "observation_focus_regions": ["around d"],
                 "coordinate_reuse_min": 1,
                 "opening_sentence_hint": "name d in the opening obstacle",
                 "helper_sentence_hint": "name d and e in the helper sentence",
@@ -172,6 +180,7 @@ class CotSftPromptBuildersTest(unittest.TestCase):
         self.assertIn("[Approved Writer Handoff]", prompt)
         self.assertIn("[Compression Target]", prompt)
         self.assertIn("Output only the plain-text body.", prompt)
+        self.assertIn("observation-led sentence built from the approved visual checks", prompt)
 
     def test_build_writer_retry_feedback_surfaces_contract_specific_hints(self):
         feedback = build_writer_retry_feedback(
@@ -193,6 +202,7 @@ class CotSftPromptBuildersTest(unittest.TestCase):
 
         self.assertIn("approved coordinate relations again", feedback)
         self.assertIn("points b, c, and d look nearly collinear", feedback)
+        self.assertIn("preferred early observation cues", feedback)
 
     def test_build_writer_retry_feedback_surfaces_coordinate_paraphrase_hint_for_overlap(self):
         feedback = build_writer_retry_feedback(

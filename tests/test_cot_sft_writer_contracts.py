@@ -35,6 +35,12 @@ class CotSftWriterContractsTest(unittest.TestCase):
         plan = {
             "anchor_points": ["a", "b", "c"],
             "figure_overview": "point d lies on bc while point e lies beyond c on line ac",
+            "observation_relations": [
+                {
+                    "relation": "points b, c, and d are collinear",
+                    "points": ["b", "c", "d"],
+                }
+            ],
             "coordinate_relations": ["points b, c, d are collinear"],
             "visible_relations": ["line ae is parallel to line bd"],
             "bridge_steps": [
@@ -54,6 +60,7 @@ class CotSftWriterContractsTest(unittest.TestCase):
         self.assertTrue(coverage["non_anchor_points"])
         self.assertTrue(coverage["focus_relations"])
         self.assertEqual(coverage["coordinate_focus_points"], ["d"])
+        self.assertEqual(coverage["observation_focus_relations"], ["b, c, d are collinear"])
         self.assertEqual(coverage["coordinate_reuse_min"], 1)
 
     def test_build_writer_handoff_and_prefix_block_include_expected_fields(self):
@@ -62,6 +69,12 @@ class CotSftWriterContractsTest(unittest.TestCase):
             "anchor_relation": "triangle abc is the main visible frame",
             "figure_overview": "point d lies on line bc",
             "coordinate_hints": "the near-collinearity of b, c, and d matters",
+            "observation_relations": [
+                {
+                    "relation": "points b, c, and d look nearly collinear",
+                    "points": ["b", "c", "d"],
+                }
+            ],
             "coordinate_relations": ["points b, c, and d look nearly collinear"],
             "visible_relations": ["ab equals ac"],
             "goal_bottleneck": "the target angle still needs a link through d",
@@ -84,6 +97,8 @@ class CotSftWriterContractsTest(unittest.TestCase):
                 "bridge_focus_points": ["d", "e"],
                 "coordinate_focus_points": ["d"],
                 "coordinate_focus_relations": ["points b, c, and d look nearly collinear"],
+                "observation_focus_relations": ["points b, c, and d look nearly collinear"],
+                "observation_focus_regions": ["around d"],
                 "coordinate_reuse_min": 1,
                 "opening_sentence_hint": "name d in the opening obstacle",
                 "helper_sentence_hint": "name d and e in the helper sentence",
@@ -97,6 +112,8 @@ class CotSftWriterContractsTest(unittest.TestCase):
 
         self.assertEqual(handoff["bridge_steps"][0]["relation"], "de equals ce")
         self.assertEqual(handoff["coordinate_focus_points"], ["d"])
+        self.assertEqual(handoff["observation_focus_relations"], ["points b, c, and d look nearly collinear"])
+        self.assertTrue(prefix.startswith("The first useful visual checks are"))
         self.assertIn("<point>a</point><coord>(0,0)</coord>", prefix)
         self.assertIn("The visible givens also show that ab equals ac.", prefix)
 

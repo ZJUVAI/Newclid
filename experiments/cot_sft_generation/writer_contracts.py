@@ -152,6 +152,24 @@ def build_anchor_sentence(plan, point_coords):
     return f"From the diagram, the key visible anchors are {anchor_list}; visually, {relation}."
 
 
+def build_observation_sentence(plan):
+    observation_relations = []
+    for observation in plan.get("observation_relations", []) or []:
+        if not isinstance(observation, dict):
+            continue
+        relation = normalize_relation_surface((observation.get("relation") or "")).strip().rstrip(".")
+        if relation:
+            observation_relations.append(relation)
+    if not observation_relations:
+        return build_coordinate_hint_sentence(plan)
+    relation_text = "; ".join(observation_relations[:3]).strip().rstrip(".")
+    return f"The first useful visual checks are that {relation_text}."
+
+
+def build_orientation_sentence(plan, point_coords):
+    return build_anchor_sentence(plan, point_coords)
+
+
 def build_overview_sentence(plan):
     overview = plan["figure_overview"].strip().rstrip(".")
     return f"{overview}."
@@ -179,6 +197,12 @@ def build_prefix_coverage_notes(plan):
     figure_overview = plan.get("figure_overview")
     if isinstance(figure_overview, str) and figure_overview.strip():
         notes.append(f"overview already covered: {figure_overview.strip().rstrip('.')}")
+    for observation in plan.get("observation_relations", []) or []:
+        if not isinstance(observation, dict):
+            continue
+        relation = observation.get("relation")
+        if isinstance(relation, str) and relation.strip():
+            notes.append(f"observation cue already covered: {relation.strip().rstrip('.')}")
     for relation in plan.get("coordinate_relations", []) or []:
         if isinstance(relation, str) and relation.strip():
             notes.append(f"coordinate cue already covered: {relation.strip().rstrip('.')}")
@@ -257,6 +281,23 @@ def build_prefix_reuse_guidance(plan):
         return "[]"
     guidance = []
     seen = set()
+    for observation in plan.get("observation_relations", []) or []:
+        if not isinstance(observation, dict):
+            continue
+        relation = observation.get("relation")
+        if not isinstance(relation, str) or not relation.strip():
+            continue
+        normalized = normalize_relation_surface(relation).strip().rstrip(".")
+        lowered = normalized.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        guidance.append(
+            {
+                "already_in_prefix": normalized,
+                "reuse_hint": build_relation_reuse_hint(normalized),
+            }
+        )
     for field_name in ["coordinate_relations", "visible_relations"]:
         for relation in plan.get(field_name, []) or []:
             if not isinstance(relation, str) or not relation.strip():
@@ -314,6 +355,12 @@ def build_plan_coverage_targets(plan, visible_goal="", visible_points=None, max_
     overview = plan.get("figure_overview")
     if isinstance(overview, str) and overview.strip():
         relation_sources.append(("figure_overview", overview.strip(), False))
+    for observation in plan.get("observation_relations", []) or []:
+        if not isinstance(observation, dict):
+            continue
+        relation = observation.get("relation", "")
+        if isinstance(relation, str) and relation.strip():
+            relation_sources.append(("observation_relation", relation.strip(), True))
     for relation in plan.get("visible_relations", []) or []:
         if isinstance(relation, str) and relation.strip():
             relation_sources.append(("visible_relation", relation.strip(), True))
@@ -406,8 +453,35 @@ def build_plan_coverage_targets(plan, visible_goal="", visible_points=None, max_
         item["relation"]
         for item in coordinate_focus_relations[:coordinate_focus_relation_cap]
     ]
+    observation_focus_relations = [
+        item["relation"]
+        for item in focus_relations
+        if item["source"] == "observation_relation"
+    ][:coordinate_focus_relation_cap]
+    observation_focus_regions = []
+    for item in focus_relations:
+        if item["source"] != "observation_relation":
+            continue
+        region_points = item.get("points", [])[:4]
+        if not region_points:
+            continue
+        region_text = f"around {join_natural_list(region_points)}"
+        if region_text not in observation_focus_regions:
+            observation_focus_regions.append(region_text)
+    goal_side_relation_chain = [
+        item["relation"]
+        for item in focus_relations
+        if any(point in goal_points_outside_anchors for point in item.get("points", []))
+    ][:max_relations]
+    bridge_side_relation_chain = [
+        item["relation"]
+        for item in focus_relations
+        if not any(point in goal_points_outside_anchors for point in item.get("points", []))
+    ][:max_relations]
     coordinate_reuse_min = 0
-    if coordinate_focus_relation_texts:
+    if observation_focus_relations:
+        coordinate_reuse_min = 2 if extended_budget and len(observation_focus_relations) >= 2 else 1
+    elif coordinate_focus_relation_texts:
         coordinate_reuse_min = 2 if extended_budget and len(coordinate_focus_relation_texts) >= 2 else 1
     early_coordinate_reuse_min = 1 if coordinate_focus_relation_texts else 0
 
@@ -423,6 +497,10 @@ def build_plan_coverage_targets(plan, visible_goal="", visible_points=None, max_
     if coordinate_focus_points:
         reminder_parts.append(
             f"keep using coordinate-backed cues around {join_natural_list(coordinate_focus_points)} instead of collapsing back to the anchor frame"
+        )
+    if observation_focus_regions:
+        reminder_parts.append(
+            f"keep the early reasoning grounded in observation regions {join_natural_list(observation_focus_regions)} before falling back to orientation anchors"
         )
     reminder = ". ".join(reminder_parts).strip()
     if reminder:
@@ -452,6 +530,10 @@ def build_plan_coverage_targets(plan, visible_goal="", visible_points=None, max_
         "bridge_focus_points": bridge_focus_points,
         "coordinate_focus_points": coordinate_focus_points,
         "coordinate_focus_relations": coordinate_focus_relation_texts,
+        "observation_focus_relations": observation_focus_relations,
+        "observation_focus_regions": observation_focus_regions,
+        "goal_side_relation_chain": goal_side_relation_chain,
+        "bridge_side_relation_chain": bridge_side_relation_chain,
         "coordinate_reuse_min": coordinate_reuse_min,
         "early_coordinate_reuse_min": early_coordinate_reuse_min,
         "focus_relations": focus_relations[:max_relations],
@@ -774,6 +856,10 @@ def build_writer_handoff(plan):
         "bridge_focus_points": coverage_targets.get("bridge_focus_points", []),
         "coordinate_focus_points": coverage_targets.get("coordinate_focus_points", []),
         "coordinate_focus_relations": coverage_targets.get("coordinate_focus_relations", []),
+        "observation_focus_relations": coverage_targets.get("observation_focus_relations", []),
+        "observation_focus_regions": coverage_targets.get("observation_focus_regions", []),
+        "goal_side_relation_chain": coverage_targets.get("goal_side_relation_chain", []),
+        "bridge_side_relation_chain": coverage_targets.get("bridge_side_relation_chain", []),
         "coordinate_reuse_min": coverage_targets.get("coordinate_reuse_min", 0),
         "opening_sentence_hint": coverage_targets.get("opening_sentence_hint", ""),
         "helper_sentence_hint": coverage_targets.get("helper_sentence_hint", ""),
@@ -791,8 +877,11 @@ def build_writer_sentence_blueprints(plan):
             "goal_finish": plan.get("goal_finish", ""),
             "coverage_points": coverage_targets.get("opening_focus_points", []),
             "preferred_focus_hint": coverage_targets.get("opening_sentence_hint", ""),
+            "observation_focus_relations": coverage_targets.get("observation_focus_relations", []),
+            "observation_focus_regions": coverage_targets.get("observation_focus_regions", []),
             "instruction": (
                 "State the obstacle directly in goal-side terms without re-describing the injected prefix. "
+                "Prefer continuing from the observation-led prefix rather than restarting from the anchor frame. "
                 "When possible, anchor that obstacle in one of the listed non-anchor coverage points instead of narrating only the anchor triangle."
             ),
         },
@@ -802,6 +891,8 @@ def build_writer_sentence_blueprints(plan):
             "preferred_focus_hint": coverage_targets.get("helper_sentence_hint", ""),
             "coordinate_focus_points": coverage_targets.get("coordinate_focus_points", []),
             "coordinate_focus_relations": coverage_targets.get("coordinate_focus_relations", []),
+            "observation_focus_relations": coverage_targets.get("observation_focus_relations", []),
+            "observation_focus_regions": coverage_targets.get("observation_focus_regions", []),
             "instruction": (
                 "State the missing helper mechanism impersonally and concretely, keep it tied to the broader visible figure listed under the coverage points, and start reusing the approved non-anchor coordinate cues instead of dropping back to anchor-only language."
             ),
@@ -858,8 +949,9 @@ def build_writer_sentence_blueprints(plan):
 
 def build_prefix_sentences(plan, point_coords):
     sentences = [
-        build_anchor_sentence(plan, point_coords),
+        build_observation_sentence(plan),
         build_overview_sentence(plan),
+        build_orientation_sentence(plan, point_coords),
         build_coordinate_hint_sentence(plan),
     ]
     visible_relation_sentence = build_visible_relation_sentence(plan)

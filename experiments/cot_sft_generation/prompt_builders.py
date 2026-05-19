@@ -509,6 +509,16 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
             if isinstance(relation, str) and relation.strip()
         ] if isinstance(plan, dict) else []
         coverage_targets_dict = plan.get("coverage_targets", {}) if isinstance(plan, dict) else {}
+        observation_focus_relations = [
+            relation
+            for relation in (coverage_targets_dict.get("observation_focus_relations") or [])
+            if isinstance(relation, str) and relation.strip()
+        ]
+        observation_focus_regions = [
+            region
+            for region in (coverage_targets_dict.get("observation_focus_regions") or [])
+            if isinstance(region, str) and region.strip()
+        ]
         coordinate_focus_points = [
             point
             for point in (coverage_targets_dict.get("coordinate_focus_points") or [])
@@ -517,6 +527,14 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
         targeted_hints.append(
             "- after the prefix, mention the approved coordinate relations again in natural language so the body actually uses the visual cues instead of leaving them only in the injected prefix."
         )
+        if observation_focus_relations:
+            targeted_hints.append(
+                f"- preferred early observation cues: {json.dumps(observation_focus_relations[:3], ensure_ascii=False)}."
+            )
+        if observation_focus_regions:
+            targeted_hints.append(
+                f"- keep the early body grounded in observation regions such as {join_natural_list(observation_focus_regions[:3])} before falling back to orientation anchors."
+            )
         if coordinate_relations:
             targeted_hints.append(
                 f"- approved coordinate cues available for reuse: {json.dumps(coordinate_relations[:3], ensure_ascii=False)}."
@@ -530,6 +548,11 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
         )
     if "Writer early body must connect the bottleneck/helper to at least one approved non-anchor coordinate cue" in validation_message:
         coverage_targets_dict = plan.get("coverage_targets", {}) if isinstance(plan, dict) else {}
+        observation_focus_relations = [
+            relation
+            for relation in (coverage_targets_dict.get("observation_focus_relations") or [])
+            if isinstance(relation, str) and relation.strip()
+        ]
         coordinate_focus_relations = [
             relation
             for relation in (coverage_targets_dict.get("coordinate_focus_relations") or [])
@@ -543,6 +566,10 @@ def build_writer_retry_feedback(validation_message, plan, injected_prefix=""):
         targeted_hints.append(
             "- within the first three body sentences, tie the obstacle or helper to at least one approved non-anchor coordinate cue instead of waiting until the final bridge."
         )
+        if observation_focus_relations:
+            targeted_hints.append(
+                f"- preferred early observation cues: {json.dumps(observation_focus_relations[:3], ensure_ascii=False)}."
+            )
         if coordinate_focus_relations:
             targeted_hints.append(
                 f"- preferred early coordinate cues: {json.dumps(coordinate_focus_relations[:3], ensure_ascii=False)}."
@@ -1021,7 +1048,7 @@ def build_write_prompt(record, plan, aux_part, injected_prefix_block, proof_guid
         "If a later bridge sentence needs one of the prefix-covered visible relations, prefer these paraphrase patterns instead of copying the same wording again.\n"
         f"{prefix_reuse_guidance}\n\n"
         "[Write Requirements]\n"
-        "Write only the body text that comes after the script-supplied prefix block: an anchor sentence with coordinate tags, a full-figure overview sentence, a coordinate-focused prefix built from the approved relation checks, and a visible-relations sentence injected from the approved plan.\n"
+        "Write only the body text that comes after the script-supplied prefix block: an observation-led sentence built from the approved visual checks, a full-figure overview sentence, an orientation sentence with coordinate tags, a coordinate-focused sentence built from the approved relation checks, and a visible-relations sentence injected from the approved plan.\n"
         "Do NOT output <thinking>, <point>, or <coord> tags; the script will add the prefix sentences and the coordinate tags itself.\n"
         "The body must satisfy all of the following:\n"
         "1. It should sound supportable from the image and visible problem text alone.\n"
@@ -1046,7 +1073,7 @@ def build_write_prompt(record, plan, aux_part, injected_prefix_block, proof_guid
         "18. Stay impersonal. Do not write in the first person.\n"
         "19. The very first sentence of your body should state the bottleneck or goal-side obstacle. Do not spend the first sentence re-describing triangle abc, the midpoint layout, or the visible givens already covered by the injected prefix block.\n"
         "19a. The second sentence should state the missing helper idea, not repeat any overview, coordinate cue, or visible relation already listed under Prefix-Covered Facts.\n"
-        "19b. Use the Global Coverage Targets block to keep the obstacle and helper tied to non-anchor visible points or substructures whenever the approved plan depends on them.\n"
+        "19b. Use the Global Coverage Targets block to keep the obstacle and helper tied to non-anchor visible points, observation regions, or local substructures whenever the approved plan depends on them.\n"
         "19c. Reuse the approved coordinate cues early, especially the ones attached to non-anchor visible points, so the body keeps extracting geometry from the broader coordinate layout instead of falling back to anchor-only narration.\n"
         "20. Give each bridge_steps relation its own sentence. In that sentence, explicitly name at least one concrete depends_on relation before or while stating the new bridge relation.\n"
         "20a. When a bridge step lists internal required_supports, mention those support relations explicitly in the same sentence unless doing so would repeat the exact prefix wording; in that case paraphrase them.\n"
