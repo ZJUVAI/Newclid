@@ -30,6 +30,7 @@ try:
         audit_source_record,
         bridge_step_relation_realized,
         build_visible_premise_summaries,
+        extract_visible_formal_facts,
         count_support_relation_mentions,
         coordinate_relation_matches_candidate,
         count_relation_mentions,
@@ -91,28 +92,20 @@ try:
         summarize_aux_clause,
     )
     from .prompt_builders import (
-        build_plan_narrative_prompt as build_plan_narrative_prompt_text,
         build_plan_prompt as build_plan_prompt_text,
+        build_plan_critic_prompt as build_plan_critic_prompt_text,
         build_plan_retry_feedback,
+        build_raw_plan_retry_feedback,
+        build_raw_record_plan_prompt,
         build_write_prompt as build_write_prompt_text,
         build_writer_retry_feedback,
     )
     from .writer_contracts import (
-        anonymize_new_point_mentions,
-        build_injected_prefix_block,
+        build_coordinate_derivation_block,
         build_instruction_text,
-        build_plan_coverage_targets,
-        build_prefix_coverage_notes,
-        build_prefix_reuse_guidance,
-        build_writer_bridge_contracts,
         build_writer_handoff,
-        build_writer_sentence_blueprints,
-        build_writer_sentence_duties,
-        build_bridge_sentence_checklist,
-        enrich_bridge_steps_with_coverage_targets,
-        enrich_bridge_steps_with_targets,
         join_natural_list,
-        build_canonical_bridge_unlock,
+        render_coordinate_derivation_snippet,
     )
 except ImportError:  # pragma: no cover - script execution path
     from audits import (
@@ -120,6 +113,7 @@ except ImportError:  # pragma: no cover - script execution path
         audit_source_record,
         bridge_step_relation_realized,
         build_visible_premise_summaries,
+        extract_visible_formal_facts,
         count_support_relation_mentions,
         coordinate_relation_matches_candidate,
         count_relation_mentions,
@@ -181,28 +175,20 @@ except ImportError:  # pragma: no cover - script execution path
         summarize_aux_clause,
     )
     from prompt_builders import (
-        build_plan_narrative_prompt as build_plan_narrative_prompt_text,
         build_plan_prompt as build_plan_prompt_text,
+        build_plan_critic_prompt as build_plan_critic_prompt_text,
         build_plan_retry_feedback,
+        build_raw_plan_retry_feedback,
+        build_raw_record_plan_prompt,
         build_write_prompt as build_write_prompt_text,
         build_writer_retry_feedback,
     )
     from writer_contracts import (
-        anonymize_new_point_mentions,
-        build_injected_prefix_block,
+        build_coordinate_derivation_block,
         build_instruction_text,
-        build_plan_coverage_targets,
-        build_prefix_coverage_notes,
-        build_prefix_reuse_guidance,
-        build_writer_bridge_contracts,
         build_writer_handoff,
-        build_writer_sentence_blueprints,
-        build_writer_sentence_duties,
-        build_bridge_sentence_checklist,
-        enrich_bridge_steps_with_coverage_targets,
-        enrich_bridge_steps_with_targets,
         join_natural_list,
-        build_canonical_bridge_unlock,
+        render_coordinate_derivation_snippet,
     )
 
 try:
@@ -253,7 +239,6 @@ FORBIDDEN_THINKING_PATTERNS = [
     re.compile(r"\bfacilitate\b", re.IGNORECASE),
     re.compile(r"\bessential for proving\b", re.IGNORECASE),
     re.compile(r"\bhelp establish\b", re.IGNORECASE),
-    re.compile(r"\bcoordinates?\b", re.IGNORECASE),
     re.compile(r"\bcoordinate table\b", re.IGNORECASE),
     re.compile(r"\brotational symmetry\b", re.IGNORECASE),
     re.compile(r"\bcenter of symmetry\b", re.IGNORECASE),
@@ -268,6 +253,14 @@ POINT_TAG_RE = re.compile(
     re.IGNORECASE,
 )
 RAW_POINT_TAG_RE = re.compile(r"<point>\s*([a-z]\w*)\s*</point>", re.IGNORECASE)
+INLINE_POINT_COORD_RE = re.compile(
+    r"\b([a-z]\w*)\s*=\s*\(\s*(-?\d+)\s*,\s*(-?\d+)\s*\)",
+    re.IGNORECASE,
+)
+RAW_PLAN_SUPPORT_REF_RE = re.compile(
+    r"^(text_facts_used|image_observations|coordinate_derivations|bridge_steps)\[(\d+)\]$",
+    re.IGNORECASE,
+)
 
 
 def configure_logging(log_path=None):
@@ -454,10 +447,30 @@ def validate_coord_tags(thinking_text: str, point_coords, max_tags=4):
     return True, "Coordinate tags valid"
 
 
+def validate_inline_point_coordinates(thinking_text: str, point_coords):
+    seen = {}
+    for point_name, x_str, y_str in INLINE_POINT_COORD_RE.findall(thinking_text):
+        point_name = point_name.lower()
+        x_val = int(x_str)
+        y_val = int(y_str)
+        if point_name not in point_coords:
+            return False, f"Inline coordinate uses non-visible point '{point_name}'"
+        expected_x, expected_y = point_coords[point_name]
+        if (x_val, y_val) != (expected_x, expected_y):
+            return False, (
+                f"Inline coordinate mismatch for point '{point_name}': "
+                f"expected ({expected_x}, {expected_y}), got ({x_val}, {y_val})"
+            )
+        if point_name in seen and seen[point_name] != (x_val, y_val):
+            return False, f"Inconsistent repeated inline coordinates for point '{point_name}'"
+        seen[point_name] = (x_val, y_val)
+    return True, "Inline coordinates valid"
+
+
 def validate_thinking_response(
     output_text: str,
     point_coords,
-    require_coord_tags=True,
+    require_coord_tags=False,
     max_total_len=2200,
     max_coord_tags=4,
 ):
@@ -485,6 +498,11 @@ def validate_thinking_response(
         if not ok:
             return False, message
 
+    if point_coords:
+        ok, message = validate_inline_point_coordinates(thinking_text, point_coords)
+        if not ok:
+            return False, message
+
     return True, "Valid thinking response"
 
 
@@ -505,6 +523,157 @@ def extract_json_object(output_text: str):
             return json.loads(match.group(1))
         except json.JSONDecodeError:
             return None
+
+
+def build_visible_text_facts(record, max_items=12):
+    point_coords = get_point_coords(record)
+    visible_points = extract_visible_point_names(point_coords)
+    facts = []
+    seen = set()
+    for fact in extract_visible_formal_facts(record):
+        relation = normalize_relation_surface((fact.get("summary") or "").strip())
+        if not relation:
+            continue
+        lowered = relation.lower()
+        if lowered in seen:
+            continue
+        seen.add(lowered)
+        facts.append(
+            {
+                "id": f"T{len(facts) + 1}",
+                "relation": relation,
+                "predicate": fact.get("predicate", ""),
+                "points": sorted(extract_point_mentions(relation, visible_points)),
+                "source": "public_problem_text",
+            }
+        )
+        if len(facts) >= max_items:
+            break
+    return facts
+
+
+def build_coordinate_candidate_witness(candidate, point_coords):
+    if not isinstance(candidate, dict):
+        return {}
+    relation_type = candidate.get("relation_type")
+    points = [point for point in candidate.get("points", []) if point in point_coords]
+    if relation_type in {"parallel", "perpendicular", "equal_length"} and len(points) >= 4:
+        a, b, c, d = points[:4]
+        x1, y1 = point_coords[a]
+        x2, y2 = point_coords[b]
+        x3, y3 = point_coords[c]
+        x4, y4 = point_coords[d]
+        v1 = [x2 - x1, y2 - y1]
+        v2 = [x4 - x3, y4 - y3]
+        cross = v1[0] * v2[1] - v1[1] * v2[0]
+        dot = v1[0] * v2[0] + v1[1] * v2[1]
+        len_sq_1 = v1[0] * v1[0] + v1[1] * v1[1]
+        len_sq_2 = v2[0] * v2[0] + v2[1] * v2[1]
+        return {
+            "vector_1": v1,
+            "vector_2": v2,
+            "cross": cross,
+            "dot": dot,
+            "length_sq_1": len_sq_1,
+            "length_sq_2": len_sq_2,
+        }
+    if relation_type == "midpoint" and len(points) >= 3:
+        mid, p1, p2 = points[:3]
+        xm, ym = point_coords[mid]
+        x1, y1 = point_coords[p1]
+        x2, y2 = point_coords[p2]
+        midpoint = [(x1 + x2) / 2, (y1 + y2) / 2]
+        midpoint_gap = ((xm - midpoint[0]) ** 2 + (ym - midpoint[1]) ** 2) ** 0.5
+        area2 = abs((x2 - x1) * (ym - y1) - (y2 - y1) * (xm - x1))
+        seg_len = ((x2 - x1) ** 2 + (y2 - y1) ** 2) ** 0.5 or 1.0
+        return {
+            "midpoint_of_endpoints": midpoint,
+            "midpoint_gap": round(midpoint_gap, 4),
+            "line_residual": round(area2 / seg_len, 4),
+        }
+    if relation_type == "collinear" and len(points) >= 3:
+        p1, p2, p3 = points[:3]
+        x1, y1 = point_coords[p1]
+        x2, y2 = point_coords[p2]
+        x3, y3 = point_coords[p3]
+        area2 = (x2 - x1) * (y3 - y1) - (y2 - y1) * (x3 - x1)
+        return {
+            "area_residual": round(area2, 4),
+        }
+    return {}
+
+
+def build_image_coordinate_candidates(point_coords, visible_text_facts, max_items=10):
+    raw_candidates = build_hidden_coordinate_candidates(
+        point_coords,
+        max_items=max_items * 4,
+        relax_type_limits=True,
+    )
+    visible_points = extract_visible_point_names(point_coords)
+    allowed_types = {"parallel", "perpendicular", "equal_length", "midpoint", "collinear"}
+    items = []
+    for raw_candidate in raw_candidates:
+        relation_type = raw_candidate.get("relation_type")
+        if relation_type not in allowed_types:
+            continue
+        relation = normalize_relation_surface((raw_candidate.get("summary") or "").strip())
+        if not relation:
+            continue
+        overlaps_text = any(
+            relations_semantically_match(relation, fact.get("relation", ""), visible_points)
+            for fact in visible_text_facts
+        )
+        items.append(
+            {
+                "id": f"C{len(items) + 1}",
+                "relation": relation,
+                "relation_type": relation_type,
+                "points": [point for point in raw_candidate.get("points", []) if point in point_coords],
+                "score": raw_candidate.get("score"),
+                "overlaps_text": overlaps_text,
+                "witness": build_coordinate_candidate_witness(raw_candidate, point_coords),
+            }
+        )
+        if len(items) >= max_items:
+            break
+    return items
+
+
+def relation_matches_hint_bucket(relation_text, bucket_relations, point_names):
+    if not isinstance(relation_text, str) or not relation_text.strip():
+        return False
+    for bucket_relation in bucket_relations or []:
+        if relations_semantically_match(relation_text, bucket_relation, point_names):
+            return True
+        shared_points = extract_point_mentions(relation_text, point_names) & extract_point_mentions(bucket_relation, point_names)
+        shared_keywords = relation_text_keywords(relation_text) & relation_text_keywords(bucket_relation)
+        if len(shared_points) >= 2 and shared_keywords:
+            return True
+    return False
+
+
+def resolve_support_refs(step, fact_lookup, candidate_lookup, prior_bridge_lookup):
+    dependencies = []
+    for ref in step.get("support_refs", []) or []:
+        if ref in fact_lookup:
+            dependencies.append(fact_lookup[ref]["relation"])
+        elif ref in candidate_lookup:
+            dependencies.append(candidate_lookup[ref]["relation"])
+        elif ref in prior_bridge_lookup:
+            dependencies.append(prior_bridge_lookup[ref])
+    return dependencies
+
+
+def render_plan_coordinate_derivations(plan, point_coords):
+    rendered = []
+    for derivation in plan.get("coordinate_derivations", []) if isinstance(plan, dict) else []:
+        if not isinstance(derivation, dict):
+            continue
+        snippet = render_coordinate_derivation_snippet(derivation, point_coords)
+        item = dict(derivation)
+        item["rendered_text"] = snippet
+        rendered.append(item)
+    return rendered
 
 
 def backoff_last_bridge_before_goal_finish(cleaned_plan, hidden_route_relations, point_names):
@@ -1371,6 +1540,19 @@ def compute_writer_body_budget(plan=None, injected_prefix=""):
     if injected_prefix:
         body_budget = min(body_budget, max(240, total_budget - len(injected_prefix) - 12))
     return body_budget
+
+
+def normalize_coordinate_render_mode(render_mode, calc_type):
+    normalized = str(render_mode or "").strip().lower()
+    if normalized == "coordinate":
+        return {
+            "parallel": "vector",
+            "perpendicular": "vector",
+            "equal_length": "distance",
+            "midpoint": "midpoint",
+            "collinear": "area",
+        }.get(str(calc_type or "").strip().lower(), normalized)
+    return normalized
 
 
 def compute_thinking_total_budget(plan=None):
@@ -2562,27 +2744,30 @@ def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", 
     return True, "Valid writer body"
 
 
-def build_plan_prompt(record, aux_part, sanitized_rest):
+def build_plan_prompt(record, aux_part, sanitized_rest, planner_style="default"):
+    if planner_style == "raw_record_v1":
+        return build_raw_record_plan_prompt(record)
     point_coords = get_point_coords(record)
     visible_goal = extract_problem_goal(record)
     proof_guidance_payload = build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal)
+    visible_text_facts = build_visible_text_facts(record)
+    image_coordinate_candidates = build_image_coordinate_candidates(point_coords, visible_text_facts)
     return build_plan_prompt_text(
         record,
         aux_part,
-        sanitized_rest,
-        point_coords=point_coords,
-        coordinate_hints=build_hidden_coordinate_hints(point_coords),
-        coordinate_guidance=build_hidden_coordinate_guidance(point_coords),
-        visible_premise_summaries=build_visible_premise_summaries(record),
-        proof_guidance_payload=proof_guidance_payload,
+        visible_text_facts=visible_text_facts,
+        image_coordinate_candidates=image_coordinate_candidates,
+        hidden_route_hints=proof_guidance_payload,
     )
 
 
-def build_plan_narrative_prompt(record, aux_part, plan_skeleton):
-    return build_plan_narrative_prompt_text(
+def build_plan_critic_prompt(record, plan, sanitized_rest, aux_part):
+    visible_goal = extract_problem_goal(record)
+    proof_guidance_payload = build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal)
+    return build_plan_critic_prompt_text(
         record,
-        aux_part,
-        plan_skeleton,
+        plan,
+        hidden_route_hints=proof_guidance_payload,
     )
 
 
@@ -3128,16 +3313,1066 @@ def merge_plan_skeleton_and_narrative(plan_skeleton, narrative_fields):
     return merged
 
 
-def build_write_prompt(record, plan, aux_part, sanitized_rest, injected_prefix_block):
-    visible_goal = extract_problem_goal(record)
-    proof_guidance_payload = build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal)
+def build_write_prompt(record, plan, aux_part, point_coords):
     return build_write_prompt_text(
         record,
         plan,
         aux_part,
-        injected_prefix_block=injected_prefix_block,
-        proof_guidance_payload=proof_guidance_payload,
+        coordinate_derivation_block=build_coordinate_derivation_block(plan, point_coords),
     )
+
+
+def _resolve_raw_plan_support_ref(
+    ref_text,
+    cleaned_text_facts,
+    cleaned_observations,
+    cleaned_derivations,
+    cleaned_bridge_steps,
+):
+    match = RAW_PLAN_SUPPORT_REF_RE.fullmatch(str(ref_text or "").strip())
+    if not match:
+        return None, "supports must use only text_facts_used[i], image_observations[i], coordinate_derivations[i], or earlier bridge_steps[i]"
+    bucket_name = match.group(1).lower()
+    index = int(match.group(2))
+    if index <= 0:
+        return None, "support indices must be 1-based positive integers"
+    if bucket_name == "text_facts_used":
+        if index > len(cleaned_text_facts):
+            return None, "supports references unknown text_facts_used item"
+        return cleaned_text_facts[index - 1], None
+    if bucket_name == "image_observations":
+        if index > len(cleaned_observations):
+            return None, "supports references unknown image_observations item"
+        return cleaned_observations[index - 1], None
+    if bucket_name == "coordinate_derivations":
+        if index > len(cleaned_derivations):
+            return None, "supports references unknown coordinate_derivations item"
+        return cleaned_derivations[index - 1]["relation"], None
+    if bucket_name == "bridge_steps":
+        if index > len(cleaned_bridge_steps):
+            return None, "supports may reference only earlier bridge_steps items"
+        return cleaned_bridge_steps[index - 1]["relation"], None
+    return None, "unsupported support reference bucket"
+
+
+def validate_raw_plan_response(
+    output_text: str,
+    point_coords,
+    visible_goal="",
+    aux_part=None,
+    coordinate_candidates=None,
+    sanitized_rest=None,
+    visible_premise_summaries=None,
+    visible_text_facts=None,
+):
+    del coordinate_candidates, sanitized_rest, visible_premise_summaries, visible_text_facts
+    plan = output_text if isinstance(output_text, dict) else extract_json_object(output_text)
+    if not isinstance(plan, dict):
+        return False, "Planner must return a single JSON object", None
+
+    visible_points = extract_visible_point_names(point_coords)
+    aux_points = [point.lower() for point in extract_aux_new_points(aux_part or "")]
+    known_points = visible_points + aux_points
+    limits = compute_plan_complexity_limits(point_coords, visible_goal=visible_goal, aux_part=aux_part)
+    required_keys = [
+        "text_facts_used",
+        "image_observations",
+        "coordinate_derivations",
+        "goal_bottleneck",
+        "helper_idea",
+        "construction",
+        "aux_direct_relations",
+        "bridge_steps",
+        "goal_finish",
+    ]
+    missing = [key for key in required_keys if key not in plan]
+    if missing:
+        return False, f"Planner JSON missing keys: {missing}", None
+
+    ok, message, cleaned_text_facts = validate_relation_list(
+        plan.get("text_facts_used"),
+        "text_facts_used",
+        visible_points,
+        min_len=1,
+        max_len=limits["visible_relations_max"],
+        min_chars=5,
+    )
+    if not ok:
+        return False, message, None
+    ok, message, cleaned_observations = validate_relation_list(
+        plan.get("image_observations"),
+        "image_observations",
+        visible_points,
+        min_len=1,
+        max_len=limits["coordinate_relations_max"],
+        min_chars=5,
+    )
+    if not ok:
+        return False, message, None
+
+    cleaned_plan = {
+        "text_facts_used": cleaned_text_facts,
+        "visible_relations": cleaned_text_facts[:],
+        "image_observations": cleaned_observations,
+        "observation_relations": [
+            {
+                "id": f"obs_{idx + 1}",
+                "relation": relation,
+                "points": sorted(extract_point_mentions(relation, visible_points)),
+            }
+            for idx, relation in enumerate(cleaned_observations)
+        ],
+        "anchor_points": [],
+        "anchor_relation": "",
+    }
+
+    for key in ["goal_bottleneck", "helper_idea", "construction"]:
+        ok, message, cleaned_value = validate_descriptive_text(
+            plan.get(key),
+            key,
+            point_names=known_points,
+        )
+        if not ok:
+            return False, message, None
+        cleaned_plan[key] = cleaned_value
+
+    aux_direct_relations = plan.get("aux_direct_relations") or []
+    if not isinstance(aux_direct_relations, list) or not (
+        limits["aux_direct_relations_min"] <= len(aux_direct_relations) <= limits["aux_direct_relations_max"]
+    ):
+        return False, (
+            "aux_direct_relations must be a list with "
+            f"{limits['aux_direct_relations_min']} to {limits['aux_direct_relations_max']} ordered direct consequences"
+        ), None
+    cleaned_direct = []
+    for idx, relation in enumerate(aux_direct_relations):
+        ok, message, cleaned_relation = validate_descriptive_text(
+            relation,
+            f"aux_direct_relations[{idx}]",
+            min_chars=5,
+            point_names=known_points,
+        )
+        if not ok:
+            return False, message, None
+        cleaned_relation = normalize_relation_surface(cleaned_relation)
+        if not relation_keyword_present(cleaned_relation):
+            return False, f"aux_direct_relations[{idx}] must mention a concrete geometric relation", None
+        cleaned_direct.append(cleaned_relation)
+    cleaned_plan["aux_direct_relations"] = cleaned_direct
+
+    coordinate_derivations = plan.get("coordinate_derivations") or []
+    if not isinstance(coordinate_derivations, list) or not coordinate_derivations:
+        return False, "coordinate_derivations must contain at least one explicit coordinate computation", None
+    allowed_calc_types = {"parallel", "perpendicular", "equal_length", "midpoint", "collinear"}
+    allowed_render_modes = {"vector", "distance", "midpoint", "area"}
+    cleaned_derivations = []
+    for idx, derivation in enumerate(coordinate_derivations[: limits["coordinate_relations_max"]]):
+        if not isinstance(derivation, dict):
+            return False, f"coordinate_derivations[{idx}] must be an object", None
+        calc_type = str(derivation.get("calc_type") or "").strip().lower()
+        render_mode = normalize_coordinate_render_mode(derivation.get("render_mode"), calc_type)
+        if calc_type not in allowed_calc_types:
+            return False, f"coordinate_derivations[{idx}].calc_type is unsupported", None
+        if render_mode not in allowed_render_modes:
+            return False, f"coordinate_derivations[{idx}].render_mode is unsupported", None
+        ok, message, cleaned_relation = validate_descriptive_text(
+            derivation.get("relation"),
+            f"coordinate_derivations[{idx}].relation",
+            min_chars=5,
+            point_names=visible_points,
+        )
+        if not ok:
+            return False, message, None
+        cleaned_relation = normalize_relation_surface(cleaned_relation)
+        if not relation_keyword_present(cleaned_relation):
+            return False, f"coordinate_derivations[{idx}].relation must mention a concrete geometric relation", None
+        points = [
+            point.lower()
+            for point in (derivation.get("points") or [])
+            if isinstance(point, str) and point.lower() in point_coords
+        ]
+        min_point_count = 4 if calc_type in {"parallel", "perpendicular", "equal_length"} else 3
+        if len(points) < min_point_count:
+            return False, f"coordinate_derivations[{idx}].points must name at least {min_point_count} visible points", None
+        if any(point in aux_points for point in points):
+            return False, f"coordinate_derivations[{idx}] must not assign coordinates to auxiliary points", None
+        ok, message, why_it_matters = validate_descriptive_text(
+            derivation.get("why_it_matters"),
+            f"coordinate_derivations[{idx}].why_it_matters",
+            min_chars=8,
+            point_names=known_points,
+        )
+        if not ok:
+            return False, message, None
+        witness = build_coordinate_candidate_witness(
+            {
+                "relation_type": calc_type,
+                "points": points,
+            },
+            point_coords,
+        )
+        cleaned_item = {
+            "relation": cleaned_relation,
+            "points": points,
+            "calc_type": calc_type,
+            "render_mode": render_mode,
+            "why_it_matters": why_it_matters,
+            "witness": witness,
+        }
+        cleaned_item["rendered_text"] = render_coordinate_derivation_snippet(cleaned_item, point_coords)
+        cleaned_derivations.append(cleaned_item)
+    cleaned_plan["coordinate_derivations"] = cleaned_derivations
+    cleaned_plan["coordinate_relations"] = [item["relation"] for item in cleaned_derivations]
+
+    bridge_steps = plan.get("bridge_steps") or []
+    if not isinstance(bridge_steps, list) or not (
+        limits["bridge_steps_min"] <= len(bridge_steps) <= limits["bridge_steps_max"]
+    ):
+        return False, (
+            "bridge_steps must be a list with "
+            f"{limits['bridge_steps_min']} to {limits['bridge_steps_max']} ordered bridge-step objects"
+        ), None
+    cleaned_bridge_steps = []
+    for idx, step in enumerate(bridge_steps):
+        if not isinstance(step, dict):
+            return False, f"bridge_steps[{idx}] must be an object", None
+        if any(key not in step for key in ["relation", "supports", "why_it_helps", "focus_points"]):
+            return False, f"bridge_steps[{idx}] must contain relation, supports, why_it_helps, and focus_points", None
+        ok, message, cleaned_relation = validate_descriptive_text(
+            step.get("relation"),
+            f"bridge_steps[{idx}].relation",
+            min_chars=5,
+            point_names=known_points,
+        )
+        if not ok:
+            return False, message, None
+        cleaned_relation = normalize_relation_surface(cleaned_relation)
+        if not relation_keyword_present(cleaned_relation):
+            return False, f"bridge_steps[{idx}].relation must mention a concrete geometric relation", None
+        supports = [
+            str(ref).strip()
+            for ref in (step.get("supports") or [])
+            if str(ref).strip()
+        ]
+        if not supports:
+            return False, f"bridge_steps[{idx}].supports must not be empty", None
+        resolved_supports = []
+        for ref in supports:
+            resolved, support_error = _resolve_raw_plan_support_ref(
+                ref,
+                cleaned_text_facts,
+                cleaned_observations,
+                cleaned_derivations,
+                cleaned_bridge_steps,
+            )
+            if support_error:
+                return False, f"bridge_steps[{idx}].supports invalid: {support_error}", None
+            resolved_supports.append(resolved)
+        ok, message, cleaned_help = validate_descriptive_text(
+            step.get("why_it_helps"),
+            f"bridge_steps[{idx}].why_it_helps",
+            min_chars=8,
+            point_names=known_points,
+        )
+        if not ok:
+            return False, message, None
+        focus_points = [
+            point.lower()
+            for point in (step.get("focus_points") or [])
+            if isinstance(point, str) and point.lower() in known_points
+        ]
+        if len(focus_points) < 2:
+            return False, f"bridge_steps[{idx}].focus_points must mention at least two known points", None
+        cleaned_bridge_steps.append(
+            {
+                "id": f"B{idx + 1}",
+                "relation": cleaned_relation,
+                "support_refs": supports,
+                "depends_on": resolved_supports,
+                "required_supports": resolved_supports[: min(2, len(resolved_supports))],
+                "min_support_mentions": 1,
+                "why_it_helps": cleaned_help,
+                "proof_alignment": "bridge",
+                "focus_points": focus_points,
+                "approved_route_relation": cleaned_relation,
+            }
+        )
+    cleaned_plan["bridge_steps"] = cleaned_bridge_steps
+    cleaned_plan["bridge_relations"] = [step["relation"] for step in cleaned_bridge_steps]
+
+    ok, message, cleaned_goal_finish = validate_descriptive_text(
+        plan.get("goal_finish"),
+        "goal_finish",
+        min_chars=8,
+        point_names=known_points,
+    )
+    if not ok:
+        return False, message, None
+    cleaned_goal_finish = normalize_relation_surface(cleaned_goal_finish)
+    if not relation_keyword_present(cleaned_goal_finish):
+        return False, "goal_finish must mention a concrete goal-side geometric relation", None
+    goal_spec = parse_goal_expression(visible_goal)
+    goal_points = set(goal_spec.get("points") or [])
+    goal_keywords = goal_keyword_hints(visible_goal)
+    if goal_points:
+        mentioned_goal_points = {point for point in goal_points if point in cleaned_goal_finish.lower()}
+        if len(mentioned_goal_points) < min(2, len(goal_points)):
+            return False, "goal_finish must mention the target relation using goal-side points", None
+    if not any(keyword in cleaned_goal_finish.lower() for keyword in goal_keywords):
+        return False, "goal_finish must explicitly describe the goal-side relation it is aiming for", None
+    cleaned_plan["goal_finish"] = cleaned_goal_finish
+
+    relation_mentions = extract_point_mentions(" ".join(cleaned_plan["coordinate_relations"]), visible_points)
+    if relation_mentions and len(relation_mentions) < min(3, len(visible_points)):
+        return False, "coordinate_derivations should collectively cover at least three visible points", None
+
+    if aux_part:
+        new_points = [point.lower() for point in extract_aux_new_points(aux_part)]
+        preconstruction_fields = [
+            " ".join(cleaned_text_facts),
+            " ".join(cleaned_observations),
+            cleaned_plan["goal_bottleneck"],
+            cleaned_plan["helper_idea"],
+        ]
+        for point_name in new_points:
+            if any(re.search(rf"\b{re.escape(point_name)}\b", field.lower()) for field in preconstruction_fields):
+                return False, f"new point '{point_name}' must not appear before the construction field", None
+            if point_name not in cleaned_plan["construction"].lower():
+                return False, f"construction must mention new point '{point_name}' explicitly", None
+        if len(new_points) > 1:
+            stage_markers = ["first", "then", "next", "after", "finally", "together", "simultaneously"]
+            combined_text = (
+                f"{cleaned_plan['construction']} "
+                f"{' '.join(cleaned_plan['aux_direct_relations'])} "
+                f"{' '.join(cleaned_plan['bridge_relations'])}"
+            ).lower()
+            if not any(marker in combined_text for marker in stage_markers):
+                return False, "multi-point auxiliary plans must describe a staged or combined construction strategy", None
+
+    cleaned_plan["figure_overview"] = " ".join(cleaned_observations[:2])
+    cleaned_plan["coordinate_hints"] = build_canonical_coordinate_hint(cleaned_plan["coordinate_relations"])
+    cleaned_plan["coverage_targets"] = {
+        "coordinate_focus_relations": cleaned_plan["coordinate_relations"][:3],
+        "observation_focus_relations": cleaned_observations[:3],
+        "coordinate_reuse_min": 1 if cleaned_derivations else 0,
+        "goal_points": list(goal_points),
+    }
+    return True, "Valid raw-record plan", cleaned_plan
+
+
+def validate_plan_response(
+    output_text: str,
+    point_coords,
+    visible_goal="",
+    aux_part=None,
+    coordinate_candidates=None,
+    sanitized_rest=None,
+    visible_premise_summaries=None,
+    visible_text_facts=None,
+):
+    plan = output_text if isinstance(output_text, dict) else extract_json_object(output_text)
+    if not isinstance(plan, dict):
+        return False, "Planner must return a single JSON object", None
+
+    visible_points = extract_visible_point_names(point_coords)
+    aux_points = [point.lower() for point in extract_aux_new_points(aux_part or "")]
+    known_points = visible_points + aux_points
+    limits = compute_plan_complexity_limits(point_coords, visible_goal=visible_goal, aux_part=aux_part)
+    hidden_route_hints = (
+        build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal)
+        if sanitized_rest and aux_part else {}
+    )
+
+    required_keys = [
+        "selected_text_fact_ids",
+        "selected_coordinate_candidate_ids",
+        "image_observations",
+        "coordinate_derivations",
+        "goal_bottleneck",
+        "helper_idea",
+        "construction",
+        "aux_direct_relations",
+        "bridge_steps",
+        "goal_finish",
+    ]
+    missing = [key for key in required_keys if key not in plan]
+    if missing:
+        return False, f"Planner JSON missing keys: {missing}", None
+
+    visible_text_facts = visible_text_facts or [
+        {"id": f"T{idx + 1}", "relation": relation}
+        for idx, relation in enumerate(visible_premise_summaries or [])
+    ]
+    coordinate_candidates = coordinate_candidates or []
+    fact_lookup = {
+        item["id"]: item
+        for item in visible_text_facts
+        if isinstance(item, dict) and item.get("id") and item.get("relation")
+    }
+    candidate_lookup = {
+        item["id"]: item
+        for item in coordinate_candidates
+        if isinstance(item, dict) and item.get("id") and item.get("relation")
+    }
+
+    selected_text_fact_ids = [
+        str(item).strip() for item in (plan.get("selected_text_fact_ids") or [])
+        if str(item).strip()
+    ]
+    selected_coordinate_candidate_ids = [
+        str(item).strip() for item in (plan.get("selected_coordinate_candidate_ids") or [])
+        if str(item).strip()
+    ]
+    if not selected_text_fact_ids:
+        return False, "selected_text_fact_ids must contain at least one T* item", None
+    if not selected_coordinate_candidate_ids:
+        return False, "selected_coordinate_candidate_ids must contain at least one C* item", None
+    if any(item not in fact_lookup for item in selected_text_fact_ids):
+        return False, "selected_text_fact_ids contains unknown T* item", None
+    if any(item not in candidate_lookup for item in selected_coordinate_candidate_ids):
+        return False, "selected_coordinate_candidate_ids contains unknown C* item", None
+
+    cleaned_plan = {
+        "selected_text_fact_ids": selected_text_fact_ids,
+        "selected_coordinate_candidate_ids": selected_coordinate_candidate_ids,
+        "visible_relations": [fact_lookup[item]["relation"] for item in selected_text_fact_ids],
+        "coordinate_relations": [candidate_lookup[item]["relation"] for item in selected_coordinate_candidate_ids],
+        "anchor_points": [],
+        "anchor_relation": "",
+    }
+
+    cleaned_plan["image_observations"] = []
+    cleaned_plan["observation_relations"] = []
+    image_observations = plan.get("image_observations") or cleaned_plan["coordinate_relations"]
+    if not isinstance(image_observations, list) or not image_observations:
+        return False, "image_observations must be a non-empty list", None
+    for idx, observation in enumerate(image_observations[: max(2, limits["coordinate_relations_max"])]):
+        ok, message, cleaned_observation = validate_descriptive_text(
+            observation,
+            f"image_observations[{idx}]",
+            min_chars=5,
+            point_names=visible_points,
+        )
+        if not ok:
+            return False, message, None
+        cleaned_observation = normalize_relation_surface(cleaned_observation)
+        cleaned_plan["image_observations"].append(cleaned_observation)
+        cleaned_plan["observation_relations"].append(
+            {
+                "id": f"obs_{idx + 1}",
+                "relation": cleaned_observation,
+                "points": sorted(extract_point_mentions(cleaned_observation, visible_points)),
+            }
+        )
+
+    for key in ["goal_bottleneck", "helper_idea", "construction"]:
+        ok, message, cleaned_value = validate_descriptive_text(
+            plan.get(key),
+            key,
+            point_names=known_points,
+        )
+        if not ok:
+            return False, message, None
+        cleaned_plan[key] = cleaned_value
+
+    aux_direct_relations = plan.get("aux_direct_relations") or []
+    if not isinstance(aux_direct_relations, list) or not (
+        limits["aux_direct_relations_min"] <= len(aux_direct_relations) <= limits["aux_direct_relations_max"]
+    ):
+        return False, (
+            "aux_direct_relations must be a list with "
+            f"{limits['aux_direct_relations_min']} to {limits['aux_direct_relations_max']} ordered direct consequences"
+        ), None
+    cleaned_direct = []
+    for idx, relation in enumerate(aux_direct_relations):
+        ok, message, cleaned_relation = validate_descriptive_text(
+            relation,
+            f"aux_direct_relations[{idx}]",
+            min_chars=5,
+            point_names=known_points,
+        )
+        if not ok:
+            return False, message, None
+        cleaned_relation = normalize_relation_surface(cleaned_relation)
+        if not relation_keyword_present(cleaned_relation):
+            return False, f"aux_direct_relations[{idx}] must mention a concrete geometric relation", None
+        cleaned_direct.append(cleaned_relation)
+    immediate_hints = hidden_route_hints.get("immediate_aux_consequences", [])
+    if immediate_hints and not any(
+        relation_matches_hint_bucket(relation, immediate_hints, known_points)
+        for relation in cleaned_direct
+    ):
+        return False, "aux_direct_relations must stay close to the immediate aux consequences", None
+    cleaned_plan["aux_direct_relations"] = cleaned_direct
+
+    coordinate_derivations = plan.get("coordinate_derivations") or []
+    if not isinstance(coordinate_derivations, list) or not coordinate_derivations:
+        return False, "coordinate_derivations must contain at least one explicit coordinate computation", None
+    cleaned_derivations = []
+    allowed_calc_types = {"parallel", "perpendicular", "equal_length", "midpoint", "collinear"}
+    allowed_render_modes = {"vector", "distance", "midpoint", "area"}
+    for idx, derivation in enumerate(coordinate_derivations[: limits["coordinate_relations_max"]]):
+        if not isinstance(derivation, dict):
+            return False, f"coordinate_derivations[{idx}] must be an object", None
+        candidate_id = str(derivation.get("candidate_id") or "").strip()
+        if candidate_id not in candidate_lookup or candidate_id not in selected_coordinate_candidate_ids:
+            return False, f"coordinate_derivations[{idx}].candidate_id must reference a selected C* item", None
+        calc_type = str(derivation.get("calc_type") or "").strip()
+        render_mode = normalize_coordinate_render_mode(
+            derivation.get("render_mode"),
+            calc_type,
+        )
+        if calc_type not in allowed_calc_types:
+            return False, f"coordinate_derivations[{idx}].calc_type is unsupported", None
+        if render_mode not in allowed_render_modes:
+            return False, f"coordinate_derivations[{idx}].render_mode is unsupported", None
+        ok, message, cleaned_relation = validate_descriptive_text(
+            derivation.get("relation"),
+            f"coordinate_derivations[{idx}].relation",
+            min_chars=5,
+            point_names=visible_points,
+        )
+        if not ok:
+            return False, message, None
+        candidate_relation = candidate_lookup[candidate_id]["relation"]
+        if not relations_semantically_match(cleaned_relation, candidate_relation, visible_points):
+            return False, f"coordinate_derivations[{idx}].relation must match its selected coordinate candidate", None
+        points = [
+            point.lower()
+            for point in (derivation.get("points") or candidate_lookup[candidate_id].get("points") or [])
+            if isinstance(point, str) and point.lower() in point_coords
+        ]
+        if any(point in aux_points for point in points):
+            return False, f"coordinate_derivations[{idx}] must not assign coordinates to auxiliary points", None
+        ok, message, why_it_matters = validate_descriptive_text(
+            derivation.get("why_it_matters"),
+            f"coordinate_derivations[{idx}].why_it_matters",
+            min_chars=8,
+            point_names=known_points,
+        )
+        if not ok:
+            return False, message, None
+        cleaned_item = {
+            "candidate_id": candidate_id,
+            "relation": candidate_relation,
+            "points": points,
+            "calc_type": calc_type,
+            "render_mode": render_mode,
+            "why_it_matters": why_it_matters,
+            "witness": candidate_lookup[candidate_id].get("witness", {}),
+        }
+        cleaned_item["rendered_text"] = render_coordinate_derivation_snippet(cleaned_item, point_coords)
+        cleaned_derivations.append(cleaned_item)
+    cleaned_plan["coordinate_derivations"] = cleaned_derivations
+
+    bridge_steps = plan.get("bridge_steps") or []
+    if not isinstance(bridge_steps, list) or not (
+        limits["bridge_steps_min"] <= len(bridge_steps) <= limits["bridge_steps_max"]
+    ):
+        return False, (
+            "bridge_steps must be a list with "
+            f"{limits['bridge_steps_min']} to {limits['bridge_steps_max']} ordered bridge-step objects"
+        ), None
+    cleaned_bridge_steps = []
+    prior_bridge_lookup = {}
+    for idx, step in enumerate(bridge_steps):
+        if not isinstance(step, dict):
+            return False, f"bridge_steps[{idx}] must be an object", None
+        if any(key not in step for key in ["relation", "support_refs", "why_it_helps", "proof_alignment", "focus_points"]):
+            return False, f"bridge_steps[{idx}] must contain relation, support_refs, why_it_helps, proof_alignment, and focus_points", None
+        ok, message, cleaned_relation = validate_descriptive_text(
+            step.get("relation"),
+            f"bridge_steps[{idx}].relation",
+            min_chars=5,
+            point_names=known_points,
+        )
+        if not ok:
+            return False, message, None
+        cleaned_relation = normalize_relation_surface(cleaned_relation)
+        if not relation_keyword_present(cleaned_relation):
+            return False, f"bridge_steps[{idx}].relation must mention a concrete geometric relation", None
+        support_refs = [
+            str(ref).strip()
+            for ref in (step.get("support_refs") or [])
+            if str(ref).strip()
+        ]
+        if not support_refs:
+            return False, f"bridge_steps[{idx}].support_refs must not be empty", None
+        for ref in support_refs:
+            if ref[0] not in {"T", "C", "B"}:
+                return False, f"bridge_steps[{idx}].support_refs must use only T*, C*, or B* references", None
+            if ref.startswith("T") and ref not in fact_lookup:
+                return False, f"bridge_steps[{idx}].support_refs references unknown text fact", None
+            if ref.startswith("C") and ref not in candidate_lookup:
+                return False, f"bridge_steps[{idx}].support_refs references unknown coordinate candidate", None
+            if ref.startswith("B") and ref not in prior_bridge_lookup:
+                return False, f"bridge_steps[{idx}].support_refs may only reference earlier bridge steps", None
+        ok, message, cleaned_help = validate_descriptive_text(
+            step.get("why_it_helps"),
+            f"bridge_steps[{idx}].why_it_helps",
+            min_chars=8,
+            point_names=known_points,
+        )
+        if not ok:
+            return False, message, None
+        proof_alignment = str(step.get("proof_alignment") or "").strip()
+        if proof_alignment not in {"immediate_aux", "bridge", "goal_finish"}:
+            return False, f"bridge_steps[{idx}].proof_alignment must be immediate_aux, bridge, or goal_finish", None
+        focus_points = [
+            point.lower()
+            for point in (step.get("focus_points") or [])
+            if isinstance(point, str) and point.lower() in known_points
+        ]
+        dependencies = resolve_support_refs(step, fact_lookup, candidate_lookup, prior_bridge_lookup)
+        if not dependencies:
+            return False, f"bridge_steps[{idx}] could not resolve any support_refs into earlier evidence", None
+        bridge_id = f"B{idx + 1}"
+        cleaned_step = {
+            "id": bridge_id,
+            "relation": cleaned_relation,
+            "support_refs": support_refs,
+            "depends_on": dependencies,
+            "required_supports": dependencies[: min(2, len(dependencies))],
+            "min_support_mentions": 1,
+            "why_it_helps": cleaned_help,
+            "proof_alignment": proof_alignment,
+            "focus_points": focus_points,
+            "approved_route_relation": cleaned_relation,
+        }
+        cleaned_bridge_steps.append(cleaned_step)
+        prior_bridge_lookup[bridge_id] = cleaned_relation
+    cleaned_plan["bridge_steps"] = cleaned_bridge_steps
+    cleaned_plan["bridge_relations"] = [step["relation"] for step in cleaned_bridge_steps]
+
+    ok, message, cleaned_goal_finish = validate_descriptive_text(
+        plan.get("goal_finish"),
+        "goal_finish",
+        min_chars=8,
+        point_names=known_points,
+    )
+    if not ok:
+        return False, message, None
+    cleaned_goal_finish = normalize_relation_surface(cleaned_goal_finish)
+    if not relation_keyword_present(cleaned_goal_finish):
+        return False, "goal_finish must mention a concrete goal-side geometric relation", None
+    cleaned_plan["goal_finish"] = cleaned_goal_finish
+
+    for idx, step in enumerate(cleaned_bridge_steps):
+        bucket_name = "bridge_relations"
+        if step["proof_alignment"] == "immediate_aux":
+            bucket_name = "immediate_aux_consequences"
+        elif step["proof_alignment"] == "goal_finish":
+            bucket_name = "goal_finish_relations"
+        bucket = hidden_route_hints.get(bucket_name, [])
+        if bucket and not relation_matches_hint_bucket(step["relation"], bucket, known_points):
+            return False, (
+                f"bridge_steps[{idx}] does not stay close to its hidden {step['proof_alignment']} hint bucket"
+            ), None
+    finish_bucket = hidden_route_hints.get("goal_finish_relations", [])
+    if finish_bucket and not relation_matches_hint_bucket(cleaned_goal_finish, finish_bucket, known_points):
+        return False, "goal_finish must stay close to the hidden goal_finish hint bucket", None
+
+    cleaned_plan["figure_overview"] = " ".join(cleaned_plan["image_observations"][:2])
+    cleaned_plan["coordinate_hints"] = build_canonical_coordinate_hint(cleaned_plan["coordinate_relations"])
+    cleaned_plan["coverage_targets"] = {
+        "coordinate_focus_relations": cleaned_plan["coordinate_relations"][:3],
+        "observation_focus_relations": cleaned_plan["image_observations"][:3],
+        "coordinate_reuse_min": 1 if cleaned_derivations else 0,
+        "goal_points": parse_goal_expression(visible_goal).get("points", []),
+    }
+    return True, "Valid plan", cleaned_plan
+
+
+def validate_writer_body(output_text: str, visible_goal="", injected_prefix="", plan=None):
+    del injected_prefix
+    if not output_text or not output_text.strip():
+        return False, "Writer body is empty"
+    body = output_text.strip()
+    if body.startswith("<thinking>") or body.endswith("</thinking>"):
+        return False, "Writer body must be plain text only, without <thinking> tags"
+    if RAW_POINT_TAG_RE.search(body) or POINT_TAG_RE.search(body) or "<coord>" in body:
+        return False, "Writer body must not contain point/coord tags"
+    if len(body) < 160:
+        return False, f"Writer body too short ({len(body)} chars, minimum 160)"
+    if len(body) > compute_writer_body_budget(plan=plan):
+        return False, f"Writer body too long ({len(body)} chars, maximum {compute_writer_body_budget(plan=plan)})"
+    if re.search(r"\b(I|We|I'm|We'll|I've|we've)\b", body):
+        return False, "Writer body must stay impersonal and should not use first-person narration"
+    for pattern in FORBIDDEN_THINKING_PATTERNS:
+        hit = pattern.search(body)
+        if hit:
+            return False, f"Writer body contains forbidden pattern: {hit.group(0)}"
+    if plan and plan.get("coordinate_derivations"):
+        if not INLINE_POINT_COORD_RE.search(body):
+            return False, "Writer body must include at least one explicit coordinate computation"
+        rendered_snippets = [
+            derivation.get("rendered_text", "")
+            for derivation in plan.get("coordinate_derivations", [])
+            if isinstance(derivation, dict)
+        ]
+        if rendered_snippets and not any(snippet and snippet.split(";")[-1].strip(". ")[:20].lower() in body.lower() for snippet in rendered_snippets):
+            return False, "Writer body must reuse at least one approved coordinate computation"
+    sentences = split_into_sentences(body)
+    search_start = 0
+    for idx, step in enumerate((plan or {}).get("bridge_steps", [])):
+        match_idx = None
+        for sentence_idx in range(search_start, len(sentences)):
+            if relation_mentioned_in_text(sentences[sentence_idx], step.get("relation", "")):
+                match_idx = sentence_idx
+                break
+        if match_idx is None:
+            return False, f"Writer body must explicitly realize bridge_steps[{idx}]"
+        sentence = sentences[match_idx]
+        support_mentions = count_support_relation_mentions(
+            sentence,
+            step.get("required_supports") or step.get("depends_on") or [],
+            point_names=extract_problem_goal({"llm_input_renamed": visible_goal}) if False else None,
+            target_relation=step.get("relation", ""),
+        )
+        if step.get("required_supports") and support_mentions < step.get("min_support_mentions", 1):
+            return False, f"Writer sentence for bridge_steps[{idx}] must name at least one approved supporting relation"
+        search_start = match_idx + 1
+    goal_finish = (plan or {}).get("goal_finish", "")
+    if goal_finish and not any(relation_mentioned_in_text(sentence, goal_finish) for sentence in sentences[search_start:]):
+        return False, "Writer body must explicitly realize goal_finish after the bridge steps"
+    return True, "Valid writer body"
+
+
+def run_plan_stage(
+    stage_name,
+    messages,
+    model_name,
+    point_coords,
+    visible_goal,
+    aux_part,
+    coordinate_candidates,
+    sanitized_rest,
+    visible_premise_summaries,
+    max_retries,
+    fallback_model_names=None,
+    visible_text_facts=None,
+    validator_fn=None,
+    retry_feedback_builder=None,
+):
+    validator_fn = validator_fn or validate_plan_response
+    retry_feedback_builder = retry_feedback_builder or build_plan_retry_feedback
+    last_error = None
+    last_output = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(f"[{stage_name}] Attempt {attempt}/{max_retries}")
+            start = time.time()
+            output = call_model(messages, model_name, fallback_model_names=fallback_model_names)
+            elapsed = time.time() - start
+            last_output = output
+            ok, message, plan = validator_fn(
+                output,
+                point_coords,
+                visible_goal=visible_goal,
+                aux_part=aux_part,
+                coordinate_candidates=coordinate_candidates,
+                sanitized_rest=sanitized_rest,
+                visible_premise_summaries=visible_premise_summaries,
+                visible_text_facts=visible_text_facts,
+            )
+            if ok:
+                return {
+                    "success": True,
+                    "output": output,
+                    "parsed": plan,
+                    "attempts_used": attempt,
+                    "elapsed_seconds": elapsed,
+                    "error": None,
+                }
+            last_error = message
+            logger.warning(f"[{stage_name}] Validation failed: {message}")
+            if attempt < max_retries:
+                messages = messages + [{"role": "user", "content": retry_feedback_builder(message, aux_part)}]
+                time.sleep(1)
+        except Exception as exc:
+            last_error = str(exc)
+            logger.error(f"[{stage_name}] API call failed: {exc}")
+            if attempt < max_retries:
+                time.sleep(2)
+    return {
+        "success": False,
+        "output": last_output,
+        "parsed": None,
+        "attempts_used": max_retries,
+        "elapsed_seconds": None,
+        "error": last_error or "Unknown error",
+    }
+
+
+def run_plan_critic_stage(stage_name, messages, model_name, max_retries, fallback_model_names=None):
+    last_error = None
+    last_output = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(f"[{stage_name}] Attempt {attempt}/{max_retries}")
+            start = time.time()
+            output = call_model(messages, model_name, fallback_model_names=fallback_model_names)
+            elapsed = time.time() - start
+            last_output = output
+            parsed = extract_json_object(output)
+            if isinstance(parsed, dict) and isinstance(parsed.get("approved"), bool):
+                if parsed["approved"]:
+                    return {
+                        "success": True,
+                        "output": output,
+                        "parsed": parsed,
+                        "attempts_used": attempt,
+                        "elapsed_seconds": elapsed,
+                        "error": None,
+                    }
+                last_error = "; ".join(parsed.get("issues") or []) or "critic_rejected_plan"
+            else:
+                last_error = "plan critic must return JSON with boolean approved"
+            logger.warning(f"[{stage_name}] Validation failed: {last_error}")
+            if attempt < max_retries:
+                messages = messages + [{"role": "user", "content": "Return exactly one JSON object with approved, issues, and summary."}]
+                time.sleep(1)
+        except Exception as exc:
+            last_error = str(exc)
+            logger.error(f"[{stage_name}] API call failed: {exc}")
+            if attempt < max_retries:
+                time.sleep(2)
+    return {
+        "success": False,
+        "output": last_output,
+        "parsed": None,
+        "attempts_used": max_retries,
+        "elapsed_seconds": None,
+        "error": last_error or "Unknown error",
+    }
+
+
+def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_prefix, plan, max_retries, fallback_model_names=None):
+    del injected_prefix
+    last_error = None
+    last_output = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            logger.info(f"[{stage_name}] Attempt {attempt}/{max_retries}")
+            start = time.time()
+            output = call_model(messages, model_name, fallback_model_names=fallback_model_names)
+            elapsed = time.time() - start
+            last_output = output
+            ok, message = validate_writer_body(
+                output,
+                visible_goal=visible_goal,
+                plan=plan,
+            )
+            if ok:
+                return {
+                    "success": True,
+                    "output": output.strip(),
+                    "attempts_used": attempt,
+                    "elapsed_seconds": elapsed,
+                    "error": None,
+                }
+            last_error = message
+            logger.warning(f"[{stage_name}] Validation failed: {message}")
+            if attempt < max_retries:
+                feedback = build_writer_retry_feedback(message, plan)
+                messages = messages + [{"role": "user", "content": feedback}]
+                time.sleep(1)
+        except Exception as exc:
+            last_error = str(exc)
+            logger.error(f"[{stage_name}] API call failed: {exc}")
+            if attempt < max_retries:
+                time.sleep(2)
+    return {
+        "success": False,
+        "output": last_output,
+        "attempts_used": max_retries,
+        "elapsed_seconds": None,
+        "error": last_error or "Unknown error",
+    }
+
+
+def generate_thinking(
+    record,
+    image_path: Path,
+    aux_part,
+    sanitized_rest,
+    model_name,
+    max_retries,
+    verbose,
+    plan_mode=None,
+    planner_style="default",
+    fallback_model_names=None,
+):
+    point_coords = get_point_coords(record)
+    visible_goal = extract_problem_goal(record)
+    visible_text_facts = build_visible_text_facts(record)
+    coordinate_candidates = build_image_coordinate_candidates(point_coords, visible_text_facts, max_items=8)
+    visible_premise_summaries = [fact["relation"] for fact in visible_text_facts]
+    plan_prompt = build_plan_prompt(record, aux_part, sanitized_rest, planner_style=planner_style)
+    plan_messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}},
+                {"type": "text", "text": plan_prompt},
+            ],
+        }
+    ]
+    plan_validator = validate_plan_response
+    retry_feedback_builder = build_plan_retry_feedback
+    if planner_style == "raw_record_v1":
+        plan_validator = validate_raw_plan_response
+        retry_feedback_builder = build_raw_plan_retry_feedback
+    plan_result = run_plan_stage(
+        "plan",
+        plan_messages,
+        model_name=model_name,
+        fallback_model_names=fallback_model_names,
+        point_coords=point_coords,
+        visible_goal=visible_goal,
+        aux_part=aux_part,
+        coordinate_candidates=coordinate_candidates,
+        sanitized_rest=sanitized_rest,
+        visible_premise_summaries=visible_premise_summaries,
+        visible_text_facts=visible_text_facts,
+        max_retries=max_retries,
+        validator_fn=plan_validator,
+        retry_feedback_builder=retry_feedback_builder,
+    )
+    if not plan_result["success"]:
+        return {
+            "success": False,
+            "thinking": plan_result["output"],
+            "plan_prompt": plan_prompt if verbose else None,
+            "write_prompt": None,
+            "plan_output": plan_result["output"] if verbose else None,
+            "plan_parsed": None,
+            "attempts_used": plan_result["attempts_used"],
+            "elapsed_seconds": plan_result["elapsed_seconds"],
+            "error": plan_result["error"],
+            "write_output": None,
+        }
+
+    if plan_mode == "plan_only":
+        plan_result["parsed"]["coordinate_derivations"] = render_plan_coordinate_derivations(
+            plan_result["parsed"],
+            point_coords,
+        )
+        return {
+            "success": True,
+            "thinking": None,
+            "plan_prompt": plan_prompt if verbose else None,
+            "write_prompt": None,
+            "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+            "plan_parsed": plan_result["parsed"],
+            "attempts_used": plan_result["attempts_used"],
+            "elapsed_seconds": plan_result["elapsed_seconds"],
+            "error": None,
+            "write_output": None,
+        }
+
+    critic_prompt = build_plan_critic_prompt(record, plan_result["parsed"], sanitized_rest, aux_part)
+    critic_messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}},
+                {"type": "text", "text": critic_prompt},
+            ],
+        }
+    ]
+    critic_result = run_plan_critic_stage(
+        "plan_critic",
+        critic_messages,
+        model_name=model_name,
+        fallback_model_names=fallback_model_names,
+        max_retries=max_retries,
+    )
+    if not critic_result["success"]:
+        return {
+            "success": False,
+            "thinking": plan_result["output"],
+            "plan_prompt": plan_prompt if verbose else None,
+            "write_prompt": None,
+            "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+            "plan_parsed": plan_result["parsed"],
+            "attempts_used": plan_result["attempts_used"] + critic_result["attempts_used"],
+            "elapsed_seconds": (plan_result["elapsed_seconds"] or 0.0) + (critic_result["elapsed_seconds"] or 0.0),
+            "error": critic_result["error"],
+            "write_output": None,
+        }
+
+    plan_result["parsed"]["coordinate_derivations"] = render_plan_coordinate_derivations(
+        plan_result["parsed"],
+        point_coords,
+    )
+    write_prompt = build_write_prompt(
+        record,
+        plan_result["parsed"],
+        aux_part=aux_part,
+        point_coords=point_coords,
+    )
+    write_messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": _encode_image_base64(image_path)}},
+                {"type": "text", "text": write_prompt},
+            ],
+        }
+    ]
+    write_result = run_writer_stage(
+        "write",
+        write_messages,
+        model_name=model_name,
+        fallback_model_names=fallback_model_names,
+        visible_goal=visible_goal,
+        injected_prefix="",
+        plan=plan_result["parsed"],
+        max_retries=max_retries,
+    )
+    assembled_thinking = None
+    if write_result["output"]:
+        assembled_thinking = f"<thinking>{write_result['output'].strip()}</thinking>"
+        is_valid, message = validate_thinking_response(
+            assembled_thinking,
+            point_coords=point_coords,
+            require_coord_tags=False,
+            max_total_len=compute_thinking_total_budget(plan_result["parsed"]),
+        )
+        if not is_valid:
+            return {
+                "success": False,
+                "thinking": assembled_thinking,
+                "plan_prompt": plan_prompt if verbose else None,
+                "write_prompt": write_prompt if verbose else None,
+                "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+                "plan_parsed": plan_result["parsed"],
+                "attempts_used": plan_result["attempts_used"] + critic_result["attempts_used"] + write_result["attempts_used"],
+                "elapsed_seconds": (
+                    (plan_result["elapsed_seconds"] or 0.0) +
+                    (critic_result["elapsed_seconds"] or 0.0) +
+                    (write_result["elapsed_seconds"] or 0.0)
+                ),
+                "error": f"Final assembly validation failed: {message}",
+                "write_output": write_result["output"],
+            }
+    return {
+        "success": write_result["success"],
+        "thinking": assembled_thinking,
+        "plan_prompt": plan_prompt if verbose else None,
+        "write_prompt": write_prompt if verbose else None,
+        "plan_output": json.dumps(plan_result["parsed"], ensure_ascii=False, indent=2) if verbose else None,
+        "plan_parsed": plan_result["parsed"],
+        "elapsed_seconds": (
+            (plan_result["elapsed_seconds"] or 0.0) +
+            (critic_result["elapsed_seconds"] or 0.0) +
+            (write_result["elapsed_seconds"] or 0.0)
+        ),
+        "attempts_used": plan_result["attempts_used"] + critic_result["attempts_used"] + write_result["attempts_used"],
+        "error": write_result["error"],
+        "write_output": write_result["output"],
+    }
 
 
 def is_transient_api_error(exc):
@@ -3250,7 +4485,7 @@ def call_model(messages, model_name, fallback_model_names=None, temperature=0.2,
     raise last_exc
 
 
-def run_plan_stage(
+def legacy_run_plan_stage_old(
     stage_name,
     messages,
     model_name,
@@ -3263,6 +4498,7 @@ def run_plan_stage(
     max_retries,
     fallback_model_names=None,
 ):
+    raise RuntimeError("Legacy planner path has been removed; use the model_evidence pipeline.")
     last_error = None
     last_output = None
     attempt = 1
@@ -3323,7 +4559,7 @@ def run_plan_stage(
     }
 
 
-def run_plan_narrative_stage(
+def legacy_run_plan_narrative_stage(
     stage_name,
     messages,
     model_name,
@@ -3337,6 +4573,7 @@ def run_plan_narrative_stage(
     max_retries,
     fallback_model_names=None,
 ):
+    raise RuntimeError("Legacy plan narrative stage has been removed; use the model_evidence pipeline.")
     last_error = None
     last_output = None
 
@@ -3406,7 +4643,8 @@ def run_plan_narrative_stage(
     }
 
 
-def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_prefix, plan, max_retries, fallback_model_names=None):
+def legacy_run_writer_stage(stage_name, messages, model_name, visible_goal, injected_prefix, plan, max_retries, fallback_model_names=None):
+    raise RuntimeError("Legacy writer prefix stage has been removed; use the model_evidence pipeline.")
     last_error = None
     last_output = None
 
@@ -3455,7 +4693,7 @@ def run_writer_stage(stage_name, messages, model_name, visible_goal, injected_pr
     }
 
 
-def generate_thinking(
+def legacy_generate_thinking(
     record,
     image_path: Path,
     aux_part,
@@ -3466,6 +4704,7 @@ def generate_thinking(
     plan_mode="hybrid",
     fallback_model_names=None,
 ):
+    raise RuntimeError("Legacy hybrid/llm generation path has been removed; use the model_evidence pipeline.")
     point_coords = get_point_coords(record)
     visible_goal = extract_problem_goal(record)
     coordinate_candidates = build_hidden_coordinate_candidates(point_coords, max_items=64, relax_type_limits=True)
@@ -3656,11 +4895,12 @@ def process_and_generate_sft(
     sample_size,
     num_workers,
     model_name,
-    plan_mode,
     verbose,
     random_sample,
     process_all,
     max_retries,
+    plan_mode=None,
+    planner_style="default",
     run_metadata=None,
     run_dir=None,
     fallback_model_names=None,
@@ -3760,6 +5000,7 @@ def process_and_generate_sft(
             max_retries=max_retries,
             verbose=verbose,
             plan_mode=plan_mode,
+            planner_style=planner_style,
         )
         public_problem = build_public_problem_text(record)
         aux_part = record["_aux_part"]
@@ -3927,13 +5168,6 @@ def parse_args():
         help=f"Per-request API timeout in seconds. Default: {DEFAULT_API_TIMEOUT_SECONDS}",
     )
     parser.add_argument(
-        "--plan-mode",
-        type=str,
-        choices=["hybrid", "llm"],
-        default="hybrid",
-        help="Planning mode. 'hybrid' uses a scripted skeleton plus model-written narrative fields; 'llm' uses the legacy full-model planner. Default: hybrid.",
-    )
-    parser.add_argument(
         "-r",
         "--max-retries",
         type=int,
@@ -3951,11 +5185,25 @@ def parse_args():
         action="store_true",
         help="Write sampled inputs and item-level prompts/outputs to artifacts.",
     )
+    parser.add_argument(
+        "--plan-only",
+        action="store_true",
+        help="Run only the planner stage and stop after plan validation/artifact export.",
+    )
+    parser.add_argument(
+        "--planner-style",
+        type=str,
+        default="default",
+        choices=["default", "raw_record_v1"],
+        help="Planner prompt style. Default: default.",
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
+    if args.planner_style != "default" and not args.plan_only:
+        raise SystemExit("--planner-style raw_record_v1 is currently supported only together with --plan-only")
     fallback_model_names = normalize_model_name_list(args.fallback_models)
     configure_client(timeout_seconds=args.api_timeout_seconds)
     args_dict = vars(args).copy()
@@ -3983,7 +5231,8 @@ if __name__ == "__main__":
         num_workers=args.num_workers,
         model_name=args.model_name,
         fallback_model_names=fallback_model_names,
-        plan_mode=args.plan_mode,
+        plan_mode="plan_only" if args.plan_only else None,
+        planner_style=args.planner_style,
         verbose=args.verbose,
         random_sample=not args.sequential,
         process_all=args.process_all,

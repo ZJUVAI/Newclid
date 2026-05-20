@@ -13,10 +13,13 @@ try:
         audit_generation_quality,
         audit_source_record,
         build_visible_premise_summaries,
+        extract_visible_formal_facts,
         get_point_coords,
     )
     from .generate_cot_sft import (
+        build_image_coordinate_candidates,
         build_hidden_proof_guidance,
+        build_visible_text_facts,
         compute_thinking_total_budget,
         validate_plan_response,
         validate_thinking_response,
@@ -27,16 +30,18 @@ try:
         extract_problem_goal,
         parse_goal_expression,
     )
-    from .writer_contracts import build_injected_prefix_block
 except ImportError:  # pragma: no cover - script execution path
     from audits import (
         audit_generation_quality,
         audit_source_record,
         build_visible_premise_summaries,
+        extract_visible_formal_facts,
         get_point_coords,
     )
     from generate_cot_sft import (
+        build_image_coordinate_candidates,
         build_hidden_proof_guidance,
+        build_visible_text_facts,
         compute_thinking_total_budget,
         validate_plan_response,
         validate_thinking_response,
@@ -47,7 +52,6 @@ except ImportError:  # pragma: no cover - script execution path
         extract_problem_goal,
         parse_goal_expression,
     )
-    from writer_contracts import build_injected_prefix_block
 
 
 def read_jsonl(path: Path) -> List[Dict[str, Any]]:
@@ -92,11 +96,8 @@ def recheck_item_record(item_record: Dict[str, Any]) -> Dict[str, Any]:
     visible_goal = extract_problem_goal(record)
     point_coords = get_point_coords(record)
     point_names = sorted(point_coords)
-    coordinate_candidates = build_hidden_coordinate_candidates(
-        point_coords,
-        max_items=64,
-        relax_type_limits=True,
-    )
+    visible_text_facts = build_visible_text_facts(record)
+    coordinate_candidates = build_image_coordinate_candidates(point_coords, visible_text_facts, max_items=8)
     visible_premise_summaries = build_visible_premise_summaries(record)
     proof_guidance = build_hidden_proof_guidance(sanitized_rest, aux_part, visible_goal)
     image_path = Path(record.get("image_path", "") or "")
@@ -120,20 +121,18 @@ def recheck_item_record(item_record: Dict[str, Any]) -> Dict[str, Any]:
         coordinate_candidates=coordinate_candidates,
         sanitized_rest=sanitized_rest,
         visible_premise_summaries=visible_premise_summaries,
+        visible_text_facts=visible_text_facts,
     )
 
     plan_for_checks = revalidated_plan or item_record.get("plan_parsed") or {}
     write_output = item_record.get("write_output", "") or ""
     thinking = item_record.get("thinking", "") or ""
-    injected_prefix = ""
     writer_ok = False
     writer_message = "missing_write_output"
     if plan_ok and revalidated_plan and write_output:
-        injected_prefix = build_injected_prefix_block(revalidated_plan, point_coords)
         writer_ok, writer_message = validate_writer_body(
             write_output,
             visible_goal=visible_goal,
-            injected_prefix=injected_prefix,
             plan=revalidated_plan,
         )
     elif plan_ok and revalidated_plan:
@@ -144,13 +143,11 @@ def recheck_item_record(item_record: Dict[str, Any]) -> Dict[str, Any]:
     thinking_ok = False
     thinking_message = "missing_thinking"
     if thinking:
-        max_coord_tags = min(5, max(1, len(plan_for_checks.get("anchor_points") or [])))
         thinking_ok, thinking_message = validate_thinking_response(
             thinking,
             point_coords=point_coords,
-            require_coord_tags=True,
+            require_coord_tags=False,
             max_total_len=compute_thinking_total_budget(plan_for_checks),
-            max_coord_tags=max_coord_tags,
         )
 
     generation = {

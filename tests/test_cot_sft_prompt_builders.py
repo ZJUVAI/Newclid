@@ -1,10 +1,13 @@
 import unittest
 
-from experiments.cot_sft_generation.audits import build_visible_premise_summaries
 from experiments.cot_sft_generation.prompt_builders import (
-    build_plan_narrative_prompt,
+    build_formal_language_guide,
+    build_plan_critic_prompt,
     build_plan_prompt,
     build_plan_retry_feedback,
+    build_planning_guidance,
+    build_raw_plan_retry_feedback,
+    build_raw_record_plan_prompt,
     build_supervisor_payload,
     build_write_prompt,
     build_writer_retry_feedback,
@@ -16,61 +19,56 @@ class CotSftPromptBuildersTest(unittest.TestCase):
         self.record = {
             "nl_problem": "observe the diagram",
             "llm_input_renamed": "<problem>g1: para a b c d; g2: cong a b a c ? eqangle a b c d</problem>",
-        }
-        self.proof_guidance_payload = {
-            "immediate_aux_consequences": ["h is the midpoint of bc", "bh equals ch"],
-            "aux_bridge_relations": ["ah equals ch"],
-            "bridge_relations": ["angle abh equals angle hcd"],
-            "goal_finish_relations": ["angle abc equals angle dcb"],
+            "llm_output_renamed": "<aux>x00 h : midp h b c</aux> <proof>proof text</proof>",
+            "point_coords_grid": {"a": [0, 0], "b": [4, 0], "c": [0, 2], "d": [4, 2]},
         }
         self.plan = {
-            "anchor_points": ["a", "b", "c"],
-            "anchor_relation": "triangle abc is the main visible frame",
-            "figure_overview": "point d lies on line bc",
-            "coordinate_hints": "the near-collinearity of b, c, and d matters",
-            "observation_relations": [
+            "selected_text_fact_ids": ["T1"],
+            "selected_coordinate_candidate_ids": ["C1"],
+            "visible_relations": ["line ab is parallel to line cd"],
+            "coordinate_relations": ["segments ab and cd look parallel"],
+            "coordinate_derivations": [
                 {
-                    "relation": "points b, c, and d look nearly collinear",
-                    "points": ["b", "c", "d"],
+                    "candidate_id": "C1",
+                    "relation": "segments ab and cd look parallel",
+                    "points": ["a", "b", "c", "d"],
+                    "calc_type": "parallel",
+                    "render_mode": "vector",
+                    "witness": {"vector_1": [4, 0], "vector_2": [4, 0], "cross": 0},
+                    "rendered_text": "a=(0,0), b=(4,0), c=(0,2), d=(4,2); vec(ab)=(4,0) and vec(cd)=(4,0), so the cross product is 0 and segments ab and cd look parallel.",
+                    "why_it_matters": "this fixes one direction comparison.",
                 }
             ],
-            "coordinate_relations": ["points b, c, and d look nearly collinear"],
-            "visible_relations": ["ab equals ac"],
-            "goal_bottleneck": "the target angle still needs a link through d",
-            "helper_idea": "a helper should connect d back to the equal sides",
-            "construction": "construct point e on line ad",
-            "aux_direct_relations": ["a, d, e are collinear"],
-            "goal_finish": "angle abc equals angle dce",
             "bridge_steps": [
                 {
-                    "relation": "de equals ce",
-                    "approved_route_relation": "de equals ce",
-                    "required_supports": ["a, d, e are collinear"],
-                    "min_support_mentions": 1,
-                    "focus_points": ["d", "e"],
-                    "next_target_purpose": "this supplies the angle comparison needed next.",
+                    "id": "B1",
+                    "relation": "angle abc equals angle cda",
+                    "required_supports": ["line ab is parallel to line cd"],
+                    "support_refs": ["T1", "C1"],
+                    "why_it_helps": "this starts the bridge toward the goal.",
+                    "proof_alignment": "bridge",
+                    "focus_points": ["a", "b", "c", "d"],
                 }
             ],
-            "coverage_targets": {
-                "opening_focus_points": ["d"],
-                "bridge_focus_points": ["d", "e"],
-                "coordinate_focus_points": ["d"],
-                "coordinate_focus_relations": ["points b, c, and d look nearly collinear"],
-                "observation_focus_relations": ["points b, c, and d look nearly collinear"],
-                "observation_focus_regions": ["around d"],
-                "coordinate_reuse_min": 1,
-                "opening_sentence_hint": "name d in the opening obstacle",
-                "helper_sentence_hint": "name d and e in the helper sentence",
-                "coordinate_sentence_hint": "reuse the d-side collinearity early",
-            },
+            "goal_finish": "angle abc equals angle dcb",
         }
-
-    def test_build_visible_premise_summaries_reads_problem_body(self):
-        summaries = build_visible_premise_summaries(self.record)
-
-        self.assertTrue(summaries)
-        self.assertTrue(any("parallel" in item.lower() for item in summaries))
-        self.assertTrue(any("equals" in item.lower() for item in summaries))
+        self.visible_text_facts = [
+            {"id": "T1", "relation": "line ab is parallel to line cd", "points": ["a", "b", "c", "d"]},
+        ]
+        self.image_coordinate_candidates = [
+            {
+                "id": "C1",
+                "relation": "segments ab and cd look parallel",
+                "relation_type": "parallel",
+                "points": ["a", "b", "c", "d"],
+                "witness": {"vector_1": [4, 0], "vector_2": [4, 0], "cross": 0},
+            }
+        ]
+        self.hidden_route_hints = {
+            "immediate_aux_consequences": ["ah equals dh"],
+            "bridge_relations": ["angle abc equals angle cda"],
+            "goal_finish_relations": ["angle abc equals angle dcb"],
+        }
 
     def test_build_supervisor_payload_filters_private_fields(self):
         payload = build_supervisor_payload(
@@ -83,157 +81,85 @@ class CotSftPromptBuildersTest(unittest.TestCase):
         self.assertNotIn("_private", payload)
         self.assertIn('"exact_aux": "<aux>x00 h : midp h b c</aux>"', payload)
 
-    def test_build_plan_prompt_includes_route_and_constraint_sections(self):
+    def test_build_plan_prompt_includes_new_evidence_sections(self):
         prompt = build_plan_prompt(
             self.record,
             "<aux>x00 h : midp h b c</aux>",
-            "<proof>midp h b c</proof>",
-            point_coords={"a": (0, 0), "b": (2, 0), "c": (1, 2)},
-            coordinate_hints="point h would balance the b-c side",
-            coordinate_guidance='[{"summary": "points b, c, and d look nearly collinear"}]',
-            visible_premise_summaries=["line ab is parallel to line cd"],
-            proof_guidance_payload=self.proof_guidance_payload,
+            self.visible_text_facts,
+            self.image_coordinate_candidates,
+            self.hidden_route_hints,
         )
 
-        self.assertIn("[Hidden Structured Coordinate Candidates]", prompt)
-        self.assertIn("[Approved Ordered Route Checkpoints]", prompt)
-        self.assertIn("1. ah equals ch", prompt)
-        self.assertIn("Do not use <point> tags", prompt)
-        self.assertIn("depends_on list should already name almost all of the segment or ray objects", prompt)
-        self.assertIn("depends_on list should reuse concrete items from coordinate_relations", prompt)
+        self.assertIn("[Visible Text Facts]", prompt)
+        self.assertIn("[Image / Coordinate Candidates]", prompt)
+        self.assertIn("[Hidden Route Hints]", prompt)
+        self.assertIn("support_refs may only cite text facts `T*`", prompt)
 
-    def test_build_plan_narrative_prompt_locks_route_structure(self):
-        prompt = build_plan_narrative_prompt(
-            self.record,
-            "<aux>x00 h : midp h b c</aux>",
-            self.plan,
-        )
-
-        self.assertIn("[Locked Scripted Plan Skeleton]", prompt)
-        self.assertIn("Do not change any bridge route", prompt)
-        self.assertIn("bridge_step_unlocks", prompt)
-        self.assertIn('"anchor_relation"', prompt)
-
-    def test_build_plan_retry_feedback_adds_multi_point_stage_hint(self):
+    def test_build_plan_retry_feedback_mentions_coordinate_derivations(self):
         feedback = build_plan_retry_feedback(
-            "Planner JSON missing keys",
+            "coordinate_derivations must contain at least one explicit coordinate computation",
             "<aux>x00 h : coll h a b; x00 k : perp k h a b</aux>",
         )
 
-        self.assertIn("coordinate_hints, bridge_steps, or goal_finish", feedback)
-        self.assertIn("first, then, and finally", feedback)
+        self.assertIn("coordinate_derivations entry", feedback)
+        self.assertIn("multiple points", feedback)
 
-    def test_build_plan_retry_feedback_adds_non_anchor_coordinate_spread_hint(self):
-        feedback = build_plan_retry_feedback(
-            "coordinate_relations should cover at least 3 visible non-anchor points so the route does not stay trapped on the anchor frame",
-            "<aux>x00 k : cyclic b f g k [016] coll c d k [017] ; </aux>",
+    def test_build_plan_critic_prompt_requests_boolean_approval(self):
+        prompt = build_plan_critic_prompt(
+            self.record,
+            self.plan,
+            self.hidden_route_hints,
         )
 
-        self.assertIn("broader visible figure", feedback)
-        self.assertIn("same anchor triangle", feedback)
-        self.assertIn("do not absorb too many coordinate-rich outer points into anchor_points", feedback)
+        self.assertIn("approved", prompt)
+        self.assertIn("issues", prompt)
+        self.assertIn("[Candidate Plan]", prompt)
 
-    def test_build_plan_retry_feedback_mentions_coordinate_relations_as_valid_support_sources(self):
-        feedback = build_plan_retry_feedback(
-            "bridge_steps[1].depends_on must reuse an earlier visible, coordinate, direct, or bridge relation",
-            "<aux>x00 k : cyclic b f g k [016] coll c d k [017] ; </aux>",
-        )
-
-        self.assertIn("coordinate_relations, visible_relations, aux_direct_relations", feedback)
-
-    def test_build_plan_retry_feedback_adds_goal_finish_midpoint_shorthand_hint(self):
-        feedback = build_plan_retry_feedback(
-            "goal_finish contains forbidden pattern: midpoint properties",
-            "<aux>x00 k : cyclic b f g k [016] coll c d k [017] ; </aux>",
-        )
-
-        self.assertIn("concrete final goal-side relation", feedback)
-        self.assertIn("midpoint property", feedback)
-
-    def test_build_plan_retry_feedback_surfaces_missing_segment_objects_for_high_order_bridge(self):
-        feedback = build_plan_retry_feedback(
-            "bridge_steps[2].relation still introduces unsupported angle/ratio/similar segments before they are grounded by required_supports: ['bd', 'df', 'dk']",
-            "<aux>x00 k : cyclic b f g k [016] coll c d k [017] ; </aux>",
-        )
-
-        self.assertIn("failed bridge still leaves these segment objects ungrounded", feedback)
-        self.assertIn("['bd', 'df', 'dk']", feedback)
-
-    def test_build_plan_retry_feedback_surfaces_named_missing_prerequisite_checkpoint(self):
-        feedback = build_plan_retry_feedback(
-            "bridge_steps should not skip prerequisite hidden-route checkpoints before higher-order similarity or ratio steps; missing prerequisite: angle bg/df equals angle dg/fk",
-            "<aux>x00 k : cyclic b f g k [016] coll c d k [017] ; </aux>",
-        )
-
-        self.assertIn("do not skip the earlier approved checkpoint", feedback)
-        self.assertIn("angle bg/df equals angle dg/fk", feedback)
-
-    def test_build_write_prompt_includes_writer_handoff_and_compression_target(self):
+    def test_build_write_prompt_mentions_plain_text_coordinate_computation(self):
         prompt = build_write_prompt(
             self.record,
             self.plan,
-            "<aux>x00 e : coll e a d</aux>",
-            injected_prefix_block="Prefix sentence block.",
-            proof_guidance_payload=self.proof_guidance_payload,
+            "<aux>x00 h : coll h a d</aux>",
+            "- a=(0,0), b=(4,0), c=(0,2), d=(4,2); vec(ab)=(4,0) and vec(cd)=(4,0), so the cross product is 0 and segments ab and cd look parallel.",
         )
 
-        self.assertIn("[Approved Writer Handoff]", prompt)
-        self.assertIn("[Compression Target]", prompt)
-        self.assertIn("Output only the plain-text body.", prompt)
-        self.assertIn("observation-led sentence built from the approved visual checks", prompt)
+        self.assertIn("[Approved Coordinate Derivations]", prompt)
+        self.assertIn("You may explicitly write visible-point coordinates", prompt)
+        self.assertIn("Output only the plain-text content", prompt)
 
-    def test_build_writer_retry_feedback_surfaces_contract_specific_hints(self):
+    def test_build_writer_retry_feedback_mentions_coordinate_computation(self):
         feedback = build_writer_retry_feedback(
-            "must explicitly realize bridge_steps[0] and must mention at least one approved bridge focus point from its contract",
+            "Writer body must include at least one explicit coordinate computation",
             self.plan,
-            injected_prefix="Prefix sentence block.",
         )
 
-        self.assertIn("bridge_steps[0] stating 'de equals ce'", feedback)
-        self.assertIn('["a, d, e are collinear"]', feedback)
-        self.assertIn("d and e", feedback)
+        self.assertIn("coordinate derivation", feedback)
+        self.assertIn("bridge steps", feedback)
 
-    def test_build_writer_retry_feedback_surfaces_coordinate_cue_hint(self):
-        feedback = build_writer_retry_feedback(
-            "Writer body must explicitly reuse at least one approved coordinate relation cue after the prefix",
-            self.plan,
-            injected_prefix="Prefix sentence block.",
+    def test_build_raw_record_plan_prompt_uses_raw_sections_and_fixed_guides(self):
+        prompt = build_raw_record_plan_prompt(self.record)
+
+        self.assertIn("[Raw Problem Text]", prompt)
+        self.assertIn("[Raw Teacher Output]", prompt)
+        self.assertIn("[Visible Point Coordinates]", prompt)
+        self.assertIn("[Formal Language Guide]", prompt)
+        self.assertIn("[Planning Guidance]", prompt)
+        self.assertNotIn("[Visible Text Facts]", prompt)
+        self.assertNotIn("[Image / Coordinate Candidates]", prompt)
+
+    def test_fixed_guides_cover_formal_translation_and_planning_contracts(self):
+        formal_guide = build_formal_language_guide()
+        planning_guidance = build_planning_guidance()
+        raw_feedback = build_raw_plan_retry_feedback(
+            "bridge_steps[1].supports invalid: supports references unknown coordinate_derivations item",
+            "<aux>x00 h : midp h b c</aux>",
         )
 
-        self.assertIn("approved coordinate relations again", feedback)
-        self.assertIn("points b, c, and d look nearly collinear", feedback)
-        self.assertIn("preferred early observation cues", feedback)
-
-    def test_build_writer_retry_feedback_surfaces_coordinate_paraphrase_hint_for_overlap(self):
-        feedback = build_writer_retry_feedback(
-            "Writer body overlaps too much with the injected prefix block; continue from it instead of repeating it",
-            self.plan,
-            injected_prefix="Prefix sentence block.",
-        )
-
-        self.assertIn("apply the same rule to coordinate cues", feedback)
-        self.assertIn("midpoint-looking point g on cd", feedback)
-
-    def test_build_writer_retry_feedback_surfaces_early_coordinate_hint(self):
-        feedback = build_writer_retry_feedback(
-            "Writer early body must connect the bottleneck/helper to at least one approved non-anchor coordinate cue",
-            self.plan,
-            injected_prefix="Prefix sentence block.",
-        )
-
-        self.assertIn("first three body sentences", feedback)
-        self.assertIn("preferred early coordinate cues", feedback)
-        self.assertIn("preferred non-anchor coordinate region", feedback)
-
-    def test_build_writer_retry_feedback_surfaces_observation_retry_hints(self):
-        feedback = build_writer_retry_feedback(
-            "Writer early body must continue from at least one approved observation cue instead of restarting from the anchor frame",
-            self.plan,
-            injected_prefix="Prefix sentence block.",
-        )
-
-        self.assertIn("preferred early observation cues", feedback)
-        self.assertIn("same local observation region", feedback)
+        self.assertIn("`cong a b c d`", formal_guide)
+        self.assertIn("`eqangle a b c d e f g h`", formal_guide)
+        self.assertIn("goal_bottleneck -> helper_idea -> construction", planning_guidance)
+        self.assertIn("coordinate_derivations", raw_feedback)
+        self.assertIn("bridge_steps[i]", raw_feedback)
 
 
 if __name__ == "__main__":

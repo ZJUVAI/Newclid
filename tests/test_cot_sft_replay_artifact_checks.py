@@ -9,109 +9,77 @@ from experiments.cot_sft_generation.replay_artifact_checks import recheck_item_r
 from experiments.cot_sft_generation.run_artifacts import build_run_config
 
 
-PLAN_OUTPUT_COORD_SUPPORT = {
-    "anchor_points": ["a", "b", "c", "e"],
-    "anchor_relation": "triangle abc is the visible frame and point e sits on the lower side of the wider figure.",
-    "figure_overview": (
-        "points d, f, g, and j sit outside the anchor frame, so the target ratio must be "
-        "transferred through the outer right side."
-    ),
-    "coordinate_relations": [
-        "point f looks like the midpoint of ac",
-        "point g looks like the midpoint of cd",
-        "points b, d, and f look nearly collinear",
+PLAN_OUTPUT = {
+    "selected_text_fact_ids": ["T1", "T2"],
+    "selected_coordinate_candidate_ids": ["C1"],
+    "image_observations": ["point a looks like the midpoint of bc"],
+    "coordinate_derivations": [
+        {
+            "candidate_id": "C1",
+            "relation": "point a looks like the midpoint of bc",
+            "points": ["a", "b", "c"],
+            "calc_type": "midpoint",
+            "render_mode": "midpoint",
+            "why_it_matters": "this gives one image-based balance check inside the visible triangle before the helper is added.",
+        }
     ],
-    "visible_relations": [
-        "ab is parallel to cd",
-        "ad is parallel to bc",
-        "ab equals bc",
-    ],
-    "coordinate_hints": (
-        "point f looks like the midpoint of ac, point g looks like the midpoint of cd, "
-        "and points b, d, and f look nearly collinear."
-    ),
-    "goal_bottleneck": (
-        "the target ratio still needs a route from the outer d-side configuration back to ae, af, ce, and cj."
-    ),
-    "helper_idea": (
-        "a helper through k should connect the outer line through d and g to the cyclic relation around b, f, and g."
-    ),
-    "construction": "construct point k such that b, f, g, k are concyclic and c, d, k are collinear.",
-    "aux_direct_relations": [
-        "b, f, g, k are concyclic",
-        "c, d, k are collinear",
-    ],
+    "goal_bottleneck": "the target still needs one local equality that can transfer the d-side to the c-side.",
+    "helper_idea": "a helper should create two local equalities around one new point before the final transfer.",
+    "construction": "construct point h such that ah equals dh and bh equals ch.",
+    "aux_direct_relations": ["ah equals dh", "bh equals ch"],
     "bridge_steps": [
         {
-            "relation": "c, g, k are collinear",
-            "depends_on": [
-                "b, f, g, k are concyclic",
-                "c, d, k are collinear",
-                "c, d, g are collinear",
-            ],
-            "why_it_helps": "this aligns k with the outer d-g line before the angle transfer.",
+            "relation": "ah equals bh",
+            "support_refs": ["T2", "C1"],
+            "why_it_helps": "this creates the first shared equality in the helper frame.",
+            "proof_alignment": "bridge",
+            "focus_points": ["a", "b", "h"],
         },
         {
-            "relation": "b, d, f are collinear",
-            "depends_on": [
-                "b, f, g, k are concyclic",
-                "c, d, k are collinear",
-                "ab is parallel to cd",
-                "f is the midpoint of ac",
-            ],
-            "why_it_helps": "this fixes the line needed for the upcoming angle comparison.",
-        },
-        {
-            "relation": "angle bd/bg equals angle fk/dk",
-            "depends_on": [
-                "b, f, g, k are concyclic",
-                "b, d, f are collinear",
-                "c, d, k are collinear",
-            ],
-            "why_it_helps": "this supplies the angle alignment needed before the final ratio route.",
+            "relation": "dh equals ch",
+            "support_refs": ["B1", "T2"],
+            "why_it_helps": "this transfers the helper equality to the d-side and c-side.",
+            "proof_alignment": "goal_finish",
+            "focus_points": ["c", "d", "h"],
         },
     ],
-    "goal_finish": "ratio ae to af equals ratio ce to cj",
+    "goal_finish": "ad equals bc",
 }
 
-WRITER_BODY_COORD_SUPPORT = (
-    "The remaining obstacle is to connect ae, af, ce, and cj, so points f and j must be tied "
-    "back to the outer d-side configuration before the target ratio can close. "
-    "Since point f looks like the midpoint of ac and point g looks like the midpoint of cd, "
-    "a helper through k can track the outer line through d and g without losing the f-side comparison. "
-    "Because c, d, g are collinear and c, d, k are collinear, c, g, k are collinear, and this "
-    "places k on the outer d-g line for the next step. "
-    "The nearly collinear placement of b, d, and f shows that b, d, f are collinear, and this "
-    "fixes the line needed for the angle transfer. "
-    "Because b, f, g, k are concyclic and b, d, f are collinear, angle bd/bg equals angle fk/dk, "
-    "and this supplies the last angle comparison before the target ratio. "
-    "Therefore, ratio ae to af equals ratio ce to cj."
+PLAN_CRITIC_OUTPUT = {
+    "approved": True,
+    "issues": [],
+    "summary": "the selected supports and the ending are coherent.",
+}
+
+WRITER_BODY = (
+    "The obstacle is to transfer the d-side and c-side into one local helper frame before the final equality closes. "
+    "Using a=(0,0), b=(4,0), and c=(0,2), the midpoint of bc is (2.0, 1.0), which differs from a by residual 2.2361 and the collinearity residual is 1.7889, so point a looks like the midpoint of bc. "
+    "Construct point h such that ah equals dh and bh equals ch. "
+    "Because point a looks like the midpoint of bc and ac equals bd, ah equals bh, and this creates the first shared equality in the helper frame. "
+    "Because ah equals bh and ac equals bd, dh equals ch, and this transfers the helper equality to the d-side and c-side. "
+    "Therefore ad equals bc."
 )
 
 
 class CotSftReplayArtifactChecksTest(unittest.TestCase):
     def test_recheck_run_dir_replays_current_checks_on_verbose_fixture_run(self):
         record = {
-            "nl_problem": "Observe the diagram and justify the target ratio.",
+            "nl_problem": "Observe the diagram and justify the target relation.",
             "llm_input_renamed": (
-                "<problem>g1: para a b c d [000]; g2: para a d b c [001]; g3: cong a b b c [002] ? "
-                "eqratio a e a f c e c j</problem>"
+                "<problem>g1: para a b c d [000]; g2: cong a c b d [001] ? cong a d b c</problem>"
             ),
             "llm_output_renamed": (
-                "<aux>x00 k : cyclic b f g k [016] coll c d k [017]</aux> "
-                "<proof>coll c g k; coll b d f; eqangle b d b g f k d k; eqratio a e a f c e c j</proof>"
+                "<aux>x00 h : cong a h d h; cong b h c h</aux> "
+                "<proof>cong a h b h; cong d h c h; cong a d b c</proof>"
             ),
             "point_coords_grid": {
-                "a": [-2, -2],
-                "b": [-4, -4],
-                "c": [4, 0],
-                "d": [6, 2],
-                "e": [-1, 6],
-                "f": [1, -1],
-                "g": [5, 1],
-                "j": [4, -3],
+                "a": [0, 0],
+                "b": [4, 0],
+                "c": [0, 2],
+                "d": [4, 2],
             },
-            "image_path": "fixture_ratio.png",
+            "image_path": "fixture.png",
         }
 
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -121,7 +89,7 @@ class CotSftReplayArtifactChecksTest(unittest.TestCase):
             run_dir = temp_dir_path / "artifacts"
 
             input_path.write_text(json.dumps(record, ensure_ascii=False) + "\n", encoding="utf-8")
-            (temp_dir_path / "fixture_ratio.png").write_bytes(b"fixture-image")
+            (temp_dir_path / "fixture.png").write_bytes(b"fixture-image")
 
             run_metadata = build_run_config(
                 args_dict={
@@ -149,7 +117,7 @@ class CotSftReplayArtifactChecksTest(unittest.TestCase):
 
             with patch(
                 "experiments.cot_sft_generation.generate_cot_sft.call_model",
-                side_effect=[json.dumps(PLAN_OUTPUT_COORD_SUPPORT), WRITER_BODY_COORD_SUPPORT],
+                side_effect=[json.dumps(PLAN_OUTPUT), json.dumps(PLAN_CRITIC_OUTPUT), WRITER_BODY],
             ):
                 process_and_generate_sft(
                     input_jsonl=str(input_path),
@@ -157,7 +125,6 @@ class CotSftReplayArtifactChecksTest(unittest.TestCase):
                     sample_size=1,
                     num_workers=1,
                     model_name="fixture-model",
-                    plan_mode="llm",
                     verbose=True,
                     random_sample=False,
                     process_all=False,
@@ -178,16 +145,10 @@ class CotSftReplayArtifactChecksTest(unittest.TestCase):
             self.assertTrue(item_recheck["writer_valid"])
             self.assertTrue(item_recheck["thinking_valid"])
             self.assertTrue(item_recheck["current_all_checks_pass"])
-            self.assertEqual(
-                item_recheck["revalidated_plan"]["bridge_steps"][1]["required_supports"],
-                ["points b, d, and f look nearly collinear"],
-            )
-            self.assertFalse(item_recheck["generation_audit_changed"])
 
             run_recheck = recheck_run_dir(run_dir)
             self.assertEqual(run_recheck["summary"]["total_items"], 1)
             self.assertEqual(run_recheck["summary"]["current_all_checks_pass_items"], 1)
-            self.assertEqual(run_recheck["summary"]["generation_audit_changed_items"], 0)
 
 
 if __name__ == "__main__":
