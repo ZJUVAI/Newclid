@@ -1,0 +1,276 @@
+{
+  "metadata": {
+    "time_utc": "2026-05-14T07:03:18Z",
+    "endpoint": "https://api.zjuqx.cn/v1/chat/completions",
+    "prompt": "请只回复字符串 CONNECT_OK，不要添加任何其他内容。",
+    "attempts_per_model": 3
+  },
+  "summary": {
+    "qwen/qwen3.5-flash-02-23": {
+      "requested_model": "qwen/qwen3.5-flash-02-23",
+      "returned_models": [
+        "qwen/qwen3.5-flash-20260224"
+      ],
+      "attempts": 3,
+      "successes": 3,
+      "failures": 0,
+      "success_rate": 1.0,
+      "min_elapsed_seconds": 2.983,
+      "max_elapsed_seconds": 3.781,
+      "avg_elapsed_seconds": 3.278,
+      "avg_cost": 5.733e-05,
+      "all_contents": [
+        "CONNECT_OK",
+        "CONNECT_OK",
+        "CONNECT_OK"
+      ],
+      "all_finish_reasons": [
+        "stop",
+        "stop",
+        "stop"
+      ]
+    },
+    "qwen/qwen3.5-plus-02-15": {
+      "requested_model": "qwen/qwen3.5-plus-02-15",
+      "returned_models": [
+        "qwen/qwen3.5-plus-20260216"
+      ],
+      "attempts": 3,
+      "successes": 3,
+      "failures": 0,
+      "success_rate": 1.0,
+      "min_elapsed_seconds": 6.822,
+      "max_elapsed_seconds": 8.873,
+      "avg_elapsed_seconds": 7.728,
+      "avg_cost": 0.00049764,
+      "all_contents": [
+        "CONNECT_OK",
+        "CONNECT_OK",
+        "CONNECT_OK"
+      ],
+      "all_finish_reasons": [
+        "stop",
+        "stop",
+        "stop"
+      ]
+    }
+  },
+  "results": [
+    {
+      "model": "qwen/qwen3.5-flash-02-23",
+      "attempt": 1,
+      "ok": true,
+      "http_status": 200,
+      "elapsed_seconds": 3.069,
+      "request_id": "202605141501551097450575YyMRj7x",
+      "response_id": "gen-1778742115-AaRCNG94nfaHXZOJ4a2C",
+      "response_model": "qwen/qwen3.5-flash-20260224",
+      "content": "CONNECT_OK",
+      "reasoning_content": null,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 22,
+        "completion_tokens": 215,
+        "total_tokens": 237,
+        "cost": 5.733e-05,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 5.733e-05,
+          "upstream_inference_prompt_cost": 1.43e-06,
+          "upstream_inference_completions_cost": 5.59e-05
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 208,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "qwen/qwen3.5-flash-02-23",
+      "attempt": 2,
+      "ok": true,
+      "http_status": 200,
+      "elapsed_seconds": 3.781,
+      "request_id": "20260514150158137916885rcb7OfwT",
+      "response_id": "gen-1778742118-BGn7R87fMJvRrRcbITW3",
+      "response_model": "qwen/qwen3.5-flash-20260224",
+      "content": "CONNECT_OK",
+      "reasoning_content": null,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 22,
+        "completion_tokens": 215,
+        "total_tokens": 237,
+        "cost": 5.733e-05,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 5.733e-05,
+          "upstream_inference_prompt_cost": 1.43e-06,
+          "upstream_inference_completions_cost": 5.59e-05
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 208,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "qwen/qwen3.5-flash-02-23",
+      "attempt": 3,
+      "ok": true,
+      "http_status": 200,
+      "elapsed_seconds": 2.983,
+      "request_id": "20260514150201932034226sDIh7qjv",
+      "response_id": "gen-1778742121-y2Ufx1R4Qa9NHvUpIyzK",
+      "response_model": "qwen/qwen3.5-flash-20260224",
+      "content": "CONNECT_OK",
+      "reasoning_content": null,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 22,
+        "completion_tokens": 215,
+        "total_tokens": 237,
+        "cost": 5.733e-05,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 5.733e-05,
+          "upstream_inference_prompt_cost": 1.43e-06,
+          "upstream_inference_completions_cost": 5.59e-05
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 208,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "qwen/qwen3.5-plus-02-15",
+      "attempt": 1,
+      "ok": true,
+      "http_status": 200,
+      "elapsed_seconds": 7.488,
+      "request_id": "20260514150204944115891IgEpZaFy",
+      "response_id": "gen-1778742124-bj1sZEKuQJ7hGWH5NJ4C",
+      "response_model": "qwen/qwen3.5-plus-20260216",
+      "content": "CONNECT_OK",
+      "reasoning_content": null,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 22,
+        "completion_tokens": 300,
+        "total_tokens": 322,
+        "cost": 0.00047372,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.00047372,
+          "upstream_inference_prompt_cost": 5.72e-06,
+          "upstream_inference_completions_cost": 0.000468
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 293,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "qwen/qwen3.5-plus-02-15",
+      "attempt": 2,
+      "ok": true,
+      "http_status": 200,
+      "elapsed_seconds": 6.822,
+      "request_id": "20260514150212404564354qTL3E55l",
+      "response_id": "gen-1778742132-2bfEtwNnx1GowNcvpIZO",
+      "response_model": "qwen/qwen3.5-plus-20260216",
+      "content": "CONNECT_OK",
+      "reasoning_content": null,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 22,
+        "completion_tokens": 273,
+        "total_tokens": 295,
+        "cost": 0.0004316,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0004316,
+          "upstream_inference_prompt_cost": 5.72e-06,
+          "upstream_inference_completions_cost": 0.00042588
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 266,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    },
+    {
+      "model": "qwen/qwen3.5-plus-02-15",
+      "attempt": 3,
+      "ok": true,
+      "http_status": 200,
+      "elapsed_seconds": 8.873,
+      "request_id": "20260514150219244075539KfAc7iRY",
+      "response_id": "gen-1778742139-XJ2CCicXVSdDZnW7BLGN",
+      "response_model": "qwen/qwen3.5-plus-20260216",
+      "content": "CONNECT_OK",
+      "reasoning_content": null,
+      "finish_reason": "stop",
+      "usage": {
+        "prompt_tokens": 22,
+        "completion_tokens": 373,
+        "total_tokens": 395,
+        "cost": 0.0005876,
+        "is_byok": false,
+        "prompt_tokens_details": {
+          "cached_tokens": 0,
+          "cache_write_tokens": 0,
+          "audio_tokens": 0,
+          "video_tokens": 0
+        },
+        "cost_details": {
+          "upstream_inference_cost": 0.0005876,
+          "upstream_inference_prompt_cost": 5.72e-06,
+          "upstream_inference_completions_cost": 0.00058188
+        },
+        "completion_tokens_details": {
+          "reasoning_tokens": 366,
+          "image_tokens": 0,
+          "audio_tokens": 0
+        }
+      }
+    }
+  ]
+}
